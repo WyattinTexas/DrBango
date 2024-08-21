@@ -1,5 +1,5 @@
 ﻿{
-	"version": 1724271882,
+	"version": 1724274476,
 	"fileList": [
 		"data.js",
 		"c2runtime.js",
@@ -23,6 +23,11 @@
 		"media/youwin.ogg",
 		"media/item_get.ogg",
 		"media/nuclear explosion sound effect.ogg",
+		"media/instructions.m4a",
+		"media/item_get.m4a",
+		"media/nuclear explosion sound effect.m4a",
+		"media/numbers.m4a",
+		"media/youwin.m4a",
 		"icon-16.png",
 		"icon-32.png",
 		"icon-114.png",
