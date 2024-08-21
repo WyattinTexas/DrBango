@@ -22046,23 +22046,23 @@ cr.behaviors.scrollto = function(runtime)
 	behaviorProto.acts = new Acts();
 }());
 cr.getObjectRefTable = function () { return [
-	cr.plugins_.Audio,
-	cr.plugins_.Function,
-	cr.plugins_.Text,
 	cr.plugins_.Sprite,
 	cr.plugins_.Touch,
+	cr.plugins_.Text,
+	cr.plugins_.Audio,
+	cr.plugins_.Function,
 	cr.behaviors.Sin,
 	cr.behaviors.scrollto,
 	cr.system_object.prototype.cnds.Every,
 	cr.system_object.prototype.cnds.CompareVar,
 	cr.system_object.prototype.acts.SubVar,
 	cr.plugins_.Text.prototype.acts.SetText,
-	cr.system_object.prototype.cnds.TriggerOnce,
-	cr.system_object.prototype.acts.SetVar,
+	cr.system_object.prototype.cnds.Else,
 	cr.behaviors.scrollto.prototype.acts.Shake,
 	cr.plugins_.Audio.prototype.acts.StopAll,
 	cr.system_object.prototype.acts.SetLayerVisible,
 	cr.plugins_.Audio.prototype.acts.Play,
+	cr.system_object.prototype.acts.SetVar,
 	cr.system_object.prototype.acts.Wait,
 	cr.system_object.prototype.acts.ResetGlobals,
 	cr.system_object.prototype.acts.RestartLayout,
@@ -22077,6 +22077,6 @@ cr.getObjectRefTable = function () { return [
 	cr.system_object.prototype.exps["int"],
 	cr.plugins_.Text.prototype.exps.Text,
 	cr.plugins_.Function.prototype.exps.Param,
-	cr.system_object.prototype.cnds.Else,
+	cr.system_object.prototype.cnds.TriggerOnce,
 	cr.behaviors.Sin.prototype.acts.SetActive
 ];};
