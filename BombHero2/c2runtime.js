@@ -22046,11 +22046,11 @@ cr.behaviors.scrollto = function(runtime)
 	behaviorProto.acts = new Acts();
 }());
 cr.getObjectRefTable = function () { return [
-	cr.plugins_.Touch,
-	cr.plugins_.Sprite,
-	cr.plugins_.Text,
 	cr.plugins_.Audio,
 	cr.plugins_.Function,
+	cr.plugins_.Touch,
+	cr.plugins_.Text,
+	cr.plugins_.Sprite,
 	cr.behaviors.Sin,
 	cr.behaviors.scrollto,
 	cr.system_object.prototype.cnds.Every,
