@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Keycard Editor</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Lucide icons since we can't import the package */
+        .lucide {
+            width: 1em;
+            height: 1em;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        // Simple icon components (replacing Lucide icons)
+        const Download = ({ size = 20, className = "" }) => (
+            <svg className={`lucide ${className}`} width={size} height={size} viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7,10 12,15 17,10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+        );
+
+        const FileText = ({ size = 20, className = "" }) => (
+            <svg className={`lucide ${className}`} width={size} height={size} viewBox="0 0 24 24">
+                <path d="M14,2 L14,8 L20,8 M14,2 L20,8 L20,22 L4,22 L4,2 L14,2 Z"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10,9 9,9 8,9"/>
+            </svg>
+        );
+
+        const Trash2 = ({ size = 20, className = "" }) => (
+            <svg className={`lucide ${className}`} width={size} height={size} viewBox="0 0 24 24">
+                <polyline points="3,6 5,6 21,6"/>
+                <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+        );
+
+        const Plus = ({ size = 20, className = "" }) => (
+            <svg className={`lucide ${className}`} width={size} height={size} viewBox="0 0 24 24">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+        );
+
+        const GhostGameDashboard = () => {
+            // Start with empty ghost data
+            const [ghosts, setGhosts] = useState([]);
+            const [editingCell, setEditingCell] = useState(null);
+            const [editValue, setEditValue] = useState('');
+            const [uploading, setUploading] = useState(false);
+            const [uploadStatus, setUploadStatus] = useState(null);
+            const jsonInputRef = useRef(null);
+            const imageInputRef = useRef(null);
+
+            const rarityOptions = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+
+            // Function to create default ghost values
+            const createDefaultGhost = (id, name = null, sprite = null) => ({
+                id: id,
+                sprite: sprite || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zMiA0OEM0MS45NDExIDQ4IDUwIDM5Ljk0MTEgNTAgMzBDNTAgMjAuMDU4OSA0MS45NDExIDEyIDMyIDEyQzIyLjA1ODkgMTIgMTQgMjAuMDU4OSAxNCAzMEMxNCAzOS45NDExIDIyLjA1ODkgNDggMzIgNDhaIiBmaWxsPSIjNkI3MjgwIi8+CjxjaXJjbGUgY3g9IjI2IiBjeT0iMjYiIHI9IjMiIGZpbGw9IiNGRkZGRkYiLz4KPGNpcmNsZSBjeD0iMzgiIGN5PSIyNiIgcj0iMyIgZmlsbD0iI0ZGRkZGRiIvPgo8cGF0aCBkPSJNMjQgMzZIMzZDMzYgMzkuMzEzNyAzNC4yMDkxIDQyIDMyIDQyQzI5Ljc5MDkgNDIgMjQgMzkuMzEzNyAyNCAzNloiIGZpbGw9IiNGRkZGRkYiLz4KPC9zdmc+',
+                name: name || `Ghost ${id}`,
+                hp: 0,
+                ability: '',
+                rarity: 'Common'
+            });
+
+            // Convert file to base64
+            const fileToBase64 = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                });
+            };
+
+            // Handle JSON file upload
+            const handleJsonUpload = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                try {
+                    setUploading(true);
+                    setUploadStatus('Loading JSON...');
+                    
+                    const text = await file.text();
+                    const jsonData = JSON.parse(text);
+                    
+                    if (!Array.isArray(jsonData)) {
+                        throw new Error('JSON must contain an array of ghosts');
+                    }
+                    
+                    setGhosts(jsonData);
+                    setUploadStatus(`✅ Loaded ${jsonData.length} ghosts from keycard`);
+                    console.log(`✅ Loaded ${jsonData.length} ghosts from JSON file`);
+                    
+                } catch (error) {
+                    console.error('❌ Error loading JSON:', error);
+                    setUploadStatus(`❌ Error: ${error.message}`);
+                } finally {
+                    setUploading(false);
+                    if (jsonInputRef.current) {
+                        jsonInputRef.current.value = '';
+                    }
+                }
+            };
+
+            // Handle creating a new ghost with image upload
+            const handleCreateGhost = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                try {
+                    setUploading(true);
+                    setUploadStatus('Converting image to base64...');
+                    
+                    const base64 = await fileToBase64(file);
+                    const newId = ghosts.length > 0 ? Math.max(...ghosts.map(g => g.id)) + 1 : 1;
+                    const newGhost = createDefaultGhost(newId, `Ghost ${newId}`, base64);
+                    
+                    setGhosts([...ghosts, newGhost]);
+                    setUploadStatus(`✅ Created new ghost #${newId} with uploaded image`);
+                    console.log(`✅ Created ghost #${newId} with image from ${file.name}`);
+                    
+                } catch (error) {
+                    console.error('❌ Error creating ghost:', error);
+                    setUploadStatus(`❌ Error: ${error.message}`);
+                } finally {
+                    setUploading(false);
+                    if (imageInputRef.current) {
+                        imageInputRef.current.value = '';
+                    }
+                }
+            };
+
+            const handleCellClick = (ghostId, field) => {
+                const ghost = ghosts.find(g => g.id === ghostId);
+                setEditingCell({ ghostId, field });
+                setEditValue(ghost[field].toString());
+            };
+
+            const handleCellSave = () => {
+                if (!editingCell) return;
+                
+                const updatedGhosts = ghosts.map(ghost => 
+                    ghost.id === editingCell.ghostId 
+                        ? { ...ghost, [editingCell.field]: editingCell.field === 'hp' ? parseInt(editValue) || 0 : editValue }
+                        : ghost
+                );
+                
+                setGhosts(updatedGhosts);
+                
+                const ghostName = updatedGhosts.find(g => g.id === editingCell.ghostId)?.name || 'ghost';
+                setUploadStatus(`✏️ Updated ${ghostName}`);
+                
+                setEditingCell(null);
+                setEditValue('');
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    handleCellSave();
+                } else if (e.key === 'Escape') {
+                    setEditingCell(null);
+                    setEditValue('');
+                }
+            };
+
+            const exportToJSON = () => {
+                if (ghosts.length === 0) {
+                    setUploadStatus('❌ No ghosts to export');
+                    return;
+                }
+
+                try {
+                    const dataStr = JSON.stringify(ghosts, null, 2);
+                    const filename = `ghost-keycard-${new Date().toISOString().split('T')[0]}.json`;
+                    
+                    // Try multiple download methods
+                    
+                    // Method 1: Blob download (most reliable)
+                    try {
+                        const blob = new Blob([dataStr], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        setUploadStatus(`📥 Downloaded ${filename} with ${ghosts.length} ghosts`);
+                        return;
+                    } catch (blobError) {
+                        console.log('Blob method failed, trying alternative...');
+                    }
+                    
+                    // Method 2: Data URI fallback
+                    try {
+                        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                        const link = document.createElement('a');
+                        link.href = dataUri;
+                        link.download = filename;
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setUploadStatus(`📥 Downloaded ${filename} with ${ghosts.length} ghosts`);
+                        return;
+                    } catch (dataUriError) {
+                        console.log('Data URI method failed, opening new window...');
+                    }
+                    
+                    // Method 3: New window with copy instructions (fallback)
+                    const newWindow = window.open('', '_blank');
+                    if (newWindow) {
+                        newWindow.document.write(`
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <title>Ghost Keycard Export</title>
+                                <style>
+                                    body { 
+                                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                        margin: 20px; 
+                                        background: #f5f5f5; 
+                                        line-height: 1.6;
+                                    }
+                                    .container {
+                                        background: white;
+                                        padding: 30px;
+                                        border-radius: 12px;
+                                        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                                        max-width: 800px;
+                                        margin: 0 auto;
+                                    }
+                                    .header {
+                                        background: linear-gradient(135deg, #7c3aed, #3b82f6);
+                                        color: white;
+                                        padding: 20px;
+                                        border-radius: 8px;
+                                        margin-bottom: 25px;
+                                        text-align: center;
+                                    }
+                                    .instructions {
+                                        background: #e3f2fd;
+                                        padding: 20px;
+                                        border-radius: 8px;
+                                        margin-bottom: 25px;
+                                        border-left: 4px solid #2196f3;
+                                    }
+                                    .button-group {
+                                        text-align: center;
+                                        margin: 20px 0;
+                                    }
+                                    button {
+                                        background: #7c3aed;
+                                        color: white;
+                                        border: none;
+                                        padding: 12px 24px;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        margin: 0 10px;
+                                        font-size: 14px;
+                                        font-weight: 500;
+                                    }
+                                    button:hover { background: #6d28d9; }
+                                    .copy-btn { background: #059669; }
+                                    .copy-btn:hover { background: #047857; }
+                                    .close-btn { background: #dc2626; }
+                                    .close-btn:hover { background: #b91c1c; }
+                                    pre { 
+                                        background: #f8fafc; 
+                                        padding: 20px; 
+                                        border-radius: 8px; 
+                                        overflow: auto;
+                                        border: 2px solid #e2e8f0;
+                                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                                        font-size: 12px;
+                                        max-height: 400px;
+                                    }
+                                    .filename {
+                                        background: #fef3c7;
+                                        padding: 10px;
+                                        border-radius: 6px;
+                                        border: 1px solid #f59e0b;
+                                        margin-bottom: 15px;
+                                        font-family: monospace;
+                                        font-weight: bold;
+                                    }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="container">
+                                    <div class="header">
+                                        <h1>👻 Ghost Keycard Export</h1>
+                                        <p>Successfully exported ${ghosts.length} ghosts • ${new Date().toLocaleString()}</p>
+                                    </div>
+                                    
+                                    <div class="instructions">
+                                        <h3>📝 How to save your Ghost Keycard:</h3>
+                                        <ol>
+                                            <li><strong>Click "Copy JSON"</strong> to copy all the data to your clipboard</li>
+                                            <li><strong>Create a new file</strong> in your text editor or file manager</li>
+                                            <li><strong>Paste the JSON data</strong> (Ctrl+V or Cmd+V)</li>
+                                            <li><strong>Save the file</strong> with the name below (make sure it ends in .json)</li>
+                                        </ol>
+                                    </div>
+                                    
+                                    <div class="filename">
+                                        💾 Recommended filename: ${filename}
+                                    </div>
+                                    
+                                    <div class="button-group">
+                                        <button class="copy-btn" onclick="copyToClipboard()">📋 Copy JSON</button>
+                                        <button onclick="selectAllText()">🔍 Select All</button>
+                                        <button onclick="downloadAsFile()">💾 Try Download</button>
+                                        <button class="close-btn" onclick="window.close()">❌ Close</button>
+                                    </div>
+                                    
+                                    <h3>Your Ghost Keycard JSON:</h3>
+                                    <pre id="jsonContent">${dataStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                                    
+                                    <script>
+                                        function selectAllText() {
+                                            const range = document.createRange();
+                                            range.selectNode(document.getElementById('jsonContent'));
+                                            window.getSelection().removeAllRanges();
+                                            window.getSelection().addRange(range);
+                                        }
+                                        
+                                        function copyToClipboard() {
+                                            const jsonData = ${JSON.stringify(dataStr)};
+                                            
+                                            if (navigator.clipboard) {
+                                                navigator.clipboard.writeText(jsonData).then(() => {
+                                                    alert('✅ Ghost keycard JSON copied to clipboard!\\n\\nNow paste it into a text file and save as: ${filename}');
+                                                }).catch(() => {
+                                                    selectAllText();
+                                                    alert('❌ Auto-copy failed. The JSON is now selected - please copy manually (Ctrl+C or Cmd+C)');
+                                                });
+                                            } else {
+                                                selectAllText();
+                                                alert('❌ Clipboard not available. The JSON is now selected - please copy manually (Ctrl+C or Cmd+C)');
+                                            }
+                                        }
+                                        
+                                        function downloadAsFile() {
+                                            try {
+                                                const blob = new Blob([${JSON.stringify(dataStr)}], { type: 'application/json' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = '${filename}';
+                                                a.click();
+                                                URL.revokeObjectURL(url);
+                                                alert('✅ Download initiated!');
+                                            } catch (err) {
+                                                alert('❌ Download failed. Please use the copy method instead.');
+                                            }
+                                        }
+                                    </script>
+                                </div>
+                            </body>
+                            </html>
+                        `);
+                        newWindow.document.close();
+                        setUploadStatus(`📤 Opened export window with ${ghosts.length} ghosts`);
+                    } else {
+                        // Final fallback: console + clipboard
+                        navigator.clipboard.writeText(dataStr).then(() => {
+                            setUploadStatus(`📋 JSON copied to clipboard! (${ghosts.length} ghosts)`);
+                            alert(`✅ Ghost keycard JSON copied to clipboard!\n\nPaste it into a text file and save as: ${filename}`);
+                        }).catch(() => {
+                            setUploadStatus(`📄 Export ready - check console for JSON data`);
+                            console.log('=== GHOST KEYCARD JSON ===');
+                            console.log('Filename:', filename);
+                            console.log('Data:');
+                            console.log(dataStr);
+                            console.log('=== END JSON ===');
+                            alert('❌ Could not copy automatically.\n\nCheck the browser console for the JSON data.');
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Export error:', error);
+                    setUploadStatus(`❌ Export failed: ${error.message}`);
+                }
+            };
+
+            const deleteGhost = (ghostId) => {
+                const ghost = ghosts.find(g => g.id === ghostId);
+                if (window.confirm(`Delete ${ghost?.name || `Ghost #${ghostId}`}?`)) {
+                    setGhosts(ghosts.filter(g => g.id !== ghostId));
+                    setUploadStatus(`🗑️ Deleted ghost: ${ghost?.name || `#${ghostId}`}`);
+                }
+            };
+
+            const clearAll = () => {
+                if (window.confirm('Are you sure you want to clear all ghosts? This cannot be undone.')) {
+                    setGhosts([]);
+                    setUploadStatus('🧹 Cleared all ghost data');
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100 p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
+                                <h1 className="text-3xl font-bold mb-4">👻 Ghost Keycard Editor</h1>
+                                
+                                <div className="flex items-center gap-4 mb-4">
+                                    {/* Load JSON */}
+                                    <div className="relative">
+                                        <input
+                                            ref={jsonInputRef}
+                                            type="file"
+                                            accept=".json"
+                                            onChange={handleJsonUpload}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <button
+                                            disabled={uploading}
+                                            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            <FileText size={20} />
+                                            {uploading ? 'Loading...' : 'Load Keycard'}
+                                        </button>
+                                    </div>
+
+                                    {/* Create Ghost with Image */}
+                                    <div className="relative">
+                                        <input
+                                            ref={imageInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleCreateGhost}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <button
+                                            disabled={uploading}
+                                            className="flex items-center gap-2 bg-green-500/30 hover:bg-green-500/50 px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            <Plus size={20} />
+                                            {uploading ? 'Creating...' : 'Create Ghost'}
+                                        </button>
+                                    </div>
+
+                                    {/* Export JSON */}
+                                    <button
+                                        onClick={exportToJSON}
+                                        disabled={ghosts.length === 0}
+                                        className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        <Download size={20} />
+                                        Export Keycard
+                                    </button>
+
+                                    {/* Clear All */}
+                                    {ghosts.length > 0 && (
+                                        <button
+                                            onClick={clearAll}
+                                            className="flex items-center gap-2 bg-red-500/30 hover:bg-red-500/50 px-6 py-3 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={20} />
+                                            Clear All
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Status Message */}
+                                {uploadStatus && (
+                                    <div className="p-3 bg-white/20 border border-white/30 rounded-lg">
+                                        <p className="text-sm">{uploadStatus}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Table */}
+                            {ghosts.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-orange-400 text-white">
+                                            <tr>
+                                                <th className="p-4 text-left font-bold border-r-2 border-orange-500">Sprite</th>
+                                                <th className="p-4 text-left font-bold border-r-2 border-orange-500">Name</th>
+                                                <th className="p-4 text-left font-bold border-r-2 border-orange-500">HP</th>
+                                                <th className="p-4 text-left font-bold border-r-2 border-orange-500">Ability</th>
+                                                <th className="p-4 text-left font-bold border-r-2 border-orange-500">Rarity</th>
+                                                <th className="p-4 text-left font-bold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {ghosts.map((ghost, index) => (
+                                                <tr key={ghost.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                    {/* Sprite */}
+                                                    <td className="p-4 border-r-2 border-orange-300">
+                                                        {editingCell?.ghostId === ghost.id && editingCell?.field === 'sprite' ? (
+                                                            <div className="space-y-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editValue}
+                                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                                    onBlur={handleCellSave}
+                                                                    onKeyPress={handleKeyPress}
+                                                                    className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    placeholder="Image URL or base64 data"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div 
+                                                                onClick={() => handleCellClick(ghost.id, 'sprite')}
+                                                                className="cursor-pointer hover:bg-blue-50 p-1 rounded"
+                                                            >
+                                                                <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden border-2 border-gray-300">
+                                                                    <img 
+                                                                        src={ghost.sprite} 
+                                                                        alt={ghost.name}
+                                                                        className="w-full h-full object-contain"
+                                                                        onLoad={(e) => {
+                                                                            e.target.style.display = 'block';
+                                                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'none';
+                                                                        }}
+                                                                        onError={(e) => {
+                                                                            e.target.style.display = 'none';
+                                                                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                                        }}
+                                                                    />
+                                                                    <div className="flex text-xs text-gray-500 text-center items-center justify-center flex-col">
+                                                                        <span>#{ghost.id}</span>
+                                                                        <span className="text-[10px]">Click to edit</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* Name */}
+                                                    <td className="p-4 border-r-2 border-orange-300">
+                                                        {editingCell?.ghostId === ghost.id && editingCell?.field === 'name' ? (
+                                                            <input
+                                                                type="text"
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                onBlur={handleCellSave}
+                                                                onKeyPress={handleKeyPress}
+                                                                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <div
+                                                                onClick={() => handleCellClick(ghost.id, 'name')}
+                                                                className="cursor-pointer hover:bg-blue-50 p-2 rounded min-h-[2rem] flex items-center font-medium"
+                                                            >
+                                                                {ghost.name}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* HP */}
+                                                    <td className="p-4 border-r-2 border-orange-300">
+                                                        {editingCell?.ghostId === ghost.id && editingCell?.field === 'hp' ? (
+                                                            <input
+                                                                type="number"
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                onBlur={handleCellSave}
+                                                                onKeyPress={handleKeyPress}
+                                                                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <div
+                                                                onClick={() => handleCellClick(ghost.id, 'hp')}
+                                                                className="cursor-pointer hover:bg-blue-50 p-2 rounded min-h-[2rem] flex items-center font-semibold text-lg"
+                                                            >
+                                                                {ghost.hp}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* Ability */}
+                                                    <td className="p-4 border-r-2 border-orange-300">
+                                                        {editingCell?.ghostId === ghost.id && editingCell?.field === 'ability' ? (
+                                                            <input
+                                                                type="text"
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                onBlur={handleCellSave}
+                                                                onKeyPress={handleKeyPress}
+                                                                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <div
+                                                                onClick={() => handleCellClick(ghost.id, 'ability')}
+                                                                className="cursor-pointer hover:bg-blue-50 p-2 rounded min-h-[2rem] flex items-center"
+                                                            >
+                                                                {ghost.ability || <span className="text-gray-400 italic">No ability</span>}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* Rarity */}
+                                                    <td className="p-4 border-r-2 border-orange-300">
+                                                        {editingCell?.ghostId === ghost.id && editingCell?.field === 'rarity' ? (
+                                                            <select
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                onBlur={handleCellSave}
+                                                                onKeyPress={handleKeyPress}
+                                                                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                autoFocus
+                                                            >
+                                                                {rarityOptions.map(option => (
+                                                                    <option key={option} value={option}>{option}</option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <div
+                                                                onClick={() => handleCellClick(ghost.id, 'rarity')}
+                                                                className="cursor-pointer hover:bg-blue-50 p-2 rounded min-h-[2rem] flex items-center"
+                                                            >
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                                    ghost.rarity === 'Common' ? 'bg-gray-200 text-gray-800' :
+                                                                    ghost.rarity === 'Uncommon' ? 'bg-green-200 text-green-800' :
+                                                                    ghost.rarity === 'Rare' ? 'bg-blue-200 text-blue-800' :
+                                                                    ghost.rarity === 'Epic' ? 'bg-purple-200 text-purple-800' :
+                                                                    'bg-orange-200 text-orange-800'
+                                                                }`}>
+                                                                    {ghost.rarity}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* Actions */}
+                                                    <td className="p-4">
+                                                        <button
+                                                            onClick={() => deleteGhost(ghost.id)}
+                                                            className="text-red-600 hover:text-red-800 p-2 rounded hover:bg-red-50 transition-colors"
+                                                            title="Delete ghost"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="p-12 text-center text-gray-500">
+                                    <div className="text-6xl mb-4">👻</div>
+                                    <h3 className="text-xl font-semibold mb-2">No Keycard Loaded</h3>
+                                    <p className="mb-6">Load a ghost keycard JSON file or create your first ghost</p>
+                                    <div className="flex gap-4 justify-center">
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept=".json"
+                                                onChange={handleJsonUpload}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <button 
+                                                disabled={uploading}
+                                                className="flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 text-lg"
+                                            >
+                                                <FileText size={24} />
+                                                {uploading ? 'Loading...' : 'Load Ghost Keycard'}
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleCreateGhost}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <button 
+                                                disabled={uploading}
+                                                className="flex items-center gap-2 bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-lg"
+                                            >
+                                                <Plus size={24} />
+                                                {uploading ? 'Creating...' : 'Create First Ghost'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Footer */}
+                            {ghosts.length > 0 && (
+                                <div className="bg-gray-50 p-4 border-t">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-600 font-medium">👻 Ghosts in Keycard: {ghosts.length}</span>
+                                        <span className="text-sm text-gray-500">
+                                            Click any cell to edit • Press Enter to save • Press Escape to cancel
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<GhostGameDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
