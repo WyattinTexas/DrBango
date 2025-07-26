@@ -130,6 +130,11 @@
             transform: translateY(-1px);
         }
 
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .success-message {
             display: none;
             color: white;
@@ -289,12 +294,12 @@
 
         function showPopup() {
             document.getElementById('popupOverlay').classList.add('active');
-            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            document.body.style.overflow = 'hidden';
         }
 
         function hidePopup() {
             document.getElementById('popupOverlay').classList.remove('active');
-            document.body.style.overflow = 'auto'; // Restore scrolling
+            document.body.style.overflow = 'auto';
         }
 
         async function handleSubmit(event) {
@@ -303,12 +308,10 @@
             const email = document.getElementById('emailInput').value;
             const submitBtn = document.querySelector('.submit-btn');
             
-            // Show loading state
             submitBtn.innerHTML = 'Saving...';
             submitBtn.disabled = true;
             
             try {
-                // Send email to Google Sheets via Apps Script
                 const response = await fetch('https://script.google.com/macros/s/AKfycbzbDjpQ4nRTPh_OjI7KHy8DBySSX_zSqFoV6gHM5vNzCyMCg4bqaeewZ3ZDzaKVQ_4SgA/exec', {
                     method: 'POST',
                     headers: {
@@ -320,7 +323,6 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Show success message
                     document.getElementById('emailForm').style.display = 'none';
                     document.getElementById('successMessage').classList.add('show');
                     console.log('Email saved to Google Sheets:', email);
@@ -332,34 +334,36 @@
                 console.error('Error saving email:', error);
                 alert('There was an error saving your email. Please try again.');
                 
-                // Reset button
                 submitBtn.innerHTML = 'Get My Discount Code!';
                 submitBtn.disabled = false;
             }
         }
 
-        // Auto-show popup after 3 seconds (optional)
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                if (!hasShownPopup) {
-                    showPopup();
-                    hasShownPopup = true;
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Only auto-show if NOT in an iframe (not embedded in Canva)
+            if (window.self === window.top) {
+                setTimeout(function() {
+                    if (!hasShownPopup) {
+                        showPopup();
+                        hasShownPopup = true;
+                    }
+                }, 2000);
+            }
+
+            // Close popup when clicking overlay
+            document.getElementById('popupOverlay').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hidePopup();
                 }
-            }, 3000);
-        });
+            });
 
-        // Close popup when clicking overlay
-        document.getElementById('popupOverlay').addEventListener('click', function(e) {
-            if (e.target === this) {
-                hidePopup();
-            }
-        });
-
-        // Close popup with Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                hidePopup();
-            }
+            // Close popup with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    hidePopup();
+                }
+            });
         });
     </script>
 </body>
