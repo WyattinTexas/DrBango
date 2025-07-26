@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Popup Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: transparent;
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .popup-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .popup-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+            transform: scale(0.8) translateY(20px);
+            transition: all 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .popup-overlay.active .popup-container {
+            transform: scale(1) translateY(0);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: white;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .close-btn:hover {
+            opacity: 1;
+        }
+
+        .popup-content h2 {
+            color: white;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .popup-content p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .email-form {
+            margin-bottom: 20px;
+        }
+
+        .email-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.95);
+            transition: all 0.2s ease;
+        }
+
+        .email-input:focus {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .submit-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(238, 90, 36, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .success-message {
+            display: none;
+            color: white;
+            animation: slideIn 0.5s ease;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .promo-code {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .promo-code h3 {
+            color: #ffd700;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .code-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: white;
+            letter-spacing: 3px;
+            margin: 10px 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .shop-btn {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .shop-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(46, 204, 113, 0.4);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .trigger-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            z-index: 9999;
+        }
+
+        .trigger-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            .popup-container {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+            
+            .popup-content h2 {
+                font-size: 24px;
+            }
+            
+            .code-text {
+                font-size: 24px;
+                letter-spacing: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Trigger Button -->
+    <button class="trigger-btn" onclick="showPopup()">🎁 Get Discount!</button>
+
+    <!-- Popup Overlay -->
+    <div class="popup-overlay" id="popupOverlay">
+        <div class="popup-container">
+            <button class="close-btn" onclick="hidePopup()">&times;</button>
+            
+            <div class="popup-content" id="emailForm">
+                <h2>🎮 Exclusive Offer!</h2>
+                <p>Join our gaming community and get an instant discount code for Corkscrew Games!</p>
+                
+                <form class="email-form" onsubmit="handleSubmit(event)">
+                    <input 
+                        type="email" 
+                        class="email-input" 
+                        placeholder="Enter your email address"
+                        required
+                        id="emailInput"
+                    >
+                    <button type="submit" class="submit-btn">Get My Discount Code!</button>
+                </form>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <h2>🎉 Awesome!</h2>
+                <p>Thanks for joining our community! Here's your exclusive discount code:</p>
+                
+                <div class="promo-code">
+                    <h3>Your Discount Code:</h3>
+                    <div class="code-text">BOOHOO</div>
+                    <p style="margin: 10px 0; color: rgba(255,255,255,0.9);">
+                        Save on your next purchase!
+                    </p>
+                </div>
+
+                <a href="https://corkscrewgames.org/discount/BOOHOO?redirect=%2Fcollections%2Ffrontpage" 
+                   class="shop-btn" 
+                   target="_blank">
+                    🛒 Shop Now with Discount
+                </a>
+                
+                <p style="margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.8);">
+                    The discount has been automatically applied to the link above!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hasShownPopup = false;
+
+        function showPopup() {
+            document.getElementById('popupOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function hidePopup() {
+            document.getElementById('popupOverlay').classList.remove('active');
+            document.body.style.overflow = 'auto'; // Restore scrolling
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('emailInput').value;
+            const submitBtn = document.querySelector('.submit-btn');
+            
+            // Show loading state
+            submitBtn.innerHTML = 'Saving...';
+            submitBtn.disabled = true;
+            
+            try {
+                // Send email to Google Sheets via Apps Script
+                const response = await fetch('YOUR_APPS_SCRIPT_URL_HERE', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `email=${encodeURIComponent(email)}`
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success message
+                    document.getElementById('emailForm').style.display = 'none';
+                    document.getElementById('successMessage').classList.add('show');
+                    console.log('Email saved to Google Sheets:', email);
+                } else {
+                    throw new Error(result.message || 'Failed to save email');
+                }
+                
+            } catch (error) {
+                console.error('Error saving email:', error);
+                alert('There was an error saving your email. Please try again.');
+                
+                // Reset button
+                submitBtn.innerHTML = 'Get My Discount Code!';
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Auto-show popup after 3 seconds (optional)
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (!hasShownPopup) {
+                    showPopup();
+                    hasShownPopup = true;
+                }
+            }, 3000);
+        });
+
+        // Close popup when clicking overlay
+        document.getElementById('popupOverlay').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hidePopup();
+            }
+        });
+
+        // Close popup with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hidePopup();
+            }
+        });
+    </script>
+</body>
+</html>
