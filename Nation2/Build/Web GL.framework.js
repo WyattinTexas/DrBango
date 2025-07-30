@@ -1182,13 +1182,13 @@ function dbg(text) {
 // === Body ===
 
 var ASM_CONSTS = {
-  4873648: () => { return Module.webglContextAttributes.premultipliedAlpha; },  
- 4873709: () => { return Module.webglContextAttributes.preserveDrawingBuffer; },  
- 4873773: () => { return Module.webglContextAttributes.powerPreference; },  
- 4873831: () => { Module['emscripten_get_now_backup'] = performance.now; },  
- 4873886: ($0) => { performance.now = function() { return $0; }; },  
- 4873934: ($0) => { performance.now = function() { return $0; }; },  
- 4873982: () => { performance.now = Module['emscripten_get_now_backup']; }
+  4875328: () => { return Module.webglContextAttributes.premultipliedAlpha; },  
+ 4875389: () => { return Module.webglContextAttributes.preserveDrawingBuffer; },  
+ 4875453: () => { return Module.webglContextAttributes.powerPreference; },  
+ 4875511: () => { Module['emscripten_get_now_backup'] = performance.now; },  
+ 4875566: ($0) => { performance.now = function() { return $0; }; },  
+ 4875614: ($0) => { performance.now = function() { return $0; }; },  
+ 4875662: () => { performance.now = Module['emscripten_get_now_backup']; }
 };
 
 
@@ -18862,6 +18862,17 @@ function invoke_fiiffi(index,a1,a2,a3,a4,a5) {
   }
 }
 
+function invoke_vfiii(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    dynCall_vfiii(index,a1,a2,a3,a4);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_iiffii(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
@@ -18877,17 +18888,6 @@ function invoke_vifffi(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
     dynCall_vifffi(index,a1,a2,a3,a4,a5);
-  } catch(e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_vfiii(index,a1,a2,a3,a4) {
-  var sp = stackSave();
-  try {
-    dynCall_vfiii(index,a1,a2,a3,a4);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
