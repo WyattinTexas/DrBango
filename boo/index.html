@@ -1180,24 +1180,54 @@ let playerHp, enemyHp, round, phase;
 // ══════════════════════════════════════════
 // DICE MECHANICS — real Boo! Spirit Battles
 // ══════════════════════════════════════════
+function shuffle3(dice) {
+  for (let i = 2; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [dice[i], dice[j]] = [dice[j], dice[i]];
+  }
+  return dice;
+}
+
 function rollDice(boosted) {
-  if (boosted) {
-    // 15% chance to force triples
-    if (Math.random() < 0.15) {
-      const v = Math.floor(Math.random()*6)+1;
-      return [v, v, v];
-    }
-    // 8% chance to force double 6's in random positions
-    if (Math.random() < 0.08) {
-      const kicker = Math.floor(Math.random()*5)+1;
-      const dice = [6, 6, kicker];
-      for (let i = dice.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [dice[i], dice[j]] = [dice[j], dice[i]];
-      }
-      return dice;
+  if (!boosted) return [1,2,3].map(() => Math.floor(Math.random()*6)+1);
+
+  // Calculate dynamic boost based on game state
+  let triplesChance = 0.15;
+  let highDoubleChance = 0.08;
+
+  // Desperate mode: player at 1 or 2 HP — +20% to triples & high doubles
+  if (playerHp <= 2) {
+    triplesChance += 0.20;
+    highDoubleChance += 0.20;
+  }
+
+  // Counter enemy triples: +15% more triples chance
+  if (currentEnemyRoll && currentEnemyRoll.type === 'triples') {
+    triplesChance += 0.15;
+  }
+
+  // Counter enemy high doubles (4,5,6): 20% chance to roll slightly better
+  if (currentEnemyRoll && currentEnemyRoll.type === 'doubles' && currentEnemyRoll.value >= 4) {
+    if (Math.random() < 0.20) {
+      // Roll doubles one higher than enemy, or 6 if enemy has 6
+      const beatVal = Math.min(currentEnemyRoll.value + 1, 6);
+      const kicker = Math.floor(Math.random()*6)+1;
+      return shuffle3([beatVal, beatVal, kicker]);
     }
   }
+
+  // Triples boost
+  if (Math.random() < triplesChance) {
+    const v = Math.floor(Math.random()*6)+1;
+    return [v, v, v];
+  }
+
+  // High double 6's boost
+  if (Math.random() < highDoubleChance) {
+    const kicker = Math.floor(Math.random()*5)+1;
+    return shuffle3([6, 6, kicker]);
+  }
+
   return [1,2,3].map(() => Math.floor(Math.random()*6)+1);
 }
 
