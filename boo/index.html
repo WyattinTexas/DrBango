@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOO! Spirit Battles</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080810;
+    --player: #67e8f9;
+    --enemy: #f87171;
+    --gold: #fbbf24;
+    --green: #34d399;
+  }
+
+  body {
+    background: var(--bg);
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(248,113,113,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(103,232,249,0.04) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen { display: none; flex-direction: column; flex: 1; }
+  .screen.active { display: flex; }
+
+  /* ======== SHARED ======== */
+  .big-title {
+    font-family: 'Creepster', cursive;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+
+  .narrator {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ccc;
+    line-height: 1.5;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .narrator b.you { color: var(--player); }
+  .narrator b.them { color: var(--enemy); }
+  .narrator b.gold { color: var(--gold); }
+
+  .action-btn {
+    display: block;
+    margin: 0 auto;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 48px;
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+  }
+
+  .action-btn.ready {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .action-btn:hover { transform: scale(1.05); }
+
+  .action-btn.cyan {
+    background: linear-gradient(135deg, var(--player), #a78bfa);
+    color: var(--bg);
+    box-shadow: 0 4px 24px rgba(103,232,249,0.3);
+  }
+
+  .action-btn.gold {
+    background: linear-gradient(135deg, var(--gold), #f59e0b);
+    color: var(--bg);
+    box-shadow: 0 4px 24px rgba(251,191,36,0.3);
+  }
+
+  /* ======== PICK SCREEN ======== */
+  .pick-screen {
+    align-items: center;
+    justify-content: space-evenly;
+    padding: 16px 0;
+  }
+
+  .rules-box {
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+
+  .rules-box .rules-title {
+    font-family: 'Creepster', cursive;
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--gold), #fde68a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .rules-box p {
+    font-size: 0.88rem;
+    color: #bbb;
+    margin-bottom: 2px;
+  }
+
+  .rules-box p b { color: #fff; }
+
+  .pick-label {
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    color: var(--player);
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  .ghost-grid {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: stretch;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .pick-card {
+    flex: 1;
+    max-width: 160px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+    border: 3px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pick-card::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--player), #a78bfa, var(--player));
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.35s;
+  }
+
+  .pick-card:hover {
+    transform: translateY(-6px) scale(1.04);
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  .pick-card.selected {
+    transform: translateY(-8px) scale(1.07);
+    border-color: transparent;
+    box-shadow: 0 0 0 3px var(--player), 0 0 40px rgba(103,232,249,0.4), 0 0 80px rgba(103,232,249,0.15);
+    z-index: 10;
+  }
+
+  .pick-card.selected::before { opacity: 1; }
+  .pick-card.selected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(103,232,249,0.15) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .pick-card.dimmed { opacity: 0.25; transform: scale(0.95); filter: grayscale(0.6); }
+
+  .pick-card img {
+    width: 100%;
+    flex: 1;
+    object-fit: cover;
+    display: block;
+    min-height: 0;
+  }
+
+  .pick-card .pick-name {
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 6px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s;
+    flex-shrink: 0;
+  }
+
+  .pick-card.selected .pick-name { color: var(--player); }
+
+  /* Selected ghost name display */
+  .selected-ghost-name {
+    text-align: center;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s;
+    opacity: 0;
+  }
+
+  .selected-ghost-name.visible { opacity: 1; }
+
+  .selected-ghost-name .sgn-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.8rem;
+    letter-spacing: 2px;
+    line-height: 1.2;
+  }
+
+  .selected-ghost-name .sgn-tagline {
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  /* Mountain King — fiery power */
+  .selected-ghost-name.mountain-king .sgn-name {
+    color: #ff8c42;
+    text-shadow: 0 0 20px rgba(255,107,53,0.5), 0 0 40px rgba(255,69,0,0.25);
+  }
+  .selected-ghost-name.mountain-king .sgn-tagline { color: #ffcba4; }
+
+  /* Lucy — icy blue */
+  .selected-ghost-name.lucy .sgn-name {
+    color: #7dd3fc;
+    text-shadow: 0 0 20px rgba(96,165,250,0.5), 0 0 40px rgba(56,189,248,0.25);
+  }
+  .selected-ghost-name.lucy .sgn-tagline { color: #bfdbfe; }
+
+  /* Prince Balatron — playful purple */
+  .selected-ghost-name.balatron .sgn-name {
+    color: #d8b4fe;
+    text-shadow: 0 0 20px rgba(192,132,252,0.5), 0 0 40px rgba(232,121,249,0.25);
+  }
+  .selected-ghost-name.balatron .sgn-tagline { color: #e9d5ff; }
+
+  @media (max-width: 480px) {
+    .selected-ghost-name .sgn-name { font-size: 1.4rem; }
+    .selected-ghost-name .sgn-tagline { font-size: 0.7rem; }
+    .selected-ghost-name { min-height: 44px; }
+  }
+
+  /* ======== BATTLE SCREEN — Pokemon-style ======== */
+  .battle-screen {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, #0c0c1a 0%, #101028 40%, #151530 60%, #1a1a3a 100%);
+  }
+
+  /* Arena floor gradient */
+  .battle-screen::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -20%;
+    right: -20%;
+    height: 45%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(103,232,249,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .battle-screen::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -20%;
+    right: -20%;
+    height: 45%;
+    background: radial-gradient(ellipse at 50% 0%, rgba(248,113,113,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Enemy — top right */
+  .enemy-zone {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    z-index: 10;
+  }
+
+  /* Player — bottom left */
+  .player-zone {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    z-index: 10;
+  }
+
+  /* Name plate — Pokemon style */
+  .name-plate {
+    background: linear-gradient(135deg, rgba(15,15,35,0.92), rgba(20,20,45,0.88));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 8px 16px 10px;
+    min-width: 200px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .name-plate .np-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.2rem;
+    letter-spacing: 1.5px;
+  }
+
+  .name-plate.enemy-plate {
+    border-color: rgba(248,113,113,0.25);
+    box-shadow: 0 4px 20px rgba(248,113,113,0.1);
+  }
+  .name-plate.enemy-plate .np-name { color: var(--enemy); }
+
+  .name-plate.player-plate {
+    border-color: rgba(103,232,249,0.25);
+    box-shadow: 0 4px 20px rgba(103,232,249,0.1);
+  }
+  .name-plate.player-plate .np-name { color: var(--player); }
+
+  .name-plate .hp-bar-wrap {
+    margin-top: 6px;
+    height: 10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+  }
+
+  .name-plate .hp-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease-out, background 0.4s;
+    position: relative;
+  }
+
+  /* Shine effect on HP bar */
+  .name-plate .hp-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%);
+    border-radius: 4px 4px 0 0;
+  }
+
+  .name-plate.enemy-plate .hp-bar {
+    background: linear-gradient(90deg, #dc2626, #f87171);
+    box-shadow: 0 0 8px rgba(248,113,113,0.4);
+    width: 100%;
+  }
+
+  .name-plate.player-plate .hp-bar {
+    background: linear-gradient(90deg, #0891b2, #67e8f9);
+    box-shadow: 0 0 8px rgba(103,232,249,0.4);
+    width: 100%;
+  }
+
+  /* Low HP — yellow then red pulse */
+  .name-plate .hp-bar.hp-low {
+    background: linear-gradient(90deg, #d97706, #fbbf24) !important;
+    box-shadow: 0 0 10px rgba(251,191,36,0.5) !important;
+  }
+
+  .name-plate .hp-bar.hp-critical {
+    background: linear-gradient(90deg, #b91c1c, #ef4444) !important;
+    box-shadow: 0 0 12px rgba(239,68,68,0.6) !important;
+    animation: hpPulse 0.8s ease-in-out infinite;
+  }
+
+  @keyframes hpPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+  }
+
+  .name-plate .hp-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #666;
+    margin-top: 3px;
+  }
+
+  .name-plate .hp-text .hp-num { color: #aaa; }
+
+  /* Battle ghost cards — positioned diagonally */
+  .battle-card {
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s;
+  }
+
+  .battle-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .battle-card.enemy-card {
+    width: 142px;
+    height: 198px;
+    border: 2px solid rgba(248,113,113,0.4);
+    box-shadow: 0 0 20px rgba(248,113,113,0.2);
+    filter: brightness(0.85);
+  }
+
+  .battle-card.player-card {
+    width: 165px;
+    height: 231px;
+    border: 3px solid rgba(103,232,249,0.5);
+    box-shadow: 0 0 28px rgba(103,232,249,0.25);
+  }
+
+  .battle-card.hit {
+    animation: hitShake 0.4s ease-out;
+  }
+
+  @keyframes hitShake {
+    0% { transform: translate(0,0); }
+    15% { transform: translate(-6px, 3px); }
+    30% { transform: translate(4px, -4px); }
+    45% { transform: translate(-3px, 2px); }
+    60% { transform: translate(2px, -1px); }
+    100% { transform: translate(0,0); }
+  }
+
+  /* Center area — dice + narrator + roll btn all together */
+  .battle-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 94%;
+    max-width: 440px;
+    gap: 6px;
+    z-index: 20;
+  }
+
+  /* Dice */
+  .dice-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .dice-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 80px;
+  }
+
+  .dice-owner {
+    width: 54px;
+    font-family: 'Creepster', cursive;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: right;
+  }
+
+  .dice-owner.enemy { color: var(--enemy); }
+  .dice-owner.player { color: var(--player); }
+
+  .die {
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.4rem;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.5) rotateZ(-20deg);
+    transition: all 0.3s;
+  }
+
+  .die.visible { opacity: 1; transform: scale(1) rotateZ(0); }
+  .die.glow { box-shadow: 0 0 24px currentColor; transform: scale(1.15); }
+  .die.triples-glow {
+    box-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor;
+    transform: scale(1.25);
+    animation: triplesPulse 0.6s ease-in-out infinite;
+  }
+  .die.rolling { animation: roll 0.1s infinite alternate; }
+
+  @keyframes triplesPulse {
+    0%, 100% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor; transform: scale(1.25); }
+    50% { box-shadow: 0 0 40px currentColor, 0 0 80px currentColor, 0 0 120px currentColor; transform: scale(1.32); }
+  }
+
+  /* Triples banner */
+  .triples-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    z-index: 800;
+    font-family: 'Creepster', cursive;
+    font-size: 5rem;
+    letter-spacing: 6px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: none;
+  }
+
+  .triples-banner.enemy-triples {
+    color: var(--enemy);
+    text-shadow: 0 0 40px rgba(248,113,113,0.8), 0 0 80px rgba(248,113,113,0.4), 0 4px 8px rgba(0,0,0,0.6);
+  }
+
+  .triples-banner.player-triples {
+    color: var(--player);
+    text-shadow: 0 0 40px rgba(103,232,249,0.8), 0 0 80px rgba(103,232,249,0.4), 0 4px 8px rgba(0,0,0,0.6);
+  }
+
+  .triples-banner.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    transition: opacity 0.2s, transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  .triples-banner.fade {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.3);
+    transition: opacity 0.4s, transform 0.4s ease-in;
+  }
+
+  .triples-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 799;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .triples-flash.enemy-flash { background: radial-gradient(ellipse at center, rgba(248,113,113,0.3), transparent 70%); }
+  .triples-flash.player-flash { background: radial-gradient(ellipse at center, rgba(103,232,249,0.3), transparent 70%); }
+
+  @media (max-width: 480px) {
+    .triples-banner { font-size: 3.5rem; }
+  }
+
+  .die.e {
+    background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(248,113,113,0.08));
+    border: 2px solid rgba(248,113,113,0.4);
+    color: var(--enemy);
+  }
+
+  .die.p {
+    background: linear-gradient(135deg, rgba(103,232,249,0.2), rgba(103,232,249,0.08));
+    border: 2px solid rgba(103,232,249,0.4);
+    color: var(--player);
+  }
+
+  @keyframes roll {
+    0% { transform: scale(1) rotate(-8deg); }
+    100% { transform: scale(1.05) rotate(8deg); }
+  }
+
+  .vs-line {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: #444;
+    letter-spacing: 6px;
+    text-align: center;
+  }
+
+  /* Narrator + Roll — inside battle-center, below dice */
+  .battle-ui-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .narrator-box {
+    width: 100%;
+  }
+
+  .narrator-box .narrator-inner {
+    background: rgba(10,10,25,0.92);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 8px 14px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ccc;
+    line-height: 1.4;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+
+  .narrator-box .narrator-inner b.you { color: var(--player); }
+  .narrator-box .narrator-inner b.them { color: var(--enemy); }
+  .narrator-box .narrator-inner b.gold { color: var(--gold); }
+
+  .battle-ui-row .action-btn {
+    margin: 0;
+    width: 100%;
+    padding: 11px 20px;
+    font-size: 1.2rem;
+  }
+
+  /* ======== CRASH OVERLAY ======== */
+  .crash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+
+  .crash-overlay.active { display: flex; }
+
+  .crash-card {
+    position: absolute;
+    width: 160px;
+    height: 224px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .crash-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .crash-card.pc {
+    border: 3px solid var(--player);
+    box-shadow: 0 0 40px rgba(103,232,249,0.4);
+    z-index: 1002;
+  }
+
+  .crash-card.ec {
+    border: 3px solid var(--enemy);
+    box-shadow: 0 0 40px rgba(248,113,113,0.3);
+    z-index: 1001;
+  }
+
+  .impact-flash {
+    position: fixed;
+    inset: 0;
+    background: white;
+    z-index: 1003;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .shard {
+    position: absolute;
+    overflow: hidden;
+    z-index: 1001;
+    pointer-events: none;
+  }
+
+  .shard img {
+    position: absolute;
+    width: 160px;
+    height: 224px;
+    object-fit: cover;
+  }
+
+  @keyframes shake {
+    0% { transform: translate(0,0); }
+    10% { transform: translate(-8px,4px); }
+    20% { transform: translate(6px,-6px); }
+    30% { transform: translate(-4px,6px); }
+    40% { transform: translate(4px,-2px); }
+    60% { transform: translate(-2px,2px); }
+    100% { transform: translate(0,0); }
+  }
+
+  .screen-shake { animation: shake 0.5s ease-out; }
+
+  @keyframes winGlow {
+    0%,100% { box-shadow: 0 0 30px rgba(103,232,249,0.4), 0 0 60px rgba(103,232,249,0.15); }
+    50% { box-shadow: 0 0 50px rgba(103,232,249,0.6), 0 0 100px rgba(103,232,249,0.25); }
+  }
+
+  .crash-card.winner { animation: winGlow 1.5s ease-in-out infinite; }
+
+  /* ======== CTA SCREEN ======== */
+  .cta-screen {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 18px;
+  }
+
+  .cta-screen .big-title {
+    font-size: 2.6rem;
+    background: linear-gradient(135deg, var(--gold), #fde68a, var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .cta-card img {
+    width: 150px;
+    height: 210px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 3px solid var(--player);
+    box-shadow: 0 0 40px rgba(103,232,249,0.25), 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .cta-text {
+    color: #999;
+    font-size: 1rem;
+    line-height: 1.6;
+    max-width: 400px;
+  }
+
+  .cta-text b { color: #e0e0e0; }
+
+  .cta-small-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 10px 28px;
+    color: #888;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .cta-small-btn:hover { color: #e0e0e0; border-color: rgba(255,255,255,0.3); }
+
+  .cta-footer { font-size: 0.7rem; color: #444; }
+  .cta-footer a { color: var(--player); text-decoration: none; }
+
+  /* ======== ABILITY SPLASH ======== */
+  .ability-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .ability-splash.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .ability-splash-inner {
+    text-align: center;
+    transform: scale(0.6);
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    padding: 0 20px;
+  }
+
+  .ability-splash.active .ability-splash-inner {
+    transform: scale(1);
+  }
+
+  .ability-splash-name {
+    font-family: 'Creepster', cursive;
+    font-size: 3.2rem;
+    letter-spacing: 3px;
+    line-height: 1.2;
+  }
+
+  .ability-splash-desc {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-top: 10px;
+    text-shadow: 0 0 12px rgba(0,0,0,0.8);
+  }
+
+  /* Counter die for Balatron */
+  .counter-die-area {
+    margin-top: 20px;
+    display: none;
+  }
+
+  .counter-die-area.visible { display: block; }
+
+  .counter-die-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(96,165,250,0.3), rgba(147,130,220,0.2));
+    border: 3px solid rgba(96,165,250,0.5);
+    color: #93c5fd;
+    font-size: 2.2rem;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .counter-die-btn:hover { transform: scale(1.1); box-shadow: 0 0 24px rgba(96,165,250,0.4); }
+  .counter-die-btn.rolling { animation: roll 0.1s infinite alternate; cursor: default; }
+  .counter-die-btn.landed { cursor: default; }
+
+  .counter-die-label {
+    font-size: 0.85rem;
+    color: #93c5fd;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  /* Beast Mode — fiery orange/red */
+  .ability-splash.beast-mode {
+    background: radial-gradient(ellipse at center, rgba(180,60,20,0.45) 0%, rgba(0,0,0,0.85) 70%);
+  }
+  .ability-splash.beast-mode .ability-splash-name {
+    color: #ff8c42;
+    text-shadow: 0 0 30px rgba(255,107,53,0.8), 0 0 60px rgba(255,69,0,0.4), 0 2px 4px rgba(0,0,0,0.6);
+  }
+  .ability-splash.beast-mode .ability-splash-desc { color: #ffcba4; }
+
+  /* Blue Fire — icy blue */
+  .ability-splash.blue-fire {
+    background: radial-gradient(ellipse at center, rgba(30,80,180,0.4) 0%, rgba(0,0,0,0.85) 70%);
+  }
+  .ability-splash.blue-fire .ability-splash-name {
+    color: #7dd3fc;
+    text-shadow: 0 0 30px rgba(96,165,250,0.8), 0 0 60px rgba(56,189,248,0.4), 0 2px 4px rgba(0,0,0,0.6);
+  }
+  .ability-splash.blue-fire .ability-splash-desc { color: #bfdbfe; }
+
+  /* Party Time — playful purple/pink */
+  .ability-splash.party-time {
+    background: radial-gradient(ellipse at center, rgba(120,50,180,0.4) 0%, rgba(0,0,0,0.85) 70%);
+  }
+  .ability-splash.party-time .ability-splash-name {
+    color: #d8b4fe;
+    text-shadow: 0 0 30px rgba(192,132,252,0.8), 0 0 60px rgba(232,121,249,0.4), 0 2px 4px rgba(0,0,0,0.6);
+  }
+  .ability-splash.party-time .ability-splash-desc { color: #e9d5ff; }
+
+  @media (max-width: 480px) {
+    .ability-splash-name { font-size: 2.4rem; }
+    .ability-splash-desc { font-size: 0.9rem; }
+    .counter-die-btn { width: 66px; height: 66px; font-size: 1.8rem; }
+  }
+
+  .watermark {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-size: 0.6rem;
+    color: #222;
+    letter-spacing: 1px;
+    z-index: 200;
+  }
+
+  @media (max-width: 480px) {
+    .rules-box .rules-title { font-size: 1.6rem; }
+    .rules-box p { font-size: 0.82rem; }
+    .pick-label { font-size: 1.2rem; }
+    .ghost-grid { gap: 10px; max-width: 360px; }
+    .pick-card { max-width: 110px; }
+    .pick-card .pick-name { font-size: 0.7rem; padding: 5px 3px; }
+    .battle-card.enemy-card { width: 106px; height: 149px; }
+    .battle-card.player-card { width: 130px; height: 182px; }
+    .name-plate { min-width: 142px; padding: 6px 10px; }
+    .name-plate .np-name { font-size: 1rem; }
+    .narrator-box .narrator-inner { font-size: 0.75rem; padding: 7px 10px; }
+    .battle-ui-row .action-btn { font-size: 1rem; padding: 9px 14px; }
+    .battle-center { top: 50%; }
+    .crash-card { width: 130px; height: 182px; }
+    .crash-card img { width: 130px; height: 182px; }
+    .shard img { width: 130px; height: 182px; }
+    .die { width: 58px; height: 58px; font-size: 1.9rem; }
+    .dice-row { gap: 10px; min-height: 66px; }
+    .dice-owner { font-size: 0.75rem; width: 44px; }
+    .narrator { font-size: 0.95rem; }
+    .cta-card img { width: 120px; height: 168px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- PICK -->
+  <div class="screen pick-screen active" id="pickScreen">
+    <div class="rules-box">
+      <div class="rules-title">Roll the most matching dice!</div>
+      <p>Both players roll <b>3 dice</b></p>
+      <p>A matching pair beats no match</p>
+      <p>The <b>higher pair wins</b></p>
+    </div>
+    <div>
+      <div class="pick-label">Choose your ghost <span style="font-family:'Inter',sans-serif;font-size:0.65rem;color:#666;letter-spacing:0;font-weight:500;display:block;margin-top:2px;">Pick which one speaks to you..</span></div>
+    </div>
+    <div class="ghost-grid" id="ghostGrid"></div>
+    <div class="selected-ghost-name" id="selectedGhostName">
+      <div class="sgn-name" id="sgnName"></div>
+      <div class="sgn-tagline" id="sgnTagline"></div>
+    </div>
+    <button class="action-btn cyan" id="fightBtn" onclick="startBattle()">Fight!</button>
+  </div>
+
+  <!-- BATTLE -->
+  <div class="screen battle-screen" id="battleScreen">
+    <!-- Enemy — top right -->
+    <div class="enemy-zone">
+      <div class="name-plate enemy-plate" id="enemyPlate">
+        <div class="np-name" id="enemyNameText"></div>
+        <div class="hp-bar-wrap"><div class="hp-bar" id="enemyHpBar"></div></div>
+        <div class="hp-text"><span class="hp-num" id="enemyHpText">HP 5/5</span></div>
+      </div>
+      <div class="battle-card enemy-card" id="enemyCard"></div>
+    </div>
+
+    <!-- Player — bottom left -->
+    <div class="player-zone">
+      <div class="battle-card player-card" id="playerCard"></div>
+      <div class="name-plate player-plate" id="playerPlate">
+        <div class="np-name" id="playerNameText"></div>
+        <div class="hp-bar-wrap"><div class="hp-bar" id="playerHpBar"></div></div>
+        <div class="hp-text"><span class="hp-num" id="playerHpText">HP 5/5</span></div>
+      </div>
+    </div>
+
+    <!-- Center — dice -->
+    <div class="battle-center">
+      <div class="dice-area">
+        <div class="dice-row">
+          <div class="dice-owner enemy">Enemy</div>
+          <div class="die e" id="eDie0"></div>
+          <div class="die e" id="eDie1"></div>
+          <div class="die e" id="eDie2"></div>
+        </div>
+        <div class="vs-line">VS</div>
+        <div class="dice-row">
+          <div class="dice-owner player">You</div>
+          <div class="die p" id="pDie0"></div>
+          <div class="die p" id="pDie1"></div>
+          <div class="die p" id="pDie2"></div>
+        </div>
+      </div>
+      <div class="battle-ui-row">
+        <div class="narrator-box">
+          <div class="narrator-inner" id="narrator"></div>
+        </div>
+        <button class="action-btn cyan" id="rollBtn" onclick="doPlayerRoll()">Roll Your Dice!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="screen cta-screen" id="ctaScreen">
+    <h1 class="big-title" id="ctaTitle">You Won!</h1>
+    <div class="cta-card" id="ctaGhost"></div>
+    <div class="cta-text">
+      Not bad for your first time! <b>200 unique ghosts</b> with special abilities that change the dice to discover.<br><br>
+      Build your squad. Roll your fate.
+    </div>
+    <a class="action-btn gold ready" href="https://www.corkscrewgames.com" target="_blank" style="text-decoration:none;">Back This on Kickstarter</a>
+    <button class="cta-small-btn" onclick="replay()">Play Again</button>
+    <div class="cta-footer"><a href="https://www.corkscrewgames.com" target="_blank">corkscrewgames.com</a> · Coming September 2026</div>
+  </div>
+</div>
+
+<div class="crash-overlay" id="crashOverlay">
+  <div class="crash-card ec" id="crashEnemy"></div>
+  <div class="crash-card pc" id="crashPlayer"></div>
+</div>
+<div class="impact-flash" id="impactFlash"></div>
+<!-- Triples effect -->
+<div class="triples-banner" id="triplesBanner">TRIPLES!</div>
+<div class="triples-flash" id="triplesFlash"></div>
+<!-- Ability splash overlay -->
+<div id="abilitySplash" class="ability-splash">
+  <div class="ability-splash-inner">
+    <div class="ability-splash-name" id="splashName"></div>
+    <div class="ability-splash-desc" id="splashDesc"></div>
+    <div class="counter-die-area" id="counterDieArea">
+      <div class="counter-die-label">Tap to roll!</div>
+      <button class="counter-die-btn" id="counterDieBtn" onclick="rollCounterDie()">?</button>
+    </div>
+  </div>
+</div>
+<audio id="bgMusic" src="BGG.mp3" loop preload="auto"></audio>
+<audio id="triplesSfx" src="triples.mp3" preload="auto"></audio>
+<audio id="sfxDiceRoll" src="DiceRoll.mp3" preload="auto"></audio>
+<audio id="sfx1Damage" src="1Damage.mp3" preload="auto"></audio>
+<audio id="sfx2Damage" src="2Damage.mp3" preload="auto"></audio>
+<audio id="sfx3Damage" src="3Damage.mp3" preload="auto"></audio>
+<audio id="sfxWin" src="winningwhistle.mp3" preload="auto"></audio>
+<div class="watermark">CORKSCREW GAMES</div>
+
+<script>
+// ══════════════════════════════════════════════
+// GHOST DATA — real HP and abilities from cards
+// ══════════════════════════════════════════════
+const GHOSTS = [
+  {
+    name: "The Mountain King", file: "mountain_king.png", maxHp: 9,
+    ability: "Beast Mode",
+    abilityDesc: "Doubles deal 2X damage",
+    cssClass: "mountain-king",
+    tagline: "Doubles hit twice as hard.",
+    // triggers when this ghost wins with doubles — damage is doubled
+    applyAbility(roll, baseDmg, winner) {
+      if (winner === this && roll.type === 'doubles') return baseDmg * 2;
+      return baseDmg;
+    }
+  },
+  {
+    name: "Lucy", file: "lucy.png", maxHp: 8,
+    ability: "Blue Fire",
+    abilityDesc: "Win a roll → 1 bonus damage",
+    cssClass: "lucy",
+    tagline: "Every victory burns hot!",
+    // triggers when Lucy wins any roll — +1 bonus damage
+    applyAbility(roll, baseDmg, winner) {
+      if (winner === this) return baseDmg + 1;
+      return baseDmg;
+    }
+  },
+  {
+    name: "Prince Balatron", file: "balatron.png", maxHp: 6,
+    ability: "Party Time",
+    abilityDesc: "Lose a roll & survive → roll 1 die for counter damage",
+    cssClass: "balatron",
+    tagline: "Lose a roll? The party's just getting started.",
+    // handled specially in resolveRound — returns bonus counter damage
+    applyAbility(roll, baseDmg, winner) {
+      return baseDmg; // counter handled separately
+    }
+  },
+];
+
+const IMG = 'cards/';
+
+function playSfx(id, vol = 0.8) {
+  const s = document.getElementById(id);
+  if (!s) return;
+  s.currentTime = 0;
+  s.volume = Math.min(vol, 1.0);
+  s.play().catch(() => {});
+}
+
+function playDamageSfx(dmg) {
+  if (dmg >= 3) playSfx('sfx3Damage');
+  else if (dmg === 2) playSfx('sfx2Damage');
+  else playSfx('sfx1Damage');
+}
+
+// ══════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════
+let pick = null, enemy = null;
+let playerHp, enemyHp, round, phase;
+// phase: 0=waiting, 1=enemy rolled waiting for player, 2=resolving
+
+// ══════════════════════════════════════════
+// DICE MECHANICS — real Boo! Spirit Battles
+// ══════════════════════════════════════════
+function rollDice() {
+  return [1,2,3].map(() => Math.floor(Math.random()*6)+1);
+}
+
+function analyzeRoll(dice) {
+  const sorted = [...dice].sort((a,b) => b-a);
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d]||0)+1);
+  const maxCount = Math.max(...Object.values(counts));
+
+  if (maxCount === 3) {
+    return { type: 'triples', value: sorted[0], damage: 3, dice: sorted, matchDie: sorted[0] };
+  }
+  if (maxCount === 2) {
+    const pairVal = +Object.keys(counts).find(k => counts[k]===2);
+    const kicker = +Object.keys(counts).find(k => counts[k]===1);
+    return { type: 'doubles', value: pairVal, kicker, damage: 2, dice: sorted, matchDie: pairVal };
+  }
+  return { type: 'singles', value: sorted[0], damage: 1, dice: sorted, matchDie: null };
+}
+
+// Compare two rolls. Returns: 1 = player wins, -1 = enemy wins, 0 = tie
+function compareRolls(pRoll, eRoll) {
+  const rank = { singles: 0, doubles: 1, triples: 2 };
+  if (rank[pRoll.type] !== rank[eRoll.type]) return rank[pRoll.type] > rank[eRoll.type] ? 1 : -1;
+  // Same type
+  if (pRoll.type === 'triples') return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
+  if (pRoll.type === 'doubles') {
+    // Higher kicker wins when pairs tied? No — higher pair wins, then kicker breaks ties
+    if (pRoll.value !== eRoll.value) return pRoll.value > eRoll.value ? 1 : -1;
+    return pRoll.kicker > eRoll.kicker ? 1 : pRoll.kicker < eRoll.kicker ? -1 : 0;
+  }
+  // Singles — highest die
+  return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
+}
+
+function describeRoll(roll) {
+  if (roll.type === 'triples') return `three ${roll.value}'s`;
+  if (roll.type === 'doubles') return `two ${roll.value}'s and a ${roll.kicker}`;
+  return `${roll.dice[0]}, ${roll.dice[1]}, ${roll.dice[2]}`;
+}
+
+function typeLabel(type) {
+  return type === 'triples' ? 'Triples!' : type === 'doubles' ? 'Doubles!' : 'Singles';
+}
+
+// ══════════════════════════════════════════
+// PICK SCREEN
+// ══════════════════════════════════════════
+function initPick() {
+  pick = null;
+  const grid = document.getElementById('ghostGrid');
+  grid.innerHTML = '';
+  GHOSTS.forEach(g => {
+    const c = document.createElement('div');
+    c.className = 'pick-card';
+    c.dataset.name = g.name;
+    c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div>`;
+    c.onclick = () => selectGhost(g);
+    grid.appendChild(c);
+  });
+  document.getElementById('fightBtn').classList.remove('ready');
+  document.getElementById('selectedGhostName').classList.remove('visible');
+}
+
+function selectGhost(g) {
+  const nameEl = document.getElementById('selectedGhostName');
+  if (pick && pick.name === g.name) {
+    pick = null;
+    document.querySelectorAll('.pick-card').forEach(c => c.classList.remove('selected','dimmed'));
+    document.getElementById('fightBtn').classList.remove('ready');
+    nameEl.classList.remove('visible');
+    return;
+  }
+  pick = g;
+  document.querySelectorAll('.pick-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.name === g.name);
+    c.classList.toggle('dimmed', c.dataset.name !== g.name);
+  });
+  document.getElementById('fightBtn').classList.add('ready');
+
+  // Show selected ghost name with themed style
+  nameEl.className = 'selected-ghost-name visible ' + g.cssClass;
+  document.getElementById('sgnName').textContent = g.name;
+  document.getElementById('sgnTagline').textContent = g.tagline;
+}
+
+// ══════════════════════════════════════════
+// BATTLE
+// ══════════════════════════════════════════
+function startBattle() {
+  if (!pick) return;
+  // Start background music
+  const music = document.getElementById('bgMusic');
+  music.currentTime = 0;
+  music.volume = 0.4;
+  music.play().catch(() => {});
+
+  const pool = GHOSTS.filter(g => g.name !== pick.name);
+  enemy = pool[Math.floor(Math.random() * pool.length)];
+
+  playerHp = pick.maxHp;
+  enemyHp = enemy.maxHp;
+  round = 1;
+
+  show('battleScreen');
+
+  document.getElementById('enemyCard').innerHTML = `<img src="${IMG}${enemy.file}" alt="${enemy.name}">`;
+  document.getElementById('playerCard').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
+  document.getElementById('enemyNameText').textContent = enemy.name;
+  document.getElementById('playerNameText').textContent = pick.name;
+  updateHpDisplay();
+  document.getElementById('enemyCard').classList.remove('hit');
+  document.getElementById('playerCard').classList.remove('hit');
+
+  resetDice();
+  document.getElementById('rollBtn').classList.remove('ready');
+
+  narrate(`<b class="them">${enemy.name}</b> rolls first...`);
+  setTimeout(doEnemyRoll, 1000);
+}
+
+function updateHpDisplay() {
+  const ePct = Math.max(0, enemyHp / enemy.maxHp * 100);
+  const pPct = Math.max(0, playerHp / pick.maxHp * 100);
+
+  const eBar = document.getElementById('enemyHpBar');
+  const pBar = document.getElementById('playerHpBar');
+
+  eBar.style.width = ePct + '%';
+  pBar.style.width = pPct + '%';
+
+  // Low / critical states
+  eBar.classList.toggle('hp-low', ePct <= 50 && ePct > 25);
+  eBar.classList.toggle('hp-critical', ePct <= 25);
+  pBar.classList.toggle('hp-low', pPct <= 50 && pPct > 25);
+  pBar.classList.toggle('hp-critical', pPct <= 25);
+
+  document.getElementById('enemyHpText').textContent = `${Math.max(0,enemyHp)} / ${enemy.maxHp}`;
+  document.getElementById('playerHpText').textContent = `${Math.max(0,playerHp)} / ${pick.maxHp}`;
+}
+
+function resetDice() {
+  for (let i = 0; i < 3; i++) {
+    ['eDie','pDie'].forEach(p => {
+      const d = document.getElementById(p+i);
+      d.textContent = '';
+      d.className = d.className.replace(/ visible| glow| triples-glow| rolling/g, '');
+    });
+  }
+}
+
+function showTriplesEffect(side) {
+  // side: 'enemy' or 'player'
+  const banner = document.getElementById('triplesBanner');
+  const flash = document.getElementById('triplesFlash');
+  const prefix = side === 'enemy' ? 'e' : 'p';
+
+  // Upgrade dice glow to triples-glow
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById((side === 'enemy' ? 'eDie' : 'pDie') + i);
+    d.classList.remove('glow');
+    d.classList.add('triples-glow');
+  }
+
+  // SFX
+  playSfx('triplesSfx', 1.0);
+
+  // Screen flash
+  flash.className = 'triples-flash ' + (side === 'enemy' ? 'enemy-flash' : 'player-flash');
+  flash.style.transition = 'none';
+  flash.style.opacity = '0.6';
+  requestAnimationFrame(() => {
+    flash.style.transition = 'opacity 0.8s ease-out';
+    flash.style.opacity = '0';
+  });
+
+  // Screen shake
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+
+  // Big banner
+  banner.className = 'triples-banner ' + (side === 'enemy' ? 'enemy-triples' : 'player-triples');
+  requestAnimationFrame(() => {
+    banner.classList.add('show');
+    setTimeout(() => {
+      banner.classList.remove('show');
+      banner.classList.add('fade');
+      setTimeout(() => { banner.className = 'triples-banner'; }, 500);
+    }, 1200);
+  });
+}
+
+function narrate(html) {
+  document.getElementById('narrator').innerHTML = html;
+}
+
+// Theme map for each ability
+const ABILITY_THEMES = {
+  'Beast Mode': 'beast-mode',
+  'Blue Fire': 'blue-fire',
+  'Party Time': 'party-time',
+};
+
+function showAbilitySplash(name, desc, duration, callback) {
+  const el = document.getElementById('abilitySplash');
+  const theme = ABILITY_THEMES[name] || '';
+  // Clear old themes
+  el.className = 'ability-splash ' + theme;
+  document.getElementById('splashName').textContent = name;
+  document.getElementById('splashDesc').textContent = desc;
+  document.getElementById('counterDieArea').classList.remove('visible');
+  el.classList.add('active');
+  setTimeout(() => {
+    el.classList.remove('active');
+    setTimeout(callback, 300);
+  }, duration);
+}
+
+// Interactive Balatron counter
+let counterCallback = null;
+
+function showBalatronSplash(ghost, target) {
+  const el = document.getElementById('abilitySplash');
+  el.className = 'ability-splash party-time';
+  document.getElementById('splashName').textContent = 'Party Time!';
+  document.getElementById('splashDesc').textContent = `${ghost.name} fights back!`;
+  const dieArea = document.getElementById('counterDieArea');
+  const dieBtn = document.getElementById('counterDieBtn');
+  const isPlayerGhost = ghost === pick;
+
+  // Only let the human player roll if it's their ghost
+  if (isPlayerGhost) {
+    dieArea.classList.add('visible');
+    dieBtn.textContent = '?';
+    dieBtn.className = 'counter-die-btn';
+    document.querySelector('.counter-die-label').textContent = 'Tap to roll!';
+    counterCallback = (counterDie) => {
+      if (target === 'enemy') enemyHp -= counterDie;
+      else playerHp -= counterDie;
+
+      setTimeout(() => {
+        el.classList.remove('active');
+        setTimeout(() => {
+          narrate(`<b class="${isPlayerGhost ? 'you' : 'them'}">Party Time!</b> Counter roll: <b class="gold">${counterDie} damage!</b>`);
+          playDamageSfx(counterDie);
+          document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          checkAfterCounter();
+        }, 300);
+      }, 800);
+    };
+  } else {
+    // Enemy Balatron — auto-roll after a beat
+    dieArea.classList.add('visible');
+    dieBtn.textContent = '?';
+    dieBtn.className = 'counter-die-btn rolling';
+    document.querySelector('.counter-die-label').textContent = 'Rolling...';
+    counterCallback = null;
+    setTimeout(() => {
+      const counterDie = Math.floor(Math.random()*6)+1;
+      dieBtn.classList.remove('rolling');
+      dieBtn.classList.add('landed');
+      dieBtn.textContent = counterDie;
+      document.querySelector('.counter-die-label').textContent = `${counterDie} damage!`;
+
+      if (target === 'enemy') enemyHp -= counterDie;
+      else playerHp -= counterDie;
+
+      setTimeout(() => {
+        el.classList.remove('active');
+        setTimeout(() => {
+          narrate(`<b class="them">Party Time!</b> Counter roll: <b class="gold">${counterDie} damage!</b>`);
+          playDamageSfx(counterDie);
+          document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          checkAfterCounter();
+        }, 300);
+      }, 1000);
+    }, 1200);
+  }
+
+  el.classList.add('active');
+}
+
+function rollCounterDie() {
+  if (!counterCallback) return;
+  const dieBtn = document.getElementById('counterDieBtn');
+  if (dieBtn.classList.contains('landed')) return;
+
+  dieBtn.classList.add('rolling');
+  document.querySelector('.counter-die-label').textContent = 'Rolling...';
+
+  const counterDie = Math.floor(Math.random()*6)+1;
+
+  setTimeout(() => {
+    dieBtn.classList.remove('rolling');
+    dieBtn.classList.add('landed');
+    dieBtn.textContent = counterDie;
+    document.querySelector('.counter-die-label').textContent = `${counterDie} damage!`;
+    const cb = counterCallback;
+    counterCallback = null;
+    setTimeout(() => cb(counterDie), 600);
+  }, 600);
+}
+
+function checkAfterCounter() {
+  if (enemyHp <= 0) {
+    setTimeout(() => { narrate(`<b class="gold">${enemy.name} is defeated!</b>`); setTimeout(crashAnimation, 1200); }, 600);
+  } else if (playerHp <= 0) {
+    setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); setTimeout(showLossCTA, 1500); }, 600);
+  } else {
+    setTimeout(nextRound, 1200);
+  }
+}
+
+// Store current round's rolls
+let currentEnemyRoll = null;
+
+function doEnemyRoll() {
+  phase = 0;
+  resetDice();
+  const dice = rollDice();
+  currentEnemyRoll = analyzeRoll(dice);
+
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById('eDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  setTimeout(() => {
+    dice.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById('eDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
+          setTimeout(() => d.classList.add('glow'), 120);
+        }
+      }, i * 200);
+    });
+
+    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
+
+    // Triples effect after dice land
+    if (currentEnemyRoll.type === 'triples') {
+      setTimeout(() => showTriplesEffect('enemy'), 700);
+    }
+
+    setTimeout(() => {
+      narrate(`<b class="them">${enemy.name}</b> rolled ${describeRoll(currentEnemyRoll)}.<br><b class="you">Your turn!</b>`);
+      document.getElementById('rollBtn').classList.add('ready');
+      phase = 1;
+    }, 800 + extraDelay);
+  }, 700);
+}
+
+function doPlayerRoll() {
+  if (phase !== 1) return;
+  phase = 2;
+  document.getElementById('rollBtn').classList.remove('ready');
+  playSfx('sfxDiceRoll');
+  narrate(`Rolling...`);
+
+  const dice = rollDice();
+  const pRoll = analyzeRoll(dice);
+
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById('pDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  setTimeout(() => {
+    dice.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById('pDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+        if (pRoll.matchDie && v === pRoll.matchDie) {
+          setTimeout(() => d.classList.add('glow'), 120);
+        }
+      }, i * 200);
+    });
+
+    const extraDelay = pRoll.type === 'triples' ? 1400 : 0;
+
+    if (pRoll.type === 'triples') {
+      setTimeout(() => showTriplesEffect('player'), 700);
+    }
+
+    setTimeout(() => resolveRound(pRoll, currentEnemyRoll), 900 + extraDelay);
+  }, 700);
+}
+
+function resolveRound(pRoll, eRoll) {
+  const result = compareRolls(pRoll, eRoll);
+
+  if (result === 0) {
+    // Tie — re-roll
+    narrate(`You rolled ${describeRoll(pRoll)}.<br><b class="gold">Tie! Roll again!</b>`);
+    setTimeout(() => {
+      narrate(`<b class="them">${enemy.name}</b> rolls again...`);
+      setTimeout(doEnemyRoll, 800);
+    }, 1400);
+    return;
+  }
+
+  const playerWins = result === 1;
+
+  if (playerWins) {
+    const baseDmg = pRoll.damage;
+    const damage = pick.applyAbility(pRoll, baseDmg, pick);
+    const abilityTriggered = damage !== baseDmg;
+
+    narrate(`You rolled ${describeRoll(pRoll)}.<br><b class="gold">${typeLabel(pRoll.type)} You win!</b>`);
+
+    const applyDamage = () => {
+      enemyHp -= damage;
+      playDamageSfx(damage);
+      narrate(`<b class="gold">${damage} damage to ${enemy.name}!</b>`);
+      document.getElementById('enemyCard').classList.add('hit');
+      setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+      updateHpDisplay();
+
+      if (enemy.ability === 'Party Time' && enemyHp > 0) {
+        setTimeout(() => doBalatronCounter(enemy, 'player'), 800);
+        return;
+      }
+      if (enemyHp <= 0) {
+        setTimeout(() => { narrate(`<b class="gold">${enemy.name} is defeated!</b>`); setTimeout(crashAnimation, 1200); }, 600);
+      } else {
+        setTimeout(nextRound, 1400);
+      }
+    };
+
+    if (abilityTriggered) {
+      setTimeout(() => {
+        showAbilitySplash(pick.ability, `${pick.abilityDesc} — ${damage} damage!`, 1600, applyDamage);
+      }, 800);
+    } else {
+      setTimeout(applyDamage, 800);
+    }
+
+  } else {
+    const baseDmg = eRoll.damage;
+    const damage = enemy.applyAbility(eRoll, baseDmg, enemy);
+    const abilityTriggered = damage !== baseDmg;
+
+    narrate(`You rolled ${describeRoll(pRoll)}.<br><b class="them">${enemy.name} wins!</b>`);
+
+    const applyDamage = () => {
+      playerHp -= damage;
+      playDamageSfx(damage);
+      narrate(`<b class="them">${damage} damage to ${pick.name}!</b>`);
+      document.getElementById('playerCard').classList.add('hit');
+      setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+      updateHpDisplay();
+
+      if (pick.ability === 'Party Time' && playerHp > 0) {
+        setTimeout(() => doBalatronCounter(pick, 'enemy'), 800);
+        return;
+      }
+      if (playerHp <= 0) {
+        setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); setTimeout(showLossCTA, 1500); }, 600);
+      } else {
+        setTimeout(nextRound, 1400);
+      }
+    };
+
+    if (abilityTriggered) {
+      setTimeout(() => {
+        showAbilitySplash(enemy.ability, `${enemy.abilityDesc} — ${damage} damage!`, 1600, applyDamage);
+      }, 800);
+    } else {
+      setTimeout(applyDamage, 800);
+    }
+  }
+}
+
+// Prince Balatron's counter — roll 1 die, deal that as damage
+function doBalatronCounter(ghost, target) {
+  showBalatronSplash(ghost, target);
+}
+
+function nextRound() {
+  round++;
+  narrate(`<b class="them">${enemy.name}</b> rolls...`);
+  setTimeout(doEnemyRoll, 800);
+}
+
+// ══════════════════════════════════════════
+// CRASH ANIMATION (player wins)
+// ══════════════════════════════════════════
+function crashAnimation() {
+  const overlay = document.getElementById('crashOverlay');
+  const pc = document.getElementById('crashPlayer');
+  const ec = document.getElementById('crashEnemy');
+  const flash = document.getElementById('impactFlash');
+
+  const mob = window.innerWidth <= 480;
+  const W = mob ? 130 : 160, H = mob ? 182 : 224;
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+
+  pc.innerHTML = `<img src="${IMG}${pick.file}">`;
+  ec.innerHTML = `<img src="${IMG}${enemy.file}">`;
+
+  ec.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${cy-H/2-20}px;transition:none;opacity:1;transform:none;`;
+  pc.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${innerHeight+20}px;transition:none;opacity:1;transform:none;`;
+  pc.classList.remove('winner');
+  overlay.classList.add('active');
+
+  requestAnimationFrame(() => {
+    pc.style.transition = 'top 0.35s cubic-bezier(0.2,0,0.4,1)';
+    pc.style.top = `${cy-H/2-20}px`;
+  });
+
+  setTimeout(() => {
+    document.body.classList.add('screen-shake');
+    setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+    flash.style.transition = 'none';
+    flash.style.opacity = '0.7';
+    requestAnimationFrame(() => { flash.style.transition = 'opacity 0.4s'; flash.style.opacity = '0'; });
+    ec.style.opacity = '0';
+    spawnShards(cx-W/2, cy-H/2-20, W, H);
+    pc.style.transition = 'top 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+    pc.style.top = `${cy-H/2}px`;
+    pc.classList.add('winner');
+    setTimeout(() => {
+      pc.style.transition = 'opacity 0.6s';
+      pc.style.opacity = '0';
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        document.querySelectorAll('.shard').forEach(s => s.remove());
+        showWinCTA();
+      }, 700);
+    }, 1800);
+  }, 380);
+}
+
+function spawnShards(x, y, W, H) {
+  const cols = 4, rows = 5, sw = W/cols, sh = H/rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const s = document.createElement('div');
+      s.className = 'shard';
+      s.style.width = sw+'px'; s.style.height = sh+'px';
+      s.style.left = (x+c*sw)+'px'; s.style.top = (y+r*sh)+'px';
+      s.style.borderRadius = '2px';
+      const img = document.createElement('img');
+      img.src = IMG + enemy.file;
+      img.style.left = -(c*sw)+'px'; img.style.top = -(r*sh)+'px';
+      s.appendChild(img);
+      document.getElementById('crashOverlay').appendChild(s);
+      const angle = Math.atan2(r-rows/2+.5, c-cols/2+.5);
+      const dist = 200+Math.random()*300;
+      const dx = Math.cos(angle)*dist+(Math.random()-.5)*100;
+      const dy = Math.sin(angle)*dist+Math.random()*200;
+      const rot = (Math.random()-.5)*720;
+      const delay = Math.random()*80;
+      s.style.transition = 'none';
+      requestAnimationFrame(() => {
+        s.style.transition = `transform ${1+Math.random()*.6}s cubic-bezier(0.2,0,0.3,1) ${delay}ms, opacity ${1.2+Math.random()*.5}s ease-out ${delay+200}ms`;
+        s.style.transform = `translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${.2+Math.random()*.3})`;
+        s.style.opacity = '0';
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+// CTA SCREENS
+// ══════════════════════════════════════════
+function fadeOutMusic() {
+  const music = document.getElementById('bgMusic');
+  let vol = music.volume;
+  const fade = setInterval(() => {
+    vol -= 0.05;
+    if (vol <= 0) { clearInterval(fade); music.pause(); music.volume = 0.4; }
+    else music.volume = vol;
+  }, 80);
+}
+
+function showWinCTA() {
+  fadeOutMusic();
+  playSfx('sfxWin', 0.9);
+  document.getElementById('ctaTitle').textContent = 'You Won!';
+  document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
+  show('ctaScreen');
+}
+
+function showLossCTA() {
+  fadeOutMusic();
+  document.getElementById('ctaTitle').textContent = 'You Lose!';
+  document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
+  show('ctaScreen');
+}
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function replay() { show('pickScreen'); initPick(); }
+
+initPick();
+</script>
+</body>
+</html>
