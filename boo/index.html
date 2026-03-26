@@ -750,8 +750,8 @@
   }
 
   .crash-card.winner {
-    animation: winGlow 1.2s ease-in-out infinite;
-    border-color: var(--gold) !important;
+    border-color: transparent !important;
+    box-shadow: 0 0 40px rgba(251,191,36,0.3);
   }
 
   /* Victory text that appears above winning card */
@@ -1764,43 +1764,32 @@ function crashAnimation() {
 }
 
 function spawnSparkles(cx, cy, W, H) {
-  for (let i = 0; i < 20; i++) {
-    const s = document.createElement('div');
-    s.className = 'sparkle';
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 80;
-    const startX = cx + (Math.random() - 0.5) * W * 0.8;
-    const startY = cy + (Math.random() - 0.5) * H * 0.8;
-    s.style.left = startX + 'px';
-    s.style.top = startY + 'px';
-    s.style.width = (3 + Math.random() * 5) + 'px';
-    s.style.height = s.style.width;
-    s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
-    s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
-    s.style.background = Math.random() > 0.5 ? 'var(--gold)' : 'var(--player)';
-    s.style.animation = `sparkleFloat ${0.8 + Math.random() * 0.6}s ease-out ${Math.random() * 0.4}s forwards`;
-    document.getElementById('crashOverlay').appendChild(s);
+  const overlay = document.getElementById('crashOverlay');
+  function burst(count, delay, spread, distMin, distMax, sizeMin, sizeMax) {
+    setTimeout(() => {
+      for (let i = 0; i < count; i++) {
+        const s = document.createElement('div');
+        s.className = 'sparkle';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = distMin + Math.random() * distMax;
+        s.style.left = (cx + (Math.random() - 0.5) * W * spread) + 'px';
+        s.style.top = (cy + (Math.random() - 0.5) * H * spread) + 'px';
+        const size = sizeMin + Math.random() * sizeMax;
+        s.style.width = size + 'px';
+        s.style.height = size + 'px';
+        s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+        s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+        const r = Math.random();
+        s.style.background = r > 0.6 ? 'var(--gold)' : r > 0.3 ? 'var(--player)' : '#fff';
+        s.style.animation = `sparkleFloat ${0.7 + Math.random() * 0.8}s ease-out ${Math.random() * 0.3}s forwards`;
+        overlay.appendChild(s);
+      }
+    }, delay);
   }
-  // Second wave
-  setTimeout(() => {
-    for (let i = 0; i < 15; i++) {
-      const s = document.createElement('div');
-      s.className = 'sparkle';
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * 100;
-      const startX = cx + (Math.random() - 0.5) * W * 0.6;
-      const startY = cy + (Math.random() - 0.5) * H * 0.6;
-      s.style.left = startX + 'px';
-      s.style.top = startY + 'px';
-      s.style.width = (2 + Math.random() * 4) + 'px';
-      s.style.height = s.style.width;
-      s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
-      s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
-      s.style.background = Math.random() > 0.3 ? 'var(--gold)' : '#fff';
-      s.style.animation = `sparkleFloat ${0.6 + Math.random() * 0.5}s ease-out ${Math.random() * 0.3}s forwards`;
-      document.getElementById('crashOverlay').appendChild(s);
-    }
-  }, 600);
+  // 3 waves of confetti
+  burst(60, 0, 0.9, 40, 120, 3, 6);
+  burst(50, 400, 0.7, 60, 150, 2, 5);
+  burst(45, 900, 1.0, 50, 180, 3, 7);
 }
 
 function spawnShards(x, y, W, H) {
