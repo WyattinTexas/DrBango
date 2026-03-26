@@ -284,36 +284,67 @@
     .selected-ghost-name { min-height: 44px; }
   }
 
-  /* ======== BATTLE SCREEN — Pokemon-style ======== */
+  /* ======== BATTLE SCREEN — Spirit World Arena ======== */
   .battle-screen {
     position: relative;
     padding: 0;
     overflow: hidden;
     background:
-      linear-gradient(180deg, #0c0c1a 0%, #101028 40%, #151530 60%, #1a1a3a 100%);
+      radial-gradient(ellipse at 50% 50%, rgba(30,20,60,1) 0%, rgba(8,8,16,1) 100%);
   }
 
-  /* Arena floor gradient */
+  /* Mystical spirit energy layers */
   .battle-screen::before {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: -20%;
-    right: -20%;
-    height: 45%;
-    background: radial-gradient(ellipse at 50% 100%, rgba(103,232,249,0.06) 0%, transparent 70%);
+    inset: 0;
+    background:
+      /* Central ethereal glow — the spirit realm rift */
+      radial-gradient(ellipse at 50% 45%, rgba(100,60,180,0.15) 0%, transparent 50%),
+      /* Enemy aura — top, warm menace */
+      radial-gradient(ellipse at 70% 10%, rgba(180,60,80,0.12) 0%, transparent 40%),
+      /* Player aura — bottom, cool power */
+      radial-gradient(ellipse at 30% 90%, rgba(40,120,200,0.12) 0%, transparent 40%),
+      /* Distant spirit wisps */
+      radial-gradient(circle at 15% 30%, rgba(103,232,249,0.06) 0%, transparent 25%),
+      radial-gradient(circle at 85% 70%, rgba(192,132,252,0.06) 0%, transparent 25%),
+      radial-gradient(circle at 50% 20%, rgba(251,191,36,0.04) 0%, transparent 20%);
     pointer-events: none;
+    z-index: 1;
   }
 
   .battle-screen::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: -20%;
-    right: -20%;
-    height: 45%;
-    background: radial-gradient(ellipse at 50% 0%, rgba(248,113,113,0.04) 0%, transparent 70%);
+    inset: 0;
+    /* Subtle vignette to frame the battle */
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.5) 100%);
     pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Floating spirit particles — CSS only ambient dots */
+  .battle-screen .spirit-particles {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .spirit-dot {
+    position: absolute;
+    border-radius: 50%;
+    animation: spiritFloat linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes spiritFloat {
+    0% { opacity: 0; transform: translateY(0) scale(0.5); }
+    20% { opacity: 0.6; }
+    80% { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(-120px) scale(0.2); }
   }
 
   /* Enemy — top right */
@@ -1049,6 +1080,7 @@
 
   <!-- BATTLE -->
   <div class="screen battle-screen" id="battleScreen">
+    <div class="spirit-particles" id="spiritParticles"></div>
     <!-- Enemy — top right -->
     <div class="enemy-zone">
       <div class="name-plate enemy-plate" id="enemyPlate">
@@ -1350,6 +1382,8 @@ function selectGhost(g) {
 // ══════════════════════════════════════════
 function startBattle() {
   if (!pick) return;
+  // Spawn ambient spirit particles
+  spawnSpiritParticles();
   // Start background music
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
@@ -1764,6 +1798,37 @@ function enemyDefeated() {
 }
 
 // ══════════════════════════════════════════
+// SPIRIT PARTICLES — ambient floating dots
+// ══════════════════════════════════════════
+let spiritInterval = null;
+
+function spawnSpiritParticles() {
+  const container = document.getElementById('spiritParticles');
+  container.innerHTML = '';
+  if (spiritInterval) clearInterval(spiritInterval);
+  spiritInterval = setInterval(() => {
+    const dot = document.createElement('div');
+    dot.className = 'spirit-dot';
+    const size = 2 + Math.random() * 3;
+    dot.style.width = size + 'px';
+    dot.style.height = size + 'px';
+    dot.style.left = (Math.random() * 100) + '%';
+    dot.style.top = (30 + Math.random() * 60) + '%';
+    const colors = ['rgba(103,232,249,0.7)', 'rgba(192,132,252,0.6)', 'rgba(251,191,36,0.5)', 'rgba(255,255,255,0.5)'];
+    dot.style.background = colors[Math.floor(Math.random() * colors.length)];
+    dot.style.boxShadow = `0 0 ${4+Math.random()*6}px ${dot.style.background}`;
+    const dur = 4 + Math.random() * 6;
+    dot.style.animationDuration = dur + 's';
+    container.appendChild(dot);
+    setTimeout(() => dot.remove(), dur * 1000);
+  }, 500);
+}
+
+function stopSpiritParticles() {
+  if (spiritInterval) { clearInterval(spiritInterval); spiritInterval = null; }
+}
+
+// ══════════════════════════════════════════
 // SNOW EFFECT
 // ══════════════════════════════════════════
 let snowInterval = null;
@@ -1972,6 +2037,7 @@ function fadeOutMusic() {
 
 function showWinCTA() {
   fadeOutMusic();
+  stopSpiritParticles();
   startSnow();
   document.getElementById('ctaTitle').textContent = 'You Win!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
@@ -1980,6 +2046,7 @@ function showWinCTA() {
 
 function showLossCTA() {
   fadeOutMusic();
+  stopSpiritParticles();
   startSnow();
   document.getElementById('ctaTitle').textContent = 'You Lose!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
