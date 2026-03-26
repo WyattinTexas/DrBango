@@ -741,11 +741,64 @@
   .screen-shake { animation: shake 0.5s ease-out; }
 
   @keyframes winGlow {
-    0%,100% { box-shadow: 0 0 30px rgba(103,232,249,0.4), 0 0 60px rgba(103,232,249,0.15); }
-    50% { box-shadow: 0 0 50px rgba(103,232,249,0.6), 0 0 100px rgba(103,232,249,0.25); }
+    0%,100% {
+      box-shadow: 0 0 40px rgba(251,191,36,0.5), 0 0 80px rgba(103,232,249,0.3), 0 0 120px rgba(251,191,36,0.15);
+      transform: scale(1.15);
+    }
+    50% {
+      box-shadow: 0 0 60px rgba(251,191,36,0.7), 0 0 100px rgba(103,232,249,0.4), 0 0 160px rgba(251,191,36,0.25);
+      transform: scale(1.18);
+    }
   }
 
-  .crash-card.winner { animation: winGlow 1.5s ease-in-out infinite; }
+  .crash-card.winner {
+    animation: winGlow 1.2s ease-in-out infinite;
+    border-color: var(--gold) !important;
+  }
+
+  /* Victory text that appears above winning card */
+  .victory-text {
+    position: absolute;
+    top: 12%;
+    left: 50%;
+    transform: translateX(-50%) scale(0.5);
+    font-family: 'Creepster', cursive;
+    font-size: 3.5rem;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(251,191,36,0.6), 0 0 60px rgba(251,191,36,0.3), 0 4px 8px rgba(0,0,0,0.6);
+    opacity: 0;
+    transition: opacity 0.4s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 1005;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .victory-text.show {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+
+  /* Sparkle particles around winner */
+  .sparkle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    z-index: 1004;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  @keyframes sparkleFloat {
+    0% { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0); }
+  }
+
+  @media (max-width: 480px) {
+    .victory-text { font-size: 2.5rem; }
+  }
 
   /* ======== CTA SCREEN ======== */
   .cta-screen {
@@ -1035,6 +1088,7 @@
 <div class="crash-overlay" id="crashOverlay">
   <div class="crash-card ec" id="crashEnemy"></div>
   <div class="crash-card pc" id="crashPlayer"></div>
+  <div class="victory-text" id="victoryText">VICTORY!</div>
 </div>
 <div class="impact-flash" id="impactFlash"></div>
 <!-- Triples effect -->
@@ -1645,50 +1699,112 @@ function nextRound() {
 // CRASH ANIMATION (player wins)
 // ══════════════════════════════════════════
 function crashAnimation() {
-  playSfx('sfxShatter', 0.9);
   const overlay = document.getElementById('crashOverlay');
   const pc = document.getElementById('crashPlayer');
   const ec = document.getElementById('crashEnemy');
   const flash = document.getElementById('impactFlash');
+  const vicText = document.getElementById('victoryText');
 
   const mob = window.innerWidth <= 480;
-  const W = mob ? 130 : 160, H = mob ? 182 : 224;
+  const W = mob ? 150 : 180, H = mob ? 210 : 252;
   const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
 
   pc.innerHTML = `<img src="${IMG}${pick.file}">`;
   ec.innerHTML = `<img src="${IMG}${enemy.file}">`;
 
-  ec.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${cy-H/2-20}px;transition:none;opacity:1;transform:none;`;
-  pc.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${innerHeight+20}px;transition:none;opacity:1;transform:none;`;
+  ec.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${cy-H/2-20}px;transition:none;opacity:1;transform:none;border-radius:14px;`;
+  pc.style.cssText = `width:${W}px;height:${H}px;left:${cx-W/2}px;top:${innerHeight+20}px;transition:none;opacity:1;transform:none;border-radius:14px;`;
   pc.classList.remove('winner');
+  vicText.classList.remove('show');
   overlay.classList.add('active');
 
+  // Phase 1: Player card charges up
   requestAnimationFrame(() => {
     pc.style.transition = 'top 0.35s cubic-bezier(0.2,0,0.4,1)';
     pc.style.top = `${cy-H/2-20}px`;
   });
 
+  // Phase 2: Impact
   setTimeout(() => {
+    playSfx('sfxShatter', 0.9);
     document.body.classList.add('screen-shake');
     setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+
+    // White flash
     flash.style.transition = 'none';
-    flash.style.opacity = '0.7';
-    requestAnimationFrame(() => { flash.style.transition = 'opacity 0.4s'; flash.style.opacity = '0'; });
+    flash.style.opacity = '0.8';
+    requestAnimationFrame(() => { flash.style.transition = 'opacity 0.5s'; flash.style.opacity = '0'; });
+
+    // Enemy shatters
     ec.style.opacity = '0';
     spawnShards(cx-W/2, cy-H/2-20, W, H);
-    pc.style.transition = 'top 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+
+    // Player card settles to center, gets winner glow
+    pc.style.transition = 'top 0.6s cubic-bezier(0.34,1.56,0.64,1)';
     pc.style.top = `${cy-H/2}px`;
     pc.classList.add('winner');
+
+    // Phase 3: Victory moment — sparkles + text
     setTimeout(() => {
-      pc.style.transition = 'opacity 0.6s';
+      vicText.classList.add('show');
+      spawnSparkles(cx, cy, W, H);
+    }, 500);
+
+    // Phase 4: Hold, then fade to CTA
+    setTimeout(() => {
+      vicText.classList.remove('show');
+      pc.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
       pc.style.opacity = '0';
+      pc.style.transform = 'scale(1.3)';
       setTimeout(() => {
         overlay.classList.remove('active');
         document.querySelectorAll('.shard').forEach(s => s.remove());
+        document.querySelectorAll('.sparkle').forEach(s => s.remove());
+        pc.style.transform = 'none';
         showWinCTA();
-      }, 700);
-    }, 1800);
+      }, 900);
+    }, 2800);
   }, 380);
+}
+
+function spawnSparkles(cx, cy, W, H) {
+  for (let i = 0; i < 20; i++) {
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 80;
+    const startX = cx + (Math.random() - 0.5) * W * 0.8;
+    const startY = cy + (Math.random() - 0.5) * H * 0.8;
+    s.style.left = startX + 'px';
+    s.style.top = startY + 'px';
+    s.style.width = (3 + Math.random() * 5) + 'px';
+    s.style.height = s.style.width;
+    s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+    s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+    s.style.background = Math.random() > 0.5 ? 'var(--gold)' : 'var(--player)';
+    s.style.animation = `sparkleFloat ${0.8 + Math.random() * 0.6}s ease-out ${Math.random() * 0.4}s forwards`;
+    document.getElementById('crashOverlay').appendChild(s);
+  }
+  // Second wave
+  setTimeout(() => {
+    for (let i = 0; i < 15; i++) {
+      const s = document.createElement('div');
+      s.className = 'sparkle';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 50 + Math.random() * 100;
+      const startX = cx + (Math.random() - 0.5) * W * 0.6;
+      const startY = cy + (Math.random() - 0.5) * H * 0.6;
+      s.style.left = startX + 'px';
+      s.style.top = startY + 'px';
+      s.style.width = (2 + Math.random() * 4) + 'px';
+      s.style.height = s.style.width;
+      s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+      s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+      s.style.background = Math.random() > 0.3 ? 'var(--gold)' : '#fff';
+      s.style.animation = `sparkleFloat ${0.6 + Math.random() * 0.5}s ease-out ${Math.random() * 0.3}s forwards`;
+      document.getElementById('crashOverlay').appendChild(s);
+    }
+  }, 600);
 }
 
 function spawnShards(x, y, W, H) {
