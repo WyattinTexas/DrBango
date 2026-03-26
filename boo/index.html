@@ -963,6 +963,33 @@
     .counter-die-btn { width: 66px; height: 66px; font-size: 1.8rem; }
   }
 
+  /* ======== SNOW EFFECT ======== */
+  .snow-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    overflow: hidden;
+    display: none;
+  }
+
+  .snow-container.active { display: block; }
+
+  .snowflake {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+    animation: snowfall linear forwards;
+  }
+
+  @keyframes snowfall {
+    0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+    10% { opacity: 0.8; }
+    90% { opacity: 0.6; }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--rot)); }
+  }
+
   .watermark {
     position: fixed;
     bottom: 10px;
@@ -1088,6 +1115,7 @@
   <div class="victory-text" id="victoryText">VICTORY!</div>
 </div>
 <div class="impact-flash" id="impactFlash"></div>
+<div class="snow-container" id="snowContainer"></div>
 <!-- Triples effect -->
 <div class="triples-banner" id="triplesBanner">TRIPLES!</div>
 <div class="triples-flash" id="triplesFlash"></div>
@@ -1322,7 +1350,8 @@ function selectGhost(g) {
 // ══════════════════════════════════════════
 function startBattle() {
   if (!pick) return;
-  // Start background music
+  // Start snow + background music
+  startSnow();
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.4;
@@ -1735,6 +1764,45 @@ function enemyDefeated() {
   setTimeout(crashAnimation, 1400);
 }
 
+// ══════════════════════════════════════════
+// SNOW EFFECT
+// ══════════════════════════════════════════
+let snowInterval = null;
+
+function startSnow() {
+  const container = document.getElementById('snowContainer');
+  container.classList.add('active');
+  snowInterval = setInterval(() => {
+    const flake = document.createElement('div');
+    flake.className = 'snowflake';
+    const size = 2 + Math.random() * 4;
+    const startX = window.innerWidth * 0.6 + Math.random() * window.innerWidth * 0.5;
+    const startY = -10;
+    const driftX = -(100 + Math.random() * 300);
+    const driftY = window.innerHeight + 40;
+    const duration = 3 + Math.random() * 4;
+    flake.style.width = size + 'px';
+    flake.style.height = size + 'px';
+    flake.style.left = startX + 'px';
+    flake.style.top = startY + 'px';
+    flake.style.setProperty('--sx', driftX + 'px');
+    flake.style.setProperty('--sy', driftY + 'px');
+    flake.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+    flake.style.animationDuration = duration + 's';
+    container.appendChild(flake);
+    setTimeout(() => flake.remove(), duration * 1000);
+  }, 80);
+}
+
+function stopSnow() {
+  if (snowInterval) { clearInterval(snowInterval); snowInterval = null; }
+  const container = document.getElementById('snowContainer');
+  setTimeout(() => {
+    container.classList.remove('active');
+    container.innerHTML = '';
+  }, 4000);
+}
+
 function nextRound() {
   round++;
   narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
@@ -1891,6 +1959,7 @@ function fadeOutMusic() {
 
 function showWinCTA() {
   fadeOutMusic();
+  stopSnow();
   document.getElementById('ctaTitle').textContent = 'You Win!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
@@ -1898,6 +1967,7 @@ function showWinCTA() {
 
 function showLossCTA() {
   fadeOutMusic();
+  stopSnow();
   document.getElementById('ctaTitle').textContent = 'You Lose!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
