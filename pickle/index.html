@@ -3,908 +3,924 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pickleball Match Review</title>
+<title>Pickle Review - Match Analyzer</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #111; color: #eee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; overflow: hidden; }
+  body { background: #0a0a12; color: #e0e0e8; font-family: 'Inter', sans-serif; height: 100vh; display: flex; overflow: hidden; }
 
   /* --- Sidebar --- */
   #sidebar {
-    width: 280px; min-width: 280px; background: #1a1a2e; display: flex; flex-direction: column;
-    border-right: 1px solid #333; overflow: hidden;
+    width: 300px; min-width: 300px; background: #12121e; display: flex; flex-direction: column;
+    border-right: 1px solid #1e1e30;
   }
-  #sidebar-header { padding: 12px; border-bottom: 1px solid #333; }
-  #sidebar-header h2 { font-size: 14px; margin-bottom: 8px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
-
-  .team-setup { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .team-setup input[type="text"] {
-    flex: 1; background: #0d1b2a; border: 1px solid #333; color: #eee;
-    padding: 5px 8px; border-radius: 4px; font-size: 13px;
+  #sidebar-header {
+    padding: 14px 16px; border-bottom: 1px solid #1e1e30;
+    background: linear-gradient(135deg, #16162a, #1a1a30);
   }
-  .team-setup input[type="color"] { width: 28px; height: 28px; border: none; border-radius: 4px; cursor: pointer; }
-  .team-emoji {
-    width: 32px; height: 32px; font-size: 20px; text-align: center; line-height: 32px;
-    background: #0d1b2a; border: 1px solid #333; border-radius: 4px; cursor: pointer;
+  #app-title {
+    font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;
+    background: linear-gradient(90deg, #6ee7b7, #3b82f6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
   }
 
-  #score-bar {
-    display: flex; align-items: center; justify-content: center; gap: 16px;
-    padding: 10px; background: #0d1b2a; border-bottom: 1px solid #333;
-    font-size: 28px; font-weight: bold; font-variant-numeric: tabular-nums;
-  }
-  .score-team { display: flex; align-items: center; gap: 8px; }
-  .score-num { min-width: 36px; text-align: center; }
-  .score-dash { color: #555; }
-
-  #point-actions {
-    display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #333;
-  }
-  .point-btn {
-    flex: 1; padding: 8px; border: 2px solid; border-radius: 8px;
-    font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+  .team-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .team-emoji-btn {
+    width: 36px; height: 36px; font-size: 20px; text-align: center; line-height: 36px;
+    background: #1a1a2e; border: 2px solid #2a2a40; border-radius: 8px; cursor: pointer;
     transition: all 0.15s;
   }
-  .point-btn:hover { filter: brightness(1.3); }
+  .team-emoji-btn:hover { border-color: #4a4a6a; transform: scale(1.05); }
+  .team-input {
+    flex: 1; background: #1a1a2e; border: 1px solid #2a2a40; color: #e0e0e8;
+    padding: 7px 10px; border-radius: 6px; font-size: 13px; font-family: 'Inter', sans-serif;
+  }
+  .team-input:focus { outline: none; border-color: #4a4a6a; }
+  .team-color-input { width: 36px; height: 36px; border: none; border-radius: 8px; cursor: pointer; background: none; padding: 0; }
 
-  #points-list {
-    flex: 1; overflow-y: auto; padding: 4px;
+  /* Score display */
+  #scoreboard {
+    display: flex; align-items: center; justify-content: center; gap: 0;
+    padding: 16px; background: #0e0e1a; border-bottom: 1px solid #1e1e30;
   }
-  .point-entry {
-    display: flex; align-items: center; gap: 8px; padding: 8px; margin: 2px 0;
-    background: #0d1b2a; border-radius: 6px; cursor: pointer; font-size: 12px;
-    border-left: 3px solid transparent; transition: background 0.15s;
+  .score-side {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1;
   }
-  .point-entry:hover { background: #162447; }
-  .point-entry.active { background: #1a3a5c; }
-  .point-emoji { font-size: 18px; }
-  .point-info { flex: 1; }
-  .point-time { color: #888; font-variant-numeric: tabular-nums; }
-  .point-score { font-weight: 600; }
-  .point-note {
-    font-size: 11px; color: #aaa; margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
+  .score-side .team-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
+  .score-side .score-big {
+    font-size: 44px; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
   }
-  .point-delete { opacity: 0; color: #e94560; cursor: pointer; padding: 2px 6px; font-size: 14px; }
-  .point-entry:hover .point-delete { opacity: 0.6; }
-  .point-delete:hover { opacity: 1 !important; }
+  .score-side .score-emoji { font-size: 22px; margin-bottom: 2px; }
+  .score-divider {
+    font-size: 28px; color: #333; margin: 0 12px; font-weight: 300;
+  }
+  .serve-badge {
+    font-size: 9px; font-weight: 700; background: #f59e0b; color: #000; padding: 2px 6px;
+    border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;
+    visibility: hidden;
+  }
+  .serve-badge.active { visibility: visible; }
+
+  /* Score buttons */
+  #score-actions {
+    display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid #1e1e30;
+  }
+  .score-btn {
+    flex: 1; padding: 10px 6px; border: 2px solid; border-radius: 10px;
+    font-size: 12px; font-weight: 700; cursor: pointer; text-align: center;
+    font-family: 'Inter', sans-serif; transition: all 0.15s; background: transparent;
+  }
+  .score-btn:hover { filter: brightness(1.4); transform: translateY(-1px); }
+  .score-btn kbd { display: inline-block; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px; font-size: 10px; margin-left: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  /* Point type selector in modal */
+  .point-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .pt-type-btn {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e;
+    color: #aaa; font-size: 11px; cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+  .pt-type-btn:hover { border-color: #666; color: #eee; }
+  .pt-type-btn.selected { background: #e94560; border-color: #e94560; color: #fff; }
+
+  /* Points list */
+  #points-filter {
+    display: flex; gap: 4px; padding: 8px 14px; border-bottom: 1px solid #1e1e30;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 3px 8px; border-radius: 4px; border: 1px solid #2a2a40; background: transparent;
+    color: #888; font-size: 10px; cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .filter-btn:hover { color: #eee; border-color: #4a4a6a; }
+  .filter-btn.active { background: #2a2a50; border-color: #4a4a8a; color: #eee; }
+
+  #points-list { flex: 1; overflow-y: auto; padding: 6px; }
+  .point-card {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 3px 0;
+    background: #16162a; border-radius: 8px; cursor: pointer;
+    border-left: 4px solid transparent; transition: all 0.15s;
+    position: relative;
+  }
+  .point-card:hover { background: #1c1c36; }
+  .point-card.active { background: #1e2848; box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3); }
+  .point-card .pc-emoji { font-size: 20px; }
+  .point-card .pc-body { flex: 1; min-width: 0; }
+  .point-card .pc-top { display: flex; align-items: center; gap: 6px; }
+  .point-card .pc-score { font-weight: 700; font-size: 14px; font-family: 'JetBrains Mono', monospace; }
+  .point-card .pc-time { font-size: 11px; color: #666; font-family: 'JetBrains Mono', monospace; }
+  .point-card .pc-type {
+    font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .point-card .pc-note { font-size: 11px; color: #777; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .point-card .pc-delete {
+    position: absolute; top: 4px; right: 6px; opacity: 0; color: #e94560;
+    cursor: pointer; font-size: 16px; padding: 2px 4px; transition: opacity 0.15s;
+  }
+  .point-card:hover .pc-delete { opacity: 0.5; }
+  .point-card .pc-delete:hover { opacity: 1 !important; }
+
+  /* Stats bar */
+  #stats-bar {
+    padding: 10px 14px; border-top: 1px solid #1e1e30; background: #0e0e1a;
+    display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 10px; color: #555;
+  }
+  #stats-bar .stat-item span { color: #999; font-weight: 600; }
 
   #sidebar-footer {
-    padding: 8px 12px; border-top: 1px solid #333; font-size: 11px; color: #555;
-    display: flex; justify-content: space-between;
+    padding: 8px 14px; border-top: 1px solid #1e1e30;
+    display: flex; gap: 6px;
   }
-  #sidebar-footer button {
-    background: none; border: 1px solid #333; color: #888; padding: 3px 8px;
-    border-radius: 4px; cursor: pointer; font-size: 11px;
+  .footer-btn {
+    flex: 1; background: #1a1a2e; border: 1px solid #2a2a40; color: #888;
+    padding: 6px; border-radius: 6px; cursor: pointer; font-size: 10px;
+    font-family: 'Inter', sans-serif; text-align: center; transition: all 0.15s;
   }
-  #sidebar-footer button:hover { color: #eee; border-color: #666; }
+  .footer-btn:hover { color: #eee; border-color: #4a4a6a; }
 
-  /* --- Main area --- */
+  /* --- Main --- */
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
+  /* Drop zone */
   #dropzone {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(17,17,17,0.97); z-index: 100; cursor: pointer;
-    flex-direction: column; gap: 16px;
+    background: rgba(10,10,18,0.98); z-index: 100; cursor: pointer;
+    flex-direction: column; gap: 20px;
   }
   #dropzone.hidden { display: none; }
-  #dropzone .icon { font-size: 72px; }
-  #dropzone p { font-size: 18px; opacity: 0.6; }
-  #dropzone.dragover { background: rgba(40,40,120,0.97); }
+  #dropzone .drop-icon { font-size: 80px; opacity: 0.8; }
+  #dropzone h2 { font-size: 22px; font-weight: 600; }
+  #dropzone p { font-size: 13px; opacity: 0.4; }
+  #dropzone.dragover { background: rgba(30,30,80,0.98); }
+  #dropzone.dragover .drop-icon { transform: scale(1.1); }
+  .drop-hint {
+    display: flex; gap: 24px; margin-top: 10px; font-size: 11px; color: #555;
+  }
+  .drop-hint div { display: flex; align-items: center; gap: 6px; }
+  .drop-hint kbd { background: #222; padding: 3px 7px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; }
 
+  /* Video area */
   #video-container {
     flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
     background: #000; overflow: hidden;
   }
   video { max-width: 100%; max-height: 100%; display: block; }
-  #draw-canvas {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    cursor: crosshair;
-  }
+  #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
   #draw-canvas.inactive { cursor: default; pointer-events: none; }
 
+  /* HUD overlays on video */
+  #hud-score {
+    position: absolute; top: 12px; left: 12px; z-index: 20; pointer-events: none;
+    display: flex; align-items: center; gap: 0;
+    background: rgba(0,0,0,0.7); border-radius: 8px; padding: 6px 12px;
+    backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08);
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  #hud-score.visible { opacity: 1; }
+  #hud-divider { color: #444; margin: 0 8px; }
+
+  #hud-frame {
+    position: absolute; top: 12px; right: 12px; z-index: 20; pointer-events: none;
+    background: rgba(0,0,0,0.7); border-radius: 6px; padding: 4px 10px;
+    backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #888;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  #hud-frame.visible { opacity: 1; }
+
+  /* Text input */
   #text-input-overlay { position: absolute; display: none; z-index: 50; }
   #text-input-overlay input {
-    background: rgba(0,0,0,0.8); border: 2px solid #e94560; color: #fff;
-    font-size: 18px; padding: 6px 10px; border-radius: 4px; min-width: 220px;
-    outline: none;
+    background: rgba(0,0,0,0.85); border: 2px solid #6ee7b7; color: #fff;
+    font-size: 18px; padding: 6px 12px; border-radius: 6px; min-width: 220px;
+    outline: none; font-family: 'Inter', sans-serif;
   }
 
   /* --- Controls --- */
-  #controls {
-    background: #1a1a2e; padding: 0; display: flex; flex-direction: column;
-    border-top: 1px solid #333;
-  }
+  #controls { background: #12121e; border-top: 1px solid #1e1e30; }
 
-  /* Custom timeline */
+  /* Timeline */
   #timeline-wrapper {
-    position: relative; height: 48px; background: #0d1b2a; cursor: pointer;
-    user-select: none;
+    position: relative; height: 52px; background: #0a0a14; cursor: pointer;
+    user-select: none; border-bottom: 1px solid #1e1e30;
   }
-  #timeline-bar {
-    position: absolute; top: 20px; left: 0; right: 0; height: 8px;
-    background: #222; border-radius: 4px;
+  #tl-track { position: absolute; top: 24px; left: 12px; right: 12px; height: 6px; background: #1a1a2e; border-radius: 3px; }
+  #tl-progress { height: 100%; background: linear-gradient(90deg, #6ee7b7, #3b82f6); border-radius: 3px; width: 0%; }
+  #tl-playhead {
+    position: absolute; top: 18px; width: 4px; height: 18px; left: 12px;
+    background: #fff; border-radius: 2px; transform: translateX(-2px);
+    pointer-events: none; box-shadow: 0 0 8px rgba(255,255,255,0.4);
+    z-index: 5;
   }
-  #timeline-progress {
-    height: 100%; background: linear-gradient(90deg, #e94560, #c23152);
-    border-radius: 4px; width: 0%; transition: none;
-  }
-  #timeline-playhead {
-    position: absolute; top: 14px; width: 3px; height: 20px;
-    background: #fff; border-radius: 2px; transform: translateX(-1px);
-    pointer-events: none; box-shadow: 0 0 6px rgba(255,255,255,0.5);
-  }
-  .timeline-marker {
-    position: absolute; top: 0px; transform: translateX(-10px);
-    font-size: 16px; pointer-events: auto; cursor: pointer;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
+  .tl-marker {
+    position: absolute; top: 2px; transform: translateX(-10px);
+    font-size: 15px; cursor: pointer; z-index: 4;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.8));
     transition: transform 0.1s;
-    z-index: 2;
   }
-  .timeline-marker:hover { transform: translateX(-10px) scale(1.3); }
-  .timeline-marker .marker-score {
-    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-    font-size: 8px; font-weight: 700; color: #fff;
-    background: rgba(0,0,0,0.7); padding: 0 3px; border-radius: 2px;
+  .tl-marker:hover { transform: translateX(-10px) scale(1.4); z-index: 6; }
+  .tl-marker .tl-score-tag {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 7px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace;
+    background: rgba(0,0,0,0.8); padding: 1px 4px; border-radius: 2px;
     white-space: nowrap; pointer-events: none;
   }
-
-  #button-row {
-    display: flex; align-items: center; gap: 4px; padding: 8px 12px; flex-wrap: wrap;
+  .tl-marker .tl-type-dot {
+    position: absolute; top: 34px; left: 50%; transform: translateX(-50%);
+    width: 4px; height: 4px; border-radius: 50%; pointer-events: none;
   }
-  .btn {
-    background: #0f3460; border: 1px solid #1a4a8a; color: #eee;
-    padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+
+  /* Buttons row */
+  #btn-row {
+    display: flex; align-items: center; gap: 3px; padding: 8px 12px; flex-wrap: wrap;
+  }
+  .cb {
+    background: #1a1a2e; border: 1px solid #2a2a40; color: #bbb;
+    padding: 5px 9px; border-radius: 6px; cursor: pointer; font-size: 11px;
     display: flex; align-items: center; gap: 3px; white-space: nowrap;
+    font-family: 'Inter', sans-serif; transition: all 0.12s;
   }
-  .btn:hover { background: #1a4a8a; }
-  .btn.active { background: #e94560; border-color: #e94560; }
-  .btn kbd { background: rgba(255,255,255,0.12); padding: 1px 4px; border-radius: 3px; font-size: 10px; }
-  .separator { width: 1px; height: 22px; background: #333; margin: 0 3px; }
-  #speed-display { font-size: 11px; min-width: 32px; text-align: center; color: #aaa; }
-  #time-display { font-size: 12px; font-variant-numeric: tabular-nums; margin-left: auto; color: #aaa; }
+  .cb:hover { background: #22224a; border-color: #3a3a5a; color: #eee; }
+  .cb.active { background: #e94560; border-color: #e94560; color: #fff; }
+  .cb kbd { font-family: 'JetBrains Mono', monospace; font-size: 9px; opacity: 0.6; }
+  .sep { width: 1px; height: 22px; background: #1e1e30; margin: 0 3px; }
+  #speed-val { font-size: 11px; min-width: 32px; text-align: center; color: #666; font-family: 'JetBrains Mono', monospace; }
+  #time-val { font-size: 11px; margin-left: auto; color: #555; font-family: 'JetBrains Mono', monospace; }
+  #color-pick { width: 26px; height: 26px; border: none; border-radius: 6px; cursor: pointer; background: none; }
+  #size-range { width: 50px; accent-color: #6ee7b7; }
 
-  .tool-group { display: flex; align-items: center; gap: 3px; }
-  #color-picker { width: 26px; height: 26px; border: none; border-radius: 4px; cursor: pointer; background: none; }
-  #size-slider { width: 50px; }
-
-  /* Point note modal */
-  #note-modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  /* --- Modal --- */
+  #modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
     z-index: 200; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
   }
-  #note-modal.show { display: flex; }
-  #note-modal-inner {
-    background: #1a1a2e; border: 1px solid #333; border-radius: 12px;
-    padding: 20px; width: 360px;
+  #modal-bg.show { display: flex; }
+  #modal-box {
+    background: #16162a; border: 1px solid #2a2a40; border-radius: 14px;
+    padding: 24px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
-  #note-modal-inner h3 { margin-bottom: 10px; font-size: 15px; }
-  #note-textarea {
-    width: 100%; height: 80px; background: #0d1b2a; border: 1px solid #333;
-    color: #eee; padding: 8px; border-radius: 6px; font-size: 13px; resize: vertical;
+  #modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  #modal-subtitle { font-size: 12px; color: #666; margin-bottom: 12px; }
+  #modal-note {
+    width: 100%; height: 70px; background: #1a1a2e; border: 1px solid #2a2a40;
+    color: #e0e0e8; padding: 10px; border-radius: 8px; font-size: 13px; resize: vertical;
+    font-family: 'Inter', sans-serif;
   }
-  #note-modal-btns { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
-  #note-modal-btns button {
-    padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px;
+  #modal-note:focus { outline: none; border-color: #4a4a6a; }
+  #modal-btns { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  #modal-btns button {
+    padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif;
   }
-  #note-save { background: #e94560; color: #fff; }
-  #note-cancel { background: #333; color: #eee; }
+  .modal-save { background: linear-gradient(135deg, #6ee7b7, #3b82f6); color: #000; }
+  .modal-skip { background: #2a2a40; color: #aaa; }
 
   /* Emoji picker */
-  #emoji-picker {
-    display: none; position: absolute; background: #1a1a2e; border: 1px solid #444;
-    border-radius: 8px; padding: 8px; z-index: 300; gap: 4px; flex-wrap: wrap; width: 200px;
+  #emoji-pick {
+    display: none; position: absolute; background: #1a1a2e; border: 1px solid #2a2a40;
+    border-radius: 10px; padding: 10px; z-index: 300; gap: 4px; flex-wrap: wrap; width: 210px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   }
-  #emoji-picker.show { display: flex; }
-  .emoji-option { font-size: 22px; cursor: pointer; padding: 4px; border-radius: 4px; }
-  .emoji-option:hover { background: #333; }
+  #emoji-pick.show { display: flex; }
+  .ep-opt { font-size: 20px; cursor: pointer; padding: 5px; border-radius: 6px; transition: background 0.1s; }
+  .ep-opt:hover { background: #2a2a40; }
+
+  /* Keyboard help */
+  #kb-help {
+    position: absolute; bottom: 80px; right: 12px; z-index: 30;
+    background: rgba(0,0,0,0.85); border: 1px solid #2a2a40; border-radius: 10px;
+    padding: 14px 18px; font-size: 11px; display: none; backdrop-filter: blur(8px);
+    min-width: 240px;
+  }
+  #kb-help.show { display: block; }
+  #kb-help h4 { font-size: 12px; margin-bottom: 8px; color: #6ee7b7; }
+  .kb-row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .kb-row kbd { color: #aaa; font-family: 'JetBrains Mono', monospace; font-size: 10px; background: #222; padding: 1px 5px; border-radius: 3px; }
+  .kb-row span { color: #666; }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 3px; }
 </style>
 </head>
 <body>
 
 <div id="sidebar">
   <div id="sidebar-header">
-    <h2>Match Setup</h2>
-    <div class="team-setup">
-      <div class="team-emoji" id="emoji1" title="Click to change icon">&#127993;</div>
-      <input type="text" id="team1-name" value="Team 1" placeholder="Team 1">
-      <input type="color" id="team1-color" value="#4fc3f7">
+    <div id="app-title">Pickle Review</div>
+    <div class="team-row">
+      <div class="team-emoji-btn" id="em1" title="Change icon">&#127993;</div>
+      <input type="text" class="team-input" id="t1name" value="Team 1" placeholder="Team 1">
+      <input type="color" class="team-color-input" id="t1color" value="#3b82f6">
     </div>
-    <div class="team-setup">
-      <div class="team-emoji" id="emoji2" title="Click to change icon">&#127992;</div>
-      <input type="text" id="team2-name" value="Team 2" placeholder="Team 2">
-      <input type="color" id="team2-color" value="#ef5350">
+    <div class="team-row">
+      <div class="team-emoji-btn" id="em2" title="Change icon">&#127992;</div>
+      <input type="text" class="team-input" id="t2name" value="Team 2" placeholder="Team 2">
+      <input type="color" class="team-color-input" id="t2color" value="#ef4444">
     </div>
   </div>
 
-  <div id="score-bar">
-    <div class="score-team"><span id="score1-emoji">&#127993;</span> <span class="score-num" id="score1">0</span></div>
-    <span class="score-dash">&ndash;</span>
-    <div class="score-team"><span class="score-num" id="score2">0</span> <span id="score2-emoji">&#127992;</span></div>
+  <div id="scoreboard">
+    <div class="score-side" id="side1">
+      <span class="score-emoji" id="se1">&#127993;</span>
+      <span class="team-label" id="tl1">Team 1</span>
+      <span class="score-big" id="s1" style="color:#3b82f6">0</span>
+      <span class="serve-badge" id="sv1">Serving</span>
+    </div>
+    <span class="score-divider">:</span>
+    <div class="score-side" id="side2">
+      <span class="score-emoji" id="se2">&#127992;</span>
+      <span class="team-label" id="tl2">Team 2</span>
+      <span class="score-big" id="s2" style="color:#ef4444">0</span>
+      <span class="serve-badge" id="sv2">Serving</span>
+    </div>
   </div>
 
-  <div id="point-actions">
-    <button class="point-btn" id="btn-score1" style="border-color: #4fc3f7; background: rgba(79,195,247,0.1); color: #4fc3f7;">
-      &#127993; Point <kbd>1</kbd>
-    </button>
-    <button class="point-btn" id="btn-score2" style="border-color: #ef5350; background: rgba(239,83,80,0.1); color: #ef5350;">
-      Point &#127992; <kbd>2</kbd>
-    </button>
+  <div id="score-actions">
+    <button class="score-btn" id="sb1" style="border-color:#3b82f6;color:#3b82f6">&#127993; Point<kbd>1</kbd></button>
+    <button class="score-btn" id="sb2" style="border-color:#ef4444;color:#ef4444">Point &#127992;<kbd>2</kbd></button>
+  </div>
+
+  <div id="points-filter">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="ace">Ace</button>
+    <button class="filter-btn" data-filter="winner">Winner</button>
+    <button class="filter-btn" data-filter="error">Error</button>
+    <button class="filter-btn" data-filter="rally">Rally</button>
   </div>
 
   <div id="points-list"></div>
 
+  <div id="stats-bar">
+    <div class="stat-item">Points: <span id="stat-total">0</span></div>
+    <div class="stat-item">Aces: <span id="stat-aces">0</span></div>
+    <div class="stat-item">Winners: <span id="stat-winners">0</span></div>
+    <div class="stat-item">Errors: <span id="stat-errors">0</span></div>
+  </div>
+
   <div id="sidebar-footer">
-    <span id="point-count">0 points</span>
-    <button id="btn-export-data">Export JSON</button>
-    <button id="btn-import-data">Import</button>
+    <button class="footer-btn" id="btn-export-json">Export JSON</button>
+    <button class="footer-btn" id="btn-import-json">Import</button>
+    <button class="footer-btn" id="btn-toggle-serve">Toggle Serve</button>
   </div>
 </div>
 
 <div id="main">
   <div id="dropzone">
-    <div class="icon">&#127993;</div>
-    <p>Drop your pickleball match video here</p>
-    <p style="font-size:13px;opacity:0.4;margin-top:8px;">or click to browse</p>
-    <input type="file" id="file-input" accept="video/*" style="display:none">
+    <div class="drop-icon">&#127993;</div>
+    <h2>Drop your match video</h2>
+    <p>or click anywhere to browse</p>
+    <div class="drop-hint">
+      <div><kbd>Space</kbd> Play/Pause</div>
+      <div><kbd>&larr; &rarr;</kbd> Frame by frame</div>
+      <div><kbd>1</kbd> <kbd>2</kbd> Score point</div>
+      <div><kbd>?</kbd> All shortcuts</div>
+    </div>
+    <input type="file" id="file-in" accept="video/*" style="display:none">
   </div>
 
   <div id="video-container">
-    <video id="video" preload="auto"></video>
+    <video id="vid" preload="auto"></video>
     <canvas id="draw-canvas" class="inactive"></canvas>
-    <div id="text-input-overlay"><input id="text-input" type="text" placeholder="Type text, press Enter"></div>
+    <div id="text-input-overlay"><input id="text-in" type="text" placeholder="Type, press Enter"></div>
+    <div id="hud-score">
+      <span id="hud-e1">&#127993;</span>
+      <span id="hud-s1" style="color:#3b82f6">0</span>
+      <span id="hud-divider">:</span>
+      <span id="hud-s2" style="color:#ef4444">0</span>
+      <span id="hud-e2">&#127992;</span>
+    </div>
+    <div id="hud-frame">F0 | 0:00.000</div>
+    <div id="kb-help">
+      <h4>Keyboard Shortcuts</h4>
+      <div class="kb-row"><span>Play / Pause</span><kbd>Space</kbd></div>
+      <div class="kb-row"><span>Prev / Next frame</span><kbd>&larr; &rarr;</kbd></div>
+      <div class="kb-row"><span>Skip 10 frames</span><kbd>Shift+&larr; &rarr;</kbd></div>
+      <div class="kb-row"><span>Skip 1 second</span><kbd>Ctrl+&larr; &rarr;</kbd></div>
+      <div class="kb-row"><span>Prev / Next point</span><kbd>[ ]</kbd></div>
+      <div class="kb-row"><span>Team 1 / 2 scores</span><kbd>1 2</kbd></div>
+      <div class="kb-row"><span>Draw</span><kbd>D</kbd></div>
+      <div class="kb-row"><span>Arrow</span><kbd>A</kbd></div>
+      <div class="kb-row"><span>Circle</span><kbd>C</kbd></div>
+      <div class="kb-row"><span>Highlight</span><kbd>H</kbd></div>
+      <div class="kb-row"><span>Text</span><kbd>T</kbd></div>
+      <div class="kb-row"><span>Eraser</span><kbd>E</kbd></div>
+      <div class="kb-row"><span>Deselect tool</span><kbd>Esc</kbd></div>
+      <div class="kb-row"><span>Undo</span><kbd>Cmd+Z</kbd></div>
+      <div class="kb-row"><span>Slower / Faster</span><kbd>, .</kbd></div>
+      <div class="kb-row"><span>Toggle shortcuts</span><kbd>?</kbd></div>
+    </div>
   </div>
 
   <div id="controls">
     <div id="timeline-wrapper">
-      <div id="timeline-bar"><div id="timeline-progress"></div></div>
-      <div id="timeline-playhead"></div>
+      <div id="tl-track"><div id="tl-progress"></div></div>
+      <div id="tl-playhead"></div>
     </div>
-    <div id="button-row">
-      <button class="btn" id="btn-prev10" title="Back 10 frames">&#9198;<kbd>&#8679;&larr;</kbd></button>
-      <button class="btn" id="btn-prev" title="Prev frame">&#9664;<kbd>&larr;</kbd></button>
-      <button class="btn" id="btn-play">&#9654;<kbd>Spc</kbd></button>
-      <button class="btn" id="btn-next">&#9654;<kbd>&rarr;</kbd></button>
-      <button class="btn" id="btn-next10">&#9197;<kbd>&#8679;&rarr;</kbd></button>
-
-      <div class="separator"></div>
-      <button class="btn" id="btn-slower">&#8722;</button>
-      <span id="speed-display">1x</span>
-      <button class="btn" id="btn-faster">+</button>
-
-      <div class="separator"></div>
-      <button class="btn" id="btn-prev-point" title="Jump to previous point">&#9664;&#9664; Pt</button>
-      <button class="btn" id="btn-next-point" title="Jump to next point">Pt &#9654;&#9654;</button>
-
-      <div class="separator"></div>
-      <div class="tool-group">
-        <button class="btn" id="btn-draw">&#9998; <kbd>D</kbd></button>
-        <button class="btn" id="btn-arrow">&#10132; <kbd>A</kbd></button>
-        <button class="btn" id="btn-text">T <kbd>T</kbd></button>
-        <button class="btn" id="btn-eraser">&#9003; <kbd>E</kbd></button>
-      </div>
-      <input type="color" id="color-picker" value="#ff0000">
-      <input type="range" id="size-slider" min="2" max="20" value="4">
-      <div class="separator"></div>
-      <button class="btn" id="btn-undo">&#8617;<kbd>&#8984;Z</kbd></button>
-      <button class="btn" id="btn-clear">Clear</button>
-      <button class="btn" id="btn-screenshot">&#128247;</button>
-
-      <span id="time-display">0:00.000 / 0:00 [F0]</span>
+    <div id="btn-row">
+      <button class="cb" id="b-p10">&#9198;<kbd>&#8679;&larr;</kbd></button>
+      <button class="cb" id="b-p1">&#9664;<kbd>&larr;</kbd></button>
+      <button class="cb" id="b-play">&#9654;<kbd>Spc</kbd></button>
+      <button class="cb" id="b-n1">&#9654;<kbd>&rarr;</kbd></button>
+      <button class="cb" id="b-n10">&#9197;<kbd>&#8679;&rarr;</kbd></button>
+      <div class="sep"></div>
+      <button class="cb" id="b-slow">&minus;</button>
+      <span id="speed-val">1x</span>
+      <button class="cb" id="b-fast">+</button>
+      <div class="sep"></div>
+      <button class="cb" id="b-pp">&#9664;&#9664; Pt<kbd>[</kbd></button>
+      <button class="cb" id="b-np">Pt &#9654;&#9654;<kbd>]</kbd></button>
+      <div class="sep"></div>
+      <button class="cb" id="b-draw">&#9998;<kbd>D</kbd></button>
+      <button class="cb" id="b-arrow">&#10132;<kbd>A</kbd></button>
+      <button class="cb" id="b-circle">&#9711;<kbd>C</kbd></button>
+      <button class="cb" id="b-highlight">&#9632;<kbd>H</kbd></button>
+      <button class="cb" id="b-text">T<kbd>T</kbd></button>
+      <button class="cb" id="b-eraser">&#9003;<kbd>E</kbd></button>
+      <input type="color" id="color-pick" value="#ff0000">
+      <input type="range" id="size-range" min="2" max="24" value="4">
+      <div class="sep"></div>
+      <button class="cb" id="b-undo">&#8617;<kbd>&#8984;Z</kbd></button>
+      <button class="cb" id="b-clear">Clear</button>
+      <button class="cb" id="b-snap">&#128247;</button>
+      <button class="cb" id="b-help">?</button>
+      <span id="time-val">0:00.000 / 0:00 [F0]</span>
     </div>
   </div>
 </div>
 
-<!-- Note modal -->
-<div id="note-modal">
-  <div id="note-modal-inner">
-    <h3 id="note-modal-title">Add Note</h3>
-    <textarea id="note-textarea" placeholder="What happened on this point? (optional)"></textarea>
-    <div id="note-modal-btns">
-      <button id="note-cancel">Skip</button>
-      <button id="note-save">Save</button>
+<!-- Modal -->
+<div id="modal-bg">
+  <div id="modal-box">
+    <h3 id="modal-title">Point Scored!</h3>
+    <div id="modal-subtitle"></div>
+    <div class="point-types" id="modal-types">
+      <button class="pt-type-btn" data-type="ace">&#9889; Ace</button>
+      <button class="pt-type-btn" data-type="winner">&#127942; Winner</button>
+      <button class="pt-type-btn selected" data-type="rally">&#127955; Rally</button>
+      <button class="pt-type-btn" data-type="error">&#10060; Unforced Error</button>
+      <button class="pt-type-btn" data-type="forced">&#128165; Forced Error</button>
+      <button class="pt-type-btn" data-type="dink">&#127860; Dink Win</button>
+      <button class="pt-type-btn" data-type="drive">&#128168; Drive Win</button>
+      <button class="pt-type-btn" data-type="lob">&#127752; Lob</button>
+    </div>
+    <textarea id="modal-note" placeholder="What happened? (optional)"></textarea>
+    <div id="modal-btns">
+      <button class="modal-skip" id="m-skip">Skip</button>
+      <button class="modal-save" id="m-save">Save Point</button>
     </div>
   </div>
 </div>
 
 <!-- Emoji picker -->
-<div id="emoji-picker"></div>
-
-<!-- Hidden import input -->
-<input type="file" id="import-input" accept=".json" style="display:none">
+<div id="emoji-pick"></div>
+<input type="file" id="import-in" accept=".json" style="display:none">
 
 <script>
-const video = document.getElementById('video');
+const vid = document.getElementById('vid');
 const canvas = document.getElementById('draw-canvas');
 const ctx = canvas.getContext('2d');
-const dropzone = document.getElementById('dropzone');
-const fileInput = document.getElementById('file-input');
-const textOverlay = document.getElementById('text-input-overlay');
-const textInput = document.getElementById('text-input');
-const timeDisplay = document.getElementById('time-display');
-const timelineWrapper = document.getElementById('timeline-wrapper');
-const timelineProgress = document.getElementById('timeline-progress');
-const timelinePlayhead = document.getElementById('timeline-playhead');
-const pointsList = document.getElementById('points-list');
+const FD = 1/60;
 
-const FRAME_DUR = 1/60;
-let currentTool = null;
-let isDrawing = false;
-let playbackSpeed = 1;
-let annotations = {}; // frame -> [strokes]
-let currentStroke = null;
+let tool = null, drawing = false, speed = 1, curStroke = null;
+let annotations = {};
+let points = [];
+let serving = 1;
+let activeFilter = 'all';
 
-// --- Match data ---
-let team1 = { name: 'Team 1', color: '#4fc3f7', emoji: '\u{1F3C9}', score: 0 };
-let team2 = { name: 'Team 2', color: '#ef5350', emoji: '\u{1F3C8}', score: 0 };
-let points = []; // { time, team: 1|2, score1, score2, note, frame }
+let T1 = { name:'Team 1', color:'#3b82f6', emoji:'\u{1F3C9}', score:0 };
+let T2 = { name:'Team 2', color:'#ef4444', emoji:'\u{1F3C8}', score:0 };
 
-const EMOJIS = [
-  '\u{1F3C9}','\u{1F3C8}','\u{1F3BE}','\u{26BD}','\u{1F3D3}','\u{1F94F}',
-  '\u{1F3B3}','\u{1F3CF}','\u{1F3D2}','\u{1F94E}','\u{26F3}','\u{1F3AF}',
-  '\u{1F947}','\u{1F948}','\u{1F525}','\u{2B50}','\u{1F4A5}','\u{26A1}',
+const TYPE_COLORS = { ace:'#f59e0b', winner:'#22c55e', rally:'#3b82f6', error:'#ef4444', forced:'#f97316', dink:'#a78bfa', drive:'#06b6d4', lob:'#ec4899' };
+const TYPE_ICONS = { ace:'\u26A1', winner:'\u{1F3C6}', rally:'\u{1F3CB}', error:'\u274C', forced:'\u{1F4A5}', dink:'\u{1F372}', drive:'\u{1F4A8}', lob:'\u{1F308}' };
+
+const EMOJIS = ['\u{1F3C9}','\u{1F3C8}','\u{1F3BE}','\u26BD','\u{1F3D3}','\u{1F94F}','\u{1F3B3}','\u{1F3CF}',
+  '\u{1F947}','\u{1F948}','\u{1F525}','\u2B50','\u{1F4A5}','\u26A1',
   '\u{1F7E2}','\u{1F534}','\u{1F535}','\u{1F7E1}','\u{1F7E3}','\u{1F7E0}',
-  '\u{2764}\u{FE0F}','\u{1F499}','\u{1F49A}','\u{1F49B}',
-  '\u{1F600}','\u{1F60E}','\u{1F4AA}','\u{1F3C6}'
-];
+  '\u2764\uFE0F','\u{1F499}','\u{1F49A}','\u{1F49B}','\u{1F600}','\u{1F60E}','\u{1F4AA}','\u{1F3C6}',
+  '\u{1F1FA}\u{1F1F8}','\u{1F40D}','\u{1F41D}','\u{1F98A}'];
 
-// --- File loading ---
-dropzone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', e => { if (e.target.files[0]) loadVideo(e.target.files[0]); });
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-dropzone.addEventListener('drop', e => {
-  e.preventDefault(); dropzone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) loadVideo(e.dataTransfer.files[0]);
-});
+// --- File ---
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('file-in');
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', e => { if(e.target.files[0]) loadVid(e.target.files[0]); });
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if(e.dataTransfer.files[0]) loadVid(e.dataTransfer.files[0]); });
 
-function loadVideo(file) {
-  video.src = URL.createObjectURL(file);
-  video.load();
-  video.addEventListener('loadedmetadata', () => {
-    dropzone.classList.add('hidden');
-    video.pause();
-    video.currentTime = 0;
-    resizeCanvas();
-    updateUI();
-  }, { once: true });
+function loadVid(f) {
+  vid.src = URL.createObjectURL(f);
+  vid.load();
+  vid.addEventListener('loadedmetadata', () => {
+    dz.classList.add('hidden');
+    vid.pause(); vid.currentTime = 0;
+    resizeCanvas(); updateUI();
+    document.getElementById('hud-score').classList.add('visible');
+    document.getElementById('hud-frame').classList.add('visible');
+  }, {once:true});
 }
 
 // --- Canvas ---
 function resizeCanvas() {
-  const rect = video.getBoundingClientRect();
-  const parent = video.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * devicePixelRatio;
-  canvas.height = rect.height * devicePixelRatio;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  canvas.style.left = (rect.left - parent.left) + 'px';
-  canvas.style.top = (rect.top - parent.top) + 'px';
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  redrawAnnotations();
+  const r = vid.getBoundingClientRect(), p = vid.parentElement.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio; canvas.height = r.height * devicePixelRatio;
+  canvas.style.width = r.width+'px'; canvas.style.height = r.height+'px';
+  canvas.style.left = (r.left-p.left)+'px'; canvas.style.top = (r.top-p.top)+'px';
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  redraw();
 }
 window.addEventListener('resize', resizeCanvas);
-video.addEventListener('loadeddata', resizeCanvas);
+vid.addEventListener('loadeddata', resizeCanvas);
 
-// --- Frame nav ---
-function curFrame() { return Math.round(video.currentTime / FRAME_DUR); }
-function seekFrame(d) {
-  video.pause();
-  video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + d * FRAME_DUR));
-  updateUI();
-}
+// --- Frame ---
+function cf() { return Math.round(vid.currentTime/FD); }
+function seekF(d) { vid.pause(); vid.currentTime = Math.max(0,Math.min(vid.duration,vid.currentTime+d*FD)); updateUI(); }
+function seekSec(d) { vid.pause(); vid.currentTime = Math.max(0,Math.min(vid.duration,vid.currentTime+d)); updateUI(); }
+
 function updateUI() {
-  updateTimeDisplay();
-  updateTimeline();
-  redrawAnnotations();
-  highlightActivePoint();
-}
-function updateTimeDisplay() {
-  const t = video.currentTime, d = video.duration || 0;
+  updateTime(); updateTL(); redraw(); highlightPt();
+  // HUD
+  document.getElementById('hud-s1').textContent = T1.score;
+  document.getElementById('hud-s2').textContent = T2.score;
+  document.getElementById('hud-e1').textContent = T1.emoji;
+  document.getElementById('hud-e2').textContent = T2.emoji;
+  document.getElementById('hud-s1').style.color = T1.color;
+  document.getElementById('hud-s2').style.color = T2.color;
+  const t = vid.currentTime;
   const fmt = s => `${Math.floor(s/60)}:${(s%60).toFixed(3).padStart(6,'0')}`;
-  const fmtS = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-  timeDisplay.textContent = `${fmt(t)} / ${fmtS(d)}  [F${curFrame()}]`;
+  document.getElementById('hud-frame').textContent = `F${cf()} | ${fmt(t)}`;
 }
 
-// --- Custom timeline ---
-function updateTimeline() {
-  if (!video.duration) return;
-  const pct = (video.currentTime / video.duration) * 100;
-  timelineProgress.style.width = pct + '%';
-  const wrapW = timelineWrapper.offsetWidth;
-  timelinePlayhead.style.left = (pct / 100 * wrapW) + 'px';
+function updateTime() {
+  const t=vid.currentTime, d=vid.duration||0;
+  const fmt=s=>`${Math.floor(s/60)}:${(s%60).toFixed(3).padStart(6,'0')}`;
+  const fs=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+  document.getElementById('time-val').textContent = `${fmt(t)} / ${fs(d)} [F${cf()}]`;
 }
 
-function renderTimelineMarkers() {
-  timelineWrapper.querySelectorAll('.timeline-marker').forEach(m => m.remove());
-  if (!video.duration) return;
-  const wrapW = timelineWrapper.offsetWidth;
-  points.forEach((pt, i) => {
-    const pct = pt.time / video.duration;
-    const marker = document.createElement('div');
-    marker.className = 'timeline-marker';
-    marker.style.left = (pct * wrapW) + 'px';
-    marker.innerHTML = `<span>${pt.team === 1 ? team1.emoji : team2.emoji}</span><span class="marker-score">${pt.score1}-${pt.score2}</span>`;
-    marker.title = `${pt.team === 1 ? team1.name : team2.name} scores (${pt.score1}-${pt.score2})${pt.note ? '\n' + pt.note : ''}`;
-    marker.addEventListener('click', e => { e.stopPropagation(); jumpToPoint(i); });
-    timelineWrapper.appendChild(marker);
+// --- Timeline ---
+function updateTL() {
+  if(!vid.duration) return;
+  const pct = vid.currentTime/vid.duration*100;
+  document.getElementById('tl-progress').style.width = pct+'%';
+  const w = document.getElementById('timeline-wrapper');
+  const trackL = 12, trackR = w.offsetWidth - 12;
+  document.getElementById('tl-playhead').style.left = (trackL + pct/100*(trackR-trackL))+'px';
+}
+
+function renderMarkers() {
+  document.querySelectorAll('.tl-marker').forEach(m=>m.remove());
+  if(!vid.duration) return;
+  const w = document.getElementById('timeline-wrapper');
+  const trackL = 12, trackW = w.offsetWidth - 24;
+  points.forEach((pt,i) => {
+    const pct = pt.time / vid.duration;
+    const m = document.createElement('div');
+    m.className = 'tl-marker';
+    m.style.left = (trackL + pct*trackW)+'px';
+    const tc = TYPE_COLORS[pt.type]||'#888';
+    m.innerHTML = `<span>${pt.team===1?T1.emoji:T2.emoji}</span><span class="tl-score-tag">${pt.score1}-${pt.score2}</span><span class="tl-type-dot" style="background:${tc}"></span>`;
+    m.title = `${pt.team===1?T1.name:T2.name}: ${pt.type||'rally'} (${pt.score1}-${pt.score2})${pt.note?'\n'+pt.note:''}`;
+    m.addEventListener('click', e => { e.stopPropagation(); jumpPt(i); });
+    w.appendChild(m);
   });
 }
 
-let isDraggingTimeline = false;
-timelineWrapper.addEventListener('mousedown', e => {
-  if (e.target.closest('.timeline-marker')) return;
-  isDraggingTimeline = true;
-  seekToTimelinePos(e);
+let tlDrag = false;
+document.getElementById('timeline-wrapper').addEventListener('mousedown', e => {
+  if(e.target.closest('.tl-marker')) return;
+  tlDrag = true; seekTL(e);
 });
-window.addEventListener('mousemove', e => { if (isDraggingTimeline) seekToTimelinePos(e); });
-window.addEventListener('mouseup', () => isDraggingTimeline = false);
-
-function seekToTimelinePos(e) {
-  const rect = timelineWrapper.getBoundingClientRect();
-  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  video.currentTime = pct * video.duration;
-  video.pause();
-  updateUI();
+window.addEventListener('mousemove', e => { if(tlDrag) seekTL(e); });
+window.addEventListener('mouseup', () => tlDrag = false);
+function seekTL(e) {
+  const r = document.getElementById('timeline-wrapper').getBoundingClientRect();
+  const pct = Math.max(0,Math.min(1,(e.clientX-r.left-12)/(r.width-24)));
+  vid.currentTime = pct*vid.duration; vid.pause(); updateUI();
 }
-
-video.addEventListener('timeupdate', updateUI);
+vid.addEventListener('timeupdate', updateUI);
 
 // --- Playback ---
 function togglePlay() {
-  if (video.paused) { video.playbackRate = playbackSpeed; video.play(); }
-  else video.pause();
-  document.getElementById('btn-play').innerHTML = video.paused ? '&#9654;<kbd>Spc</kbd>' : '&#9646;&#9646;<kbd>Spc</kbd>';
+  if(vid.paused){vid.playbackRate=speed;vid.play();}else vid.pause();
+  document.getElementById('b-play').innerHTML = vid.paused?'&#9654;<kbd>Spc</kbd>':'&#9646;&#9646;<kbd>Spc</kbd>';
+}
+const SPEEDS = [0.05,0.1,0.25,0.5,0.75,1,1.5,2,4];
+function chgSpeed(d) {
+  let i=SPEEDS.indexOf(speed); if(i<0)i=5;
+  i=Math.max(0,Math.min(SPEEDS.length-1,i+d));
+  speed=SPEEDS[i]; vid.playbackRate=speed;
+  document.getElementById('speed-val').textContent=speed+'x';
 }
 
-const speeds = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 4];
-function changeSpeed(dir) {
-  let idx = speeds.indexOf(playbackSpeed);
-  if (idx === -1) idx = 4;
-  idx = Math.max(0, Math.min(speeds.length-1, idx+dir));
-  playbackSpeed = speeds[idx];
-  video.playbackRate = playbackSpeed;
-  document.getElementById('speed-display').textContent = playbackSpeed + 'x';
-}
-
-document.getElementById('btn-play').addEventListener('click', togglePlay);
-document.getElementById('btn-prev').addEventListener('click', () => seekFrame(-1));
-document.getElementById('btn-next').addEventListener('click', () => seekFrame(1));
-document.getElementById('btn-prev10').addEventListener('click', () => seekFrame(-10));
-document.getElementById('btn-next10').addEventListener('click', () => seekFrame(10));
-document.getElementById('btn-slower').addEventListener('click', () => changeSpeed(-1));
-document.getElementById('btn-faster').addEventListener('click', () => changeSpeed(1));
+document.getElementById('b-play').addEventListener('click', togglePlay);
+document.getElementById('b-p1').addEventListener('click', ()=>seekF(-1));
+document.getElementById('b-n1').addEventListener('click', ()=>seekF(1));
+document.getElementById('b-p10').addEventListener('click', ()=>seekF(-10));
+document.getElementById('b-n10').addEventListener('click', ()=>seekF(10));
+document.getElementById('b-slow').addEventListener('click', ()=>chgSpeed(-1));
+document.getElementById('b-fast').addEventListener('click', ()=>chgSpeed(1));
 
 // --- Scoring ---
-function syncTeamUI() {
-  team1.name = document.getElementById('team1-name').value || 'Team 1';
-  team1.color = document.getElementById('team1-color').value;
-  team2.name = document.getElementById('team2-name').value || 'Team 2';
-  team2.color = document.getElementById('team2-color').value;
-
-  document.getElementById('score1-emoji').textContent = team1.emoji;
-  document.getElementById('score2-emoji').textContent = team2.emoji;
-  document.getElementById('emoji1').textContent = team1.emoji;
-  document.getElementById('emoji2').textContent = team2.emoji;
-
-  const b1 = document.getElementById('btn-score1');
-  b1.style.borderColor = team1.color;
-  b1.style.color = team1.color;
-  b1.style.background = team1.color + '1a';
-  b1.innerHTML = `${team1.emoji} Point <kbd>1</kbd>`;
-
-  const b2 = document.getElementById('btn-score2');
-  b2.style.borderColor = team2.color;
-  b2.style.color = team2.color;
-  b2.style.background = team2.color + '1a';
-  b2.innerHTML = `Point ${team2.emoji} <kbd>2</kbd>`;
-
-  recalcScores();
-  renderPointsList();
-  renderTimelineMarkers();
+function syncUI() {
+  T1.name=document.getElementById('t1name').value||'Team 1';
+  T1.color=document.getElementById('t1color').value;
+  T2.name=document.getElementById('t2name').value||'Team 2';
+  T2.color=document.getElementById('t2color').value;
+  document.getElementById('se1').textContent=T1.emoji;
+  document.getElementById('se2').textContent=T2.emoji;
+  document.getElementById('em1').textContent=T1.emoji;
+  document.getElementById('em2').textContent=T2.emoji;
+  document.getElementById('tl1').textContent=T1.name;
+  document.getElementById('tl2').textContent=T2.name;
+  const b1=document.getElementById('sb1');
+  b1.style.borderColor=T1.color; b1.style.color=T1.color;
+  b1.innerHTML=`${T1.emoji} Point<kbd>1</kbd>`;
+  const b2=document.getElementById('sb2');
+  b2.style.borderColor=T2.color; b2.style.color=T2.color;
+  b2.innerHTML=`Point ${T2.emoji}<kbd>2</kbd>`;
+  document.getElementById('s1').style.color=T1.color;
+  document.getElementById('s2').style.color=T2.color;
+  document.getElementById('sv1').classList.toggle('active', serving===1);
+  document.getElementById('sv2').classList.toggle('active', serving===2);
+  recalc(); renderPtList(); renderMarkers();
 }
-
-['team1-name','team1-color','team2-name','team2-color'].forEach(id => {
-  document.getElementById(id).addEventListener('input', syncTeamUI);
-});
+['t1name','t1color','t2name','t2color'].forEach(id=>document.getElementById(id).addEventListener('input',syncUI));
 
 // Emoji picker
-let emojiTarget = null;
-const emojiPicker = document.getElementById('emoji-picker');
-EMOJIS.forEach(em => {
-  const span = document.createElement('span');
-  span.className = 'emoji-option';
-  span.textContent = em;
-  span.addEventListener('click', () => {
-    if (emojiTarget === 1) team1.emoji = em;
-    else team2.emoji = em;
-    emojiPicker.classList.remove('show');
-    syncTeamUI();
+let epTarget=null;
+const ep=document.getElementById('emoji-pick');
+EMOJIS.forEach(em=>{const s=document.createElement('span');s.className='ep-opt';s.textContent=em;s.addEventListener('click',()=>{if(epTarget===1)T1.emoji=em;else T2.emoji=em;ep.classList.remove('show');syncUI();});ep.appendChild(s);});
+document.getElementById('em1').addEventListener('click',e=>{epTarget=1;const r=e.target.getBoundingClientRect();ep.style.left=r.left+'px';ep.style.top=r.bottom+4+'px';ep.classList.toggle('show');});
+document.getElementById('em2').addEventListener('click',e=>{epTarget=2;const r=e.target.getBoundingClientRect();ep.style.left=r.left+'px';ep.style.top=r.bottom+4+'px';ep.classList.toggle('show');});
+document.addEventListener('click',e=>{if(!e.target.closest('#emoji-pick')&&!e.target.closest('.team-emoji-btn'))ep.classList.remove('show');});
+
+document.getElementById('btn-toggle-serve').addEventListener('click',()=>{serving=serving===1?2:1;syncUI();});
+
+function addPoint(team) {
+  const time=vid.currentTime, frame=cf();
+  const ns1=team===1?T1.score+1:T1.score, ns2=team===2?T2.score+1:T2.score;
+  showModal({time,frame,team,score1:ns1,score2:ns2,note:'',type:'rally'});
+}
+
+let modalSelectedType='rally';
+function showModal(pt) {
+  const m=document.getElementById('modal-bg');
+  const note=document.getElementById('modal-note');
+  document.getElementById('modal-title').textContent=`${pt.team===1?T1.emoji+' '+T1.name:T2.name+' '+T2.emoji} scores!`;
+  document.getElementById('modal-subtitle').textContent=`Score: ${pt.score1} - ${pt.score2}`;
+  note.value=''; modalSelectedType='rally';
+  document.querySelectorAll('.pt-type-btn').forEach(b=>{b.classList.toggle('selected',b.dataset.type==='rally');});
+  m.classList.add('show'); note.focus();
+
+  const commit = () => {
+    pt.note=note.value.trim(); pt.type=modalSelectedType;
+    points.push(pt); points.sort((a,b)=>a.time-b.time);
+    recalc(); renderPtList(); renderMarkers(); updateStats();
+    m.classList.remove('show'); cleanup();
+  };
+  const skip = () => { pt.note=''; pt.type=modalSelectedType; points.push(pt); points.sort((a,b)=>a.time-b.time); recalc(); renderPtList(); renderMarkers(); updateStats(); m.classList.remove('show'); cleanup(); };
+  const kh = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit();}else if(e.key==='Escape')skip(); };
+  const cleanup = () => { document.getElementById('m-save').removeEventListener('click',commit); document.getElementById('m-skip').removeEventListener('click',skip); note.removeEventListener('keydown',kh); };
+  document.getElementById('m-save').addEventListener('click',commit);
+  document.getElementById('m-skip').addEventListener('click',skip);
+  note.addEventListener('keydown',kh);
+}
+
+document.querySelectorAll('.pt-type-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.pt-type-btn').forEach(x=>x.classList.remove('selected'));
+    b.classList.add('selected'); modalSelectedType=b.dataset.type;
   });
-  emojiPicker.appendChild(span);
 });
 
-document.getElementById('emoji1').addEventListener('click', e => {
-  emojiTarget = 1;
-  const rect = e.target.getBoundingClientRect();
-  emojiPicker.style.left = rect.left + 'px';
-  emojiPicker.style.top = rect.bottom + 4 + 'px';
-  emojiPicker.classList.toggle('show');
-});
-document.getElementById('emoji2').addEventListener('click', e => {
-  emojiTarget = 2;
-  const rect = e.target.getBoundingClientRect();
-  emojiPicker.style.left = rect.left + 'px';
-  emojiPicker.style.top = rect.bottom + 4 + 'px';
-  emojiPicker.classList.toggle('show');
-});
-document.addEventListener('click', e => {
-  if (!e.target.closest('#emoji-picker') && !e.target.closest('.team-emoji'))
-    emojiPicker.classList.remove('show');
-});
-
-function addPoint(teamNum) {
-  const time = video.currentTime;
-  const frame = curFrame();
-
-  // Tentatively add the point
-  const s1 = teamNum === 1 ? team1.score + 1 : team1.score;
-  const s2 = teamNum === 2 ? team2.score + 1 : team2.score;
-
-  const pt = { time, frame, team: teamNum, score1: s1, score2: s2, note: '' };
-
-  // Show note modal
-  showNoteModal(pt);
+function recalc() {
+  let s1=0,s2=0;
+  points.forEach(pt=>{if(pt.team===1)s1++;else s2++;pt.score1=s1;pt.score2=s2;});
+  T1.score=s1;T2.score=s2;
+  document.getElementById('s1').textContent=s1;
+  document.getElementById('s2').textContent=s2;
 }
 
-function showNoteModal(pt) {
-  const modal = document.getElementById('note-modal');
-  const textarea = document.getElementById('note-textarea');
-  const title = document.getElementById('note-modal-title');
-  title.textContent = `${pt.team === 1 ? team1.emoji + ' ' + team1.name : team2.name + ' ' + team2.emoji} scores! (${pt.score1}-${pt.score2})`;
-  textarea.value = '';
-  modal.classList.add('show');
-  textarea.focus();
-
-  const save = () => {
-    pt.note = textarea.value.trim();
-    points.push(pt);
-    points.sort((a,b) => a.time - b.time);
-    recalcScores();
-    renderPointsList();
-    renderTimelineMarkers();
-    modal.classList.remove('show');
-    cleanup();
-  };
-  const cancel = () => {
-    pt.note = '';
-    points.push(pt);
-    points.sort((a,b) => a.time - b.time);
-    recalcScores();
-    renderPointsList();
-    renderTimelineMarkers();
-    modal.classList.remove('show');
-    cleanup();
-  };
-  const keyHandler = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } else if (e.key === 'Escape') cancel(); };
-
-  const cleanup = () => {
-    document.getElementById('note-save').removeEventListener('click', save);
-    document.getElementById('note-cancel').removeEventListener('click', cancel);
-    textarea.removeEventListener('keydown', keyHandler);
-  };
-
-  document.getElementById('note-save').addEventListener('click', save);
-  document.getElementById('note-cancel').addEventListener('click', cancel);
-  textarea.addEventListener('keydown', keyHandler);
+function updateStats() {
+  document.getElementById('stat-total').textContent=points.length;
+  document.getElementById('stat-aces').textContent=points.filter(p=>p.type==='ace').length;
+  document.getElementById('stat-winners').textContent=points.filter(p=>p.type==='winner').length;
+  document.getElementById('stat-errors').textContent=points.filter(p=>p.type==='error').length;
 }
 
-function recalcScores() {
-  let s1 = 0, s2 = 0;
-  points.forEach(pt => {
-    if (pt.team === 1) s1++;
-    else s2++;
-    pt.score1 = s1;
-    pt.score2 = s2;
-  });
-  team1.score = s1;
-  team2.score = s2;
-  document.getElementById('score1').textContent = s1;
-  document.getElementById('score2').textContent = s2;
-  document.getElementById('point-count').textContent = `${points.length} points`;
-}
-
-function renderPointsList() {
-  pointsList.innerHTML = '';
-  points.forEach((pt, i) => {
-    const div = document.createElement('div');
-    div.className = 'point-entry';
-    div.dataset.idx = i;
-    div.style.borderLeftColor = pt.team === 1 ? team1.color : team2.color;
-    const emoji = pt.team === 1 ? team1.emoji : team2.emoji;
-    const teamName = pt.team === 1 ? team1.name : team2.name;
-    const timeStr = `${Math.floor(pt.time/60)}:${String(Math.floor(pt.time%60)).padStart(2,'0')}`;
-    div.innerHTML = `
-      <span class="point-emoji">${emoji}</span>
-      <div class="point-info">
-        <div><span class="point-score">${pt.score1}-${pt.score2}</span> <span class="point-time">${timeStr}</span></div>
-        ${pt.note ? `<div class="point-note" title="${pt.note.replace(/"/g,'&quot;')}">${pt.note}</div>` : ''}
+function renderPtList() {
+  const list=document.getElementById('points-list');
+  list.innerHTML='';
+  points.forEach((pt,i) => {
+    if(activeFilter!=='all' && pt.type!==activeFilter) return;
+    const d=document.createElement('div');
+    d.className='point-card'; d.dataset.idx=i;
+    d.style.borderLeftColor=pt.team===1?T1.color:T2.color;
+    const emoji=pt.team===1?T1.emoji:T2.emoji;
+    const ts=`${Math.floor(pt.time/60)}:${String(Math.floor(pt.time%60)).padStart(2,'0')}`;
+    const tc=TYPE_COLORS[pt.type]||'#888';
+    const ti=TYPE_ICONS[pt.type]||'';
+    d.innerHTML=`
+      <span class="pc-emoji">${emoji}</span>
+      <div class="pc-body">
+        <div class="pc-top">
+          <span class="pc-score">${pt.score1}-${pt.score2}</span>
+          <span class="pc-type" style="background:${tc}22;color:${tc}">${ti} ${pt.type||'rally'}</span>
+          <span class="pc-time">${ts}</span>
+        </div>
+        ${pt.note?`<div class="pc-note" title="${pt.note.replace(/"/g,'&quot;')}">${pt.note}</div>`:''}
       </div>
-      <span class="point-delete" title="Remove point">&times;</span>
-    `;
-    div.addEventListener('click', e => {
-      if (e.target.closest('.point-delete')) {
-        points.splice(i, 1);
-        recalcScores();
-        renderPointsList();
-        renderTimelineMarkers();
-        return;
-      }
-      jumpToPoint(i);
-    });
-    // Double click to edit note
-    div.addEventListener('dblclick', () => {
-      const note = prompt('Edit note:', pt.note || '');
-      if (note !== null) {
-        pt.note = note;
-        renderPointsList();
-        renderTimelineMarkers();
-      }
-    });
-    pointsList.appendChild(div);
+      <span class="pc-delete" title="Remove">&times;</span>`;
+    d.addEventListener('click',e=>{if(e.target.closest('.pc-delete')){points.splice(i,1);recalc();renderPtList();renderMarkers();updateStats();return;}jumpPt(i);});
+    d.addEventListener('dblclick',()=>{const n=prompt('Edit note:',pt.note||'');if(n!==null){pt.note=n;renderPtList();renderMarkers();}});
+    list.appendChild(d);
   });
 }
 
-function jumpToPoint(i) {
-  if (!points[i]) return;
-  video.currentTime = points[i].time;
-  video.pause();
-  updateUI();
-}
+// Filters
+document.querySelectorAll('.filter-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); activeFilter=b.dataset.filter; renderPtList();
+  });
+});
 
-function highlightActivePoint() {
-  const t = video.currentTime;
-  document.querySelectorAll('.point-entry').forEach(div => {
-    const idx = parseInt(div.dataset.idx);
-    const pt = points[idx];
-    div.classList.toggle('active', pt && Math.abs(pt.time - t) < 0.5);
+function jumpPt(i) { if(!points[i])return; vid.currentTime=points[i].time; vid.pause(); updateUI(); }
+function highlightPt() {
+  const t=vid.currentTime;
+  document.querySelectorAll('.point-card').forEach(d=>{
+    const idx=parseInt(d.dataset.idx);
+    d.classList.toggle('active',points[idx]&&Math.abs(points[idx].time-t)<0.5);
   });
 }
+function prevPt() { const t=vid.currentTime-0.1; for(let i=points.length-1;i>=0;i--)if(points[i].time<t){jumpPt(i);return;} }
+function nextPt() { const t=vid.currentTime+0.1; for(let i=0;i<points.length;i++)if(points[i].time>t){jumpPt(i);return;} }
 
-// Jump between points
-document.getElementById('btn-prev-point').addEventListener('click', () => jumpToPrevPoint());
-document.getElementById('btn-next-point').addEventListener('click', () => jumpToNextPoint());
+document.getElementById('b-pp').addEventListener('click',prevPt);
+document.getElementById('b-np').addEventListener('click',nextPt);
+document.getElementById('sb1').addEventListener('click',()=>addPoint(1));
+document.getElementById('sb2').addEventListener('click',()=>addPoint(2));
 
-function jumpToPrevPoint() {
-  const t = video.currentTime - 0.1;
-  for (let i = points.length - 1; i >= 0; i--) {
-    if (points[i].time < t) { jumpToPoint(i); return; }
+// --- Drawing ---
+function setTool(t) {
+  tool=tool===t?null:t;
+  canvas.className=tool?'':'inactive';
+  if(tool==='eraser')canvas.style.cursor='cell';
+  else if(tool==='text')canvas.style.cursor='text';
+  else if(tool)canvas.style.cursor='crosshair';
+  ['draw','arrow','circle','highlight','text','eraser'].forEach(n=>
+    document.getElementById('b-'+n).classList.toggle('active',tool===n));
+}
+['draw','arrow','circle','highlight','text','eraser'].forEach(n=>
+  document.getElementById('b-'+n).addEventListener('click',()=>setTool(n)));
+
+function gp(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+
+canvas.addEventListener('mousedown',e=>{
+  if(!tool)return; const pos=gp(e);const frame=cf();
+  const color=document.getElementById('color-pick').value;
+  const size=parseInt(document.getElementById('size-range').value);
+
+  if(tool==='text'){
+    const ov=document.getElementById('text-input-overlay');
+    ov.style.display='block';ov.style.left=pos.x+'px';ov.style.top=pos.y+'px';
+    const inp=document.getElementById('text-in');
+    inp.style.color=color;inp.value='';inp.focus();
+    inp._p=pos;inp._f=frame;inp._c=color;inp._s=Math.max(size*2,16);return;
   }
-}
-function jumpToNextPoint() {
-  const t = video.currentTime + 0.1;
-  for (let i = 0; i < points.length; i++) {
-    if (points[i].time > t) { jumpToPoint(i); return; }
-  }
-}
-
-document.getElementById('btn-score1').addEventListener('click', () => addPoint(1));
-document.getElementById('btn-score2').addEventListener('click', () => addPoint(2));
-
-// --- Drawing tools ---
-function setTool(tool) {
-  currentTool = currentTool === tool ? null : tool;
-  canvas.className = currentTool ? '' : 'inactive';
-  if (currentTool === 'eraser') canvas.style.cursor = 'cell';
-  else if (currentTool === 'text') canvas.style.cursor = 'text';
-  else if (currentTool) canvas.style.cursor = 'crosshair';
-
-  document.getElementById('btn-draw').classList.toggle('active', currentTool === 'draw');
-  document.getElementById('btn-arrow').classList.toggle('active', currentTool === 'arrow');
-  document.getElementById('btn-text').classList.toggle('active', currentTool === 'text');
-  document.getElementById('btn-eraser').classList.toggle('active', currentTool === 'eraser');
-}
-
-document.getElementById('btn-draw').addEventListener('click', () => setTool('draw'));
-document.getElementById('btn-arrow').addEventListener('click', () => setTool('arrow'));
-document.getElementById('btn-text').addEventListener('click', () => setTool('text'));
-document.getElementById('btn-eraser').addEventListener('click', () => setTool('eraser'));
-
-function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-}
-
-canvas.addEventListener('mousedown', e => {
-  if (!currentTool) return;
-  const pos = getPos(e);
-  const frame = curFrame();
-  const color = document.getElementById('color-picker').value;
-  const size = parseInt(document.getElementById('size-slider').value);
-
-  if (currentTool === 'text') {
-    textOverlay.style.display = 'block';
-    textOverlay.style.left = pos.x + 'px';
-    textOverlay.style.top = pos.y + 'px';
-    textInput.style.color = color;
-    textInput.value = '';
-    textInput.focus();
-    textInput._pos = pos; textInput._frame = frame; textInput._color = color;
-    textInput._size = Math.max(size * 2, 16);
-    return;
+  if(tool==='eraser'){
+    const fa=annotations[frame];
+    if(fa&&fa.length){let bi=-1,bd=30;fa.forEach((s,i)=>{const pts=s.type==='text'?[{x:s.x,y:s.y}]:(s.points||[s]);pts.forEach(p=>{const d=Math.hypot(pos.x-(p.x||p.cx||0),pos.y-(p.y||p.cy||0));if(d<bd){bd=d;bi=i;}});});if(bi>=0){fa.splice(bi,1);redraw();}}return;
   }
 
-  if (currentTool === 'eraser') {
-    const frameAnns = annotations[frame];
-    if (frameAnns && frameAnns.length) {
-      let bestIdx = -1, bestDist = 30;
-      frameAnns.forEach((s, i) => {
-        const checkPts = s.type === 'text' ? [{x:s.x, y:s.y}] : (s.points||[]);
-        checkPts.forEach(p => {
-          const d = Math.hypot(pos.x-p.x, pos.y-p.y);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
-        });
-      });
-      if (bestIdx >= 0) { frameAnns.splice(bestIdx, 1); redrawAnnotations(); }
-    }
-    return;
+  drawing=true;
+  if(tool==='circle'||tool==='highlight'){
+    curStroke={type:tool,color,size,cx:pos.x,cy:pos.y,rx:0,ry:0,points:[pos]};
+  } else {
+    curStroke={type:tool==='arrow'?'arrow':'path',color,size,points:[pos]};
   }
-
-  isDrawing = true;
-  currentStroke = { type: currentTool === 'arrow' ? 'arrow' : 'path', color, size, points: [pos] };
 });
 
-canvas.addEventListener('mousemove', e => {
-  if (!isDrawing || !currentStroke) return;
-  currentStroke.points.push(getPos(e));
-  redrawAnnotations();
-  drawStroke(ctx, currentStroke);
+canvas.addEventListener('mousemove',e=>{
+  if(!drawing||!curStroke)return;const pos=gp(e);
+  if(curStroke.type==='circle'||curStroke.type==='highlight'){
+    curStroke.rx=Math.abs(pos.x-curStroke.cx);curStroke.ry=Math.abs(pos.y-curStroke.cy);
+  } else curStroke.points.push(pos);
+  redraw(); drawS(ctx,curStroke);
 });
 
-canvas.addEventListener('mouseup', () => {
-  if (!isDrawing || !currentStroke) return;
-  isDrawing = false;
-  const frame = curFrame();
-  if (!annotations[frame]) annotations[frame] = [];
-  annotations[frame].push(currentStroke);
-  currentStroke = null;
-  redrawAnnotations();
+canvas.addEventListener('mouseup',()=>{
+  if(!drawing||!curStroke)return; drawing=false;
+  const f=cf(); if(!annotations[f])annotations[f]=[];
+  annotations[f].push(curStroke); curStroke=null; redraw();
 });
 
-textInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const text = textInput.value.trim();
-    if (text) {
-      const frame = textInput._frame;
-      if (!annotations[frame]) annotations[frame] = [];
-      annotations[frame].push({ type:'text', text, x:textInput._pos.x, y:textInput._pos.y, color:textInput._color, size:textInput._size });
-      redrawAnnotations();
-    }
-    textOverlay.style.display = 'none';
-  } else if (e.key === 'Escape') textOverlay.style.display = 'none';
+document.getElementById('text-in').addEventListener('keydown',e=>{
+  const inp=document.getElementById('text-in');
+  if(e.key==='Enter'){
+    const txt=inp.value.trim();
+    if(txt){const f=inp._f;if(!annotations[f])annotations[f]=[];annotations[f].push({type:'text',text:txt,x:inp._p.x,y:inp._p.y,color:inp._c,size:inp._s});redraw();}
+    document.getElementById('text-input-overlay').style.display='none';
+  }else if(e.key==='Escape')document.getElementById('text-input-overlay').style.display='none';
 });
 
-function drawStroke(c, s) {
-  if (s.type === 'path') {
-    c.strokeStyle = s.color; c.lineWidth = s.size; c.lineCap = 'round'; c.lineJoin = 'round';
-    c.beginPath(); s.points.forEach((p,i) => i===0 ? c.moveTo(p.x,p.y) : c.lineTo(p.x,p.y)); c.stroke();
-  } else if (s.type === 'arrow' && s.points.length >= 2) {
-    c.strokeStyle = s.color; c.fillStyle = s.color; c.lineWidth = s.size; c.lineCap = 'round';
-    c.beginPath(); s.points.forEach((p,i) => i===0 ? c.moveTo(p.x,p.y) : c.lineTo(p.x,p.y)); c.stroke();
-    const last = s.points[s.points.length-1], prev = s.points[Math.max(0,s.points.length-5)];
-    const ang = Math.atan2(last.y-prev.y, last.x-prev.x), hl = s.size*4;
-    c.beginPath(); c.moveTo(last.x, last.y);
-    c.lineTo(last.x - hl*Math.cos(ang-0.4), last.y - hl*Math.sin(ang-0.4));
-    c.lineTo(last.x - hl*Math.cos(ang+0.4), last.y - hl*Math.sin(ang+0.4));
-    c.closePath(); c.fill();
-  } else if (s.type === 'text') {
-    c.fillStyle = s.color; c.font = `bold ${s.size}px -apple-system, sans-serif`;
-    c.shadowColor = 'rgba(0,0,0,0.8)'; c.shadowBlur = 4;
-    c.fillText(s.text, s.x, s.y); c.shadowBlur = 0;
+function drawS(c,s) {
+  if(s.type==='path'){
+    c.strokeStyle=s.color;c.lineWidth=s.size;c.lineCap='round';c.lineJoin='round';
+    c.beginPath();s.points.forEach((p,i)=>i===0?c.moveTo(p.x,p.y):c.lineTo(p.x,p.y));c.stroke();
+  } else if(s.type==='arrow'&&s.points.length>=2){
+    c.strokeStyle=s.color;c.fillStyle=s.color;c.lineWidth=s.size;c.lineCap='round';
+    c.beginPath();s.points.forEach((p,i)=>i===0?c.moveTo(p.x,p.y):c.lineTo(p.x,p.y));c.stroke();
+    const l=s.points[s.points.length-1],pr=s.points[Math.max(0,s.points.length-5)];
+    const a=Math.atan2(l.y-pr.y,l.x-pr.x),h=s.size*4;
+    c.beginPath();c.moveTo(l.x,l.y);c.lineTo(l.x-h*Math.cos(a-.4),l.y-h*Math.sin(a-.4));
+    c.lineTo(l.x-h*Math.cos(a+.4),l.y-h*Math.sin(a+.4));c.closePath();c.fill();
+  } else if(s.type==='circle'){
+    c.strokeStyle=s.color;c.lineWidth=s.size;
+    c.beginPath();c.ellipse(s.cx,s.cy,Math.max(s.rx,1),Math.max(s.ry,1),0,0,Math.PI*2);c.stroke();
+  } else if(s.type==='highlight'){
+    c.fillStyle=s.color+'40';c.strokeStyle=s.color;c.lineWidth=2;
+    c.beginPath();c.ellipse(s.cx,s.cy,Math.max(s.rx,1),Math.max(s.ry,1),0,0,Math.PI*2);c.fill();c.stroke();
+  } else if(s.type==='text'){
+    c.fillStyle=s.color;c.font=`bold ${s.size}px 'Inter',sans-serif`;
+    c.shadowColor='rgba(0,0,0,0.9)';c.shadowBlur=5;c.fillText(s.text,s.x,s.y);c.shadowBlur=0;
   }
 }
 
-function redrawAnnotations() {
-  ctx.clearRect(0, 0, canvas.width/devicePixelRatio, canvas.height/devicePixelRatio);
-  (annotations[curFrame()] || []).forEach(s => drawStroke(ctx, s));
+function redraw() {
+  ctx.clearRect(0,0,canvas.width/devicePixelRatio,canvas.height/devicePixelRatio);
+  (annotations[cf()]||[]).forEach(s=>drawS(ctx,s));
 }
 
-// --- Undo / Clear ---
-document.getElementById('btn-undo').addEventListener('click', () => {
-  const f = curFrame();
-  if (annotations[f]?.length) { annotations[f].pop(); redrawAnnotations(); }
-});
-document.getElementById('btn-clear').addEventListener('click', () => {
-  annotations[curFrame()] = [];
-  redrawAnnotations();
-});
+// Undo / Clear
+document.getElementById('b-undo').addEventListener('click',()=>{const f=cf();if(annotations[f]?.length){annotations[f].pop();redraw();}});
+document.getElementById('b-clear').addEventListener('click',()=>{annotations[cf()]=[];redraw();});
 
-// --- Screenshot export ---
-document.getElementById('btn-screenshot').addEventListener('click', () => {
-  const ec = document.createElement('canvas');
-  ec.width = video.videoWidth; ec.height = video.videoHeight;
-  const ectx = ec.getContext('2d');
-  ectx.drawImage(video, 0, 0);
-  const sx = video.videoWidth / (canvas.width/devicePixelRatio);
-  const sy = video.videoHeight / (canvas.height/devicePixelRatio);
-  (annotations[curFrame()] || []).forEach(s => {
-    if (s.type === 'text') {
-      drawStroke(ectx, { ...s, size: s.size*sx, x: s.x*sx, y: s.y*sy });
-    } else {
-      drawStroke(ectx, { ...s, size: s.size*sx, points: s.points.map(p => ({x:p.x*sx, y:p.y*sy})) });
-    }
+// Screenshot
+document.getElementById('b-snap').addEventListener('click',()=>{
+  const ec=document.createElement('canvas');ec.width=vid.videoWidth;ec.height=vid.videoHeight;
+  const ex=ec.getContext('2d');ex.drawImage(vid,0,0);
+  const sx=vid.videoWidth/(canvas.width/devicePixelRatio),sy=vid.videoHeight/(canvas.height/devicePixelRatio);
+  (annotations[cf()]||[]).forEach(s=>{
+    if(s.type==='text')drawS(ex,{...s,size:s.size*sx,x:s.x*sx,y:s.y*sy});
+    else if(s.type==='circle'||s.type==='highlight')drawS(ex,{...s,size:s.size*sx,cx:s.cx*sx,cy:s.cy*sy,rx:s.rx*sx,ry:s.ry*sy});
+    else drawS(ex,{...s,size:s.size*sx,points:s.points.map(p=>({x:p.x*sx,y:p.y*sy}))});
   });
-  const a = document.createElement('a');
-  a.download = `frame-${curFrame()}.png`;
-  a.href = ec.toDataURL('image/png');
-  a.click();
+  const a=document.createElement('a');a.download=`frame-${cf()}.png`;a.href=ec.toDataURL('image/png');a.click();
 });
 
-// --- Data export/import ---
-document.getElementById('btn-export-data').addEventListener('click', () => {
-  const data = { team1, team2, points, annotations: {} };
-  // Only save non-empty annotation frames
-  Object.keys(annotations).forEach(k => {
-    if (annotations[k].length) data.annotations[k] = annotations[k];
-  });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.download = `match-review-${new Date().toISOString().slice(0,10)}.json`;
-  a.href = URL.createObjectURL(blob);
-  a.click();
+// Help
+document.getElementById('b-help').addEventListener('click',()=>document.getElementById('kb-help').classList.toggle('show'));
+
+// Export / Import
+document.getElementById('btn-export-json').addEventListener('click',()=>{
+  const d={team1:T1,team2:T2,points,serving,annotations:{}};
+  Object.keys(annotations).forEach(k=>{if(annotations[k].length)d.annotations[k]=annotations[k];});
+  const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.download=`pickle-review-${new Date().toISOString().slice(0,10)}.json`;a.href=URL.createObjectURL(b);a.click();
+});
+document.getElementById('btn-import-json').addEventListener('click',()=>document.getElementById('import-in').click());
+document.getElementById('import-in').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{const d=JSON.parse(ev.target.result);
+      if(d.team1){T1=d.team1;document.getElementById('t1name').value=T1.name;document.getElementById('t1color').value=T1.color;}
+      if(d.team2){T2=d.team2;document.getElementById('t2name').value=T2.name;document.getElementById('t2color').value=T2.color;}
+      if(d.points)points=d.points;if(d.serving)serving=d.serving;if(d.annotations)annotations=d.annotations;
+      syncUI();redraw();updateStats();
+    }catch(err){alert('Invalid file');}};
+  r.readAsText(f);
 });
 
-document.getElementById('btn-import-data').addEventListener('click', () => {
-  document.getElementById('import-input').click();
-});
-document.getElementById('import-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if (data.team1) { team1 = data.team1; document.getElementById('team1-name').value = team1.name; document.getElementById('team1-color').value = team1.color; }
-      if (data.team2) { team2 = data.team2; document.getElementById('team2-name').value = team2.name; document.getElementById('team2-color').value = team2.color; }
-      if (data.points) points = data.points;
-      if (data.annotations) annotations = data.annotations;
-      syncTeamUI();
-      redrawAnnotations();
-    } catch(err) { alert('Invalid file'); }
-  };
-  reader.readAsText(file);
-});
-
-// --- Keyboard ---
-document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (document.getElementById('note-modal').classList.contains('show')) return;
-
-  switch(e.code) {
-    case 'Space': e.preventDefault(); togglePlay(); break;
-    case 'ArrowLeft': e.shiftKey ? seekFrame(-10) : seekFrame(-1); break;
-    case 'ArrowRight': e.shiftKey ? seekFrame(10) : seekFrame(1); break;
-    case 'KeyD': setTool('draw'); break;
-    case 'KeyA': setTool('arrow'); break;
-    case 'KeyT': setTool('text'); break;
-    case 'KeyE': setTool('eraser'); break;
-    case 'Digit1': addPoint(1); break;
-    case 'Digit2': addPoint(2); break;
-    case 'BracketLeft': jumpToPrevPoint(); break;
-    case 'BracketRight': jumpToNextPoint(); break;
-    case 'Comma': changeSpeed(-1); break;
-    case 'Period': changeSpeed(1); break;
-    case 'Escape': setTool(null); break;
-    case 'KeyZ': if (e.metaKey||e.ctrlKey) { e.preventDefault(); document.getElementById('btn-undo').click(); } break;
+// --- Keys ---
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(document.getElementById('modal-bg').classList.contains('show'))return;
+  switch(e.code){
+    case'Space':e.preventDefault();togglePlay();break;
+    case'ArrowLeft':e.preventDefault();e.ctrlKey?seekSec(-1):e.shiftKey?seekF(-10):seekF(-1);break;
+    case'ArrowRight':e.preventDefault();e.ctrlKey?seekSec(1):e.shiftKey?seekF(10):seekF(1);break;
+    case'KeyD':setTool('draw');break;case'KeyA':setTool('arrow');break;
+    case'KeyC':setTool('circle');break;case'KeyH':setTool('highlight');break;
+    case'KeyT':setTool('text');break;case'KeyE':setTool('eraser');break;
+    case'Digit1':addPoint(1);break;case'Digit2':addPoint(2);break;
+    case'BracketLeft':prevPt();break;case'BracketRight':nextPt();break;
+    case'Comma':chgSpeed(-1);break;case'Period':chgSpeed(1);break;
+    case'Escape':setTool(null);document.getElementById('kb-help').classList.remove('show');break;
+    case'KeyZ':if(e.metaKey||e.ctrlKey){e.preventDefault();document.getElementById('b-undo').click();}break;
+    case'Slash':if(e.shiftKey)document.getElementById('kb-help').classList.toggle('show');break;
   }
 });
 
-// Init
-syncTeamUI();
+syncUI(); updateStats();
 </script>
 </body>
 </html>
