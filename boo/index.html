@@ -556,7 +556,6 @@
     height: 238px;
     border: 2px solid rgba(248,113,113,0.4);
     box-shadow: 0 0 20px rgba(248,113,113,0.2);
-    filter: brightness(1.15);
   }
 
   .battle-card.player-card {
@@ -564,7 +563,6 @@
     height: 231px;
     border: 3px solid rgba(103,232,249,0.5);
     box-shadow: 0 0 28px rgba(103,232,249,0.25);
-    filter: brightness(1.15);
   }
 
   .ability-card-overlay {
@@ -572,7 +570,7 @@
     z-index: 950;
     border-radius: 12px;
     overflow: hidden;
-    filter: brightness(1.4);
+    filter: brightness(1.2);
     transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
     pointer-events: none;
   }
@@ -607,7 +605,9 @@
   }
 
   /* Dice */
+  .dice-area.hidden { opacity: 0; }
   .dice-area {
+    transition: opacity 0.4s ease-in;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -963,6 +963,33 @@
   .cta-footer a { color: var(--player); text-decoration: none; }
 
   /* ======== ABILITY SPLASH ======== */
+  .ready-go-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 850;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .ready-go-overlay.active { opacity: 1; }
+  .ready-go-text {
+    font-family: 'Creepster', cursive;
+    font-size: 4.5rem;
+    color: var(--player);
+    text-shadow: 0 0 30px rgba(103,232,249,0.6), 0 0 60px rgba(103,232,249,0.3), 0 0 100px rgba(103,232,249,0.15);
+    letter-spacing: 4px;
+    text-align: center;
+    animation: readyPulse 0.4s ease-out;
+  }
+  @keyframes readyPulse {
+    0% { transform: scale(0.5); opacity: 0; }
+    60% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
   .ability-splash {
     position: fixed;
     inset: 0;
@@ -1228,6 +1255,7 @@
   </div>
 </div>
 
+<div class="ready-go-overlay" id="readyGoOverlay"><div class="ready-go-text" id="readyGoText"></div></div>
 <div class="crash-overlay" id="crashOverlay">
   <div class="crash-card ec" id="crashEnemy"></div>
   <div class="crash-card pc" id="crashPlayer"></div>
@@ -1624,9 +1652,21 @@ function startBattle() {
 
   resetDice();
   document.getElementById('rollBtn').classList.remove('ready');
+  const diceArea = document.querySelector('.dice-area');
+  diceArea.classList.add('hidden');
 
-  narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
-  setTimeout(doEnemyRoll, 1000);
+  const rgo = document.getElementById('readyGoOverlay');
+  const rgt = document.getElementById('readyGoText');
+  rgt.textContent = 'Start';
+  rgt.style.animation = 'none';
+  rgo.classList.add('active');
+  requestAnimationFrame(() => { rgt.style.animation = ''; });
+  setTimeout(() => {
+    rgo.classList.remove('active');
+    diceArea.classList.remove('hidden');
+    narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
+    setTimeout(doEnemyRoll, 1000);
+  }, 1800);
 }
 
 function updateHpDisplay() {
@@ -1874,6 +1914,9 @@ function doEnemyRoll() {
     d.classList.add('visible','rolling');
   }
 
+  // First roll gets extra shake time so player can orient
+  const rollDelay = round === 1 ? 1100 : 700;
+
   setTimeout(() => {
     dice.forEach((v, i) => {
       setTimeout(() => {
@@ -1898,7 +1941,7 @@ function doEnemyRoll() {
       document.getElementById('rollBtn').classList.add('ready');
       phase = 1;
     }, 800 + extraDelay);
-  }, 700);
+  }, rollDelay);
 }
 
 function doPlayerRoll() {
