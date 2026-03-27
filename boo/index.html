@@ -114,6 +114,78 @@
     align-items: center;
     justify-content: space-evenly;
     padding: 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pick-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(30,80,120,0.6) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, rgba(10,30,60,0.8) 0%, transparent 60%),
+      linear-gradient(180deg, #06141f 0%, #0a1e32 30%, #0d2540 55%, #081a2a 80%, #050e18 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .pick-screen .light-ray {
+    position: absolute;
+    top: -20%;
+    width: 120px;
+    height: 140%;
+    background: linear-gradient(180deg, rgba(140,200,255,0.18) 0%, rgba(140,200,255,0.08) 40%, transparent 100%);
+    transform: rotate(15deg);
+    filter: blur(20px);
+    animation: rayDrift 12s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .pick-screen .light-ray:nth-child(2) {
+    width: 80px;
+    animation: rayDrift2 16s ease-in-out infinite;
+    animation-delay: -5s;
+    opacity: 0.6;
+  }
+
+  @keyframes rayDrift {
+    0% { left: -15%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { left: 110%; opacity: 0; }
+  }
+
+  @keyframes rayDrift2 {
+    0% { left: 110%; opacity: 0; }
+    10% { opacity: 0.6; }
+    90% { opacity: 0.6; }
+    100% { left: -15%; opacity: 0; }
+  }
+
+  .pick-screen > *:not(.light-ray):not(.pick-orbs) { position: relative; z-index: 1; }
+  .pick-screen > .light-ray, .pick-screen > .pick-orbs { z-index: 0; }
+
+  .pick-orbs {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .pick-orb {
+    position: absolute;
+    border-radius: 50%;
+    animation: orbFloat linear infinite;
+  }
+
+  @keyframes orbFloat {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(var(--drift-y)) translateX(var(--drift-x)); opacity: 0; }
   }
 
   .rules-box {
@@ -245,13 +317,13 @@
 
   .selected-ghost-name .sgn-name {
     font-family: 'Creepster', cursive;
-    font-size: 2.43rem;
+    font-size: 3.21rem;
     letter-spacing: 2px;
     line-height: 1.2;
   }
 
   .selected-ghost-name .sgn-tagline {
-    font-size: 1.6rem;
+    font-size: 1.22rem;
     font-weight: 600;
     font-style: italic;
     margin-top: 2px;
@@ -273,14 +345,14 @@
 
   /* Prince Balatron — playful purple */
   .selected-ghost-name.balatron .sgn-name {
-    color: #d8b4fe;
-    text-shadow: 0 0 20px rgba(192,132,252,0.5), 0 0 40px rgba(232,121,249,0.25);
+    color: #fbbf24;
+    text-shadow: 0 0 20px rgba(251,191,36,0.5), 0 0 40px rgba(245,158,11,0.25);
   }
-  .selected-ghost-name.balatron .sgn-tagline { color: #e9d5ff; }
+  .selected-ghost-name.balatron .sgn-tagline { color: #d8b4fe; }
 
   @media (max-width: 480px) {
-    .selected-ghost-name .sgn-name { font-size: 1.89rem; }
-    .selected-ghost-name .sgn-tagline { font-size: 1.4rem; }
+    .selected-ghost-name .sgn-name { font-size: 2.50rem; }
+    .selected-ghost-name .sgn-tagline { font-size: 1.07rem; }
     .selected-ghost-name { min-height: 44px; }
   }
 
@@ -494,6 +566,17 @@
     box-shadow: 0 0 28px rgba(103,232,249,0.25);
     filter: brightness(1.15);
   }
+
+  .ability-card-overlay {
+    position: fixed;
+    z-index: 950;
+    border-radius: 12px;
+    overflow: hidden;
+    filter: brightness(1.4);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    pointer-events: none;
+  }
+  .ability-card-overlay img { width: 100%; height: 100%; object-fit: cover; }
 
   .battle-card.hit {
     animation: hitShake 0.4s ease-out;
@@ -1062,6 +1145,9 @@
 <div class="app">
   <!-- PICK -->
   <div class="screen pick-screen active" id="pickScreen">
+    <div class="light-ray"></div>
+    <div class="light-ray"></div>
+    <div class="pick-orbs" id="pickOrbs"></div>
     <div class="rules-box">
       <div class="rules-title">Roll the most matching dice!</div>
       <p>Both players roll <b>3 dice</b></p>
@@ -1216,6 +1302,48 @@ const GHOSTS = [
 
 const IMG = 'cards/';
 
+// ══════════════════════════════════════════════
+// SCRIPTED SCENARIOS — cinematic dice sequences
+// ══════════════════════════════════════════════
+const SCENARIOS = {
+  lucy: {
+    name: 'Hercules',
+    enemyName: 'The Mountain King',
+    rounds: [
+      { enemy: [6,5,2], player: [6,4,1] },           // Enemy singles win (1 dmg) → 7/8
+      { enemy: [4,3,1], player: [3,2,1] },           // Enemy singles win (1 dmg) → 6/8
+      { enemy: [5,5,3], player: [4,2,1] },           // Enemy doubles Beast Mode (4 dmg) → 2/8!
+      { enemy: [2,4,1], player: [4,4,6] },           // Player comeback doubles + Blue Fire (3) → E 6/9
+      { enemy: [3,1,5], player: [5,5,2] },           // Player doubles + Blue Fire (3) → E 3/9
+      { enemy: [3,3,3], player: [5,5,5] },           // TRIPLE 3s vs TRIPLE 5s!!! Blue Fire (4) → E -1/9
+    ]
+  },
+  'mountain-king': {
+    name: 'Zeus',
+    enemyName: 'Lucy',
+    // PURE DOMINANCE — player never takes damage, ends on triple 6s
+    rounds: [
+      { enemy: [3,5,1], player: [6,6,2] },           // Beast Mode doubles 6s (4 dmg) → E 4/8. Statement.
+      { enemy: [4,2,1], player: [5,3,2] },           // Casual singles win (1 dmg) → E 3/8. Didn't even need doubles.
+      { enemy: [5,5,4], player: [6,6,6] },           // Lucy swings doubles 5s → TRIPLE 6s!!! (3 dmg) → E 0/8. GOD ROLL.
+    ]
+  },
+  balatron: {
+    name: 'Pluto',
+    enemyName: 'Lucy',
+    // KNIFE FIGHT — trading blows, both near death, counter-kill with exact damage
+    rounds: [
+      { enemy: [5,5,4], player: [2,3,1], counterDie: 3 },  // Enemy doubles (3 dmg) → P 3/6. Party Time counter 3 → E 5/8
+      { enemy: [4,2,1], player: [5,5,3] },           // Player doubles win (2 dmg) → E 3/8. Fighting back.
+      { enemy: [6,4,3], player: [6,3,2], counterDie: 3 },  // Enemy wins by ONE die (4 vs 3). Lucy (2 dmg) → P 1/6. Party Time counter 3 — EXACTLY enough → E 0/8!
+    ]
+  }
+};
+
+let activeScript = null;
+let scriptRound = 0;
+let scriptedCounterDie = null;
+
 function playSfx(id, vol = 0.8) {
   const s = document.getElementById(id);
   if (!s) return;
@@ -1254,6 +1382,12 @@ function rollDice(boosted) {
   // Calculate dynamic boost based on game state
   let triplesChance = 0.15;
   let highDoubleChance = 0.08;
+
+  // When enemy is near death, reduce boost so the kill shot feels earned
+  if (enemyHp <= 1) {
+    triplesChance = 0.05;
+    highDoubleChance = 0.03;
+  }
 
   // Desperate mode: player at 1 or 2 HP — +20% to triples & high doubles
   if (playerHp <= 2) {
@@ -1327,6 +1461,18 @@ function compareRolls(pRoll, eRoll) {
   return 0;
 }
 
+// Shift dice values ±2 so scripted scenarios feel fresh each time
+function varyScenario(base) {
+  const shift = [-2,-1,0,1,2][Math.floor(Math.random()*5)];
+  const varied = JSON.parse(JSON.stringify(base));
+  varied.rounds.forEach(r => {
+    r.enemy = r.enemy.map(d => Math.max(1, Math.min(6, d + shift)));
+    r.player = r.player.map(d => Math.max(1, Math.min(6, d + shift)));
+    if (r.counterDie) r.counterDie = Math.max(1, Math.min(6, r.counterDie + [-1,0,1][Math.floor(Math.random()*3)]));
+  });
+  return varied;
+}
+
 function describeRoll(roll) {
   if (roll.type === 'triples') return `three ${roll.value}'s`;
   if (roll.type === 'doubles') return `two ${roll.value}'s and a ${roll.kicker}`;
@@ -1354,6 +1500,57 @@ function initPick() {
   });
   document.getElementById('fightBtn').classList.remove('ready');
   document.getElementById('selectedGhostName').classList.remove('visible');
+  spawnPickOrbs();
+}
+
+let pickOrbInterval = null;
+function spawnPickOrbs() {
+  if (pickOrbInterval) clearInterval(pickOrbInterval);
+  const container = document.getElementById('pickOrbs');
+  container.innerHTML = '';
+
+  function makeOrb() {
+    const orb = document.createElement('div');
+    orb.className = 'pick-orb';
+    const size = 3 + Math.random() * 6;
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const dur = 6 + Math.random() * 8;
+    const driftX = (Math.random() - 0.5) * 80;
+    const driftY = -(40 + Math.random() * 120);
+
+    orb.style.width = size + 'px';
+    orb.style.height = size + 'px';
+    orb.style.left = x + '%';
+    orb.style.top = y + '%';
+    orb.style.setProperty('--drift-x', driftX + 'px');
+    orb.style.setProperty('--drift-y', driftY + 'px');
+    orb.style.animationDuration = dur + 's';
+
+    const warmth = Math.random();
+    if (warmth > 0.6) {
+      orb.style.background = 'radial-gradient(circle, rgba(255,240,180,0.9), rgba(255,220,100,0.3))';
+      orb.style.boxShadow = `0 0 ${6+size}px rgba(255,230,140,0.6), 0 0 ${12+size*2}px rgba(255,210,80,0.2)`;
+    } else if (warmth > 0.3) {
+      orb.style.background = 'radial-gradient(circle, rgba(180,220,255,0.9), rgba(100,180,255,0.3))';
+      orb.style.boxShadow = `0 0 ${6+size}px rgba(140,200,255,0.5), 0 0 ${12+size*2}px rgba(80,160,255,0.2)`;
+    } else {
+      orb.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9), rgba(200,230,255,0.3))';
+      orb.style.boxShadow = `0 0 ${6+size}px rgba(220,240,255,0.5)`;
+    }
+
+    container.appendChild(orb);
+    setTimeout(() => orb.remove(), dur * 1000);
+  }
+
+  // Initial burst
+  for (let i = 0; i < 15; i++) setTimeout(makeOrb, Math.random() * 2000);
+  // Continuous spawn
+  pickOrbInterval = setInterval(makeOrb, 600);
+}
+
+function stopPickOrbs() {
+  if (pickOrbInterval) { clearInterval(pickOrbInterval); pickOrbInterval = null; }
 }
 
 function selectGhost(g) {
@@ -1383,6 +1580,7 @@ function selectGhost(g) {
 // ══════════════════════════════════════════
 function startBattle() {
   if (!pick) return;
+  stopPickOrbs();
   // Spawn ambient spirit particles
   spawnSpiritParticles();
   // Start background music
@@ -1391,8 +1589,20 @@ function startBattle() {
   music.volume = 0.4;
   music.play().catch(() => {});
 
-  const pool = GHOSTS.filter(g => g.name !== pick.name);
-  enemy = pool[Math.floor(Math.random() * pool.length)];
+  // 30% chance of a scripted cinematic scenario
+  const scenario = SCENARIOS[pick.cssClass];
+  if (scenario && Math.random() < 0.30) {
+    const varied = varyScenario(scenario);
+    enemy = GHOSTS.find(g => g.name === varied.enemyName);
+    activeScript = varied;
+    scriptRound = 0;
+    scriptedCounterDie = null;
+  } else {
+    activeScript = null;
+    scriptedCounterDie = null;
+    const pool = GHOSTS.filter(g => g.name !== pick.name);
+    enemy = pool[Math.floor(Math.random() * pool.length)];
+  }
 
   playerHp = pick.maxHp;
   enemyHp = enemy.maxHp;
@@ -1501,17 +1711,41 @@ const ABILITY_THEMES = {
   'Party Time': 'party-time',
 };
 
-function showAbilitySplash(name, desc, duration, callback) {
+// Float a ghost card above the ability splash overlay
+let abilityOverlayEl = null;
+function showAbilityCard(cardId) {
+  removeAbilityCard();
+  const card = document.getElementById(cardId);
+  const rect = card.getBoundingClientRect();
+  const clone = document.createElement('div');
+  clone.className = 'ability-card-overlay';
+  clone.innerHTML = card.innerHTML;
+  clone.style.left = rect.left + 'px';
+  clone.style.top = rect.top + 'px';
+  clone.style.width = rect.width + 'px';
+  clone.style.height = rect.height + 'px';
+  clone.style.transform = 'scale(1)';
+  document.body.appendChild(clone);
+  abilityOverlayEl = clone;
+  requestAnimationFrame(() => { clone.style.transform = 'scale(1.10)'; });
+}
+function removeAbilityCard() {
+  if (abilityOverlayEl) { abilityOverlayEl.remove(); abilityOverlayEl = null; }
+}
+
+function showAbilitySplash(name, desc, duration, callback, cardId) {
   const el = document.getElementById('abilitySplash');
   const theme = ABILITY_THEMES[name] || '';
   el.className = 'ability-splash ' + theme;
   document.getElementById('splashName').textContent = name;
   document.getElementById('splashDesc').textContent = desc;
   document.getElementById('counterDieArea').classList.remove('visible');
+  if (cardId) showAbilityCard(cardId);
   playSfx('sfxSpecial', 0.85);
   el.classList.add('active');
   setTimeout(() => {
     el.classList.remove('active');
+    removeAbilityCard();
     setTimeout(callback, 300);
   }, duration);
 }
@@ -1528,6 +1762,9 @@ function showBalatronSplash(ghost, target) {
   const dieArea = document.getElementById('counterDieArea');
   const dieBtn = document.getElementById('counterDieBtn');
   const isPlayerGhost = ghost === pick;
+  // Bring the Balatron ghost's card to the foreground
+  const abilityCardId = isPlayerGhost ? 'playerCard' : 'enemyCard';
+  showAbilityCard(abilityCardId);
 
   // Only let the human player roll if it's their ghost
   if (isPlayerGhost) {
@@ -1541,6 +1778,7 @@ function showBalatronSplash(ghost, target) {
 
       setTimeout(() => {
         el.classList.remove('active');
+        removeAbilityCard();
         setTimeout(() => {
           narrate(`<b class="${isPlayerGhost ? 'you' : 'them'}">Party Time!</b>&nbsp;Counter roll:&nbsp;<b class="gold">${counterDie} damage!</b>`);
           playDamageSfx(counterDie);
@@ -1559,7 +1797,8 @@ function showBalatronSplash(ghost, target) {
     document.querySelector('.counter-die-label').textContent = 'Rolling...';
     counterCallback = null;
     setTimeout(() => {
-      const counterDie = Math.floor(Math.random()*6)+1;
+      const counterDie = scriptedCounterDie || (Math.floor(Math.random()*6)+1);
+      scriptedCounterDie = null;
       dieBtn.classList.remove('rolling');
       dieBtn.classList.add('landed');
       dieBtn.textContent = counterDie;
@@ -1570,6 +1809,7 @@ function showBalatronSplash(ghost, target) {
 
       setTimeout(() => {
         el.classList.remove('active');
+        removeAbilityCard();
         setTimeout(() => {
           narrate(`<b class="them">Party Time!</b>&nbsp;Counter roll:&nbsp;<b class="gold">${counterDie} damage!</b>`);
           playDamageSfx(counterDie);
@@ -1593,7 +1833,8 @@ function rollCounterDie() {
   dieBtn.classList.add('rolling');
   document.querySelector('.counter-die-label').textContent = 'Rolling...';
 
-  const counterDie = Math.floor(Math.random()*6)+1;
+  const counterDie = scriptedCounterDie || (Math.floor(Math.random()*6)+1);
+  scriptedCounterDie = null;
 
   setTimeout(() => {
     dieBtn.classList.remove('rolling');
@@ -1622,7 +1863,9 @@ let currentEnemyRoll = null;
 function doEnemyRoll() {
   phase = 0;
   resetDice();
-  const dice = rollDice();
+  const dice = (activeScript && scriptRound < activeScript.rounds.length)
+    ? [...activeScript.rounds[scriptRound].enemy]
+    : rollDice();
   currentEnemyRoll = analyzeRoll(dice);
 
   for (let i = 0; i < 3; i++) {
@@ -1665,7 +1908,12 @@ function doPlayerRoll() {
   playSfx('sfxDiceRoll');
   narrate(`Rolling...`);
 
-  const dice = rollDice(true);
+  const roundData = (activeScript && scriptRound < activeScript.rounds.length)
+    ? activeScript.rounds[scriptRound]
+    : null;
+  const dice = roundData ? [...roundData.player] : rollDice(true);
+  if (roundData && roundData.counterDie) scriptedCounterDie = roundData.counterDie;
+  scriptRound++;
   const pRoll = analyzeRoll(dice);
 
   for (let i = 0; i < 3; i++) {
@@ -1739,7 +1987,7 @@ function resolveRound(pRoll, eRoll) {
 
     if (abilityTriggered) {
       setTimeout(() => {
-        showAbilitySplash(pick.ability, `${pick.abilityDesc} — ${damage} damage!`, 1600, applyDamage);
+        showAbilitySplash(pick.ability, `${pick.abilityDesc} — ${damage} damage!`, 1600, applyDamage, 'playerCard');
       }, 800);
     } else {
       setTimeout(applyDamage, 800);
@@ -1773,7 +2021,7 @@ function resolveRound(pRoll, eRoll) {
 
     if (abilityTriggered) {
       setTimeout(() => {
-        showAbilitySplash(enemy.ability, `${enemy.abilityDesc} — ${damage} damage!`, 1600, applyDamage);
+        showAbilitySplash(enemy.ability, `${enemy.abilityDesc} — ${damage} damage!`, 1600, applyDamage, 'enemyCard');
       }, 800);
     } else {
       setTimeout(applyDamage, 800);
@@ -2026,14 +2274,23 @@ function spawnShards(x, y, W, H) {
 // ══════════════════════════════════════════
 // CTA SCREENS
 // ══════════════════════════════════════════
+let fadeInterval = null;
 function fadeOutMusic() {
   const music = document.getElementById('bgMusic');
+  if (fadeInterval) clearInterval(fadeInterval);
   let vol = music.volume;
-  const fade = setInterval(() => {
-    vol -= 0.01;
-    if (vol <= 0) { clearInterval(fade); music.pause(); music.volume = 0.4; }
+  fadeInterval = setInterval(() => {
+    vol -= 0.03;
+    if (vol <= 0) { clearInterval(fadeInterval); fadeInterval = null; music.pause(); music.volume = 0.4; }
     else music.volume = vol;
   }, 60);
+}
+function stopMusicHard() {
+  if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
+  const music = document.getElementById('bgMusic');
+  music.pause();
+  music.currentTime = 0;
+  music.volume = 0.4;
 }
 
 function showWinCTA() {
@@ -2059,7 +2316,7 @@ function show(id) {
   document.getElementById(id).classList.add('active');
 }
 
-function replay() { stopSnow(); show('pickScreen'); initPick(); }
+function replay() { stopMusicHard(); stopSnow(); show('pickScreen'); initPick(); }
 
 initPick();
 </script>
