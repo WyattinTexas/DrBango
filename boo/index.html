@@ -233,14 +233,17 @@
     flex: 1;
     max-width: 160px;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
     cursor: pointer;
     transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
     border: 3px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.03);
-    position: relative;
     display: flex;
     flex-direction: column;
+  }
+  .pick-card img {
+    border-radius: 10px 10px 0 0;
   }
 
   .pick-card::before {
@@ -349,6 +352,104 @@
     text-shadow: 0 0 20px rgba(251,191,36,0.5), 0 0 40px rgba(245,158,11,0.25);
   }
   .selected-ghost-name.balatron .sgn-tagline { color: #d8b4fe; }
+
+  /* Romy — frost guardian */
+  .selected-ghost-name.romy .sgn-name {
+    color: #a5f3fc;
+    text-shadow: 0 0 20px rgba(165,243,252,0.5), 0 0 40px rgba(186,230,253,0.25);
+  }
+  .selected-ghost-name.romy .sgn-tagline { color: #cffafe; }
+
+  /* Doom — fiendish red */
+  .selected-ghost-name.doom .sgn-name {
+    color: #f87171;
+    text-shadow: 0 0 20px rgba(248,113,113,0.5), 0 0 40px rgba(239,68,68,0.25);
+  }
+  .selected-ghost-name.doom .sgn-tagline { color: #fecaca; }
+
+  /* Shade — stormy silver */
+  .selected-ghost-name.shade .sgn-name {
+    color: #cbd5e1;
+    text-shadow: 0 0 20px rgba(148,163,184,0.5), 0 0 40px rgba(100,116,139,0.25);
+  }
+  .selected-ghost-name.shade .sgn-tagline { color: #94a3b8; }
+
+  /* Romy prediction picker */
+  .predict-area {
+    display: none;
+    text-align: center;
+    margin: 6px auto 0;
+  }
+  .predict-area.visible { display: block; }
+  .predict-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #a5f3fc;
+    margin-bottom: 6px;
+    text-shadow: 0 0 10px rgba(165,243,252,0.3);
+  }
+  .predict-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+  .predict-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 2px solid rgba(165,243,252,0.4);
+    background: rgba(165,243,252,0.08);
+    color: #a5f3fc;
+    font-family: 'Creepster', cursive;
+    font-size: 1.3rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .predict-btn:hover {
+    background: rgba(165,243,252,0.2);
+    border-color: #a5f3fc;
+    transform: scale(1.1);
+    box-shadow: 0 0 16px rgba(165,243,252,0.3);
+  }
+
+  /* Shade haunt tick */
+  .haunt-tick {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Creepster', cursive;
+    font-size: 1.6rem;
+    color: #94a3b8;
+    text-shadow: 0 0 20px rgba(100,116,139,0.6);
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    animation: hauntFade 1.2s ease-out forwards;
+  }
+  @keyframes hauntFade {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+  }
+
+  /* Unlock badge */
+  .pick-card .unlock-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #080810;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.55rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(251,191,36,0.4);
+  }
 
   @media (max-width: 480px) {
     .selected-ghost-name .sgn-name { font-size: 2.50rem; }
@@ -1236,6 +1337,17 @@
         <div class="narrator-box">
           <div class="narrator-inner" id="narrator"></div>
         </div>
+        <div class="predict-area" id="predictArea">
+          <div class="predict-label">Predict a number — if a die matches, +3 damage!</div>
+          <div class="predict-btns">
+            <button class="predict-btn" onclick="pickPrediction(1)">1</button>
+            <button class="predict-btn" onclick="pickPrediction(2)">2</button>
+            <button class="predict-btn" onclick="pickPrediction(3)">3</button>
+            <button class="predict-btn" onclick="pickPrediction(4)">4</button>
+            <button class="predict-btn" onclick="pickPrediction(5)">5</button>
+            <button class="predict-btn" onclick="pickPrediction(6)">6</button>
+          </div>
+        </div>
         <button class="action-btn cyan" id="rollBtn" onclick="doPlayerRoll()">Roll Your Dice!</button>
       </div>
     </div>
@@ -1297,7 +1409,7 @@ const GHOSTS = [
     abilityDesc: "Doubles deal 2X damage",
     cssClass: "mountain-king",
     tagline: "Doubles hit twice as hard.",
-    // triggers when this ghost wins with doubles — damage is doubled
+    unlockAfterFirst: false,
     applyAbility(roll, baseDmg, winner) {
       if (winner === this && roll.type === 'doubles') return baseDmg * 2;
       return baseDmg;
@@ -1309,7 +1421,7 @@ const GHOSTS = [
     abilityDesc: "Win a roll → 1 bonus damage",
     cssClass: "lucy",
     tagline: "Every victory burns hot!",
-    // triggers when Lucy wins any roll — +1 bonus damage
+    unlockAfterFirst: false,
     applyAbility(roll, baseDmg, winner) {
       if (winner === this) return baseDmg + 1;
       return baseDmg;
@@ -1321,9 +1433,21 @@ const GHOSTS = [
     abilityDesc: "Lose a roll & survive → roll 1 die for counter damage",
     cssClass: "balatron",
     tagline: "Lose a roll? The party's just getting started.",
-    // handled specially in resolveRound — returns bonus counter damage
+    unlockAfterFirst: false,
     applyAbility(roll, baseDmg, winner) {
       return baseDmg; // counter handled separately
+    }
+  },
+  {
+    name: "Romy", shortName: "Romy", file: "romy.png", maxHp: 8,
+    ability: "Valley Guardian",
+    abilityDesc: "Predict a die → +3 damage",
+    cssClass: "romy",
+    tagline: "Predict your roll!",
+    unlockAfterFirst: true,
+    // prediction bonus handled in resolveRound
+    applyAbility(roll, baseDmg, winner) {
+      return baseDmg;
     }
   },
 ];
@@ -1347,13 +1471,16 @@ const SCENARIOS = {
     ]
   },
   'mountain-king': {
-    name: 'Zeus',
+    name: 'Atlas',
     enemyName: 'Lucy',
-    // PURE DOMINANCE — player never takes damage, ends on triple 6s
+    // LAST STAND — beaten to 1 HP by Blue Fire, claws back with Beast Mode + triple 4s
     rounds: [
-      { enemy: [3,5,1], player: [6,6,2] },           // Beast Mode doubles 6s (4 dmg) → E 4/8. Statement.
-      { enemy: [4,2,1], player: [5,3,2] },           // Casual singles win (1 dmg) → E 3/8. Didn't even need doubles.
-      { enemy: [5,5,4], player: [6,6,6] },           // Lucy swings doubles 5s → TRIPLE 6s!!! (3 dmg) → E 0/8. GOD ROLL.
+      { enemy: [5,5,3], player: [4,2,1] },           // Lucy doubles + Blue Fire (3 dmg) → MK 6/9
+      { enemy: [6,4,2], player: [6,3,1] },           // Lucy singles + Blue Fire (2 dmg) → MK 4/9
+      { enemy: [4,4,6], player: [2,1,3] },           // Lucy doubles + Blue Fire (3 dmg) → MK 1/9!!!
+      { enemy: [4,3,1], player: [5,3,2] },           // MK singles win (1 dmg) → Lucy 7/8. Just surviving.
+      { enemy: [3,3,4], player: [5,5,3] },           // Beast Mode! Doubles 5s beat doubles 3s (4 dmg) → Lucy 3/8
+      { enemy: [5,2,1], player: [4,4,4] },           // TRIPLE 4s!!! (3 dmg) → Lucy 0/8. DEAD.
     ]
   },
   balatron: {
@@ -1365,12 +1492,78 @@ const SCENARIOS = {
       { enemy: [4,2,1], player: [5,5,3] },           // Player doubles win (2 dmg) → E 3/8. Fighting back.
       { enemy: [6,4,3], player: [6,3,2], counterDie: 3 },  // Enemy wins by ONE die (4 vs 3). Lucy (2 dmg) → P 1/6. Party Time counter 3 — EXACTLY enough → E 0/8!
     ]
+  },
+  romy: {
+    name: 'Oracle',
+    enemyName: 'The Mountain King',
+    // PREDICTION CLUTCH — Beast Mode opener, then two prediction-powered kills
+    rounds: [
+      { enemy: [4,4,6], player: [3,2,1] },                           // Beast Mode! (4 dmg) → Romy 4/8. Half health gone.
+      { enemy: [5,3,1], player: [5,4,2], prediction: 4 },            // Romy singles win (1 dmg), prediction 4 hits! +3 = 4 dmg → MK 5/9
+      { enemy: [6,3,2], player: [3,3,5], prediction: 3 },            // Romy doubles (2 dmg), prediction 3 hits! +3 = 5 dmg → MK 0/9. DEAD.
+    ]
   }
 };
 
 let activeScript = null;
 let scriptRound = 0;
 let scriptedCounterDie = null;
+let playerPrediction = null; // Romy's Valley Guardian prediction
+let hauntActive = false;     // Shade's Haunt — active after round 1
+
+function pickPrediction(num) {
+  if (phase !== 1) return;
+  playerPrediction = num;
+  document.getElementById('predictArea').classList.remove('visible');
+  doPlayerRoll();
+}
+
+function applyHauntDamage() {
+  // Shade's Haunt: enemy takes 1 passive damage before each roll (after round 1)
+  const isPlayerShade = pick.ability === 'Haunt';
+  const isEnemyShade = enemy.ability === 'Haunt';
+  if (!isPlayerShade && !isEnemyShade) return Promise.resolve();
+  if (!hauntActive) return Promise.resolve();
+
+  return new Promise(resolve => {
+    const target = isPlayerShade ? 'enemy' : 'player';
+    const ghostName = isPlayerShade ? pick.shortName : enemy.shortName;
+    const tick = document.createElement('div');
+    tick.className = 'haunt-tick';
+    tick.textContent = `${ghostName}'s Haunt — 1 damage`;
+    document.body.appendChild(tick);
+
+    if (target === 'enemy') {
+      enemyHp -= 1;
+      playDamageSfx(1);
+      document.getElementById('enemyCard').classList.add('hit');
+      setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+    } else {
+      playerHp -= 1;
+      playDamageSfx(1);
+      document.getElementById('playerCard').classList.add('hit');
+      setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+    }
+    updateHpDisplay();
+
+    setTimeout(() => {
+      tick.remove();
+      if ((target === 'enemy' && enemyHp <= 0) || (target === 'player' && playerHp <= 0)) {
+        if (target === 'enemy') {
+          narrate(`<b class="gold">${enemy.shortName} is defeated by the Haunt!</b>`);
+          setTimeout(enemyDefeated, 600);
+        } else {
+          narrate(`<b class="them">${pick.shortName} is defeated by the Haunt!</b>`);
+          fadeOutMusic();
+          setTimeout(showLossCTA, 1500);
+        }
+        resolve('dead');
+      } else {
+        resolve('alive');
+      }
+    }, 1000);
+  });
+}
 
 function playSfx(id, vol = 0.8) {
   const s = document.getElementById(id);
@@ -1514,15 +1707,42 @@ function typeLabel(type) {
 // ══════════════════════════════════════════
 // PICK SCREEN
 // ══════════════════════════════════════════
+let gamesPlayed = parseInt(localStorage.getItem('boo_gamesPlayed') || '0');
+
+function getAvailableGhosts() {
+  if (gamesPlayed === 0) return GHOSTS.filter(g => !g.unlockAfterFirst);
+  return [...GHOSTS];
+}
+
+function pickRandomFromArray(arr, count) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 function initPick() {
   pick = null;
   const grid = document.getElementById('ghostGrid');
   grid.innerHTML = '';
-  GHOSTS.forEach(g => {
+  const available = getAvailableGhosts();
+  let displayGhosts;
+  if (available.length <= 3) {
+    displayGhosts = available;
+  } else {
+    // Guarantee Romy is always an option after unlock
+    const romy = available.find(g => g.name === 'Romy');
+    const others = available.filter(g => g.name !== 'Romy');
+    const randomOthers = pickRandomFromArray(others, 2);
+    displayGhosts = romy ? [randomOthers[0], romy, randomOthers[1]] : pickRandomFromArray(available, 3);
+  }
+  displayGhosts.forEach(g => {
     const c = document.createElement('div');
     c.className = 'pick-card';
     c.dataset.name = g.name;
-    c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div>`;
+    let badgeHtml = '';
+    if (g.unlockAfterFirst && gamesPlayed <= 2) {
+      badgeHtml = '<div class="unlock-badge">NEW</div>';
+    }
+    c.innerHTML = `${badgeHtml}<img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div>`;
     c.onclick = () => selectGhost(g);
     grid.appendChild(c);
   });
@@ -1617,9 +1837,10 @@ function startBattle() {
   music.volume = 0.4;
   music.play().catch(() => {});
 
-  // 30% chance of a scripted cinematic scenario
+  // 70% chance of a scripted cinematic scenario (favor Hercules & Pluto over Zeus)
   const scenario = SCENARIOS[pick.cssClass];
-  if (scenario && Math.random() < 0.30) {
+  const scriptChance = (pick.cssClass === 'mountain-king') ? 0.30 : 0.70;
+  if (scenario && Math.random() < scriptChance) {
     const varied = varyScenario(scenario);
     enemy = GHOSTS.find(g => g.name === varied.enemyName);
     activeScript = varied;
@@ -1628,13 +1849,16 @@ function startBattle() {
   } else {
     activeScript = null;
     scriptedCounterDie = null;
-    const pool = GHOSTS.filter(g => g.name !== pick.name);
+    const pool = getAvailableGhosts().filter(g => g.name !== pick.name);
     enemy = pool[Math.floor(Math.random() * pool.length)];
   }
 
   playerHp = pick.maxHp;
   enemyHp = enemy.maxHp;
   round = 1;
+  hauntActive = false;
+  playerPrediction = null;
+  document.getElementById('predictArea').classList.remove('visible');
 
   show('battleScreen');
 
@@ -1939,8 +2163,23 @@ function doEnemyRoll() {
 
     setTimeout(() => {
       narrate(`<b class="them">${enemy.shortName}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">Your turn!</b>`);
-      document.getElementById('rollBtn').classList.add('ready');
       phase = 1;
+      // Romy's Valley Guardian — show prediction picker or auto-pick in scripted scenario
+      if (pick.ability === 'Valley Guardian') {
+        const nextRoundData = (activeScript && scriptRound < activeScript.rounds.length)
+          ? activeScript.rounds[scriptRound] : null;
+        if (nextRoundData && nextRoundData.prediction) {
+          // Scripted: auto-select prediction and roll
+          playerPrediction = nextRoundData.prediction;
+          narrate(`<b class="you">You predict: ${playerPrediction}!</b>&nbsp;&nbsp;Rolling...`);
+          setTimeout(() => doPlayerRoll(), 800);
+        } else {
+          playerPrediction = null;
+          document.getElementById('predictArea').classList.add('visible');
+        }
+      } else {
+        document.getElementById('rollBtn').classList.add('ready');
+      }
     }, 800 + extraDelay);
   }, rollDelay);
 }
@@ -2004,8 +2243,11 @@ function resolveRound(pRoll, eRoll) {
   const playerWins = result === 1;
 
   if (playerWins) {
-    const baseDmg = pRoll.damage;
-    const damage = pick.applyAbility(pRoll, baseDmg, pick);
+    let baseDmg = pRoll.damage;
+    let damage = pick.applyAbility(pRoll, baseDmg, pick);
+    // Romy's Valley Guardian — prediction bonus
+    const predictionHit = pick.ability === 'Valley Guardian' && playerPrediction && pRoll.dice.includes(playerPrediction);
+    if (predictionHit) damage += 3;
     const abilityTriggered = damage !== baseDmg;
 
     narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${typeLabel(pRoll.type)} You win!</b>`);
@@ -2029,7 +2271,11 @@ function resolveRound(pRoll, eRoll) {
       }
     };
 
-    if (abilityTriggered) {
+    if (predictionHit) {
+      setTimeout(() => {
+        showAbilitySplash('Valley Guardian', `Predicted ${playerPrediction}! +3 damage — ${damage} total!`, 1600, applyDamage, 'playerCard');
+      }, 800);
+    } else if (abilityTriggered) {
       setTimeout(() => {
         showAbilitySplash(pick.ability, `${pick.abilityDesc} — ${damage} damage!`, 1600, applyDamage, 'playerCard');
       }, 800);
@@ -2038,8 +2284,13 @@ function resolveRound(pRoll, eRoll) {
     }
 
   } else {
-    const baseDmg = eRoll.damage;
-    const damage = enemy.applyAbility(eRoll, baseDmg, enemy);
+    let baseDmg = eRoll.damage;
+    let damage = enemy.applyAbility(eRoll, baseDmg, enemy);
+    // Enemy Romy prediction — auto-pick a random number
+    if (enemy.ability === 'Valley Guardian' && eRoll.dice) {
+      const enemyGuess = Math.floor(Math.random() * 6) + 1;
+      if (eRoll.dice.includes(enemyGuess)) damage += 3;
+    }
     const abilityTriggered = damage !== baseDmg;
 
     narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="them">${enemy.shortName} wins!</b>`);
@@ -2176,8 +2427,21 @@ function stopSnow() {
 
 function nextRound() {
   round++;
-  narrate(`<b class="them">${enemy.shortName}</b>&nbsp;rolls...`);
-  setTimeout(doEnemyRoll, 800);
+  // Activate Shade's Haunt after round 1
+  if (round === 2 && (pick.ability === 'Haunt' || enemy.ability === 'Haunt')) {
+    hauntActive = true;
+  }
+  // Apply Haunt damage before the next roll
+  if (hauntActive && (pick.ability === 'Haunt' || enemy.ability === 'Haunt')) {
+    applyHauntDamage().then(result => {
+      if (result === 'dead') return;
+      narrate(`<b class="them">${enemy.shortName}</b>&nbsp;rolls...`);
+      setTimeout(doEnemyRoll, 800);
+    });
+  } else {
+    narrate(`<b class="them">${enemy.shortName}</b>&nbsp;rolls...`);
+    setTimeout(doEnemyRoll, 800);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2337,10 +2601,18 @@ function stopMusicHard() {
   music.volume = 0.4;
 }
 
+function markGamePlayed() {
+  if (gamesPlayed === 0) {
+    gamesPlayed = 1;
+    localStorage.setItem('boo_gamesPlayed', '1');
+  }
+}
+
 function showWinCTA() {
   fadeOutMusic();
   stopSpiritParticles();
   startSnow();
+  markGamePlayed();
   document.getElementById('ctaTitle').textContent = 'You Win!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
@@ -2350,6 +2622,7 @@ function showLossCTA() {
   fadeOutMusic();
   stopSpiritParticles();
   startSnow();
+  markGamePlayed();
   document.getElementById('ctaTitle').textContent = 'You Lose!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
@@ -2360,7 +2633,13 @@ function show(id) {
   document.getElementById(id).classList.add('active');
 }
 
-function replay() { stopMusicHard(); stopSnow(); show('pickScreen'); initPick(); }
+function replay() {
+  stopMusicHard(); stopSnow();
+  gamesPlayed++;
+  localStorage.setItem('boo_gamesPlayed', gamesPlayed);
+  show('pickScreen');
+  initPick();
+}
 
 initPick();
 </script>
