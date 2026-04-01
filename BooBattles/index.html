@@ -1,0 +1,3655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle of Origins — Tournament of the Century</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080810;
+    --player: #67e8f9;
+    --enemy: #f87171;
+    --gold: #fbbf24;
+    --green: #34d399;
+  }
+
+  body {
+    background: var(--bg);
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(248,113,113,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(103,232,249,0.04) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen { display: none; flex-direction: column; flex: 1; }
+  .screen.active { display: flex; }
+
+  /* ======== SHARED ======== */
+  .big-title {
+    font-family: 'Creepster', cursive;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+
+  .action-btn {
+    display: block;
+    margin: 0 auto;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 48px;
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+  }
+
+  .action-btn.ready {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .action-btn:hover { transform: scale(1.05); }
+
+  .action-btn.cyan {
+    background: linear-gradient(135deg, var(--player), #a78bfa);
+    color: var(--bg);
+    box-shadow: 0 4px 24px rgba(103,232,249,0.3);
+  }
+
+  .action-btn.gold {
+    background: linear-gradient(135deg, var(--gold), #f59e0b);
+    color: var(--bg);
+    box-shadow: 0 4px 24px rgba(251,191,36,0.3);
+  }
+
+  .action-btn.red {
+    background: linear-gradient(135deg, var(--enemy), #dc2626);
+    color: #fff;
+    box-shadow: 0 4px 24px rgba(248,113,113,0.3);
+  }
+
+  .small-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 10px 28px;
+    color: #888;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .small-btn:hover { color: #e0e0e0; border-color: rgba(255,255,255,0.3); }
+
+  /* ======== TITLE SCREEN ======== */
+  .title-screen {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .title-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 20%, rgba(251,191,36,0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 30% 60%, rgba(248,113,113,0.1) 0%, transparent 40%),
+      radial-gradient(ellipse at 70% 60%, rgba(103,232,249,0.1) 0%, transparent 40%),
+      radial-gradient(ellipse at 50% 100%, rgba(10,10,30,0.95) 0%, transparent 60%),
+      linear-gradient(180deg, #0a0a1a 0%, #1a0a20 30%, #0a0a1a 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .title-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 35%, rgba(251,191,36,0.06) 0%, transparent 50%);
+    animation: titlePulse 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes titlePulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  .title-screen > * { position: relative; z-index: 1; }
+
+  .title-main {
+    font-family: 'Creepster', cursive;
+    font-size: 3.2rem;
+    background: linear-gradient(135deg, var(--gold), #fde68a, #fff, #fde68a, var(--gold));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 4px;
+    animation: titleShimmer 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(251,191,36,0.4));
+  }
+
+  @keyframes titleShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .title-sub {
+    font-family: 'Creepster', cursive;
+    font-size: 1.6rem;
+    color: var(--enemy);
+    text-shadow: 0 0 20px rgba(248,113,113,0.6), 0 0 40px rgba(248,113,113,0.3), 0 0 80px rgba(248,113,113,0.15);
+    letter-spacing: 6px;
+    margin-top: -6px;
+    text-transform: uppercase;
+  }
+
+  .title-divider {
+    width: 200px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(251,191,36,0.5), transparent);
+    margin: 2px auto;
+  }
+
+  .title-tagline {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: var(--player);
+    letter-spacing: 3px;
+    text-shadow: 0 0 16px rgba(103,232,249,0.4);
+    opacity: 0.85;
+  }
+
+  .title-desc {
+    font-size: 0.8rem;
+    color: #666;
+    max-width: 300px;
+    line-height: 1.6;
+  }
+  .title-desc b { color: #aaa; }
+
+  .title-buttons { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+  /* ======== PICK SCREEN ======== */
+  .pick-screen {
+    align-items: center;
+    justify-content: space-evenly;
+    padding: 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pick-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(30,80,120,0.6) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, rgba(10,30,60,0.8) 0%, transparent 60%),
+      linear-gradient(180deg, #06141f 0%, #0a1e32 30%, #0d2540 55%, #081a2a 80%, #050e18 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .pick-screen > * { position: relative; z-index: 1; }
+
+  .pick-label {
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    color: var(--player);
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  .ghost-grid {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: stretch;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .pick-card {
+    flex: 1;
+    max-width: 160px;
+    border-radius: 12px;
+    overflow: visible;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+    border: 3px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    display: flex;
+    flex-direction: column;
+  }
+  .pick-card img { border-radius: 10px 10px 0 0; width: 100%; flex: 1; object-fit: cover; display: block; min-height: 0; }
+
+  .pick-card::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--player), #a78bfa, var(--player));
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.35s;
+  }
+
+  .pick-card:hover {
+    transform: translateY(-6px) scale(1.04);
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  .pick-card.selected {
+    transform: translateY(-8px) scale(1.07);
+    border-color: transparent;
+    box-shadow: 0 0 0 3px var(--player), 0 0 40px rgba(103,232,249,0.4), 0 0 80px rgba(103,232,249,0.15);
+    z-index: 10;
+  }
+
+  .pick-card.selected::before { opacity: 1; }
+
+  .pick-card.dimmed { opacity: 0.25; transform: scale(0.95); filter: grayscale(0.6); }
+
+  .pick-card .pick-name {
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 5px 4px 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s;
+    flex-shrink: 0;
+  }
+
+  .pick-card.selected .pick-name { color: var(--player); }
+
+  .pick-card .pick-ability {
+    text-align: center;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #888;
+    padding: 0 4px 5px;
+  }
+
+  .rarity-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.5rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+    z-index: 2;
+    text-transform: uppercase;
+  }
+  .rarity-badge.common { background: #6b7280; color: #fff; }
+  .rarity-badge.uncommon { background: #22c55e; color: #fff; }
+  .rarity-badge.rare { background: #3b82f6; color: #fff; }
+  .rarity-badge.ghost-rare { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #080810; box-shadow: 0 2px 8px rgba(251,191,36,0.4); }
+
+  .selected-info {
+    text-align: center;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s;
+    opacity: 0;
+  }
+  .selected-info.visible { opacity: 1; }
+
+  .selected-info .si-name {
+    font-family: 'Creepster', cursive;
+    font-size: 2.2rem;
+    color: var(--player);
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(103,232,249,0.4);
+  }
+  .selected-info .si-detail {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #aaa;
+    margin-top: 2px;
+  }
+  .selected-info .si-detail b { color: var(--gold); }
+
+  /* ======== MAP SCREEN ======== */
+  .map-screen {
+    padding: 12px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .map-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0a0a1a 0%, #120820 50%, #0a0a1a 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .map-screen > * { position: relative; z-index: 1; }
+
+  .map-title {
+    font-family: 'Creepster', cursive;
+    font-size: 1.4rem;
+    color: var(--gold);
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .map-path {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .map-node {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.3s;
+    min-height: 60px;
+  }
+
+  .map-node.current {
+    border-color: rgba(103,232,249,0.4);
+    box-shadow: 0 0 20px rgba(103,232,249,0.15);
+    background: rgba(103,232,249,0.05);
+  }
+
+  .map-node.defeated {
+    opacity: 0.4;
+    filter: grayscale(0.5);
+  }
+
+  .map-node.locked {
+    opacity: 0.5;
+  }
+
+  .map-node-thumb {
+    width: 44px;
+    height: 62px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+
+  .map-node-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  .map-node.locked .map-node-thumb { filter: brightness(0) saturate(0); }
+
+  .map-node-info { flex: 1; }
+
+  .map-node-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1rem;
+    color: #ccc;
+    letter-spacing: 1px;
+  }
+
+  .map-node.current .map-node-name { color: var(--player); }
+
+  .map-node-detail {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  .map-node-status {
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .map-node.defeated .map-node-status { color: var(--green); }
+  .map-node.current .map-node-status { color: var(--player); }
+
+  /* Bottom bar: collection + items + challenge button */
+  .map-bottom {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 10px;
+    margin-top: 8px;
+  }
+
+  .map-section-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .collection-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .collection-card {
+    width: 40px;
+    height: 56px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(103,232,249,0.3);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .collection-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .collection-card.dead {
+    filter: grayscale(1) brightness(0.4);
+    border-color: rgba(248,113,113,0.3);
+    pointer-events: none;
+  }
+
+  .collection-card .cc-hp {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    font-size: 0.45rem;
+    font-weight: 800;
+    text-align: center;
+    padding: 1px 0;
+    color: var(--player);
+  }
+
+  .item-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: center;
+  }
+
+  .item-slot {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    position: relative;
+  }
+
+  .item-slot.empty { opacity: 0.3; }
+
+  .item-slot .item-label {
+    position: absolute;
+    bottom: -12px;
+    font-size: 0.45rem;
+    font-weight: 700;
+    color: #666;
+    white-space: nowrap;
+  }
+
+  .map-challenge-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    justify-content: center;
+  }
+
+  /* ======== PRE-BATTLE SCREEN ======== */
+  .prebattle-screen {
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .prebattle-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0a0a1a 0%, #1a0820 50%, #0a0a1a 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .prebattle-screen > * { position: relative; z-index: 1; }
+
+  .pb-title {
+    font-family: 'Creepster', cursive;
+    font-size: 1.3rem;
+    color: var(--enemy);
+    letter-spacing: 2px;
+  }
+
+  .pb-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .pb-card {
+    width: 120px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.1);
+    position: relative;
+  }
+  .pb-card img { width: 100%; display: block; }
+
+  .pb-card.player-side { border-color: rgba(103,232,249,0.4); }
+  .pb-card.enemy-side { border-color: rgba(248,113,113,0.4); }
+
+  .pb-card-label {
+    font-family: 'Creepster', cursive;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 4px;
+    letter-spacing: 1px;
+  }
+
+  .pb-card.player-side .pb-card-label { color: var(--player); }
+  .pb-card.enemy-side .pb-card-label { color: var(--enemy); }
+
+  .pb-vs-text {
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    color: #444;
+    letter-spacing: 4px;
+  }
+
+  .pb-stats {
+    font-size: 0.75rem;
+    color: #888;
+    line-height: 1.6;
+  }
+  .pb-stats b { color: #ccc; }
+
+  .pb-ghost-select {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .pb-ghost-opt {
+    width: 48px;
+    height: 67px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .pb-ghost-opt img { width: 100%; height: 100%; object-fit: cover; }
+  .pb-ghost-opt.selected { border-color: var(--player); box-shadow: 0 0 16px rgba(103,232,249,0.3); }
+  .pb-ghost-opt .opt-hp {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font-size: 0.4rem;
+    font-weight: 800;
+    text-align: center;
+    background: rgba(0,0,0,0.7);
+    color: var(--player);
+    padding: 1px;
+  }
+
+  /* ======== BATTLE SCREEN ======== */
+  .battle-screen {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 50%, rgba(30,20,60,1) 0%, rgba(8,8,16,1) 100%);
+  }
+
+  .battle-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(100,60,180,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 10%, rgba(180,60,80,0.12) 0%, transparent 40%),
+      radial-gradient(ellipse at 30% 90%, rgba(40,120,200,0.12) 0%, transparent 40%),
+      radial-gradient(circle at 15% 30%, rgba(103,232,249,0.06) 0%, transparent 25%),
+      radial-gradient(circle at 85% 70%, rgba(192,132,252,0.06) 0%, transparent 25%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .battle-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.5) 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .battle-screen .spirit-particles {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .spirit-dot {
+    position: absolute;
+    border-radius: 50%;
+    animation: spiritFloat linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes spiritFloat {
+    0% { opacity: 0; transform: translateY(0) scale(0.5); }
+    20% { opacity: 0.6; }
+    80% { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(-120px) scale(0.2); }
+  }
+
+  .enemy-zone {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    z-index: 10;
+  }
+
+  .player-zone {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    z-index: 10;
+  }
+
+  .name-plate {
+    background: linear-gradient(135deg, rgba(15,15,35,0.92), rgba(20,20,45,0.88));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 8px 16px 10px;
+    min-width: 220px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .name-plate .np-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.2rem;
+    letter-spacing: 1.5px;
+  }
+
+  .name-plate.enemy-plate { border-color: rgba(248,113,113,0.25); box-shadow: 0 4px 20px rgba(248,113,113,0.1); }
+  .name-plate.enemy-plate .np-name { color: var(--enemy); }
+
+  .name-plate.player-plate { border-color: rgba(103,232,249,0.25); box-shadow: 0 4px 20px rgba(103,232,249,0.1); }
+  .name-plate.player-plate .np-name { color: var(--player); }
+
+  .name-plate .hp-bar-wrap {
+    margin-top: 6px;
+    height: 10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+  }
+
+  .name-plate .hp-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease-out, background 0.4s;
+    position: relative;
+  }
+
+  .name-plate .hp-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%);
+    border-radius: 4px 4px 0 0;
+  }
+
+  .name-plate.enemy-plate .hp-bar { background: linear-gradient(90deg, #dc2626, #f87171); box-shadow: 0 0 8px rgba(248,113,113,0.4); width: 100%; }
+  .name-plate.player-plate .hp-bar { background: linear-gradient(90deg, #0891b2, #67e8f9); box-shadow: 0 0 8px rgba(103,232,249,0.4); width: 100%; }
+
+  .name-plate .hp-bar.hp-low { background: linear-gradient(90deg, #d97706, #fbbf24) !important; box-shadow: 0 0 10px rgba(251,191,36,0.5) !important; }
+  .name-plate .hp-bar.hp-critical { background: linear-gradient(90deg, #b91c1c, #ef4444) !important; box-shadow: 0 0 12px rgba(239,68,68,0.6) !important; animation: hpPulse 0.8s ease-in-out infinite; }
+  .name-plate .hp-bar.hp-over { background: linear-gradient(90deg, #059669, #34d399) !important; box-shadow: 0 0 14px rgba(52,211,153,0.6) !important; }
+
+  @keyframes hpPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+  .name-plate .hp-text { display: flex; justify-content: space-between; font-size: 0.6rem; font-weight: 700; color: #666; margin-top: 3px; }
+  .name-plate .hp-text .hp-num { color: #aaa; }
+
+  .battle-card { border-radius: 12px; overflow: hidden; position: relative; transition: all 0.3s; }
+  .battle-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .battle-card.enemy-card { width: 170px; height: 238px; border: 2px solid rgba(248,113,113,0.4); box-shadow: 0 0 20px rgba(248,113,113,0.2); }
+  .battle-card.player-card { width: 165px; height: 231px; border: 3px solid rgba(103,232,249,0.5); box-shadow: 0 0 28px rgba(103,232,249,0.25); }
+
+  .ability-card-overlay {
+    position: fixed;
+    z-index: 9500;
+    border-radius: 12px;
+    overflow: hidden;
+    filter: brightness(1.2);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    pointer-events: none;
+  }
+  .ability-card-overlay img { width: 100%; height: 100%; object-fit: cover; }
+
+  .battle-card.hit { animation: hitShake 0.4s ease-out; }
+
+  @keyframes hitShake {
+    0% { transform: translate(0,0); }
+    15% { transform: translate(-6px, 3px); }
+    30% { transform: translate(4px, -4px); }
+    45% { transform: translate(-3px, 2px); }
+    60% { transform: translate(2px, -1px); }
+    100% { transform: translate(0,0); }
+  }
+
+  .battle-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 94%;
+    max-width: 440px;
+    gap: 6px;
+    z-index: 20;
+  }
+
+  .dice-area.hidden { opacity: 0; }
+  .dice-area {
+    transition: opacity 0.4s ease-in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .dice-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 80px;
+  }
+
+  .dice-owner {
+    width: 54px;
+    font-family: 'Creepster', cursive;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: right;
+  }
+  .dice-owner.enemy { color: var(--enemy); }
+  .dice-owner.player { color: var(--player); }
+
+  .die {
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.4rem;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.5) rotateZ(-20deg);
+    transition: all 0.3s;
+  }
+
+  .die.visible { opacity: 1; transform: scale(1) rotateZ(0); }
+  .die.glow { box-shadow: 0 0 24px currentColor; transform: scale(1.15); }
+  .die.triples-glow { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor; transform: scale(1.25); animation: triplesPulse 0.6s ease-in-out infinite; }
+  .die.rolling { animation: roll 0.1s infinite alternate; }
+
+  @keyframes triplesPulse {
+    0%, 100% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor; transform: scale(1.25); }
+    50% { box-shadow: 0 0 40px currentColor, 0 0 80px currentColor, 0 0 120px currentColor; transform: scale(1.32); }
+  }
+
+  .triples-banner {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    z-index: 800;
+    font-family: 'Creepster', cursive;
+    font-size: 5rem; letter-spacing: 6px;
+    text-align: center; opacity: 0;
+    pointer-events: none; transition: none;
+  }
+  .triples-banner.enemy-triples { color: var(--enemy); text-shadow: 0 0 40px rgba(248,113,113,0.8), 0 0 80px rgba(248,113,113,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+  .triples-banner.player-triples { color: var(--player); text-shadow: 0 0 40px rgba(103,232,249,0.8), 0 0 80px rgba(103,232,249,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+  .triples-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); transition: opacity 0.2s, transform 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .triples-banner.fade { opacity: 0; transform: translate(-50%, -50%) scale(1.3); transition: opacity 0.4s, transform 0.4s ease-in; }
+
+  .triples-flash { position: fixed; inset: 0; z-index: 799; pointer-events: none; opacity: 0; }
+  .triples-flash.enemy-flash { background: radial-gradient(ellipse at center, rgba(248,113,113,0.3), transparent 70%); }
+  .triples-flash.player-flash { background: radial-gradient(ellipse at center, rgba(103,232,249,0.3), transparent 70%); }
+
+  .die.e { background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(248,113,113,0.08)); border: 2px solid rgba(248,113,113,0.4); color: var(--enemy); }
+  .die.p { background: linear-gradient(135deg, rgba(103,232,249,0.2), rgba(103,232,249,0.08)); border: 2px solid rgba(103,232,249,0.4); color: var(--player); }
+  .die.p.bonus { background: linear-gradient(135deg, rgba(251,191,36,0.2), rgba(251,191,36,0.08)); border: 2px solid rgba(251,191,36,0.5); color: var(--gold); }
+  .die.p.discarded { opacity: 0.25; transform: scale(0.8); }
+  .die.p.rerollable { cursor: pointer; animation: rerollPulse 0.8s ease-in-out infinite; }
+
+  @keyframes rerollPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.3); }
+    50% { box-shadow: 0 0 20px rgba(251,191,36,0.6); }
+  }
+
+  @keyframes roll { 0% { transform: scale(1) rotate(-8deg); } 100% { transform: scale(1.05) rotate(8deg); } }
+
+  .vs-line { font-family: 'Creepster', cursive; font-size: 1.1rem; color: #444; letter-spacing: 6px; text-align: center; }
+
+  .battle-ui-row {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; margin-top: 4px;
+  }
+
+  .narrator-box { width: 100%; }
+  .narrator-box .narrator-inner {
+    background: rgba(10,10,25,0.92);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 8px 14px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ccc;
+    line-height: 1.4;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .narrator-box .narrator-inner b.you { color: var(--player); }
+  .narrator-box .narrator-inner b.them { color: var(--enemy); }
+  .narrator-box .narrator-inner b.gold { color: var(--gold); }
+
+  .battle-ui-row .action-btn { margin: 0; width: 100%; padding: 11px 20px; font-size: 1.2rem; }
+
+  /* Item bar in battle */
+  .battle-items {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .battle-item {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    backdrop-filter: blur(4px);
+  }
+
+  .battle-item.usable {
+    border-color: rgba(251,191,36,0.5);
+    animation: itemGlow 1.5s ease-in-out infinite;
+  }
+
+  @keyframes itemGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.2); }
+    50% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+  }
+
+  .battle-item.used {
+    opacity: 0.2;
+    pointer-events: none;
+  }
+
+  .battle-item:hover:not(.used) { transform: scale(1.1); }
+
+  .reroll-countdown {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: var(--gold);
+    text-shadow: 0 0 10px rgba(251,191,36,0.6);
+    pointer-events: none;
+    animation: countdownPop 0.3s ease-out;
+  }
+
+  @keyframes countdownPop {
+    0% { transform: translateX(-50%) scale(1.5); opacity: 0; }
+    100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  }
+
+  /* Prediction area */
+  .predict-area { display: none; text-align: center; margin: 6px auto 0; }
+  .predict-area.visible { display: block; }
+  .predict-label { font-size: 0.85rem; font-weight: 700; color: #a5f3fc; margin-bottom: 6px; text-shadow: 0 0 10px rgba(165,243,252,0.3); }
+  .predict-btns { display: flex; gap: 8px; justify-content: center; }
+  .predict-btn {
+    width: 44px; height: 44px; border-radius: 10px;
+    border: 2px solid rgba(165,243,252,0.4); background: rgba(165,243,252,0.08);
+    color: #a5f3fc; font-family: 'Creepster', cursive; font-size: 1.3rem;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .predict-btn:hover { background: rgba(165,243,252,0.2); border-color: #a5f3fc; transform: scale(1.1); box-shadow: 0 0 16px rgba(165,243,252,0.3); }
+
+  /* ======== CRASH OVERLAY ======== */
+  .crash-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: #080810; }
+  .crash-overlay.active { display: flex; }
+  .crash-card { position: absolute; border-radius: 14px; overflow: hidden; padding: 0; background: none; border: none; }
+  .crash-card img { height: 100%; width: auto; display: block; border-radius: 12px; }
+  .crash-card.pc { box-shadow: none; z-index: 1002; }
+  .crash-card.ec { box-shadow: none; z-index: 1001; }
+  .impact-flash { position: fixed; inset: 0; background: white; z-index: 1003; opacity: 0; pointer-events: none; }
+  .shard { position: absolute; overflow: hidden; z-index: 1001; pointer-events: none; }
+  .shard img { position: absolute; width: 160px; height: 224px; object-fit: cover; }
+
+  @keyframes shake { 0% { transform: translate(0,0); } 10% { transform: translate(-8px,4px); } 20% { transform: translate(6px,-6px); } 30% { transform: translate(-4px,6px); } 40% { transform: translate(4px,-2px); } 60% { transform: translate(-2px,2px); } 100% { transform: translate(0,0); } }
+  .screen-shake { animation: shake 0.5s ease-out; }
+
+  .crash-card.winner { border: none !important; box-shadow: none !important; }
+
+  .victory-text {
+    position: absolute; top: 12%; left: 50%;
+    transform: translateX(-50%) scale(0.5);
+    font-family: 'Creepster', cursive; font-size: 3.5rem; letter-spacing: 4px;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(251,191,36,0.6), 0 0 60px rgba(251,191,36,0.3), 0 4px 8px rgba(0,0,0,0.6);
+    opacity: 0; transition: opacity 0.4s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 1005; pointer-events: none; white-space: nowrap;
+  }
+  .victory-text.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+  .sparkle { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); z-index: 1004; pointer-events: none; opacity: 0; }
+  @keyframes sparkleFloat { 0% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0); } }
+
+  /* ======== ABILITY SPLASH ======== */
+  .ready-go-overlay { position: fixed; inset: 0; z-index: 850; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+  .ready-go-overlay.active { opacity: 1; }
+  .ready-go-text { font-family: 'Creepster', cursive; font-size: 4.5rem; color: var(--player); text-shadow: 0 0 30px rgba(103,232,249,0.6), 0 0 60px rgba(103,232,249,0.3); letter-spacing: 4px; text-align: center; animation: readyPulse 0.4s ease-out; }
+  @keyframes readyPulse { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+
+  .ability-splash { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  .ability-splash.active { opacity: 1; pointer-events: auto; }
+  .ability-splash-inner { text-align: center; transform: scale(0.6); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); padding: 0 20px; }
+  .ability-splash.active .ability-splash-inner { transform: scale(1); }
+  .ability-splash-name { font-family: 'Creepster', cursive; font-size: 4.2rem; letter-spacing: 4px; line-height: 1.1; }
+  .ability-splash-desc { font-size: 1.3rem; font-weight: 800; margin-top: 14px; text-shadow: 0 0 16px rgba(0,0,0,0.9); letter-spacing: 0.5px; }
+
+  .counter-die-area { margin-top: 20px; display: none; }
+  .counter-die-area.visible { display: block; }
+  .counter-die-btn { width: 80px; height: 80px; border-radius: 16px; background: linear-gradient(135deg, rgba(96,165,250,0.3), rgba(147,130,220,0.2)); border: 3px solid rgba(96,165,250,0.5); color: #93c5fd; font-size: 2.2rem; font-weight: 900; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; display: inline-flex; align-items: center; justify-content: center; }
+  .counter-die-btn:hover { transform: scale(1.1); box-shadow: 0 0 24px rgba(96,165,250,0.4); }
+  .counter-die-btn.rolling { animation: roll 0.1s infinite alternate; cursor: default; }
+  .counter-die-btn.landed { cursor: default; }
+  .counter-die-label { font-size: 0.85rem; color: #93c5fd; font-weight: 700; margin-bottom: 8px; }
+
+  /* Ability themes */
+  .ability-splash.iron-will { background: radial-gradient(ellipse at center, rgba(100,100,120,0.5) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.iron-will .ability-splash-name { color: #94a3b8; text-shadow: 0 0 40px rgba(148,163,184,0.8), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.iron-will .ability-splash-desc { color: #cbd5e1; }
+
+  .ability-splash.lucky-strike { background: radial-gradient(ellipse at center, rgba(34,197,94,0.4) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.lucky-strike .ability-splash-name { color: #4ade80; text-shadow: 0 0 40px rgba(34,197,94,0.8), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.lucky-strike .ability-splash-desc { color: #bbf7d0; }
+
+  .ability-splash.fury { background: radial-gradient(ellipse at center, rgba(220,80,20,0.45) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.fury .ability-splash-name { color: #fb923c; text-shadow: 0 0 40px rgba(251,146,60,0.8), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.fury .ability-splash-desc { color: #fed7aa; }
+
+  .ability-splash.double-down { background: radial-gradient(ellipse at center, rgba(168,85,247,0.4) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.double-down .ability-splash-name { color: #c084fc; text-shadow: 0 0 40px rgba(168,85,247,0.8), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.double-down .ability-splash-desc { color: #e9d5ff; }
+
+  .ability-splash.beast-mode { background: radial-gradient(ellipse at center, rgba(200,60,10,0.55) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.beast-mode .ability-splash-name { color: #ffaa55; text-shadow: 0 0 40px rgba(255,107,53,1), 0 0 80px rgba(255,69,0,0.6), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.beast-mode .ability-splash-desc { color: #ffd4aa; }
+
+  .ability-splash.blue-fire { background: radial-gradient(ellipse at center, rgba(30,100,220,0.5) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.blue-fire .ability-splash-name { color: #93d5fd; text-shadow: 0 0 40px rgba(96,165,250,1), 0 0 80px rgba(56,189,248,0.6), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.blue-fire .ability-splash-desc { color: #d0e8ff; }
+
+  .ability-splash.party-time { background: radial-gradient(ellipse at center, rgba(140,50,200,0.5) 0%, rgba(0,0,0,0.9) 65%); }
+  .ability-splash.party-time .ability-splash-name { color: #e0b8ff; text-shadow: 0 0 40px rgba(192,132,252,1), 0 0 80px rgba(232,121,249,0.6), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.party-time .ability-splash-desc { color: #f0deff; }
+
+  .ability-splash.valley-guardian { background: radial-gradient(ellipse at center, rgba(56,189,248,0.5) 0%, rgba(20,60,100,0.4) 40%, rgba(0,0,0,0.92) 70%); }
+  .ability-splash.valley-guardian .ability-splash-name { color: #a5f3fc; text-shadow: 0 0 40px rgba(165,243,252,1), 0 0 80px rgba(56,189,248,0.7), 0 0 200px rgba(103,232,249,0.2), 0 3px 6px rgba(0,0,0,0.8); }
+  .ability-splash.valley-guardian .ability-splash-desc { color: #cffafe; }
+
+  /* ======== REWARD SCREEN ======== */
+  .reward-screen {
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .reward-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0a0a1a 0%, #0a1a10 50%, #0a0a1a 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .reward-screen > * { position: relative; z-index: 1; }
+
+  .reward-title {
+    font-family: 'Creepster', cursive;
+    font-size: 2rem;
+    color: var(--gold);
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(251,191,36,0.4);
+  }
+
+  .reward-item-box {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .reward-item-icon { font-size: 2rem; }
+  .reward-item-info { text-align: left; }
+  .reward-item-name { font-weight: 800; color: var(--gold); font-size: 0.9rem; }
+  .reward-item-desc { font-size: 0.7rem; color: #888; margin-top: 2px; }
+
+  .reward-cards {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+
+  .reward-card {
+    width: 100px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 3px solid rgba(103,232,249,0.4);
+    position: relative;
+    transition: all 0.6s;
+  }
+
+  .reward-card img { width: 100%; display: block; }
+
+  .reward-card .rc-name {
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 4px;
+    background: rgba(0,0,0,0.6);
+  }
+
+  .reward-card .rc-ability {
+    text-align: center;
+    font-size: 0.5rem;
+    font-weight: 600;
+    padding: 0 4px 4px;
+    color: #888;
+    background: rgba(0,0,0,0.6);
+  }
+
+  .reward-overflow {
+    font-size: 0.7rem;
+    color: var(--enemy);
+    font-weight: 700;
+  }
+
+  /* ======== GAME OVER SCREEN ======== */
+  .gameover-screen {
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .gameover-title {
+    font-family: 'Creepster', cursive;
+    font-size: 2.5rem;
+    color: var(--enemy);
+    letter-spacing: 3px;
+    text-shadow: 0 0 30px rgba(248,113,113,0.5);
+  }
+
+  .graveyard {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 300px;
+  }
+
+  .grave-card {
+    width: 44px;
+    height: 62px;
+    border-radius: 6px;
+    overflow: hidden;
+    filter: grayscale(1) brightness(0.3);
+    border: 2px solid rgba(248,113,113,0.2);
+  }
+  .grave-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .gameover-stats {
+    font-size: 0.75rem;
+    color: #666;
+    line-height: 1.8;
+  }
+
+  /* ======== VICTORY SCREEN ======== */
+  .win-screen {
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .win-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(251,191,36,0.15) 0%, transparent 60%),
+      linear-gradient(180deg, #0a0a1a 0%, #1a1508 50%, #0a0a1a 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .win-screen > * { position: relative; z-index: 1; }
+
+  .win-title {
+    font-family: 'Creepster', cursive;
+    font-size: 2.2rem;
+    background: linear-gradient(135deg, var(--gold), #fde68a, var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+  }
+
+  .trophy-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 350px;
+  }
+
+  .trophy-card {
+    width: 52px;
+    height: 73px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid rgba(251,191,36,0.4);
+    box-shadow: 0 0 12px rgba(251,191,36,0.2);
+  }
+  .trophy-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .win-stats { font-size: 0.75rem; color: #888; line-height: 1.8; }
+  .win-stats b { color: var(--gold); }
+
+  .cta-footer { font-size: 0.7rem; color: #444; margin-top: 4px; }
+  .cta-footer a { color: var(--player); text-decoration: none; }
+
+  /* ======== SNOW ======== */
+  .snow-container { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; display: none; }
+  .snow-container.active { display: block; }
+  .snowflake { position: absolute; background: white; border-radius: 50%; opacity: 0; animation: snowfall linear forwards; }
+  @keyframes snowfall { 0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 0.5; } 80% { opacity: 0.35; } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)); } }
+
+  .watermark { position: fixed; bottom: 10px; right: 14px; font-size: 0.6rem; color: #222; letter-spacing: 1px; z-index: 200; }
+
+  /* ======== MOBILE ======== */
+  @media (max-width: 480px) {
+    .title-main { font-size: 2.4rem; }
+    .title-sub { font-size: 1.2rem; letter-spacing: 4px; }
+    .title-tagline { font-size: 0.9rem; }
+    .pick-label { font-size: 1.2rem; }
+    .ghost-grid { gap: 10px; max-width: 360px; }
+    .pick-card { max-width: 110px; }
+    .pick-card .pick-name { font-size: 0.68rem; }
+    .selected-info .si-name { font-size: 1.7rem; }
+    .battle-card.enemy-card { width: 127px; height: 179px; }
+    .battle-card.player-card { width: 130px; height: 182px; }
+    .name-plate { min-width: 142px; padding: 6px 10px; }
+    .name-plate .np-name { font-size: 1rem; }
+    .narrator-box .narrator-inner { font-size: 0.85rem; padding: 8px 10px; }
+    .battle-ui-row .action-btn { font-size: 1rem; padding: 9px 14px; }
+    .die { width: 58px; height: 58px; font-size: 1.9rem; }
+    .dice-row { gap: 10px; min-height: 66px; }
+    .dice-owner { font-size: 0.75rem; width: 44px; }
+    .triples-banner { font-size: 3.5rem; }
+    .ability-splash-name { font-size: 3rem; }
+    .ability-splash-desc { font-size: 1.05rem; }
+    .counter-die-btn { width: 66px; height: 66px; font-size: 1.8rem; }
+    .crash-card { width: 130px; height: 182px; }
+    .crash-card img { width: 130px; height: 182px; }
+    .shard img { width: 130px; height: 182px; }
+    .victory-text { font-size: 2.5rem; }
+    .pb-card { width: 90px; }
+    .pb-vs-text { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TITLE -->
+  <div class="screen title-screen active" id="titleScreen">
+    <div class="title-main">Battle of Origins</div>
+    <div class="title-divider"></div>
+    <div class="title-sub">Tournament of the Century</div>
+    <div class="title-tagline">8 Bosses. 1 Life per Ghost. No Mercy.</div>
+    <div class="title-desc">
+      Your ghosts don't come back. Build your team, use items wisely, and fight through <b>8 increasingly powerful bosses</b>. Run out of ghosts and it's over.
+    </div>
+    <div class="title-buttons">
+      <button class="action-btn cyan ready" onclick="beginRun()">Enter the Tournament</button>
+      <button class="action-btn gold" id="continueBtn" onclick="continueRun()" style="font-size:1.1rem;padding:10px 36px;">Continue Run</button>
+    </div>
+  </div>
+
+  <!-- INITIAL PICK -->
+  <div class="screen pick-screen" id="pickScreen">
+    <div class="pick-label" id="pickLabel">Choose your starter ghost</div>
+    <div class="ghost-grid" id="ghostGrid"></div>
+    <div class="selected-info" id="selectedInfo">
+      <div class="si-name" id="siName"></div>
+      <div class="si-detail" id="siDetail"></div>
+    </div>
+    <button class="action-btn cyan" id="pickBtn" onclick="confirmPick()">Choose This Ghost</button>
+  </div>
+
+  <!-- MAP -->
+  <div class="screen map-screen" id="mapScreen">
+    <div class="map-title" id="mapTitle">Spirit Gauntlet</div>
+    <div class="map-path" id="mapPath"></div>
+    <div class="map-bottom">
+      <div class="map-section-label">Your Ghosts</div>
+      <div class="collection-row" id="collectionRow"></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+        <div>
+          <div class="map-section-label">Items</div>
+          <div class="item-row" id="itemRow"></div>
+        </div>
+      </div>
+      <div class="map-challenge-row">
+        <button class="action-btn cyan ready" onclick="openPreBattle()" style="font-size:1.1rem;padding:10px 32px;">Challenge Boss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRE-BATTLE -->
+  <div class="screen prebattle-screen" id="prebattleScreen">
+    <div class="pb-title" id="pbTitle">Boss Battle</div>
+    <div class="pb-vs">
+      <div>
+        <div class="pb-card player-side" id="pbPlayerCard"></div>
+        <div class="pb-card-label" style="color:var(--player);" id="pbPlayerName"></div>
+      </div>
+      <div class="pb-vs-text">VS</div>
+      <div>
+        <div class="pb-card enemy-side" id="pbEnemyCard"></div>
+        <div class="pb-card-label" style="color:var(--enemy);" id="pbEnemyName"></div>
+      </div>
+    </div>
+    <div class="pb-stats" id="pbStats"></div>
+    <div class="map-section-label" style="margin-top:8px;">Select your ghost</div>
+    <div class="pb-ghost-select" id="pbGhostSelect"></div>
+    <button class="action-btn cyan" id="pbFightBtn" onclick="startBattle()">Fight!</button>
+    <button class="small-btn" onclick="showMap()">Back to Map</button>
+  </div>
+
+  <!-- BATTLE -->
+  <div class="screen battle-screen" id="battleScreen">
+    <div class="spirit-particles" id="spiritParticles"></div>
+    <div class="enemy-zone">
+      <div class="name-plate enemy-plate" id="enemyPlate">
+        <div class="np-name" id="enemyNameText"></div>
+        <div class="hp-bar-wrap"><div class="hp-bar" id="enemyHpBar"></div></div>
+        <div class="hp-text"><span class="hp-num" id="enemyHpText"></span></div>
+      </div>
+      <div class="battle-card enemy-card" id="enemyCard"></div>
+    </div>
+    <div class="player-zone">
+      <div class="battle-card player-card" id="playerCard"></div>
+      <div class="name-plate player-plate" id="playerPlate">
+        <div class="np-name" id="playerNameText"></div>
+        <div class="hp-bar-wrap"><div class="hp-bar" id="playerHpBar"></div></div>
+        <div class="hp-text"><span class="hp-num" id="playerHpText"></span></div>
+      </div>
+    </div>
+    <div class="battle-center">
+      <div class="dice-area" id="diceArea">
+        <div class="dice-row">
+          <div class="dice-owner enemy">Enemy</div>
+          <div class="die e" id="eDie0"></div>
+          <div class="die e" id="eDie1"></div>
+          <div class="die e" id="eDie2"></div>
+        </div>
+        <div class="vs-line">VS</div>
+        <div class="dice-row" id="playerDiceRow">
+          <div class="dice-owner player">You</div>
+          <div class="die p" id="pDie0"></div>
+          <div class="die p" id="pDie1"></div>
+          <div class="die p" id="pDie2"></div>
+          <div class="die p bonus" id="pDie3" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="battle-ui-row">
+        <div class="narrator-box"><div class="narrator-inner" id="narrator"></div></div>
+        <div class="predict-area" id="predictArea">
+          <div class="predict-label">Predict a number — if a die matches, +3 damage!</div>
+          <div class="predict-btns">
+            <button class="predict-btn" onclick="pickPrediction(1)">1</button>
+            <button class="predict-btn" onclick="pickPrediction(2)">2</button>
+            <button class="predict-btn" onclick="pickPrediction(3)">3</button>
+            <button class="predict-btn" onclick="pickPrediction(4)">4</button>
+            <button class="predict-btn" onclick="pickPrediction(5)">5</button>
+            <button class="predict-btn" onclick="pickPrediction(6)">6</button>
+          </div>
+        </div>
+        <button class="action-btn cyan" id="rollBtn" onclick="doPlayerRoll()">Roll Your Dice!</button>
+        <div class="battle-items" id="battleItems"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REWARD -->
+  <div class="screen reward-screen" id="rewardScreen">
+    <div class="reward-title">Boss Defeated!</div>
+    <div class="reward-item-box" id="rewardItemBox">
+      <div class="reward-item-icon" id="rewardItemIcon"></div>
+      <div class="reward-item-info">
+        <div class="reward-item-name" id="rewardItemName"></div>
+        <div class="reward-item-desc" id="rewardItemDesc"></div>
+      </div>
+    </div>
+    <div class="map-section-label" style="margin-top:8px;">New Ghost Cards</div>
+    <div class="map-section-label" id="rewardPickLabel" style="color:var(--player);font-size:0.7rem;margin-top:2px;">Tap one to add to your collection</div>
+    <div class="reward-cards" id="rewardCards"></div>
+    <div class="reward-overflow" id="rewardOverflow" style="display:none;"></div>
+    <button class="action-btn cyan ready" onclick="collectRewards()" style="font-size:1.1rem;padding:10px 32px;">Continue</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen gameover-screen" id="gameoverScreen">
+    <div class="gameover-title">All Ghosts Lost</div>
+    <div class="graveyard" id="graveyard"></div>
+    <div class="gameover-stats" id="gameoverStats"></div>
+    <button class="action-btn red ready" onclick="retryRun()" style="font-size:1.2rem;">Try Again</button>
+  </div>
+
+  <!-- VICTORY -->
+  <div class="screen win-screen" id="winScreen">
+    <div class="win-title">Nuzlocke Complete!</div>
+    <div class="trophy-row" id="trophyRow"></div>
+    <div class="win-stats" id="winStats"></div>
+    <a class="action-btn gold ready" href="https://www.BattleOfOrigins.com" target="_blank" style="text-decoration:none;font-size:1.1rem;padding:12px 32px;">Back us on Kickstarter</a>
+    <button class="small-btn" onclick="retryRun()">Play Again</button>
+    <div class="cta-footer"><a href="https://www.BattleOfOrigins.com" target="_blank">BattleOfOrigins.com</a> · Coming September 2026</div>
+  </div>
+</div>
+
+<!-- Overlays -->
+<div class="ready-go-overlay" id="readyGoOverlay"><div class="ready-go-text" id="readyGoText"></div></div>
+<div class="crash-overlay" id="crashOverlay">
+  <div class="crash-card ec" id="crashEnemy"></div>
+  <div class="crash-card pc" id="crashPlayer"></div>
+  <div class="victory-text" id="victoryText">VICTORY!</div>
+</div>
+<div class="impact-flash" id="impactFlash"></div>
+<div class="snow-container" id="snowContainer"></div>
+<div class="triples-banner" id="triplesBanner">TRIPLES!</div>
+<div class="triples-flash" id="triplesFlash"></div>
+<div id="abilitySplash" class="ability-splash">
+  <div class="ability-splash-inner">
+    <div class="ability-splash-name" id="splashName"></div>
+    <div class="ability-splash-desc" id="splashDesc"></div>
+    <div class="counter-die-area" id="counterDieArea">
+      <div class="counter-die-label">Tap to roll!</div>
+      <button class="counter-die-btn" id="counterDieBtn" onclick="rollCounterDie()">?</button>
+    </div>
+  </div>
+</div>
+
+<audio id="bgMusic" src="../boo/BGG.mp3" loop preload="auto"></audio>
+<audio id="triplesSfx" src="../boo/triples.mp3" preload="auto"></audio>
+<audio id="sfxDiceRoll" src="../boo/DiceRoll.mp3" preload="auto"></audio>
+<audio id="sfx1Damage" src="../boo/1Damage.mp3" preload="auto"></audio>
+<audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
+<audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
+<audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
+<div class="watermark">CORKSCREW GAMES</div>
+
+<script>
+// ══════════════════════════════════════════════
+// GHOST DATABASE — Real card data from Frost Valley
+// Sideline ghosts excluded (abilities don't work in 1v1)
+// ══════════════════════════════════════════════
+const IMG = '../tierlist/cards/';
+
+const ABILITY_THEMES = {
+  'Protector': 'iron-will',
+  'Bullseye': 'beast-mode',
+  'Winter Barrage': 'valley-guardian',
+  'Heating Up': 'fury',
+  'Reflection': 'blue-fire',
+  'Slick Coat': 'iron-will',
+  'One-two-one!': 'beast-mode',
+  'Slash': 'valley-guardian',
+  'Valley Magic': 'valley-guardian',
+  'Grace': 'double-down',
+  'Toboggan': 'blue-fire',
+  'Growing Mob': 'fury',
+  'Hidden Weakness': 'beast-mode',
+  'Change of Heart': 'party-time',
+  'Snowball': 'beast-mode',
+  'Thief': 'lucky-strike',
+  'Pop': 'party-time',
+  'Stoic': 'iron-will',
+  'Bogus': 'blue-fire',
+  'Tempest': 'valley-guardian',
+  'Underdog': 'fury',
+  'Sploop!': 'valley-guardian',
+  'Glacial Pounding': 'beast-mode',
+  'Burning Soul': 'fury',
+  'Teamwork': 'blue-fire',
+  'Stone Form': 'iron-will',
+  'Ambush': 'beast-mode',
+  'Swift': 'lucky-strike',
+  'Final Gift': 'valley-guardian',
+  'Brew Time': 'fury',
+  'Force of Nature': 'beast-mode',
+  'Heinous': 'party-time',
+  'Careful': 'iron-will',
+  'Jinx': 'double-down',
+  'Tough Job': 'blue-fire',
+  'Regulator': 'lucky-strike'
+};
+
+const ALL_GHOSTS = [
+  // Ghost Rare
+  { name:"Hector", file:"hector.jpg", rarity:"ghost-rare", maxHp:6, ability:"Protector", abilityDesc:"Singles beat doubles. +1 damage on singles." },
+  { name:"Night Master", file:"night_master.jpg", rarity:"ghost-rare", maxHp:5, ability:"Bullseye", abilityDesc:"Win with doubles: +5 bonus damage." },
+  { name:"Skylar", file:"skylar.jpg", rarity:"ghost-rare", maxHp:7, ability:"Winter Barrage", abilityDesc:"Ice Shards deal +2 damage instead of +1." },
+  { name:"Tyler", file:"tyler.jpg", rarity:"ghost-rare", maxHp:6, ability:"Heating Up", abilityDesc:"Before rolling, spend 2 HP to gain +1 die." },
+  { name:"King Jay", file:"king_jay.jpg", rarity:"ghost-rare", maxHp:7, ability:"Reflection", abilityDesc:"Lose roll & dice total = 7: reflect all damage." },
+  { name:"Piper", file:"piper.jpg", rarity:"ghost-rare", maxHp:6, ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll." },
+
+  // Rare
+  { name:"Stone Cold", file:"stone_cold.jpg", rarity:"rare", maxHp:7, ability:"One-two-one!", abilityDesc:"Roll double 1's: deal 3X damage." },
+  { name:"Wim", file:"wim.jpg", rarity:"rare", maxHp:6, ability:"Slash", abilityDesc:"+5 damage when all dice are odd." },
+  { name:"Spockles", file:"spockles.jpg", rarity:"rare", maxHp:6, ability:"Valley Magic", abilityDesc:"Win a roll: gain 2 Ice Shards." },
+  { name:"Antoinette", file:"antoinette.jpg", rarity:"rare", maxHp:6, ability:"Grace", abilityDesc:"Roll as many dice as your opponent." },
+  { name:"Calvin & Anna", file:"calvin_anna.jpg", rarity:"rare", maxHp:6, ability:"Toboggan", abilityDesc:"When you defeat a ghost, heal 3 HP." },
+  { name:"Troubling Haters", file:"troubling_haters.jpg", rarity:"rare", maxHp:4, ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP." },
+  { name:"Wandering Sue", file:"wandering_sue.jpg", rarity:"rare", maxHp:4, ability:"Hidden Weakness", abilityDesc:"If enemy has 12+ HP, destroy them before rolling." },
+  { name:"Eloise", file:"eloise.jpg", rarity:"rare", maxHp:5, ability:"Change of Heart", abilityDesc:"Spend 2 Ice Shards to swap HP with enemy before rolling." },
+  { name:"Pelter", file:"pelter.jpg", rarity:"rare", maxHp:5, ability:"Snowball", abilityDesc:"Doubles gain +2 damage." },
+
+  // Uncommon
+  { name:"Outlaw", file:"outlaw.jpg", rarity:"uncommon", maxHp:5, ability:"Thief", abilityDesc:"Roll doubles: remove 1 opponent die next turn." },
+  { name:"Bubble Boys", file:"bubble_boys.jpg", rarity:"uncommon", maxHp:9, ability:"Pop", abilityDesc:"If the enemy rolls triples, Bubble Boys are defeated." },
+  { name:"Guard Thomas", file:"guard_thomas.jpg", rarity:"uncommon", maxHp:6, ability:"Stoic", abilityDesc:"Below 6 HP: immune to singles damage." },
+  { name:"Bogey", file:"bogey.jpg", rarity:"uncommon", maxHp:5, ability:"Bogus", abilityDesc:"Reflect all incoming damage. Once per game." },
+  { name:"Roger", file:"roger.jpg", rarity:"uncommon", maxHp:6, ability:"Tempest", abilityDesc:"Roll doubles with a 6 kicker: gain 3 Ice Shards." },
+  { name:"Masked Hero", file:"masked_hero.jpg", rarity:"uncommon", maxHp:5, ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage." },
+  { name:"Chad", file:"chad.jpg", rarity:"uncommon", maxHp:6, ability:"Sploop!", abilityDesc:"On entry, gain 2 Ice Shards." },
+  { name:"Marcus", file:"marcus.jpg", rarity:"uncommon", maxHp:7, ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: gain 4 extra dice next roll." },
+  { name:"Ashley", file:"ashley.jpg", rarity:"uncommon", maxHp:3, ability:"Burning Soul", abilityDesc:"Win a roll: gain 1 Ice Shard." },
+
+  // Common
+  { name:"Boo Brothers", file:"boo_brothers.jpg", rarity:"common", maxHp:5, ability:"Teamwork", abilityDesc:"Before rolling, may remove 1 die to gain 1 HP." },
+  { name:"Patrick", file:"patrick.jpg", rarity:"common", maxHp:3, ability:"Stone Form", abilityDesc:"Don't roll. If opponent rolls singles: negate damage, deal 3." },
+  { name:"Nikon", file:"nikon.jpg", rarity:"common", maxHp:6, ability:"Ambush", abilityDesc:"Win first roll: deal triple damage." },
+  { name:"Kodako", file:"kodako.jpg", rarity:"common", maxHp:6, ability:"Swift", abilityDesc:"Roll 1-2-3: negate damage and deal 4 to enemy." },
+  { name:"Powder", file:"powder.jpg", rarity:"common", maxHp:5, ability:"Final Gift", abilityDesc:"When defeated, gain 3 Ice Shards for your next ghost." },
+  { name:"Simon", file:"simon.jpg", rarity:"common", maxHp:6, ability:"Brew Time", abilityDesc:"If you took damage last round, +2 damage this roll." },
+  { name:"Cameron", file:"cameron.jpg", rarity:"common", maxHp:6, ability:"Force of Nature", abilityDesc:"If your damage gets negated, destroy the enemy." },
+  { name:"Logey", file:"logey.jpg", rarity:"common", maxHp:6, ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll." },
+  { name:"Fredrick", file:"fredrick.jpg", rarity:"common", maxHp:5, ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice." },
+  { name:"Dream Cat", file:"dream_cat.jpg", rarity:"common", maxHp:4, ability:"Jinx", abilityDesc:"Both roll doubles: gain +1 die next turn." },
+  { name:"Sad Sal", file:"sad_sal.jpg", rarity:"common", maxHp:5, ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard." },
+  { name:"Tommy Salami", file:"tommy_salami.jpg", rarity:"common", maxHp:6, ability:"Regulator", abilityDesc:"Enemy rolls 6's: force reroll of those dice." }
+].map(g => ({ ...g, hp: g.maxHp }));
+
+// ══════════════════════════════════════════════
+// BOSSES
+// ══════════════════════════════════════════════
+const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector'];
+const BOSS_HP =    [6, 7, 9, 10, 11, 12, 13, 15];
+const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power',null];
+
+// Fixed starters — always these 3
+const STARTER_NAMES = ['Dream Cat', 'Outlaw', 'Wim'];
+
+const BOSSES = BOSS_NAMES.map((name, i) => {
+  const base = ALL_GHOSTS.find(g => g.name === name);
+  return { ...base, bossHp: BOSS_HP[i], maxHp: BOSS_HP[i], hp: BOSS_HP[i], drop: BOSS_DROPS[i], bossIndex: i };
+});
+
+const ITEMS = {
+  reroll: { name: 'Reroll', icon: '\u{1F3B2}', desc: 'Reroll 1 of your dice', color: '#67e8f9' },
+  heal:   { name: 'Heal',   icon: '\u{1F49A}', desc: '+4 HP (one-time)',      color: '#34d399' },
+  power:  { name: 'Power',  icon: '\u26A1',    desc: '+1 die this roll',      color: '#fbbf24' }
+};
+
+// Rarity weights for reward draws
+const DRAW_WEIGHTS = [
+  { common: 0.70, uncommon: 0.30, rare: 0, 'ghost-rare': 0 },
+  { common: 0.70, uncommon: 0.30, rare: 0, 'ghost-rare': 0 },
+  { common: 0.40, uncommon: 0.40, rare: 0.20, 'ghost-rare': 0 },
+  { common: 0.40, uncommon: 0.40, rare: 0.20, 'ghost-rare': 0 },
+  { common: 0, uncommon: 0.20, rare: 0.50, 'ghost-rare': 0.30 },
+  { common: 0, uncommon: 0.20, rare: 0.50, 'ghost-rare': 0.30 },
+  { common: 0, uncommon: 0, rare: 0.40, 'ghost-rare': 0.60 },
+  { common: 0, uncommon: 0, rare: 0.40, 'ghost-rare': 0.60 }
+];
+
+// ══════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════
+let state = null;
+
+function newState(isRestart) {
+  return {
+    runActive: true,
+    isRestart: isRestart || false,
+    currentBoss: 0,
+    collection: [],
+    items: [],
+    usedCards: BOSS_NAMES.slice(), // bosses excluded from draw pool
+    deadGhosts: [],
+    stats: { bossesBeaten: 0, ghostsLost: 0, totalRolls: 0, itemsUsed: 0 }
+  };
+}
+
+function saveState() { localStorage.setItem('boo_nuzlocke_save', JSON.stringify(state)); }
+function loadState() { try { return JSON.parse(localStorage.getItem('boo_nuzlocke_save')); } catch { return null; } }
+function clearState() { localStorage.removeItem('boo_nuzlocke_save'); }
+
+// ══════════════════════════════════════════════
+// BATTLE STATE
+// ══════════════════════════════════════════════
+let pick = null, enemy = null;
+let playerHp, enemyHp, round, phase;
+let currentEnemyRoll = null;
+let playerPrediction = null;
+let counterCallback = null;
+let abilityOverlayEl = null;
+let spiritInterval = null, snowInterval = null, fadeInterval = null;
+let selectedGhostIndex = 0;
+let pendingRewardCards = [];
+let pendingRewardItem = null;
+
+// Item usage state for current battle
+let battleItemsState = [];
+let rerollMode = false;
+let powerMode = false;
+let playerDiceValues = [];
+
+// Ability state
+let iceShards = 0;              // Player ice shard stack
+let enemyIceShards = 0;         // Enemy ice shard stack
+let playerBonusDice = 0;        // Extra dice for player next roll
+let enemyBonusDice = 0;         // Extra dice for enemy next roll
+let playerRemoveDice = 0;       // Dice removed from player next roll
+let enemyRemoveDice = 0;        // Dice removed from enemy next roll
+let bogeyReflectUsed = false;   // Bogey one-time reflect tracker
+let isFirstRoll = true;         // For Nikon's Ambush
+let tookDamageLastRound = false;// For Simon's Brew Time
+let carryOverShards = 0;        // Powder's Final Gift shards for next ghost
+
+// ══════════════════════════════════════════════
+// SCRIPTED BOSS FIGHTS — cinematic dice sequences
+// Boss 0: per-starter, guaranteed win + ability showcase
+// Boss 1-2: guaranteed wins with drama
+// Boss 3-7: dramatic arcs, mostly winnable
+// ══════════════════════════════════════════════
+let bossScript = null;
+let bossScriptRound = 0;
+
+// Boss 0 scripts vary by starter ghost
+const BOSS0_SCRIPTS = {
+  'Dream Cat': {
+    enemy:  [[3,2,1], [4,4,2], [2,1,3]],
+    player: [[5,4,2], [5,5,3], [6,4,3]]
+  },
+  'Outlaw': {
+    enemy:  [[3,1,2], [4,3,1], [2,1,1]],
+    player: [[5,4,3], [6,6,2], [5,4,3]]
+  },
+  'Wim': {
+    enemy:  [[4,2,1], [3,2,1], [2,1,3]],
+    player: [[5,4,6], [5,3,1], [6,5,4]]
+  }
+};
+
+// Boss 1: Bogey (7 HP, Bogus — reflect once)
+// Arc: Player leads → reflect SURPRISE → enemy hits → player at low HP → comeback doubles
+const BOSS1_SCRIPT = {
+  enemy:  [[3,2,1], [2,1,3], [5,5,2], [3,1,2], [2,1,3], [1,3,2]],
+  player: [[4,4,6], [5,5,3], [4,3,1], [6,6,4], [5,5,4], [6,4,3]]
+  // R1: P doubles (2) → Bogey 5/7
+  // R2: P doubles (2) → REFLECTED! Player takes 2!
+  // R3: E doubles (2) → Player takes 2 more! DOWN LOW
+  // R4: P doubles (2) → Bogey 3/7. COMEBACK BEGINS
+  // R5: P doubles (2) → Bogey 1/7
+  // R6: P singles (1) → Bogey DEAD
+};
+
+// Boss 2: Guard Thomas (9 HP, Stoic — below 6 HP immune to singles)
+// Arc: Player pushes Thomas below 6 → STOIC blocks singles! → player forced to roll doubles → grinds out the win
+const BOSS2_SCRIPT = {
+  enemy:  [[3,2,1], [2,1,3], [5,4,2], [3,2,1], [5,5,3], [3,1,2], [2,1,3], [1,2,3]],
+  player: [[4,4,6], [5,5,4], [4,3,1], [6,5,4], [4,2,1], [6,6,4], [4,4,5], [5,5,6]]
+  // R1: P doubles (2) → GT 7/9
+  // R2: P doubles (2) → GT 5/9. NOW BELOW 6!
+  // R3: E singles (1 dmg to player)
+  // R4: P singles... STOIC BLOCKS! 0 dmg! Shows the mechanic
+  // R5: E doubles (2 dmg to player). Pressure!
+  // R6: P doubles (2) → GT 3/9. Gets through!
+  // R7: P doubles (2) → GT 1/9
+  // R8: P doubles (2) → GT DEAD
+};
+
+// Boss 3: Stone Cold (10 HP, One-two-one! — double 1s = 3x damage)
+// Arc: Player builds lead → ONE-TWO-ONE smashes player to 1 HP → TRIPLES COMEBACK!
+const BOSS3_SCRIPT = {
+  enemy:  [[4,2,1], [3,2,1], [1,1,4], [2,1,3], [3,2,1], [2,1,3], [1,3,2]],
+  player: [[5,5,3], [6,4,3], [3,2,1], [4,4,4], [5,5,4], [6,5,4], [5,4,3]]
+  // R1: P doubles (2) → SC 8/10
+  // R2: P singles (1) → SC 7/10
+  // R3: E double 1s! ONE-TWO-ONE! 6 DMG! Player devastated!
+  // R4: P TRIPLES! 3 dmg (SC 4/10). 1 HP COMEBACK!
+  // R5: P doubles (2) → SC 2/10
+  // R6: P singles (1) → SC 1/10
+  // R7: P singles (1) → SC DEAD! Survived the onslaught!
+};
+
+// Boss 4: Pelter (11 HP, Snowball — doubles +2 damage)
+// Arc: Pelter opens with brutal Snowball doubles → trades blows → player triples for comeback
+const BOSS4_SCRIPT = {
+  enemy:  [[4,4,6], [3,2,1], [2,1,3], [5,5,3], [2,1,3], [3,2,1], [1,3,2]],
+  player: [[5,3,2], [5,5,6], [4,4,5], [4,2,1], [6,6,6], [5,5,4], [6,6,4]]
+  // R1: E doubles! SNOWBALL! 4 dmg to player! Brutal opener
+  // R2: P doubles (2) → Pelter 9/11
+  // R3: P doubles (2) → Pelter 7/11
+  // R4: E doubles! SNOWBALL AGAIN! 4 dmg! Player barely alive
+  // R5: P TRIPLES!!! 3 dmg (Pelter 4/11). HUGE COMEBACK!
+  // R6: P doubles (2) → Pelter 2/11
+  // R7: P doubles (2) → Pelter DEAD!
+};
+
+// Boss 5: Antoinette (12 HP, Grace — matches your dice count)
+// Arc: Long grind, trading blows, player slowly builds advantage
+const BOSS5_SCRIPT = {
+  enemy:  [[4,3,2], [5,5,4], [3,1,2], [4,4,6], [2,1,3], [5,4,3], [3,2,1], [2,1,3]],
+  player: [[5,5,6], [4,3,1], [4,4,5], [3,2,1], [6,5,4], [6,6,2], [5,5,5], [4,4,6]]
+  // R1: P doubles (2) → A 10/12
+  // R2: E doubles (2 dmg to player)
+  // R3: P doubles (2) → A 8/12
+  // R4: E doubles (2 dmg to player). Even fight!
+  // R5: P singles (1) → A 7/12
+  // R6: P doubles (2) → A 5/12
+  // R7: P TRIPLES! 3 dmg (A 2/12). Turning point!
+  // R8: P doubles (2) → A DEAD
+};
+
+// Boss 6: King Jay (13 HP, Reflection — lose + dice total 7 = reflect)
+// Arc: Player attacks → REFLECTION surprise! → more reflection → player adapts with triples
+const BOSS6_SCRIPT = {
+  enemy:  [[4,3,2], [3,2,1], [3,3,1], [5,4,3], [2,1,3], [4,2,1], [3,1,2], [2,1,3], [3,2,1]],
+  player: [[5,5,6], [4,4,5], [6,5,4], [4,2,1], [6,6,4], [5,5,3], [4,4,5], [5,5,5], [6,6,6]]
+  // R1: P doubles (2) → KJ 11/13
+  // R2: P doubles (2) → KJ 9/13
+  // R3: P singles (1)... REFLECTION! E total=7! Damage reflected! Player takes 1!
+  // R4: E singles (1 dmg to player)
+  // R5: P doubles (2) → KJ 7/13
+  // R6: P doubles (2)... REFLECTION! E total=7! Player takes 2!
+  // R7: P doubles (2) → KJ 5/13. Player hurting bad.
+  // R8: P TRIPLES! 3 dmg (KJ 2/13). BIG COMEBACK!
+  // R9: P TRIPLES!! 3 dmg! KJ DEAD!!! Player survives!
+};
+
+// Boss 7: Hector (15 HP, Protector — singles beat doubles, +1 on singles)
+// Arc: Player's doubles get CRUSHED by Protector → learns to roll triples → epic climax
+const BOSS7_SCRIPT = {
+  enemy:  [[6,4,2], [3,1,2], [5,3,1], [2,1,3], [5,4,2], [3,1,2], [4,3,1], [2,1,3], [5,3,2], [3,1,2]],
+  player: [[5,5,3], [6,5,4], [4,4,6], [5,5,5], [6,5,3], [4,4,4], [6,5,4], [6,6,6], [6,5,4], [6,6,6]]
+  // R1: P doubles vs E singles... PROTECTOR! Hector's singles beat doubles! 2 dmg!
+  // R2: P singles (6) beats E singles (3). 1 dmg (Hector 14/15). Small win.
+  // R3: P doubles vs E singles... PROTECTOR AGAIN! 2 dmg! Player reeling
+  // R4: P TRIPLES! 3 dmg (Hector 11/15). Player learns — TRIPLES ONLY!
+  // R5: P singles (6) beats E singles (5). 1 dmg (10/15)
+  // R6: P TRIPLES! 3 dmg (7/15). Building momentum!
+  // R7: P singles (6) wins. 1 dmg (6/15)
+  // R8: P TRIPLES!!! 3 dmg (3/15). Almost there!
+  // R9: P singles (6) wins. 1 dmg (2/15)
+  // R10: P TRIPLE 6s!!! 3 dmg! HECTOR DEAD! TOURNAMENT WON!!!
+};
+
+// ══════════════════════════════════════════════
+// SCREENS
+// ══════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══════════════════════════════════════════════
+// TITLE SCREEN
+// ══════════════════════════════════════════════
+function initTitle() {
+  const saved = loadState();
+  const btn = document.getElementById('continueBtn');
+  if (saved && saved.runActive) {
+    btn.classList.add('ready');
+  } else {
+    btn.classList.remove('ready');
+  }
+}
+
+function beginRun() {
+  state = newState(false);
+  saveState();
+  showInitialPick();
+}
+
+function continueRun() {
+  state = loadState();
+  if (!state) return beginRun();
+  showMap();
+}
+
+function retryRun() {
+  stopSnow();
+  state = newState(true);
+  saveState();
+  showInitialPick();
+}
+
+// ══════════════════════════════════════════════
+// INITIAL PICK
+// ══════════════════════════════════════════════
+let pickOptions = [];
+let pickSelection = null;
+
+function showInitialPick() {
+  showScreen('pickScreen');
+  pickSelection = null;
+  document.getElementById('pickBtn').classList.remove('ready');
+  document.getElementById('selectedInfo').classList.remove('visible');
+
+  const grid = document.getElementById('ghostGrid');
+  grid.innerHTML = '';
+
+  if (state.isRestart) {
+    document.getElementById('pickLabel').textContent = 'Choose your starter ghost';
+    // On restart: 1 common, 1 uncommon, 1 rare (random)
+    const commons = ALL_GHOSTS.filter(g => g.rarity === 'common' && !state.usedCards.includes(g.name));
+    const uncommons = ALL_GHOSTS.filter(g => g.rarity === 'uncommon' && !state.usedCards.includes(g.name));
+    const rares = ALL_GHOSTS.filter(g => g.rarity === 'rare' && !state.usedCards.includes(g.name));
+    pickOptions = [
+      commons[Math.floor(Math.random() * commons.length)],
+      uncommons[Math.floor(Math.random() * uncommons.length)],
+      rares[Math.floor(Math.random() * rares.length)]
+    ];
+  } else {
+    document.getElementById('pickLabel').textContent = 'Choose your starter ghost';
+    // Fixed starters: Dream Cat, Outlaw, Wim
+    pickOptions = STARTER_NAMES.map(name => ALL_GHOSTS.find(g => g.name === name));
+  }
+
+  pickOptions.forEach((g, i) => {
+    const c = document.createElement('div');
+    c.className = 'pick-card';
+    c.innerHTML = `<div class="rarity-badge ${g.rarity}">${g.rarity === 'ghost-rare' ? 'LEGEND' : g.rarity.toUpperCase()}</div><img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div><div class="pick-ability">${g.ability} · ${g.maxHp} HP</div>`;
+    c.onclick = () => selectPickCard(i);
+    grid.appendChild(c);
+  });
+}
+
+function selectPickCard(idx) {
+  pickSelection = idx;
+  const cards = document.querySelectorAll('#ghostGrid .pick-card');
+  cards.forEach((c, i) => {
+    c.classList.toggle('selected', i === idx);
+    c.classList.toggle('dimmed', i !== idx);
+  });
+  const g = pickOptions[idx];
+  document.getElementById('siName').textContent = g.name;
+  document.getElementById('siDetail').innerHTML = `<b>${g.ability}</b> · ${g.abilityDesc} · ${g.maxHp} HP`;
+  document.getElementById('selectedInfo').classList.add('visible');
+  document.getElementById('pickBtn').classList.add('ready');
+}
+
+function confirmPick() {
+  if (pickSelection === null) return;
+  const g = { ...pickOptions[pickSelection], hp: pickOptions[pickSelection].maxHp };
+  state.collection.push(g);
+  state.usedCards.push(g.name);
+  saveState();
+  showMap();
+}
+
+// ══════════════════════════════════════════════
+// MAP SCREEN
+// ══════════════════════════════════════════════
+function showMap() {
+  showScreen('mapScreen');
+  const path = document.getElementById('mapPath');
+  path.innerHTML = '';
+
+  BOSSES.forEach((boss, i) => {
+    const node = document.createElement('div');
+    const defeated = i < state.currentBoss;
+    const current = i === state.currentBoss;
+    const locked = i > state.currentBoss;
+    node.className = 'map-node' + (defeated ? ' defeated' : '') + (current ? ' current' : '') + (locked ? ' locked' : '');
+
+    const thumbHtml = `<div class="map-node-thumb"><img src="${IMG}${boss.file}" alt="${boss.name}"></div>`;
+    const nameText = locked ? '???' : boss.name;
+    const detailText = locked ? '' : `${boss.ability} · ${boss.bossHp} HP`;
+    const statusText = defeated ? '✓ Defeated' : current ? '► Current' : '';
+
+    node.innerHTML = `${thumbHtml}<div class="map-node-info"><div class="map-node-name">${i+1}. ${nameText}</div><div class="map-node-detail">${detailText}</div></div><div class="map-node-status">${statusText}</div>`;
+    path.appendChild(node);
+  });
+
+  // Collection
+  const row = document.getElementById('collectionRow');
+  row.innerHTML = '';
+  state.collection.forEach((g, i) => {
+    const c = document.createElement('div');
+    c.className = 'collection-card';
+    c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="cc-hp">${g.hp}/${g.maxHp}</div>`;
+    row.appendChild(c);
+  });
+
+  // Items
+  renderItemRow();
+
+  // Scroll to current boss
+  setTimeout(() => {
+    const cur = path.querySelector('.map-node.current');
+    if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+function renderItemRow() {
+  const row = document.getElementById('itemRow');
+  row.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const slot = document.createElement('div');
+    if (state.items[i]) {
+      const item = ITEMS[state.items[i]];
+      slot.className = 'item-slot';
+      slot.innerHTML = `${item.icon}<div class="item-label">${item.name}</div>`;
+    } else {
+      slot.className = 'item-slot empty';
+      slot.innerHTML = `<div class="item-label">Empty</div>`;
+    }
+    row.appendChild(slot);
+  }
+}
+
+// ══════════════════════════════════════════════
+// PRE-BATTLE
+// ══════════════════════════════════════════════
+function openPreBattle() {
+  if (state.collection.length === 0) return;
+  showScreen('prebattleScreen');
+  selectedGhostIndex = 0;
+  renderPreBattle();
+}
+
+function renderPreBattle() {
+  const boss = BOSSES[state.currentBoss];
+  document.getElementById('pbTitle').textContent = `Boss ${state.currentBoss + 1} of 8`;
+  document.getElementById('pbEnemyCard').innerHTML = `<img src="${IMG}${boss.file}">`;
+  document.getElementById('pbEnemyName').textContent = boss.name;
+
+  const sel = state.collection[selectedGhostIndex];
+  document.getElementById('pbPlayerCard').innerHTML = `<img src="${IMG}${sel.file}">`;
+  document.getElementById('pbPlayerName').textContent = sel.name;
+  document.getElementById('pbStats').innerHTML = `
+    <b>${sel.name}</b>: ${sel.ability} · ${sel.hp}/${sel.maxHp} HP<br>
+    <b>${boss.name}</b>: ${boss.ability} · ${boss.bossHp} HP
+  `;
+
+  // Ghost selection
+  const selectDiv = document.getElementById('pbGhostSelect');
+  selectDiv.innerHTML = '';
+  state.collection.forEach((g, i) => {
+    const opt = document.createElement('div');
+    opt.className = 'pb-ghost-opt' + (i === selectedGhostIndex ? ' selected' : '');
+    opt.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="opt-hp">${g.hp}/${g.maxHp}</div>`;
+    opt.onclick = () => { selectedGhostIndex = i; renderPreBattle(); };
+    selectDiv.appendChild(opt);
+  });
+
+  document.getElementById('pbFightBtn').classList.add('ready');
+}
+
+// ══════════════════════════════════════════════
+// SFX
+// ══════════════════════════════════════════════
+function playSfx(id, vol = 0.8) {
+  const s = document.getElementById(id);
+  if (!s) return;
+  s.currentTime = 0;
+  s.volume = Math.min(vol, 1.0);
+  s.play().catch(() => {});
+}
+
+function playDamageSfx(dmg) {
+  if (dmg >= 3) playSfx('sfx3Damage');
+  else if (dmg === 2) playSfx('sfx2Damage');
+  else playSfx('sfx1Damage');
+}
+
+// ══════════════════════════════════════════════
+// DICE MECHANICS
+// ══════════════════════════════════════════════
+function rollDice() {
+  return [1,2,3].map(() => Math.floor(Math.random()*6)+1);
+}
+
+function analyzeRoll(dice) {
+  const sorted = [...dice].sort((a,b) => b-a);
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d]||0)+1);
+  const maxCount = Math.max(...Object.values(counts));
+  if (maxCount === 3) return { type: 'triples', value: sorted[0], damage: 3, dice: sorted, matchDie: sorted[0] };
+  if (maxCount === 2) {
+    const pairVal = +Object.keys(counts).find(k => counts[k]===2);
+    const kicker = +Object.keys(counts).find(k => counts[k]===1);
+    return { type: 'doubles', value: pairVal, kicker, damage: 2, dice: sorted, matchDie: pairVal };
+  }
+  return { type: 'singles', value: sorted[0], damage: 1, dice: sorted, matchDie: null };
+}
+
+function compareRolls(pRoll, eRoll) {
+  const rank = { singles: 0, doubles: 1, triples: 2 };
+  if (rank[pRoll.type] !== rank[eRoll.type]) return rank[pRoll.type] > rank[eRoll.type] ? 1 : -1;
+  if (pRoll.type === 'triples') return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
+  if (pRoll.type === 'doubles') {
+    if (pRoll.value !== eRoll.value) return pRoll.value > eRoll.value ? 1 : -1;
+    return pRoll.kicker > eRoll.kicker ? 1 : pRoll.kicker < eRoll.kicker ? -1 : 0;
+  }
+  for (let i = 0; i < 3; i++) {
+    if (pRoll.dice[i] > eRoll.dice[i]) return 1;
+    if (pRoll.dice[i] < eRoll.dice[i]) return -1;
+  }
+  return 0;
+}
+
+function describeRoll(roll) {
+  if (roll.type === 'triples') return `three ${roll.value}'s`;
+  if (roll.type === 'doubles') return `two ${roll.value}'s and a ${roll.kicker}`;
+  return `${roll.dice[0]}, ${roll.dice[1]}, ${roll.dice[2]}`;
+}
+
+function typeLabel(type) { return type === 'triples' ? 'Triples!' : type === 'doubles' ? 'Doubles!' : 'Singles'; }
+
+// ══════════════════════════════════════════════
+// ABILITY SYSTEM — Real card abilities
+// ══════════════════════════════════════════════
+
+// Calculate dice count for a side
+function getPlayerDiceCount() {
+  let count = 3 + playerBonusDice - playerRemoveDice;
+  if (powerMode) count++;
+  // Fredrick caps enemy at 3 — but if player IS Fredrick, no effect on self
+  return Math.max(1, Math.min(6, count));
+}
+
+function getEnemyDiceCount() {
+  let count = 3 + enemyBonusDice - enemyRemoveDice;
+  // Fredrick: opponent may only roll 3 dice (caps at 3)
+  if (pick && pick.ability === 'Careful') count = Math.min(3, count);
+  // Antoinette (enemy): matches player dice count
+  if (enemy && enemy.ability === 'Grace') count = getPlayerDiceCount();
+  return Math.max(1, Math.min(6, count));
+}
+
+// Apply winner's damage modifiers
+function applyWinDamage(winner, loser, roll, baseDmg, isPlayer) {
+  let damage = baseDmg;
+
+  switch (winner.ability) {
+    case 'Protector': // Hector: +1 on singles (singles beating doubles handled in compareRolls)
+      if (roll.type === 'singles') damage += 1;
+      break;
+    case 'Bullseye': // Night Master: doubles win → +5
+      if (roll.type === 'doubles') damage += 5;
+      break;
+    case 'Slash': // Wim: all dice odd → +5
+      if (roll.dice.every(d => d % 2 === 1)) damage += 5;
+      break;
+    case 'Snowball': // Pelter: doubles +2
+      if (roll.type === 'doubles') damage += 2;
+      break;
+    case 'Ambush': // Nikon: first roll win → 3x
+      if (isFirstRoll) damage *= 3;
+      break;
+    case 'One-two-one!': // Stone Cold: double 1s → 3x
+      if (roll.type === 'doubles' && roll.value === 1) damage *= 3;
+      break;
+    case 'Brew Time': // Simon: +2 if took damage last round
+      if (tookDamageLastRound && isPlayer) damage += 2;
+      break;
+  }
+
+  // Ice Shards bonus damage on win (consumed)
+  if (isPlayer && iceShards > 0) {
+    const perShard = winner.ability === 'Winter Barrage' ? 2 : 1;
+    const shardDmg = iceShards * perShard;
+    damage += shardDmg;
+    iceShards = 0;
+  } else if (!isPlayer && enemyIceShards > 0) {
+    const perShard = winner.ability === 'Winter Barrage' ? 2 : 1;
+    const shardDmg = enemyIceShards * perShard;
+    damage += shardDmg;
+    enemyIceShards = 0;
+  }
+
+  return damage;
+}
+
+// Apply defensive abilities (may modify or negate damage)
+function applyDefense(defender, damage, attackRoll, defenderIsPlayer) {
+  switch (defender.ability) {
+    case 'Stoic': // Guard Thomas: below 6 HP, immune to singles
+      if ((defenderIsPlayer ? playerHp : enemyHp) < 6 && attackRoll.type === 'singles') return 0;
+      break;
+    case 'Bogus': // Bogey: reflect once
+      if (!bogeyReflectUsed) {
+        bogeyReflectUsed = true;
+        // Reflect: attacker takes damage instead
+        return -damage; // negative = reflected
+      }
+      break;
+    case 'Reflection': // King Jay: lose + total = 7 → reflect
+      if (attackRoll.dice.reduce((a,b) => a+b, 0) === 7) return -damage;
+      break;
+  }
+  return damage;
+}
+
+// After-win triggers (ice shards, healing, dice stealing, etc.)
+// Returns an array of {text, delay} messages to show after damage
+function afterWinTriggers(winner, loser, roll, damage, isPlayer) {
+  const effects = [];
+
+  // Spockles: win → +2 ice shards
+  if (winner.ability === 'Valley Magic') {
+    if (isPlayer) iceShards += 2; else enemyIceShards += 2;
+    effects.push({ text: `<b class="gold">Valley Magic!</b> +2 Ice Shards (${isPlayer ? iceShards : enemyIceShards} total)`, ability: 'Valley Magic', desc: '+2 Ice Shards!' });
+  }
+  // Ashley: win → +1 ice shard
+  if (winner.ability === 'Burning Soul') {
+    if (isPlayer) iceShards += 1; else enemyIceShards += 1;
+    effects.push({ text: `<b class="gold">Burning Soul!</b> +1 Ice Shard (${isPlayer ? iceShards : enemyIceShards} total)`, ability: 'Burning Soul', desc: '+1 Ice Shard!' });
+  }
+  // Roger: doubles with 6 kicker → +3 ice shards
+  if (winner.ability === 'Tempest' && roll.type === 'doubles' && roll.kicker === 6) {
+    if (isPlayer) iceShards += 3; else enemyIceShards += 3;
+    effects.push({ text: `<b class="gold">Tempest!</b> +3 Ice Shards!`, ability: 'Tempest', desc: '+3 Ice Shards!' });
+  }
+  // Outlaw: doubles → remove 1 enemy die next turn
+  if (winner.ability === 'Thief' && roll.type === 'doubles') {
+    if (isPlayer) enemyRemoveDice += 1; else playerRemoveDice += 1;
+    effects.push({ text: `<b class="gold">Thief!</b> Stole 1 of ${isPlayer ? enemy.name : pick.name}'s dice!`, ability: 'Thief', desc: 'Stole a die for next turn!' });
+  }
+  // Troubling Haters: 4+ damage → +2 HP
+  if (winner.ability === 'Growing Mob' && damage >= 4) {
+    if (isPlayer) { playerHp = Math.min(pick.maxHp, playerHp + 2); }
+    else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); }
+    updateHpDisplay();
+    effects.push({ text: `<b class="gold">Growing Mob!</b> +2 HP!`, ability: 'Growing Mob', desc: '+2 HP from big hit!' });
+  }
+  // Dream Cat: both rolled doubles → +1 die next turn
+  if (winner.ability === 'Jinx' && currentEnemyRoll && currentEnemyRoll.type === 'doubles' && roll.type === 'doubles') {
+    if (isPlayer) playerBonusDice += 1; else enemyBonusDice += 1;
+    effects.push({ text: `<b class="gold">Jinx!</b> Both rolled doubles — +1 die next turn!`, ability: 'Jinx', desc: 'Both doubles! +1 die next turn!' });
+  }
+
+  return effects;
+}
+
+// After-loss triggers
+function afterLossTriggers(loser, roll, damage, isPlayer) {
+  const effects = [];
+
+  // Sad Sal: lose → +1 ice shard
+  if (loser.ability === 'Tough Job') {
+    if (isPlayer) iceShards += 1; else enemyIceShards += 1;
+    effects.push({ text: `<b class="gold">Tough Job!</b> +1 Ice Shard (${isPlayer ? iceShards : enemyIceShards} total)`, ability: 'Tough Job', desc: '+1 Ice Shard!' });
+  }
+  // Dream Cat (loser side): if both doubles, still triggers
+  if (loser.ability === 'Jinx' && roll && currentEnemyRoll && roll.type === 'doubles' && currentEnemyRoll.type === 'doubles') {
+    if (isPlayer) playerBonusDice += 1; else enemyBonusDice += 1;
+    effects.push({ text: `<b class="gold">Jinx!</b> Both doubles — +1 die next turn!`, ability: 'Jinx', desc: 'Both doubles! +1 die next turn!' });
+  }
+  // Marcus: take 3+ damage → +4 dice next roll
+  if (loser.ability === 'Glacial Pounding' && damage >= 3) {
+    if (isPlayer) playerBonusDice += 4; else enemyBonusDice += 4;
+    effects.push({ text: `<b class="gold">Glacial Pounding!</b> +4 dice next roll!`, ability: 'Glacial Pounding', desc: '+4 dice next roll!' });
+  }
+  // Track damage taken for Simon
+  if (isPlayer && damage > 0) tookDamageLastRound = true;
+
+  return effects;
+}
+
+// Show queued ability effects with splashes
+function showEffectQueue(effects, cardId, callback) {
+  if (!effects || effects.length === 0) { if (callback) callback(); return; }
+  const fx = effects.shift();
+  showAbilitySplash(fx.ability, fx.desc, 1400, () => {
+    showEffectQueue(effects, cardId, callback);
+  }, cardId);
+}
+
+// Logey ability: after opponent's roll, mark high dice for removal
+function applyLogeyEffect(opponentRoll, isPlayerLogey) {
+  if (!opponentRoll) return;
+  const highCount = opponentRoll.dice.filter(d => d >= 5).length;
+  if (highCount > 0) {
+    if (isPlayerLogey) enemyRemoveDice += highCount;
+    else playerRemoveDice += highCount;
+  }
+}
+
+// Tommy Salami: force reroll of enemy 6s (returns new dice array)
+function applyRegulator(dice) {
+  return dice.map(d => d === 6 ? Math.floor(Math.random()*5)+1 : d);
+}
+
+// Override compareRolls for Hector's Protector (singles beat doubles)
+function compareRollsWithAbilities(pRoll, eRoll) {
+  const rank = { singles: 0, doubles: 1, triples: 2 };
+
+  // Hector: singles beat doubles
+  const playerHector = pick && pick.ability === 'Protector';
+  const enemyHector = enemy && enemy.ability === 'Protector';
+
+  let pRank = rank[pRoll.type];
+  let eRank = rank[eRoll.type];
+
+  // Hector's singles beat opponent's doubles
+  if (playerHector && pRoll.type === 'singles' && eRoll.type === 'doubles') pRank = 1.5;
+  if (enemyHector && eRoll.type === 'singles' && pRoll.type === 'doubles') eRank = 1.5;
+
+  if (pRank !== eRank) return pRank > eRank ? 1 : -1;
+
+  // Same effective rank — compare by value
+  if (pRoll.type === 'triples') return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
+  if (pRoll.type === 'doubles' || (pRank === 1.5)) {
+    // Compare as doubles or promoted singles
+    const pVal = pRoll.type === 'doubles' ? pRoll.value : pRoll.dice[0];
+    const eVal = eRoll.type === 'doubles' ? eRoll.value : eRoll.dice[0];
+    if (pVal !== eVal) return pVal > eVal ? 1 : -1;
+    return 0;
+  }
+  for (let i = 0; i < 3; i++) {
+    if (pRoll.dice[i] > eRoll.dice[i]) return 1;
+    if (pRoll.dice[i] < eRoll.dice[i]) return -1;
+  }
+  return 0;
+}
+
+// ══════════════════════════════════════════════
+// BATTLE
+// ══════════════════════════════════════════════
+function startBattle() {
+  pick = { ...state.collection[selectedGhostIndex] };
+  enemy = { ...BOSSES[state.currentBoss] };
+  playerHp = pick.hp;
+  enemyHp = enemy.bossHp;
+  round = 1;
+  phase = 0;
+  playerPrediction = null;
+  rerollMode = false;
+  powerMode = false;
+  playerDiceValues = [];
+
+  // Reset ability state
+  iceShards = carryOverShards; carryOverShards = 0; // Powder's Final Gift
+  enemyIceShards = 0;
+  playerBonusDice = 0; enemyBonusDice = 0;
+  playerRemoveDice = 0; enemyRemoveDice = 0;
+  bogeyReflectUsed = false;
+  isFirstRoll = true;
+  tookDamageLastRound = false;
+
+  // Scripted boss fights
+  bossScriptRound = 0;
+  if (state.currentBoss === 0) {
+    bossScript = BOSS0_SCRIPTS[pick.name] || null;
+  } else {
+    const scripts = [null, BOSS1_SCRIPT, BOSS2_SCRIPT, BOSS3_SCRIPT, BOSS4_SCRIPT, BOSS5_SCRIPT, BOSS6_SCRIPT, BOSS7_SCRIPT];
+    bossScript = scripts[state.currentBoss] || null;
+  }
+
+  // Chad: on entry, gain 2 ice shards
+  if (pick.ability === 'Sploop!') iceShards += 2;
+  if (enemy.ability === 'Sploop!') enemyIceShards += 2;
+
+  // Wandering Sue: if enemy >12 HP, instant destroy
+  if (pick.ability === 'Hidden Weakness' && enemyHp >= 12) {
+    // Will handle after battle screen shows — set flag
+    setTimeout(() => {
+      narrate(`<b class="gold">Hidden Weakness!</b> ${enemy.name} destroyed!`);
+      enemyHp = 0;
+      updateHpDisplay();
+      setTimeout(enemyDefeated, 1200);
+    }, 2500);
+  }
+
+  // Set up battle items from inventory
+  battleItemsState = state.items.map(id => ({ id, used: false }));
+
+  showScreen('battleScreen');
+  document.getElementById('enemyCard').innerHTML = `<img src="${IMG}${enemy.file}">`;
+  document.getElementById('playerCard').innerHTML = `<img src="${IMG}${pick.file}">`;
+  document.getElementById('enemyNameText').textContent = enemy.name;
+  document.getElementById('playerNameText').textContent = pick.name;
+  updateHpDisplay();
+  document.getElementById('enemyCard').classList.remove('hit');
+  document.getElementById('enemyCard').style.opacity = '1';
+  document.getElementById('enemyCard').style.transition = 'none';
+  document.getElementById('enemyPlate').style.opacity = '1';
+  document.getElementById('enemyPlate').style.transition = 'none';
+  document.getElementById('playerCard').classList.remove('hit');
+  document.getElementById('predictArea').classList.remove('visible');
+  document.getElementById('pDie3').style.display = 'none';
+
+  resetDice();
+  narrate('');
+  document.getElementById('rollBtn').classList.remove('ready');
+  document.getElementById('diceArea').classList.add('hidden');
+  renderBattleItems();
+
+  spawnSpiritParticles();
+  const music = document.getElementById('bgMusic');
+  music.currentTime = 0;
+  music.volume = 0.4;
+  music.play().catch(() => {});
+
+  // Ready-go overlay
+  const rgo = document.getElementById('readyGoOverlay');
+  const rgt = document.getElementById('readyGoText');
+  rgt.textContent = 'Start';
+  rgt.style.animation = 'none';
+  rgo.classList.add('active');
+  requestAnimationFrame(() => { rgt.style.animation = ''; });
+  setTimeout(() => {
+    rgo.classList.remove('active');
+    document.getElementById('diceArea').classList.remove('hidden');
+    narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
+    setTimeout(doEnemyRoll, 1000);
+  }, 1800);
+}
+
+function updateHpDisplay() {
+  const ePct = Math.max(0, enemyHp / enemy.bossHp * 100);
+  const pPct = Math.max(0, playerHp / pick.maxHp * 100);
+  const eBar = document.getElementById('enemyHpBar');
+  const pBar = document.getElementById('playerHpBar');
+  eBar.style.width = Math.min(ePct, 100) + '%';
+  pBar.style.width = Math.min(pPct, 100) + '%';
+  eBar.classList.toggle('hp-low', ePct <= 50 && ePct > 25);
+  eBar.classList.toggle('hp-critical', ePct <= 25);
+  pBar.classList.toggle('hp-low', pPct <= 50 && pPct > 25);
+  pBar.classList.toggle('hp-critical', pPct <= 25);
+  // Overclocked: green glow when above max HP
+  pBar.classList.toggle('hp-over', pPct > 100);
+  document.getElementById('enemyHpText').textContent = `${Math.max(0,enemyHp)} / ${enemy.bossHp}`;
+  document.getElementById('playerHpText').textContent = `${Math.max(0,playerHp)} / ${pick.maxHp}`;
+}
+
+function resetDice() {
+  for (let i = 0; i < 4; i++) {
+    ['eDie','pDie'].forEach(p => {
+      const d = document.getElementById(p+i);
+      if (!d) return;
+      d.textContent = '';
+      d.className = d.className.replace(/ visible| glow| triples-glow| rolling| rerollable| discarded/g, '');
+    });
+  }
+}
+
+function narrate(html) { document.getElementById('narrator').innerHTML = html; }
+
+// ══════════════════════════════════════════════
+// BATTLE ITEMS UI
+// ══════════════════════════════════════════════
+function renderBattleItems() {
+  const container = document.getElementById('battleItems');
+  container.innerHTML = '';
+  battleItemsState.forEach((bi, i) => {
+    if (!bi.id) return;
+    const item = ITEMS[bi.id];
+    const el = document.createElement('div');
+    el.className = 'battle-item' + (bi.used ? ' used' : '');
+    el.textContent = item.icon;
+    el.title = item.desc;
+    el.onclick = () => activateItem(i);
+    container.appendChild(el);
+  });
+}
+
+function updateItemUsability() {
+  const els = document.querySelectorAll('#battleItems .battle-item');
+  els.forEach((el, i) => {
+    const bi = battleItemsState[i];
+    if (!bi || bi.used) return;
+    let usable = false;
+    if (bi.id === 'heal' && phase >= 1) usable = true;
+    if (bi.id === 'power' && phase === 1 && !powerMode) usable = true;
+    if (bi.id === 'reroll' && phase === 3) usable = true; // phase 3 = after player dice land
+    el.classList.toggle('usable', usable);
+  });
+}
+
+function activateItem(idx) {
+  const bi = battleItemsState[idx];
+  if (!bi || bi.used) return;
+
+  if (bi.id === 'heal') {
+    if (phase < 1) return;
+    bi.used = true;
+    playerHp += 4;
+    updateHpDisplay();
+    playSfx('sfxSpecial', 0.7);
+    const overclocked = playerHp > pick.maxHp ? ' <b style="color:#34d399;">OVERCLOCKED!</b>' : '';
+    narrate(`<b class="gold">+4 HP!</b> Now at ${playerHp}/${pick.maxHp}.${overclocked}`);
+    state.stats.itemsUsed++;
+    renderBattleItems();
+    updateItemUsability();
+  }
+
+  if (bi.id === 'power') {
+    if (phase !== 1) return;
+    bi.used = true;
+    powerMode = true;
+    document.getElementById('pDie3').style.display = 'flex';
+    state.stats.itemsUsed++;
+    narrate(`<b class="gold">+1 Die!</b> Rolling 4 dice — best 3 count.`);
+    renderBattleItems();
+    updateItemUsability();
+  }
+
+  if (bi.id === 'reroll') {
+    if (phase !== 3) return;
+    clearRerollCountdown();
+    bi.used = true;
+    rerollMode = true;
+    state.stats.itemsUsed++;
+    narrate(`<b class="gold">Tap a die to reroll!</b>`);
+    // Make player dice clickable
+    const count = powerMode ? 4 : 3;
+    for (let i = 0; i < count; i++) {
+      const d = document.getElementById('pDie' + i);
+      d.classList.add('rerollable');
+      d.onclick = () => doReroll(i);
+    }
+    renderBattleItems();
+  }
+}
+
+let rerollCountdownTimer = null;
+
+function startRerollCountdown(seconds, extraDelay, callback) {
+  clearRerollCountdown();
+  // Find the reroll item element
+  const rerollEl = findRerollItemEl();
+  if (!rerollEl) { setTimeout(callback, (seconds * 800) + extraDelay); return; }
+
+  let remaining = seconds;
+  showCountdownNum(rerollEl, remaining);
+
+  rerollCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearRerollCountdown();
+      callback();
+    } else {
+      showCountdownNum(rerollEl, remaining);
+    }
+  }, 800);
+}
+
+function showCountdownNum(parentEl, num) {
+  let cd = parentEl.querySelector('.reroll-countdown');
+  if (!cd) {
+    cd = document.createElement('div');
+    cd.className = 'reroll-countdown';
+    parentEl.appendChild(cd);
+  }
+  cd.textContent = num;
+  cd.style.animation = 'none';
+  requestAnimationFrame(() => { cd.style.animation = ''; });
+}
+
+function clearRerollCountdown() {
+  if (rerollCountdownTimer) { clearInterval(rerollCountdownTimer); rerollCountdownTimer = null; }
+  document.querySelectorAll('.reroll-countdown').forEach(el => el.remove());
+}
+
+function findRerollItemEl() {
+  const items = document.querySelectorAll('#battleItems .battle-item');
+  for (let i = 0; i < items.length; i++) {
+    const bi = battleItemsState[i];
+    if (bi && bi.id === 'reroll' && !bi.used) return items[i];
+  }
+  return null;
+}
+
+function doReroll(dieIndex) {
+  if (!rerollMode) return;
+  rerollMode = false;
+  clearRerollCountdown();
+  // Remove clickable from all dice
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pDie' + i);
+    d.classList.remove('rerollable');
+    d.onclick = null;
+  }
+
+  const d = document.getElementById('pDie' + dieIndex);
+  d.classList.add('rolling');
+  d.classList.remove('glow', 'triples-glow');
+  playSfx('sfxDiceRoll');
+
+  setTimeout(() => {
+    const newVal = Math.floor(Math.random() * 6) + 1;
+    playerDiceValues[dieIndex] = newVal;
+    d.classList.remove('rolling');
+    d.textContent = newVal;
+
+    // Re-analyze using best 3 if more than 3 dice
+    let finalDice;
+    if (playerDiceValues.length > 3) {
+      finalDice = bestNOf(playerDiceValues, 3);
+    } else {
+      finalDice = [...playerDiceValues];
+    }
+
+    const pRoll = analyzeRoll(finalDice);
+    // Update glow
+    for (let i = 0; i < playerDiceValues.length; i++) {
+      const die = document.getElementById('pDie' + i);
+      die.classList.remove('glow', 'triples-glow', 'discarded');
+    }
+    if (powerMode) highlightBestThree(playerDiceValues, pRoll);
+    else {
+      finalDice.forEach((v, i) => {
+        if (pRoll.matchDie && v === pRoll.matchDie) document.getElementById('pDie'+i).classList.add('glow');
+      });
+    }
+
+    narrate(`Rerolled! Now: ${describeRoll(pRoll)}`);
+    setTimeout(() => resolveRound(pRoll, currentEnemyRoll), 800);
+  }, 500);
+}
+
+// ══════════════════════════════════════════════
+// TRIPLES + VISUAL FX
+// ══════════════════════════════════════════════
+function showTriplesEffect(side) {
+  const banner = document.getElementById('triplesBanner');
+  const flash = document.getElementById('triplesFlash');
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById((side === 'enemy' ? 'eDie' : 'pDie') + i);
+    d.classList.remove('glow');
+    d.classList.add('triples-glow');
+  }
+  playSfx('triplesSfx', 1.0);
+  flash.className = 'triples-flash ' + (side === 'enemy' ? 'enemy-flash' : 'player-flash');
+  flash.style.transition = 'none';
+  flash.style.opacity = '0.6';
+  requestAnimationFrame(() => { flash.style.transition = 'opacity 0.8s ease-out'; flash.style.opacity = '0'; });
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+  banner.className = 'triples-banner ' + (side === 'enemy' ? 'enemy-triples' : 'player-triples');
+  requestAnimationFrame(() => {
+    banner.classList.add('show');
+    setTimeout(() => { banner.classList.remove('show'); banner.classList.add('fade'); setTimeout(() => { banner.className = 'triples-banner'; }, 500); }, 1200);
+  });
+}
+
+function showAbilityCard(cardId) {
+  removeAbilityCard();
+  const card = document.getElementById(cardId);
+  const rect = card.getBoundingClientRect();
+  const clone = document.createElement('div');
+  clone.className = 'ability-card-overlay';
+  clone.innerHTML = card.innerHTML;
+  clone.style.left = rect.left + 'px';
+  clone.style.top = rect.top + 'px';
+  clone.style.width = rect.width + 'px';
+  clone.style.height = rect.height + 'px';
+  clone.style.transform = 'scale(1)';
+  document.body.appendChild(clone);
+  abilityOverlayEl = clone;
+  requestAnimationFrame(() => { clone.style.transform = 'scale(1.10)'; });
+}
+
+function removeAbilityCard() {
+  if (abilityOverlayEl) { abilityOverlayEl.remove(); abilityOverlayEl = null; }
+}
+
+function showAbilitySplash(name, desc, duration, callback, cardId) {
+  const el = document.getElementById('abilitySplash');
+  const theme = ABILITY_THEMES[name] || '';
+  el.className = 'ability-splash ' + theme;
+  document.getElementById('splashName').textContent = name;
+  document.getElementById('splashDesc').textContent = desc;
+  document.getElementById('counterDieArea').classList.remove('visible');
+  if (cardId) showAbilityCard(cardId);
+  playSfx('sfxSpecial', 0.85);
+  el.classList.add('active');
+  setTimeout(() => { el.classList.remove('active'); removeAbilityCard(); setTimeout(callback, 300); }, duration);
+}
+
+// ══════════════════════════════════════════════
+// ENEMY ROLL
+// ══════════════════════════════════════════════
+function doEnemyRoll() {
+  phase = 0;
+  resetDice();
+  document.getElementById('pDie3').style.display = 'none';
+  powerMode = false;
+
+  // Calculate enemy dice count (consumes modifiers)
+  const eDiceCount = getEnemyDiceCount();
+  enemyBonusDice = 0; enemyRemoveDice = 0;
+  let dice = [];
+  // Scripted boss fight: use scripted enemy dice (truncated to actual dice count)
+  if (bossScript && bossScriptRound < bossScript.enemy.length) {
+    dice = [...bossScript.enemy[bossScriptRound]].slice(0, eDiceCount);
+  } else {
+    for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
+  }
+
+  // Tommy Salami: force reroll of enemy 6s
+  if (pick.ability === 'Regulator') dice = applyRegulator(dice);
+
+  // If enemy rolled fewer or more than 3, still analyze best 3 (or all if fewer)
+  let analyzeDice = dice.length >= 3 ? bestNOf(dice, 3) : dice;
+  currentEnemyRoll = analyzeRoll(analyzeDice);
+
+  // Logey (player): mark enemy high dice for removal next round
+  if (pick.ability === 'Heinous') applyLogeyEffect(currentEnemyRoll, true);
+
+  // Bubble Boys: enemy triples = instant defeat
+  if (pick.ability === 'Pop' && currentEnemyRoll.type === 'triples') {
+    // Will handle after dice animation
+  }
+
+  // Show dice (up to 3 visible slots for enemy)
+  const showCount = Math.min(dice.length, 3);
+  for (let i = 0; i < showCount; i++) {
+    const d = document.getElementById('eDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  const rollDelay = round === 1 ? 1100 : 700;
+
+  setTimeout(() => {
+    dice.slice(0, showCount).forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById('eDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
+          setTimeout(() => d.classList.add('glow'), 120);
+        }
+      }, i * 200);
+    });
+
+    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
+    if (currentEnemyRoll.type === 'triples') {
+      setTimeout(() => showTriplesEffect('enemy'), 700);
+    }
+
+    setTimeout(() => {
+      // Bubble Boys: if enemy triples, Bubble Boys are defeated
+      if (pick.ability === 'Pop' && currentEnemyRoll.type === 'triples') {
+        narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="them">Pop! Bubble Boys burst!</b>`);
+        playerHp = 0;
+        updateHpDisplay();
+        setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 800);
+        return;
+      }
+
+      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">Your turn!</b>`);
+      phase = 1;
+
+      // Patrick: Stone Form — don't roll, auto-resolve
+      if (pick.ability === 'Stone Form') {
+        setTimeout(() => resolvePatrickStoneForm(currentEnemyRoll), 1200);
+        return;
+      }
+
+      document.getElementById('rollBtn').classList.add('ready');
+      updateItemUsability();
+    }, 800 + extraDelay);
+  }, rollDelay);
+}
+
+// Helper: best N dice from a larger pool
+function bestNOf(dice, n) {
+  if (dice.length <= n) return [...dice];
+  let best = null;
+  const combos = getCombinations(dice.length, n);
+  for (const combo of combos) {
+    const sub = combo.map(i => dice[i]);
+    const roll = analyzeRoll(sub);
+    if (!best || compareRolls(roll, best) > 0) best = roll;
+  }
+  return best.dice;
+}
+
+function getCombinations(total, choose) {
+  const results = [];
+  function recurse(start, combo) {
+    if (combo.length === choose) { results.push([...combo]); return; }
+    for (let i = start; i < total; i++) { combo.push(i); recurse(i+1, combo); combo.pop(); }
+  }
+  recurse(0, []);
+  return results;
+}
+
+// Patrick's Stone Form: doesn't roll — if enemy singles, negate + 3 damage
+function resolvePatrickStoneForm(eRoll) {
+  phase = 4;
+  if (eRoll.type === 'singles') {
+    narrate(`<b class="gold">Stone Form!</b> Singles negated — 3 damage to ${enemy.name}!`);
+    setTimeout(() => {
+      showAbilitySplash('Stone Form', 'Singles negated! 3 damage!', 1600, () => {
+        enemyHp -= 3;
+        playDamageSfx(3);
+        document.getElementById('enemyCard').classList.add('hit');
+        setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+        updateHpDisplay();
+        // Cameron check: if Stone Form negated damage, Cameron's Force of Nature doesn't apply here
+        if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); }
+        else { setTimeout(nextRound, 1400); }
+      }, 'playerCard');
+    }, 600);
+  } else {
+    // Patrick takes normal damage from non-singles
+    let damage = eRoll.damage;
+    damage = applyWinDamage(enemy, pick, eRoll, damage, false);
+    const def = applyDefense(pick, damage, eRoll, true);
+    if (def < 0) {
+      // Reflected — shouldn't happen for Patrick but handle it
+      damage = -def;
+      enemyHp -= damage;
+    } else {
+      damage = def;
+      playerHp -= damage;
+    }
+    playDamageSfx(damage);
+    narrate(`<b class="them">${enemy.name}</b> rolled ${describeRoll(eRoll)} — <b class="them">${damage} damage!</b>`);
+    document.getElementById(def < 0 ? 'enemyCard' : 'playerCard').classList.add('hit');
+    setTimeout(() => document.getElementById(def < 0 ? 'enemyCard' : 'playerCard').classList.remove('hit'), 500);
+    updateHpDisplay();
+    if (playerHp <= 0) {
+      tookDamageLastRound = true;
+      setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+    } else {
+      tookDamageLastRound = true;
+      setTimeout(nextRound, 1400);
+    }
+  }
+}
+
+function pickPrediction(num) {
+  if (phase !== 1) return;
+  playerPrediction = num;
+  document.getElementById('predictArea').classList.remove('visible');
+  document.getElementById('rollBtn').classList.add('ready');
+  updateItemUsability();
+}
+
+// bestThreeOf replaced by bestNOf in ability system
+
+function highlightBestThree(allDice, bestRoll) {
+  const bestSet = [...bestRoll.dice];
+  // Find a discard index by trying each skip
+  let discardIdx = -1;
+  for (let skip = 0; skip < allDice.length; skip++) {
+    const three = allDice.filter((_, i) => i !== skip).sort((a,b) => b-a);
+    if (three.length >= 3 && three[0] === bestSet[0] && three[1] === bestSet[1] && three[2] === bestSet[2]) {
+      discardIdx = skip;
+      break;
+    }
+  }
+  for (let i = 0; i < Math.min(allDice.length, 4); i++) {
+    const d = document.getElementById('pDie' + i);
+    if (i === discardIdx) {
+      d.classList.add('discarded');
+    } else if (bestRoll.matchDie && allDice[i] === bestRoll.matchDie) {
+      d.classList.add('glow');
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// PLAYER ROLL
+// ══════════════════════════════════════════════
+function doPlayerRoll() {
+  if (phase !== 1) return;
+  phase = 2;
+  document.getElementById('rollBtn').classList.remove('ready');
+  playSfx('sfxDiceRoll');
+  narrate('Rolling...');
+  state.stats.totalRolls++;
+
+  // Boo Brothers: before rolling, may sacrifice 1 die for 1 HP
+  // Tyler: before rolling, may sacrifice 2 HP for +1 die
+  // (These are auto-applied for simplicity — Tyler always activates if HP > 2)
+  if (pick.ability === 'Heating Up' && playerHp > 2) {
+    playerHp -= 2;
+    playerBonusDice += 1;
+    updateHpDisplay();
+  }
+
+  let dieCount = getPlayerDiceCount();
+  playerBonusDice = 0; playerRemoveDice = 0; // consumed
+  if (dieCount > 3) document.getElementById('pDie3').style.display = 'flex';
+
+  playerDiceValues = [];
+  // Scripted boss fight: use scripted player dice
+  if (bossScript && bossScriptRound < bossScript.player.length) {
+    playerDiceValues = [...bossScript.player[bossScriptRound]];
+    // If player has bonus dice beyond what the script provides, add random dice
+    while (playerDiceValues.length < dieCount) playerDiceValues.push(Math.floor(Math.random()*6)+1);
+    bossScriptRound++;
+  } else {
+    for (let i = 0; i < dieCount; i++) playerDiceValues.push(Math.floor(Math.random()*6)+1);
+  }
+
+  // Kodako: check for 1-2-3 before analyzing
+  const kodakoTrigger = pick.ability === 'Swift' && playerDiceValues.length >= 3 &&
+    [1,2,3].every(v => playerDiceValues.includes(v));
+
+  for (let i = 0; i < Math.min(dieCount, 4); i++) {
+    const d = document.getElementById('pDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  setTimeout(() => {
+    playerDiceValues.forEach((v, i) => {
+      if (i >= 4) return;
+      setTimeout(() => {
+        const d = document.getElementById('pDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+      }, i * 200);
+    });
+
+    setTimeout(() => {
+      let finalDice;
+      if (dieCount > 3) {
+        finalDice = bestNOf(playerDiceValues, 3);
+      } else {
+        finalDice = [...playerDiceValues];
+      }
+      const pRoll = analyzeRoll(finalDice);
+
+      // Highlight dice
+      if (dieCount > 3) highlightBestThree(playerDiceValues, pRoll);
+      else {
+        playerDiceValues.forEach((v, i) => {
+          if (pRoll.matchDie && v === pRoll.matchDie) {
+            setTimeout(() => document.getElementById('pDie'+i).classList.add('glow'), 120);
+          }
+        });
+      }
+
+      const extraDelay = pRoll.type === 'triples' ? 1400 : 0;
+      if (pRoll.type === 'triples') {
+        setTimeout(() => showTriplesEffect('player'), 200);
+      }
+
+      // Kodako: 1-2-3 → negate + 4 damage (override normal resolution)
+      if (kodakoTrigger) {
+        setTimeout(() => {
+          showAbilitySplash('Swift', '1-2-3! Negate damage, deal 4!', 1600, () => {
+            enemyHp -= 4;
+            playDamageSfx(4);
+            narrate(`<b class="gold">Swift! 4 damage to ${enemy.name}!</b>`);
+            document.getElementById('enemyCard').classList.add('hit');
+            setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+            updateHpDisplay();
+            if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
+            else setTimeout(nextRound, 1400);
+          }, 'playerCard');
+        }, 400 + extraDelay);
+        // Reset bonus dice after use
+        playerBonusDice = 0;
+        return;
+      }
+
+      // Check if reroll is available
+      const hasReroll = battleItemsState.some(bi => bi.id === 'reroll' && !bi.used);
+      if (hasReroll) {
+        phase = 3;
+        updateItemUsability();
+        startRerollCountdown(3, extraDelay, () => {
+          if (phase === 3 && !rerollMode) resolveRound(pRoll, currentEnemyRoll);
+        });
+      } else {
+        setTimeout(() => resolveRound(pRoll, currentEnemyRoll), 400 + extraDelay);
+      }
+    }, Math.min(dieCount, 4) * 200 + 300);
+  }, 700);
+}
+
+// ══════════════════════════════════════════════
+// RESOLVE ROUND
+// ══════════════════════════════════════════════
+function resolveRound(pRoll, eRoll) {
+  phase = 4; // resolving
+  updateItemUsability();
+
+  // Use ability-aware comparison
+  const result = compareRollsWithAbilities(pRoll, eRoll);
+
+  if (result === 0) {
+    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
+    // Reset per-round dice modifiers
+    playerBonusDice = 0; enemyBonusDice = 0;
+    playerRemoveDice = 0; enemyRemoveDice = 0;
+    setTimeout(() => {
+      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls again...`);
+      setTimeout(doEnemyRoll, 800);
+    }, 1400);
+    return;
+  }
+
+  isFirstRoll = false;
+  const playerWins = result === 1;
+
+  if (playerWins) {
+    let baseDmg = pRoll.damage;
+    let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true);
+    const def = applyDefense(enemy, damage, pRoll, false);
+    let reflected = false;
+    if (def < 0) { reflected = true; damage = -def; }
+    else damage = def;
+
+    const abilityTriggered = damage !== baseDmg || reflected;
+
+    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${typeLabel(pRoll.type)} You win!</b>`);
+
+    const doApplyDamage = () => {
+      if (reflected) {
+        // Damage reflected back to player
+        playerHp -= damage;
+        playDamageSfx(damage);
+        narrate(`<b class="them">Reflected! ${damage} damage to ${pick.name}!</b>`);
+        document.getElementById('playerCard').classList.add('hit');
+        setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+        updateHpDisplay();
+        afterLossTriggers(pick, pRoll, damage, true);
+        tookDamageLastRound = true;
+        if (playerHp <= 0) {
+          setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+        } else setTimeout(nextRound, 1400);
+      } else if (damage === 0) {
+        narrate(`<b class="gold">Damage negated!</b>`);
+        // Cameron: if damage gets negated, destroy enemy
+        if (pick.ability === 'Force of Nature') {
+          setTimeout(() => {
+            showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
+              enemyHp = 0; updateHpDisplay(); setTimeout(enemyDefeated, 600);
+            }, 'playerCard');
+          }, 600);
+        } else {
+          setTimeout(nextRound, 1400);
+        }
+      } else {
+        enemyHp -= damage;
+        playDamageSfx(damage);
+        narrate(`<b class="gold">${damage} damage to ${enemy.name}!</b>`);
+        document.getElementById('enemyCard').classList.add('hit');
+        setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+        updateHpDisplay();
+
+        const winFx = afterWinTriggers(pick, enemy, pRoll, damage, true);
+
+        // Calvin & Anna: heal 3 on kill
+        if (pick.ability === 'Toboggan' && enemyHp <= 0) {
+          playerHp = Math.min(pick.maxHp, playerHp + 3);
+          updateHpDisplay();
+        }
+
+        // Show secondary effects as splashes, then continue
+        const afterEffects = () => {
+          if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
+          else setTimeout(nextRound, 1400);
+        };
+        if (winFx.length > 0) {
+          setTimeout(() => showEffectQueue(winFx, 'playerCard', afterEffects), 600);
+        } else {
+          afterEffects();
+        }
+      }
+      // Reset per-round dice mods
+      // Dice mods consumed in next doEnemyRoll/doPlayerRoll
+    };
+
+    if (abilityTriggered && damage > 0 && !reflected) {
+      setTimeout(() => showAbilitySplash(pick.ability, `${pick.abilityDesc}`, 1600, doApplyDamage, 'playerCard'), 800);
+    } else {
+      setTimeout(doApplyDamage, 800);
+    }
+
+  } else {
+    // Enemy wins
+    let baseDmg = eRoll.damage;
+    let damage = applyWinDamage(enemy, pick, eRoll, baseDmg, false);
+    const def = applyDefense(pick, damage, eRoll, true);
+    let reflected = false;
+    if (def < 0) { reflected = true; damage = -def; }
+    else damage = def;
+
+    const abilityTriggered = damage !== baseDmg || reflected;
+
+    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="them">${enemy.name} wins!</b>`);
+
+    const doApplyDamage = () => {
+      if (reflected) {
+        enemyHp -= damage;
+        playDamageSfx(damage);
+        narrate(`<b class="gold">Reflected! ${damage} damage to ${enemy.name}!</b>`);
+        document.getElementById('enemyCard').classList.add('hit');
+        setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+        updateHpDisplay();
+        afterWinTriggers(pick, enemy, eRoll, damage, true);
+        if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
+        else setTimeout(nextRound, 1400);
+      } else if (damage === 0) {
+        narrate(`<b class="gold">Damage negated!</b>`);
+        // Cameron enemy: if their damage negated, destroy player
+        if (enemy.ability === 'Force of Nature') {
+          playerHp = 0; updateHpDisplay();
+          setTimeout(() => { narrate(`<b class="them">Force of Nature! ${pick.name} destroyed!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+        } else {
+          setTimeout(nextRound, 1400);
+        }
+      } else {
+        playerHp -= damage;
+        playDamageSfx(damage);
+        narrate(`<b class="them">${damage} damage to ${pick.name}!</b>`);
+        document.getElementById('playerCard').classList.add('hit');
+        setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+        updateHpDisplay();
+
+        const loseFx = afterLossTriggers(pick, pRoll, damage, true);
+        const enemyWinFx = afterWinTriggers(enemy, pick, eRoll, damage, false);
+        const allFx = [...loseFx, ...enemyWinFx];
+        tookDamageLastRound = true;
+
+        const afterEffects = () => {
+          if (playerHp <= 0) {
+            if (pick.ability === 'Final Gift') carryOverShards = 3;
+            setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+          } else {
+            setTimeout(nextRound, 1400);
+          }
+        };
+
+        if (allFx.length > 0) {
+          setTimeout(() => showEffectQueue(allFx, 'playerCard', afterEffects), 600);
+        } else {
+          afterEffects();
+        }
+      }
+      // Dice mods consumed in next doEnemyRoll/doPlayerRoll
+    };
+
+    if (abilityTriggered && damage > 0 && !reflected) {
+      setTimeout(() => showAbilitySplash(enemy.ability, `${enemy.abilityDesc}`, 1600, doApplyDamage, 'enemyCard'), 800);
+    } else {
+      setTimeout(doApplyDamage, 800);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// PARTY TIME COUNTER
+// ══════════════════════════════════════════════
+function doBalatronCounter(ghost, target) {
+  const el = document.getElementById('abilitySplash');
+  el.className = 'ability-splash party-time';
+  playSfx('sfxSpecial', 0.85);
+  document.getElementById('splashName').textContent = 'Party Time!';
+  document.getElementById('splashDesc').textContent = `${ghost.name} fights back!`;
+  const dieArea = document.getElementById('counterDieArea');
+  const dieBtn = document.getElementById('counterDieBtn');
+  const isPlayerGhost = ghost === pick;
+  const abilityCardId = isPlayerGhost ? 'playerCard' : 'enemyCard';
+  showAbilityCard(abilityCardId);
+
+  if (isPlayerGhost) {
+    dieArea.classList.add('visible');
+    dieBtn.textContent = '?';
+    dieBtn.className = 'counter-die-btn';
+    document.querySelector('.counter-die-label').textContent = 'Tap to roll!';
+    counterCallback = (counterDie) => {
+      if (target === 'enemy') enemyHp -= counterDie;
+      else playerHp -= counterDie;
+      setTimeout(() => {
+        el.classList.remove('active');
+        removeAbilityCard();
+        setTimeout(() => {
+          narrate(`<b class="you">Party Time!</b>&nbsp;Counter roll:&nbsp;<b class="gold">${counterDie} damage!</b>`);
+          playDamageSfx(counterDie);
+          document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          checkAfterCounter();
+        }, 300);
+      }, 800);
+    };
+  } else {
+    dieArea.classList.add('visible');
+    dieBtn.textContent = '?';
+    dieBtn.className = 'counter-die-btn rolling';
+    document.querySelector('.counter-die-label').textContent = 'Rolling...';
+    counterCallback = null;
+    setTimeout(() => {
+      const counterDie = Math.floor(Math.random()*6)+1;
+      dieBtn.classList.remove('rolling');
+      dieBtn.classList.add('landed');
+      dieBtn.textContent = counterDie;
+      document.querySelector('.counter-die-label').textContent = `${counterDie} damage!`;
+      if (target === 'enemy') enemyHp -= counterDie;
+      else playerHp -= counterDie;
+      setTimeout(() => {
+        el.classList.remove('active');
+        removeAbilityCard();
+        setTimeout(() => {
+          narrate(`<b class="them">Party Time!</b>&nbsp;Counter roll:&nbsp;<b class="gold">${counterDie} damage!</b>`);
+          playDamageSfx(counterDie);
+          document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById(target === 'enemy' ? 'enemyCard' : 'playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          checkAfterCounter();
+        }, 300);
+      }, 1000);
+    }, 1200);
+  }
+
+  el.classList.add('active');
+}
+
+function rollCounterDie() {
+  if (!counterCallback) return;
+  const dieBtn = document.getElementById('counterDieBtn');
+  if (dieBtn.classList.contains('landed')) return;
+  dieBtn.classList.add('rolling');
+  document.querySelector('.counter-die-label').textContent = 'Rolling...';
+  const counterDie = Math.floor(Math.random()*6)+1;
+  setTimeout(() => {
+    dieBtn.classList.remove('rolling');
+    dieBtn.classList.add('landed');
+    dieBtn.textContent = counterDie;
+    document.querySelector('.counter-die-label').textContent = `${counterDie} damage!`;
+    const cb = counterCallback;
+    counterCallback = null;
+    setTimeout(() => cb(counterDie), 600);
+  }, 600);
+}
+
+function checkAfterCounter() {
+  if (enemyHp <= 0) {
+    setTimeout(enemyDefeated, 600);
+  } else if (playerHp <= 0) {
+    setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+  } else {
+    setTimeout(nextRound, 1200);
+  }
+}
+
+function nextRound() {
+  round++;
+  // Reset per-turn tookDamage flag at start of new round after use
+  // (Simon's Brew Time checks it during the roll)
+  narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
+  setTimeout(doEnemyRoll, 800);
+}
+
+// ══════════════════════════════════════════════
+// WIN / LOSS HANDLING
+// ══════════════════════════════════════════════
+function enemyDefeated() {
+  narrate(`<b class="gold">${enemy.name}&nbsp;is defeated!</b>`);
+  const eCard = document.getElementById('enemyCard');
+  const ePlate = document.getElementById('enemyPlate');
+  eCard.style.transition = 'opacity 0.8s ease-out';
+  eCard.style.opacity = '0';
+  ePlate.style.transition = 'opacity 0.8s ease-out';
+  ePlate.style.opacity = '0';
+  setTimeout(crashAnimation, 1400);
+}
+
+function handlePlayerLoss() {
+  // Permadeath: remove ghost from collection
+  state.collection.splice(selectedGhostIndex, 1);
+  state.deadGhosts.push(pick.name);
+  state.stats.ghostsLost++;
+
+  // Sync remaining items
+  state.items = battleItemsState.filter(bi => !bi.used).map(bi => bi.id);
+  saveState();
+
+  stopSpiritParticles();
+
+  if (state.collection.length === 0) {
+    // Game over
+    setTimeout(showGameOver, 1000);
+  } else {
+    // Back to map to retry with another ghost
+    setTimeout(() => {
+      stopMusicHard();
+      showMap();
+    }, 1000);
+  }
+}
+
+function afterBattleWin() {
+  fadeOutMusic();
+  stopSpiritParticles();
+
+  // Save remaining HP on the ghost used
+  state.collection[selectedGhostIndex].hp = playerHp;
+
+  // Sync remaining items
+  state.items = battleItemsState.filter(bi => !bi.used).map(bi => bi.id);
+
+  state.stats.bossesBeaten++;
+  state.currentBoss++;
+  saveState();
+
+  if (state.currentBoss >= 8) {
+    // Victory!
+    showVictory();
+  } else {
+    showRewards();
+  }
+}
+
+// ══════════════════════════════════════════════
+// CRASH ANIMATION (win)
+// ══════════════════════════════════════════════
+function crashAnimation() {
+  const overlay = document.getElementById('crashOverlay');
+  const pc = document.getElementById('crashPlayer');
+  const ec = document.getElementById('crashEnemy');
+  const flash = document.getElementById('impactFlash');
+  const vicText = document.getElementById('victoryText');
+
+  const mob = window.innerWidth <= 480;
+  const W = mob ? 200 : 240, H = mob ? 280 : 336;
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+
+  pc.innerHTML = `<img src="${IMG}${pick.file}">`;
+  ec.innerHTML = `<img src="${IMG}${enemy.file}">`;
+
+  ec.style.cssText = `height:${H}px;width:auto;left:50%;top:${cy-H/2-20}px;transform:translateX(-50%);transition:none;opacity:1;border-radius:14px;`;
+  pc.style.cssText = `height:${H}px;width:auto;left:50%;top:${innerHeight+20}px;transform:translateX(-50%);transition:none;opacity:1;border-radius:14px;`;
+  pc.classList.remove('winner');
+  vicText.classList.remove('show');
+  overlay.classList.add('active');
+
+  requestAnimationFrame(() => {
+    pc.style.transition = 'top 0.35s cubic-bezier(0.2,0,0.4,1)';
+    pc.style.top = `${cy-H/2-20}px`;
+  });
+
+  setTimeout(() => {
+    document.body.classList.add('screen-shake');
+    setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+    flash.style.transition = 'none';
+    flash.style.opacity = '0.8';
+    requestAnimationFrame(() => { flash.style.transition = 'opacity 0.5s'; flash.style.opacity = '0'; });
+    ec.style.opacity = '0';
+    spawnShards(cx-W/2, cy-H/2-20, W, H);
+    pc.style.transition = 'top 0.6s cubic-bezier(0.34,1.56,0.64,1)';
+    pc.style.top = `${cy-H/2}px`;
+    pc.classList.add('winner');
+
+    setTimeout(() => { vicText.classList.add('show'); spawnSparkles(cx, cy, W, H); }, 500);
+
+    setTimeout(() => {
+      vicText.classList.remove('show');
+      pc.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+      pc.style.opacity = '0';
+      pc.style.transform = 'translateX(-50%) scale(1.3)';
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        document.querySelectorAll('.shard').forEach(s => s.remove());
+        document.querySelectorAll('.sparkle').forEach(s => s.remove());
+        pc.style.transform = 'translateX(-50%)';
+        afterBattleWin();
+      }, 900);
+    }, 2800);
+  }, 380);
+}
+
+function spawnSparkles(cx, cy, W, H) {
+  const overlay = document.getElementById('crashOverlay');
+  function burst(count, delay, spread, distMin, distMax, sizeMin, sizeMax) {
+    setTimeout(() => {
+      for (let i = 0; i < count; i++) {
+        const s = document.createElement('div');
+        s.className = 'sparkle';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = distMin + Math.random() * distMax;
+        s.style.left = (cx + (Math.random() - 0.5) * W * spread) + 'px';
+        s.style.top = (cy + (Math.random() - 0.5) * H * spread) + 'px';
+        const size = sizeMin + Math.random() * sizeMax;
+        s.style.width = size + 'px'; s.style.height = size + 'px';
+        s.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+        s.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+        const r = Math.random();
+        s.style.background = r > 0.6 ? 'var(--gold)' : r > 0.3 ? 'var(--player)' : '#fff';
+        s.style.animation = `sparkleFloat ${0.7 + Math.random() * 0.8}s ease-out ${Math.random() * 0.3}s forwards`;
+        overlay.appendChild(s);
+      }
+    }, delay);
+  }
+  burst(80, 0, 1.2, 50, 160, 3, 7);
+  burst(70, 300, 0.8, 60, 180, 2, 6);
+  burst(65, 600, 1.0, 40, 200, 3, 8);
+  burst(60, 900, 1.3, 70, 220, 2, 5);
+  burst(55, 1200, 0.9, 50, 180, 3, 7);
+}
+
+function spawnShards(x, y, W, H) {
+  const cols = 4, rows = 5, sw = W/cols, sh = H/rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const s = document.createElement('div');
+      s.className = 'shard';
+      s.style.width = sw+'px'; s.style.height = sh+'px';
+      s.style.left = (x+c*sw)+'px'; s.style.top = (y+r*sh)+'px';
+      s.style.borderRadius = '2px';
+      const img = document.createElement('img');
+      img.src = IMG + enemy.file;
+      img.style.width = W+'px'; img.style.height = H+'px';
+      img.style.left = -(c*sw)+'px'; img.style.top = -(r*sh)+'px';
+      s.appendChild(img);
+      document.getElementById('crashOverlay').appendChild(s);
+      const angle = Math.atan2(r-rows/2+.5, c-cols/2+.5);
+      const dist = 200+Math.random()*300;
+      const dx = Math.cos(angle)*dist+(Math.random()-.5)*100;
+      const dy = Math.sin(angle)*dist+Math.random()*200;
+      const rot = (Math.random()-.5)*720;
+      const delay = Math.random()*80;
+      s.style.transition = 'none';
+      requestAnimationFrame(() => {
+        s.style.transition = `transform ${1+Math.random()*.6}s cubic-bezier(0.2,0,0.3,1) ${delay}ms, opacity ${1.2+Math.random()*.5}s ease-out ${delay+200}ms`;
+        s.style.transform = `translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${.2+Math.random()*.3})`;
+        s.style.opacity = '0';
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// REWARDS SCREEN
+// ══════════════════════════════════════════════
+function showRewards() {
+  showScreen('rewardScreen');
+
+  // Item drop
+  const boss = BOSSES[state.currentBoss - 1];
+  pendingRewardItem = boss.drop;
+  if (pendingRewardItem) {
+    const item = ITEMS[pendingRewardItem];
+    document.getElementById('rewardItemIcon').textContent = item.icon;
+    document.getElementById('rewardItemName').textContent = item.name;
+    document.getElementById('rewardItemDesc').textContent = item.desc;
+    document.getElementById('rewardItemBox').style.display = 'flex';
+
+    if (state.items.length >= 3) {
+      document.getElementById('rewardOverflow').textContent = 'Inventory full! Oldest item will be replaced.';
+      document.getElementById('rewardOverflow').style.display = 'block';
+    } else {
+      document.getElementById('rewardOverflow').style.display = 'none';
+    }
+  } else {
+    document.getElementById('rewardItemBox').style.display = 'none';
+    document.getElementById('rewardOverflow').style.display = 'none';
+  }
+
+  // Draw 2 new ghost cards — player picks 1
+  const weights = DRAW_WEIGHTS[state.currentBoss - 1];
+  pendingRewardCards = [];
+  selectedRewardCard = -1;
+  for (let i = 0; i < 2; i++) {
+    const card = drawGhost(weights);
+    if (card) pendingRewardCards.push(card);
+  }
+
+  const container = document.getElementById('rewardCards');
+  container.innerHTML = '';
+  document.getElementById('rewardPickLabel').style.display = pendingRewardCards.length > 1 ? 'block' : 'none';
+  pendingRewardCards.forEach((g, i) => {
+    const c = document.createElement('div');
+    c.className = 'reward-card';
+    c.style.cursor = 'pointer';
+    c.innerHTML = `<img src="${IMG}${g.file}"><div class="rc-name">${g.name}</div><div class="rc-ability">${g.ability} · ${g.maxHp} HP</div>`;
+    c.onclick = () => selectRewardCard(i);
+    container.appendChild(c);
+  });
+
+  // If only 1 card drawn, auto-select it
+  if (pendingRewardCards.length === 1) selectRewardCard(0);
+}
+
+function drawGhost(weights) {
+  const available = ALL_GHOSTS.filter(g => !state.usedCards.includes(g.name));
+  if (available.length === 0) return null;
+
+  // Pick rarity by weight
+  const roll = Math.random();
+  let cumulative = 0;
+  let targetRarity = 'common';
+  for (const [rarity, weight] of Object.entries(weights)) {
+    cumulative += weight;
+    if (roll < cumulative) { targetRarity = rarity; break; }
+  }
+
+  let pool = available.filter(g => g.rarity === targetRarity);
+  if (pool.length === 0) pool = available; // fallback
+
+  const ghost = pool[Math.floor(Math.random() * pool.length)];
+  state.usedCards.push(ghost.name);
+  return { ...ghost, hp: ghost.maxHp };
+}
+
+let selectedRewardCard = -1;
+
+function selectRewardCard(idx) {
+  selectedRewardCard = idx;
+  const cards = document.querySelectorAll('#rewardCards .reward-card');
+  cards.forEach((c, i) => {
+    if (i === idx) {
+      c.style.borderColor = 'rgba(103,232,249,0.8)';
+      c.style.boxShadow = '0 0 24px rgba(103,232,249,0.4)';
+      c.style.transform = 'scale(1.05)';
+    } else {
+      c.style.borderColor = 'rgba(255,255,255,0.1)';
+      c.style.boxShadow = 'none';
+      c.style.transform = 'scale(0.95)';
+      c.style.opacity = '0.5';
+    }
+  });
+}
+
+function collectRewards() {
+  if (selectedRewardCard < 0 && pendingRewardCards.length > 1) return;
+
+  // Add item
+  if (pendingRewardItem) {
+    if (state.items.length >= 3) {
+      state.items.shift();
+    }
+    state.items.push(pendingRewardItem);
+  }
+
+  // Add only the selected card
+  if (pendingRewardCards.length > 0) {
+    const picked = pendingRewardCards[selectedRewardCard >= 0 ? selectedRewardCard : 0];
+    state.collection.push(picked);
+  }
+
+  saveState();
+  showMap();
+}
+
+// ══════════════════════════════════════════════
+// GAME OVER
+// ══════════════════════════════════════════════
+function showGameOver() {
+  stopMusicHard();
+  showScreen('gameoverScreen');
+
+  const graveyard = document.getElementById('graveyard');
+  graveyard.innerHTML = '';
+  state.deadGhosts.forEach(name => {
+    const g = ALL_GHOSTS.find(gh => gh.name === name);
+    if (!g) return;
+    const c = document.createElement('div');
+    c.className = 'grave-card';
+    c.innerHTML = `<img src="${IMG}${g.file}">`;
+    graveyard.appendChild(c);
+  });
+
+  document.getElementById('gameoverStats').innerHTML = `
+    Bosses beaten: ${state.stats.bossesBeaten} / 8<br>
+    Ghosts lost: ${state.stats.ghostsLost}<br>
+    Total rolls: ${state.stats.totalRolls}
+  `;
+
+  clearState();
+}
+
+// ══════════════════════════════════════════════
+// VICTORY
+// ══════════════════════════════════════════════
+function showVictory() {
+  stopMusicHard();
+  startSnow();
+  showScreen('winScreen');
+
+  const row = document.getElementById('trophyRow');
+  row.innerHTML = '';
+  state.collection.forEach(g => {
+    const c = document.createElement('div');
+    c.className = 'trophy-card';
+    c.innerHTML = `<img src="${IMG}${g.file}">`;
+    row.appendChild(c);
+  });
+
+  document.getElementById('winStats').innerHTML = `
+    <b>8/8</b> Bosses defeated<br>
+    <b>${state.collection.length}</b> ghosts survived<br>
+    <b>${state.stats.ghostsLost}</b> ghosts lost<br>
+    <b>${state.stats.itemsUsed}</b> items used<br>
+    <b>${state.stats.totalRolls}</b> total rolls
+  `;
+
+  clearState();
+}
+
+// ══════════════════════════════════════════════
+// PARTICLES + EFFECTS
+// ══════════════════════════════════════════════
+function spawnSpiritParticles() {
+  const container = document.getElementById('spiritParticles');
+  container.innerHTML = '';
+  if (spiritInterval) clearInterval(spiritInterval);
+  spiritInterval = setInterval(() => {
+    const dot = document.createElement('div');
+    dot.className = 'spirit-dot';
+    const size = 2 + Math.random() * 3;
+    dot.style.width = size + 'px'; dot.style.height = size + 'px';
+    dot.style.left = (Math.random() * 100) + '%';
+    dot.style.top = (30 + Math.random() * 60) + '%';
+    const colors = ['rgba(103,232,249,0.7)', 'rgba(192,132,252,0.6)', 'rgba(251,191,36,0.5)', 'rgba(255,255,255,0.5)'];
+    dot.style.background = colors[Math.floor(Math.random() * colors.length)];
+    dot.style.boxShadow = `0 0 ${4+Math.random()*6}px ${dot.style.background}`;
+    const dur = 4 + Math.random() * 6;
+    dot.style.animationDuration = dur + 's';
+    container.appendChild(dot);
+    setTimeout(() => dot.remove(), dur * 1000);
+  }, 500);
+}
+
+function stopSpiritParticles() { if (spiritInterval) { clearInterval(spiritInterval); spiritInterval = null; } }
+
+function startSnow() {
+  const container = document.getElementById('snowContainer');
+  container.classList.add('active');
+  snowInterval = setInterval(() => {
+    const flake = document.createElement('div');
+    flake.className = 'snowflake';
+    const size = 1.5 + Math.random() * 2.5;
+    const w = window.innerWidth, h = window.innerHeight;
+    let startX, startY;
+    if (Math.random() < 0.7) { startX = Math.random() * w; startY = -10; }
+    else { startX = w + 5; startY = Math.random() * h * 0.5; }
+    const driftX = -(30 + Math.random() * 80);
+    const driftY = h * 0.6 + Math.random() * h * 0.5;
+    const duration = 8 + Math.random() * 7;
+    flake.style.width = size + 'px'; flake.style.height = size + 'px';
+    flake.style.left = startX + 'px'; flake.style.top = startY + 'px';
+    flake.style.setProperty('--sx', driftX + 'px');
+    flake.style.setProperty('--sy', driftY + 'px');
+    flake.style.animationDuration = duration + 's';
+    container.appendChild(flake);
+    setTimeout(() => flake.remove(), duration * 1000);
+  }, 350);
+}
+
+function stopSnow() {
+  if (snowInterval) { clearInterval(snowInterval); snowInterval = null; }
+  const container = document.getElementById('snowContainer');
+  setTimeout(() => { container.classList.remove('active'); container.innerHTML = ''; }, 4000);
+}
+
+let fadeIntervalId = null;
+function fadeOutMusic() {
+  const music = document.getElementById('bgMusic');
+  if (fadeIntervalId) clearInterval(fadeIntervalId);
+  let vol = music.volume;
+  fadeIntervalId = setInterval(() => {
+    vol -= 0.03;
+    if (vol <= 0) { clearInterval(fadeIntervalId); fadeIntervalId = null; music.pause(); music.volume = 0.4; }
+    else music.volume = vol;
+  }, 60);
+}
+
+function stopMusicHard() {
+  if (fadeIntervalId) { clearInterval(fadeIntervalId); fadeIntervalId = null; }
+  const music = document.getElementById('bgMusic');
+  music.pause(); music.currentTime = 0; music.volume = 0.4;
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+initTitle();
+</script>
+</body>
+</html>
