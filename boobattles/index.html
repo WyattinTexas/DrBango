@@ -1077,6 +1077,13 @@
   .ability-splash.iron-will .ability-splash-name { color: #94a3b8; text-shadow: 0 0 40px rgba(148,163,184,0.8), 0 3px 6px rgba(0,0,0,0.8); }
   .ability-splash.iron-will .ability-splash-desc { color: #cbd5e1; }
 
+  .ability-splash.stoic { background: radial-gradient(ellipse at center, rgba(160,140,80,0.45) 0%, rgba(60,50,20,0.3) 35%, rgba(0,0,0,0.92) 65%); }
+  .ability-splash.stoic .ability-splash-name {
+    color: #d4a44a;
+    text-shadow: 0 0 40px rgba(212,164,74,0.9), 0 0 80px rgba(180,130,40,0.5), 0 0 120px rgba(160,120,30,0.3), 0 3px 6px rgba(0,0,0,0.8);
+  }
+  .ability-splash.stoic .ability-splash-desc { color: #e8d5a0; }
+
   .ability-splash.lucky-strike { background: radial-gradient(ellipse at center, rgba(34,197,94,0.4) 0%, rgba(0,0,0,0.9) 65%); }
   .ability-splash.lucky-strike .ability-splash-name { color: #4ade80; text-shadow: 0 0 40px rgba(34,197,94,0.8), 0 3px 6px rgba(0,0,0,0.8); }
   .ability-splash.lucky-strike .ability-splash-desc { color: #bbf7d0; }
@@ -1610,7 +1617,7 @@ const ABILITY_THEMES = {
   'Snowball': 'beast-mode',
   'Thief': 'lucky-strike',
   'Pop': 'party-time',
-  'Stoic': 'iron-will',
+  'Stoic': 'stoic',
   'Bogus': 'reflect',
   'Reflected!': 'reflect',
   'Tempest': 'valley-guardian',
@@ -3101,17 +3108,23 @@ function resolveRound(pRoll, eRoll) {
         }, 'enemyCard');
         return; // splash handles the rest
       } else if (damage === 0) {
-        narrate(`<b class="gold">Damage negated!</b>`);
-        // Cameron: if damage gets negated, destroy enemy
-        if (pick.ability === 'Force of Nature') {
-          setTimeout(() => {
-            showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
-              enemyHp = 0; updateHpDisplay(); setTimeout(enemyDefeated, 600);
-            }, 'playerCard');
-          }, 600);
-        } else {
-          setTimeout(nextRound, 1400);
-        }
+        // Show defender's blocking ability as a splash
+        const blockerName = enemy.ability || 'Blocked';
+        const blockerDesc = enemy.ability === 'Stoic' ? 'Immune to singles below 6 HP!' : 'Damage negated!';
+        showAbilitySplash(blockerName, blockerDesc, 1600, () => {
+          narrate(`<b class="them">${enemy.name} blocked the attack!</b>`);
+          // Cameron: if damage gets negated, destroy enemy
+          if (pick.ability === 'Force of Nature') {
+            setTimeout(() => {
+              showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
+                enemyHp = 0; updateHpDisplay(); setTimeout(enemyDefeated, 600);
+              }, 'playerCard');
+            }, 600);
+          } else {
+            setTimeout(nextRound, 1400);
+          }
+        }, 'enemyCard');
+        return;
       } else {
         enemyHp -= damage;
         playDamageSfx(damage);
@@ -3179,14 +3192,19 @@ function resolveRound(pRoll, eRoll) {
         }, 'playerCard');
         return;
       } else if (damage === 0) {
-        narrate(`<b class="gold">Damage negated!</b>`);
-        // Cameron enemy: if their damage negated, destroy player
-        if (enemy.ability === 'Force of Nature') {
-          playerHp = 0; updateHpDisplay();
-          setTimeout(() => { narrate(`<b class="them">Force of Nature! ${pick.name} destroyed!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
-        } else {
-          setTimeout(nextRound, 1400);
-        }
+        const blockerName = pick.ability || 'Blocked';
+        const blockerDesc = pick.ability === 'Stoic' ? 'Immune to singles below 6 HP!' : 'Damage negated!';
+        showAbilitySplash(blockerName, blockerDesc, 1600, () => {
+          narrate(`<b class="gold">${pick.name} blocked the attack!</b>`);
+          // Cameron enemy: if their damage negated, destroy player
+          if (enemy.ability === 'Force of Nature') {
+            playerHp = 0; updateHpDisplay();
+            setTimeout(() => { narrate(`<b class="them">Force of Nature! ${pick.name} destroyed!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+          } else {
+            setTimeout(nextRound, 1400);
+          }
+        }, 'playerCard');
+        return;
       } else {
         playerHp -= damage;
         playDamageSfx(damage);
@@ -3391,8 +3409,8 @@ function afterBattleWin() {
   fadeOutMusic();
   stopSpiritParticles();
 
-  // Save remaining HP on the ghost used
-  state.collection[selectedGhostIndex].hp = playerHp;
+  // Heal all ghosts to full HP between fights
+  state.collection.forEach(g => { g.hp = g.maxHp; });
 
   // Sync remaining items
   state.items = battleItemsState.filter(bi => !bi.used).map(bi => bi.id);
