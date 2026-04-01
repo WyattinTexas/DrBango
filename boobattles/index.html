@@ -1008,6 +1008,15 @@
     box-shadow: 0 0 10px rgba(251,146,60,0.15);
   }
   .shard-icon.fire .shard-count { color: #fb923c; }
+  .shard-icon.committed {
+    border-color: rgba(251,191,36,0.7);
+    box-shadow: 0 0 16px rgba(251,191,36,0.4);
+    animation: committedPulse 1s ease-in-out infinite;
+  }
+  @keyframes committedPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(251,191,36,0.3); }
+    50% { box-shadow: 0 0 24px rgba(251,191,36,0.6); }
+  }
 
   .ability-icon {
     border-color: rgba(192,132,252,0.4);
@@ -1397,14 +1406,14 @@
     border-radius: 14px;
     overflow: hidden;
     border: 3px solid rgba(248,113,113,0.4);
-    filter: grayscale(0.6) brightness(0.7);
-    animation: farewellFloat 3s ease-in-out infinite;
+    animation: farewellFade 4.5s ease-in forwards;
   }
   .farewell-card img { width: 100%; display: block; }
 
-  @keyframes farewellFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+  @keyframes farewellFade {
+    0% { opacity: 1; transform: translateY(0) scale(1); filter: grayscale(0) brightness(1); }
+    30% { opacity: 0.8; filter: grayscale(0.4) brightness(0.8); }
+    100% { opacity: 0; transform: translateY(-30px) scale(0.9); filter: grayscale(1) brightness(0.3); }
   }
 
   .farewell-name {
@@ -1413,15 +1422,22 @@
     color: var(--enemy);
     letter-spacing: 2px;
     text-shadow: 0 0 20px rgba(248,113,113,0.4);
+    animation: farewellTextFade 4.5s ease-in forwards;
+  }
+
+  @keyframes farewellTextFade {
+    0% { opacity: 1; }
+    60% { opacity: 0.6; }
+    100% { opacity: 0; }
   }
 
   .farewell-text {
-    font-size: 0.85rem;
-    color: #666;
+    font-family: 'Creepster', cursive;
+    font-size: 1.4rem;
+    color: #888;
     font-style: italic;
-    max-width: 260px;
-    text-align: center;
-    line-height: 1.5;
+    letter-spacing: 3px;
+    animation: farewellTextFade 4.5s ease-in forwards;
   }
 
   .watermark { position: fixed; bottom: 10px; right: 14px; font-size: 0.6rem; color: #222; letter-spacing: 1px; z-index: 200; }
@@ -1831,6 +1847,8 @@ let sacredFires = 0;            // Player sacred fire stack
 let enemySacredFires = 0;       // Enemy sacred fire stack
 let lastShardsConsumed = null;  // Track for splash display
 let lastFiresConsumed = null;   // Track for splash display
+let committedShards = 0;        // Shards discarded before this roll
+let committedFires = 0;         // Fires discarded before this roll
 let playerBonusDice = 0;        // Extra dice for player next roll
 let enemyBonusDice = 0;         // Extra dice for enemy next roll
 let playerRemoveDice = 0;       // Dice removed from player next roll
@@ -2301,34 +2319,21 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer) {
       break;
   }
 
-  // Ice Shards bonus damage on win (consumed)
-  if (isPlayer && iceShards > 0) {
+  // Committed Ice Shards: +1 per shard if winner (Skylar Winter Barrage: +2 each)
+  lastShardsConsumed = null;
+  lastFiresConsumed = null;
+  if (isPlayer && committedShards > 0) {
     const perShard = winner.ability === 'Winter Barrage' ? 2 : 1;
-    const shardDmg = iceShards * perShard;
+    const shardDmg = committedShards * perShard;
     damage += shardDmg;
-    lastShardsConsumed = { type: 'ice', count: iceShards, dmg: shardDmg };
-    iceShards = 0;
-  } else if (!isPlayer && enemyIceShards > 0) {
-    const perShard = winner.ability === 'Winter Barrage' ? 2 : 1;
-    const shardDmg = enemyIceShards * perShard;
-    damage += shardDmg;
-    enemyIceShards = 0;
-  } else {
-    lastShardsConsumed = null;
+    lastShardsConsumed = { count: committedShards, dmg: shardDmg };
   }
 
-  // Sacred Fires bonus damage on win (consumed, +2 each)
-  if (isPlayer && sacredFires > 0) {
-    const fireDmg = sacredFires * 2;
+  // Committed Sacred Fires: +3 per fire if winner
+  if (isPlayer && committedFires > 0) {
+    const fireDmg = committedFires * 3;
     damage += fireDmg;
-    lastFiresConsumed = { count: sacredFires, dmg: fireDmg };
-    sacredFires = 0;
-  } else if (!isPlayer && enemySacredFires > 0) {
-    const fireDmg = enemySacredFires * 2;
-    damage += fireDmg;
-    enemySacredFires = 0;
-  } else {
-    lastFiresConsumed = null;
+    lastFiresConsumed = { count: committedFires, dmg: fireDmg };
   }
 
   return damage;
@@ -2497,6 +2502,8 @@ function startBattle() {
   enemyIceShards = 0;
   sacredFires = 0;
   enemySacredFires = 0;
+  committedShards = 0;
+  committedFires = 0;
   playerBonusDice = 0; enemyBonusDice = 0;
   playerRemoveDice = 0; enemyRemoveDice = 0;
   bogeyReflectUsed = false;
@@ -2621,22 +2628,29 @@ function renderBattleActionBar() {
   const container = document.getElementById('battleActionBar');
   container.innerHTML = '';
 
-  // Ice Shards counter
-  if (iceShards > 0) {
+  // Ice Shards — tap to discard before rolling (gamble: +1 per shard IF you win)
+  if (iceShards > 0 || committedShards > 0) {
     const shard = document.createElement('div');
-    shard.className = 'shard-icon';
     const perShard = pick && pick.ability === 'Winter Barrage' ? 2 : 1;
-    shard.innerHTML = `\u2744\uFE0F<div class="shard-count">${iceShards}</div>`;
-    shard.title = `${iceShards} Ice Shard${iceShards > 1 ? 's' : ''} — +${iceShards * perShard} damage on next win`;
+    const total = iceShards + committedShards;
+    shard.className = 'shard-icon' + (committedShards > 0 ? ' committed' : '');
+    shard.id = 'shardBtn';
+    shard.innerHTML = `\u2744\uFE0F<div class="shard-count">${committedShards > 0 ? committedShards + ' \u2694' : iceShards}</div>`;
+    shard.title = committedShards > 0 ? `${committedShards} shard${committedShards>1?'s':''} committed (+${committedShards*perShard} if you win)` : `Tap to discard ${iceShards} shard${iceShards>1?'s':''} before rolling (+${perShard} each if you win)`;
+    shard.style.cursor = iceShards > 0 ? 'pointer' : 'default';
+    shard.onclick = () => commitShards();
     container.appendChild(shard);
   }
 
-  // Sacred Fires counter
-  if (sacredFires > 0) {
+  // Sacred Fires — tap to discard before rolling (gamble: +3 per fire IF you win)
+  if (sacredFires > 0 || committedFires > 0) {
     const fire = document.createElement('div');
-    fire.className = 'shard-icon fire';
-    fire.innerHTML = `\u{1F525}<div class="shard-count">${sacredFires}</div>`;
-    fire.title = `${sacredFires} Sacred Fire${sacredFires > 1 ? 's' : ''} — +${sacredFires * 2} damage on next win`;
+    fire.className = 'shard-icon fire' + (committedFires > 0 ? ' committed' : '');
+    fire.id = 'fireBtn';
+    fire.innerHTML = `\u{1F525}<div class="shard-count">${committedFires > 0 ? committedFires + ' \u2694' : sacredFires}</div>`;
+    fire.title = committedFires > 0 ? `${committedFires} fire${committedFires>1?'s':''} committed (+${committedFires*3} if you win)` : `Tap to discard ${sacredFires} fire${sacredFires>1?'s':''} before rolling (+3 each if you win)`;
+    fire.style.cursor = sacredFires > 0 ? 'pointer' : 'default';
+    fire.onclick = () => commitFires();
     container.appendChild(fire);
   }
 
@@ -2713,6 +2727,25 @@ function updateItemUsability() {
     if (hasShardIcon && iceShards > 0) hasShardIcon.querySelector('.shard-count').textContent = iceShards;
     if (hasFireIcon && sacredFires > 0) hasFireIcon.querySelector('.shard-count').textContent = sacredFires;
   }
+}
+
+function commitShards() {
+  if (phase !== 1 || iceShards <= 0) return;
+  committedShards += iceShards;
+  iceShards = 0;
+  playSfx('sfxSpecial', 0.5);
+  const perShard = pick && pick.ability === 'Winter Barrage' ? 2 : 1;
+  narrate(`<b class="gold">${committedShards} Ice Shard${committedShards>1?'s':''} committed!</b> +${committedShards*perShard} damage if you win.`);
+  renderBattleActionBar();
+}
+
+function commitFires() {
+  if (phase !== 1 || sacredFires <= 0) return;
+  committedFires += sacredFires;
+  sacredFires = 0;
+  playSfx('sfxSpecial', 0.5);
+  narrate(`<b class="gold">${committedFires} Sacred Fire${committedFires>1?'s':''} committed!</b> +${committedFires*3} damage if you win.`);
+  renderBattleActionBar();
 }
 
 function activateAbility() {
@@ -2950,6 +2983,7 @@ function doEnemyRoll() {
   resetDice();
   document.getElementById('pDie3').style.display = 'none';
   powerMode = false;
+  committedShards = 0; committedFires = 0; // reset for new round
 
   // Calculate enemy dice count (consumes modifiers)
   const eDiceCount = getEnemyDiceCount();
@@ -3246,9 +3280,7 @@ function resolveRound(pRoll, eRoll) {
 
   if (result === 0) {
     narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
-    // Reset per-round dice modifiers
-    playerBonusDice = 0; enemyBonusDice = 0;
-    playerRemoveDice = 0; enemyRemoveDice = 0;
+    committedShards = 0; committedFires = 0; // wasted on tie
     setTimeout(() => {
       narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls again...`);
       setTimeout(doEnemyRoll, 800);
@@ -3587,23 +3619,22 @@ function handlePlayerLoss() {
 
   stopSpiritParticles();
 
-  // Show farewell overlay for 5 seconds
+  // Show farewell overlay — ghost fades to nothing
+  stopMusicHard();
   const overlay = document.getElementById('farewellOverlay');
   document.getElementById('farewellCard').innerHTML = `<img src="${IMG}${deadGhost.file}">`;
   document.getElementById('farewellName').textContent = deadGhost.name;
-  document.getElementById('farewellText').textContent = FAREWELL_LINES[Math.floor(Math.random() * FAREWELL_LINES.length)];
+  document.getElementById('farewellText').textContent = 'Farewell...';
   overlay.classList.add('active');
 
   setTimeout(() => {
     overlay.classList.remove('active');
-    setTimeout(() => {
-      stopMusicHard();
-      if (state.collection.length === 0) {
-        showGameOver();
-      } else {
-        showMap();
-      }
-    }, 800);
+    // Go directly to next screen — no flash back to battle
+    if (state.collection.length === 0) {
+      showGameOver();
+    } else {
+      showMap();
+    }
   }, 5000);
 }
 
