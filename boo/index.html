@@ -374,6 +374,21 @@
   }
   .selected-ghost-name.shade .sgn-tagline { color: #94a3b8; }
 
+  /* Win/Loss record */
+  .record-counter {
+    display: none;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+  .record-counter.visible { display: block; }
+  .record-counter .win-count { color: var(--player); }
+  .record-counter .loss-count { color: var(--enemy); }
+
   /* Romy prediction picker */
   .predict-area {
     display: none;
@@ -1301,6 +1316,7 @@
       <div class="sgn-tagline" id="sgnTagline"></div>
     </div>
     <button class="action-btn cyan" id="fightBtn" onclick="startBattle()">Fight!</button>
+    <div class="record-counter" id="recordCounter"></div>
   </div>
 
   <!-- BATTLE -->
@@ -1727,6 +1743,8 @@ function typeLabel(type) {
 // PICK SCREEN
 // ══════════════════════════════════════════
 let gamesPlayed = parseInt(localStorage.getItem('boo_gamesPlayed') || '0');
+let wins = parseInt(localStorage.getItem('boo_wins') || '0');
+let losses = parseInt(localStorage.getItem('boo_losses') || '0');
 
 function getAvailableGhosts() {
   if (gamesPlayed === 0) return GHOSTS.filter(g => !g.unlockAfterFirst);
@@ -1770,6 +1788,14 @@ function initPick() {
   });
   document.getElementById('fightBtn').classList.remove('ready');
   document.getElementById('selectedGhostName').classList.remove('visible');
+  // Show win/loss record after first game
+  const record = document.getElementById('recordCounter');
+  if (gamesPlayed > 0) {
+    record.innerHTML = `<span class="win-count">${wins}W</span> &mdash; <span class="loss-count">${losses}L</span>`;
+    record.classList.add('visible');
+  } else {
+    record.classList.remove('visible');
+  }
   spawnPickOrbs();
 }
 
@@ -2627,6 +2653,8 @@ function showWinCTA() {
   stopSpiritParticles();
   startSnow();
   markGamePlayed();
+  wins++;
+  localStorage.setItem('boo_wins', wins);
   document.getElementById('ctaTitle').textContent = 'You Win!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
@@ -2637,6 +2665,8 @@ function showLossCTA() {
   stopSpiritParticles();
   startSnow();
   markGamePlayed();
+  losses++;
+  localStorage.setItem('boo_losses', losses);
   document.getElementById('ctaTitle').textContent = 'You Lose!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
