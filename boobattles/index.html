@@ -1787,7 +1787,6 @@ const IMG = '../tierlist/cards/';
 
 const ABILITY_THEMES = {
   'Protector': 'iron-will',
-  'Bullseye': 'beast-mode',
   'Winter Barrage': 'valley-guardian',
   'Heating Up': 'fury',
   'Reflection': 'blue-fire',
@@ -1828,13 +1827,14 @@ const ABILITY_THEMES = {
   'Careful': 'iron-will',
   'Jinx': 'double-down',
   'Tough Job': 'blue-fire',
-  'Regulator': 'lucky-strike'
+  'Regulator': 'lucky-strike',
+  'Restore': 'blue-fire'
 };
 
 const ALL_GHOSTS = [
   // Ghost Rare
   { name:"Hector", file:"hector.jpg", rarity:"ghost-rare", maxHp:6, ability:"Protector", abilityDesc:"Singles beat doubles. +1 damage on singles." },
-  { name:"Night Master", file:"night_master.jpg", rarity:"ghost-rare", maxHp:5, ability:"Bullseye", abilityDesc:"Win with doubles: +5 bonus damage." },
+  { name:"Flora", file:"flora.jpg", rarity:"rare", maxHp:4, ability:"Restore", abilityDesc:"Roll doubles: +2 HP after damage is applied." },
   { name:"Skylar", file:"skylar.jpg", rarity:"ghost-rare", maxHp:7, ability:"Winter Barrage", abilityDesc:"Ice Shards deal +2 damage instead of +1." },
   { name:"Tyler", file:"tyler.jpg", rarity:"ghost-rare", maxHp:6, ability:"Heating Up", abilityDesc:"Before rolling, spend 2 HP to gain +1 die." },
   { name:"King Jay", file:"king_jay.jpg", rarity:"ghost-rare", maxHp:7, ability:"Reflection", abilityDesc:"Lose roll & dice total = 7: reflect all damage." },
@@ -2540,8 +2540,7 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
     case 'Protector': // Hector: +1 on singles (singles beating doubles handled in compareRolls)
       if (roll.type === 'singles') damage += 1;
       break;
-    case 'Bullseye': // Night Master: doubles win → +5
-      if (roll.type === 'doubles') damage += 5;
+    case 'Restore': // Flora: healing handled after damage in resolveRound
       break;
     case 'Slash': // Wim: all dice odd → +5
       if (roll.dice.every(d => d % 2 === 1)) damage += 5;
@@ -2647,6 +2646,12 @@ function afterWinTriggers(winner, loser, roll, damage, isPlayer) {
     if (isPlayer) playerBonusDice += 1; else enemyBonusDice += 1;
     effects.push({ text: `<b class="gold">Jinx!</b> Both rolled doubles — +1 die next turn!`, ability: 'Jinx', desc: 'Both doubles! +1 die next turn!' });
   }
+  // Flora: rolled doubles → +2 HP after damage
+  if (winner.ability === 'Restore' && roll.type === 'doubles') {
+    if (isPlayer) { playerHp += 2; updateHpDisplay(); }
+    else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
+    effects.push({ ability: 'Restore', desc: 'Doubles rolled! +2 HP!' });
+  }
 
   return effects;
 }
@@ -2669,6 +2674,15 @@ function afterLossTriggers(loser, roll, damage, isPlayer) {
   if (loser.ability === 'Glacial Pounding' && damage >= 3) {
     if (isPlayer) playerBonusDice += 4; else enemyBonusDice += 4;
     effects.push({ text: `<b class="gold">Glacial Pounding!</b> +4 dice next roll!`, ability: 'Glacial Pounding', desc: '+4 dice next roll!' });
+  }
+  // Flora: rolled doubles even on a loss → +2 HP if still alive
+  if (loser.ability === 'Restore' && roll && roll.type === 'doubles') {
+    const alive = isPlayer ? playerHp > 0 : enemyHp > 0;
+    if (alive) {
+      if (isPlayer) { playerHp += 2; updateHpDisplay(); }
+      else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
+      effects.push({ ability: 'Restore', desc: 'Doubles rolled! +2 HP!' });
+    }
   }
   // Track damage taken for Simon
   if (isPlayer && damage > 0) tookDamageLastRound = true;
