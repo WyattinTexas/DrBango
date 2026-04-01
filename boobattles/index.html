@@ -2174,6 +2174,32 @@ const BOSS11_SCRIPT = {
   // Backup R9 if needed: TRIPLE 6s for the absolute climax.
 };
 
+// Shift scripted dice ±2 so fights feel fresh each play
+// Rejects shifts that would change any roll's type (singles/doubles/triples)
+function varyScript(base) {
+  if (!base) return null;
+  const candidates = [-2,-1,0,1,2].sort(() => Math.random() - 0.5);
+  let shift = 0;
+  for (const s of candidates) {
+    let safe = true;
+    for (let r = 0; r < base.enemy.length; r++) {
+      for (const dice of [base.enemy[r], base.player[r]]) {
+        if (!dice) continue;
+        const original = analyzeRoll(dice).type;
+        const shifted = dice.map(d => Math.max(1, Math.min(6, d + s)));
+        if (analyzeRoll(shifted).type !== original) { safe = false; break; }
+      }
+      if (!safe) break;
+    }
+    if (safe) { shift = s; break; }
+  }
+  if (shift === 0) return base; // no safe shift found, use original
+  return {
+    enemy: base.enemy.map(r => r.map(d => Math.max(1, Math.min(6, d + shift)))),
+    player: base.player.map(r => r.map(d => Math.max(1, Math.min(6, d + shift))))
+  };
+}
+
 // ══════════════════════════════════════════════
 // SCREENS
 // ══════════════════════════════════════════════
@@ -2735,13 +2761,13 @@ function startBattle() {
   isFirstRoll = true;
   tookDamageLastRound = false;
 
-  // Scripted boss fights
+  // Scripted boss fights — boss 0 exact (tutorial), rest varied ±2
   bossScriptRound = 0;
   if (state.currentBoss === 0) {
     bossScript = BOSS0_SCRIPTS[pick.name] || null;
   } else {
     const scripts = [null, BOSS1_SCRIPT, BOSS2_SCRIPT, BOSS3_SCRIPT, BOSS4_SCRIPT, BOSS5_SCRIPT, BOSS6_SCRIPT, BOSS7_SCRIPT, BOSS8_SCRIPT, BOSS9_SCRIPT, BOSS10_SCRIPT, BOSS11_SCRIPT];
-    bossScript = scripts[state.currentBoss] || null;
+    bossScript = varyScript(scripts[state.currentBoss]) || null;
   }
 
   // Chad: ice shards added after entry splash (not here)
