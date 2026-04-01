@@ -951,44 +951,82 @@
   .battle-ui-row .action-btn { margin: 0; width: 100%; padding: 11px 20px; font-size: 1.2rem; }
 
   /* Item bar in battle */
-  .battle-items {
+  /* Action bar: items + ability + shards */
+  .battle-action-bar {
     display: flex;
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  .battle-item {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border: 2px solid rgba(255,255,255,0.15);
-    background: rgba(0,0,0,0.6);
-    display: flex;
+    gap: 6px;
+    margin-top: 6px;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
+    flex-wrap: wrap;
+  }
+
+  .battle-item, .ability-icon, .shard-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
     backdrop-filter: blur(4px);
   }
 
-  .battle-item.usable {
+  .battle-item .icon-label, .ability-icon .icon-label, .shard-icon .icon-label {
+    font-size: 0.4rem;
+    font-weight: 800;
+    color: #888;
+    letter-spacing: 0.5px;
+    margin-top: 1px;
+    text-transform: uppercase;
+  }
+
+  .battle-item.usable, .ability-icon.usable {
     border-color: rgba(251,191,36,0.5);
     animation: itemGlow 1.5s ease-in-out infinite;
   }
 
-  @keyframes itemGlow {
-    0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.2); }
-    50% { box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+  .shard-icon {
+    border-color: rgba(103,232,249,0.4);
+    cursor: default;
+    font-size: 1.2rem;
+  }
+  .shard-icon .shard-count {
+    font-size: 0.7rem;
+    font-weight: 900;
+    color: var(--player);
   }
 
-  .battle-item.used {
+  .ability-icon {
+    border-color: rgba(192,132,252,0.4);
+  }
+  .ability-icon.usable {
+    border-color: rgba(192,132,252,0.6);
+    animation: abilityGlow 1.5s ease-in-out infinite;
+  }
+
+  @keyframes itemGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.2); }
+    50% { box-shadow: 0 0 20px rgba(251,191,36,0.5); }
+  }
+
+  @keyframes abilityGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(192,132,252,0.2); }
+    50% { box-shadow: 0 0 20px rgba(192,132,252,0.5); }
+  }
+
+  .battle-item.used, .ability-icon.used {
     opacity: 0.2;
     pointer-events: none;
   }
 
-  .battle-item:hover:not(.used) { transform: scale(1.1); }
+  .battle-item:hover:not(.used), .ability-icon:hover:not(.used) { transform: scale(1.1); }
 
   .reroll-countdown {
     position: absolute;
@@ -1515,7 +1553,7 @@
           </div>
         </div>
         <button class="action-btn cyan" id="rollBtn" onclick="doPlayerRoll()">Roll Your Dice!</button>
-        <div class="battle-items" id="battleItems"></div>
+        <div class="battle-action-bar" id="battleActionBar"></div>
       </div>
     </div>
   </div>
@@ -1689,7 +1727,7 @@ const ALL_GHOSTS = [
 // BOSSES
 // ══════════════════════════════════════════════
 const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector'];
-const BOSS_HP =    [6, 7, 9, 10, 11, 12, 13, 15];
+const BOSS_HP =    [6, 7, 9, 7, 11, 12, 13, 15];
 const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power',null];
 
 // Fixed starters — always these 3
@@ -1836,7 +1874,7 @@ const BOSS2_SCRIPT = {
   // R8: P doubles(5) → 2 dmg. GT DEAD!
 };
 
-// Boss 3: Stone Cold (10 HP, One-two-one!). Total P dmg: 2+1+3+2+1+1=10 ✓
+// Boss 3: Stone Cold (7 HP, One-two-one!). P dmg: 2+1+3+2=8>7, kills at R5
 // Arc: Build lead → ONE-TWO-ONE! 6 dmg devastation → TRIPLES COMEBACK!
 const BOSS3_SCRIPT = {
   enemy:  [[4,2,1], [3,2,1], [1,1,4], [2,1,3], [3,2,1], [2,1,3], [1,3,2]],
@@ -2462,7 +2500,7 @@ function startBattle() {
   narrate('');
   document.getElementById('rollBtn').classList.remove('ready');
   document.getElementById('diceArea').classList.add('hidden');
-  renderBattleItems();
+  renderBattleActionBar();
 
   spawnSpiritParticles();
   const music = document.getElementById('bgMusic');
@@ -2518,15 +2556,47 @@ function narrate(html) { document.getElementById('narrator').innerHTML = html; }
 // ══════════════════════════════════════════════
 // BATTLE ITEMS UI
 // ══════════════════════════════════════════════
-function renderBattleItems() {
-  const container = document.getElementById('battleItems');
+let abilityUsedThisBattle = false; // for once-per-battle abilities like Bogey
+
+function renderBattleActionBar() {
+  const container = document.getElementById('battleActionBar');
   container.innerHTML = '';
+
+  // Ice Shards counter (if any)
+  if (iceShards > 0) {
+    const shard = document.createElement('div');
+    shard.className = 'shard-icon';
+    shard.innerHTML = `\u2744\uFE0F<div class="shard-count">${iceShards}</div>`;
+    shard.title = `${iceShards} Ice Shard${iceShards > 1 ? 's' : ''} — auto-consumed on next win for +${pick && pick.ability === 'Winter Barrage' ? iceShards*2 : iceShards} damage`;
+    container.appendChild(shard);
+  }
+
+  // Activatable ability icon (before-rolling effects the player can trigger)
+  const abilityId = pick ? pick.ability : null;
+  const hasActivatable = ['Teamwork', 'Heating Up', 'Bogus'].includes(abilityId);
+  if (hasActivatable) {
+    const ab = document.createElement('div');
+    ab.className = 'ability-icon';
+    ab.id = 'abilityBtn';
+    let icon = '\u2728'; // sparkles default
+    if (abilityId === 'Teamwork') icon = '\u{1F91D}';      // handshake
+    if (abilityId === 'Heating Up') icon = '\u{1F525}';     // fire
+    if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';   // shield
+    const label = abilityId === 'Bogus' && bogeyReflectUsed ? 'USED' : abilityId.split(' ')[0];
+    ab.innerHTML = `${icon}<div class="icon-label">${label}</div>`;
+    ab.title = pick.abilityDesc;
+    if (abilityId === 'Bogus' && bogeyReflectUsed) ab.classList.add('used');
+    ab.onclick = () => activateAbility();
+    container.appendChild(ab);
+  }
+
+  // Items
   battleItemsState.forEach((bi, i) => {
     if (!bi.id) return;
     const item = ITEMS[bi.id];
     const el = document.createElement('div');
     el.className = 'battle-item' + (bi.used ? ' used' : '');
-    el.textContent = item.icon;
+    el.innerHTML = `${item.icon}<div class="icon-label">${item.name}</div>`;
     el.title = item.desc;
     el.onclick = () => activateItem(i);
     container.appendChild(el);
@@ -2534,16 +2604,70 @@ function renderBattleItems() {
 }
 
 function updateItemUsability() {
-  const els = document.querySelectorAll('#battleItems .battle-item');
-  els.forEach((el, i) => {
-    const bi = battleItemsState[i];
+  // Items
+  const items = document.querySelectorAll('#battleActionBar .battle-item');
+  items.forEach((el, idx) => {
+    // Find the actual battleItemsState index for this element
+    let stateIdx = -1;
+    let itemCount = 0;
+    for (let i = 0; i < battleItemsState.length; i++) {
+      if (battleItemsState[i].id) {
+        if (itemCount === idx) { stateIdx = i; break; }
+        itemCount++;
+      }
+    }
+    const bi = battleItemsState[stateIdx];
     if (!bi || bi.used) return;
     let usable = false;
     if (bi.id === 'heal' && phase >= 1) usable = true;
     if (bi.id === 'power' && phase === 1 && !powerMode) usable = true;
-    if (bi.id === 'reroll' && phase === 3) usable = true; // phase 3 = after player dice land
+    if (bi.id === 'reroll' && phase === 3) usable = true;
     el.classList.toggle('usable', usable);
   });
+
+  // Ability button
+  const abBtn = document.getElementById('abilityBtn');
+  if (abBtn && pick) {
+    let usable = false;
+    if (pick.ability === 'Teamwork' && phase === 1 && playerHp < pick.maxHp) usable = true;
+    if (pick.ability === 'Heating Up' && phase === 1 && playerHp > 3) usable = true;
+    // Bogus is passive (auto-reflects), no manual activation needed
+    abBtn.classList.toggle('usable', usable);
+  }
+
+  // Update shard display
+  const shardEl = document.querySelector('#battleActionBar .shard-icon');
+  if (shardEl && iceShards > 0) {
+    shardEl.querySelector('.shard-count').textContent = iceShards;
+  } else if (!shardEl && iceShards > 0) {
+    renderBattleActionBar(); // re-render to add shard icon
+  } else if (shardEl && iceShards <= 0) {
+    shardEl.remove();
+  }
+}
+
+function activateAbility() {
+  if (!pick || phase !== 1) return;
+
+  if (pick.ability === 'Teamwork' && playerHp < pick.maxHp) {
+    playerRemoveDice += 1;
+    playerHp = Math.min(pick.maxHp, playerHp + 1);
+    updateHpDisplay();
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="gold">Teamwork!</b> -1 die → +1 HP! (${playerHp}/${pick.maxHp})`);
+    renderBattleActionBar();
+    updateItemUsability();
+  }
+
+  if (pick.ability === 'Heating Up' && playerHp > 3) {
+    playerHp -= 2;
+    playerBonusDice += 1;
+    updateHpDisplay();
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="gold">Heating Up!</b> -2 HP → +1 die this roll!`);
+    renderBattleActionBar();
+    updateItemUsability();
+  }
 }
 
 function activateItem(idx) {
@@ -2559,7 +2683,7 @@ function activateItem(idx) {
     const overclocked = playerHp > pick.maxHp ? ' <b style="color:#34d399;">OVERCLOCKED!</b>' : '';
     narrate(`<b class="gold">+4 HP!</b> Now at ${playerHp}/${pick.maxHp}.${overclocked}`);
     state.stats.itemsUsed++;
-    renderBattleItems();
+    renderBattleActionBar();
     updateItemUsability();
   }
 
@@ -2570,7 +2694,7 @@ function activateItem(idx) {
     document.getElementById('pDie3').style.display = 'flex';
     state.stats.itemsUsed++;
     narrate(`<b class="gold">+1 Die!</b> Rolling 4 dice — best 3 count.`);
-    renderBattleItems();
+    renderBattleActionBar();
     updateItemUsability();
   }
 
@@ -2588,7 +2712,7 @@ function activateItem(idx) {
       d.classList.add('rerollable');
       d.onclick = () => doReroll(i);
     }
-    renderBattleItems();
+    renderBattleActionBar();
   }
 }
 
@@ -2632,10 +2756,12 @@ function clearRerollCountdown() {
 }
 
 function findRerollItemEl() {
-  const items = document.querySelectorAll('#battleItems .battle-item');
+  const items = document.querySelectorAll('#battleActionBar .battle-item');
+  let stateIdx = 0;
   for (let i = 0; i < items.length; i++) {
-    const bi = battleItemsState[i];
-    if (bi && bi.id === 'reroll' && !bi.used) return items[i];
+    while (stateIdx < battleItemsState.length && !battleItemsState[stateIdx].id) stateIdx++;
+    if (stateIdx < battleItemsState.length && battleItemsState[stateIdx].id === 'reroll' && !battleItemsState[stateIdx].used) return items[i];
+    stateIdx++;
   }
   return null;
 }
@@ -2944,19 +3070,7 @@ function doPlayerRoll() {
   narrate('Rolling...');
   state.stats.totalRolls++;
 
-  // Before-rolling abilities (auto-activate with narration)
-  if (pick.ability === 'Heating Up' && playerHp > 3) {
-    playerHp -= 2;
-    playerBonusDice += 1;
-    updateHpDisplay();
-    narrate(`<b class="gold">Heating Up!</b> -2 HP → +1 die this roll!`);
-  }
-  if (pick.ability === 'Teamwork' && playerHp < pick.maxHp) {
-    playerRemoveDice += 1; // sacrifice 1 die
-    playerHp = Math.min(pick.maxHp, playerHp + 1);
-    updateHpDisplay();
-    narrate(`<b class="gold">Teamwork!</b> -1 die → +1 HP!`);
-  }
+  // Before-rolling abilities now activated via action bar icons (manual)
 
   let dieCount = getPlayerDiceCount();
   playerBonusDice = 0; playerRemoveDice = 0; // consumed
