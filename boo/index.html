@@ -465,6 +465,14 @@
     z-index: 2;
     box-shadow: 0 2px 8px rgba(251,191,36,0.4);
   }
+  .pick-card .crown-badge {
+    position: absolute;
+    top: -8px;
+    left: -4px;
+    font-size: 1.2rem;
+    z-index: 2;
+    filter: drop-shadow(0 2px 6px rgba(251,191,36,0.5));
+  }
 
   @media (max-width: 480px) {
     .selected-ghost-name .sgn-name { font-size: 2.50rem; }
@@ -1718,8 +1726,22 @@ function compareRolls(pRoll, eRoll) {
 }
 
 // Shift dice values ±2 so scripted scenarios feel fresh each time
+// Rejects shifts that would change any roll's type (e.g. doubles → triples from clamping)
 function varyScenario(base) {
-  const shift = [-2,-1,0,1,2][Math.floor(Math.random()*5)];
+  const candidates = [-2,-1,0,1,2].sort(() => Math.random() - 0.5);
+  let shift = 0;
+  for (const s of candidates) {
+    let safe = true;
+    for (const r of base.rounds) {
+      for (const dice of [r.enemy, r.player]) {
+        const original = analyzeRoll(dice).type;
+        const shifted = dice.map(d => Math.max(1, Math.min(6, d + s)));
+        if (analyzeRoll(shifted).type !== original) { safe = false; break; }
+      }
+      if (!safe) break;
+    }
+    if (safe) { shift = s; break; }
+  }
   const varied = JSON.parse(JSON.stringify(base));
   varied.rounds.forEach(r => {
     r.enemy = r.enemy.map(d => Math.max(1, Math.min(6, d + shift)));
@@ -1745,6 +1767,7 @@ function typeLabel(type) {
 let gamesPlayed = parseInt(localStorage.getItem('boo_gamesPlayed') || '0');
 let wins = parseInt(localStorage.getItem('boo_wins') || '0');
 let losses = parseInt(localStorage.getItem('boo_losses') || '0');
+let ghostWins = JSON.parse(localStorage.getItem('boo_ghostWins') || '{}');
 
 function getAvailableGhosts() {
   if (gamesPlayed === 0) return GHOSTS.filter(g => !g.unlockAfterFirst);
@@ -1781,6 +1804,9 @@ function initPick() {
     let badgeHtml = '';
     if (g.unlockAfterFirst && gamesPlayed <= 2) {
       badgeHtml = '<div class="unlock-badge">NEW</div>';
+    }
+    if (ghostWins[g.cssClass]) {
+      badgeHtml += '<div class="crown-badge">\u{1F451}</div>';
     }
     c.innerHTML = `${badgeHtml}<img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div>`;
     c.onclick = () => selectGhost(g);
@@ -2655,6 +2681,8 @@ function showWinCTA() {
   markGamePlayed();
   wins++;
   localStorage.setItem('boo_wins', wins);
+  ghostWins[pick.cssClass] = (ghostWins[pick.cssClass] || 0) + 1;
+  localStorage.setItem('boo_ghostWins', JSON.stringify(ghostWins));
   document.getElementById('ctaTitle').textContent = 'You Win!';
   document.getElementById('ctaGhost').innerHTML = `<img src="${IMG}${pick.file}" alt="${pick.name}">`;
   show('ctaScreen');
