@@ -951,14 +951,20 @@
   .battle-ui-row .action-btn { margin: 0; width: 100%; padding: 11px 20px; font-size: 1.2rem; }
 
   /* Item bar in battle */
-  /* Action bar: items + ability + shards */
+  /* Action bar: items on top row, shards/fires below */
   .battle-action-bar {
     display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 6px;
     margin-top: 6px;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 6px;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
   }
 
   .battle-item, .ability-icon, .shard-icon {
@@ -1404,18 +1410,15 @@
   .farewell-overlay {
     position: fixed;
     inset: 0;
-    z-index: 8000;
-    background: rgba(0,0,0,0.92);
-    display: flex;
+    z-index: 10000;
+    background: #080810;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 16px;
-    opacity: 0;
-    transition: opacity 0.8s;
-    pointer-events: none;
   }
-  .farewell-overlay.active { opacity: 1; pointer-events: auto; }
+  .farewell-overlay.active { display: flex; }
 
   .farewell-card {
     width: 140px;
@@ -1428,8 +1431,8 @@
 
   @keyframes farewellFade {
     0% { opacity: 1; transform: translateY(0) scale(1); filter: grayscale(0) brightness(1); }
-    30% { opacity: 0.8; filter: grayscale(0.4) brightness(0.8); }
-    100% { opacity: 0; transform: translateY(-30px) scale(0.9); filter: grayscale(1) brightness(0.3); }
+    50% { opacity: 0.7; transform: translateY(-10px) scale(0.97); filter: grayscale(0.5) brightness(0.7); }
+    100% { opacity: 0; transform: translateY(-30px) scale(0.9); filter: grayscale(1) brightness(0.2); }
   }
 
   .farewell-name {
@@ -1785,7 +1788,7 @@ const ALL_GHOSTS = [
 // BOSSES
 // ══════════════════════════════════════════════
 const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector'];
-const BOSS_HP =    [6, 5, 9, 7, 11, 12, 13, 15];
+const BOSS_HP =    [6, 5, 9, 7, 5, 12, 13, 15];
 const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power',null];
 
 // Fixed starters — always these 3
@@ -2535,8 +2538,7 @@ function startBattle() {
     bossScript = scripts[state.currentBoss] || null;
   }
 
-  // Chad: on entry, gain 2 ice shards
-  if (pick.ability === 'Sploop!') iceShards += 2;
+  // Chad: ice shards added after entry splash (not here)
   if (enemy.ability === 'Sploop!') enemyIceShards += 2;
 
   // Wandering Sue: if enemy >12 HP, instant destroy
@@ -2594,6 +2596,7 @@ function startBattle() {
     // On-entry ability splashes
     if (pick.ability === 'Sploop!') {
       showAbilitySplash('Sploop!', '+2 Ice Shards!', 1600, () => {
+        iceShards += 2;
         renderBattleActionBar();
         narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
         setTimeout(doEnemyRoll, 1000);
@@ -2644,49 +2647,27 @@ function renderBattleActionBar() {
   const container = document.getElementById('battleActionBar');
   container.innerHTML = '';
 
-  // Ice Shards — tap to discard before rolling (gamble: +1 per shard IF you win)
-  if (iceShards > 0 || committedShards > 0) {
-    const shard = document.createElement('div');
-    const perShard = pick && pick.ability === 'Winter Barrage' ? 2 : 1;
-    const total = iceShards + committedShards;
-    shard.className = 'shard-icon' + (committedShards > 0 ? ' committed' : '');
-    shard.id = 'shardBtn';
-    shard.innerHTML = `<img src="iceshard.png" class="shard-img"><div class="shard-count">${committedShards > 0 ? committedShards + ' \u2694' : iceShards}</div>`;
-    shard.title = committedShards > 0 ? `${committedShards} shard${committedShards>1?'s':''} committed (+${committedShards*perShard} if you win)` : `Tap to discard ${iceShards} shard${iceShards>1?'s':''} before rolling (+${perShard} each if you win)`;
-    shard.style.cursor = iceShards > 0 ? 'pointer' : 'default';
-    shard.onclick = () => commitShards();
-    container.appendChild(shard);
-  }
+  // Top row: ability icon + items
+  const topRow = document.createElement('div');
+  topRow.className = 'action-row';
 
-  // Sacred Fires — tap to discard before rolling (gamble: +3 per fire IF you win)
-  if (sacredFires > 0 || committedFires > 0) {
-    const fire = document.createElement('div');
-    fire.className = 'shard-icon fire' + (committedFires > 0 ? ' committed' : '');
-    fire.id = 'fireBtn';
-    fire.innerHTML = `<img src="sacredfire.png" class="shard-img"><div class="shard-count">${committedFires > 0 ? committedFires + ' \u2694' : sacredFires}</div>`;
-    fire.title = committedFires > 0 ? `${committedFires} fire${committedFires>1?'s':''} committed (+${committedFires*3} if you win)` : `Tap to discard ${sacredFires} fire${sacredFires>1?'s':''} before rolling (+3 each if you win)`;
-    fire.style.cursor = sacredFires > 0 ? 'pointer' : 'default';
-    fire.onclick = () => commitFires();
-    container.appendChild(fire);
-  }
-
-  // Activatable ability icon (before-rolling effects the player can trigger)
+  // Activatable ability icon
   const abilityId = pick ? pick.ability : null;
   const hasActivatable = ['Teamwork', 'Heating Up', 'Bogus'].includes(abilityId);
   if (hasActivatable) {
     const ab = document.createElement('div');
     ab.className = 'ability-icon';
     ab.id = 'abilityBtn';
-    let icon = '\u2728'; // sparkles default
-    if (abilityId === 'Teamwork') icon = '\u{1F91D}';      // handshake
-    if (abilityId === 'Heating Up') icon = '\u{1F525}';     // fire
-    if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';   // shield
+    let icon = '\u2728';
+    if (abilityId === 'Teamwork') icon = '\u{1F91D}';
+    if (abilityId === 'Heating Up') icon = '\u{1F525}';
+    if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';
     const label = abilityId === 'Bogus' && bogeyReflectUsed ? 'USED' : abilityId.split(' ')[0];
     ab.innerHTML = `${icon}<div class="icon-label">${label}</div>`;
     ab.title = pick.abilityDesc;
     if (abilityId === 'Bogus' && bogeyReflectUsed) ab.classList.add('used');
     ab.onclick = () => activateAbility();
-    container.appendChild(ab);
+    topRow.appendChild(ab);
   }
 
   // Items
@@ -2698,8 +2679,49 @@ function renderBattleActionBar() {
     el.innerHTML = `${item.icon}<div class="icon-label">${item.name}</div>`;
     el.title = item.desc;
     el.onclick = () => activateItem(i);
-    container.appendChild(el);
+    topRow.appendChild(el);
   });
+
+  if (topRow.children.length > 0) container.appendChild(topRow);
+
+  // Bottom row: Ice Shards + Sacred Fires (tap to cycle committed count)
+  const totalShards = iceShards + committedShards;
+  const totalFires = sacredFires + committedFires;
+  if (totalShards > 0 || totalFires > 0) {
+    const botRow = document.createElement('div');
+    botRow.className = 'action-row';
+
+    if (totalShards > 0) {
+      const perShard = pick && pick.ability === 'Winter Barrage' ? 2 : 1;
+      const shard = document.createElement('div');
+      shard.className = 'shard-icon' + (committedShards > 0 ? ' committed' : '');
+      shard.id = 'shardBtn';
+      const label = committedShards > 0 ? `${committedShards}/${totalShards} \u2694` : `${totalShards}`;
+      shard.innerHTML = `<img src="iceshard.png" class="shard-img"><div class="shard-count">${label}</div>`;
+      shard.title = committedShards > 0
+        ? `${committedShards} committed (+${committedShards*perShard} if you win). Tap to cycle.`
+        : `${totalShards} Ice Shard${totalShards>1?'s':''}. Tap to commit before rolling (+${perShard} each if you win).`;
+      shard.style.cursor = 'pointer';
+      shard.onclick = () => cycleShards();
+      botRow.appendChild(shard);
+    }
+
+    if (totalFires > 0) {
+      const fire = document.createElement('div');
+      fire.className = 'shard-icon fire' + (committedFires > 0 ? ' committed' : '');
+      fire.id = 'fireBtn';
+      const label = committedFires > 0 ? `${committedFires}/${totalFires} \u2694` : `${totalFires}`;
+      fire.innerHTML = `<img src="sacredfire.png" class="shard-img"><div class="shard-count">${label}</div>`;
+      fire.title = committedFires > 0
+        ? `${committedFires} committed (+${committedFires*3} if you win). Tap to cycle.`
+        : `${totalFires} Sacred Fire${totalFires>1?'s':''}. Tap to commit before rolling (+3 each if you win).`;
+      fire.style.cursor = 'pointer';
+      fire.onclick = () => cycleFires();
+      botRow.appendChild(fire);
+    }
+
+    container.appendChild(botRow);
+  }
 }
 
 function updateItemUsability() {
@@ -2745,22 +2767,45 @@ function updateItemUsability() {
   }
 }
 
-function commitShards() {
-  if (phase !== 1 || iceShards <= 0) return;
-  committedShards += iceShards;
-  iceShards = 0;
-  playSfx('sfxSpecial', 0.5);
+// Cycle committed shards: 0 → 1 → 2 → ... → max → 0
+function cycleShards() {
+  if (phase !== 1) return;
+  const total = iceShards + committedShards;
+  if (total <= 0) return;
+  // Cycle: add 1 more committed, wrapping back to 0
+  committedShards++;
+  iceShards--;
+  if (committedShards > total) {
+    // Wrap: put all back
+    iceShards = total;
+    committedShards = 0;
+  }
+  playSfx('sfxSpecial', 0.4);
   const perShard = pick && pick.ability === 'Winter Barrage' ? 2 : 1;
-  narrate(`<b class="gold">${committedShards} Ice Shard${committedShards>1?'s':''} committed!</b> +${committedShards*perShard} damage if you win.`);
+  if (committedShards > 0) {
+    narrate(`<b class="gold">${committedShards} Ice Shard${committedShards>1?'s':''} committed!</b> +${committedShards*perShard} if you win.`);
+  } else {
+    narrate(`Ice Shards uncommitted.`);
+  }
   renderBattleActionBar();
 }
 
-function commitFires() {
-  if (phase !== 1 || sacredFires <= 0) return;
-  committedFires += sacredFires;
-  sacredFires = 0;
-  playSfx('sfxSpecial', 0.5);
-  narrate(`<b class="gold">${committedFires} Sacred Fire${committedFires>1?'s':''} committed!</b> +${committedFires*3} damage if you win.`);
+function cycleFires() {
+  if (phase !== 1) return;
+  const total = sacredFires + committedFires;
+  if (total <= 0) return;
+  committedFires++;
+  sacredFires--;
+  if (committedFires > total) {
+    sacredFires = total;
+    committedFires = 0;
+  }
+  playSfx('sfxSpecial', 0.4);
+  if (committedFires > 0) {
+    narrate(`<b class="gold">${committedFires} Sacred Fire${committedFires>1?'s':''} committed!</b> +${committedFires*3} if you win.`);
+  } else {
+    narrate(`Sacred Fires uncommitted.`);
+  }
   renderBattleActionBar();
 }
 
@@ -3593,9 +3638,12 @@ function checkAfterCounter() {
 
 function nextRound() {
   round++;
+  // Clear committed shards/fires and re-render to remove empty icons immediately
+  committedShards = 0;
+  committedFires = 0;
+  renderBattleActionBar();
   narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
   setTimeout(doEnemyRoll, 800);
-  // tookDamageLastRound persists until Simon's Brew Time consumes it in doPlayerRoll
 }
 
 // ══════════════════════════════════════════════
