@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Plan</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #fdf6e3;
+  --card: #fff8ee;
+  --card-border: #e8d5b7;
+  --accent: #7b9e6b;
+  --accent-dark: #5a7d4a;
+  --header-bg: #6b8c5a;
+  --warm: #c4956a;
+  --warm-light: #f0e0cc;
+  --text: #4a3728;
+  --text-light: #8b7355;
+  --check-green: #7b9e6b;
+  --warn-orange: #d4883e;
+  --good-green: #6a9e5a;
+  --red-flag: #b35a4a;
+  --shadow: rgba(74,55,40,0.08);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  min-height: 100vh;
+  line-height: 1.4;
+}
+
+.header {
+  background: var(--header-bg);
+  padding: 24px 20px 18px;
+  text-align: center;
+  border-bottom: 4px solid var(--accent-dark);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header h1 { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: 1px; }
+.header .subtitle { font-size: 13px; color: #c8ddb8; margin-top: 2px; font-weight: 600; }
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 400px;
+  margin: 10px auto 0;
+}
+
+.progress-label { font-size: 12px; color: #c8ddb8; font-weight: 700; white-space: nowrap; }
+
+.progress-bar-bg {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a8d48a, #e8d44d);
+  border-radius: 10px;
+  transition: width 0.4s ease;
+}
+
+.search-wrap { max-width: 680px; margin: 16px auto 0; padding: 0 16px; }
+
+.search-wrap input {
+  width: 100%;
+  font-family: 'Nunito', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-wrap input:focus { border-color: var(--accent); }
+.search-wrap input::placeholder { color: #bba88a; }
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 10px 4px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover { border-color: var(--accent); color: var(--text); }
+
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.tab .tab-count { font-size: 11px; opacity: 0.7; margin-left: 4px; }
+
+.content { max-width: 700px; margin: 12px auto; padding: 0 16px 60px; }
+.panel { display: none; }
+.panel.active { display: block; animation: fadeIn 0.25s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.category { margin-bottom: 20px; }
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--warm-light);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  border: 2px solid var(--card-border);
+}
+
+.cat-icon { font-size: 26px; line-height: 1; }
+.cat-title { font-size: 17px; font-weight: 800; color: var(--text); }
+
+.cat-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-light);
+  background: rgba(255,255,255,0.6);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* ITEMS */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.item:hover { background: rgba(123,158,107,0.08); }
+.item.checked { opacity: 0.45; }
+.item.checked .item-name { text-decoration: line-through; text-decoration-color: var(--check-green); }
+
+.item-checkbox {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: 2px solid var(--card-border);
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--check-green);
+  transition: all 0.15s;
+}
+
+.item.checked .item-checkbox {
+  border-color: var(--check-green);
+  background: #e8f5e0;
+}
+
+/* ITEM IMAGE */
+.item-img-wrap {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.item-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-img-wrap .img-fallback {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-size: 15px; font-weight: 700; color: var(--text); }
+
+.item-note {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-note .good { color: var(--good-green); font-weight: 700; }
+.item-note .warn { color: var(--warn-orange); font-weight: 700; }
+
+/* MEAL CARDS */
+.meal-section { margin-bottom: 20px; }
+
+.meal-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--warm-light);
+  border-radius: 10px;
+  border: 2px solid var(--card-border);
+  margin-bottom: 8px;
+}
+
+.meal-section-title .cat-icon { font-size: 24px; }
+.meal-section-title .cat-title { font-size: 16px; }
+
+.meal-card {
+  background: var(--card);
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.meal-card:hover { border-color: var(--accent); transform: translateX(2px); }
+.meal-card.expanded { border-color: var(--accent); background: #fff; }
+
+.meal-img-wrap {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meal-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.meal-img-wrap .img-fallback { font-size: 28px; }
+
+.meal-info { flex: 1; min-width: 0; }
+.meal-name { font-size: 16px; font-weight: 800; color: var(--warm); }
+
+.meal-desc {
+  font-size: 13px;
+  color: var(--text-light);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, margin 0.3s ease;
+}
+
+.meal-card.expanded .meal-desc { max-height: 80px; margin-top: 4px; }
+
+.meal-benefit {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--good-green);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, margin 0.3s ease;
+}
+
+.meal-card.expanded .meal-benefit { max-height: 40px; margin-top: 4px; }
+
+/* RED FLAGS */
+.flag-card {
+  background: var(--card);
+  border: 2px solid #e0c0b0;
+  border-left: 5px solid var(--red-flag);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 6px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.flag-icon { font-size: 20px; margin-top: 2px; }
+.flag-name { font-size: 15px; font-weight: 800; color: var(--red-flag); }
+.flag-found { font-size: 12px; font-weight: 600; color: var(--warn-orange); }
+.flag-why { font-size: 13px; color: var(--text-light); margin-top: 1px; }
+
+.reset-btn {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  background: var(--card);
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  color: var(--text-light);
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.15s;
+}
+
+.reset-btn:hover { border-color: var(--red-flag); color: var(--red-flag); }
+
+@media (max-width: 500px) {
+  .header h1 { font-size: 20px; }
+  .tab { padding: 6px 12px; font-size: 12px; }
+  .item-name { font-size: 14px; }
+  .item-img-wrap { width: 40px; height: 40px; min-width: 40px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Grocery Plan</h1>
+  <div class="subtitle">HDL-Boosting Mediterranean Fusion</div>
+  <div class="progress-row">
+    <span class="progress-label" id="progress-label">0 / 0</span>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="search-wrap">
+  <input type="text" id="search" placeholder="Search items...">
+</div>
+
+<div class="tabs" id="tabs"></div>
+<div class="content" id="content"></div>
+<button class="reset-btn" onclick="resetAll()">Clear All</button>
+
+<script>
+// ---- IMAGE MAPS ----
+// TheMealDB ingredient images: https://www.themealdb.com/images/ingredients/{Name}-Small.png
+const mealDbImg = (name) => `https://www.themealdb.com/images/ingredients/${encodeURIComponent(name)}-Small.png`;
+
+// Map grocery items → TheMealDB ingredient name + emoji fallback
+const itemImages = {
+  // TJ Sauces
+  "Gochujang": { img: "Gochujang", fb: "🌶️" },
+  "Harissa paste": { img: "Harissa Spice", fb: "🫙" },
+  "Miso paste": { img: "Miso", fb: "🫙" },
+  "Chili Onion Crunch": { img: "Chilli Flakes", fb: "🌶️" },
+  "Everything Bagel Seasoning": { img: "Sesame Seed", fb: "🥯" },
+  "Za'atar": { img: "Mixed Herbs", fb: "🌿" },
+  "Coconut aminos": { img: "Soy Sauce", fb: "🥥" },
+  "Hot honey": { img: "Honey", fb: "🍯" },
+  // TJ Fish
+  "Wild-caught salmon fillets": { img: "Salmon", fb: "🐟" },
+  "Smoked salmon / lox": { img: "Smoked Salmon", fb: "🐟" },
+  "Canned tuna in olive oil": { img: "Tuna", fb: "🐟" },
+  "Canned sardines in olive oil": { img: "Sardines", fb: "🐟" },
+  // TJ Grains
+  "Black rice": { img: "Rice", fb: "🍚" },
+  "Farro": { img: "Bulgur Wheat", fb: "🌾" },
+  "Pre-cooked lentils": { img: "Red Lentils", fb: "🫘" },
+  "Frozen cauliflower rice": { img: "Cauliflower", fb: "🥦" },
+  "Açaí packets (frozen)": { img: "Blueberries", fb: "🫐" },
+  // TJ Nuts
+  "Almond butter": { img: "Almonds", fb: "🥜" },
+  "Peanut butter": { img: "Peanut Butter", fb: "🥜" },
+  "Tahini": { img: "Tahini", fb: "🥜" },
+  "Chili-lime almonds": { img: "Almonds", fb: "🥜" },
+  "Mixed nuts": { img: "Cashew Nuts", fb: "🥜" },
+  "Cacao nibs": { img: "Cocoa", fb: "🍫" },
+  "Bee pollen": { img: "Honey", fb: "🐝" },
+  // TJ Dairy
+  "Full-fat plain Greek yogurt": { img: "Greek Yogurt", fb: "🥛" },
+  "Feta block (imported)": { img: "Feta", fb: "🧀" },
+  "Coconut milk, full-fat canned": { img: "Coconut Milk", fb: "🥥" },
+  // TJ Frozen
+  "Frozen mango chunks": { img: "Mango", fb: "🥭" },
+  "Frozen mixed berries": { img: "Raspberries", fb: "🍓" },
+  // TJ Drinks
+  "Matcha powder": { img: "Matcha", fb: "🍵" },
+  "Hibiscus tea": { img: "Water", fb: "🌺" },
+  "Kombucha": { img: "Apple Cider Vinegar", fb: "🍵" },
+  // TJ Spices
+  "Ras el hanout": { img: "Allspice", fb: "🌿" },
+  "Tajín": { img: "Paprika", fb: "🌶️" },
+  "Smoked paprika, turmeric, cumin": { img: "Paprika", fb: "🌿" },
+  "Furikake seasoning": { img: "Sesame Seed", fb: "🌿" },
+  // TJ Sweet
+  "Dark chocolate 72%+ (Pound Plus)": { img: "Dark Chocolate Chips", fb: "🍫" },
+  "Medjool dates": { img: "Medjool Dates", fb: "🌴" },
+  "Dried tart cherries": { img: "Cherries", fb: "🍒" },
+  "Coconut whipped cream": { img: "Coconut Cream", fb: "🥥" },
+  // Walmart Grains
+  "Rolled oats (large canister)": { img: "Rolled Oats", fb: "🥣" },
+  "Brown rice (5 lb bag)": { img: "Rice", fb: "🍚" },
+  "Dried lentils (green + red)": { img: "Green Lentils", fb: "🫘" },
+  "Dried chickpeas + black beans": { img: "Chickpeas", fb: "🫘" },
+  "Whole wheat pasta": { img: "Penne Rigate", fb: "🍝" },
+  "Corn tortillas": { img: "Flour Tortilla", fb: "🫓" },
+  "Dave's Killer Bread": { img: "Bread", fb: "🍞" },
+  "Couscous": { img: "Couscous", fb: "🌾" },
+  // Walmart Canned
+  "Canned chickpeas": { img: "Chickpeas", fb: "🫘" },
+  "Canned black beans": { img: "Black Beans", fb: "🫘" },
+  "Canned diced tomatoes": { img: "Chopped Tomatoes", fb: "🍅" },
+  "Tomato paste": { img: "Tomato Puree", fb: "🍅" },
+  "Low-sodium broth": { img: "Vegetable Stock", fb: "🍲" },
+  // Walmart Produce
+  "Garlic, onions, ginger": { img: "Garlic", fb: "🧄" },
+  "Sweet potatoes": { img: "Sweet Potatoes", fb: "🍠" },
+  "Broccoli, bok choy, bell peppers, cucumbers": { img: "Broccoli", fb: "🥦" },
+  "Lemons + limes": { img: "Lemon", fb: "🍋" },
+  "Bananas, apples, pears": { img: "Banana", fb: "🍌" },
+  "Bagged spinach / mixed greens": { img: "Spinach", fb: "🥬" },
+  "Beets (fresh)": { img: "Beetroot", fb: "🟣" },
+  "Purple cabbage": { img: "Red Cabbage", fb: "🟣" },
+  "Cherry tomatoes": { img: "Cherry Tomatoes", fb: "🍅" },
+  "Jalapeños": { img: "Green Chilli", fb: "🌶️" },
+  "Fresh herbs: cilantro, mint, basil, parsley": { img: "Coriander", fb: "🌿" },
+  // Walmart Meat
+  "Cage-free eggs": { img: "Eggs", fb: "🥚" },
+  "Chicken thighs": { img: "Chicken Thighs", fb: "🍗" },
+  "Ground turkey, 93% lean": { img: "Turkey Mince", fb: "🍗" },
+  "Ground lamb": { img: "Lamb Mince", fb: "🥩" },
+  // Walmart Oils
+  "Extra virgin olive oil": { img: "Olive Oil", fb: "🫒" },
+  "Apple cider vinegar (Bragg's)": { img: "Apple Cider Vinegar", fb: "🍎" },
+  "Balsamic vinegar": { img: "Balsamic Vinegar", fb: "🍷" },
+  "Dijon mustard": { img: "Mustard", fb: "🟡" },
+  "Hot sauce (Frank's or Cholula)": { img: "Sriracha", fb: "🌶️" },
+  "Pickled jalapeños": { img: "Green Chilli", fb: "🌶️" },
+  "Capers + olives": { img: "Capers", fb: "🫒" },
+  // Walmart Frozen
+  "Frozen edamame (shelled)": { img: "Broad Beans", fb: "🫛" },
+  "Frozen broccoli / stir-fry veg": { img: "Broccoli", fb: "🥦" },
+  // Walmart Drinks
+  "Sparkling water": { img: "Water", fb: "💧" },
+  "100% pomegranate juice": { img: "Pomegranate", fb: "🍎" },
+  "100% orange juice": { img: "Orange", fb: "🍊" },
+};
+
+// Meal images
+const mealImages = {
+  "Smashed Avocado Toast": { img: "Avocado", fb: "🥑" },
+  "Açaí Bowl": { img: "Blueberries", fb: "🫐" },
+  "Savory Oat Bowl": { img: "Rolled Oats", fb: "🥣" },
+  "Smoked Salmon Flatbread": { img: "Smoked Salmon", fb: "🐟" },
+  "PB Banana Smoothie Bowl": { img: "Banana", fb: "🍌" },
+  "Korean Bibimbap Bowl": { img: "Rice", fb: "🍚" },
+  "Crispy Falafel Wraps": { img: "Falafel", fb: "🧆" },
+  "Mango Avocado Poke Bowl": { img: "Tuna", fb: "🐟" },
+  "Crispy Chickpea Tacos": { img: "Chickpeas", fb: "🌮" },
+  "Lentil Noodle Soup": { img: "Red Lentils", fb: "🍜" },
+  "Miso-Glazed Salmon": { img: "Salmon", fb: "🐟" },
+  "Harissa Chicken Thighs": { img: "Chicken Thighs", fb: "🍗" },
+  "Spicy Thai Peanut Noodles": { img: "Noodles", fb: "🍜" },
+  "Moroccan Lamb Meatballs": { img: "Lamb", fb: "🥩" },
+  "Mackerel + Farro Salad": { img: "Mackerel", fb: "🐟" },
+  "Black Bean Enchiladas": { img: "Black Beans", fb: "🫘" },
+  "Spicy Mango Tajín": { img: "Mango", fb: "🥭" },
+  "Whipped Feta Dip": { img: "Feta", fb: "🧀" },
+  "Avocado Cucumber Rounds": { img: "Cucumber", fb: "🥒" },
+  "Dark Chocolate Bark": { img: "Dark Chocolate Chips", fb: "🍫" },
+  "Apple + Peanut Butter": { img: "Peanut Butter", fb: "🍎" },
+  "Dark Chocolate Mug Cake": { img: "Cocoa", fb: "🍫" },
+  "Frozen Mango Sorbet": { img: "Mango", fb: "🥭" },
+  "Churro Baked Pear": { img: "Pear", fb: "🍐" },
+  "Chocolate-Dipped Strawberries": { img: "Strawberries", fb: "🍓" },
+  "Tahini Chocolate Truffles": { img: "Tahini", fb: "🍫" },
+  "Stuffed Medjool Dates": { img: "Medjool Dates", fb: "🌴" },
+};
+
+function imgHtml(name, map, cls) {
+  const entry = map[name];
+  const fb = entry ? entry.fb : "📦";
+  const imgName = entry ? entry.img : null;
+  if (!imgName) return `<div class="${cls}"><span class="img-fallback">${fb}</span></div>`;
+  const url = mealDbImg(imgName);
+  return `<div class="${cls}"><img src="${url}" alt="${name}" loading="lazy" onerror="this.parentNode.innerHTML='<span class=img-fallback>${fb}</span>'"></div>`;
+}
+
+// ---- CATEGORY ICONS ----
+const catIcons = {
+  "Sauces, Condiments & Flavor": "🫙",
+  "Fish & Protein": "🐟",
+  "Specialty Grains & Legumes": "🌾",
+  "Nuts, Seeds & Butters": "🥜",
+  "Dairy & Refrigerated": "🧀",
+  "Frozen": "❄️",
+  "Drinks": "🍵",
+  "Spices & Blends": "🌿",
+  "Sweet Treats": "🍫",
+  "Bulk Grains & Dry Goods": "🌾",
+  "Canned Goods": "🥫",
+  "Fresh Produce": "🥬",
+  "Eggs & Meat": "🥩",
+  "Oils, Pantry Basics & Condiments": "🫒",
+};
+
+// ---- DATA ----
+const traderJoes = {
+  store: "tj",
+  categories: [
+    { name: "Sauces, Condiments & Flavor", items: [
+      { name: "Gochujang", note: "No corn syrup — most grocery brands add HFCS", good: true },
+      { name: "Harissa paste", note: "Short, clean ingredient list", good: true },
+      { name: "Miso paste", note: "Just soybeans, salt, rice", good: true },
+      { name: "Chili Onion Crunch", note: "Cleaner than most chili oils", good: true },
+      { name: "Everything Bagel Seasoning", note: "Original — no fillers", good: true },
+      { name: "Za'atar", note: "Hard to find elsewhere without additives", good: true },
+      { name: "Coconut aminos", note: "Just coconut sap + salt", good: true },
+      { name: "Hot honey", note: "Just honey + chili", good: true },
+    ]},
+    { name: "Fish & Protein", items: [
+      { name: "Wild-caught salmon fillets", note: "Clearly labeled sourcing", good: true },
+      { name: "Smoked salmon / lox", note: "Salmon, salt, smoke — no preservatives", good: true },
+      { name: "Canned tuna in olive oil", note: "Avoid 'broth' or 'vegetable broth' (hidden MSG)", warn: true },
+      { name: "Canned sardines in olive oil", note: "Fish + olive oil + salt only", good: true },
+    ]},
+    { name: "Specialty Grains & Legumes", items: [
+      { name: "Black rice", note: "Nutty, dramatic, hard to find elsewhere" },
+      { name: "Farro", note: "Hearty grain — TJ's usually has it" },
+      { name: "Pre-cooked lentils", note: "Just lentils + salt — huge time saver", good: true },
+      { name: "Frozen cauliflower rice", note: "Just cauliflower", good: true },
+      { name: "Açaí packets (frozen)", note: "Just açaí + guaraná", good: true },
+    ]},
+    { name: "Nuts, Seeds & Butters", items: [
+      { name: "Almond butter", note: "Must say: almonds, salt only. Reject palm oil or sugar", warn: true },
+      { name: "Peanut butter", note: "Peanuts + salt only. Avoid xylitol, hydrogenated oils", warn: true },
+      { name: "Tahini", note: "Just sesame seeds", good: true },
+      { name: "Chili-lime almonds", note: "Real chili — no artificial flavoring", good: true },
+      { name: "Mixed nuts", note: "No added oils or mystery seasoning", good: true },
+      { name: "Cacao nibs", note: "Just crushed cacao", good: true },
+      { name: "Bee pollen", note: "Superfood topper — clean" },
+    ]},
+    { name: "Dairy & Refrigerated", items: [
+      { name: "Full-fat plain Greek yogurt", note: "Milk + live cultures only. Avoid carrageenan", warn: true },
+      { name: "Feta block (imported)", note: "Better quality — pre-crumbled has cellulose filler", good: true },
+      { name: "Coconut milk, full-fat canned", note: "Coconut + water only. Reject carrageenan", warn: true },
+    ]},
+    { name: "Frozen", items: [
+      { name: "Frozen mango chunks", note: "Just mango — no syrup", good: true },
+      { name: "Frozen mixed berries", note: "Just fruit", good: true },
+    ]},
+    { name: "Drinks", items: [
+      { name: "Matcha powder", note: "Ceremonial grade — just tea", good: true },
+      { name: "Hibiscus tea", note: "Just hibiscus flowers — great iced", good: true },
+      { name: "Kombucha", note: "Under 8g sugar. Avoid 'natural flavors'", warn: true },
+    ]},
+    { name: "Spices & Blends", items: [
+      { name: "Ras el hanout", note: "Moroccan spice blend — hard to find elsewhere" },
+      { name: "Tajín", note: "Chili, lime, salt only", good: true },
+      { name: "Smoked paprika, turmeric, cumin", note: "Fresher than most — no anti-caking agents", good: true },
+      { name: "Furikake seasoning", note: "Great on avocado toast and rice bowls" },
+    ]},
+    { name: "Sweet Treats", items: [
+      { name: "Dark chocolate 72%+ (Pound Plus)", note: "Best value for quality. Avoid PGPR, vanillin", warn: true },
+      { name: "Medjool dates", note: "Just dates — nature's candy", good: true },
+      { name: "Dried tart cherries", note: "Check for no added sugar or sulfites", warn: true },
+      { name: "Coconut whipped cream", note: "Coconut + minimal gums", good: true },
+    ]},
+  ]
+};
+
+const walmart = {
+  store: "wm",
+  categories: [
+    { name: "Bulk Grains & Dry Goods", items: [
+      { name: "Rolled oats (large canister)", note: "Great Value: just oats", good: true },
+      { name: "Brown rice (5 lb bag)", note: "Pantry staple — stock up" },
+      { name: "Dried lentils (green + red)", note: "Cheap, versatile, clean" },
+      { name: "Dried chickpeas + black beans", note: "Soak overnight — much cheaper than canned" },
+      { name: "Whole wheat pasta", note: "Whole wheat flour must be #1. Reject 'enriched wheat flour'", warn: true },
+      { name: "Corn tortillas", note: "Mission brand — corn, water, lime only", good: true },
+      { name: "Dave's Killer Bread", note: "Avoid azodicarbonamide or calcium propionate", warn: true },
+      { name: "Couscous", note: "Quick cooking, versatile" },
+    ]},
+    { name: "Canned Goods", items: [
+      { name: "Canned chickpeas", note: "Beans, water, salt. Reject EDTA or 'flavoring'", warn: true },
+      { name: "Canned black beans", note: "Short ingredient list only" },
+      { name: "Canned diced tomatoes", note: "Just tomatoes. Check for added sugar", warn: true },
+      { name: "Tomato paste", note: "Clean pantry staple", good: true },
+      { name: "Low-sodium broth", note: "Swanson OK. Avoid 'yeast extract' (hidden MSG)", warn: true },
+    ]},
+    { name: "Fresh Produce", items: [
+      { name: "Garlic, onions, ginger", note: "Core flavor base" },
+      { name: "Sweet potatoes", note: "HDL-friendly, filling, delicious" },
+      { name: "Broccoli, bok choy, bell peppers, cucumbers", note: "Buy weekly" },
+      { name: "Lemons + limes", note: "Always have these" },
+      { name: "Bananas, apples, pears", note: "Clean snacks" },
+      { name: "Bagged spinach / mixed greens", note: "Same quality as TJ's at lower price" },
+      { name: "Beets (fresh)", note: "Potent HDL booster" },
+      { name: "Purple cabbage", note: "For slaws and stir fry" },
+      { name: "Cherry tomatoes", note: "Great raw or roasted" },
+      { name: "Jalapeños", note: "Fresh heat" },
+      { name: "Fresh herbs: cilantro, mint, basil, parsley", note: "Buy weekly — transforms any dish" },
+    ]},
+    { name: "Eggs & Meat", items: [
+      { name: "Cage-free eggs", note: "Cheaper than TJ's" },
+      { name: "Chicken thighs", note: "No 'added solution' or 'retained water'", warn: true },
+      { name: "Ground turkey, 93% lean", note: "Great Value is fine" },
+      { name: "Ground lamb", note: "If available — otherwise get at TJ's" },
+    ]},
+    { name: "Oils, Pantry Basics & Condiments", items: [
+      { name: "Extra virgin olive oil", note: "'First cold pressed' + harvest date. Skip 'light'", warn: true },
+      { name: "Apple cider vinegar (Bragg's)", note: "Just apples — same quality anywhere", good: true },
+      { name: "Balsamic vinegar", note: "Grapes only. Avoid caramel color added", warn: true },
+      { name: "Dijon mustard", note: "Short ingredient list" },
+      { name: "Hot sauce (Frank's or Cholula)", note: "Clean labels", good: true },
+      { name: "Pickled jalapeños", note: "Pantry staple for punchy flavor" },
+      { name: "Capers + olives", note: "Mediterranean pantry must-haves" },
+    ]},
+    { name: "Frozen", items: [
+      { name: "Frozen edamame (shelled)", note: "Just edamame", good: true },
+      { name: "Frozen broccoli / stir-fry veg", note: "Just vegetables — no sauce packets", good: true },
+    ]},
+    { name: "Drinks", items: [
+      { name: "Sparkling water", note: "Great Value or LaCroix", good: true },
+      { name: "100% pomegranate juice", note: "Must say 100% juice. Reject 'cocktail'", warn: true },
+      { name: "100% orange juice", note: "Tropicana or store brand" },
+    ]},
+  ]
+};
+
+const meals = [
+  { section: "Breakfast", icon: "☀️", items: [
+    { name: "Smashed Avocado Toast", desc: "Whole grain bread, smashed avocado, everything bagel seasoning, fried egg, hot honey drizzle", benefit: "Healthy fats, fiber, protein" },
+    { name: "Açaí Bowl", desc: "Açaí + banana base, topped with granola, sliced mango, toasted coconut flakes, cacao nibs", benefit: "Antioxidants, omega-3, fiber" },
+    { name: "Savory Oat Bowl", desc: "Soft-poached egg over rolled oats, crispy chickpeas, drizzle of chili oil", benefit: "Soluble fiber, protein, omega-3" },
+    { name: "Smoked Salmon Flatbread", desc: "Whole grain flatbread, whipped cream cheese, lox, capers, pickled red onion", benefit: "Omega-3, protein, probiotics" },
+    { name: "PB Banana Smoothie Bowl", desc: "Peanut butter + banana blended, topped with walnuts, chia seeds, bee pollen", benefit: "Healthy fats, potassium, omega-3" },
+  ]},
+  { section: "Lunch", icon: "🌿", items: [
+    { name: "Korean Bibimbap Bowl", desc: "Black rice base, sautéed mixed veggies, fried egg, gochujang drizzle", benefit: "Antioxidants, fiber, phytonutrients" },
+    { name: "Crispy Falafel Wraps", desc: "Falafel in whole grain wrap, tzatziki, pickled cabbage, fresh mint", benefit: "Plant protein, probiotics, fiber" },
+    { name: "Mango Avocado Poke Bowl", desc: "Canned tuna in olive oil, mango, avocado, over cauliflower rice, sesame dressing", benefit: "Omega-3, healthy fats, vitamin C" },
+    { name: "Crispy Chickpea Tacos", desc: "Smashed fried chickpeas in corn tortillas, chipotle slaw, lime crema", benefit: "Plant protein, fiber, beta-glucan" },
+    { name: "Lentil Noodle Soup", desc: "Vietnamese-inspired with rice noodles, lentils, fresh herbs, lime, star anise broth", benefit: "Soluble fiber, plant protein" },
+  ]},
+  { section: "Dinner", icon: "🌙", items: [
+    { name: "Miso-Glazed Salmon", desc: "Salmon fillet with white miso glaze, sesame bok choy, black rice", benefit: "High omega-3, probiotics, fiber" },
+    { name: "Harissa Chicken Thighs", desc: "Chicken with harissa, roasted beets, chickpeas, herbed Greek yogurt", benefit: "Lean protein, antioxidants, probiotics" },
+    { name: "Spicy Thai Peanut Noodles", desc: "Whole wheat noodles, peanut sauce, edamame, shredded purple cabbage", benefit: "Plant protein, healthy fats, fiber" },
+    { name: "Moroccan Lamb Meatballs", desc: "Ras el hanout spiced lamb in tomato sauce, olives, couscous", benefit: "Iron, omega-3 (grass-fed), fiber" },
+    { name: "Mackerel + Farro Salad", desc: "Crispy skin mackerel over warm farro, roasted grapes, arugula, lemon vinaigrette", benefit: "High omega-3, complex carbs, antioxidants" },
+    { name: "Black Bean Enchiladas", desc: "Sweet potato + black bean filling, verde sauce, pickled jalapeños", benefit: "Plant protein, fiber, potassium" },
+  ]},
+  { section: "Snacks", icon: "🥜", items: [
+    { name: "Spicy Mango Tajín", desc: "Fresh mango chunks dusted with tajín and chili-lime almonds on the side", benefit: "Vitamin C, healthy fats, fiber" },
+    { name: "Whipped Feta Dip", desc: "Whipped feta, drizzle of olive oil, za'atar, served with pita chips", benefit: "Healthy fats, calcium, probiotics" },
+    { name: "Avocado Cucumber Rounds", desc: "Cucumber slices topped with smashed avocado and furikake seasoning", benefit: "Healthy fats, hydration, omega-3" },
+    { name: "Dark Chocolate Bark", desc: "Dark chocolate 72%+ with pistachios and dried tart cherries", benefit: "Antioxidants, magnesium, fiber" },
+    { name: "Apple + Peanut Butter", desc: "Apple slices with clean peanut butter (peanuts + salt only)", benefit: "Soluble fiber, healthy fats, protein" },
+  ]},
+  { section: "Sweet Treats", icon: "🍫", items: [
+    { name: "Dark Chocolate Mug Cake", desc: "2-min microwave cake made with dark chocolate, olive oil, egg — no butter", benefit: "Antioxidants, healthy fats" },
+    { name: "Frozen Mango Sorbet", desc: "Blended frozen mango + coconut milk + lime zest — no sugar needed", benefit: "Vitamin C, healthy fats, natural sugars" },
+    { name: "Churro Baked Pear", desc: "Cinnamon-dusted baked pear with coconut whipped cream", benefit: "Fiber, antioxidants, no refined sugar" },
+    { name: "Chocolate-Dipped Strawberries", desc: "Dark chocolate 72%+ dipped strawberries with crushed pistachios", benefit: "Antioxidants, vitamin C, healthy fats" },
+    { name: "Tahini Chocolate Truffles", desc: "Salted tahini + dark chocolate rolled into truffles", benefit: "Calcium, magnesium, antioxidants" },
+    { name: "Stuffed Medjool Dates", desc: "Medjool dates filled with almond butter, pinch of sea salt", benefit: "Natural sugar, fiber, healthy fats" },
+  ]},
+];
+
+const redFlags = [
+  { name: "Partially hydrogenated oils", found: "Bread, crackers, peanut butter", why: "WORST for HDL — trans fats directly lower good cholesterol" },
+  { name: "High fructose corn syrup", found: "Gochujang, condiments, bread", why: "Raises triglycerides, lowers HDL" },
+  { name: "Carrageenan", found: "Coconut milk, yogurt, broth", why: "Gut inflammation — banned in EU organic foods" },
+  { name: "Xylitol / Sorbitol", found: "Peanut butter, 'sugar-free' items", why: "GI distress in humans; xylitol is LETHAL to dogs" },
+  { name: "Azodicarbonamide", found: "Bread, wraps, rolls", why: "Dough conditioner — banned in EU, possible carcinogen" },
+  { name: "BHA / BHT", found: "Chips, cereals, oils", why: "Synthetic preservatives, potential hormone disruptors" },
+  { name: "Artificial colors (Red 40, Yellow 5)", found: "Sauces, drinks, candy", why: "Inflammatory, zero nutritional value" },
+  { name: "'Natural flavors'", found: "Almost anything packaged", why: "Catch-all term — can hide up to 100 sub-ingredients" },
+  { name: "Enriched wheat flour as #1 ingredient", found: "Bread, pasta, wraps", why: "White flour with vitamins sprayed back on — not whole grain" },
+  { name: "Yeast extract", found: "Broth, soups, chips, crackers", why: "Hidden MSG — causes headaches in sensitive people" },
+  { name: "PGPR", found: "Cheap chocolate", why: "Replaces cocoa butter to cut costs" },
+  { name: "Caramel color", found: "Bread, broth, soda", why: "Used to fake a 'whole grain' appearance" },
+  { name: "Vanillin", found: "Cheap chocolate", why: "Synthetic vanilla — sign of low-quality chocolate" },
+  { name: "'Chocolate-flavored' on label", found: "Baking chips, coating", why: "Not real chocolate — usually contains hydrogenated oils" },
+  { name: "Calcium propionate", found: "Bread, baked goods", why: "Mold inhibitor linked to irritability and sleep disruption" },
+  { name: "Palm oil", found: "Peanut butter, crackers", why: "Filler — inflammatory, environmentally destructive" },
+  { name: "Added solution / retained water", found: "Chicken, meat", why: "Brine-injected — adds sodium and dilutes nutrition" },
+];
+
+// ---- STATE ----
+let checked = JSON.parse(localStorage.getItem('groceryChecked') || '{}');
+
+// ---- BUILD ----
+function buildTabs() {
+  const tabsEl = document.getElementById('tabs');
+  const panels = [
+    { id: 'tj', label: '🟢 Trader Joe\'s' },
+    { id: 'wm', label: '🔵 Walmart' },
+    { id: 'meals', label: '🍽 Meals' },
+    { id: 'flags', label: '🚩 Red Flags' },
+  ];
+  panels.forEach((p, i) => {
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (i === 0 ? ' active' : '');
+    tab.dataset.panel = p.id;
+    tab.innerHTML = `${p.label}<span class="tab-count" id="count-${p.id}"></span>`;
+    tab.onclick = () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.panel === p.id));
+      document.querySelectorAll('.panel').forEach(el => el.classList.toggle('active', el.id === 'panel-' + p.id));
+    };
+    tabsEl.appendChild(tab);
+  });
+}
+
+function buildStorePanel(id, store) {
+  const panel = document.createElement('div');
+  panel.className = 'panel' + (id === 'tj' ? ' active' : '');
+  panel.id = 'panel-' + id;
+
+  store.categories.forEach(cat => {
+    const catDiv = document.createElement('div');
+    catDiv.className = 'category';
+    const icon = catIcons[cat.name] || '📦';
+    const catChecked = cat.items.filter(item => checked[id + ':' + item.name]).length;
+
+    catDiv.innerHTML = `<div class="category-header">
+      <span class="cat-icon">${icon}</span>
+      <span class="cat-title">${cat.name}</span>
+      <span class="cat-count" data-cat="${id}:${cat.name}">${catChecked}/${cat.items.length}</span>
+    </div>`;
+
+    cat.items.forEach(item => {
+      const key = id + ':' + item.name;
+      const isChecked = checked[key];
+      const div = document.createElement('div');
+      div.className = 'item' + (isChecked ? ' checked' : '');
+      div.dataset.key = key;
+      div.dataset.cat = id + ':' + cat.name;
+      div.dataset.search = item.name.toLowerCase() + ' ' + (item.note || '').toLowerCase();
+
+      let noteHtml = item.note || '';
+      if (item.good) noteHtml = `<span class="good">✓</span> ${noteHtml}`;
+      if (item.warn) noteHtml = `<span class="warn">⚠</span> ${noteHtml}`;
+
+      div.innerHTML = `
+        <div class="item-checkbox">${isChecked ? '✓' : ''}</div>
+        ${imgHtml(item.name, itemImages, 'item-img-wrap')}
+        <div class="item-info">
+          <div class="item-name">${item.name}</div>
+          <div class="item-note">${noteHtml}</div>
+        </div>`;
+      div.onclick = () => toggleItem(div, key);
+      catDiv.appendChild(div);
+    });
+
+    panel.appendChild(catDiv);
+  });
+
+  document.getElementById('content').appendChild(panel);
+}
+
+function buildMealsPanel() {
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-meals';
+
+  meals.forEach(sec => {
+    const secDiv = document.createElement('div');
+    secDiv.className = 'meal-section';
+    secDiv.innerHTML = `<div class="meal-section-title">
+      <span class="cat-icon">${sec.icon}</span>
+      <span class="cat-title">${sec.section}</span>
+    </div>`;
+
+    sec.items.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'meal-card';
+      card.dataset.search = m.name.toLowerCase() + ' ' + m.desc.toLowerCase();
+      card.innerHTML = `
+        ${imgHtml(m.name, mealImages, 'meal-img-wrap')}
+        <div class="meal-info">
+          <div class="meal-name">${m.name}</div>
+          <div class="meal-desc">${m.desc}</div>
+          <div class="meal-benefit">♥ ${m.benefit}</div>
+        </div>`;
+      card.onclick = () => card.classList.toggle('expanded');
+      secDiv.appendChild(card);
+    });
+
+    panel.appendChild(secDiv);
+  });
+
+  document.getElementById('content').appendChild(panel);
+}
+
+function buildFlagsPanel() {
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-flags';
+
+  redFlags.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'flag-card';
+    card.dataset.search = f.name.toLowerCase() + ' ' + f.found.toLowerCase() + ' ' + f.why.toLowerCase();
+    card.innerHTML = `
+      <div class="flag-icon">🚫</div>
+      <div>
+        <div class="flag-name">${f.name}</div>
+        <div class="flag-found">Found in: ${f.found}</div>
+        <div class="flag-why">${f.why}</div>
+      </div>`;
+    panel.appendChild(card);
+  });
+
+  document.getElementById('content').appendChild(panel);
+}
+
+// ---- INTERACTIONS ----
+function toggleItem(div, key) {
+  const isNowChecked = !checked[key];
+  if (isNowChecked) checked[key] = true;
+  else delete checked[key];
+
+  div.classList.toggle('checked', isNowChecked);
+  div.querySelector('.item-checkbox').textContent = isNowChecked ? '✓' : '';
+
+  localStorage.setItem('groceryChecked', JSON.stringify(checked));
+  updateProgress();
+  updateCatCount(div.dataset.cat);
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.item').length;
+  const done = Object.keys(checked).length;
+  const pct = total > 0 ? (done / total * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${done} / ${total}`;
+  updateStoreCounts();
+}
+
+function updateStoreCounts() {
+  const stores = { tj: traderJoes, wm: walmart };
+  ['tj', 'wm'].forEach(id => {
+    let total = 0, done = 0;
+    stores[id].categories.forEach(c => c.items.forEach(item => {
+      total++;
+      if (checked[id + ':' + item.name]) done++;
+    }));
+    const el = document.getElementById('count-' + id);
+    if (el) el.textContent = ` ${done}/${total}`;
+  });
+}
+
+function updateCatCount(catKey) {
+  const el = document.querySelector(`.cat-count[data-cat="${catKey}"]`);
+  if (!el) return;
+  const items = document.querySelectorAll(`.item[data-cat="${catKey}"]`);
+  const done = [...items].filter(i => i.classList.contains('checked')).length;
+  el.textContent = `${done}/${items.length}`;
+}
+
+function resetAll() {
+  if (!confirm('Clear all checked items?')) return;
+  checked = {};
+  localStorage.removeItem('groceryChecked');
+  document.querySelectorAll('.item').forEach(el => {
+    el.classList.remove('checked');
+    el.querySelector('.item-checkbox').textContent = '';
+  });
+  updateProgress();
+  document.querySelectorAll('.cat-count').forEach(el => {
+    const items = document.querySelectorAll(`.item[data-cat="${el.dataset.cat}"]`);
+    el.textContent = `0/${items.length}`;
+  });
+}
+
+// SEARCH
+document.getElementById('search').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('[data-search]').forEach(el => {
+    el.style.display = (!q || el.dataset.search.includes(q)) ? '' : 'none';
+  });
+  document.querySelectorAll('.category, .meal-section').forEach(sec => {
+    const visible = sec.querySelectorAll('[data-search]:not([style*="display: none"])').length;
+    sec.style.display = visible > 0 || !q ? '' : 'none';
+  });
+});
+
+// ---- INIT ----
+buildTabs();
+buildStorePanel('tj', traderJoes);
+buildStorePanel('wm', walmart);
+buildMealsPanel();
+buildFlagsPanel();
+updateProgress();
+</script>
+</body>
+</html>
