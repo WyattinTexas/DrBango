@@ -329,6 +329,7 @@
   .rarity-badge.uncommon { background: #22c55e; color: #fff; }
   .rarity-badge.rare { background: #3b82f6; color: #fff; }
   .rarity-badge.ghost-rare { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #080810; box-shadow: 0 2px 8px rgba(251,191,36,0.4); }
+  .rarity-badge.legendary { background: linear-gradient(135deg, #c084fc, #a855f7); color: #fff; box-shadow: 0 2px 8px rgba(168,85,247,0.5); }
 
   .selected-info {
     text-align: center;
@@ -1501,9 +1502,9 @@
     <div class="title-main">Battle of Origins</div>
     <div class="title-divider"></div>
     <div class="title-sub">Tournament of the Century</div>
-    <div class="title-tagline">8 Bosses. 1 Life per Ghost. No Mercy.</div>
+    <div class="title-tagline">12 Bosses. 1 Life per Ghost. No Mercy.</div>
     <div class="title-desc">
-      Your ghosts don't come back. Build your team, use items wisely, and fight through <b>8 increasingly powerful bosses</b>. Run out of ghosts and it's over.
+      Your ghosts don't come back. Build your team, use items wisely, and fight through <b>8 bosses</b> and <b>4 legendaries</b>. Run out of ghosts and it's over.
     </div>
     <div class="title-buttons">
       <button class="action-btn cyan ready" onclick="beginRun()">Enter the Tournament</button>
@@ -1722,6 +1723,10 @@ const ABILITY_THEMES = {
   'Sploop!': 'valley-guardian',
   'Ice Shards': 'ice-shards',
   'Sacred Fire': 'sacred-fire',
+  'Party Time': 'party-time',
+  'Blue Fire': 'blue-fire',
+  'Valley Guardian': 'valley-guardian',
+  'Beast Mode': 'beast-mode',
   'Glacial Pounding': 'beast-mode',
   'Burning Soul': 'fury',
   'Teamwork': 'blue-fire',
@@ -1781,15 +1786,21 @@ const ALL_GHOSTS = [
   { name:"Fredrick", file:"fredrick.jpg", rarity:"common", maxHp:5, ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice." },
   { name:"Dream Cat", file:"dream_cat.jpg", rarity:"common", maxHp:4, ability:"Jinx", abilityDesc:"Both roll doubles: gain +1 die next turn." },
   { name:"Sad Sal", file:"sad_sal.jpg", rarity:"common", maxHp:5, ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard." },
-  { name:"Tommy Salami", file:"tommy_salami.jpg", rarity:"common", maxHp:6, ability:"Regulator", abilityDesc:"Enemy rolls 6's: force reroll of those dice." }
+  { name:"Tommy Salami", file:"tommy_salami.jpg", rarity:"common", maxHp:6, ability:"Regulator", abilityDesc:"Enemy rolls 6's: force reroll of those dice." },
+
+  // Legendaries
+  { name:"Prince Balatron", file:"balatron.jpg", rarity:"legendary", maxHp:6, ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage." },
+  { name:"Lucy", file:"lucy.jpg", rarity:"legendary", maxHp:8, ability:"Blue Fire", abilityDesc:"Win a roll: +1 bonus damage." },
+  { name:"Romy", file:"romy.jpg", rarity:"legendary", maxHp:8, ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage." },
+  { name:"The Mountain King", file:"mountain_king_leg.jpg", rarity:"legendary", maxHp:9, ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage." }
 ].map(g => ({ ...g, hp: g.maxHp }));
 
 // ══════════════════════════════════════════════
 // BOSSES
 // ══════════════════════════════════════════════
-const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector'];
-const BOSS_HP =    [6, 5, 6, 7, 5, 6, 7, 6];
-const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power',null];
+const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector','Prince Balatron','Lucy','Romy','The Mountain King'];
+const BOSS_HP =    [6, 5, 6, 7, 5, 6, 7, 6, 6, 8, 8, 9];
+const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power','heal','power','reroll','heal',null];
 
 // Fixed starters — always these 3
 const STARTER_NAMES = ['Dream Cat', 'Outlaw', 'Wim'];
@@ -2019,6 +2030,57 @@ const BOSS7_SCRIPT = {
   // R10: P TRIPLE 6s!!! → 3 dmg! HECTOR DEAD! TOURNAMENT WON!!!
 };
 
+// Boss 8: Prince Balatron (6 HP, Party Time — lose & survive → counter die)
+// Arc: Player wins → Balatron counters! Trading blows. Tense knife fight.
+const BOSS8_SCRIPT = {
+  enemy:  [[3,2,1], [4,3,1], [5,5,3], [3,1,2], [2,1,3]],
+  player: [[5,5,4], [6,4,3], [4,2,1], [6,6,4], [5,4,3]]
+  // R1: P doubles(5) → 2 dmg (Bal 4/6). Party Time counter!
+  // R2: P singles(6) → 1 dmg (Bal 3/6). Party Time counter!
+  // R3: E doubles(5) → 2 dmg to player
+  // R4: P doubles(6) → 2 dmg (Bal 1/6). Party Time counter!
+  // R5: P singles(5) → 1 dmg. Balatron DEAD!
+};
+
+// Boss 9: Lucy (8 HP, Blue Fire — win → +1 damage on every win)
+// Arc: Lucy hits hard with Blue Fire stacking. Player needs big rolls.
+const BOSS9_SCRIPT = {
+  enemy:  [[5,4,2], [3,2,1], [5,5,4], [2,1,3], [4,3,1], [3,1,2]],
+  player: [[4,3,1], [5,5,6], [4,2,1], [6,6,4], [5,5,3], [6,4,3]]
+  // R1: E singles(5) + Blue Fire = 2 dmg to player!
+  // R2: P doubles(5) → 2 dmg (Lucy 6/8)
+  // R3: E doubles(5) + Blue Fire = 3 dmg to player! Ouch!
+  // R4: P doubles(6) → 2 dmg (Lucy 4/8)
+  // R5: P doubles(5) → 2 dmg (Lucy 2/8)
+  // R6: P singles(6) → 1 dmg (Lucy 1/8)... then 1 more needed
+};
+
+// Boss 10: Romy (8 HP, Valley Guardian — predict die, +3 if correct)
+// Arc: Romy predicts correctly once for devastating damage. Player survives and fights back.
+const BOSS10_SCRIPT = {
+  enemy:  [[4,3,2], [5,4,3], [3,2,1], [2,1,3], [3,1,2], [2,1,3]],
+  player: [[5,5,6], [4,2,1], [4,4,5], [6,6,4], [5,5,3], [6,4,3]]
+  // R1: P doubles(5) → 2 dmg (Romy 6/8)
+  // R2: E singles(5) + Valley Guardian prediction hit! +3 = 4 dmg! Devastating!
+  // R3: P doubles(4) → 2 dmg (Romy 4/8). Comeback!
+  // R4: P doubles(6) → 2 dmg (Romy 2/8)
+  // R5: P doubles(5) → 2 dmg. Romy DEAD!
+};
+
+// Boss 11: The Mountain King (9 HP, Beast Mode — doubles deal 2x)
+// Arc: BEAST MODE doubles devastate player → 1 HP comeback → TRIPLES FINISH!
+const BOSS11_SCRIPT = {
+  enemy:  [[3,2,1], [4,4,6], [3,1,2], [5,5,3], [2,1,3], [3,2,1], [1,3,2]],
+  player: [[5,5,4], [4,3,1], [6,4,3], [4,2,1], [5,5,5], [6,6,4], [6,5,4]]
+  // R1: P doubles(5) → 2 dmg (MK 7/9)
+  // R2: E doubles(4) BEAST MODE! 4 dmg to player!!!
+  // R3: P singles(6) → 1 dmg (MK 6/9)
+  // R4: E doubles(5) BEAST MODE! 4 dmg! Player nearly dead!
+  // R5: P TRIPLES(5)!! → 3 dmg (MK 3/9). 1 HP COMEBACK!
+  // R6: P doubles(6) → 2 dmg (MK 1/9)
+  // R7: P singles(6) → 1 dmg. MOUNTAIN KING DEAD! TOURNAMENT COMPLETE!!!
+};
+
 // ══════════════════════════════════════════════
 // SCREENS
 // ══════════════════════════════════════════════
@@ -2202,7 +2264,7 @@ function openPreBattle() {
 
 function renderPreBattle() {
   const boss = BOSSES[state.currentBoss];
-  document.getElementById('pbTitle').textContent = `Boss ${state.currentBoss + 1} of 8`;
+  document.getElementById('pbTitle').textContent = `Boss ${state.currentBoss + 1} of 12`;
   document.getElementById('pbEnemyCard').innerHTML = `<img src="${IMG}${boss.file}">`;
   document.getElementById('pbEnemyName').textContent = boss.name;
 
@@ -2335,6 +2397,16 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
       break;
     case 'Brew Time': // Simon: +2 if took damage last round
       if (tookDamageLastRound && isPlayer) { damage += 2; tookDamageLastRound = false; }
+      break;
+    case 'Blue Fire': // Lucy: win → +1 damage
+      damage += 1;
+      break;
+    case 'Beast Mode': // Mountain King: doubles deal 2x
+      if (roll.type === 'doubles') damage *= 2;
+      break;
+    case 'Valley Guardian': // Romy: prediction hit → +3 (checked separately)
+      break;
+    case 'Party Time': // Balatron: counter die handled separately
       break;
   }
 
@@ -2534,7 +2606,7 @@ function startBattle() {
   if (state.currentBoss === 0) {
     bossScript = BOSS0_SCRIPTS[pick.name] || null;
   } else {
-    const scripts = [null, BOSS1_SCRIPT, BOSS2_SCRIPT, BOSS3_SCRIPT, BOSS4_SCRIPT, BOSS5_SCRIPT, BOSS6_SCRIPT, BOSS7_SCRIPT];
+    const scripts = [null, BOSS1_SCRIPT, BOSS2_SCRIPT, BOSS3_SCRIPT, BOSS4_SCRIPT, BOSS5_SCRIPT, BOSS6_SCRIPT, BOSS7_SCRIPT, BOSS8_SCRIPT, BOSS9_SCRIPT, BOSS10_SCRIPT, BOSS11_SCRIPT];
     bossScript = scripts[state.currentBoss] || null;
   }
 
@@ -3123,7 +3195,13 @@ function doEnemyRoll() {
         return;
       }
 
-      document.getElementById('rollBtn').classList.add('ready');
+      // Valley Guardian: show prediction picker instead of roll button
+      if (pick.ability === 'Valley Guardian') {
+        playerPrediction = null;
+        document.getElementById('predictArea').classList.add('visible');
+      } else {
+        document.getElementById('rollBtn').classList.add('ready');
+      }
       updateItemUsability();
     }, 800 + extraDelay);
   }, rollDelay);
@@ -3264,6 +3342,11 @@ function doPlayerRoll() {
     for (let i = 0; i < dieCount; i++) playerDiceValues.push(Math.floor(Math.random()*6)+1);
   }
 
+  // Wim's Slash boost: +15% chance all dice become odd
+  if (pick.ability === 'Slash' && !playerDiceValues.every(d => d % 2 === 1) && Math.random() < 0.15) {
+    playerDiceValues = playerDiceValues.map(d => d % 2 === 0 ? d - 1 || 1 : d);
+  }
+
   // Kodako: check for 1-2-3 before analyzing
   const kodakoTrigger = pick.ability === 'Swift' && playerDiceValues.length >= 3 &&
     [1,2,3].every(v => playerDiceValues.includes(v));
@@ -3369,12 +3452,15 @@ function resolveRound(pRoll, eRoll) {
   if (playerWins) {
     let baseDmg = pRoll.damage;
     let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true, wasFirstRoll);
+    // Valley Guardian prediction bonus
+    const predictionHit = pick.ability === 'Valley Guardian' && playerPrediction && pRoll.dice.includes(playerPrediction);
+    if (predictionHit) damage += 3;
     const def = applyDefense(enemy, damage, pRoll, false);
     let reflected = false;
     if (def < 0) { reflected = true; damage = -def; }
     else damage = def;
 
-    const abilityTriggered = damage !== baseDmg || reflected;
+    const abilityTriggered = damage !== baseDmg || reflected || predictionHit;
     const consumedShards = lastShardsConsumed;
     const consumedFires = lastFiresConsumed;
 
@@ -3433,8 +3519,13 @@ function resolveRound(pRoll, eRoll) {
           updateHpDisplay();
         }
 
-        // Show secondary effects as splashes, then continue
+        // Show secondary effects, then check Party Time counter, then continue
         const afterEffects = () => {
+          // Enemy Party Time: lose & survive → counter die
+          if (enemy.ability === 'Party Time' && enemyHp > 0) {
+            setTimeout(() => doBalatronCounter(enemy, 'player'), 800);
+            return;
+          }
           if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
           else setTimeout(nextRound, 1400);
         };
@@ -3475,6 +3566,11 @@ function resolveRound(pRoll, eRoll) {
     // Enemy wins
     let baseDmg = eRoll.damage;
     let damage = applyWinDamage(enemy, pick, eRoll, baseDmg, false, wasFirstRoll);
+    // Enemy Romy: auto-predict a random number, +3 if match
+    if (enemy.ability === 'Valley Guardian' && eRoll.dice) {
+      const enemyGuess = Math.floor(Math.random() * 6) + 1;
+      if (eRoll.dice.includes(enemyGuess)) damage += 3;
+    }
     const def = applyDefense(pick, damage, eRoll, true);
     let reflected = false;
     if (def < 0) { reflected = true; damage = -def; }
@@ -3531,6 +3627,9 @@ function resolveRound(pRoll, eRoll) {
           if (playerHp <= 0) {
             if (pick.ability === 'Final Gift') carryOverShards = 3;
             setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+          } else if (pick.ability === 'Party Time' && playerHp > 0) {
+            // Player's Party Time: lose & survive → counter die
+            setTimeout(() => doBalatronCounter(pick, 'enemy'), 800);
           } else {
             setTimeout(nextRound, 1400);
           }
@@ -3730,7 +3829,7 @@ function afterBattleWin() {
   state.currentBoss++;
   saveState();
 
-  if (state.currentBoss >= 8) {
+  if (state.currentBoss >= 12) {
     // Victory!
     showVictory();
   } else {
@@ -4014,7 +4113,7 @@ function showVictory() {
   });
 
   document.getElementById('winStats').innerHTML = `
-    <b>8/8</b> Bosses defeated<br>
+    <b>12/12</b> Bosses defeated<br>
     <b>${state.collection.length}</b> ghosts survived<br>
     <b>${state.stats.ghostsLost}</b> ghosts lost<br>
     <b>${state.stats.itemsUsed}</b> items used<br>
