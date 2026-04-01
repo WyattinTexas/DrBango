@@ -1105,6 +1105,21 @@
   .ability-splash.valley-guardian .ability-splash-name { color: #a5f3fc; text-shadow: 0 0 40px rgba(165,243,252,1), 0 0 80px rgba(56,189,248,0.7), 0 0 200px rgba(103,232,249,0.2), 0 3px 6px rgba(0,0,0,0.8); }
   .ability-splash.valley-guardian .ability-splash-desc { color: #cffafe; }
 
+  .ability-splash.reflect {
+    background: radial-gradient(ellipse at center, rgba(220,220,255,0.4) 0%, rgba(80,80,160,0.3) 30%, rgba(0,0,0,0.92) 65%);
+  }
+  .ability-splash.reflect .ability-splash-name {
+    color: #e0e7ff;
+    text-shadow: 0 0 40px rgba(165,180,252,1), 0 0 80px rgba(129,140,248,0.7), 0 0 160px rgba(99,102,241,0.4), 0 3px 6px rgba(0,0,0,0.8);
+    animation: reflectPulse 0.6s ease-in-out infinite;
+  }
+  .ability-splash.reflect .ability-splash-desc { color: #c7d2fe; }
+
+  @keyframes reflectPulse {
+    0%, 100% { text-shadow: 0 0 40px rgba(165,180,252,1), 0 0 80px rgba(129,140,248,0.7); transform: scale(1); }
+    50% { text-shadow: 0 0 60px rgba(165,180,252,1), 0 0 120px rgba(129,140,248,0.9), 0 0 200px rgba(99,102,241,0.5); transform: scale(1.05); }
+  }
+
   /* ======== REWARD SCREEN ======== */
   .reward-screen {
     align-items: center;
@@ -1596,7 +1611,8 @@ const ABILITY_THEMES = {
   'Thief': 'lucky-strike',
   'Pop': 'party-time',
   'Stoic': 'iron-will',
-  'Bogus': 'blue-fire',
+  'Bogus': 'reflect',
+  'Reflected!': 'reflect',
   'Tempest': 'valley-guardian',
   'Underdog': 'fury',
   'Sploop!': 'valley-guardian',
@@ -3067,18 +3083,23 @@ function resolveRound(pRoll, eRoll) {
 
     const doApplyDamage = () => {
       if (reflected) {
-        // Damage reflected back to player
-        playerHp -= damage;
-        playDamageSfx(damage);
-        narrate(`<b class="them">Reflected! ${damage} damage to ${pick.name}!</b>`);
-        document.getElementById('playerCard').classList.add('hit');
-        setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
-        updateHpDisplay();
-        afterLossTriggers(pick, pRoll, damage, true);
-        tookDamageLastRound = true;
-        if (playerHp <= 0) {
-          setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
-        } else setTimeout(nextRound, 1400);
+        // Show dramatic reflect splash, then apply damage to player
+        const reflectName = enemy.ability === 'Bogus' ? 'Bogus!' : 'Reflected!';
+        const reflectDesc = `${damage} damage bounced back!`;
+        showAbilitySplash(reflectName, reflectDesc, 1800, () => {
+          playerHp -= damage;
+          playDamageSfx(damage);
+          narrate(`<b class="them">Reflected! ${damage} damage to ${pick.name}!</b>`);
+          document.getElementById('playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          afterLossTriggers(pick, pRoll, damage, true);
+          tookDamageLastRound = true;
+          if (playerHp <= 0) {
+            setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+          } else setTimeout(nextRound, 1400);
+        }, 'enemyCard');
+        return; // splash handles the rest
       } else if (damage === 0) {
         narrate(`<b class="gold">Damage negated!</b>`);
         // Cameron: if damage gets negated, destroy enemy
@@ -3143,15 +3164,20 @@ function resolveRound(pRoll, eRoll) {
 
     const doApplyDamage = () => {
       if (reflected) {
-        enemyHp -= damage;
-        playDamageSfx(damage);
-        narrate(`<b class="gold">Reflected! ${damage} damage to ${enemy.name}!</b>`);
-        document.getElementById('enemyCard').classList.add('hit');
-        setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
-        updateHpDisplay();
-        afterWinTriggers(pick, enemy, eRoll, damage, true);
-        if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
-        else setTimeout(nextRound, 1400);
+        const reflectName = pick.ability === 'Bogus' ? 'Bogus!' : 'Reflected!';
+        const reflectDesc = `${damage} damage bounced back!`;
+        showAbilitySplash(reflectName, reflectDesc, 1800, () => {
+          enemyHp -= damage;
+          playDamageSfx(damage);
+          narrate(`<b class="gold">Reflected! ${damage} damage to ${enemy.name}!</b>`);
+          document.getElementById('enemyCard').classList.add('hit');
+          setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          afterWinTriggers(pick, enemy, eRoll, damage, true);
+          if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
+          else setTimeout(nextRound, 1400);
+        }, 'playerCard');
+        return;
       } else if (damage === 0) {
         narrate(`<b class="gold">Damage negated!</b>`);
         // Cameron enemy: if their damage negated, destroy player
