@@ -802,7 +802,7 @@
 
   .ability-card-overlay {
     position: fixed;
-    z-index: 9500;
+    z-index: 8500;
     border-radius: 12px;
     overflow: hidden;
     filter: brightness(1.2);
@@ -1059,7 +1059,7 @@
 
   .ability-splash { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
   .ability-splash.active { opacity: 1; pointer-events: auto; }
-  .ability-splash-inner { text-align: center; transform: scale(0.6); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); padding: 0 20px; }
+  .ability-splash-inner { text-align: center; transform: scale(0.6); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); padding: 0 20px; position: relative; z-index: 9100; }
   .ability-splash.active .ability-splash-inner { transform: scale(1); }
   .ability-splash-name { font-family: 'Creepster', cursive; font-size: 4.2rem; letter-spacing: 4px; line-height: 1.1; }
   .ability-splash-desc { font-size: 1.3rem; font-weight: 800; margin-top: 14px; text-shadow: 0 0 16px rgba(0,0,0,0.9); letter-spacing: 0.5px; }
@@ -1291,6 +1291,55 @@
   .snowflake { position: absolute; background: white; border-radius: 50%; opacity: 0; animation: snowfall linear forwards; }
   @keyframes snowfall { 0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 0.5; } 80% { opacity: 0.35; } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)); } }
 
+  /* Farewell overlay when ghost dies */
+  .farewell-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    opacity: 0;
+    transition: opacity 0.8s;
+    pointer-events: none;
+  }
+  .farewell-overlay.active { opacity: 1; pointer-events: auto; }
+
+  .farewell-card {
+    width: 140px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 3px solid rgba(248,113,113,0.4);
+    filter: grayscale(0.6) brightness(0.7);
+    animation: farewellFloat 3s ease-in-out infinite;
+  }
+  .farewell-card img { width: 100%; display: block; }
+
+  @keyframes farewellFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .farewell-name {
+    font-family: 'Creepster', cursive;
+    font-size: 2rem;
+    color: var(--enemy);
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(248,113,113,0.4);
+  }
+
+  .farewell-text {
+    font-size: 0.85rem;
+    color: #666;
+    font-style: italic;
+    max-width: 260px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
   .watermark { position: fixed; bottom: 10px; right: 14px; font-size: 0.6rem; color: #222; letter-spacing: 1px; z-index: 200; }
 
   /* ======== MOBILE ======== */
@@ -1514,6 +1563,11 @@
 <audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
 <audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
+<div class="farewell-overlay" id="farewellOverlay">
+  <div class="farewell-card" id="farewellCard"></div>
+  <div class="farewell-name" id="farewellName"></div>
+  <div class="farewell-text" id="farewellText"></div>
+</div>
 <div class="watermark">CORKSCREW GAMES</div>
 
 <script>
@@ -1938,7 +1992,13 @@ function confirmPick() {
   state.collection.push(g);
   state.usedCards.push(g.name);
   saveState();
-  showMap();
+  // First pick → straight into boss 1 battle
+  if (state.currentBoss === 0 && state.collection.length === 1) {
+    selectedGhostIndex = 0;
+    startBattle();
+  } else {
+    showMap();
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -3257,8 +3317,20 @@ function enemyDefeated() {
   setTimeout(crashAnimation, 1400);
 }
 
+const FAREWELL_LINES = [
+  "Gone, but never forgotten.",
+  "The spirit world calls them home.",
+  "They fought bravely to the end.",
+  "Their light fades into the mist.",
+  "A true warrior. Rest now.",
+  "The battle claimed another soul.",
+  "They gave everything they had.",
+  "Lost to the void between worlds.",
+];
+
 function handlePlayerLoss() {
   // Permadeath: remove ghost from collection
+  const deadGhost = { ...pick };
   state.collection.splice(selectedGhostIndex, 1);
   state.deadGhosts.push(pick.name);
   state.stats.ghostsLost++;
@@ -3269,16 +3341,24 @@ function handlePlayerLoss() {
 
   stopSpiritParticles();
 
-  if (state.collection.length === 0) {
-    // Game over
-    setTimeout(showGameOver, 1000);
-  } else {
-    // Back to map to retry with another ghost
+  // Show farewell overlay for 5 seconds
+  const overlay = document.getElementById('farewellOverlay');
+  document.getElementById('farewellCard').innerHTML = `<img src="${IMG}${deadGhost.file}">`;
+  document.getElementById('farewellName').textContent = deadGhost.name;
+  document.getElementById('farewellText').textContent = FAREWELL_LINES[Math.floor(Math.random() * FAREWELL_LINES.length)];
+  overlay.classList.add('active');
+
+  setTimeout(() => {
+    overlay.classList.remove('active');
     setTimeout(() => {
       stopMusicHard();
-      showMap();
-    }, 1000);
-  }
+      if (state.collection.length === 0) {
+        showGameOver();
+      } else {
+        showMap();
+      }
+    }, 800);
+  }, 5000);
 }
 
 function afterBattleWin() {
