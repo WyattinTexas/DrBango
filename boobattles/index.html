@@ -3048,11 +3048,14 @@ function doEnemyRoll() {
 
   // Calculate enemy dice count (consumes modifiers)
   const eDiceCount = getEnemyDiceCount();
+  // Grace: show splash if Antoinette matches extra dice
+  const graceTriggered = enemy && enemy.ability === 'Grace' && eDiceCount > 3;
   enemyBonusDice = 0; enemyRemoveDice = 0;
   let dice = [];
-  // Scripted boss fight: use scripted enemy dice (truncated to actual dice count)
+  // Scripted boss fight: use scripted enemy dice (truncated/padded to actual dice count)
   if (bossScript && bossScriptRound < bossScript.enemy.length) {
     dice = [...bossScript.enemy[bossScriptRound]].slice(0, eDiceCount);
+    while (dice.length < eDiceCount) dice.push(Math.floor(Math.random()*6)+1);
   } else {
     for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
   }
@@ -3074,15 +3077,17 @@ function doEnemyRoll() {
 
   // Show dice (up to 3 visible slots for enemy)
   const showCount = Math.min(dice.length, 3);
-  for (let i = 0; i < showCount; i++) {
-    const d = document.getElementById('eDie'+i);
-    d.textContent = '?';
-    d.classList.add('visible','rolling');
-  }
 
-  const rollDelay = round === 1 ? 1100 : 700;
+  const doRollAnimation = () => {
+    for (let i = 0; i < showCount; i++) {
+      const d = document.getElementById('eDie'+i);
+      d.textContent = '?';
+      d.classList.add('visible','rolling');
+    }
 
-  setTimeout(() => {
+    const rollDelay = round === 1 ? 1100 : 700;
+
+    setTimeout(() => {
     dice.slice(0, showCount).forEach((v, i) => {
       setTimeout(() => {
         const d = document.getElementById('eDie'+i);
@@ -3122,6 +3127,14 @@ function doEnemyRoll() {
       updateItemUsability();
     }, 800 + extraDelay);
   }, rollDelay);
+  }; // end doRollAnimation
+
+  // Grace: show splash before rolling if Antoinette matches extra dice
+  if (graceTriggered) {
+    showAbilitySplash('Grace', `Matching your ${getPlayerDiceCount()} dice!`, 1400, doRollAnimation, 'enemyCard');
+  } else {
+    doRollAnimation();
+  }
 }
 
 // Helper: best N dice from a larger pool
