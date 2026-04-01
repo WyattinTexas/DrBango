@@ -1195,18 +1195,23 @@
   .ability-splash.sacred-fire .ability-splash-desc { color: #fed7aa; }
 
   .ability-splash.reflect {
-    background: radial-gradient(ellipse at center, rgba(220,220,255,0.4) 0%, rgba(80,80,160,0.3) 30%, rgba(0,0,0,0.92) 65%);
+    background: radial-gradient(ellipse at center, rgba(99,102,241,0.85) 0%, rgba(55,48,163,0.7) 30%, rgba(0,0,0,0.97) 60%);
   }
   .ability-splash.reflect .ability-splash-name {
-    color: #e0e7ff;
-    text-shadow: 0 0 40px rgba(165,180,252,1), 0 0 80px rgba(129,140,248,0.7), 0 0 160px rgba(99,102,241,0.4), 0 3px 6px rgba(0,0,0,0.8);
-    animation: reflectPulse 0.6s ease-in-out infinite;
+    color: #fff;
+    font-size: 5rem;
+    text-shadow: 0 0 30px rgba(165,180,252,1), 0 0 60px rgba(129,140,248,0.9), 0 0 120px rgba(99,102,241,0.6), 0 0 200px rgba(79,70,229,0.4), 0 4px 8px rgba(0,0,0,0.9);
+    animation: reflectPulse 0.5s ease-in-out infinite;
   }
-  .ability-splash.reflect .ability-splash-desc { color: #c7d2fe; }
+  .ability-splash.reflect .ability-splash-desc {
+    color: #e0e7ff;
+    font-size: 1.5rem;
+    text-shadow: 0 0 12px rgba(99,102,241,0.8), 0 2px 4px rgba(0,0,0,0.9);
+  }
 
   @keyframes reflectPulse {
-    0%, 100% { text-shadow: 0 0 40px rgba(165,180,252,1), 0 0 80px rgba(129,140,248,0.7); transform: scale(1); }
-    50% { text-shadow: 0 0 60px rgba(165,180,252,1), 0 0 120px rgba(129,140,248,0.9), 0 0 200px rgba(99,102,241,0.5); transform: scale(1.05); }
+    0%, 100% { text-shadow: 0 0 30px rgba(165,180,252,1), 0 0 60px rgba(129,140,248,0.9), 0 0 120px rgba(99,102,241,0.6), 0 4px 8px rgba(0,0,0,0.9); transform: scale(1); }
+    50% { text-shadow: 0 0 50px rgba(255,255,255,0.8), 0 0 100px rgba(165,180,252,1), 0 0 180px rgba(99,102,241,0.7), 0 4px 8px rgba(0,0,0,0.9); transform: scale(1.08); }
   }
 
   /* ======== REWARD SCREEN ======== */
@@ -1780,7 +1785,7 @@ const ALL_GHOSTS = [
 // BOSSES
 // ══════════════════════════════════════════════
 const BOSS_NAMES = ['Logey','Bogey','Guard Thomas','Stone Cold','Pelter','Antoinette','King Jay','Hector'];
-const BOSS_HP =    [6, 7, 9, 7, 11, 12, 13, 15];
+const BOSS_HP =    [6, 5, 9, 7, 11, 12, 13, 15];
 const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power',null];
 
 // Fixed starters — always these 3
@@ -2303,7 +2308,7 @@ function getEnemyDiceCount() {
 }
 
 // Apply winner's damage modifiers
-function applyWinDamage(winner, loser, roll, baseDmg, isPlayer) {
+function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
   let damage = baseDmg;
 
   switch (winner.ability) {
@@ -2320,7 +2325,7 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer) {
       if (roll.type === 'doubles') damage += 2;
       break;
     case 'Ambush': // Nikon: first roll win → 3x
-      if (isFirstRoll) damage *= 3;
+      if (firstRoll) damage *= 3;
       break;
     case 'One-two-one!': // Stone Cold: double 1s → 3x
       if (roll.type === 'doubles' && roll.value === 1) damage *= 3;
@@ -3117,7 +3122,7 @@ function resolvePatrickStoneForm(eRoll) {
   } else {
     // Patrick takes normal damage from non-singles
     let damage = eRoll.damage;
-    damage = applyWinDamage(enemy, pick, eRoll, damage, false);
+    damage = applyWinDamage(enemy, pick, eRoll, damage, false, false);
     const def = applyDefense(pick, damage, eRoll, true);
     if (def < 0) {
       // Reflected — shouldn't happen for Patrick but handle it
@@ -3299,12 +3304,13 @@ function resolveRound(pRoll, eRoll) {
     return;
   }
 
+  const wasFirstRoll = isFirstRoll;
   isFirstRoll = false;
   const playerWins = result === 1;
 
   if (playerWins) {
     let baseDmg = pRoll.damage;
-    let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true);
+    let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true, wasFirstRoll);
     const def = applyDefense(enemy, damage, pRoll, false);
     let reflected = false;
     if (def < 0) { reflected = true; damage = -def; }
@@ -3410,7 +3416,7 @@ function resolveRound(pRoll, eRoll) {
   } else {
     // Enemy wins
     let baseDmg = eRoll.damage;
-    let damage = applyWinDamage(enemy, pick, eRoll, baseDmg, false);
+    let damage = applyWinDamage(enemy, pick, eRoll, baseDmg, false, wasFirstRoll);
     const def = applyDefense(pick, damage, eRoll, true);
     let reflected = false;
     if (def < 0) { reflected = true; damage = -def; }
