@@ -2225,6 +2225,68 @@
   .battle-screen.vs-mode .battle-action-bar .battle-item { display: none; }
   .battle-screen.vs-mode .battle-ui-row .action-btn { display: none; }
 
+  /* Red Action Bar (VS mode only) */
+  .red-action-bar {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+    z-index: 12;
+  }
+  .battle-screen.vs-mode .red-action-bar { display: flex; }
+
+  .red-action-bar .ability-icon,
+  .red-action-bar .shard-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 2px solid rgba(248,113,113,0.3);
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    backdrop-filter: blur(4px);
+  }
+  .red-action-bar .ability-icon .icon-label,
+  .red-action-bar .shard-icon .icon-label,
+  .red-action-bar .shard-icon .shard-count {
+    font-size: 0.4rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .red-action-bar .shard-icon .shard-img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+  .red-action-bar .ability-icon.usable {
+    border-color: rgba(248,113,113,0.8);
+    box-shadow: 0 0 12px rgba(248,113,113,0.4);
+    animation: redGlow 1.5s ease-in-out infinite;
+  }
+  .red-action-bar .ability-icon.used {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .red-action-bar .shard-icon.committed {
+    border-color: rgba(248,113,113,0.8);
+    box-shadow: 0 0 10px rgba(248,113,113,0.3);
+  }
+  @keyframes redGlow {
+    0%, 100% { box-shadow: 0 0 12px rgba(248,113,113,0.4); }
+    50% { box-shadow: 0 0 20px rgba(248,113,113,0.7); }
+  }
+
   /* Blue's roll button — bottom-right corner in VS */
   .vs-blue-roll-area {
     position: absolute;
@@ -2482,6 +2544,7 @@
   <!-- BATTLE -->
   <div class="screen battle-screen" id="battleScreen">
     <div class="spirit-particles" id="spiritParticles"></div>
+    <div class="red-action-bar" id="redActionBar"></div>
     <div class="vs-red-roll-area" id="vsRedRollArea">
       <button class="vs-red-roll-btn" onclick="vsRedRoll()">Roll Dice!</button>
     </div>
@@ -2908,6 +2971,10 @@ let lastShardsConsumed = null;  // Track for splash display
 let lastFiresConsumed = null;   // Track for splash display
 let committedShards = 0;        // Shards discarded before this roll
 let committedFires = 0;         // Fires discarded before this roll
+let redCommittedShards = 0;     // Red's committed shards (VS mode)
+let redCommittedFires = 0;      // Red's committed fires (VS mode)
+let redBogeyReflectArmed = false; // Red's Bogey armed state (VS mode)
+let redBogeyReflectUsed = false;  // Red's Bogey used state (VS mode)
 let playerBonusDice = 0;        // Extra dice for player next roll
 let enemyBonusDice = 0;         // Extra dice for enemy next roll
 let playerRemoveDice = 0;       // Dice removed from player next roll
@@ -3698,6 +3765,13 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
     damage += shardDmg;
     lastShardsConsumed = { count: committedShards, dmg: shardDmg };
   }
+  // Red committed shards (VS mode)
+  if (!isPlayer && vsMode && redCommittedShards > 0) {
+    const perShard = winner.ability === 'Winter Barrage' ? 2 : 1;
+    const shardDmg = redCommittedShards * perShard;
+    damage += shardDmg;
+    lastShardsConsumed = { count: redCommittedShards, dmg: shardDmg };
+  }
 
   // Committed Sacred Fires: +3 per fire if winner (Tyler Heating Up: x2)
   if (isPlayer && committedFires > 0) {
@@ -3705,6 +3779,13 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
     const fireDmg = committedFires * perFire;
     damage += fireDmg;
     lastFiresConsumed = { count: committedFires, dmg: fireDmg };
+  }
+  // Red committed fires (VS mode)
+  if (!isPlayer && vsMode && redCommittedFires > 0) {
+    const perFire = winner.ability === 'Heating Up' ? 6 : 3;
+    const fireDmg = redCommittedFires * perFire;
+    damage += fireDmg;
+    lastFiresConsumed = { count: redCommittedFires, dmg: fireDmg };
   }
 
   return damage;
@@ -3717,7 +3798,13 @@ function applyDefense(defender, damage, attackRoll, defenderIsPlayer, defenderRo
       if ((defenderIsPlayer ? playerHp : enemyHp) < 6 && attackRoll.type === 'singles') return 0;
       break;
     case 'Bogus': // Bogey: manual reflect for player, auto for boss when taking 2+ damage
-      if (!defenderIsPlayer && !bogeyReflectUsed && damage >= 2) {
+      if (!defenderIsPlayer && vsMode && !redBogeyReflectUsed && redBogeyReflectArmed) {
+        // VS mode: Red manually armed Bogey reflect
+        redBogeyReflectUsed = true;
+        redBogeyReflectArmed = false;
+        return -damage;
+      }
+      if (!defenderIsPlayer && !vsMode && !bogeyReflectUsed && damage >= 2) {
         // Boss Bogey auto-reflects the first hit of 2+ damage
         bogeyReflectUsed = true;
         return -damage;
@@ -4151,6 +4238,8 @@ function renderBattleActionBar() {
 
     container.appendChild(botRow);
   }
+  // Also render Red action bar in VS mode
+  if (vsMode) renderRedActionBar();
 }
 
 function updateItemUsability() {
@@ -4196,6 +4285,8 @@ function updateItemUsability() {
     if (hasShardIcon && iceShards > 0) hasShardIcon.querySelector('.shard-count').textContent = iceShards;
     if (hasFireIcon && sacredFires > 0) hasFireIcon.querySelector('.shard-count').textContent = sacredFires;
   }
+  // Also update Red action bar in VS mode
+  if (vsMode) updateRedItemUsability();
 }
 
 // Cycle committed shards: 0 → 1 → 2 → ... → max → 0
@@ -4282,6 +4373,196 @@ function activateAbility() {
     narrate(`<b class="gold">Bogus armed!</b> Next hit will be reflected!`);
     renderBattleActionBar();
     updateItemUsability();
+  }
+}
+
+// ══════════════════════════════════════════════
+// RED ACTION BAR (VS MODE ONLY)
+// ══════════════════════════════════════════════
+
+function renderRedActionBar() {
+  if (!vsMode) return;
+  const container = document.getElementById('redActionBar');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const topRow = document.createElement('div');
+  topRow.className = 'action-row';
+
+  const abilityId = enemy ? enemy.ability : null;
+  const hasActivatable = ['Teamwork', 'Heating Up', 'Bogus', 'Change of Heart'].includes(abilityId);
+  if (hasActivatable) {
+    const ab = document.createElement('div');
+    ab.className = 'ability-icon';
+    ab.id = 'redAbilityBtn';
+    let icon = '\u2728';
+    if (abilityId === 'Teamwork') icon = '\u{1F91D}';
+    if (abilityId === 'Heating Up') icon = '\u{1F525}';
+    if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';
+    if (abilityId === 'Change of Heart') icon = '\u{1F504}';
+    let label = abilityId.split(' ')[0];
+    if (abilityId === 'Bogus' && redBogeyReflectArmed) label = 'ARMED';
+    if (abilityId === 'Bogus' && redBogeyReflectUsed) label = 'USED';
+    if (abilityId === 'Change of Heart') label = 'Swap';
+    ab.innerHTML = `${icon}<div class="icon-label">${label}</div>`;
+    ab.title = enemy.abilityDesc;
+    if (abilityId === 'Bogus' && redBogeyReflectUsed) ab.classList.add('used');
+    ab.onclick = () => activateRedAbility();
+    topRow.appendChild(ab);
+  }
+
+  if (topRow.children.length > 0) container.appendChild(topRow);
+
+  const totalShards = enemyIceShards + redCommittedShards;
+  const totalFires = enemySacredFires + redCommittedFires;
+  if (totalShards > 0 || totalFires > 0) {
+    const botRow = document.createElement('div');
+    botRow.className = 'action-row';
+
+    if (totalShards > 0) {
+      const perShard = enemy && enemy.ability === 'Winter Barrage' ? 2 : 1;
+      const shard = document.createElement('div');
+      shard.className = 'shard-icon' + (redCommittedShards > 0 ? ' committed' : '');
+      shard.id = 'redShardBtn';
+      const label = redCommittedShards > 0 ? `${redCommittedShards}/${totalShards} \u2694` : `${totalShards}`;
+      shard.innerHTML = `<img src="iceshard.png" class="shard-img"><div class="shard-count">${label}</div>`;
+      shard.title = redCommittedShards > 0
+        ? `${redCommittedShards} committed (+${redCommittedShards*perShard} if Red wins). Tap to cycle.`
+        : `${totalShards} Ice Shard${totalShards>1?'s':''}. Tap to commit (+${perShard} each if Red wins).`;
+      shard.style.cursor = 'pointer';
+      shard.onclick = () => cycleRedShards();
+      botRow.appendChild(shard);
+    }
+
+    if (totalFires > 0) {
+      const fire = document.createElement('div');
+      fire.className = 'shard-icon fire' + (redCommittedFires > 0 ? ' committed' : '');
+      fire.id = 'redFireBtn';
+      const label = redCommittedFires > 0 ? `${redCommittedFires}/${totalFires} \u2694` : `${totalFires}`;
+      fire.innerHTML = `<img src="sacredfire.png" class="shard-img"><div class="shard-count">${label}</div>`;
+      fire.title = redCommittedFires > 0
+        ? `${redCommittedFires} committed (+${redCommittedFires*3} if Red wins). Tap to cycle.`
+        : `${totalFires} Sacred Fire${totalFires>1?'s':''}. Tap to commit (+3 each if Red wins).`;
+      fire.style.cursor = 'pointer';
+      fire.onclick = () => cycleRedFires();
+      botRow.appendChild(fire);
+    }
+
+    container.appendChild(botRow);
+  }
+}
+
+function updateRedItemUsability() {
+  if (!vsMode) return;
+  const abBtn = document.getElementById('redAbilityBtn');
+  if (abBtn && enemy) {
+    let usable = false;
+    const abilityPhaseOk = phase === 1 || phase === 0;
+    if (enemy.ability === 'Teamwork' && abilityPhaseOk) usable = true;
+    if (enemy.ability === 'Heating Up' && abilityPhaseOk && enemyHp > 3) usable = true;
+    if (enemy.ability === 'Change of Heart' && abilityPhaseOk && enemyIceShards >= 1) usable = true;
+    if (enemy.ability === 'Bogus' && abilityPhaseOk && !redBogeyReflectUsed && !redBogeyReflectArmed) usable = true;
+    abBtn.classList.toggle('usable', usable);
+  }
+
+  const hasShardIcon = document.querySelector('#redActionBar .shard-icon:not(.fire)');
+  const hasFireIcon = document.querySelector('#redActionBar .shard-icon.fire');
+  if ((enemyIceShards > 0 || redCommittedShards > 0) !== !!hasShardIcon || (enemySacredFires > 0 || redCommittedFires > 0) !== !!hasFireIcon) {
+    renderRedActionBar();
+  } else {
+    if (hasShardIcon && (enemyIceShards > 0 || redCommittedShards > 0)) {
+      const ts = enemyIceShards + redCommittedShards;
+      hasShardIcon.querySelector('.shard-count').textContent = redCommittedShards > 0 ? `${redCommittedShards}/${ts} \u2694` : `${ts}`;
+    }
+    if (hasFireIcon && (enemySacredFires > 0 || redCommittedFires > 0)) {
+      const tf = enemySacredFires + redCommittedFires;
+      hasFireIcon.querySelector('.shard-count').textContent = redCommittedFires > 0 ? `${redCommittedFires}/${tf} \u2694` : `${tf}`;
+    }
+  }
+}
+
+function cycleRedShards() {
+  if (phase !== 1 && phase !== 0) return;
+  const total = enemyIceShards + redCommittedShards;
+  if (total <= 0) return;
+  redCommittedShards++;
+  enemyIceShards--;
+  if (redCommittedShards > total) {
+    enemyIceShards = total;
+    redCommittedShards = 0;
+  }
+  playSfx('sfxSpecial', 0.4);
+  const perShard = enemy && enemy.ability === 'Winter Barrage' ? 2 : 1;
+  if (redCommittedShards > 0) {
+    narrate(`<b class="them">${redCommittedShards} Ice Shard${redCommittedShards>1?'s':''} committed (Red)!</b> +${redCommittedShards*perShard} if Red wins.`);
+  } else {
+    narrate(`Red Ice Shards uncommitted.`);
+  }
+  renderRedActionBar();
+}
+
+function cycleRedFires() {
+  if (phase !== 1 && phase !== 0) return;
+  const total = enemySacredFires + redCommittedFires;
+  if (total <= 0) return;
+  redCommittedFires++;
+  enemySacredFires--;
+  if (redCommittedFires > total) {
+    enemySacredFires = total;
+    redCommittedFires = 0;
+  }
+  playSfx('sfxSpecial', 0.4);
+  if (redCommittedFires > 0) {
+    narrate(`<b class="them">${redCommittedFires} Sacred Fire${redCommittedFires>1?'s':''} committed (Red)!</b> +${redCommittedFires*3} if Red wins.`);
+  } else {
+    narrate(`Red Sacred Fires uncommitted.`);
+  }
+  renderRedActionBar();
+}
+
+function activateRedAbility() {
+  if (!enemy || !vsMode) return;
+  if (phase !== 1 && phase !== 0) return;
+
+  if (enemy.ability === 'Teamwork') {
+    enemyRemoveDice += 1;
+    enemyHp += 1;
+    updateHpDisplay();
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="them">Teamwork (Red)!</b> -1 die \u2192 +1 HP! (${enemyHp}/${enemy.maxHp})`);
+    renderRedActionBar();
+    updateRedItemUsability();
+  }
+
+  if (enemy.ability === 'Heating Up' && enemyHp > 3) {
+    enemyHp -= 2;
+    enemyBonusDice += 1;
+    updateHpDisplay();
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="them">Heating Up (Red)!</b> -2 HP \u2192 +1 die this roll!`);
+    renderRedActionBar();
+    updateRedItemUsability();
+  }
+
+  if (enemy.ability === 'Change of Heart' && enemyIceShards >= 1) {
+    enemyIceShards -= 1;
+    const tempHp = enemyHp;
+    enemyHp = playerHp;
+    playerHp = tempHp;
+    updateHpDisplay();
+    showAbilitySplash('Change of Heart', `HP swapped! Red: ${enemyHp} \u2194 Blue: ${playerHp}`, 1800, () => {
+      narrate(`<b class="them">Change of Heart (Red)!</b> HP swapped! Red: ${enemyHp} \u00b7 Blue: ${playerHp}`);
+      renderRedActionBar();
+      updateRedItemUsability();
+    }, 'enemyCard');
+  }
+
+  if (enemy.ability === 'Bogus' && !redBogeyReflectUsed && !redBogeyReflectArmed) {
+    redBogeyReflectArmed = true;
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="them">Bogus armed (Red)!</b> Next hit will be reflected!`);
+    renderRedActionBar();
+    updateRedItemUsability();
   }
 }
 
@@ -4514,7 +4795,10 @@ function doEnemyRoll() {
   for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
   powerMode = 0;
   committedShards = 0; committedFires = 0; // reset for new round
+  if (vsMode) { redCommittedShards = 0; redCommittedFires = 0; }
 
+  // Piper Slick Coat: -1 enemy die each round
+  if (pick && pick.ability === 'Slick Coat') enemyRemoveDice += 1;
   // Calculate enemy dice count (consumes modifiers)
   const eDiceCount = getEnemyDiceCount();
   // Grace: show splash if Antoinette matches extra dice
@@ -4642,12 +4926,16 @@ function doEnemyRoll() {
   }
 
   // Boss Romy: pick prediction — 50% chance she "reads" her own dice correctly
-  if (enemy && enemy.ability === 'Valley Guardian' && !vsMode) {
+  // Piper Slick Coat: negate enemy Valley Guardian prediction
+  if (enemy && enemy.ability === 'Valley Guardian' && !vsMode && !(pick && pick.ability === 'Slick Coat')) {
     if (dice.length && Math.random() < 0.50) {
       enemyPrediction = dice[Math.floor(Math.random() * dice.length)];
     } else {
       enemyPrediction = Math.floor(Math.random() * 6) + 1;
     }
+  }
+  if (enemy && enemy.ability === 'Valley Guardian' && !vsMode && pick && pick.ability === 'Slick Coat') {
+    enemyPrediction = null;
   }
 
   // Show dice (up to 3 visible slots for enemy)
@@ -4712,10 +5000,17 @@ function doEnemyRoll() {
 
   // Romy: announce prediction before rolling to build anticipation
   const romyPredicting = enemy && enemy.ability === 'Valley Guardian' && enemyPrediction && !vsMode;
+  // Piper Slick Coat: show negation splash if enemy is Romy but prediction was nullified
+  const slickCoatNegatedPrediction = enemy && enemy.ability === 'Valley Guardian' && !enemyPrediction && !vsMode && pick && pick.ability === 'Slick Coat';
 
   // Grace: show splash before rolling if Antoinette matches extra dice
   if (graceTriggered) {
     showAbilitySplash('Grace', `Matching your ${getPlayerDiceCount()} dice!`, 1400, doRollAnimation, 'enemyCard');
+  } else if (slickCoatNegatedPrediction) {
+    showAbilitySplash('Slick Coat', 'Prediction negated!', 1400, () => {
+      narrate(`<b class="gold">Slick Coat!</b> ${pick.name} negates Valley Guardian!`);
+      doRollAnimation();
+    }, 'playerCard');
   } else if (romyPredicting) {
     narrate(`<b class="them">${enemy.name} predicts... ${enemyPrediction}!</b>`);
     // Masked Hero: Underdog counters enemy prediction
@@ -4912,7 +5207,17 @@ function doPlayerRoll() {
   phase = 2;
   document.getElementById('rollBtn').classList.remove('ready');
   playSfx('sfxDiceRoll');
-  narrate('Rolling...');
+  const sillyRolls = [
+    'Rolling... <i>*blows on dice*</i>',
+    'Rolling... please be good please be good',
+    'Rolling... this one\'s for everything!',
+    'Rolling... <i>*shakes dice aggressively*</i>',
+    'Rolling... I have a good feeling about this one',
+    'Rolling... come on triples come on triples',
+    'Rolling... <i>*whispers to dice*</i>',
+    'Rolling... don\'t let me down boys',
+  ];
+  narrate(Math.random() < 0.02 ? sillyRolls[Math.floor(Math.random() * sillyRolls.length)] : 'Rolling...');
   if (state && state.stats) state.stats.totalRolls++;
 
   // Before-rolling abilities now activated via action bar icons (manual)
@@ -5099,6 +5404,7 @@ function resolveRound(pRoll, eRoll) {
     const vsSlow = vsMode ? 800 : 0;
     narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
     committedShards = 0; committedFires = 0; // wasted on tie
+    if (vsMode) { redCommittedShards = 0; redCommittedFires = 0; }
     setTimeout(() => {
       if (vsMode) {
         // VS mode: both re-roll together
@@ -5118,8 +5424,8 @@ function resolveRound(pRoll, eRoll) {
   if (playerWins) {
     let baseDmg = pRoll.damage;
     let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true, wasFirstRoll);
-    // Valley Guardian prediction bonus
-    const predictionHit = pick.ability === 'Valley Guardian' && playerPrediction && pRoll.dice.includes(playerPrediction);
+    // Valley Guardian prediction bonus (Slick Coat negates)
+    const predictionHit = pick.ability === 'Valley Guardian' && playerPrediction && pRoll.dice.includes(playerPrediction) && !(enemy && enemy.ability === 'Slick Coat');
     if (predictionHit) damage += 3;
     const def = applyDefense(enemy, damage, pRoll, false, eRoll);
     let reflected = false;
@@ -5230,8 +5536,8 @@ function resolveRound(pRoll, eRoll) {
     // Enemy wins
     let baseDmg = eRoll.damage;
     let damage = applyWinDamage(enemy, pick, eRoll, baseDmg, false, wasFirstRoll);
-    // Enemy Romy: +3 if prediction matches a die
-    if (enemy.ability === 'Valley Guardian' && eRoll.dice) {
+    // Enemy Romy: +3 if prediction matches a die (Slick Coat negates)
+    if (enemy.ability === 'Valley Guardian' && eRoll.dice && !(pick && pick.ability === 'Slick Coat')) {
       const enemyGuess = enemyPrediction || Math.floor(Math.random() * 6) + 1;
       if (eRoll.dice.includes(enemyGuess)) {
         damage += 3;
@@ -5310,8 +5616,27 @@ function resolveRound(pRoll, eRoll) {
       // Dice mods consumed in next doEnemyRoll/doPlayerRoll
     };
 
-    if (abilityTriggered && damage > 0 && !reflected) {
-      setTimeout(() => showAbilitySplash(enemy.ability, `${enemy.abilityDesc}`, 1600, doApplyDamage, 'enemyCard'), 800);
+    // Build splash queue for enemy win (VS mode: show Red committed resource splashes)
+    const enemySplashQueue = [];
+    const consumedShards = lastShardsConsumed;
+    const consumedFires = lastFiresConsumed;
+    if (abilityTriggered && damage > 0 && !reflected && !consumedShards && !consumedFires) {
+      enemySplashQueue.push({ ability: enemy.ability, desc: enemy.abilityDesc, card: 'enemyCard' });
+    }
+    if (consumedShards) {
+      enemySplashQueue.push({ ability: 'Ice Shards', desc: `${consumedShards.count} shard${consumedShards.count>1?'s':''} consumed! +${consumedShards.dmg} damage!`, card: 'enemyCard' });
+    }
+    if (consumedFires) {
+      enemySplashQueue.push({ ability: 'Sacred Fire', desc: `${consumedFires.count} fire${consumedFires.count>1?'s':''} consumed! +${consumedFires.dmg} damage!`, card: 'enemyCard' });
+    }
+
+    if (enemySplashQueue.length > 0) {
+      const runQueue = (idx) => {
+        if (idx >= enemySplashQueue.length) { doApplyDamage(); return; }
+        const s = enemySplashQueue[idx];
+        showAbilitySplash(s.ability, s.desc, 1400, () => runQueue(idx + 1), s.card);
+      };
+      setTimeout(() => runQueue(0), 800);
     } else {
       setTimeout(doApplyDamage, 800);
     }
@@ -5419,11 +5744,13 @@ function nextRound() {
   lastKillWasSlash = false;
   committedShards = 0;
   committedFires = 0;
+  if (vsMode) { redCommittedShards = 0; redCommittedFires = 0; }
   renderBattleActionBar();
 
   // Heinous: lock out opponent's high dice
   // Boss Logey: fires once max per fight so it's not overwhelming for new players
-  if (enemy && enemy.ability === 'Heinous' && enemyHp > 0 && playerDiceValues.length && !enemyHeinousUsed) {
+  // Piper Slick Coat: negate enemy Heinous
+  if (enemy && enemy.ability === 'Heinous' && enemyHp > 0 && playerDiceValues.length && !enemyHeinousUsed && !(pick && pick.ability === 'Slick Coat')) {
     enemyHeinousUsed = true;
     // Show splash, then continue the rest of nextRound after it finishes
     const pRollForHeinous = analyzeRoll(playerDiceValues);
@@ -5453,8 +5780,22 @@ function nextRound() {
       return;
     }
   }
+  // Piper Slick Coat: narrate negation of enemy Heinous
+  if (enemy && enemy.ability === 'Heinous' && enemyHp > 0 && playerDiceValues.length && !enemyHeinousUsed && pick && pick.ability === 'Slick Coat') {
+    enemyHeinousUsed = true;
+    const pRollForHeinous = analyzeRoll(playerDiceValues);
+    const highCount = pRollForHeinous.dice.filter(d => d >= 5).length;
+    if (highCount > 0) {
+      showAbilitySplash('Slick Coat', 'Heinous negated!', 1400, () => {
+        narrate(`<b class="gold">Slick Coat!</b> ${pick.name} negates Heinous!`);
+        setTimeout(() => continueNextRound(), 600);
+      }, 'playerCard');
+      return;
+    }
+  }
   // Player-owned Logey: fires every round
-  if (pick.ability === 'Heinous' && playerHp > 0 && currentEnemyRoll) {
+  // Piper Slick Coat (enemy): negate player Heinous
+  if (pick.ability === 'Heinous' && playerHp > 0 && currentEnemyRoll && !(enemy && enemy.ability === 'Slick Coat')) {
     const highCount = currentEnemyRoll.dice.filter(d => d >= 5).length;
     if (highCount > 0) {
       enemyRemoveDice += highCount;
@@ -5482,6 +5823,17 @@ function nextRound() {
       return;
     }
   }
+  // Piper Slick Coat (enemy): narrate negation of player Heinous
+  if (pick.ability === 'Heinous' && playerHp > 0 && currentEnemyRoll && enemy && enemy.ability === 'Slick Coat') {
+    const highCount = currentEnemyRoll.dice.filter(d => d >= 5).length;
+    if (highCount > 0) {
+      showAbilitySplash('Slick Coat', 'Heinous negated!', 1400, () => {
+        narrate(`<b class="them">Slick Coat!</b> ${enemy.name} negates Heinous!`);
+        setTimeout(() => continueNextRound(), 600);
+      }, 'enemyCard');
+      return;
+    }
+  }
 
   continueNextRound();
 }
@@ -5489,7 +5841,7 @@ function nextRound() {
 function continueNextRound() {
   // Haunt: after first roll, opponent takes 1 damage before each roll
   if (round > 1) {
-    if (pick.ability === 'Haunt') {
+    if (pick.ability === 'Haunt' && !(enemy && enemy.ability === 'Slick Coat')) {
       enemyHp -= 1;
       updateHpDisplay();
       narrate(`<b class="gold">Haunt!</b> ${enemy.name} takes 1 damage!`);
@@ -5512,7 +5864,15 @@ function continueNextRound() {
       setTimeout(doEnemyRoll, 1200);
       return;
     }
-    if (enemy.ability === 'Haunt') {
+    // Piper Slick Coat (enemy): negate player Haunt
+    if (pick.ability === 'Haunt' && enemy && enemy.ability === 'Slick Coat') {
+      showAbilitySplash('Slick Coat', 'Haunt negated!', 1400, () => {
+        narrate(`<b class="them">Slick Coat!</b> ${enemy.name} negates Haunt!`);
+        if (vsMode) { setTimeout(vsStartBothRolls, 800); } else { setTimeout(doEnemyRoll, 800); }
+      }, 'enemyCard');
+      return;
+    }
+    if (enemy.ability === 'Haunt' && !(pick && pick.ability === 'Slick Coat')) {
       playerHp -= 1;
       updateHpDisplay();
       narrate(`<b class="them">Haunt!</b> ${pick.name} takes 1 damage!`);
@@ -5534,6 +5894,14 @@ function continueNextRound() {
         setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
         return;
       }
+    }
+    // Piper Slick Coat (player): negate enemy Haunt
+    if (enemy.ability === 'Haunt' && pick && pick.ability === 'Slick Coat') {
+      showAbilitySplash('Slick Coat', 'Haunt negated!', 1400, () => {
+        narrate(`<b class="gold">Slick Coat!</b> ${pick.name} negates Haunt!`);
+        if (vsMode) { setTimeout(vsStartBothRolls, 800); } else { setTimeout(doEnemyRoll, 800); }
+      }, 'playerCard');
+      return;
     }
   }
 
@@ -6281,9 +6649,11 @@ function startVsBattle() {
   playerBonusDice = 0; enemyBonusDice = 0;
   playerRemoveDice = 0; enemyRemoveDice = 0;
   bogeyReflectUsed = false; bogeyReflectArmed = false;
+  redBogeyReflectUsed = false; redBogeyReflectArmed = false;
   isFirstRoll = true; tookDamageLastRound = false;
   enemyHeinousUsed = false;
   committedShards = 0; committedFires = 0;
+  redCommittedShards = 0; redCommittedFires = 0;
   bossScript = null; bossScriptRound = 0;
   // Chad Sploop!: entry shards for VS
   if (pick.ability === 'Sploop!') iceShards += 2;
@@ -6431,6 +6801,8 @@ function vsRedRoll() {
     enemyHp += 1;
     updateHpDisplay();
   }
+  // Piper Slick Coat: -1 enemy die each round
+  if (pick && pick.ability === 'Slick Coat') enemyRemoveDice += 1;
   // Use ability-aware dice count
   const eDieCount = getEnemyDiceCount();
   enemyBonusDice = 0; enemyRemoveDice = 0;
@@ -6491,6 +6863,8 @@ function vsBlueRoll() {
     playerHp += 1;
     updateHpDisplay();
   }
+  // Piper Slick Coat: -1 player die each round (enemy is Piper)
+  if (enemy && enemy.ability === 'Slick Coat') playerRemoveDice += 1;
   // Use ability-aware dice count
   const bDieCount = getPlayerDiceCount();
   playerBonusDice = 0; playerRemoveDice = 0;
