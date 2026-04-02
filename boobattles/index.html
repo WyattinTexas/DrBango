@@ -281,12 +281,12 @@
 
   .pick-card.selected {
     transform: translateY(-8px) scale(1.07);
-    border-color: transparent;
-    box-shadow: 0 0 0 3px var(--player), 0 0 40px rgba(103,232,249,0.4), 0 0 80px rgba(103,232,249,0.15);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 0 30px rgba(103,232,249,0.15);
     z-index: 10;
   }
 
-  .pick-card.selected::before { opacity: 1; }
+  .pick-card.selected::before { opacity: 0; }
 
   .pick-card.dimmed { opacity: 0.25; transform: scale(0.95); filter: grayscale(0.6); }
 
@@ -1767,42 +1767,47 @@
   .vs-pick-title.p2 { color: var(--enemy); }
 
   .vs-ghost-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
+    display: flex;
+    gap: 16px;
     width: 100%;
-    max-width: 340px;
-    padding: 4px;
-    overflow-y: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 30%;
     flex: 1;
+    align-items: center;
   }
 
   .vs-ghost-card {
-    aspect-ratio: 5/7;
-    border-radius: 6px;
+    flex-shrink: 0;
+    width: 180px;
+    border-radius: 14px;
     overflow: hidden;
-    border: 2px solid rgba(255,255,255,0.06);
+    border: 3px solid rgba(255,255,255,0.08);
     cursor: pointer;
-    transition: all 0.15s;
-    background: rgba(255,255,255,0.02);
+    transition: all 0.25s;
+    scroll-snap-align: center;
+    opacity: 0.5;
+    transform: scale(0.9);
   }
-  .vs-ghost-card img { width: 100%; height: 100%; object-fit: cover; }
-  .vs-ghost-card:hover { border-color: rgba(255,255,255,0.2); }
-  .vs-ghost-card.selected {
-    border-color: var(--player);
-    box-shadow: 0 0 12px rgba(103,232,249,0.3);
+  .vs-ghost-card img { width: 100%; display: block; }
+  .vs-ghost-card.selected, .vs-ghost-card.p2-selected {
+    opacity: 1;
+    transform: scale(1);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 0 30px rgba(103,232,249,0.2);
   }
   .vs-ghost-card.p2-selected {
-    border-color: var(--enemy);
-    box-shadow: 0 0 12px rgba(248,113,113,0.3);
+    box-shadow: 0 0 30px rgba(248,113,113,0.2);
   }
 
-  /* VS Battle: flip P2 zone */
+  /* VS Battle: flip P2 zone + dice row */
   .battle-screen.vs-mode .enemy-zone {
     transform: rotate(180deg);
   }
-  .battle-screen.vs-mode .enemy-zone .name-plate {
-    transform: none;
+  .battle-screen.vs-mode .dice-row:first-child {
+    transform: rotate(180deg);
   }
 
   /* VS turn indicators */
@@ -1822,6 +1827,66 @@
   .vs-turn-banner.active { opacity: 1; }
   .vs-turn-banner.p1-turn { color: var(--player); text-shadow: 0 0 30px rgba(103,232,249,0.6); }
   .vs-turn-banner.p2-turn { color: var(--enemy); text-shadow: 0 0 30px rgba(248,113,113,0.6); transform: translate(-50%, -50%) rotate(180deg); }
+
+  /* Wim Slash kill effect */
+  .slash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .slash-overlay.active { opacity: 1; }
+
+  .slash-line {
+    position: absolute;
+    top: 50%;
+    left: -20%;
+    width: 140%;
+    height: 4px;
+    background: linear-gradient(90deg, transparent 0%, rgba(165,243,252,0.3) 20%, #fff 45%, #a5f3fc 50%, #fff 55%, rgba(165,243,252,0.3) 80%, transparent 100%);
+    transform: rotate(-25deg) scaleX(0);
+    transform-origin: left center;
+    box-shadow: 0 0 20px rgba(165,243,252,0.8), 0 0 60px rgba(103,232,249,0.4);
+  }
+  .slash-overlay.active .slash-line {
+    animation: slashSwipe 0.4s cubic-bezier(0.2,0,0.3,1) forwards;
+  }
+  .slash-line:nth-child(2) {
+    top: 45%;
+    transform: rotate(-35deg) scaleX(0);
+    height: 2px;
+    opacity: 0.6;
+    animation-delay: 0.08s;
+  }
+  .slash-line:nth-child(3) {
+    top: 55%;
+    transform: rotate(-15deg) scaleX(0);
+    height: 2px;
+    opacity: 0.5;
+    animation-delay: 0.15s;
+  }
+
+  @keyframes slashSwipe {
+    0% { transform: rotate(-25deg) scaleX(0); opacity: 0; }
+    30% { opacity: 1; }
+    100% { transform: rotate(-25deg) scaleX(1); opacity: 0; }
+  }
+
+  .slash-flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(165,243,252,0.4) 0%, transparent 60%);
+    opacity: 0;
+  }
+  .slash-overlay.active .slash-flash {
+    animation: slashFlash 0.5s ease-out;
+  }
+  @keyframes slashFlash {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+  }
 
   .watermark { position: fixed; bottom: 10px; right: 14px; font-size: 0.6rem; color: #222; letter-spacing: 1px; z-index: 200; }
 
@@ -2073,6 +2138,12 @@
 <audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
 <audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
+<div class="slash-overlay" id="slashOverlay">
+  <div class="slash-flash"></div>
+  <div class="slash-line"></div>
+  <div class="slash-line"></div>
+  <div class="slash-line"></div>
+</div>
 <div class="vs-turn-banner" id="vsTurnBanner"></div>
 <div class="farewell-overlay" id="farewellOverlay">
   <div class="farewell-card" id="farewellCard"></div>
@@ -2960,7 +3031,7 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
     case 'Restore': // Flora: healing handled after damage in resolveRound
       break;
     case 'Slash': // Wim: all dice odd → +5
-      if (roll.dice.every(d => d % 2 === 1)) damage += 5;
+      if (roll.dice.every(d => d % 2 === 1)) { damage += 5; lastKillWasSlash = true; }
       break;
     case 'Snowball': // Pelter: doubles +2
       if (roll.type === 'doubles') damage += 2;
@@ -4432,6 +4503,7 @@ function checkAfterCounter() {
 
 function nextRound() {
   round++;
+  lastKillWasSlash = false;
   committedShards = 0;
   committedFires = 0;
   renderBattleActionBar();
@@ -4464,7 +4536,37 @@ function nextRound() {
 // ══════════════════════════════════════════════
 // WIN / LOSS HANDLING
 // ══════════════════════════════════════════════
+let lastKillWasSlash = false;
+
+function showSlashEffect(callback) {
+  const overlay = document.getElementById('slashOverlay');
+  overlay.classList.add('active');
+  playSfx('sfxSpecial', 1.0);
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 400);
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    if (callback) callback();
+  }, 600);
+}
+
 function enemyDefeated() {
+  // Check if this was a Slash kill (Wim's all-odd bonus)
+  if (lastKillWasSlash) {
+    lastKillWasSlash = false;
+    narrate(`<b class="gold">SLASH! ${enemy.name}&nbsp;is destroyed!</b>`);
+    showSlashEffect(() => {
+      const eCard = document.getElementById('enemyCard');
+      const ePlate = document.getElementById('enemyPlate');
+      eCard.style.transition = 'opacity 0.4s ease-out';
+      eCard.style.opacity = '0';
+      ePlate.style.transition = 'opacity 0.4s ease-out';
+      ePlate.style.opacity = '0';
+      setTimeout(crashAnimation, 800);
+    });
+    return;
+  }
+
   narrate(`<b class="gold">${enemy.name}&nbsp;is defeated!</b>`);
   const eCard = document.getElementById('enemyCard');
   const ePlate = document.getElementById('enemyPlate');
@@ -4975,8 +5077,8 @@ function confirmVsPick() {
 
 function startVsBattle() {
   // P1 = player (bottom), P2 = enemy (top, flipped)
-  pick = vsP1Ghost;
-  enemy = vsP2Ghost;
+  pick = { ...vsP1Ghost, bossHp: vsP1Ghost.maxHp };
+  enemy = { ...vsP2Ghost, bossHp: vsP2Ghost.maxHp };
   playerHp = pick.maxHp;
   enemyHp = enemy.maxHp;
   round = 1;
