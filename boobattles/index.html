@@ -2736,7 +2736,7 @@ const ALL_GHOSTS = [
   { name:"Calvin & Anna", file:"calvin_anna.jpg", rarity:"rare", maxHp:6, ability:"Toboggan", abilityDesc:"When you defeat a ghost, heal 3 HP." },
   { name:"Troubling Haters", file:"troubling_haters.jpg", rarity:"rare", maxHp:4, ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP." },
   { name:"Wandering Sue", file:"wandering_sue.jpg", rarity:"rare", maxHp:4, ability:"Hidden Weakness", abilityDesc:"If enemy has 12+ HP, destroy them before rolling." },
-  { name:"Eloise", file:"eloise.jpg", rarity:"rare", maxHp:5, ability:"Change of Heart", abilityDesc:"Spend 2 Ice Shards to swap HP with enemy before rolling." },
+  { name:"Eloise", file:"eloise.jpg", rarity:"rare", maxHp:5, ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling." },
   { name:"Pelter", file:"pelter.jpg", rarity:"rare", maxHp:5, ability:"Snowball", abilityDesc:"Doubles gain +2 damage." },
 
   // Uncommon
@@ -4150,7 +4150,7 @@ function updateItemUsability() {
     const abilityPhaseOk = phase === 1 || (vsMode && phase === 0);
     if (pick.ability === 'Teamwork' && abilityPhaseOk) usable = true;
     if (pick.ability === 'Heating Up' && abilityPhaseOk && playerHp > 3) usable = true;
-    if (pick.ability === 'Change of Heart' && abilityPhaseOk && iceShards >= 2) usable = true;
+    if (pick.ability === 'Change of Heart' && abilityPhaseOk && iceShards >= 1) usable = true;
     if (pick.ability === 'Bogus' && abilityPhaseOk && !bogeyReflectUsed && !bogeyReflectArmed) usable = true;
     abBtn.classList.toggle('usable', usable);
   }
@@ -4231,8 +4231,8 @@ function activateAbility() {
     updateItemUsability();
   }
 
-  if (pick.ability === 'Change of Heart' && iceShards >= 2) {
-    iceShards -= 2;
+  if (pick.ability === 'Change of Heart' && iceShards >= 1) {
+    iceShards -= 1;
     const tempHp = playerHp;
     playerHp = enemyHp;
     enemyHp = tempHp;
@@ -4641,10 +4641,7 @@ function doEnemyRoll() {
         return;
       }
 
-      const predMsg = (enemy && enemy.ability === 'Valley Guardian' && enemyPrediction && !vsMode)
-        ? `&nbsp;<b class="them">${enemy.name} predicted ${enemyPrediction}!</b>&nbsp;`
-        : '';
-      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.${predMsg}&nbsp;<b class="you">Your turn!</b>`);
+      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;<b class="you">Your turn!</b>`);
       phase = 1;
 
       // Patrick: Stone Form — don't roll, auto-resolve
@@ -4665,9 +4662,15 @@ function doEnemyRoll() {
   }, rollDelay);
   }; // end doRollAnimation
 
+  // Romy: announce prediction before rolling to build anticipation
+  const romyPredicting = enemy && enemy.ability === 'Valley Guardian' && enemyPrediction && !vsMode;
+
   // Grace: show splash before rolling if Antoinette matches extra dice
   if (graceTriggered) {
     showAbilitySplash('Grace', `Matching your ${getPlayerDiceCount()} dice!`, 1400, doRollAnimation, 'enemyCard');
+  } else if (romyPredicting) {
+    narrate(`<b class="them">${enemy.name} predicts... ${enemyPrediction}!</b>`);
+    showAbilitySplash('Valley Guardian', `"I predict... ${enemyPrediction}!"`, 1600, doRollAnimation, 'enemyCard');
   } else {
     doRollAnimation();
   }
@@ -5882,8 +5885,8 @@ function showVictory() {
 }
 
 function saveRunToHallOfFame(battleWins, deadNames) {
-  const hof = getHallOfFame();
-  const runId = Date.now(); // unique per run
+  // Replace entire HoF with just this run — only ghosts that actually battled
+  const hof = [];
 
   // Group wins by ghost
   const ghostWins = {};
@@ -5892,14 +5895,13 @@ function saveRunToHallOfFame(battleWins, deadNames) {
     ghostWins[w.ghost].bosses.push(w.boss);
   });
 
-  // Add each ghost as one entry with their full defeated list
+  // Only include ghosts that won at least one fight
   Object.entries(ghostWins).forEach(([ghostName, data]) => {
     hof.push({
       ghost: ghostName,
       file: data.file,
       defeated: data.bosses,
-      fallen: deadNames.includes(ghostName),
-      runId
+      fallen: deadNames.includes(ghostName)
     });
   });
 
