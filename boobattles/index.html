@@ -3212,8 +3212,13 @@ function applyLogeyEffect(opponentRoll, isPlayerLogey) {
   if (!opponentRoll) return;
   const highCount = opponentRoll.dice.filter(d => d >= 5).length;
   if (highCount > 0) {
-    if (isPlayerLogey) enemyRemoveDice += highCount;
-    else playerRemoveDice += highCount;
+    if (isPlayerLogey) {
+      enemyRemoveDice += highCount;
+      narrate(`<b class="gold">Heinous!</b> ${highCount} of ${enemy.name}'s dice locked out!`);
+    } else {
+      playerRemoveDice += highCount;
+      narrate(`<b class="them">Heinous!</b> ${highCount} of your dice locked out!`);
+    }
   }
 }
 
@@ -4127,6 +4132,9 @@ function doPlayerRoll() {
         finalDice = [...playerDiceValues];
       }
       const pRoll = analyzeRoll(finalDice);
+
+      // Enemy Logey: lock out player's high dice for next round
+      if (enemy && enemy.ability === 'Heinous') applyLogeyEffect(pRoll, false);
 
       // Highlight dice
       if (dieCount > 3) highlightBestThree(playerDiceValues, pRoll);
@@ -5042,10 +5050,15 @@ function showVsPick(player) {
 
   const grid = document.getElementById('vsGhostGrid');
   grid.innerHTML = '';
-  // 6 random non-legendary ghosts (exclude P1's pick for P2)
-  const pool = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  const available = shuffled.slice(0, 6);
+  // 6 random ghosts — sometimes include up to 2 legendaries
+  const nonLeg = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
+  const legends = ALL_GHOSTS.filter(g => g.rarity === 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
+  const shuffledNon = [...nonLeg].sort(() => Math.random() - 0.5);
+  const shuffledLeg = [...legends].sort(() => Math.random() - 0.5);
+  // 30% chance to include legendaries, max 2
+  const numLeg = Math.random() < 0.30 ? Math.min(2, shuffledLeg.length) : 0;
+  const picks = [...shuffledLeg.slice(0, numLeg), ...shuffledNon.slice(0, 6 - numLeg)];
+  const available = picks.sort(() => Math.random() - 0.5);
   const cards = [];
   available.forEach(g => {
     const c = document.createElement('div');
