@@ -4919,6 +4919,19 @@ function doPlayerRoll() {
     for (let i = 0; i < dieCount; i++) playerDiceValues.push(Math.floor(Math.random()*6)+1);
   }
 
+  // Guard Thomas: player-side luck — 15% triples, 20% doubles boost
+  if (pick.ability === 'Stoic') {
+    const r = Math.random();
+    if (r < 0.15) {
+      const v = Math.floor(Math.random()*6)+1;
+      playerDiceValues = [v, v, v];
+    } else if (r < 0.35) {
+      const v = Math.floor(Math.random()*6)+1;
+      playerDiceValues[0] = v;
+      playerDiceValues[1] = v;
+    }
+  }
+
   // Wim's Slash boost: +15% chance all dice become odd
   if (pick.ability === 'Slash' && !playerDiceValues.every(d => d % 2 === 1) && Math.random() < 0.15) {
     playerDiceValues = playerDiceValues.map(d => d % 2 === 0 ? d - 1 || 1 : d);
@@ -5776,9 +5789,31 @@ function showRewards() {
   }
 }
 
+// Featured ghosts with individual draw boost chances
+const FEATURED_GHOSTS = [
+  { name: 'Prince Balatron', chance: 0.15 },
+  { name: 'Kairan', chance: 0.15 },
+  { name: 'Katrina', chance: 0.15 },
+  { name: 'Romy', chance: 0.12, minBoss: 4 },
+  { name: 'Eloise', chance: 0.18 },
+  { name: 'Guard Thomas', chance: 0.18 },
+];
+
 function drawGhost(weights) {
   const available = ALL_GHOSTS.filter(g => !state.usedCards.includes(g.name));
   if (available.length === 0) return null;
+
+  // Check each featured ghost for a boost draw
+  const eligibleFeatured = FEATURED_GHOSTS.filter(f =>
+    available.some(g => g.name === f.name) && (!f.minBoss || state.currentBoss >= f.minBoss)
+  );
+  for (const feat of eligibleFeatured.sort(() => Math.random() - 0.5)) {
+    if (Math.random() < feat.chance) {
+      const ghost = available.find(g => g.name === feat.name);
+      state.usedCards.push(ghost.name);
+      return { ...ghost, hp: ghost.maxHp };
+    }
+  }
 
   // Pick rarity by weight
   const roll = Math.random();
