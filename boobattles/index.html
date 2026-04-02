@@ -748,9 +748,9 @@
   .pb-title {
     font-family: 'Creepster', cursive;
     font-size: 1.6rem;
-    color: var(--enemy);
+    color: var(--gold);
     letter-spacing: 3px;
-    text-shadow: 0 0 16px rgba(248,113,113,0.3);
+    text-shadow: 0 0 16px rgba(251,191,36,0.4);
   }
 
   .pb-vs {
@@ -1799,7 +1799,7 @@
 
   <!-- MAP -->
   <div class="screen map-screen" id="mapScreen">
-    <div class="map-title" id="mapTitle">Spirit Gauntlet</div>
+    <div class="map-title" id="mapTitle">Battle of Origins</div>
     <div class="map-path" id="mapPath"></div>
     <div class="map-bottom">
       <div class="map-section-label">Your Ghosts</div>
@@ -2185,7 +2185,7 @@ let enemyRemoveDice = 0;        // Dice removed from enemy next roll
 let bogeyReflectUsed = false;   // Bogey one-time reflect tracker
 let isFirstRoll = true;         // For Nikon's Ambush
 let tookDamageLastRound = false;// For Simon's Brew Time
-let carryOverShards = 0;        // Powder's Final Gift shards for next ghost
+// Powder's Final Gift adds shards directly to iceShards (persists between fights)
 
 // ══════════════════════════════════════════════
 // SCRIPTED BOSS FIGHTS — cinematic dice sequences
@@ -2437,6 +2437,7 @@ function initTitle() {
 
 function beginRun() {
   state = newState(false);
+  iceShards = 0; sacredFires = 0; // reset for new run
   saveState();
   showInitialPick();
 }
@@ -2450,6 +2451,7 @@ function continueRun() {
 function retryRun() {
   stopSnow();
   state = newState(true);
+  iceShards = 0; sacredFires = 0; // reset for new run
   saveState();
   showInitialPick();
 }
@@ -2617,7 +2619,7 @@ function showMap() {
 
   } else {
     // Regular phase: big current boss showcase + compact defeated/locked list
-    title.textContent = 'Spirit Gauntlet';
+    title.textContent = 'Battle of Origins';
 
     // Big showcase for current boss
     const currentBoss = BOSSES[state.currentBoss];
@@ -2626,7 +2628,7 @@ function showMap() {
       const showcase = document.createElement('div');
       showcase.className = 'map-boss-showcase';
       showcase.innerHTML = `
-        <div style="font-size:0.7rem;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${location}</div>
+        <div style="font-family:'Creepster',cursive;font-size:0.9rem;color:var(--gold);letter-spacing:2px;text-shadow:0 0 10px rgba(251,191,36,0.3);margin-bottom:4px;">${location}</div>
         <div class="map-boss-card"><img src="${IMG}${currentBoss.file}"></div>
         <div class="map-boss-name">${currentBoss.name}</div>
         <div class="map-boss-detail">${currentBoss.ability} · ${currentBoss.bossHp} HP</div>
@@ -3034,9 +3036,8 @@ function startBattle() {
   playerDiceValues = [];
 
   // Reset ability state
-  iceShards = carryOverShards; carryOverShards = 0; // Powder's Final Gift
+  // Player ice shards & sacred fires persist between fights
   enemyIceShards = 0;
-  sacredFires = 0;
   enemySacredFires = 0;
   committedShards = 0;
   committedFires = 0;
@@ -4070,7 +4071,7 @@ function resolveRound(pRoll, eRoll) {
 
         const afterEffects = () => {
           if (playerHp <= 0) {
-            if (pick.ability === 'Final Gift') carryOverShards = 3;
+            if (pick.ability === 'Final Gift') iceShards += 3;
             setTimeout(() => { narrate(`<b class="them">${pick.name} is defeated!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
           } else if (pick.ability === 'Party Time' && playerHp > 0) {
             // Player's Party Time: lose & survive → counter die
