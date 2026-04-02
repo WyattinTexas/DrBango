@@ -4708,7 +4708,20 @@ function doEnemyRoll() {
     showAbilitySplash('Grace', `Matching your ${getPlayerDiceCount()} dice!`, 1400, doRollAnimation, 'enemyCard');
   } else if (romyPredicting) {
     narrate(`<b class="them">${enemy.name} predicts... ${enemyPrediction}!</b>`);
-    showAbilitySplash('Valley Guardian', `"I predict... ${enemyPrediction}!"`, 1600, doRollAnimation, 'enemyCard');
+    // Masked Hero: Underdog counters enemy prediction
+    if (pick.ability === 'Underdog') {
+      showAbilitySplash('Valley Guardian', `"I predict... ${enemyPrediction}!"`, 1600, () => {
+        enemyHp -= 3;
+        updateHpDisplay();
+        showAbilitySplash('Underdog', '3 damage counter!', 1400, () => {
+          narrate(`<b class="gold">Underdog!</b> 3 damage to ${enemy.name}!`);
+          if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+          doRollAnimation();
+        }, 'playerCard');
+      }, 'enemyCard');
+    } else {
+      showAbilitySplash('Valley Guardian', `"I predict... ${enemyPrediction}!"`, 1600, doRollAnimation, 'enemyCard');
+    }
   } else {
     doRollAnimation();
   }
@@ -4927,6 +4940,19 @@ function doPlayerRoll() {
       playerDiceValues = [v, v, v];
     } else if (r < 0.35) {
       const v = Math.floor(Math.random()*6)+1;
+      playerDiceValues[0] = v;
+      playerDiceValues[1] = v;
+    }
+  }
+
+  // Masked Hero: at 1 HP, 40% triples, 30% high doubles — clutch mode
+  if (pick.ability === 'Underdog' && playerHp === 1) {
+    const r = Math.random();
+    if (r < 0.40) {
+      const v = Math.ceil(Math.random()*4)+2; // 3-6 triples
+      playerDiceValues = playerDiceValues.map(() => v);
+    } else if (r < 0.70) {
+      const v = Math.ceil(Math.random()*3)+3; // high doubles (4-6)
       playerDiceValues[0] = v;
       playerDiceValues[1] = v;
     }
@@ -5389,6 +5415,22 @@ function nextRound() {
     const highCount = pRollForHeinous.dice.filter(d => d >= 5).length;
     if (highCount > 0) {
       playerRemoveDice += highCount;
+      // Masked Hero: Underdog counters enemy Heinous
+      if (pick.ability === 'Underdog') {
+        showAbilitySplash('Heinous', `${highCount} dice locked out!`, 1600, () => {
+          narrate(`<b class="them">Heinous!</b> ${highCount} of your dice locked!`);
+          enemyHp -= 3;
+          updateHpDisplay();
+          setTimeout(() => {
+            showAbilitySplash('Underdog', '3 damage counter!', 1400, () => {
+              narrate(`<b class="gold">Underdog!</b> 3 damage to ${enemy.name}!`);
+              if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+              setTimeout(() => continueNextRound(), 600);
+            }, 'playerCard');
+          }, 400);
+        }, 'enemyCard');
+        return;
+      }
       showAbilitySplash('Heinous', `${highCount} dice locked out!`, 1600, () => {
         narrate(`<b class="them">Heinous!</b> ${highCount} of your dice locked!`);
         setTimeout(() => continueNextRound(), 600);
@@ -5427,6 +5469,20 @@ function continueNextRound() {
       playerHp -= 1;
       updateHpDisplay();
       narrate(`<b class="them">Haunt!</b> ${pick.name} takes 1 damage!`);
+      // Masked Hero: Underdog counters enemy before-rolling effects
+      if (pick.ability === 'Underdog') {
+        enemyHp -= 3;
+        updateHpDisplay();
+        setTimeout(() => {
+          showAbilitySplash('Underdog', '3 damage counter!', 1400, () => {
+            narrate(`<b class="gold">Underdog!</b> 3 damage to ${enemy.name}!`);
+            if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+            if (playerHp <= 0) { setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600); return; }
+            doEnemyRoll();
+          }, 'playerCard');
+        }, 800);
+        return;
+      }
       if (playerHp <= 0) {
         setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
         return;
