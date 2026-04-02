@@ -210,8 +210,9 @@
   /* ======== PICK SCREEN ======== */
   .pick-screen {
     align-items: center;
-    justify-content: space-evenly;
-    padding: 16px 0;
+    justify-content: center;
+    gap: 24px;
+    padding: 20px 0;
     position: relative;
     overflow: hidden;
   }
@@ -232,21 +233,21 @@
 
   .pick-label {
     font-family: 'Creepster', cursive;
-    font-size: 2.4rem;
+    font-size: 1.6rem;
     color: var(--player);
-    letter-spacing: 3px;
+    letter-spacing: 2px;
     text-align: center;
-    text-shadow: 0 0 24px rgba(103,232,249,0.3);
-    line-height: 1.2;
+    text-shadow: 0 0 16px rgba(103,232,249,0.25);
+    line-height: 1.4;
   }
 
   .ghost-grid {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     justify-content: center;
     align-items: stretch;
     width: 100%;
-    max-width: 520px;
+    max-width: 480px;
   }
 
   .pick-card {
@@ -1874,9 +1875,31 @@
     cursor: pointer;
   }
 
-  /* VS mode: hide shared action bar */
+  /* VS mode: hide shared action bar + narrator, use corner buttons */
   .battle-screen.vs-mode .battle-action-bar { display: none; }
-  .battle-screen.vs-mode .battle-ui-row .action-btn { width: auto; padding: 10px 28px; }
+  .battle-screen.vs-mode .battle-ui-row .action-btn { display: none; }
+
+  /* Blue's roll button — bottom-right corner in VS */
+  .vs-blue-roll-area {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 15;
+    display: none;
+  }
+  .vs-blue-roll-area.active { display: block; }
+  .vs-blue-roll-btn {
+    font-family: 'Creepster', cursive;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    padding: 8px 24px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--player), #0891b2);
+    color: #fff;
+    box-shadow: 0 0 16px rgba(103,232,249,0.4);
+    cursor: pointer;
+  }
 
   /* VS turn indicators */
   .vs-turn-banner {
@@ -2072,7 +2095,10 @@
   <div class="screen battle-screen" id="battleScreen">
     <div class="spirit-particles" id="spiritParticles"></div>
     <div class="vs-red-roll-area" id="vsRedRollArea">
-      <button class="vs-red-roll-btn" id="vsRedRollBtn" onclick="vsRedRoll()">Roll Dice!</button>
+      <button class="vs-red-roll-btn" onclick="vsRedRoll()">Roll Dice!</button>
+    </div>
+    <div class="vs-blue-roll-area" id="vsBlueRollArea">
+      <button class="vs-blue-roll-btn" onclick="vsBlueRoll()">Roll Dice!</button>
     </div>
     <div class="enemy-zone">
       <div class="name-plate enemy-plate" id="enemyPlate">
@@ -5330,15 +5356,14 @@ function vsStartBothRolls() {
   for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
   narrate('Both players — Roll!');
   document.getElementById('vsRedRollArea').classList.add('active');
-  document.getElementById('rollBtn').textContent = 'Roll Dice!';
-  document.getElementById('rollBtn').classList.add('ready');
-  document.getElementById('rollBtn').onclick = vsBlueRoll;
+  document.getElementById('vsBlueRollArea').classList.add('active');
 }
 
 function vsRedRoll() {
   if (vsRedRolled) return;
   vsRedRolled = true;
   document.getElementById('vsRedRollArea').classList.remove('active');
+  document.getElementById('vsBlueRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
   vsRedDice = rollDice();
   for (let i = 0; i < 3; i++) { const d = document.getElementById('eDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
@@ -5351,7 +5376,7 @@ function vsRedRoll() {
 function vsBlueRoll() {
   if (vsBlueRolled) return;
   vsBlueRolled = true;
-  document.getElementById('rollBtn').classList.remove('ready');
+  document.getElementById('vsBlueRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
   vsBlueDice = rollDice();
   for (let i = 0; i < 3; i++) { const d = document.getElementById('pDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
