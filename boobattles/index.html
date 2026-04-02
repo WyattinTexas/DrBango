@@ -529,225 +529,323 @@
     100% { transform: scale(1); opacity: 1; }
   }
 
-  /* ======== MAP SCREEN ======== */
+  /* ======== MAP SCREEN (Tournament Road) ======== */
   .map-screen {
-    padding: 12px 0;
+    padding: 0;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    --accent: #67e8f9;
   }
 
-  .map-screen::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, #0a0a1a 0%, #120820 50%, #0a0a1a 100%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
+  .map-screen::before { display: none; }
   .map-screen > * { position: relative; z-index: 1; }
 
-  .map-title {
-    font-family: 'Creepster', cursive;
-    font-size: 1.4rem;
-    color: var(--gold);
-    text-align: center;
-    letter-spacing: 2px;
-    margin-bottom: 8px;
+  /* Progress bar */
+  .tournament-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 14px 16px 10px;
+    position: relative;
+    opacity: 0;
+  }
+  .map-entered .tournament-progress {
+    animation: slideUpFade 0.5s ease-out 0ms forwards;
+  }
+  .tournament-progress::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 24px;
+    right: 24px;
+    height: 2px;
+    background: rgba(255,255,255,0.08);
+    transform: translateY(-50%);
+    margin-top: 2px;
   }
 
-  .map-path {
+  .progress-node {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    margin: 0 4px;
+    transition: all 0.3s;
+  }
+  .progress-node.defeated {
+    background: var(--green, #4ade80);
+    box-shadow: 0 0 6px rgba(74,222,128,0.4);
+  }
+  .progress-node.defeated::after {
+    content: '\2713';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8px;
+    font-weight: 900;
+    color: #000;
+    line-height: 1;
+  }
+  .progress-node.current {
+    width: 18px;
+    height: 18px;
+    background: var(--gold, #f59e0b);
+    box-shadow: 0 0 12px rgba(245,158,11,0.6);
+    animation: nodeGlow 2s ease-in-out infinite;
+  }
+  .progress-node.upcoming {
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.15);
+  }
+  .progress-node.legendary { border-color: rgba(168,85,247,0.3); }
+  .progress-node.legendary.defeated {
+    background: #a855f7;
+    border: none;
+  }
+  .progress-node.legendary.defeated::after { color: #fff; }
+  .progress-node.legendary.current {
+    background: #a855f7;
+    box-shadow: 0 0 16px rgba(168,85,247,0.7);
+  }
+
+  /* Opponent reveal */
+  .opponent-reveal {
     flex: 1;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
     gap: 6px;
-    padding: 0 8px;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  .map-node {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    transition: all 0.3s;
-    min-height: 44px;
-  }
-
-  .map-node.defeated {
-    opacity: 0.35;
-    filter: grayscale(0.5);
-  }
-
-  .map-node.locked {
-    opacity: 0.4;
-  }
-
-  .map-node-thumb {
-    width: 34px;
-    height: 48px;
-    border-radius: 6px;
-    overflow: hidden;
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-
-  .map-node-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .map-node.locked .map-node-thumb { filter: brightness(0) saturate(0); }
-
-  .map-node-info { flex: 1; }
-
-  .map-node-name {
-    font-family: 'Creepster', cursive;
-    font-size: 0.85rem;
-    color: #888;
-    letter-spacing: 1px;
-  }
-
-  .map-node-detail {
-    font-size: 0.55rem;
-    color: #555;
-    margin-top: 1px;
-  }
-
-  .map-node-status {
+  .fight-number {
     font-size: 0.65rem;
-    font-weight: 700;
-    flex-shrink: 0;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    opacity: 0;
+  }
+  .map-entered .fight-number {
+    animation: slideUpFade 0.5s ease-out 200ms forwards;
   }
 
-  .map-node.defeated .map-node-status { color: var(--green); }
+  .location-banner {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px color-mix(in srgb, var(--accent) 40%, transparent);
+    opacity: 0;
+  }
+  .map-entered .location-banner {
+    animation: slideUpFade 0.5s ease-out 400ms forwards;
+  }
 
-  /* Current boss: big showcase above the list */
-  .map-boss-showcase {
+  .boss-entrance {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 8px;
   }
 
-  .map-boss-card {
-    width: 150px;
-    border-radius: 14px;
+  .boss-card-showcase {
+    width: 180px;
+    border-radius: 16px;
     overflow: hidden;
-    border: 3px solid rgba(103,232,249,0.5);
-    box-shadow: 0 0 24px rgba(103,232,249,0.25), 0 0 48px rgba(103,232,249,0.1);
-    animation: legendaryPulse 2s ease-in-out infinite;
+    border: 3px solid var(--accent);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 40%, transparent),
+                0 0 60px color-mix(in srgb, var(--accent) 15%, transparent);
+    opacity: 0;
   }
-  .map-boss-card img { width: 100%; display: block; }
+  .map-entered .boss-card-showcase {
+    animation: slideUpFade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 600ms forwards;
+  }
+  .boss-card-showcase img { width: 100%; display: block; }
 
-  .map-boss-name {
+  .boss-name-reveal {
     font-family: 'Creepster', cursive;
-    font-size: 1.6rem;
-    color: var(--player);
-    letter-spacing: 2px;
-    text-shadow: 0 0 16px rgba(103,232,249,0.4);
+    font-size: 2.5rem;
+    color: #fff;
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px color-mix(in srgb, var(--accent) 50%, transparent),
+                 0 2px 8px rgba(0,0,0,0.8);
+    opacity: 0;
+  }
+  .map-entered .boss-name-reveal {
+    animation: bossNameSlam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 900ms forwards;
   }
 
-  .map-boss-detail {
+  .boss-stats-reveal {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+  }
+  .map-entered .boss-stats-reveal {
+    animation: slideUpFade 0.4s ease-out 1100ms forwards;
+  }
+
+  .hp-pips { display: flex; gap: 4px; }
+  .hp-pip {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239,68,68,0.5);
+  }
+  .hp-text {
     font-size: 0.75rem;
-    color: #888;
-    font-weight: 600;
-  }
-
-  /* Bottom bar: collection + items + challenge button */
-  .map-bottom {
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding-top: 10px;
-    margin-top: 8px;
-  }
-
-  .map-section-label {
-    font-size: 0.6rem;
-    font-weight: 700;
-    color: #555;
-    text-transform: uppercase;
+    font-weight: 800;
+    color: rgba(255,255,255,0.5);
     letter-spacing: 1px;
+  }
+
+  .boss-ability-card {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 10px 16px;
+    text-align: center;
+    max-width: 300px;
+    opacity: 0;
+  }
+  .map-entered .boss-ability-card {
+    animation: slideUpFade 0.4s ease-out 1100ms forwards;
+  }
+  .ability-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 2px;
     margin-bottom: 4px;
   }
+  .ability-desc {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+  }
 
-  .collection-row {
+  .stakes-text {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    opacity: 0;
+  }
+  .map-entered .stakes-text {
+    animation: slideUpFade 0.4s ease-out 1300ms forwards;
+  }
+
+  /* Team status bar */
+  .team-status-bar {
+    background: rgba(0,0,0,0.5);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 10px 12px 12px;
     display: flex;
+    flex-direction: column;
     gap: 8px;
+    opacity: 0;
+  }
+  .map-entered .team-status-bar {
+    animation: slideUpFade 0.4s ease-out 1500ms forwards;
+  }
+
+  .team-ghosts {
+    display: flex;
+    gap: 6px;
     overflow-x: auto;
-    padding: 4px 0;
+    padding: 2px 0;
     -webkit-overflow-scrolling: touch;
   }
-
-  .collection-card {
-    width: 40px;
-    height: 56px;
-    border-radius: 6px;
+  .team-ghost-thumb {
+    width: 48px;
+    height: 66px;
+    border-radius: 8px;
     overflow: hidden;
     flex-shrink: 0;
-    border: 2px solid rgba(103,232,249,0.3);
+    border: 2px solid rgba(255,255,255,0.1);
     position: relative;
-    cursor: pointer;
-    transition: all 0.2s;
   }
-
-  .collection-card img { width: 100%; height: 100%; object-fit: cover; }
-
-  .collection-card.dead {
-    filter: grayscale(1) brightness(0.4);
-    border-color: rgba(248,113,113,0.3);
-    pointer-events: none;
+  .team-ghost-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .team-ghost-thumb.dead {
+    filter: grayscale(1) brightness(0.3);
+    border-color: rgba(239,68,68,0.4);
   }
-
-  .collection-card .cc-hp {
+  .dead-x {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0,0,0,0.7);
-    font-size: 0.45rem;
-    font-weight: 800;
-    text-align: center;
-    padding: 1px 0;
-    color: var(--player);
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: rgba(239,68,68,0.7);
+    text-shadow: 0 0 8px rgba(239,68,68,0.5);
   }
 
-  .item-row {
+  .team-items {
     display: flex;
     gap: 8px;
-    margin-top: 6px;
-    align-items: center;
+    min-height: 20px;
   }
-
-  .item-slot {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    border: 2px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.03);
+  .team-item-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
-    position: relative;
+    font-size: 1rem;
   }
 
-  .item-slot.empty { opacity: 0.3; }
-
-  .item-slot .item-label {
-    position: absolute;
-    bottom: -12px;
-    font-size: 0.45rem;
-    font-weight: 700;
-    color: #666;
-    white-space: nowrap;
+  .fight-btn {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    font-family: 'Creepster', cursive;
+    font-size: 1.8rem;
+    letter-spacing: 6px;
+    cursor: pointer;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 20%, transparent);
+    animation: fightPulse 2s ease-in-out infinite;
+    -webkit-tap-highlight-color: transparent;
   }
+  .fight-btn:active { transform: scale(0.97); }
 
-  .map-challenge-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-    justify-content: center;
+  /* Map screen animations */
+  @keyframes slideUpFade {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes bossNameSlam {
+    from { transform: scale(1.4); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes fightPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+  @keyframes nodeGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+    50% { box-shadow: 0 0 20px rgba(245,158,11,0.8), 0 0 40px rgba(245,158,11,0.3); }
   }
 
   /* Legendary phase — epic boss showcase */
@@ -3528,97 +3626,106 @@ function confirmPick() {
 // ══════════════════════════════════════════════
 // MAP SCREEN
 // ══════════════════════════════════════════════
+function getStakesText(bossIndex, deadCount, aliveCount) {
+  if (bossIndex === 0) return 'Your journey begins...';
+  if (bossIndex === 1) return 'The tournament continues.';
+  if (bossIndex === 2) return `${bossIndex} challengers defeated.`;
+  if (deadCount > 0 && aliveCount <= 2) return `Only ${aliveCount} Spiritkin remain. Tread carefully.`;
+  if (deadCount > 0 && aliveCount <= 3) return `${deadCount} fallen. ${aliveCount} still fighting.`;
+  if (bossIndex === 8) return 'The legendary trials begin.';
+  if (bossIndex === 9) return 'Almost there. Stay focused.';
+  if (bossIndex === 10) return 'One more after this.';
+  if (bossIndex === 11) return 'The final battle awaits.';
+  if (bossIndex >= 5) return `${bossIndex} down, ${12 - bossIndex} to go. The road gets harder.`;
+  return `${bossIndex} down, ${12 - bossIndex} to go.`;
+}
+
 function showMap() {
   showScreen('mapScreen');
-  const path = document.getElementById('mapPath');
-  path.innerHTML = '';
-  const title = document.getElementById('mapTitle');
+  const boss = BOSSES[state.currentBoss];
+  const location = BOSS_LOCATIONS[state.currentBoss] || 'Unknown';
+  const theme = LOCATION_THEMES[location] || { bg: 'linear-gradient(180deg, #0a0a1a, #1a1a2a)', accent: '#67e8f9' };
 
-  // Legendary phase: epic showcase layout
-  if (state.currentBoss >= 8) {
-    const boss = BOSSES[state.currentBoss];
-    const isFinal = state.currentBoss === 11;
-    title.textContent = 'Battle of Origins';
+  // Apply theme
+  const mapScreen = document.getElementById('mapScreen');
+  mapScreen.style.background = theme.bg;
+  mapScreen.style.setProperty('--accent', theme.accent);
 
-    // Header — tournament round name
-    const header = document.createElement('div');
-    header.className = 'legendary-header';
-    header.textContent = BOSS_LOCATIONS[state.currentBoss];
-    path.appendChild(header);
-
-    // Big boss showcase
-    const showcase = document.createElement('div');
-    showcase.className = 'legendary-boss-showcase';
-    showcase.innerHTML = `
-      <div class="legendary-boss-card${isFinal ? ' final' : ''}"><img src="${IMG}${boss.file}"></div>
-      <div class="legendary-boss-name${isFinal ? ' final' : ''}">${boss.name}</div>
-      <div class="legendary-boss-ability">${boss.ability} · ${boss.bossHp} HP</div>
-    `;
-    path.appendChild(showcase);
-
-    // Mystery cards for upcoming legendaries
-    const remaining = 12 - state.currentBoss - 1;
-    if (remaining > 0) {
-      const upcoming = document.createElement('div');
-      upcoming.className = 'legendary-upcoming';
-      for (let i = 0; i < remaining; i++) {
-        const mystery = document.createElement('div');
-        mystery.className = 'legendary-mystery';
-        mystery.textContent = '?';
-        upcoming.appendChild(mystery);
-      }
-      path.appendChild(upcoming);
-    }
-
-  } else {
-    // Regular phase: big current boss showcase + compact defeated/locked list
-    title.textContent = 'Battle of Origins';
-
-    // Big showcase for current boss
-    const currentBoss = BOSSES[state.currentBoss];
-    if (currentBoss) {
-      const location = BOSS_LOCATIONS[state.currentBoss];
-      const showcase = document.createElement('div');
-      showcase.className = 'map-boss-showcase';
-      showcase.innerHTML = `
-        <div style="font-family:'Creepster',cursive;font-size:1.1rem;color:#ff9f43;letter-spacing:3px;text-shadow:0 0 12px rgba(255,159,67,0.5),0 0 30px rgba(255,107,53,0.2);margin-bottom:6px;border-bottom:1px solid rgba(255,159,67,0.2);padding-bottom:6px;">~ ${location} ~</div>
-        <div class="map-boss-card"><img src="${IMG}${currentBoss.file}"></div>
-        <div class="map-boss-name">${currentBoss.name}</div>
-        <div class="map-boss-detail">${currentBoss.ability} · ${currentBoss.bossHp} HP</div>
-      `;
-      path.appendChild(showcase);
-    }
-
-    // Compact list for defeated + locked (not current)
-    BOSSES.slice(0, 8).forEach((boss, i) => {
-      if (i === state.currentBoss) return; // skip — shown above
-      const node = document.createElement('div');
-      const defeated = i < state.currentBoss;
-      const locked = i > state.currentBoss;
-      node.className = 'map-node' + (defeated ? ' defeated' : '') + (locked ? ' locked' : '');
-
-      const thumbHtml = `<div class="map-node-thumb"><img src="${IMG}${boss.file}" alt="${boss.name}"></div>`;
-      const nameText = locked ? '???' : boss.name;
-      const detailText = locked ? '' : `${boss.ability} · ${boss.bossHp} HP`;
-      const statusText = defeated ? '✓' : '';
-
-      node.innerHTML = `${thumbHtml}<div class="map-node-info"><div class="map-node-name">${i+1}. ${nameText}</div><div class="map-node-detail">${detailText}</div></div><div class="map-node-status">${statusText}</div>`;
-      path.appendChild(node);
-    });
+  // Build progress bar (12 nodes)
+  const progress = document.getElementById('tournamentProgress');
+  progress.innerHTML = '';
+  for (let i = 0; i < BOSSES.length && i < 12; i++) {
+    const node = document.createElement('div');
+    node.className = 'progress-node';
+    if (i < state.currentBoss) node.classList.add('defeated');
+    else if (i === state.currentBoss) node.classList.add('current');
+    else node.classList.add('upcoming');
+    if (i >= 8) node.classList.add('legendary');
+    progress.appendChild(node);
   }
 
-  // Collection
-  const row = document.getElementById('collectionRow');
-  row.innerHTML = '';
-  state.collection.forEach((g, i) => {
-    const c = document.createElement('div');
-    c.className = 'collection-card';
-    c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="cc-hp">${g.hp}/${g.maxHp}</div>`;
-    row.appendChild(c);
+  // Fight number
+  document.getElementById('fightNumber').textContent = `FIGHT ${state.currentBoss + 1} OF 12`;
+
+  // Location
+  document.getElementById('locationBanner').textContent = location;
+
+  // Boss card
+  document.getElementById('bossCardShowcase').innerHTML = `<img src="${IMG}${boss.file}">`;
+
+  // Boss name
+  document.getElementById('bossNameReveal').textContent = boss.name;
+
+  // Boss HP as pips + text
+  const pips = Array(boss.bossHp).fill('<span class="hp-pip"></span>').join('');
+  document.getElementById('bossStatsReveal').innerHTML = `<div class="hp-pips">${pips}</div><div class="hp-text">${boss.bossHp} HP</div>`;
+
+  // Ability card
+  document.getElementById('bossAbilityCard').innerHTML = `
+    <div class="ability-name">${boss.ability}</div>
+    <div class="ability-desc">${boss.abilityDesc}</div>
+  `;
+
+  // Stakes text
+  document.getElementById('stakesText').textContent = getStakesText(state.currentBoss, state.deadGhosts.length, state.collection.length);
+
+  // Team ghosts (living + dead)
+  const teamGhosts = document.getElementById('teamGhosts');
+  teamGhosts.innerHTML = '';
+  state.collection.forEach(g => {
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb';
+    el.innerHTML = `<img src="${IMG}${g.file}">`;
+    teamGhosts.appendChild(el);
+  });
+  state.deadGhosts.forEach(name => {
+    const g = ALL_GHOSTS.find(gh => gh.name === name);
+    if (!g) return;
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb dead';
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="dead-x">\u2715</div>`;
+    teamGhosts.appendChild(el);
   });
 
   // Items
-  renderItemRow();
+  const teamItems = document.getElementById('teamItems');
+  teamItems.innerHTML = '';
+  (state.items || []).forEach(id => {
+    const item = ITEMS[id];
+    if (!item) return;
+    const el = document.createElement('div');
+    el.className = 'team-item-icon';
+    el.textContent = item.icon;
+    teamItems.appendChild(el);
+  });
+
+  // Fight button accent
+  document.getElementById('fightBtn').style.borderColor = theme.accent;
+
+  // Trigger entrance animations by adding a class
+  mapScreen.classList.remove('map-entered');
+  void mapScreen.offsetHeight; // force reflow
+  mapScreen.classList.add('map-entered');
 }
 
 function renderItemRow() {
