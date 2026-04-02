@@ -6386,7 +6386,12 @@ function vsRedRoll() {
   vsRedRolled = true;
   document.getElementById('vsRedRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
-  vsRedDice = rollDice();
+  // Katrina's Seeker: heal before rolling (Red side)
+  if (enemy.ability === 'Seeker' && enemyHp < playerHp) {
+    enemyHp += 1;
+    updateHpDisplay();
+  }
+  vsRedDice = applyVsDiceModifiers(rollDice(), enemy, false);
   for (let i = 0; i < 3; i++) { const d = document.getElementById('eDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
   setTimeout(() => {
     vsRedDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('eDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
@@ -6394,12 +6399,39 @@ function vsRedRoll() {
   }, 900);
 }
 
+// Apply ghost-specific dice modifiers for VS mode
+function applyVsDiceModifiers(dice, ghost, isBlue) {
+  const hp = isBlue ? playerHp : enemyHp;
+  // Wim's Slash: 15% chance all dice become odd
+  if (ghost.ability === 'Slash' && !dice.every(d => d % 2 === 1) && Math.random() < 0.15) {
+    dice = dice.map(d => d % 2 === 0 ? d - 1 || 1 : d);
+  }
+  // Guard Thomas: 15% triples, 20% doubles
+  if (ghost.ability === 'Stoic') {
+    const r = Math.random();
+    if (r < 0.15) { const v = Math.floor(Math.random()*6)+1; dice = [v, v, v]; }
+    else if (r < 0.35) { const v = Math.floor(Math.random()*6)+1; dice[0] = v; dice[1] = v; }
+  }
+  // Masked Hero: 1 HP clutch — 40% triples, 30% high doubles
+  if (ghost.ability === 'Underdog' && hp === 1) {
+    const r = Math.random();
+    if (r < 0.40) { const v = Math.ceil(Math.random()*4)+2; dice = dice.map(() => v); }
+    else if (r < 0.70) { const v = Math.ceil(Math.random()*3)+3; dice[0] = v; dice[1] = v; }
+  }
+  return dice;
+}
+
 function vsBlueRoll() {
   if (vsBlueRolled) return;
   vsBlueRolled = true;
   document.getElementById('vsBlueRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
-  vsBlueDice = rollDice();
+  // Katrina's Seeker: heal before rolling
+  if (pick.ability === 'Seeker' && playerHp < enemyHp) {
+    playerHp += 1;
+    updateHpDisplay();
+  }
+  vsBlueDice = applyVsDiceModifiers(rollDice(), pick, true);
   for (let i = 0; i < 3; i++) { const d = document.getElementById('pDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
   setTimeout(() => {
     vsBlueDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('pDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
