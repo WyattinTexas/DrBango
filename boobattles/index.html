@@ -2059,7 +2059,7 @@ const ALL_GHOSTS = [
   { name:"Bubble Boys", file:"bubble_boys.jpg", rarity:"uncommon", maxHp:9, ability:"Pop", abilityDesc:"If the enemy rolls triples, Bubble Boys are defeated." },
   { name:"Guard Thomas", file:"guard_thomas.jpg", rarity:"uncommon", maxHp:6, ability:"Stoic", abilityDesc:"Below 6 HP: immune to singles damage." },
   { name:"Bogey", file:"bogey.jpg", rarity:"uncommon", maxHp:5, ability:"Bogus", abilityDesc:"Reflect all incoming damage. Once per game." },
-  { name:"Roger", file:"roger.jpg", rarity:"uncommon", maxHp:6, ability:"Tempest", abilityDesc:"Roll doubles with a 6 kicker: gain 3 Ice Shards." },
+  { name:"Roger", file:"roger.jpg", rarity:"uncommon", maxHp:6, ability:"Tempest", abilityDesc:"Roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires." },
   { name:"Masked Hero", file:"masked_hero.jpg", rarity:"uncommon", maxHp:5, ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage." },
   { name:"Chad", file:"chad.jpg", rarity:"uncommon", maxHp:6, ability:"Sploop!", abilityDesc:"On entry, gain 2 Ice Shards." },
   { name:"Marcus", file:"marcus.jpg", rarity:"uncommon", maxHp:7, ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: gain 4 extra dice next roll." },
@@ -2942,10 +2942,21 @@ function afterWinTriggers(winner, loser, roll, damage, isPlayer) {
     if (isPlayer) sacredFires += 1; else enemySacredFires += 1;
     effects.push({ text: `<b class="gold">Burning Soul!</b> +1 Sacred Fire`, ability: 'Burning Soul', desc: '+1 Sacred Fire!' });
   }
-  // Roger: doubles with 6 kicker → +3 ice shards
-  if (winner.ability === 'Tempest' && roll.type === 'doubles' && roll.kicker === 6) {
-    if (isPlayer) iceShards += 3; else enemyIceShards += 3;
-    effects.push({ text: `<b class="gold">Tempest!</b> +3 Ice Shards!`, ability: 'Tempest', desc: '+3 Ice Shards!' });
+  // Roger: 2 different pairs of doubles in full roll (4+ dice) → +3 sacred fires
+  if (winner.ability === 'Tempest' && isPlayer && playerDiceValues.length >= 4) {
+    const counts = {};
+    playerDiceValues.forEach(d => counts[d] = (counts[d]||0)+1);
+    const pairs = Object.values(counts).filter(c => c >= 2).length;
+    if (pairs >= 2) {
+      sacredFires += 3;
+      effects.push({ text: `<b class="gold">Tempest!</b> Two pairs! +3 Sacred Fires!`, ability: 'Tempest', desc: 'Two pairs of doubles! +3 Sacred Fires!' });
+    }
+  } else if (winner.ability === 'Tempest' && !isPlayer) {
+    // Enemy Roger: simplified — 20% chance on any win with doubles
+    if (roll.type === 'doubles' && Math.random() < 0.20) {
+      enemySacredFires += 3;
+      effects.push({ text: `<b class="gold">Tempest!</b> +3 Sacred Fires!`, ability: 'Tempest', desc: '+3 Sacred Fires!' });
+    }
   }
   // Outlaw: doubles → remove 1 enemy die next turn
   if (winner.ability === 'Thief' && roll.type === 'doubles') {
@@ -3878,6 +3889,22 @@ function doPlayerRoll() {
   // Wim's Slash boost: +15% chance all dice become odd
   if (pick.ability === 'Slash' && !playerDiceValues.every(d => d % 2 === 1) && Math.random() < 0.15) {
     playerDiceValues = playerDiceValues.map(d => d % 2 === 0 ? d - 1 || 1 : d);
+  }
+
+  // Roger's Tempest boost: 80% chance to force 2 pairs when rolling 4+ dice
+  if (pick.ability === 'Tempest' && playerDiceValues.length >= 4 && Math.random() < 0.80) {
+    const v1 = Math.floor(Math.random()*6)+1;
+    let v2 = Math.floor(Math.random()*5)+1;
+    if (v2 >= v1) v2++; // ensure different pair
+    playerDiceValues[0] = v1;
+    playerDiceValues[1] = v1;
+    playerDiceValues[2] = v2;
+    playerDiceValues[3] = v2;
+    // Shuffle so it doesn't look rigged
+    for (let i = playerDiceValues.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playerDiceValues[i], playerDiceValues[j]] = [playerDiceValues[j], playerDiceValues[i]];
+    }
   }
 
   // Kodako: check for 1-2-3 before analyzing
