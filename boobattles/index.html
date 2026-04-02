@@ -3725,6 +3725,31 @@ function describeRoll(roll) {
 
 function isTripleOrBetter(type) { return ['triples','quads','penta','sixcity'].includes(type); }
 
+// VS-aware narration helpers
+const VS_TIE_LINES = [
+  'Dead even! Both sides dig in for another roll!',
+  'Matched! Neither side gives an inch!',
+  'A standoff! The dice demand a rematch!',
+  'Evenly matched! Roll again!',
+  'Stalemate! The spirits clash again!',
+];
+const VS_WIN_LINES = [
+  (w, l, d) => `<b class="gold">${w}</b> strikes for <b class="gold">${d} damage</b> to ${l}!`,
+  (w, l, d) => `<b class="gold">${d} damage!</b> ${w} lands a clean hit on ${l}!`,
+  (w, l, d) => `${w} connects — <b class="gold">${d} damage</b> crashes into ${l}!`,
+  (w, l, d) => `<b class="gold">${d} to ${l}!</b> ${w} takes the round!`,
+];
+const VS_BIG_WIN_LINES = [
+  (w, l, d) => `<b class="gold">DEVASTATING!</b> ${w} unleashes <b class="gold">${d} damage</b> on ${l}!`,
+  (w, l, d) => `<b class="gold">${d} DAMAGE!</b> ${w} crushes ${l} with a massive hit!`,
+  (w, l, d) => `${w} SLAMS ${l} for <b class="gold">${d} damage!</b> What a blow!`,
+];
+function vsNarrateDamage(winner, loser, damage) {
+  if (damage >= 4) return VS_BIG_WIN_LINES[Math.floor(Math.random()*VS_BIG_WIN_LINES.length)](winner, loser, damage);
+  return VS_WIN_LINES[Math.floor(Math.random()*VS_WIN_LINES.length)](winner, loser, damage);
+}
+function vsNarrateTie() { return VS_TIE_LINES[Math.floor(Math.random()*VS_TIE_LINES.length)]; }
+
 function typeLabel(type) {
   if (type === 'sixcity') return 'SIX CITY!!';
   if (type === 'penta') return 'Penta!';
@@ -5184,7 +5209,7 @@ function pickPrediction(num) {
     if (redNeedsPrediction) {
       narrate('Blue picked! Waiting for Red to predict...');
     } else {
-      narrate('Both players — Tap your ROLL button!');
+      narrate(`Round ${round} — Both players, roll!`);
       // If red already predicted or doesn't need to, show red roll
       if (!document.getElementById('vsRedRollArea').classList.contains('active') && enemy.ability !== 'Stone Form') {
         document.getElementById('vsRedRollArea').classList.add('active');
@@ -5207,7 +5232,7 @@ function pickRedPrediction(num) {
   if (blueNeedsPrediction) {
     narrate('Red picked! Waiting for Blue to predict...');
   } else {
-    narrate('Both players — Tap your ROLL button!');
+    narrate(`Round ${round} — Both players, roll!`);
     // If blue already predicted or doesn't need to, show blue roll
     if (!document.getElementById('vsBlueRollArea').classList.contains('active') && pick.ability !== 'Stone Form') {
       document.getElementById('vsBlueRollArea').classList.add('active');
@@ -5453,12 +5478,15 @@ function resolveRound(pRoll, eRoll) {
 
   if (result === 0) {
     const vsSlow = vsMode ? 800 : 0;
-    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
+    if (vsMode) {
+      narrate(`Both rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${vsNarrateTie()}</b>`);
+    } else {
+      narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
+    }
     committedShards = 0; committedFires = 0; // wasted on tie
     if (vsMode) { redCommittedShards = 0; redCommittedFires = 0; }
     setTimeout(() => {
       if (vsMode) {
-        // VS mode: both re-roll together
         vsStartBothRolls();
       } else {
         narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls again...`);
@@ -5487,7 +5515,11 @@ function resolveRound(pRoll, eRoll) {
     const consumedShards = lastShardsConsumed;
     const consumedFires = lastFiresConsumed;
 
-    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${typeLabel(pRoll.type)} You win!</b>`);
+    if (vsMode) {
+      narrate(`<b class="you">${pick.name}</b> rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${typeLabel(pRoll.type)} Blue takes it!</b>`);
+    } else {
+      narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">${typeLabel(pRoll.type)} You win!</b>`);
+    }
 
     const doApplyDamage = () => {
       if (reflected) {
@@ -5529,7 +5561,11 @@ function resolveRound(pRoll, eRoll) {
       } else {
         enemyHp -= damage;
         playDamageSfx(damage);
-        narrate(`<b class="gold">${damage} damage to ${enemy.name}!</b>`);
+        if (vsMode) {
+          narrate(vsNarrateDamage(pick.name, enemy.name, damage));
+        } else {
+          narrate(`<b class="gold">${damage} damage to ${enemy.name}!</b>`);
+        }
         // Skip hit shake if this is a slash kill — slash effect handles its own shake
         if (!(lastKillWasSlash && enemyHp <= 0)) {
           document.getElementById('enemyCard').classList.add('hit');
@@ -5602,7 +5638,11 @@ function resolveRound(pRoll, eRoll) {
 
     const abilityTriggered = damage !== baseDmg || reflected;
 
-    narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="them">${enemy.name} wins!</b>`);
+    if (vsMode) {
+      narrate(`<b class="them">${enemy.name}</b> rolled ${describeRoll(eRoll)}.&nbsp;&nbsp;<b class="them">${typeLabel(eRoll.type)} Red takes it!</b>`);
+    } else {
+      narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="them">${enemy.name} wins!</b>`);
+    }
 
     const doApplyDamage = () => {
       if (reflected) {
@@ -5637,7 +5677,11 @@ function resolveRound(pRoll, eRoll) {
       } else {
         playerHp -= damage;
         playDamageSfx(damage);
-        narrate(`<b class="them">${damage} damage to ${pick.name}!</b>`);
+        if (vsMode) {
+          narrate(vsNarrateDamage(enemy.name, pick.name, damage));
+        } else {
+          narrate(`<b class="them">${damage} damage to ${pick.name}!</b>`);
+        }
         document.getElementById('playerCard').classList.add('hit');
         setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
         updateHpDisplay();
@@ -6859,7 +6903,7 @@ function vsStartBothRolls() {
   } else if (redIsPatrick && !blueIsPatrick) {
     narrate('Red has Stone Form — Blue, tap your ROLL button!');
   } else {
-    narrate('Both players — Tap your ROLL button!');
+    narrate(`Round ${round} — Both players, roll!`);
   }
 
   // If both auto-rolled, check immediately
