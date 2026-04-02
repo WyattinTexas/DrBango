@@ -4533,7 +4533,18 @@ function doEnemyRoll() {
     dice = [...bossScript.enemy[bossScriptRound]].slice(0, eDiceCount);
     while (dice.length < eDiceCount) dice.push(Math.floor(Math.random()*6)+1);
   } else {
-    for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
+    // Tommy Salami: enemies roll weighted toward 5s and 6s (40% chance each die is 5 or 6)
+    if (pick && pick.ability === 'Regulator') {
+      for (let i = 0; i < eDiceCount; i++) {
+        if (Math.random() < 0.40) {
+          dice.push(Math.random() < 0.5 ? 5 : 6);
+        } else {
+          dice.push(Math.floor(Math.random()*6)+1);
+        }
+      }
+    } else {
+      for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
+    }
 
     // Boss-specific dice boosts (non-scripted rounds)
     if (enemy) {
@@ -4611,10 +4622,9 @@ function doEnemyRoll() {
     }
   }
 
-  // Tommy Salami: +35% chance each enemy die becomes a 5/6, then reroll those to low numbers
+  // Tommy Salami: only reroll actual 5s and 6s the enemy rolled
   // Each rerolled die grants +1 damage if Tommy wins this roll
   if (pick.ability === 'Regulator') {
-    dice = dice.map(d => (d < 5 && Math.random() < 0.35) ? (Math.random() < 0.5 ? 5 : 6) : d);
     dice = applyRegulator(dice);
   } else {
     regulatorBonus = 0;
@@ -5539,22 +5549,7 @@ function showSlashEffect(callback) {
 }
 
 function enemyDefeated() {
-  // Check if this was a Slash kill (Wim's all-odd bonus)
-  if (lastKillWasSlash) {
-    lastKillWasSlash = false;
-    narrate(`<b class="gold">SLASH! ${enemy.name}&nbsp;is destroyed!</b>`);
-    showSlashEffect(() => {
-      const eCard = document.getElementById('enemyCard');
-      const ePlate = document.getElementById('enemyPlate');
-      eCard.style.transition = 'opacity 0.4s ease-out';
-      eCard.style.opacity = '0';
-      ePlate.style.transition = 'opacity 0.4s ease-out';
-      ePlate.style.opacity = '0';
-      setTimeout(crashAnimation, 800);
-    });
-    return;
-  }
-
+  lastKillWasSlash = false;
   narrate(`<b class="gold">${enemy.name}&nbsp;is defeated!</b>`);
   const eCard = document.getElementById('enemyCard');
   const ePlate = document.getElementById('enemyPlate');
