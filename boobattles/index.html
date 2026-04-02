@@ -1651,30 +1651,60 @@
 
   .hof-grid {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    justify-content: center;
-    max-width: 400px;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 380px;
     padding: 8px 0;
+    overflow-y: auto;
+    flex: 1;
   }
 
   .hof-entry {
-    width: 70px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 14px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(251,191,36,0.15);
+    border-radius: 12px;
   }
 
   .hof-card {
-    width: 64px;
-    height: 90px;
-    border-radius: 10px;
+    width: 56px;
+    height: 78px;
+    border-radius: 8px;
     overflow: hidden;
+    flex-shrink: 0;
     border: 2px solid rgba(251,191,36,0.4);
     box-shadow: 0 0 12px rgba(251,191,36,0.15);
   }
   .hof-card img { width: 100%; height: 100%; object-fit: cover; }
+
+  .hof-info { flex: 1; }
+
+  .hof-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: var(--player);
+    letter-spacing: 1px;
+  }
+
+  .hof-boss {
+    font-size: 0.7rem;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .hof-location {
+    font-size: 0.6rem;
+    color: #666;
+    font-style: italic;
+  }
+
+  .hof-entry.fallen {
+    border-color: rgba(248,113,113,0.15);
+  }
 
   .hof-entry.fallen .hof-card {
     filter: grayscale(0.5) brightness(0.6);
@@ -1682,31 +1712,22 @@
     box-shadow: 0 0 8px rgba(248,113,113,0.1);
   }
 
-  .hof-name {
-    font-size: 0.55rem;
-    font-weight: 700;
-    color: #ccc;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 70px;
-  }
-
   .hof-entry.fallen .hof-name { color: #888; }
-
-  .hof-boss {
-    font-size: 0.45rem;
-    color: var(--gold);
-    font-weight: 600;
-  }
-
   .hof-entry.fallen .hof-boss { color: #666; }
 
   .hof-fallen-tag {
-    font-size: 0.4rem;
+    font-size: 0.55rem;
     color: var(--enemy);
     font-weight: 800;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .hof-quote {
+    font-size: 0.65rem;
+    color: #a78bfa;
+    font-style: italic;
+    margin-top: 2px;
   }
 
   .hof-empty {
@@ -3252,7 +3273,7 @@ function updateItemUsability() {
   const abBtn = document.getElementById('abilityBtn');
   if (abBtn && pick) {
     let usable = false;
-    if (pick.ability === 'Teamwork' && phase === 1 && playerHp < pick.maxHp) usable = true;
+    if (pick.ability === 'Teamwork' && phase === 1) usable = true;
     if (pick.ability === 'Heating Up' && phase === 1 && playerHp > 3) usable = true;
     if (pick.ability === 'Change of Heart' && phase === 1 && iceShards >= 2) usable = true;
     // Bogus is passive (auto-reflects), no manual activation needed
@@ -3315,9 +3336,9 @@ function cycleFires() {
 function activateAbility() {
   if (!pick || phase !== 1) return;
 
-  if (pick.ability === 'Teamwork' && playerHp < pick.maxHp) {
+  if (pick.ability === 'Teamwork') {
     playerRemoveDice += 1;
-    playerHp = Math.min(pick.maxHp, playerHp + 1);
+    playerHp += 1; // overclocks past max
     updateHpDisplay();
     playSfx('sfxSpecial', 0.7);
     narrate(`<b class="gold">Teamwork!</b> -1 die → +1 HP! (${playerHp}/${pick.maxHp})`);
@@ -4279,7 +4300,7 @@ function afterBattleWin() {
   state.stats.bossesBeaten++;
 
   // Record in Hall of Fame
-  addToHallOfFame(pick.name, pick.file, BOSSES[state.currentBoss].name);
+  addToHallOfFame(pick.name, pick.file, BOSSES[state.currentBoss].name, BOSS_LOCATIONS[state.currentBoss]);
 
   state.currentBoss++;
   saveState();
@@ -4666,9 +4687,11 @@ function saveHallOfFame(hof) {
   localStorage.setItem('boo_hall_of_fame', JSON.stringify(hof));
 }
 
-function addToHallOfFame(ghostName, ghostFile, bossName) {
+function addToHallOfFame(ghostName, ghostFile, bossName, location) {
   const hof = getHallOfFame();
-  hof.push({ ghost: ghostName, file: ghostFile, boss: bossName, fallen: false });
+  // Prevent duplicate entries for same ghost beating same boss
+  if (hof.some(e => e.ghost === ghostName && e.boss === bossName)) return;
+  hof.push({ ghost: ghostName, file: ghostFile, boss: bossName, location: location || '', fallen: false });
   saveHallOfFame(hof);
 }
 
@@ -4679,6 +4702,14 @@ function markFallenInHallOfFame(deadNames) {
   });
   saveHallOfFame(hof);
 }
+
+const FALLEN_QUOTES = [
+  "I knew we could do it!",
+  "Whoopie!!",
+  "You did it...",
+  "Yippie!",
+  "Way to go, champ"
+];
 
 function showHallOfFame() {
   showScreen('hofScreen');
@@ -4691,17 +4722,43 @@ function showHallOfFame() {
     return;
   }
 
-  hof.forEach(entry => {
+  // Slideshow: reveal entries one at a time
+  let idx = 0;
+  function showNext() {
+    if (idx >= hof.length) return;
+    const entry = hof[idx];
     const el = document.createElement('div');
     el.className = 'hof-entry' + (entry.fallen ? ' fallen' : '');
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px) scale(0.9)';
+    el.style.transition = 'opacity 0.5s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+
+    const locationText = entry.location ? `<div class="hof-location">${entry.location}</div>` : '';
+    const fallenQuote = entry.fallen ? `<div class="hof-quote">"${FALLEN_QUOTES[Math.floor(Math.random() * FALLEN_QUOTES.length)]}"</div>` : '';
+
     el.innerHTML = `
       <div class="hof-card"><img src="${IMG}${entry.file}"></div>
-      <div class="hof-name">${entry.ghost}</div>
-      <div class="hof-boss">Beat ${entry.boss}</div>
-      ${entry.fallen ? '<div class="hof-fallen-tag">FALLEN</div>' : ''}
+      <div class="hof-info">
+        <div class="hof-name">${entry.ghost}</div>
+        <div class="hof-boss">Defeated ${entry.boss}</div>
+        ${locationText}
+        ${entry.fallen ? '<div class="hof-fallen-tag">FALLEN HERO</div>' : ''}
+        ${fallenQuote}
+      </div>
     `;
     grid.appendChild(el);
-  });
+    playSfx('sfxSpecial', 0.4);
+
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0) scale(1)';
+    });
+
+    idx++;
+    if (idx < hof.length) setTimeout(showNext, 800);
+  }
+
+  showNext();
 }
 
 // ══════════════════════════════════════════════
