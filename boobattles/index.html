@@ -304,7 +304,7 @@
   }
   .pick-card.facedown {
     position: relative;
-    min-height: 220px;
+    aspect-ratio: 5/7;
   }
   .pick-card.facedown .card-back {
     display: block;
@@ -1916,7 +1916,7 @@
 
   <!-- GAME OVER -->
   <div class="screen gameover-screen" id="gameoverScreen">
-    <div class="gameover-title">All Ghosts Lost</div>
+    <div class="gameover-title">All Spiritkin Lost</div>
     <div class="graveyard" id="graveyard"></div>
     <div class="gameover-stats" id="gameoverStats"></div>
     <button class="action-btn red ready" onclick="retryRun()" style="font-size:1.2rem;">Try Again</button>
@@ -1924,7 +1924,7 @@
 
   <!-- VICTORY -->
   <div class="screen win-screen" id="winScreen">
-    <div class="win-title">Nuzlocke Complete!</div>
+    <div class="win-title">Champions!</div>
     <div class="trophy-row" id="trophyRow"></div>
     <div class="win-stats" id="winStats"></div>
     <button class="action-btn cyan ready" onclick="showHallOfFame()" style="font-size:1.1rem;padding:10px 32px;">Hall of Fame</button>
@@ -2015,6 +2015,8 @@ const ABILITY_THEMES = {
   'Blue Fire': 'blue-fire',
   'Valley Guardian': 'valley-guardian',
   'Beast Mode': 'beast-mode',
+  'Haunt': 'iron-will',
+  'Fiendship': 'beast-mode',
   'Glacial Pounding': 'beast-mode',
   'Burning Soul': 'fury',
   'Teamwork': 'blue-fire',
@@ -2081,7 +2083,9 @@ const ALL_GHOSTS = [
   { name:"Prince Balatron", file:"balatron.jpg", rarity:"legendary", maxHp:6, ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage." },
   { name:"Lucy", file:"lucy.jpg", rarity:"legendary", maxHp:8, ability:"Blue Fire", abilityDesc:"Win a roll: +1 bonus damage." },
   { name:"Romy", file:"romy.jpg", rarity:"legendary", maxHp:8, ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage." },
-  { name:"The Mountain King", file:"mountain_king_leg.jpg", rarity:"legendary", maxHp:9, ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage." }
+  { name:"The Mountain King", file:"mountain_king_leg.jpg", rarity:"legendary", maxHp:9, ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage." },
+  { name:"Shade", file:"shade.jpg", rarity:"legendary", maxHp:5, ability:"Haunt", abilityDesc:"After first roll, opponent takes 1 damage before each roll." },
+  { name:"Doom", file:"doom.jpg", rarity:"legendary", maxHp:7, ability:"Fiendship", abilityDesc:"+2 damage when you win a roll." }
 ].map(g => ({ ...g, hp: g.maxHp }));
 
 // ══════════════════════════════════════════════
@@ -2092,7 +2096,7 @@ const BOSS_HP =    [6, 5, 6, 7, 5, 6, 7, 6, 6, 8, 8, 9];
 const BOSS_DROPS = ['reroll','heal','reroll','power','heal','reroll','power','heal','power','reroll','heal',null];
 
 // Themed location names for each boss fight
-const BOSS_LOCATIONS = [
+let BOSS_LOCATIONS = [
   'Castle Depths',              // Logey
   'Hot Hot Cavern',             // Bogey
   'Jeffery Manor',              // Guard Thomas
@@ -2110,10 +2114,32 @@ const BOSS_LOCATIONS = [
 // Fixed starters — always these 3
 const STARTER_NAMES = ['Dream Cat', 'Outlaw', 'Wim'];
 
-const BOSSES = BOSS_NAMES.map((name, i) => {
-  const base = ALL_GHOSTS.find(g => g.name === name);
-  return { ...base, bossHp: BOSS_HP[i], maxHp: BOSS_HP[i], hp: BOSS_HP[i], drop: BOSS_DROPS[i], bossIndex: i };
-});
+// Replay final 4 bosses
+const REPLAY_FINAL4 = ['The Mountain King', 'Shade', 'Prince Balatron', 'Doom'];
+const REPLAY_FINAL4_LOCATIONS = ['The Dark Summit', 'The Shadow Realm', 'The Throne Room', 'The Abyss'];
+
+let BOSSES = buildBosses(false);
+
+function buildBosses(isReplay) {
+  if (!isReplay) {
+    return BOSS_NAMES.map((name, i) => {
+      const base = ALL_GHOSTS.find(g => g.name === name);
+      return { ...base, bossHp: BOSS_HP[i], maxHp: BOSS_HP[i], hp: BOSS_HP[i], drop: BOSS_DROPS[i], bossIndex: i };
+    });
+  }
+  // Replay: random non-legendary ghosts for first 8, then special final 4
+  const nonLeg = ALL_GHOSTS.filter(g => g.rarity !== 'legendary');
+  const shuffled = [...nonLeg].sort(() => Math.random() - 0.5);
+  const first8 = shuffled.slice(0, 8).map((g, i) => ({
+    ...g, bossHp: g.maxHp, maxHp: g.maxHp, hp: g.maxHp, drop: BOSS_DROPS[i], bossIndex: i
+  }));
+  const final4 = REPLAY_FINAL4.map((name, i) => {
+    const base = ALL_GHOSTS.find(g => g.name === name);
+    const idx = 8 + i;
+    return { ...base, bossHp: base.maxHp, maxHp: base.maxHp, hp: base.maxHp, drop: BOSS_DROPS[idx] || null, bossIndex: idx };
+  });
+  return [...first8, ...final4];
+}
 
 const ITEMS = {
   reroll: { name: 'Reroll', icon: '\u{1F3B2}', desc: 'Reroll 1 of your dice', color: '#67e8f9' },
@@ -2150,7 +2176,7 @@ function newState(isRestart) {
     currentBoss: 0,
     collection: [],
     items: [],
-    usedCards: BOSS_NAMES.slice(), // bosses excluded from draw pool
+    usedCards: BOSSES.map(b => b.name), // bosses excluded from draw pool
     deadGhosts: [],
     stats: { bossesBeaten: 0, ghostsLost: 0, totalRolls: 0, itemsUsed: 0 }
   };
@@ -2461,8 +2487,20 @@ function continueRun() {
 
 function retryRun() {
   stopSnow();
+  // Check if player has beaten the game before (HoF has Mountain King entry)
+  const hof = getHallOfFame();
+  const hasBeatenGame = hof.some(e => e.boss === 'The Mountain King');
+  BOSSES = buildBosses(hasBeatenGame);
+  // Update locations for replay
+  if (hasBeatenGame) {
+    for (let i = 0; i < 8; i++) BOSS_LOCATIONS[i] = ['???'][0]; // mystery for random bosses
+    BOSS_LOCATIONS[8] = REPLAY_FINAL4_LOCATIONS[0];
+    BOSS_LOCATIONS[9] = REPLAY_FINAL4_LOCATIONS[1];
+    BOSS_LOCATIONS[10] = REPLAY_FINAL4_LOCATIONS[2];
+    BOSS_LOCATIONS[11] = REPLAY_FINAL4_LOCATIONS[3];
+  }
   state = newState(true);
-  iceShards = 0; sacredFires = 0; // reset for new run
+  iceShards = 0; sacredFires = 0;
   saveState();
   showInitialPick();
 }
@@ -2834,6 +2872,11 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
       break;
     case 'Blue Fire': // Lucy: win → +1 damage
       damage += 1;
+      break;
+    case 'Fiendship': // Doom: win → +2 damage
+      damage += 2;
+      break;
+    case 'Haunt': // Shade: passive damage handled in nextRound
       break;
     case 'Beast Mode': // Mountain King: doubles deal 2x
       if (roll.type === 'doubles') damage *= 2;
@@ -4240,10 +4283,31 @@ function checkAfterCounter() {
 
 function nextRound() {
   round++;
-  // Clear committed shards/fires and re-render to remove empty icons immediately
   committedShards = 0;
   committedFires = 0;
   renderBattleActionBar();
+
+  // Haunt: after first roll, opponent takes 1 damage before each roll
+  if (round > 1) {
+    if (pick.ability === 'Haunt') {
+      enemyHp -= 1;
+      updateHpDisplay();
+      narrate(`<b class="gold">Haunt!</b> ${enemy.name} takes 1 damage!`);
+      if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+      setTimeout(doEnemyRoll, 1200);
+      return;
+    }
+    if (enemy.ability === 'Haunt') {
+      playerHp -= 1;
+      updateHpDisplay();
+      narrate(`<b class="them">Haunt!</b> ${pick.name} takes 1 damage!`);
+      if (playerHp <= 0) {
+        setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+        return;
+      }
+    }
+  }
+
   narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
   setTimeout(doEnemyRoll, 800);
 }
@@ -4582,7 +4646,7 @@ function showGameOver() {
 
   document.getElementById('gameoverStats').innerHTML = `
     Bosses beaten: ${state.stats.bossesBeaten}<br>
-    Ghosts lost: ${state.stats.ghostsLost}<br>
+    Spiritkin lost: ${state.stats.ghostsLost}<br>
     Total rolls: ${state.stats.totalRolls}
   `;
 
@@ -4609,8 +4673,8 @@ function showVictory() {
 
   document.getElementById('winStats').innerHTML = `
     <b>All</b> challengers defeated<br>
-    <b>${state.collection.length}</b> ghosts survived<br>
-    <b>${state.stats.ghostsLost}</b> ghosts lost<br>
+    <b>${state.collection.length}</b> Spiritkin survived<br>
+    <b>${state.stats.ghostsLost}</b> Spiritkin lost<br>
     <b>${state.stats.itemsUsed}</b> items used<br>
     <b>${state.stats.totalRolls}</b> total rolls
   `;
