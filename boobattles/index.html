@@ -2224,6 +2224,7 @@ let enemyBonusDice = 0;         // Extra dice for enemy next roll
 let playerRemoveDice = 0;       // Dice removed from player next roll
 let enemyRemoveDice = 0;        // Dice removed from enemy next roll
 let bogeyReflectUsed = false;   // Bogey one-time reflect tracker
+let bogeyReflectArmed = false;  // Player must tap shield to arm it
 let isFirstRoll = true;         // For Nikon's Ambush
 let tookDamageLastRound = false;// For Simon's Brew Time
 // Powder's Final Gift adds shards directly to iceShards (persists between fights)
@@ -2672,7 +2673,7 @@ function showMap() {
       const showcase = document.createElement('div');
       showcase.className = 'map-boss-showcase';
       showcase.innerHTML = `
-        <div style="font-family:'Creepster',cursive;font-size:0.9rem;color:var(--gold);letter-spacing:2px;text-shadow:0 0 10px rgba(251,191,36,0.3);margin-bottom:4px;">${location}</div>
+        <div style="font-family:'Creepster',cursive;font-size:1.1rem;color:#ff9f43;letter-spacing:3px;text-shadow:0 0 12px rgba(255,159,67,0.5),0 0 30px rgba(255,107,53,0.2);margin-bottom:6px;border-bottom:1px solid rgba(255,159,67,0.2);padding-bottom:6px;">~ ${location} ~</div>
         <div class="map-boss-card"><img src="${IMG}${currentBoss.file}"></div>
         <div class="map-boss-name">${currentBoss.name}</div>
         <div class="map-boss-detail">${currentBoss.ability} · ${currentBoss.bossHp} HP</div>
@@ -2917,10 +2918,10 @@ function applyDefense(defender, damage, attackRoll, defenderIsPlayer) {
     case 'Stoic': // Guard Thomas: below 6 HP, immune to singles
       if ((defenderIsPlayer ? playerHp : enemyHp) < 6 && attackRoll.type === 'singles') return 0;
       break;
-    case 'Bogus': // Bogey: reflect once
-      if (!bogeyReflectUsed) {
+    case 'Bogus': // Bogey: manual reflect — must be armed by tapping shield
+      if (!bogeyReflectUsed && bogeyReflectArmed) {
         bogeyReflectUsed = true;
-        // Reflect: attacker takes damage instead
+        bogeyReflectArmed = false;
         return -damage; // negative = reflected
       }
       break;
@@ -3109,6 +3110,7 @@ function startBattle() {
   playerBonusDice = 0; enemyBonusDice = 0;
   playerRemoveDice = 0; enemyRemoveDice = 0;
   bogeyReflectUsed = false;
+  bogeyReflectArmed = false;
   isFirstRoll = true;
   tookDamageLastRound = false;
 
@@ -3247,6 +3249,7 @@ function renderBattleActionBar() {
     if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';
     if (abilityId === 'Change of Heart') icon = '\u{1F504}';
     let label = abilityId.split(' ')[0];
+    if (abilityId === 'Bogus' && bogeyReflectArmed) label = 'ARMED';
     if (abilityId === 'Bogus' && bogeyReflectUsed) label = 'USED';
     if (abilityId === 'Change of Heart') label = 'Swap';
     ab.innerHTML = `${icon}<div class="icon-label">${label}</div>`;
@@ -3339,7 +3342,7 @@ function updateItemUsability() {
     if (pick.ability === 'Teamwork' && phase === 1) usable = true;
     if (pick.ability === 'Heating Up' && phase === 1 && playerHp > 3) usable = true;
     if (pick.ability === 'Change of Heart' && phase === 1 && iceShards >= 2) usable = true;
-    // Bogus is passive (auto-reflects), no manual activation needed
+    if (pick.ability === 'Bogus' && phase === 1 && !bogeyReflectUsed && !bogeyReflectArmed) usable = true;
     abBtn.classList.toggle('usable', usable);
   }
 
@@ -3430,6 +3433,14 @@ function activateAbility() {
       renderBattleActionBar();
       updateItemUsability();
     }, 'playerCard');
+  }
+
+  if (pick.ability === 'Bogus' && !bogeyReflectUsed && !bogeyReflectArmed) {
+    bogeyReflectArmed = true;
+    playSfx('sfxSpecial', 0.7);
+    narrate(`<b class="gold">Bogus armed!</b> Next hit will be reflected!`);
+    renderBattleActionBar();
+    updateItemUsability();
   }
 }
 
