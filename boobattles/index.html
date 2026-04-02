@@ -1767,39 +1767,37 @@
 
   .vs-ghost-grid {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
-    padding: 10px 30%;
-    flex: 1;
+    padding: 6px calc(50% - 70px);
     align-items: center;
+    max-height: 240px;
   }
 
   .vs-ghost-card {
     flex-shrink: 0;
-    width: 180px;
-    border-radius: 14px;
+    width: 140px;
+    border-radius: 12px;
     overflow: hidden;
-    border: 3px solid rgba(255,255,255,0.08);
+    border: 3px solid rgba(255,255,255,0.06);
     cursor: pointer;
     transition: all 0.25s;
     scroll-snap-align: center;
-    opacity: 0.5;
-    transform: scale(0.9);
+    opacity: 0.4;
+    transform: scale(0.85);
   }
   .vs-ghost-card img { width: 100%; display: block; }
   .vs-ghost-card.selected, .vs-ghost-card.p2-selected {
     opacity: 1;
-    transform: scale(1);
-    border-color: rgba(255,255,255,0.15);
-    box-shadow: 0 0 30px rgba(103,232,249,0.2);
+    transform: scale(1.05);
+    border-color: rgba(255,255,255,0.12);
   }
-  .vs-ghost-card.p2-selected {
-    box-shadow: 0 0 30px rgba(248,113,113,0.2);
-  }
+  .vs-ghost-card.selected { box-shadow: 0 0 24px rgba(103,232,249,0.2); }
+  .vs-ghost-card.p2-selected { box-shadow: 0 0 24px rgba(248,113,113,0.2); }
 
   /* VS Battle: flip P2 zone + dice row */
   .battle-screen.vs-mode .enemy-zone {
@@ -2015,14 +2013,14 @@
     <div class="battle-center">
       <div class="dice-area" id="diceArea">
         <div class="dice-row">
-          <div class="dice-owner enemy">Enemy</div>
+          <div class="dice-owner enemy" id="diceOwnerEnemy">Enemy</div>
           <div class="die e" id="eDie0"></div>
           <div class="die e" id="eDie1"></div>
           <div class="die e" id="eDie2"></div>
         </div>
         <div class="vs-line">VS</div>
         <div class="dice-row" id="playerDiceRow">
-          <div class="dice-owner player">You</div>
+          <div class="dice-owner player" id="diceOwnerPlayer">You</div>
           <div class="die p" id="pDie0"></div>
           <div class="die p" id="pDie1"></div>
           <div class="die p" id="pDie2"></div>
@@ -4536,8 +4534,12 @@ function nextRound() {
     }
   }
 
-  narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
-  setTimeout(doEnemyRoll, 800);
+  if (vsMode) {
+    setTimeout(vsStartRedTurn, 800);
+  } else {
+    narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
+    setTimeout(doEnemyRoll, 800);
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -5152,6 +5154,9 @@ function startVsBattle() {
   document.getElementById('playerCard').innerHTML = `<img src="${IMG}${pick.file}">`;
   document.getElementById('enemyNameText').textContent = enemy.name;
   document.getElementById('playerNameText').textContent = pick.name;
+  // VS labels
+  document.getElementById('diceOwnerEnemy').textContent = 'RED';
+  document.getElementById('diceOwnerPlayer').textContent = 'BLUE';
   updateHpDisplay();
   document.getElementById('enemyCard').classList.remove('hit');
   document.getElementById('enemyCard').style.opacity = '1';
@@ -5182,18 +5187,75 @@ function startVsBattle() {
   setTimeout(() => {
     rgo.classList.remove('active');
     document.getElementById('diceArea').classList.remove('hidden');
-    narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
-    setTimeout(doEnemyRoll, 1000);
+    vsStartRedTurn();
   }, 1800);
 }
 
-// VS mode uses the normal doEnemyRoll → doPlayerRoll flow
+// VS turn system: RED rolls manually, then BLUE rolls manually
+function vsStartRedTurn() {
+  phase = 0;
+  vsTurn = 2; // Red's turn
+  resetDice();
+  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
+  narrate(`<b class="them">RED</b> — Tap to roll!`);
+  document.getElementById('rollBtn').textContent = "Red's Roll!";
+  document.getElementById('rollBtn').classList.add('ready');
+  // Override roll button for RED
+  document.getElementById('rollBtn').onclick = vsRedRoll;
+}
+
+function vsRedRoll() {
+  if (vsTurn !== 2) return;
+  document.getElementById('rollBtn').classList.remove('ready');
+  document.getElementById('rollBtn').onclick = () => doPlayerRoll();
+  document.getElementById('rollBtn').textContent = "Roll Your Dice!";
+  playSfx('sfxDiceRoll');
+
+  const dice = rollDice();
+  currentEnemyRoll = analyzeRoll(dice);
+
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById('eDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  setTimeout(() => {
+    dice.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById('eDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
+          setTimeout(() => d.classList.add('glow'), 120);
+        }
+      }, i * 200);
+    });
+
+    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
+    if (currentEnemyRoll.type === 'triples') {
+      setTimeout(() => showTriplesEffect('enemy'), 700);
+    }
+
+    setTimeout(() => {
+      narrate(`<b class="them">RED</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">BLUE's turn!</b>`);
+      phase = 1;
+      vsTurn = 1;
+      document.getElementById('rollBtn').classList.add('ready');
+      updateItemUsability();
+    }, 800 + extraDelay);
+  }, 700);
+}
 
 // Override win/loss for VS mode
 function vsShowResult(winnerName, winnerFile, winnerLabel) {
   fadeOutMusic();
   stopSpiritParticles();
   document.getElementById('battleScreen').classList.remove('vs-mode');
+  document.getElementById('diceOwnerEnemy').textContent = 'Enemy';
+  document.getElementById('diceOwnerPlayer').textContent = 'You';
+  document.getElementById('rollBtn').textContent = 'Roll Your Dice!';
+  document.getElementById('rollBtn').onclick = () => doPlayerRoll();
   stopSnow(); startSnow();
   showScreen('winScreen');
   document.querySelector('.win-title').textContent = `${winnerName} Wins!`;
