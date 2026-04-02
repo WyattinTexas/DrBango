@@ -7149,7 +7149,7 @@ function vsCheckBothRolled() {
 }
 
 // Override win/loss for VS mode
-function vsShowResult(winnerName, winnerFile, winnerLabel) {
+function vsShowResult(winnerName, winnerFile, winnerLabel, loserName, loserFile, winnerHp, winnerMaxHp) {
   fadeOutMusic();
   stopSpiritParticles();
   document.getElementById('battleScreen').classList.remove('vs-mode');
@@ -7168,23 +7168,29 @@ function vsShowResult(winnerName, winnerFile, winnerLabel) {
   const winTitle = document.querySelector('.win-title');
   const winScreen = document.getElementById('winScreen');
   winScreen.classList.remove('vs-blue-wins', 'vs-red-wins');
-  if (winnerLabel === 'Blue') {
-    winTitle.textContent = `Blue Wins!`;
-    winScreen.classList.add('vs-blue-wins');
-  } else {
-    winTitle.textContent = `Red Wins!`;
-    winScreen.classList.add('vs-red-wins');
-  }
+  const isBlue = winnerLabel === 'Blue';
+  winScreen.classList.add(isBlue ? 'vs-blue-wins' : 'vs-red-wins');
+  winTitle.textContent = `${winnerLabel} Wins!`;
 
-  document.getElementById('trophyRow').innerHTML = `<div class="trophy-card" style="width:140px;height:196px;"><img src="${IMG}${winnerFile}"></div>`;
+  // Big winner card with loser faded behind
+  document.getElementById('trophyRow').innerHTML = `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+      <div class="trophy-card" style="width:80px;height:112px;position:absolute;left:-30px;top:20px;opacity:0.25;filter:grayscale(0.8) brightness(0.4);transform:rotate(-8deg);z-index:0;"><img src="${IMG}${loserFile}"></div>
+      <div class="trophy-card" style="width:180px;height:252px;border-color:${isBlue ? 'rgba(103,232,249,0.6)' : 'rgba(248,113,113,0.6)'};box-shadow:0 0 40px ${isBlue ? 'rgba(103,232,249,0.3)' : 'rgba(248,113,113,0.3)'};z-index:1;"><img src="${IMG}${winnerFile}"></div>
+    </div>
+  `;
+
+  // Fight summary
+  const closeness = winnerHp <= 2 ? 'A razor-thin victory!' : winnerHp <= Math.ceil(winnerMaxHp/2) ? 'A hard-fought win!' : 'A dominant performance!';
   document.getElementById('winStats').innerHTML = `
-    <b>${winnerLabel}</b> wins with <b>${winnerName}</b>!<br>
-    <b>${round}</b> rounds fought
+    <b>${winnerName}</b> defeats <b>${loserName}</b><br>
+    <b>${round}</b> rounds · ${winnerHp}/${winnerMaxHp} HP remaining<br>
+    <span style="color:${isBlue ? 'var(--player)' : 'var(--enemy)'};">${closeness}</span>
   `;
 }
 
-function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Blue'); }
-function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Red'); }
+function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Blue', enemy.name, enemy.file, playerHp, pick.maxHp); }
+function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Red', pick.name, pick.file, enemyHp, enemy.maxHp); }
 
 // ══════════════════════════════════════════════
 // HALL OF FAME — persists across runs
