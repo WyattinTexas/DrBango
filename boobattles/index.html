@@ -1738,6 +1738,91 @@
     padding: 30px 0;
   }
 
+  /* VS Mode */
+  .vs-pick-screen {
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px 0 12px;
+    gap: 10px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .vs-pick-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #0a0a12;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .vs-pick-screen > * { position: relative; z-index: 1; }
+
+  .vs-pick-title {
+    font-family: 'Creepster', cursive;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+  .vs-pick-title.p1 { color: var(--player); }
+  .vs-pick-title.p2 { color: var(--enemy); }
+
+  .vs-ghost-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    width: 100%;
+    max-width: 340px;
+    padding: 4px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .vs-ghost-card {
+    aspect-ratio: 5/7;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.02);
+  }
+  .vs-ghost-card img { width: 100%; height: 100%; object-fit: cover; }
+  .vs-ghost-card:hover { border-color: rgba(255,255,255,0.2); }
+  .vs-ghost-card.selected {
+    border-color: var(--player);
+    box-shadow: 0 0 12px rgba(103,232,249,0.3);
+  }
+  .vs-ghost-card.p2-selected {
+    border-color: var(--enemy);
+    box-shadow: 0 0 12px rgba(248,113,113,0.3);
+  }
+
+  /* VS Battle: flip P2 zone */
+  .battle-screen.vs-mode .enemy-zone {
+    transform: rotate(180deg);
+  }
+  .battle-screen.vs-mode .enemy-zone .name-plate {
+    transform: none;
+  }
+
+  /* VS turn indicators */
+  .vs-turn-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Creepster', cursive;
+    font-size: 2.5rem;
+    letter-spacing: 4px;
+    z-index: 850;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .vs-turn-banner.active { opacity: 1; }
+  .vs-turn-banner.p1-turn { color: var(--player); text-shadow: 0 0 30px rgba(103,232,249,0.6); }
+  .vs-turn-banner.p2-turn { color: var(--enemy); text-shadow: 0 0 30px rgba(248,113,113,0.6); transform: translate(-50%, -50%) rotate(180deg); }
+
   .watermark { position: fixed; bottom: 10px; right: 14px; font-size: 0.6rem; color: #222; letter-spacing: 1px; z-index: 200; }
 
   /* ======== MOBILE ======== */
@@ -1788,6 +1873,7 @@
     <div class="title-buttons">
       <button class="action-btn cyan ready" onclick="beginRun()">Enter the Tournament</button>
       <button class="action-btn gold" id="continueBtn" onclick="continueRun()" style="font-size:1.1rem;padding:10px 36px;">Continue Run</button>
+      <button class="action-btn red ready" onclick="startVsMode()" style="font-size:1.1rem;padding:10px 36px;">VS Mode</button>
       <button class="small-btn" id="hofBtn" onclick="showHallOfFame()" style="display:none;">Hall of Fame</button>
     </div>
   </div>
@@ -1933,8 +2019,20 @@
     <div class="win-stats" id="winStats"></div>
     <button class="action-btn cyan ready" onclick="showHallOfFame()" style="font-size:1.1rem;padding:10px 32px;">Hall of Fame</button>
     <a class="action-btn gold ready" href="https://www.BattleOfOrigins.com" target="_blank" style="text-decoration:none;font-size:1.1rem;padding:12px 32px;">Back us on Kickstarter</a>
-    <button class="small-btn" onclick="retryRun()">Play Again</button>
+    <button class="small-btn" onclick="vsMode ? startVsMode() : retryRun()">Play Again</button>
+    <button class="small-btn" onclick="vsMode=false;stopSnow();showScreen('titleScreen');initTitle();">Back to Menu</button>
     <div class="cta-footer"><a href="https://www.BattleOfOrigins.com" target="_blank">BattleOfOrigins.com</a> · Coming September 2026</div>
+  </div>
+
+  <!-- VS PICK -->
+  <div class="screen vs-pick-screen" id="vsPickScreen">
+    <div class="vs-pick-title" id="vsPickTitle">Player 1 — Pick Your Spiritkin</div>
+    <div class="vs-ghost-grid" id="vsGhostGrid"></div>
+    <div class="selected-info" id="vsSelectedInfo">
+      <div class="si-name" id="vsSiName"></div>
+      <div class="si-detail" id="vsSiDetail"></div>
+    </div>
+    <button class="action-btn cyan" id="vsPickBtn" onclick="confirmVsPick()">Lock In</button>
   </div>
 
   <!-- HALL OF FAME -->
@@ -1975,6 +2073,7 @@
 <audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
 <audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
+<div class="vs-turn-banner" id="vsTurnBanner"></div>
 <div class="farewell-overlay" id="farewellOverlay">
   <div class="farewell-card" id="farewellCard"></div>
   <div class="farewell-name" id="farewellName"></div>
@@ -4359,7 +4458,7 @@ function nextRound() {
   }
 
   narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
-  setTimeout(doEnemyRoll, 800);
+  setTimeout(vsMode ? vsDoP2Roll : doEnemyRoll, 800);
 }
 
 // ══════════════════════════════════════════════
@@ -4388,6 +4487,7 @@ const FAREWELL_LINES = [
 ];
 
 function handlePlayerLoss() {
+  if (vsMode) { vsHandleLoss(); return; }
   // Permadeath: remove ghost from collection
   const deadGhost = { ...pick };
   state.collection.splice(selectedGhostIndex, 1);
@@ -4420,6 +4520,7 @@ function handlePlayerLoss() {
 }
 
 function afterBattleWin() {
+  if (vsMode) { vsHandleWin(); return; }
   fadeOutMusic();
   stopSpiritParticles();
 
@@ -4807,6 +4908,206 @@ function stopMusicHard() {
   const music = document.getElementById('bgMusic');
   music.pause(); music.currentTime = 0; music.volume = 0.4;
 }
+
+// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// VS MODE — Local 2-player
+// ══════════════════════════════════════════════
+let vsMode = false;
+let vsP1Ghost = null;
+let vsP2Ghost = null;
+let vsPickingPlayer = 1;
+let vsSelectedGhost = null;
+let vsTurn = 1; // whose turn to roll: 1 or 2
+
+function startVsMode() {
+  vsMode = true;
+  vsPickingPlayer = 1;
+  vsP1Ghost = null;
+  vsP2Ghost = null;
+  showVsPick(1);
+}
+
+function showVsPick(player) {
+  vsPickingPlayer = player;
+  vsSelectedGhost = null;
+  showScreen('vsPickScreen');
+  const title = document.getElementById('vsPickTitle');
+  title.textContent = `Player ${player} — Pick Your Spiritkin`;
+  title.className = 'vs-pick-title ' + (player === 1 ? 'p1' : 'p2');
+  document.getElementById('vsPickBtn').classList.remove('ready');
+  document.getElementById('vsSelectedInfo').classList.remove('visible');
+
+  const grid = document.getElementById('vsGhostGrid');
+  grid.innerHTML = '';
+  // Show all non-legendary ghosts (exclude P1's pick for P2)
+  const available = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
+  available.forEach(g => {
+    const c = document.createElement('div');
+    c.className = 'vs-ghost-card';
+    c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}">`;
+    c.onclick = () => selectVsGhost(g, c);
+    grid.appendChild(c);
+  });
+}
+
+function selectVsGhost(ghost, el) {
+  vsSelectedGhost = ghost;
+  const cls = vsPickingPlayer === 1 ? 'selected' : 'p2-selected';
+  document.querySelectorAll('.vs-ghost-card').forEach(c => { c.classList.remove('selected', 'p2-selected'); });
+  el.classList.add(cls);
+  document.getElementById('vsSiName').textContent = ghost.name;
+  document.getElementById('vsSiDetail').innerHTML = `<b>${ghost.ability}</b> · ${ghost.abilityDesc} · ${ghost.maxHp} HP`;
+  document.getElementById('vsSelectedInfo').classList.add('visible');
+  document.getElementById('vsPickBtn').classList.add('ready');
+}
+
+function confirmVsPick() {
+  if (!vsSelectedGhost) return;
+  if (vsPickingPlayer === 1) {
+    vsP1Ghost = { ...vsSelectedGhost, hp: vsSelectedGhost.maxHp };
+    showVsPick(2);
+  } else {
+    vsP2Ghost = { ...vsSelectedGhost, hp: vsSelectedGhost.maxHp };
+    startVsBattle();
+  }
+}
+
+function startVsBattle() {
+  // P1 = player (bottom), P2 = enemy (top, flipped)
+  pick = vsP1Ghost;
+  enemy = vsP2Ghost;
+  playerHp = pick.maxHp;
+  enemyHp = enemy.maxHp;
+  round = 1;
+  phase = 0;
+  vsTurn = 1;
+  playerPrediction = null;
+  rerollMode = false;
+  powerMode = false;
+  playerDiceValues = [];
+  iceShards = 0; sacredFires = 0;
+  enemyIceShards = 0; enemySacredFires = 0;
+  playerBonusDice = 0; enemyBonusDice = 0;
+  playerRemoveDice = 0; enemyRemoveDice = 0;
+  bogeyReflectUsed = false; bogeyReflectArmed = false;
+  isFirstRoll = true; tookDamageLastRound = false;
+  committedShards = 0; committedFires = 0;
+  bossScript = null; bossScriptRound = 0;
+  battleItemsState = [];
+
+  showScreen('battleScreen');
+  document.getElementById('battleScreen').classList.add('vs-mode');
+  document.getElementById('enemyCard').innerHTML = `<img src="${IMG}${enemy.file}">`;
+  document.getElementById('playerCard').innerHTML = `<img src="${IMG}${pick.file}">`;
+  document.getElementById('enemyNameText').textContent = enemy.name;
+  document.getElementById('playerNameText').textContent = pick.name;
+  updateHpDisplay();
+  document.getElementById('enemyCard').classList.remove('hit');
+  document.getElementById('enemyCard').style.opacity = '1';
+  document.getElementById('enemyCard').style.transition = 'none';
+  document.getElementById('enemyPlate').style.opacity = '1';
+  document.getElementById('enemyPlate').style.transition = 'none';
+  document.getElementById('playerCard').classList.remove('hit');
+  document.getElementById('predictArea').classList.remove('visible');
+  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
+  resetDice();
+  narrate('');
+  document.getElementById('rollBtn').classList.remove('ready');
+  document.getElementById('diceArea').classList.add('hidden');
+  renderBattleActionBar();
+  spawnSpiritParticles();
+
+  const music = document.getElementById('bgMusic');
+  music.currentTime = 0; music.volume = 0.4;
+  music.play().catch(() => {});
+
+  // Ready-go overlay
+  const rgo = document.getElementById('readyGoOverlay');
+  const rgt = document.getElementById('readyGoText');
+  rgt.textContent = 'FIGHT!';
+  rgt.style.animation = 'none';
+  rgo.classList.add('active');
+  requestAnimationFrame(() => { rgt.style.animation = ''; });
+  setTimeout(() => {
+    rgo.classList.remove('active');
+    document.getElementById('diceArea').classList.remove('hidden');
+    vsDoP2Roll();
+  }, 1800);
+}
+
+// VS: P2 (top player) rolls — they tap the roll button while phone is flipped
+function vsDoP2Roll() {
+  phase = 0;
+  resetDice();
+  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
+
+  // P2 rolls random dice
+  const eDiceCount = 3;
+  let dice = [];
+  for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
+  currentEnemyRoll = analyzeRoll(dice);
+
+  // Show turn banner for P2
+  showVsTurnBanner(2);
+
+  for (let i = 0; i < 3; i++) {
+    const d = document.getElementById('eDie'+i);
+    d.textContent = '?';
+    d.classList.add('visible','rolling');
+  }
+
+  // Auto-roll after 1.5s (P2 sees their dice from upside down)
+  setTimeout(() => {
+    dice.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById('eDie'+i);
+        d.classList.remove('rolling');
+        d.textContent = v;
+        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
+          setTimeout(() => d.classList.add('glow'), 120);
+        }
+      }, i * 200);
+    });
+
+    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
+    if (currentEnemyRoll.type === 'triples') {
+      setTimeout(() => showTriplesEffect('enemy'), 700);
+    }
+
+    setTimeout(() => {
+      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">P1's turn!</b>`);
+      phase = 1;
+      showVsTurnBanner(1);
+      document.getElementById('rollBtn').classList.add('ready');
+    }, 800 + extraDelay);
+  }, 1000);
+}
+
+function showVsTurnBanner(player) {
+  const banner = document.getElementById('vsTurnBanner');
+  banner.textContent = player === 1 ? "Player 1's Turn" : "Player 2's Turn";
+  banner.className = 'vs-turn-banner active ' + (player === 1 ? 'p1-turn' : 'p2-turn');
+  setTimeout(() => { banner.classList.remove('active'); }, 1500);
+}
+
+// Override win/loss for VS mode
+function vsShowResult(winnerName, winnerFile, winnerLabel) {
+  fadeOutMusic();
+  stopSpiritParticles();
+  document.getElementById('battleScreen').classList.remove('vs-mode');
+  stopSnow(); startSnow();
+  showScreen('winScreen');
+  document.querySelector('.win-title').textContent = `${winnerName} Wins!`;
+  document.getElementById('trophyRow').innerHTML = `<div class="trophy-card" style="width:140px;height:196px;"><img src="${IMG}${winnerFile}"></div>`;
+  document.getElementById('winStats').innerHTML = `
+    <b>${winnerLabel}</b> is the champion!<br>
+    <b>${round}</b> rounds fought
+  `;
+}
+
+function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Player 1'); }
+function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Player 2'); }
 
 // ══════════════════════════════════════════════
 // HALL OF FAME — persists across runs
