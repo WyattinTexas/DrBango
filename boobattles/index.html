@@ -5089,6 +5089,11 @@ function resolveRound(pRoll, eRoll) {
     playerBonusDice += 1;
     setTimeout(() => narrate(`<b class="gold">Let's Dance!</b> +1 die next roll!`), 1200);
   }
+  // Kairan's Let's Dance (Red/enemy side): doubles → +1 die next roll
+  if (vsMode && enemy && enemy.ability === "Let's Dance" && eRoll.type === 'doubles') {
+    enemyBonusDice += 1;
+    setTimeout(() => narrate(`<b class="them">Let's Dance!</b> Red gets +1 die next roll!`), 1400);
+  }
 
   if (result === 0) {
     const vsSlow = vsMode ? 800 : 0;
@@ -5453,6 +5458,23 @@ function nextRound() {
     const highCount = currentEnemyRoll.dice.filter(d => d >= 5).length;
     if (highCount > 0) {
       enemyRemoveDice += highCount;
+      // VS: Red Underdog counters Blue Heinous
+      if (vsMode && enemy.ability === 'Underdog') {
+        showAbilitySplash('Heinous', `${highCount} dice locked out!`, 1600, () => {
+          narrate(`<b class="gold">Heinous!</b> ${highCount} of ${enemy.name}'s dice locked!`);
+          playerHp -= 3;
+          updateHpDisplay();
+          setTimeout(() => {
+            showAbilitySplash('Underdog', '3 damage counter!', 1400, () => {
+              narrate(`<b class="them">Underdog!</b> 3 damage to ${pick.name}!`);
+              if (playerHp <= 0) { if (vsMode) { vsHandleLoss(); } else { setTimeout(handlePlayerLoss, 600); } return; }
+              if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+              setTimeout(() => continueNextRound(), 600);
+            }, 'enemyCard');
+          }, 400);
+        }, 'playerCard');
+        return;
+      }
       showAbilitySplash('Heinous', `${highCount} dice locked out!`, 1600, () => {
         narrate(`<b class="gold">Heinous!</b> ${highCount} of ${enemy.name}'s dice locked!`);
         setTimeout(() => continueNextRound(), 600);
@@ -5472,6 +5494,21 @@ function continueNextRound() {
       updateHpDisplay();
       narrate(`<b class="gold">Haunt!</b> ${enemy.name} takes 1 damage!`);
       if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+      // VS: Red Underdog counters Blue Haunt
+      if (vsMode && enemy.ability === 'Underdog') {
+        playerHp -= 3;
+        updateHpDisplay();
+        setTimeout(() => {
+          showAbilitySplash('Underdog', '3 damage counter!', 1400, () => {
+            narrate(`<b class="them">Underdog!</b> 3 damage to ${pick.name}!`);
+            if (playerHp <= 0) { if (vsMode) { vsHandleLoss(); } else { setTimeout(handlePlayerLoss, 600); } return; }
+            if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
+            setTimeout(vsStartBothRolls, 800);
+          }, 'enemyCard');
+        }, 800);
+        return;
+      }
+      if (vsMode) { setTimeout(vsStartBothRolls, 1200); return; }
       setTimeout(doEnemyRoll, 1200);
       return;
     }
@@ -5488,7 +5525,7 @@ function continueNextRound() {
             narrate(`<b class="gold">Underdog!</b> 3 damage to ${enemy.name}!`);
             if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); return; }
             if (playerHp <= 0) { setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600); return; }
-            doEnemyRoll();
+            if (vsMode) vsStartBothRolls(); else doEnemyRoll();
           }, 'playerCard');
         }, 800);
         return;
@@ -6248,6 +6285,9 @@ function startVsBattle() {
   enemyHeinousUsed = false;
   committedShards = 0; committedFires = 0;
   bossScript = null; bossScriptRound = 0;
+  // Chad Sploop!: entry shards for VS
+  if (pick.ability === 'Sploop!') iceShards += 2;
+  if (enemy.ability === 'Sploop!') enemyIceShards += 2;
   // Give both players 3 random items
   const itemTypes = ['reroll', 'heal', 'power'];
   battleItemsState = [0,1,2].map(() => ({ id: itemTypes[Math.floor(Math.random()*3)], used: false }));
@@ -6391,10 +6431,30 @@ function vsRedRoll() {
     enemyHp += 1;
     updateHpDisplay();
   }
-  vsRedDice = applyVsDiceModifiers(rollDice(), enemy, false);
-  for (let i = 0; i < 3; i++) { const d = document.getElementById('eDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
+  // Use ability-aware dice count
+  const eDieCount = getEnemyDiceCount();
+  enemyBonusDice = 0; enemyRemoveDice = 0;
+  let redRawDice = [];
+  // Tommy Salami (Blue): weight Red's dice toward 5/6 (40% per die)
+  if (pick && pick.ability === 'Regulator') {
+    for (let i = 0; i < eDieCount; i++) {
+      if (Math.random() < 0.40) { redRawDice.push(Math.random() < 0.5 ? 5 : 6); }
+      else { redRawDice.push(Math.floor(Math.random()*6)+1); }
+    }
+  } else {
+    for (let i = 0; i < eDieCount; i++) redRawDice.push(Math.floor(Math.random()*6)+1);
+  }
+  // Tommy Salami (Blue): reroll 5s and 6s low
+  if (pick && pick.ability === 'Regulator') {
+    redRawDice = applyRegulator(redRawDice);
+  } else { regulatorBonus = 0; }
+  vsRedDice = applyVsDiceModifiers(redRawDice, enemy, false);
+  // If more than 3 dice, pick best 3
+  if (vsRedDice.length > 3) vsRedDice = bestNOf(vsRedDice, 3);
+  const redShowCount = Math.min(vsRedDice.length, 7);
+  for (let i = 0; i < redShowCount; i++) { const d = document.getElementById('eDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
   setTimeout(() => {
-    vsRedDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('eDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
+    vsRedDice.forEach((v, i) => { if (i < 7) setTimeout(() => { const d = document.getElementById('eDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
     setTimeout(vsCheckBothRolled, 1200);
   }, 900);
 }
@@ -6431,10 +6491,31 @@ function vsBlueRoll() {
     playerHp += 1;
     updateHpDisplay();
   }
-  vsBlueDice = applyVsDiceModifiers(rollDice(), pick, true);
-  for (let i = 0; i < 3; i++) { const d = document.getElementById('pDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
+  // Use ability-aware dice count
+  const bDieCount = getPlayerDiceCount();
+  playerBonusDice = 0; playerRemoveDice = 0;
+  let blueRawDice = [];
+  // Tommy Salami (Red): weight Blue's dice toward 5/6 (40% per die)
+  if (enemy && enemy.ability === 'Regulator') {
+    for (let i = 0; i < bDieCount; i++) {
+      if (Math.random() < 0.40) { blueRawDice.push(Math.random() < 0.5 ? 5 : 6); }
+      else { blueRawDice.push(Math.floor(Math.random()*6)+1); }
+    }
+  } else {
+    for (let i = 0; i < bDieCount; i++) blueRawDice.push(Math.floor(Math.random()*6)+1);
+  }
+  // Tommy Salami (Red): reroll 5s and 6s low — store bonus for Red's damage calc
+  // Note: regulatorBonus is shared, so Red's Regulator uses a separate path in resolveRound
+  if (enemy && enemy.ability === 'Regulator') {
+    blueRawDice = applyRegulator(blueRawDice);
+  }
+  vsBlueDice = applyVsDiceModifiers(blueRawDice, pick, true);
+  // If more than 3 dice, pick best 3
+  if (vsBlueDice.length > 3) vsBlueDice = bestNOf(vsBlueDice, 3);
+  const blueShowCount = Math.min(vsBlueDice.length, 7);
+  for (let i = 0; i < blueShowCount; i++) { const d = document.getElementById('pDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
   setTimeout(() => {
-    vsBlueDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('pDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
+    vsBlueDice.forEach((v, i) => { if (i < 7) setTimeout(() => { const d = document.getElementById('pDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 300); });
     setTimeout(vsCheckBothRolled, 1200);
   }, 900);
 }
@@ -6504,6 +6585,70 @@ function vsCheckBothRolled() {
   if (isTripleOrBetter(pRoll.type)) setTimeout(() => showTriplesEffect('player', pRoll.type), isTripleOrBetter(currentEnemyRoll.type) ? 2200 : 600);
   const triplesDelay = (isTripleOrBetter(currentEnemyRoll.type) || isTripleOrBetter(pRoll.type)) ? 3000 : 0;
   phase = 4;
+
+  // --- VS-specific ability checks before resolveRound ---
+
+  // Kodako Swift: 1-2-3 → negate damage and deal 4
+  const blueKodako = pick.ability === 'Swift' && vsBlueDice.length >= 3 && [1,2,3].every(v => vsBlueDice.includes(v));
+  const redKodako = enemy.ability === 'Swift' && vsRedDice.length >= 3 && [1,2,3].every(v => vsRedDice.includes(v));
+
+  if (blueKodako || redKodako) {
+    setTimeout(() => {
+      if (blueKodako && redKodako) {
+        // Both Kodako — both trigger, net zero, treat as tie
+        showAbilitySplash('Swift', '1-2-3! Both sides trigger — Tie!', 1600, () => {
+          narrate(`<b class="gold">Swift!</b> Both players rolled 1-2-3 — cancels out!`);
+          setTimeout(nextRound, 1400);
+        }, 'playerCard');
+      } else if (blueKodako) {
+        showAbilitySplash('Swift', '1-2-3! Negate damage, deal 4!', 1600, () => {
+          enemyHp -= 4; playDamageSfx(4);
+          narrate(`<b class="gold">Swift! 4 damage to ${enemy.name}!</b>`);
+          document.getElementById('enemyCard').classList.add('hit');
+          setTimeout(() => document.getElementById('enemyCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          if (enemyHp <= 0) setTimeout(enemyDefeated, 600);
+          else setTimeout(nextRound, 1400);
+        }, 'playerCard');
+      } else {
+        showAbilitySplash('Swift', '1-2-3! Negate damage, deal 4!', 1600, () => {
+          playerHp -= 4; playDamageSfx(4);
+          narrate(`<b class="them">Swift! 4 damage to ${pick.name}!</b>`);
+          document.getElementById('playerCard').classList.add('hit');
+          setTimeout(() => document.getElementById('playerCard').classList.remove('hit'), 500);
+          updateHpDisplay();
+          if (playerHp <= 0) { if (vsMode) { vsHandleLoss(); } else { setTimeout(handlePlayerLoss, 600); } }
+          else setTimeout(nextRound, 1400);
+        }, 'enemyCard');
+      }
+    }, 1800 + triplesDelay);
+    return;
+  }
+
+  // Bubble Boys Pop: if opponent rolls triples, Bubble Boys are defeated
+  const bluePopTriggered = pick.ability === 'Pop' && isTripleOrBetter(currentEnemyRoll.type);
+  const redPopTriggered = enemy.ability === 'Pop' && isTripleOrBetter(pRoll.type);
+
+  if (bluePopTriggered || redPopTriggered) {
+    setTimeout(() => {
+      if (bluePopTriggered && redPopTriggered) {
+        // Both Bubble Boys popped — double KO, Red wins (enemy advantage on tie)
+        narrate(`<b class="them">Pop!</b> Both Bubble Boys burst!`);
+        playerHp = 0; enemyHp = 0; updateHpDisplay();
+        setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+      } else if (bluePopTriggered) {
+        narrate(`<b class="them">Pop!</b> ${pick.name} burst!`);
+        playerHp = 0; updateHpDisplay();
+        setTimeout(() => { fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+      } else {
+        narrate(`<b class="gold">Pop!</b> ${enemy.name} burst!`);
+        enemyHp = 0; updateHpDisplay();
+        setTimeout(enemyDefeated, 600);
+      }
+    }, 1800 + triplesDelay);
+    return;
+  }
+
   // Extra pause so both players can see the dice before damage resolves
   setTimeout(() => resolveRound(pRoll, currentEnemyRoll), 1800 + triplesDelay);
 }
