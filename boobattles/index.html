@@ -6665,24 +6665,27 @@ function showVsPick(player) {
 
   const grid = document.getElementById('vsGhostGrid');
   grid.innerHTML = '';
-  // 6 random ghosts — always include legendaries, guarantee Mountain King on first pick
-  const nonLeg = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
-  const legends = ALL_GHOSTS.filter(g => g.rarity === 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
-  const shuffledNon = [...nonLeg].sort(() => Math.random() - 0.5);
-  const shuffledLeg = [...legends].sort(() => Math.random() - 0.5);
-  // Always include 1-2 legendaries in VS; guarantee Mountain King for P1's first pick
-  const numLeg = Math.min(2, shuffledLeg.length);
-  let picks = [...shuffledLeg.slice(0, numLeg), ...shuffledNon.slice(0, 6 - numLeg)];
-  // Guarantee Mountain King in P1's pool, Doom in P2's pool
-  const mk = ALL_GHOSTS.find(g => g.name === 'The Mountain King');
-  const doom = ALL_GHOSTS.find(g => g.name === 'Doom');
-  if (player === 1 && mk && !picks.some(g => g.name === 'The Mountain King')) {
-    picks[0] = mk;
-  }
-  if (player === 2 && doom && !picks.some(g => g.name === 'Doom')) {
-    picks[0] = doom;
-  }
-  const available = picks.sort(() => Math.random() - 0.5);
+  // VS pick pool: 7 ghosts. Star ghost in center, high-odds fan favorites, rest random.
+  const alreadyPicked = vsP1Ghost ? vsP1Ghost.name : null;
+  const pool = ALL_GHOSTS.filter(g => g.name !== alreadyPicked);
+  const starName = player === 1 ? 'The Mountain King' : 'Doom';
+  const star = pool.find(g => g.name === starName);
+  const favNames = ['Kairan', 'Katrina', 'Wim'];
+  // 70% chance each favorite is included
+  const favs = favNames
+    .filter(n => n !== alreadyPicked && Math.random() < 0.70)
+    .map(n => pool.find(g => g.name === n))
+    .filter(Boolean);
+  // Fill remaining slots with random ghosts (mix of rarities)
+  const used = new Set([starName, ...favs.map(g => g.name)]);
+  const filler = pool.filter(g => !used.has(g.name)).sort(() => Math.random() - 0.5);
+  const slotsNeeded = 7 - 1 - favs.length; // 1 for star
+  const fillerPicks = filler.slice(0, slotsNeeded);
+  // Build final array: random left side, STAR in center, random right side
+  const sides = [...favs, ...fillerPicks].sort(() => Math.random() - 0.5);
+  const mid = Math.floor(sides.length / 2);
+  const available = [...sides.slice(0, mid), star, ...sides.slice(mid)].filter(Boolean);
+
   const cards = [];
   available.forEach(g => {
     const c = document.createElement('div');
@@ -6693,17 +6696,11 @@ function showVsPick(player) {
     cards.push({ el: c, ghost: g });
   });
 
-  // Auto-select: Mountain King for P1, Doom for P2, otherwise middle card
-  let defaultIdx = Math.floor(available.length / 2);
-  if (player === 1) {
-    const mkIdx = cards.findIndex(c => c.ghost.name === 'The Mountain King');
-    if (mkIdx >= 0) defaultIdx = mkIdx;
-  } else if (player === 2) {
-    const doomIdx = cards.findIndex(c => c.ghost.name === 'Doom');
-    if (doomIdx >= 0) defaultIdx = doomIdx;
-  }
+  // Auto-select the star ghost (center position)
+  const defaultIdx = cards.findIndex(c => c.ghost.name === starName);
+  const selectIdx = defaultIdx >= 0 ? defaultIdx : Math.floor(cards.length / 2);
   setTimeout(() => {
-    const defCard = cards[defaultIdx];
+    const defCard = cards[selectIdx];
     if (defCard) {
       defCard.el.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
       selectVsGhost(defCard.ghost, defCard.el);
