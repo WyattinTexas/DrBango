@@ -2681,7 +2681,9 @@ const ABILITY_THEMES = {
   'Slash': 'valley-guardian',
   'Valley Magic': 'valley-guardian',
   'Grace': 'double-down',
-  'Toboggan': 'blue-fire',
+  "Let's Dance": 'blue-fire',
+  'Seeker': 'valley-guardian',
+  'Fissure': 'fury',
   'Growing Mob': 'fury',
   'Hidden Weakness': 'beast-mode',
   'Change of Heart': 'party-time',
@@ -2733,7 +2735,9 @@ const ALL_GHOSTS = [
   { name:"Wim", file:"wim.jpg", rarity:"rare", maxHp:6, ability:"Slash", abilityDesc:"+5 damage when all dice are odd." },
   { name:"Spockles", file:"spockles.jpg", rarity:"rare", maxHp:6, ability:"Valley Magic", abilityDesc:"Win a roll: gain 2 Ice Shards." },
   { name:"Antoinette", file:"antoinette.jpg", rarity:"rare", maxHp:6, ability:"Grace", abilityDesc:"Roll as many dice as your opponent." },
-  { name:"Calvin & Anna", file:"calvin_anna.jpg", rarity:"rare", maxHp:6, ability:"Toboggan", abilityDesc:"When you defeat a ghost, heal 3 HP." },
+  { name:"Kairan", file:"kairan.jpg", rarity:"rare", maxHp:3, ability:"Let's Dance", abilityDesc:"Roll doubles: +1 die next roll." },
+  { name:"Katrina", file:"katrina.jpg", rarity:"rare", maxHp:5, ability:"Seeker", abilityDesc:"Before rolling, if you have less HP than the enemy, gain 1 HP." },
+  { name:"Hard Luck Snorton", file:"snorton.jpg", rarity:"rare", maxHp:8, ability:"Fissure", abilityDesc:"+5 damage if you roll at least two 6's and deal damage." },
   { name:"Troubling Haters", file:"troubling_haters.jpg", rarity:"rare", maxHp:4, ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP." },
   { name:"Wandering Sue", file:"wandering_sue.jpg", rarity:"rare", maxHp:4, ability:"Hidden Weakness", abilityDesc:"If enemy has 12+ HP, destroy them before rolling." },
   { name:"Eloise", file:"eloise.jpg", rarity:"rare", maxHp:5, ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling." },
@@ -2863,6 +2867,7 @@ function newState(isRestart) {
     items: [],
     usedCards: BOSSES.map(b => b.name), // bosses excluded from draw pool
     deadGhosts: [],
+    killedBy: {},
     battleWins: [],
     stats: { bossesBeaten: 0, ghostsLost: 0, totalRolls: 0, itemsUsed: 0 }
   };
@@ -3668,6 +3673,9 @@ function applyWinDamage(winner, loser, roll, baseDmg, isPlayer, firstRoll) {
     case 'Valley Guardian': // Romy: prediction hit → +3 (checked separately)
       break;
     case 'Party Time': // Balatron: counter die handled separately
+      break;
+    case 'Fissure': // Hard Luck Snorton: two+ 6's → +5 damage
+      if (roll.dice.filter(d => d === 6).length >= 2) damage += 5;
       break;
   }
 
@@ -4856,6 +4864,13 @@ function doPlayerRoll() {
 
   // Before-rolling abilities now activated via action bar icons (manual)
 
+  // Katrina's Seeker: gain 1 HP if below enemy HP (no cap — can overclock)
+  if (pick && pick.ability === 'Seeker' && playerHp < enemyHp) {
+    playerHp += 1;
+    updateHpDisplay();
+    narrate(`<b class="gold">Seeker!</b> +1 HP!`);
+  }
+
   let dieCount = getPlayerDiceCount();
   playerBonusDice = 0; playerRemoveDice = 0; // consumed
   // Show bonus dice elements as needed
@@ -4990,6 +5005,12 @@ function resolveRound(pRoll, eRoll) {
   // Use ability-aware comparison
   const result = compareRollsWithAbilities(pRoll, eRoll);
 
+  // Kairan's Let's Dance: doubles → +1 die next roll (win, lose, or tie)
+  if (pick && pick.ability === "Let's Dance" && pRoll.type === 'doubles') {
+    playerBonusDice += 1;
+    setTimeout(() => narrate(`<b class="gold">Let's Dance!</b> +1 die next roll!`), 1200);
+  }
+
   if (result === 0) {
     const vsSlow = vsMode ? 800 : 0;
     narrate(`You rolled ${describeRoll(pRoll)}.&nbsp;&nbsp;<b class="gold">Tie! Roll again!</b>`);
@@ -5077,11 +5098,6 @@ function resolveRound(pRoll, eRoll) {
 
         const winFx = afterWinTriggers(pick, enemy, pRoll, damage, true);
 
-        // Calvin & Anna: heal 3 on kill
-        if (pick.ability === 'Toboggan' && enemyHp <= 0) {
-          playerHp = Math.min(pick.maxHp, playerHp + 3);
-          updateHpDisplay();
-        }
 
         // Show secondary effects, then check Party Time counter, then continue
         const afterEffects = () => {
@@ -5468,6 +5484,7 @@ function handlePlayerLoss() {
   const deadGhost = { ...pick };
   state.collection.splice(selectedGhostIndex, 1);
   state.deadGhosts.push(pick.name);
+  state.killedBy[pick.name] = enemy.name;
   state.stats.ghostsLost++;
 
   // Sync remaining items
@@ -5880,11 +5897,11 @@ function showVictory() {
   `;
 
   // Save to Hall of Fame — grouped by ghost with defeated list
-  saveRunToHallOfFame(wins, deadNames);
+  saveRunToHallOfFame(wins, deadNames, state.killedBy || {});
   clearState();
 }
 
-function saveRunToHallOfFame(battleWins, deadNames) {
+function saveRunToHallOfFame(battleWins, deadNames, killedBy) {
   // Replace entire HoF with just this run — only ghosts that actually battled
   const hof = [];
 
@@ -5897,12 +5914,14 @@ function saveRunToHallOfFame(battleWins, deadNames) {
 
   // Only include ghosts that won at least one fight
   Object.entries(ghostWins).forEach(([ghostName, data]) => {
-    hof.push({
+    const entry = {
       ghost: ghostName,
       file: data.file,
       defeated: data.bosses,
       fallen: deadNames.includes(ghostName)
-    });
+    };
+    if (entry.fallen && killedBy[ghostName]) entry.killedBy = killedBy[ghostName];
+    hof.push(entry);
   });
 
   saveHallOfFame(hof);
@@ -6426,11 +6445,16 @@ function showHallOfFame() {
       if (!ghostMap[key].defeated.includes(entry.boss)) ghostMap[key].defeated.push(entry.boss);
     }
     if (entry.fallen) ghostMap[key].fallen = true;
+    if (entry.killedBy) ghostMap[key].killedBy = entry.killedBy;
   });
 
   const entries = Object.values(ghostMap);
   // Sort: survivors first, then fallen
   entries.sort((a, b) => (a.fallen ? 1 : 0) - (b.fallen ? 1 : 0));
+
+  // Shuffle quotes so no two fallen ghosts share one
+  const shuffledQuotes = [...FALLEN_QUOTES].sort(() => Math.random() - 0.5);
+  let quoteIdx = 0;
 
   // Slideshow: reveal entries one at a time
   let idx = 0;
@@ -6447,7 +6471,7 @@ function showHallOfFame() {
       ? `<div class="hof-boss">Defeated: ${entry.defeated.join(', ')}</div>`
       : '';
     const fallenQuote = entry.fallen
-      ? `<div class="hof-quote">"${FALLEN_QUOTES[Math.floor(Math.random() * FALLEN_QUOTES.length)]}"</div>`
+      ? `<div class="hof-quote">"${shuffledQuotes[quoteIdx++ % shuffledQuotes.length]}"</div>`
       : '';
 
     el.innerHTML = `
@@ -6455,7 +6479,7 @@ function showHallOfFame() {
       <div class="hof-info">
         <div class="hof-name">${entry.ghost}</div>
         ${defeatedText}
-        ${entry.fallen ? '<div class="hof-fallen-tag">FALLEN HERO</div>' : ''}
+        ${entry.fallen ? `<div class="hof-fallen-tag">Defeated by ${entry.killedBy || 'unknown'}</div>` : ''}
         ${fallenQuote}
       </div>
     `;
