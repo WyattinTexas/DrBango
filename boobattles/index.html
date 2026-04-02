@@ -290,6 +290,63 @@
 
   .pick-card.dimmed { opacity: 0.25; transform: scale(0.95); filter: grayscale(0.6); }
 
+  /* Face-down mystery card */
+  .pick-card.facedown {
+    perspective: 600px;
+  }
+  .pick-card.facedown .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1);
+    transform-style: preserve-3d;
+  }
+  .pick-card.facedown.revealed .card-inner {
+    transform: rotateY(180deg);
+  }
+  .pick-card .card-front, .pick-card .card-back {
+    backface-visibility: hidden;
+    width: 100%;
+  }
+  .pick-card .card-back {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(135deg, #1a1030 0%, #2d1b4e 40%, #1a1030 100%);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transform: rotateY(0deg);
+  }
+  .pick-card .card-front {
+    transform: rotateY(180deg);
+  }
+  .pick-card .card-back-icon {
+    font-size: 2.5rem;
+    animation: mysteryPulse 2s ease-in-out infinite;
+  }
+  .pick-card .card-back-text {
+    font-family: 'Creepster', cursive;
+    font-size: 0.9rem;
+    color: #a78bfa;
+    letter-spacing: 2px;
+  }
+  @keyframes mysteryPulse {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  .pick-card.revealed {
+    animation: revealBurst 0.6s ease-out;
+  }
+  @keyframes revealBurst {
+    0% { box-shadow: 0 0 0 rgba(103,232,249,0); }
+    50% { box-shadow: 0 0 40px rgba(103,232,249,0.6), 0 0 80px rgba(167,139,250,0.3); }
+    100% { box-shadow: 0 0 0 rgba(103,232,249,0); }
+  }
+
   .pick-card .pick-name {
     text-align: center;
     font-size: 0.78rem;
@@ -2406,6 +2463,7 @@ let pickSelection = null;
 function showInitialPick() {
   showScreen('pickScreen');
   pickSelection = null;
+  revealedCards = new Set();
   document.getElementById('pickBtn').classList.remove('ready');
   document.getElementById('selectedInfo').classList.remove('visible');
 
@@ -2429,21 +2487,66 @@ function showInitialPick() {
     pickOptions = STARTER_NAMES.map(name => ALL_GHOSTS.find(g => g.name === name));
   }
 
+  const labels = ['?', '?', '?'];
   pickOptions.forEach((g, i) => {
     const c = document.createElement('div');
-    c.className = 'pick-card';
-    c.innerHTML = `<div class="rarity-badge ${g.rarity}">${g.rarity === 'ghost-rare' ? 'LEGEND' : g.rarity.toUpperCase()}</div><img src="${IMG}${g.file}" alt="${g.name}"><div class="pick-name">${g.name}</div><div class="pick-ability">${g.ability} · ${g.maxHp} HP</div>`;
-    c.onclick = () => selectPickCard(i);
+    c.className = 'pick-card facedown';
+    c.innerHTML = `
+      <div class="card-inner">
+        <div class="card-back">
+          <div class="card-back-icon">\u{1F47B}</div>
+          <div class="card-back-text">Tap to reveal</div>
+        </div>
+        <div class="card-front">
+          <div class="rarity-badge ${g.rarity}">${g.rarity === 'ghost-rare' ? 'LEGEND' : g.rarity === 'legendary' ? 'LEGEND' : g.rarity.toUpperCase()}</div>
+          <img src="${IMG}${g.file}" alt="${g.name}">
+          <div class="pick-name">${g.name}</div>
+          <div class="pick-ability">${g.ability} · ${g.maxHp} HP</div>
+        </div>
+      </div>
+    `;
+    c.onclick = () => revealAndSelect(i);
     grid.appendChild(c);
   });
+
+  document.getElementById('pickLabel').innerHTML = state.isRestart
+    ? 'Choose your starter ghost<br><span style="font-size:0.7rem;color:#666;">Tap a card to reveal it</span>'
+    : 'Choose your starter ghost<br><span style="font-size:0.7rem;color:#666;">Tap a card to reveal it</span>';
+}
+
+let revealedCards = new Set();
+
+function revealAndSelect(idx) {
+  const cards = document.querySelectorAll('#ghostGrid .pick-card');
+  const card = cards[idx];
+
+  // If not revealed yet, reveal it
+  if (!revealedCards.has(idx)) {
+    revealedCards.add(idx);
+    card.classList.add('revealed');
+    playSfx('sfxSpecial', 0.6);
+
+    // After flip animation, show as selected
+    setTimeout(() => selectPickCard(idx), 400);
+    return;
+  }
+
+  // Already revealed — just select
+  selectPickCard(idx);
 }
 
 function selectPickCard(idx) {
   pickSelection = idx;
   const cards = document.querySelectorAll('#ghostGrid .pick-card');
   cards.forEach((c, i) => {
-    c.classList.toggle('selected', i === idx);
-    c.classList.toggle('dimmed', i !== idx);
+    if (revealedCards.has(i)) {
+      c.classList.toggle('selected', i === idx);
+      c.classList.toggle('dimmed', i !== idx);
+      c.classList.remove('facedown'); // ensure revealed cards stay face-up
+    } else {
+      c.classList.remove('selected');
+      c.classList.remove('dimmed');
+    }
   });
   const g = pickOptions[idx];
   document.getElementById('siName').textContent = g.name;
