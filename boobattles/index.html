@@ -4530,7 +4530,7 @@ function nextRound() {
   }
 
   narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
-  setTimeout(vsMode ? vsDoP2Roll : doEnemyRoll, 800);
+  setTimeout(doEnemyRoll, 800);
 }
 
 // ══════════════════════════════════════════════
@@ -5096,7 +5096,9 @@ function startVsBattle() {
   isFirstRoll = true; tookDamageLastRound = false;
   committedShards = 0; committedFires = 0;
   bossScript = null; bossScriptRound = 0;
-  battleItemsState = [];
+  // Give both players 3 random items
+  const itemTypes = ['reroll', 'heal', 'power'];
+  battleItemsState = [0,1,2].map(() => ({ id: itemTypes[Math.floor(Math.random()*3)], used: false }));
 
   showScreen('battleScreen');
   document.getElementById('battleScreen').classList.add('vs-mode');
@@ -5134,64 +5136,12 @@ function startVsBattle() {
   setTimeout(() => {
     rgo.classList.remove('active');
     document.getElementById('diceArea').classList.remove('hidden');
-    vsDoP2Roll();
+    narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls first...`);
+    setTimeout(doEnemyRoll, 1000);
   }, 1800);
 }
 
-// VS: P2 (top player) rolls — they tap the roll button while phone is flipped
-function vsDoP2Roll() {
-  phase = 0;
-  resetDice();
-  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
-
-  // P2 rolls random dice
-  const eDiceCount = 3;
-  let dice = [];
-  for (let i = 0; i < eDiceCount; i++) dice.push(Math.floor(Math.random()*6)+1);
-  currentEnemyRoll = analyzeRoll(dice);
-
-  // Show turn banner for P2
-  showVsTurnBanner(2);
-
-  for (let i = 0; i < 3; i++) {
-    const d = document.getElementById('eDie'+i);
-    d.textContent = '?';
-    d.classList.add('visible','rolling');
-  }
-
-  // Auto-roll after 1.5s (P2 sees their dice from upside down)
-  setTimeout(() => {
-    dice.forEach((v, i) => {
-      setTimeout(() => {
-        const d = document.getElementById('eDie'+i);
-        d.classList.remove('rolling');
-        d.textContent = v;
-        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
-          setTimeout(() => d.classList.add('glow'), 120);
-        }
-      }, i * 200);
-    });
-
-    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
-    if (currentEnemyRoll.type === 'triples') {
-      setTimeout(() => showTriplesEffect('enemy'), 700);
-    }
-
-    setTimeout(() => {
-      narrate(`<b class="them">${enemy.name}</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">P1's turn!</b>`);
-      phase = 1;
-      showVsTurnBanner(1);
-      document.getElementById('rollBtn').classList.add('ready');
-    }, 800 + extraDelay);
-  }, 1000);
-}
-
-function showVsTurnBanner(player) {
-  const banner = document.getElementById('vsTurnBanner');
-  banner.textContent = player === 1 ? "Player 1's Turn" : "Player 2's Turn";
-  banner.className = 'vs-turn-banner active ' + (player === 1 ? 'p1-turn' : 'p2-turn');
-  setTimeout(() => { banner.classList.remove('active'); }, 1500);
-}
+// VS mode uses the normal doEnemyRoll → doPlayerRoll flow
 
 // Override win/loss for VS mode
 function vsShowResult(winnerName, winnerFile, winnerLabel) {
