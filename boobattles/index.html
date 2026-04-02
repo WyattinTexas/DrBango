@@ -4006,6 +4006,21 @@ function afterLossTriggers(loser, roll, damage, isPlayer) {
   return effects;
 }
 
+// VS mode: universal shard/fire rewards (doesn't affect campaign)
+// Winner gets +1 ice shard, triples+ gives +1 sacred fire to roller
+function vsAwardResources(pRoll, eRoll, playerWins) {
+  if (!vsMode) return;
+  // Winner earns +1 ice shard
+  if (playerWins) {
+    iceShards += 1;
+  } else {
+    enemyIceShards += 1;
+  }
+  // Triples or better earns +1 sacred fire for whoever rolled it
+  if (isTripleOrBetter(pRoll.type)) sacredFires += 1;
+  if (isTripleOrBetter(eRoll.type)) enemySacredFires += 1;
+}
+
 // Show queued ability effects with splashes
 function showEffectQueue(effects, cardId, callback) {
   if (!effects || effects.length === 0) { if (callback) callback(); return; }
@@ -5511,6 +5526,9 @@ function resolveRound(pRoll, eRoll) {
   isFirstRoll = false;
   const playerWins = result === 1;
 
+  // VS: award ice shards & sacred fires for winning / rolling triples
+  vsAwardResources(pRoll, eRoll, playerWins);
+
   if (playerWins) {
     let baseDmg = pRoll.damage;
     let damage = applyWinDamage(pick, enemy, pRoll, baseDmg, true, wasFirstRoll);
@@ -6829,8 +6847,8 @@ function startVsBattle() {
   rerollMode = false;
   powerMode = 0;
   playerDiceValues = [];
-  iceShards = 0; sacredFires = 0;
-  enemyIceShards = 0; enemySacredFires = 0;
+  iceShards = 1; sacredFires = 0;        // VS: both start with 1 ice shard
+  enemyIceShards = 1; enemySacredFires = 0;
   playerBonusDice = 0; enemyBonusDice = 0;
   playerRemoveDice = 0; enemyRemoveDice = 0;
   bogeyReflectUsed = false; bogeyReflectArmed = false;
@@ -6840,7 +6858,7 @@ function startVsBattle() {
   committedShards = 0; committedFires = 0;
   redCommittedShards = 0; redCommittedFires = 0;
   bossScript = null; bossScriptRound = 0;
-  // Chad Sploop!: entry shards for VS
+  // Chad Sploop!: entry shards for VS (stacks with starting shard)
   if (pick.ability === 'Sploop!') iceShards += 2;
   if (enemy.ability === 'Sploop!') enemyIceShards += 2;
   // Give both players 3 random items
