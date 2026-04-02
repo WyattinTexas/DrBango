@@ -2345,7 +2345,7 @@
   /* Red narrator — upside down for north-facing Red player */
   .vs-red-narrator {
     position: absolute;
-    top: 28%;
+    top: 18%;
     left: 5%;
     right: 5%;
     z-index: 14;
@@ -6652,14 +6652,19 @@ function showVsPick(player) {
 
   const grid = document.getElementById('vsGhostGrid');
   grid.innerHTML = '';
-  // 6 random ghosts — sometimes include up to 2 legendaries
+  // 6 random ghosts — always include legendaries, guarantee Mountain King on first pick
   const nonLeg = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
   const legends = ALL_GHOSTS.filter(g => g.rarity === 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
   const shuffledNon = [...nonLeg].sort(() => Math.random() - 0.5);
   const shuffledLeg = [...legends].sort(() => Math.random() - 0.5);
-  // 30% chance to include legendaries, max 2
-  const numLeg = Math.random() < 0.30 ? Math.min(2, shuffledLeg.length) : 0;
-  const picks = [...shuffledLeg.slice(0, numLeg), ...shuffledNon.slice(0, 6 - numLeg)];
+  // Always include 1-2 legendaries in VS; guarantee Mountain King for P1's first pick
+  const numLeg = Math.min(2, shuffledLeg.length);
+  let picks = [...shuffledLeg.slice(0, numLeg), ...shuffledNon.slice(0, 6 - numLeg)];
+  // Guarantee Mountain King in P1's pool
+  const mk = ALL_GHOSTS.find(g => g.name === 'The Mountain King');
+  if (player === 1 && mk && !picks.some(g => g.name === 'The Mountain King')) {
+    picks[0] = mk; // replace first slot
+  }
   const available = picks.sort(() => Math.random() - 0.5);
   const cards = [];
   available.forEach(g => {
@@ -6671,13 +6676,17 @@ function showVsPick(player) {
     cards.push({ el: c, ghost: g });
   });
 
-  // Auto-select middle ghost and scroll to it
-  const midIdx = Math.floor(available.length / 2);
+  // Auto-select: Mountain King for P1's first pick, otherwise middle card
+  let defaultIdx = Math.floor(available.length / 2);
+  if (player === 1) {
+    const mkIdx = cards.findIndex(c => c.ghost.name === 'The Mountain King');
+    if (mkIdx >= 0) defaultIdx = mkIdx;
+  }
   setTimeout(() => {
-    const midCard = cards[midIdx];
-    if (midCard) {
-      midCard.el.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
-      selectVsGhost(midCard.ghost, midCard.el);
+    const defCard = cards[defaultIdx];
+    if (defCard) {
+      defCard.el.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
+      selectVsGhost(defCard.ghost, defCard.el);
     }
   }, 50);
 
