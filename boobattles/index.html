@@ -771,19 +771,57 @@
     padding: 2px 0;
     -webkit-overflow-scrolling: touch;
   }
+  .select-fighter-label {
+    font-family: 'Creepster', cursive;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
   .team-ghost-thumb {
-    width: 48px;
-    height: 66px;
+    width: 52px;
+    height: 72px;
     border-radius: 8px;
     overflow: hidden;
     flex-shrink: 0;
     border: 2px solid rgba(255,255,255,0.1);
     position: relative;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+  .team-ghost-thumb.selectable:hover { transform: scale(1.05); }
+  .team-ghost-thumb.selectable.selected {
+    border-color: var(--accent, #67e8f9);
+    box-shadow: 0 0 12px var(--accent, rgba(103,232,249,0.5));
+    transform: scale(1.08);
   }
   .team-ghost-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .ghost-hp-tag {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-align: center;
+    padding: 1px 0;
+  }
   .team-ghost-thumb.dead {
     filter: grayscale(1) brightness(0.3);
     border-color: rgba(239,68,68,0.4);
+    cursor: default;
+  }
+  .selected-fighter-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    color: var(--accent, #67e8f9);
+    text-align: center;
+    margin: 4px 0;
+    letter-spacing: 1px;
+    min-height: 1.3em;
   }
   .dead-x {
     position: absolute;
@@ -2659,9 +2697,11 @@
       <div class="stakes-text" id="stakesText"></div>
     </div>
     <div class="team-status-bar" id="teamStatusBar">
+      <div class="select-fighter-label">Select your fighter</div>
       <div class="team-ghosts" id="teamGhosts"></div>
+      <div class="selected-fighter-name" id="selectedFighterName"></div>
       <div class="team-items" id="teamItems"></div>
-      <button class="fight-btn" id="fightBtn" onclick="openPreBattle()">FIGHT!</button>
+      <button class="fight-btn" id="fightBtn" onclick="startBattle()">FIGHT!</button>
     </div>
   </div>
 
@@ -2773,7 +2813,7 @@
         <div class="reward-item-desc" id="rewardItemDesc"></div>
       </div>
     </div>
-    <div class="reward-ghost-label rw-anim" id="rewardGhostLabel">Pick your newest teammate</div>
+    <div class="reward-ghost-label rw-anim" id="rewardGhostLabel">Pick your new teammate</div>
     <div class="reward-cards rw-anim" id="rewardCards"></div>
     <div class="reward-selected-info" id="rewardSelectedInfo">
       <div class="rsi-name" id="rsiName"></div>
@@ -3691,13 +3731,19 @@ function showMap() {
   // Stakes text
   document.getElementById('stakesText').textContent = getStakesText(state.currentBoss, state.deadGhosts.length, state.collection.length);
 
-  // Team ghosts (living + dead)
+  // Team ghosts — selectable for battle
+  selectedGhostIndex = 0;
   const teamGhosts = document.getElementById('teamGhosts');
   teamGhosts.innerHTML = '';
-  state.collection.forEach(g => {
+  state.collection.forEach((g, i) => {
     const el = document.createElement('div');
-    el.className = 'team-ghost-thumb';
-    el.innerHTML = `<img src="${IMG}${g.file}">`;
+    el.className = 'team-ghost-thumb selectable' + (i === 0 ? ' selected' : '');
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="ghost-hp-tag">${g.hp}/${g.maxHp}</div>`;
+    el.onclick = () => {
+      selectedGhostIndex = i;
+      document.querySelectorAll('.team-ghost-thumb.selectable').forEach((t, j) => t.classList.toggle('selected', j === i));
+      document.getElementById('selectedFighterName').textContent = g.name;
+    };
     teamGhosts.appendChild(el);
   });
   state.deadGhosts.forEach(name => {
@@ -3720,6 +3766,11 @@ function showMap() {
     el.textContent = item.icon;
     teamItems.appendChild(el);
   });
+
+  // Selected fighter name
+  if (state.collection.length > 0) {
+    document.getElementById('selectedFighterName').textContent = state.collection[0].name;
+  }
 
   // Fight button accent
   document.getElementById('fightBtn').style.borderColor = theme.accent;
