@@ -1013,8 +1013,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
+    gap: 8px;
     min-height: 80px;
+    flex-wrap: wrap;
   }
 
   .dice-owner {
@@ -1876,6 +1877,9 @@
           <div class="die p" id="pDie1"></div>
           <div class="die p" id="pDie2"></div>
           <div class="die p bonus" id="pDie3" style="display:none;"></div>
+          <div class="die p bonus" id="pDie4" style="display:none;"></div>
+          <div class="die p bonus" id="pDie5" style="display:none;"></div>
+          <div class="die p bonus" id="pDie6" style="display:none;"></div>
         </div>
       </div>
       <div class="battle-ui-row">
@@ -3147,7 +3151,7 @@ function startBattle() {
   document.getElementById('enemyPlate').style.transition = 'none';
   document.getElementById('playerCard').classList.remove('hit');
   document.getElementById('predictArea').classList.remove('visible');
-  document.getElementById('pDie3').style.display = 'none';
+  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
 
   resetDice();
   narrate('');
@@ -3205,7 +3209,7 @@ function updateHpDisplay() {
 }
 
 function resetDice() {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 7; i++) {
     ['eDie','pDie'].forEach(p => {
       const d = document.getElementById(p+i);
       if (!d) return;
@@ -3645,7 +3649,7 @@ function showAbilitySplash(name, desc, duration, callback, cardId) {
 function doEnemyRoll() {
   phase = 0;
   resetDice();
-  document.getElementById('pDie3').style.display = 'none';
+  for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
   powerMode = false;
   committedShards = 0; committedFires = 0; // reset for new round
 
@@ -3853,7 +3857,7 @@ function highlightBestThree(allDice, bestRoll) {
       break;
     }
   }
-  for (let i = 0; i < Math.min(allDice.length, 4); i++) {
+  for (let i = 0; i < Math.min(allDice.length, 7); i++) {
     const d = document.getElementById('pDie' + i);
     if (i === discardIdx) {
       d.classList.add('discarded');
@@ -3878,7 +3882,10 @@ function doPlayerRoll() {
 
   let dieCount = getPlayerDiceCount();
   playerBonusDice = 0; playerRemoveDice = 0; // consumed
-  if (dieCount > 3) document.getElementById('pDie3').style.display = 'flex';
+  // Show bonus dice elements as needed
+  for (let i = 3; i < 7; i++) {
+    document.getElementById('pDie'+i).style.display = i < dieCount ? 'flex' : 'none';
+  }
 
   playerDiceValues = [];
   // Scripted boss fight: use scripted player dice
@@ -3916,7 +3923,7 @@ function doPlayerRoll() {
   const kodakoTrigger = pick.ability === 'Swift' && playerDiceValues.length >= 3 &&
     [1,2,3].every(v => playerDiceValues.includes(v));
 
-  for (let i = 0; i < Math.min(dieCount, 4); i++) {
+  for (let i = 0; i < Math.min(dieCount, 7); i++) {
     const d = document.getElementById('pDie'+i);
     d.textContent = '?';
     d.classList.add('visible','rolling');
@@ -3986,7 +3993,7 @@ function doPlayerRoll() {
       } else {
         setTimeout(() => resolveRound(pRoll, currentEnemyRoll), 400 + extraDelay);
       }
-    }, Math.min(dieCount, 4) * 200 + 300);
+    }, Math.min(dieCount, 7) * 200 + 300);
   }, 700);
 }
 
