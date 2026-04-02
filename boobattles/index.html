@@ -1741,9 +1741,8 @@
   /* VS Mode */
   .vs-pick-screen {
     align-items: center;
-    justify-content: flex-start;
-    padding: 20px 0 12px;
-    gap: 10px;
+    justify-content: center;
+    gap: 8px;
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -5035,7 +5034,8 @@ function showVsPick(player) {
   vsSelectedGhost = null;
   showScreen('vsPickScreen');
   const title = document.getElementById('vsPickTitle');
-  title.textContent = `Player ${player} — Pick Your Spiritkin`;
+  const teamName = player === 1 ? 'Blue' : 'Red';
+  title.textContent = `${teamName} — Pick Your Spiritkin`;
   title.className = 'vs-pick-title ' + (player === 1 ? 'p1' : 'p2');
   document.getElementById('vsPickBtn').classList.remove('ready');
   document.getElementById('vsSelectedInfo').classList.remove('visible');
@@ -5044,13 +5044,44 @@ function showVsPick(player) {
   grid.innerHTML = '';
   // Show all non-legendary ghosts (exclude P1's pick for P2)
   const available = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && (!vsP1Ghost || g.name !== vsP1Ghost.name));
+  const cards = [];
   available.forEach(g => {
     const c = document.createElement('div');
     c.className = 'vs-ghost-card';
     c.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}">`;
     c.onclick = () => selectVsGhost(g, c);
     grid.appendChild(c);
+    cards.push({ el: c, ghost: g });
   });
+
+  // Auto-select middle ghost and scroll to it
+  const midIdx = Math.floor(available.length / 2);
+  setTimeout(() => {
+    const midCard = cards[midIdx];
+    if (midCard) {
+      midCard.el.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
+      selectVsGhost(midCard.ghost, midCard.el);
+    }
+  }, 50);
+
+  // Auto-select nearest card on scroll stop
+  let scrollTimer = null;
+  grid.onscroll = () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const gridRect = grid.getBoundingClientRect();
+      const centerX = gridRect.left + gridRect.width / 2;
+      let closest = null, closestDist = Infinity;
+      cards.forEach(({ el, ghost }) => {
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.left + rect.width/2 - centerX);
+        if (dist < closestDist) { closestDist = dist; closest = { el, ghost }; }
+      });
+      if (closest && closest.ghost !== vsSelectedGhost) {
+        selectVsGhost(closest.ghost, closest.el);
+      }
+    }, 100);
+  };
 }
 
 function selectVsGhost(ghost, el) {
@@ -5158,8 +5189,8 @@ function vsShowResult(winnerName, winnerFile, winnerLabel) {
   `;
 }
 
-function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Player 1'); }
-function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Player 2'); }
+function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Blue'); }
+function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Red'); }
 
 // ══════════════════════════════════════════════
 // HALL OF FAME — persists across runs
