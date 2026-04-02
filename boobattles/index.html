@@ -3147,7 +3147,7 @@ function renderBattleActionBar() {
 
   // Activatable ability icon
   const abilityId = pick ? pick.ability : null;
-  const hasActivatable = ['Teamwork', 'Heating Up', 'Bogus'].includes(abilityId);
+  const hasActivatable = ['Teamwork', 'Heating Up', 'Bogus', 'Change of Heart'].includes(abilityId);
   if (hasActivatable) {
     const ab = document.createElement('div');
     ab.className = 'ability-icon';
@@ -3156,7 +3156,10 @@ function renderBattleActionBar() {
     if (abilityId === 'Teamwork') icon = '\u{1F91D}';
     if (abilityId === 'Heating Up') icon = '\u{1F525}';
     if (abilityId === 'Bogus') icon = '\u{1F6E1}\uFE0F';
-    const label = abilityId === 'Bogus' && bogeyReflectUsed ? 'USED' : abilityId.split(' ')[0];
+    if (abilityId === 'Change of Heart') icon = '\u{1F504}';
+    let label = abilityId.split(' ')[0];
+    if (abilityId === 'Bogus' && bogeyReflectUsed) label = 'USED';
+    if (abilityId === 'Change of Heart') label = 'Swap';
     ab.innerHTML = `${icon}<div class="icon-label">${label}</div>`;
     ab.title = pick.abilityDesc;
     if (abilityId === 'Bogus' && bogeyReflectUsed) ab.classList.add('used');
@@ -3246,6 +3249,7 @@ function updateItemUsability() {
     let usable = false;
     if (pick.ability === 'Teamwork' && phase === 1 && playerHp < pick.maxHp) usable = true;
     if (pick.ability === 'Heating Up' && phase === 1 && playerHp > 3) usable = true;
+    if (pick.ability === 'Change of Heart' && phase === 1 && iceShards >= 2) usable = true;
     // Bogus is passive (auto-reflects), no manual activation needed
     abBtn.classList.toggle('usable', usable);
   }
@@ -3324,6 +3328,19 @@ function activateAbility() {
     narrate(`<b class="gold">Heating Up!</b> -2 HP → +1 die this roll!`);
     renderBattleActionBar();
     updateItemUsability();
+  }
+
+  if (pick.ability === 'Change of Heart' && iceShards >= 2) {
+    iceShards -= 2;
+    const tempHp = playerHp;
+    playerHp = enemyHp;
+    enemyHp = tempHp;
+    updateHpDisplay();
+    showAbilitySplash('Change of Heart', `HP swapped! You: ${playerHp} ↔ Enemy: ${enemyHp}`, 1800, () => {
+      narrate(`<b class="gold">Change of Heart!</b> HP swapped! You: ${playerHp} · ${enemy.name}: ${enemyHp}`);
+      renderBattleActionBar();
+      updateItemUsability();
+    }, 'playerCard');
   }
 }
 
@@ -3440,7 +3457,14 @@ function doReroll(dieIndex) {
   playSfx('sfxDiceRoll');
 
   setTimeout(() => {
-    const newVal = Math.floor(Math.random() * 6) + 1;
+    // 60% chance to match one of the other dice (creates hype doubles/triples)
+    let newVal;
+    const otherDice = playerDiceValues.filter((_, i) => i !== dieIndex);
+    if (otherDice.length > 0 && Math.random() < 0.60) {
+      newVal = otherDice[Math.floor(Math.random() * otherDice.length)];
+    } else {
+      newVal = Math.floor(Math.random() * 6) + 1;
+    }
     playerDiceValues[dieIndex] = newVal;
     d.classList.remove('rolling');
     d.textContent = newVal;
