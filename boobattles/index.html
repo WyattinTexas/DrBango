@@ -2342,10 +2342,10 @@
     cursor: pointer;
   }
 
-  /* Red narrator — upside down for north-facing Red player */
+  /* Red narrator — upside down for north-facing Red player, below card area */
   .vs-red-narrator {
     position: absolute;
-    top: 18%;
+    top: 38%;
     left: 5%;
     right: 5%;
     z-index: 14;
@@ -6660,10 +6660,14 @@ function showVsPick(player) {
   // Always include 1-2 legendaries in VS; guarantee Mountain King for P1's first pick
   const numLeg = Math.min(2, shuffledLeg.length);
   let picks = [...shuffledLeg.slice(0, numLeg), ...shuffledNon.slice(0, 6 - numLeg)];
-  // Guarantee Mountain King in P1's pool
+  // Guarantee Mountain King in P1's pool, Doom in P2's pool
   const mk = ALL_GHOSTS.find(g => g.name === 'The Mountain King');
+  const doom = ALL_GHOSTS.find(g => g.name === 'Doom');
   if (player === 1 && mk && !picks.some(g => g.name === 'The Mountain King')) {
-    picks[0] = mk; // replace first slot
+    picks[0] = mk;
+  }
+  if (player === 2 && doom && !picks.some(g => g.name === 'Doom')) {
+    picks[0] = doom;
   }
   const available = picks.sort(() => Math.random() - 0.5);
   const cards = [];
@@ -6676,11 +6680,14 @@ function showVsPick(player) {
     cards.push({ el: c, ghost: g });
   });
 
-  // Auto-select: Mountain King for P1's first pick, otherwise middle card
+  // Auto-select: Mountain King for P1, Doom for P2, otherwise middle card
   let defaultIdx = Math.floor(available.length / 2);
   if (player === 1) {
     const mkIdx = cards.findIndex(c => c.ghost.name === 'The Mountain King');
     if (mkIdx >= 0) defaultIdx = mkIdx;
+  } else if (player === 2) {
+    const doomIdx = cards.findIndex(c => c.ghost.name === 'Doom');
+    if (doomIdx >= 0) defaultIdx = doomIdx;
   }
   setTimeout(() => {
     const defCard = cards[defaultIdx];
