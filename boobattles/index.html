@@ -278,14 +278,13 @@
     transition: opacity 0.35s;
   }
 
-  .pick-card:hover:not(.dimmed) {
+  .pick-card:hover:not(.dimmed):not(.selected) {
     transform: translateY(-6px) scale(1.04);
     border-color: rgba(255,255,255,0.25);
     box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   }
 
   .pick-card.selected {
-    transform: translateY(-10px) scale(1.06);
     border-color: rgba(103,232,249,0.3);
     box-shadow: 0 0 30px rgba(103,232,249,0.15), 0 16px 40px rgba(0,0,0,0.4);
     z-index: 10;
@@ -295,7 +294,6 @@
 
   .pick-card.dimmed {
     opacity: 0.3;
-    transform: scale(0.96);
     filter: grayscale(0.5) brightness(0.7);
   }
 
@@ -1833,6 +1831,41 @@
     transform: rotate(180deg);
   }
 
+  /* Red's roll button — top-left, flipped for Red player */
+  .vs-red-roll-area {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    z-index: 15;
+    transform: rotate(180deg);
+    display: none;
+  }
+  .vs-red-roll-area.active { display: block; }
+  .vs-red-roll-btn {
+    font-family: 'Creepster', cursive;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    padding: 10px 32px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--enemy), #dc2626);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(248,113,113,0.4);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .vs-red-roll-btn:hover { transform: scale(1.05); }
+
+  /* VS mode: offset Blue items */
+  .battle-screen.vs-mode .battle-action-bar {
+    position: absolute;
+    bottom: 240px;
+    right: 12px;
+    left: auto;
+    width: auto;
+    z-index: 15;
+  }
+
   /* VS turn indicators */
   .vs-turn-banner {
     position: fixed;
@@ -2020,6 +2053,9 @@
   <!-- BATTLE -->
   <div class="screen battle-screen" id="battleScreen">
     <div class="spirit-particles" id="spiritParticles"></div>
+    <div class="vs-red-roll-area" id="vsRedRollArea">
+      <button class="vs-red-roll-btn" id="vsRedRollBtn" onclick="vsRedRoll()">Roll Dice!</button>
+    </div>
     <div class="enemy-zone">
       <div class="name-plate enemy-plate" id="enemyPlate">
         <div class="np-name" id="enemyNameText"></div>
@@ -2713,6 +2749,7 @@ function showInitialPick() {
   showScreen('pickScreen');
   pickSelection = null;
   revealedCards = new Set();
+  pickCardNaturalCenters = []; // reset so we re-measure fresh
   document.getElementById('pickBtn').classList.remove('ready');
   document.getElementById('selectedInfo').classList.remove('visible');
 
@@ -2778,16 +2815,54 @@ function revealAndSelect(idx) {
   selectPickCard(idx);
 }
 
+// Natural card centers — measured once before any transforms applied
+let pickCardNaturalCenters = [];
+
+function measurePickCards() {
+  const cards = document.querySelectorAll('#ghostGrid .pick-card');
+  if (!cards.length) return;
+  // Temporarily strip transforms to read natural positions
+  cards.forEach(c => { c.style.transition = 'none'; c.style.transform = 'none'; });
+  void cards[0].offsetHeight; // force reflow
+  pickCardNaturalCenters = Array.from(cards).map(c => {
+    const r = c.getBoundingClientRect();
+    return r.left + r.width / 2;
+  });
+  // Restore transitions (clear inline overrides)
+  cards.forEach(c => { c.style.transform = ''; c.style.transition = ''; });
+}
+
 function selectPickCard(idx) {
   pickSelection = idx;
   const cards = document.querySelectorAll('#ghostGrid .pick-card');
+  const centerIdx = 1;
+
+  // Measure natural positions once
+  if (pickCardNaturalCenters.length === 0) measurePickCards();
+
+  const cardOffset = pickCardNaturalCenters.length >= 2
+    ? pickCardNaturalCenters[1] - pickCardNaturalCenters[0]
+    : 0;
+
   cards.forEach((c, i) => {
     if (revealedCards.has(i)) {
       c.classList.remove('facedown');
       c.classList.toggle('selected', i === idx);
       c.classList.toggle('dimmed', i !== idx && revealedCards.has(i));
     }
+
+    // Slide: selected → center, center → selected's old slot, others stay
+    if (i === idx) {
+      const tx = (centerIdx - i) * cardOffset;
+      c.style.transform = `translateX(${tx}px) translateY(-10px) scale(1.08)`;
+    } else if (i === centerIdx && idx !== centerIdx) {
+      const tx = (idx - centerIdx) * cardOffset;
+      c.style.transform = `translateX(${tx}px) scale(0.94)`;
+    } else {
+      c.style.transform = 'scale(0.94)';
+    }
   });
+
   const g = pickOptions[idx];
   document.getElementById('siName').textContent = g.name;
   document.getElementById('siDetail').innerHTML = `<b>${g.ability}</b> · ${g.abilityDesc} · ${g.maxHp} HP`;
@@ -5223,24 +5298,20 @@ function startVsBattle() {
   }, 1800);
 }
 
-// VS turn system: RED rolls manually, then BLUE rolls manually
+// VS turn system: RED has own top button (flipped), BLUE has bottom button
 function vsStartRedTurn() {
   phase = 0;
-  vsTurn = 2; // Red's turn
+  vsTurn = 2;
   resetDice();
   for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
-  narrate(`<b class="them">RED</b> — Tap to roll!`);
-  document.getElementById('rollBtn').textContent = "Red's Roll!";
-  document.getElementById('rollBtn').classList.add('ready');
-  // Override roll button for RED
-  document.getElementById('rollBtn').onclick = vsRedRoll;
+  narrate(`<b class="them">RED's turn!</b>`);
+  document.getElementById('vsRedRollArea').classList.add('active');
+  document.getElementById('rollBtn').classList.remove('ready');
 }
 
 function vsRedRoll() {
   if (vsTurn !== 2) return;
-  document.getElementById('rollBtn').classList.remove('ready');
-  document.getElementById('rollBtn').onclick = () => doPlayerRoll();
-  document.getElementById('rollBtn').textContent = "Roll Your Dice!";
+  document.getElementById('vsRedRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
 
   const dice = rollDice();
@@ -5284,6 +5355,7 @@ function vsShowResult(winnerName, winnerFile, winnerLabel) {
   fadeOutMusic();
   stopSpiritParticles();
   document.getElementById('battleScreen').classList.remove('vs-mode');
+  document.getElementById('vsRedRollArea').classList.remove('active');
   document.getElementById('diceOwnerEnemy').textContent = 'Enemy';
   document.getElementById('diceOwnerPlayer').textContent = 'You';
   document.getElementById('rollBtn').textContent = 'Roll Your Dice!';
