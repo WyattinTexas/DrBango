@@ -232,10 +232,12 @@
 
   .pick-label {
     font-family: 'Creepster', cursive;
-    font-size: 1.5rem;
+    font-size: 2.4rem;
     color: var(--player);
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     text-align: center;
+    text-shadow: 0 0 24px rgba(103,232,249,0.3);
+    line-height: 1.2;
   }
 
   .ghost-grid {
@@ -394,18 +396,36 @@
 
   .selected-info .si-name {
     font-family: 'Creepster', cursive;
-    font-size: 2.2rem;
+    font-size: 2.8rem;
     color: var(--player);
+    letter-spacing: 3px;
+    line-height: 1;
+    text-shadow: 0 0 24px rgba(103,232,249,0.4);
+  }
+  .selected-info .si-ability-name {
+    font-family: 'Creepster', cursive;
+    font-size: 1.6rem;
+    color: var(--gold);
     letter-spacing: 2px;
-    text-shadow: 0 0 20px rgba(103,232,249,0.4);
+    margin-top: 6px;
+    text-shadow: 0 0 16px rgba(251,191,36,0.35);
   }
-  .selected-info .si-detail {
-    font-size: 0.85rem;
+  .selected-info .si-desc {
+    font-size: 1.15rem;
     font-weight: 600;
-    color: #aaa;
-    margin-top: 2px;
+    color: rgba(255,255,255,0.9);
+    margin-top: 8px;
+    line-height: 1.4;
+    max-width: 340px;
   }
-  .selected-info .si-detail b { color: var(--gold); }
+  .selected-info .si-hp {
+    font-family: 'Creepster', cursive;
+    font-size: 1.3rem;
+    color: var(--green);
+    letter-spacing: 2px;
+    margin-top: 8px;
+    text-shadow: 0 0 14px rgba(52,211,153,0.35);
+  }
 
   /* ======== MAP SCREEN ======== */
   .map-screen {
@@ -1831,7 +1851,7 @@
     transform: rotate(180deg);
   }
 
-  /* Red's roll button — top-left, flipped for Red player */
+  /* Red's roll button — top-left, flipped */
   .vs-red-roll-area {
     position: absolute;
     top: 8px;
@@ -1843,28 +1863,20 @@
   .vs-red-roll-area.active { display: block; }
   .vs-red-roll-btn {
     font-family: 'Creepster', cursive;
-    font-size: 1.1rem;
+    font-size: 1rem;
     letter-spacing: 2px;
-    padding: 10px 32px;
+    padding: 8px 24px;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     background: linear-gradient(135deg, var(--enemy), #dc2626);
     color: #fff;
-    box-shadow: 0 0 20px rgba(248,113,113,0.4);
+    box-shadow: 0 0 16px rgba(248,113,113,0.4);
     cursor: pointer;
-    transition: all 0.2s;
   }
-  .vs-red-roll-btn:hover { transform: scale(1.05); }
 
-  /* VS mode: offset Blue items */
-  .battle-screen.vs-mode .battle-action-bar {
-    position: absolute;
-    bottom: 240px;
-    right: 12px;
-    left: auto;
-    width: auto;
-    z-index: 15;
-  }
+  /* VS mode: hide shared action bar */
+  .battle-screen.vs-mode .battle-action-bar { display: none; }
+  .battle-screen.vs-mode .battle-ui-row .action-btn { width: auto; padding: 10px 28px; }
 
   /* VS turn indicators */
   .vs-turn-banner {
@@ -1955,7 +1967,11 @@
     .ghost-grid { gap: 10px; max-width: 360px; }
     .pick-card { max-width: 110px; }
     .pick-card .pick-name { font-size: 0.68rem; }
-    .selected-info .si-name { font-size: 1.7rem; }
+    .pick-label { font-size: 2rem; }
+    .selected-info .si-name { font-size: 2.2rem; }
+    .selected-info .si-ability-name { font-size: 1.3rem; }
+    .selected-info .si-desc { font-size: 1rem; }
+    .selected-info .si-hp { font-size: 1.1rem; }
     .battle-card.enemy-card { width: 127px; height: 179px; }
     .battle-card.player-card { width: 130px; height: 182px; }
     .name-plate { min-width: 142px; padding: 6px 10px; }
@@ -2005,7 +2021,9 @@
     <div class="ghost-grid" id="ghostGrid"></div>
     <div class="selected-info" id="selectedInfo">
       <div class="si-name" id="siName"></div>
-      <div class="si-detail" id="siDetail"></div>
+      <div class="si-ability-name" id="siAbilityName"></div>
+      <div class="si-desc" id="siDesc"></div>
+      <div class="si-hp" id="siHp"></div>
     </div>
     <button class="action-btn cyan" id="pickBtn" onclick="confirmPick()">Confirm your choice</button>
   </div>
@@ -2789,8 +2807,8 @@ function showInitialPick() {
   });
 
   document.getElementById('pickLabel').innerHTML = state.isRestart
-    ? 'Choose Your Spiritkin<br><span style="font-size:0.7rem;color:#666;">Tap a card to reveal it</span>'
-    : 'Choose Your Spiritkin<br><span style="font-size:0.7rem;color:#666;">Tap a card to reveal it</span>';
+    ? 'Choose Your Spiritkin<br><span style="font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:3px;font-family:Creepster,cursive;">Tap a card to reveal it</span>'
+    : 'Choose Your Spiritkin<br><span style="font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:3px;font-family:Creepster,cursive;">Tap a card to reveal it</span>';
 }
 
 let revealedCards = new Set();
@@ -2865,7 +2883,9 @@ function selectPickCard(idx) {
 
   const g = pickOptions[idx];
   document.getElementById('siName').textContent = g.name;
-  document.getElementById('siDetail').innerHTML = `<b>${g.ability}</b> · ${g.abilityDesc} · ${g.maxHp} HP`;
+  document.getElementById('siAbilityName').textContent = g.ability;
+  document.getElementById('siDesc').textContent = g.abilityDesc;
+  document.getElementById('siHp').textContent = `${g.maxHp} HP`;
   document.getElementById('selectedInfo').classList.add('visible');
   document.getElementById('pickBtn').classList.add('ready');
 }
@@ -4642,7 +4662,7 @@ function nextRound() {
   }
 
   if (vsMode) {
-    setTimeout(vsStartRedTurn, 800);
+    setTimeout(vsStartBothRolls, 800);
   } else {
     narrate(`<b class="them">${enemy.name}</b>&nbsp;rolls...`);
     setTimeout(doEnemyRoll, 800);
@@ -5294,60 +5314,65 @@ function startVsBattle() {
   setTimeout(() => {
     rgo.classList.remove('active');
     document.getElementById('diceArea').classList.remove('hidden');
-    vsStartRedTurn();
+    vsStartBothRolls();
   }, 1800);
 }
 
-// VS turn system: RED has own top button (flipped), BLUE has bottom button
-function vsStartRedTurn() {
+// VS turn system: both roll simultaneously
+let vsRedRolled = false, vsBlueRolled = false;
+let vsRedDice = null, vsBlueDice = null;
+
+function vsStartBothRolls() {
   phase = 0;
-  vsTurn = 2;
+  vsRedRolled = false; vsBlueRolled = false;
+  vsRedDice = null; vsBlueDice = null;
   resetDice();
   for (let i = 3; i < 7; i++) document.getElementById('pDie'+i).style.display = 'none';
-  narrate(`<b class="them">RED's turn!</b>`);
+  narrate('Both players — Roll!');
   document.getElementById('vsRedRollArea').classList.add('active');
-  document.getElementById('rollBtn').classList.remove('ready');
+  document.getElementById('rollBtn').textContent = 'Roll Dice!';
+  document.getElementById('rollBtn').classList.add('ready');
+  document.getElementById('rollBtn').onclick = vsBlueRoll;
 }
 
 function vsRedRoll() {
-  if (vsTurn !== 2) return;
+  if (vsRedRolled) return;
+  vsRedRolled = true;
   document.getElementById('vsRedRollArea').classList.remove('active');
   playSfx('sfxDiceRoll');
-
-  const dice = rollDice();
-  currentEnemyRoll = analyzeRoll(dice);
-
-  for (let i = 0; i < 3; i++) {
-    const d = document.getElementById('eDie'+i);
-    d.textContent = '?';
-    d.classList.add('visible','rolling');
-  }
-
+  vsRedDice = rollDice();
+  for (let i = 0; i < 3; i++) { const d = document.getElementById('eDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
   setTimeout(() => {
-    dice.forEach((v, i) => {
-      setTimeout(() => {
-        const d = document.getElementById('eDie'+i);
-        d.classList.remove('rolling');
-        d.textContent = v;
-        if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) {
-          setTimeout(() => d.classList.add('glow'), 120);
-        }
-      }, i * 200);
-    });
-
-    const extraDelay = currentEnemyRoll.type === 'triples' ? 1400 : 0;
-    if (currentEnemyRoll.type === 'triples') {
-      setTimeout(() => showTriplesEffect('enemy'), 700);
-    }
-
-    setTimeout(() => {
-      narrate(`<b class="them">RED</b>&nbsp;rolled ${describeRoll(currentEnemyRoll)}.&nbsp;&nbsp;<b class="you">BLUE's turn!</b>`);
-      phase = 1;
-      vsTurn = 1;
-      document.getElementById('rollBtn').classList.add('ready');
-      updateItemUsability();
-    }, 800 + extraDelay);
+    vsRedDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('eDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 200); });
+    setTimeout(vsCheckBothRolled, 800);
   }, 700);
+}
+
+function vsBlueRoll() {
+  if (vsBlueRolled) return;
+  vsBlueRolled = true;
+  document.getElementById('rollBtn').classList.remove('ready');
+  playSfx('sfxDiceRoll');
+  vsBlueDice = rollDice();
+  for (let i = 0; i < 3; i++) { const d = document.getElementById('pDie'+i); d.textContent = '?'; d.classList.add('visible','rolling'); }
+  setTimeout(() => {
+    vsBlueDice.forEach((v, i) => { setTimeout(() => { const d = document.getElementById('pDie'+i); d.classList.remove('rolling'); d.textContent = v; }, i * 200); });
+    setTimeout(vsCheckBothRolled, 800);
+  }, 700);
+}
+
+function vsCheckBothRolled() {
+  if (!vsRedRolled || !vsBlueRolled) return;
+  currentEnemyRoll = analyzeRoll(vsRedDice);
+  const pRoll = analyzeRoll(vsBlueDice);
+  playerDiceValues = [...vsBlueDice];
+  vsRedDice.forEach((v, i) => { if (currentEnemyRoll.matchDie && v === currentEnemyRoll.matchDie) document.getElementById('eDie'+i).classList.add('glow'); });
+  vsBlueDice.forEach((v, i) => { if (pRoll.matchDie && v === pRoll.matchDie) document.getElementById('pDie'+i).classList.add('glow'); });
+  if (currentEnemyRoll.type === 'triples') showTriplesEffect('enemy');
+  if (pRoll.type === 'triples') setTimeout(() => showTriplesEffect('player'), currentEnemyRoll.type === 'triples' ? 1500 : 0);
+  const delay = (currentEnemyRoll.type === 'triples' || pRoll.type === 'triples') ? 2000 : 600;
+  phase = 4;
+  setTimeout(() => resolveRound(pRoll, currentEnemyRoll), delay);
 }
 
 // Override win/loss for VS mode
