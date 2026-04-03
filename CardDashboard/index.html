@@ -129,6 +129,21 @@
   .toast.show { transform: translateY(0); opacity: 1; }
 
   #fileInput { display: none; }
+  .card-preview-overlay { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.35); z-index: 900; }
+  .card-preview-overlay.open { display: block; }
+  .card-preview { position: fixed; top: 0; right: -400px; bottom: 0; width: 380px; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -4px 0 24px rgba(0,0,0,0.12); z-index: 1000; transition: right 0.25s ease; overflow-y: auto; padding: 24px; }
+  .card-preview.open { right: 0; }
+  .card-preview .close-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 20px; color: var(--text2); cursor: pointer; padding: 4px 8px; }
+  .card-preview .close-btn:hover { color: var(--text); }
+  .card-preview .card-img { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+  .card-preview .no-img { width: 100%; height: 280px; background: var(--surface2); border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 13px; }
+  .card-preview h2 { font-size: 20px; margin-bottom: 4px; }
+  .card-preview .card-meta { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+  .card-preview .card-ability-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-preview .card-ability-desc { font-size: 14px; color: var(--text2); line-height: 1.5; margin-bottom: 16px; }
+  .card-preview .card-detail { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .card-preview .card-detail strong { color: var(--text); }
+  tr { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -290,6 +305,11 @@
   </div>
 </div>
 
+<div class="card-preview-overlay" id="previewOverlay" onclick="closePreview()"></div>
+<div class="card-preview" id="previewPanel">
+  <button class="close-btn" onclick="closePreview()">&times;</button>
+  <div id="previewContent"></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -660,7 +680,7 @@ function renderTable() {
     const colId = spirits.indexOf(s) + 1;
     const setColor = SET_COLORS[s.set] || '#8b8b9e';
     return `
-      <tr>
+      <tr onclick="openPreview(${s.id})">
         <td style="color:var(--text2);font-size:12px;text-align:center">${colId}/200</td>
         <td><strong>${esc(s.name)}</strong></td>
         <td><span class="category-badge" style="background:${setColor}22;color:${setColor}">${esc(s.set || '')}</span></td>
@@ -676,8 +696,8 @@ function renderTable() {
         <td><div class="ability-desc">${esc(s.abilityDesc)}</div></td>
         <td style="font-size:12px;color:var(--text2)">${esc(s.artist || '')}</td>
         <td>
-          <button class="btn-sm" onclick="startEdit(${s.id})">Edit</button>
-          <button class="btn-sm btn-danger" onclick="deleteSpirit(${s.id})">×</button>
+          <button class="btn-sm" onclick="event.stopPropagation();startEdit(${s.id})">Edit</button>
+          <button class="btn-sm btn-danger" onclick="event.stopPropagation();deleteSpirit(${s.id})">×</button>
         </td>
       </tr>
     `;
@@ -1051,6 +1071,81 @@ function copyPrompt() {
 // ============================================================
 // HELPERS
 // ============================================================
+// Card image mapping
+const CARD_IMAGES = {
+  'Kodako': 'kodako.jpg', 'Nikon': 'nikon.jpg', 'Ancient Librarian': 'AncientLibrarian.png',
+  'Wanderer': 'Wanderer.png', 'Puff': 'Puff.png', 'Fang Outside': 'FangOutside.png',
+  'Fang Undercover': 'FangUndercover.png', 'Buttons': 'Buttons.png', 'Little Boo': 'LittleBoo.png',
+  'Patrick': 'patrick.jpg', 'Villager': 'Villager.png', 'Dupy': 'Dupy.png', 'Shoo': 'Shoo.png',
+  'Jeffery': 'Jeffery.png', 'Winston': 'Winston.png', 'Chip': 'Chip.png',
+  'Boo Brothers': 'boo_brothers.jpg', 'Charlie': 'Charlie.png',
+  'Scallywags': 'Scallywags.png', 'Floop': 'Floop.png', 'Needle': 'Needle_dc.png',
+  'Ancient One': 'ancient_one.jpg', 'Powder': 'powder.jpg', 'Simon': 'simon.jpg',
+  'Cameron': 'cameron.jpg', 'Logey': 'logey.jpg', 'Fredrick': 'fredrick.jpg',
+  'Dream Cat': 'dream_cat.jpg', 'Sad Sal': 'sad_sal.jpg', 'Tommy Salami': 'tommy_salami.jpg',
+  'Gus': 'gus.jpg', 'Lou': 'lou.jpg', 'Sandwiches': 'sandwiches.jpg',
+  'Grawr': 'Grawr.png', 'Larry': 'Larry.png', 'Bill & Bob': 'Bill&Bob.png',
+  'Dealer': 'Dealer.png', 'Alucard': 'Alucard.png', 'Castle Guards': 'CastleGuards.png',
+  'Team Zippy': 'TeamZippy.png', 'Guard Thomas': 'guard_thomas.jpg', 'Doc': 'Doc.png',
+  'Outlaw': 'outlaw.jpg', 'Bubble Boys': 'bubble_boys.jpg', 'Cornelius': 'Cornelius.png',
+  'Cave Dweller': 'cave_dweller.jpg', 'Hermit': 'Hermit.png', 'Opa': 'Opa.png',
+  'Greg': 'Greg.png', 'Jackson': 'Jackson.png', 'Nicholas': 'nicholas.jpg',
+  'Hugo': 'Hugo.png', 'Bogey': 'bogey.jpg', 'Roger': 'roger.jpg',
+  'Masked Hero': 'masked_hero.jpg', 'Chad': 'chad.jpg', 'Marcus': 'marcus.jpg',
+  'Ashley': 'ashley.jpg', 'Mr Filbert': 'mr_filbert.jpg', 'Dallas': 'dallas.jpg',
+  'Suspicious Jeff': 'suspicious_jeff.jpg',
+  'Raditz': 'Raditz.png', 'Doug': 'Doug.png', 'Sparky': 'Sparky.png',
+  'Wim': 'wim.jpg', 'Munch': 'Munch.png', 'Snorton': 'snorton.jpg',
+  'Kairan': 'kairan.jpg', 'Sonya': 'Sonya.png', 'Katrina': 'katrina.jpg',
+  'Admiral': 'Admiral.png', 'Sky': 'Sky.png', 'Stone Cold': 'stone_cold.jpg',
+  'Dark Jeff': 'DarkJeff.png', 'Flora': 'flora.jpg', 'Dark Wing': 'DarkWing.png',
+  'City Cyboo': 'CityCyboo.png', 'Haywire': 'Haywire.png',
+  'Laura': 'laura.jpg', 'Bilbo': 'bilbo.jpg', 'Spockles': 'spockles.jpg',
+  'Antoinette': 'antoinette.jpg', 'Troubling Haters': 'troubling_haters.jpg',
+  'Wandering Sue': 'wandering_sue.jpg', 'Eloise': 'eloise.jpg', 'Pelter': 'pelter.jpg',
+  'Zach': 'zach.jpg', 'Pale Nimbus': 'pale_nimbus.jpg', 'Mallow': 'mallow.jpg',
+  'Jeanie': 'jeanie.jpg', 'Calvin & Anna': 'calvin_anna.jpg', 'Gary': 'gary.jpg',
+  'Bandit Pete': 'bandit_pete.jpg',
+  'Jenkins': 'Jenkins.png', 'Tabitha': 'Tabitha.png', 'Hector': 'hector.jpg',
+  'Toby': 'Toby.png', 'Redd': 'Redd.png', 'Guardian Fairy': 'GuardianFairy.png',
+  'Cyboo': 'Cyboo.png', 'Splinter': 'Splinter.png',
+  'Night Master': 'night_master.jpg', 'Skylar': 'skylar.jpg', 'Tyler': 'tyler.jpg',
+  'King Jay': 'king_jay.jpg', 'Piper': 'piper.jpg',
+  'Lucy': 'lucy.jpg', 'Bo': 'Bo.png', 'The Mountain King': 'mountain_king_leg.jpg',
+  'Shade': 'shade.jpg', 'Doom': 'doom.jpg',
+  'Prince Balatron': 'balatron.jpg', 'Romy': 'romy.jpg',
+};
+
+function openPreview(id) {
+  const s = spirits.find(sp => sp.id === id);
+  if (!s) return;
+  const colId = spirits.indexOf(s) + 1;
+  const imgFile = CARD_IMAGES[s.name];
+  const imgHtml = imgFile
+    ? `<img class="card-img" src="cards/${imgFile}" alt="${esc(s.name)}" onerror="this.outerHTML='<div class=\\'no-img\\'>Image not found</div>'">`
+    : `<div class="no-img">No card image</div>`;
+
+  document.getElementById('previewContent').innerHTML = `
+    ${imgHtml}
+    <h2>${esc(s.name)}</h2>
+    <div class="card-meta">#${colId}/200 &middot; ${capitalize(s.rarity)} &middot; ${esc(s.set || '')}</div>
+    <div class="card-detail"><strong>HP:</strong> ${s.maxHp}</div>
+    <div class="card-ability-name">${esc(s.ability)}</div>
+    <div class="card-ability-desc">${esc(s.abilityDesc)}</div>
+    <div class="card-detail"><strong>Category:</strong> ${esc(s.category)}</div>
+    <div class="card-detail"><strong>Artist:</strong> ${esc(s.artist || 'Uncredited')}</div>
+  `;
+  document.getElementById('previewPanel').classList.add('open');
+  document.getElementById('previewOverlay').classList.add('open');
+}
+
+function closePreview() {
+  document.getElementById('previewPanel').classList.remove('open');
+  document.getElementById('previewOverlay').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
 function capitalize(s) {
   return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-');
 }
