@@ -5388,13 +5388,17 @@ function getCombinations(total, choose) {
 // Patrick's Stone Form: doesn't roll — if enemy singles, negate + 3 damage
 function resolvePatrickStoneForm(eRoll) {
   phase = 4;
+  // Advance script round since Patrick skips doPlayerRoll
+  if (bossScript) bossScriptRound++;
   if (eRoll.type === 'singles') {
     narrate(`<b class="gold">Stone Form!</b> Singles negated — 3 damage to ${enemy.name}!`);
     setTimeout(() => {
       showAbilitySplash('Stone Form', 'Singles negated! 3 damage!', 1600, () => {
         // Check enemy defense (Bogey reflect, etc.)
+        // Use 'ability' type so Stoic doesn't block Stone Form's flat damage
         let damage = 3;
-        const def = applyDefense(enemy, damage, eRoll, false, eRoll);
+        const stoneFormRoll = { ...eRoll, type: 'ability' };
+        const def = applyDefense(enemy, damage, stoneFormRoll, false, eRoll);
         if (def < 0) {
           // Reflected back to Patrick
           damage = -def;
