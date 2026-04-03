@@ -3467,10 +3467,25 @@ function varyScript(base) {
     if (safe) { shift = s; break; }
   }
   if (shift === 0) return base; // no safe shift found, use original
-  return {
+  const result = {
     enemy: base.enemy.map(r => r.map(d => Math.max(1, Math.min(6, d + shift)))),
     player: base.player.map(r => r.map(d => Math.max(1, Math.min(6, d + shift))))
   };
+  // Post-process: occasionally bump individual enemy low dice for variety
+  // Only bumps that don't change the roll's hand type (singles stay singles, etc.)
+  result.enemy = result.enemy.map(round => {
+    const originalType = analyzeRoll(round).type;
+    const bumped = round.map(d => {
+      if (Math.random() < 0.25) {
+        return Math.min(6, d + Math.floor(Math.random() * 2) + 1);
+      }
+      return d;
+    });
+    // Reject the bump if it changed the hand type
+    if (analyzeRoll(bumped).type !== originalType) return round;
+    return bumped;
+  });
+  return result;
 }
 
 // ══════════════════════════════════════════════
@@ -5093,10 +5108,12 @@ function showAbilityCard(cardId) {
   clone.style.top = rect.top + 'px';
   clone.style.width = rect.width + 'px';
   clone.style.height = rect.height + 'px';
-  clone.style.transform = 'scale(1)';
+  // In VS mode, enemy card's parent zone is rotated 180deg — clone must inherit that
+  const inEnemyZone = vsMode && card.closest('.enemy-zone');
+  clone.style.transform = inEnemyZone ? 'scale(1) rotate(180deg)' : 'scale(1)';
   document.body.appendChild(clone);
   abilityOverlayEl = clone;
-  requestAnimationFrame(() => { clone.style.transform = 'scale(1.10)'; });
+  requestAnimationFrame(() => { clone.style.transform = inEnemyZone ? 'scale(1.10) rotate(180deg)' : 'scale(1.10)'; });
 }
 
 function removeAbilityCard() {
@@ -5605,6 +5622,23 @@ function doPlayerRoll() {
       playerDiceValues[0] = v;
       playerDiceValues[1] = v;
     }
+  }
+
+  // Campaign mode: 1 HP clutch — improved odds for a strong roll (all ghosts)
+  // Underdog's stronger boost above takes priority; this is the fallback for everyone else
+  if (!vsMode && playerHp === 1 && pick.ability !== 'Underdog') {
+    const r = Math.random();
+    if (r < 0.20) {
+      // 20% chance: force doubles (value 3-6)
+      const v = Math.ceil(Math.random() * 4) + 2;
+      playerDiceValues[0] = v;
+      playerDiceValues[1] = v;
+    } else if (r < 0.30) {
+      // 10% chance: force triples (value 3-6)
+      const v = Math.ceil(Math.random() * 4) + 2;
+      playerDiceValues = playerDiceValues.map(() => v);
+    }
+    // 70% normal — still tense but not guaranteed
   }
 
   // Wim's Slash boost: +15% chance all dice become odd
