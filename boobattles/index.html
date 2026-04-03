@@ -2819,6 +2819,10 @@
           <div class="die e" id="eDie0"></div>
           <div class="die e" id="eDie1"></div>
           <div class="die e" id="eDie2"></div>
+          <div class="die e bonus" id="eDie3" style="display:none;"></div>
+          <div class="die e bonus" id="eDie4" style="display:none;"></div>
+          <div class="die e bonus" id="eDie5" style="display:none;"></div>
+          <div class="die e bonus" id="eDie6" style="display:none;"></div>
         </div>
         <div class="vs-line">VS</div>
         <div class="dice-row" id="playerDiceRow">
@@ -4333,10 +4337,14 @@ function compareRollsWithAbilities(pRoll, eRoll) {
   // Same effective rank — compare by value
   if (isTripleOrBetter(pRoll.type)) return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
   if (pRoll.type === 'doubles' || (pRank === 1.5)) {
-    // Compare as doubles or promoted singles
+    // Compare as doubles or promoted singles — pair value first, then kicker
     const pVal = pRoll.type === 'doubles' ? pRoll.value : pRoll.dice[0];
     const eVal = eRoll.type === 'doubles' ? eRoll.value : eRoll.dice[0];
     if (pVal !== eVal) return pVal > eVal ? 1 : -1;
+    // Same pair value — compare kicker
+    const pKick = pRoll.kicker || 0;
+    const eKick = eRoll.kicker || 0;
+    if (pKick !== eKick) return pKick > eKick ? 1 : -1;
     return 0;
   }
   for (let i = 0; i < 3; i++) {
@@ -5285,8 +5293,11 @@ function doEnemyRoll() {
     enemyPrediction = null;
   }
 
-  // Show dice (up to 3 visible slots for enemy)
-  const showCount = Math.min(dice.length, 3);
+  // Show/hide enemy bonus dice slots
+  for (let i = 3; i < 7; i++) {
+    document.getElementById('eDie'+i).style.display = i < dice.length ? 'flex' : 'none';
+  }
+  const showCount = Math.min(dice.length, 7);
 
   const doRollAnimation = () => {
     for (let i = 0; i < showCount; i++) {
