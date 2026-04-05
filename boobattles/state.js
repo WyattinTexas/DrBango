@@ -83,12 +83,27 @@ let bossScriptRound = 0;
 // CO-OP 2v2 STATE
 // ══════════════════════════════════════════════
 let coopMode = false;
-let coopP1 = null, coopP2 = null;       // player ghost objects
-let coopE1 = null, coopE2 = null;       // enemy ghost objects
+let coopState = null;  // { currentBoss, p1:{collection,items,deadGhosts,killedBy,battleWins,selectedIdx}, p2:{...}, stats }
+let coopP1 = null, coopP2 = null;       // active player ghost objects in battle
+let coopE1 = null, coopE2 = null;       // enemy ghost objects (boss + partner)
 let coopP1Hp = 0, coopP2Hp = 0;
 let coopE1Hp = 0, coopE2Hp = 0;
 let coopTurn = 1;                        // whose turn: 1 or 2
 let coopTarget = 1;                      // which enemy targeted: 1 or 2
 let coopPickingPlayer = 1;
 let coopSelectedGhost = null;
-let coopRound = 0;                       // total rounds played
+let coopRound = 0;
+
+function newCoopState() {
+  return {
+    currentBoss: 0,
+    p1: { collection: [], items: [], deadGhosts: [], killedBy: {}, battleWins: [], selectedIdx: 0 },
+    p2: { collection: [], items: [], deadGhosts: [], killedBy: {}, battleWins: [], selectedIdx: 0 },
+    stats: { bossesBeaten: 0, ghostsLost: 0, totalRolls: 0, itemsUsed: 0 },
+    usedCards: BOSSES.map(b => b.name)
+  };
+}
+
+function saveCoopState() { localStorage.setItem('boo_coop_save', JSON.stringify(coopState)); }
+function loadCoopState() { try { return JSON.parse(localStorage.getItem('boo_coop_save')); } catch { return null; } }
+function clearCoopState() { localStorage.removeItem('boo_coop_save'); }

@@ -1123,47 +1123,63 @@ function vsHandleWin() { vsShowResult(pick.name, pick.file, 'Blue', enemy.name, 
 function vsHandleLoss() { vsShowResult(enemy.name, enemy.file, 'Red', pick.name, pick.file, enemyHp, enemy.maxHp); }
 
 // ══════════════════════════════════════════════
-// CO-OP 2v2 MODE
+// CO-OP 2v2 CAMPAIGN MODE
 // ══════════════════════════════════════════════
 
 function startCoopMode() {
   coopMode = true;
   vsMode = false;
-  coopP1 = null; coopP2 = null;
-  coopE1 = null; coopE2 = null;
+  coopState = newCoopState();
   coopPickingPlayer = 1;
   coopSelectedGhost = null;
-  showCoopPick(1);
+  iceShards = 0; sacredFires = 0;
+  showCoopStarterPick(1);
 }
 
-function showCoopPick(player) {
+// ══════════════════════════════════════════════
+// CO-OP 2v2 CAMPAIGN
+// ══════════════════════════════════════════════
+
+let coopRewardPlayer = 1;           // which player is currently picking a reward ghost
+let coopPendingRewardCards1 = [];   // P1's 2 drawn cards
+let coopPendingRewardCards2 = [];   // P2's 2 drawn cards
+let coopSelectedRewardIdx = -1;
+let coopRewardRevealedCards = new Set();
+let coopBossPartner = null;         // the boss's partner ghost for current fight
+
+// ── STARTER PICK ──
+
+function showCoopStarterPick(player) {
   coopPickingPlayer = player;
   coopSelectedGhost = null;
-  // Reuse the VS pick screen
-  const screen = document.getElementById('vsPickScreen');
+
   const title = document.getElementById('vsPickTitle');
   const grid = document.getElementById('vsGhostGrid');
   const info = document.getElementById('vsSelectedInfo');
   const btn = document.getElementById('vsPickBtn');
 
-  title.textContent = `Player ${player} — Pick Your Ghost`;
+  title.textContent = `Player ${player} — Pick Your Starter`;
   title.style.color = player === 1 ? 'var(--player)' : 'var(--gold)';
   info.style.display = 'none';
   btn.classList.remove('ready');
   btn.onclick = confirmCoopPick;
 
-  // Build ghost pool — 7 random ghosts, filter out already picked
-  let pool = ALL_GHOSTS.filter(g => g.rarity !== 'legendary');
-  if (coopP1) pool = pool.filter(g => g.name !== coopP1.name);
-
-  // Shuffle and take 7
-  pool = pool.sort(() => Math.random() - 0.5).slice(0, 7);
+  // Build starter pool
+  let pool;
+  if (player === 1) {
+    // P1 picks from all 3 starters
+    pool = STARTER_NAMES.map(name => ALL_GHOSTS.find(g => g.name === name)).filter(Boolean);
+  } else {
+    // P2 picks from remaining 2 (exclude P1's pick)
+    const p1Name = coopState.p1.collection[0]?.name;
+    pool = STARTER_NAMES.filter(n => n !== p1Name).map(name => ALL_GHOSTS.find(g => g.name === name)).filter(Boolean);
+  }
 
   grid.innerHTML = '';
+  const rarityColors = { common: '#9ca3af', uncommon: '#60a5fa', rare: '#c084fc', 'ghost-rare': '#f472b6' };
   pool.forEach(ghost => {
     const card = document.createElement('div');
     card.className = 'vs-ghost-card';
-    const rarityColors = { 'common': '#9ca3af', 'uncommon': '#60a5fa', 'rare': '#c084fc', 'ghost-rare': '#f472b6' };
     card.innerHTML = `
       <div class="vs-card-img-wrap">
         <img src="${IMG}${ghost.file}" alt="${ghost.name}">
@@ -1200,65 +1216,238 @@ function selectCoopGhost(ghost, el) {
     pips.appendChild(pip);
   }
 
-  const btn = document.getElementById('vsPickBtn');
-  btn.classList.add('ready');
+  document.getElementById('vsPickBtn').classList.add('ready');
 }
 
 function confirmCoopPick() {
   if (!coopSelectedGhost) return;
+  const ghost = { ...coopSelectedGhost, hp: coopSelectedGhost.maxHp };
+
   if (coopPickingPlayer === 1) {
-    coopP1 = { ...coopSelectedGhost, hp: coopSelectedGhost.maxHp };
-    showCoopPick(2);
+    coopState.p1.collection.push(ghost);
+    saveCoopState();
+    showCoopStarterPick(2);
   } else {
-    coopP2 = { ...coopSelectedGhost, hp: coopSelectedGhost.maxHp };
-    showCoopMatchup();
+    coopState.p2.collection.push(ghost);
+    saveCoopState();
+    showCoopMap();
   }
 }
 
-function drawCoopEnemy() {
-  // Draw a non-legendary ghost, boost HP by 1-2
-  const pool = ALL_GHOSTS.filter(g => g.rarity !== 'legendary');
-  const ghost = { ...pool[Math.floor(Math.random() * pool.length)] };
-  ghost.hp = ghost.maxHp + 1 + Math.floor(Math.random() * 2); // +1 or +2 HP
-  ghost.maxHp = ghost.hp;
-  return ghost;
+// ── BOSS PARTNER GENERATION ──
+
+function generateBossPartner(bossIndex) {
+  // Collect names already in play (both player collections + current boss)
+  const usedNames = new Set([
+    ...coopState.p1.collection.map(g => g.name),
+    ...coopState.p2.collection.map(g => g.name),
+    BOSSES[bossIndex].name
+  ]);
+
+  let rarities, hpBonus;
+  if (bossIndex <= 3) {
+    // Early fights: commons/uncommons, +0-1 HP
+    rarities = ['common', 'uncommon'];
+    hpBonus = Math.floor(Math.random() * 2); // 0 or 1
+  } else if (bossIndex <= 7) {
+    // Mid fights: uncommons/rares, +1-2 HP
+    rarities = ['uncommon', 'rare'];
+    hpBonus = 1 + Math.floor(Math.random() * 2); // 1 or 2
+  } else {
+    // Late fights: rares/ghost-rares, +2-3 HP
+    rarities = ['rare', 'ghost-rare'];
+    hpBonus = 2 + Math.floor(Math.random() * 2); // 2 or 3
+  }
+
+  let pool = ALL_GHOSTS.filter(g => rarities.includes(g.rarity) && !usedNames.has(g.name));
+  // Fallback: if pool is empty, allow any non-legendary
+  if (pool.length === 0) pool = ALL_GHOSTS.filter(g => g.rarity !== 'legendary' && !usedNames.has(g.name));
+  if (pool.length === 0) pool = ALL_GHOSTS.filter(g => g.rarity !== 'legendary');
+
+  const base = pool[Math.floor(Math.random() * pool.length)];
+  const partner = { ...base };
+  partner.hp = partner.maxHp + hpBonus;
+  partner.maxHp = partner.hp;
+  return partner;
 }
 
-function showCoopMatchup() {
-  // Generate 2 enemies
-  coopE1 = drawCoopEnemy();
-  coopE2 = drawCoopEnemy();
-  // Make sure they're different
-  while (coopE2.name === coopE1.name) coopE2 = drawCoopEnemy();
+// ── CAMPAIGN MAP ──
 
-  // Render matchup screen
-  const renderCard = (el, ghost, color) => {
-    el.style.borderColor = color;
-    el.innerHTML = `
-      <img src="${IMG}${ghost.file}" alt="${ghost.name}">
-      <div class="coop-match-name" style="color:${color}">${ghost.name}</div>
-      <div class="coop-match-hp">${ghost.maxHp} HP · ${ghost.ability}</div>
-    `;
+function showCoopMap() {
+  const bossIdx = coopState.currentBoss;
+  const boss = BOSSES[bossIdx];
+  const location = BOSS_LOCATIONS[bossIdx] || 'Unknown';
+  const theme = LOCATION_THEMES[location] || { bg: 'linear-gradient(180deg, #0a0a1a, #1a1a2a)', accent: '#67e8f9' };
+
+  // Generate the boss's partner for this fight
+  coopBossPartner = generateBossPartner(bossIdx);
+
+  // Repurpose the matchup screen as a campaign map
+  const screen = document.getElementById('coopMatchupScreen');
+
+  screen.innerHTML = `
+    <div class="coop-map-header">
+      <div class="coop-map-fight-num">BATTLE ${bossIdx + 1} OF 12</div>
+      <div class="coop-map-location" style="color:${theme.accent}">${location}</div>
+      <div class="coop-map-progress" id="coopProgress"></div>
+    </div>
+
+    <div class="coop-map-enemies">
+      <div class="coop-map-enemy-card">
+        <div class="coop-map-enemy-label" style="color:var(--enemy);">BOSS</div>
+        <img src="${IMG}${boss.file}" class="coop-map-card-img">
+        <div class="coop-map-enemy-name">${boss.name}</div>
+        <div class="coop-map-enemy-stats">${boss.bossHp} HP &middot; ${boss.ability}</div>
+        <div class="coop-map-enemy-desc">${boss.abilityDesc}</div>
+      </div>
+      <div class="coop-map-enemy-card">
+        <div class="coop-map-enemy-label" style="color:var(--enemy);">PARTNER</div>
+        <img src="${IMG}${coopBossPartner.file}" class="coop-map-card-img">
+        <div class="coop-map-enemy-name">${coopBossPartner.name}</div>
+        <div class="coop-map-enemy-stats">${coopBossPartner.maxHp} HP &middot; ${coopBossPartner.ability}</div>
+      </div>
+    </div>
+
+    <div class="coop-map-teams">
+      <div class="coop-map-team">
+        <div class="coop-map-team-label" style="color:var(--player);">P1 Team</div>
+        <div class="coop-map-ghosts" id="coopMapP1Ghosts"></div>
+        <div class="coop-map-items" id="coopMapP1Items"></div>
+      </div>
+      <div class="coop-map-team">
+        <div class="coop-map-team-label" style="color:var(--gold);">P2 Team</div>
+        <div class="coop-map-ghosts" id="coopMapP2Ghosts"></div>
+        <div class="coop-map-items" id="coopMapP2Items"></div>
+      </div>
+    </div>
+
+    <button class="action-btn cyan ready" id="coopFightBtn" style="font-size:1.3rem;">FIGHT!</button>
+    <button class="small-btn" onclick="coopMode=false;clearCoopState();showScreen('titleScreen');initTitle();">Abandon Run</button>
+  `;
+
+  // Apply theme
+  screen.style.background = theme.bg;
+
+  // Progress bar
+  const progress = document.getElementById('coopProgress');
+  for (let i = 0; i < 12; i++) {
+    const node = document.createElement('div');
+    node.className = 'progress-node';
+    if (i < bossIdx) node.classList.add('defeated');
+    else if (i === bossIdx) node.classList.add('current');
+    else node.classList.add('upcoming');
+    if (i >= 8) node.classList.add('legendary');
+    progress.appendChild(node);
+  }
+
+  // Render P1 team
+  const p1Container = document.getElementById('coopMapP1Ghosts');
+  coopState.p1.selectedIdx = 0;
+  coopState.p1.collection.forEach((g, i) => {
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb selectable' + (i === 0 ? ' selected' : '');
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="ghost-hp-tag">${g.hp}/${g.maxHp}</div>`;
+    el.onclick = () => {
+      coopState.p1.selectedIdx = i;
+      p1Container.querySelectorAll('.team-ghost-thumb.selectable').forEach((t, j) => t.classList.toggle('selected', j === i));
+    };
+    p1Container.appendChild(el);
+  });
+  // P1 dead ghosts
+  coopState.p1.deadGhosts.forEach(name => {
+    const g = ALL_GHOSTS.find(gh => gh.name === name);
+    if (!g) return;
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb dead';
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="dead-x">\u2715</div>`;
+    p1Container.appendChild(el);
+  });
+
+  // Render P2 team
+  const p2Container = document.getElementById('coopMapP2Ghosts');
+  coopState.p2.selectedIdx = 0;
+  coopState.p2.collection.forEach((g, i) => {
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb selectable' + (i === 0 ? ' selected' : '');
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="ghost-hp-tag">${g.hp}/${g.maxHp}</div>`;
+    el.onclick = () => {
+      coopState.p2.selectedIdx = i;
+      p2Container.querySelectorAll('.team-ghost-thumb.selectable').forEach((t, j) => t.classList.toggle('selected', j === i));
+    };
+    p2Container.appendChild(el);
+  });
+  // P2 dead ghosts
+  coopState.p2.deadGhosts.forEach(name => {
+    const g = ALL_GHOSTS.find(gh => gh.name === name);
+    if (!g) return;
+    const el = document.createElement('div');
+    el.className = 'team-ghost-thumb dead';
+    el.innerHTML = `<img src="${IMG}${g.file}"><div class="dead-x">\u2715</div>`;
+    p2Container.appendChild(el);
+  });
+
+  // Render items for each player
+  const renderItems = (containerId, items) => {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    (items || []).forEach(id => {
+      const item = ITEMS[id];
+      if (!item) return;
+      const d = document.createElement('div');
+      d.className = 'team-item-icon';
+      d.textContent = item.icon;
+      el.appendChild(d);
+    });
+    // Empty slots
+    for (let i = (items || []).length; i < 3; i++) {
+      const d = document.createElement('div');
+      d.className = 'team-item-icon empty';
+      d.textContent = '\u00B7';
+      el.appendChild(d);
+    }
   };
+  renderItems('coopMapP1Items', coopState.p1.items);
+  renderItems('coopMapP2Items', coopState.p2.items);
 
-  renderCard(document.getElementById('coopMatchP1'), coopP1, 'var(--player)');
-  renderCard(document.getElementById('coopMatchP2'), coopP2, 'var(--gold)');
-  renderCard(document.getElementById('coopMatchE1'), coopE1, 'var(--enemy)');
-  renderCard(document.getElementById('coopMatchE2'), coopE2, 'var(--enemy)');
+  // Fight button
+  document.getElementById('coopFightBtn').onclick = startCoopBattle;
 
   showScreen('coopMatchupScreen');
 }
 
+// ── BATTLE SETUP ──
+
 function startCoopBattle() {
-  coopP1Hp = coopP1.maxHp;
-  coopP2Hp = coopP2.maxHp;
-  coopE1Hp = coopE1.maxHp;
+  const bossIdx = coopState.currentBoss;
+  const boss = BOSSES[bossIdx];
+
+  // Copy selected ghosts for the fight
+  const p1Ghost = coopState.p1.collection[coopState.p1.selectedIdx || 0];
+  const p2Ghost = coopState.p2.collection[coopState.p2.selectedIdx || 0];
+  coopP1 = { ...p1Ghost };
+  coopP2 = { ...p2Ghost };
+  coopE1 = { ...boss, hp: boss.bossHp, maxHp: boss.bossHp };
+  coopE2 = { ...coopBossPartner };
+
+  coopP1Hp = coopP1.hp;
+  coopP2Hp = coopP2.hp;
+  coopE1Hp = coopE1.bossHp || coopE1.maxHp;
   coopE2Hp = coopE2.maxHp;
   coopTurn = 1;
   coopTarget = 1;
   coopRound = 0;
 
-  // Map active player to battle globals
+  // Set up boss script for E1 (same logic as regular campaign)
+  bossScriptRound = 0;
+  if (bossIdx === 0) {
+    bossScript = BOSS0_SCRIPTS[coopP1.name] || null;
+  } else {
+    const scripts = [null, BOSS1_SCRIPT, BOSS2_SCRIPT, BOSS3_SCRIPT, BOSS4_SCRIPT, BOSS5_SCRIPT, BOSS6_SCRIPT, BOSS7_SCRIPT, BOSS8_SCRIPT, BOSS9_SCRIPT, BOSS10_SCRIPT, BOSS11_SCRIPT];
+    const useScript = bossIdx <= 2 || Math.random() < 0.5;
+    bossScript = useScript ? (varyScript(scripts[bossIdx]) || null) : null;
+  }
+
+  // Map P1 as active player
   coopMapToBattle();
 
   // Reset all battle state
@@ -1274,11 +1463,14 @@ function startCoopBattle() {
   committedShards = 0; committedFires = 0;
   playerBonusDice = 0; enemyBonusDice = 0;
   playerRemoveDice = 0; enemyRemoveDice = 0;
-  bossScript = null;
-  bossScriptRound = 0;
-  battleItemsState = [];
   rerollMode = false;
   powerMode = 0;
+
+  // Set up battle items from P1's inventory (active player)
+  battleItemsState = (coopState.p1.items || []).map(id => ({ id, used: false }));
+
+  // Boss entry abilities
+  if (coopE1.ability === 'Sploop!') enemyIceShards += 2;
 
   const battleScreen = document.getElementById('battleScreen');
   battleScreen.classList.add('coop-mode');
@@ -1299,12 +1491,6 @@ function startCoopBattle() {
   updateHpDisplay();
   resetDice();
   renderBattleActionBar();
-
-  // Show roll button
-  const rollBtn = document.getElementById('rollBtn');
-  rollBtn.textContent = `Player ${coopTurn} — Roll!`;
-  rollBtn.style.display = '';
-  rollBtn.classList.add('ready');
 
   // Reset card visibility
   document.getElementById('enemyCard').style.opacity = '1';
@@ -1337,12 +1523,18 @@ function startCoopBattle() {
   }, 1800);
 }
 
+// ── BATTLE STATE MAPPING ──
+
 function coopMapToBattle() {
   // Map the active player and target to the battle globals
   pick = coopTurn === 1 ? { ...coopP1 } : { ...coopP2 };
   enemy = coopTarget === 1 ? { ...coopE1 } : { ...coopE2 };
   playerHp = coopTurn === 1 ? coopP1Hp : coopP2Hp;
   enemyHp = coopTarget === 1 ? coopE1Hp : coopE2Hp;
+
+  // Swap battle items to active player's inventory
+  const activePlayer = coopTurn === 1 ? coopState.p1 : coopState.p2;
+  battleItemsState = (activePlayer.items || []).map(id => ({ id, used: false }));
 }
 
 function coopSyncFromBattle() {
@@ -1373,33 +1565,29 @@ function coopSelectTarget(t) {
   narrate(`Targeting <b style="color:var(--enemy)">${enemy.name}</b>!`);
 }
 
+// ── ROUND RESOLUTION ──
+
 function coopAfterRound() {
-  // Sync HP back from battle globals
   coopSyncFromBattle();
   updateCoopPanels();
 
   // Check if targeted enemy died
   const targetHp = coopTarget === 1 ? coopE1Hp : coopE2Hp;
   if (targetHp <= 0) {
-    // Check if both enemies dead = WIN
+    // Check if both enemies dead = boss defeated
     if (coopE1Hp <= 0 && coopE2Hp <= 0) {
-      setTimeout(() => coopVictory(), 800);
+      setTimeout(() => coopBossDefeated(), 800);
       return;
     }
     // Auto-target surviving enemy
     narrate(`<b style="color:var(--enemy)">${enemy.name}</b> is defeated!`);
   }
 
-  // Check if active player died
+  // Check if active player's ghost died
   const activeHp = coopTurn === 1 ? coopP1Hp : coopP2Hp;
   if (activeHp <= 0) {
-    // Check if both players dead = LOSE
-    if (coopP1Hp <= 0 && coopP2Hp <= 0) {
-      setTimeout(() => coopGameOver(), 800);
-      return;
-    }
-    const deadName = coopTurn === 1 ? coopP1.name : coopP2.name;
-    narrate(`<b style="color:var(--player)">${deadName}</b> has fallen! Partner continues!`);
+    coopHandlePlayerDeath();
+    return;
   }
 
   // Switch turns
@@ -1419,8 +1607,12 @@ function coopNextTurn() {
 
   coopRound++;
 
-  // Remap battle globals
+  // Remap battle globals (also swaps items)
   coopMapToBattle();
+
+  // Boss script only applies when targeting E1 (the actual boss)
+  // Reset per-turn state but keep bossScript alive
+  bossScriptRound = coopTarget === 1 ? bossScriptRound : 0;
 
   // Reset round state
   round = 1;
@@ -1460,57 +1652,349 @@ function coopNextTurn() {
   setTimeout(doEnemyRoll, 1000);
 }
 
-function coopVictory() {
+// ── PLAYER DEATH (PERMADEATH) ──
+
+function coopHandlePlayerDeath() {
+  const deadTurn = coopTurn;
+  const pState = deadTurn === 1 ? coopState.p1 : coopState.p2;
+  const deadGhost = deadTurn === 1 ? coopP1 : coopP2;
+
+  // Remove from collection
+  const idx = pState.collection.findIndex(g => g.name === deadGhost.name);
+  if (idx !== -1) pState.collection.splice(idx, 1);
+  pState.deadGhosts.push(deadGhost.name);
+  pState.killedBy[deadGhost.name] = enemy.name;
+  coopState.stats.ghostsLost++;
+  saveCoopState();
+
+  // Show farewell overlay
+  stopMusicHard();
+  const overlay = document.getElementById('farewellOverlay');
+  document.getElementById('farewellCard').innerHTML = `<img src="${IMG}${deadGhost.file}">`;
+  document.getElementById('farewellName').textContent = deadGhost.name;
+  document.getElementById('farewellText').textContent = 'Farewell...';
+  overlay.classList.add('active');
+
+  setTimeout(() => {
+    overlay.classList.remove('active');
+
+    // Check if both players have no ghosts left
+    if (coopState.p1.collection.length === 0 && coopState.p2.collection.length === 0) {
+      coopGameOver();
+      return;
+    }
+
+    // Check if both battle ghosts are dead (both HP <= 0)
+    if (coopP1Hp <= 0 && coopP2Hp <= 0) {
+      // Both active ghosts in this fight are dead — but players may still have bench ghosts
+      // For now, treat this fight as a loss; return to map so they can pick new fighters
+      if (coopState.p1.collection.length === 0 && coopState.p2.collection.length === 0) {
+        coopGameOver();
+      } else {
+        // Still have ghosts — go back to map to pick new fighters
+        stopSpiritParticles();
+        document.getElementById('battleScreen').classList.remove('coop-mode');
+        showCoopMap();
+      }
+      return;
+    }
+
+    // One player's ghost still alive — continue fighting
+    narrate(`<b style="color:var(--player)">${deadGhost.name}</b> has fallen! Partner continues!`);
+    setTimeout(() => coopNextTurn(), 800);
+  }, 4000);
+}
+
+// ── BOSS DEFEATED ──
+
+function coopBossDefeated() {
+  fadeOutMusic();
   stopSpiritParticles();
   document.getElementById('battleScreen').classList.remove('coop-mode');
 
-  const screen = document.getElementById('winScreen');
+  // Heal all ghosts to full HP
+  coopState.p1.collection.forEach(g => { g.hp = g.maxHp; });
+  coopState.p2.collection.forEach(g => { g.hp = g.maxHp; });
+
+  // Track battle wins
+  const boss = BOSSES[coopState.currentBoss];
+  coopState.p1.battleWins.push({ ghost: coopP1.name, ghostFile: coopP1.file, boss: boss.name });
+  coopState.p2.battleWins.push({ ghost: coopP2.name, ghostFile: coopP2.file, boss: boss.name });
+  coopState.stats.bossesBeaten++;
+
+  coopState.currentBoss++;
+  saveCoopState();
+
+  if (coopState.currentBoss >= 12) {
+    coopVictory();
+  } else {
+    showCoopRewards();
+  }
+}
+
+// ── REWARDS ──
+
+function showCoopRewards() {
+  const prevBoss = coopState.currentBoss - 1;
+  const boss = BOSSES[prevBoss];
+  const weights = DRAW_WEIGHTS[prevBoss];
+
+  // Item drop — both players get the same item type
+  const itemDrop = boss.drop;
+
+  // Draw 2 cards for each player
+  coopPendingRewardCards1 = [];
+  coopPendingRewardCards2 = [];
+  for (let i = 0; i < 2; i++) {
+    const c1 = drawGhost(weights);
+    if (c1) coopPendingRewardCards1.push(c1);
+    const c2 = drawGhost(weights);
+    if (c2) coopPendingRewardCards2.push(c2);
+  }
+
+  // Add items to both players (max 3)
+  if (itemDrop) {
+    [coopState.p1, coopState.p2].forEach(p => {
+      while (p.items.length >= 3) p.items.shift();
+      p.items.push(itemDrop);
+    });
+    saveCoopState();
+  }
+
+  // Start with P1's reward pick
+  coopRewardPlayer = 1;
+  showCoopRewardPick();
+}
+
+function showCoopRewardPick() {
+  const isP1 = coopRewardPlayer === 1;
+  const cards = isP1 ? coopPendingRewardCards1 : coopPendingRewardCards2;
+  const prevBoss = coopState.currentBoss - 1;
+  const boss = BOSSES[prevBoss];
+
+  showScreen('rewardScreen');
+
+  // Reset animations
+  document.querySelectorAll('.rw-anim').forEach(el => el.classList.remove('rw-show'));
+  document.getElementById('rewardSelectedInfo').classList.remove('visible');
+  document.getElementById('rewardContinueBtn').classList.remove('ready');
+
+  // Title — show which player is picking
+  const titleEl = document.getElementById('rewardTitle');
+  if (titleEl) {
+    titleEl.textContent = isP1 ? 'Player 1 — Choose a Spiritkin' : 'Player 2 — Choose a Spiritkin';
+    titleEl.style.color = isP1 ? 'var(--player)' : 'var(--gold)';
+  }
+
+  // Item display (show once for P1, skip for P2 since already collected)
+  if (isP1 && boss.drop) {
+    const item = ITEMS[boss.drop];
+    document.getElementById('rewardItemIcon').textContent = item.icon;
+    document.getElementById('rewardItemName').textContent = item.name;
+    document.getElementById('rewardItemDesc').textContent = item.desc + ' (both players)';
+    document.getElementById('rewardItemBox').style.display = 'flex';
+    document.getElementById('rewardOverflow').style.display = 'none';
+  } else {
+    document.getElementById('rewardItemBox').style.display = 'none';
+    document.getElementById('rewardOverflow').style.display = 'none';
+  }
+
+  // Render ghost cards
+  coopSelectedRewardIdx = -1;
+  coopRewardRevealedCards = new Set();
+
+  const container = document.getElementById('rewardCards');
+  container.innerHTML = '';
+  const rarityBadgeClass = r => r === 'ghost-rare' ? 'ghost-rare' : r === 'legendary' ? 'legendary' : r;
+  const rarityLabel = r => (r === 'ghost-rare' || r === 'legendary') ? 'LEGEND' : r.toUpperCase();
+
+  cards.forEach((g, i) => {
+    const c = document.createElement('div');
+    c.className = 'reward-card rc-facedown';
+    c.innerHTML = `
+      <div class="rc-back"><img src="${CARDBACK}" alt=""><div class="rc-back-text">Tap to Reveal</div></div>
+      <div class="rc-rarity rarity-badge ${rarityBadgeClass(g.rarity)}">${rarityLabel(g.rarity)}</div>
+      <img src="${IMG}${g.file}">
+      <div class="rc-name">${g.name}</div>
+      <div class="rc-ability">${g.ability} \u00B7 ${g.maxHp} HP</div>
+    `;
+    c.onclick = () => coopRewardRevealAndSelect(i);
+    container.appendChild(c);
+  });
+
+  // Override continue button to use co-op flow
+  const continueBtn = document.getElementById('rewardContinueBtn');
+  continueBtn.onclick = coopCollectReward;
+
+  // Staggered entrance
+  const stagger = [
+    { el: 'rewardTitle', delay: 200 },
+    { el: 'rewardItemBox', delay: 700 },
+    { el: 'rewardGhostLabel', delay: 1200 },
+    { el: null, delay: 1400, action: () => document.querySelector('.reward-cards')?.classList.add('rw-show') },
+  ];
+  stagger.forEach(({ el, delay, action }) => {
+    setTimeout(() => {
+      if (el) document.getElementById(el)?.classList.add('rw-show');
+      if (action) action();
+    }, delay);
+  });
+
+  // Auto-reveal if only 1 card
+  if (cards.length === 1) {
+    setTimeout(() => coopRewardRevealAndSelect(0), 1800);
+  }
+}
+
+function coopRewardRevealAndSelect(idx) {
+  const cards = document.querySelectorAll('#rewardCards .reward-card');
+  const card = cards[idx];
+
+  if (!coopRewardRevealedCards.has(idx)) {
+    coopRewardRevealedCards.add(idx);
+    card.classList.remove('rc-facedown');
+    card.classList.add('rc-revealed');
+    playSfx('sfxSpecial', 0.6);
+    setTimeout(() => coopSelectRewardCard(idx), 300);
+    return;
+  }
+  coopSelectRewardCard(idx);
+}
+
+function coopSelectRewardCard(idx) {
+  coopSelectedRewardIdx = idx;
+  const isP1 = coopRewardPlayer === 1;
+  const pendingCards = isP1 ? coopPendingRewardCards1 : coopPendingRewardCards2;
+  const cards = document.querySelectorAll('#rewardCards .reward-card');
+  const rarityColors = {
+    common: '#9ca3af', uncommon: '#4ade80', rare: '#60a5fa',
+    'ghost-rare': '#fbbf24', legendary: '#c084fc'
+  };
+
+  cards.forEach((c, i) => {
+    if (coopRewardRevealedCards.has(i)) {
+      c.classList.remove('rc-facedown');
+      c.classList.toggle('rc-selected', i === idx);
+      c.classList.toggle('rc-dimmed', i !== idx && coopRewardRevealedCards.has(i));
+    }
+  });
+
+  const g = pendingCards[idx];
+  const rarityGlows = {
+    common: 'rgba(156,163,175,0.3)', uncommon: 'rgba(74,222,128,0.3)',
+    rare: 'rgba(96,165,250,0.4)', 'ghost-rare': 'rgba(251,191,36,0.4)', legendary: 'rgba(192,132,252,0.4)'
+  };
+  const nameEl = document.getElementById('rsiName');
+  nameEl.textContent = g.name;
+  nameEl.style.color = rarityColors[g.rarity] || '#e0e0e0';
+  nameEl.style.textShadow = `0 0 20px ${rarityGlows[g.rarity] || 'rgba(255,255,255,0.3)'}`;
+  document.getElementById('rsiAbility').textContent = g.ability;
+  document.getElementById('rsiHp').textContent = `${g.maxHp} HP`;
+  document.getElementById('rsiDesc').textContent = g.abilityDesc;
+  document.getElementById('rewardSelectedInfo').classList.add('visible');
+
+  document.getElementById('rewardContinueBtn').classList.add('ready');
+  document.getElementById('rewardContinueBtn').classList.add('rw-show');
+}
+
+function coopCollectReward() {
+  const isP1 = coopRewardPlayer === 1;
+  const pendingCards = isP1 ? coopPendingRewardCards1 : coopPendingRewardCards2;
+  const pState = isP1 ? coopState.p1 : coopState.p2;
+
+  if (coopSelectedRewardIdx < 0 && pendingCards.length > 1) return;
+
+  // Add the selected ghost to current player's collection
+  if (pendingCards.length > 0) {
+    const picked = pendingCards[coopSelectedRewardIdx >= 0 ? coopSelectedRewardIdx : 0];
+    pState.collection.push({ ...picked, hp: picked.maxHp });
+  }
+
+  saveCoopState();
+
+  if (isP1) {
+    // Show P2's reward pick
+    coopRewardPlayer = 2;
+    showCoopRewardPick();
+  } else {
+    // Both players picked — back to map
+    // Restore the continue button for regular campaign use
+    document.getElementById('rewardContinueBtn').onclick = collectRewards;
+    showCoopMap();
+  }
+}
+
+// ── VICTORY & GAME OVER ──
+
+function coopVictory() {
+  stopSpiritParticles();
+  stopMusicHard();
+  startSnow();
+  document.getElementById('battleScreen').classList.remove('coop-mode');
+
   document.getElementById('winScreen').querySelector('.win-title').textContent = 'Co-op Victory!';
   const trophyRow = document.getElementById('trophyRow');
   trophyRow.innerHTML = '';
-  [coopP1, coopP2].forEach(g => {
+
+  // Show all surviving ghosts from both teams
+  const allSurvivors = [...coopState.p1.collection, ...coopState.p2.collection];
+  allSurvivors.forEach(g => {
     const div = document.createElement('div');
     div.className = 'trophy-ghost';
     div.innerHTML = `<img src="${IMG}${g.file}" style="width:80px;border-radius:12px;"><div style="font-family:Creepster;margin-top:4px;">${g.name}</div>`;
     trophyRow.appendChild(div);
   });
+
+  const totalDeaths = coopState.p1.deadGhosts.length + coopState.p2.deadGhosts.length;
   document.getElementById('winStats').innerHTML = `
-    <b>Defeated:</b> ${coopE1.name} & ${coopE2.name}<br>
-    <b>Rounds:</b> ${coopRound}<br>
-    <b>P1 HP:</b> ${Math.max(0, coopP1Hp)}/${coopP1.maxHp} · <b>P2 HP:</b> ${Math.max(0, coopP2Hp)}/${coopP2.maxHp}
+    <b>12 Bosses Defeated!</b><br>
+    <b>Spiritkin Lost:</b> ${totalDeaths}<br>
+    <b>P1 Survivors:</b> ${coopState.p1.collection.length} &middot; <b>P2 Survivors:</b> ${coopState.p2.collection.length}
   `;
 
   // Hide campaign-only buttons
   const hofBtn = document.getElementById('winHofBtn');
   if (hofBtn) hofBtn.style.display = 'none';
+  const ksBtn = document.getElementById('winKsBtn');
+  if (ksBtn) ksBtn.style.display = 'none';
 
   showScreen('winScreen');
-  startSnow();
+  clearCoopState();
 }
 
 function coopGameOver() {
   stopSpiritParticles();
+  stopMusicHard();
   document.getElementById('battleScreen').classList.remove('coop-mode');
 
-  document.getElementById('gameoverScreen').querySelector('.gameover-title').textContent = 'Defeated!';
+  document.getElementById('gameoverScreen').querySelector('.gameover-title').textContent = 'Co-op Defeated!';
   const graveyard = document.getElementById('graveyard');
   graveyard.innerHTML = '';
-  [coopP1, coopP2].forEach(g => {
+
+  // Show all dead ghosts from both players
+  const allDead = [...coopState.p1.deadGhosts, ...coopState.p2.deadGhosts];
+  allDead.forEach(name => {
+    const g = ALL_GHOSTS.find(gh => gh.name === name);
+    if (!g) return;
     const div = document.createElement('div');
-    div.className = 'graveyard-ghost';
-    div.innerHTML = `<img src="${IMG}${g.file}" style="width:70px;border-radius:10px;filter:grayscale(1) brightness(0.5);"><div style="font-family:Creepster;color:#f87171;">${g.name}</div>`;
+    div.className = 'grave-card';
+    div.innerHTML = `<img src="${IMG}${g.file}" style="filter:grayscale(1) brightness(0.5);">`;
     graveyard.appendChild(div);
   });
+
   document.getElementById('gameoverStats').innerHTML = `
-    <b>Enemies remaining:</b> ${coopE1Hp > 0 ? coopE1.name + ' (' + coopE1Hp + ' HP)' : ''}${coopE1Hp > 0 && coopE2Hp > 0 ? ' & ' : ''}${coopE2Hp > 0 ? coopE2.name + ' (' + coopE2Hp + ' HP)' : ''}<br>
-    <b>Rounds fought:</b> ${coopRound}
+    <b>Bosses beaten:</b> ${coopState.stats.bossesBeaten}<br>
+    <b>Spiritkin lost:</b> ${coopState.stats.ghostsLost}<br>
+    <b>Fell at:</b> ${BOSS_NAMES[coopState.currentBoss] || 'Unknown'}
   `;
 
   showScreen('gameoverScreen');
+  clearCoopState();
 }
 
+// ── COOP PANEL RENDERING ──
+
 function renderCoopPanels() {
-  // Set up the co-op panel images and names
   const setSlot = (prefix, ghost) => {
     document.getElementById(prefix + 'Img').src = IMG + ghost.file;
     document.getElementById(prefix + 'Name').textContent = ghost.name;
