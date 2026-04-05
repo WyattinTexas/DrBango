@@ -423,8 +423,9 @@ function doEnemyRoll() {
   enemyBonusDice = 0; enemyRemoveDice = 0;
   // Boss 2-8: 50% chance each round to break off-script permanently
   // Boss 9-11 (Lucy, Romy, Mountain King): 20% — keep the epic scripted arcs more often
-  if (bossScript && state.currentBoss >= 2 && bossScriptRound > 0) {
-    const breakChance = state.currentBoss >= 9 ? 0.20 : 0.50;
+  const currentBossIdx = coopMode ? coopState.currentBoss : (state ? state.currentBoss : 0);
+  if (bossScript && currentBossIdx >= 2 && bossScriptRound > 0) {
+    const breakChance = currentBossIdx >= 9 ? 0.20 : 0.50;
     if (Math.random() < breakChance) bossScript = null;
   }
 
@@ -797,7 +798,8 @@ function doPlayerRoll() {
     'Rolling... don\'t let me down boys',
   ];
   narrate(Math.random() < 0.02 ? sillyRolls[Math.floor(Math.random() * sillyRolls.length)] : 'Rolling...');
-  if (state && state.stats) state.stats.totalRolls++;
+  if (coopMode && coopState && coopState.stats) coopState.stats.totalRolls++;
+  else if (state && state.stats) state.stats.totalRolls++;
 
   // Before-rolling abilities now activated via action bar icons (manual)
 
