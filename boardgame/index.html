@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battle of Origins — Board Game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <!-- TITLE SCREEN -->
+  <div class="screen active" id="titleScreen">
+    <div class="title-main">Battle of Origins</div>
+    <div class="title-divider"></div>
+    <div class="title-sub">The Board Game</div>
+    <div class="title-desc">
+      Travel the spirit world. Find items. Make choices. Battle monsters. Defeat the Mountain King.
+    </div>
+    <div class="title-buttons">
+      <button class="action-btn cyan ready" onclick="startNewGame()">New Adventure</button>
+      <button class="action-btn gold ready" id="continueBtn" onclick="continueGame()" style="display:none;font-size:1.1rem;padding:10px 36px;">Continue</button>
+    </div>
+    <div class="version-tag">v0.1</div>
+  </div>
+
+  <!-- STARTER PICK -->
+  <div class="screen" id="pickScreen">
+    <div class="pick-header">Choose Your Spiritkin</div>
+    <div class="pick-grid" id="pickGrid"></div>
+    <div class="pick-info" id="pickInfo"></div>
+    <button class="action-btn cyan" id="pickBtn" onclick="confirmStarter()">Choose</button>
+  </div>
+
+  <!-- MAP SCREEN -->
+  <div class="screen" id="mapScreen">
+    <div class="map-hud" id="mapHud"></div>
+    <div class="map-container" id="mapContainer">
+      <canvas id="mapCanvas"></canvas>
+      <div class="map-nodes" id="mapNodes"></div>
+    </div>
+    <div class="map-info-panel" id="mapInfoPanel"></div>
+  </div>
+
+  <!-- EVENT SCREEN -->
+  <div class="screen" id="eventScreen">
+    <div class="event-title" id="eventTitle"></div>
+    <div class="event-desc" id="eventDesc"></div>
+    <div class="event-choices" id="eventChoices"></div>
+  </div>
+
+  <!-- PRE-BATTLE -->
+  <div class="screen" id="prebattleScreen">
+    <div class="pb-title" id="pbTitle"></div>
+    <div class="pb-vs-row">
+      <div class="pb-side">
+        <div class="pb-card player-side" id="pbPlayerCard"></div>
+        <div class="pb-label player-label" id="pbPlayerName"></div>
+      </div>
+      <div class="pb-vs-text">VS</div>
+      <div class="pb-side">
+        <div class="pb-card enemy-side" id="pbEnemyCard"></div>
+        <div class="pb-label enemy-label" id="pbEnemyName"></div>
+      </div>
+    </div>
+    <div class="pb-stats" id="pbStats"></div>
+    <div class="pb-ghost-select" id="pbGhostSelect"></div>
+    <button class="action-btn cyan ready" onclick="startBattle()">Fight!</button>
+  </div>
+
+  <!-- BATTLE SCREEN -->
+  <div class="screen" id="battleScreen">
+    <div class="battle-enemy-zone">
+      <div class="battle-nameplate enemy-plate">
+        <span class="np-name" id="enemyNameText"></span>
+        <div class="hp-bar-wrap"><div class="hp-bar enemy-hp" id="enemyHpBar"></div></div>
+        <span class="hp-num" id="enemyHpText"></span>
+      </div>
+      <div class="battle-card" id="enemyCard"></div>
+    </div>
+    <div class="battle-center">
+      <div class="dice-area" id="diceArea">
+        <div class="dice-row enemy-dice">
+          <div class="die e" id="eDie0"></div>
+          <div class="die e" id="eDie1"></div>
+          <div class="die e" id="eDie2"></div>
+        </div>
+        <div class="vs-line">VS</div>
+        <div class="dice-row player-dice">
+          <div class="die p" id="pDie0"></div>
+          <div class="die p" id="pDie1"></div>
+          <div class="die p" id="pDie2"></div>
+        </div>
+      </div>
+      <div class="narrator-box" id="narrator"></div>
+      <div class="battle-items" id="battleItems"></div>
+      <button class="action-btn cyan ready" id="rollBtn" onclick="doPlayerRoll()">Roll!</button>
+    </div>
+    <div class="battle-player-zone">
+      <div class="battle-card" id="playerCard"></div>
+      <div class="battle-nameplate player-plate">
+        <span class="np-name" id="playerNameText"></span>
+        <div class="hp-bar-wrap"><div class="hp-bar player-hp" id="playerHpBar"></div></div>
+        <span class="hp-num" id="playerHpText"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- REWARD SCREEN -->
+  <div class="screen" id="rewardScreen">
+    <div class="reward-title" id="rewardTitle">Victory!</div>
+    <div class="reward-loot" id="rewardLoot"></div>
+    <div class="reward-ghost-pick" id="rewardGhostPick"></div>
+    <button class="action-btn cyan ready" onclick="collectAndReturn()">Continue</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen" id="gameoverScreen">
+    <div class="gameover-title">Game Over</div>
+    <div class="gameover-stats" id="gameoverStats"></div>
+    <button class="action-btn red ready" onclick="startNewGame()">Try Again</button>
+  </div>
+
+  <!-- VICTORY -->
+  <div class="screen" id="winScreen">
+    <div class="win-title">Champion!</div>
+    <div class="win-stats" id="winStats"></div>
+    <button class="action-btn cyan ready" onclick="startNewGame()">Play Again</button>
+    <div class="cta-footer"><a href="https://www.BattleOfOrigins.com" target="_blank">BattleOfOrigins.com</a></div>
+  </div>
+</div>
+
+<!-- Overlays -->
+<div class="overlay" id="readyGoOverlay"><div class="overlay-text" id="readyGoText"></div></div>
+<div class="impact-flash" id="impactFlash"></div>
+<div class="ability-splash" id="abilitySplash">
+  <div class="ability-splash-inner">
+    <div class="ability-splash-name" id="splashName"></div>
+    <div class="ability-splash-desc" id="splashDesc"></div>
+  </div>
+</div>
+
+<audio id="sfxDiceRoll" src="../boo/DiceRoll.mp3" preload="auto"></audio>
+<audio id="sfx1Damage" src="../boo/1Damage.mp3" preload="auto"></audio>
+<audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
+<audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
+
+<div class="watermark">CORKSCREW GAMES</div>
+
+<script src="data.js"></script>
+<script src="map.js"></script>
+<script src="battle.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
