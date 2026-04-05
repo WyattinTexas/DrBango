@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reformer for Pickleball | DUPR 5.0 Program</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0c0c14;
+      --surface: #14141f;
+      --surface-hover: #1a1a2a;
+      --border: rgba(255,255,255,0.06);
+      --border-hover: rgba(255,255,255,0.12);
+      --text: #e8e8f0;
+      --text-muted: #8888a0;
+      --text-dim: #5a5a72;
+      --accent: #22d3ee;
+      --accent-glow: rgba(34,211,238,0.15);
+      --block1: #f59e0b;
+      --block1-bg: rgba(245,158,11,0.08);
+      --block1-border: rgba(245,158,11,0.2);
+      --block2: #8b5cf6;
+      --block2-bg: rgba(139,92,246,0.08);
+      --block2-border: rgba(139,92,246,0.2);
+      --block3: #10b981;
+      --block3-bg: rgba(16,185,129,0.08);
+      --block3-border: rgba(16,185,129,0.2);
+      --spring-red: #ef4444;
+      --spring-blue: #3b82f6;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(34,211,238,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 100%, rgba(139,92,246,0.04) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* HEADER */
+    header {
+      padding: 48px 0 32px;
+      text-align: center;
+    }
+
+    header .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-glow);
+      padding: 6px 16px;
+      border-radius: 100px;
+      border: 1px solid rgba(34,211,238,0.2);
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+
+    header h1 span {
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* ATHLETE BAR */
+    .athlete-bar {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin: 24px 0 40px;
+      padding: 16px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .athlete-bar .stat {
+      text-align: center;
+    }
+
+    .athlete-bar .stat-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .athlete-bar .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* DAY SELECTOR */
+    .day-nav {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+    }
+
+    .day-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .day-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+      background: var(--surface-hover);
+    }
+
+    .day-btn.active {
+      background: var(--accent-glow);
+      border-color: rgba(34,211,238,0.3);
+      color: var(--accent);
+    }
+
+    /* SESSION HEADER */
+    .session-header {
+      margin-bottom: 32px;
+    }
+
+    .session-header h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .session-header .session-meta {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .session-header .session-goal {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* BLOCK HEADERS */
+    .block-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 36px 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .block-header .block-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .block-header h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .block-header .block-time {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+
+    .block1 .block-num { background: var(--block1-bg); color: var(--block1); border: 1px solid var(--block1-border); }
+    .block1 h3 { color: var(--block1); }
+    .block2 .block-num { background: var(--block2-bg); color: var(--block2); border: 1px solid var(--block2-border); }
+    .block2 h3 { color: var(--block2); }
+    .block3 .block-num { background: var(--block3-bg); color: var(--block3); border: 1px solid var(--block3-border); }
+    .block3 h3 { color: var(--block3); }
+
+    /* EXERCISE CARDS */
+    .exercise-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .exercise-card:hover {
+      border-color: var(--border-hover);
+    }
+
+    .exercise-top {
+      display: flex;
+      gap: 16px;
+      padding: 20px;
+      align-items: flex-start;
+    }
+
+    .exercise-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-dim);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .exercise-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .exercise-title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .exercise-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+    .spring-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .spring-red {
+      background: rgba(239,68,68,0.1);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+
+    .spring-blue {
+      background: rgba(59,130,246,0.1);
+      color: #60a5fa;
+      border: 1px solid rgba(59,130,246,0.2);
+    }
+
+    .spring-mixed {
+      background: rgba(168,85,247,0.1);
+      color: #c084fc;
+      border: 1px solid rgba(168,85,247,0.2);
+    }
+
+    .exercise-details {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .exercise-details li {
+      margin-bottom: 4px;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .exercise-details li::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      background: var(--text-dim);
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .exercise-mimics {
+      font-size: 12px;
+      color: var(--accent);
+      opacity: 0.8;
+      font-style: italic;
+      margin-top: 6px;
+    }
+
+    .exercise-cue {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .exercise-cue strong {
+      color: var(--text-muted);
+    }
+
+    /* VIDEO SECTION */
+    .video-section {
+      border-top: 1px solid var(--border);
+      padding: 16px 20px;
+      background: rgba(0,0,0,0.15);
+    }
+
+    .video-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    .video-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .video-grid.single { grid-template-columns: 1fr; max-width: 560px; }
+    .video-grid.double { grid-template-columns: 1fr 1fr; }
+    .video-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+    .video-wrap {
+      position: relative;
+      padding-bottom: 56.25%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .video-wrap iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .video-title {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* DAY CONTENT */
+    .day-content {
+      display: none;
+    }
+
+    .day-content.active {
+      display: block;
+    }
+
+    /* NOTES SECTION */
+    .notes-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin: 40px 0;
+    }
+
+    .notes-card h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+
+    .notes-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .notes-card li {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .notes-card li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 4px;
+      height: 4px;
+      background: var(--text-dim);
+      border-radius: 50%;
+    }
+
+    .spring-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .spring-legend-item {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .spring-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .spring-dot.red { background: #ef4444; }
+    .spring-dot.blue { background: #3b82f6; }
+    .spring-dot.green { background: #22c55e; }
+    .spring-dot.yellow { background: #eab308; }
+
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 700px) {
+      .video-grid.double,
+      .video-grid.triple {
+        grid-template-columns: 1fr;
+      }
+
+      .exercise-top {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .athlete-bar {
+        gap: 16px;
+      }
+
+      .block-header .block-time {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="tag">DUPR 3.86 &rarr; 5.0</div>
+      <h1>Reformer <span>for Pickleball</span></h1>
+      <p class="subtitle">Pilates Reformer program designed to build stroke power through kinetic chain training. Every exercise maps to a specific on-court movement.</p>
+    </header>
+
+    <div class="athlete-bar">
+      <div class="stat">
+        <div class="stat-value">3.861</div>
+        <div class="stat-label">Doubles</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">3.635</div>
+        <div class="stat-label">Singles</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">52-53</div>
+        <div class="stat-label">Record</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">5.0</div>
+        <div class="stat-label">Target</div>
+      </div>
+    </div>
+
+    <!-- DAY NAVIGATION -->
+    <nav class="day-nav">
+      <button class="day-btn active" data-day="monday">Monday</button>
+      <button class="day-btn" data-day="wednesday">Wednesday</button>
+      <button class="day-btn" data-day="saturday">Saturday</button>
+    </nav>
+
+    <!-- ==================== MONDAY ==================== -->
+    <div class="day-content active" id="monday">
+      <div class="session-header">
+        <h2>Rotational Power & Hip Loading</h2>
+        <div class="session-meta">Monday &middot; 40 minutes &middot; 10 exercises</div>
+        <div class="session-goal">Train the ground-up power chain. Load the hips, fire through rotation, stabilize the finish. This is the "cannon builder" session.</div>
+      </div>
+
+      <!-- BLOCK 1 -->
+      <div class="block-header block1">
+        <div class="block-num">1</div>
+        <h3>Hip Load & Drive</h3>
+        <div class="block-time">12 min</div>
+      </div>
+
+      <!-- Exercise 1 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">1</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Skating / Ice Skater on Carriage</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Standing on platform, one foot on carriage, push out laterally and return</li>
+              <li>10 reps each side, slow eccentric (3 sec out), explosive return</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: loading the outside hip before a forehand drive</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Sit deep into the standing hip, feel the glute medius fire on the push-off</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/blIqPI5mlM4" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Pilates Reformer Exercises - Skaters</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/f8n-Uj5if9I" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Reformer Pilates - Skater Series</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 2 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">2</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Single-Leg Jump Board</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Single-leg squat jumps on the jump board, landing softly</li>
+              <li>8 reps each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: split step landing &rarr; explosive first step to the ball</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Land toe-ball-heel, absorb through the whole foot, spring back up</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/ZhULRXCXTwQ" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Single Leg 8s - Jumpboard</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/6INN_THLo30" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Eccentric Foot Series</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 3 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">3</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Scooter (Advanced Variation)</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Standing on platform, pressing leg pushes carriage back at a diagonal</li>
+              <li>Add trunk rotation at the top of each rep &mdash; rotate toward the standing leg</li>
+              <li>10 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: the hip-to-trunk transfer on a cross-court drive</div>
+            <div class="exercise-cue"><strong>Cue:</strong> The rotation should feel like it's powered by the hip closing, not the shoulders pulling</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Video</div>
+          <div class="video-grid single">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/2d2FAf1egf0" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">PilatesPT How-To: Scooter - Glute Workout</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOCK 2 -->
+      <div class="block-header block2">
+        <div class="block-num">2</div>
+        <h3>Trunk Rotation Under Load</h3>
+        <div class="block-time">14 min</div>
+      </div>
+
+      <!-- Exercise 4 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">4</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Kneeling Arm Series with Rotation</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Kneel on carriage facing the side, one hand in strap</li>
+              <li>Pull strap across body in a horizontal chop pattern &mdash; slow out, explosive pull</li>
+              <li>12 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: the forehand speed-up / roll volley &mdash; generating topspin from the core</div>
+            <div class="exercise-cue"><strong>Cue:</strong> The hand follows the hip. If the arm arrives before the hip rotates, you're arm-swinging</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/eImZ4Jv1AYM" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Intermediate Reformer - Kneeling Arm Work</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/2lYcODUmXPg" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Kneeling Arm Series - Flowing Body</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 5 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">5</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Long Stretch with Rotation</span>
+              <span class="spring-tag spring-mixed">1 Red + 1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Plank position, hands on footbar, feet on headrest</li>
+              <li>Push carriage out, hold, rotate one arm to ceiling (thread-the-needle)</li>
+              <li>6 each side, 3-second hold at rotation</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: anti-rotation stability during a wide reach volley</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Don't let the hips sag or rotate &mdash; the rotation is thoracic only</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/ax5ThUOHTeU" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Pilates Reformer: Long Stretch Series</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/Y1MbS8sS-Mw" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Full Body Long Stretch - Contrology</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 6 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">6</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Russian Splits with Chop</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>One foot on carriage, one on platform, deep lunge position</li>
+              <li>Hold a strap or light ball, rotate and chop diagonally across the body as you press out</li>
+              <li>8 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: loading the back leg on a forehand drive and uncoiling through the shot</div>
+            <div class="exercise-cue"><strong>Cue:</strong> This should feel like coiling a spring in the back hip and releasing it</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid triple">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/J0EpwNI_f_w" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Russian Splits Full Series - OPC</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/Po9NpVojl74" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Encyclopedia: Russian Splits</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/cSfkO1KtRYs" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">The Struggle is Real - OPC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 7 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">7</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Snake / Twist (Advanced)</span>
+              <span class="spring-tag spring-mixed">1 Red + 1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Side-facing, bottom hand on footbar, top hand behind head</li>
+              <li>Press out with legs while spiraling the trunk &mdash; full spinal rotation under load</li>
+              <li>5 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: the full-body rotation pattern of an overhead smash</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Initiate from the obliques, not the shoulder</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid triple">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/P46ZhmxrOgw" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Encyclopedia: Snake & Twist</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/fLpdC5MvDU4" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Reformer - Snake & Twist</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/jetTGzJEg1o" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Mindful Movement: Snake & Twist</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOCK 3 -->
+      <div class="block-header block3">
+        <div class="block-num">3</div>
+        <h3>Eccentric Deceleration</h3>
+        <div class="block-time">12 min</div>
+      </div>
+
+      <!-- Exercise 8 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">8</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Single-Leg Landing Series</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Two-foot jump, single-leg land, hold 2 seconds, push off again</li>
+              <li>8 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: deceleration after lunging for a wide ball &mdash; stable when you arrive</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Quiet landing, knee tracks over second toe, no wobble</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/ZhULRXCXTwQ" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Single Leg 8s - Jumpboard</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/6INN_THLo30" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Eccentric Foot Series</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 9 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">9</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Side-Lying Eccentric Adductor Press</span>
+              <span class="spring-tag spring-blue">1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Side-lying on carriage, top foot on footbar</li>
+              <li>Slowly lower the carriage (adductors lengthening under load), 4-second eccentric</li>
+              <li>10 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: decelerating from a lateral lunge to the kitchen &mdash; protecting the groin</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Control the descent, don't just drop</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/Sw0UcdRra10" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Side Lying Reformer Workout</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/dSnnzB4Psxk" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Side Glute Strengthening</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise 10 -->
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">10</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Elephant into Arabesque</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Start in elephant (pike, hands on footbar, feet on carriage)</li>
+              <li>Push carriage back, then lift one leg into arabesque, hold 3 seconds</li>
+              <li>6 each side</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: reaching forward for a dink while stabilizing on one leg</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Keep the standing hip level, don't let it drop</div>
+          </div>
+        </div>
+        <div class="video-section">
+          <div class="video-label">Reference Videos</div>
+          <div class="video-grid double">
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/NKq_zBQlCgg" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Elephant Arabesque - Align-Pilates</div>
+            </div>
+            <div>
+              <div class="video-wrap">
+                <iframe src="https://www.youtube.com/embed/uj0wM-4qhQ0" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+              </div>
+              <div class="video-title">Reformer - Elephant Arabesque</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="notes-card">
+        <h3>Notes for the Pilates Professional</h3>
+        <ul>
+          <li>Wyatt is 35, advanced fitness, extremely fast feet. Primary deficit is stroke power &mdash; not arm strength, but kinetic chain efficiency.</li>
+          <li>Power comes from: foot plant &rarr; hip load &rarr; trunk rotation &rarr; shoulder &rarr; wrist snap. Train this chain, not isolated muscles.</li>
+          <li>He will want to go fast &mdash; force him to slow the eccentrics. His speed is elite; his body needs to learn to LOAD before EXPLODING.</li>
+          <li>Watch for upper trap dominance in all arm/shoulder work &mdash; cue "shoulders away from ears" relentlessly.</li>
+          <li>Monitor right shoulder (paddle arm) for impingement signs.</li>
+          <li>Hip flexor tightness will be the biggest mobility limiter &mdash; prioritize Eve's lunge and pigeon every session.</li>
+          <li>Custom variations (scooter with rotation, Russian splits with chop) combine the base exercise shown in the video with the rotation/chop described in the instructions above.</li>
+        </ul>
+        <div class="spring-legend">
+          <div class="spring-legend-item"><span class="spring-dot red"></span> Red = Heavy</div>
+          <div class="spring-legend-item"><span class="spring-dot blue"></span> Blue = Medium</div>
+          <div class="spring-legend-item"><span class="spring-dot green"></span> Green = Light</div>
+          <div class="spring-legend-item"><span class="spring-dot yellow"></span> Yellow = Lightest</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== WEDNESDAY ==================== -->
+    <div class="day-content" id="wednesday">
+      <div class="session-header">
+        <h2>Shoulder Stability & Paddle Endurance</h2>
+        <div class="session-meta">Wednesday &middot; 40 minutes &middot; 9 exercises</div>
+        <div class="session-goal">Build the shoulder girdle to hold the paddle out front for an entire match without fatigue, plus wrist/forearm endurance for spin generation.</div>
+      </div>
+
+      <div class="block-header block1">
+        <div class="block-num">1</div>
+        <h3>Scapular Stability & Shoulder Endurance</h3>
+        <div class="block-time">15 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">1</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Arms in Straps: Serve Sequence</span>
+              <span class="spring-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;border:1px solid rgba(34,197,94,0.2)">1 Green</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Lying supine, arms in straps</li>
+              <li>10 chest press &rarr; 10 arm circles &rarr; 10 T-pulls &rarr; 10 tricep press overhead</li>
+              <li>NO REST between movements &mdash; straight through</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: maintaining paddle position through long rallies without dropping the elbow</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Keep scapulae anchored to the carriage &mdash; if they wing, the spring is too heavy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">2</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Prone Pulling on Long Box</span>
+              <span class="spring-tag spring-blue">1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Lie face down on long box, arms in straps hanging toward floor</li>
+              <li>Pull straps to hips (back extension + retraction), hold 2 sec at top &mdash; 12 reps</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: the posture and upper back engagement of the "ready position"</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Pull with the lats and rhomboids, not the upper traps</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">3</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Kneeling Chest Expansion with Head Turns</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Kneeling on carriage facing the ropes, pull handles behind hips</li>
+              <li>Hold, turn head left, center, right, center, release &mdash; 8 reps</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: tracking the ball while maintaining an open chest and engaged back</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">4</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Up-Stretch Combo</span>
+              <span class="spring-tag spring-mixed">1 Red + 1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Pike position (hands on footbar, feet on carriage)</li>
+              <li>Push out to plank &rarr; pull back to pike &rarr; drop into up-stretch (chest through arms) &mdash; 8 reps</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: the overhead reach pattern &mdash; thoracic extension under load</div>
+            <div class="exercise-cue"><strong>Cue:</strong> The chest-through position should feel like loading a serve</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block-header block2">
+        <div class="block-num">2</div>
+        <h3>Wrist, Forearm & Grip</h3>
+        <div class="block-time">10 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">5</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Wrist Circles in Straps</span>
+              <span class="spring-tag" style="background:rgba(234,179,8,0.1);color:#facc15;border:1px solid rgba(234,179,8,0.2)">1 Yellow</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Wrists in straps (wrap around wrists, not hands)</li>
+              <li>Flexion/extension &times; 15, radial/ulnar deviation &times; 15, circles &times; 10 each direction</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: spin generation &mdash; topspin and slice both require wrist snap endurance</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Isolate the wrist, don't let the forearm compensate</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">6</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Forearm Plank with Perturbation</span>
+              <span class="spring-tag" style="background:rgba(100,100,130,0.15);color:#888;border:1px solid rgba(100,100,130,0.3)">Springs Off</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Forearms on carriage, toes on platform</li>
+              <li>Partner gently nudges the carriage side to side while you stabilize</li>
+              <li>Hold 30 sec &times; 3 sets</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: absorbing a hard drive at the kitchen &mdash; receiving pace without losing paddle control</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Grip with the fingers, engage the forearm, don't hold your breath</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block-header block3">
+        <div class="block-num">3</div>
+        <h3>Thoracic Mobility & Posterior Chain</h3>
+        <div class="block-time">15 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">7</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Short Box Series (Full Advanced)</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Round back &times; 8, Flat back &times; 8, Side bend &times; 6 each</li>
+              <li>Twist &times; 6 each, Twist + reach &times; 4 each</li>
+            </ul>
+            <div class="exercise-mimics">Mimics: thoracic rotation freedom &mdash; the difference between stiff arm-only swings and whip-like strokes</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">8</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Long Spine Massage</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Straps on feet, roll up through the spine to shoulder stand</li>
+              <li>Open legs, roll down with control &mdash; 5 reps</li>
+            </ul>
+            <div class="exercise-mimics">Spinal segmental mobility &mdash; keeps you supple so rotation doesn't get stuck</div>
+            <div class="exercise-cue"><strong>Cue:</strong> Articulate every vertebra on the way down</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">9</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Hamstring Series on Long Box</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Prone on box, ankles in straps</li>
+              <li>Hamstring curl &times; 10, Straight-leg hip extension &times; 10, Bicycle &times; 10</li>
+            </ul>
+            <div class="exercise-mimics">Posterior chain endurance &mdash; your hamstrings maintain the athletic stance for 2+ hours</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SATURDAY ==================== -->
+    <div class="day-content" id="saturday">
+      <div class="session-header">
+        <h2>Recovery, Mobility & Movement Quality</h2>
+        <div class="session-meta">Saturday &middot; 35 minutes &middot; 11 exercises</div>
+        <div class="session-goal">Undo the week's accumulated tension, restore range of motion, and refine proprioception. This is where smooth movers separate from choppy ones.</div>
+      </div>
+
+      <div class="block-header block1">
+        <div class="block-num">1</div>
+        <h3>Hip Complex</h3>
+        <div class="block-time">12 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">1</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Frog on Carriage</span>
+              <span class="spring-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;border:1px solid rgba(34,197,94,0.2)">1 Green</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Prone on carriage, knees wide, heels together</li>
+              <li>Press out slowly (5-second eccentric), return &mdash; 10 reps</li>
+            </ul>
+            <div class="exercise-mimics">Opens the adductors and hip rotators that get tight from lateral shuffling</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">2</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Eve's Lunge (Deep)</span>
+              <span class="spring-tag spring-mixed">1 Red + 1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>One foot on headrest, back knee on carriage, hands on footbar</li>
+              <li>Press carriage back into deep hip flexor stretch, hold 30 sec</li>
+              <li>Add rotation: rotate toward the front leg, hold 15 sec &mdash; 2 rounds each side</li>
+            </ul>
+            <div class="exercise-mimics">Hip flexor length is critical &mdash; tight hip flexors kill hip rotation which kills stroke power</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">3</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Pigeon Stretch on Carriage</span>
+              <span class="spring-tag spring-blue">1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Front shin on carriage, back leg extended on platform</li>
+              <li>Let the carriage drift to find the stretch, hold 45 sec each side</li>
+            </ul>
+            <div class="exercise-mimics">Deep external rotator release &mdash; protects the hip joint during explosive direction changes</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">4</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Kneeling Inner Thigh Stretch</span>
+              <span class="spring-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;border:1px solid rgba(34,197,94,0.2)">1 Green</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Kneel on carriage, one knee out to side on platform</li>
+              <li>Let carriage drift open, hold 30 sec each side</li>
+            </ul>
+            <div class="exercise-mimics">Adductor length for wide stance at the kitchen</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block-header block2">
+        <div class="block-num">2</div>
+        <h3>Spinal Mobility</h3>
+        <div class="block-time">10 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">5</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Mermaid (Full Expression)</span>
+              <span class="spring-tag spring-blue">1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Seated side-saddle on carriage, push out with inside hand on footbar</li>
+              <li>Top arm reaches over in full side bend, hold 5 sec &mdash; 6 each side</li>
+              <li>Add rotation: turn chest toward the floor at end range</li>
+            </ul>
+            <div class="exercise-mimics">Lateral trunk mobility + oblique engagement &mdash; prevents rib cage stiffness</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">6</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Seated Spine Twist with Strap</span>
+              <span class="spring-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;border:1px solid rgba(34,197,94,0.2)">1 Green</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Seated on carriage, legs extended, one hand in strap</li>
+              <li>Rotate and pull the strap across the body, return with control &mdash; 8 each side</li>
+            </ul>
+            <div class="exercise-mimics">Active rotation through range &mdash; maintains rotational freedom built on Monday</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">7</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Corkscrew on Long Box</span>
+              <span class="spring-tag" style="background:rgba(100,100,130,0.15);color:#888;border:1px solid rgba(100,100,130,0.3)">No Springs</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Supine on box, legs to ceiling</li>
+              <li>Circle legs together &mdash; right, down, left, up &mdash; keeping pelvis stable</li>
+              <li>5 each direction</li>
+            </ul>
+            <div class="exercise-mimics">Deep core stabilization &mdash; hold court position while swinging</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block-header block3">
+        <div class="block-num">3</div>
+        <h3>Proprioception & Foot/Ankle</h3>
+        <div class="block-time">13 min</div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">8</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Standing Balance Series on Carriage</span>
+              <span class="spring-tag spring-blue">1 Blue</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Stand on carriage with one foot, other foot on platform</li>
+              <li>Eyes open: hold 30 sec each side &mdash; Eyes closed: hold 20 sec each</li>
+              <li>Add micro-squats (quarter depth) on the standing leg &times; 8 each side</li>
+            </ul>
+            <div class="exercise-mimics">Ankle proprioception &mdash; if your ankles are smart, your feet are fast</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">9</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Toe-Ball-Heel Presses on Footbar</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Supine, feet on footbar</li>
+              <li>Full foot articulation: toes, then ball, then full foot, then heels only &mdash; 5 reps each</li>
+            </ul>
+            <div class="exercise-mimics">Trains intrinsic foot muscles for grip and push-off on court surfaces</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">10</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Running in Place on Carriage</span>
+              <span class="spring-tag spring-red">2 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Supine, balls of feet on footbar</li>
+              <li>Alternating calf raises &mdash; 30 reps total, slow and controlled</li>
+            </ul>
+            <div class="exercise-mimics">Calf endurance and Achilles tendon health &mdash; the #2 injury site for pickleball players</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exercise-card">
+        <div class="exercise-top">
+          <div class="exercise-num">11</div>
+          <div class="exercise-info">
+            <div class="exercise-title-row">
+              <span class="exercise-name">Single-Leg Bridge on Carriage</span>
+              <span class="spring-tag spring-red">1 Red</span>
+            </div>
+            <ul class="exercise-details">
+              <li>Supine on carriage, feet on platform, lift one leg</li>
+              <li>Press hips up and hold 5 sec, lower with control &mdash; 8 each side</li>
+            </ul>
+            <div class="exercise-mimics">Glute activation and pelvic stability &mdash; foundation of every lateral push</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Reformer for Pickleball &middot; DUPR 5.0 Program &middot; Wyatt Gable
+    </footer>
+  </div>
+
+  <script>
+    document.querySelectorAll('.day-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.day-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.day).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
