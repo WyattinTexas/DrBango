@@ -263,8 +263,8 @@ function renderHud() {
     <div class="hud-items">${itemIcons || 'No items'}</div>
     ${keyIcons ? `<div class="hud-keys">Keys: ${keyIcons}</div>` : ''}
     <div class="hud-ice-fire">
-      ${game.iceShards ? `<span class="hud-ice">❄️ ${game.iceShards}</span>` : ''}
-      ${game.sacredFires ? `<span class="hud-fire">🔥 ${game.sacredFires}</span>` : ''}
+      ${game.iceShards ? `<span class="hud-ice"><img src="iceshard.png" class="res-icon"> ${game.iceShards}</span>` : ''}
+      ${game.sacredFires ? `<span class="hud-fire"><img src="sacredfire.png" class="res-icon"> ${game.sacredFires}</span>` : ''}
     </div>
   `;
 }

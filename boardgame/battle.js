@@ -1176,8 +1176,8 @@ function updateHpDisplay() {
 function renderResources() {
   const el = document.getElementById('battleResources');
   let html = '';
-  if (iceShards > 0) html += `<span class="res-ice">Ice Shards: ${iceShards}</span>`;
-  if (sacredFires > 0) html += `<span class="res-fire">Sacred Fires: ${sacredFires}</span>`;
+  if (iceShards > 0) html += `<span class="res-ice"><img src="iceshard.png" class="res-icon"> ${iceShards}</span>`;
+  if (sacredFires > 0) html += `<span class="res-fire"><img src="sacredfire.png" class="res-icon"> ${sacredFires}</span>`;
   if (playerBonusDice > 0) html += `<span class="res-dice">+${playerBonusDice} bonus dice</span>`;
   el.innerHTML = html;
 }
