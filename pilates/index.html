@@ -620,6 +620,33 @@
       }
     }
 
+    /* QUOTE CARD — shown when no video */
+    .quote-card {
+      background: linear-gradient(135deg, rgba(34,211,238,0.06), rgba(139,92,246,0.06));
+      border: 1px solid rgba(34,211,238,0.15);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .quote-card .quote-text {
+      font-size: 16px;
+      font-weight: 500;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .quote-card .quote-author {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
     /* DAY CONTENT */
     .day-content {
       display: none;
@@ -1432,6 +1459,38 @@
   </div>
 
   <script>
+    // Motivational quotes for no-video exercises
+    const quotes = [
+      { text: "Hard work beats talent when talent doesn't work hard.", author: "Tim Notke" },
+      { text: "The only way to prove you're a good sport is to lose.", author: "Ernie Banks" },
+      { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
+      { text: "It's not the will to win that matters. Everyone has that. It's the will to prepare to win that matters.", author: "Bear Bryant" },
+      { text: "The more I practice, the luckier I get.", author: "Gary Player" },
+      { text: "Do something today that your future self will thank you for.", author: "Sean Patrick Flanery" },
+      { text: "Strength does not come from winning. Your struggles develop your strengths.", author: "Arnold Schwarzenegger" },
+      { text: "The body achieves what the mind believes.", author: "Napoleon Hill" },
+      { text: "Suffer the pain of discipline or suffer the pain of regret.", author: "Jim Rohn" },
+      { text: "Champions keep playing until they get it right.", author: "Billie Jean King" },
+      { text: "You can't put a limit on anything. The more you dream, the farther you get.", author: "Michael Phelps" },
+      { text: "The difference between the impossible and the possible lies in a person's determination.", author: "Tommy Lasorda" },
+      { text: "I hated every minute of training, but I said, don't quit. Suffer now and live the rest of your life as a champion.", author: "Muhammad Ali" },
+      { text: "The pain you feel today will be the strength you feel tomorrow.", author: "Arnold Schwarzenegger" },
+      { text: "If you want something you've never had, you must be willing to do something you've never done.", author: "Thomas Jefferson" },
+      { text: "Obsessed is a word the lazy use to describe the dedicated.", author: "Grant Cardone" },
+      { text: "The only person you are destined to become is the person you decide to be.", author: "Ralph Waldo Emerson" },
+      { text: "Don't count the days. Make the days count.", author: "Muhammad Ali" },
+      { text: "Every champion was once a contender who refused to give up.", author: "Rocky Balboa" },
+      { text: "The successful warrior is the average man, with laser-like focus.", author: "Bruce Lee" },
+    ];
+    let lastQuoteIndex = -1;
+
+    function getRandomQuote() {
+      let idx;
+      do { idx = Math.floor(Math.random() * quotes.length); } while (idx === lastQuoteIndex);
+      lastQuoteIndex = idx;
+      return quotes[idx];
+    }
+
     // Warmup video loader
     function openWarmupVideo(videoId, btn) {
       const card = btn.closest('.warmup-card');
@@ -1473,29 +1532,28 @@
         // Close all cards in this day
         dayContent.querySelectorAll('.exercise-card.open').forEach(c => {
           c.classList.remove('open');
-          // Remove iframe to stop video
           const vm = c.querySelector('.video-main');
           if (vm) vm.innerHTML = '';
+          const qc = c.querySelector('.quote-card');
+          if (qc) qc.remove();
         });
 
         if (!wasOpen) {
           card.classList.add('open');
-          // Load first video
           const vids = card.dataset.videos;
+
           if (vids) {
+            // Load video
             const videos = JSON.parse(vids);
             const tabsEl = card.querySelector('.video-tabs');
             const mainEl = card.querySelector('.video-main');
 
-            // Build tabs
             tabsEl.innerHTML = videos.map((v, i) =>
               `<button class="video-tab${i === 0 ? ' active' : ''}" data-id="${v.id}">${v.title}</button>`
             ).join('');
 
-            // Load first video
             mainEl.innerHTML = `<iframe src="https://www.youtube.com/embed/${videos[0].id}?playsinline=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
 
-            // Tab click handlers
             tabsEl.querySelectorAll('.video-tab').forEach(tab => {
               tab.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1504,6 +1562,16 @@
                 mainEl.innerHTML = `<iframe src="https://www.youtube.com/embed/${tab.dataset.id}?playsinline=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
               });
             });
+          } else {
+            // No video — show a motivational quote
+            const body = card.querySelector('.exercise-body');
+            const existing = body.querySelector('.quote-card');
+            if (existing) existing.remove();
+            const q = getRandomQuote();
+            const quoteEl = document.createElement('div');
+            quoteEl.className = 'quote-card';
+            quoteEl.innerHTML = `<div class="quote-text">"${q.text}"</div><div class="quote-author">${q.author}</div>`;
+            body.insertBefore(quoteEl, body.firstChild);
           }
 
           // Scroll card into view
