@@ -308,6 +308,177 @@
       color: var(--text-muted);
     }
 
+    /* PLAY ALL BUTTON */
+    .play-all-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(34,211,238,0.3);
+      background: linear-gradient(135deg, rgba(34,211,238,0.12), rgba(139,92,246,0.08));
+      color: var(--accent);
+      cursor: pointer;
+      margin-top: 14px;
+      transition: all 0.2s;
+    }
+
+    .play-all-btn:hover, .play-all-btn:active {
+      background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(139,92,246,0.15));
+      border-color: rgba(34,211,238,0.5);
+      transform: scale(1.02);
+    }
+
+    .play-all-btn .play-icon {
+      font-size: 16px;
+    }
+
+    /* PLAY ALL OVERLAY */
+    .playall-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 1000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .playall-overlay.active {
+      display: flex;
+    }
+
+    .playall-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      font-size: 28px;
+      color: #888;
+      cursor: pointer;
+      background: none;
+      border: none;
+      z-index: 1001;
+      padding: 8px;
+      line-height: 1;
+    }
+
+    .playall-close:hover { color: #fff; }
+
+    .playall-now {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .playall-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(18px, 4vw, 26px);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .playall-video {
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      position: relative;
+    }
+
+    .playall-video iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    @supports not (aspect-ratio: 16 / 9) {
+      .playall-video { padding-bottom: 56.25%; height: 0; }
+    }
+
+    .playall-progress {
+      display: flex;
+      gap: 6px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .playall-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: all 0.3s;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+
+    .playall-dot.current {
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(34,211,238,0.5);
+      transform: scale(1.3);
+    }
+
+    .playall-dot.done {
+      background: rgba(34,211,238,0.4);
+    }
+
+    /* TRANSITION CARD */
+    .playall-transition {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, #0c0c14, #14141f);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      border-radius: 12px;
+    }
+
+    .playall-transition.active {
+      display: flex;
+    }
+
+    .playall-transition .trans-up-next {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .playall-transition .trans-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .playall-transition .trans-num {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
     /* BLOCK HEADERS */
     .block-header {
       display: flex;
@@ -837,6 +1008,7 @@
         <h2>Rotational Power & Hip Loading</h2>
         <div class="session-meta">Monday &middot; 40 minutes &middot; 10 exercises</div>
         <div class="session-goal">Train the ground-up power chain. Load the hips, fire through rotation, stabilize the finish. This is the "cannon builder" session.</div>
+        <button class="play-all-btn" onclick="startPlayAll()"><span class="play-icon">&#9654;</span> Play All Exercises</button>
       </div>
 
       <!-- WARMUP CALLOUT -->
@@ -1504,6 +1676,21 @@
     </footer>
   </div>
 
+  <!-- PLAY ALL OVERLAY -->
+  <div class="playall-overlay" id="playallOverlay">
+    <button class="playall-close" onclick="stopPlayAll()">&times;</button>
+    <div class="playall-now" id="playallNow">Exercise 1 of 10</div>
+    <div class="playall-title" id="playallTitle"></div>
+    <div class="playall-video" id="playallVideoWrap">
+      <div class="playall-transition" id="playallTransition">
+        <div class="trans-up-next">Up Next</div>
+        <div class="trans-name" id="transName"></div>
+        <div class="trans-num" id="transNum"></div>
+      </div>
+    </div>
+    <div class="playall-progress" id="playallProgress"></div>
+  </div>
+
   <script>
     // Motivational quotes for no-video exercises
     const quotes = [
@@ -1640,6 +1827,113 @@
           }, 100);
         }
       });
+    });
+    // ==================== PLAY ALL MODE ====================
+    const playAllPlaylist = [
+      { name: "Skating / Ice Skater", id: "blIqPI5mlM4" },
+      { name: "Single-Leg Jump Board", id: "ZhULRXCXTwQ" },
+      { name: "Scooter (Advanced)", id: "2d2FAf1egf0" },
+      { name: "Kneeling Arm Rotation", id: "eImZ4Jv1AYM" },
+      { name: "Long Stretch w/ Rotation", id: "ax5ThUOHTeU" },
+      { name: "Russian Splits w/ Chop", id: "J0EpwNI_f_w" },
+      { name: "Snake / Twist", id: "P46ZhmxrOgw" },
+      { name: "Single-Leg Landing", id: "ZhULRXCXTwQ" },
+      { name: "Side-Lying Adductor", id: "Sw0UcdRra10" },
+      { name: "Elephant into Arabesque", id: "NKq_zBQlCgg" },
+    ];
+
+    let playAllIndex = 0;
+    let playAllPlayer = null;
+
+    function buildProgress() {
+      const el = document.getElementById('playallProgress');
+      el.innerHTML = playAllPlaylist.map((_, i) => {
+        let cls = 'playall-dot';
+        if (i === playAllIndex) cls += ' current';
+        else if (i < playAllIndex) cls += ' done';
+        return `<button class="${cls}" onclick="jumpToExercise(${i})"></button>`;
+      }).join('');
+    }
+
+    function loadExercise(idx) {
+      playAllIndex = idx;
+      const ex = playAllPlaylist[idx];
+      document.getElementById('playallNow').textContent = `Exercise ${idx + 1} of ${playAllPlaylist.length}`;
+      document.getElementById('playallTitle').textContent = ex.name;
+      buildProgress();
+
+      const wrap = document.getElementById('playallVideoWrap');
+      const trans = document.getElementById('playallTransition');
+      trans.classList.remove('active');
+
+      // Remove old iframe
+      const oldIframe = wrap.querySelector('iframe');
+      if (oldIframe) oldIframe.remove();
+
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${ex.id}?playsinline=1&enablejsapi=1&autoplay=1`;
+      iframe.allowFullscreen = true;
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      wrap.appendChild(iframe);
+    }
+
+    function showTransition(nextIdx) {
+      const trans = document.getElementById('playallTransition');
+      const ex = playAllPlaylist[nextIdx];
+      document.getElementById('transName').textContent = ex.name;
+      document.getElementById('transNum').textContent = `Exercise ${nextIdx + 1} of ${playAllPlaylist.length}`;
+      trans.classList.add('active');
+
+      setTimeout(() => {
+        loadExercise(nextIdx);
+      }, 2500);
+    }
+
+    function jumpToExercise(idx) {
+      if (idx >= 0 && idx < playAllPlaylist.length) {
+        loadExercise(idx);
+      }
+    }
+
+    function startPlayAll() {
+      playAllIndex = 0;
+      document.getElementById('playallOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      loadExercise(0);
+
+      // Poll for video end (YouTube postMessage API)
+      window.addEventListener('message', handleYTMessage);
+    }
+
+    function stopPlayAll() {
+      const overlay = document.getElementById('playallOverlay');
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+      const wrap = document.getElementById('playallVideoWrap');
+      const iframe = wrap.querySelector('iframe');
+      if (iframe) iframe.remove();
+      window.removeEventListener('message', handleYTMessage);
+    }
+
+    function handleYTMessage(e) {
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        // YouTube sends state 0 when video ends
+        if (data.event === 'onStateChange' && data.info === 0) {
+          if (playAllIndex < playAllPlaylist.length - 1) {
+            showTransition(playAllIndex + 1);
+          }
+        }
+      } catch(err) {}
+    }
+
+    // Also allow keyboard nav in play-all mode
+    document.addEventListener('keydown', (e) => {
+      if (!document.getElementById('playallOverlay').classList.contains('active')) return;
+      if (e.key === 'Escape') stopPlayAll();
+      if (e.key === 'ArrowRight' && playAllIndex < playAllPlaylist.length - 1) loadExercise(playAllIndex + 1);
+      if (e.key === 'ArrowLeft' && playAllIndex > 0) loadExercise(playAllIndex - 1);
     });
   </script>
 </body>
