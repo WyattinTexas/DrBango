@@ -86,76 +86,340 @@ body {
 .pick-info { font-size: 0.85rem; color: #aaa; text-align: center; min-height: 40px; }
 
 /* ════ MAP ════ */
-#mapScreen { gap: 0; position: relative; }
-.map-hud {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  background: rgba(0,0,0,0.5); border-radius: 10px; margin-bottom: 6px;
-  flex-wrap: wrap; font-size: 0.8rem;
-}
-.hud-ghost { display: flex; align-items: center; gap: 8px; }
-.hud-ghost-img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.15); }
-.hud-ghost-name { font-weight: 700; font-size: 0.85rem; }
-.hud-ghost-hp { color: var(--green); font-size: 0.75rem; }
-.hud-team-count { color: #666; font-size: 0.7rem; }
-.hud-items { color: #aaa; }
-.hud-keys { color: var(--gold); font-size: 0.75rem; }
-.hud-ice-fire { display: flex; gap: 8px; }
-.hud-ice { color: #67e8f9; display: flex; align-items: center; gap: 4px; }
-.hud-fire { color: #f97316; display: flex; align-items: center; gap: 4px; }
-.res-icon { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; }
+#mapScreen { gap: 6px; position: relative; }
 
-.map-container {
-  flex: 1; position: relative; border-radius: 12px;
-  background: rgba(0,0,0,0.3); overflow: hidden;
+/* ── Team HUD: 1 active + 2 sideline + reserve badge ── */
+.team-hud {
+  display: flex; gap: 6px; padding: 6px; align-items: stretch;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.35));
+  border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);
+}
+.team-slot {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 5px 7px; border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  transition: all 0.3s; min-width: 0; position: relative;
+}
+.team-slot .slot-role {
+  font-size: 0.52rem; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(255,255,255,0.4); font-weight: 700;
+}
+.team-slot .team-slot-portrait {
+  width: 38px; height: 38px; border-radius: 8px; object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;
+}
+.team-slot .team-slot-info { flex: 1; min-width: 0; }
+.team-slot .team-slot-name {
+  font-family: 'Creepster', cursive; font-size: 0.78rem;
+  color: #fff; letter-spacing: 1px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.team-slot .team-slot-hp-wrap {
+  width: 100%; height: 4px; background: rgba(255,255,255,0.08);
+  border-radius: 3px; overflow: hidden; margin-top: 2px;
+}
+.team-slot .team-slot-hp-bar {
+  height: 100%; background: linear-gradient(90deg, var(--green), #22c55e);
+  transition: width 0.5s;
+}
+.team-slot .team-slot-hp-text { font-size: 0.58rem; color: #aaa; margin-top: 1px; }
+.team-slot.empty {
+  border-style: dashed; border-color: rgba(255,255,255,0.12);
+  opacity: 0.5; align-items: center; justify-content: center;
+}
+.team-slot-empty-text {
+  font-family: 'Creepster', cursive; font-size: 0.68rem;
+  color: #555; letter-spacing: 2px;
+}
+
+/* Active slot — biggest, accent glow */
+.team-slot.active-slot {
+  flex: 1.4;
+  background: linear-gradient(180deg, rgba(56,189,248,0.14), rgba(56,189,248,0.04));
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(56,189,248,0.3), inset 0 0 20px rgba(56,189,248,0.05);
+}
+.team-slot.active-slot .slot-role { color: var(--accent); }
+.team-slot.active-slot .team-slot-portrait {
+  width: 46px; height: 46px;
+  border-color: var(--accent); box-shadow: 0 0 10px rgba(56,189,248,0.5);
+}
+.team-slot.active-slot .team-slot-name { font-size: 0.88rem; }
+.team-slot.active-slot::before {
+  content: '★'; position: absolute; top: 2px; right: 4px;
+  color: var(--accent); font-size: 0.6rem;
+}
+
+/* Sideline slots — smaller, dimmer */
+.team-slot.sideline-slot { flex: 1; cursor: pointer; }
+.team-slot.sideline-slot:not(.empty):hover {
+  background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25);
+}
+.team-slot.sideline-slot .slot-role { color: rgba(251,191,36,0.6); }
+
+/* Reserve badge */
+.reserve-badge {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 54px; padding: 4px; border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  cursor: pointer; transition: all 0.3s; gap: 1px;
+}
+.reserve-badge:not(.empty):hover {
+  background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.4);
+}
+.reserve-badge.empty { opacity: 0.4; cursor: default; }
+.reserve-badge-icon { font-size: 1.1rem; color: var(--gold); }
+.reserve-badge-count {
+  font-family: 'Creepster', cursive; font-size: 1rem;
+  color: #fff; line-height: 1;
+}
+.reserve-badge-label {
+  font-size: 0.5rem; letter-spacing: 1.2px; text-transform: uppercase;
+  color: #888; font-weight: 700;
+}
+
+/* Reserve overlay panel */
+.reserve-overlay {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0,0,0,0.82);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.reserve-overlay.active { display: flex; }
+.reserve-panel {
+  width: 100%; max-width: 520px; max-height: 80vh;
+  background: linear-gradient(180deg, #0a0a14, #141420);
+  border: 1.5px solid rgba(255,255,255,0.12); border-radius: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+}
+.reserve-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.reserve-title {
+  font-family: 'Creepster', cursive; font-size: 1.3rem;
+  color: var(--gold); letter-spacing: 2px;
+}
+.reserve-close {
+  background: transparent; border: none; color: #888;
+  font-size: 1.6rem; cursor: pointer; padding: 0 4px;
+  line-height: 1;
+}
+.reserve-close:hover { color: #fff; }
+.reserve-subtitle {
+  padding: 6px 16px; font-size: 0.7rem; color: #888;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.reserve-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.reserve-empty {
+  padding: 24px; text-align: center; color: #666;
+  font-size: 0.8rem;
+}
+.reserve-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 8px; border-radius: 8px;
+  background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.06);
 }
-#mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.map-nodes { position: absolute; inset: 0; }
+.reserve-portrait {
+  width: 50px; height: 50px; border-radius: 8px; object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.12); flex-shrink: 0;
+}
+.reserve-info { flex: 1; min-width: 0; }
+.reserve-name {
+  font-family: 'Creepster', cursive; font-size: 0.95rem;
+  color: #fff; letter-spacing: 0.5px;
+}
+.reserve-hp { font-size: 0.68rem; color: var(--green); }
+.reserve-desc { font-size: 0.62rem; color: #888; line-height: 1.3; margin-top: 2px; }
+.reserve-swap-btn {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent);
+  background: rgba(56,189,248,0.1); color: var(--accent);
+  font-size: 0.7rem; cursor: pointer; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.reserve-swap-btn:hover { background: rgba(56,189,248,0.2); }
 
+/* ── Resource strip ── */
+.resource-strip {
+  display: flex; gap: 10px; padding: 4px 10px;
+  background: rgba(0,0,0,0.35); border-radius: 8px;
+  align-items: center; flex-wrap: wrap; font-size: 0.72rem;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.rs-items { color: #aaa; }
+.rs-keys { color: var(--gold); font-weight: 600; }
+.rs-res { display: flex; gap: 8px; margin-left: auto; }
+.rs-ice { color: #67e8f9; display: flex; align-items: center; gap: 3px; }
+.rs-fire { color: #f97316; display: flex; align-items: center; gap: 3px; }
+.res-icon { width: 16px; height: 16px; object-fit: cover; border-radius: 3px; }
+
+/* ── Map container with terrain layer ── */
+.map-container {
+  flex: 1; position: relative; border-radius: 14px;
+  background: rgba(0,0,0,0.35); overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.5);
+}
+
+/* Terrain/atmosphere layer (CSS gradient per region; placeholder for painted background) */
+.map-terrain {
+  position: absolute; inset: 0; pointer-events: none;
+  transition: background 0.8s;
+}
+.map-terrain::before {
+  /* subtle vignette */
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
+}
+.map-terrain.no-art::after {
+  /* tiny dev label showing where the key art goes */
+  content: '[ art slot: region panorama ]';
+  position: absolute; bottom: 6px; right: 8px;
+  font-size: 0.55rem; color: rgba(255,255,255,0.12);
+  letter-spacing: 1.5px; font-family: 'Inter', monospace;
+  text-transform: uppercase;
+}
+
+/* ── Region banner at top of map ── */
+.region-banner {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 6px 14px 22px; z-index: 3;
+  background: linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0.35) 50%, transparent);
+  text-align: center; pointer-events: none;
+}
+.region-banner-name {
+  font-family: 'Creepster', cursive; font-size: 1.1rem;
+  letter-spacing: 3px; color: var(--accent);
+  text-shadow: 0 0 14px currentColor, 0 2px 4px rgba(0,0,0,0.9);
+}
+.region-banner-tagline {
+  font-size: 0.6rem; color: #bbb; margin-top: 1px;
+  font-style: italic; letter-spacing: 0.3px;
+}
+.region-banner-boss {
+  font-size: 0.55rem; color: var(--gold); margin-top: 2px;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+
+#mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.map-nodes { position: absolute; inset: 0; z-index: 2; }
+
+/* ── Nodes: themed plates per type ── */
 .map-node {
   position: absolute; transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  cursor: default; transition: all 0.3s;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  cursor: default; transition: all 0.3s; width: 88px;
 }
-.node-icon {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(20,20,30,0.9); border: 2px solid rgba(255,255,255,0.15);
+.node-plate {
+  position: relative; width: 54px; height: 54px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; transition: all 0.3s;
+  transition: all 0.3s;
 }
-.node-label { font-size: 0.6rem; color: #888; text-align: center; max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node-plate::before {
+  /* outer ring */
+  content: ''; position: absolute; inset: -3px;
+  border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.08);
+  transition: all 0.3s;
+}
+.node-plate-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.1), rgba(15,15,25,0.95));
+  border: 2px solid rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; color: #fff;
+  box-shadow: inset 0 -8px 14px rgba(0,0,0,0.6), 0 3px 8px rgba(0,0,0,0.4);
+}
 
-.map-node.current .node-icon {
-  border-color: var(--player); box-shadow: 0 0 16px rgba(103,232,249,0.5);
-  background: rgba(103,232,249,0.1);
+/* Type-specific tint — subtle colored glow on the plate rim */
+.map-node[data-type="battle"] .node-plate-inner { border-color: rgba(248,113,113,0.55); color: #fca5a5; }
+.map-node[data-type="item"]   .node-plate-inner { border-color: rgba(251,191,36,0.55); color: #fde68a; }
+.map-node[data-type="event"]  .node-plate-inner { border-color: rgba(167,139,250,0.55); color: #c4b5fd; }
+.map-node[data-type="rest"]   .node-plate-inner { border-color: rgba(52,211,153,0.55); color: #6ee7b7; }
+.map-node[data-type="boss"]   .node-plate-inner { border-color: rgba(251,191,36,0.85); color: var(--gold); font-size: 1.9rem; }
+.map-node[data-type="start"]  .node-plate-inner { border-color: rgba(103,232,249,0.55); color: var(--player); }
+
+.map-node[data-type="boss"] .node-plate { width: 68px; height: 68px; }
+
+/* Art placeholder label (appears when no image is set for this node type) */
+.node-plate.no-art::after {
+  content: attr(data-art-slot);
+  position: absolute; top: -10px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.45rem; color: rgba(255,255,255,0.22);
+  letter-spacing: 1px; text-transform: uppercase;
+  white-space: nowrap; pointer-events: none;
+}
+
+.node-type-label {
+  font-size: 0.52rem; letter-spacing: 1.5px; text-transform: uppercase;
+  font-weight: 700; color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.map-node[data-type="battle"] .node-type-label { color: #f87171; }
+.map-node[data-type="item"]   .node-type-label { color: var(--gold); }
+.map-node[data-type="event"]  .node-type-label { color: #a78bfa; }
+.map-node[data-type="rest"]   .node-type-label { color: var(--green); }
+.map-node[data-type="boss"]   .node-type-label { color: var(--gold); font-size: 0.58rem; }
+
+.node-name {
+  font-size: 0.62rem; color: #cbd5e1; text-align: center;
+  max-width: 88px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+}
+
+/* States */
+.map-node.current .node-plate-inner {
+  border-color: var(--player); color: var(--player);
+  box-shadow: 0 0 24px rgba(103,232,249,0.7), inset 0 -8px 14px rgba(0,0,0,0.6);
   animation: pulse-node 2s infinite;
 }
-.map-node.visited .node-icon { opacity: 0.35; border-color: rgba(255,255,255,0.06); }
-.map-node.reachable { cursor: pointer; }
-.map-node.reachable .node-icon {
-  border-color: var(--accent); animation: pulse-reachable 1.5s infinite;
+.map-node.current .node-plate::before {
+  border-color: rgba(103,232,249,0.5);
+  animation: pulse-ring 2s infinite;
 }
-.map-node.reachable:hover .node-icon { transform: scale(1.15); box-shadow: 0 0 20px rgba(56,189,248,0.4); }
-.map-node.locked .node-icon { opacity: 0.25; }
+.map-node.visited .node-plate-inner { opacity: 0.35; filter: grayscale(0.6); }
+.map-node.visited .node-name { opacity: 0.4; }
+.map-node.reachable { cursor: pointer; }
+.map-node.reachable .node-plate::before {
+  border-color: var(--accent);
+  animation: pulse-ring 1.5s infinite;
+}
+.map-node.reachable:hover .node-plate-inner {
+  transform: scale(1.1);
+  box-shadow: 0 0 24px var(--accent), inset 0 -8px 14px rgba(0,0,0,0.6);
+}
+.map-node.locked .node-plate-inner { opacity: 0.3; filter: grayscale(0.8); }
 
 @keyframes pulse-node {
-  0%, 100% { box-shadow: 0 0 16px rgba(103,232,249,0.5); }
-  50% { box-shadow: 0 0 28px rgba(103,232,249,0.8); }
+  0%, 100% { box-shadow: 0 0 20px rgba(103,232,249,0.5), inset 0 -8px 14px rgba(0,0,0,0.6); }
+  50% { box-shadow: 0 0 32px rgba(103,232,249,0.9), inset 0 -8px 14px rgba(0,0,0,0.6); }
 }
-@keyframes pulse-reachable {
-  0%, 100% { box-shadow: 0 0 8px rgba(56,189,248,0.2); }
-  50% { box-shadow: 0 0 16px rgba(56,189,248,0.5); }
+@keyframes pulse-ring {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 0.3; }
 }
 
-.map-info-panel { padding: 8px; text-align: center; }
-.info-region { font-family: 'Creepster', cursive; font-size: 1.1rem; color: var(--accent); }
-.info-node { font-size: 0.75rem; color: #888; }
+/* ── Info panel + region tabs ── */
+.map-info-panel { padding: 4px 0 2px; text-align: center; }
+.info-node-line {
+  font-size: 0.72rem; color: #aaa; min-height: 16px;
+}
+.info-node-line b { color: var(--accent); }
 
-.region-tabs { display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+.region-tabs { display: flex; gap: 5px; justify-content: center; margin-top: 4px; flex-wrap: wrap; }
 .region-tab {
-  padding: 6px 14px; border-radius: 8px; font-size: 0.7rem;
+  padding: 5px 12px; border-radius: 8px; font-size: 0.66rem;
   background: rgba(255,255,255,0.04); color: #666; cursor: pointer;
   border: 1px solid transparent; transition: all 0.3s;
+  letter-spacing: 0.5px;
 }
 .region-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(56,189,248,0.08); }
 .region-tab.locked { opacity: 0.3; cursor: default; }
@@ -199,6 +463,34 @@ body {
 .pb-ghost-card img { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; }
 .pb-ghost-name { font-size: 0.6rem; color: #aaa; margin-top: 2px; }
 .pb-ghost-hp { font-size: 0.55rem; color: var(--green); }
+.pb-ghost-role {
+  font-size: 0.5rem; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #666; font-weight: 700; margin-bottom: 2px;
+}
+.pb-ghost-card.selected .pb-ghost-role { color: var(--accent); }
+
+/* Battle sideline row — face-up supporting ghosts during combat */
+.battle-sideline {
+  display: flex; gap: 4px; align-items: center;
+  flex-shrink: 0;
+}
+.sideline-ghost {
+  position: relative; width: 36px; height: 50px;
+  border-radius: 5px; overflow: hidden;
+  border: 1px solid rgba(251,191,36,0.4);
+  box-shadow: 0 0 6px rgba(251,191,36,0.15);
+  opacity: 0.85;
+}
+.sideline-ghost img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.sideline-ghost-hp {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  font-size: 0.5rem; color: #fff;
+  background: rgba(0,0,0,0.75);
+  text-align: center; padding: 1px 0;
+  font-weight: 700;
+}
 
 /* ════ BATTLE ════ */
 #battleScreen {
@@ -321,6 +613,38 @@ body {
 .res-fire { color: #f97316; font-size: 0.7rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .res-dice { color: var(--gold); font-size: 0.7rem; font-weight: 600; }
 
+/* Committable — phase 1 tap-to-commit affordance */
+.res-ice.committable, .res-fire.committable {
+  cursor: pointer;
+  padding: 2px 8px; border-radius: 6px;
+  border: 1px dashed currentColor;
+  animation: commit-pulse 1.6s infinite;
+}
+.res-ice.committable:hover, .res-fire.committable:hover {
+  background: currentColor;
+  color: #000;
+}
+@keyframes commit-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(103,232,249,0); }
+  50% { box-shadow: 0 0 8px currentColor; }
+}
+
+/* Committed (locked-in) — distinct pill, tap to uncommit */
+.res-ice-committed, .res-fire-committed {
+  font-size: 0.7rem; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 6px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.res-ice-committed {
+  color: #0b0b14; background: #67e8f9;
+  box-shadow: 0 0 12px rgba(103,232,249,0.6);
+}
+.res-fire-committed {
+  color: #0b0b14; background: #fb923c;
+  box-shadow: 0 0 12px rgba(249,115,22,0.6);
+}
+
 /* -- Controls -- */
 .battle-controls { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 
@@ -368,6 +692,13 @@ body {
 .reward-title { font-family: 'Creepster', cursive; font-size: 2rem; color: var(--gold); }
 .reward-loot { display: flex; flex-direction: column; gap: 8px; }
 .reward-item { padding: 10px 20px; background: rgba(255,255,255,0.04); border-radius: 10px; font-size: 0.9rem; }
+.reward-key-item {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--key-color, #fbbf24);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--key-color, #fbbf24) 30%, transparent);
+}
+.reward-key-item .ri-icon { font-size: 1.4rem; }
+.reward-key-item .ri-name { color: var(--key-color, #fbbf24); font-weight: 700; }
 .reward-ghost-label { font-size: 0.9rem; color: #aaa; margin-top: 8px; }
 .reward-ghost-pick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .reward-ghost-option {
@@ -415,6 +746,170 @@ body {
 .ability-splash-inner { text-align: center; }
 .ability-splash-name { font-family: 'Creepster', cursive; font-size: 1.8rem; color: var(--gold); }
 .ability-splash-desc { font-size: 0.9rem; color: #ccc; margin-top: 8px; }
+
+/* ════ BOSS CEREMONY — Zelda-style relic acquisition ════ */
+.boss-ceremony {
+  position: fixed; inset: 0; z-index: 200;
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column;
+  background: rgba(0,0,0,0);
+  transition: background 1.5s ease;
+  overflow: hidden;
+}
+.boss-ceremony.active { display: flex; }
+.boss-ceremony.darken { background: rgba(0,0,0,0.92); }
+
+/* Light beam from above */
+.ceremony-light-beam {
+  position: absolute;
+  top: -20%; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 130%;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.25) 0%,
+    rgba(255,255,255,0.08) 30%,
+    rgba(255,255,255,0.02) 60%,
+    transparent 100%);
+  opacity: 0;
+  transition: opacity 1.2s ease 0.3s;
+  filter: blur(20px);
+}
+.boss-ceremony.reveal .ceremony-light-beam { opacity: 1; }
+
+/* Relic container */
+.ceremony-relic-wrap {
+  position: relative;
+  z-index: 10;
+  transform: translateY(-200px) scale(0.5);
+  opacity: 0;
+  transition: transform 2.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 1s ease;
+}
+.boss-ceremony.reveal .ceremony-relic-wrap {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* The relic itself */
+.ceremony-relic {
+  font-size: 4.5rem;
+  filter: drop-shadow(0 0 30px var(--ceremony-color, #fbbf24));
+  animation: none;
+  position: relative;
+  z-index: 2;
+}
+.boss-ceremony.float .ceremony-relic {
+  animation: relic-float 3s ease-in-out infinite;
+}
+
+/* Glow behind relic */
+.ceremony-relic-glow {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--ceremony-color, #fbbf24) 0%, transparent 70%);
+  opacity: 0;
+  filter: blur(30px);
+  transition: opacity 1.5s ease 1s;
+}
+.boss-ceremony.reveal .ceremony-relic-glow { opacity: 0.5; }
+.boss-ceremony.float .ceremony-relic-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Labels */
+.ceremony-label {
+  font-family: 'Creepster', cursive;
+  font-size: 1.6rem;
+  color: var(--ceremony-color, #fbbf24);
+  margin-top: 30px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 1s ease 2.2s, transform 1s ease 2.2s;
+  text-shadow: 0 0 40px var(--ceremony-color, #fbbf24);
+  letter-spacing: 3px;
+  z-index: 10;
+}
+.boss-ceremony.reveal .ceremony-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ceremony-sublabel {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 1s ease 2.8s;
+  z-index: 10;
+  letter-spacing: 1px;
+}
+.boss-ceremony.reveal .ceremony-sublabel { opacity: 1; }
+
+/* Particles */
+.ceremony-particles {
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 5;
+}
+.ceremony-particle {
+  position: absolute;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--ceremony-color, #fbbf24);
+  opacity: 0;
+  box-shadow: 0 0 6px var(--ceremony-color, #fbbf24);
+}
+.boss-ceremony.reveal .ceremony-particle {
+  animation: particle-rise var(--p-dur, 4s) ease-out var(--p-delay, 0s) infinite;
+}
+
+/* Shimmer ring — expands outward when relic lands */
+.ceremony-relic-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  border: 2px solid var(--ceremony-color, #fbbf24);
+  opacity: 0;
+  transition: none;
+}
+.boss-ceremony.ring .ceremony-relic-wrap::after {
+  animation: ring-expand 1.5s ease-out forwards;
+}
+
+@keyframes relic-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+@keyframes particle-rise {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-300px) scale(0); }
+}
+
+@keyframes ring-expand {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+}
+
+/* ════ FINAL VICTORY — grander version ════ */
+.boss-ceremony.final .ceremony-light-beam {
+  width: 200px;
+  background: linear-gradient(180deg,
+    rgba(251,191,36,0.35) 0%,
+    rgba(251,191,36,0.12) 30%,
+    rgba(251,191,36,0.03) 60%,
+    transparent 100%);
+}
+.boss-ceremony.final .ceremony-relic { font-size: 5.5rem; }
 
 .watermark {
   position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%);

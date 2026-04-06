@@ -6,6 +6,8 @@ let pick = null, enemy = null;
 let playerHp, enemyHp, round, battleOver, phase;
 let currentEnemyRoll = null;
 let iceShards = 0, sacredFires = 0;
+// Committed resources — locked in before rolling, spent win or lose (real game rule)
+let committedShards = 0, committedFires = 0;
 let enemyIceShards = 0, enemySacredFires = 0;
 let playerBonusDice = 0, enemyBonusDice = 0;
 let playerRemoveDice = 0, enemyRemoveDice = 0;
@@ -182,6 +184,8 @@ function showTriplesBanner(type) {
 // ══════════════════════════════════════════════
 
 function showPreBattle(enemyGhost, boss) {
+  // Safety: should never happen, but guard anyway
+  if (!game.active) { showGameOver(); return; }
   isBossFight = !!boss;
   enemy = { ...enemyGhost };
   enemyHp = enemy.hp;
@@ -195,24 +199,41 @@ function showPreBattle(enemyGhost, boss) {
     <div class="pb-stat-ability"><span class="ability-label">${enemy.ability}</span> ${enemy.abilityDesc}</div>
   `;
 
+  // Pre-battle shows the active fighter; tap a sideline ghost to swap them in first.
   const sel = document.getElementById('pbGhostSelect');
   sel.innerHTML = '';
-  game.collection.forEach((g, i) => {
-    const card = document.createElement('div');
-    card.className = 'pb-ghost-card' + (i === 0 ? ' selected' : '');
-    card.innerHTML = `<img src="${IMG}${g.file}"><div class="pb-ghost-name">${g.name}</div><div class="pb-ghost-hp">${g.hp}/${g.maxHp}</div>`;
-    card.onclick = () => {
-      sel.querySelectorAll('.pb-ghost-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      game.selectedGhostIndex = i;
-      document.getElementById('pbPlayerCard').innerHTML = `<img src="${IMG}${g.file}">`;
-      document.getElementById('pbPlayerName').textContent = g.name;
-    };
-    sel.appendChild(card);
-  });
+  const renderPickRow = () => {
+    sel.innerHTML = '';
+    const slots = [
+      { ghost: game.active, label: 'ACTIVE', kind: 'active' },
+      ...game.sideline.map(g => ({ ghost: g, label: 'SIDELINE', kind: 'sideline' })),
+    ];
+    slots.forEach((slot, i) => {
+      if (!slot.ghost) return;
+      const card = document.createElement('div');
+      card.className = 'pb-ghost-card' + (slot.kind === 'active' ? ' selected' : '');
+      card.innerHTML = `
+        <div class="pb-ghost-role">${slot.label}</div>
+        <img src="${IMG}${slot.ghost.file}">
+        <div class="pb-ghost-name">${slot.ghost.name}</div>
+        <div class="pb-ghost-hp">${slot.ghost.hp}/${slot.ghost.maxHp}</div>
+      `;
+      if (slot.kind === 'sideline') {
+        card.onclick = () => {
+          // Promote this sideline ghost to active
+          const sIdx = i - 1;
+          promoteSideline(sIdx);
+          renderPickRow();
+          document.getElementById('pbPlayerCard').innerHTML = `<img src="${IMG}${game.active.file}">`;
+          document.getElementById('pbPlayerName').textContent = game.active.name;
+        };
+      }
+      sel.appendChild(card);
+    });
+  };
+  renderPickRow();
 
-  game.selectedGhostIndex = 0;
-  const g = game.collection[0];
+  const g = game.active;
   document.getElementById('pbPlayerCard').innerHTML = `<img src="${IMG}${g.file}">`;
   document.getElementById('pbPlayerName').textContent = g.name;
 }
@@ -222,11 +243,13 @@ function showPreBattle(enemyGhost, boss) {
 // ══════════════════════════════════════════════
 
 function startBattle() {
-  pick = { ...game.collection[game.selectedGhostIndex] };
+  pick = { ...game.active };
   playerHp = pick.hp;
   round = 1;
   phase = 0;
   battleOver = false;
+  committedShards = 0;
+  committedFires = 0;
   isFirstRoll = true;
   bogeyReflectUsed = false;
   tookDamageLastRound = false;
@@ -247,6 +270,19 @@ function startBattle() {
   document.getElementById('playerAbilityTag').innerHTML = `<span class="at-name">${pick.ability}</span> <span class="at-desc">${pick.abilityDesc}</span>`;
   document.getElementById('enemyDiceLabel').textContent = enemy.name;
   document.getElementById('playerDiceLabel').textContent = pick.name;
+
+  // Render face-up sideline ghosts (visual support row)
+  const sidelineEl = document.getElementById('battleSideline');
+  if (sidelineEl) {
+    sidelineEl.innerHTML = game.sideline.length > 0
+      ? game.sideline.map(g => `
+          <div class="sideline-ghost" title="${g.name} — ${g.ability}: ${g.abilityDesc}">
+            <img src="${IMG}${g.file}" alt="${g.name}">
+            <div class="sideline-ghost-hp">${g.hp}/${g.maxHp}</div>
+          </div>
+        `).join('')
+      : '';
+  }
 
   updateHpDisplay();
   renderBattleItems();
@@ -406,6 +442,7 @@ function doEnemyRoll() {
       log(`Your turn — tap Roll!`, 'prompt');
       showRollBtn();
       renderBattleItems();
+      renderResources(); // refresh so shards/fires show as committable
     }, revealTime + (isTripleOrBetter(currentEnemyRoll.type) ? 800 : 0));
   }, 600);
 }
@@ -418,6 +455,7 @@ function doPlayerRoll() {
   if (phase !== 1 || battleOver) return;
   phase = 2;
   hideRollBtn();
+  renderResources(); // clear committable highlight
   playSfx('sfxDiceRoll');
 
   // ── Before-roll abilities ──
@@ -584,7 +622,13 @@ function resolveRound(pRoll, eRoll) {
 
   // ── TIE ──
   if (result === 0) {
-    log(`Tie! No damage dealt. Roll again!`, 'tie');
+    if (committedShards > 0 || committedFires > 0) {
+      log(`Committed resources lost on the tie — rolling again with empty hands.`, 'tie');
+      committedShards = 0; committedFires = 0;
+      renderResources();
+    } else {
+      log(`Tie! No damage dealt. Roll again!`, 'tie');
+    }
     round++;
     setTimeout(doEnemyRoll, 1400);
     return;
@@ -595,6 +639,11 @@ function resolveRound(pRoll, eRoll) {
   if (playerWins) {
     resolvePlayerWin(pRoll, eRoll, wasFirstRoll);
   } else {
+    // Lost the roll — committed shards/fires are burned (real rule)
+    if (committedShards > 0 || committedFires > 0) {
+      log(`Committed shards/fires wasted on the loss.`, 'tie');
+      committedShards = 0; committedFires = 0;
+    }
     resolveEnemyWin(pRoll, eRoll, wasFirstRoll);
   }
 }
@@ -646,23 +695,24 @@ function resolvePlayerWin(pRoll, eRoll, wasFirstRoll) {
     abilityLog.push(`Fissure! Two 6's — +5 damage!`);
   }
 
-  // ── Ice Shards — consumed on win ──
-  if (iceShards > 0) {
+  // ── Committed Ice Shards — add damage on win (already spent, win or lose) ──
+  if (committedShards > 0) {
     const perShard = pick.ability === 'Winter Barrage' ? 2 : 1;
-    const shardDmg = iceShards * perShard;
+    const shardDmg = committedShards * perShard;
     damage += shardDmg;
-    abilityLog.push(`${iceShards} Ice Shard${iceShards>1?'s':''} consumed! +${shardDmg} damage${pick.ability === 'Winter Barrage' ? ' (Winter Barrage 2X!)' : ''}`);
-    iceShards = 0;
+    abilityLog.push(`${committedShards} Ice Shard${committedShards>1?'s':''} cashed in! +${shardDmg} damage${pick.ability === 'Winter Barrage' ? ' (Winter Barrage 2X!)' : ''}`);
   }
 
-  // ── Sacred Fires — consumed on win ──
-  if (sacredFires > 0) {
+  // ── Committed Sacred Fires — add damage on win ──
+  if (committedFires > 0) {
     const perFire = pick.ability === 'Heating Up' ? 6 : 3;
-    const fireDmg = sacredFires * perFire;
+    const fireDmg = committedFires * perFire;
     damage += fireDmg;
-    abilityLog.push(`${sacredFires} Sacred Fire${sacredFires>1?'s':''} consumed! +${fireDmg} damage${pick.ability === 'Heating Up' ? ' (Heating Up 2X!)' : ''}`);
-    sacredFires = 0;
+    abilityLog.push(`${committedFires} Sacred Fire${committedFires>1?'s':''} cashed in! +${fireDmg} damage${pick.ability === 'Heating Up' ? ' (Heating Up 2X!)' : ''}`);
   }
+  // Committed resources are spent now — zero them so renderResources reflects it next redraw
+  committedShards = 0; committedFires = 0;
+  renderResources();
 
   // ── Defense — enemy blocks/reflects ──
   let reflected = false;
@@ -1038,20 +1088,118 @@ function nextRound() {
 function enemyDefeated() {
   battleOver = true;
   log(`${enemy.name} defeated!`, 'victory');
-  showAbilitySplash('Victory!', `${enemy.name} has been defeated!`, 2000, () => {
-    game.collection[game.selectedGhostIndex].hp = Math.max(1, playerHp);
-    const nodes = game.regionMaps[game.currentRegion];
-    const node = nodes.find(n => n.id === game.currentNode);
-    if (node) node.visited = true;
 
-    if (isBossFight) {
+  if (isBossFight) {
+    // Boss fights get the full ceremony
+    showAbilitySplash('Victory!', `${enemy.name} has been defeated!`, 2000, () => {
+      if (game.active) game.active.hp = Math.max(1, playerHp);
+      const nodes = game.regionMaps[game.currentRegion];
+      const node = nodes.find(n => n.id === game.currentNode);
+      if (node) node.visited = true;
       game.bossesBeaten++;
-      if (game.currentRegion === REGIONS.length - 1) {
-        setTimeout(showVictory, 500);
-        return;
-      }
-    }
-    setTimeout(() => showRewards(isBossFight), 500);
+
+      const isFinal = game.currentRegion === REGIONS.length - 1;
+      showBossCeremony(game.currentRegion, isFinal, () => {
+        if (isFinal) {
+          showVictory();
+        } else {
+          showRewards(true);
+        }
+      });
+    });
+  } else {
+    // Regular battles — quick splash
+    showAbilitySplash('Victory!', `${enemy.name} has been defeated!`, 2000, () => {
+      if (game.active) game.active.hp = Math.max(1, playerHp);
+      const nodes = game.regionMaps[game.currentRegion];
+      const node = nodes.find(n => n.id === game.currentNode);
+      if (node) node.visited = true;
+      setTimeout(() => showRewards(false), 500);
+    });
+  }
+}
+
+// ══════════════════════════════════════════════
+// BOSS CEREMONY — Zelda OoT-style relic moment
+// ══════════════════════════════════════════════
+
+const BOSS_RELICS = [
+  { icon: '🗝️', name: 'Cavern Key',  sub: 'The path to Hot Hot Cavern is open', color: '#f97316' },
+  { icon: '🏔️', name: 'Palace Key',  sub: 'The gates of Ice Palace await',      color: '#3b82f6' },
+  { icon: '🏰', name: 'Castle Key',  sub: 'The Dark Castle beckons',             color: '#8b5cf6' },
+  { icon: '👑', name: 'Champion',     sub: 'The Mountain King has fallen',        color: '#fbbf24' },
+];
+
+function showBossCeremony(regionIdx, isFinal, callback) {
+  const relic = BOSS_RELICS[regionIdx];
+  const el = document.getElementById('bossCeremony');
+  const particles = document.getElementById('ceremonyParticles');
+
+  // Set region color
+  el.style.setProperty('--ceremony-color', relic.color);
+
+  // Set relic content
+  document.getElementById('ceremonyRelic').textContent = relic.icon;
+  document.getElementById('ceremonyLabel').textContent = relic.name;
+  document.getElementById('ceremonySublabel').textContent = relic.sub;
+
+  // Final boss gets the grander version
+  if (isFinal) el.classList.add('final');
+  else el.classList.remove('final');
+
+  // Generate particles
+  particles.innerHTML = '';
+  const particleCount = isFinal ? 40 : 24;
+  for (let i = 0; i < particleCount; i++) {
+    const p = document.createElement('div');
+    p.className = 'ceremony-particle';
+    p.style.left = (15 + Math.random() * 70) + '%';
+    p.style.top = (50 + Math.random() * 40) + '%';
+    p.style.setProperty('--p-dur', (3 + Math.random() * 3) + 's');
+    p.style.setProperty('--p-delay', (Math.random() * 3) + 's');
+    p.style.width = p.style.height = (2 + Math.random() * 4) + 'px';
+    particles.appendChild(p);
+  }
+
+  // Reset classes
+  el.className = 'boss-ceremony';
+
+  // Sequence the reveal
+  el.classList.add('active');
+  requestAnimationFrame(() => {
+    // Phase 1: darken
+    el.classList.add('darken');
+
+    // Phase 2: beam + relic descend (after darkness settles)
+    setTimeout(() => {
+      el.classList.add('reveal');
+      playSfx('sfxSpecial');
+    }, 800);
+
+    // Phase 3: ring burst when relic lands
+    setTimeout(() => {
+      el.classList.add('ring');
+    }, 2600);
+
+    // Phase 4: gentle float
+    setTimeout(() => {
+      el.classList.add('float');
+    }, 3200);
+
+    // Phase 5: hold the moment, then fade out
+    const holdTime = isFinal ? 6500 : 5500;
+    setTimeout(() => {
+      el.classList.add('darken');
+      el.style.transition = 'opacity 1s ease';
+      el.style.opacity = '0';
+      setTimeout(() => {
+        el.className = 'boss-ceremony';
+        el.style.transition = '';
+        el.style.opacity = '';
+        particles.innerHTML = '';
+        if (callback) callback();
+      }, 1000);
+    }, holdTime);
   });
 }
 
@@ -1066,16 +1214,17 @@ function playerDefeated() {
 
   log(`${pick.name} has fallen...`, 'defeat');
 
-  game.collection.splice(game.selectedGhostIndex, 1);
-  game.deadGhosts.push(pick.name);
+  // Promote a sideline/reserve ghost if any remain
+  const stillAlive = handleActiveDeath();
 
   const nodes = game.regionMaps[game.currentRegion];
   const node = nodes.find(n => n.id === game.currentNode);
   if (node) node.visited = true;
 
-  if (game.collection.length === 0) {
+  if (!stillAlive) {
     setTimeout(showGameOver, 1500);
   } else {
+    log(`${game.active.name} steps up from the sideline!`, 'ability');
     setTimeout(() => { saveGame(); showMap(); }, 2500);
   }
 }
@@ -1086,15 +1235,16 @@ function playerDefeated() {
 
 function showRewards(wasBoss) {
   showScreen('rewardScreen');
+  document.getElementById('rewardTitle').textContent = wasBoss ? 'Region Conquered!' : 'Victory!';
   const loot = document.getElementById('rewardLoot');
   const ghostPick = document.getElementById('rewardGhostPick');
   let html = '';
 
   if (wasBoss) {
     const regionIdx = game.currentRegion;
-    if (regionIdx === 0) { gainItem('key_cavern'); html += rewardItemHtml('key_cavern'); }
-    else if (regionIdx === 1) { gainItem('key_palace'); html += rewardItemHtml('key_palace'); }
-    else if (regionIdx === 2) { gainItem('key_castle'); html += rewardItemHtml('key_castle'); }
+    if (regionIdx === 0) { gainItem('key_cavern'); html += rewardItemHtml('key_cavern', true); }
+    else if (regionIdx === 1) { gainItem('key_palace'); html += rewardItemHtml('key_palace', true); }
+    else if (regionIdx === 2) { gainItem('key_castle'); html += rewardItemHtml('key_castle', true); }
     gainItem('power');
     html += rewardItemHtml('power');
   } else {
@@ -1108,7 +1258,7 @@ function showRewards(wasBoss) {
   const options = [];
   for (let i = 0; i < 2; i++) {
     let rarity = weightedRarity(weights);
-    const pool = ALL_GHOSTS.filter(g => g.rarity === rarity && !game.collection.find(c => c.name === g.name) && !options.find(o => o.name === g.name));
+    const pool = ALL_GHOSTS.filter(g => g.rarity === rarity && !ownsGhost(g.name) && !options.find(o => o.name === g.name));
     if (pool.length > 0) options.push({ ...pool[Math.floor(Math.random() * pool.length)] });
   }
 
@@ -1130,9 +1280,12 @@ function showRewards(wasBoss) {
   }
 }
 
-function rewardItemHtml(id) {
+function rewardItemHtml(id, isKey) {
   const item = ITEMS[id];
-  return `<div class="reward-item"><span class="ri-icon">${item.icon}</span><span class="ri-name">${item.name}</span><span class="ri-desc">${item.desc}</span></div>`;
+  const cls = isKey ? 'reward-item reward-key-item' : 'reward-item';
+  return `<div class="${cls}" ${isKey ? `style="--key-color:${item.color}"` : ''}>
+    <span class="ri-icon">${item.icon}</span><span class="ri-name">${item.name}</span><span class="ri-desc">${item.desc}</span>
+  </div>`;
 }
 
 function selectRewardGhost(index) {
@@ -1143,7 +1296,7 @@ function selectRewardGhost(index) {
 function collectAndReturn() {
   if (game.pendingRewardGhosts && game.selectedRewardGhost >= 0) {
     const ghost = game.pendingRewardGhosts[game.selectedRewardGhost];
-    game.collection.push({ ...ghost, hp: ghost.maxHp });
+    recruitGhost(ghost);
   }
   game.iceShards = iceShards;
   game.sacredFires = sacredFires;
@@ -1175,11 +1328,61 @@ function updateHpDisplay() {
 
 function renderResources() {
   const el = document.getElementById('battleResources');
+  const canCommit = phase === 1 && !battleOver;
   let html = '';
-  if (iceShards > 0) html += `<span class="res-ice"><img src="iceshard.png" class="res-icon"> ${iceShards}</span>`;
-  if (sacredFires > 0) html += `<span class="res-fire"><img src="sacredfire.png" class="res-icon"> ${sacredFires}</span>`;
+
+  // Ice shards — tap during phase 1 to commit
+  if (iceShards > 0) {
+    const cls = canCommit ? 'res-ice committable' : 'res-ice';
+    const onclick = canCommit ? 'onclick="commitShard()"' : '';
+    html += `<span class="${cls}" ${onclick} title="Tap to commit — +1 dmg on win, lost on loss"><img src="iceshard.png" class="res-icon"> ${iceShards}</span>`;
+  }
+  if (committedShards > 0) {
+    const onclick = canCommit ? 'onclick="uncommitShard()"' : '';
+    html += `<span class="res-ice-committed" ${onclick} title="Committed — tap to take back"><img src="iceshard.png" class="res-icon"> ${committedShards} locked</span>`;
+  }
+
+  // Sacred fires — tap during phase 1 to commit
+  if (sacredFires > 0) {
+    const cls = canCommit ? 'res-fire committable' : 'res-fire';
+    const onclick = canCommit ? 'onclick="commitFire()"' : '';
+    html += `<span class="${cls}" ${onclick} title="Tap to commit — +3 dmg on win, lost on loss"><img src="sacredfire.png" class="res-icon"> ${sacredFires}</span>`;
+  }
+  if (committedFires > 0) {
+    const onclick = canCommit ? 'onclick="uncommitFire()"' : '';
+    html += `<span class="res-fire-committed" ${onclick} title="Committed — tap to take back"><img src="sacredfire.png" class="res-icon"> ${committedFires} locked</span>`;
+  }
+
   if (playerBonusDice > 0) html += `<span class="res-dice">+${playerBonusDice} bonus dice</span>`;
   el.innerHTML = html;
+}
+
+// Commit / uncommit helpers — move resources between pool and committed
+function commitShard() {
+  if (phase !== 1 || iceShards <= 0) return;
+  iceShards -= 1;
+  committedShards += 1;
+  log(`Ice Shard committed — ${committedShards} locked in.`, 'ability');
+  renderResources();
+}
+function uncommitShard() {
+  if (phase !== 1 || committedShards <= 0) return;
+  committedShards -= 1;
+  iceShards += 1;
+  renderResources();
+}
+function commitFire() {
+  if (phase !== 1 || sacredFires <= 0) return;
+  sacredFires -= 1;
+  committedFires += 1;
+  log(`Sacred Fire committed — ${committedFires} locked in.`, 'ability');
+  renderResources();
+}
+function uncommitFire() {
+  if (phase !== 1 || committedFires <= 0) return;
+  committedFires -= 1;
+  sacredFires += 1;
+  renderResources();
 }
 
 function renderBattleItems() {
