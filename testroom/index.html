@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volcanic Activity Testroom — Boo! Spirit Battles</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --surface3: #1a1a2e;
+  --border: #2a2a4a;
+  --text: #e8e8e8;
+  --text2: #8888aa;
+  --accent: #e94560;
+  --accent2: #ff6b6b;
+  --magma: #ff6348;
+  --magma-glow: rgba(255,99,72,0.3);
+  --lava: #ff4500;
+  --ember: #ff8c00;
+  --ash: #4a4a5a;
+  --common: #8b95a5;
+  --uncommon: #2ecc71;
+  --rare: #3498db;
+  --ghost-rare: #9b59b6;
+  --legendary: #f39c12;
+  --hp-green: #27ae60;
+  --hp-yellow: #f1c40f;
+  --hp-red: #e74c3c;
+  --win: #2ecc71;
+  --lose: #e74c3c;
+  --tie: #f1c40f;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+.app { max-width:1400px; margin:0 auto; padding:20px; }
+
+/* Header */
+header { text-align:center; padding:20px 0 24px; border-bottom:2px solid var(--border); margin-bottom:24px; }
+header h1 { font-size:28px; font-weight:800; background:linear-gradient(135deg, var(--magma), var(--ember), var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.5px; }
+header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
+
+/* Tabs */
+.tabs { display:flex; gap:4px; margin-bottom:24px; background:var(--surface); border-radius:10px; padding:4px; border:1px solid var(--border); }
+.tab { flex:1; padding:10px; text-align:center; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; color:var(--text2); transition:all .2s; }
+.tab:hover { color:var(--text); }
+.tab.active { background:linear-gradient(135deg, var(--magma), var(--accent)); color:white; }
+
+/* Ghost Cards Grid */
+.ghost-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:16px; margin-bottom:24px; }
+.ghost-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px;
+  cursor:pointer; transition:all .2s; position:relative; overflow:hidden;
+}
+.ghost-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+}
+.ghost-card.rarity-common::before { background:var(--common); }
+.ghost-card.rarity-uncommon::before { background:var(--uncommon); }
+.ghost-card.rarity-rare::before { background:var(--rare); }
+.ghost-card.rarity-ghost-rare::before { background:var(--ghost-rare); }
+.ghost-card.rarity-legendary::before { background:var(--legendary); }
+.ghost-card:hover { transform:translateY(-2px); border-color:var(--magma); box-shadow:0 4px 20px var(--magma-glow); }
+.ghost-card.selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.ghost-card .card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.ghost-card .card-name { font-size:18px; font-weight:700; }
+.ghost-card .card-hp { display:flex; align-items:center; gap:4px; font-size:14px; font-weight:700; color:var(--hp-green); }
+.ghost-card .card-hp .heart { color:var(--hp-red); }
+.ghost-card .rarity-tag { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+.ghost-card .ability-name { font-size:13px; font-weight:700; color:var(--ember); margin-bottom:2px; }
+.ghost-card .ability-desc { font-size:12px; color:var(--text2); line-height:1.5; }
+.ghost-card .card-category { font-size:10px; color:var(--text2); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); text-transform:uppercase; letter-spacing:0.5px; }
+.ghost-card .card-set { font-size:10px; color:var(--magma); font-weight:600; }
+
+/* Battle Arena */
+.arena { display:none; }
+.arena.active { display:block; }
+.panel.active { display:block; }
+.panel { display:none; }
+
+/* Team Selection */
+.team-select { margin-bottom:24px; }
+.team-select h3 { font-size:16px; margin-bottom:12px; color:var(--ember); }
+.team-label { font-size:14px; font-weight:700; margin-bottom:8px; }
+.team-label.red { color:var(--accent); }
+.team-label.blue { color:var(--rare); }
+.pick-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:8px; margin-bottom:16px; }
+.pick-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px;
+  cursor:pointer; transition:all .15s; text-align:center; font-size:13px;
+}
+.pick-card:hover { border-color:var(--text2); }
+.pick-card.picked-red { border-color:var(--accent); background:rgba(233,69,96,0.1); }
+.pick-card.picked-blue { border-color:var(--rare); background:rgba(52,152,219,0.1); }
+.pick-card.picked-red.disabled, .pick-card.picked-blue.disabled { opacity:0.5; pointer-events:none; }
+.pick-card .pick-name { font-weight:700; }
+.pick-card .pick-hp { font-size:11px; color:var(--text2); }
+
+.start-btn {
+  display:block; width:100%; max-width:400px; margin:20px auto; padding:14px; border:none;
+  background:linear-gradient(135deg, var(--magma), var(--accent)); color:white; font-size:16px;
+  font-weight:700; border-radius:10px; cursor:pointer; transition:all .2s; letter-spacing:0.3px;
+}
+.start-btn:hover { transform:scale(1.02); box-shadow:0 4px 20px var(--magma-glow); }
+.start-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+/* Battle View */
+.battle-view { display:none; }
+.battle-view.active { display:block; }
+
+.battlefield { display:grid; grid-template-columns:1fr 80px 1fr; gap:16px; align-items:start; margin-bottom:20px; }
+
+.team-side { display:flex; flex-direction:column; gap:12px; }
+.team-side.right { text-align:right; }
+
+.fighter-card {
+  background:var(--surface); border:2px solid var(--border); border-radius:12px; padding:16px;
+  position:relative; transition:all .3s;
+}
+.fighter-card.active-fighter { border-color:var(--ember); box-shadow:0 0 20px var(--magma-glow); }
+.fighter-card.ko { opacity:0.35; }
+.fighter-card .fighter-name { font-size:20px; font-weight:800; margin-bottom:4px; }
+.fighter-card .fighter-ability { font-size:11px; color:var(--ember); font-weight:600; }
+.fighter-card .fighter-ability-desc { font-size:11px; color:var(--text2); margin-top:2px; }
+
+.hp-bar-wrap { margin-top:10px; }
+.hp-bar-bg { height:10px; background:var(--border); border-radius:5px; overflow:hidden; }
+.hp-bar-fill { height:100%; border-radius:5px; transition:width .4s, background .4s; }
+.hp-label { display:flex; justify-content:space-between; font-size:11px; margin-top:3px; color:var(--text2); }
+
+.sideline-cards { display:flex; gap:8px; }
+.right .sideline-cards { justify-content:flex-end; }
+.sideline-card {
+  background:var(--surface3); border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+  font-size:12px; flex:1; max-width:180px; cursor:pointer; transition:all .15s;
+}
+.sideline-card:hover:not(.ko) { border-color:var(--ember); }
+.sideline-card.ko { opacity:0.3; cursor:default; }
+.sideline-card .sl-name { font-weight:700; font-size:13px; }
+.sideline-card .sl-hp { font-size:11px; color:var(--text2); }
+.sideline-card .sl-ability { font-size:10px; color:var(--ember); margin-top:2px; }
+
+/* Resources */
+.resources { display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; }
+.right .resources { justify-content:flex-end; }
+.resource { font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px; }
+.resource.magma { background:rgba(255,99,72,0.15); color:var(--magma); border:1px solid rgba(255,99,72,0.3); }
+.resource.ice { background:rgba(52,152,219,0.15); color:var(--rare); border:1px solid rgba(52,152,219,0.3); }
+.resource.fire { background:rgba(243,156,18,0.15); color:var(--legendary); border:1px solid rgba(243,156,18,0.3); }
+
+/* VS Center */
+.vs-center { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding-top:20px; }
+.vs-text { font-size:28px; font-weight:900; color:var(--magma); text-shadow:0 0 20px var(--magma-glow); }
+.turn-indicator { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; }
+
+/* Dice */
+.dice-zone { display:flex; justify-content:center; gap:20px; margin:20px 0; flex-wrap:wrap; align-items:center; }
+.dice-group { display:flex; gap:6px; align-items:center; }
+.dice-group-label { font-size:12px; font-weight:700; margin-right:6px; }
+.dice-group-label.red { color:var(--accent); }
+.dice-group-label.blue { color:var(--rare); }
+.die {
+  width:48px; height:48px; background:var(--surface); border:2px solid var(--border);
+  border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:800; transition:all .3s;
+}
+.die.rolling { animation:shake .15s infinite; }
+.die.hit { border-color:var(--win); color:var(--win); }
+.die.miss { border-color:var(--lose); color:var(--lose); opacity:0.5; }
+
+@keyframes shake {
+  0%,100% { transform:rotate(0deg); }
+  25% { transform:rotate(-8deg) scale(1.1); }
+  75% { transform:rotate(8deg) scale(1.1); }
+}
+
+/* Battle Log */
+.log-wrap { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; max-height:300px; overflow-y:auto; margin-top:16px; }
+.log-wrap h4 { font-size:13px; color:var(--text2); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+.log-entry { font-size:12px; padding:4px 0; border-bottom:1px solid var(--border); color:var(--text2); line-height:1.5; }
+.log-entry:last-child { border-bottom:none; }
+.log-entry .log-dmg { color:var(--accent); font-weight:700; }
+.log-entry .log-heal { color:var(--hp-green); font-weight:700; }
+.log-entry .log-magma { color:var(--magma); font-weight:700; }
+.log-entry .log-ability { color:var(--ember); font-weight:600; }
+.log-entry .log-ko { color:var(--accent); font-weight:800; text-transform:uppercase; }
+
+/* Action Buttons */
+.actions { display:flex; gap:10px; justify-content:center; margin:16px 0; flex-wrap:wrap; }
+.action-btn {
+  padding:10px 24px; border:1px solid var(--border); border-radius:8px; cursor:pointer;
+  font-size:14px; font-weight:600; background:var(--surface); color:var(--text); transition:all .15s;
+}
+.action-btn:hover { border-color:var(--ember); background:var(--surface2); }
+.action-btn.primary { background:linear-gradient(135deg, var(--magma), var(--accent)); border:none; color:white; }
+.action-btn.primary:hover { transform:scale(1.03); }
+.action-btn:disabled { opacity:0.3; pointer-events:none; }
+
+/* Swap Modal */
+.swap-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
+.swap-overlay.active { display:flex; }
+.swap-modal { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:24px; max-width:400px; width:90%; }
+.swap-modal h3 { margin-bottom:16px; font-size:16px; }
+.swap-option { padding:12px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:all .15s; }
+.swap-option:hover { border-color:var(--ember); }
+.swap-option.ko { opacity:0.3; pointer-events:none; }
+.swap-option .so-name { font-weight:700; }
+.swap-option .so-hp { font-size:12px; color:var(--text2); }
+
+/* Game Over */
+.game-over-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center; }
+.game-over-overlay.active { display:flex; }
+.game-over-box { text-align:center; padding:40px; }
+.game-over-box h2 { font-size:36px; font-weight:900; margin-bottom:8px; }
+.game-over-box h2.red-win { color:var(--accent); }
+.game-over-box h2.blue-win { color:var(--rare); }
+.game-over-box p { color:var(--text2); margin-bottom:24px; }
+.game-over-box button { padding:12px 32px; border:none; border-radius:8px; background:var(--magma); color:white; font-size:16px; font-weight:700; cursor:pointer; }
+
+/* Responsive */
+@media (max-width:768px) {
+  .battlefield { grid-template-columns:1fr; gap:20px; }
+  .team-side.right { text-align:left; }
+  .right .sideline-cards { justify-content:flex-start; }
+  .right .resources { justify-content:flex-start; }
+  .vs-center { flex-direction:row; padding:0; }
+  .ghost-grid { grid-template-columns:1fr; }
+  .dice-zone { flex-direction:column; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>VOLCANIC ACTIVITY TESTROOM</h1>
+    <div class="sub">Boo! Spirit Battles — New Ghost Testing Lab</div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('browse')">Ghost Gallery</div>
+    <div class="tab" onclick="switchTab('battle')">Battle Simulator</div>
+  </div>
+
+  <!-- BROWSE PANEL -->
+  <div id="browse-panel" class="panel active">
+    <div class="ghost-grid" id="ghostGrid"></div>
+  </div>
+
+  <!-- BATTLE PANEL -->
+  <div id="battle-panel" class="panel">
+    <!-- Team Selection -->
+    <div id="team-select" class="team-select">
+      <div style="margin-bottom:20px;">
+        <div class="team-label red">Team Red — Pick 3</div>
+        <div class="pick-grid" id="red-picks"></div>
+      </div>
+      <div style="margin-bottom:20px;">
+        <div class="team-label blue">Team Blue — Pick 3</div>
+        <div class="pick-grid" id="blue-picks"></div>
+      </div>
+      <button class="start-btn" id="startBtn" disabled onclick="startBattle()">Select 3 ghosts per team to begin</button>
+    </div>
+
+    <!-- Battle View -->
+    <div id="battle-view" class="battle-view">
+      <div class="battlefield">
+        <!-- Team Red (Left) -->
+        <div class="team-side" id="red-side">
+          <div class="team-label red">TEAM RED</div>
+          <div id="red-active" class="fighter-card active-fighter"></div>
+          <div class="resources" id="red-resources"></div>
+          <div class="sideline-cards" id="red-sideline"></div>
+        </div>
+
+        <!-- VS -->
+        <div class="vs-center">
+          <div class="vs-text">VS</div>
+          <div class="turn-indicator" id="turnIndicator">Round 1</div>
+        </div>
+
+        <!-- Team Blue (Right) -->
+        <div class="team-side right" id="blue-side">
+          <div class="team-label blue">TEAM BLUE</div>
+          <div id="blue-active" class="fighter-card active-fighter"></div>
+          <div class="resources" id="blue-resources"></div>
+          <div class="sideline-cards" id="blue-sideline"></div>
+        </div>
+      </div>
+
+      <!-- Dice Zone -->
+      <div class="dice-zone" id="diceZone">
+        <div class="dice-group"><span class="dice-group-label red">RED</span><div id="red-dice"></div></div>
+        <div class="dice-group"><span class="dice-group-label blue">BLUE</span><div id="blue-dice"></div></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="action-btn primary" id="rollBtn" onclick="rollDice()">Roll Dice</button>
+        <button class="action-btn" id="swapBtn" onclick="openSwap()">Swap Ghost</button>
+        <button class="action-btn" onclick="resetBattle()" style="color:var(--text2);">Reset</button>
+      </div>
+
+      <!-- Battle Log -->
+      <div class="log-wrap">
+        <h4>Battle Log</h4>
+        <div id="battleLog"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Swap Modal -->
+<div class="swap-overlay" id="swapOverlay">
+  <div class="swap-modal">
+    <h3 id="swapTitle">Swap Active Ghost</h3>
+    <div id="swapOptions"></div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="game-over-overlay" id="gameOverOverlay">
+  <div class="game-over-box">
+    <h2 id="gameOverTitle">VICTORY</h2>
+    <p id="gameOverSub"></p>
+    <button onclick="resetBattle()">Play Again</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// GHOST DATA — Volcanic Activity Set
+// ============================================================
+const GHOSTS = [
+  {
+    id:201, name:"Ember", rarity:"common", maxHp:5, ability:"Slow Burn",
+    abilityDesc:"Win: enemy takes 1 damage at start of their next roll.",
+    category:"Debuff", set:"Volcanic Activity",
+    onWin(ctx) {
+      ctx.opponent.statusEffects.push({type:"burn", damage:1, turns:1});
+      ctx.log(`<span class="log-ability">Slow Burn</span> — enemy will take <span class="log-dmg">1 damage</span> next roll`);
+    }
+  },
+  {
+    id:202, name:"Cinder", rarity:"common", maxHp:4, ability:"Eruption",
+    abilityDesc:"Below 2 HP: doubles deal 2X damage.",
+    category:"Damage Multiplier", set:"Volcanic Activity",
+    modifyDamage(ctx, dmg, rollType) {
+      if (ctx.self.hp < 2 && rollType === 'doubles') {
+        ctx.log(`<span class="log-ability">Eruption!</span> Cinder's doubles deal <span class="log-dmg">2X damage</span>!`);
+        return dmg * 2;
+      }
+      return dmg;
+    }
+  },
+  {
+    id:203, name:"Slag", rarity:"common", maxHp:7, ability:"Molten Entry",
+    abilityDesc:"Entry: deal 1 damage to enemy. Gain 1 Magma.",
+    category:"Debuff", set:"Volcanic Activity",
+    onEntry(ctx) {
+      ctx.dealDamage(ctx.opponent, 1);
+      ctx.addResource(ctx.selfTeam, 'magma', 1);
+      ctx.log(`<span class="log-ability">Molten Entry</span> — dealt <span class="log-dmg">1 damage</span>, gained <span class="log-magma">1 Magma</span>`);
+    }
+  },
+  {
+    id:204, name:"Fumarole", rarity:"common", maxHp:3, ability:"Vent",
+    abilityDesc:"Sideline: gain 1 Magma per tie.",
+    category:"Resource Generation", set:"Volcanic Activity",
+    onTie(ctx) {
+      if (ctx.isSideline) {
+        ctx.addResource(ctx.selfTeam, 'magma', 1);
+        ctx.log(`<span class="log-ability">Vent</span> (sideline) — gained <span class="log-magma">1 Magma</span> from tie`);
+      }
+    }
+  },
+  {
+    id:205, name:"Basalt", rarity:"uncommon", maxHp:8, ability:"Hardened",
+    abilityDesc:"Singles deal 0 damage to you. Take 1 damage each turn.",
+    category:"Defense/Negation", set:"Volcanic Activity",
+    modifyIncoming(ctx, dmg, rollType) {
+      if (rollType === 'singles') {
+        ctx.log(`<span class="log-ability">Hardened</span> — singles negated!`);
+        return 0;
+      }
+      return dmg;
+    },
+    onTurnStart(ctx) {
+      if (!ctx.isSideline) {
+        ctx.dealDamage(ctx.self, 1);
+        ctx.log(`<span class="log-ability">Hardened</span> — Basalt erodes for <span class="log-dmg">1 damage</span>`);
+      }
+    }
+  },
+  {
+    id:206, name:"Pyroclast", rarity:"uncommon", maxHp:4, ability:"Chain Blast",
+    abilityDesc:"Spend all Magma: deal +2 per Magma spent (instead of +2 total).",
+    category:"Damage Multiplier", set:"Volcanic Activity",
+    modifyMagmaSpend(ctx, magmaCount) {
+      if (magmaCount > 0) {
+        ctx.log(`<span class="log-ability">Chain Blast!</span> — ${magmaCount} Magma = <span class="log-dmg">+${magmaCount * 2} damage</span> instead of +2`);
+        return magmaCount * 2;
+      }
+      return magmaCount > 0 ? 2 : 0;
+    }
+  },
+  {
+    id:207, name:"Caldera", rarity:"uncommon", maxHp:6, ability:"Pressure Build",
+    abilityDesc:"Each roll without winning: gain 1 Magma. Win: spend all Magma automatically.",
+    category:"Prediction/Reaction", set:"Volcanic Activity",
+    onLose(ctx) {
+      if (!ctx.isSideline) {
+        ctx.addResource(ctx.selfTeam, 'magma', 1);
+        ctx.log(`<span class="log-ability">Pressure Build</span> — gained <span class="log-magma">1 Magma</span> (pressure rising...)`);
+      }
+    },
+    onTie(ctx) {
+      if (!ctx.isSideline) {
+        ctx.addResource(ctx.selfTeam, 'magma', 1);
+        ctx.log(`<span class="log-ability">Pressure Build</span> — gained <span class="log-magma">1 Magma</span> from tie`);
+      }
+    }
+  },
+  {
+    id:208, name:"Obsidian", rarity:"rare", maxHp:5, ability:"Shatter",
+    abilityDesc:"Eruption (below 3 HP): triples destroy enemy regardless of HP.",
+    category:"Destruction/Instant Kill", set:"Volcanic Activity",
+    onWin(ctx) {
+      if (ctx.self.hp < 3 && ctx.rollType === 'triples') {
+        ctx.log(`<span class="log-ability">SHATTER!</span> <span class="log-ko">Obsidian erupts — enemy DESTROYED!</span>`);
+        ctx.destroyGhost(ctx.opponent);
+      }
+    }
+  },
+  {
+    id:209, name:"Magmus", rarity:"rare", maxHp:6, ability:"Forge",
+    abilityDesc:"Sideline: convert 1 Ice Shard → 2 Magma, or 1 Sacred Fire → 3 Magma.",
+    category:"Resource Generation", set:"Volcanic Activity",
+    onTurnStart(ctx) {
+      if (ctx.isSideline) {
+        const team = ctx.selfTeam;
+        if ((team.resources.ice || 0) > 0) {
+          team.resources.ice--;
+          ctx.addResource(team, 'magma', 2);
+          ctx.log(`<span class="log-ability">Forge</span> (sideline) — converted Ice Shard → <span class="log-magma">2 Magma</span>`);
+        } else if ((team.resources.fire || 0) > 0) {
+          team.resources.fire--;
+          ctx.addResource(team, 'magma', 3);
+          ctx.log(`<span class="log-ability">Forge</span> (sideline) — converted Sacred Fire → <span class="log-magma">3 Magma</span>`);
+        }
+      }
+    }
+  },
+  {
+    id:210, name:"Vulcanus", rarity:"ghost-rare", maxHp:7, ability:"Meltdown",
+    abilityDesc:"Eruption (below 4 HP): all your Magma deals damage to both active ghosts simultaneously.",
+    category:"Prediction/Reaction", set:"Volcanic Activity",
+    onTurnStart(ctx) {
+      if (!ctx.isSideline && ctx.self.hp < 4) {
+        const magma = ctx.selfTeam.resources.magma || 0;
+        if (magma > 0) {
+          const dmg = magma * 2;
+          ctx.selfTeam.resources.magma = 0;
+          ctx.log(`<span class="log-ability">MELTDOWN!</span> <span class="log-magma">${magma} Magma</span> erupts for <span class="log-dmg">${dmg} damage to BOTH fighters!</span>`);
+          ctx.dealDamage(ctx.opponent, dmg);
+          ctx.dealDamage(ctx.self, dmg);
+        }
+      }
+    }
+  }
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  tab: 'browse',
+  redPicks: [],
+  bluePicks: [],
+  battle: null
+};
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && tab==='browse') || (i===1 && tab==='battle'));
+  });
+  document.getElementById('browse-panel').classList.toggle('active', tab==='browse');
+  document.getElementById('battle-panel').classList.toggle('active', tab==='battle');
+}
+
+// ============================================================
+// GHOST GALLERY
+// ============================================================
+function renderGhostGrid() {
+  const grid = document.getElementById('ghostGrid');
+  grid.innerHTML = GHOSTS.map(g => `
+    <div class="ghost-card rarity-${g.rarity}">
+      <div class="card-header">
+        <div class="card-name">${g.name}</div>
+        <div class="card-hp"><span class="heart">&hearts;</span> ${g.maxHp}</div>
+      </div>
+      <div class="rarity-tag" style="color:var(--${g.rarity})">${g.rarity.replace('-',' ')}</div>
+      <div class="ability-name">${g.ability}</div>
+      <div class="ability-desc">${g.abilityDesc}</div>
+      <div class="card-category">
+        <span>${g.category}</span> &middot; <span class="card-set">${g.set}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// TEAM SELECTION
+// ============================================================
+function renderPicks() {
+  ['red','blue'].forEach(team => {
+    const container = document.getElementById(`${team}-picks`);
+    const picks = team === 'red' ? state.redPicks : state.bluePicks;
+    const otherPicks = team === 'red' ? state.bluePicks : state.redPicks;
+    container.innerHTML = GHOSTS.map(g => {
+      const picked = picks.includes(g.id);
+      const pickedOther = otherPicks.includes(g.id);
+      const full = picks.length >= 3 && !picked;
+      const cls = picked ? `picked-${team}` : (full || pickedOther ? 'disabled' : '');
+      return `<div class="pick-card ${cls}" onclick="togglePick('${team}',${g.id})">
+        <div class="pick-name">${g.name}</div>
+        <div class="pick-hp">&hearts; ${g.maxHp} &middot; ${g.rarity.replace('-',' ')}</div>
+      </div>`;
+    }).join('');
+  });
+  const ready = state.redPicks.length === 3 && state.bluePicks.length === 3;
+  const btn = document.getElementById('startBtn');
+  btn.disabled = !ready;
+  btn.textContent = ready ? 'BATTLE!' : `Select ${3 - state.redPicks.length} red, ${3 - state.bluePicks.length} blue`;
+}
+
+function togglePick(team, id) {
+  const picks = team === 'red' ? state.redPicks : state.bluePicks;
+  const otherPicks = team === 'red' ? state.bluePicks : state.redPicks;
+  if (otherPicks.includes(id)) return;
+  const idx = picks.indexOf(id);
+  if (idx >= 0) picks.splice(idx, 1);
+  else if (picks.length < 3) picks.push(id);
+  renderPicks();
+}
+
+// ============================================================
+// BATTLE ENGINE
+// ============================================================
+function makeTeamState(pickIds) {
+  const ghosts = pickIds.map(id => {
+    const g = GHOSTS.find(x => x.id === id);
+    return { ...g, hp: g.maxHp, ko: false, usedOnce: {} };
+  });
+  return { ghosts, activeIdx: 0, resources: { magma:0, ice:0, fire:0 } };
+}
+
+function getActive(team) { return team.ghosts[team.activeIdx]; }
+function getSideline(team) { return team.ghosts.filter((g,i) => i !== team.activeIdx && !g.ko); }
+
+function startBattle() {
+  state.battle = {
+    red: makeTeamState(state.redPicks),
+    blue: makeTeamState(state.bluePicks),
+    round: 1,
+    turn: 'roll', // roll | swap-forced
+    log: [],
+    lastRedRoll: [], lastBlueRoll: [],
+    waitingSwap: null
+  };
+  document.getElementById('team-select').style.display = 'none';
+  document.getElementById('battle-view').classList.add('active');
+  addLog("Battle begins!");
+  // Trigger entry abilities for starting fighters
+  triggerAbility(getActive(state.battle.red), 'onEntry', state.battle.red, state.battle.blue);
+  triggerAbility(getActive(state.battle.blue), 'onEntry', state.battle.blue, state.battle.red);
+  renderBattle();
+}
+
+function addLog(html) {
+  state.battle.log.unshift(html);
+}
+
+function makeCtx(ghost, selfTeam, opponentTeam, extras = {}) {
+  return {
+    self: ghost,
+    selfTeam,
+    opponent: getActive(opponentTeam),
+    opponentTeam,
+    isSideline: selfTeam.ghosts[selfTeam.activeIdx].id !== ghost.id,
+    log: (msg) => addLog(`<span style="color:var(--ember)">${ghost.name}</span>: ${msg}`),
+    dealDamage(target, amt) {
+      target.hp = Math.max(0, target.hp - amt);
+      if (target.hp <= 0) target.ko = true;
+    },
+    addResource(team, type, amt) {
+      team.resources[type] = (team.resources[type] || 0) + amt;
+    },
+    destroyGhost(target) {
+      target.hp = 0;
+      target.ko = true;
+    },
+    ...extras
+  };
+}
+
+function triggerAbility(ghost, hook, selfTeam, opponentTeam, extras = {}) {
+  if (ghost.ko) return;
+  const fn = GHOSTS.find(g => g.id === ghost.id)?.[hook];
+  if (fn) fn(makeCtx(ghost, selfTeam, opponentTeam, extras));
+}
+
+function triggerTeamAbilities(hook, selfTeam, opponentTeam, extras = {}) {
+  // Active fighter
+  triggerAbility(getActive(selfTeam), hook, selfTeam, opponentTeam, extras);
+  // Sideline
+  selfTeam.ghosts.forEach((g, i) => {
+    if (i !== selfTeam.activeIdx && !g.ko) {
+      triggerAbility(g, hook, selfTeam, opponentTeam, extras);
+    }
+  });
+}
+
+function rollNDice(n) {
+  const dice = [];
+  for (let i = 0; i < n; i++) dice.push(Math.floor(Math.random() * 6) + 1);
+  return dice.sort((a,b) => a-b);
+}
+
+function classifyRoll(dice) {
+  if (dice.length === 0) return { type:'none', value:0 };
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d]||0)+1);
+  const maxCount = Math.max(...Object.values(counts));
+  const maxVal = Math.max(...Object.entries(counts).filter(([k,v])=>v===maxCount).map(([k])=>+k));
+  if (maxCount >= 3) return { type:'triples', value:maxVal, damage:3 };
+  if (maxCount >= 2) return { type:'doubles', value:maxVal, damage:2 };
+  return { type:'singles', value:Math.max(...dice), damage:1 };
+}
+
+function rollDice() {
+  if (!state.battle || state.battle.waitingSwap) return;
+
+  const b = state.battle;
+  const redFighter = getActive(b.red);
+  const blueFighter = getActive(b.blue);
+
+  if (redFighter.ko || blueFighter.ko) return;
+
+  // Turn start abilities
+  triggerTeamAbilities('onTurnStart', b.red, b.blue);
+  triggerTeamAbilities('onTurnStart', b.blue, b.red);
+
+  // Check for KOs from turn start (e.g. Basalt erosion, Meltdown)
+  if (checkKOs()) return;
+
+  // Apply burn status effects
+  applyStatusEffects(b.red, b.blue);
+  applyStatusEffects(b.blue, b.red);
+
+  if (checkKOs()) return;
+
+  // Magma burn — holding magma damages active ghost
+  if (b.red.resources.magma > 0) {
+    const mgDmg = b.red.resources.magma > 0 ? 1 : 0;
+    if (mgDmg > 0) {
+      redFighter.hp = Math.max(0, redFighter.hp - mgDmg);
+      if (redFighter.hp <= 0) redFighter.ko = true;
+      addLog(`<span class="log-magma">Magma burns Red's ${redFighter.name} for 1!</span>`);
+    }
+  }
+  if (b.blue.resources.magma > 0) {
+    const mgDmg = b.blue.resources.magma > 0 ? 1 : 0;
+    if (mgDmg > 0) {
+      blueFighter.hp = Math.max(0, blueFighter.hp - mgDmg);
+      if (blueFighter.hp <= 0) blueFighter.ko = true;
+      addLog(`<span class="log-magma">Magma burns Blue's ${blueFighter.name} for 1!</span>`);
+    }
+  }
+
+  if (checkKOs()) return;
+
+  // Roll dice (3 each by default)
+  let redDiceCount = 3, blueDiceCount = 3;
+  const redRoll = rollNDice(redDiceCount);
+  const blueRoll = rollNDice(blueDiceCount);
+  b.lastRedRoll = redRoll;
+  b.lastBlueRoll = blueRoll;
+
+  const redResult = classifyRoll(redRoll);
+  const blueResult = classifyRoll(blueRoll);
+
+  addLog(`Round ${b.round}: Red rolls [${redRoll.join(',')}] (${redResult.type} ${redResult.value}) vs Blue [${blueRoll.join(',')}] (${blueResult.type} ${blueResult.value})`);
+
+  // Determine winner
+  let winner = null, loser = null, winTeam = null, loseTeam = null;
+  const typeRank = { triples:3, doubles:2, singles:1, none:0 };
+
+  if (typeRank[redResult.type] > typeRank[blueResult.type]) {
+    winner = 'red';
+  } else if (typeRank[blueResult.type] > typeRank[redResult.type]) {
+    winner = 'blue';
+  } else {
+    // Same type — compare value
+    if (redResult.value > blueResult.value) winner = 'red';
+    else if (blueResult.value > redResult.value) winner = 'blue';
+    else {
+      // Tie
+      addLog(`<span class="log-ability">TIE!</span> Re-roll next round.`);
+      triggerTeamAbilities('onTie', b.red, b.blue);
+      triggerTeamAbilities('onTie', b.blue, b.red);
+      b.round++;
+      checkKOs();
+      renderBattle();
+      animateDice(redRoll, blueRoll);
+      return;
+    }
+  }
+
+  if (winner === 'red') {
+    winTeam = b.red; loseTeam = b.blue;
+  } else {
+    winTeam = b.blue; loseTeam = b.red;
+  }
+
+  const winFighter = getActive(winTeam);
+  const loseFighter = getActive(loseTeam);
+  const winResult = winner === 'red' ? redResult : blueResult;
+  const loseResult = winner === 'red' ? blueResult : redResult;
+
+  // Calculate damage
+  let dmg = winResult.damage;
+
+  // Magma spend: +2 per magma (or modified by Pyroclast)
+  const magma = winTeam.resources.magma || 0;
+  if (magma > 0) {
+    let magmaBonus = 2; // default: all magma = +2 total
+    // Check for Pyroclast modifyMagmaSpend
+    const pyroclast = winTeam.ghosts.find(g => g.id === 206 && winTeam.ghosts[winTeam.activeIdx].id === 206);
+    if (pyroclast && !pyroclast.ko) {
+      magmaBonus = magma * 2;
+      addLog(`<span class="log-ability">Chain Blast!</span> ${magma} Magma = <span class="log-dmg">+${magmaBonus} damage</span>`);
+    } else {
+      addLog(`<span class="log-magma">Spent ${magma} Magma for +${magmaBonus} damage</span>`);
+    }
+    dmg += magmaBonus;
+    winTeam.resources.magma = 0;
+  }
+
+  // Modify damage via winner abilities
+  const winGhost = GHOSTS.find(g => g.id === winFighter.id);
+  if (winGhost?.modifyDamage) {
+    dmg = winGhost.modifyDamage(makeCtx(winFighter, winTeam, loseTeam), dmg, winResult.type);
+  }
+
+  // Modify incoming via loser abilities
+  const loseGhost = GHOSTS.find(g => g.id === loseFighter.id);
+  if (loseGhost?.modifyIncoming) {
+    dmg = loseGhost.modifyIncoming(makeCtx(loseFighter, loseTeam, winTeam), dmg, winResult.type);
+  }
+
+  // Apply damage
+  dmg = Math.max(0, dmg);
+  if (dmg > 0) {
+    loseFighter.hp = Math.max(0, loseFighter.hp - dmg);
+    if (loseFighter.hp <= 0) loseFighter.ko = true;
+    addLog(`<span class="log-dmg">${winFighter.name} deals ${dmg} damage to ${loseFighter.name}!</span> (${loseFighter.ko ? '<span class="log-ko">KO!</span>' : loseFighter.hp + ' HP left'})`);
+  } else {
+    addLog(`${winFighter.name} wins but deals 0 damage!`);
+  }
+
+  // Trigger win/lose hooks
+  triggerTeamAbilities('onWin', winTeam, loseTeam, { rollType: winResult.type });
+  triggerTeamAbilities('onLose', loseTeam, winTeam, { rollType: loseResult.type });
+
+  b.round++;
+
+  if (!checkKOs()) {
+    renderBattle();
+  }
+
+  animateDice(redRoll, blueRoll);
+}
+
+function applyStatusEffects(team, opponentTeam) {
+  const fighter = getActive(team);
+  if (!fighter.statusEffects) fighter.statusEffects = [];
+  const remaining = [];
+  fighter.statusEffects.forEach(eff => {
+    if (eff.type === 'burn') {
+      fighter.hp = Math.max(0, fighter.hp - eff.damage);
+      if (fighter.hp <= 0) fighter.ko = true;
+      addLog(`<span class="log-dmg">${fighter.name} takes ${eff.damage} burn damage!</span>`);
+    }
+    eff.turns--;
+    if (eff.turns > 0) remaining.push(eff);
+  });
+  fighter.statusEffects = remaining;
+}
+
+function checkKOs() {
+  const b = state.battle;
+  let needSwap = null;
+
+  ['red','blue'].forEach(team => {
+    const t = b[team];
+    const active = getActive(t);
+    if (active.ko) {
+      const alive = t.ghosts.filter(g => !g.ko);
+      if (alive.length === 0) {
+        showGameOver(team === 'red' ? 'blue' : 'red');
+        return;
+      }
+      // Auto-swap to next alive
+      const nextAlive = t.ghosts.findIndex((g,i) => i !== t.activeIdx && !g.ko);
+      if (nextAlive >= 0) {
+        addLog(`<span class="log-ko">${active.name} is KO'd!</span> ${t.ghosts[nextAlive].name} enters battle!`);
+        t.activeIdx = nextAlive;
+        triggerAbility(getActive(t), 'onEntry', t, b[team === 'red' ? 'blue' : 'red']);
+      } else {
+        showGameOver(team === 'red' ? 'blue' : 'red');
+        return;
+      }
+    }
+  });
+
+  // Check for full team wipe
+  if (b.red.ghosts.every(g => g.ko)) { showGameOver('blue'); renderBattle(); return true; }
+  if (b.blue.ghosts.every(g => g.ko)) { showGameOver('red'); renderBattle(); return true; }
+
+  renderBattle();
+  return false;
+}
+
+function showGameOver(winner) {
+  const overlay = document.getElementById('gameOverOverlay');
+  overlay.classList.add('active');
+  const title = document.getElementById('gameOverTitle');
+  title.textContent = `TEAM ${winner.toUpperCase()} WINS!`;
+  title.className = `${winner}-win`;
+  document.getElementById('gameOverSub').textContent = `Victory in ${state.battle.round - 1} rounds`;
+}
+
+// ============================================================
+// SWAP
+// ============================================================
+function openSwap() {
+  if (!state.battle) return;
+  const b = state.battle;
+  // For simplicity, swap is for red team (player-controlled)
+  state.battle.waitingSwap = 'red';
+  renderSwapModal('red');
+}
+
+function renderSwapModal(team) {
+  const t = state.battle[team];
+  const overlay = document.getElementById('swapOverlay');
+  const options = document.getElementById('swapOptions');
+  document.getElementById('swapTitle').textContent = `Swap ${team.toUpperCase()} Active Ghost`;
+
+  options.innerHTML = t.ghosts.filter((g,i) => i !== t.activeIdx).map((g,i) => `
+    <div class="swap-option ${g.ko ? 'ko' : ''}" onclick="doSwap('${team}',${t.ghosts.indexOf(g)})">
+      <div class="so-name">${g.name}</div>
+      <div class="so-hp">&hearts; ${g.hp}/${g.maxHp} ${g.ko ? '(KO)' : ''} &middot; ${g.ability}</div>
+    </div>
+  `).join('');
+
+  overlay.classList.add('active');
+}
+
+function doSwap(team, idx) {
+  const t = state.battle[team];
+  if (t.ghosts[idx].ko) return;
+  const oldName = getActive(t).name;
+  t.activeIdx = idx;
+  const newGhost = getActive(t);
+  addLog(`<span class="log-ability">${oldName} swaps out — ${newGhost.name} enters!</span>`);
+  triggerAbility(newGhost, 'onEntry', t, state.battle[team === 'red' ? 'blue' : 'red']);
+  document.getElementById('swapOverlay').classList.remove('active');
+  state.battle.waitingSwap = null;
+  renderBattle();
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderBattle() {
+  const b = state.battle;
+  if (!b) return;
+
+  ['red','blue'].forEach(team => {
+    const t = b[team];
+    const active = getActive(t);
+    const sideliners = t.ghosts.filter((g,i) => i !== t.activeIdx);
+
+    // Active fighter
+    const el = document.getElementById(`${team}-active`);
+    const hpPct = (active.hp / active.maxHp * 100);
+    const hpColor = hpPct > 60 ? 'var(--hp-green)' : hpPct > 30 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+    el.className = `fighter-card active-fighter ${active.ko ? 'ko' : ''}`;
+    el.innerHTML = `
+      <div class="fighter-name">${active.name}</div>
+      <div class="fighter-ability">${active.ability}</div>
+      <div class="fighter-ability-desc">${active.abilityDesc}</div>
+      <div class="hp-bar-wrap">
+        <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+        <div class="hp-label"><span>${active.hp} / ${active.maxHp} HP</span><span style="color:var(--${active.rarity})">${active.rarity.replace('-',' ')}</span></div>
+      </div>
+    `;
+
+    // Sideline
+    const slEl = document.getElementById(`${team}-sideline`);
+    slEl.innerHTML = sideliners.map(g => `
+      <div class="sideline-card ${g.ko ? 'ko' : ''}" onclick="openSwapFor('${team}')">
+        <div class="sl-name">${g.name}</div>
+        <div class="sl-hp">&hearts; ${g.hp}/${g.maxHp} ${g.ko ? '(KO)' : ''}</div>
+        <div class="sl-ability">${g.ability}</div>
+      </div>
+    `).join('');
+
+    // Resources
+    const resEl = document.getElementById(`${team}-resources`);
+    const r = t.resources;
+    let resHtml = '';
+    if (r.magma > 0) resHtml += `<div class="resource magma">Magma: ${r.magma}</div>`;
+    if (r.ice > 0) resHtml += `<div class="resource ice">Ice Shards: ${r.ice}</div>`;
+    if (r.fire > 0) resHtml += `<div class="resource fire">Sacred Fires: ${r.fire}</div>`;
+    resEl.innerHTML = resHtml;
+  });
+
+  // Round
+  document.getElementById('turnIndicator').textContent = `Round ${b.round}`;
+
+  // Dice
+  renderDiceStatic(b.lastRedRoll, 'red-dice');
+  renderDiceStatic(b.lastBlueRoll, 'blue-dice');
+
+  // Log
+  const logEl = document.getElementById('battleLog');
+  logEl.innerHTML = b.log.map(l => `<div class="log-entry">${l}</div>`).join('');
+}
+
+function renderDiceStatic(dice, containerId) {
+  const el = document.getElementById(containerId);
+  if (!dice || dice.length === 0) {
+    el.innerHTML = [1,2,3].map(() => `<div class="die">?</div>`).join('');
+    return;
+  }
+  el.innerHTML = dice.map(d => `<div class="die">${d}</div>`).join('');
+}
+
+function animateDice(redRoll, blueRoll) {
+  const redDice = document.querySelectorAll('#red-dice .die');
+  const blueDice = document.querySelectorAll('#blue-dice .die');
+  [...redDice, ...blueDice].forEach(d => d.classList.add('rolling'));
+  setTimeout(() => {
+    redDice.forEach((d,i) => { d.classList.remove('rolling'); d.textContent = redRoll[i]; });
+    blueDice.forEach((d,i) => { d.classList.remove('rolling'); d.textContent = blueRoll[i]; });
+  }, 400);
+}
+
+function openSwapFor(team) {
+  if (!state.battle) return;
+  state.battle.waitingSwap = team;
+  renderSwapModal(team);
+}
+
+function resetBattle() {
+  state.battle = null;
+  state.redPicks = [];
+  state.bluePicks = [];
+  document.getElementById('battle-view').classList.remove('active');
+  document.getElementById('team-select').style.display = 'block';
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('swapOverlay').classList.remove('active');
+  renderPicks();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGhostGrid();
+renderPicks();
+</script>
+</body>
+</html>
