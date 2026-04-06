@@ -46,14 +46,22 @@ const ALL_GHOSTS = [
 
 const STARTERS = ['Dream Cat', 'Outlaw', 'Wim'];
 
+// Art slot labels — shown as placeholders on the map until real art is dropped in.
+// Wyatt: swap the `art` fields to image paths when illustrations are ready.
+const NODE_ART = {
+  start:  { art: null, label: 'START',    tagline: 'The trail begins',    icon: '✦' },
+  battle: { art: null, label: 'BATTLE',   tagline: 'A spirit blocks the way', icon: '⚔' },
+  item:   { art: null, label: 'CHEST',    tagline: 'Loot inside',         icon: '◈' },
+  event:  { art: null, label: 'MYSTERY',  tagline: 'Fate calls',          icon: '?' },
+  rest:   { art: null, label: 'CAMPFIRE', tagline: 'Rest & recover',      icon: '△' },
+  boss:   { art: null, label: 'BOSS',     tagline: 'The region tyrant',   icon: '♛' },
+};
+
 // ── ITEMS ──
 const ITEMS = {
   reroll: { name: 'Reroll Charm', icon: '🎲', desc: 'Reroll 1 of your dice', color: '#67e8f9' },
   heal:   { name: 'Spirit Potion', icon: '💚', desc: '+4 HP to active ghost', color: '#34d399' },
   power:  { name: 'Power Shard', icon: '⚡', desc: '+1 die this roll', color: '#fbbf24' },
-  key_cavern: { name: 'Cavern Key', icon: '🗝️', desc: 'Unlocks Hot Hot Cavern', color: '#f97316', keyItem: true, unlocks: 'cavern' },
-  key_palace: { name: 'Palace Key', icon: '🏔️', desc: 'Unlocks Ice Palace', color: '#3b82f6', keyItem: true, unlocks: 'palace' },
-  key_castle: { name: 'Castle Key', icon: '🏰', desc: 'Unlocks Dark Castle', color: '#8b5cf6', keyItem: true, unlocks: 'castle' },
   shield: { name: 'Spirit Shield', icon: '🛡️', desc: 'Block first hit in battle', color: '#a78bfa' },
   lucky_dice: { name: 'Lucky Dice', icon: '🍀', desc: 'Reroll losing rolls once per battle', color: '#22c55e' },
 };
@@ -122,31 +130,55 @@ const EVENTS = [
 const REGIONS = [
   {
     name: 'Frost Valley',
-    theme: { bg: 'linear-gradient(180deg, #001020, #002040, #001020)', accent: '#38bdf8' },
+    tagline: 'Snowbound pines, frozen rivers, restless spirits',
+    theme: {
+      bg: 'linear-gradient(180deg, #001020, #002040, #001020)',
+      accent: '#38bdf8',
+      terrain: 'radial-gradient(ellipse at 50% 20%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(167,139,250,0.08), transparent 60%)',
+      fogColor: 'rgba(103,232,249,0.06)',
+    },
+    keyArt: null, // [art slot: frost-valley-panorama — 600×180]
     boss: 'Pelter',
     bossHp: 7,
-    unlockRequires: null,
   },
   {
     name: 'Hot Hot Cavern',
-    theme: { bg: 'linear-gradient(180deg, #1a0500, #2a0a00, #0a0500)', accent: '#f97316' },
+    tagline: 'Magma veins, sulfur smoke, old stone gods',
+    theme: {
+      bg: 'linear-gradient(180deg, #1a0500, #2a0a00, #0a0500)',
+      accent: '#f97316',
+      terrain: 'radial-gradient(ellipse at 50% 30%, rgba(249,115,22,0.18), transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(220,38,38,0.12), transparent 60%)',
+      fogColor: 'rgba(249,115,22,0.07)',
+    },
+    keyArt: null, // [art slot: hot-hot-cavern-panorama — 600×180]
     boss: 'Stone Cold',
     bossHp: 9,
-    unlockRequires: 'cavern',
   },
   {
     name: 'Ice Palace',
-    theme: { bg: 'linear-gradient(180deg, #000a1a, #001a2a, #000a1a)', accent: '#3b82f6' },
+    tagline: 'Crystal halls, silent thrones, watchful ghosts',
+    theme: {
+      bg: 'linear-gradient(180deg, #000a1a, #001a2a, #000a1a)',
+      accent: '#3b82f6',
+      terrain: 'radial-gradient(ellipse at 50% 20%, rgba(59,130,246,0.22), transparent 60%), radial-gradient(ellipse at 30% 80%, rgba(103,232,249,0.1), transparent 60%)',
+      fogColor: 'rgba(59,130,246,0.08)',
+    },
+    keyArt: null, // [art slot: ice-palace-panorama — 600×180]
     boss: 'King Jay',
     bossHp: 9,
-    unlockRequires: 'palace',
   },
   {
     name: 'Dark Castle',
-    theme: { bg: 'linear-gradient(180deg, #0a0a2a, #1a0a2a, #0a0a1a)', accent: '#8b5cf6' },
+    tagline: 'Black spires, bound spirits, the king who never sleeps',
+    theme: {
+      bg: 'linear-gradient(180deg, #0a0a2a, #1a0a2a, #0a0a1a)',
+      accent: '#8b5cf6',
+      terrain: 'radial-gradient(ellipse at 50% 20%, rgba(139,92,246,0.22), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(236,72,153,0.1), transparent 60%)',
+      fogColor: 'rgba(139,92,246,0.08)',
+    },
+    keyArt: null, // [art slot: dark-castle-panorama — 600×180]
     boss: 'The Mountain King',
     bossHp: 12,
-    unlockRequires: 'castle',
   },
 ];
 

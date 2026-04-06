@@ -4,19 +4,24 @@
 
 let game = null;
 
+// ── Real game rules ──
+// Team in play = 1 active fighter + up to 2 sideline supporters (face-up).
+// Overflow recruits go into reserve (inventory). Deaths are permanent.
+const SIDELINE_MAX = 2;
+
 function newGame() {
   return {
-    collection: [],
+    active: null,        // single fighting ghost
+    sideline: [],        // up to SIDELINE_MAX face-up supporters
+    reserve: [],         // overflow inventory (unlimited)
     items: [],
     iceShards: 0,
     sacredFires: 0,
-    unlockedAreas: [],
     currentRegion: 0,
     currentNode: 'r0_n0',
     regionMaps: [],
     deadGhosts: [],
     bossesBeaten: 0,
-    selectedGhostIndex: 0,
     selectedRewardGhost: -1,
     pendingRewardGhosts: [],
   };
@@ -27,7 +32,98 @@ function saveGame() {
 }
 
 function loadGame() {
-  try { return JSON.parse(localStorage.getItem('boo_boardgame_save')); } catch { return null; }
+  try {
+    const raw = JSON.parse(localStorage.getItem('boo_boardgame_save'));
+    return migrateSave(raw);
+  } catch { return null; }
+}
+
+// Migrate v0.3 flat-collection saves into v0.4 active/sideline/reserve model
+function migrateSave(s) {
+  if (!s) return s;
+  if (s.collection && !s.active && !s.sideline) {
+    s.active = s.collection[0] || null;
+    s.sideline = s.collection.slice(1, 1 + SIDELINE_MAX);
+    s.reserve = s.collection.slice(1 + SIDELINE_MAX);
+    delete s.collection;
+    delete s.selectedGhostIndex;
+  }
+  s.sideline = s.sideline || [];
+  s.reserve = s.reserve || [];
+  return s;
+}
+
+// ── Team helpers ──
+
+// All ghosts currently in play (active + sideline). Order: active first.
+function teamInPlay() {
+  return game.active ? [game.active, ...game.sideline] : [...game.sideline];
+}
+
+// Add a recruited ghost to the first available slot.
+// Returns 'active' | 'sideline' | 'reserve'
+function recruitGhost(ghost) {
+  const g = { ...ghost, hp: ghost.maxHp };
+  if (!game.active) { game.active = g; return 'active'; }
+  if (game.sideline.length < SIDELINE_MAX) { game.sideline.push(g); return 'sideline'; }
+  game.reserve.push(g);
+  return 'reserve';
+}
+
+// Swap the active ghost with a sideline ghost at given index
+function promoteSideline(sidelineIdx) {
+  if (sidelineIdx < 0 || sidelineIdx >= game.sideline.length) return;
+  const prev = game.active;
+  game.active = game.sideline[sidelineIdx];
+  game.sideline[sidelineIdx] = prev;
+  saveGame();
+}
+
+// Move a reserve ghost into the team. If sideline has room, push to sideline.
+// Otherwise swap into the given sideline index (replaced ghost goes back to reserve).
+function pullFromReserve(reserveIdx, targetSidelineIdx) {
+  if (reserveIdx < 0 || reserveIdx >= game.reserve.length) return;
+  const incoming = game.reserve.splice(reserveIdx, 1)[0];
+  if (!game.active) { game.active = incoming; saveGame(); return; }
+  if (game.sideline.length < SIDELINE_MAX) {
+    game.sideline.push(incoming);
+  } else {
+    const idx = (targetSidelineIdx != null) ? targetSidelineIdx : 0;
+    const displaced = game.sideline[idx];
+    game.sideline[idx] = incoming;
+    game.reserve.push(displaced);
+  }
+  saveGame();
+}
+
+// When the active ghost dies: promote the first sideline, or pull from reserve.
+// Returns true if the team still has fighters, false if wiped.
+function handleActiveDeath() {
+  if (game.active) {
+    game.deadGhosts.push(game.active.name);
+    game.active = null;
+  }
+  if (game.sideline.length > 0) {
+    game.active = game.sideline.shift();
+    // Back-fill sideline from reserve if any
+    if (game.reserve.length > 0 && game.sideline.length < SIDELINE_MAX) {
+      game.sideline.push(game.reserve.shift());
+    }
+    return true;
+  }
+  if (game.reserve.length > 0) {
+    game.active = game.reserve.shift();
+    return true;
+  }
+  return false;
+}
+
+// Is this ghost already on our team (active/sideline/reserve)?
+function ownsGhost(name) {
+  if (game.active && game.active.name === name) return true;
+  if (game.sideline.find(g => g.name === name)) return true;
+  if (game.reserve.find(g => g.name === name)) return true;
+  return false;
 }
 
 // ── SCREEN MANAGEMENT ──
@@ -86,7 +182,7 @@ function renderStarterPick() {
   window._confirmStarter = () => {
     if (selected < 0) return;
     const ghost = ALL_GHOSTS.find(g => g.name === STARTERS[selected]);
-    game.collection.push({ ...ghost, hp: ghost.maxHp });
+    recruitGhost(ghost);
     saveGame();
     showMap();
   };
@@ -121,7 +217,7 @@ function showEvent(event) {
 }
 
 function resolveEvent(effect) {
-  const activeGhost = game.collection[0];
+  const activeGhost = game.active;
   let msg = '';
 
   switch (effect) {
@@ -167,16 +263,19 @@ function resolveEvent(effect) {
         msg = `Trapped! Lost 3 HP!`;
       }
       break;
-    case 'recruit_random':
-      const pool = ALL_GHOSTS.filter(g => !game.collection.find(c => c.name === g.name));
+    case 'recruit_random': {
+      const pool = ALL_GHOSTS.filter(g => !ownsGhost(g.name));
       if (pool.length > 0) {
         const ghost = pool[Math.floor(Math.random() * pool.length)];
-        game.collection.push({ ...ghost, hp: ghost.maxHp });
-        msg = `${ghost.name} joined your team!`;
+        const slot = recruitGhost(ghost);
+        if (slot === 'active') msg = `${ghost.name} joins as your fighter!`;
+        else if (slot === 'sideline') msg = `${ghost.name} takes a sideline spot!`;
+        else msg = `${ghost.name} joins your reserve.`;
       } else {
         msg = 'No spirits available...';
       }
       break;
+    }
     case 'gamble_roll':
       const roll = Math.floor(Math.random() * 6) + 1;
       if (roll >= 4) {
@@ -208,13 +307,6 @@ function resolveEvent(effect) {
 
 function gainItem(itemId) {
   game.items.push(itemId);
-  // Auto-unlock areas
-  const item = ITEMS[itemId];
-  if (item && item.keyItem && item.unlocks) {
-    if (!game.unlockedAreas.includes(item.unlocks)) {
-      game.unlockedAreas.push(item.unlocks);
-    }
-  }
   saveGame();
 }
 
@@ -232,11 +324,15 @@ function showGameOver() {
 
 function showVictory() {
   showScreen('winScreen');
+  const survivors = [];
+  if (game.active) survivors.push(game.active.name);
+  game.sideline.forEach(g => survivors.push(g.name));
+  game.reserve.forEach(g => survivors.push(g.name));
   document.getElementById('winStats').innerHTML = `
     <div class="win-crown">👑</div>
     <div>You defeated The Mountain King!</div>
     <div>Bosses beaten: ${game.bossesBeaten}</div>
-    <div>Team: ${game.collection.map(g => g.name).join(', ')}</div>
+    <div>Survivors: ${survivors.join(', ') || '—'}</div>
     <div>Fallen heroes: ${game.deadGhosts.join(', ') || 'None'}</div>
   `;
   localStorage.removeItem('boo_boardgame_save');

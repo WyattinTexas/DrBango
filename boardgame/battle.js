@@ -1124,10 +1124,10 @@ function enemyDefeated() {
 // ══════════════════════════════════════════════
 
 const BOSS_RELICS = [
-  { icon: '🗝️', name: 'Cavern Key',  sub: 'The path to Hot Hot Cavern is open', color: '#f97316' },
-  { icon: '🏔️', name: 'Palace Key',  sub: 'The gates of Ice Palace await',      color: '#3b82f6' },
-  { icon: '🏰', name: 'Castle Key',  sub: 'The Dark Castle beckons',             color: '#8b5cf6' },
-  { icon: '👑', name: 'Champion',     sub: 'The Mountain King has fallen',        color: '#fbbf24' },
+  { icon: '❄️', name: 'Frost Valley Conquered',  sub: 'The caverns tremble at your approach', color: '#38bdf8' },
+  { icon: '🔥', name: 'Hot Hot Cavern Conquered', sub: 'The ice palace gates shatter open',   color: '#f97316' },
+  { icon: '💎', name: 'Ice Palace Conquered',     sub: 'The Dark Castle awaits',               color: '#3b82f6' },
+  { icon: '👑', name: 'Champion',                  sub: 'The Mountain King has fallen',         color: '#fbbf24' },
 ];
 
 function showBossCeremony(regionIdx, isFinal, callback) {
@@ -1241,12 +1241,10 @@ function showRewards(wasBoss) {
   let html = '';
 
   if (wasBoss) {
-    const regionIdx = game.currentRegion;
-    if (regionIdx === 0) { gainItem('key_cavern'); html += rewardItemHtml('key_cavern', true); }
-    else if (regionIdx === 1) { gainItem('key_palace'); html += rewardItemHtml('key_palace', true); }
-    else if (regionIdx === 2) { gainItem('key_castle'); html += rewardItemHtml('key_castle', true); }
     gainItem('power');
     html += rewardItemHtml('power');
+    gainItem('shield');
+    html += rewardItemHtml('shield');
   } else {
     const drop = ['reroll', 'heal', 'power'][Math.floor(Math.random() * 3)];
     gainItem(drop);
@@ -1280,12 +1278,9 @@ function showRewards(wasBoss) {
   }
 }
 
-function rewardItemHtml(id, isKey) {
+function rewardItemHtml(id) {
   const item = ITEMS[id];
-  const cls = isKey ? 'reward-item reward-key-item' : 'reward-item';
-  return `<div class="${cls}" ${isKey ? `style="--key-color:${item.color}"` : ''}>
-    <span class="ri-icon">${item.icon}</span><span class="ri-name">${item.name}</span><span class="ri-desc">${item.desc}</span>
-  </div>`;
+  return `<div class="reward-item"><span class="ri-icon">${item.icon}</span><span class="ri-name">${item.name}</span><span class="ri-desc">${item.desc}</span></div>`;
 }
 
 function selectRewardGhost(index) {
@@ -1387,7 +1382,7 @@ function uncommitFire() {
 
 function renderBattleItems() {
   const el = document.getElementById('battleItems');
-  const usable = game.items.filter(id => !ITEMS[id]?.keyItem && !battleItemsUsed.includes(id));
+  const usable = game.items.filter(id => !battleItemsUsed.includes(id));
   el.innerHTML = usable.map(id => `<button class="battle-item-btn" onclick="useBattleItem('${id}')">${ITEMS[id].icon} ${ITEMS[id].name}</button>`).join('');
 }
 
