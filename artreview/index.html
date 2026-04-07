@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Art Critics Panel — BOO! Spirit Battles</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #16213e;
+  --surface3: #0f3460;
+  --border: #2a2a4a;
+  --text: #e8e8e8;
+  --text2: #8888aa;
+  --accent: #e94560;
+  --accent2: #ff6b6b;
+  --magma: #ff6348;
+  --magma-glow: rgba(255,99,72,0.25);
+  --moonstone: #7ee8fa;
+  --moonstone-glow: rgba(126,232,250,0.35);
+  --use: #2ecc71;
+  --rework: #f39c12;
+  --scrap: #e74c3c;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+.app { max-width:1400px; margin:0 auto; padding:20px; }
+
+header { text-align:center; padding:20px 0 24px; border-bottom:2px solid var(--border); margin-bottom:32px; }
+header h1 { font-size:28px; font-weight:800; background:linear-gradient(135deg, var(--magma), var(--moonstone)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.5px; }
+header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
+
+/* ── CRITICS PANEL ── */
+.critics-panel { margin-bottom:40px; }
+.critics-panel h2 { font-size:18px; color:var(--moonstone); margin-bottom:16px; text-transform:uppercase; letter-spacing:2px; font-weight:600; }
+.critics-grid {
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:16px;
+}
+@media (max-width:900px) { .critics-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width:500px) { .critics-grid { grid-template-columns: 1fr; } }
+
+.critic-card {
+  background: var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px 16px 16px;
+  text-align:center;
+  position:relative;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.critic-card:hover { transform:translateY(-3px); border-color:var(--moonstone); }
+.critic-card svg { display:block; margin:0 auto 12px; }
+.critic-card .name { font-size:16px; font-weight:700; color:var(--text); }
+.critic-card .title { font-size:12px; color:var(--moonstone); font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:2px 0 6px; }
+.critic-card .bio { font-size:12px; color:var(--text2); line-height:1.4; margin-bottom:8px; }
+.critic-card .style-tag {
+  display:inline-block;
+  font-size:10px;
+  color:var(--text);
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:3px 10px;
+  cursor:help;
+}
+
+/* ── REVIEW GRID ── */
+.reviews-section { margin-bottom:40px; }
+.reviews-section h2 { font-size:18px; color:var(--magma); margin-bottom:16px; text-transform:uppercase; letter-spacing:2px; font-weight:600; }
+.reviews-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap:20px;
+}
+
+.review-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+  transition: border-color 0.2s;
+}
+.review-card:hover { border-color:var(--text2); }
+.review-card .art-placeholder {
+  height:140px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  font-weight:600;
+  color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,0.5);
+  position:relative;
+}
+.review-card .art-placeholder .batch-label {
+  position:absolute;
+  top:8px;
+  left:10px;
+  font-size:10px;
+  background:rgba(0,0,0,0.5);
+  padding:2px 8px;
+  border-radius:10px;
+  color:#fff;
+  font-weight:400;
+}
+.review-body { padding:14px 16px 16px; }
+.review-body .card-name { font-size:17px; font-weight:700; margin-bottom:10px; }
+
+.scores-row {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.score-pip {
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  font-weight:700;
+  color:#fff;
+  position:relative;
+  cursor:pointer;
+  transition: transform 0.15s;
+}
+.score-pip:hover { transform:scale(1.25); z-index:2; }
+.score-pip .pip-tooltip {
+  display:none;
+  position:absolute;
+  bottom:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  background:#111;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 10px;
+  width:220px;
+  font-size:11px;
+  font-weight:400;
+  color:var(--text);
+  text-align:left;
+  line-height:1.4;
+  z-index:100;
+  pointer-events:none;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+}
+.score-pip .pip-tooltip .critic-name { font-weight:700; color:var(--moonstone); margin-bottom:3px; }
+.score-pip:hover .pip-tooltip { display:block; }
+
+.consensus-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--border);
+}
+.consensus-score {
+  font-size:22px;
+  font-weight:800;
+}
+.verdict-badge {
+  font-size:11px;
+  font-weight:700;
+  padding:4px 14px;
+  border-radius:20px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+.verdict-use { background:var(--use); color:#000; }
+.verdict-rework { background:var(--rework); color:#000; }
+.verdict-scrap { background:var(--scrap); color:#fff; }
+
+/* score colors */
+.pip-1, .pip-2 { background:var(--scrap); }
+.pip-3, .pip-4 { background:#e67e22; }
+.pip-5, .pip-6 { background:var(--rework); }
+.pip-7 { background:#7dbd3b; }
+.pip-8 { background:var(--use); }
+.pip-9, .pip-10 { background:#16a085; }
+
+/* ── PROMPTS SECTION ── */
+.prompts-section { margin-bottom:40px; }
+.prompts-section h2 { font-size:18px; color:var(--rework); margin-bottom:6px; text-transform:uppercase; letter-spacing:2px; font-weight:600; }
+.prompts-section .section-sub { color:var(--text2); font-size:13px; margin-bottom:20px; }
+.prompt-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:16px;
+}
+.prompt-card .prompt-header {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:14px;
+}
+.prompt-card .prompt-header .card-name { font-size:16px; font-weight:700; }
+.prompt-card .prompt-header .rework-tag {
+  font-size:10px;
+  font-weight:700;
+  background:var(--rework);
+  color:#000;
+  padding:2px 10px;
+  border-radius:10px;
+  text-transform:uppercase;
+}
+.prompt-block {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  margin-bottom:10px;
+  font-family:'SF Mono', 'Fira Code', monospace;
+  font-size:12px;
+  line-height:1.6;
+  color:var(--text2);
+  position:relative;
+}
+.prompt-block.improved { border-color:var(--use); color:var(--text); }
+.prompt-block .label {
+  position:absolute;
+  top:-8px;
+  left:12px;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  padding:0 6px;
+  background:var(--bg);
+}
+.prompt-block .label.old { color:var(--scrap); }
+.prompt-block .label.new { color:var(--use); }
+.critic-notes {
+  font-size:12px;
+  color:var(--text2);
+  margin-top:6px;
+  padding-left:12px;
+  border-left:2px solid var(--rework);
+  line-height:1.5;
+}
+.critic-notes strong { color:var(--moonstone); }
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <h1>Art Critics Panel</h1>
+  <div class="sub">BOO! Spirit Battles -- Volcanic Activity Card Art Review</div>
+</header>
+
+<!-- ════════ CRITICS ════════ -->
+<section class="critics-panel">
+  <h2>The Panel</h2>
+  <div class="critics-grid">
+
+    <!-- TYLER -->
+    <div class="critic-card">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#ffe0bd" stroke="#c9956b" stroke-width="2"/>
+        <!-- messy brown hair -->
+        <ellipse cx="40" cy="22" rx="30" ry="16" fill="#6b3e26"/>
+        <ellipse cx="22" cy="26" rx="8" ry="6" fill="#6b3e26" transform="rotate(-15 22 26)"/>
+        <ellipse cx="58" cy="24" rx="9" ry="5" fill="#6b3e26" transform="rotate(20 58 24)"/>
+        <ellipse cx="48" cy="16" rx="7" ry="5" fill="#7a4a2e" transform="rotate(10 48 16)"/>
+        <ellipse cx="32" cy="14" rx="6" ry="4" fill="#7a4a2e" transform="rotate(-10 32 14)"/>
+        <!-- eyes -->
+        <circle cx="30" cy="38" r="4" fill="#fff"/>
+        <circle cx="50" cy="38" r="4" fill="#fff"/>
+        <circle cx="31" cy="38" r="2.5" fill="#3e2723"/>
+        <circle cx="51" cy="38" r="2.5" fill="#3e2723"/>
+        <!-- freckles -->
+        <circle cx="24" cy="46" r="1.2" fill="#c9956b"/>
+        <circle cx="28" cy="48" r="1" fill="#c9956b"/>
+        <circle cx="22" cy="49" r="1.1" fill="#c9956b"/>
+        <circle cx="52" cy="46" r="1.2" fill="#c9956b"/>
+        <circle cx="56" cy="48" r="1" fill="#c9956b"/>
+        <circle cx="58" cy="46" r="1.1" fill="#c9956b"/>
+        <!-- big smile -->
+        <path d="M28 54 Q40 66 52 54" stroke="#a0522d" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Tyler</div>
+      <div class="title">Age 10, Target Demo</div>
+      <div class="bio">Would rather open packs than eat dinner. Judges art by whether he'd trade for it on the bus.</div>
+      <span class="style-tag" title="Rates on gut-feeling coolness and whether he'd want the card">Coolness Factor</span>
+    </div>
+
+    <!-- MARCIA -->
+    <div class="critic-card">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#f5d5c8" stroke="#b07d6a" stroke-width="2"/>
+        <!-- dark hair bun -->
+        <ellipse cx="40" cy="20" rx="26" ry="14" fill="#1a1a1a"/>
+        <circle cx="40" cy="10" r="12" fill="#1a1a1a"/>
+        <!-- sharp brows -->
+        <line x1="22" y1="33" x2="33" y2="31" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="47" y1="31" x2="58" y2="33" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+        <!-- eyes -->
+        <ellipse cx="30" cy="38" rx="3.5" ry="3" fill="#fff"/>
+        <ellipse cx="50" cy="38" rx="3.5" ry="3" fill="#fff"/>
+        <circle cx="30" cy="38" r="2" fill="#2c1810"/>
+        <circle cx="50" cy="38" r="2" fill="#2c1810"/>
+        <!-- earrings -->
+        <circle cx="14" cy="44" r="3" fill="#e94560" opacity="0.9"/>
+        <circle cx="66" cy="44" r="3" fill="#e94560" opacity="0.9"/>
+        <!-- serious mouth -->
+        <line x1="33" y1="54" x2="47" y2="54" stroke="#8b5e4b" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Marcia</div>
+      <div class="title">TCG Art Director</div>
+      <div class="bio">15 years directing card art for three major TCGs. Has rejected thousands of finals. Nothing impresses her.</div>
+      <span class="style-tag" title="Judges composition, silhouette clarity, and print-readiness at card size">Technical Precision</span>
+    </div>
+
+    <!-- DAN -->
+    <div class="critic-card">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#fce4c5" stroke="#c9a87c" stroke-width="2"/>
+        <!-- balding hair -->
+        <path d="M14 34 Q14 16 28 14 Q32 20 40 20 Q48 20 52 14 Q66 16 66 34" fill="#a0734e" stroke="none"/>
+        <!-- glasses -->
+        <rect x="20" y="33" width="16" height="12" rx="4" fill="none" stroke="#555" stroke-width="2"/>
+        <rect x="44" y="33" width="16" height="12" rx="4" fill="none" stroke="#555" stroke-width="2"/>
+        <line x1="36" y1="39" x2="44" y2="39" stroke="#555" stroke-width="2"/>
+        <!-- eyes behind glasses -->
+        <circle cx="28" cy="39" r="2.5" fill="#fff"/>
+        <circle cx="52" cy="39" r="2.5" fill="#fff"/>
+        <circle cx="28.5" cy="39" r="1.5" fill="#5b7553"/>
+        <circle cx="52.5" cy="39" r="1.5" fill="#5b7553"/>
+        <!-- slight smile -->
+        <path d="M32 54 Q40 60 48 54" stroke="#a0734e" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Dan</div>
+      <div class="title">Parent Buyer</div>
+      <div class="bio">Buys games for his 3 kids. Needs art that isn't nightmare fuel. Checks content before the cart.</div>
+      <span class="style-tag" title="Rates family-friendliness, age-appropriateness, and gift-ability">Parent Gut Check</span>
+    </div>
+
+    <!-- SOO-YUN -->
+    <div class="critic-card">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#f8ead0" stroke="#c9b896" stroke-width="2"/>
+        <!-- white/silver hair swept -->
+        <ellipse cx="40" cy="20" rx="28" ry="15" fill="#d4d4d8"/>
+        <ellipse cx="20" cy="28" rx="10" ry="8" fill="#e0e0e4" transform="rotate(-10 20 28)"/>
+        <ellipse cx="60" cy="28" rx="10" ry="8" fill="#e0e0e4" transform="rotate(10 60 28)"/>
+        <!-- small glasses -->
+        <ellipse cx="30" cy="39" rx="7" ry="5.5" fill="none" stroke="#999" stroke-width="1.5"/>
+        <ellipse cx="50" cy="39" rx="7" ry="5.5" fill="none" stroke="#999" stroke-width="1.5"/>
+        <line x1="37" y1="39" x2="43" y2="39" stroke="#999" stroke-width="1.5"/>
+        <!-- gentle eyes -->
+        <circle cx="30" cy="39" r="2" fill="#3e2723"/>
+        <circle cx="50" cy="39" r="2" fill="#3e2723"/>
+        <!-- gentle expression -->
+        <path d="M33 53 Q40 58 47 53" stroke="#a08060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Soo-Yun</div>
+      <div class="title">Watercolor Artist</div>
+      <div class="bio">30 years in traditional watercolor. Can spot a digital fake from across the room. Loves visible paper grain.</div>
+      <span class="style-tag" title="Judges watercolor authenticity, paper texture, and pigment behavior">Medium Authenticity</span>
+    </div>
+
+    <!-- RAY -->
+    <div class="critic-card">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#e8c9a0" stroke="#b08860" stroke-width="2"/>
+        <!-- baseball cap -->
+        <path d="M12 30 Q12 12 40 12 Q68 12 68 30 L12 30 Z" fill="#2a4a7f"/>
+        <rect x="8" y="28" width="48" height="5" rx="2" fill="#1e3a6a"/>
+        <!-- square jaw outline -->
+        <path d="M18 42 L18 56 Q18 66 40 66 Q62 66 62 56 L62 42" fill="none" stroke="#b08860" stroke-width="0" />
+        <!-- gray beard -->
+        <path d="M20 50 Q20 66 40 68 Q60 66 60 50 Q50 48 40 50 Q30 48 20 50 Z" fill="#888" opacity="0.7"/>
+        <!-- eyes -->
+        <circle cx="30" cy="38" r="3" fill="#fff"/>
+        <circle cx="50" cy="38" r="3" fill="#fff"/>
+        <circle cx="30.5" cy="38" r="2" fill="#4a3520"/>
+        <circle cx="50.5" cy="38" r="2" fill="#4a3520"/>
+        <!-- confident grin -->
+        <path d="M30 54 Q40 62 50 54" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Ray</div>
+      <div class="title">Game Store Owner</div>
+      <div class="bio">Runs a 2,000 sq ft FLGS. Knows what moves off shelves and what collects dust. Thinks like a retailer.</div>
+      <span class="style-tag" title="Rates shelf appeal, collectibility, and whether customers would impulse-buy">Shelf Appeal</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════ REVIEWS ════════ -->
+<section class="reviews-section">
+  <h2>Batch Reviews</h2>
+  <div class="reviews-grid" id="reviewsGrid"></div>
+</section>
+
+<!-- ════════ PROMPTS ════════ -->
+<section class="prompts-section">
+  <h2>Next Generation Prompts</h2>
+  <div class="section-sub">Improved prompts for REWORK cards, incorporating critic feedback</div>
+  <div id="promptsContainer"></div>
+</section>
+
+</div><!-- .app -->
+
+<script>
+const CRITICS = [
+  { id:'tyler', name:'Tyler', color:'#3498db' },
+  { id:'marcia', name:'Marcia', color:'#e94560' },
+  { id:'dan', name:'Dan', color:'#2ecc71' },
+  { id:'sooyun', name:'Soo-Yun', color:'#9b59b6' },
+  { id:'ray', name:'Ray', color:'#f39c12' },
+];
+
+const CARDS = [
+  {
+    name: 'Magma Drake',
+    bgColor: 'linear-gradient(135deg, #b71c1c, #ff6f00)',
+    scores: [7, 5, 4, 3, 7],
+    quotes: [
+      "Looks like a dragon boss in a video game. I'd want this card BAD.",
+      "Strong silhouette, but the rendering is pure digital. At card size the darks will crush to black. Needs 40% more value range.",
+      "A little intense for younger kids. The dark palette makes it feel more teen-rated than the rest of the set.",
+      "This is digital painting cosplaying as watercolor. No paper tooth, no pigment bloom, no happy accidents. Technically skilled, artistically dishonest.",
+      "Dragons sell. Period. But the dark art won't pop in a sleeve or under store lighting. Needs to be brighter to move units."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'A magma drake creature, watercolor style, volcanic theme, dramatic lighting, fiery breath, molten scales',
+    improvedPrompt: 'A magma drake creature painted in light watercolor on visible cream-white paper. Warm orange and gold palette (avoid deep blacks). Clear creature silhouette with clean edges against a pale background. Soft pigment blooms around fire effects. Friendly but powerful expression. Style reference: classic children\'s book illustration with watercolor paper grain visible throughout.',
+    criticNotes: 'Soo-Yun: "Show the paper." Marcia: "Boost value range 40%." Dan: "Soften the intensity." Ray: "Brighter = better shelf pop."'
+  },
+  {
+    name: 'Ember Serpent',
+    bgColor: 'linear-gradient(135deg, #4a0000, #8b0000)',
+    scores: [4, 3, 2, 2, 3],
+    quotes: [
+      "I can barely see it. It's like... a dark blob? Pass.",
+      "No readable silhouette whatsoever. This would be a black rectangle at card size. Fundamentally broken composition.",
+      "I genuinely cannot tell what this is. My kids would skip right past it. Hard no.",
+      "The artist forgot the first rule of watercolor: light comes from the paper. This has no luminosity. It's gouache at best, mud at worst.",
+      "Dead on arrival for retail. Customers need to see the art from 3 feet away. This is invisible."
+    ],
+    verdict: 'scrap',
+    originalPrompt: 'An ember serpent slithering through volcanic darkness, glowing ember scales, watercolor style, mysterious atmosphere',
+    improvedPrompt: null,
+    criticNotes: 'Unanimous: start over completely. The "volcanic darkness" prompt direction produces unreadable results every time.'
+  },
+  {
+    name: 'Caldera Beast',
+    bgColor: 'linear-gradient(135deg, #5d1a00, #cc5200)',
+    scores: [5, 4, 5, 3, 5],
+    quotes: [
+      "It's okay I guess? Number 4 in the batch looks kinda cool though, like a lava bear.",
+      "Batch #4 has usable bones. The creature reads at small scale and has decent weight. The other three are reject-bin.",
+      "The lava bear version (#4) feels appropriate. Strong but not scary. I could see this on a card my kid would like.",
+      "Still too digital overall, but #4 shows some restraint with the values. If the artist let more white paper breathe through, it could work.",
+      "The bear-like one has merchandising potential. Kids like chunky creatures. Refine #4 and kill the rest."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'A caldera beast emerging from a volcanic crater, massive rocky creature, watercolor style, earth tones, molten cracks',
+    improvedPrompt: 'A friendly caldera beast (bear-like, chunky build) standing on volcanic rock. Light watercolor on white paper, visible paper texture. Warm earth tones -- burnt sienna, raw umber, touches of molten orange in cracks. Creature fills 60% of frame with clear silhouette. Gentle eyes, strong stance. Background is minimal -- pale warm wash suggesting heat haze. NO deep blacks, NO dark backgrounds.',
+    criticNotes: 'Build on batch #4 direction (lava bear). Soo-Yun: "Let white paper breathe." Ray: "Chunky = merchandisable." Marcia: "Creature must fill the frame."'
+  },
+  {
+    name: 'Cinder Imp',
+    bgColor: 'linear-gradient(135deg, #ff8a00, #ffcc02)',
+    scores: [9, 7, 9, 6, 8],
+    quotes: [
+      "OH. MY. GOSH. Number 2 is the cutest thing ever. I want a plushie of #4 immediately. These are SO GOOD.",
+      "Surprisingly effective. #2 and #4 nail the brief -- clear silhouette, reads at thumbnail, good color separation. Printable.",
+      "THIS is what the whole set should feel like. Cute, bright, fun. My daughter would collect these. Both #2 and #4 are winners.",
+      "Finally, some actual watercolor sensibility. The light washes in #2 let the paper sing. #4 has nice wet-on-wet blooms. Not perfect, but honest.",
+      "These would sell. Cute creatures with bright colors fly off shelves. The imp design has plushie/merch crossover too. Green light."
+    ],
+    verdict: 'use',
+    originalPrompt: 'A small cinder imp, playful fire creature, watercolor style, bright warm colors, cute and mischievous',
+    improvedPrompt: null,
+    criticNotes: null
+  },
+  {
+    name: 'Volcanic Stag',
+    bgColor: 'linear-gradient(135deg, #a83200, #e65100)',
+    scores: [6, 5, 6, 4, 6],
+    quotes: [
+      "The concept is really cool -- a deer made of lava? Sick. But it got kinda blobby in some versions.",
+      "Good concept, poor execution. The form dissolves into abstract magma in 3 of 4 variants. One has a readable antler silhouette -- build from that.",
+      "I like the idea of a majestic stag. It's nature-y and not scary. But the abstract versions would confuse kids.",
+      "The artist is fighting the medium. Watercolor wants to flow and they keep forcing hard edges. Let the antlers bleed naturally.",
+      "Stag/deer designs do well in the nature-creature space. Concept is strong. Execution needs another pass for clarity."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'A volcanic stag with magma antlers, majestic fire deer, watercolor style, dramatic pose, volcanic landscape background',
+    improvedPrompt: 'A majestic volcanic stag standing in profile, clear antler silhouette against a pale sky wash. Light watercolor technique -- let pigment bleed naturally in the antlers (wet-on-wet for organic fire effect). Body is warm brown and sienna with subtle molten-orange cracks. White paper visible in highlights. Background: minimal pale warm wash, NO volcanic landscape (too busy). Gentle, noble expression. Clean readable form at thumbnail size.',
+    criticNotes: 'Marcia: "Profile view for max silhouette." Soo-Yun: "Wet-on-wet in the antlers, stop forcing edges." Dan: "Keep it majestic, not abstract." Ray: "Strong concept, just needs clarity."'
+  },
+  {
+    name: 'Magma Twins',
+    bgColor: 'linear-gradient(135deg, #ff6348, #ffa502)',
+    scores: [10, 8, 10, 8, 9],
+    quotes: [
+      "BEST. CARDS. EVER. They're like little fire buddies!! I want to put them on my binder cover!!",
+      "Excellent work. Dual-character composition is tricky and they nailed it. Good color harmony, clear shapes, printable values. Ship it.",
+      "Adorable. Wholesome. I'd buy this set just for these two. This is the exact energy the game needs.",
+      "Beautiful watercolor. Real pigment behavior -- the washes interact naturally, the paper glows through. This artist understood the assignment.",
+      "These would be the chase cards of the set. Dual-character designs create emotional attachment. Guaranteed seller. Box art potential."
+    ],
+    verdict: 'use',
+    originalPrompt: 'Twin magma creatures, cute paired fire spirits, watercolor style, warm playful colors, kid-friendly, light background',
+    improvedPrompt: null,
+    criticNotes: null
+  },
+  {
+    name: 'Inferno Raptor',
+    bgColor: 'linear-gradient(135deg, #d32f2f, #ff7043)',
+    scores: [7, 5, 5, 4, 6],
+    quotes: [
+      "Some are cool and some are weird. The one that looks like a fire hawk is awesome though.",
+      "Mixed bag. One variant has a strong raptor silhouette. The others lose the bird form entirely -- too much fire, not enough creature.",
+      "Birds of prey can go either way. The cleaner versions are fine. The chaotic fire ones are a bit much for the age range.",
+      "Overworked. The artist kept adding fire effects until the watercolor turned to mud. The simplest version is the strongest by far.",
+      "Raptors/hawks have appeal but these need consistency. Pick the cleanest one and refine. The busy ones won't read on a shelf."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'An inferno raptor, fierce fire bird of prey, watercolor style, wings spread, flames trailing, dynamic action pose',
+    improvedPrompt: 'A fire raptor (hawk-like) in a clean soaring pose, wings spread symmetrically. Simple watercolor on white paper -- the bird is the ONLY subject, no background clutter. Warm reds and oranges with clean edges defining the wing shape. Minimal flame effects (just feather tips glowing). Strong bird silhouette that reads instantly. Light washes, visible paper grain. NOT an action pose -- a clean, iconic, centered composition.',
+    criticNotes: 'Soo-Yun: "Simplest = strongest. Stop overworking." Marcia: "Bird first, fire second." Ray: "Iconic > chaotic." Dan: "Tone down the intensity."'
+  },
+  {
+    name: 'Smoke Lurker',
+    bgColor: 'linear-gradient(135deg, #37474f, #78909c)',
+    scores: [5, 4, 3, 5, 4],
+    quotes: [
+      "It's kinda spooky? I can't really tell what it is. Like a ghost in smoke? That's kinda cool actually but also confusing.",
+      "Atmospheric concept but fatally flawed for a card game. The creature needs to be immediately identifiable. These are smoke with eyes.",
+      "Too ambiguous. Is it friendly? Scary? My kids wouldn't know how to feel about it. Needs a clearer emotional read.",
+      "Interesting use of wet-on-wet for the smoke effects -- that part is genuinely good watercolor work. But the creature is lost in its own atmosphere.",
+      "Atmosphere doesn't sell cards. Characters sell cards. I need to see a face, a personality, something to connect with. These are moody wallpapers."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'A smoke lurker creature, shadowy smoke entity, watercolor style, mysterious, ethereal, volcanic smoke and ash',
+    improvedPrompt: 'A smoke lurker creature with a clear visible face and expressive eyes, emerging from a light smoke wash. The creature has a defined body shape (cat-like or fox-like) made of translucent gray-blue smoke. Light watercolor on white paper -- the smoke is PALE (not dark), using the white of the paper as the light source. Friendly but mysterious expression, visible smile or curious look. Simple composition: creature centered, minimal background. Personality over atmosphere.',
+    criticNotes: 'Ray: "Characters sell, atmosphere doesn\'t." Marcia: "Needs immediate creature ID." Soo-Yun: "Keep the wet-on-wet smoke technique but show the creature." Dan: "Needs clear emotional read."'
+  },
+  {
+    name: 'Core Golem',
+    bgColor: 'linear-gradient(135deg, #795548, #ff8a65)',
+    scores: [7, 6, 8, 5, 7],
+    quotes: [
+      "He looks like a big friendly rock guy! I love the ones where he looks kinda shy. Like a gentle giant!",
+      "Solid creature design. Good sense of mass and weight. The gentle expression sells it. Silhouette works. Needs refinement on the watercolor execution.",
+      "Great personality -- big, strong, but sweet. This is the kind of character that makes parents comfortable and kids excited. Approved.",
+      "Better than most in this batch. Some watercolor authenticity in the rock textures. Still too polished overall -- needs more spontaneous brush moments.",
+      "Gentle giants are evergreen sellers in the creature space. This has the Totoro factor -- big, lovable, collectible. Strong direction, refine and ship."
+    ],
+    verdict: 'rework',
+    originalPrompt: 'A core golem, gentle giant rock creature with a molten core, watercolor style, warm earth tones, friendly expression',
+    improvedPrompt: 'A gentle core golem (large, round, boulder-like body) with a shy, sweet expression. Small glowing molten-orange core visible in chest. Light watercolor on cream paper -- use dry brush for rocky texture, wet washes for the warm glow. Earth tones: raw umber, burnt sienna, gray. The creature should feel HUGGABLE despite being made of rock. Slightly tilted head, small eyes, big rounded form. White paper visible in highlights. Simple pale background wash.',
+    criticNotes: 'Tyler: "Lean into the shy/gentle vibe." Soo-Yun: "Dry brush for rocks, wet wash for glow." Ray: "Totoro factor = money." Marcia: "Silhouette works, refine medium."'
+  },
+  {
+    name: 'Pyroclast',
+    bgColor: 'linear-gradient(135deg, #e65100, #ffd600)',
+    scores: [4, 3, 3, 2, 4],
+    quotes: [
+      "It's like... an explosion? I don't know what I'm looking at. Is there a creature in there?",
+      "This isn't a creature, it's a particle effect. Zero compositional structure. I can't identify a face, body, or silhouette in any variant.",
+      "Way too abstract. My kids looked at it and said 'what is that.' If a 7-year-old can't identify it, it fails.",
+      "The artist got lost in the explosion. All technique, no subject. Watercolor is about restraint -- knowing when to stop. This never stopped.",
+      "Unsellable. Card art needs an identifiable character. This is a lava lamp screenshot. Total restart with a clear creature concept."
+    ],
+    verdict: 'scrap',
+    originalPrompt: 'A pyroclast creature, explosive volcanic entity, watercolor style, dynamic explosion of lava and rock, abstract energy form',
+    improvedPrompt: null,
+    criticNotes: 'Unanimous: "abstract energy form" is a dead-end prompt direction. If regenerating, define a SPECIFIC creature shape first (bipedal? quadruped? floating orb with face?) then add volcanic elements on top.'
+  },
+];
+
+function getVerdictClass(v) {
+  return v === 'use' ? 'verdict-use' : v === 'rework' ? 'verdict-rework' : 'verdict-scrap';
+}
+function getVerdictLabel(v) {
+  return v === 'use' ? 'USE IT' : v === 'rework' ? 'REWORK' : 'SCRAP';
+}
+function avgScore(scores) {
+  return (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(1);
+}
+function scoreColor(s) {
+  if (s <= 2) return 'var(--scrap)';
+  if (s <= 4) return '#e67e22';
+  if (s <= 6) return 'var(--rework)';
+  if (s <= 7) return '#7dbd3b';
+  if (s <= 8) return 'var(--use)';
+  return '#16a085';
+}
+function consensusColor(avg) {
+  const n = parseFloat(avg);
+  if (n < 4) return 'var(--scrap)';
+  if (n < 6) return 'var(--rework)';
+  if (n < 7.5) return '#7dbd3b';
+  return 'var(--use)';
+}
+
+// Render review cards
+const grid = document.getElementById('reviewsGrid');
+CARDS.forEach(card => {
+  const avg = avgScore(card.scores);
+  const pips = card.scores.map((s, i) => {
+    const c = CRITICS[i];
+    return `<div class="score-pip" style="background:${scoreColor(s)}">
+      ${s}
+      <div class="pip-tooltip">
+        <div class="critic-name">${c.name} -- ${s}/10</div>
+        ${card.quotes[i]}
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML += `
+    <div class="review-card">
+      <div class="art-placeholder" style="background:${card.bgColor}">
+        <span class="batch-label">4 variants</span>
+        ${card.name}
+      </div>
+      <div class="review-body">
+        <div class="card-name">${card.name}</div>
+        <div class="scores-row">${pips}</div>
+        <div class="consensus-row">
+          <span class="consensus-score" style="color:${consensusColor(avg)}">${avg}<span style="font-size:12px;color:var(--text2);font-weight:400"> / 10</span></span>
+          <span class="verdict-badge ${getVerdictClass(card.verdict)}">${getVerdictLabel(card.verdict)}</span>
+        </div>
+      </div>
+    </div>`;
+});
+
+// Render prompt improvements
+const promptsContainer = document.getElementById('promptsContainer');
+CARDS.forEach(card => {
+  if (card.verdict === 'use') return;
+  if (!card.improvedPrompt && card.verdict === 'scrap') {
+    // Show scrap notice
+    promptsContainer.innerHTML += `
+      <div class="prompt-card" style="border-color:var(--scrap);">
+        <div class="prompt-header">
+          <span class="card-name">${card.name}</span>
+          <span class="rework-tag" style="background:var(--scrap);color:#fff;">SCRAP</span>
+        </div>
+        <div class="prompt-block">
+          <span class="label old">Original Prompt</span>
+          <br>${card.originalPrompt}
+        </div>
+        <div class="critic-notes"><strong>Panel Notes:</strong> ${card.criticNotes}</div>
+      </div>`;
+    return;
+  }
+  if (!card.improvedPrompt) return;
+
+  promptsContainer.innerHTML += `
+    <div class="prompt-card">
+      <div class="prompt-header">
+        <span class="card-name">${card.name}</span>
+        <span class="rework-tag">REWORK</span>
+      </div>
+      <div class="prompt-block">
+        <span class="label old">Original Prompt</span>
+        <br>${card.originalPrompt}
+      </div>
+      <div class="prompt-block improved">
+        <span class="label new">Improved Prompt</span>
+        <br>${card.improvedPrompt}
+      </div>
+      <div class="critic-notes"><strong>Panel Notes:</strong> ${card.criticNotes}</div>
+    </div>`;
+});
+</script>
+</body>
+</html>
