@@ -236,15 +236,11 @@ function afterWinTriggers(winner, loser, roll, damage, isPlayer) {
       effects.push({ text: `<b class="gold">Tempest!</b> +3 Sacred Fires!`, ability: 'Tempest', desc: '+3 Sacred Fires!' });
     }
   }
-  // Outlaw: doubles → remove 1 enemy die next turn
-  if (winner.ability === 'Thief' && roll.type === 'doubles') {
-    if (isPlayer) enemyRemoveDice += 1; else playerRemoveDice += 1;
-    effects.push({ text: `<b class="gold">Thief!</b> Stole 1 of ${isPlayer ? enemy.name : pick.name}'s dice!`, ability: 'Thief', desc: 'Stole a die for next turn!' });
-  }
+  // Outlaw Thief: moved to resolveRound so it triggers on doubles regardless of win/loss
   // Troubling Haters: 4+ damage → +2 HP
   if (winner.ability === 'Growing Mob' && damage >= 4) {
     if (isPlayer) { playerHp = Math.min(pick.maxHp, playerHp + 2); }
-    else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); }
+    else { enemyHp = Math.min(enemy.maxHp || enemy.bossHp, enemyHp + 2); }
     updateHpDisplay();
     effects.push({ text: `<b class="gold">Growing Mob!</b> +2 HP!`, ability: 'Growing Mob', desc: '+2 HP from big hit!' });
   }
@@ -256,7 +252,7 @@ function afterWinTriggers(winner, loser, roll, damage, isPlayer) {
   // Flora: rolled doubles → +2 HP after damage
   if (winner.ability === 'Restore' && roll.type === 'doubles') {
     if (isPlayer) { playerHp += 2; updateHpDisplay(); }
-    else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
+    else { enemyHp = Math.min(enemy.maxHp || enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
     effects.push({ ability: 'Restore', desc: 'Doubles rolled! +2 HP!' });
   }
 
@@ -287,7 +283,7 @@ function afterLossTriggers(loser, roll, damage, isPlayer) {
     const alive = isPlayer ? playerHp > 0 : enemyHp > 0;
     if (alive) {
       if (isPlayer) { playerHp += 2; updateHpDisplay(); }
-      else { enemyHp = Math.min(enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
+      else { enemyHp = Math.min(enemy.maxHp || enemy.bossHp, enemyHp + 2); updateHpDisplay(); }
       effects.push({ ability: 'Restore', desc: 'Doubles rolled! +2 HP!' });
     }
   }
@@ -458,7 +454,7 @@ function doEnemyRoll() {
       // Normal: 45% reflect, 25% doubles (no triples), 30% random
       // Rage (<30% HP): 55% reflect, 30% doubles, 15% random
       if (enemy.ability === 'Reflection') {
-        const rage = enemyHp <= Math.ceil(enemy.bossHp * 0.3);
+        const rage = enemyHp <= Math.ceil((enemy.maxHp || enemy.bossHp) * 0.3);
         const reflectChance = rage ? 0.55 : 0.45;
         const doublesChance = rage ? 0.30 : 0.25;
         const r = Math.random();
@@ -475,7 +471,7 @@ function doEnemyRoll() {
       }
       // Hector: Protector — strong singles + rage mode below 30% HP
       if (enemy.ability === 'Protector') {
-        const rage = enemyHp <= Math.ceil(enemy.bossHp * 0.3);
+        const rage = enemyHp <= Math.ceil((enemy.maxHp || enemy.bossHp) * 0.3);
         const r = Math.random();
         if (rage) {
           // Rage: 30% high singles (5-6), 25% triples, 20% doubles
@@ -508,9 +504,9 @@ function doEnemyRoll() {
           dice = [v, v, Math.floor(Math.random()*6)+1]; // doubles
         }
       }
-      // Pelter: +20% chance to roll doubles (Snowball synergy)
+      // Pelter: +20% chance to roll doubles (Snowball synergy) — capped at 5 to reduce double-6 frequency
       if (enemy.ability === 'Snowball' && Math.random() < 0.20) {
-        const v = Math.floor(Math.random()*6)+1;
+        const v = Math.floor(Math.random()*5)+1;
         dice = [v, v, Math.floor(Math.random()*6)+1];
       }
       // Antoinette: +30% chance to roll doubles (Grace)
@@ -878,6 +874,13 @@ function doPlayerRoll() {
     // 70% normal — still tense but not guaranteed
   }
 
+  // Dream Cat's Jinx luck: +15% chance to force doubles (synergizes with Jinx passive)
+  if (pick.ability === 'Jinx' && Math.random() < 0.15) {
+    const v = Math.floor(Math.random()*6)+1;
+    playerDiceValues[0] = v;
+    playerDiceValues[1] = v;
+  }
+
   // Wim's Slash boost: +15% chance all dice become odd
   if (pick.ability === 'Slash' && !playerDiceValues.every(d => d % 2 === 1) && Math.random() < 0.15) {
     playerDiceValues = playerDiceValues.map(d => d % 2 === 0 ? d - 1 || 1 : d);
@@ -897,6 +900,15 @@ function doPlayerRoll() {
       const j = Math.floor(Math.random() * (i + 1));
       [playerDiceValues[i], playerDiceValues[j]] = [playerDiceValues[j], playerDiceValues[i]];
     }
+  }
+
+  // Quad boost: 15% chance to force quads when rolling 4+ dice
+  if (playerDiceValues.length >= 4 && pick.ability !== 'Tempest' && Math.random() < 0.15) {
+    const v = Math.floor(Math.random()*6)+1;
+    playerDiceValues[0] = v;
+    playerDiceValues[1] = v;
+    playerDiceValues[2] = v;
+    playerDiceValues[3] = v;
   }
 
   // Kodako: check for 1-2-3 before analyzing
@@ -1003,6 +1015,18 @@ function resolveRound(pRoll, eRoll) {
   if (vsMode && enemy && enemy.ability === "Let's Dance" && eRoll.type === 'doubles') {
     enemyBonusDice += 1;
     setTimeout(() => showAbilitySplash("Let's Dance", '+1 die next roll!', 1200, () => {}, 'enemyCard'), 1000);
+  }
+
+  // Outlaw's Thief: doubles → remove 1 enemy die next turn (win, lose, or tie)
+  if (pick && pick.ability === 'Thief' && pRoll.type === 'doubles') {
+    enemyRemoveDice += 1;
+    setTimeout(() => showAbilitySplash('Thief', `Stole 1 of ${enemy.name}'s dice!`, 1200, () => {}, 'playerCard'), 800);
+  }
+  if (enemy && enemy.ability === 'Thief' && eRoll.type === 'doubles') {
+    playerRemoveDice += 1;
+    if (vsMode) {
+      setTimeout(() => showAbilitySplash('Thief', `Stole 1 of ${pick.name}'s dice!`, 1200, () => {}, 'enemyCard'), 1000);
+    }
   }
 
   if (result === 0) {
@@ -1364,8 +1388,11 @@ function checkAfterCounter() {
 }
 
 function nextRound() {
-  // Co-op: switch turns after each roll exchange
+  // Co-op: switch turns after each roll exchange. Increment round for the
+  // active player BEFORE swap/save so their bucket records the new round
+  // number (needed for abilities like Shade's Haunt which checks round > 1).
   if (coopMode) {
+    round++;
     coopSyncFromBattle();
     updateCoopPanels();
     coopNextTurn();
