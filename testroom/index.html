@@ -879,7 +879,7 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0 }, blue: { ice:0, fire:0, surge:0 } }
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:false }, blue: { ice:0, fire:0, surge:0, auntSusan:false } }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -1027,6 +1027,37 @@ function spendHealingSeed(team) {
   renderBattle();
 }
 
+function sacrificeHappyCrystal(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 208 || f.ko) return;
+  f.hp = 0; f.ko = true;
+  t.resources.moonstone++;
+  showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)');
+  log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
+  handleKOs();
+  renderBattle();
+}
+
+function toggleAuntSusan(team) {
+  if (!B || B.phase !== 'ready') return;
+  const tName = team;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 309) return;
+  if (B.committed[tName].auntSusan) {
+    // Uncommit — give seed back
+    B.committed[tName].auntSusan = false;
+    t.resources.healingSeed++;
+  } else if (t.resources.healingSeed > 0) {
+    // Commit — spend seed
+    B.committed[tName].auntSusan = true;
+    t.resources.healingSeed--;
+  }
+  renderBattle();
+}
+
 // Main round
 function doRound() {
   if (!B || B.phase!=='ready') return;
@@ -1044,17 +1075,7 @@ function doRound() {
   // PHASE 1: PRE-ROLL
   // ========================================
 
-  // Happy Crystal (208) — auto-sacrifice: KO it, gain 1 moonstone
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    if (f.id === 208 && !f.ko) {
-      f.hp = 0; f.ko = true;
-      team.resources.moonstone++;
-      showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)');
-      log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
-    }
-  });
-  if (handleKOs()) return;
+  // Happy Crystal (208) — sacrifice is now manual via spend button
 
   // Death Howl (202) — force opponent to swap (negated by Dylan on opponent sideline)
   [B.red, B.blue].forEach(team => {
@@ -1112,13 +1133,12 @@ function doRound() {
     }
   });
 
-  // Aunt Susan (309) — auto-spend 1 healingSeed for +2 damage
+  // Aunt Susan (309) — spending is now manual via commit button
   B.auntSusanBonus = { red: false, blue: false };
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 309 && !f.ko && team.resources.healingSeed > 0) {
-      team.resources.healingSeed--;
+    if (f.id === 309 && B.committed[tName].auntSusan) {
       B.auntSusanBonus[tName] = true;
       log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent 1 Healing Seed for +2 damage!`);
     }
@@ -1411,8 +1431,8 @@ function resolveRound() {
     });
 
     // Reset committed resources
-    B.committed.red = { ice:0, fire:0, surge:0 };
-    B.committed.blue = { ice:0, fire:0, surge:0 };
+    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false };
+    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
 
     B.round++;
     B.phase = 'ready';
@@ -1582,8 +1602,8 @@ function resolveRound() {
   });
 
   // Reset committed resources
-  B.committed.red = { ice:0, fire:0, surge:0 };
-  B.committed.blue = { ice:0, fire:0, surge:0 };
+  B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false };
+  B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
 
   B.round++;
   B.phase = 'ready';
@@ -1786,6 +1806,16 @@ function renderBattle() {
       }
       if (r.healingSeed > 0 && active(t).hp < active(t).maxHp) {
         spendHtml += `<div class="spend-btn heal" onclick="spendHealingSeed('${team}')" title="Heal 1 HP">🌱 Heal</div>`;
+      }
+      // Happy Crystal (208) — sacrifice button
+      const f = active(t);
+      if (f.id === 208 && !f.ko) {
+        spendHtml += `<div class="spend-btn committed" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone">💎 Sacrifice</div>`;
+      }
+      // Aunt Susan (309) — commit healing seed for +2 damage
+      if (f.id === 309 && (r.healingSeed > 0 || c.auntSusan)) {
+        const label = c.auntSusan ? '🌱 +2 dmg ⚔' : '🌱 +2 dmg';
+        spendHtml += `<div class="spend-btn ${c.auntSusan?'committed':''}" onclick="toggleAuntSusan('${team}')" title="Spend Healing Seed for +2 damage">${label}</div>`;
       }
     }
     document.getElementById(`${team}-resources`).innerHTML = rh + (spendHtml ? `<div class="spend-bar">${spendHtml}</div>` : '');
