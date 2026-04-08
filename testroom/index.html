@@ -400,6 +400,52 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .narrator-inner b.gold { color:var(--legendary); }
 .narrator-inner b.ko-text { color:var(--accent); font-size:16px; }
 
+/* Ability Splash — full screen announcement */
+.ability-splash {
+  position:fixed; inset:0; z-index:900; display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 0.3s;
+  background:radial-gradient(ellipse at center, rgba(126,232,250,0.25) 0%, rgba(0,0,0,0.85) 65%);
+}
+.ability-splash.active { opacity:1; pointer-events:auto; }
+.ability-splash-inner {
+  text-align:center; transform:scale(0.6); transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  padding:0 20px; position:relative; z-index:910;
+}
+.ability-splash.active .ability-splash-inner { transform:scale(1); }
+.ability-splash-name {
+  font-size:3.5rem; font-weight:900; letter-spacing:4px; line-height:1.1;
+  text-transform:uppercase; color:var(--moonstone);
+  text-shadow:0 0 40px rgba(126,232,250,0.8), 0 0 80px rgba(126,232,250,0.4), 0 4px 8px rgba(0,0,0,0.6);
+}
+.ability-splash-desc {
+  font-size:1.1rem; font-weight:700; margin-top:10px; color:#ccc;
+  text-shadow:0 0 16px rgba(0,0,0,0.9); letter-spacing:0.5px;
+}
+/* Splash color themes */
+.ability-splash.theme-fire { background:radial-gradient(ellipse at center, rgba(255,99,72,0.3) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-fire .ability-splash-name { color:var(--magma); text-shadow:0 0 40px rgba(255,99,72,0.8), 0 0 80px rgba(255,99,72,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-fire .ability-splash-desc { color:#ffd4aa; }
+
+.ability-splash.theme-green { background:radial-gradient(ellipse at center, rgba(34,197,94,0.25) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-green .ability-splash-name { color:#4ade80; text-shadow:0 0 40px rgba(34,197,94,0.8), 0 0 80px rgba(34,197,94,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-green .ability-splash-desc { color:#bbf7d0; }
+
+.ability-splash.theme-purple { background:radial-gradient(ellipse at center, rgba(155,89,182,0.3) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-purple .ability-splash-name { color:#c084fc; text-shadow:0 0 40px rgba(168,85,247,0.8), 0 0 80px rgba(168,85,247,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-purple .ability-splash-desc { color:#e9d5ff; }
+
+.ability-splash.theme-gold { background:radial-gradient(ellipse at center, rgba(243,156,18,0.3) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-gold .ability-splash-name { color:var(--legendary); text-shadow:0 0 40px rgba(243,156,18,0.8), 0 0 80px rgba(243,156,18,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-gold .ability-splash-desc { color:#fef3c7; }
+
+.ability-splash.theme-red { background:radial-gradient(ellipse at center, rgba(233,69,96,0.3) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-red .ability-splash-name { color:var(--accent); text-shadow:0 0 40px rgba(233,69,96,0.8), 0 0 80px rgba(233,69,96,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-red .ability-splash-desc { color:#fda4af; }
+
+.ability-splash.theme-blue { background:radial-gradient(ellipse at center, rgba(52,152,219,0.3) 0%, rgba(0,0,0,0.85) 65%); }
+.ability-splash.theme-blue .ability-splash-name { color:var(--rare); text-shadow:0 0 40px rgba(52,152,219,0.8), 0 0 80px rgba(52,152,219,0.4), 0 4px 8px rgba(0,0,0,0.6); }
+.ability-splash.theme-blue .ability-splash-desc { color:#bae6fd; }
+
 /* Triples/Quads/Penta Banner */
 .triples-banner {
   position:fixed; top:50%; left:50%;
@@ -617,6 +663,14 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   <div class="steal-modal">
     <h3>Plunder — Steal a Resource</h3>
     <div id="stealOptions" class="steal-options"></div>
+  </div>
+</div>
+
+<!-- Ability Splash -->
+<div class="ability-splash" id="abilitySplash">
+  <div class="ability-splash-inner">
+    <div class="ability-splash-name" id="splashName"></div>
+    <div class="ability-splash-desc" id="splashDesc"></div>
   </div>
 </div>
 
@@ -1005,7 +1059,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) ef.ko = true;
-      showAbilityCallout('LEVIATHAN!', 'var(--rare)');
+      showAbilityCallout('LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
     }
   }
@@ -1022,7 +1076,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (!ef.ko && ef.hp > f.hp) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) ef.ko = true;
-      showAbilityCallout('BIG TARGET!', 'var(--moonstone)');
+      showAbilityCallout('BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
     }
   }
@@ -1142,7 +1196,7 @@ function sacrificeHappyCrystal(team) {
   if (f.id !== 208 || f.ko) return;
   f.hp = 0; f.ko = true;
   t.resources.moonstone++;
-  showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)');
+  showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)', `${f.name} sacrificed for 1 Moonstone!`);
   log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
   handleKOs();
   renderBattle();
@@ -1196,7 +1250,7 @@ function doRound() {
         const swap = aliveSideline[Math.floor(Math.random() * aliveSideline.length)];
         const oldName = active(enemy).name;
         enemy.activeIdx = enemy.ghosts.indexOf(swap);
-        showAbilityCallout('PRESSURE!', 'var(--magma)');
+        showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
         log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${swap.name} enters!`);
         triggerEntry(enemy);
       }
@@ -1215,7 +1269,7 @@ function doRound() {
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
-        showAbilityCallout('SWARM!', 'var(--magma)');
+        showAbilityCallout('SWARM!', 'var(--magma)', `${f.name} — 1 damage to ${ef.name}!`);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
@@ -1410,7 +1464,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     const dice = team === B.red ? redDice : blueDice;
     if (f.id === 327 && !f.ko && hasDouble2sOr3s(dice)) {
       team.resources.moonstone++;
-      showAbilityCallout('CRACK OPEN!', 'var(--ghost-rare)');
+      showAbilityCallout('CRACK OPEN!', 'var(--ghost-rare)', `${f.name} — gained 1 Moonstone!`);
       log(`<span class="log-ms">${f.name}</span> — Crack Open! Double 2s/3s → gained <span class="log-ms">1 Moonstone</span>!`);
     }
   });
@@ -1656,7 +1710,7 @@ function resolveRound() {
       const f = active(team);
       if (f.id === 352 && !f.ko) {
         team.resources.luckyStone += 5;
-        showAbilityCallout('CHIRP!', '#fbbf24');
+        showAbilityCallout('CHIRP!', '#fbbf24', `${f.name} — Tie! +5 Lucky Stones!`);
         log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span>!`);
       }
     });
@@ -1713,7 +1767,7 @@ function resolveRound() {
   // Aunt Susan (309) — +2 damage if healingSeed was spent
   if (B.auntSusanBonus[winTeamName]) {
     dmg += 2;
-    showAbilityCallout('HARVEST DANCE!', '#22c55e');
+    showAbilityCallout('HARVEST DANCE!', '#22c55e', `${wF.name} — Healing Seed spent for +2 damage!`);
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+2 bonus damage!</span>`);
   }
 
@@ -1722,7 +1776,7 @@ function resolveRound() {
   if (wF.id === 311 && wR.type === 'doubles') {
     dmg += 2;
     pudgeSelfDmg = true;
-    showAbilityCallout('BELLY FLOP!', 'var(--uncommon)');
+    showAbilityCallout('BELLY FLOP!', 'var(--uncommon)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
     log(`<span class="log-ability">${wF.name}</span> — Belly Flop! Doubles → <span class="log-dmg">+2 damage!</span>`);
   }
 
@@ -1731,7 +1785,7 @@ function resolveRound() {
     const eRes = loseTeam.resources;
     if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
       dmg += 3;
-      showAbilityCallout('RUMBLE!', 'var(--magma)');
+      showAbilityCallout('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
       log(`<span class="log-ability">${wF.name}</span> — Rumble! Opponent has specials → <span class="log-dmg">+3 damage!</span>`);
     }
   }
@@ -1741,7 +1795,7 @@ function resolveRound() {
     const dodgeRoll = Math.floor(Math.random()*6)+1;
     if (dodgeRoll === 6) {
       dmg = 0;
-      showAbilityCallout('PORPOISE DODGE!', 'var(--rare)');
+      showAbilityCallout('PORPOISE DODGE!', 'var(--rare)', `${lF.name} rolled a 6 — damage negated!`);
       log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled a ${dodgeRoll} — <span class="log-heal">ALL DAMAGE NEGATED!</span>`);
     } else {
       log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge roll: ${dodgeRoll} (needed 6).`);
@@ -1986,15 +2040,36 @@ function showTriplesEffect(side, rollType) {
   });
 }
 
-function showAbilityCallout(text, color) {
-  const el = document.getElementById('abilityCallout');
-  el.textContent = text;
-  el.style.color = color || 'var(--moonstone)';
-  el.classList.remove('hype-pop');
-  void el.offsetWidth; // force reflow to re-trigger animation
-  el.classList.add('hype-pop');
+// Ability splash themes mapped from color vars
+const SPLASH_THEMES = {
+  'var(--magma)': 'theme-fire',
+  'var(--moonstone)': 'theme-blue',
+  'var(--rare)': 'theme-blue',
+  'var(--ghost-rare)': 'theme-purple',
+  'var(--uncommon)': 'theme-green',
+  '#22c55e': 'theme-green',
+  '#fbbf24': 'theme-gold',
+};
+
+function showAbilityCallout(name, color, desc) {
+  const el = document.getElementById('abilitySplash');
+  const theme = SPLASH_THEMES[color] || '';
+  el.className = 'ability-splash ' + theme;
+  document.getElementById('splashName').textContent = name;
+  document.getElementById('splashDesc').textContent = desc || '';
+  el.classList.add('active');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.textContent = ''; el.classList.remove('hype-pop'); }, 2200);
+  el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
+
+  // Also update the small callout for continuity
+  const small = document.getElementById('abilityCallout');
+  small.textContent = name;
+  small.style.color = color || 'var(--moonstone)';
+  small.classList.remove('hype-pop');
+  void small.offsetWidth;
+  small.classList.add('hype-pop');
+  clearTimeout(small._timer);
+  small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
 }
 
 // ============================================================
