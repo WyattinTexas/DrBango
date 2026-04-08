@@ -261,6 +261,9 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .resource.moonstone { background:rgba(126,232,250,0.12); color:var(--moonstone); border:1px solid rgba(126,232,250,0.25); }
 .resource.ice { background:rgba(52,152,219,0.12); color:var(--rare); border:1px solid rgba(52,152,219,0.25); }
 .resource.fire { background:rgba(243,156,18,0.12); color:var(--legendary); border:1px solid rgba(243,156,18,0.25); }
+.resource.surge { background:rgba(168,85,247,0.12); color:#a855f7; border:1px solid rgba(168,85,247,0.25); }
+.resource.healingSeed { background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.25); }
+.resource.luckyStone { background:rgba(251,191,36,0.12); color:#fbbf24; border:1px solid rgba(251,191,36,0.25); }
 
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; align-items:center; gap:16px; justify-content:center; padding:12px 0; }
@@ -849,10 +852,10 @@ function makeTeam(ids) {
     ghosts: ids.map(id => {
       const g = ghostData(id);
       return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
-        pressure:0, winStreak:0, mimicking:null, usedMoonstone:false };
+        hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0 }
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0 }
   };
 }
 
@@ -879,17 +882,53 @@ function startBattle() {
   renderBattle();
 }
 
-function triggerEntry(team) {
+function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
-  const g = ghostData(f.id);
   const enemy = opp(team);
-  // Hollow mimic
-  if (g.id === 206) {
-    const target = active(enemy);
-    f.mimicking = target.id;
-    log(`<span class="log-ability">${f.name}</span> copies <span class="log-ms">${target.name}'s ${ghostData(target.id).ability}</span>!`);
+  if (skipEntryEffects) return; // Tyson's Hop: no entry effects
+
+  // Hank (201) — Lazy: first roll is auto 1-2-3
+  if (f.id === 201) {
+    f.hankFirstRoll = true;
+    log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
   }
-  // Crag check — did opponent switch INTO this? Handled in swap logic
+
+  // Zain (206) — Aquatic Wisdom: spend 2 ice for 1 moonstone
+  if (f.id === 206) {
+    if (team.resources.ice >= 2) {
+      team.resources.ice -= 2;
+      team.resources.moonstone++;
+      log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
+    }
+  }
+
+  // Nerina (306) — Leviathan: deal 3 damage to enemy active
+  if (f.id === 306) {
+    const ef = active(enemy);
+    if (!ef.ko) {
+      ef.hp = Math.max(0, ef.hp - 3);
+      if (ef.hp <= 0) ef.ko = true;
+      showAbilityCallout('LEVIATHAN!', 'var(--rare)');
+      log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+    }
+  }
+
+  // Maximo (302) — Nap: first roll is 1 die
+  if (f.id === 302) {
+    f.maximoFirstRoll = true;
+    log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
+  }
+
+  // Timpleton (312) — Big Target: if enemy HP > Timpleton's HP, deal 3 damage
+  if (f.id === 312) {
+    const ef = active(enemy);
+    if (!ef.ko && ef.hp > f.hp) {
+      ef.hp = Math.max(0, ef.hp - 3);
+      if (ef.hp <= 0) ef.ko = true;
+      showAbilityCallout('BIG TARGET!', 'var(--moonstone)');
+      log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+    }
+  }
 }
 
 function rollDice(n) {
@@ -910,6 +949,43 @@ function classify(dice) {
   return {type:'singles',value:Math.max(...dice),damage:1};
 }
 
+// Helper: check if a team has a ghost with given id on sideline (alive)
+function hasSideline(team, id) {
+  return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+}
+
+// Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
+function dylanNegates(enemyTeam) {
+  return hasSideline(enemyTeam, 301);
+}
+
+// Helper: count occurrences of a value in dice array
+function countVal(dice, val) { return dice.filter(d => d === val).length; }
+
+// Helper: check if dice contain doubles (at least two of same value)
+function hasDoubles(dice) {
+  const c = {};
+  dice.forEach(d => c[d] = (c[d]||0)+1);
+  return Object.values(c).some(v => v >= 2);
+}
+
+// Helper: check if dice have double 2s or double 3s
+function hasDouble2sOr3s(dice) {
+  const c = {};
+  dice.forEach(d => c[d] = (c[d]||0)+1);
+  return (c[2] >= 2) || (c[3] >= 2);
+}
+
+// Boris (343) — Fortify: when surge is spent, Boris gains 2 HP
+function triggerBorisHook(team) {
+  team.ghosts.forEach(g => {
+    if (g.id === 343 && !g.ko) {
+      g.hp = Math.min(g.hp + 2, g.maxHp);
+      log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → gained 2 HP (${g.hp}/${g.maxHp}).`);
+    }
+  });
+}
+
 // Main round
 function doRound() {
   if (!B || B.phase!=='ready') return;
@@ -918,62 +994,214 @@ function doRound() {
 
   B.phase = 'rolling';
 
-  // === PRE-ROLL: Basalt erosion ===
+  // Reset per-round flags
+  [B.red, B.blue].forEach(team => {
+    active(team).usedMagicTouch = false;
+  });
+
+  // ========================================
+  // PHASE 1: PRE-ROLL
+  // ========================================
+
+  // Happy Crystal (208) — auto-sacrifice: KO it, gain 1 moonstone
   [B.red, B.blue].forEach(team => {
     const f = active(team);
-    const gid = getEffectiveId(f);
-    if (gid === 201 && !f.ko) { // Basalt
-      f.hp = Math.max(0, f.hp - 1);
-      if (f.hp<=0) f.ko = true;
-      showAbilityCallout('ERODE', 'var(--magma)');
-      log(`<span class="log-ability">${f.name}</span> erodes — <span class="log-dmg">1 self-damage</span> (${f.hp} HP left)`);
+    if (f.id === 208 && !f.ko) {
+      f.hp = 0; f.ko = true;
+      team.resources.moonstone++;
+      showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)');
+      log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
     }
   });
   if (handleKOs()) return;
 
-  // === PRE-ROLL: Magmus forge (sideline) ===
+  // Death Howl (202) — force opponent to swap (negated by Dylan on opponent sideline)
   [B.red, B.blue].forEach(team => {
-    team.ghosts.forEach((g,i) => {
-      if (i===team.activeIdx || g.ko) return;
-      if (getEffectiveId(g) === 204) { // Magmus
-        if (team.resources.ice >= 2) {
-          team.resources.ice -= 2;
-          team.resources.moonstone++;
-          log(`<span class="log-ability">${g.name}</span> (sideline) forges 2 Ice Shards into <span class="log-ms">1 Moonstone</span>!`);
-        } else if (team.resources.fire >= 2) {
-          team.resources.fire -= 2;
-          team.resources.moonstone++;
-          log(`<span class="log-ability">${g.name}</span> (sideline) forges 2 Sacred Fires into <span class="log-ms">1 Moonstone</span>!`);
-        }
+    const f = active(team);
+    const enemy = opp(team);
+    if (f.id === 202 && !f.ko && !dylanNegates(enemy)) {
+      const aliveSideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
+      if (aliveSideline.length > 0) {
+        const swap = aliveSideline[Math.floor(Math.random() * aliveSideline.length)];
+        const oldName = active(enemy).name;
+        enemy.activeIdx = enemy.ghosts.indexOf(swap);
+        showAbilityCallout('PRESSURE!', 'var(--magma)');
+        log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${swap.name} enters!`);
+        triggerEntry(enemy);
       }
-    });
+    } else if (f.id === 202 && !f.ko && dylanNegates(enemy)) {
+      log(`<span class="log-ability">${f.name}</span> — Pressure blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+    }
+  });
+  if (handleKOs()) return;
+
+  // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const enemy = opp(team);
+    if (f.id === 304 && !f.ko && !dylanNegates(enemy)) {
+      const ef = active(enemy);
+      if (!ef.ko) {
+        ef.hp = Math.max(0, ef.hp - 1);
+        if (ef.hp <= 0) ef.ko = true;
+        showAbilityCallout('SWARM!', 'var(--magma)');
+        log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+      }
+    } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
+      log(`<span class="log-ability">${f.name}</span> — Swarm blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+    }
+  });
+  if (handleKOs()) return;
+
+  // Shade's Shadow (205) — sideline: deal 1 damage to enemy active after roll (pre-roll placement)
+  // Actually per spec: "after you roll, deal 1 damage to enemy active ghost before they roll"
+  // We'll handle this in post-roll phase. Mark teams that have Shade on sideline.
+  // (handled in resolveRound)
+
+  // Harrison (315) — auto-spend 1 healingSeed for +1 die
+  // Tracked via flag, applied during dice roll count
+  B.harrisonExtraDie = { red: false, blue: false };
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 315 && !f.ko && team.resources.healingSeed > 0) {
+      team.resources.healingSeed--;
+      B.harrisonExtraDie[tName] = true;
+      log(`<span class="log-ability">${f.name}</span> — Ascend! Spent 1 Healing Seed for an extra die!`);
+    }
   });
 
-  // === ROLL DICE ===
-  let redDice = rollDice(3), blueDice = rollDice(3);
+  // Aunt Susan (309) — auto-spend 1 healingSeed for +2 damage
+  B.auntSusanBonus = { red: false, blue: false };
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 309 && !f.ko && team.resources.healingSeed > 0) {
+      team.resources.healingSeed--;
+      B.auntSusanBonus[tName] = true;
+      log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent 1 Healing Seed for +2 damage!`);
+    }
+  });
+
+  // ========================================
+  // PHASE 2: ROLL DICE
+  // ========================================
+  let redCount = 3, blueCount = 3;
+
+  // Hank (201) — first roll override
+  let hankOverride = { red: false, blue: false };
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 201 && f.hankFirstRoll) {
+      hankOverride[tName] = true;
+      f.hankFirstRoll = false;
+    }
+  });
+
+  // Maximo (302) — first roll 1 die
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 302 && f.maximoFirstRoll) {
+      if (tName === 'red') redCount = 1;
+      else blueCount = 1;
+      f.maximoFirstRoll = false;
+      log(`<span class="log-ability">${f.name}</span> is still napping — rolling only 1 die!`);
+    }
+  });
+
+  // Timber (210) — opponent rolls 1 fewer die
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 210 && !f.ko) {
+      const oppTeamName = team === B.red ? 'blue' : 'red';
+      if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
+      else blueCount = Math.max(1, blueCount - 1);
+      log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die!`);
+    }
+  });
+
+  // Harrison extra die
+  if (B.harrisonExtraDie.red) redCount++;
+  if (B.harrisonExtraDie.blue) blueCount++;
+
+  // Roll
+  let redDice = hankOverride.red ? [1,2,3] : rollDice(redCount);
+  let blueDice = hankOverride.blue ? [1,2,3] : rollDice(blueCount);
+  if (hankOverride.red) log(`<span class="log-ability">Hank</span> — Lazy! Auto-rolled [1,2,3]!`);
+  if (hankOverride.blue) log(`<span class="log-ability">Hank</span> — Lazy! Auto-rolled [1,2,3]!`);
+
   B.redDice = redDice; B.blueDice = blueDice;
 
-  // === FLINT: Moonstone on triples ===
+  // ========================================
+  // PHASE 3: POST-ROLL RESOURCE TRIGGERS
+  // ========================================
+
+  // Shade's Shadow (205) — sideline: after you roll, deal 1 dmg to enemy active
   [B.red, B.blue].forEach(team => {
-    const dice = team===B.red ? redDice : blueDice;
-    const cl = classify(dice);
-    team.ghosts.forEach((g,i) => {
-      if (g.ko) return;
-      const gid = getEffectiveId(g);
-      if (gid === 208) { // Flint
-        if (cl.type === 'triples') {
-          team.resources.moonstone++;
-          log(`<span class="log-ms">${g.name} found a Moonstone!</span> Triples triggered Spark Strike!`);
-        }
+    const enemy = opp(team);
+    if (hasSideline(team, 205)) {
+      const ef = active(enemy);
+      if (!ef.ko) {
+        ef.hp = Math.max(0, ef.hp - 1);
+        if (ef.hp <= 0) ef.ko = true;
+        log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       }
-    });
+    }
+  });
+  if (handleKOs()) return;
+
+  // Dart (207) — each 4 rolled: gain 1 Lucky Stone
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const dice = team === B.red ? redDice : blueDice;
+    if (f.id === 207 && !f.ko) {
+      const fours = countVal(dice, 4);
+      if (fours > 0) {
+        team.resources.luckyStone += fours;
+        log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
+      }
+    }
   });
 
-  // === MOONSTONE CHECK: offer to both teams if they have one ===
-  // For simplicity in this test build, auto-check and prompt sequentially
+  // Selene (305) — doubles: gain 1 Healing Seed + 1 Lucky Stone
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const dice = team === B.red ? redDice : blueDice;
+    if (f.id === 305 && !f.ko && hasDoubles(dice)) {
+      team.resources.healingSeed++;
+      team.resources.luckyStone++;
+      log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
+    }
+  });
+
+  // Natalia (327) — double 2s or double 3s: gain 1 Moonstone
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const dice = team === B.red ? redDice : blueDice;
+    if (f.id === 327 && !f.ko && hasDouble2sOr3s(dice)) {
+      team.resources.moonstone++;
+      showAbilityCallout('CRACK OPEN!', 'var(--ghost-rare)');
+      log(`<span class="log-ms">${f.name}</span> — Crack Open! Double 2s/3s → gained <span class="log-ms">1 Moonstone</span>!`);
+    }
+  });
+
+  // Kaplan (308) — when OPPONENT rolls doubles: gain 1 Healing Seed
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const oppDice = team === B.red ? blueDice : redDice;
+    if (f.id === 308 && !f.ko && hasDoubles(oppDice)) {
+      team.resources.healingSeed++;
+      log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
+    }
+  });
+
+  // ========================================
+  // PHASE 4: MOONSTONE CHECK
+  // ========================================
   B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
 
-  // Check if either team wants to use Moonstone
   if (B.red.resources.moonstone > 0) {
     B.phase = 'moonstone-red';
     showMoonstoneChoice('red', redDice);
@@ -1016,7 +1244,16 @@ function pickMsValue(val) {
   const ms = B.pendingMoonstone;
   const team = ms.team;
   const t = B[team];
-  t.resources.moonstone--;
+  const f = active(t);
+
+  // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
+  if (f.id === 203 && !f.usedMagicTouch) {
+    f.usedMagicTouch = true;
+    log(`<span class="log-ability">${f.name}</span> — Magic Touch! Used Moonstone without discarding it!`);
+  } else {
+    t.resources.moonstone--;
+  }
+
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
 
@@ -1026,7 +1263,7 @@ function pickMsValue(val) {
   B.redDice = B.pendingResolve.redDice;
   B.blueDice = B.pendingResolve.blueDice;
 
-  log(`<span class="log-ms">Moonstone spent!</span> ${teamName(t===B.red?B.red:B.blue)} changed die to ${val} → [${ms.dice.join(',')}]`);
+  log(`<span class="log-ms">Moonstone used!</span> ${teamName(t===B.red?B.red:B.blue)} changed die to ${val} → [${ms.dice.join(',')}]`);
 
   document.getElementById('msPicker').classList.remove('active');
   B.pendingMoonstone = null;
@@ -1055,12 +1292,6 @@ function skipMoonstone() {
   resolveRound();
 }
 
-function getEffectiveId(ghost) {
-  // For Hollow mimic
-  if (ghost.mimicking) return ghost.mimicking;
-  return ghost.id;
-}
-
 function resolveRound() {
   B.phase = 'resolving';
   const redDice = B.pendingResolve.redDice;
@@ -1073,24 +1304,43 @@ function resolveRound() {
   const typeRank = {triples:3,doubles:2,singles:1,none:0};
   let winner = null;
 
-  // Basalt: singles negate (check if loser has Basalt)
-  // Pyroclast Moonstone destroy (handled by flag)
-
   if (typeRank[rR.type] > typeRank[bR.type]) winner = 'red';
   else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
   else if (rR.value > bR.value) winner = 'red';
   else if (bR.value > rR.value) winner = 'blue';
   else {
+    // ========================================
     // TIE
+    // ========================================
     log(`<span class="log-ability">TIE!</span> No damage dealt.`);
-    // Caldera: ties count as not winning
-    [B.red,B.blue].forEach(team => {
-      const f = active(team);
-      if (getEffectiveId(f)===202 && !f.ko) {
-        f.pressure = (f.pressure||0) + 1;
-        log(`<span class="log-ability">${f.name}</span> pressure builds to <span class="log-dmg">+${f.pressure}</span>`);
+
+    // Tweak and Twonk (303) — sideline: tie → gain 3 Surge
+    [B.red, B.blue].forEach(team => {
+      if (hasSideline(team, 303)) {
+        team.resources.surge += 3;
+        log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
       }
     });
+
+    // Jimmy (352) — active: tie → gain 5 Lucky Stones
+    [B.red, B.blue].forEach(team => {
+      const f = active(team);
+      if (f.id === 352 && !f.ko) {
+        team.resources.luckyStone += 5;
+        showAbilityCallout('CHIRP!', '#fbbf24');
+        log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span>!`);
+      }
+    });
+
+    // Maximo (302) — end of round: gain 1 Healing Seed
+    [B.red, B.blue].forEach(team => {
+      const f = active(team);
+      if (f.id === 302 && !f.ko) {
+        team.resources.healingSeed++;
+        log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
+      }
+    });
+
     B.round++;
     B.phase = 'ready';
     renderDice(redDice, blueDice);
@@ -1098,138 +1348,157 @@ function resolveRound() {
     return;
   }
 
+  // ========================================
+  // PHASE 5: RESOLVE DAMAGE
+  // ========================================
+  const winTeamName = winner;
   const winTeam = B[winner];
+  const loseTeamName = winner === 'red' ? 'blue' : 'red';
   const loseTeam = opp(winTeam);
   const wF = active(winTeam);
   const lF = active(loseTeam);
   const wR = winner==='red' ? rR : bR;
   const lR = winner==='red' ? bR : rR;
+  const winDice = winner==='red' ? redDice : blueDice;
+  const loseDice = winner==='red' ? blueDice : redDice;
 
-  // --- CALC DAMAGE ---
   let dmg = wR.damage;
 
-  // Caldera pressure bonus
-  if (getEffectiveId(wF)===202) {
-    const bonus = wF.pressure || 0;
-    if (bonus > 0) {
-      dmg += bonus;
-      showAbilityCallout('PRESSURE!', 'var(--magma)');
-      log(`<span class="log-ability">${wF.name}</span> releases pressure! <span class="log-dmg">+${bonus} bonus damage!</span>`);
-      wF.pressure = 0;
+  // Aunt Susan (309) — +2 damage if healingSeed was spent
+  if (B.auntSusanBonus[winTeamName]) {
+    dmg += 2;
+    showAbilityCallout('HARVEST DANCE!', '#22c55e');
+    log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+2 bonus damage!</span>`);
+  }
+
+  // Pudge (311) — doubles: +2 damage
+  let pudgeSelfDmg = false;
+  if (wF.id === 311 && wR.type === 'doubles') {
+    dmg += 2;
+    pudgeSelfDmg = true;
+    showAbilityCallout('BELLY FLOP!', 'var(--uncommon)');
+    log(`<span class="log-ability">${wF.name}</span> — Belly Flop! Doubles → <span class="log-dmg">+2 damage!</span>`);
+  }
+
+  // Red Hunter (345) — if opponent has any resources: +3 damage
+  if (wF.id === 345) {
+    const eRes = loseTeam.resources;
+    if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
+      dmg += 3;
+      showAbilityCallout('RUMBLE!', 'var(--magma)');
+      log(`<span class="log-ability">${wF.name}</span> — Rumble! Opponent has specials → <span class="log-dmg">+3 damage!</span>`);
     }
   }
 
-  // Sulfur win streak
-  if (getEffectiveId(wF)===210) {
-    wF.winStreak = (wF.winStreak||0) + 1;
-    if (wF.winStreak >= 3) {
-      dmg *= 3;
-      showAbilityCallout('VOLATILE!!!', 'var(--legendary)');
-      log(`<span class="log-ability">${wF.name} VOLATILE!</span> 3 wins in a row — <span class="log-dmg">TRIPLE DAMAGE!</span>`);
-      wF.winStreak = 0;
+  // Sylvia (313) — loser dodge check: roll 1 die, if 6 negate all damage
+  if (lF.id === 313 && !lF.ko) {
+    const dodgeRoll = Math.floor(Math.random()*6)+1;
+    if (dodgeRoll === 6) {
+      dmg = 0;
+      showAbilityCallout('PORPOISE DODGE!', 'var(--rare)');
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled a ${dodgeRoll} — <span class="log-heal">ALL DAMAGE NEGATED!</span>`);
     } else {
-      log(`<span class="log-ability">${wF.name}</span> win streak: ${wF.winStreak}/3`);
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge roll: ${dodgeRoll} (needed 6).`);
     }
-  }
-
-  // Pyroclast: Moonstone instant kill
-  if (getEffectiveId(wF)===203 && wF.usedMoonstone) {
-    showAbilityCallout('DETONATE!', 'var(--accent)');
-    log(`<span class="log-ko">${wF.name} DETONATES! ${lF.name} is DESTROYED!</span>`);
-    lF.hp = 0; lF.ko = true;
-    wF.usedMoonstone = false;
-    finishRound(winner, winTeam, loseTeam, wR, lR, redDice, blueDice);
-    return;
-  }
-
-  // --- CHECK BASALT: negate singles ---
-  if (getEffectiveId(lF)===201 && wR.type==='singles' && !lF.ko) {
-    log(`<span class="log-ability">${lF.name} — Hardened!</span> Singles negated!`);
-    dmg = 0;
   }
 
   // --- APPLY DAMAGE ---
   if (dmg > 0) {
     lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp<=0) lF.ko = true;
+    if (lF.hp <= 0) lF.ko = true;
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
-  } else if (dmg===0 && getEffectiveId(lF)!==201) {
+  } else {
     log(`${wF.name} wins but deals 0 damage.`);
   }
 
-  finishRound(winner, winTeam, loseTeam, wR, lR, redDice, blueDice);
-}
-
-function finishRound(winner, winTeam, loseTeam, wR, lR, redDice, blueDice) {
-  const wF = active(winTeam);
-  const lF = active(loseTeam);
-
-  // --- CALDERA: loser gains pressure ---
-  if (getEffectiveId(lF)===202 && !lF.ko) {
-    lF.pressure = (lF.pressure||0) + 1;
-    log(`<span class="log-ability">${lF.name}</span> pressure builds to <span class="log-dmg">+${lF.pressure}</span>`);
+  // Pudge (311) — self-damage after damage applied
+  if (pudgeSelfDmg && !wF.ko) {
+    wF.hp = Math.max(0, wF.hp - 1);
+    if (wF.hp <= 0) wF.ko = true;
+    log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
   }
 
-  // --- SULFUR: loser resets streak ---
-  if (getEffectiveId(lF)===210 && !lF.ko) {
-    lF.winStreak = 0;
+  // ========================================
+  // PHASE 6: ON-WIN TRIGGERS
+  // ========================================
+
+  // Skucher (209) — win: +2 Surge
+  if (wF.id === 209 && !wF.ko) {
+    winTeam.resources.surge += 2;
+    log(`<span class="log-ability">${wF.name}</span> — Plunder! Gained <span class="log-ms">2 Surge</span>!`);
   }
 
-  // --- ASHEN: steal resource on win ---
-  if (getEffectiveId(wF)===209 && !wF.ko) {
-    const enemyRes = loseTeam.resources;
-    const available = [];
-    if (enemyRes.moonstone>0) available.push('moonstone');
-    if (enemyRes.ice>0) available.push('ice');
-    if (enemyRes.fire>0) available.push('fire');
-    if (available.length > 0) {
-      B.pendingSteal = { from:loseTeam, to:winTeam, options:available };
-      renderDice(redDice, blueDice);
-      renderBattle();
-      showStealPicker(available);
-      return; // pause for steal choice
+  // Artemis (307) — win: +1 Surge, +1 Ice
+  if (wF.id === 307 && !wF.ko) {
+    winTeam.resources.surge++;
+    winTeam.resources.ice++;
+    log(`<span class="log-ability">${wF.name}</span> — Daughter of the Stream! Gained <span class="log-ms">1 Surge + 1 Ice Shard</span>!`);
+  }
+
+  // Calvin (342) — win: heal +1 HP (can't exceed maxHp)
+  if (wF.id === 342 && !wF.ko) {
+    if (wF.hp < wF.maxHp) {
+      wF.hp++;
+      log(`<span class="log-heal">${wF.name}</span> — Overgrowth! Healed to ${wF.hp} HP!`);
     }
   }
 
-  // --- VULCANUS: death explosion ---
-  if (lF.ko && getEffectiveId(lF)===205) {
-    const blastDmg = wF.hp;
-    if (blastDmg > 0) {
-      showAbilityCallout('MELTDOWN!', 'var(--magma)');
-      log(`<span class="log-ko">${lF.name} MELTDOWN!</span> Deals <span class="log-dmg">${blastDmg} damage</span> back to ${wF.name}!`);
-      wF.hp = Math.max(0, wF.hp - blastDmg);
-      if (wF.hp<=0) wF.ko = true;
-      if (wF.ko) log(`<span class="log-ko">${wF.name} is also KO'd!</span>`);
+  // Humar (336) — win: +1 Sacred Fire
+  if (wF.id === 336 && !wF.ko) {
+    winTeam.resources.fire++;
+    log(`<span class="log-ability">${wF.name}</span> — Sacred Flame! Gained <span class="log-ms">1 Sacred Fire</span>!`);
+  }
+
+  // Aunt Susan (309) — win: +1 Healing Seed
+  if (wF.id === 309 && !wF.ko) {
+    winTeam.resources.healingSeed++;
+    log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! Win → gained <span class="log-ms">1 Healing Seed</span>!`);
+  }
+
+  // Farmer Jeff (314) — sideline: when ghost wins, gain 1 Healing Seed + 1 per 6 rolled
+  if (hasSideline(winTeam, 314)) {
+    const sixes = countVal(winDice, 6);
+    const seeds = 1 + sixes;
+    winTeam.resources.healingSeed += seeds;
+    log(`<span class="log-ability">Farmer Jeff</span> (sideline) — Harvest! Win → gained <span class="log-ms">${seeds} Healing Seed${seeds>1?'s':''}</span>!`);
+  }
+
+  // ========================================
+  // PHASE 8: ON-KO TRIGGERS
+  // ========================================
+
+  // Granny (310) — sideline consolation when YOUR ghost is defeated
+  if (lF.ko) {
+    if (hasSideline(loseTeam, 310)) {
+      if (wR.type === 'singles') {
+        loseTeam.resources.luckyStone++;
+        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to singles → gained <span class="log-ms">1 Lucky Stone</span>.`);
+      } else if (wR.type === 'doubles') {
+        loseTeam.resources.surge++;
+        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to doubles → gained <span class="log-ms">1 Surge</span>.`);
+      } else if (wR.type === 'triples') {
+        loseTeam.resources.moonstone++;
+        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to triples → gained <span class="log-ms">1 Moonstone</span>!`);
+      }
     }
   }
+
+  // ========================================
+  // PHASE 9: END OF ROUND
+  // ========================================
+
+  // Maximo (302) — end of round: gain 1 Healing Seed if active
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 302 && !f.ko) {
+      team.resources.healingSeed++;
+      log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
+    }
+  });
 
   B.round++;
   B.phase = 'ready';
   renderDice(redDice, blueDice);
-  handleKOs();
-  renderBattle();
-}
-
-function showStealPicker(options) {
-  const names = { moonstone:'Moonstone', ice:'Ice Shard', fire:'Sacred Fire' };
-  document.getElementById('stealOptions').innerHTML = options.map(o =>
-    `<div class="steal-opt" onclick="doSteal('${o}')">${names[o]}</div>`
-  ).join('');
-  document.getElementById('stealOverlay').classList.add('active');
-}
-
-function doSteal(type) {
-  const st = B.pendingSteal;
-  st.from.resources[type]--;
-  st.to.resources[type]++;
-  const names = { moonstone:'Moonstone', ice:'Ice Shard', fire:'Sacred Fire' };
-  log(`<span class="log-ms">Plunder!</span> Stole a <span class="log-ms">${names[type]}</span>!`);
-  B.pendingSteal = null;
-  document.getElementById('stealOverlay').classList.remove('active');
-
-  // Continue with Vulcanus check etc (simplified — re-finish)
-  B.round++;
-  B.phase = 'ready';
   handleKOs();
   renderBattle();
 }
@@ -1243,17 +1512,6 @@ function handleKOs() {
       const aliveIdx = t.ghosts.findIndex((g,i) => i!==t.activeIdx && !g.ko);
       if (aliveIdx >= 0) {
         log(`<span class="log-ko">${f.name} is down!</span> ${t.ghosts[aliveIdx].name} enters!`);
-        // Crag: check if opponent has Crag
-        const enemyTeam = opp(t);
-        const cragCheck = [active(enemyTeam), ...enemyTeam.ghosts.filter((_,i)=>i!==enemyTeam.activeIdx&&!_.ko)];
-        cragCheck.forEach(eg => {
-          if (getEffectiveId(eg)===207 && !eg.ko) {
-            const incoming = t.ghosts[aliveIdx];
-            incoming.hp = Math.max(0, incoming.hp - 2);
-            if (incoming.hp<=0) incoming.ko = true;
-            log(`<span class="log-ability">${eg.name} — Tremor!</span> <span class="log-dmg">${incoming.name} takes 2 entry damage!</span> (${incoming.hp} HP)`);
-          }
-        });
         t.activeIdx = aliveIdx;
         triggerEntry(t);
       } else {
@@ -1309,22 +1567,17 @@ function openSwap(team) {
 function doSwap(team, idx) {
   const t = B[team];
   if (t.ghosts[idx].ko) return;
-  const oldName = active(t).name;
+  const oldGhost = active(t);
+  const oldName = oldGhost.name;
+  const skipEntry = (oldGhost.id === 365); // Tyson — Hop: no entry effects
   t.activeIdx = idx;
   const f = active(t);
 
-  // Crag damage from opponent
-  const enemyTeam = opp(t);
-  enemyTeam.ghosts.forEach(eg => {
-    if (getEffectiveId(eg)===207 && !eg.ko) {
-      f.hp = Math.max(0, f.hp - 2);
-      if (f.hp<=0) f.ko = true;
-      log(`<span class="log-ability">${eg.name} — Tremor!</span> <span class="log-dmg">${f.name} takes 2 swap damage!</span> (${f.hp} HP)`);
-    }
-  });
-
   log(`<span class="log-ability">${oldName} swaps out — ${f.name} enters!</span>`);
-  triggerEntry(t);
+  if (skipEntry) {
+    log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
+  }
+  triggerEntry(t, skipEntry);
 
   document.getElementById('swapOverlay').classList.remove('active');
   handleKOs();
@@ -1356,9 +1609,8 @@ function renderCardSlot(ghost, isFighter) {
     : `<div class="card-img-placeholder">👻</div>`;
   let statusHtml = '';
   if (isFighter) {
-    if (ghost.pressure>0) statusHtml += `<span class="status-tag pressure">+${ghost.pressure}</span>`;
-    if (ghost.winStreak>0) statusHtml += `<span class="status-tag streak">${ghost.winStreak}/3</span>`;
-    if (ghost.mimicking) statusHtml += `<span class="status-tag mimic">Mimic</span>`;
+    if (ghost.hankFirstRoll) statusHtml += `<span class="status-tag pressure">Lazy (1-2-3)</span>`;
+    if (ghost.maximoFirstRoll) statusHtml += `<span class="status-tag streak">Napping (1 die)</span>`;
   }
   // HP color
   const hpRatio = ghost.hp / ghost.maxHp;
@@ -1417,9 +1669,12 @@ function renderBattle() {
     // Resources
     const r = t.resources;
     let rh = '';
-    if (r.moonstone>0) rh += `<div class="resource moonstone">&#x1F48E;${r.moonstone}</div>`;
-    if (r.ice>0) rh += `<div class="resource ice">${r.ice}</div>`;
-    if (r.fire>0) rh += `<div class="resource fire">${r.fire}</div>`;
+    if (r.moonstone>0) rh += `<div class="resource moonstone">💎${r.moonstone}</div>`;
+    if (r.ice>0) rh += `<div class="resource ice">❄${r.ice}</div>`;
+    if (r.fire>0) rh += `<div class="resource fire">🔥${r.fire}</div>`;
+    if (r.surge>0) rh += `<div class="resource surge">⚡${r.surge}</div>`;
+    if (r.healingSeed>0) rh += `<div class="resource healingSeed">🌱${r.healingSeed}</div>`;
+    if (r.luckyStone>0) rh += `<div class="resource luckyStone">🍀${r.luckyStone}</div>`;
     document.getElementById(`${team}-resources`).innerHTML = rh;
   });
 
@@ -1430,7 +1685,8 @@ function renderBattle() {
 function renderDice(rd, bd) {
   const rolling = !rd || !bd;
   const makeRolling = (container, values, teamClass) => {
-    container.innerHTML = (values||[0,0,0]).map(() => `<div class="die ${teamClass} rolling">?</div>`).join('');
+    const diceArr = values || [0,0,0];
+    container.innerHTML = diceArr.map(() => `<div class="die ${teamClass} rolling">?</div>`).join('');
     if (!rolling && values) {
       setTimeout(() => {
         container.innerHTML = values.map(d => `<div class="die ${teamClass}">${d}</div>`).join('');
