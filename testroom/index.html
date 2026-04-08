@@ -265,6 +265,13 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .resource.healingSeed { background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.25); }
 .resource.luckyStone { background:rgba(251,191,36,0.12); color:#fbbf24; border:1px solid rgba(251,191,36,0.25); }
 
+/* Spending buttons */
+.spend-bar { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+.spend-btn { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); color:var(--text2); transition:all 0.2s; user-select:none; }
+.spend-btn:hover { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.3); }
+.spend-btn.committed { background:rgba(243,156,18,0.2); border-color:rgba(243,156,18,0.5); color:var(--legendary); }
+.spend-btn.heal { background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#22c55e; }
+
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; align-items:center; gap:16px; justify-content:center; padding:12px 0; }
 .dice-stack { display:flex; flex-direction:column; gap:6px; }
@@ -871,7 +878,8 @@ function startBattle() {
   B = {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
-    pendingMoonstone:null, pendingSteal:null
+    pendingMoonstone:null, pendingSteal:null,
+    committed: { red: { ice:0, fire:0, surge:0 }, blue: { ice:0, fire:0, surge:0 } }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -984,6 +992,39 @@ function triggerBorisHook(team) {
       log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → gained 2 HP (${g.hp}/${g.maxHp}).`);
     }
   });
+}
+
+// ========================================
+// RESOURCE SPENDING
+// ========================================
+function cycleCommit(team, type) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const c = B.committed[team];
+  const total = t.resources[type] + c[type];
+  if (total <= 0) return;
+  c[type]++;
+  t.resources[type]--;
+  if (c[type] > total) {
+    t.resources[type] = total;
+    c[type] = 0;
+  }
+  // Boris hook when committing surge
+  if (type === 'surge' && c[type] > 0) {
+    // Boris triggers on actual spend (in doRound), not on commit
+  }
+  renderBattle();
+}
+
+function spendHealingSeed(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (t.resources.healingSeed <= 0 || f.hp >= f.maxHp) return;
+  t.resources.healingSeed--;
+  f.hp = Math.min(f.maxHp, f.hp + 1);
+  log(`<span class="log-heal">${f.name}</span> used a Healing Seed! Healed to ${f.hp} HP.`);
+  renderBattle();
 }
 
 // Main round
@@ -1126,6 +1167,18 @@ function doRound() {
   if (B.harrisonExtraDie.red) redCount++;
   if (B.harrisonExtraDie.blue) blueCount++;
 
+  // Committed Surge: +1 die per surge
+  if (B.committed.red.surge > 0) {
+    redCount += B.committed.red.surge;
+    log(`<span class="log-ability">Red</span> committed <span class="log-ms">${B.committed.red.surge} Surge</span> → +${B.committed.red.surge} dice!`);
+    triggerBorisHook(B.red);
+  }
+  if (B.committed.blue.surge > 0) {
+    blueCount += B.committed.blue.surge;
+    log(`<span class="log-ability">Blue</span> committed <span class="log-ms">${B.committed.blue.surge} Surge</span> → +${B.committed.blue.surge} dice!`);
+    triggerBorisHook(B.blue);
+  }
+
   // Roll
   let redDice = hankOverride.red ? [1,2,3] : rollDice(redCount);
   let blueDice = hankOverride.blue ? [1,2,3] : rollDice(blueCount);
@@ -1133,6 +1186,22 @@ function doRound() {
   if (hankOverride.blue) log(`<span class="log-ability">Hank</span> — Lazy! Auto-rolled [1,2,3]!`);
 
   B.redDice = redDice; B.blueDice = blueDice;
+
+  // Lucky Stone auto-reroll: reroll lowest die
+  [['red', B.red], ['blue', B.blue]].forEach(([tName, team]) => {
+    if (team.resources.luckyStone > 0) {
+      let dice = tName === 'red' ? redDice : blueDice;
+      const minIdx = dice.indexOf(Math.min(...dice));
+      const oldVal = dice[minIdx];
+      const newVal = Math.floor(Math.random()*6)+1;
+      dice[minIdx] = newVal;
+      dice.sort((a,b)=>a-b);
+      team.resources.luckyStone--;
+      log(`<span class="log-ms">${tName.charAt(0).toUpperCase()+tName.slice(1)} used a Lucky Stone!</span> Rerolled ${oldVal} → ${newVal}!`);
+      if (tName === 'red') { redDice = dice; B.redDice = redDice; }
+      else { blueDice = dice; B.blueDice = blueDice; }
+    }
+  });
 
   // ========================================
   // PHASE 3: POST-ROLL RESOURCE TRIGGERS
@@ -1341,6 +1410,10 @@ function resolveRound() {
       }
     });
 
+    // Reset committed resources
+    B.committed.red = { ice:0, fire:0, surge:0 };
+    B.committed.blue = { ice:0, fire:0, surge:0 };
+
     B.round++;
     B.phase = 'ready';
     renderDice(redDice, blueDice);
@@ -1363,6 +1436,18 @@ function resolveRound() {
   const loseDice = winner==='red' ? blueDice : redDice;
 
   let dmg = wR.damage;
+
+  // Committed Ice Shards: +1 per shard
+  if (B.committed[winTeamName].ice > 0) {
+    dmg += B.committed[winTeamName].ice;
+    log(`<span class="log-ms">Ice Shards committed!</span> <span class="log-dmg">+${B.committed[winTeamName].ice} damage!</span>`);
+  }
+  // Committed Sacred Fires: +3 per fire
+  if (B.committed[winTeamName].fire > 0) {
+    const fireDmg = B.committed[winTeamName].fire * 3;
+    dmg += fireDmg;
+    log(`<span class="log-ms">Sacred Fires committed!</span> <span class="log-dmg">+${fireDmg} damage!</span>`);
+  }
 
   // Aunt Susan (309) — +2 damage if healingSeed was spent
   if (B.auntSusanBonus[winTeamName]) {
@@ -1495,6 +1580,10 @@ function resolveRound() {
       log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
     }
   });
+
+  // Reset committed resources
+  B.committed.red = { ice:0, fire:0, surge:0 };
+  B.committed.blue = { ice:0, fire:0, surge:0 };
 
   B.round++;
   B.phase = 'ready';
@@ -1668,14 +1757,38 @@ function renderBattle() {
 
     // Resources
     const r = t.resources;
+    const c = B.committed[team];
     let rh = '';
     if (r.moonstone>0) rh += `<div class="resource moonstone">💎${r.moonstone}</div>`;
-    if (r.ice>0) rh += `<div class="resource ice">❄${r.ice}</div>`;
-    if (r.fire>0) rh += `<div class="resource fire">🔥${r.fire}</div>`;
-    if (r.surge>0) rh += `<div class="resource surge">⚡${r.surge}</div>`;
+    const totalIce = r.ice + c.ice;
+    const totalFire = r.fire + c.fire;
+    const totalSurge = r.surge + c.surge;
+    if (totalIce>0) rh += `<div class="resource ice">❄${totalIce}${c.ice>0?' ('+c.ice+'⚔)':''}</div>`;
+    if (totalFire>0) rh += `<div class="resource fire">🔥${totalFire}${c.fire>0?' ('+c.fire+'⚔)':''}</div>`;
+    if (totalSurge>0) rh += `<div class="resource surge">⚡${totalSurge}${c.surge>0?' ('+c.surge+'⚔)':''}</div>`;
     if (r.healingSeed>0) rh += `<div class="resource healingSeed">🌱${r.healingSeed}</div>`;
     if (r.luckyStone>0) rh += `<div class="resource luckyStone">🍀${r.luckyStone}</div>`;
-    document.getElementById(`${team}-resources`).innerHTML = rh;
+
+    // Spending buttons (only in ready phase)
+    let spendHtml = '';
+    if (B.phase === 'ready') {
+      if (totalIce > 0) {
+        const label = c.ice > 0 ? `❄ ${c.ice}/${totalIce} ⚔` : `❄ ${totalIce}`;
+        spendHtml += `<div class="spend-btn ${c.ice>0?'committed':''}" onclick="cycleCommit('${team}','ice')" title="Ice Shards: +1 dmg each if you win">${label}</div>`;
+      }
+      if (totalFire > 0) {
+        const label = c.fire > 0 ? `🔥 ${c.fire}/${totalFire} ⚔` : `🔥 ${totalFire}`;
+        spendHtml += `<div class="spend-btn ${c.fire>0?'committed':''}" onclick="cycleCommit('${team}','fire')" title="Sacred Fire: +3 dmg each if you win">${label}</div>`;
+      }
+      if (totalSurge > 0) {
+        const label = c.surge > 0 ? `⚡ ${c.surge}/${totalSurge} ⚔` : `⚡ ${totalSurge}`;
+        spendHtml += `<div class="spend-btn ${c.surge>0?'committed':''}" onclick="cycleCommit('${team}','surge')" title="Surge: +1 die each">${label}</div>`;
+      }
+      if (r.healingSeed > 0 && active(t).hp < active(t).maxHp) {
+        spendHtml += `<div class="spend-btn heal" onclick="spendHealingSeed('${team}')" title="Heal 1 HP">🌱 Heal</div>`;
+      }
+    }
+    document.getElementById(`${team}-resources`).innerHTML = rh + (spendHtml ? `<div class="spend-bar">${spendHtml}</div>` : '');
   });
 
   document.getElementById('turnIndicator').textContent = `Round ${B.round}`;
