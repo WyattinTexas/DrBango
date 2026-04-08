@@ -1026,6 +1026,7 @@ function startBattle() {
   document.getElementById('team-select').style.display = 'none';
   document.getElementById('battle-view').style.display = 'block';
   document.querySelector('.app').classList.add('battle-active');
+  startMusic();
   log('<span class="log-round">Battle begins!</span>');
   narrate(`<b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
   // Entry abilities
@@ -1384,6 +1385,7 @@ function doRound() {
   // T=0: Red starts rolling
   showRolling('red', redCount);
   showRolling('blue', blueCount);
+  playSfx('sfxDiceRoll');
   narrate(`<b class="red-text">${rF2.name}</b> rolls...`);
 
   // T=700ms: Red dice land
@@ -1399,6 +1401,7 @@ function doRound() {
   setTimeout(() => {
     narrate(`<b class="blue-text">${bF2.name}</b> rolls...`);
     showRolling('blue', blueCount);
+    playSfx('sfxDiceRoll');
   }, 1600);
 
   // T=2300ms: Blue dice land
@@ -1808,6 +1811,7 @@ function resolveRound() {
   if (dmg > 0) {
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) lF.ko = true;
+    playDamageSfx(dmg);
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
     if (lF.ko) {
       narrate(`<b class="${winColor}">${wF.name}</b> rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage!</b> &nbsp;<b class="ko-text">${lF.name} is KO'd!</b>`);
@@ -1946,6 +1950,7 @@ function handleKOs() {
 
 function showGameOver(winner) {
   B.phase = 'over';
+  fadeOutMusic();
   const el = document.getElementById('gameOver');
   el.classList.add('active');
   const title = document.getElementById('goTitle');
@@ -2006,11 +2011,53 @@ function narrate(html) {
   if (el) el.innerHTML = html;
 }
 
+// ============================================================
+// AUDIO
+// ============================================================
+function playSfx(id, vol) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.currentTime = 0;
+  el.volume = Math.min(vol || 0.8, 1.0);
+  el.play().catch(() => {});
+}
+
+function playDamageSfx(dmg) {
+  if (dmg >= 3) playSfx('sfx3Damage');
+  else if (dmg === 2) playSfx('sfx2Damage');
+  else playSfx('sfx1Damage');
+}
+
+function startMusic() {
+  const music = document.getElementById('bgMusic');
+  music.currentTime = 0;
+  music.volume = 0.4;
+  music.play().catch(() => {});
+}
+
+function fadeOutMusic() {
+  const music = document.getElementById('bgMusic');
+  clearInterval(music._fadeInt);
+  music._fadeInt = setInterval(() => {
+    if (music.volume > 0.03) { music.volume -= 0.03; }
+    else { clearInterval(music._fadeInt); music.pause(); music.volume = 0.4; }
+  }, 60);
+}
+
+function stopMusicHard() {
+  const music = document.getElementById('bgMusic');
+  clearInterval(music._fadeInt);
+  music.pause();
+  music.currentTime = 0;
+}
+
 function showTriplesEffect(side, rollType) {
   const banner = document.getElementById('triplesBanner');
   const flash = document.getElementById('triplesFlash');
   const bannerText = { penta:'PENTA!!', quads:'QUADS!', triples:'TRIPLES!' };
   banner.textContent = bannerText[rollType] || 'TRIPLES!';
+
+  playSfx('triplesSfx', 1.0);
 
   // Glow on dice
   const diceEl = document.getElementById(side + '-dice');
@@ -2057,6 +2104,7 @@ function showAbilityCallout(name, color, desc) {
   el.className = 'ability-splash ' + theme;
   document.getElementById('splashName').textContent = name;
   document.getElementById('splashDesc').textContent = desc || '';
+  playSfx('sfxSpecial', 0.85);
   el.classList.add('active');
   clearTimeout(el._timer);
   el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
@@ -2219,6 +2267,7 @@ function revealDice(team, values) {
 }
 
 function resetBattle() {
+  stopMusicHard();
   B = null; S.battle = null;
   S.redPicks = []; S.bluePicks = [];
   document.getElementById('battle-view').style.display = 'none';
@@ -2240,5 +2289,14 @@ renderGallery();
 renderPicks();
 renderDice(null,null);
 </script>
+
+<!-- Audio -->
+<audio id="bgMusic" src="../boo/BGG.mp3" loop preload="auto"></audio>
+<audio id="triplesSfx" src="../boo/triples.mp3" preload="auto"></audio>
+<audio id="sfxDiceRoll" src="../boo/DiceRoll.mp3" preload="auto"></audio>
+<audio id="sfx1Damage" src="../boo/1Damage.mp3" preload="auto"></audio>
+<audio id="sfx2Damage" src="../boo/2Damage.mp3" preload="auto"></audio>
+<audio id="sfx3Damage" src="../boo/3Damage.mp3" preload="auto"></audio>
+<audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
 </body>
 </html>
