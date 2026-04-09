@@ -312,6 +312,21 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .die.rolling { animation:shake .12s infinite; }
 .die.die-red { border-color:rgba(233,69,96,0.6); background:rgba(233,69,96,0.1); color:var(--accent2); }
 .die.die-blue { border-color:rgba(52,152,219,0.6); background:rgba(52,152,219,0.1); color:var(--moonstone); }
+.die.rerollable { cursor:pointer; animation:rerollPulse 0.8s ease-in-out infinite; }
+@keyframes rerollPulse {
+  0%,100% { box-shadow:0 0 8px rgba(251,191,36,0.3); }
+  50% { box-shadow:0 0 20px rgba(251,191,36,0.6); }
+}
+.reroll-countdown {
+  position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+  font-size:14px; font-weight:900; color:#fbbf24;
+  text-shadow:0 0 10px rgba(251,191,36,0.6);
+  pointer-events:none; animation:countdownPop 0.3s ease-out;
+}
+@keyframes countdownPop {
+  0% { transform:translateX(-50%) scale(1.5); opacity:0; }
+  100% { transform:translateX(-50%) scale(1); opacity:1; }
+}
 .die.moonstone-active { border-color:var(--moonstone); box-shadow:0 0 16px var(--moonstone-glow); cursor:pointer; }
 .die.moonstone-active:hover { transform:scale(1.12); }
 .die.moonstone-changed { background:rgba(126,232,250,0.15); border-color:var(--moonstone); color:var(--moonstone); }
@@ -370,6 +385,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .action-btn:hover { border-color:var(--moonstone); background:var(--surface2); }
 .action-btn.primary { background:linear-gradient(135deg, var(--magma), var(--accent)); border:none; color:white; }
 .action-btn.primary:hover { transform:scale(1.03); }
+.action-btn.roll-red { background:linear-gradient(135deg, var(--accent), #c0392b); border:none; color:white; font-weight:800; }
+.action-btn.roll-red:hover:not(:disabled) { transform:scale(1.03); }
+.action-btn.roll-red.locked { background:var(--surface); border:1px solid var(--accent); color:var(--accent); opacity:0.7; pointer-events:none; }
+.action-btn.roll-blue { background:linear-gradient(135deg, var(--rare), #2471a3); border:none; color:white; font-weight:800; }
+.action-btn.roll-blue:hover:not(:disabled) { transform:scale(1.03); }
+.action-btn.roll-blue.locked { background:var(--surface); border:1px solid var(--rare); color:var(--rare); opacity:0.7; pointer-events:none; }
 .action-btn.moonstone-btn { background:linear-gradient(135deg, var(--moonstone-deep), var(--moonstone)); border:none; color:var(--bg); }
 .action-btn.moonstone-btn:hover { transform:scale(1.03); }
 .action-btn:disabled { opacity:0.3; pointer-events:none; }
@@ -616,7 +637,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
       </div>
 
       <div class="actions" id="actionBar">
-        <button class="action-btn primary" id="rollBtn" onclick="doRound()">Roll Dice</button>
+        <button class="action-btn roll-red" id="rollRedBtn" onclick="rollReady('red')">Red Roll</button>
+        <button class="action-btn roll-blue" id="rollBlueBtn" onclick="rollReady('blue')">Blue Roll</button>
         <button class="action-btn" onclick="resetBattle()" style="color:var(--text2)">Reset</button>
       </div>
 
@@ -650,14 +672,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </div>
 </div>
 
-<!-- Lucky Stone Picker -->
-<div class="moonstone-picker" id="lsPicker">
-  <div class="ms-modal" style="border-color:#fbbf24; box-shadow:0 0 40px rgba(251,191,36,0.25);">
-    <h3 style="color:#fbbf24;">&#x1F340; Lucky Stone</h3>
-    <p id="lsPickerInfo" style="color:var(--text2); font-size:13px; margin-bottom:16px;">Pick a die to reroll (random new value).</p>
-    <div id="lsDiceOptions" class="ms-dice-options"></div>
-  </div>
-</div>
+<!-- Lucky Stone now uses countdown + clickable dice (no modal needed) -->
 
 <!-- Steal Picker -->
 <div class="steal-overlay" id="stealOverlay">
@@ -1223,6 +1238,36 @@ function toggleAuntSusan(team) {
   renderBattle();
 }
 
+// ============================================================
+// TWO-BUTTON ROLL SYSTEM
+// ============================================================
+function rollReady(team) {
+  if (!B || B.phase !== 'ready') return;
+  const btn = document.getElementById(team === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+  if (btn.classList.contains('locked')) return;
+  btn.classList.add('locked');
+  btn.textContent = team === 'red' ? 'Red Ready!' : 'Blue Ready!';
+
+  // Check if both are ready
+  const redReady = document.getElementById('rollRedBtn').classList.contains('locked');
+  const blueReady = document.getElementById('rollBlueBtn').classList.contains('locked');
+  if (redReady && blueReady) {
+    doRound();
+  }
+}
+
+function resetRollButtons() {
+  const r = document.getElementById('rollRedBtn');
+  const b = document.getElementById('rollBlueBtn');
+  r.classList.remove('locked'); r.disabled = false; r.textContent = 'Red Roll';
+  b.classList.remove('locked'); b.disabled = false; b.textContent = 'Blue Roll';
+}
+
+function disableRollButtons() {
+  document.getElementById('rollRedBtn').disabled = true;
+  document.getElementById('rollBlueBtn').disabled = true;
+}
+
 // Main round
 function doRound() {
   if (!B || B.phase!=='ready') return;
@@ -1230,7 +1275,7 @@ function doRound() {
   if (rF.ko || bF.ko) return;
 
   B.phase = 'rolling';
-  document.getElementById('rollBtn').disabled = true;
+  disableRollButtons();
 
   // Reset per-round flags
   [B.red, B.blue].forEach(team => {
@@ -1580,102 +1625,123 @@ function skipMoonstone() {
 }
 
 // ============================================================
-// LUCKY STONE — post-roll reroll picker
+// LUCKY STONE — countdown + clickable dice reroll
 // ============================================================
+let lsCountdownTimer = null;
+
 function checkLuckyStones() {
+  // Check red first, then blue
   if (B.red.resources.luckyStone > 0) {
-    B.phase = 'luckystone-red';
-    showLuckyStoneChoice('red');
+    startLuckyStoneWindow('red', () => {
+      if (B.blue.resources.luckyStone > 0) {
+        startLuckyStoneWindow('blue', () => resolveRound());
+      } else {
+        resolveRound();
+      }
+    });
     return;
   }
   if (B.blue.resources.luckyStone > 0) {
-    B.phase = 'luckystone-blue';
-    showLuckyStoneChoice('blue');
+    startLuckyStoneWindow('blue', () => resolveRound());
     return;
   }
   resolveRound();
 }
 
-function showLuckyStoneChoice(team) {
+function startLuckyStoneWindow(team, callback) {
+  B.phase = 'luckystone-' + team;
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
-  const color = team === 'red' ? 'var(--accent)' : 'var(--rare)';
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone</b>! Pick a die to reroll or skip.`);
-  log(`<span style="color:${color}">Team ${team.toUpperCase()}</span> has a <span class="log-ms">Lucky Stone</span>! Choose a die to reroll or skip.`);
-  renderBattle();
 
-  B.pendingLuckyStone = { team, dice: [...dice] };
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b> &nbsp;Tap a die to reroll!`);
 
-  const el = document.getElementById('lsDiceOptions');
-  el.innerHTML = dice.map((d, i) =>
-    `<div class="ms-die-option" onclick="pickLsDie(${i})" style="border-color:rgba(251,191,36,0.5);">${d}</div>`
-  ).join('') +
-  `<div class="ms-die-option" onclick="skipLuckyStone()" style="border-color:rgba(255,255,255,0.2); font-size:12px; color:var(--text2);">Skip</div>`;
+  // Make dice clickable
+  const diceEl = document.getElementById(team + '-dice');
+  const dieDivs = diceEl.querySelectorAll('.die');
+  dieDivs.forEach((d, i) => {
+    d.classList.add('rerollable');
+    d.onclick = () => doLuckyReroll(team, i, dice, callback);
+  });
 
-  document.getElementById('lsPicker').classList.add('active');
+  // Start countdown (3, 2, 1)
+  let remaining = 3;
+  showLsCountdown(diceEl, remaining);
+
+  lsCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearLsCountdown();
+      clearDiceClickable(team);
+      log(`<span style="color:var(--text2)">${team.toUpperCase()} didn't use their Lucky Stone.</span>`);
+      callback();
+    } else {
+      showLsCountdown(diceEl, remaining);
+    }
+  }, 1000);
 }
 
-function pickLsDie(idx) {
-  const ls = B.pendingLuckyStone;
-  const team = ls.team;
+function showLsCountdown(parentEl, num) {
+  let cd = parentEl.querySelector('.reroll-countdown');
+  if (!cd) {
+    cd = document.createElement('div');
+    cd.className = 'reroll-countdown';
+    parentEl.style.position = 'relative';
+    parentEl.appendChild(cd);
+  }
+  cd.textContent = num;
+  cd.style.animation = 'none';
+  requestAnimationFrame(() => { cd.style.animation = ''; });
+}
+
+function clearLsCountdown() {
+  if (lsCountdownTimer) { clearInterval(lsCountdownTimer); lsCountdownTimer = null; }
+  document.querySelectorAll('.reroll-countdown').forEach(el => el.remove());
+}
+
+function clearDiceClickable(team) {
+  const diceEl = document.getElementById(team + '-dice');
+  diceEl.querySelectorAll('.die').forEach(d => {
+    d.classList.remove('rerollable');
+    d.onclick = null;
+  });
+}
+
+function doLuckyReroll(team, dieIndex, dice, callback) {
+  clearLsCountdown();
+  clearDiceClickable(team);
+
   const t = B[team];
+  const oldVal = dice[dieIndex];
 
-  // Reroll randomly
-  const oldVal = ls.dice[idx];
-  const newVal = Math.floor(Math.random() * 6) + 1;
-  ls.dice[idx] = newVal;
-  ls.dice.sort((a, b) => a - b);
+  // Animate the die rolling
+  const diceEl = document.getElementById(team + '-dice');
+  const dieDivs = diceEl.querySelectorAll('.die');
+  const targetDie = dieDivs[dieIndex];
+  targetDie.classList.add('rolling');
+  targetDie.textContent = '?';
+  playSfx('sfxDiceRoll');
 
-  t.resources.luckyStone--;
+  setTimeout(() => {
+    const newVal = Math.floor(Math.random() * 6) + 1;
+    dice[dieIndex] = newVal;
+    dice.sort((a, b) => a - b);
+    t.resources.luckyStone--;
 
-  if (team === 'red') B.pendingResolve.redDice = ls.dice;
-  else B.pendingResolve.blueDice = ls.dice;
+    if (team === 'red') B.pendingResolve.redDice = dice;
+    else B.pendingResolve.blueDice = dice;
+    B.redDice = B.pendingResolve.redDice;
+    B.blueDice = B.pendingResolve.blueDice;
 
-  B.redDice = B.pendingResolve.redDice;
-  B.blueDice = B.pendingResolve.blueDice;
+    // Re-render dice
+    revealDice(team, dice);
 
-  log(`<span class="log-ms">Lucky Stone used!</span> ${team.charAt(0).toUpperCase()+team.slice(1)} rerolled ${oldVal} → <b>${newVal}</b> → [${ls.dice.join(',')}]`);
-  narrate(`<b class="gold">Lucky Stone!</b> Rerolled ${oldVal} → <b>${newVal}</b>!`);
+    log(`<span class="log-ms">Lucky Stone!</span> ${team.charAt(0).toUpperCase()+team.slice(1)} rerolled ${oldVal} → <b>${newVal}</b> → [${dice.join(',')}]`);
+    narrate(`<b class="gold">Lucky Stone!</b> Rerolled ${oldVal} → <b>${newVal}</b>!`);
+    renderBattle();
 
-  // Update dice display
-  renderDice(B.redDice, B.blueDice);
-
-  document.getElementById('lsPicker').classList.remove('active');
-  B.pendingLuckyStone = null;
-
-  // Check if same team has more lucky stones
-  if (t.resources.luckyStone > 0) {
-    setTimeout(() => {
-      B.phase = 'luckystone-' + team;
-      showLuckyStoneChoice(team);
-    }, 600);
-    return;
-  }
-
-  // Check if other team has lucky stones
-  if (team === 'red' && B.blue.resources.luckyStone > 0) {
-    setTimeout(() => {
-      B.phase = 'luckystone-blue';
-      showLuckyStoneChoice('blue');
-    }, 600);
-    return;
-  }
-
-  resolveRound();
-}
-
-function skipLuckyStone() {
-  const team = B.pendingLuckyStone.team;
-  document.getElementById('lsPicker').classList.remove('active');
-  B.pendingLuckyStone = null;
-  log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Lucky Stone.</span>`);
-
-  if (team === 'red' && B.blue.resources.luckyStone > 0) {
-    B.phase = 'luckystone-blue';
-    showLuckyStoneChoice('blue');
-    return;
-  }
-  resolveRound();
+    // Short pause then continue
+    setTimeout(callback, 600);
+  }, 500);
 }
 
 function resolveRound() {
@@ -1735,7 +1801,7 @@ function resolveRound() {
 
     B.round++;
     B.phase = 'ready';
-    document.getElementById('rollBtn').disabled = false;
+    resetRollButtons();
     renderDice(redDice, blueDice);
     renderBattle();
     return;
@@ -2278,7 +2344,7 @@ function resetBattle() {
   document.getElementById('gameOver').classList.remove('active');
   document.getElementById('swapOverlay').classList.remove('active');
   document.getElementById('msPicker').classList.remove('active');
-  document.getElementById('lsPicker').classList.remove('active');
+  clearLsCountdown();
   document.getElementById('stealOverlay').classList.remove('active');
   renderDice(null,null);
   renderPicks();
