@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watchroom — Corkscrew Agents</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #06060e;
+            --bg2: #0c0c1a;
+            --bg3: #121228;
+            --border: rgba(60, 80, 160, 0.15);
+            --text: #b0b0d0;
+            --text2: #5a5a80;
+            --green: #40c878;
+            --amber: #e0b040;
+            --blue: #5080e0;
+            --red: #e05050;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                transparent 0px, transparent 2px,
+                rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        header {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: var(--green);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .pulse {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            display: inline-block;
+            margin-right: 10px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .pulse.idle { background: var(--text2); animation: none; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--green); }
+            50% { opacity: 0.4; box-shadow: 0 0 12px var(--green); }
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text2);
+            background: var(--bg3);
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+        .section-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .refiners { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+
+        .refiner-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green);
+            border-radius: 8px;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .refiner-card.done { border-left-color: var(--blue); }
+
+        .refiner-card .target {
+            font-weight: 700;
+            color: var(--blue);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        .refiner-card .meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text2);
+            text-align: right;
+        }
+
+        .feed { display: flex; flex-direction: column; gap: 8px; }
+
+        .feed-item {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .feed-item .cycle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .feed-item .cycle-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--amber);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .feed-item .cycle-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text2);
+        }
+
+        .feed-item .summary {
+            font-size: 0.82rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .feed-item .summary.empty {
+            color: var(--text2);
+            font-style: italic;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text2);
+        }
+
+        .no-data .big {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--text2);
+            margin-bottom: 8px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border: 2px solid var(--border);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            header h1 { font-size: 0.85rem; }
+            .refiner-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><span class="pulse" id="pulse"></span>Watchroom</h1>
+        <div class="badge" id="badge">loading...</div>
+    </header>
+
+    <div class="container">
+        <div class="section-label">Active Refiners</div>
+        <div class="refiners" id="refiners">
+            <div class="no-data"><div class="big">Scanning...</div></div>
+        </div>
+
+        <div class="section-label">Improvement Feed</div>
+        <div class="feed" id="feed">
+            <div class="no-data">
+                <div class="big">Waiting for agents...</div>
+                Improvements will appear here as refiners complete cycles
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pulse = document.getElementById('pulse');
+        const badge = document.getElementById('badge');
+        const refinersEl = document.getElementById('refiners');
+        const feedEl = document.getElementById('feed');
+
+        function esc(t) { const d = document.createElement('span'); d.textContent = t; return d.innerHTML; }
+
+        function timeAgo(isoStr) {
+            const secs = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+            if (secs < 60) return secs + 's ago';
+            if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+            return Math.floor(secs / 3600) + 'h ago';
+        }
+
+        async function refresh() {
+            try {
+                const res = await fetch('status.json?t=' + Date.now());
+                if (!res.ok) throw new Error('No status');
+                const data = await res.json();
+
+                const refs = Object.entries(data.refiners || {});
+                const activeCount = refs.filter(([_, r]) => r.status === 'running').length;
+
+                if (activeCount > 0) {
+                    pulse.classList.remove('idle');
+                    badge.textContent = 'LIVE — ' + activeCount + ' agent(s)';
+                } else if (refs.length > 0) {
+                    pulse.classList.add('idle');
+                    badge.textContent = refs.length + ' refiner(s) — idle';
+                } else {
+                    pulse.classList.add('idle');
+                    badge.textContent = 'no agents';
+                }
+
+                // Refiner cards
+                if (refs.length > 0) {
+                    refinersEl.innerHTML = refs.map(([key, r]) => `
+                        <div class="refiner-card ${r.status === 'done' ? 'done' : ''}">
+                            <div>
+                                <div class="target">
+                                    ${r.status === 'running' ? '<span class="spinner"></span>' : ''}
+                                    ${esc(key)} refiner
+                                </div>
+                            </div>
+                            <div class="meta">
+                                ${r.cycles} cycles<br>
+                                ${r.status === 'running' ? r.remaining_mins + 'm left &middot; until ' + esc(r.until) : 'completed'}<br>
+                                ${timeAgo(r.last_update)}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // Feed
+                const feed = data.feed || [];
+                if (feed.length > 0) {
+                    feedEl.innerHTML = feed.map(e => `
+                        <div class="feed-item">
+                            <div class="cycle-header">
+                                <div class="cycle-tag">${esc(e.target)} #${e.cycle}</div>
+                                <div class="cycle-time">${esc(e.time)}</div>
+                            </div>
+                            <div class="summary ${e.summary.includes('no summary') ? 'empty' : ''}">
+                                ${esc(e.summary)}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (err) {
+                // status.json doesn't exist yet — that's fine
+                badge.textContent = 'waiting for data';
+                pulse.classList.add('idle');
+            }
+        }
+
+        refresh();
+        setInterval(refresh, 15000); // Poll every 15s (it's a static file)
+    </script>
+</body>
+</html>
