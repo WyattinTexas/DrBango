@@ -704,14 +704,34 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .so-info { font-size:12px; color:var(--text2); }
 
 /* Game Over */
-.game-over { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:200; align-items:center; justify-content:center; }
+.game-over { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; align-items:center; justify-content:center; overflow-y:auto; }
 .game-over.active { display:flex; }
-.go-box { text-align:center; padding:40px; }
-.go-box h2 { font-size:34px; font-weight:900; margin-bottom:6px; }
-.go-box h2.red-win { color:var(--accent); }
-.go-box h2.blue-win { color:var(--rare); }
-.go-box p { color:var(--text2); margin-bottom:20px; font-size:14px; }
-.go-box button { padding:12px 30px; border:none; border-radius:8px; background:var(--magma); color:white; font-size:15px; font-weight:700; cursor:pointer; }
+.go-box { text-align:center; padding:32px 24px; max-width:640px; width:100%; }
+.go-box h2 { font-size:38px; font-weight:900; margin-bottom:4px; text-transform:uppercase; letter-spacing:2px; }
+.go-box h2.red-win { color:var(--accent); text-shadow:0 0 30px rgba(233,69,96,0.5); }
+.go-box h2.blue-win { color:var(--rare); text-shadow:0 0 30px rgba(52,152,219,0.5); }
+.go-rounds { font-size:13px; color:var(--text2); margin-bottom:20px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+.go-summary { display:flex; gap:16px; margin-bottom:24px; }
+.go-team-col { flex:1; background:var(--surface); border-radius:12px; padding:14px; border:1px solid var(--border); }
+.go-team-col h3 { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.go-team-col h3.red-label { color:var(--accent); }
+.go-team-col h3.blue-label { color:var(--rare); }
+.go-ghost-row { display:flex; align-items:center; gap:10px; padding:8px 6px; border-radius:8px; margin-bottom:4px; }
+.go-ghost-row.mvp { background:linear-gradient(135deg, rgba(243,156,18,0.15), rgba(243,156,18,0.05)); border:1px solid rgba(243,156,18,0.3); }
+.go-ghost-art { width:40px; height:40px; border-radius:8px; object-fit:cover; background:var(--bg); flex-shrink:0; }
+.go-ghost-art-placeholder { width:40px; height:40px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.go-ghost-info { flex:1; text-align:left; }
+.go-ghost-name { font-size:13px; font-weight:700; }
+.go-ghost-status { font-size:11px; margin-top:2px; }
+.go-ghost-status.survived { color:var(--win); }
+.go-ghost-status.ko { color:var(--lose); }
+.go-mvp-badge { font-size:10px; font-weight:800; color:var(--legendary); background:rgba(243,156,18,0.15); padding:2px 8px; border-radius:4px; letter-spacing:0.5px; white-space:nowrap; }
+.go-buttons { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.go-buttons button { padding:12px 28px; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; }
+.go-buttons button:hover { transform:translateY(-2px); }
+.go-btn-rematch { background:linear-gradient(135deg, var(--moonstone-deep), var(--moonstone)); color:#0f0f1a; }
+.go-btn-newgame { background:var(--surface2); color:var(--text); border:1px solid var(--border) !important; }
+.go-btn-newgame:hover { border-color:var(--moonstone) !important; }
 
 /* Standings */
 .standings-btn {
@@ -990,8 +1010,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 <div class="game-over" id="gameOver">
   <div class="go-box">
     <h2 id="goTitle">VICTORY</h2>
-    <p id="goSub"></p>
-    <button onclick="resetBattle()">Play Again</button>
+    <div class="go-rounds" id="goRounds"></div>
+    <div class="go-summary" id="goSummary"></div>
+    <div class="go-buttons">
+      <button class="go-btn-rematch" onclick="rematchBattle()">Rematch (Same Teams)</button>
+      <button class="go-btn-newgame" onclick="resetBattle()">New Game</button>
+    </div>
   </div>
 </div>
 
@@ -999,7 +1023,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v13';
+const TESTROOM_VERSION = 'v14';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3125,33 +3149,67 @@ function showGameOver(winner) {
   clearLsCountdown();
   disableRollButtons();
 
-  // Record standings — ALL ghosts on winning team get W, ALL on losing team get L
+  // Record standings
   if (winner === 'red' || winner === 'blue') {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];
-    // Every ghost on the winning team gets a W
     winTeam.ghosts.forEach(g => recordWin(g.id));
-    // Every ghost on the losing team gets an L
     loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
-    // Track KOs separately for "Ghosts Defeated" stat
     loseTeamObj.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
     winTeam.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
-  }
-
-  const rounds = B.round - 1;
-  if (winner === 'draw') {
-    narrate(`GAME OVER! Both teams fall — a bitter draw in ${rounds} rounds!`);
-  } else {
-    narrate(`GAME OVER! Team ${winner.toUpperCase()} claims victory in ${rounds} round${rounds !== 1 ? 's' : ''}!`);
   }
 
   const el = document.getElementById('gameOver');
   el.classList.add('active');
   const title = document.getElementById('goTitle');
-  if (winner==='draw') { title.textContent='DRAW!'; title.className=''; }
-  else { title.textContent=`TEAM ${winner.toUpperCase()} WINS!`; title.className=`${winner}-win`; }
-  document.getElementById('goSub').textContent = `Battle ended in ${rounds} rounds`;
+  const rounds = B.round - 1;
+  if (winner === 'draw') { title.textContent = 'DRAW!'; title.className = ''; }
+  else { title.textContent = `TEAM ${winner.toUpperCase()} WINS!`; title.className = `${winner}-win`; }
+
+  // Round count
+  document.getElementById('goRounds').textContent = `${rounds} round${rounds !== 1 ? 's' : ''} played`;
+
+  // Battle summary with ghost statuses
+  function buildTeamCol(teamObj, teamLabel, teamColor) {
+    const gd = id => ghostData(id);
+    // Find MVP: survivor with highest remaining HP ratio
+    let mvpIdx = -1;
+    let bestScore = -1;
+    teamObj.ghosts.forEach((g, i) => {
+      const score = g.ko ? 0 : (g.hp / g.maxHp) + 1;
+      if (score > bestScore) { bestScore = score; mvpIdx = i; }
+    });
+
+    const rows = teamObj.ghosts.map((g, i) => {
+      const data = gd(g.id);
+      const isMvp = i === mvpIdx && !g.ko;
+      const artHtml = data.art
+        ? `<img class="go-ghost-art" src="${data.art}" alt="${g.name}">`
+        : `<div class="go-ghost-art-placeholder">&#128123;</div>`;
+      const statusText = g.ko
+        ? "KO'd"
+        : `${g.hp}/${g.maxHp} HP`;
+      const statusClass = g.ko ? 'ko' : 'survived';
+      const mvpBadge = isMvp ? '<span class="go-mvp-badge">MVP</span>' : '';
+      return `<div class="go-ghost-row${isMvp ? ' mvp' : ''}">
+        ${artHtml}
+        <div class="go-ghost-info">
+          <div class="go-ghost-name">${g.name}</div>
+          <div class="go-ghost-status ${statusClass}">${statusText}</div>
+        </div>
+        ${mvpBadge}
+      </div>`;
+    }).join('');
+
+    return `<div class="go-team-col">
+      <h3 class="${teamColor}-label">Team ${teamLabel}</h3>
+      ${rows}
+    </div>`;
+  }
+
+  const summaryHtml = buildTeamCol(B.red, 'Red', 'red') + buildTeamCol(B.blue, 'Blue', 'blue');
+  document.getElementById('goSummary').innerHTML = summaryHtml;
 }
 
 // ============================================================
@@ -3592,13 +3650,7 @@ function revealDice(team, values) {
   });
 }
 
-function resetBattle() {
-  stopMusicHard();
-  B = null; S.battle = null;
-  S.redPicks = []; S.bluePicks = [];
-  document.getElementById('battle-view').style.display = 'none';
-  document.getElementById('team-select').style.display = 'block';
-  document.querySelector('.app').classList.remove('battle-active');
+function clearAllOverlays() {
   document.getElementById('gameOver').classList.remove('active');
   document.getElementById('swapOverlay').classList.remove('active');
   document.getElementById('msPicker').classList.remove('active');
@@ -3606,11 +3658,43 @@ function resetBattle() {
   document.getElementById('stealOverlay').classList.remove('active');
   document.getElementById('pressureOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
+  document.getElementById('abilitySplash').classList.remove('active');
   const vsSplash = document.getElementById('vsSplash');
   if (vsSplash) vsSplash.classList.remove('active');
   clearTimeout(afkTimer);
-  renderDice(null,null);
+}
+
+function resetBattle() {
+  stopMusicHard();
+  B = null; S.battle = null;
+  S.redPicks = []; S.bluePicks = [];
+  abilityQueue = [];
+  abilityQueueMode = false;
+  clearAllOverlays();
+  document.getElementById('battle-view').style.display = 'none';
+  document.getElementById('team-select').style.display = 'block';
+  document.querySelector('.app').classList.remove('battle-active');
+  resetRollButtons();
+  narrate('');
+  renderDice(null, null);
   renderPicks();
+}
+
+function rematchBattle() {
+  stopMusicHard();
+  const redIds = S.redPicks.slice();
+  const blueIds = S.bluePicks.slice();
+  B = null; S.battle = null;
+  abilityQueue = [];
+  abilityQueueMode = false;
+  clearAllOverlays();
+  resetRollButtons();
+  narrate('');
+  renderDice(null, null);
+  // Restore picks and start fresh battle
+  S.redPicks = redIds;
+  S.bluePicks = blueIds;
+  startBattle();
 }
 
 // ============================================================
