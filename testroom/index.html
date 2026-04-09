@@ -1168,7 +1168,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v39';
+const TESTROOM_VERSION = 'v40';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2299,16 +2299,14 @@ function rollReady(team) {
   // First click: do pre-roll setup (abilities, dice counts)
   let preRollDelay = 0;
   if (B.phase === 'ready') {
-    // Check if any ability callouts will fire during pre-roll
-    const hadCalloutBefore = document.getElementById('abilitySplash').classList.contains('active');
-    doPreRollSetup();
+    const calloutCount = doPreRollSetup();
     if (B.phase !== 'ready') return; // pre-roll interrupted — KO-swap, game-over, or other phase change
     B.phase = 'rolling';
     // Re-render immediately so consumed status tags (Retribution, etc.) clear from fighter cards
     renderBattle();
-    // If a callout fired during pre-roll, delay dice roll so player can read it
-    const hasCalloutNow = document.getElementById('abilitySplash').classList.contains('active');
-    if (hasCalloutNow) preRollDelay = 1500;
+    // If pre-roll callouts were queued (via setTimeout), wait for all of them to fully play
+    // before dice roll — last callout starts at (N-1)*1500 and lasts ~1400ms, so N*1500 is exact
+    if (calloutCount > 0) preRollDelay = calloutCount * 1500;
   }
 
   // Lock this button
@@ -2415,7 +2413,7 @@ function doPreRollSetup() {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        showAbilityCallout('SWARM!', 'var(--magma)', `${f.name} — 1 damage to ${ef.name}!`);
+        preRollCallouts.push(['SWARM!', 'var(--magma)', `${f.name} — 1 damage to ${ef.name}!`]);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
         hitDamage(enemyName);
@@ -2424,6 +2422,28 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${f.name}</span> — Swarm blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
     }
   });
+
+  // Shade's Shadow (205) — sideline: deal 1 dmg to enemy active before rolling
+  [B.red, B.blue].forEach(team => {
+    const enemy = opp(team);
+    const tNameShade = team === B.red ? 'red' : 'blue';
+    if (hasSideline(team, 205)) {
+      const shadeGhost = getSidelineGhost(team, 205);
+      checkKnightEffects(tNameShade, "Shade's Shadow", shadeGhost);
+      const ef = active(enemy);
+      if (!ef.ko) {
+        ef.hp = Math.max(0, ef.hp - 1);
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
+        const enemyName = enemy === B.red ? 'red' : 'blue';
+        preRollCallouts.push(['MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`]);
+        log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+        playDamageSfx(1);
+        hitDamage(enemyName);
+        popSidelineCard(team, 205);
+      }
+    }
+  });
+
   if (handleKOs()) {
     // Refund committed resources — round ended before resolution
     refundCommitted();
@@ -2440,7 +2460,7 @@ function doPreRollSetup() {
       B.harrisonExtraDie[tName] = B.committed[tName].harrison;
       const cnt = B.committed[tName].harrison;
       B.committed[tName].harrison = 0; // reset after use
-      showAbilityCallout('ASCEND!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt} dice!`);
+      preRollCallouts.push(['ASCEND!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt} dice!`]);
       log(`<span class="log-ability">${f.name}</span> — Ascend! Spent ${cnt} Healing Seed${cnt>1?'s':''} for +${cnt} extra dice!`);
     }
   });
@@ -2484,7 +2504,7 @@ function doPreRollSetup() {
 
       // Single callout covers both conversions — no second call stomping the first
       const calloutDesc = `Smithy — ${parts.join(' + ')}!`;
-      showAbilityCallout('FORGE!', 'var(--legendary)', calloutDesc);
+      preRollCallouts.push(['FORGE!', 'var(--legendary)', calloutDesc]);
       popSidelineCard(team, 204);
     }
   });
@@ -2526,7 +2546,7 @@ function doPreRollSetup() {
       if (tName === 'red') redCount = 1;
       else blueCount = 1;
       f.maximoFirstRoll = false;
-      showAbilityCallout('NAP!', '#22c55e', `${f.name} — still napping, rolling only 1 die!`);
+      preRollCallouts.push(['NAP!', '#22c55e', `${f.name} — still napping, rolling only 1 die!`]);
       log(`<span class="log-ability">${f.name}</span> is still napping — rolling only 1 die!`);
     }
   });
@@ -2552,23 +2572,23 @@ function doPreRollSetup() {
         // Spring: +1 HP (heal, capped at maxHp)
         const gained = f.hp < f.maxHp;
         f.hp = Math.min(f.maxHp, f.hp + 1);
-        showAbilityCallout('SEASONS — SPRING!', 'var(--legendary)', `${f.name} — ${gained ? '+1 HP restored! ('+f.hp+'/'+f.maxHp+')' : 'already at full HP.'}`);
+        preRollCallouts.push(['SEASONS — SPRING!', 'var(--legendary)', `${f.name} — ${gained ? '+1 HP restored! ('+f.hp+'/'+f.maxHp+')' : 'already at full HP.'}`]);
         log(`<span class="log-ability">${f.name}</span> — Seasons: Spring! ${gained ? '+1 HP ('+f.hp+'/'+f.maxHp+')' : 'already at full HP'}.`);
       } else if (season === 2) {
         // Summer: +1 damage this round for Mother Nature's team
         B.motherNatureSummer[tName] = true;
-        showAbilityCallout('SEASONS — SUMMER!', 'var(--legendary)', `${f.name} — Summer: +1 damage if you win this round!`);
+        preRollCallouts.push(['SEASONS — SUMMER!', 'var(--legendary)', `${f.name} — Summer: +1 damage if you win this round!`]);
         log(`<span class="log-ability">${f.name}</span> — Seasons: Summer! +1 damage this round.`);
       } else if (season === 3) {
         // Autumn: +1 Healing Seed for Mother Nature's team
         team.resources.healingSeed++;
-        showAbilityCallout('SEASONS — AUTUMN!', 'var(--legendary)', `${f.name} — Autumn: +1 Healing Seed!`);
+        preRollCallouts.push(['SEASONS — AUTUMN!', 'var(--legendary)', `${f.name} — Autumn: +1 Healing Seed!`]);
         log(`<span class="log-ability">${f.name}</span> — Seasons: Autumn! Gained 1 Healing Seed.`);
       } else {
         // Winter (round % 4 === 0): opponent rolls 1 fewer die
         if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
         else blueCount = Math.max(1, blueCount - 1);
-        showAbilityCallout('SEASONS — WINTER!', 'var(--legendary)', `${f.name} — Winter: opponent rolls 1 fewer die!`);
+        preRollCallouts.push(['SEASONS — WINTER!', 'var(--legendary)', `${f.name} — Winter: opponent rolls 1 fewer die!`]);
         log(`<span class="log-ability">${f.name}</span> — Seasons: Winter! Opponent rolls 1 fewer die.`);
       }
     }
@@ -2596,7 +2616,13 @@ function doPreRollSetup() {
     blue: { count: blueCount, override: hankOverride.blue, dice: null }
   };
 
+  // Drain pre-roll callouts sequentially — each plays for 1.4s before the next fires
+  preRollCallouts.forEach((c, i) => {
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2]), i * 1500);
+  });
+
   renderBattle();
+  return preRollCallouts.length; // caller uses this to defer dice until all callouts clear
 }
 
 // ========================================
@@ -2607,23 +2633,7 @@ function doPostRollAndResolve(redDice, blueDice) {
   abilityQueue = [];
   abilityQueueMode = true;
 
-  // Shade's Shadow (205) — sideline: after you roll, deal 1 dmg to enemy active
-  [B.red, B.blue].forEach(team => {
-    const enemy = opp(team);
-    const tNamePost = team === B.red ? 'red' : 'blue';
-    if (hasSideline(team, 205)) {
-      const shadeGhost = getSidelineGhost(team, 205);
-      checkKnightEffects(tNamePost, "Shade's Shadow", shadeGhost);
-      const ef = active(enemy);
-      if (!ef.ko) {
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
-        const enemyName = enemy === B.red ? 'red' : 'blue';
-        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`, () => { playDamageSfx(1); hitDamage(enemyName); popSidelineCard(team, 205); });
-        log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
-      }
-    }
-  });
+  // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
 
   // Dart (207) — each 4 rolled: gain 1 Lucky Stone
   [B.red, B.blue].forEach(team => {
