@@ -20,16 +20,25 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 28,
-      "remaining_mins": 9,
+      "cycles": 29,
+      "remaining_mins": 7,
       "until": "06:55 PM",
-      "last_update": "2026-04-09T18:47:24.268957",
+      "last_update": "2026-04-09T18:57:56.695048",
       "status": "running",
-      "next_up": "Harrison (315) extra-die grant queue-order audit \u2014 verify `B.harrisonBonus` applies before dice are rendered when multiple on-win abilities chain simultaneously (e.g. Overclock + Harrison on same team), and confirm the bonus die actually shows in the dice row rather than being silently granted.",
-      "after_that": "Full `hasSideline` cross-check for Granny (310) \u2014 confirm the Bedtime Story on-KO trigger correctly reads the winner's roll type via `wR.type` (not the loser's), and that it doesn't fire when Granny herself is the KO'd ghost."
+      "next_up": "Sylvia (313) Porpoise ability description mismatch \u2014 the card says \"roll 1 die\" but the implementation rolls 2 dice (yielding ~30% dodge chance by design per the design note). The displayed callout shows `[X, Y]` which directly contradicts the description. Update `abilityDesc` to say \"roll 2 dice\" to match actual behaviour.",
+      "after_that": "Auto-pick KO swap narration gap \u2014 when only 1 sideline ghost is alive and the active ghost is KO'd, `openKoSwap` calls `doKoSwap` immediately with no narrator feedback (no \"X is down!\"); the narrator only shows \"Y enters the arena!\" from `triggerEntry`, so players lose context for why the ghost suddenly changed. Add a `narrate()` call in the auto-pick branch before the `doKoSwap` call."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 29,
+      "summary": "Dylan's Scarecrow now blocks Shade's Shadow's pre-roll Meltdown \u2014 `hasSideline(team, 205)` had no `dylanNegates(enemy)` guard, so Shade's Shadow would chip the enemy even when Dylan was on their sideline, violating Dylan's \"enemy before-roll effects don't activate\" rule. Added `!dylanNegates(enemy)` to the condition and an `else if` log matching the Ember Force blocked pattern.",
+      "next_up": "Sylvia (313) Porpoise ability description mismatch \u2014 the card says \"roll 1 die\" but the implementation rolls 2 dice (yielding ~30% dodge chance by design per the design note). The displayed callout shows `[X, Y]` which directly contradicts the description. Update `abilityDesc` to say \"roll 2 dice\" to match actual behaviour.",
+      "after_that": "Auto-pick KO swap narration gap \u2014 when only 1 sideline ghost is alive and the active ghost is KO'd, `openKoSwap` calls `doKoSwap` immediately with no narrator feedback (no \"X is down!\"); the narrator only shows \"Y enters the arena!\" from `triggerEntry`, so players lose context for why the ghost suddenly changed. Add a `narrate()` call in the auto-pick branch before the `doKoSwap` call.",
+      "time": "18:57:56",
+      "timestamp": "2026-04-09T18:57:56.695064"
+    },
     {
       "target": "testroom",
       "cycle": 28,
@@ -470,18 +479,9 @@
       "after_that": "Audit whether `retributionDice` also needs a round-boundary reset \u2014 Knight Light accumulates bonus dice across rounds, which is likely intentional (they persist until spent), but verify the reset logic is correct and the Retribution tag clears when the dice are actually consumed in `rollReady`",
       "time": "15:54:28",
       "timestamp": "2026-04-09T15:54:28.764789"
-    },
-    {
-      "target": "testroom",
-      "cycle": 17,
-      "summary": "Implemented Mother Nature (366) Seasons ability from scratch \u2014 Spring (+1 HP heal), Summer (+1 damage), Autumn (+1 Healing Seed), and Winter (opponent \u22121 die) now all fire each round with gold legendary callouts, plus a blue \"-1 Die (Winter)\" status tag on the opponent's fighter card; previously this Legendary card did absolutely nothing in battle.",
-      "next_up": "Audit whether `B.motherNatureSummer` gets reset at round boundaries \u2014 the current init sets it to `{ red: false, blue: false }` and the damage hook clears it post-use, but a round with a tie (where damage is never resolved) could leave a stale `true` value that bleeds into the next round; add a reset at the tie-round and win-round transition points alongside the existing `pressureUsed` reset.",
-      "after_that": "Pressure opponent choice UX refinement \u2014 when the opponent has only 1 sideline ghost, `usePressure` auto-picks instantly with no feedback to the *attacking* player that it happened silently; should show the same callout splash before executing so both players see the effect land.",
-      "time": "15:53:36",
-      "timestamp": "2026-04-09T15:53:36.229403"
     }
   ],
-  "last_update": "2026-04-09T18:47:24.268980",
+  "last_update": "2026-04-09T18:57:56.695071",
   "orchestrator_check": {
     "timestamp": "2026-04-09T18:32:52.631807",
     "summary": "DRIFT: Refiner reworked Timber + Selene abilities without auth. Revert needed. 24 cycles, good polish otherwise."
