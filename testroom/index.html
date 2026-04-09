@@ -1168,7 +1168,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v38';
+const TESTROOM_VERSION = 'v39';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2380,6 +2380,9 @@ function doPreRollSetup() {
   const rF = active(B.red), bF = active(B.blue);
   if (rF.ko || bF.ko) return;
 
+  // Collect pre-roll callouts — drained sequentially after setup so none stomp each other
+  const preRollCallouts = [];
+
   // Snapshot Lucky Stones + Moonstones available BEFORE this round
   // (can't use resources gained during the same roll)
   B.lsAvailable = {
@@ -3386,17 +3389,20 @@ function resolveRound() {
     }
   }
 
-  // Sylvia (313) — loser dodge check: roll 1 die, if 6 negate all damage
+  // Sylvia (313) — loser dodge check: roll 2 dice, if either is a 6 negate all damage
   let sylviaDodged = false;
-  let sylviaDodgeRoll = 0; // store for callout (0 = Sylvia not active)
+  let sylviaDodgeRolls = []; // store for callout
   if (lF.id === 313 && !lF.ko) {
     checkKnightEffects(loseTeamName, lF.name);
-    sylviaDodgeRoll = Math.floor(Math.random()*6)+1;
-    if (sylviaDodgeRoll === 6) {
+    sylviaDodgeRolls = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1];
+    if (sylviaDodgeRolls.includes(6)) {
       dmg = 0;
       sylviaDodged = true;
+      queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`);
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled [${sylviaDodgeRolls.join(',')}] — <span class="log-ms">ALL DAMAGE NEGATED!</span>`);
     } else {
-      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge roll: ${sylviaDodgeRoll} (needed 6).`);
+      queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`);
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${sylviaDodgeRolls.join(',')}] (needed a 6).`);
     }
   }
 
