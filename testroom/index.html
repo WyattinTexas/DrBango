@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Volcanic Activity & Rolling Hills Testroom — BOO! Battle of Origins</title>
 <style>
 :root {
@@ -1169,7 +1172,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v52';
+const TESTROOM_VERSION = 'v54';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3558,7 +3561,7 @@ function resolveRound() {
   // On-win callouts
   if (wF.id === 209 && !wF.ko) queueAbility('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`);
   if (wF.id === 307 && !wF.ko) queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`);
-  if (wF.id === 342 && !wF.ko) queueAbility('OVERCLOCK!', 'var(--moonstone)', `${wF.name} — Win heals 1 HP! ${wF.hp} HP${wF.hp > wF.maxHp ? ' (overclocked!)' : ''}`);
+  if (wF.id === 342 && !wF.ko) queueAbility('OVERCLOCK!', 'var(--moonstone)', `${wF.name} — Win heals 1 HP! ${wF.hp - 1}→${wF.hp} HP${wF.hp > wF.maxHp ? ' (overclocked!)' : ''}`);
   if (wF.id === 336 && !wF.ko) queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`);
   if (wF.id === 309 && !wF.ko) queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`);
   if (wF.id === 362 && !wF.ko) queueAbility('POLLINATE!', '#22c55e', `${wF.name} — Win! +2 🌱 Seeds gained, 1 🌱 given to opponent!`);
@@ -4144,8 +4147,13 @@ function renderCardSlot(ghost, isFighter) {
       if (ghost.id === 364 && !ghost.ko && B.round > 5) {
         statusHtml += `<span class="status-tag" style="background:rgba(139,92,246,0.18);color:#c4b5fd;border:1px solid #c4b5fd44;">🌙 Twilight Active · +1 Dmg</span>`;
       }
-      // Smithy (204) sideline Forge indicator — show on fighter card when Smithy is on your sideline
-      if (hasSideline(thisTeam, 204)) {
+      // Smithy (204) Forge indicator:
+      // • Smithy on sideline → show Forge state on the active fighter's card
+      // • Smithy IS the active fighter → show "dormant" on his own card so players
+      //   know they need to bench him for Forge to activate
+      if (ghost.id === 204) {
+        statusHtml += `<span class="status-tag" style="background:rgba(100,116,139,0.18);color:#94a3b8;" title="Forge only works when Smithy is on the sideline">🔨 Forge: dormant</span>`;
+      } else if (hasSideline(thisTeam, 204)) {
         const canForge = (thisTeam.resources.ice >= 2) || (thisTeam.resources.fire >= 2);
         if (canForge) {
           statusHtml += `<span class="status-tag" style="background:rgba(251,191,36,0.16);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);">🔨 Forge: ready</span>`;
