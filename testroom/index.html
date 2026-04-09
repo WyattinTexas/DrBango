@@ -420,6 +420,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .ability-btn.pressure { border-color:rgba(255,99,72,0.5); color:var(--magma); background:rgba(255,99,72,0.1); }
 .ability-btn.pressure:hover { background:rgba(255,99,72,0.2); box-shadow:0 0 12px rgba(255,99,72,0.3); }
 
+.blackout-picker { display:flex; align-items:center; gap:4px; margin-top:4px; }
+.blackout-label { font-size:11px; color:var(--moonstone); font-weight:700; }
+.blackout-num { width:28px; height:28px; border-radius:6px; border:2px solid var(--border); background:var(--surface2); color:var(--text); font-weight:700; font-size:14px; cursor:pointer; transition:all .2s; }
+.blackout-num:hover { border-color:var(--moonstone); }
+.blackout-num.active { background:var(--magma); border-color:var(--magma); color:white; }
+
 @keyframes shake {
   0%,100% { transform:rotate(0); }
   25% { transform:rotate(-8deg) scale(1.08); }
@@ -1190,8 +1196,11 @@ function triggerEntry(team, skipEntryEffects) {
   const enemy = opp(team);
   if (skipEntryEffects) return; // Tyson's Hop: no entry effects
 
+  const entryTeamName = team === B.red ? 'red' : 'blue';
+
   // Bouril (201) — Slumber: first roll is auto 1-2-3
   if (f.id === 201) {
+    checkKnightEffects(entryTeamName, f.name);
     f.hankFirstRoll = true;
     log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
   }
@@ -1199,6 +1208,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Zain (206) — Aquatic Wisdom: spend 2 ice for 1 moonstone
   if (f.id === 206) {
     if (team.resources.ice >= 2) {
+      checkKnightEffects(entryTeamName, f.name);
       team.resources.ice -= 2;
       team.resources.moonstone++;
       log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
@@ -1207,6 +1217,7 @@ function triggerEntry(team, skipEntryEffects) {
 
   // Nerina (306) — Leviathan: deal 3 damage to enemy active
   if (f.id === 306) {
+    checkKnightEffects(entryTeamName, f.name);
     const ef = active(enemy);
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
@@ -1221,6 +1232,7 @@ function triggerEntry(team, skipEntryEffects) {
 
   // Maximo (302) — Nap: first roll is 1 die
   if (f.id === 302) {
+    checkKnightEffects(entryTeamName, f.name);
     f.maximoFirstRoll = true;
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
   }
@@ -1229,6 +1241,7 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 312) {
     const ef = active(enemy);
     if (!ef.ko && ef.hp > f.hp) {
+      checkKnightEffects(entryTeamName, f.name);
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) ef.ko = true;
       const enemyName = enemy === B.red ? 'red' : 'blue';
@@ -1248,6 +1261,7 @@ function rollDice(n) {
 
 function classify(dice) {
   if (!dice||!dice.length) return {type:'none',value:0,damage:0};
+  if (dice.length === 1) return {type:'singles',value:dice[0],damage:1};
   const c = {};
   dice.forEach(d=>c[d]=(c[d]||0)+1);
   const mx = Math.max(...Object.values(c));
@@ -1386,6 +1400,49 @@ function toggleAuntSusan(team) {
 }
 
 // ============================================================
+// KNIGHT EFFECTS — Heavy Air (401) & Retribution (402)
+// ============================================================
+function checkKnightEffects(abilityTeamName, abilityGhostName) {
+  // abilityTeamName = the team whose ability is triggering
+  // The OPPONENT of that team might have Heavy Air or Retribution
+  const oppTeamName = abilityTeamName === 'red' ? 'blue' : 'red';
+  const oppTeam = B[oppTeamName];
+  const oppActive = active(oppTeam);
+
+  // Heavy Air (401) — opponent's active ghost: abilities cost 2 HP
+  if (oppActive.id === 401 && !oppActive.ko) {
+    const abilityTeam = B[abilityTeamName];
+    const target = active(abilityTeam);
+    if (!target.ko) {
+      target.hp = Math.max(0, target.hp - 2);
+      if (target.hp <= 0) target.ko = true;
+      log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${abilityGhostName} loses 2 HP!</span> ${target.ko ? '<span class="log-ko">KO!</span>' : target.hp + ' HP left'}`);
+    }
+  }
+
+  // Retribution (402) — your active ghost heals 1 HP when opponent uses ability
+  if (oppActive.id === 402 && !oppActive.ko) {
+    if (oppActive.hp < oppActive.maxHp) {
+      oppActive.hp = Math.min(oppActive.maxHp, oppActive.hp + 1);
+      log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-heal">Healed 1 HP!</span> ${oppActive.hp} HP.`);
+    }
+  }
+}
+
+// ============================================================
+// BLACKOUT — Smudge (403): name a number
+// ============================================================
+function setBlackout(team, num) {
+  if (!B.blackoutNum) B.blackoutNum = {};
+  if (B.blackoutNum[team] === num) {
+    delete B.blackoutNum[team]; // toggle off
+  } else {
+    B.blackoutNum[team] = num;
+  }
+  renderBattle();
+}
+
+// ============================================================
 // PRESSURE — manual pre-roll ability (Death Howl 202)
 // ============================================================
 function usePressure(team) {
@@ -1498,7 +1555,9 @@ function doPreRollSetup() {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const enemy = opp(team);
+    const tNamePre = team === B.red ? 'red' : 'blue';
     if (f.id === 304 && !f.ko && !dylanNegates(enemy)) {
+      checkKnightEffects(tNamePre, f.name);
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
@@ -1521,6 +1580,7 @@ function doPreRollSetup() {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
     if (f.id === 315 && !f.ko && team.resources.healingSeed > 0) {
+      checkKnightEffects(tName, f.name);
       team.resources.healingSeed--;
       B.harrisonExtraDie[tName] = true;
       log(`<span class="log-ability">${f.name}</span> — Ascend! Spent 1 Healing Seed for an extra die!`);
@@ -1609,7 +1669,9 @@ function doPostRollAndResolve(redDice, blueDice) {
   // Shade's Shadow (205) — sideline: after you roll, deal 1 dmg to enemy active
   [B.red, B.blue].forEach(team => {
     const enemy = opp(team);
+    const tNamePost = team === B.red ? 'red' : 'blue';
     if (hasSideline(team, 205)) {
+      checkKnightEffects(tNamePost, "Shade's Shadow");
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
@@ -1627,9 +1689,11 @@ function doPostRollAndResolve(redDice, blueDice) {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
+    const tNameHank = team === B.red ? 'red' : 'blue';
     if (f.id === 207 && !f.ko) {
       const fours = countVal(dice, 4);
       if (fours > 0) {
+        checkKnightEffects(tNameHank, f.name);
         team.resources.luckyStone += fours;
         log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
       }
@@ -1640,7 +1704,9 @@ function doPostRollAndResolve(redDice, blueDice) {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
+    const tNameSel = team === B.red ? 'red' : 'blue';
     if (f.id === 305 && !f.ko && hasDoubles(dice)) {
+      checkKnightEffects(tNameSel, f.name);
       team.resources.healingSeed++;
       team.resources.luckyStone++;
       log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
@@ -1651,7 +1717,9 @@ function doPostRollAndResolve(redDice, blueDice) {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
+    const tNameNat = team === B.red ? 'red' : 'blue';
     if (f.id === 327 && !f.ko && hasDouble2sOr3s(dice)) {
+      checkKnightEffects(tNameNat, f.name);
       team.resources.moonstone++;
       showAbilityCallout('CRACK OPEN!', 'var(--ghost-rare)', `${f.name} — gained 1 Moonstone!`);
       log(`<span class="log-ms">${f.name}</span> — Crack Open! Double 2s/3s → gained <span class="log-ms">1 Moonstone</span>!`);
@@ -1662,7 +1730,9 @@ function doPostRollAndResolve(redDice, blueDice) {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const oppDice = team === B.red ? blueDice : redDice;
+    const tNameKap = team === B.red ? 'red' : 'blue';
     if (f.id === 308 && !f.ko && hasDoubles(oppDice)) {
+      checkKnightEffects(tNameKap, f.name);
       team.resources.healingSeed++;
       log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
     }
@@ -1895,10 +1965,36 @@ function resolveRound() {
   B.phase = 'resolving';
   const redDice = B.pendingResolve.redDice;
   const blueDice = B.pendingResolve.blueDice;
+
+  // Blackout (403) — remove named number from opponent's dice
+  ['red', 'blue'].forEach(team => {
+    const oppTeam = team === 'red' ? 'blue' : 'red';
+    if (B.blackoutNum && B.blackoutNum[team]) {
+      const num = B.blackoutNum[team];
+      const originalDice = team === 'red' ? blueDice : redDice;
+      const filtered = [];
+      let removed = 0;
+      originalDice.forEach(d => {
+        if (d === num) { removed++; }
+        else { filtered.push(d); }
+      });
+      if (removed > 0) {
+        if (team === 'red') { blueDice.splice(0, blueDice.length, ...filtered); }
+        else { redDice.splice(0, redDice.length, ...filtered); }
+        showAbilityCallout('BLACKOUT!', 'var(--rare)', `Smudge — ${removed} dice showing ${num} removed!`);
+        log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
+      } else {
+        log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — no matches.`);
+      }
+    }
+  });
+  // Reset blackout picks
+  B.blackoutNum = {};
+
   B.redDice = redDice; B.blueDice = blueDice;
 
   const rR = classify(redDice), bR = classify(blueDice);
-  log(`<span class="log-round">Round ${B.round}:</span> Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
+  log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
 
   // Narrate the roll
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
@@ -1917,7 +2013,9 @@ function resolveRound() {
 
     // Tweak and Twonk (303) — sideline: tie → gain 3 Surge
     [B.red, B.blue].forEach(team => {
+      const tNameTie = team === B.red ? 'red' : 'blue';
       if (hasSideline(team, 303)) {
+        checkKnightEffects(tNameTie, 'Tweak and Twonk');
         team.resources.surge += 3;
         log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
       }
@@ -1926,7 +2024,9 @@ function resolveRound() {
     // Jimmy (352) — active: tie → gain 5 Lucky Stones
     [B.red, B.blue].forEach(team => {
       const f = active(team);
+      const tNameJim = team === B.red ? 'red' : 'blue';
       if (f.id === 352 && !f.ko) {
+        checkKnightEffects(tNameJim, f.name);
         team.resources.luckyStone += 5;
         showAbilityCallout('CHIRP!', '#fbbf24', `${f.name} — Tie! +5 Lucky Stones!`);
         log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span>!`);
@@ -1936,7 +2036,9 @@ function resolveRound() {
     // Maximo (302) — end of round: gain 1 Healing Seed
     [B.red, B.blue].forEach(team => {
       const f = active(team);
+      const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
+        checkKnightEffects(tNameMax, f.name);
         team.resources.healingSeed++;
         log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
       }
@@ -1981,6 +2083,13 @@ function resolveRound() {
     const fireDmg = B.committed[winTeamName].fire * 3;
     dmg += fireDmg;
     log(`<span class="log-ms">Sacred Fires committed!</span> <span class="log-dmg">+${fireDmg} damage!</span>`);
+
+    // Eternal Flame (406) — Sacred Fires not discarded
+    if (winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
+      winTeam.resources.fire += B.committed[winTeamName].fire;
+      showAbilityCallout('ETERNAL FLAME!', 'var(--magma)', `Fed and Hayden — Sacred Fires preserved!`);
+      log(`<span class="log-ability">Fed and Hayden</span> — Eternal Flame! Sacred Fires not discarded!`);
+    }
   }
 
   // Aunt Susan (309) — +2 damage if healingSeed was spent
@@ -1993,6 +2102,7 @@ function resolveRound() {
   // Pudge (311) — doubles: +2 damage
   let pudgeSelfDmg = false;
   if (wF.id === 311 && wR.type === 'doubles') {
+    checkKnightEffects(winTeamName, wF.name);
     dmg += 2;
     pudgeSelfDmg = true;
     showAbilityCallout('BELLY FLOP!', 'var(--uncommon)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
@@ -2001,6 +2111,7 @@ function resolveRound() {
 
   // Red Hunter (345) — if opponent has any resources: +3 damage
   if (wF.id === 345) {
+    checkKnightEffects(winTeamName, wF.name);
     const eRes = loseTeam.resources;
     if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
       dmg += 3;
@@ -2011,6 +2122,7 @@ function resolveRound() {
 
   // Sylvia (313) — loser dodge check: roll 1 die, if 6 negate all damage
   if (lF.id === 313 && !lF.ko) {
+    checkKnightEffects(loseTeamName, lF.name);
     const dodgeRoll = Math.floor(Math.random()*6)+1;
     if (dodgeRoll === 6) {
       dmg = 0;
@@ -2062,12 +2174,14 @@ function resolveRound() {
 
   // Skucher (209) — win: +2 Surge
   if (wF.id === 209 && !wF.ko) {
+    checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.surge += 2;
     log(`<span class="log-ability">${wF.name}</span> — Plunder! Gained <span class="log-ms">2 Surge</span>!`);
   }
 
   // Artemis (307) — win: +1 Surge, +1 Ice
   if (wF.id === 307 && !wF.ko) {
+    checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.surge++;
     winTeam.resources.ice++;
     log(`<span class="log-ability">${wF.name}</span> — Daughter of the Stream! Gained <span class="log-ms">1 Surge + 1 Ice Shard</span>!`);
@@ -2075,6 +2189,7 @@ function resolveRound() {
 
   // Calvin (342) — win: heal +1 HP (can't exceed maxHp)
   if (wF.id === 342 && !wF.ko) {
+    checkKnightEffects(winTeamName, wF.name);
     if (wF.hp < wF.maxHp) {
       wF.hp++;
       log(`<span class="log-heal">${wF.name}</span> — Overgrowth! Healed to ${wF.hp} HP!`);
@@ -2083,12 +2198,14 @@ function resolveRound() {
 
   // Humar (336) — win: +1 Sacred Fire
   if (wF.id === 336 && !wF.ko) {
+    checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.fire++;
     log(`<span class="log-ability">${wF.name}</span> — Sacred Flame! Gained <span class="log-ms">1 Sacred Fire</span>!`);
   }
 
   // Aunt Susan (309) — win: +1 Healing Seed
   if (wF.id === 309 && !wF.ko) {
+    checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.healingSeed++;
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! Win → gained <span class="log-ms">1 Healing Seed</span>!`);
   }
@@ -2097,9 +2214,22 @@ function resolveRound() {
   if (hasSideline(winTeam, 314)) {
     const sixes = countVal(winDice, 6);
     if (sixes > 0) {
+      checkKnightEffects(winTeamName, 'Farmer Jeff');
       winTeam.resources.healingSeed += sixes;
       log(`<span class="log-ability">Farmer Jeff</span> (sideline) — Harvest! ${sixes} six${sixes>1?'es':''} rolled → gained <span class="log-ms">${sixes} Healing Seed${sixes>1?'s':''}</span>!`);
     }
+  }
+
+  // ========================================
+  // ON-LOSE TRIGGERS
+  // ========================================
+
+  // Bitter End (404) — lose: gain 1 Surge (alive)
+  if (lF.id === 404 && !lF.ko) {
+    checkKnightEffects(loseTeamName, lF.name);
+    loseTeam.resources.surge++;
+    showAbilityCallout('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`);
+    log(`<span class="log-ability">${lF.name}</span> — Bitter End! Lost → gained <span class="log-ms">1 Surge</span>!`);
   }
 
   // ========================================
@@ -2109,6 +2239,7 @@ function resolveRound() {
   // Granny (310) — sideline consolation when YOUR ghost is defeated
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
+      checkKnightEffects(loseTeamName, 'Granny');
       if (wR.type === 'singles') {
         loseTeam.resources.luckyStone++;
         log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to singles → gained <span class="log-ms">1 Lucky Stone</span>.`);
@@ -2120,6 +2251,12 @@ function resolveRound() {
         log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to triples → gained <span class="log-ms">1 Moonstone</span>!`);
       }
     }
+
+    // Bitter End (404) — KO'd: still gain 1 Surge on loss
+    if (lF.id === 404) {
+      loseTeam.resources.surge++;
+      log(`<span class="log-ability">${lF.name}</span> — Bitter End! Defeated but gained <span class="log-ms">1 Surge</span>!`);
+    }
   }
 
   // ========================================
@@ -2129,7 +2266,9 @@ function resolveRound() {
   // Maximo (302) — end of round: gain 1 Healing Seed if active
   [B.red, B.blue].forEach(team => {
     const f = active(team);
+    const tNameMax2 = team === B.red ? 'red' : 'blue';
     if (f.id === 302 && !f.ko) {
+      checkKnightEffects(tNameMax2, f.name);
       team.resources.healingSeed++;
       log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
     }
@@ -2144,11 +2283,23 @@ function resolveRound() {
   renderDice(redDice, blueDice);
 
   // handleKOs may open the swap picker (sets phase to 'ko-swap')
-  // If no KO swap needed, resume to ready
-  if (!handleKOs()) {
-    B.phase = 'ready';
-    resetRollButtons();
+  // If a KO happened, add a dramatic pause before showing swap picker
+  if (lF.ko) {
+    B.phase = 'ko-pause'; // prevent double-clicks during pause
     renderBattle();
+    setTimeout(() => {
+      if (!handleKOs()) {
+        B.phase = 'ready';
+        resetRollButtons();
+        renderBattle();
+      }
+    }, 1500);
+  } else {
+    if (!handleKOs()) {
+      B.phase = 'ready';
+      resetRollButtons();
+      renderBattle();
+    }
   }
 }
 
@@ -2553,7 +2704,7 @@ function renderBattle() {
     document.getElementById(`${team}-resources`).innerHTML = rh;
   });
 
-  document.getElementById('turnIndicator').textContent = `Round ${B.round}`;
+  document.getElementById('turnIndicator').textContent = '';
   document.getElementById('redDiceLabel').textContent = active(B.red).name;
   document.getElementById('blueDiceLabel').textContent = active(B.blue).name;
   document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
@@ -2571,6 +2722,15 @@ function renderBattle() {
         if (enemySideline.length > 0) {
           html += `<button class="ability-btn pressure" onclick="usePressure('${team}')">🔥 Pressure</button>`;
         }
+      }
+      // Smudge (403) — Blackout: name a number
+      if (f.id === 403 && !f.ko) {
+        html += `<div class="blackout-picker">
+          <span class="blackout-label">Blackout:</span>
+          ${[1,2,3,4,5,6].map(n =>
+            `<button class="blackout-num ${B.blackoutNum && B.blackoutNum[team] === n ? 'active' : ''}" onclick="setBlackout('${team}', ${n})">${n}</button>`
+          ).join('')}
+        </div>`;
       }
     }
     el.innerHTML = html;
