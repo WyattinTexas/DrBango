@@ -404,6 +404,89 @@
             margin-left: 8px;
         }
 
+        /* === ORCHESTRATOR HEARTBEAT === */
+        .heartbeat-bar {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+        }
+
+        .hb-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hb-light {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            transition: all 0.5s;
+        }
+
+        .hb-light.active {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green), 0 0 20px rgba(64, 200, 120, 0.3);
+            animation: hbPulse 2s ease-in-out infinite;
+        }
+
+        .hb-light.stale {
+            background: var(--amber);
+            box-shadow: 0 0 6px rgba(224, 176, 64, 0.3);
+            animation: none;
+        }
+
+        .hb-light.dead {
+            background: var(--red);
+            box-shadow: 0 0 6px rgba(224, 80, 80, 0.3);
+            animation: hbDead 1s ease-in-out infinite;
+        }
+
+        @keyframes hbPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes hbDead {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .hb-label {
+            color: var(--text2);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .hb-label.active { color: var(--green); }
+        .hb-label.stale { color: var(--amber); }
+        .hb-label.dead { color: var(--red); }
+
+        .hb-detail {
+            color: var(--text2);
+            font-size: 0.6rem;
+        }
+
+        .hb-summary {
+            margin-top: 4px;
+            padding: 6px 12px;
+            background: rgba(64, 200, 120, 0.04);
+            border: 1px solid rgba(64, 200, 120, 0.08);
+            border-radius: 6px;
+            font-size: 0.68rem;
+            color: var(--text);
+            line-height: 1.5;
+            display: none;
+        }
+
+        .hb-summary.visible { display: block; }
+
+        .heartbeat-bar:hover .hb-summary { display: block; }
+
         @media (max-width: 600px) {
             .container { padding: 16px; }
             header h1 { font-size: 0.85rem; }
@@ -417,6 +500,15 @@
         <h1><span class="pulse" id="pulse"></span>Watchroom</h1>
         <div class="badge" id="badge">loading...</div>
     </header>
+
+    <div class="heartbeat-bar" id="heartbeatBar">
+        <div class="hb-left">
+            <div class="hb-light dead" id="hbLight"></div>
+            <span class="hb-label dead" id="hbLabel">Orchestrator — no checks</span>
+        </div>
+        <div class="hb-detail" id="hbDetail"></div>
+    </div>
+    <div class="hb-summary" id="hbSummary" style="margin:0 24px;"></div>
 
     <div class="container">
         <!-- Live ticker: most recent activity at a glance -->
@@ -447,6 +539,10 @@
         const tickerEl = document.getElementById('ticker');
         const tickerItemsEl = document.getElementById('ticker-items');
         const totalCyclesEl = document.getElementById('total-cycles');
+        const hbLight = document.getElementById('hbLight');
+        const hbLabel = document.getElementById('hbLabel');
+        const hbDetail = document.getElementById('hbDetail');
+        const hbSummary = document.getElementById('hbSummary');
 
         let lastFeedHash = '';
         let seenCycles = new Set();
@@ -593,6 +689,40 @@
 
                 lastFeedHash = newHash;
                 firstLoad = false;
+
+                // === ORCHESTRATOR HEARTBEAT ===
+                const check = data.orchestrator_check;
+                if (check && check.timestamp) {
+                    const checkAge = Math.floor((Date.now() - new Date(check.timestamp).getTime()) / 1000);
+                    const checkMins = Math.floor(checkAge / 60);
+                    let state = 'active';
+                    if (checkAge > 5400) state = 'dead';      // >90 min = dead
+                    else if (checkAge > 3900) state = 'stale'; // >65 min = stale
+
+                    hbLight.className = 'hb-light ' + state;
+                    hbLabel.className = 'hb-label ' + state;
+
+                    if (state === 'active') {
+                        hbLabel.textContent = 'Orchestrator — checks active';
+                    } else if (state === 'stale') {
+                        hbLabel.textContent = 'Orchestrator — check overdue';
+                    } else {
+                        hbLabel.textContent = 'Orchestrator — checks stopped';
+                    }
+
+                    hbDetail.textContent = 'Last check: ' + (checkMins < 1 ? 'just now' : checkMins + 'm ago');
+
+                    if (check.summary) {
+                        hbSummary.innerHTML = '<span>' + esc(check.summary) + '</span>';
+                        hbSummary.classList.add('visible');
+                    }
+                } else {
+                    hbLight.className = 'hb-light dead';
+                    hbLabel.className = 'hb-label dead';
+                    hbLabel.textContent = 'Orchestrator — no checks yet';
+                    hbDetail.textContent = '';
+                    hbSummary.classList.remove('visible');
+                }
 
             } catch (err) {
                 badge.textContent = 'waiting for data';
