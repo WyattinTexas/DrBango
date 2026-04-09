@@ -1169,7 +1169,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v51';
+const TESTROOM_VERSION = 'v52';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1296,9 +1296,9 @@ const GHOSTS = [
   },
   {
     id:305, name:"Selene", rarity:"legendary", maxHp:6, art:"art/luna.jpg",
-    ability:"Heart of the Hills", abilityDesc:"Roll doubles: gain 1 Healing Seed and 1 Lucky Stone.",
-    category:"Damage Multiplier", set:"Rolling Hills",
-    designNote:"The heart of Rolling Hills. Legendary moon spirit who generates Healing Seeds and Lucky Stones on doubles (~42%). Selene's creek runs through the hills — Artemis is her messenger."
+    ability:"Heart of the Hills", abilityDesc:"Roll doubles: choose — gain 1 Healing Seed OR 2 Lucky Stones.",
+    category:"Resource Generation", set:"Rolling Hills",
+    designNote:"Wyatt's fix for dual-resource problem. Player chooses 1 Healing Seed OR 2 Lucky Stones on doubles (~42%). No more double-dipping — forces a decision between sustain and reroll economy. Selene's creek runs through the hills — Artemis is her messenger."
   },
   {
     id:306, name:"Nerina", rarity:"legendary", maxHp:9, art:"art/the_deep.jpg",
@@ -2606,11 +2606,15 @@ function doPreRollSetup() {
     redCount += B.committed.red.surge;
     log(`<span class="log-ability">Red</span> committed <span class="log-ms">${B.committed.red.surge} Surge</span> → +${B.committed.red.surge} dice!`);
     triggerBorisHook(B.red);
+    const borisRed = B.red.ghosts.find(g => g.id === 343 && !g.ko);
+    if (borisRed) preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP! (${borisRed.hp}/${borisRed.maxHp})`]);
   }
   if (B.committed.blue.surge > 0) {
     blueCount += B.committed.blue.surge;
     log(`<span class="log-ability">Blue</span> committed <span class="log-ms">${B.committed.blue.surge} Surge</span> → +${B.committed.blue.surge} dice!`);
     triggerBorisHook(B.blue);
+    const borisBlue = B.blue.ghosts.find(g => g.id === 343 && !g.ko);
+    if (borisBlue) preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP! (${borisBlue.hp}/${borisBlue.maxHp})`]);
   }
 
   // Store pre-roll data for per-click rolling
