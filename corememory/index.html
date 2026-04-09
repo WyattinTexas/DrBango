@@ -530,6 +530,16 @@
             white-space: nowrap;
         }
 
+        .destruct-bar.critical .destruct-msg {
+            color: #cc4444;
+            animation: msg-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes msg-pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
         /* Push content down for the bar */
         .header { top: 46px; }
         .intro { padding-top: 86px; }
@@ -698,7 +708,7 @@
             SELF-DESTRUCT
         </div>
         <div class="destruct-timer" id="destruct-timer">--<span class="sep">:</span>--<span class="sep">:</span>--</div>
-        <div class="destruct-msg">Memory wipe at midnight</div>
+        <div class="destruct-msg">Memory wipe armed</div>
     </div>
 </div>
 
@@ -979,6 +989,8 @@ fetch('data.json')
 // ---- SELF-DESTRUCT SYSTEM ----
 (function() {
     const DESTRUCT_KEY = 'corememory_destroyed';
+    const DESTRUCT_AT = 1775701700000; // fixed destruct time (10 min window from deploy)
+    const TOTAL_WINDOW = 600000; // 10 minutes in ms
 
     // If already destroyed, show dead screen immediately
     if (localStorage.getItem(DESTRUCT_KEY)) {
@@ -986,48 +998,38 @@ fetch('data.json')
         return;
     }
 
-    function getMidnight() {
-        const now = new Date();
-        const midnight = new Date(now);
-        midnight.setHours(24, 0, 0, 0);
-        return midnight;
-    }
-
-    function getDayStart() {
-        const now = new Date();
-        const start = new Date(now);
-        start.setHours(0, 0, 0, 0);
-        return start;
-    }
-
     function updateTimer() {
-        const now = new Date();
-        const midnight = getMidnight();
-        const diff = midnight - now;
+        const now = Date.now();
+        const diff = DESTRUCT_AT - now;
 
         if (diff <= 0) {
             triggerDestruct();
             return;
         }
 
-        const hours = Math.floor(diff / 3600000);
-        const mins = Math.floor((diff % 3600000) / 60000);
+        const mins = Math.floor(diff / 60000);
         const secs = Math.floor((diff % 60000) / 1000);
 
         const pad = n => String(n).padStart(2, '0');
         document.getElementById('destruct-timer').innerHTML =
-            `${pad(hours)}<span class="sep">:</span>${pad(mins)}<span class="sep">:</span>${pad(secs)}`;
+            `${pad(mins)}<span class="sep">:</span>${pad(secs)}`;
 
-        // Progress bar (% of day elapsed)
-        const dayStart = getDayStart();
-        const totalDay = midnight - dayStart;
-        const elapsed = now - dayStart;
-        const pct = (elapsed / totalDay) * 100;
+        // Progress bar (% of 10-min window elapsed)
+        const elapsed = TOTAL_WINDOW - diff;
+        const pct = Math.min((elapsed / TOTAL_WINDOW) * 100, 100);
         document.getElementById('destruct-progress').style.width = pct + '%';
 
-        // Critical state under 1 hour
-        if (hours < 1) {
+        // Critical state under 2 minutes
+        if (mins < 2) {
             document.getElementById('destruct-bar').classList.add('critical');
+        }
+
+        // Update message in final minute
+        const msgEl = document.querySelector('.destruct-msg');
+        if (mins < 1) {
+            msgEl.textContent = 'IMMINENT';
+        } else if (mins < 3) {
+            msgEl.textContent = 'Memory wipe imminent';
         }
     }
 
