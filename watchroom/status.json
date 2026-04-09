@@ -20,16 +20,25 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 33,
-      "remaining_mins": 18,
+      "cycles": 34,
+      "remaining_mins": 17,
       "until": "04:51 PM",
-      "last_update": "2026-04-09T16:34:33.692034",
+      "last_update": "2026-04-09T16:43:17.665217",
       "status": "running",
-      "next_up": "Audit the broken single-slash \"comments\" (`/ Helper:`, `/ Smithy`, `/ Mother Nature` etc.) in the JS \u2014 these stray `/` characters are latent parse hazards that look like division operators and will silently break the game under any minification or strict-mode build pass",
-      "after_that": "Pressure opponent choice \u2014 the opponent still auto-picks randomly when they have only 1 sideline ghost (no feedback to either player); the auto-path should show a brief callout splash *before* executing so both players see the effect land rather than noticing the swap already happened"
+      "next_up": "Queue the pre-roll callouts \u2014 Ember Force (SWARM!), Smithy (FORGE!), Maximo (NAP!), and Mother Nature (SEASONS!) all call `showAbilityCallout` directly in `doPreRollSetup`, so when two of them fire the same round (e.g., Red Ember Force vs. Blue Mother Nature), the second callout instantly stomps the first; convert these to `queueAbility` with a pre-roll queue block and drain before the dice roll fires.",
+      "after_that": "Audit the `doTeamRoll` path for the second-click case (B.phase === 'rolling') \u2014 when the KO-swap guard was broken, the `btn.classList.add('locked')` and `doTeamRoll` calls outside the `if (B.phase === 'ready')` block still fired; verify those outer lines are also safe when the phase has been interrupted."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 34,
+      "summary": "Fixed `rollReady` silently rolling dice during an Ember-Force-triggered KO-swap \u2014 the old guard only caught `phase === 'over'`, so when Ember Force killed the active ghost with replacements still available, `phase` became `'ko-swap'`, the check was missed, phase was overwritten to `'rolling'`, and dice fired while the KO-swap picker was on screen; changed the guard to `phase !== 'ready'` so any mid-pre-roll interruption (game-over, ko-swap, or future states) aborts the roll.",
+      "next_up": "Queue the pre-roll callouts \u2014 Ember Force (SWARM!), Smithy (FORGE!), Maximo (NAP!), and Mother Nature (SEASONS!) all call `showAbilityCallout` directly in `doPreRollSetup`, so when two of them fire the same round (e.g., Red Ember Force vs. Blue Mother Nature), the second callout instantly stomps the first; convert these to `queueAbility` with a pre-roll queue block and drain before the dice roll fires.",
+      "after_that": "Audit the `doTeamRoll` path for the second-click case (B.phase === 'rolling') \u2014 when the KO-swap guard was broken, the `btn.classList.add('locked')` and `doTeamRoll` calls outside the `if (B.phase === 'ready')` block still fired; verify those outer lines are also safe when the phase has been interrupted.",
+      "time": "16:43:17",
+      "timestamp": "2026-04-09T16:43:17.665225"
+    },
     {
       "target": "testroom",
       "cycle": 33,
@@ -470,18 +479,9 @@
       "after_that": "Add a `mypy` or `flake8` CMD_RX entry \u2014 both are currently silent linting/type-checking commands with natural TCG framing (\"checking card text for rules violations before the judge does\" is exactly the Jeeves angle), and they fire right after pytest in a typical Python workflow",
       "time": "01:10:27",
       "timestamp": "2026-04-09T01:10:27.421788"
-    },
-    {
-      "target": "jeeves",
-      "cycle": 58,
-      "summary": "Added `git clone` (3 lines) and `git init` (3 lines) CMD_RX entries \u2014 two of the most-run git commands that were completely silent; clone gets \"welcome to the format\" energy, init gets the \"four commits before it gets complicated\" inevitability beat",
-      "next_up": "Audit the two oldest IDLE lines (\"Kodako fires 2.78% of the time. That's not a mechanic. That's a wish.\" and \"Shoo: 49 of 50 sim top teams. That's not dominance. That's a distress signal.\") \u2014 both still punchy but now have 20+ more specific neighbors; verify they're differentiated enough or replace the weaker one with a fresher angle",
-      "after_that": "Add a `pytest` CMD_RX entry \u2014 high-frequency Python test runner that's currently silent, and \"running a hundred playtests at once and reading the failure reports\" is exactly the kind of Jeeves framing that hasn't been touched",
-      "time": "01:08:53",
-      "timestamp": "2026-04-09T01:08:53.894892"
     }
   ],
-  "last_update": "2026-04-09T16:34:33.692069",
+  "last_update": "2026-04-09T16:43:17.665228",
   "orchestrator_check": {
     "timestamp": "2026-04-09T16:32:15.063290",
     "summary": "Initial check: testroom refiner at 26 cycles, 39 active cards. Priorities: Pressure opponent choice, combo playtesting, audit drifted cards."
