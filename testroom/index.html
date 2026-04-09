@@ -1162,7 +1162,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v25';
+const TESTROOM_VERSION = 'v26';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1673,7 +1673,14 @@ function togglePick(team, id) {
   const other = S[team==='red'?'bluePicks':'redPicks'];
   if (other.includes(id)) return;
   const i = picks.indexOf(id);
-  if (i>=0) picks.splice(i,1); else if (picks.length<3) picks.push(id);
+  if (i>=0) {
+    picks.splice(i,1);
+  } else if (picks.length<3) {
+    // Max 1 legendary per team
+    const g = ghostData(id);
+    if (g.rarity === 'legendary' && picks.some(pid => ghostData(pid).rarity === 'legendary')) return;
+    picks.push(id);
+  }
   renderPicks();
 
   // Auto-scroll after picking
@@ -1761,6 +1768,9 @@ function startBattle() {
     splash.classList.add('active');
     setTimeout(() => {
       splash.classList.remove('active');
+      // Check for entry-effect KOs (e.g. Leviathan, Big Target) before enabling roll
+      // buttons — if handleKOs() returns true it owns the flow (ko-swap or game-over)
+      if (handleKOs()) return;
       // Re-enable roll buttons and start pulse after splash
       if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
       if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
@@ -3499,9 +3509,6 @@ function doKoSwap(team, idx) {
   f.hp = f.maxHp;
 
   log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters at full HP!</span>`);
-  if (skipEntry) {
-    log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
-  }
   triggerEntry(t, skipEntry);
 
   renderBattle();
