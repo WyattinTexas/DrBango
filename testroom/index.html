@@ -1162,7 +1162,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v22';
+const TESTROOM_VERSION = 'v23';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2305,7 +2305,7 @@ function doTeamRoll(team, btn) {
       B.preRoll.resolved = true;
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
-      }, isTripleOrBetter(roll.type) ? 1200 : 900);
+      }, isTripleOrBetter(roll.type) ? 1800 : 1400);
     }
   }, 700);
 }
@@ -2585,25 +2585,46 @@ let msCountdownTimer = null;
 function showMoonstoneChoice(team, dice) {
   renderDice(B.redDice, B.blueDice);
   renderBattle();
-  B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-die' };
+  B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-resource' };
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b> &nbsp;Tap a die to change it!`);
-  log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Tap a die to change — 3 seconds!`);
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b> &nbsp;Click it to use!`);
+  log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to use — 3 seconds!`);
 
-  // Make dice clickable
   const diceEl = document.getElementById(team + '-dice');
-  const dieDivs = diceEl.querySelectorAll('.die');
-  dieDivs.forEach((d, i) => {
-    d.classList.add('rerollable');
-    d.style.borderColor = 'var(--moonstone)';
-    d.onclick = () => pickMsDie(i);
-  });
-
-  // Start 3s countdown
-  let remaining = 3;
   const resEl = document.getElementById(team + '-resources');
   const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
+
+  // Highlight the Moonstone resource — player clicks IT first
+  if (msEl && msEl !== diceEl) {
+    msEl.classList.add('rerollable');
+    msEl.style.cursor = 'pointer';
+    msEl.onclick = () => {
+      // Player clicked Moonstone — now highlight dice to pick which to change
+      msEl.classList.remove('rerollable');
+      msEl.onclick = null;
+      B.pendingMoonstone.phase = 'pick-die';
+      narrate(`<b class="${team}-text">${teamLabel}</b> — pick a die to change!`);
+      const dieDivs = diceEl.querySelectorAll('.die');
+      dieDivs.forEach((d, i) => {
+        d.classList.add('rerollable');
+        d.style.borderColor = 'var(--moonstone)';
+        d.onclick = () => pickMsDie(i);
+      });
+    };
+  } else {
+    // No resource tile — fall back to direct dice click
+    B.pendingMoonstone.phase = 'pick-die';
+    const dieDivs = diceEl.querySelectorAll('.die');
+    dieDivs.forEach((d, i) => {
+      d.classList.add('rerollable');
+      d.style.borderColor = 'var(--moonstone)';
+      d.onclick = () => pickMsDie(i);
+    });
+  }
+
+  // Start 3s countdown — auto-skip if not used
+  let remaining = 3;
   showLsCountdown(msEl, remaining);
 
   clearInterval(msCountdownTimer);
@@ -2613,6 +2634,7 @@ function showMoonstoneChoice(team, dice) {
       clearInterval(msCountdownTimer);
       clearMsCountdown(msEl);
       clearDiceClickable(team);
+      if (msEl) { msEl.classList.remove('rerollable'); msEl.onclick = null; }
       skipMoonstone();
     } else {
       showLsCountdown(msEl, remaining);
@@ -2758,22 +2780,38 @@ function startLuckyStoneWindow(team, callback) {
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
 
-  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b> &nbsp;Tap a die to reroll!`);
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b> &nbsp;Click it to use!`);
 
-  // Make dice clickable
-  const diceEl = document.getElementById(team + '-dice');
-  const dieDivs = diceEl.querySelectorAll('.die');
-  dieDivs.forEach((d, i) => {
-    d.classList.add('rerollable');
-    d.onclick = () => doLuckyReroll(team, i, dice, callback);
-  });
-
-  // Find the Lucky Stone resource element for countdown display
+  // Highlight the Lucky Stone resource tile — player clicks IT first
   const resEl = document.getElementById(team + '-resources');
   const lsEl = resEl.querySelector('.res-tile.luckyStone');
+  const diceEl = document.getElementById(team + '-dice');
   const countdownTarget = lsEl || diceEl;
 
-  // Start countdown (3, 2, 1)
+  if (lsEl) {
+    lsEl.classList.add('rerollable');
+    lsEl.style.cursor = 'pointer';
+    lsEl.onclick = () => {
+      // Player clicked Lucky Stone — now highlight dice to pick which to reroll
+      lsEl.classList.remove('rerollable');
+      lsEl.onclick = null;
+      narrate(`<b class="${team}-text">${teamLabel}</b> — pick a die to reroll!`);
+      const dieDivs = diceEl.querySelectorAll('.die');
+      dieDivs.forEach((d, i) => {
+        d.classList.add('rerollable');
+        d.onclick = () => doLuckyReroll(team, i, dice, callback);
+      });
+    };
+  } else {
+    // No resource tile visible — fall back to direct dice click
+    const dieDivs = diceEl.querySelectorAll('.die');
+    dieDivs.forEach((d, i) => {
+      d.classList.add('rerollable');
+      d.onclick = () => doLuckyReroll(team, i, dice, callback);
+    });
+  }
+
+  // Start countdown (3, 2, 1) — auto-skip if not used
   let remaining = 3;
   showLsCountdown(countdownTarget, remaining);
 
@@ -2782,6 +2820,7 @@ function startLuckyStoneWindow(team, callback) {
     if (remaining <= 0) {
       clearLsCountdown();
       clearDiceClickable(team);
+      if (lsEl) { lsEl.classList.remove('rerollable'); lsEl.onclick = null; }
       log(`<span style="color:var(--text2)">${team.toUpperCase()} didn't use their Lucky Stone.</span>`);
       callback();
     } else {
