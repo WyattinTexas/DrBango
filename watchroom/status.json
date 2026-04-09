@@ -20,16 +20,25 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 34,
-      "remaining_mins": 17,
+      "cycles": 35,
+      "remaining_mins": 8,
       "until": "04:51 PM",
-      "last_update": "2026-04-09T16:43:17.665217",
+      "last_update": "2026-04-09T16:46:06.003550",
       "status": "running",
-      "next_up": "Queue the pre-roll callouts \u2014 Ember Force (SWARM!), Smithy (FORGE!), Maximo (NAP!), and Mother Nature (SEASONS!) all call `showAbilityCallout` directly in `doPreRollSetup`, so when two of them fire the same round (e.g., Red Ember Force vs. Blue Mother Nature), the second callout instantly stomps the first; convert these to `queueAbility` with a pre-roll queue block and drain before the dice roll fires.",
-      "after_that": "Audit the `doTeamRoll` path for the second-click case (B.phase === 'rolling') \u2014 when the KO-swap guard was broken, the `btn.classList.add('locked')` and `doTeamRoll` calls outside the `if (B.phase === 'ready')` block still fired; verify those outer lines are also safe when the phase has been interrupted."
+      "next_up": "Audit the `doTeamRoll` outer-block path \u2014 after Cycle 34's fix changed the `rollReady` guard to `phase !== 'ready'`, the `btn.classList.add('locked')` and `doTeamRoll` calls that sit *outside* that if-block still fire unconditionally; verify those lines are guarded and can't fire when phase has been interrupted mid-pre-roll-setup (KO-swap or game-over).",
+      "after_that": "Fix the broken single-slash stray comments (`/ Helper:`, `/ Smithy`, `/ Mother Nature`) \u2014 these are latent JS parse hazards that look like division operators and will silently break the game under any minification or strict-mode build pass."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 35,
+      "summary": "Queued pre-roll callouts (SWARM!, ASCEND!, FORGE!, NAP!, all SEASONS!) into a staggered `setTimeout` sequence so simultaneous pre-roll triggers (e.g., Ember Force + Mother Nature) now play one after the other instead of the second instantly stomping the first.",
+      "next_up": "Audit the `doTeamRoll` outer-block path \u2014 after Cycle 34's fix changed the `rollReady` guard to `phase !== 'ready'`, the `btn.classList.add('locked')` and `doTeamRoll` calls that sit *outside* that if-block still fire unconditionally; verify those lines are guarded and can't fire when phase has been interrupted mid-pre-roll-setup (KO-swap or game-over).",
+      "after_that": "Fix the broken single-slash stray comments (`/ Helper:`, `/ Smithy`, `/ Mother Nature`) \u2014 these are latent JS parse hazards that look like division operators and will silently break the game under any minification or strict-mode build pass.",
+      "time": "16:46:06",
+      "timestamp": "2026-04-09T16:46:06.003559"
+    },
     {
       "target": "testroom",
       "cycle": 34,
@@ -470,18 +479,9 @@
       "after_that": "Add a `git push origin main` CMD_RX variant \u2014 currently falls through to the `\"git push origin\"` pool, but \"naming both the remote AND the branch in full\" has its own TCG parallel (declaring the tournament AND the specific event) that Jeeves hasn't touched",
       "time": "01:12:08",
       "timestamp": "2026-04-09T01:12:08.393524"
-    },
-    {
-      "target": "jeeves",
-      "cycle": 59,
-      "summary": "Added `pytest` CMD_RX entry (3 lines) \u2014 the most-run silent Python command now triggers Jeeves's sim/playtesting framing with a green-suite suspicion beat and a direct callback to the ERRORS pool's \"read the actual error\" pattern",
-      "next_up": "Audit the two oldest IDLE lines (\"Kodako fires 2.78% of the time. That's not a mechanic. That's a wish.\" and \"Shoo: 49 of 50 sim top teams. That's not dominance. That's a distress signal.\") \u2014 now have 20+ specific neighbors; verify they're differentiated enough or replace the weaker one with a fresher angle",
-      "after_that": "Add a `mypy` or `flake8` CMD_RX entry \u2014 both are currently silent linting/type-checking commands with natural TCG framing (\"checking card text for rules violations before the judge does\" is exactly the Jeeves angle), and they fire right after pytest in a typical Python workflow",
-      "time": "01:10:27",
-      "timestamp": "2026-04-09T01:10:27.421788"
     }
   ],
-  "last_update": "2026-04-09T16:43:17.665228",
+  "last_update": "2026-04-09T16:46:06.003563",
   "orchestrator_check": {
     "timestamp": "2026-04-09T16:32:15.063290",
     "summary": "Initial check: testroom refiner at 26 cycles, 39 active cards. Priorities: Pressure opponent choice, combo playtesting, audit drifted cards."
