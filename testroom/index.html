@@ -2658,16 +2658,22 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Selene (305) — doubles: gain 1 Healing Seed + 1 Lucky Stone
+  // Selene (305) — doubles: choose 1 Healing Seed OR 2 Lucky Stones
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameSel = team === B.red ? 'red' : 'blue';
     if (f.id === 305 && !f.ko && hasDoubles(dice)) {
-      team.resources.healingSeed++;
-      team.resources.luckyStone++;
-      queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Seed + Lucky Stone!`);
-      log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
+      const choice = confirm(`${f.name} — Heart of the Hills!\n\nChoose your reward:\n\nOK = 1 Healing Seed\nCancel = 2 Lucky Stones`);
+      if (choice) {
+        team.resources.healingSeed++;
+        queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 1 Healing Seed!`);
+        log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
+      } else {
+        team.resources.luckyStone += 2;
+        queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 2 Lucky Stones!`);
+        log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
+      }
       checkKnightEffects(tNameSel, f.name);
     }
   });
