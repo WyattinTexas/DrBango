@@ -2406,6 +2406,8 @@ function resolveRound() {
   B.round++;
   B.preRoll = null;
   renderDice(redDice, blueDice);
+  // Re-apply win highlights after renderDice rebuilds the innerHTML
+  setTimeout(() => highlightWinnerDice(winTeamName, wR, loseTeamName), 10);
 
   // handleKOs may open the swap picker (sets phase to 'ko-swap')
   // If a KO happened, dramatic 1.8s pause so the hit lands before swap prompt
@@ -2667,13 +2669,16 @@ function showTriplesEffect(side, rollType) {
 
 // Ability splash themes mapped from color vars
 const SPLASH_THEMES = {
-  'var(--magma)': 'theme-fire',
-  'var(--moonstone)': 'theme-blue',
-  'var(--rare)': 'theme-blue',
+  'var(--magma)':      'theme-fire',
+  'var(--moonstone)':  'theme-blue',
+  'var(--rare)':       'theme-blue',
   'var(--ghost-rare)': 'theme-purple',
-  'var(--uncommon)': 'theme-green',
-  '#22c55e': 'theme-green',
-  '#fbbf24': 'theme-gold',
+  'var(--uncommon)':   'theme-green',
+  'var(--legendary)':  'theme-gold',
+  'var(--accent)':     'theme-red',
+  '#22c55e':           'theme-green',
+  '#fbbf24':           'theme-gold',
+  '#a855f7':           'theme-purple',
 };
 
 function showAbilityCallout(name, color, desc) {
@@ -2855,7 +2860,7 @@ function renderBattle() {
       }
       // Tyson (365) — Hop: swap self to bench before rolling (no entry effects)
       if (f.id === 365 && !f.ko) {
-        const aliveSl = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+        const aliveSl = B[team].ghosts.filter((g,i) => i !== B[team].activeIdx && !g.ko);
         if (aliveSl.length > 0) {
           const blocked = dylanNegates(enemy);
           html += `<button class="ability-btn ${blocked?'':'pressure'}" onclick="useTysonHop('${team}')" ${blocked?'disabled title="Blocked by Dylan"':''}>${blocked?'🚫':'🐰'} Hop${blocked?' (Blocked)':''}</button>`;
