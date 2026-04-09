@@ -318,7 +318,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 
 /* Status tags on fighter */
 .fighter-status { display:flex; gap:4px; flex-wrap:wrap; padding:0 8px 6px; }
-.status-tag { font-size:9px; padding:1px 5px; border-radius:3px; font-weight:600; }
+.status-tag { font-size:9px; padding:1px 5px; border-radius:3px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 10px); }
 .status-tag.pressure { background:rgba(255,99,72,0.15); color:var(--magma); }
 .status-tag.streak { background:rgba(46,204,113,0.15); color:var(--win); }
 .status-tag.mimic { background:rgba(126,232,250,0.15); color:var(--moonstone); }
@@ -426,6 +426,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .die.die-red { border-color:rgba(233,69,96,0.6); background:rgba(233,69,96,0.1); color:var(--accent2); }
 .die.die-blue { border-color:rgba(52,152,219,0.6); background:rgba(52,152,219,0.1); color:var(--moonstone); }
 .die.rerollable { cursor:pointer; animation:rerollPulse 0.8s ease-in-out infinite; }
+.res-tile.rerollable { cursor:pointer; animation:rerollPulse 0.8s ease-in-out infinite; }
 @keyframes rerollPulse {
   0%,100% { box-shadow:0 0 8px rgba(251,191,36,0.3); }
   50% { box-shadow:0 0 20px rgba(251,191,36,0.6); }
@@ -1168,7 +1169,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v46';
+const TESTROOM_VERSION = 'v51';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1263,10 +1264,10 @@ const GHOSTS = [
     designNote:"Aggressive volcanic ember. Wins generate 2 Surge — one of the fastest Surge farmers in the game. 5 HP keeps him in the mix."
   },
   {
-    id:210, name:"Timber", rarity:"legendary", maxHp:7, art:"art/timber.jpg",
-    ability:"Meticulous Planning", abilityDesc:"While Timber is active: opponent rolls 1 fewer die.",
+    id:210, name:"Timber", rarity:"legendary", maxHp:6, art:"art/timber.jpg",
+    ability:"Meticulous Planning", abilityDesc:"While Timber is active, before rolling: opponent must choose — discard 2 specials OR remove 1 die for this roll.",
     category:"Debuff", set:"Rolling Hills",
-    designNote:"The ghost wolf's howl shakes your opponent to the core — permanent die suppression as long as Timber stands. 7 HP makes him tough to remove, forcing the opponent to commit resources to take him down."
+    designNote:"Gary's v4 proposal. Opponent-facing choice mechanic — declining resource trap. Discard 2 specials or roll 2 dice against a 6HP Legendary. No carryover tracking, resolves fresh each roll. 6HP keeps him killable but his ability makes him hard to hit."
   },
   // === NEW CARDS — Rolling Hills ===
   {
@@ -1937,6 +1938,7 @@ function typeLabel(type) {
   if (type==='penta') return 'PENTA!!';
   if (type==='quads') return 'QUADS!';
   if (type==='triples') return 'TRIPLES!';
+  if (type==='doubles') return 'DOUBLES!';
   return '';
 }
 
@@ -3115,11 +3117,18 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
     // Skip for singles — there's only one matched die and it's just a number, not a "hand"
     if (winRoll.type !== 'singles') {
       const matchCount = { doubles:2, triples:3, quads:4, penta:5 }[winRoll.type] || 0;
-      let count = 0;
+      let winCount = 0, loseCount = 0;
       winDivs.forEach(d => {
-        if (count < matchCount && parseInt(d.textContent) === winRoll.value) {
+        if (winCount < matchCount && parseInt(d.textContent) === winRoll.value) {
           d.classList.add('die-win-secondary');
-          count++;
+          winCount++;
+        }
+      });
+      // Symmetric: loser's matched group also gets dim-gold so both rows tell the story
+      loseDivs.forEach(d => {
+        if (loseCount < matchCount && parseInt(d.textContent) === winRoll.value) {
+          d.classList.add('die-win-secondary'); // overrides die-loser grey via CSS specificity
+          loseCount++;
         }
       });
     }
@@ -3261,7 +3270,7 @@ function resolveRound() {
     ['red','blue'].forEach(team => {
       const el = document.getElementById(team + '-dice');
       if (el) el.querySelectorAll('.die').forEach(d => {
-        d.classList.remove('die-win','die-win-doubles','die-win-triples','die-win-mega','die-loser');
+        d.classList.remove('die-win','die-win-doubles','die-win-triples','die-win-mega','die-win-secondary','die-loser');
       });
     });
 
@@ -4480,12 +4489,13 @@ document.addEventListener('keydown', e => {
     rematchBattle();
     return;
   }
-  // Escape closes any open overlay/modal
+  // Escape closes any open overlay/modal.
+  // pressureOverlay is intentionally excluded — the Pressure pick is a FORCED choice
+  // for the opponent; allowing Escape to dismiss it would bypass pressureUsed and let
+  // Death Howl spam Pressure every round. The modal only closes via doPressureSwap().
   if (e.key === 'Escape') {
-    const overlays = ['swapOverlay','msPicker','stealOverlay','pressureOverlay','standingsOverlay','gameOver'];
+    const overlays = ['swapOverlay','msPicker','stealOverlay','standingsOverlay','gameOver'];
     overlays.forEach(id => document.getElementById(id)?.classList.remove('active'));
-    // If Pressure pick was open, restore 'ready' so Roll buttons work again
-    if (B && B.phase === 'pressure') B.phase = 'ready';
   }
 });
 
