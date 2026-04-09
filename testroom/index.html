@@ -376,6 +376,25 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .die.moonstone-active { border-color:var(--moonstone); box-shadow:0 0 16px var(--moonstone-glow); cursor:pointer; }
 .die.moonstone-active:hover { transform:scale(1.12); }
 .die.moonstone-changed { background:rgba(126,232,250,0.15); border-color:var(--moonstone); color:var(--moonstone); }
+
+/* Dice Highlighting — winner dice glow, loser dice fade */
+.die.die-win {
+  border-color:#fbbf24 !important;
+  background:rgba(251,191,36,0.22) !important;
+  box-shadow:0 0 22px rgba(251,191,36,0.85), 0 0 44px rgba(251,191,36,0.4) !important;
+  transform:scale(1.22) !important;
+  animation:dieWinPulse 0.7s ease-in-out 2;
+}
+@keyframes dieWinPulse {
+  0%,100% { transform:scale(1.22); box-shadow:0 0 22px rgba(251,191,36,0.85); }
+  50%      { transform:scale(1.32); box-shadow:0 0 36px rgba(251,191,36,1), 0 0 70px rgba(251,191,36,0.5); }
+}
+.die.die-loser {
+  opacity:0.3 !important;
+  filter:grayscale(0.8);
+  transform:scale(0.92) !important;
+  transition:opacity 0.35s, filter 0.35s, transform 0.35s;
+}
 .turn-indicator { font-size:13px; color:var(--text2); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; text-align:center; }
 .ability-callout {
   font-size:24px; font-weight:900; color:var(--moonstone); text-transform:uppercase;
@@ -1202,6 +1221,7 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 201) {
     checkKnightEffects(entryTeamName, f.name);
     f.hankFirstRoll = true;
+    showAbilityCallout('SLUMBER!', 'var(--common)', `${f.name} — first roll locked to 1-2-3!`);
     log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
   }
 
@@ -1211,6 +1231,7 @@ function triggerEntry(team, skipEntryEffects) {
       checkKnightEffects(entryTeamName, f.name);
       team.resources.ice -= 2;
       team.resources.moonstone++;
+      showAbilityCallout('AQUATIC WISDOM!', 'var(--rare)', `${f.name} — 2 Ice → 1 Moonstone!`);
       log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
     }
   }
@@ -1234,6 +1255,7 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 302) {
     checkKnightEffects(entryTeamName, f.name);
     f.maximoFirstRoll = true;
+    showAbilityCallout('NAP!', '#22c55e', `${f.name} — first roll is 1 die only!`);
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
   }
 
@@ -1416,6 +1438,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName) {
     if (!target.ko) {
       target.hp = Math.max(0, target.hp - 2);
       if (target.hp <= 0) target.ko = true;
+      showAbilityCallout('HEAVY AIR!', 'var(--accent)', `Knight Terror — ${abilityGhostName} loses 2 HP!`);
       log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${abilityGhostName} loses 2 HP!</span> ${target.ko ? '<span class="log-ko">KO!</span>' : target.hp + ' HP left'}`);
     }
   }
@@ -1424,6 +1447,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName) {
   if (oppActive.id === 402 && !oppActive.ko) {
     if (oppActive.hp < oppActive.maxHp) {
       oppActive.hp = Math.min(oppActive.maxHp, oppActive.hp + 1);
+      showAbilityCallout('RETRIBUTION!', 'var(--rare)', `Knight Light heals! Opponent used an ability.`);
       log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-heal">Healed 1 HP!</span> ${oppActive.hp} HP.`);
     }
   }
@@ -1440,6 +1464,32 @@ function setBlackout(team, num) {
     B.blackoutNum[team] = num;
   }
   renderBattle();
+}
+
+// ============================================================
+// TYSON HOP — manual pre-roll swap (Tyson 365)
+// ============================================================
+function useTysonHop(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 365 || f.ko) return;
+
+  const enemy = opp(t);
+  if (dylanNegates(enemy)) {
+    showAbilityCallout('BLOCKED!', 'var(--text2)', `Dylan's Scarecrow shuts down Tyson's Hop!`);
+    log(`<span class="log-ability">Tyson</span> — Hop blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+    return;
+  }
+  const aliveSideline = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+  if (aliveSideline.length === 0) return;
+
+  checkKnightEffects(team, f.name);
+  showAbilityCallout('HOP!', 'var(--magma)', `${f.name} hops to the bench — no entry triggers!`);
+  log(`<span class="log-ability">${f.name}</span> — Hop! Swapping out, no entry effects for incoming ghost.`);
+
+  // Open the standard swap modal — doSwap already skips entry when Tyson swaps out
+  openSwap(team);
 }
 
 // ============================================================
@@ -1511,7 +1561,7 @@ function rollReady(team) {
     if (B.preRoll.red.dice && B.preRoll.blue.dice) {
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
-      }, 600);
+      }, isTripleOrBetter(roll.type) ? 1200 : 900);
     }
   }, 700);
 }
@@ -1583,6 +1633,7 @@ function doPreRollSetup() {
       checkKnightEffects(tName, f.name);
       team.resources.healingSeed--;
       B.harrisonExtraDie[tName] = true;
+      showAbilityCallout('ASCEND!', '#22c55e', `${f.name} — Healing Seed → extra die!`);
       log(`<span class="log-ability">${f.name}</span> — Ascend! Spent 1 Healing Seed for an extra die!`);
     }
   });
@@ -1594,6 +1645,7 @@ function doPreRollSetup() {
     const tName = team === B.red ? 'red' : 'blue';
     if (f.id === 309 && B.committed[tName].auntSusan) {
       B.auntSusanBonus[tName] = true;
+      showAbilityCallout('HARVEST DANCE!', '#22c55e', `${f.name} — Healing Seed spent for +2 damage!`);
       log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent 1 Healing Seed for +2 damage!`);
     }
   });
@@ -1622,6 +1674,7 @@ function doPreRollSetup() {
       if (tName === 'red') redCount = 1;
       else blueCount = 1;
       f.maximoFirstRoll = false;
+      showAbilityCallout('NAP!', '#22c55e', `${f.name} — still napping, rolling only 1 die!`);
       log(`<span class="log-ability">${f.name}</span> is still napping — rolling only 1 die!`);
     }
   });
@@ -1633,6 +1686,7 @@ function doPreRollSetup() {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
       else blueCount = Math.max(1, blueCount - 1);
+      showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent rolls 1 fewer die!`);
       log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die!`);
     }
   });
@@ -1677,6 +1731,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
         const enemyName = enemy === B.red ? 'red' : 'blue';
+        showAbilityCallout('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`);
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
         hitDamage(enemyName);
@@ -1695,6 +1750,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (fours > 0) {
         checkKnightEffects(tNameHank, f.name);
         team.resources.luckyStone += fours;
+        showAbilityCallout('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
         log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
       }
     }
@@ -1709,6 +1765,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       checkKnightEffects(tNameSel, f.name);
       team.resources.healingSeed++;
       team.resources.luckyStone++;
+      showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Seed + Lucky Stone!`);
       log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
     }
   });
@@ -1734,6 +1791,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     if (f.id === 308 && !f.ko && hasDoubles(oppDice)) {
       checkKnightEffects(tNameKap, f.name);
       team.resources.healingSeed++;
+      showAbilityCallout('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
       log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
     }
   });
@@ -1790,6 +1848,7 @@ function pickMsValue(val) {
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   if (f.id === 203 && !f.usedMagicTouch) {
     f.usedMagicTouch = true;
+    showAbilityCallout('MAGIC TOUCH!', 'var(--moonstone)', `${f.name} — Moonstone used without discarding!`);
     log(`<span class="log-ability">${f.name}</span> — Magic Touch! Used Moonstone without discarding it!`);
   } else {
     t.resources.moonstone--;
@@ -1961,6 +2020,47 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
   }, 500);
 }
 
+// ============================================================
+// DICE HIGHLIGHTING — visually tell the story of why someone won
+// ============================================================
+function highlightWinnerDice(winTeam, winRoll, loseTeam) {
+  const winEl  = document.getElementById(winTeam  + '-dice');
+  const loseEl = document.getElementById(loseTeam + '-dice');
+  if (!winEl || !loseEl) return;
+
+  const winDivs  = [...winEl.querySelectorAll('.die')];
+  const loseDivs = [...loseEl.querySelectorAll('.die')];
+
+  // Dim every losing die
+  loseDivs.forEach(d => d.classList.add('die-loser'));
+
+  if (winRoll.type === 'singles') {
+    // Highlight just the highest die (the decision-maker)
+    let done = false;
+    // dice are sorted asc, iterate reversed to find highest first
+    [...winDivs].reverse().forEach(d => {
+      if (!done && parseInt(d.textContent) === winRoll.value) {
+        d.classList.add('die-win');
+        done = true;
+      }
+    });
+  } else if (winRoll.type === 'doubles') {
+    // Highlight the matching pair
+    let count = 0;
+    winDivs.forEach(d => {
+      if (count < 2 && parseInt(d.textContent) === winRoll.value) {
+        d.classList.add('die-win');
+        count++;
+      }
+    });
+  } else {
+    // triples / quads / penta — all matching dice light up
+    winDivs.forEach(d => {
+      if (parseInt(d.textContent) === winRoll.value) d.classList.add('die-win');
+    });
+  }
+}
+
 function resolveRound() {
   B.phase = 'resolving';
   const redDice = B.pendingResolve.redDice;
@@ -2004,7 +2104,15 @@ function resolveRound() {
   else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
   else if (rR.value > bR.value) winner = 'red';
   else if (bR.value > rR.value) winner = 'blue';
-  else {
+
+  // Highlight dice immediately — winner dice glow, losers fade
+  if (winner) {
+    const loser = winner === 'red' ? 'blue' : 'red';
+    const wRoll = winner === 'red' ? rR : bR;
+    setTimeout(() => highlightWinnerDice(winner, wRoll, loser), 80);
+  }
+
+  if (winner === null) {
     // ========================================
     // TIE
     // ========================================
@@ -2017,6 +2125,7 @@ function resolveRound() {
       if (hasSideline(team, 303)) {
         checkKnightEffects(tNameTie, 'Tweak and Twonk');
         team.resources.surge += 3;
+        showAbilityCallout('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge!`);
         log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
       }
     });
@@ -2040,6 +2149,7 @@ function resolveRound() {
       if (f.id === 302 && !f.ko) {
         checkKnightEffects(tNameMax, f.name);
         team.resources.healingSeed++;
+        showAbilityCallout('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`);
         log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
       }
     });
@@ -2049,11 +2159,15 @@ function resolveRound() {
     B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
 
     B.round++;
-    B.phase = 'ready';
+    B.phase = 'ko-pause'; // brief hold on tie so narration lands
     B.preRoll = null;
-    resetRollButtons();
     renderDice(redDice, blueDice);
     renderBattle();
+    setTimeout(() => {
+      B.phase = 'ready';
+      resetRollButtons();
+      renderBattle();
+    }, 700);
     return;
   }
 
@@ -2172,10 +2286,11 @@ function resolveRound() {
   // PHASE 6: ON-WIN TRIGGERS
   // ========================================
 
-  // Skucher (209) — win: +2 Surge
+  // Dart (209) — win: +2 Surge
   if (wF.id === 209 && !wF.ko) {
     checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.surge += 2;
+    showAbilityCallout('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`);
     log(`<span class="log-ability">${wF.name}</span> — Plunder! Gained <span class="log-ms">2 Surge</span>!`);
   }
 
@@ -2184,6 +2299,7 @@ function resolveRound() {
     checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.surge++;
     winTeam.resources.ice++;
+    showAbilityCallout('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`);
     log(`<span class="log-ability">${wF.name}</span> — Daughter of the Stream! Gained <span class="log-ms">1 Surge + 1 Ice Shard</span>!`);
   }
 
@@ -2192,6 +2308,7 @@ function resolveRound() {
     checkKnightEffects(winTeamName, wF.name);
     if (wF.hp < wF.maxHp) {
       wF.hp++;
+      showAbilityCallout('OVERGROWTH!', '#22c55e', `${wF.name} — Win heals 1 HP! ${wF.hp}/${wF.maxHp}`);
       log(`<span class="log-heal">${wF.name}</span> — Overgrowth! Healed to ${wF.hp} HP!`);
     }
   }
@@ -2200,6 +2317,7 @@ function resolveRound() {
   if (wF.id === 336 && !wF.ko) {
     checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.fire++;
+    showAbilityCallout('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`);
     log(`<span class="log-ability">${wF.name}</span> — Sacred Flame! Gained <span class="log-ms">1 Sacred Fire</span>!`);
   }
 
@@ -2207,6 +2325,7 @@ function resolveRound() {
   if (wF.id === 309 && !wF.ko) {
     checkKnightEffects(winTeamName, wF.name);
     winTeam.resources.healingSeed++;
+    showAbilityCallout('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`);
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! Win → gained <span class="log-ms">1 Healing Seed</span>!`);
   }
 
@@ -2216,6 +2335,7 @@ function resolveRound() {
     if (sixes > 0) {
       checkKnightEffects(winTeamName, 'Farmer Jeff');
       winTeam.resources.healingSeed += sixes;
+      showAbilityCallout('HARVEST!', '#22c55e', `Farmer Jeff — ${sixes} six${sixes>1?'es':''} = ${sixes} Healing Seed${sixes>1?'s':''}!`);
       log(`<span class="log-ability">Farmer Jeff</span> (sideline) — Harvest! ${sixes} six${sixes>1?'es':''} rolled → gained <span class="log-ms">${sixes} Healing Seed${sixes>1?'s':''}</span>!`);
     }
   }
@@ -2242,12 +2362,15 @@ function resolveRound() {
       checkKnightEffects(loseTeamName, 'Granny');
       if (wR.type === 'singles') {
         loseTeam.resources.luckyStone++;
+        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`);
         log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to singles → gained <span class="log-ms">1 Lucky Stone</span>.`);
       } else if (wR.type === 'doubles') {
         loseTeam.resources.surge++;
+        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`);
         log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to doubles → gained <span class="log-ms">1 Surge</span>.`);
       } else if (wR.type === 'triples') {
         loseTeam.resources.moonstone++;
+        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — triples KO → MOONSTONE!`);
         log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to triples → gained <span class="log-ms">1 Moonstone</span>!`);
       }
     }
@@ -2255,6 +2378,7 @@ function resolveRound() {
     // Bitter End (404) — KO'd: still gain 1 Surge on loss
     if (lF.id === 404) {
       loseTeam.resources.surge++;
+      showAbilityCallout('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
       log(`<span class="log-ability">${lF.name}</span> — Bitter End! Defeated but gained <span class="log-ms">1 Surge</span>!`);
     }
   }
@@ -2270,6 +2394,7 @@ function resolveRound() {
     if (f.id === 302 && !f.ko) {
       checkKnightEffects(tNameMax2, f.name);
       team.resources.healingSeed++;
+      showAbilityCallout('NAP!', '#22c55e', `${f.name} — round ends, Healing Seed collected!`);
       log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
     }
   });
@@ -2283,7 +2408,7 @@ function resolveRound() {
   renderDice(redDice, blueDice);
 
   // handleKOs may open the swap picker (sets phase to 'ko-swap')
-  // If a KO happened, add a dramatic pause before showing swap picker
+  // If a KO happened, dramatic 1.8s pause so the hit lands before swap prompt
   if (lF.ko) {
     B.phase = 'ko-pause'; // prevent double-clicks during pause
     renderBattle();
@@ -2293,13 +2418,18 @@ function resolveRound() {
         resetRollButtons();
         renderBattle();
       }
-    }, 1500);
+    }, 1800);
   } else {
-    if (!handleKOs()) {
-      B.phase = 'ready';
-      resetRollButtons();
-      renderBattle();
-    }
+    // Non-KO: 750ms pacing pause so dice highlights + narration sink in before next roll
+    B.phase = 'ko-pause';
+    renderBattle();
+    setTimeout(() => {
+      if (!handleKOs()) {
+        B.phase = 'ready';
+        resetRollButtons();
+        renderBattle();
+      }
+    }, 750);
   }
 }
 
@@ -2721,6 +2851,14 @@ function renderBattle() {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
         if (enemySideline.length > 0) {
           html += `<button class="ability-btn pressure" onclick="usePressure('${team}')">🔥 Pressure</button>`;
+        }
+      }
+      // Tyson (365) — Hop: swap self to bench before rolling (no entry effects)
+      if (f.id === 365 && !f.ko) {
+        const aliveSl = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+        if (aliveSl.length > 0) {
+          const blocked = dylanNegates(enemy);
+          html += `<button class="ability-btn ${blocked?'':'pressure'}" onclick="useTysonHop('${team}')" ${blocked?'disabled title="Blocked by Dylan"':''}>${blocked?'🚫':'🐰'} Hop${blocked?' (Blocked)':''}</button>`;
         }
       }
       // Smudge (403) — Blackout: name a number
