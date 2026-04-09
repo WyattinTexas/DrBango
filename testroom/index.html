@@ -496,6 +496,14 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   transform:scale(0.92) !important;
   transition:opacity 0.35s, filter 0.35s, transform 0.35s;
 }
+/* Tiebreaker: the matched/tied hand dice — visible but dimmer than the decisive kicker */
+.die.die-win-secondary {
+  border-color:rgba(251,191,36,0.55) !important;
+  background:rgba(251,191,36,0.07) !important;
+  box-shadow:0 0 8px rgba(251,191,36,0.35) !important;
+  transform:scale(1.06) !important;
+  transition:all 0.3s;
+}
 .turn-indicator { font-size:13px; color:var(--text2); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; text-align:center; }
 .ability-callout {
   font-size:24px; font-weight:900; color:var(--moonstone); text-transform:uppercase;
@@ -1163,7 +1171,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v28';
+const TESTROOM_VERSION = 'v29';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2941,7 +2949,7 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
   if (!winEl || !loseEl) return;
 
   // Clear ALL stale highlight classes from both rows before applying fresh state
-  const ALL_HL = ['die-win','die-win-doubles','die-win-triples','die-win-mega','die-loser'];
+  const ALL_HL = ['die-win','die-win-doubles','die-win-triples','die-win-mega','die-win-secondary','die-loser'];
   [winEl, loseEl].forEach(el =>
     el.querySelectorAll('.die').forEach(d => d.classList.remove(...ALL_HL))
   );
@@ -2954,10 +2962,23 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
 
   // Tiebreaker — same hand type & value, remaining die decided it
   if (tiebreaker) {
-    // Highlight the tiebreaker die on the winner's side
+    // Secondary glow on the matched (tied) dice so players can see what hand tied
+    // Skip for singles — there's only one matched die and it's just a number, not a "hand"
+    if (winRoll.type !== 'singles') {
+      const matchCount = { doubles:2, triples:3, quads:4, penta:5 }[winRoll.type] || 0;
+      let count = 0;
+      winDivs.forEach(d => {
+        if (count < matchCount && parseInt(d.textContent) === winRoll.value) {
+          d.classList.add('die-win-secondary');
+          count++;
+        }
+      });
+    }
+    // Primary gold glow on the decisive tiebreaker die (overrides secondary if same die)
     let done = false;
     [...winDivs].reverse().forEach(d => {
       if (!done && parseInt(d.textContent) === tiebreaker.value) {
+        d.classList.remove('die-win-secondary'); // ensure gold fully overrides
         d.classList.add('die-win');
         done = true;
       }
@@ -3840,17 +3861,23 @@ function showAbilityCallout(name, color, desc) {
   playSfx('sfxSpecial', 0.85);
   el.classList.add('active');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
 
-  // Also update the small callout for continuity
+  // Hide the small callout while the big splash is showing — prevents doubled text
   const small = document.getElementById('abilityCallout');
-  small.textContent = name;
-  small.style.color = color || 'var(--moonstone)';
-  small.classList.remove('hype-pop');
-  void small.offsetWidth;
-  small.classList.add('hype-pop');
-  clearTimeout(small._timer);
-  small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
+  small.style.visibility = 'hidden';
+
+  el._timer = setTimeout(() => {
+    el.classList.remove('active');
+    // Show the small callout AFTER the big splash fades
+    small.style.visibility = '';
+    small.textContent = name;
+    small.style.color = color || 'var(--moonstone)';
+    small.classList.remove('hype-pop');
+    void small.offsetWidth;
+    small.classList.add('hype-pop');
+    clearTimeout(small._timer);
+    small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
+  }, 1400);
 }
 
 // ============================================================
