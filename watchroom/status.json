@@ -20,16 +20,25 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 22,
-      "remaining_mins": 37,
+      "cycles": 23,
+      "remaining_mins": 36,
       "until": "06:55 PM",
-      "last_update": "2026-04-09T18:18:21.793024",
+      "last_update": "2026-04-09T18:28:26.906108",
       "status": "running",
-      "next_up": "Harrison (315) extra-die grant \u2014 audit whether it fires in the correct queue order when multiple on-win abilities chain on the same team (e.g. Overclock + Harrison active simultaneously), and verify `B.harrisonBonus` correctly applies before dice are rendered rather than after.",
-      "after_that": "Full `hasSideline` cross-check for Granny (310) \u2014 confirm the Lucky Stone / Surge / Moonstone on-KO trigger correctly reads the *winner's* roll type via `wR.type` (not the loser's), and that it doesn't fire when Granny herself is the KO'd ghost."
+      "next_up": "Audit Pudge (311) + Granny (310) same-team edge case \u2014 when Pudge self-KOs via Belly Flop (winner at 1 HP rolls doubles), the on-KO trigger only checks `lF.ko` (loser's KO), so Granny on Pudge's team never fires \"Bedtime Story\" for the self-inflicted KO; add a symmetric `wF.ko` check after the self-damage block.",
+      "after_that": "Verify Selene's `confirm()` dialog is not blocking the ability queue drain \u2014 the `confirm()` call at line 2670 is synchronous and fires while `abilityQueueMode = true`, which means it could interrupt the queue if it resolves before the queue drains; check whether it needs to be deferred via `queueAbility` callback instead."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 23,
+      "summary": "Fixed Selene (305) and Kaplan (308) doubles-detection bug \u2014 both used `hasDoubles()` which mistakenly returned true for triples/quads/penta (since any triple \"contains a pair\"), causing Selene to pop a jarring confirm dialog on the player's triples rolls and Kaplan to silently over-grant Healing Seeds; both now use `classify().type === 'doubles'` for exact-doubles detection.",
+      "next_up": "Audit Pudge (311) + Granny (310) same-team edge case \u2014 when Pudge self-KOs via Belly Flop (winner at 1 HP rolls doubles), the on-KO trigger only checks `lF.ko` (loser's KO), so Granny on Pudge's team never fires \"Bedtime Story\" for the self-inflicted KO; add a symmetric `wF.ko` check after the self-damage block.",
+      "after_that": "Verify Selene's `confirm()` dialog is not blocking the ability queue drain \u2014 the `confirm()` call at line 2670 is synchronous and fires while `abilityQueueMode = true`, which means it could interrupt the queue if it resolves before the queue drains; check whether it needs to be deferred via `queueAbility` callback instead.",
+      "time": "18:28:26",
+      "timestamp": "2026-04-09T18:28:26.906125"
+    },
     {
       "target": "testroom",
       "cycle": 22,
@@ -470,18 +479,9 @@
       "after_that": "Resources panel UX \u2014 the committed resource tiles show count as `2/3\u2694` which is cryptic; add a `title` tooltip like `\"2 of 3 Ice Shards committed \u2014 +2 damage if you win\"` so players who hover can understand the mechanic without reading the log.",
       "time": "15:32:33",
       "timestamp": "2026-04-09T15:32:33.254329"
-    },
-    {
-      "target": "testroom",
-      "cycle": 11,
-      "summary": "Fixed Blackout (Smudge 403) visual bug \u2014 blacked-out dice now disappear from the dice row immediately when the ability fires, instead of remaining on screen looking like they still count while the `highlightWinnerDice` function silently applies highlights to stale DOM elements",
-      "next_up": "Investigate `resolveRound` winner highlight for tiebreaker-after-Blackout edge case \u2014 if Blackout removes the tiebreaker die, the current tiebreaker logic iterates `rRemain`/`bRemain` but the visual now shows the correct (shorter) row, verify the tiebreaker value still maps to an existing die element in `highlightWinnerDice`",
-      "after_that": "Add a visual \"Blacked out: X\" overlay/strikethrough on the removed die value in the BLACKOUT callout description so players know exactly which number was targeted (currently the callout says \"1 dice removed\" but doesn't re-display the named number)",
-      "time": "15:28:09",
-      "timestamp": "2026-04-09T15:28:09.827547"
     }
   ],
-  "last_update": "2026-04-09T18:18:21.793041",
+  "last_update": "2026-04-09T18:28:26.906137",
   "orchestrator_check": {
     "timestamp": "2026-04-09T17:32:41.524905",
     "summary": "Refiner running, 9 cycles, on-task. No drift. Doubles callout added, Pressure escape fixed, highlight polish. Top priority: combo playtesting."
