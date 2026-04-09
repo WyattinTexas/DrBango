@@ -940,7 +940,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
     </div>
-    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px">#</th><th style="width:50px"></th><th>Team</th><th class="stat-col">W</th><th class="stat-col">L</th><th class="stat-col">PCT</th><th class="stat-col">GB</th></tr></thead><tbody id="standingsBody"></tbody></table>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px">#</th><th style="width:50px"></th><th>Team</th><th class="stat-col">W</th><th class="stat-col">L</th><th class="stat-col">PCT</th><th class="stat-col">GB</th><th class="stat-col" title="Times Defeated">KO</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
@@ -966,7 +966,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v05';
+const TESTROOM_VERSION = 'v06';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1259,7 +1259,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0 };
       });
     }
     standingsLoaded = true;
@@ -1271,7 +1271,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0 };
       });
     }
   });
@@ -1284,8 +1284,8 @@ function saveStandingsToFirebase() {
   const toSave = {};
   Object.keys(standings).forEach(id => {
     const s = standings[id];
-    if (s.wins > 0 || s.losses > 0) {
-      toSave[id] = { wins: s.wins, losses: s.losses };
+    if (s.wins > 0 || s.losses > 0 || (s.kos || 0) > 0) {
+      toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0 };
     }
   });
   db.ref('testroom/standings').set(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
@@ -1298,8 +1298,14 @@ function recordWin(ghostId) {
 }
 
 function recordLoss(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0 };
   standings[ghostId].losses++;
+  saveStandingsToFirebase();
+}
+
+function recordKO(ghostId) {
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0 };
+  standings[ghostId].kos = (standings[ghostId].kos || 0) + 1;
   saveStandingsToFirebase();
 }
 
@@ -1307,10 +1313,10 @@ function openStandings() {
   document.getElementById('standingsVersion').textContent = TESTROOM_VERSION;
   const body = document.getElementById('standingsBody');
   const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => {
-    const s = standings[g.id] || { wins:0, losses:0 };
+    const s = standings[g.id] || { wins:0, losses:0, kos:0 };
     const total = s.wins + s.losses;
     const pct = total > 0 ? (s.wins / total) : 0;
-    return { ...g, w: s.wins, l: s.losses, total, pct };
+    return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, total, pct };
   }).sort((a, b) => {
     if (b.pct !== a.pct) return b.pct - a.pct;
     if (b.w !== a.w) return b.w - a.w;
@@ -1340,6 +1346,7 @@ function openStandings() {
       <td class="st-stat st-l">${g.l}</td>
       <td class="st-stat st-pct">${pctStr}</td>
       <td class="st-stat st-gb">${gbVal}</td>
+      <td class="st-stat" style="color:var(--text2)">${g.kos}</td>
     </tr>`;
   }).join('');
   document.getElementById('standingsOverlay').classList.add('active');
@@ -1477,7 +1484,7 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false }, blue: { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false } }
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 } }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -1750,19 +1757,21 @@ function toggleAuntSusan(team) {
   const t = B[team];
   const f = active(t);
   if (f.id !== 309) return;
-  // Can't have both damage and heal active
-  if (B.committed[tName].auntSusanHeal) {
-    B.committed[tName].auntSusanHeal = false;
-    t.resources.healingSeed++;
-  }
-  if (B.committed[tName].auntSusan) {
-    // Uncommit — give seed back
-    B.committed[tName].auntSusan = false;
-    t.resources.healingSeed++;
-  } else if (t.resources.healingSeed > 0) {
-    // Commit — spend seed
-    B.committed[tName].auntSusan = true;
+  // Each click adds another seed to damage commit (click again to remove one)
+  if (t.resources.healingSeed > 0) {
+    B.committed[tName].auntSusan++;
     t.resources.healingSeed--;
+  }
+  renderBattle();
+}
+
+function uncommitAuntSusan(team) {
+  if (!B || B.phase !== 'ready') return;
+  const tName = team;
+  const t = B[team];
+  if (B.committed[tName].auntSusan > 0) {
+    B.committed[tName].auntSusan--;
+    t.resources.healingSeed++;
   }
   renderBattle();
 }
@@ -1773,20 +1782,20 @@ function toggleAuntSusanHeal(team) {
   const t = B[team];
   const f = active(t);
   if (f.id !== 309) return;
-  // Can't have both damage and heal active
-  if (B.committed[tName].auntSusan) {
-    // Uncommit damage first, give seed back
-    B.committed[tName].auntSusan = false;
-    t.resources.healingSeed++;
-  }
-  if (B.committed[tName].auntSusanHeal) {
-    // Uncommit heal — give seed back
-    B.committed[tName].auntSusanHeal = false;
-    t.resources.healingSeed++;
-  } else if (t.resources.healingSeed > 0) {
-    // Commit heal — spend seed
-    B.committed[tName].auntSusanHeal = true;
+  if (t.resources.healingSeed > 0) {
+    B.committed[tName].auntSusanHeal++;
     t.resources.healingSeed--;
+  }
+  renderBattle();
+}
+
+function uncommitAuntSusanHeal(team) {
+  if (!B || B.phase !== 'ready') return;
+  const tName = team;
+  const t = B[team];
+  if (B.committed[tName].auntSusanHeal > 0) {
+    B.committed[tName].auntSusanHeal--;
+    t.resources.healingSeed++;
   }
   renderBattle();
 }
@@ -1973,8 +1982,9 @@ function doTeamRoll(team, btn) {
     narrate(`<b class="${cls}">${f.name}</b>&nbsp; rolled [${dice.join(',')}]${tl ? ' &nbsp;<b class="gold">'+tl+'</b>' : ''}`);
     if (isTripleOrBetter(roll.type)) showTriplesEffect(team, roll.type);
 
-    // Check if both have rolled
-    if (B.preRoll.red.dice && B.preRoll.blue.dice) {
+    // Check if both have rolled — guard against double-resolution
+    if (B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
+      B.preRoll.resolved = true;
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
       }, isTripleOrBetter(roll.type) ? 1200 : 900);
@@ -2062,15 +2072,13 @@ function doPreRollSetup() {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 309 && B.committed[tName].auntSusan) {
-      B.auntSusanBonus[tName] = true;
-      showAbilityCallout('HARVEST DANCE!', 'var(--magma)', `${f.name} — Healing Seed spent for +2 damage!`);
-      log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent 1 Healing Seed for +2 damage!`);
+    if (f.id === 309 && B.committed[tName].auntSusan > 0) {
+      B.auntSusanBonus[tName] = B.committed[tName].auntSusan;
+      log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent ${B.committed[tName].auntSusan} Healing Seed${B.committed[tName].auntSusan>1?'s':''} for +${B.committed[tName].auntSusan * 2} damage!`);
     }
-    if (f.id === 309 && B.committed[tName].auntSusanHeal) {
-      B.auntSusanHealBonus[tName] = true;
-      showAbilityCallout('HARVEST DANCE!', '#22c55e', `${f.name} — Healing Seed spent for +2 HP!`);
-      log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent 1 Healing Seed for +2 HP!`);
+    if (f.id === 309 && B.committed[tName].auntSusanHeal > 0) {
+      B.auntSusanHealBonus[tName] = B.committed[tName].auntSusanHeal;
+      log(`<span class="log-ability">${f.name}</span> — Harvest Dance! Spent ${B.committed[tName].auntSusanHeal} Healing Seed${B.committed[tName].auntSusanHeal>1?'s':''} for +${B.committed[tName].auntSusanHeal * 2} HP!`);
     }
   });
 
@@ -2603,8 +2611,8 @@ function resolveRound() {
     });
 
     // Reset committed resources
-    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false };
-    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false };
+    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
+    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -2654,10 +2662,11 @@ function resolveRound() {
     }
   }
 
-  // Aunt Susan (309) — +2 damage if healingSeed was spent
-  if (B.auntSusanBonus[winTeamName]) {
-    dmg += 2;
-    log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+2 bonus damage!</span>`);
+  // Aunt Susan (309) — +2 damage per seed committed
+  if (B.auntSusanBonus[winTeamName] > 0) {
+    const susanDmg = B.auntSusanBonus[winTeamName] * 2;
+    dmg += susanDmg;
+    log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
   }
 
   // Pudge (311) — doubles: +2 damage
@@ -2723,12 +2732,13 @@ function resolveRound() {
 
   // Aunt Susan heal bonus (game state — applies to whichever team committed it)
   ['red', 'blue'].forEach(tn => {
-    if (B.auntSusanHealBonus[tn]) {
+    if (B.auntSusanHealBonus[tn] > 0) {
       const t = B[tn];
       const f = active(t);
       if (!f.ko) {
-        f.hp += 2; // heals over max like other non-seed heals
-        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +2 HP → ${f.hp} HP!`);
+        const healAmt = B.auntSusanHealBonus[tn] * 2;
+        f.hp += healAmt;
+        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +${healAmt} HP → ${f.hp} HP!`);
       }
     }
   });
@@ -2766,14 +2776,16 @@ function resolveRound() {
   abilityQueueMode = true;
 
   // Damage modifier callouts
-  if (B.auntSusanBonus[winTeamName]) {
-    queueAbility('HARVEST DANCE!', 'var(--magma)', `${wF.name} — Healing Seed spent for +2 damage!`);
+  if (B.auntSusanBonus[winTeamName] > 0) {
+    const cnt = B.auntSusanBonus[winTeamName];
+    queueAbility('HARVEST DANCE!', 'var(--magma)', `${wF.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} damage!`);
   }
   // Aunt Susan heal callouts (both teams)
   ['red', 'blue'].forEach(tn => {
-    if (B.auntSusanHealBonus[tn]) {
+    if (B.auntSusanHealBonus[tn] > 0) {
+      const cnt = B.auntSusanHealBonus[tn];
       const f = active(B[tn]);
-      queueAbility('HARVEST DANCE!', '#22c55e', `${f.name} — Healing Seed heals +2 HP! ${f.hp} HP`);
+      queueAbility('HARVEST DANCE!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} HP! ${f.hp} HP`);
     }
   });
   if (pudgeSelfDmg || (wF.id === 311 && wR.type === 'doubles')) {
@@ -2855,8 +2867,8 @@ function resolveRound() {
   setTimeout(() => {
     drainAbilityQueue(() => {
       // Reset committed resources
-      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false };
-      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false, auntSusanHeal:false };
+      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
 
       B.round++;
       B.preRoll = null;
@@ -2951,8 +2963,10 @@ function doKoSwap(team, idx) {
   const skipEntry = (fallen.id === 365); // Tyson — Hop: no entry effects
   t.activeIdx = idx;
   const f = active(t);
+  // Returning from sideline = full HP
+  f.hp = f.maxHp;
 
-  log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters!</span>`);
+  log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters at full HP!</span>`);
   if (skipEntry) {
     log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
   }
@@ -2986,18 +3000,18 @@ function showGameOver(winner) {
   B.phase = 'over';
   fadeOutMusic();
 
-  // Record standings
+  // Record standings — ALL ghosts on winning team get W, ALL on losing team get L
   if (winner === 'red' || winner === 'blue') {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];
-    // The surviving ghost on the winning team gets the win
-    const survivor = active(winTeam);
-    if (survivor && !survivor.ko) recordWin(survivor.id);
-    // All defeated ghosts on the losing team get losses
-    loseTeamObj.ghosts.forEach(g => { if (g.ko) recordLoss(g.id); });
-    // Defeated ghosts on the winning team also get losses
-    winTeam.ghosts.forEach(g => { if (g.ko) recordLoss(g.id); });
+    // Every ghost on the winning team gets a W
+    winTeam.ghosts.forEach(g => recordWin(g.id));
+    // Every ghost on the losing team gets an L
+    loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
+    // Track KOs separately for "Ghosts Defeated" stat
+    loseTeamObj.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
+    winTeam.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
   }
 
   const el = document.getElementById('gameOver');
@@ -3040,8 +3054,10 @@ function doSwap(team, idx) {
   const skipEntry = (oldGhost.id === 365); // Tyson — Hop: no entry effects
   t.activeIdx = idx;
   const f = active(t);
+  // Returning from sideline = full HP
+  f.hp = f.maxHp;
 
-  log(`<span class="log-ability">${oldName} swaps out — ${f.name} enters!</span>`);
+  log(`<span class="log-ability">${oldName} swaps out — ${f.name} enters at full HP!</span>`);
   if (skipEntry) {
     log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
   }
@@ -3334,10 +3350,10 @@ function renderBattle() {
     if (isReady && f.id === 208 && !f.ko) {
       rh += `<div class="res-tile moonstone clickable" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone"><span class="res-main">💀</span><span class="res-label">Sac</span></div>`;
     }
-    // Aunt Susan (309) — commit healing seed for +2 damage OR +2 heal
-    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan || c.auntSusanHeal)) {
-      rh += `<div class="res-tile healingSeed clickable ${c.auntSusan?'committed':''}" onclick="toggleAuntSusan('${team}')" title="Spend Healing Seed for +2 damage"><span class="res-main">🌱</span><span class="res-label">+2dmg</span></div>`;
-      rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" title="Spend Healing Seed for +2 HP" style="${c.auntSusanHeal?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">+2hp</span></div>`;
+    // Aunt Susan (309) — commit healing seeds for damage or heal (click=add, right-click=remove)
+    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0 || c.auntSusanHeal > 0)) {
+      rh += `<div class="res-tile healingSeed clickable ${c.auntSusan>0?'committed':''}" onclick="toggleAuntSusan('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusan('${team}')" title="Click: +2 dmg per seed. Right-click: remove"><span class="res-main">🌱</span><span class="res-label">${c.auntSusan>0?'+'+c.auntSusan*2+'dmg':'+2dmg'}</span></div>`;
+      rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal>0?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusanHeal('${team}')" title="Click: +2 HP per seed. Right-click: remove" style="${c.auntSusanHeal>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">${c.auntSusanHeal>0?'+'+c.auntSusanHeal*2+'hp':'+2hp'}</span></div>`;
     }
     document.getElementById(`${team}-resources`).innerHTML = rh;
   });
