@@ -999,7 +999,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v12';
+const TESTROOM_VERSION = 'v13';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1567,6 +1567,7 @@ function triggerEntry(team, skipEntryEffects) {
   if (skipEntryEffects) return; // Tyson's Hop: no entry effects
 
   const entryTeamName = team === B.red ? 'red' : 'blue';
+  narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
   // Bouril (201) — Slumber: first roll is auto 1-2-3
   if (f.id === 201) {
@@ -2676,7 +2677,7 @@ function resolveRound() {
     // TIE
     // ========================================
     log(`<span class="log-ability">TIE!</span> No damage dealt.`);
-    narrate(`Both rolled ${describeRoll(rR)}. &nbsp;<b class="gold">Tie! No damage.</b>`);
+    narrate(`Both roll ${describeRoll(rR)} — <b class="gold">a standoff!</b> No damage dealt.`);
 
     // Tweak and Twonk (303) — sideline: tie → gain 3 Surge
     [B.red, B.blue].forEach(team => {
@@ -2727,6 +2728,7 @@ function resolveRound() {
     setTimeout(() => {
       B.phase = 'ready';
       resetRollButtons();
+      narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
     }, 700);
     return;
@@ -2943,11 +2945,25 @@ function resolveRound() {
   // ========================================
   // Step 1: Narration + damage hit
   if (dmg > 0) {
-    if (lF.ko) {
-      narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage!</b> &nbsp;<b class="ko-text">${lF.name} is KO'd!</b>`);
+    // Cinematic narration based on roll type
+    let dmgNarr = '';
+    if (wR.type === 'penta') {
+      dmgNarr = `IMPOSSIBLE! FIVE ${wR.value}'s! <b class="${winColor}">${wF.name}</b> unleashes <b class="gold">${dmg} damage</b>!`;
+    } else if (wR.type === 'quads') {
+      dmgNarr = `DEVASTATING! <b class="${winColor}">${wF.name}</b> slams FOUR ${wR.value}'s! <b class="gold">${dmg} damage</b>!`;
+    } else if (wR.type === 'triples') {
+      dmgNarr = `<b class="${winColor}">${wF.name}</b> CRUSHES with triple ${wR.value}'s! <b class="gold">${dmg} damage</b> rocks <b class="${loseColor}">${lF.name}</b>!`;
+    } else if (wR.type === 'doubles') {
+      dmgNarr = `<b class="${winColor}">${wF.name}</b> lands a solid hit with double ${wR.value}'s — <b class="gold">${dmg} damage</b> to <b class="${loseColor}">${lF.name}</b>!`;
     } else {
-      narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage to <b class="${loseColor}">${lF.name}</b>!</b> &nbsp;${lF.hp} HP left.`);
+      dmgNarr = `<b class="${winColor}">${wF.name}</b> edges out <b class="${loseColor}">${lF.name}</b> — <b class="gold">${dmg} damage</b>!`;
     }
+    if (lF.ko) {
+      dmgNarr += ` &nbsp;<b class="ko-text">${lF.name} goes down! ${wF.name} stands victorious!</b>`;
+    } else {
+      dmgNarr += ` &nbsp;${lF.hp} HP left.`;
+    }
+    narrate(dmgNarr);
     playDamageSfx(dmg);
     const hitEl = document.getElementById(loseTeamName + '-fighter');
     hitEl.classList.add('hit');
@@ -2985,6 +3001,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 1800);
@@ -2995,6 +3012,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 750);
@@ -3056,7 +3074,7 @@ function openKoSwap() {
   }
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-  narrate(`<b class="${team}-text">${fallen.name}</b> is down! &nbsp;<b class="${team}-text">${teamLabel}</b> — pick your next ghost from the bench!`);
+  narrate(`<b class="ko-text">${fallen.name} is down!</b> &nbsp;<b class="${team}-text">${teamLabel}</b> — who answers the call?`);
   renderBattle(); // sideline cards with ko-swap-pick class are now clickable
 }
 
@@ -3121,12 +3139,19 @@ function showGameOver(winner) {
     winTeam.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
   }
 
+  const rounds = B.round - 1;
+  if (winner === 'draw') {
+    narrate(`GAME OVER! Both teams fall — a bitter draw in ${rounds} rounds!`);
+  } else {
+    narrate(`GAME OVER! Team ${winner.toUpperCase()} claims victory in ${rounds} round${rounds !== 1 ? 's' : ''}!`);
+  }
+
   const el = document.getElementById('gameOver');
   el.classList.add('active');
   const title = document.getElementById('goTitle');
   if (winner==='draw') { title.textContent='DRAW!'; title.className=''; }
   else { title.textContent=`TEAM ${winner.toUpperCase()} WINS!`; title.className=`${winner}-win`; }
-  document.getElementById('goSub').textContent = `Battle ended in ${B.round-1} rounds`;
+  document.getElementById('goSub').textContent = `Battle ended in ${rounds} rounds`;
 }
 
 // ============================================================
