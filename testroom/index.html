@@ -1162,7 +1162,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v24';
+const TESTROOM_VERSION = 'v25';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2330,10 +2330,15 @@ function doPreRollSetup() {
   const rF = active(B.red), bF = active(B.blue);
   if (rF.ko || bF.ko) return;
 
-  // Snapshot Lucky Stones available BEFORE this round
+  // Snapshot Lucky Stones + Moonstones available BEFORE this round
+  // (can't use resources gained during the same roll)
   B.lsAvailable = {
     red: B.red.resources.luckyStone,
     blue: B.blue.resources.luckyStone
+  };
+  B.msAvailable = {
+    red: B.red.resources.moonstone,
+    blue: B.blue.resources.moonstone
   };
 
   // Reset per-round flags
@@ -2572,12 +2577,15 @@ function doPostRollAndResolve(redDice, blueDice) {
     // ========================================
     B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
 
-  if (B.red.resources.moonstone > 0) {
+  // Only offer moonstones that existed BEFORE this round (not gained during roll)
+  const redMsAvail = B.msAvailable ? B.msAvailable.red : 0;
+  const blueMsAvail = B.msAvailable ? B.msAvailable.blue : 0;
+  if (redMsAvail > 0 && B.red.resources.moonstone > 0) {
     B.phase = 'moonstone-red';
     showMoonstoneChoice('red', redDice);
     return;
   }
-  if (B.blue.resources.moonstone > 0) {
+  if (blueMsAvail > 0 && B.blue.resources.moonstone > 0) {
     B.phase = 'moonstone-blue';
     showMoonstoneChoice('blue', blueDice);
     return;
@@ -2732,8 +2740,9 @@ function pickMsValue(val) {
   log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(',')}]`);
   B.pendingMoonstone = null;
 
-  // Check if other team also has moonstone
-  if (team==='red' && B.blue.resources.moonstone > 0) {
+  // Check if other team also has moonstone (pre-round only)
+  const blueMsLeft = B.msAvailable ? B.msAvailable.blue : 0;
+  if (team==='red' && blueMsLeft > 0 && B.blue.resources.moonstone > 0) {
     B.phase = 'moonstone-blue';
     showMoonstoneChoice('blue', B.blueDice);
     return;
@@ -2751,7 +2760,8 @@ function skipMoonstone() {
   log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
   B.pendingMoonstone = null;
 
-  if (team==='red' && B.blue.resources.moonstone > 0) {
+  const blueMsSkip = B.msAvailable ? B.msAvailable.blue : 0;
+  if (team==='red' && blueMsSkip > 0 && B.blue.resources.moonstone > 0) {
     B.phase = 'moonstone-blue';
     showMoonstoneChoice('blue', B.blueDice);
     return;
@@ -3480,7 +3490,9 @@ function openKoSwap() {
 function doKoSwap(team, idx) {
   const t = B[team];
   const fallen = active(t);
-  const skipEntry = (fallen.id === 365); // Tyson — Hop: no entry effects
+  // doKoSwap fires only when a ghost is KO'd by damage — entry effects always fire.
+  // Tyson's Hop (skipEntry=true) is handled exclusively via useTysonHop → doSwap.
+  const skipEntry = false;
   t.activeIdx = idx;
   const f = active(t);
   // Returning from sideline = full HP
