@@ -760,6 +760,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   .sideline-slot { width:90px; }
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div class="app">
@@ -933,7 +935,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
     <div class="standings-header">
       <h2>STANDINGS</h2>
       <div style="display:flex; align-items:center; gap:12px;">
-        <span class="standings-version" id="standingsVersion">v01</span>
+        <span class="standings-version" id="standingsVersion">v04</span>
+        <button class="standings-close" onclick="resetStandings()" style="color:var(--accent);border-color:var(--accent);">Reset All</button>
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
     </div>
@@ -960,6 +963,32 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 </div>
 
 <script>
+// ============================================================
+// FIREBASE — persistent shared standings
+// ============================================================
+const TESTROOM_VERSION = 'v04';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
+  authDomain: "testroom-75200.firebaseapp.com",
+  databaseURL: "https://testroom-75200-default-rtdb.firebaseio.com",
+  projectId: "testroom-75200",
+  storageBucket: "testroom-75200.firebasestorage.app",
+  messagingSenderId: "711812846396",
+  appId: "1:711812846396:web:08e2375f257205483f8439"
+};
+
+let db = null;
+let firebaseReady = false;
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  firebaseReady = true;
+} catch(e) {
+  console.warn('Firebase init failed — standings will be local only:', e);
+}
+
 // ============================================================
 // GHOST DATA — Volcanic Activity (Redesigned)
 // ============================================================
@@ -1210,10 +1239,10 @@ const GHOSTS = [
 let S = { tab:'browse', redPicks:[], bluePicks:[], battle:null };
 
 // ============================================================
-// STANDINGS — backyard sports scoreboard
+// STANDINGS — persistent shared scoreboard via Firebase
 // ============================================================
-let standingsVersion = 1;
 let standings = {}; // { ghostId: { wins: 0, losses: 0 } }
+let standingsLoaded = false;
 
 function initStandings() {
   standings = {};
@@ -1223,18 +1252,59 @@ function initStandings() {
 }
 initStandings();
 
+// Load standings from Firebase on startup
+function loadStandingsFromFirebase() {
+  if (!firebaseReady) return;
+  db.ref('testroom/standings').once('value').then(snap => {
+    const data = snap.val();
+    if (data) {
+      Object.keys(data).forEach(id => {
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0 };
+      });
+    }
+    standingsLoaded = true;
+    console.log('[Standings] Loaded from Firebase');
+  }).catch(e => console.warn('[Standings] Firebase load failed:', e));
+
+  // Live sync — update in real-time when other players record results
+  db.ref('testroom/standings').on('value', snap => {
+    const data = snap.val();
+    if (data) {
+      Object.keys(data).forEach(id => {
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0 };
+      });
+    }
+  });
+}
+loadStandingsFromFirebase();
+
+function saveStandingsToFirebase() {
+  if (!firebaseReady) return;
+  // Only save ghosts that have games played
+  const toSave = {};
+  Object.keys(standings).forEach(id => {
+    const s = standings[id];
+    if (s.wins > 0 || s.losses > 0) {
+      toSave[id] = { wins: s.wins, losses: s.losses };
+    }
+  });
+  db.ref('testroom/standings').set(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
+}
+
 function recordWin(ghostId) {
   if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0 };
   standings[ghostId].wins++;
+  saveStandingsToFirebase();
 }
 
 function recordLoss(ghostId) {
   if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0 };
   standings[ghostId].losses++;
+  saveStandingsToFirebase();
 }
 
 function openStandings() {
-  document.getElementById('standingsVersion').textContent = 'v' + String(standingsVersion).padStart(2, '0');
+  document.getElementById('standingsVersion').textContent = TESTROOM_VERSION;
   const body = document.getElementById('standingsBody');
   const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => {
     const s = standings[g.id] || { wins:0, losses:0 };
@@ -1277,6 +1347,13 @@ function openStandings() {
 
 function closeStandings() {
   document.getElementById('standingsOverlay').classList.remove('active');
+}
+
+function resetStandings() {
+  if (!confirm('Reset ALL standings? This affects everyone and cannot be undone.')) return;
+  initStandings();
+  saveStandingsToFirebase();
+  openStandings(); // refresh the table
 }
 
 function switchTab(t) {
@@ -1396,10 +1473,6 @@ let B = null; // battle state
 function log(html) { B.log.unshift(html); }
 
 function startBattle() {
-  // Standings: increment version and reset all records
-  standingsVersion++;
-  initStandings();
-
   B = {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
