@@ -699,26 +699,31 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .standings-version { font-size:12px; color:var(--text2); font-weight:600; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
 .standings-close { padding:8px 16px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:13px; font-weight:700; cursor:pointer; transition:all .15s; }
 .standings-close:hover { border-color:var(--accent); color:var(--accent); }
-.standings-grid {
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px;
+.standings-table { width:100%; border-collapse:separate; border-spacing:0 4px; }
+.standings-table th {
+  text-align:left; font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase;
+  letter-spacing:1px; padding:6px 10px; border-bottom:2px solid var(--border);
 }
-.standings-card {
-  background:var(--surface); border:1px solid var(--border); border-radius:10px;
-  overflow:hidden; text-align:center; transition:all .2s; position:relative;
-}
-.standings-card:hover { border-color:rgba(126,232,250,0.3); transform:translateY(-2px); }
-.standings-card .sc-art { width:100%; aspect-ratio:1; object-fit:cover; display:block; background:var(--bg); }
-.standings-card .sc-art-placeholder { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; background:var(--bg); font-size:32px; color:var(--border); }
-.standings-card .sc-name { font-size:13px; font-weight:800; padding:6px 6px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.standings-card .sc-record { font-size:18px; font-weight:900; padding:2px 6px 8px; letter-spacing:1px; }
-.standings-card .sc-record .sc-w { color:var(--win); }
-.standings-card .sc-record .sc-l { color:var(--lose); }
-.standings-card .sc-record .sc-dash { color:var(--text2); }
-.standings-card.rarity-common { border-color:rgba(139,149,165,0.3); }
-.standings-card.rarity-uncommon { border-color:rgba(46,204,113,0.3); }
-.standings-card.rarity-rare { border-color:rgba(52,152,219,0.3); }
-.standings-card.rarity-ghost-rare { border-color:rgba(155,89,182,0.3); }
-.standings-card.rarity-legendary { border-color:rgba(243,156,18,0.4); }
+.standings-table th.stat-col { text-align:center; width:60px; }
+.standings-table tr.st-row { background:var(--surface); transition:all .15s; cursor:default; }
+.standings-table tr.st-row:hover { background:var(--surface2); }
+.standings-table td { padding:6px 10px; vertical-align:middle; }
+.standings-table .st-rank { font-size:14px; font-weight:900; color:var(--text2); text-align:center; width:32px; }
+.standings-table .st-art { width:40px; height:40px; border-radius:6px; object-fit:cover; background:var(--bg); display:block; }
+.standings-table .st-art-placeholder { width:40px; height:40px; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--border); }
+.standings-table .st-name { font-size:14px; font-weight:800; white-space:nowrap; }
+.standings-table .st-stat { text-align:center; font-size:16px; font-weight:900; font-variant-numeric:tabular-nums; }
+.standings-table .st-w { color:var(--win); }
+.standings-table .st-l { color:var(--lose); }
+.standings-table .st-pct { color:var(--text); }
+.standings-table .st-gb { color:var(--text2); }
+.standings-table tr.st-row.st-leader .st-rank { color:var(--moonstone); }
+.standings-table tr.st-row.st-leader { border-left:3px solid var(--moonstone); }
+.st-rarity-common .st-name { color:#8b95a5; }
+.st-rarity-uncommon .st-name { color:#2ecc71; }
+.st-rarity-rare .st-name { color:#3498db; }
+.st-rarity-ghost-rare .st-name { color:#9b59b6; }
+.st-rarity-legendary .st-name { color:#f39c12; }
 /* Pressure Pick Modal */
 .pressure-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
 .pressure-overlay.active { display:flex; }
@@ -934,7 +939,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
     </div>
-    <div class="standings-grid" id="standingsGrid"></div>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px">#</th><th style="width:50px"></th><th>Team</th><th class="stat-col">W</th><th class="stat-col">L</th><th class="stat-col">PCT</th><th class="stat-col">GB</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
@@ -1232,25 +1237,42 @@ function recordLoss(ghostId) {
 
 function openStandings() {
   document.getElementById('standingsVersion').textContent = 'v' + String(standingsVersion).padStart(2, '0');
-  const grid = document.getElementById('standingsGrid');
-  const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).sort((a, b) => {
-    const sa = standings[a.id] || { wins:0, losses:0 };
-    const sb = standings[b.id] || { wins:0, losses:0 };
-    // Sort by wins desc, then losses asc, then name
-    if (sb.wins !== sa.wins) return sb.wins - sa.wins;
-    if (sa.losses !== sb.losses) return sa.losses - sb.losses;
+  const body = document.getElementById('standingsBody');
+  const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => {
+    const s = standings[g.id] || { wins:0, losses:0 };
+    const total = s.wins + s.losses;
+    const pct = total > 0 ? (s.wins / total) : 0;
+    return { ...g, w: s.wins, l: s.losses, total, pct };
+  }).sort((a, b) => {
+    if (b.pct !== a.pct) return b.pct - a.pct;
+    if (b.w !== a.w) return b.w - a.w;
+    if (a.l !== b.l) return a.l - b.l;
     return a.name.localeCompare(b.name);
   });
-  grid.innerHTML = ghosts.map(g => {
-    const s = standings[g.id] || { wins:0, losses:0 };
+  // Find leader stats for GB calc
+  const leader = ghosts[0];
+  body.innerHTML = ghosts.map((g, i) => {
     const artHtml = g.art
-      ? `<img class="sc-art" src="${g.art}" alt="${g.name}" loading="lazy">`
-      : `<div class="sc-art-placeholder">&#x1F47B;</div>`;
-    return `<div class="standings-card rarity-${g.rarity}">
-      ${artHtml}
-      <div class="sc-name">${g.name}</div>
-      <div class="sc-record"><span class="sc-w">${s.wins}</span><span class="sc-dash"> - </span><span class="sc-l">${s.losses}</span></div>
-    </div>`;
+      ? `<img class="st-art" src="${g.art}" alt="${g.name}" loading="lazy">`
+      : `<div class="st-art-placeholder">&#x1F47B;</div>`;
+    const pctStr = g.total > 0 ? g.pct.toFixed(3).slice(1) : '.000';
+    let gbVal;
+    if (i === 0 || (g.w === leader.w && g.l === leader.l)) {
+      gbVal = '-';
+    } else {
+      gbVal = ((leader.w - g.w) + (g.l - leader.l)) / 2;
+      gbVal = gbVal % 1 === 0 ? gbVal.toFixed(0) : gbVal.toFixed(1);
+    }
+    const isLeader = i === 0 ? ' st-leader' : '';
+    return `<tr class="st-row st-rarity-${g.rarity}${isLeader}">
+      <td class="st-rank">${i + 1}</td>
+      <td>${artHtml}</td>
+      <td class="st-name">${g.name}</td>
+      <td class="st-stat st-w">${g.w}</td>
+      <td class="st-stat st-l">${g.l}</td>
+      <td class="st-stat st-pct">${pctStr}</td>
+      <td class="st-stat st-gb">${gbVal}</td>
+    </tr>`;
   }).join('');
   document.getElementById('standingsOverlay').classList.add('active');
 }
