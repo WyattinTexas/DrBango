@@ -286,7 +286,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .hp-text .hp-num { color:#aaa; }
 
 /* Resources — boobattles-style icon tiles */
-.resources { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+.resources { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; align-items:center; }
 .res-tile {
   width:44px; height:44px; border-radius:10px; border:2px solid rgba(255,255,255,0.15);
   background:rgba(0,0,0,0.6); display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -323,6 +323,17 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 @keyframes committedPulse {
   0%, 100% { box-shadow:0 0 10px rgba(251,191,36,0.3); }
   50% { box-shadow:0 0 24px rgba(251,191,36,0.6); }
+}
+.commit-bonus {
+  font-size:0.6rem; font-weight:900; padding:2px 6px; border-radius:5px;
+  white-space:nowrap; animation:bonusPop 0.3s ease-out;
+}
+.commit-bonus.dmg { background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3); }
+.commit-bonus.dice { background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3); }
+@keyframes bonusPop {
+  0% { transform:scale(0.5); opacity:0; }
+  60% { transform:scale(1.15); }
+  100% { transform:scale(1); opacity:1; }
 }
 
 /* Arena Mid — Dice + Info */
@@ -1288,10 +1299,18 @@ function cycleCommit(team, type) {
     t.resources[type] = total;
     c[type] = 0;
   }
-  // Boris hook when committing surge
-  if (type === 'surge' && c[type] > 0) {
-    // Boris triggers on actual spend (in doRound), not on commit
+  // Narrate what just happened
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  if (c[type] === 0) {
+    narrate(`<b class="${team}-text">${teamLabel}</b> cleared ${type === 'ice' ? 'Ice Shards' : type === 'fire' ? 'Sacred Fires' : 'Surge'}.`);
+  } else if (type === 'ice') {
+    narrate(`<b class="${team}-text">${teamLabel}</b> committed <b>${c[type]} Ice Shard${c[type]>1?'s':''}</b> — <b class="gold">+${c[type]} damage</b> if you win!`);
+  } else if (type === 'fire') {
+    narrate(`<b class="${team}-text">${teamLabel}</b> committed <b>${c[type]} Sacred Fire${c[type]>1?'s':''}</b> — <b class="gold">+${c[type]*3} damage</b> if you win!`);
+  } else if (type === 'surge') {
+    narrate(`<b class="${team}-text">${teamLabel}</b> committed <b>${c[type]} Surge</b> — <b class="gold">+${c[type]} ${c[type]>1?'dice':'die'}</b> this roll!`);
   }
+  playSfx('sfxSpecial', 0.3);
   renderBattle();
 }
 
@@ -2395,19 +2414,22 @@ function renderBattle() {
       const committed = c.ice > 0;
       const click = isReady ? `onclick="cycleCommit('${team}','ice')"` : '';
       const label = committed ? `${c.ice}/${totalIce}⚔` : totalIce;
-      rh += `<div class="res-tile ice ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Ice Shards: +1 dmg each"><span class="res-main"><img src="../boobattles/iceshard.png"></span><span class="res-count">${label}</span></div>`;
+      const bonus = committed ? `<span class="commit-bonus dmg">+${c.ice} dmg</span>` : '';
+      rh += `<div class="res-tile ice ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Ice Shards: +1 dmg each"><span class="res-main"><img src="../boobattles/iceshard.png"></span><span class="res-count">${label}</span></div>${bonus}`;
     }
     if (totalFire > 0) {
       const committed = c.fire > 0;
       const click = isReady ? `onclick="cycleCommit('${team}','fire')"` : '';
       const label = committed ? `${c.fire}/${totalFire}⚔` : totalFire;
-      rh += `<div class="res-tile fire ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Sacred Fire: +3 dmg each"><span class="res-main"><img src="../boobattles/sacredfire.png"></span><span class="res-count">${label}</span></div>`;
+      const bonus = committed ? `<span class="commit-bonus dmg">+${c.fire*3} dmg</span>` : '';
+      rh += `<div class="res-tile fire ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Sacred Fire: +3 dmg each"><span class="res-main"><img src="../boobattles/sacredfire.png"></span><span class="res-count">${label}</span></div>${bonus}`;
     }
     if (totalSurge > 0) {
       const committed = c.surge > 0;
       const click = isReady ? `onclick="cycleCommit('${team}','surge')"` : '';
       const label = committed ? `${c.surge}/${totalSurge}⚔` : totalSurge;
-      rh += `<div class="res-tile surge ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Surge: +1 die each"><span class="res-main">⚡</span><span class="res-count">${label}</span></div>`;
+      const bonus = committed ? `<span class="commit-bonus dice">+${c.surge} ${c.surge>1?'dice':'die'}</span>` : '';
+      rh += `<div class="res-tile surge ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Surge: +1 die each"><span class="res-main">⚡</span><span class="res-count">${label}</span></div>${bonus}`;
     }
     if (r.healingSeed > 0) {
       const canHeal = isReady && f.hp < f.maxHp;
