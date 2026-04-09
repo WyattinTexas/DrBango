@@ -351,6 +351,18 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .team-info { display:flex; flex-direction:column; align-items:center; gap:6px; }
 .hearts-col { flex-direction:row !important; flex-wrap:wrap; justify-content:center; }
 
+/* Team roll buttons */
+.team-roll { width:90%; max-width:280px; margin-top:6px; padding:10px 20px; font-size:14px; }
+.ability-buttons { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:4px; }
+.ability-btn {
+  padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;
+  border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:var(--text);
+  transition:all 0.15s; text-transform:uppercase; letter-spacing:0.5px;
+}
+.ability-btn:hover { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.3); transform:scale(1.05); }
+.ability-btn.pressure { border-color:rgba(255,99,72,0.5); color:var(--magma); background:rgba(255,99,72,0.1); }
+.ability-btn.pressure:hover { background:rgba(255,99,72,0.2); box-shadow:0 0 12px rgba(255,99,72,0.3); }
+
 @keyframes shake {
   0%,100% { transform:rotate(0); }
   25% { transform:rotate(-8deg) scale(1.08); }
@@ -604,6 +616,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
             <div id="red-hearts" class="hearts-col"></div>
             <div class="resources" id="red-resources"></div>
           </div>
+          <div id="red-ability-buttons" class="ability-buttons"></div>
+          <button class="action-btn roll-red team-roll" id="rollRedBtn" onclick="rollReady('red')">Red Roll</button>
         </div>
 
         <!-- Center — Dice + Round -->
@@ -633,14 +647,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
             <div id="blue-hearts" class="hearts-col"></div>
             <div class="resources" id="blue-resources"></div>
           </div>
+          <div id="blue-ability-buttons" class="ability-buttons"></div>
+          <button class="action-btn roll-blue team-roll" id="rollBlueBtn" onclick="rollReady('blue')">Blue Roll</button>
         </div>
       </div>
 
-      <div class="actions" id="actionBar">
-        <button class="action-btn roll-red" id="rollRedBtn" onclick="rollReady('red')">Red Roll</button>
-        <button class="action-btn roll-blue" id="rollBlueBtn" onclick="rollReady('blue')">Blue Roll</button>
-        <button class="action-btn" onclick="resetBattle()" style="color:var(--text2)">Reset</button>
-      </div>
+      <!-- Roll buttons are now inside each team column -->
 
       <div class="narrator-box">
         <div class="narrator-inner" id="narrator">Pick your teams and battle!</div>
@@ -1242,6 +1254,30 @@ function toggleAuntSusan(team) {
 }
 
 // ============================================================
+// PRESSURE — manual pre-roll ability (Death Howl 202)
+// ============================================================
+function usePressure(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  const enemy = opp(t);
+  if (f.id !== 202 || f.ko || dylanNegates(enemy)) return;
+
+  const aliveSideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
+  if (aliveSideline.length === 0) return;
+
+  // Opponent chooses who comes in (random for now since both players are local)
+  const swap = aliveSideline[Math.floor(Math.random() * aliveSideline.length)];
+  const oldName = active(enemy).name;
+  enemy.activeIdx = enemy.ghosts.indexOf(swap);
+  showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
+  log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${swap.name} enters!`);
+  triggerEntry(enemy);
+  handleKOs();
+  renderBattle();
+}
+
+// ============================================================
 // TWO-BUTTON ROLL SYSTEM
 // ============================================================
 function rollReady(team) {
@@ -1290,26 +1326,7 @@ function doRound() {
   // ========================================
 
   // Happy Crystal (208) — sacrifice is now manual via spend button
-
-  // Death Howl (202) — force opponent to swap (negated by Dylan on opponent sideline)
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const enemy = opp(team);
-    if (f.id === 202 && !f.ko && !dylanNegates(enemy)) {
-      const aliveSideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
-      if (aliveSideline.length > 0) {
-        const swap = aliveSideline[Math.floor(Math.random() * aliveSideline.length)];
-        const oldName = active(enemy).name;
-        enemy.activeIdx = enemy.ghosts.indexOf(swap);
-        showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
-        log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${swap.name} enters!`);
-        triggerEntry(enemy);
-      }
-    } else if (f.id === 202 && !f.ko && dylanNegates(enemy)) {
-      log(`<span class="log-ability">${f.name}</span> — Pressure blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
-    }
-  });
-  if (handleKOs()) return;
+  // Death Howl (202) — Pressure is now manual via ability button (pre-roll)
 
   // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
   [B.red, B.blue].forEach(team => {
@@ -2309,6 +2326,24 @@ function renderBattle() {
   document.getElementById('redDiceLabel').textContent = active(B.red).name;
   document.getElementById('blueDiceLabel').textContent = active(B.blue).name;
   document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
+
+  // Ability buttons (pre-roll actions)
+  ['red','blue'].forEach(team => {
+    const el = document.getElementById(`${team}-ability-buttons`);
+    const f = active(B[team]);
+    const enemy = opp(B[team]);
+    let html = '';
+    if (B.phase === 'ready') {
+      // Death Howl (202) — Pressure button
+      if (f.id === 202 && !f.ko && !dylanNegates(enemy)) {
+        const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
+        if (enemySideline.length > 0) {
+          html += `<button class="ability-btn pressure" onclick="usePressure('${team}')">🔥 Pressure</button>`;
+        }
+      }
+    }
+    el.innerHTML = html;
+  });
 }
 
 function renderDice(rd, bd) {
