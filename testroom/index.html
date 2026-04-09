@@ -2410,7 +2410,9 @@ function resolveRound() {
   const rR = classify(redDice), bR = classify(blueDice);
   log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
 
-  // Narrate the roll
+  // Determine winner with cascading tiebreakers
+  // Rule: compare best hand type first. If same type AND same value,
+  // compare remaining dice highest-to-lowest. Missing dice = 0.
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
   let winner = null;
 
@@ -2418,6 +2420,30 @@ function resolveRound() {
   else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
   else if (rR.value > bR.value) winner = 'red';
   else if (bR.value > rR.value) winner = 'blue';
+  else {
+    // Same hand type AND same value — cascading tiebreaker on remaining dice
+    // Remove the matched dice, then compare highest-to-lowest
+    const rRemain = [...redDice];
+    const bRemain = [...blueDice];
+    // Remove the matching group (e.g., for doubles of 6, remove two 6s from each)
+    const matchCount = {doubles:2, triples:3, quads:4, penta:5, singles:1, none:0}[rR.type] || 0;
+    for (let i = 0; i < matchCount; i++) {
+      const ri = rRemain.indexOf(rR.value);
+      if (ri >= 0) rRemain.splice(ri, 1);
+      const bi = bRemain.indexOf(bR.value);
+      if (bi >= 0) bRemain.splice(bi, 1);
+    }
+    // Sort remaining descending and compare
+    rRemain.sort((a,b) => b-a);
+    bRemain.sort((a,b) => b-a);
+    const maxLen = Math.max(rRemain.length, bRemain.length);
+    for (let i = 0; i < maxLen; i++) {
+      const rv = i < rRemain.length ? rRemain[i] : 0;
+      const bv = i < bRemain.length ? bRemain[i] : 0;
+      if (rv > bv) { winner = 'red'; break; }
+      if (bv > rv) { winner = 'blue'; break; }
+    }
+  }
 
   // Highlight dice immediately — winner dice glow, losers fade
   if (winner) {
@@ -2523,7 +2549,6 @@ function resolveRound() {
   // Aunt Susan (309) — +2 damage if healingSeed was spent
   if (B.auntSusanBonus[winTeamName]) {
     dmg += 2;
-    showAbilityCallout('HARVEST DANCE!', '#22c55e', `${wF.name} — Healing Seed spent for +2 damage!`);
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+2 bonus damage!</span>`);
   }
 
@@ -2533,220 +2558,207 @@ function resolveRound() {
     checkKnightEffects(winTeamName, wF.name);
     dmg += 2;
     pudgeSelfDmg = true;
-    showAbilityCallout('BELLY FLOP!', 'var(--uncommon)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
-    log(`<span class="log-ability">${wF.name}</span> — Belly Flop! Doubles → <span class="log-dmg">+2 damage!</span>`);
   }
 
   // Red Hunter (345) — if opponent has any resources: +3 damage
+  let redHunterTriggered = false;
   if (wF.id === 345) {
     checkKnightEffects(winTeamName, wF.name);
     const eRes = loseTeam.resources;
     if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
       dmg += 3;
-      showAbilityCallout('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
-      log(`<span class="log-ability">${wF.name}</span> — Rumble! Opponent has specials → <span class="log-dmg">+3 damage!</span>`);
+      redHunterTriggered = true;
     }
   }
 
   // Sylvia (313) — loser dodge check: roll 1 die, if 6 negate all damage
+  let sylviaDodged = false;
   if (lF.id === 313 && !lF.ko) {
     checkKnightEffects(loseTeamName, lF.name);
     const dodgeRoll = Math.floor(Math.random()*6)+1;
     if (dodgeRoll === 6) {
       dmg = 0;
-      showAbilityCallout('PORPOISE DODGE!', 'var(--rare)', `${lF.name} rolled a 6 — damage negated!`);
-      log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled a ${dodgeRoll} — <span class="log-heal">ALL DAMAGE NEGATED!</span>`);
+      sylviaDodged = true;
     } else {
       log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge roll: ${dodgeRoll} (needed 6).`);
     }
   }
 
-  // --- APPLY DAMAGE ---
+  // --- APPLY DAMAGE (game state updates immediately) ---
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
   if (dmg > 0) {
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) lF.ko = true;
-
-    // Narration lands first — announce the hit
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+  } else {
+    log(`${wF.name} wins but deals 0 damage.`);
+  }
+
+  // Pudge self-damage (game state)
+  if (pudgeSelfDmg && !wF.ko) {
+    wF.hp = Math.max(0, wF.hp - 1);
+    if (wF.hp <= 0) wF.ko = true;
+    log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
+  }
+
+  // On-win resource gains (game state)
+  if (wF.id === 209 && !wF.ko) { checkKnightEffects(winTeamName, wF.name); winTeam.resources.surge += 2; }
+  if (wF.id === 307 && !wF.ko) { checkKnightEffects(winTeamName, wF.name); winTeam.resources.surge++; winTeam.resources.ice++; }
+  if (wF.id === 342 && !wF.ko && wF.hp < wF.maxHp) { checkKnightEffects(winTeamName, wF.name); wF.hp++; }
+  if (wF.id === 336 && !wF.ko) { checkKnightEffects(winTeamName, wF.name); winTeam.resources.fire++; }
+  if (wF.id === 309 && !wF.ko) { checkKnightEffects(winTeamName, wF.name); winTeam.resources.healingSeed++; }
+  if (hasSideline(winTeam, 314)) {
+    const sixes = countVal(winDice, 6);
+    if (sixes > 0) { checkKnightEffects(winTeamName, 'Farmer Jeff'); winTeam.resources.healingSeed += sixes; }
+  }
+
+  // On-lose resource gains (game state)
+  if (lF.id === 404 && !lF.ko) { checkKnightEffects(loseTeamName, lF.name); loseTeam.resources.surge++; }
+
+  // On-KO triggers (game state)
+  if (lF.ko) {
+    if (hasSideline(loseTeam, 310)) {
+      checkKnightEffects(loseTeamName, 'Granny');
+      if (wR.type === 'singles') loseTeam.resources.luckyStone++;
+      else if (wR.type === 'doubles') loseTeam.resources.surge++;
+      else if (wR.type === 'triples') loseTeam.resources.moonstone++;
+    }
+    if (lF.id === 404) { loseTeam.resources.surge++; }
+  }
+
+  // End-of-round (game state)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameMax2 = team === B.red ? 'red' : 'blue';
+    if (f.id === 302 && !f.ko) { checkKnightEffects(tNameMax2, f.name); team.resources.healingSeed++; }
+  });
+
+  // Eternal Flame (game state)
+  if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
+    winTeam.resources.fire += B.committed[winTeamName].fire;
+  }
+
+  // ========================================
+  // CINEMATIC ABILITY QUEUE — visuals play sequentially
+  // ========================================
+  abilityQueue = [];
+  abilityQueueMode = true;
+
+  // Damage modifier callouts
+  if (B.auntSusanBonus[winTeamName]) {
+    queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Healing Seed spent for +2 damage!`);
+  }
+  if (pudgeSelfDmg || (wF.id === 311 && wR.type === 'doubles')) {
+    queueAbility('BELLY FLOP!', 'var(--uncommon)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
+  }
+  if (redHunterTriggered) {
+    queueAbility('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
+  }
+  if (sylviaDodged) {
+    queueAbility('PORPOISE DODGE!', 'var(--rare)', `${lF.name} rolled a 6 — damage negated!`);
+  }
+
+  // Eternal Flame callout
+  if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
+    queueAbility('ETERNAL FLAME!', 'var(--magma)', `Fed and Hayden — Sacred Fires preserved!`);
+  }
+
+  // On-win callouts
+  if (wF.id === 209 && !wF.ko) queueAbility('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`);
+  if (wF.id === 307 && !wF.ko) queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`);
+  if (wF.id === 342 && !wF.ko) queueAbility('OVERGROWTH!', '#22c55e', `${wF.name} — Win heals 1 HP! ${wF.hp}/${wF.maxHp}`);
+  if (wF.id === 336 && !wF.ko) queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`);
+  if (wF.id === 309 && !wF.ko) queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`);
+  if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
+    const sx = countVal(winDice, 6);
+    queueAbility('HARVEST!', '#22c55e', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`);
+  }
+
+  // On-lose callouts
+  if (lF.id === 404 && !lF.ko) queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`);
+
+  // On-KO callouts
+  if (lF.ko) {
+    if (hasSideline(loseTeam, 310)) {
+      if (wR.type === 'singles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`);
+      else if (wR.type === 'doubles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`);
+      else if (wR.type === 'triples') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — triples KO → MOONSTONE!`);
+    }
+    if (lF.id === 404) queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
+  }
+
+  // End-of-round callouts
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 302 && !f.ko) queueAbility('NAP!', '#22c55e', `${f.name} — round ends, Healing Seed collected!`);
+  });
+
+  abilityQueueMode = false;
+
+  // ========================================
+  // CINEMATIC PLAYBACK — damage hits first, then abilities sequence
+  // ========================================
+  // Step 1: Narration + damage hit
+  if (dmg > 0) {
     if (lF.ko) {
       narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage!</b> &nbsp;<b class="ko-text">${lF.name} is KO'd!</b>`);
     } else {
       narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage to <b class="${loseColor}">${lF.name}</b>!</b> &nbsp;${lF.hp} HP left.`);
     }
-
-    // Then the impact — SFX + shake + HP drain all at once
     playDamageSfx(dmg);
     const hitEl = document.getElementById(loseTeamName + '-fighter');
     hitEl.classList.add('hit');
     setTimeout(() => hitEl.classList.remove('hit'), 500);
     updateHpBar(loseTeamName, lF.hp, lF.maxHp);
   } else {
-    log(`${wF.name} wins but deals 0 damage.`);
     narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
   }
 
-  // Pudge (311) — self-damage after damage applied
+  // Step 2: Pudge self-damage visual (after hit lands)
   if (pudgeSelfDmg && !wF.ko) {
-    wF.hp = Math.max(0, wF.hp - 1);
-    if (wF.hp <= 0) wF.ko = true;
-    log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
-    playDamageSfx(1);
-    hitDamage(winTeamName);
-  }
-
-  // ========================================
-  // PHASE 6: ON-WIN TRIGGERS
-  // ========================================
-
-  // Dart (209) — win: +2 Surge
-  if (wF.id === 209 && !wF.ko) {
-    checkKnightEffects(winTeamName, wF.name);
-    winTeam.resources.surge += 2;
-    showAbilityCallout('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`);
-    log(`<span class="log-ability">${wF.name}</span> — Plunder! Gained <span class="log-ms">2 Surge</span>!`);
-  }
-
-  // Artemis (307) — win: +1 Surge, +1 Ice
-  if (wF.id === 307 && !wF.ko) {
-    checkKnightEffects(winTeamName, wF.name);
-    winTeam.resources.surge++;
-    winTeam.resources.ice++;
-    showAbilityCallout('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`);
-    log(`<span class="log-ability">${wF.name}</span> — Daughter of the Stream! Gained <span class="log-ms">1 Surge + 1 Ice Shard</span>!`);
-  }
-
-  // Calvin (342) — win: heal +1 HP (can't exceed maxHp)
-  if (wF.id === 342 && !wF.ko) {
-    checkKnightEffects(winTeamName, wF.name);
-    if (wF.hp < wF.maxHp) {
-      wF.hp++;
-      showAbilityCallout('OVERGROWTH!', '#22c55e', `${wF.name} — Win heals 1 HP! ${wF.hp}/${wF.maxHp}`);
-      log(`<span class="log-heal">${wF.name}</span> — Overgrowth! Healed to ${wF.hp} HP!`);
-    }
-  }
-
-  // Humar (336) — win: +1 Sacred Fire
-  if (wF.id === 336 && !wF.ko) {
-    checkKnightEffects(winTeamName, wF.name);
-    winTeam.resources.fire++;
-    showAbilityCallout('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`);
-    log(`<span class="log-ability">${wF.name}</span> — Sacred Flame! Gained <span class="log-ms">1 Sacred Fire</span>!`);
-  }
-
-  // Aunt Susan (309) — win: +1 Healing Seed
-  if (wF.id === 309 && !wF.ko) {
-    checkKnightEffects(winTeamName, wF.name);
-    winTeam.resources.healingSeed++;
-    showAbilityCallout('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`);
-    log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! Win → gained <span class="log-ms">1 Healing Seed</span>!`);
-  }
-
-  // Farmer Jeff (314) — sideline: when ghost wins, gain 1 Healing Seed per 6 rolled
-  if (hasSideline(winTeam, 314)) {
-    const sixes = countVal(winDice, 6);
-    if (sixes > 0) {
-      checkKnightEffects(winTeamName, 'Farmer Jeff');
-      winTeam.resources.healingSeed += sixes;
-      showAbilityCallout('HARVEST!', '#22c55e', `Farmer Jeff — ${sixes} six${sixes>1?'es':''} = ${sixes} Healing Seed${sixes>1?'s':''}!`);
-      log(`<span class="log-ability">Farmer Jeff</span> (sideline) — Harvest! ${sixes} six${sixes>1?'es':''} rolled → gained <span class="log-ms">${sixes} Healing Seed${sixes>1?'s':''}</span>!`);
-    }
-  }
-
-  // ========================================
-  // ON-LOSE TRIGGERS
-  // ========================================
-
-  // Bitter End (404) — lose: gain 1 Surge (alive)
-  if (lF.id === 404 && !lF.ko) {
-    checkKnightEffects(loseTeamName, lF.name);
-    loseTeam.resources.surge++;
-    showAbilityCallout('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`);
-    log(`<span class="log-ability">${lF.name}</span> — Bitter End! Lost → gained <span class="log-ms">1 Surge</span>!`);
-  }
-
-  // ========================================
-  // PHASE 8: ON-KO TRIGGERS
-  // ========================================
-
-  // Granny (310) — sideline consolation when YOUR ghost is defeated
-  if (lF.ko) {
-    if (hasSideline(loseTeam, 310)) {
-      checkKnightEffects(loseTeamName, 'Granny');
-      if (wR.type === 'singles') {
-        loseTeam.resources.luckyStone++;
-        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`);
-        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to singles → gained <span class="log-ms">1 Lucky Stone</span>.`);
-      } else if (wR.type === 'doubles') {
-        loseTeam.resources.surge++;
-        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`);
-        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to doubles → gained <span class="log-ms">1 Surge</span>.`);
-      } else if (wR.type === 'triples') {
-        loseTeam.resources.moonstone++;
-        showAbilityCallout('BEDTIME STORY!', '#fbbf24', `Granny consoles — triples KO → MOONSTONE!`);
-        log(`<span class="log-ability">Granny</span> (sideline) — Bedtime Story! Your ghost fell to triples → gained <span class="log-ms">1 Moonstone</span>!`);
-      }
-    }
-
-    // Bitter End (404) — KO'd: still gain 1 Surge on loss
-    if (lF.id === 404) {
-      loseTeam.resources.surge++;
-      showAbilityCallout('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
-      log(`<span class="log-ability">${lF.name}</span> — Bitter End! Defeated but gained <span class="log-ms">1 Surge</span>!`);
-    }
-  }
-
-  // ========================================
-  // PHASE 9: END OF ROUND
-  // ========================================
-
-  // Maximo (302) — end of round: gain 1 Healing Seed if active
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tNameMax2 = team === B.red ? 'red' : 'blue';
-    if (f.id === 302 && !f.ko) {
-      checkKnightEffects(tNameMax2, f.name);
-      team.resources.healingSeed++;
-      showAbilityCallout('NAP!', '#22c55e', `${f.name} — round ends, Healing Seed collected!`);
-      log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
-    }
-  });
-
-  // Reset committed resources
-  B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false };
-  B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
-
-  B.round++;
-  B.preRoll = null;
-  renderDice(redDice, blueDice);
-  // Re-apply win highlights after renderDice rebuilds the innerHTML
-  setTimeout(() => highlightWinnerDice(winTeamName, wR, loseTeamName), 10);
-
-  // handleKOs may open the swap picker (sets phase to 'ko-swap')
-  // If a KO happened, dramatic 1.8s pause so the hit lands before swap prompt
-  if (lF.ko) {
-    B.phase = 'ko-pause'; // prevent double-clicks during pause
-    renderBattle();
     setTimeout(() => {
-      if (!handleKOs()) {
-        B.phase = 'ready';
-        resetRollButtons();
-        renderBattle();
-      }
-    }, 1800);
-  } else {
-    // Non-KO: 750ms pacing pause so dice highlights + narration sink in before next roll
-    B.phase = 'ko-pause';
-    renderBattle();
-    setTimeout(() => {
-      if (!handleKOs()) {
-        B.phase = 'ready';
-        resetRollButtons();
-        renderBattle();
-      }
-    }, 750);
+      playDamageSfx(1);
+      hitDamage(winTeamName);
+    }, 600);
   }
+
+  // Step 3: Drain ability queue, then do end-of-round
+  const dmgDelay = dmg > 0 ? 800 : 200;
+  setTimeout(() => {
+    drainAbilityQueue(() => {
+      // Reset committed resources
+      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:false };
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
+
+      B.round++;
+      B.preRoll = null;
+      renderDice(redDice, blueDice);
+      setTimeout(() => highlightWinnerDice(winTeamName, wR, loseTeamName), 10);
+
+      if (lF.ko) {
+        B.phase = 'ko-pause';
+        renderBattle();
+        setTimeout(() => {
+          if (!handleKOs()) {
+            B.phase = 'ready';
+            resetRollButtons();
+            renderBattle();
+          }
+        }, 1800);
+      } else {
+        B.phase = 'ko-pause';
+        renderBattle();
+        setTimeout(() => {
+          if (!handleKOs()) {
+            B.phase = 'ready';
+            resetRollButtons();
+            renderBattle();
+          }
+        }, 750);
+      }
+    });
+  }, dmgDelay);
 }
 
 function handleKOs() {
@@ -3009,6 +3021,40 @@ const SPLASH_THEMES = {
   '#fbbf24':           'theme-gold',
   '#a855f7':           'theme-purple',
 };
+
+// ============================================================
+// ABILITY QUEUE — cinematic sequential playback
+// ============================================================
+let abilityQueue = [];
+let abilityQueueMode = false;
+
+function queueAbility(name, color, desc) {
+  if (abilityQueueMode) {
+    abilityQueue.push({ name, color, desc });
+  } else {
+    showAbilityCallout(name, color, desc);
+  }
+}
+
+function drainAbilityQueue(callback) {
+  abilityQueueMode = false;
+  if (abilityQueue.length === 0) {
+    callback();
+    return;
+  }
+  let i = 0;
+  function next() {
+    if (i >= abilityQueue.length) {
+      abilityQueue = [];
+      setTimeout(callback, 900);
+      return;
+    }
+    const a = abilityQueue[i++];
+    showAbilityCallout(a.name, a.color, a.desc);
+    setTimeout(next, 1300);
+  }
+  next();
+}
 
 function showAbilityCallout(name, color, desc) {
   const el = document.getElementById('abilitySplash');
