@@ -863,6 +863,19 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .pressure-modal .pm-sub { font-size:12px; color:var(--text2); margin-bottom:14px; }
 .pressure-opt { padding:10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:all .15s; display:flex; gap:10px; align-items:center; }
 .pressure-opt:hover { border-color:var(--magma); box-shadow:0 0 12px rgba(255,99,72,0.2); }
+/* Selene — Heart of the Hills choice modal */
+.selene-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; align-items:center; justify-content:center; }
+.selene-overlay.active { display:flex; }
+.selene-modal { background:var(--surface); border:2px solid #f39c12; border-radius:14px; padding:26px; max-width:340px; width:90%; text-align:center; box-shadow:0 0 40px rgba(243,156,18,0.35); }
+.selene-banner { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; padding:5px 12px; border-radius:6px; margin-bottom:10px; display:inline-block; background:rgba(243,156,18,.15); color:#f39c12; border:1px solid #f39c12; }
+.selene-banner.red  { background:rgba(235,87,87,.18);  color:#eb5757; border-color:#eb5757; }
+.selene-banner.blue { background:rgba(72,152,255,.18); color:#4898ff; border-color:#4898ff; }
+.selene-modal h3 { margin-bottom:4px; font-size:16px; color:#f39c12; }
+.selene-sub { font-size:12px; color:var(--text2); margin-bottom:16px; }
+.selene-options { display:flex; gap:10px; justify-content:center; }
+.selene-opt { padding:12px 16px; background:var(--bg); border:1px solid var(--border); border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; transition:all .18s; flex:1; color:var(--text); }
+.selene-opt.seed:hover { border-color:#22c55e; box-shadow:0 0 14px rgba(34,197,94,0.3); color:#22c55e; }
+.selene-opt.ls:hover { border-color:#fbbf24; box-shadow:0 0 14px rgba(251,191,36,0.35); color:#fbbf24; }
 
 /* Steal Modal */
 .steal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
@@ -1155,6 +1168,19 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </div>
 </div>
 
+<!-- Selene — Heart of the Hills choice modal -->
+<div class="selene-overlay" id="seleneOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" id="seleneBanner">⛰️ HEART OF THE HILLS</div>
+    <h3 id="seleneTitle">Selene — Heart of the Hills!</h3>
+    <p class="selene-sub">Doubles! Choose your reward:</p>
+    <div class="selene-options">
+      <button class="selene-opt seed" onclick="doSeleneChoice('seed')">🌱 1 Healing Seed</button>
+      <button class="selene-opt ls" onclick="doSeleneChoice('ls')">🍀 2 Lucky Stones</button>
+    </div>
+  </div>
+</div>
+
 <!-- Game Over -->
 <div class="game-over" id="gameOver">
   <div class="go-box">
@@ -1172,7 +1198,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v54';
+const TESTROOM_VERSION = 'v61';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1268,9 +1294,9 @@ const GHOSTS = [
   },
   {
     id:210, name:"Timber", rarity:"legendary", maxHp:6, art:"art/timber.jpg",
-    ability:"Meticulous Planning", abilityDesc:"While Timber is active, before rolling: opponent must choose — discard 2 specials OR remove 1 die for this roll.",
+    ability:"Howl", abilityDesc:"While Timber is active, before rolling: opponent must choose — discard 2 specials OR remove 1 die for this roll.",
     category:"Debuff", set:"Rolling Hills",
-    designNote:"Gary's v4 proposal. Opponent-facing choice mechanic — declining resource trap. Discard 2 specials or roll 2 dice against a 6HP Legendary. No carryover tracking, resolves fresh each roll. 6HP keeps him killable but his ability makes him hard to hit."
+    designNote:"Gary's v4 proposal, renamed to Howl. Opponent-facing choice mechanic — declining resource trap. Discard 2 specials or roll 2 dice against a 6HP Legendary. No carryover tracking, resolves fresh each roll."
   },
   // === NEW CARDS — Rolling Hills ===
   {
@@ -1854,11 +1880,10 @@ function triggerEntry(team, skipEntryEffects) {
     checkKnightEffects(entryTeamName, f.name);
   }
 
-  // Timber (210) — Meticulous Planning: announce once on entry
+  // Timber (210) — Howl: announce on entry
   if (f.id === 210) {
-    f.meticulousAnnounced = true;
-    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent rolls 1 fewer die!`);
-    log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die while Timber is active!`);
+    showAbilityCallout('HOWL!', 'var(--legendary)', `${f.name} — opponent must choose: discard 2 specials or lose 1 die each roll!`);
+    log(`<span class="log-ability">${f.name}</span> — Howl! Each roll, opponent must discard 2 specials or roll 1 fewer die!`);
   }
 
   // Timpleton (312) — Big Target: if enemy HP > Timpleton's HP, deal 3 damage
@@ -1988,12 +2013,15 @@ function hasDouble2sOr3s(dice) {
   return (c[2] >= 2) || (c[3] >= 2);
 }
 
-// Boris (343) — Fortify: when surge is spent, Boris gains 2 HP
+// Boris (343) — Fortify: when surge is spent, Boris gains 2 HP (capped at maxHp)
 function triggerBorisHook(team) {
   team.ghosts.forEach(g => {
     if (g.id === 343 && !g.ko) {
-      g.hp += 2; // ability heal — can exceed maxHp
-      log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → gained 2 HP (${g.hp}/${g.maxHp}).`);
+      const before = g.hp;
+      g.hp = Math.min(g.maxHp, g.hp + 2);
+      const actual = g.hp - before;
+      const capped = before + 2 > g.maxHp;
+      log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → +${actual} HP (${before}→${g.hp}/${g.maxHp}${capped ? ', capped' : ''}).`);
     }
   });
 }
@@ -2291,6 +2319,47 @@ function doPressureSwap(attackerTeam, targetIdx) {
 }
 
 // ============================================================
+// SELENE — Heart of the Hills in-game choice modal
+// ============================================================
+function showSeleneModal() {
+  const sp = B.selenePending;
+  const f = active(sp.team);
+  const tName = sp.tName;
+  const teamLabel = tName.charAt(0).toUpperCase() + tName.slice(1);
+  const bannerEl = document.getElementById('seleneBanner');
+  if (bannerEl) {
+    bannerEl.textContent = `⛰️ ${teamLabel.toUpperCase()} PICKS`;
+    bannerEl.className = `selene-banner ${tName}`;
+  }
+  const titleEl = document.getElementById('seleneTitle');
+  if (titleEl) titleEl.textContent = `${f.name} — Heart of the Hills!`;
+  narrate(`<b class="${tName}-text">${f.name}</b>&nbsp;rolled <b class="gold">DOUBLES!</b>&nbsp; Choose your reward!`);
+  document.getElementById('seleneOverlay').classList.add('active');
+}
+
+function doSeleneChoice(choice) {
+  const sp = B.selenePending;
+  if (!sp) return; // guard against double-click
+  const cont = sp._continue;
+  B.selenePending = null;
+  document.getElementById('seleneOverlay').classList.remove('active');
+  const f = active(sp.team);
+  if (choice === 'seed') {
+    sp.team.resources.healingSeed++;
+    showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 🌱 1 Healing Seed!`);
+    log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
+  } else {
+    sp.team.resources.luckyStone += 2;
+    showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 🍀 2 Lucky Stones!`);
+    log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
+  }
+  checkKnightEffects(sp.tName, f.name);
+  renderBattle();
+  // Resume post-roll flow (moonstone → lucky stones → damage) after a brief callout pause
+  setTimeout(() => { if (cont) cont(); }, 900);
+}
+
+// ============================================================
 // TWO-BUTTON ROLL SYSTEM — each side rolls independently
 // ============================================================
 function rollReady(team) {
@@ -2450,8 +2519,20 @@ function doPreRollSetup() {
     }
   });
 
+  // If a pre-roll ability (Shade's Shadow / Swarm) caused a KO, flush any pending
+  // callouts (e.g. MELTDOWN!) BEFORE the swap modal opens — previously the early
+  // return discarded them and the callout silently never played.
+  const preRollKO = [B.red, B.blue].some(t => active(t).ko);
+  if (preRollKO && preRollCallouts.length > 0) {
+    preRollCallouts.forEach((c, i) => {
+      setTimeout(() => showAbilityCallout(c[0], c[1], c[2]), i * 1500);
+    });
+    refundCommitted();
+    setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
+    return;
+  }
   if (handleKOs()) {
-    // Refund committed resources — round ended before resolution
+    // No pending callouts — swap flow opens immediately
     refundCommitted();
     return;
   }
@@ -2557,13 +2638,42 @@ function doPreRollSetup() {
     }
   });
 
-  // Timber (210) — opponent rolls 1 fewer die (silent — announced on entry)
+  // Timber (210) — Howl: opponent chooses discard 2 specials OR lose 1 die
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     if (f.id === 210 && !f.ko) {
       const oppTeamName = team === B.red ? 'blue' : 'red';
-      if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
-      else blueCount = Math.max(1, blueCount - 1);
+      const oppTeam = team === B.red ? B.blue : B.red;
+      // Count opponent's total specials
+      const r = oppTeam.resources;
+      const totalSpecials = (r.iceShard||0) + (r.sacredFire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
+      if (totalSpecials >= 2) {
+        // Opponent has resources — give them the choice
+        const chooseDice = confirm(`${oppTeamName.toUpperCase()} — Timber's Howl!\n\nYou must choose:\n\nOK = Discard 2 specials (keep all 3 dice)\nCancel = Roll 1 fewer die (keep your specials)`);
+        if (chooseDice) {
+          // Discard 2 specials — remove from most abundant first
+          let toDiscard = 2;
+          const types = ['surge','iceShard','healingSeed','luckyStone','sacredFire','moonstone'];
+          types.sort((a,b) => (r[b]||0) - (r[a]||0));
+          for (const t of types) {
+            while (toDiscard > 0 && (r[t]||0) > 0) {
+              r[t]--;
+              toDiscard--;
+            }
+          }
+          log(`<span class="log-ability">${oppTeamName}</span> chose to discard 2 specials to avoid Timber's Howl!`);
+        } else {
+          // Lose 1 die
+          if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
+          else blueCount = Math.max(1, blueCount - 1);
+          log(`<span class="log-ability">${oppTeamName}</span> chose to roll 1 fewer die under Timber's Howl!`);
+        }
+      } else {
+        // Not enough specials — forced to lose die
+        if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
+        else blueCount = Math.max(1, blueCount - 1);
+        log(`<span class="log-ability">${oppTeamName}</span> has no specials — forced to roll 1 fewer die under Timber's Howl!`);
+      }
     }
   });
 
@@ -2608,16 +2718,24 @@ function doPreRollSetup() {
   if (B.committed.red.surge > 0) {
     redCount += B.committed.red.surge;
     log(`<span class="log-ability">Red</span> committed <span class="log-ms">${B.committed.red.surge} Surge</span> → +${B.committed.red.surge} dice!`);
+    const borisRedPre = (B.red.ghosts.find(g => g.id === 343 && !g.ko) || {}).hp;
     triggerBorisHook(B.red);
     const borisRed = B.red.ghosts.find(g => g.id === 343 && !g.ko);
-    if (borisRed) preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP! (${borisRed.hp}/${borisRed.maxHp})`]);
+    if (borisRed) {
+      const capped = borisRed.hp === borisRed.maxHp && borisRedPre + 2 > borisRed.maxHp;
+      preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP (${borisRedPre}→${borisRed.hp}/${borisRed.maxHp}${capped ? ' · capped' : ''})`]);
+    }
   }
   if (B.committed.blue.surge > 0) {
     blueCount += B.committed.blue.surge;
     log(`<span class="log-ability">Blue</span> committed <span class="log-ms">${B.committed.blue.surge} Surge</span> → +${B.committed.blue.surge} dice!`);
+    const borisBlueRePre = (B.blue.ghosts.find(g => g.id === 343 && !g.ko) || {}).hp;
     triggerBorisHook(B.blue);
     const borisBlue = B.blue.ghosts.find(g => g.id === 343 && !g.ko);
-    if (borisBlue) preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP! (${borisBlue.hp}/${borisBlue.maxHp})`]);
+    if (borisBlue) {
+      const capped = borisBlue.hp === borisBlue.maxHp && borisBlueRePre + 2 > borisBlue.maxHp;
+      preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlue.hp}/${borisBlue.maxHp}${capped ? ' · capped' : ''})`]);
+    }
   }
 
   // Store pre-roll data for per-click rolling
@@ -2662,22 +2780,15 @@ function doPostRollAndResolve(redDice, blueDice) {
   });
 
   // Selene (305) — doubles: choose 1 Healing Seed OR 2 Lucky Stones
+  // Choice is deferred to AFTER the ability queue drains — shown via in-game modal
+  // (avoids blocking synchronous browser confirm() firing before callouts play)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameSel = team === B.red ? 'red' : 'blue';
-    if (f.id === 305 && !f.ko && hasDoubles(dice)) {
-      const choice = confirm(`${f.name} — Heart of the Hills!\n\nChoose your reward:\n\nOK = 1 Healing Seed\nCancel = 2 Lucky Stones`);
-      if (choice) {
-        team.resources.healingSeed++;
-        queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 1 Healing Seed!`);
-        log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
-      } else {
-        team.resources.luckyStone += 2;
-        queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 2 Lucky Stones!`);
-        log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
-      }
-      checkKnightEffects(tNameSel, f.name);
+    if (f.id === 305 && !f.ko && classify(dice).type === 'doubles') {
+      B.selenePending = { team, tName: tNameSel };
+      // Resource grant and callout happen in doSeleneChoice() after the modal closes
     }
   });
 
@@ -2699,7 +2810,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     const f = active(team);
     const oppDice = team === B.red ? blueDice : redDice;
     const tNameKap = team === B.red ? 'red' : 'blue';
-    if (f.id === 308 && !f.ko && hasDoubles(oppDice)) {
+    if (f.id === 308 && !f.ko && classify(oppDice).type === 'doubles') {
       team.resources.healingSeed++;
       queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
       log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
@@ -2739,6 +2850,12 @@ function doPostRollAndResolve(redDice, blueDice) {
   // then continue to moonstone/lucky stones
   drainAbilityQueue(() => {
     if (handleKOs()) return; // Shade's Shadow or other queued ability caused a KO — swap flow takes over
+    // Selene (305) choice is deferred here so the modal appears AFTER callouts have played
+    if (B.selenePending) {
+      B.selenePending._continue = postRollDone; // store closure so doSeleneChoice can resume
+      showSeleneModal();
+      return;
+    }
     postRollDone();
   });
 }
@@ -3490,14 +3607,18 @@ function resolveRound() {
   }
 
   // Aunt Susan heal bonus (game state — applies to whichever team committed it)
+  B.auntSusanHealResult = {}; // store {before, after} for callout delta display
   ['red', 'blue'].forEach(tn => {
     if (B.auntSusanHealBonus[tn] > 0) {
       const t = B[tn];
       const f = active(t);
       if (!f.ko) {
         const healAmt = B.auntSusanHealBonus[tn] * 2;
-        f.hp += healAmt;
-        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +${healAmt} HP → ${f.hp} HP!`);
+        const hpBefore = f.hp;
+        f.hp = Math.min(f.maxHp, f.hp + healAmt);
+        const actualHeal = f.hp - hpBefore;
+        B.auntSusanHealResult[tn] = { before: hpBefore, after: f.hp };
+        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +${actualHeal} HP (${hpBefore}→${f.hp}/${f.maxHp})${actualHeal < healAmt ? ' (capped)' : ''}!`);
       }
     }
   });
@@ -3515,6 +3636,14 @@ function resolveRound() {
       checkKnightEffects(loseTeamName, 'Granny', grannyGhost);
     }
     if (lF.id === 404) { loseTeam.resources.surge++; }
+  }
+  // Granny Bedtime Story fires for the WINNER's team too when the winner self-KOs (Pudge Belly Flop)
+  if (wF.ko && hasSideline(winTeam, 310)) {
+    const grannyGhost = getSidelineGhost(winTeam, 310);
+    if (wR.type === 'singles') winTeam.resources.luckyStone++;
+    else if (wR.type === 'doubles') winTeam.resources.surge++;
+    else if (isTripleOrBetter(wR.type)) winTeam.resources.moonstone++;
+    checkKnightEffects(winTeamName, 'Granny', grannyGhost);
   }
 
   // End-of-round (game state)
@@ -3542,7 +3671,9 @@ function resolveRound() {
     if (B.auntSusanHealBonus[tn] > 0) {
       const cnt = B.auntSusanHealBonus[tn];
       const f = active(B[tn]);
-      queueAbility('HARVEST DANCE!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} HP! ${f.hp} HP`);
+      const res = (B.auntSusanHealResult || {})[tn];
+      const hpDelta = res ? `${res.before}→${res.after} HP` : `${f.hp} HP`;
+      queueAbility('HARVEST DANCE!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} HP! ${hpDelta}`);
     }
   });
   if (pudgeSelfDmg || (wF.id === 311 && wR.type === 'doubles')) {
@@ -3583,6 +3714,13 @@ function resolveRound() {
       else if (isTripleOrBetter(wR.type)) queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, grannyPop);
     }
     if (lF.id === 404) queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
+  }
+  // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
+  if (wF.ko && hasSideline(winTeam, 310)) {
+    const grannyPop = () => popSidelineCard(winTeam, 310);
+    if (wR.type === 'singles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, grannyPop);
+    else if (wR.type === 'doubles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, grannyPop);
+    else if (isTripleOrBetter(wR.type)) queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, grannyPop);
   }
 
   // End-of-round callouts
@@ -4111,14 +4249,14 @@ function renderCardSlot(ghost, isFighter) {
   if (isFighter) {
     if (ghost.hankFirstRoll) statusHtml += `<span class="status-tag pressure">Lazy (1-2-3)</span>`;
     if (ghost.maximoFirstRoll) statusHtml += `<span class="status-tag streak">Napping (1 die)</span>`;
-    // Check if opponent has Timber (210) — Meticulous Planning debuff indicator
+    // Check if opponent has Timber (210) — Howl debuff indicator
     if (B) {
       const thisTeam = B.red.ghosts.includes(ghost) ? B.red : B.blue;
       const thisTeamName = thisTeam === B.red ? 'red' : 'blue';
       const oppTeam = thisTeam === B.red ? B.blue : B.red;
       const oppActive = active(oppTeam);
       if (oppActive && oppActive.id === 210 && !oppActive.ko) {
-        statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">-1 Die (Timber)</span>`;
+        statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">Howl (choose: -2 specials or -1 die)</span>`;
       }
       // Mother Nature (366) Winter indicator: opponent -1 die on rounds where round % 4 === 0
       if (oppActive && oppActive.id === 366 && !oppActive.ko && B.round % 4 === 0) {
@@ -4457,6 +4595,7 @@ function clearAllOverlays() {
   clearLsCountdown();
   document.getElementById('stealOverlay').classList.remove('active');
   document.getElementById('pressureOverlay').classList.remove('active');
+  document.getElementById('seleneOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
   document.getElementById('abilitySplash').classList.remove('active');
   const vsSplash = document.getElementById('vsSplash');
