@@ -966,7 +966,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v08';
+const TESTROOM_VERSION = 'v09';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1484,7 +1484,7 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 } }
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false } }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -1492,8 +1492,14 @@ function startBattle() {
   document.querySelector('.app').classList.add('battle-active');
   startMusic();
   log('<span class="log-round">Battle begins!</span>');
-  // Entry abilities
-  triggerEntry(B.red); triggerEntry(B.blue);
+  // Entry abilities — stagger if first entry shows a callout
+  triggerEntry(B.red);
+  const splashActive = document.getElementById('abilitySplash').classList.contains('active');
+  if (splashActive) {
+    setTimeout(() => { triggerEntry(B.blue); renderBattle(); }, 1500);
+  } else {
+    triggerEntry(B.blue);
+  }
   renderBattle();
 
   // Disable roll buttons until VS splash is done
@@ -1665,6 +1671,9 @@ function typeLabel(type) {
 function hasSideline(team, id) {
   return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
 }
+function getSidelineGhost(team, id) {
+  return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+}
 
 // Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
 function dylanNegates(enemyTeam) {
@@ -1801,10 +1810,33 @@ function uncommitAuntSusanHeal(team) {
 }
 
 // ============================================================
+// HARRISON (315) — opt-in: spend 1 Healing Seed for +1 die
+// ============================================================
+function toggleHarrison(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 315 || f.ko) return;
+  if (B.committed[team].harrison) {
+    // Un-commit: refund the seed
+    B.committed[team].harrison = false;
+    t.resources.healingSeed++;
+  } else {
+    // Commit: spend a seed
+    if (t.resources.healingSeed > 0) {
+      B.committed[team].harrison = true;
+      t.resources.healingSeed--;
+    }
+  }
+  renderBattle();
+}
+
+// ============================================================
 // KNIGHT EFFECTS — Heavy Air (401) & Retribution (402)
 // ============================================================
-function checkKnightEffects(abilityTeamName, abilityGhostName) {
+function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
   // abilityTeamName = the team whose ability is triggering
+  // sidelineGhost = optional: the sideline ghost using the ability (if not the active fighter)
   // The OPPONENT of that team might have Heavy Air or Retribution
   const oppTeamName = abilityTeamName === 'red' ? 'blue' : 'red';
   const oppTeam = B[oppTeamName];
@@ -1813,7 +1845,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName) {
   // Heavy Air (401) — opponent's active ghost: abilities cost 2 HP
   if (oppActive.id === 401 && !oppActive.ko) {
     const abilityTeam = B[abilityTeamName];
-    const target = active(abilityTeam);
+    const target = sidelineGhost || active(abilityTeam);
     if (!target.ko) {
       target.hp = Math.max(0, target.hp - 2);
       if (target.hp <= 0) target.ko = true;
@@ -2052,15 +2084,15 @@ function doPreRollSetup() {
   });
   if (handleKOs()) return;
 
-  // Harrison (315) — auto-spend 1 healingSeed for +1 die
+  // Harrison (315) — opt-in: spend 1 healingSeed for +1 die (committed via button)
   B.harrisonExtraDie = { red: false, blue: false };
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 315 && !f.ko && team.resources.healingSeed > 0) {
+    if (f.id === 315 && !f.ko && B.committed[tName].harrison) {
       checkKnightEffects(tName, f.name);
-      team.resources.healingSeed--;
       B.harrisonExtraDie[tName] = true;
+      B.committed[tName].harrison = false; // reset after use
       showAbilityCallout('ASCEND!', '#22c55e', `${f.name} — Healing Seed → extra die!`);
       log(`<span class="log-ability">${f.name}</span> — Ascend! Spent 1 Healing Seed for an extra die!`);
     }
@@ -2159,7 +2191,8 @@ function doPostRollAndResolve(redDice, blueDice) {
     const enemy = opp(team);
     const tNamePost = team === B.red ? 'red' : 'blue';
     if (hasSideline(team, 205)) {
-      checkKnightEffects(tNamePost, "Shade's Shadow");
+      const shadeGhost = getSidelineGhost(team, 205);
+      checkKnightEffects(tNamePost, "Shade's Shadow", shadeGhost);
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
@@ -2590,7 +2623,8 @@ function resolveRound() {
     [B.red, B.blue].forEach(team => {
       const tNameTie = team === B.red ? 'red' : 'blue';
       if (hasSideline(team, 303)) {
-        checkKnightEffects(tNameTie, 'Tweak and Twonk');
+        const tweakGhost = getSidelineGhost(team, 303);
+        checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
         team.resources.surge += 3;
         showAbilityCallout('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge!`);
         log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
@@ -2622,8 +2656,8 @@ function resolveRound() {
     });
 
     // Reset committed resources + Blackout picks
-    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
-    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
+    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
+    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
     B.blackoutNum = {};
 
     B.round++;
@@ -2739,7 +2773,7 @@ function resolveRound() {
   if (wF.id === 309 && !wF.ko) { checkKnightEffects(winTeamName, wF.name); winTeam.resources.healingSeed++; }
   if (hasSideline(winTeam, 314)) {
     const sixes = countVal(winDice, 6);
-    if (sixes > 0) { checkKnightEffects(winTeamName, 'Farmer Jeff'); winTeam.resources.healingSeed += sixes; }
+    if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314); checkKnightEffects(winTeamName, 'Farmer Jeff', jeffGhost); winTeam.resources.healingSeed += sixes; }
   }
 
   // Aunt Susan heal bonus (game state — applies to whichever team committed it)
@@ -2761,7 +2795,8 @@ function resolveRound() {
   // On-KO triggers (game state)
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
-      checkKnightEffects(loseTeamName, 'Granny');
+      const grannyGhost = getSidelineGhost(loseTeam, 310);
+      checkKnightEffects(loseTeamName, 'Granny', grannyGhost);
       if (wR.type === 'singles') loseTeam.resources.luckyStone++;
       else if (wR.type === 'doubles') loseTeam.resources.surge++;
       else if (isTripleOrBetter(wR.type)) loseTeam.resources.moonstone++;
@@ -2876,8 +2911,8 @@ function resolveRound() {
   setTimeout(() => {
     drainAbilityQueue(() => {
       // Reset committed resources
-      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
-      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
+      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
 
       B.round++;
       B.preRoll = null;
@@ -3397,6 +3432,11 @@ function renderBattle() {
           const blocked = dylanNegates(enemy);
           html += `<button class="ability-btn ${blocked?'':'pressure'}" onclick="useTysonHop('${team}')" ${blocked?'disabled title="Blocked by Dylan"':''}>${blocked?'🚫':'🐰'} Hop${blocked?' (Blocked)':''}</button>`;
         }
+      }
+      // Harrison (315) — Ascend: opt-in spend Healing Seed for +1 die
+      if (f.id === 315 && !f.ko && B[team].resources.healingSeed > 0) {
+        const committed = B.committed[team].harrison;
+        html += `<button class="ability-btn ${committed?'committed':'pressure'}" onclick="toggleHarrison('${team}')" style="${committed?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${committed?' (Ready!)':''}</button>`;
       }
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
