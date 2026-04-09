@@ -322,6 +322,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .status-tag.pressure { background:rgba(255,99,72,0.15); color:var(--magma); }
 .status-tag.streak { background:rgba(46,204,113,0.15); color:var(--win); }
 .status-tag.mimic { background:rgba(126,232,250,0.15); color:var(--moonstone); }
+.status-tag.overclock { background:rgba(251,191,36,0.18); color:#fbbf24; border:1px solid rgba(251,191,36,0.35); animation:overclockTagPulse 1.4s ease-in-out infinite; }
+@keyframes overclockTagPulse { 0%,100%{box-shadow:0 0 4px rgba(251,191,36,0.3);} 50%{box-shadow:0 0 10px rgba(251,191,36,0.7);} }
 
 /* HP Bars (boobattles style) */
 .hp-bar-wrap {
@@ -1166,7 +1168,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v34';
+const TESTROOM_VERSION = 'v35';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2289,6 +2291,8 @@ function rollReady(team) {
     doPreRollSetup();
     if (B.phase === 'over') return; // game ended during pre-roll (e.g. Ember Force KO)
     B.phase = 'rolling';
+    // Re-render immediately so consumed status tags (Retribution, etc.) clear from fighter cards
+    renderBattle();
     // If a callout fired during pre-roll, delay dice roll so player can read it
     const hasCalloutNow = document.getElementById('abilitySplash').classList.contains('active');
     if (hasCalloutNow) preRollDelay = 1500;
@@ -2976,7 +2980,9 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
   playSfx('sfxDiceRoll');
 
   setTimeout(() => {
-    const newVal = Math.floor(Math.random() * 6) + 1;
+    // Lucky Stones are 15% luckier — bias toward higher values
+    const lsRoll = Math.random();
+    const newVal = lsRoll < 0.12 ? 1 : lsRoll < 0.22 ? 2 : lsRoll < 0.34 ? 3 : lsRoll < 0.50 ? 4 : lsRoll < 0.70 ? 5 : 6;
     dice[dieIndex] = newVal;
     dice.sort((a, b) => a - b);
     t.resources.luckyStone--;
@@ -3305,11 +3311,18 @@ function resolveRound() {
     pudgeSelfDmg = true;
   }
 
-  // Red Hunter (345) — if opponent has any resources: +3 damage
+  // Red Hunter (345) — if opponent has any specials (resources, including committed): +3 damage
   let redHunterTriggered = false;
   if (wF.id === 345) {
     const eRes = loseTeam.resources;
-    if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
+    const eCom = B.committed[loseTeamName];
+    const hasSpecials = (eRes.moonstone + (eCom.moonstone||0)) > 0
+      || (eRes.ice + (eCom.ice||0)) > 0
+      || (eRes.fire + (eCom.fire||0)) > 0
+      || (eRes.surge + (eCom.surge||0)) > 0
+      || (eRes.healingSeed + (eCom.healingSeed||0)) > 0
+      || (eRes.luckyStone + (eCom.luckyStone||0)) > 0;
+    if (hasSpecials) {
       checkKnightEffects(winTeamName, wF.name);
       dmg += 3;
       redHunterTriggered = true;
@@ -3993,9 +4006,10 @@ function renderCardSlot(ghost, isFighter) {
         }
       }
     }
-    // Overclock indicator
+    // Overclock indicator — amber pulse to distinguish from normal moonstone effects
     if (ghost.hp > ghost.maxHp) {
-      statusHtml += `<span class="status-tag streak" style="background:rgba(126,232,250,0.2);color:var(--moonstone);">⚡ ${ghost.hp} HP</span>`;
+      const overAmt = ghost.hp - ghost.maxHp;
+      statusHtml += `<span class="status-tag overclock">⚡ +${overAmt} Overheal</span>`;
     }
   }
   // HP color
