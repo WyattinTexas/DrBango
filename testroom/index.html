@@ -966,7 +966,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v09';
+const TESTROOM_VERSION = 'v10';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2198,7 +2198,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`);
+        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`, () => { playDamageSfx(1); hitDamage(enemyName); });
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       }
     }
@@ -3219,11 +3219,12 @@ const SPLASH_THEMES = {
 let abilityQueue = [];
 let abilityQueueMode = false;
 
-function queueAbility(name, color, desc) {
+function queueAbility(name, color, desc, onShow) {
   if (abilityQueueMode) {
-    abilityQueue.push({ name, color, desc });
+    abilityQueue.push({ name, color, desc, onShow });
   } else {
     showAbilityCallout(name, color, desc);
+    if (onShow) onShow();
   }
 }
 
@@ -3242,6 +3243,7 @@ function drainAbilityQueue(callback) {
     }
     const a = abilityQueue[i++];
     showAbilityCallout(a.name, a.color, a.desc);
+    if (a.onShow) a.onShow();
     setTimeout(next, 1300);
   }
   next();
