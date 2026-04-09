@@ -966,7 +966,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v07';
+const TESTROOM_VERSION = 'v08';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1075,7 +1075,7 @@ const GHOSTS = [
     id:302, name:"Maximo", rarity:"common", maxHp:5, art:"art/toadstool.jpg",
     ability:"Nap", abilityDesc:"Entry: roll only 1 die on your first roll. After each round: gain 1 Healing Seed.",
     category:"Defense/Negation", set:"Rolling Hills",
-    designNote:"Sleepy mushroom. Starts slow with only 1 die on entry, but generates a Healing Seed every round. 6 HP seed farm — the longer he stays, the richer your team gets."
+    designNote:"Sleepy mushroom. Starts slow with only 1 die on entry, but generates a Healing Seed every round. 5 HP seed farm — the longer he stays, the richer your team gets."
   },
   {
     id:303, name:"Tweak and Twonk", rarity:"common", maxHp:6, art:"art/nugget.jpg",
@@ -1692,7 +1692,7 @@ function hasDouble2sOr3s(dice) {
 function triggerBorisHook(team) {
   team.ghosts.forEach(g => {
     if (g.id === 343 && !g.ko) {
-      g.hp = Math.min(g.hp + 2, g.maxHp);
+      g.hp += 2; // ability heal — can exceed maxHp
       log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → gained 2 HP (${g.hp}/${g.maxHp}).`);
     }
   });
@@ -1825,7 +1825,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName) {
   // Retribution (402) — your active ghost heals 1 HP when opponent uses ability
   if (oppActive.id === 402 && !oppActive.ko) {
     if (oppActive.hp < oppActive.maxHp) {
-      oppActive.hp = Math.min(oppActive.maxHp, oppActive.hp + 1);
+      oppActive.hp += 1; // ability heal — can exceed maxHp
       showAbilityCallout('RETRIBUTION!', 'var(--rare)', `Knight Light heals! Opponent used an ability.`);
       log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-heal">Healed 1 HP!</span> ${oppActive.hp} HP.`);
     }
@@ -1983,7 +1983,7 @@ function doTeamRoll(team, btn) {
     if (isTripleOrBetter(roll.type)) showTriplesEffect(team, roll.type);
 
     // Check if both have rolled — guard against double-resolution
-    if (B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
+    if (B.preRoll && B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
       B.preRoll.resolved = true;
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
@@ -2150,6 +2150,10 @@ function doPreRollSetup() {
 // POST-ROLL TRIGGERS (split out for staged timing)
 // ========================================
 function doPostRollAndResolve(redDice, blueDice) {
+  // Queue post-roll ability callouts so they play one at a time
+  abilityQueue = [];
+  abilityQueueMode = true;
+
   // Shade's Shadow (205) — sideline: after you roll, deal 1 dmg to enemy active
   [B.red, B.blue].forEach(team => {
     const enemy = opp(team);
@@ -2161,14 +2165,11 @@ function doPostRollAndResolve(redDice, blueDice) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        showAbilityCallout('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`);
+        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`);
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
-        playDamageSfx(1);
-        hitDamage(enemyName);
       }
     }
   });
-  if (handleKOs()) return;
 
   // Dart (207) — each 4 rolled: gain 1 Lucky Stone
   [B.red, B.blue].forEach(team => {
@@ -2180,7 +2181,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (fours > 0) {
         checkKnightEffects(tNameHank, f.name);
         team.resources.luckyStone += fours;
-        showAbilityCallout('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
+        queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
         log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
       }
     }
@@ -2195,7 +2196,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       checkKnightEffects(tNameSel, f.name);
       team.resources.healingSeed++;
       team.resources.luckyStone++;
-      showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Seed + Lucky Stone!`);
+      queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Seed + Lucky Stone!`);
       log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
     }
   });
@@ -2208,7 +2209,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     if (f.id === 327 && !f.ko && hasDouble2sOr3s(dice)) {
       checkKnightEffects(tNameNat, f.name);
       team.resources.moonstone++;
-      showAbilityCallout('CRACK OPEN!', 'var(--ghost-rare)', `${f.name} — gained 1 Moonstone!`);
+      queueAbility('CRACK OPEN!', 'var(--ghost-rare)', `${f.name} — gained 1 Moonstone!`);
       log(`<span class="log-ms">${f.name}</span> — Crack Open! Double 2s/3s → gained <span class="log-ms">1 Moonstone</span>!`);
     }
   });
@@ -2221,15 +2222,21 @@ function doPostRollAndResolve(redDice, blueDice) {
     if (f.id === 308 && !f.ko && hasDoubles(oppDice)) {
       checkKnightEffects(tNameKap, f.name);
       team.resources.healingSeed++;
-      showAbilityCallout('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
+      queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
       log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
     }
   });
 
-  // ========================================
-  // MOONSTONE CHECK
-  // ========================================
-  B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
+  abilityQueueMode = false;
+
+  // Drain post-roll callouts sequentially, THEN check moonstone/KOs
+  const postRollDone = () => {
+    if (handleKOs()) return;
+
+    // ========================================
+    // MOONSTONE CHECK
+    // ========================================
+    B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
 
   if (B.red.resources.moonstone > 0) {
     B.phase = 'moonstone-red';
@@ -2242,7 +2249,11 @@ function doPostRollAndResolve(redDice, blueDice) {
     return;
   }
 
-  checkLuckyStones();
+    checkLuckyStones();
+  };
+
+  // Drain post-roll ability callouts, then continue to moonstone/lucky stones
+  drainAbilityQueue(postRollDone);
 }
 
 function showMoonstoneChoice(team, dice) {
@@ -2610,9 +2621,10 @@ function resolveRound() {
       }
     });
 
-    // Reset committed resources
+    // Reset committed resources + Blackout picks
     B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
     B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0 };
+    B.blackoutNum = {};
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -2680,9 +2692,9 @@ function resolveRound() {
   // Red Hunter (345) — if opponent has any resources: +3 damage
   let redHunterTriggered = false;
   if (wF.id === 345) {
-    checkKnightEffects(winTeamName, wF.name);
     const eRes = loseTeam.resources;
     if (eRes.moonstone > 0 || eRes.ice > 0 || eRes.fire > 0 || eRes.surge > 0 || eRes.healingSeed > 0 || eRes.luckyStone > 0) {
+      checkKnightEffects(winTeamName, wF.name);
       dmg += 3;
       redHunterTriggered = true;
     }
@@ -2752,7 +2764,7 @@ function resolveRound() {
       checkKnightEffects(loseTeamName, 'Granny');
       if (wR.type === 'singles') loseTeam.resources.luckyStone++;
       else if (wR.type === 'doubles') loseTeam.resources.surge++;
-      else if (wR.type === 'triples') loseTeam.resources.moonstone++;
+      else if (isTripleOrBetter(wR.type)) loseTeam.resources.moonstone++;
     }
     if (lF.id === 404) { loseTeam.resources.surge++; }
   }
@@ -2764,10 +2776,7 @@ function resolveRound() {
     if (f.id === 302 && !f.ko) { checkKnightEffects(tNameMax2, f.name); team.resources.healingSeed++; }
   });
 
-  // Eternal Flame (game state)
-  if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
-    winTeam.resources.fire += B.committed[winTeamName].fire;
-  }
+  // (Eternal Flame game state already handled at line ~2657)
 
   // ========================================
   // CINEMATIC ABILITY QUEUE — visuals play sequentially
@@ -2822,7 +2831,7 @@ function resolveRound() {
     if (hasSideline(loseTeam, 310)) {
       if (wR.type === 'singles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`);
       else if (wR.type === 'doubles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`);
-      else if (wR.type === 'triples') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — triples KO → MOONSTONE!`);
+      else if (isTripleOrBetter(wR.type)) queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`);
     }
     if (lF.id === 404) queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
   }
@@ -2999,6 +3008,10 @@ function doKoSwap(team, idx) {
 function showGameOver(winner) {
   B.phase = 'over';
   fadeOutMusic();
+  // Clean up any active overlays/animations
+  document.getElementById('abilitySplash').classList.remove('active');
+  clearLsCountdown();
+  disableRollButtons();
 
   // Record standings — ALL ghosts on winning team get W, ALL on losing team get L
   if (winner === 'red' || winner === 'blue') {
