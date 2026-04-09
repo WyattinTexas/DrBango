@@ -1181,6 +1181,18 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </div>
 </div>
 
+<div class="selene-overlay" id="timberOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" id="timberBanner" style="background:linear-gradient(135deg,#4a2c0a,#7c4a1a);">🐺 METICULOUS PLANNING</div>
+    <h3 id="timberTitle">Timber — Meticulous Planning!</h3>
+    <p class="selene-sub" id="timberSub">Choose your fate:</p>
+    <div class="selene-options">
+      <button class="selene-opt seed" onclick="doTimberChoice('discard')" id="timberDiscardBtn" style="background:linear-gradient(135deg,#7c2d12,#b45309);">💎 Discard 2 Specials</button>
+      <button class="selene-opt ls" onclick="doTimberChoice('die')" style="background:linear-gradient(135deg,#4a2c0a,#78350f);">🎲 Roll 1 Fewer Die</button>
+    </div>
+  </div>
+</div>
+
 <!-- Game Over -->
 <div class="game-over" id="gameOver">
   <div class="go-box">
@@ -1198,7 +1210,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v65';
+const TESTROOM_VERSION = 'v66';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1293,10 +1305,10 @@ const GHOSTS = [
     designNote:"Aggressive volcanic ember. Wins generate 2 Surge — one of the fastest Surge farmers in the game. 5 HP keeps him in the mix."
   },
   {
-    id:210, name:"Timber", rarity:"legendary", maxHp:7, art:"art/timber.jpg",
-    ability:"Meticulous Planning", abilityDesc:"While Timber is active: opponent rolls 1 fewer die.",
+    id:210, name:"Timber", rarity:"legendary", maxHp:6, art:"art/timber.jpg",
+    ability:"Meticulous Planning", abilityDesc:"While Timber is active, before rolling: opponent must choose — discard 2 specials OR remove 1 die for this roll.",
     category:"Debuff", set:"Rolling Hills",
-    designNote:"The ghost wolf's howl shakes your opponent to the core — permanent die suppression as long as Timber stands. 7 HP makes him tough to remove, forcing the opponent to commit resources to take him down."
+    designNote:"Gary's v4 proposal. Opponent-facing choice mechanic — declining resource trap. Discard 2 specials or roll 2 dice against a 6HP Legendary. No carryover tracking, resolves fresh each roll. 6HP keeps him killable but his ability makes him hard to hit."
   },
   // === NEW CARDS — Rolling Hills ===
   {
@@ -1325,7 +1337,7 @@ const GHOSTS = [
   },
   {
     id:305, name:"Selene", rarity:"legendary", maxHp:6, art:"art/luna.jpg",
-    ability:"Heart of the Hills", abilityDesc:"Roll doubles: gain 1 Healing Seed and 1 Lucky Stone.",
+    ability:"Heart of the Hills", abilityDesc:"Roll doubles: choose — gain 1 Healing Seed OR 2 Lucky Stones.",
     category:"Resource Generation", set:"Rolling Hills",
     designNote:"Wyatt's fix for dual-resource problem. Player chooses 1 Healing Seed OR 2 Lucky Stones on doubles (~42%). No more double-dipping — forces a decision between sustain and reroll economy. Selene's creek runs through the hills — Artemis is her messenger."
   },
@@ -1880,11 +1892,10 @@ function triggerEntry(team, skipEntryEffects) {
     checkKnightEffects(entryTeamName, f.name);
   }
 
-  // Timber (210) — Meticulous Planning: announce once on entry
+  // Timber (210) — Meticulous Planning: announce on entry
   if (f.id === 210) {
-    f.meticulousAnnounced = true;
-    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent rolls 1 fewer die!`);
-    log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die while Timber is active!`);
+    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent must choose: discard 2 specials or lose 1 die each roll!`);
+    log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Each roll, opponent must discard 2 specials or roll 1 fewer die!`);
   }
 
   // Timpleton (312) — Big Target: if enemy HP > Timpleton's HP, deal 3 damage
@@ -2360,6 +2371,58 @@ function doSeleneChoice(choice) {
   setTimeout(() => { if (cont) cont(); }, 900);
 }
 
+// Timber (210) — Meticulous Planning choice modal
+function showTimberModal(tp, resumeCallback) {
+  const oppLabel = tp.oppTeamName.charAt(0).toUpperCase() + tp.oppTeamName.slice(1);
+  const bannerEl = document.getElementById('timberBanner');
+  if (bannerEl) {
+    bannerEl.textContent = `🐺 ${oppLabel.toUpperCase()} MUST CHOOSE`;
+    bannerEl.className = `selene-banner ${tp.oppTeamName}`;
+    bannerEl.style.background = 'linear-gradient(135deg,#4a2c0a,#7c4a1a)';
+  }
+  const titleEl = document.getElementById('timberTitle');
+  if (titleEl) titleEl.textContent = `Timber — Meticulous Planning!`;
+  const subEl = document.getElementById('timberSub');
+  if (subEl) subEl.textContent = `${oppLabel}: choose your fate!`;
+  // Disable discard button if somehow they don't have 2 specials (shouldn't happen, but guard)
+  const discardBtn = document.getElementById('timberDiscardBtn');
+  if (discardBtn) discardBtn.disabled = false;
+  narrate(`<b class="${tp.oppTeamName}-text">${oppLabel}</b>&nbsp;faces <b class="gold">TIMBER!</b>&nbsp; Discard 2 specials or lose a die!`);
+  B.timberPending._resumeCallback = resumeCallback;
+  document.getElementById('timberOverlay').classList.add('active');
+}
+
+function doTimberChoice(choice) {
+  const tp = B.timberPending;
+  if (!tp) return;
+  const resume = tp._resumeCallback;
+  B.timberPending = null;
+  document.getElementById('timberOverlay').classList.remove('active');
+  if (choice === 'discard') {
+    // Discard 2 specials from most abundant first
+    const r = tp.team.resources;
+    let toDiscard = 2;
+    const types = ['surge','iceShard','healingSeed','luckyStone','sacredFire','moonstone'];
+    types.sort((a,b) => (r[b]||0) - (r[a]||0));
+    for (const t of types) {
+      while (toDiscard > 0 && (r[t]||0) > 0) {
+        r[t]--;
+        toDiscard--;
+      }
+    }
+    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${tp.oppTeamName} discards 2 specials to keep all dice!`);
+    log(`<span class="log-ability">${tp.oppTeamName}</span> chose to discard 2 specials to avoid Timber's Meticulous Planning!`);
+  } else {
+    // Lose 1 die
+    if (tp.oppTeamName === 'red') B.preRoll.red.count = Math.max(1, B.preRoll.red.count - 1);
+    else B.preRoll.blue.count = Math.max(1, B.preRoll.blue.count - 1);
+    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${tp.oppTeamName} rolls 1 fewer die!`);
+    log(`<span class="log-ability">${tp.oppTeamName}</span> chose to roll 1 fewer die under Timber's Meticulous Planning!`);
+  }
+  renderBattle();
+  setTimeout(() => { if (resume) resume(); }, 900);
+}
+
 // ============================================================
 // TWO-BUTTON ROLL SYSTEM — each side rolls independently
 // ============================================================
@@ -2383,6 +2446,21 @@ function rollReady(team) {
     // If pre-roll callouts were queued (via setTimeout), wait for all of them to fully play
     // before dice roll — last callout starts at (N-1)*1500 and lasts ~1400ms, so N*1500 is exact
     if (calloutCount > 0) preRollDelay = calloutCount * 1500;
+
+    // Timber choice modal — pause rolling until opponent picks
+    if (B.timberPending) {
+      const tp = B.timberPending;
+      const timberDelay = (tp.preRollCalloutCount || 0) * 1500;
+      btn.classList.add('locked');
+      btn.disabled = true;
+      setTimeout(() => {
+        showTimberModal(tp, () => {
+          // Resume rolling after choice
+          setTimeout(() => { doTeamRoll(team, btn); }, 0);
+        });
+      }, timberDelay);
+      return;
+    }
   }
 
   // Lock this button
@@ -2641,13 +2719,27 @@ function doPreRollSetup() {
     }
   });
 
-  // Timber (210) — Meticulous Planning: opponent rolls 1 fewer die while active
+  // Timber (210) — Meticulous Planning: opponent chooses discard 2 specials OR -1 die
+  // Choice is resolved via modal before dice are stored. timberDieReduction tracks result.
+  B.timberDieReduction = { red: false, blue: false };
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     if (f.id === 210 && !f.ko) {
       const oppTeamName = team === B.red ? 'blue' : 'red';
-      if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
-      else blueCount = Math.max(1, blueCount - 1);
+      const oppTeam = team === B.red ? B.blue : B.red;
+      const r = oppTeam.resources;
+      const totalSpecials = (r.iceShard||0) + (r.sacredFire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
+      if (totalSpecials < 2) {
+        // Not enough specials — forced to lose die
+        B.timberDieReduction[oppTeamName] = true;
+        if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
+        else blueCount = Math.max(1, blueCount - 1);
+        preRollCallouts.push(['METICULOUS PLANNING!', 'var(--legendary)', `${oppTeamName} has no specials — forced to roll 1 fewer die!`]);
+        log(`<span class="log-ability">${oppTeamName}</span> has no specials — forced to roll 1 fewer die under Timber's Meticulous Planning!`);
+      } else {
+        // Opponent has resources — queue the choice modal
+        B.timberPending = { team: oppTeam, oppTeamName, timberTeam: team, redCount, blueCount };
+      }
     }
   });
 
@@ -2718,6 +2810,11 @@ function doPreRollSetup() {
     blue: { count: blueCount, override: hankOverride.blue, dice: null }
   };
 
+  // If Timber pending, update the stored counts reference so modal callback can adjust
+  if (B.timberPending) {
+    B.timberPending.preRollCalloutCount = preRollCallouts.length;
+  }
+
   // Drain pre-roll callouts sequentially — each plays for 1.4s before the next fires
   preRollCallouts.forEach((c, i) => {
     setTimeout(() => showAbilityCallout(c[0], c[1], c[2]), i * 1500);
@@ -2753,17 +2850,13 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Selene (305) — doubles: gain 1 Healing Seed + 1 Lucky Stone
+  // Selene (305) — doubles: choose 1 Healing Seed OR 2 Lucky Stones (deferred modal)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameSel = team === B.red ? 'red' : 'blue';
     if (f.id === 305 && !f.ko && classify(dice).type === 'doubles') {
-      team.resources.healingSeed++;
-      team.resources.luckyStone++;
-      queueAbility('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Seed + Lucky Stone!`);
-      log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → gained <span class="log-ms">1 Healing Seed + 1 Lucky Stone</span>!`);
-      checkKnightEffects(tNameSel, f.name);
+      B.selenePending = { team, tName: tNameSel };
     }
   });
 
@@ -4228,14 +4321,14 @@ function renderCardSlot(ghost, isFighter) {
   if (isFighter) {
     if (ghost.hankFirstRoll) statusHtml += `<span class="status-tag pressure">Lazy (1-2-3)</span>`;
     if (ghost.maximoFirstRoll) statusHtml += `<span class="status-tag streak">Napping (1 die)</span>`;
-    // Check if opponent has Timber (210) — Howl debuff indicator
+    // Check if opponent has Timber (210) — Meticulous Planning debuff indicator
     if (B) {
       const thisTeam = B.red.ghosts.includes(ghost) ? B.red : B.blue;
       const thisTeamName = thisTeam === B.red ? 'red' : 'blue';
       const oppTeam = thisTeam === B.red ? B.blue : B.red;
       const oppActive = active(oppTeam);
       if (oppActive && oppActive.id === 210 && !oppActive.ko) {
-        statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">-1 Die · Timber</span>`;
+        statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">⚠️ Timber · Choose Each Roll</span>`;
       }
       // Mother Nature (366) Winter indicator: opponent -1 die on rounds where round % 4 === 0
       if (oppActive && oppActive.id === 366 && !oppActive.ko && B.round % 4 === 0) {
@@ -4575,6 +4668,7 @@ function clearAllOverlays() {
   document.getElementById('stealOverlay').classList.remove('active');
   document.getElementById('pressureOverlay').classList.remove('active');
   document.getElementById('seleneOverlay').classList.remove('active');
+  document.getElementById('timberOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
   document.getElementById('abilitySplash').classList.remove('active');
   const vsSplash = document.getElementById('vsSplash');
