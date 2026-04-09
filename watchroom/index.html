@@ -172,6 +172,37 @@
             font-style: italic;
         }
 
+        .lookahead {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+            font-size: 0.72rem;
+            line-height: 1.5;
+        }
+
+        .lookahead .label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-right: 4px;
+        }
+
+        .lookahead .next-label { color: var(--green); }
+        .lookahead .after-label { color: var(--text2); }
+        .lookahead .plan-text { color: var(--text2); }
+
+        .refiner-plan {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(64, 200, 120, 0.05);
+            border: 1px solid rgba(64, 200, 120, 0.1);
+            border-radius: 6px;
+            font-size: 0.72rem;
+            line-height: 1.6;
+        }
+
         .no-data {
             text-align: center;
             padding: 60px 20px;
@@ -261,15 +292,20 @@
                     badge.textContent = 'no agents';
                 }
 
-                // Refiner cards
+                // Refiner cards with lookahead
                 if (refs.length > 0) {
                     refinersEl.innerHTML = refs.map(([key, r]) => `
                         <div class="refiner-card ${r.status === 'done' ? 'done' : ''}">
-                            <div>
+                            <div style="flex:1">
                                 <div class="target">
                                     ${r.status === 'running' ? '<span class="spinner"></span>' : ''}
                                     ${esc(key)} refiner
                                 </div>
+                                ${r.next_up || r.after_that ? `
+                                <div class="refiner-plan">
+                                    ${r.next_up ? `<span class="label next-label">Next:</span> <span class="plan-text">${esc(r.next_up)}</span><br>` : ''}
+                                    ${r.after_that ? `<span class="label after-label">Then:</span> <span class="plan-text">${esc(r.after_that)}</span>` : ''}
+                                </div>` : ''}
                             </div>
                             <div class="meta">
                                 ${r.cycles} cycles<br>
@@ -280,7 +316,7 @@
                     `).join('');
                 }
 
-                // Feed
+                // Feed with lookahead
                 const feed = data.feed || [];
                 if (feed.length > 0) {
                     feedEl.innerHTML = feed.map(e => `
@@ -292,6 +328,11 @@
                             <div class="summary ${e.summary.includes('no summary') ? 'empty' : ''}">
                                 ${esc(e.summary)}
                             </div>
+                            ${e.next_up || e.after_that ? `
+                            <div class="lookahead">
+                                ${e.next_up ? `<span class="label next-label">Next:</span> <span class="plan-text">${esc(e.next_up)}</span><br>` : ''}
+                                ${e.after_that ? `<span class="label after-label">Then:</span> <span class="plan-text">${esc(e.after_that)}</span>` : ''}
+                            </div>` : ''}
                         </div>
                     `).join('');
                 }
