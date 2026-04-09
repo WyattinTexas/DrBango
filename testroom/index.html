@@ -202,7 +202,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .sideline-slot .card-rarity-badge { display:none; }
 .sideline-slot .card-name-banner { font-size:11px; padding:5px 6px; }
 .sideline-slot .ability-banner { font-size:9px; padding:3px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sideline-slot .ci-desc { display:none; }
+.sideline-slot .ci-desc { font-size:10px; color:var(--text2); line-height:1.3; padding:4px 6px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .sideline-slot .card-info { padding:0; }
 .fighter-slot { width:240px; flex-shrink:0; }
 .fighter-slot .card-rarity-badge { display:none; }
@@ -1491,6 +1491,13 @@ function triggerEntry(team, skipEntryEffects) {
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
   }
 
+  // Timber (210) — Meticulous Planning: announce once on entry
+  if (f.id === 210) {
+    f.meticulousAnnounced = true;
+    showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent rolls 1 fewer die!`);
+    log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die while Timber is active!`);
+  }
+
   // Timpleton (312) — Big Target: if enemy HP > Timpleton's HP, deal 3 damage
   if (f.id === 312) {
     const ef = active(enemy);
@@ -1820,16 +1827,27 @@ function rollReady(team) {
   resetAfkTimer();
 
   // First click: do pre-roll setup (abilities, dice counts)
+  let preRollDelay = 0;
   if (B.phase === 'ready') {
+    // Check if any ability callouts will fire during pre-roll
+    const hadCalloutBefore = document.getElementById('abilitySplash').classList.contains('active');
     doPreRollSetup();
     if (B.phase === 'over') return; // game ended during pre-roll (e.g. Ember Force KO)
     B.phase = 'rolling';
+    // If a callout fired during pre-roll, delay dice roll so player can read it
+    const hasCalloutNow = document.getElementById('abilitySplash').classList.contains('active');
+    if (hasCalloutNow) preRollDelay = 1500;
   }
 
   // Lock this button
   btn.classList.add('locked');
   btn.disabled = true;
 
+  // Delay roll if pre-roll ability just showed a callout
+  setTimeout(() => { doTeamRoll(team, btn); }, preRollDelay);
+}
+
+function doTeamRoll(team, btn) {
   // Roll this team's dice (weighted for cinematic clutch moments)
   const diceCount = B.preRoll[team].count;
   const override = B.preRoll[team].override;
@@ -1977,15 +1995,13 @@ function doPreRollSetup() {
     }
   });
 
-  // Timber (210) — opponent rolls 1 fewer die
+  // Timber (210) — opponent rolls 1 fewer die (silent — announced on entry)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     if (f.id === 210 && !f.ko) {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
       else blueCount = Math.max(1, blueCount - 1);
-      showAbilityCallout('METICULOUS PLANNING!', 'var(--legendary)', `${f.name} — opponent rolls 1 fewer die!`);
-      log(`<span class="log-ability">${f.name}</span> — Meticulous Planning! Opponent rolls 1 fewer die!`);
     }
   });
 
