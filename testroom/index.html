@@ -200,7 +200,6 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 
 .sideline-slot { width:130px; flex-shrink:0; }
 .sideline-slot .card-rarity-badge { display:none; }
-.sideline-slot .card-hp-badge { display:none; }
 .sideline-slot .card-name-banner { font-size:11px; padding:5px 6px; }
 .sideline-slot .ability-banner { font-size:9px; padding:3px 6px; }
 .sideline-slot .ci-desc { font-size:9px; line-height:1.3; color:var(--text2); }
@@ -242,13 +241,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .card-rarity-badge.rarity-legendary { background:rgba(243,156,18,0.25); color:var(--legendary); border:1px solid var(--legendary); }
 
 /* HP badge — positioned on the image, below the name banner */
-.card-hp-badge {
-  position:absolute; top:38px; left:8px;
-  background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.2);
-  border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
-  font-size:13px; font-weight:900; color:var(--hp-green); backdrop-filter:blur(4px);
-}
-.fighter-slot .card-hp-badge { top:42px; width:36px; height:36px; font-size:14px; }
+.card-hp-badge { display:none; }
 
 /* Ability banner */
 .ability-banner {
@@ -386,14 +379,15 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 }
 
 /* Hit shake on fighter card */
-.fighter-slot.hit { animation:hitShake 0.4s ease-out; }
+.fighter-slot.hit { animation:hitShake 0.5s ease-out; }
 @keyframes hitShake {
-  0% { transform:translate(0,0); }
-  15% { transform:translate(-6px, 3px); }
-  30% { transform:translate(4px, -4px); }
-  45% { transform:translate(-3px, 2px); }
-  60% { transform:translate(2px, -1px); }
-  100% { transform:translate(0,0); }
+  0% { transform:translate(0,0) scale(1); }
+  10% { transform:translate(-8px, 4px) scale(0.97); }
+  25% { transform:translate(6px, -5px) scale(1.02); }
+  40% { transform:translate(-5px, 3px); }
+  55% { transform:translate(3px, -2px); }
+  70% { transform:translate(-2px, 1px); }
+  100% { transform:translate(0,0) scale(1); }
 }
 
 /* Team info (HP bar + resources) */
@@ -1176,8 +1170,11 @@ function triggerEntry(team, skipEntryEffects) {
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) ef.ko = true;
+      const enemyName = enemy === B.red ? 'red' : 'blue';
       showAbilityCallout('LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+      playDamageSfx(3);
+      hitDamage(enemyName);
     }
   }
 
@@ -1193,8 +1190,11 @@ function triggerEntry(team, skipEntryEffects) {
     if (!ef.ko && ef.hp > f.hp) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) ef.ko = true;
+      const enemyName = enemy === B.red ? 'red' : 'blue';
       showAbilityCallout('BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+      playDamageSfx(3);
+      hitDamage(enemyName);
     }
   }
 }
@@ -1456,8 +1456,11 @@ function doPreRollSetup() {
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
+        const enemyName = enemy === B.red ? 'red' : 'blue';
         showAbilityCallout('SWARM!', 'var(--magma)', `${f.name} — 1 damage to ${ef.name}!`);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+        playDamageSfx(1);
+        hitDamage(enemyName);
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
       log(`<span class="log-ability">${f.name}</span> — Swarm blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
@@ -1564,7 +1567,10 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
+        const enemyName = enemy === B.red ? 'red' : 'blue';
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+        playDamageSfx(1);
+        hitDamage(enemyName);
       }
     }
   });
@@ -1972,25 +1978,23 @@ function resolveRound() {
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
   if (dmg > 0) {
-    const prevHp = lF.hp;
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) lF.ko = true;
-    playDamageSfx(dmg);
 
-    // Hit shake on the losing fighter card
-    const hitEl = document.getElementById(loseTeamName + '-fighter');
-    hitEl.classList.add('hit');
-    setTimeout(() => hitEl.classList.remove('hit'), 500);
-
-    // Animate HP bar (CSS transition handles the tween)
-    updateHpBar(loseTeamName, lF.hp, lF.maxHp);
-
+    // Narration lands first — announce the hit
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
     if (lF.ko) {
       narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage!</b> &nbsp;<b class="ko-text">${lF.name} is KO'd!</b>`);
     } else {
       narrate(`<b class="${winColor}">${wF.name}</b>&nbsp; rolled ${describeRoll(wR)}. &nbsp;<b class="gold">${typeLabel(wR.type) ? typeLabel(wR.type)+' ' : ''}${dmg} damage to <b class="${loseColor}">${lF.name}</b>!</b> &nbsp;${lF.hp} HP left.`);
     }
+
+    // Then the impact — SFX + shake + HP drain all at once
+    playDamageSfx(dmg);
+    const hitEl = document.getElementById(loseTeamName + '-fighter');
+    hitEl.classList.add('hit');
+    setTimeout(() => hitEl.classList.remove('hit'), 500);
+    updateHpBar(loseTeamName, lF.hp, lF.maxHp);
   } else {
     log(`${wF.name} wins but deals 0 damage.`);
     narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
@@ -2001,6 +2005,8 @@ function resolveRound() {
     wF.hp = Math.max(0, wF.hp - 1);
     if (wF.hp <= 0) wF.ko = true;
     log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
+    playDamageSfx(1);
+    hitDamage(winTeamName);
   }
 
   // ========================================
@@ -2330,6 +2336,16 @@ function updateHpBar(team, hp, maxHp) {
   bar.classList.toggle('hp-low', pct <= 50 && pct > 25);
   bar.classList.toggle('hp-critical', pct <= 25);
   document.getElementById(`${team}-hpText`).textContent = `${Math.max(0, hp)} / ${maxHp}`;
+}
+
+// Visual hit — shake the card + drain the HP bar for a team
+function hitDamage(teamName) {
+  const t = B[teamName];
+  const f = active(t);
+  const el = document.getElementById(teamName + '-fighter');
+  el.classList.add('hit');
+  setTimeout(() => el.classList.remove('hit'), 500);
+  updateHpBar(teamName, f.hp, f.maxHp);
 }
 
 function renderBattle() {
