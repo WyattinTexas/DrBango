@@ -390,6 +390,15 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   60% { transform:scale(1.15); }
   100% { transform:scale(1); opacity:1; }
 }
+/* Resource gained flash */
+.res-tile.res-gained {
+  animation:resGained 0.5s ease-out;
+}
+@keyframes resGained {
+  0% { transform:scale(1); box-shadow:0 0 0 transparent; }
+  30% { transform:scale(1.2); box-shadow:0 0 18px rgba(251,191,36,0.7); }
+  100% { transform:scale(1); }
+}
 
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }
@@ -1093,9 +1102,15 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 <!-- VS Splash — pre-battle start screen -->
 <div class="vs-splash" id="vsSplash">
   <div class="vs-inner">
-    <div class="vs-fighter-name red" id="vsRedName">Red</div>
+    <div style="text-align:center;">
+      <div class="vs-fighter-name red" id="vsRedName">Red</div>
+      <div class="vs-roster" id="vsRedRoster" style="margin-top:6px; font-size:13px; color:rgba(233,69,96,0.7); font-weight:600; letter-spacing:0.5px;"></div>
+    </div>
     <div class="vs-text">VS</div>
-    <div class="vs-fighter-name blue" id="vsBlueName">Blue</div>
+    <div style="text-align:center;">
+      <div class="vs-fighter-name blue" id="vsBlueName">Blue</div>
+      <div class="vs-roster" id="vsBlueRoster" style="margin-top:6px; font-size:13px; color:rgba(52,152,219,0.7); font-weight:600; letter-spacing:0.5px;"></div>
+    </div>
   </div>
 </div>
 
@@ -1140,7 +1155,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v18';
+const TESTROOM_VERSION = 'v19';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1437,7 +1452,7 @@ function loadStandingsFromFirebase() {
       });
     }
     standingsLoaded = true;
-    console.log('[Standings] Loaded from Firebase');
+    // Standings loaded from Firebase
   }).catch(e => console.warn('[Standings] Firebase load failed:', e));
 
   // Live sync — update in real-time when other players record results
@@ -1690,10 +1705,13 @@ function opp(team) { return team===B.red ? B.blue : B.red; }
 function teamName(team) { return team===B.red ? 'Red' : 'Blue'; }
 
 let B = null; // battle state
+let prevResources = { red: {}, blue: {} }; // for resource-gained flash
 
 function log(html) { B.log.unshift(html); }
 
 function startBattle() {
+  prevResources = { red: {}, blue: {} };
+  narrateQueue = []; narrateActive = false;
   B = {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
@@ -1727,6 +1745,11 @@ function startBattle() {
   if (splash) {
     document.getElementById('vsRedName').textContent = active(B.red).name;
     document.getElementById('vsBlueName').textContent = active(B.blue).name;
+    // Show full rosters under active fighter
+    const redBench = B.red.ghosts.filter((g,i) => i !== B.red.activeIdx).map(g => g.name);
+    const blueBench = B.blue.ghosts.filter((g,i) => i !== B.blue.activeIdx).map(g => g.name);
+    document.getElementById('vsRedRoster').textContent = redBench.join(' / ');
+    document.getElementById('vsBlueRoster').textContent = blueBench.join(' / ');
     splash.classList.add('active');
     setTimeout(() => {
       splash.classList.remove('active');
@@ -3455,9 +3478,30 @@ function doSwap(team, idx) {
 // ============================================================
 // ABILITY CALLOUT
 // ============================================================
+// Narration queue — prevents rapid narrations from overwriting each other
+let narrateQueue = [];
+let narrateActive = false;
 function narrate(html) {
   const el = document.getElementById('narrator');
-  if (el) el.innerHTML = html;
+  if (!el) return;
+  if (!html) { el.innerHTML = ''; narrateQueue = []; narrateActive = false; return; }
+  narrateQueue.push(html);
+  if (!narrateActive) drainNarrate();
+}
+function drainNarrate() {
+  const el = document.getElementById('narrator');
+  if (!el || narrateQueue.length === 0) { narrateActive = false; return; }
+  narrateActive = true;
+  const html = narrateQueue.shift();
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.innerHTML = html;
+    el.style.opacity = '1';
+    // Hold each narration for at least 1.8s so it can be read
+    const hold = narrateQueue.length > 0 ? 1800 : 0;
+    if (hold > 0) setTimeout(drainNarrate, hold);
+    else narrateActive = false;
+  }, 150);
 }
 
 // ============================================================
@@ -3773,13 +3817,27 @@ function renderBattle() {
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusan>0?'committed':''}" onclick="toggleAuntSusan('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusan('${team}')" title="Click: +2 dmg per seed. Right-click: remove"><span class="res-main">🌱</span><span class="res-label">${c.auntSusan>0?'+'+c.auntSusan*2+'dmg':'+2dmg'}</span></div>`;
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal>0?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusanHeal('${team}')" title="Click: +2 HP per seed. Right-click: remove" style="${c.auntSusanHeal>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">${c.auntSusanHeal>0?'+'+c.auntSusanHeal*2+'hp':'+2hp'}</span></div>`;
     }
+    // Snapshot current resources for flash detection
+    const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone };
+    const prev = prevResources[team] || {};
     document.getElementById(`${team}-resources`).innerHTML = rh;
+    // Flash any resource tile that increased
+    const resEl = document.getElementById(`${team}-resources`);
+    ['moonstone','ice','fire','surge','healingSeed','luckyStone'].forEach(key => {
+      if ((newSnap[key]||0) > (prev[key]||0)) {
+        const tile = resEl.querySelector(`.res-tile.${key}`);
+        if (tile) { tile.classList.remove('res-gained'); void tile.offsetWidth; tile.classList.add('res-gained'); }
+      }
+    });
+    prevResources[team] = newSnap;
   });
 
   document.getElementById('turnIndicator').textContent = '';
   document.getElementById('redDiceLabel').textContent = active(B.red).name;
   document.getElementById('blueDiceLabel').textContent = active(B.blue).name;
+  const logWrap = document.getElementById('battleLog').parentElement;
   document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
+  logWrap.scrollTop = 0;
 
   // Ability buttons (pre-roll actions)
   ['red','blue'].forEach(team => {
@@ -3909,6 +3967,23 @@ function rematchBattle() {
   S.bluePicks = blueIds;
   startBattle();
 }
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+document.addEventListener('keydown', e => {
+  // Enter or Space on game-over screen → rematch
+  if ((e.key === 'Enter' || e.key === ' ') && document.getElementById('gameOver').classList.contains('active')) {
+    e.preventDefault();
+    rematchBattle();
+    return;
+  }
+  // Escape closes any open overlay/modal
+  if (e.key === 'Escape') {
+    const overlays = ['swapOverlay','msPicker','stealOverlay','pressureOverlay','standingsOverlay','gameOver'];
+    overlays.forEach(id => document.getElementById(id)?.classList.remove('active'));
+  }
+});
 
 // ============================================================
 // INIT
