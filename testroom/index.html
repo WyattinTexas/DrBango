@@ -1171,7 +1171,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v31';
+const TESTROOM_VERSION = 'v32';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1740,7 +1740,8 @@ function startBattle() {
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
-    retributionDice: { red: 0, blue: 0 }
+    retributionDice: { red: 0, blue: 0 },
+    pressureUsed: { red: false, blue: false }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -2247,6 +2248,9 @@ function usePressure(team) {
 
 function doPressureSwap(attackerTeam, targetIdx) {
   document.getElementById('pressureOverlay').classList.remove('active');
+  // Mark Pressure as used for this round — prevents double-use when opponent has 2 sideline ghosts
+  if (!B.pressureUsed) B.pressureUsed = { red: false, blue: false };
+  B.pressureUsed[attackerTeam] = true;
   const t = B[attackerTeam];
   const f = active(t);
   const enemy = opp(t);
@@ -2643,7 +2647,9 @@ function showMoonstoneChoice(team, dice) {
     msEl.classList.add('rerollable');
     msEl.style.cursor = 'pointer';
     msEl.onclick = () => {
-      // Player clicked Moonstone — now highlight dice to pick which to change
+      // Player clicked Moonstone — clear the countdown and start fresh for die picking
+      clearInterval(msCountdownTimer);
+      clearMsCountdown(msEl);
       msEl.classList.remove('rerollable');
       msEl.onclick = null;
       B.pendingMoonstone.phase = 'pick-die';
@@ -2654,6 +2660,20 @@ function showMoonstoneChoice(team, dice) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
+      // Fresh 5s countdown for picking which die
+      let pickRemaining = 5;
+      showLsCountdown(diceEl, pickRemaining);
+      msCountdownTimer = setInterval(() => {
+        pickRemaining--;
+        if (pickRemaining <= 0) {
+          clearInterval(msCountdownTimer);
+          clearMsCountdown(diceEl);
+          clearDiceClickable(team);
+          skipMoonstone();
+        } else {
+          showLsCountdown(diceEl, pickRemaining);
+        }
+      }, 1000);
     };
   } else {
     // No resource tile — fall back to direct dice click
@@ -2713,8 +2733,8 @@ function pickMsDie(idx) {
   step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
   el.classList.add('active');
 
-  // Auto-skip after 3s if no value picked
-  let remaining = 3;
+  // Auto-skip after 5s if no value picked
+  let remaining = 5;
   showLsCountdown(el, remaining);
   msCountdownTimer = setInterval(() => {
     remaining--;
@@ -3167,10 +3187,11 @@ function resolveRound() {
 
     abilityQueueMode = false;
 
-    // Reset committed resources + Blackout picks
+    // Reset committed resources + Blackout picks + per-round ability flags
     B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
     B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
     B.blackoutNum = {};
+    B.pressureUsed = { red: false, blue: false };
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -3440,9 +3461,10 @@ function resolveRound() {
   const dmgDelay = dmg > 0 ? 800 : 200;
   setTimeout(() => {
     drainAbilityQueue(() => {
-      // Reset committed resources
+      // Reset committed resources + per-round ability flags
       B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
       B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
+      B.pressureUsed = { red: false, blue: false };
 
       B.round++;
       B.preRoll = null;
@@ -4070,8 +4092,8 @@ function renderBattle() {
     const enemy = opp(B[team]);
     let html = '';
     if (B.phase === 'ready') {
-      // Death Howl (202) — Pressure button
-      if (f.id === 202 && !f.ko && !dylanNegates(enemy)) {
+      // Death Howl (202) — Pressure button (once per round)
+      if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
         if (enemySideline.length > 0) {
           html += `<button class="ability-btn pressure" onclick="usePressure('${team}')">🔥 Pressure</button>`;
