@@ -2112,39 +2112,108 @@ function resolveRound() {
   B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:false };
 
   B.round++;
-  B.phase = 'ready';
   B.preRoll = null;
-  resetRollButtons();
   renderDice(redDice, blueDice);
-  handleKOs();
-  renderBattle();
+
+  // handleKOs may open the swap picker (sets phase to 'ko-swap')
+  // If no KO swap needed, resume to ready
+  if (!handleKOs()) {
+    B.phase = 'ready';
+    resetRollButtons();
+    renderBattle();
+  }
 }
 
 function handleKOs() {
-  let gameEnded = false;
+  // Check for game-over first
+  const redAllDown = B.red.ghosts.every(g => g.ko);
+  const blueAllDown = B.blue.ghosts.every(g => g.ko);
+  if (redAllDown && blueAllDown) { showGameOver('draw'); renderBattle(); return true; }
+  if (redAllDown) { showGameOver('blue'); renderBattle(); return true; }
+  if (blueAllDown) { showGameOver('red'); renderBattle(); return true; }
+
+  // Check if any active ghost is KO'd and needs a replacement pick
+  const teamsNeedingSwap = [];
   ['red','blue'].forEach(team => {
     const t = B[team];
     const f = active(t);
     if (f.ko) {
-      const aliveIdx = t.ghosts.findIndex((g,i) => i!==t.activeIdx && !g.ko);
-      if (aliveIdx >= 0) {
-        log(`<span class="log-ko">${f.name} is down!</span> ${t.ghosts[aliveIdx].name} enters!`);
-        t.activeIdx = aliveIdx;
-        triggerEntry(t);
-      } else {
-        // All KO'd
-        const w = team==='red' ? 'blue' : 'red';
-        showGameOver(w);
-        gameEnded = true;
-      }
+      const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+      if (alive.length > 0) teamsNeedingSwap.push(team);
     }
   });
-  // Double KO check
-  if (!gameEnded && B.red.ghosts.every(g=>g.ko) && B.blue.ghosts.every(g=>g.ko)) {
-    showGameOver('draw');
+
+  if (teamsNeedingSwap.length > 0) {
+    // Queue the KO swap picks
+    B.koSwapQueue = teamsNeedingSwap.slice();
+    B.phase = 'ko-swap';
+    renderBattle();
+    openKoSwap();
+    return false;
   }
+
   renderBattle();
-  return gameEnded;
+  return false;
+}
+
+function openKoSwap() {
+  if (!B.koSwapQueue || B.koSwapQueue.length === 0) {
+    // All swaps done — resume
+    B.phase = 'ready';
+    B.koSwapQueue = null;
+    resetRollButtons();
+    renderBattle();
+    return;
+  }
+  const team = B.koSwapQueue[0];
+  const t = B[team];
+  const fallen = active(t);
+  const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+
+  // If only one option, auto-pick (no real choice)
+  if (alive.length === 1) {
+    doKoSwap(team, t.ghosts.indexOf(alive[0]));
+    return;
+  }
+
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  narrate(`<b class="${team}-text">${fallen.name}</b> is down! &nbsp;<b class="${team}-text">${teamLabel}</b>, choose your next ghost!`);
+  document.getElementById('swapTitle').textContent = `${fallen.name} is KO'd! Choose next ghost:`;
+  document.getElementById('swapOptions').innerHTML = alive.map(g => {
+    const realIdx = t.ghosts.indexOf(g);
+    const gd = ghostData(g.id);
+    const hpRatio = g.hp / g.maxHp;
+    const hpColor = hpRatio > 0.6 ? 'var(--hp-green)' : hpRatio > 0.3 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+    return `<div class="swap-option" onclick="doKoSwap('${team}',${realIdx})" style="display:flex; gap:10px; align-items:center; cursor:pointer;">
+      ${gd.art ? `<img src="${gd.art}" style="width:50px; height:50px; border-radius:6px; object-fit:cover; border:1px solid var(--${gd.rarity});">` : ''}
+      <div>
+        <div class="so-name">${g.name}</div>
+        <div class="so-info"><span style="color:${hpColor}; font-weight:700;">&hearts; ${g.hp}/${g.maxHp}</span> &middot; <span style="color:var(--moonstone);">${gd.ability}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('swapOverlay').classList.add('active');
+}
+
+function doKoSwap(team, idx) {
+  const t = B[team];
+  const fallen = active(t);
+  const skipEntry = (fallen.id === 365); // Tyson — Hop: no entry effects
+  t.activeIdx = idx;
+  const f = active(t);
+
+  log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters!</span>`);
+  if (skipEntry) {
+    log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
+  }
+  triggerEntry(t, skipEntry);
+
+  document.getElementById('swapOverlay').classList.remove('active');
+  renderBattle();
+
+  // Remove this team from the queue and process next
+  B.koSwapQueue.shift();
+  openKoSwap();
 }
 
 function showGameOver(winner) {
