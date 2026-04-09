@@ -378,16 +378,49 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .die.moonstone-changed { background:rgba(126,232,250,0.15); border-color:var(--moonstone); color:var(--moonstone); }
 
 /* Dice Highlighting — winner dice glow, loser dice fade */
+/* Singles / tiebreaker — subtle gold highlight on the decisive die */
 .die.die-win {
+  border-color:#fbbf24 !important;
+  background:rgba(251,191,36,0.15) !important;
+  box-shadow:0 0 12px rgba(251,191,36,0.6) !important;
+  transform:scale(1.1) !important;
+  animation:dieWinPulse 0.7s ease-in-out 2;
+}
+/* Doubles — matching pair glows gold */
+.die.die-win-doubles {
+  border-color:#fbbf24 !important;
+  background:rgba(251,191,36,0.18) !important;
+  box-shadow:0 0 18px rgba(251,191,36,0.7), 0 0 36px rgba(251,191,36,0.3) !important;
+  transform:scale(1.15) !important;
+  animation:dieWinPulse 0.7s ease-in-out 2;
+}
+/* Triples — brighter glow + bigger scale */
+.die.die-win-triples {
   border-color:#fbbf24 !important;
   background:rgba(251,191,36,0.22) !important;
   box-shadow:0 0 22px rgba(251,191,36,0.85), 0 0 44px rgba(251,191,36,0.4) !important;
   transform:scale(1.22) !important;
-  animation:dieWinPulse 0.7s ease-in-out 2;
+  animation:dieWinTriplesPulse 0.7s ease-in-out 2;
+}
+/* Quads / Penta — maximum intensity */
+.die.die-win-mega {
+  border-color:#ffd700 !important;
+  background:rgba(255,215,0,0.28) !important;
+  box-shadow:0 0 30px rgba(255,215,0,1), 0 0 60px rgba(255,215,0,0.5), 0 0 90px rgba(255,215,0,0.25) !important;
+  transform:scale(1.3) !important;
+  animation:dieWinMegaPulse 0.7s ease-in-out 3;
 }
 @keyframes dieWinPulse {
+  0%,100% { transform:scale(1.1); box-shadow:0 0 12px rgba(251,191,36,0.6); }
+  50%      { transform:scale(1.18); box-shadow:0 0 24px rgba(251,191,36,0.9), 0 0 48px rgba(251,191,36,0.3); }
+}
+@keyframes dieWinTriplesPulse {
   0%,100% { transform:scale(1.22); box-shadow:0 0 22px rgba(251,191,36,0.85); }
   50%      { transform:scale(1.32); box-shadow:0 0 36px rgba(251,191,36,1), 0 0 70px rgba(251,191,36,0.5); }
+}
+@keyframes dieWinMegaPulse {
+  0%,100% { transform:scale(1.3); box-shadow:0 0 30px rgba(255,215,0,1); }
+  50%      { transform:scale(1.42); box-shadow:0 0 50px rgba(255,215,0,1), 0 0 100px rgba(255,215,0,0.6); }
 }
 .die.die-loser {
   opacity:0.3 !important;
@@ -966,7 +999,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v11';
+const TESTROOM_VERSION = 'v12';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1948,12 +1981,19 @@ function doPressureSwap(attackerTeam, targetIdx) {
   const t = B[attackerTeam];
   const f = active(t);
   const enemy = opp(t);
-  const oldName = active(enemy).name;
+  const oldGhost = active(enemy);
+  const oldName = oldGhost.name;
+  const skipEntry = (oldGhost.id === 365); // Tyson — Hop: no entry effects
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
+  // Returning from sideline = full HP
+  newGhost.hp = newGhost.maxHp;
   showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
-  log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${newGhost.name} enters!`);
-  triggerEntry(enemy);
+  log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${newGhost.name} enters at full HP!`);
+  if (skipEntry) {
+    log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
+  }
+  triggerEntry(enemy, skipEntry);
   if (!handleKOs()) renderBattle();
 }
 
@@ -2497,7 +2537,7 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
 // ============================================================
 // DICE HIGHLIGHTING — visually tell the story of why someone won
 // ============================================================
-function highlightWinnerDice(winTeam, winRoll, loseTeam) {
+function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
   const winEl  = document.getElementById(winTeam  + '-dice');
   const loseEl = document.getElementById(loseTeam + '-dice');
   if (!winEl || !loseEl) return;
@@ -2508,13 +2548,31 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam) {
   // Dim every losing die
   loseDivs.forEach(d => d.classList.add('die-loser'));
 
+  // Tiebreaker — same hand type & value, remaining die decided it
+  if (tiebreaker) {
+    // Highlight the tiebreaker die on the winner's side
+    let done = false;
+    [...winDivs].reverse().forEach(d => {
+      if (!done && parseInt(d.textContent) === tiebreaker.value) {
+        d.classList.add('die-win');
+        done = true;
+      }
+    });
+    return;
+  }
+
+  // Pick the CSS class based on hand tier
+  let hlClass = 'die-win'; // singles default
+  if (winRoll.type === 'doubles') hlClass = 'die-win-doubles';
+  else if (winRoll.type === 'triples') hlClass = 'die-win-triples';
+  else if (winRoll.type === 'quads' || winRoll.type === 'penta') hlClass = 'die-win-mega';
+
   if (winRoll.type === 'singles') {
     // Highlight just the highest die (the decision-maker)
     let done = false;
-    // dice are sorted asc, iterate reversed to find highest first
     [...winDivs].reverse().forEach(d => {
       if (!done && parseInt(d.textContent) === winRoll.value) {
-        d.classList.add('die-win');
+        d.classList.add(hlClass);
         done = true;
       }
     });
@@ -2523,14 +2581,14 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam) {
     let count = 0;
     winDivs.forEach(d => {
       if (count < 2 && parseInt(d.textContent) === winRoll.value) {
-        d.classList.add('die-win');
+        d.classList.add(hlClass);
         count++;
       }
     });
   } else {
     // triples / quads / penta — all matching dice light up
     winDivs.forEach(d => {
-      if (parseInt(d.textContent) === winRoll.value) d.classList.add('die-win');
+      if (parseInt(d.textContent) === winRoll.value) d.classList.add(hlClass);
     });
   }
 }
@@ -2575,6 +2633,7 @@ function resolveRound() {
   // compare remaining dice highest-to-lowest. Missing dice = 0.
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
   let winner = null;
+  let tiebreaker = null; // {value: N} — the remaining die that broke the tie
 
   if (typeRank[rR.type] > typeRank[bR.type]) winner = 'red';
   else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
@@ -2600,8 +2659,8 @@ function resolveRound() {
     for (let i = 0; i < maxLen; i++) {
       const rv = i < rRemain.length ? rRemain[i] : 0;
       const bv = i < bRemain.length ? bRemain[i] : 0;
-      if (rv > bv) { winner = 'red'; break; }
-      if (bv > rv) { winner = 'blue'; break; }
+      if (rv > bv) { winner = 'red'; tiebreaker = {value: rv}; break; }
+      if (bv > rv) { winner = 'blue'; tiebreaker = {value: bv}; break; }
     }
   }
 
@@ -2609,7 +2668,7 @@ function resolveRound() {
   if (winner) {
     const loser = winner === 'red' ? 'blue' : 'red';
     const wRoll = winner === 'red' ? rR : bR;
-    setTimeout(() => highlightWinnerDice(winner, wRoll, loser), 80);
+    setTimeout(() => highlightWinnerDice(winner, wRoll, loser, tiebreaker), 80);
   }
 
   if (winner === null) {
