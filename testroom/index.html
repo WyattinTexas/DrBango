@@ -1334,8 +1334,7 @@ function sacrificeHappyCrystal(team) {
   t.resources.moonstone++;
   showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)', `${f.name} sacrificed for 1 Moonstone!`);
   log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
-  handleKOs();
-  renderBattle();
+  if (!handleKOs()) renderBattle();
 }
 
 function toggleAuntSusan(team) {
@@ -1376,8 +1375,7 @@ function usePressure(team) {
   showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
   log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${swap.name} enters!`);
   triggerEntry(enemy);
-  handleKOs();
-  renderBattle();
+  if (!handleKOs()) renderBattle();
 }
 
 // ============================================================
@@ -2144,12 +2142,12 @@ function handleKOs() {
   });
 
   if (teamsNeedingSwap.length > 0) {
-    // Queue the KO swap picks
+    // Queue the KO swap picks — caller must NOT resume to 'ready'
     B.koSwapQueue = teamsNeedingSwap.slice();
     B.phase = 'ko-swap';
     renderBattle();
     openKoSwap();
-    return false;
+    return true; // signal: don't resume, swap in progress
   }
 
   renderBattle();
@@ -2211,8 +2209,25 @@ function doKoSwap(team, idx) {
   document.getElementById('swapOverlay').classList.remove('active');
   renderBattle();
 
-  // Remove this team from the queue and process next
+  // Remove this team from the queue
   B.koSwapQueue.shift();
+
+  // Check if entry effects caused new KOs (e.g. Nerina's Leviathan)
+  const redAllDown = B.red.ghosts.every(g => g.ko);
+  const blueAllDown = B.blue.ghosts.every(g => g.ko);
+  if (redAllDown && blueAllDown) { showGameOver('draw'); return; }
+  if (redAllDown) { showGameOver('blue'); return; }
+  if (blueAllDown) { showGameOver('red'); return; }
+
+  // Check if entry damage KO'd someone new — add to queue
+  ['red','blue'].forEach(tm => {
+    const tt = B[tm];
+    if (active(tt).ko && !B.koSwapQueue.includes(tm)) {
+      const alive = tt.ghosts.filter((g,i) => i !== tt.activeIdx && !g.ko);
+      if (alive.length > 0) B.koSwapQueue.push(tm);
+    }
+  });
+
   openKoSwap();
 }
 
@@ -2267,8 +2282,7 @@ function doSwap(team, idx) {
   triggerEntry(t, skipEntry);
 
   document.getElementById('swapOverlay').classList.remove('active');
-  handleKOs();
-  renderBattle();
+  if (!handleKOs()) renderBattle();
 }
 
 // ============================================================
