@@ -1198,7 +1198,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v61';
+const TESTROOM_VERSION = 'v62';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2956,31 +2956,35 @@ function pickMsDie(idx) {
   const resEl = document.getElementById(team + '-resources');
   const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
   clearMsCountdown(msEl);
+  clearMsCountdown(diceEl);
 
-  narrate(`Changing die ${idx+1} — pick a new value!`);
+  narrate(`Die ${idx+1} selected — pick a new value!`);
 
-  // Show inline value picker
-  const el = document.getElementById('msPicker');
-  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
-  const step2 = document.getElementById('msStep2');
-  step2.style.display = 'flex';
-  step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
-  el.classList.add('active');
+  // Delay showing the value picker so the die-click event doesn't bleed through
+  setTimeout(() => {
+    if (!B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-value') return;
+    const el = document.getElementById('msPicker');
+    document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
+    const step2 = document.getElementById('msStep2');
+    step2.style.display = 'flex';
+    step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+    el.classList.add('active');
 
-  // Auto-skip after 7s if no value picked
-  let remaining = 7;
-  showLsCountdown(el, remaining);
-  msCountdownTimer = setInterval(() => {
-    remaining--;
-    if (remaining <= 0) {
-      clearInterval(msCountdownTimer);
-      el.classList.remove('active');
-      clearMsCountdown(el);
-      skipMoonstone();
-    } else {
-      showLsCountdown(el, remaining);
-    }
-  }, 1000);
+    // Auto-skip after 7s if no value picked
+    let remaining = 7;
+    showLsCountdown(el, remaining);
+    msCountdownTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(msCountdownTimer);
+        el.classList.remove('active');
+        clearMsCountdown(el);
+        skipMoonstone();
+      } else {
+        showLsCountdown(el, remaining);
+      }
+    }, 1000);
+  }, 150);  // 150ms delay prevents click-through from die selection
 }
 
 function pickMsValue(val) {
