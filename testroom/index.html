@@ -258,7 +258,8 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .sideline-slot .card-rarity-badge { display:none; }
 .sideline-slot .card-name-banner { font-size:11px; padding:5px 6px; }
 .sideline-slot .ability-banner { font-size:9px; padding:3px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sideline-slot .ci-desc { font-size:9px; color:var(--text2); line-height:1.4; padding:4px 6px; }
+.sideline-slot .ci-desc { font-size:9px; color:var(--text2); line-height:1.4; padding:4px 6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; transition:max-height 0.2s ease; }
+.sideline-slot:hover .ci-desc { -webkit-line-clamp:unset; overflow:visible; }
 .sideline-slot .card-info { padding:0; }
 .fighter-slot { width:240px; flex-shrink:0; }
 .fighter-slot .card-rarity-badge { display:none; }
@@ -1162,7 +1163,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v27';
+const TESTROOM_VERSION = 'v28';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3019,6 +3020,7 @@ function resolveRound() {
         showAbilityCallout('BLACKOUT!', 'var(--rare)', `Smudge — ${removed} dice showing ${num} removed!`);
         log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
       } else {
+        showAbilityCallout('BLACKOUT — MISS', 'var(--border)', `Smudge named ${num} — no dice matched!`);
         log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — no matches.`);
       }
     }
@@ -3027,6 +3029,10 @@ function resolveRound() {
   B.blackoutNum = {};
 
   B.redDice = redDice; B.blueDice = blueDice;
+  // Sync visual dice display after Blackout may have removed dice from either array.
+  // Without this, the blacked-out die stays visible on screen even though it no longer
+  // counts in the calculation, and highlightWinnerDice indexes into stale DOM elements.
+  renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
   log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
@@ -3532,7 +3538,11 @@ function doKoSwap(team, idx) {
     }
   });
 
-  openKoSwap();
+  // If triggerEntry fired an ability callout (1400ms), wait for it to clear
+  // before showing the next KO swap picker so the two UIs don't overlap.
+  const splashEl = document.getElementById('abilitySplash');
+  const splashDelay = splashEl.classList.contains('active') ? 1500 : 0;
+  setTimeout(openKoSwap, splashDelay);
 }
 
 function showGameOver(winner) {
@@ -4093,6 +4103,51 @@ function revealDice(team, values) {
       }
     }, i * 300);
   });
+  // Immediately highlight the hand type after all dice reveal
+  const revealDone = values.length * 300 + 50;
+  setTimeout(() => highlightRollPreview(team, values), revealDone);
+}
+
+function highlightRollPreview(team, dice) {
+  const roll = classify(dice);
+  if (roll.type === 'none') return;
+  const diceEl = document.getElementById(team + '-dice');
+  if (!diceEl) return;
+  const dieDivs = [...diceEl.querySelectorAll('.die')];
+
+  if (roll.type === 'singles') {
+    // Subtle bump on the highest die
+    let done = false;
+    [...dieDivs].reverse().forEach(d => {
+      if (!done && parseInt(d.textContent) === roll.value) {
+        d.style.transform = 'scale(1.12)';
+        d.style.transition = 'transform 0.3s';
+        done = true;
+      }
+    });
+  } else if (roll.type === 'doubles') {
+    // Glow on the matching pair
+    let count = 0;
+    dieDivs.forEach(d => {
+      if (count < 2 && parseInt(d.textContent) === roll.value) {
+        d.style.transform = 'scale(1.15)';
+        d.style.boxShadow = '0 0 14px rgba(251,191,36,0.5)';
+        d.style.borderColor = '#fbbf24';
+        d.style.transition = 'all 0.3s';
+        count++;
+      }
+    });
+  } else {
+    // Triples+ — all matching dice glow
+    dieDivs.forEach(d => {
+      if (parseInt(d.textContent) === roll.value) {
+        d.style.transform = 'scale(1.2)';
+        d.style.boxShadow = '0 0 20px rgba(251,191,36,0.7)';
+        d.style.borderColor = '#fbbf24';
+        d.style.transition = 'all 0.3s';
+      }
+    });
+  }
 }
 
 function clearAllOverlays() {
