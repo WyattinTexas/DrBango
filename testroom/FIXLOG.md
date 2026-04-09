@@ -3,7 +3,7 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v36
+## Current Version: v40
 
 ## HARD RULES
 - NEVER unshelve cards or remove IDs from SHELVED_IDS
@@ -22,6 +22,10 @@ After fixing something, log it here so other agents don't duplicate work.
 - **v34** — Blackout phase guard (pre-roll only), removed dice labels (Hank/Smudge names), dice 48→56px with more gap.
 - **v35** — Lucky Stones 15% luckier (weighted reroll). Red Hunter Rumble fixed — was ignoring committed resources.
 - **v36** — KO/KO'D tracking: `killedBy` tagging at every KO source, `recordKill()` function, two-column standings (KO scored + KO'D defeated).
+- **v37** — Shade's Shadow KO check after ability queue drain + Blackout tiebreaker highlight fallback.
+- **v38** — Ability splash: fullscreen blackout → focused banner strip. Cards stay visible. Glows halved.
+- **v39** — Sylvia Porpoise: now rolls 2 dice with visual callout (was silent 1-die with no feedback).
+- **v40** — Shade's Shadow MOVED from post-roll to pre-roll. Now fires with Ember Force Swarm before dice roll.
 
 ## Completed Fixes — Refiner (cycles 1-26)
 
