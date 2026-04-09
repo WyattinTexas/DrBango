@@ -2262,7 +2262,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
   const newGhost = active(enemy);
   // Returning from sideline = full HP
   newGhost.hp = newGhost.maxHp;
-  showAbilityCallout('PRESSURE!', 'var(--magma)', `${f.name} forces a swap!`);
+  showAbilityCallout('PRESSURE!', 'var(--magma)', `${oldName} forced out — ${newGhost.name} enters!`);
   log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${newGhost.name} enters at full HP!`);
   triggerEntry(enemy, false);
   if (!handleKOs()) renderBattle();
@@ -2340,6 +2340,11 @@ function resetRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
   if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
+  // Clear dice display between rounds — no leftover numbers from last roll
+  ['red', 'blue'].forEach(t => {
+    const el = document.getElementById(t + '-dice');
+    if (el) el.innerHTML = '';
+  });
   // Start AFK pulse timer — if player doesn't roll within 5s, buttons start pulsing
   resetAfkTimer();
 }
@@ -2636,7 +2641,7 @@ function showMoonstoneChoice(team, dice) {
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b> &nbsp;Click it to use!`);
-  log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to use — 3 seconds!`);
+  log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to use — 5 seconds!`);
 
   const diceEl = document.getElementById(team + '-dice');
   const resEl = document.getElementById(team + '-resources');
@@ -2686,8 +2691,8 @@ function showMoonstoneChoice(team, dice) {
     });
   }
 
-  // Start 3s countdown — auto-skip if not used
-  let remaining = 3;
+  // Start 5s countdown — auto-skip if not used
+  let remaining = 5;
   showLsCountdown(msEl, remaining);
 
   clearInterval(msCountdownTimer);
@@ -2733,8 +2738,8 @@ function pickMsDie(idx) {
   step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
   el.classList.add('active');
 
-  // Auto-skip after 5s if no value picked
-  let remaining = 5;
+  // Auto-skip after 7s if no value picked
+  let remaining = 7;
   showLsCountdown(el, remaining);
   msCountdownTimer = setInterval(() => {
     remaining--;
@@ -3927,10 +3932,18 @@ function renderCardSlot(ghost, isFighter) {
     // Check if opponent has Timber (210) — Meticulous Planning debuff indicator
     if (B) {
       const thisTeam = B.red.ghosts.includes(ghost) ? B.red : B.blue;
+      const thisTeamName = thisTeam === B.red ? 'red' : 'blue';
       const oppTeam = thisTeam === B.red ? B.blue : B.red;
       const oppActive = active(oppTeam);
       if (oppActive && oppActive.id === 210 && !oppActive.ko) {
         statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">-1 Die (Timber)</span>`;
+      }
+      // Retribution indicator — Knight Light (402) has pending bonus dice stored up
+      if (ghost.id === 402 && !ghost.ko && B.retributionDice) {
+        const stored = B.retributionDice[thisTeamName] || 0;
+        if (stored > 0) {
+          statusHtml += `<span class="status-tag" style="background:rgba(52,152,219,0.15);color:var(--rare);">+${stored} ⚡ Retribution</span>`;
+        }
       }
     }
     // Overclock indicator
