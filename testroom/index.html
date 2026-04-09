@@ -1356,7 +1356,7 @@ const GHOSTS = [
   },
   {
     id:315, name:"Harrison", rarity:"rare", maxHp:5, art:"art/moonreach.jpg",
-    ability:"Ascend", abilityDesc:"Discard 1 Healing Seed: roll 1 extra die this round.",
+    ability:"Ascend", abilityDesc:"Discard Healing Seeds: roll 1 extra die per seed discarded.",
     category:"Defense/Negation", set:"Rolling Hills",
     designNote:"The hilltop moonlight spirit. Her one moment of reaching the moon grants a Moonstone — but only late game. The card that turns a losing game around."
   },
@@ -1739,7 +1739,7 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false } },
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
     retributionDice: { red: 0, blue: 0 }
   };
   S.battle = B;
@@ -2022,8 +2022,8 @@ function refundCommitted() {
     t.resources.ice += c.ice;
     t.resources.fire += c.fire;
     t.resources.surge += c.surge;
-    t.resources.healingSeed += c.auntSusan + c.auntSusanHeal + (c.harrison ? 1 : 0);
-    B.committed[team] = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
+    t.resources.healingSeed += c.auntSusan + c.auntSusanHeal + c.harrison;
+    B.committed[team] = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
   });
 }
 
@@ -2108,16 +2108,20 @@ function toggleHarrison(team) {
   const t = B[team];
   const f = active(t);
   if (f.id !== 315 || f.ko) return;
-  if (B.committed[team].harrison) {
-    // Un-commit: refund the seed
-    B.committed[team].harrison = false;
+  // Click = add another seed, right-click to remove (handled separately)
+  if (t.resources.healingSeed > 0) {
+    B.committed[team].harrison++;
+    t.resources.healingSeed--;
+  }
+  renderBattle();
+}
+
+function uncommitHarrison(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  if (B.committed[team].harrison > 0) {
+    B.committed[team].harrison--;
     t.resources.healingSeed++;
-  } else {
-    // Commit: spend a seed
-    if (t.resources.healingSeed > 0) {
-      B.committed[team].harrison = true;
-      t.resources.healingSeed--;
-    }
   }
   renderBattle();
 }
@@ -2396,17 +2400,18 @@ function doPreRollSetup() {
     return;
   }
 
-  // Harrison (315) — opt-in: spend 1 healingSeed for +1 die (committed via button)
-  B.harrisonExtraDie = { red: false, blue: false };
+  // Harrison (315) — opt-in: spend seeds for extra dice (1 per seed)
+  B.harrisonExtraDie = { red: 0, blue: 0 };
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 315 && !f.ko && B.committed[tName].harrison) {
+    if (f.id === 315 && !f.ko && B.committed[tName].harrison > 0) {
       checkKnightEffects(tName, f.name);
-      B.harrisonExtraDie[tName] = true;
-      B.committed[tName].harrison = false; // reset after use
-      showAbilityCallout('ASCEND!', '#22c55e', `${f.name} — Healing Seed → extra die!`);
-      log(`<span class="log-ability">${f.name}</span> — Ascend! Spent 1 Healing Seed for an extra die!`);
+      B.harrisonExtraDie[tName] = B.committed[tName].harrison;
+      const cnt = B.committed[tName].harrison;
+      B.committed[tName].harrison = 0; // reset after use
+      showAbilityCallout('ASCEND!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt} dice!`);
+      log(`<span class="log-ability">${f.name}</span> — Ascend! Spent ${cnt} Healing Seed${cnt>1?'s':''} for +${cnt} extra dice!`);
     }
   });
 
@@ -2479,8 +2484,8 @@ function doPreRollSetup() {
   });
 
   // Harrison extra die
-  if (B.harrisonExtraDie.red) redCount++;
-  if (B.harrisonExtraDie.blue) blueCount++;
+  if (B.harrisonExtraDie.red) redCount += B.harrisonExtraDie.red;
+  if (B.harrisonExtraDie.blue) blueCount += B.harrisonExtraDie.blue;
 
   // Committed Surge: +1 die per surge
   if (B.committed.red.surge > 0) {
@@ -3159,8 +3164,8 @@ function resolveRound() {
     abilityQueueMode = false;
 
     // Reset committed resources + Blackout picks
-    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
-    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
+    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
+    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
     B.blackoutNum = {};
 
     B.round++;
@@ -3432,8 +3437,8 @@ function resolveRound() {
   setTimeout(() => {
     drainAbilityQueue(() => {
       // Reset committed resources
-      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
-      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:false };
+      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
 
       B.round++;
       B.preRoll = null;
@@ -4076,10 +4081,10 @@ function renderBattle() {
           html += `<button class="ability-btn ${blocked?'':'pressure'}" onclick="useTysonHop('${team}')" ${blocked?'disabled title="Blocked by Dylan"':''}>${blocked?'🚫':'🐰'} Hop${blocked?' (Blocked)':''}</button>`;
         }
       }
-      // Harrison (315) — Ascend: opt-in spend Healing Seed for +1 die
-      if (f.id === 315 && !f.ko && B[team].resources.healingSeed > 0) {
-        const committed = B.committed[team].harrison;
-        html += `<button class="ability-btn ${committed?'committed':'pressure'}" onclick="toggleHarrison('${team}')" style="${committed?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${committed?' (Ready!)':''}</button>`;
+      // Harrison (315) — Ascend: spend seeds for extra dice (click=add, right-click=remove)
+      if (f.id === 315 && !f.ko && (B[team].resources.healingSeed > 0 || B.committed[team].harrison > 0)) {
+        const cnt = B.committed[team].harrison;
+        html += `<button class="ability-btn ${cnt>0?'committed':'pressure'}" onclick="toggleHarrison('${team}')" oncontextmenu="event.preventDefault();uncommitHarrison('${team}')" style="${cnt>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${cnt>0?' (+'+cnt+' dice)':''}</button>`;
       }
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
