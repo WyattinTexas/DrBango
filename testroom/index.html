@@ -247,11 +247,18 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   50% { box-shadow:0 0 30px rgba(243,156,18,0.7), 0 0 50px rgba(243,156,18,0.25); }
 }
 
-.sideline-slot { width:130px; flex-shrink:0; }
+.sideline-slot { width:130px; flex-shrink:0; transition:transform 0.3s, z-index 0s; }
+.sideline-slot.sideline-pop {
+  transform:scale(1.25);
+  z-index:50;
+  box-shadow:0 0 20px rgba(126,232,250,0.6), 0 0 40px rgba(126,232,250,0.3);
+  border-color:var(--moonstone) !important;
+}
+@keyframes sidelinePop { 0% { transform:scale(1); } 30% { transform:scale(1.25); } 100% { transform:scale(1); } }
 .sideline-slot .card-rarity-badge { display:none; }
 .sideline-slot .card-name-banner { font-size:11px; padding:5px 6px; }
 .sideline-slot .ability-banner { font-size:9px; padding:3px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sideline-slot .ci-desc { font-size:9px; color:var(--text2); line-height:1.4; padding:4px 6px; }
+.sideline-slot .ci-desc { font-size:9px; color:var(--text2); line-height:1.4; padding:4px 6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .sideline-slot .card-info { padding:0; }
 .fighter-slot { width:240px; flex-shrink:0; }
 .fighter-slot .card-rarity-badge { display:none; }
@@ -1155,7 +1162,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v21';
+const TESTROOM_VERSION = 'v22';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1913,6 +1920,19 @@ function getSidelineGhost(team, id) {
   return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
 }
 
+// Pop a sideline card to foreground when its ability triggers
+function popSidelineCard(teamObj, ghostId) {
+  const teamName = teamObj === B.red ? 'red' : 'blue';
+  const sl = teamObj.ghosts.filter((g,i) => i !== teamObj.activeIdx);
+  const slIdx = sl.findIndex(g => g.id === ghostId);
+  if (slIdx < 0) return;
+  const elId = slIdx === 0 ? `${teamName}-sl-left` : `${teamName}-sl-right`;
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.add('sideline-pop');
+  setTimeout(() => el.classList.remove('sideline-pop'), 1300);
+}
+
 // Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
 function dylanNegates(enemyTeam) {
   return hasSideline(enemyTeam, 301);
@@ -2468,7 +2488,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) ef.ko = true;
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`, () => { playDamageSfx(1); hitDamage(enemyName); });
+        queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`, () => { playDamageSfx(1); hitDamage(enemyName); popSidelineCard(team, 205); });
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       }
     }
@@ -2991,7 +3011,7 @@ function resolveRound() {
         const tweakGhost = getSidelineGhost(team, 303);
         checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
         team.resources.surge += 3;
-        queueAbility('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge!`);
+        queueAbility('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge!`, () => popSidelineCard(team, 303));
         log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
       }
     });
@@ -3224,7 +3244,7 @@ function resolveRound() {
   if (wF.id === 309 && !wF.ko) queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`);
   if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
-    queueAbility('HARVEST!', '#22c55e', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`);
+    queueAbility('HARVEST!', '#22c55e', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => popSidelineCard(winTeam, 314));
   }
 
   // On-lose callouts
@@ -3233,9 +3253,10 @@ function resolveRound() {
   // On-KO callouts
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
-      if (wR.type === 'singles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`);
-      else if (wR.type === 'doubles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`);
-      else if (isTripleOrBetter(wR.type)) queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`);
+      const grannyPop = () => popSidelineCard(loseTeam, 310);
+      if (wR.type === 'singles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, grannyPop);
+      else if (wR.type === 'doubles') queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, grannyPop);
+      else if (isTripleOrBetter(wR.type)) queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, grannyPop);
     }
     if (lF.id === 404) queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`);
   }
@@ -3301,7 +3322,7 @@ function resolveRound() {
       B.round++;
       B.preRoll = null;
       renderDice(redDice, blueDice);
-      setTimeout(() => highlightWinnerDice(winTeamName, wR, loseTeamName), 10);
+      setTimeout(() => highlightWinnerDice(winTeamName, wR, loseTeamName, tiebreaker), 10);
 
       if (lF.ko) {
         B.phase = 'ko-pause';
