@@ -966,7 +966,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v10';
+const TESTROOM_VERSION = 'v11';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1036,7 +1036,7 @@ const GHOSTS = [
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
-    ability:"Aquatic Wisdom", abilityDesc:"Entry: you may spend 2 Ice Shards to gain 1 Moonstone.",
+    ability:"Aquatic Wisdom", abilityDesc:"Entry: spend 2 Ice Shards to gain 1 Moonstone (if available).",
     category:"Resource Generation", set:"Volcanic Activity",
     designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Activity (the other is the whale, Nerina)."
   },
@@ -3284,10 +3284,23 @@ function renderCardSlot(ghost, isFighter) {
   if (isFighter) {
     if (ghost.hankFirstRoll) statusHtml += `<span class="status-tag pressure">Lazy (1-2-3)</span>`;
     if (ghost.maximoFirstRoll) statusHtml += `<span class="status-tag streak">Napping (1 die)</span>`;
+    // Check if opponent has Timber (210) — Meticulous Planning debuff indicator
+    if (B) {
+      const thisTeam = B.red.ghosts.includes(ghost) ? B.red : B.blue;
+      const oppTeam = thisTeam === B.red ? B.blue : B.red;
+      const oppActive = active(oppTeam);
+      if (oppActive && oppActive.id === 210 && !oppActive.ko) {
+        statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">-1 Die (Timber)</span>`;
+      }
+    }
+    // Overclock indicator
+    if (ghost.hp > ghost.maxHp) {
+      statusHtml += `<span class="status-tag streak" style="background:rgba(126,232,250,0.2);color:var(--moonstone);">⚡ ${ghost.hp} HP</span>`;
+    }
   }
   // HP color
   const hpRatio = ghost.hp / ghost.maxHp;
-  const hpColor = hpRatio > 0.6 ? 'var(--hp-green)' : hpRatio > 0.3 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+  const hpColor = hpRatio > 1 ? 'var(--moonstone)' : hpRatio > 0.6 ? 'var(--hp-green)' : hpRatio > 0.3 ? 'var(--hp-yellow)' : 'var(--hp-red)';
   return `
     <div class="card-name-banner rarity-${g.rarity}">${ghost.name}</div>
     <div class="card-rarity-badge rarity-${g.rarity}">${rarityLabel}</div>
@@ -3448,6 +3461,11 @@ function renderBattle() {
             `<button class="blackout-num ${B.blackoutNum && B.blackoutNum[team] === n ? 'active' : ''}" onclick="setBlackout('${team}', ${n})">${n}</button>`
           ).join('')}
         </div>`;
+      }
+      // Voluntary Swap — always available if sideline has alive ghosts
+      const aliveSideline = B[team].ghosts.filter((g,i) => i !== B[team].activeIdx && !g.ko);
+      if (aliveSideline.length > 0) {
+        html += `<button class="ability-btn" onclick="openSwap('${team}')" style="font-size:12px;padding:6px 10px;">🔄 Swap</button>`;
       }
     }
     el.innerHTML = html;
