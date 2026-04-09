@@ -856,6 +856,9 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .pressure-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
 .pressure-overlay.active { display:flex; }
 .pressure-modal { background:var(--surface); border:1px solid var(--magma); border-radius:14px; padding:24px; max-width:420px; width:90%; box-shadow:0 0 40px rgba(255,99,72,0.3); }
+.pm-who-banner { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; padding:5px 10px; border-radius:6px; margin-bottom:10px; display:inline-block; }
+.pm-who-banner.red  { background:rgba(235,87,87,.18); color:#eb5757; border:1px solid #eb5757; }
+.pm-who-banner.blue { background:rgba(72,152,255,.18); color:#4898ff; border:1px solid #4898ff; }
 .pressure-modal h3 { margin-bottom:6px; font-size:16px; color:var(--magma); }
 .pressure-modal .pm-sub { font-size:12px; color:var(--text2); margin-bottom:14px; }
 .pressure-opt { padding:10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:all .15s; display:flex; gap:10px; align-items:center; }
@@ -1138,13 +1141,14 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
     </div>
-    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px">#</th><th style="width:50px"></th><th>Team</th><th class="stat-col">W</th><th class="stat-col">L</th><th class="stat-col">PCT</th><th class="stat-col">GB</th><th class="stat-col" title="Times Defeated">KO</th></tr></thead><tbody id="standingsBody"></tbody></table>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px">#</th><th style="width:50px"></th><th>Team</th><th class="stat-col">W</th><th class="stat-col">L</th><th class="stat-col">PCT</th><th class="stat-col">GB</th><th class="stat-col" title="KOs Scored">KO</th><th class="stat-col" title="Times Defeated">KO'D</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
 <!-- Pressure Pick -->
 <div class="pressure-overlay" id="pressureOverlay">
   <div class="pressure-modal">
+    <div id="pressureWho" class="pm-who-banner blue">🎯 BLUE PICKS</div>
     <h3 id="pressureTitle">Pressure — Forced Swap</h3>
     <div class="pm-sub" id="pressureSub">Choose which ghost enters the fight.</div>
     <div id="pressureOptions"></div>
@@ -1168,7 +1172,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v35';
+const TESTROOM_VERSION = 'v36';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1449,7 +1453,7 @@ let standingsLoaded = false;
 function initStandings() {
   standings = {};
   GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).forEach(g => {
-    standings[g.id] = { wins: 0, losses: 0, kos: 0 };
+    standings[g.id] = { wins: 0, losses: 0, kos: 0, kills: 0 };
   });
 }
 initStandings();
@@ -1461,7 +1465,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0 };
       });
     }
     standingsLoaded = true;
@@ -1473,7 +1477,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0 };
       });
     }
   });
@@ -1494,20 +1498,26 @@ function saveStandingsToFirebase() {
 }
 
 function recordWin(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
   standings[ghostId].wins++;
   saveStandingsToFirebase();
 }
 
 function recordLoss(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
   standings[ghostId].losses++;
   saveStandingsToFirebase();
 }
 
 function recordKO(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
   standings[ghostId].kos = (standings[ghostId].kos || 0) + 1;
+  saveStandingsToFirebase();
+}
+
+function recordKill(ghostId) {
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
+  standings[ghostId].kills = (standings[ghostId].kills || 0) + 1;
   saveStandingsToFirebase();
 }
 
@@ -1515,10 +1525,10 @@ function openStandings() {
   document.getElementById('standingsVersion').textContent = TESTROOM_VERSION;
   const body = document.getElementById('standingsBody');
   const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => {
-    const s = standings[g.id] || { wins:0, losses:0, kos:0 };
+    const s = standings[g.id] || { wins:0, losses:0, kos:0, kills:0 };
     const total = s.wins + s.losses;
     const pct = total > 0 ? (s.wins / total) : 0;
-    return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, total, pct };
+    return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, kills: s.kills || 0, total, pct };
   }).sort((a, b) => {
     if (b.pct !== a.pct) return b.pct - a.pct;
     if (b.w !== a.w) return b.w - a.w;
@@ -1548,6 +1558,7 @@ function openStandings() {
       <td class="st-stat st-l">${g.l}</td>
       <td class="st-stat st-pct">${pctStr}</td>
       <td class="st-stat st-gb">${gbVal}</td>
+      <td class="st-stat" style="color:var(--accent)">${g.kills}</td>
       <td class="st-stat" style="color:var(--text2)">${g.kos}</td>
     </tr>`;
   }).join('');
@@ -1824,7 +1835,7 @@ function triggerEntry(team, skipEntryEffects) {
     const ef = active(enemy);
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) ef.ko = true;
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       showAbilityCallout('LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -1854,7 +1865,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (!ef.ko && ef.hp > f.hp) {
       checkKnightEffects(entryTeamName, f.name);
       ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) ef.ko = true;
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       showAbilityCallout('BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -2043,7 +2054,7 @@ function sacrificeHappyCrystal(team) {
   const t = B[team];
   const f = active(t);
   if (f.id !== 208 || f.ko) return;
-  f.hp = 0; f.ko = true;
+  f.hp = 0; f.ko = true; f.killedBy = -1; // self-sacrifice
   t.resources.moonstone++;
   showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)', `${f.name} sacrificed for 1 Moonstone!`);
   log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
@@ -2142,7 +2153,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
     const target = sidelineGhost || active(abilityTeam);
     if (!target.ko) {
       target.hp = Math.max(0, target.hp - 2);
-      if (target.hp <= 0) target.ko = true;
+      if (target.hp <= 0) { target.ko = true; target.killedBy = 401; }
       if (abilityQueueMode) {
         queueAbility('HEAVY AIR!', 'var(--accent)', `Knight Terror — ${abilityGhostName} loses 2 HP!`);
       } else {
@@ -2227,8 +2238,12 @@ function usePressure(team) {
 
   // Open pressure picker for the OPPONENT to choose who comes in
   const enemyLabel = enemyTeamName.charAt(0).toUpperCase() + enemyTeamName.slice(1);
-  document.getElementById('pressureTitle').textContent = `Pressure! ${enemyLabel} — Pick your replacement`;
-  document.getElementById('pressureSub').textContent = `Death Howl forces a swap. ${enemyLabel} team chooses who enters.`;
+  // Update the "who picks" banner with the correct team color
+  const whoBanner = document.getElementById('pressureWho');
+  whoBanner.className = `pm-who-banner ${enemyTeamName}`;
+  whoBanner.textContent = `🎯 ${enemyLabel.toUpperCase()} PICKS`;
+  document.getElementById('pressureTitle').textContent = `Pressure! — Death Howl forces a swap`;
+  document.getElementById('pressureSub').textContent = `${enemyLabel} team: choose which ghost enters the fight.`;
   document.getElementById('pressureOptions').innerHTML = aliveSideline.map(g => {
     const realIdx = enemy.ghosts.indexOf(g);
     const gd = ghostData(g.id);
@@ -2397,7 +2412,7 @@ function doPreRollSetup() {
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) ef.ko = true;
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
         showAbilityCallout('SWARM!', 'var(--magma)', `${f.name} — 1 damage to ${ef.name}!`);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -2573,7 +2588,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) ef.ko = true;
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
         queueAbility('MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`, () => { playDamageSfx(1); hitDamage(enemyName); popSidelineCard(team, 205); });
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -3347,7 +3362,7 @@ function resolveRound() {
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
   if (dmg > 0) {
     lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) lF.ko = true;
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = wF.id; }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
   } else {
     log(`${wF.name} wins but deals 0 damage.`);
@@ -3356,7 +3371,7 @@ function resolveRound() {
   // Pudge self-damage (game state)
   if (pudgeSelfDmg && !wF.ko) {
     wF.hp = Math.max(0, wF.hp - 1);
-    if (wF.hp <= 0) wF.ko = true;
+    if (wF.hp <= 0) { wF.ko = true; wF.killedBy = lF.id; }
     log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
   }
 
@@ -3675,8 +3690,14 @@ function showGameOver(winner) {
     const loseTeamObj = B[loseTeamName];
     winTeam.ghosts.forEach(g => recordWin(g.id));
     loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
-    loseTeamObj.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
-    winTeam.ghosts.forEach(g => { if (g.ko) recordKO(g.id); });
+    // Record KO'D (times defeated) and Kills (KOs scored) from killedBy tags
+    const allGhosts = [...winTeam.ghosts, ...loseTeamObj.ghosts];
+    allGhosts.forEach(g => {
+      if (g.ko) {
+        recordKO(g.id); // this ghost was defeated
+        if (g.killedBy && g.killedBy > 0) recordKill(g.killedBy); // credit the killer
+      }
+    });
   }
 
   const el = document.getElementById('gameOver');
@@ -4104,21 +4125,30 @@ function renderBattle() {
       const click = isReady ? `onclick="cycleCommit('${team}','ice')"` : '';
       const label = committed ? `${c.ice}/${totalIce}⚔` : totalIce;
       const tileLabel = committed ? `+${c.ice} DMG` : 'ICE';
-      rh += `<div class="res-tile ice ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Ice Shards: +1 dmg each"><span class="res-main"><img src="../boobattles/iceshard.png"></span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
+      const iceTitle = committed
+        ? `${c.ice} of ${totalIce} Ice Shard${totalIce>1?'s':''} committed — +${c.ice} damage if you win${c.ice < totalIce ? ' (click to commit more)' : ''}`
+        : `Ice Shards: ${totalIce} available — click to commit (+1 dmg each)`;
+      rh += `<div class="res-tile ice ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="${iceTitle}"><span class="res-main"><img src="../boobattles/iceshard.png"></span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
     }
     if (totalFire > 0) {
       const committed = c.fire > 0;
       const click = isReady ? `onclick="cycleCommit('${team}','fire')"` : '';
       const label = committed ? `${c.fire}/${totalFire}⚔` : totalFire;
       const tileLabel = committed ? `+${c.fire*3} DMG` : 'FIRE';
-      rh += `<div class="res-tile fire ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Sacred Fire: +3 dmg each"><span class="res-main"><img src="../boobattles/sacredfire.png"></span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
+      const fireTitle = committed
+        ? `${c.fire} of ${totalFire} Sacred Fire committed — +${c.fire*3} damage if you win${c.fire < totalFire ? ' (click to commit more)' : ''}`
+        : `Sacred Fire: ${totalFire} available — click to commit (+3 dmg each)`;
+      rh += `<div class="res-tile fire ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="${fireTitle}"><span class="res-main"><img src="../boobattles/sacredfire.png"></span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
     }
     if (totalSurge > 0) {
       const committed = c.surge > 0;
       const click = isReady ? `onclick="cycleCommit('${team}','surge')"` : '';
       const label = committed ? `${c.surge}/${totalSurge}⚔` : totalSurge;
       const tileLabel = committed ? `+${c.surge} ${c.surge>1?'DICE':'DIE'}` : 'SURGE';
-      rh += `<div class="res-tile surge ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="Surge: +1 die each"><span class="res-main">⚡</span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
+      const surgeTitle = committed
+        ? `${c.surge} of ${totalSurge} Surge committed — +${c.surge} extra ${c.surge>1?'dice':'die'} this roll${c.surge < totalSurge ? ' (click to commit more)' : ''}`
+        : `Surge: ${totalSurge} available — click to commit (+1 extra die each)`;
+      rh += `<div class="res-tile surge ${committed?'committed':''} ${isReady?'clickable':''}" ${click} title="${surgeTitle}"><span class="res-main">⚡</span><span class="res-count">${label}</span><span class="res-label ${committed?'res-label-bonus':''}">${tileLabel}</span></div>`;
     }
     if (r.healingSeed > 0) {
       const canHeal = isReady && f.hp < f.maxHp;
