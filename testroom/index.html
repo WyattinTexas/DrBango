@@ -410,17 +410,14 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }
-.dice-stack { display:flex; flex-direction:column; gap:8px; width:100%; }
-.dice-row { display:flex; gap:4px; }
+.dice-stack { display:flex; flex-direction:column; gap:16px; width:100%; }
+.dice-row { display:flex; gap:8px; }
 .dice-row.dice-red { justify-content:flex-start; padding-left:8px; }
 .dice-row.dice-blue { justify-content:flex-end; padding-right:8px; }
-.dice-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; }
-.dice-label.red-label { color:var(--accent); text-align:left; padding-left:10px; }
-.dice-label.blue-label { color:var(--rare); text-align:right; padding-right:10px; }
 .die {
-  width:48px; height:48px; background:var(--surface); border:2px solid var(--border);
-  border-radius:10px; display:flex; align-items:center; justify-content:center;
-  font-size:22px; font-weight:900; transition:all .3s; user-select:none;
+  width:56px; height:56px; background:var(--surface); border:2px solid var(--border);
+  border-radius:12px; display:flex; align-items:center; justify-content:center;
+  font-size:26px; font-weight:900; transition:all .3s; user-select:none;
   box-shadow:0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .die.rolling { animation:shake .12s infinite; }
@@ -1033,9 +1030,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
           <div class="turn-indicator" id="turnIndicator">Round 1</div>
           <div class="arena-mid">
             <div class="dice-stack">
-              <div class="dice-label red-label" id="redDiceLabel">Red</div>
               <div class="dice-row dice-red" id="red-dice"></div>
-              <div class="dice-label blue-label" id="blueDiceLabel">Blue</div>
               <div class="dice-row dice-blue" id="blue-dice"></div>
             </div>
           </div>
@@ -1171,7 +1166,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v33';
+const TESTROOM_VERSION = 'v34';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1741,7 +1736,8 @@ function startBattle() {
     pendingMoonstone:null, pendingSteal:null,
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
     retributionDice: { red: 0, blue: 0 },
-    pressureUsed: { red: false, blue: false }
+    pressureUsed: { red: false, blue: false },
+    motherNatureSummer: { red: false, blue: false }
   };
   S.battle = B;
   document.getElementById('team-select').style.display = 'none';
@@ -2171,6 +2167,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
 // BLACKOUT — Smudge (403): name a number
 // ============================================================
 function setBlackout(team, num) {
+  if (!B || B.phase !== 'ready') return; // Blackout is pre-roll only
   if (!B.blackoutNum) B.blackoutNum = {};
   if (B.blackoutNum[team] === num) {
     delete B.blackoutNum[team]; // toggle off
@@ -2243,11 +2240,15 @@ function usePressure(team) {
       </div>
     </div>`;
   }).join('');
+  // Lock out Roll buttons while the opponent picks — phase resets to 'ready' in doPressureSwap
+  B.phase = 'pressure';
   document.getElementById('pressureOverlay').classList.add('active');
 }
 
 function doPressureSwap(attackerTeam, targetIdx) {
   document.getElementById('pressureOverlay').classList.remove('active');
+  // Restore 'ready' phase — was set to 'pressure' while the pick modal was open to lock Roll buttons
+  if (B.phase === 'pressure') B.phase = 'ready';
   // Mark Pressure as used for this round — prevents double-use when opponent has 2 sideline ghosts
   if (!B.pressureUsed) B.pressureUsed = { red: false, blue: false };
   B.pressureUsed[attackerTeam] = true;
@@ -2489,6 +2490,39 @@ function doPreRollSetup() {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
       else blueCount = Math.max(1, blueCount - 1);
+    }
+  });
+
+  // Mother Nature (366) — Seasons: each round cycles Spring/Summer/Autumn/Winter
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    const oppTeamName = tName === 'red' ? 'blue' : 'red';
+    if (f.id === 366 && !f.ko) {
+      const season = B.round % 4;
+      if (season === 1) {
+        // Spring: +1 HP (heal, capped at maxHp)
+        const gained = f.hp < f.maxHp;
+        f.hp = Math.min(f.maxHp, f.hp + 1);
+        showAbilityCallout('SEASONS — SPRING!', 'var(--legendary)', `${f.name} — ${gained ? '+1 HP restored! ('+f.hp+'/'+f.maxHp+')' : 'already at full HP.'}`);
+        log(`<span class="log-ability">${f.name}</span> — Seasons: Spring! ${gained ? '+1 HP ('+f.hp+'/'+f.maxHp+')' : 'already at full HP'}.`);
+      } else if (season === 2) {
+        // Summer: +1 damage this round for Mother Nature's team
+        B.motherNatureSummer[tName] = true;
+        showAbilityCallout('SEASONS — SUMMER!', 'var(--legendary)', `${f.name} — Summer: +1 damage if you win this round!`);
+        log(`<span class="log-ability">${f.name}</span> — Seasons: Summer! +1 damage this round.`);
+      } else if (season === 3) {
+        // Autumn: +1 Healing Seed for Mother Nature's team
+        team.resources.healingSeed++;
+        showAbilityCallout('SEASONS — AUTUMN!', 'var(--legendary)', `${f.name} — Autumn: +1 Healing Seed!`);
+        log(`<span class="log-ability">${f.name}</span> — Seasons: Autumn! Gained 1 Healing Seed.`);
+      } else {
+        // Winter (round % 4 === 0): opponent rolls 1 fewer die
+        if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
+        else blueCount = Math.max(1, blueCount - 1);
+        showAbilityCallout('SEASONS — WINTER!', 'var(--legendary)', `${f.name} — Winter: opponent rolls 1 fewer die!`);
+        log(`<span class="log-ability">${f.name}</span> — Seasons: Winter! Opponent rolls 1 fewer die.`);
+      }
     }
   });
 
@@ -3197,6 +3231,7 @@ function resolveRound() {
     B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
     B.blackoutNum = {};
     B.pressureUsed = { red: false, blue: false };
+    B.motherNatureSummer = { red: false, blue: false };
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -3253,6 +3288,13 @@ function resolveRound() {
     const susanDmg = B.auntSusanBonus[winTeamName] * 2;
     dmg += susanDmg;
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
+  }
+
+  // Mother Nature (366) — Summer: +1 damage for the winning team
+  if (B.motherNatureSummer && B.motherNatureSummer[winTeamName]) {
+    dmg += 1;
+    B.motherNatureSummer[winTeamName] = false;
+    log(`<span class="log-ability">Mother Nature</span> — Seasons: Summer! <span class="log-dmg">+1 bonus damage!</span>`);
   }
 
   // Pudge (311) — doubles: +2 damage
@@ -3470,6 +3512,7 @@ function resolveRound() {
       B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
       B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
       B.pressureUsed = { red: false, blue: false };
+      B.motherNatureSummer = { red: false, blue: false };
 
       B.round++;
       B.preRoll = null;
@@ -3938,6 +3981,10 @@ function renderCardSlot(ghost, isFighter) {
       if (oppActive && oppActive.id === 210 && !oppActive.ko) {
         statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">-1 Die (Timber)</span>`;
       }
+      // Mother Nature (366) Winter indicator: opponent -1 die on rounds where round % 4 === 0
+      if (oppActive && oppActive.id === 366 && !oppActive.ko && B.round % 4 === 0) {
+        statusHtml += `<span class="status-tag pressure" style="background:rgba(96,165,250,0.15);color:#93c5fd;">-1 Die (Winter)</span>`;
+      }
       // Retribution indicator — Knight Light (402) has pending bonus dice stored up
       if (ghost.id === 402 && !ghost.ko && B.retributionDice) {
         const stored = B.retributionDice[thisTeamName] || 0;
@@ -4092,8 +4139,6 @@ function renderBattle() {
   });
 
   document.getElementById('turnIndicator').textContent = '';
-  document.getElementById('redDiceLabel').textContent = active(B.red).name;
-  document.getElementById('blueDiceLabel').textContent = active(B.blue).name;
   const logWrap = document.getElementById('battleLog').parentElement;
   document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
   logWrap.scrollTop = 0;
@@ -4282,6 +4327,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const overlays = ['swapOverlay','msPicker','stealOverlay','pressureOverlay','standingsOverlay','gameOver'];
     overlays.forEach(id => document.getElementById(id)?.classList.remove('active'));
+    // If Pressure pick was open, restore 'ready' so Roll buttons work again
+    if (B && B.phase === 'pressure') B.phase = 'ready';
   }
 });
 
