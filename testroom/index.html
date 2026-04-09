@@ -1168,7 +1168,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v41';
+const TESTROOM_VERSION = 'v44';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2958,7 +2958,9 @@ function startLuckyStoneWindow(team, callback) {
     lsEl.classList.add('rerollable');
     lsEl.style.cursor = 'pointer';
     lsEl.onclick = () => {
-      // Player clicked Lucky Stone — now highlight dice to pick which to reroll
+      // Player clicked Lucky Stone — stop the old tile countdown, start a fresh one for die picking
+      clearInterval(lsCountdownTimer);
+      clearLsCountdown(); // remove countdown display from the tile
       lsEl.classList.remove('rerollable');
       lsEl.onclick = null;
       narrate(`<b class="${team}-text">${teamLabel}</b> — pick a die to reroll!`);
@@ -2967,6 +2969,20 @@ function startLuckyStoneWindow(team, callback) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(team, i, dice, callback);
       });
+      // Fresh 3s countdown on the dice row — mirrors Moonstone's pick-die phase
+      let pickRemaining = 3;
+      showLsCountdown(diceEl, pickRemaining);
+      lsCountdownTimer = setInterval(() => {
+        pickRemaining--;
+        if (pickRemaining <= 0) {
+          clearLsCountdown();
+          clearDiceClickable(team);
+          log(`<span style="color:var(--text2)">${team.toUpperCase()} didn't pick a die in time.</span>`);
+          callback();
+        } else {
+          showLsCountdown(diceEl, pickRemaining);
+        }
+      }, 1000);
     };
   } else {
     // No resource tile visible — fall back to direct dice click
@@ -3311,7 +3327,7 @@ function resolveRound() {
     drainAbilityQueue(() => {
       B.phase = 'ready';
       resetRollButtons();
-      narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
+      narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
     });
     return;
@@ -3508,11 +3524,7 @@ function resolveRound() {
   if (redHunterTriggered) {
     queueAbility('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
   }
-  if (sylviaDodged) {
-    queueAbility('PORPOISE DODGE!', 'var(--rare)', `${lF.name} rolled a 6 — damage negated!`);
-  } else if (sylviaDodgeRoll > 0) {
-    queueAbility('PORPOISE — MISS', 'var(--text2)', `${lF.name} rolled a ${sylviaDodgeRoll} — needed 6, no dodge.`);
-  }
+  // Sylvia callouts already queued in the dodge check block above
 
   // Eternal Flame callout
   if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
@@ -3618,7 +3630,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
-            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 1800);
@@ -3629,7 +3641,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
-            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> vs <b class="blue-text">${active(B.blue).name}</b>`);
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 750);
