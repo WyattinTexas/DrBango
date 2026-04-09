@@ -1210,7 +1210,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v66';
+const TESTROOM_VERSION = 'v67';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1276,9 +1276,9 @@ const GHOSTS = [
   },
   {
     id:205, name:"Shade's Shadow", rarity:"rare", maxHp:1, art:"art/kaboom.png",
-    ability:"Meltdown", abilityDesc:"Sideline: after you roll, deal 1 damage to the enemy active ghost before they roll.",
+    ability:"Meltdown", abilityDesc:"Sideline: before each roll, if the enemy active ghost has less than 4 HP, deal 1 damage.",
     category:"Damage Multiplier", set:"Volcanic Activity",
-    designNote:"Shade's literal shadow. 1 HP means he dies instantly in battle, but from the sideline he chips 1 damage every round before the enemy even rolls. Constant, unavoidable pressure."
+    designNote:"Shade's literal shadow. 1 HP means he dies instantly in battle, but from the sideline he finishes off weakened ghosts. Only triggers when enemy is below 4 HP — a closer, not a chipper."
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
@@ -2577,19 +2577,19 @@ function doPreRollSetup() {
     }
   });
 
-  // Shade's Shadow (205) — sideline: deal 1 dmg to enemy active before rolling (negated by Dylan)
+  // Shade's Shadow (205) — sideline: deal 1 dmg before each roll IF enemy active < 4 HP (negated by Dylan)
   [B.red, B.blue].forEach(team => {
     const enemy = opp(team);
     const tNameShade = team === B.red ? 'red' : 'blue';
     if (hasSideline(team, 205) && !dylanNegates(enemy)) {
       const shadeGhost = getSidelineGhost(team, 205);
       const ef = active(enemy);
-      if (!ef.ko) {
+      if (!ef.ko && ef.hp < 4) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        preRollCallouts.push(['MELTDOWN!', 'var(--accent)', `Shade's Shadow chips ${ef.name} for 1!`]);
-        log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+        preRollCallouts.push(['MELTDOWN!', 'var(--accent)', `Shade's Shadow finishes ${ef.name}! (${ef.hp < 4 ? 'below 4 HP' : ''})`]);
+        log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! Enemy below 4 HP — <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
         hitDamage(enemyName);
         popSidelineCard(team, 205);
