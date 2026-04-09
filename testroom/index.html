@@ -1155,7 +1155,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v20';
+const TESTROOM_VERSION = 'v21';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1242,7 +1242,7 @@ const GHOSTS = [
     designNote:"Sacrifice play. 2 HP crystal that you pop for a Moonstone before the opponent can KO it. Timing is everything — use it too early and you waste a slot, too late and it dies for nothing."
   },
   {
-    id:209, name:"Dart", rarity:"common", maxHp:5, art:"art/swipers.png",
+    id:209, name:"Dart", rarity:"common", maxHp:4, art:"art/swipers.png",
     ability:"Plunder", abilityDesc:"Win: gain 2 Surge.",
     category:"Debuff", set:"Volcanic Activity",
     designNote:"Aggressive volcanic ember. Wins generate 2 Surge — one of the fastest Surge farmers in the game. 5 HP keeps him in the mix."
@@ -2559,35 +2559,102 @@ function doPostRollAndResolve(redDice, blueDice) {
   drainAbilityQueue(postRollDone);
 }
 
+// Moonstone — timed window like Lucky Stone (3s countdown, click die to change)
+let msCountdownTimer = null;
+
 function showMoonstoneChoice(team, dice) {
-  // Show dice first, then offer moonstone
   renderDice(B.redDice, B.blueDice);
-  const color = team==='red' ? 'var(--accent)' : 'var(--rare)';
-  log(`<span style="color:${color}">Team ${team.toUpperCase()}</span> has a <span class="log-ms">Moonstone</span>! Choose a die to change or skip.`);
   renderBattle();
+  B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-die' };
 
-  B.pendingMoonstone = { team, dice: [...dice], dieIndex:null };
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b> &nbsp;Tap a die to change it!`);
+  log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Tap a die to change — 3 seconds!`);
 
-  const el = document.getElementById('msStep1');
-  el.innerHTML = `<p style="color:var(--text2);font-size:13px;margin-bottom:10px;">Select a die to change (or <span style="color:var(--moonstone);cursor:pointer;text-decoration:underline;" onclick="skipMoonstone()">skip</span>):</p>
-    <div style="display:flex;gap:8px;justify-content:center;">${dice.map((d,i) => `<div class="ms-die-option" onclick="pickMsDie(${i})">${d}</div>`).join('')}</div>`;
-  document.getElementById('msStep2').style.display = 'none';
-  document.getElementById('msPicker').classList.add('active');
+  // Make dice clickable
+  const diceEl = document.getElementById(team + '-dice');
+  const dieDivs = diceEl.querySelectorAll('.die');
+  dieDivs.forEach((d, i) => {
+    d.classList.add('rerollable');
+    d.style.borderColor = 'var(--moonstone)';
+    d.onclick = () => pickMsDie(i);
+  });
+
+  // Start 3s countdown
+  let remaining = 3;
+  const resEl = document.getElementById(team + '-resources');
+  const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
+  showLsCountdown(msEl, remaining);
+
+  clearInterval(msCountdownTimer);
+  msCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(msCountdownTimer);
+      clearMsCountdown(msEl);
+      clearDiceClickable(team);
+      skipMoonstone();
+    } else {
+      showLsCountdown(msEl, remaining);
+    }
+  }, 1000);
+}
+
+function clearMsCountdown(el) {
+  if (el) { const cd = el.querySelector('.reroll-countdown'); if (cd) cd.remove(); }
 }
 
 function pickMsDie(idx) {
+  if (!B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-die') return;
+  clearInterval(msCountdownTimer);
+  const team = B.pendingMoonstone.team;
   B.pendingMoonstone.dieIndex = idx;
-  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Changing die ${idx+1} (was <span class="log-ms">${B.pendingMoonstone.dice[idx]}</span>). Pick new value:</p>`;
-  const el = document.getElementById('msStep2');
-  el.style.display = 'flex';
-  el.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+  B.pendingMoonstone.phase = 'pick-value';
+
+  // Clear die clickability, show value picker on the selected die
+  clearDiceClickable(team);
+  const diceEl = document.getElementById(team + '-dice');
+  const resEl = document.getElementById(team + '-resources');
+  const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
+  clearMsCountdown(msEl);
+
+  narrate(`Changing die ${idx+1} — pick a new value!`);
+
+  // Show inline value picker
+  const el = document.getElementById('msPicker');
+  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
+  const step2 = document.getElementById('msStep2');
+  step2.style.display = 'flex';
+  step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+  el.classList.add('active');
+
+  // Auto-skip after 3s if no value picked
+  let remaining = 3;
+  showLsCountdown(el, remaining);
+  msCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(msCountdownTimer);
+      el.classList.remove('active');
+      clearMsCountdown(el);
+      skipMoonstone();
+    } else {
+      showLsCountdown(el, remaining);
+    }
+  }, 1000);
 }
 
 function pickMsValue(val) {
+  clearInterval(msCountdownTimer);
   const ms = B.pendingMoonstone;
+  if (!ms) return;
   const team = ms.team;
   const t = B[team];
   const f = active(t);
+
+  const el = document.getElementById('msPicker');
+  el.classList.remove('active');
+  clearMsCountdown(el);
 
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   if (f.id === 203 && !f.usedMagicTouch) {
@@ -2607,10 +2674,9 @@ function pickMsValue(val) {
 
   B.redDice = B.pendingResolve.redDice;
   B.blueDice = B.pendingResolve.blueDice;
+  renderDice(B.redDice, B.blueDice);
 
-  log(`<span class="log-ms">Moonstone used!</span> ${teamName(t===B.red?B.red:B.blue)} changed die to ${val} → [${ms.dice.join(',')}]`);
-
-  document.getElementById('msPicker').classList.remove('active');
+  log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(',')}]`);
   B.pendingMoonstone = null;
 
   // Check if other team also has moonstone
@@ -2624,10 +2690,13 @@ function pickMsValue(val) {
 }
 
 function skipMoonstone() {
+  if (!B.pendingMoonstone) return;
   const team = B.pendingMoonstone.team;
+  clearInterval(msCountdownTimer);
   document.getElementById('msPicker').classList.remove('active');
-  B.pendingMoonstone = null;
+  clearDiceClickable(team);
   log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
+  B.pendingMoonstone = null;
 
   if (team==='red' && B.blue.resources.moonstone > 0) {
     B.phase = 'moonstone-blue';
