@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 72,
-      "remaining_mins": 101,
+      "cycles": 73,
+      "remaining_mins": 96,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T17:51:40.169683",
+      "last_update": "2026-04-10T17:56:54.423200",
       "status": "running",
-      "next_up": "Audit whether the case where one team has both MS+LS (currently falls through to sequential) can be made safer \u2014 verify that when `_redHasMS && _redHasLS && _blueHasMS` (one team has both), the existing sequential flow correctly offers the mixed team's MS first, then LS, then the other team's MS, without any state confusion from the new simultaneous window code path.",
-      "after_that": "With all three simultaneous-specials cases now handled, sweep the `sylviaResuming` re-entry path to verify that per-round flags like `mallowDecided`, `forgeFireDecided`, `eloiseUsedThisRound`, and `sonyaUsedThisRound` correctly persist (not reset) across the re-entry point so a resumed Sylvia round doesn't accidentally re-offer those modals."
+      "next_up": "Audit the cross-type specials window (`startCrossTypeSpecialsWindow`) for the same class of multi-stone bug \u2014 when the LS player acts first in a cross-type window, the `afterLs` callback calls `startLuckyStoneWindow(lsTeam, ...)` which handles multi-stone correctly via recursive calls, but verify `doLuckyReroll` in this path correctly sees non-zero `lsAvailable` (it wasn't zeroed for this path like the simultaneous window does).",
+      "after_that": "Sweep for any remaining hardcoded color hex values in non-shelved card callouts \u2014 a final `#[0-9a-fA-F]{6}` scan of all `queueAbility`/`showAbilityCallout` calls in active code paths (not inside `SHELVED_IDS` card blocks) to confirm the v352 \"all remaining hex colors are dead code\" claim is actually correct after the v357 correction that found 4 more were still live."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 73,
+      "summary": "Fixed simultaneous Lucky Stone window double-decrement bug \u2014 players with 3+ Lucky Stones in the shared window now correctly get all uses instead of only 2 (the extra `B.lsAvailable[team]--` at the re-activation site was redundant after the `savedAvail - 1` restoration already set the correct count).",
+      "next_up": "Audit the cross-type specials window (`startCrossTypeSpecialsWindow`) for the same class of multi-stone bug \u2014 when the LS player acts first in a cross-type window, the `afterLs` callback calls `startLuckyStoneWindow(lsTeam, ...)` which handles multi-stone correctly via recursive calls, but verify `doLuckyReroll` in this path correctly sees non-zero `lsAvailable` (it wasn't zeroed for this path like the simultaneous window does).",
+      "after_that": "Sweep for any remaining hardcoded color hex values in non-shelved card callouts \u2014 a final `#[0-9a-fA-F]{6}` scan of all `queueAbility`/`showAbilityCallout` calls in active code paths (not inside `SHELVED_IDS` card blocks) to confirm the v352 \"all remaining hex colors are dead code\" claim is actually correct after the v357 correction that found 4 more were still live.",
+      "time": "17:56:59",
+      "timestamp": "2026-04-10T17:56:59.415813",
+      "roast": "Five months from Kickstarter and you're heroically ensuring the Lucky Stone hoarders get their full combo \u2014 truly the endgame content backers were dying for."
+    },
     {
       "target": "testroom",
       "cycle": 72,
@@ -519,19 +529,9 @@
       "time": "14:08:46",
       "timestamp": "2026-04-10T14:08:46.952805",
       "roast": "Two bugs down, only the entire September Kickstarter to go \u2014 but hey, Warm Belly now defers with the solemn dignity of a man rearranging deck chairs on the Twonktanic."
-    },
-    {
-      "target": "testroom",
-      "cycle": 23,
-      "summary": "Chad (56) Sploop! entry grant now respects Wisp (344) Guide Light (blocks the 2 Ice Shards when opponent has Wisp on sideline) and mirrors to Sandwiches (33) Dependable (gives opponent +2 Ice Shards when they have Sandwiches on sideline) \u2014 previously the entry grant fired unconditionally with no resource-economy guards, making Wisp and Sandwiches both ineffective against Chad.",
-      "next_up": "Audit whether other entry-path resource grants are missing the same Wisp/Sandwiches pattern \u2014 check Nicholas (51) Sneak Attack's 2 damage (damage, not resource, no guard needed), Jenkins (94) Greeting (damage, no guard), Chad is now fixed; Tadpole (358) is shelved so its entry grant is dead code. If all entry resource grants are now guarded, shift focus to verifying that the Boo Brothers comment on line 5146 \"HP is below max\" is updated (stale documentation from before v294 removed the HP gate).",
-      "after_that": "Do a broader sweep for any original cards where Wisp/Sandwiches guards were expected but missing \u2014 specifically in the sideline-effect pre-roll path (doPreRollSetup) for any cards that grant resources rather than deal damage. Gary (92) Lucky Novice win/lose paths were listed in v273's Wisp implementation as already guarded, but verifying the ice-shard-per-1 grant in both win and lose paths is the right next step.",
-      "time": "14:02:04",
-      "timestamp": "2026-04-10T14:02:04.092129",
-      "roast": "You patched a bug where Wisp's Guide Light and Sandwiches' Dependable were basically lore text against Chad, and you're framing this six-month-overdue interaction fix as \"now respects\" like Chad was just being polite."
     }
   ],
-  "last_update": "2026-04-10T17:51:45.422820",
+  "last_update": "2026-04-10T17:56:59.415836",
   "orchestrator_check": {
     "timestamp": "2026-04-10T17:17:00.852219",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 67 cycles, 135m left | last [testroom c67]: Growing Mob (83) and Munch (66) `onShow` callbacks now assign pre-computed absolute HP values (`growingMobGhost.hp = gro"
