@@ -1010,7 +1010,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 <div class="app">
   <header>
     <h1>VOLCANIC ACTIVITY & ROLLING HILLS TESTROOM</h1>
-    <div class="sub">BOO! Battle of Origins — New Ghost Testing Lab</div>
+    <div class="sub">BOO! Battle of Origins — Spiritkin Testing Lab</div>
   </header>
 
   <div class="tabs" style="display:flex; align-items:center;">
@@ -1630,7 +1630,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v280';
+const TESTROOM_VERSION = 'v281';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4299,13 +4299,21 @@ function doJeanieChoice(choice) {
   B.jeanieUsed[team] = true;
 
   // Reroll ALL of the opponent's dice
-  const oldDice = team === 'red' ? [...B.blueDice] : [...B.redDice];
+  // Mutate the preRoll dice array IN-PLACE so the doPostRollAndResolve closure captures
+  // the change. Creating a new array and assigning to B.pendingResolve does NOT work:
+  // postRollDone() creates B.pendingResolve = { redDice, blueDice } using the closure
+  // variables (which are B.preRoll.red/blue.dice) AFTER Jeanie runs, silently
+  // overwriting any assignment to B.pendingResolve made here. (Same bug fixed for Sonya
+  // in v284 and Dark Wing earlier.)
+  const oldDice = oppTeam === 'red' ? [...B.preRoll.red.dice] : [...B.preRoll.blue.dice];
   const numDice = oldDice.length;
   const newDice = Array.from({length: numDice}, () => Math.floor(Math.random() * 6) + 1).sort((a,b)=>a-b);
 
-  // Update live dice state
-  if (oppTeam === 'red') { B.pendingResolve.redDice = newDice; B.redDice = newDice; }
-  else                   { B.pendingResolve.blueDice = newDice; B.blueDice = newDice; }
+  // Splice into the preRoll array in-place so the closure sees the new values
+  const preRollDice = oppTeam === 'red' ? B.preRoll.red.dice : B.preRoll.blue.dice;
+  preRollDice.splice(0, preRollDice.length, ...newDice);
+  if (oppTeam === 'red') { B.redDice = preRollDice; if (B.pendingResolve) B.pendingResolve.redDice = preRollDice; }
+  else                   { B.blueDice = preRollDice; if (B.pendingResolve) B.pendingResolve.blueDice = preRollDice; }
   renderDice(B.redDice, B.blueDice);
   renderBattle();
 
