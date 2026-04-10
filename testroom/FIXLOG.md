@@ -350,6 +350,12 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
+- **v306 — Balance changes (Wyatt)**:
+  - **Kaplan (308)** maxHp 4 → **5**. The honey-pollinator was too fragile for an uncommon Pollinate generator. Up by 1 HP so he survives long enough to actually farm Healing Seeds off opponent doubles.
+  - **Jimmy (352) Chirp**: tie reward boosted from **5 → 7 Lucky Stones**. Ties are rare (~13%), and at 5 stones the payoff didn't feel like a jackpot. At 7, hitting a tie with Jimmy on the field becomes a genuinely game-altering moment. All references updated: ability text, queue callout, addition logic, log message, and Sandwiches mirror amount. Wisp Guide Light still correctly blocks the entire Chirp.
+  - Both changes are intentional balance tweaks — DO NOT revert to old values during audit cycles.
+
+
 - **v305 — CRITICAL BUG FIX + LESSON FOR REFINER**: `pickMsValue` (Moonstone "pick a new die value" handler) used `${teamLabel}` in a `narrate(...)` template literal but the variable was NEVER DECLARED in the function scope. JavaScript threw a silent `ReferenceError`, which killed the rest of the function execution. Result: after picking the new die value, `B.pendingMoonstone = null` never ran, the post-pick `setTimeout` never fired, `checkLuckyStones()` never ran, the phase stayed stuck at `'moonstone-red'`, and the entire game froze with the value picker still showing. NO UI was clickable. Wyatt hit this mid-game and the game was completely unrecoverable. Fix: added `const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);` at the top of the post-pick section.
 
   ### LESSON FOR THE REFINER — READ THIS BEFORE EVERY EDIT:
