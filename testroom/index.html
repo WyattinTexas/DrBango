@@ -1023,12 +1023,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   <div id="browse-panel" class="panel active">
     <div class="moonstone-info">
         <h3><span class="gem">&#x1F48E;</span> Specials</h3>
-        <p><strong>Moonstone:</strong> Spend before rolling to change ONE die to any value. Rare and game-changing.<br>
-        <strong>Healing Seed:</strong> Spend to heal 1 HP. <em>Cannot exceed max HP.</em><br>
-        <strong>Surge:</strong> Versatile energy resource. Spend to power ghost abilities.<br>
-        <strong>Lucky Stone:</strong> Discard after any roll to reroll one die.<br>
-        <strong>Ice Shard:</strong> Adds +1 damage to a winning roll. Stacks across shards.<br>
-        <strong>Sacred Fire:</strong> Adds +3 damage to a winning roll. Stacks across fires.</p>
+        <p><strong>Moonstone</strong> <em>(after rolling):</em> Change ONE die to any value (1-6). Rare and game-changing.<br>
+        <strong>Lucky Stone</strong> <em>(after rolling):</em> Discard to reroll one die.<br>
+        <strong>Surge</strong> <em>(before rolling):</em> Versatile energy resource. Spend to power ghost abilities.<br>
+        <strong>Healing Seed</strong> <em>(before rolling):</em> Heal 1 HP. <em>Cannot exceed max HP.</em><br>
+        <strong>Ice Shard</strong> <em>(before rolling):</em> Adds +1 damage to a winning roll. Stacks across shards.<br>
+        <strong>Sacred Fire</strong> <em>(before rolling):</em> Adds +3 damage to a winning roll. Stacks across fires.</p>
     </div>
     <div class="set-toggles">
       <span class="set-toggles-label">Original Sets:</span>
@@ -1630,7 +1630,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v281';
+const TESTROOM_VERSION = 'v282';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3765,10 +3765,11 @@ function doMallowChoice(choice) {
         `Mr Filbert — Dozy Cozy cursed! ${f.name} takes 3 damage! (${hpBefore} → ${f.hp} HP)`);
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Dozy Cozy flipped to damage. ${f.name} ${hpBefore} → ${f.hp} HP.`);
     } else {
-      f.hp += 3;
+      f.hp = Math.min(f.maxHp, f.hp + 3);
+      const cappedMallow = f.hp === f.maxHp && hpBefore + 3 > f.maxHp;
       showAbilityCallout('DOZY COZY!', 'var(--rare)',
-        `${mallowName} — spent 1 🔥 Sacred Fire! ${f.name} +3 HP (${hpBefore} → ${f.hp})!`);
-      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}).`);
+        `${mallowName} — spent 1 🔥 Sacred Fire! ${f.name} +3 HP (${hpBefore} → ${f.hp}${cappedMallow ? ' · capped' : ''})!`);
+      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${cappedMallow ? ' · capped' : ''}).`);
     }
     renderBattle();
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
@@ -5009,9 +5010,11 @@ function rollReady(team) {
       const mallowDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
       setTimeout(() => {
         const mF = active(B[team]);
+        const mallowHpAfter = mF ? Math.min(mF.maxHp, mF.hp + 3) : '?';
+        const mallowCapped = mF && (mF.hp + 3 > mF.maxHp) ? ' <i>· capped</i>' : '';
         document.getElementById('mallowSub').innerHTML =
           `Spend 1 🔥 Sacred Fire to give <b>${mF ? mF.name : 'your ghost'}</b> +3 HP?<br>` +
-          `(${mF ? mF.hp : '?'} HP → ${mF ? mF.hp + 3 : '?'} HP &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
+          `(${mF ? mF.hp : '?'} HP → ${mallowHpAfter} HP${mallowCapped} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
         document.getElementById('mallowOverlay').classList.add('active');
       }, mallowDelay);
       return;
