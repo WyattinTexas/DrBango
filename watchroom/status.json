@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 75,
-      "remaining_mins": 82,
+      "cycles": 76,
+      "remaining_mins": 70,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T18:17:44.279258",
+      "last_update": "2026-04-10T18:20:48.427753",
       "status": "running",
-      "next_up": "Continue stripping the remaining Slag Heap dead code \u2014 the pre-roll timer block (lines 6022-6031, runs every round but always no-ops since `slagHeapResidueRounds` starts at 0 and is only incremented from a dead `slagHeapResidueTriggered` path), the KO trigger check (`if (lF.id === 339 && lF.ko)` always false), the KO callout block, and the B-state `slagHeapResidueRounds`/`slagHeapResidueActive` initializations \u2014 together ~12 more lines of dead scaffolding.",
-      "after_that": "With Slag Heap dead code fully removed, audit whether the `ashPhoenixRebirth` scaffolding (Ash Phoenix id 361 is also shelved) needs the same treatment \u2014 `ashPhoenixRebirthTriggered` is always false, and its KO-trigger callout and `B.ashPhoenixUsed/B.ashPhoenixRebirth` state fields are all dead; 14 references total vs Slag Heap's 34."
+      "next_up": "Check whether other shelved-card scaffolding remains \u2014 specifically look for `anvilDecided`, `magnoliaBloom*`, `oldMillDecided`, `patchesQuiltArmed`, `patchesQuiltDecided` in the B-state init (lines 2370\u20132375 and 2793\u20132798); all five reference permanently-shelved cards (Anvil, Magnolia, Old Mill, Patches are in SHELVED_IDS) and their runtime blocks should be stripped the same way.",
+      "after_that": "After stripping remaining shelved-card B-state fields and their associated pre-roll/resolve logic blocks, verify the `checkWinstonScheme` post-drain step and `showGaleForcePickerModal` pattern are both correctly guarded by `B.phase === 'ready'` checks so they can't fire during a resumed Sylvia round or a mid-KO-swap state transition."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 76,
+      "summary": "Stripped all 8 remaining Slag Heap (339) and Ash Phoenix (361) dead-code sites \u2014 4 B-state initialization fields (\u00d72 startBattle blocks each), the pre-roll timer forEach, the pre-roll resurrection forEach, 2 KO trigger blocks, and 2 cinematic callout blocks \u2014 completing the shelved-card dead-code sweep that began in v363.",
+      "next_up": "Check whether other shelved-card scaffolding remains \u2014 specifically look for `anvilDecided`, `magnoliaBloom*`, `oldMillDecided`, `patchesQuiltArmed`, `patchesQuiltDecided` in the B-state init (lines 2370\u20132375 and 2793\u20132798); all five reference permanently-shelved cards (Anvil, Magnolia, Old Mill, Patches are in SHELVED_IDS) and their runtime blocks should be stripped the same way.",
+      "after_that": "After stripping remaining shelved-card B-state fields and their associated pre-roll/resolve logic blocks, verify the `checkWinstonScheme` post-drain step and `showGaleForcePickerModal` pattern are both correctly guarded by `B.phase === 'ready'` checks so they can't fire during a resumed Sylvia round or a mid-KO-swap state transition.",
+      "time": "18:20:54",
+      "timestamp": "2026-04-10T18:20:54.849318",
+      "roast": "Twenty-four commits to delete cards you already shelved is the TCG equivalent of flossing a tooth you pulled last month \u2014 Rosewater would call it elegant, Skaff would call it Tuesday, and the Kickstarter clock calls it September."
+    },
     {
       "target": "testroom",
       "cycle": 75,
@@ -519,19 +529,9 @@
       "time": "14:20:35",
       "timestamp": "2026-04-10T14:20:35.457226",
       "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
-    },
-    {
-      "target": "testroom",
-      "cycle": 26,
-      "summary": "Hank (207) Tremor Lucky Stone grant now defers to onShow \u2014 counter updates exactly when the TREMOR! callout fires, not before it (same fix pattern as Tweak and Twonk v303 and Jimmy v304).",
-      "next_up": "Check whether Natalia (327) Materialization and Kaplan (308) Pollinate in `doPostRollAndResolve` also have synchronous grants \u2014 those were Wisp-blocked in v300 and Sandwiches-mirrored in v301, but neither fix moved their primary grants to deferred onShow. If they have the same pattern (grant synchronous, mirror deferred), fix them too.",
-      "after_that": "Audit the Selene (305) `doSeleneChoice` function \u2014 looking at lines 3597-3603, both the Healing Seed path and the Lucky Stone path grant resources synchronously before `queueAbility('HEART OF THE HILLS!', ...)`, meaning the resource counter updates before the callout fires. Since Selene uses a separate queue mode entry, the fix is similar but requires setting `abilityQueueMode = true` before queuing and deferring the grant into the onShow.",
-      "time": "14:18:45",
-      "timestamp": "2026-04-10T14:18:45.211190",
-      "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
     }
   ],
-  "last_update": "2026-04-10T18:17:50.604512",
+  "last_update": "2026-04-10T18:20:54.849336",
   "orchestrator_check": {
     "timestamp": "2026-04-10T18:17:00.389783",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 74 cycles, 91m left | last [testroom c74]: Fixed `refundCommitted()` missing `zainBlade:0` in the reset object \u2014 the four per-round committed reset sites were inco"
