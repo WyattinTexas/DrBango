@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 54,
-      "remaining_mins": 184,
+      "cycles": 55,
+      "remaining_mins": 182,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T16:25:54.896571",
+      "last_update": "2026-04-10T16:27:14.840147",
       "status": "running",
-      "next_up": "Apply the same deferred-onShow fix to King Jay (106) Reflection \u2014 `wF.hp = Math.max(0, wF.hp - kingJayReflectDmg)` at line ~8785 is still synchronous; the REFLECTION! callout at line ~9432 uses `wF.hp` for the suffix (shows already-mutated value) and has no `onShow` callback \u2014 same class of bug as Bogey, Kodako, and Patrick.",
-      "after_that": "After King Jay, sweep for any remaining synchronous HP mutations before callouts \u2014 specifically Guardian Fairy (99) absorption (`gfG.hp -= absorbedDmg` at line ~8724) which fires before its cinematic WISH! callout queues, and check whether the `gfG.hp` update needs the same deferred treatment."
+      "next_up": "Audit Guardian Fairy (99) Wish \u2014 `gfG.hp -= absorbedDmg` at line ~8724 may still be a synchronous HP mutation before the WISH! callout queues; if so, apply the same deferred-onShow pattern (compute `gfHpAfter`, keep `gfG.ko` synchronous, defer `gfG.hp = gfHpAfter` to onShow).",
+      "after_that": "Audit Prince Balatron (113) Party Time counter-die \u2014 `wF.hp = Math.max(0, wF.hp - balatronCounterDie)` at line ~8850 is also synchronous; same class of bug; should be deferred to onShow so the Party Time counter lands cinematically with the callout."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 55,
+      "summary": "King Jay (106) Reflection \u2014 `wF.hp` mutation now deferred to `onShow` callback so the winner's HP bar drops exactly when REFLECTION! flashes, not silently 800ms earlier during beat 4 (same fix pattern as Bogey/Kodako/Patrick/Aunt Susan).",
+      "next_up": "Audit Guardian Fairy (99) Wish \u2014 `gfG.hp -= absorbedDmg` at line ~8724 may still be a synchronous HP mutation before the WISH! callout queues; if so, apply the same deferred-onShow pattern (compute `gfHpAfter`, keep `gfG.ko` synchronous, defer `gfG.hp = gfHpAfter` to onShow).",
+      "after_that": "Audit Prince Balatron (113) Party Time counter-die \u2014 `wF.hp = Math.max(0, wF.hp - balatronCounterDie)` at line ~8850 is also synchronous; same class of bug; should be deferred to onShow so the Party Time counter lands cinematically with the callout.",
+      "time": "16:27:20",
+      "timestamp": "2026-04-10T16:27:20.077467",
+      "roast": "Five cards deep into the same bug and you're calling it a \"pattern\" instead of admitting you should've written the helper function two reflections ago."
+    },
     {
       "target": "testroom",
       "cycle": 54,
@@ -519,19 +529,9 @@
       "time": "12:25:25",
       "timestamp": "2026-04-10T12:25:25.244947",
       "roast": "That's not a fix. That's a bandaid on a bandaid. Buttons has more structural integrity."
-    },
-    {
-      "target": "testroom",
-      "cycle": 5,
-      "summary": "Splinter (101) Toxic Fumes now shows a cinematic TOXIC FUMES! callout when she first wins and activates \u2014 previously the activation was invisible (only a log entry), leaving players confused why chip damage started appearing with no announcement.",
-      "next_up": "Audit Raditz (62), Doug (63), Sparky (64) \u2014 the first three unaudited Rare cards. Sparky's Tinder (1s deal +3 damage each) has a triggered local `sparkyTriggered` variable visible in the code around line 8034, so it likely has a cinematic callout, but the trigger condition and interaction with Drizzle (removes 1s before the roll) needs verification.",
-      "after_that": "Audit Snorton (67), Kairan (68), Sonya (69) \u2014 the next Rare tier cluster. Snorton's Fissure (two 6s \u2192 +5 damage) has `snortonTriggered` in the cinematic section but needs its trigger condition verified; Sonya's ability is unknown until we check the GHOSTS array entry.",
-      "time": "12:19:35",
-      "timestamp": "2026-04-10T12:19:35.641235",
-      "roast": "Five months from Kickstarter and we're just now telling players why they're taking damage \u2014 Rosewater calls that \"invisible information,\" I call it Tuesday at your studio."
     }
   ],
-  "last_update": "2026-04-10T16:26:02.119202",
+  "last_update": "2026-04-10T16:27:20.077484",
   "orchestrator_check": {
     "timestamp": "2026-04-10T16:17:01.060805",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 50 cycles, 198m left | last [testroom c50]: Munch (66) Scraps and Troubling Haters (83) Growing Mob HP mutations now defer to `onShow` callbacks \u2014 HP bars no longer"
