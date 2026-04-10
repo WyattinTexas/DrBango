@@ -370,6 +370,42 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
+- **v307 — CRITICAL: Wisp (344) is FAKE. Removed GHOSTS entry. Refiner must strip dead code.**
+  Wyatt confirmed the only real Rolling Hills cards are these 16: Dylan(301), Maximo(302), Tweak and Twonk(303), Selene(305), Artemis(307), Kaplan(308), Aunt Susan(309), Granny(310), Pudge(311), Timpleton(312), Farmer Jeff(314), Harrison(315), Calvin(342), Jimmy(352), plus Finn(204) and Timber(210). NOTHING ELSE.
+
+  Wisp (344) was a placeholder from old card-generation logic that never became real. The refiner has been adding Guide Light blocks to MANY abilities (Sploop, Tremor, Selene's doubles, Materialization, Pollinate, Tweak Warm Belly, Jimmy Chirp, etc.) — ALL DEAD CODE because 344 is in SHELVED_IDS and cannot appear on any team. Total: ~58 Wisp references throughout index.html.
+
+  Refiner cleanup task (HIGH PRIORITY): Strip ALL dead Wisp references from index.html. Patterns to remove:
+  1. Wisp branch in if-else: unwrap the else, delete the if-branch
+  2. const wispBlocks variable declarations
+  3. Sandwiches modifier &&-clauses that reference 344
+  4. Comment lines mentioning Wisp or 344
+  5. Variable names: wispG, wispGC, wispBlocksJim, wispBlocksTweak, wispGSel, wispGNat, wispGKap, wispNameJim
+  Verify brace balance after each removal. Bump version. Document in FIXLOG.
+
+## SHELVED_IDS IS IMMUTABLE — DO NOT IMPLEMENT LOGIC FOR SHELVED CARDS
+
+The SHELVED_IDS Set in index.html (~line 1669) lists ghost IDs that are NOT REAL CARDS. The refiner has been violating this rule by implementing battle logic for shelved IDs (Wisp, Patches, Old Mill, Drizzle, Penny, Magnolia, Bramble, Forge Fire, Anvil, Pyrope, Ash Phoenix, Slag Heap, etc.). All of this is DEAD CODE because shelved cards can never appear in a battle.
+
+HARD RULES — VIOLATION = REVERTED COMMIT:
+1. Never remove an ID from SHELVED_IDS.
+2. Never add battle logic for any ID in SHELVED_IDS.
+3. Never add hasSideline(team, X) checks where X is a shelved ID.
+4. Never add f.id === X or wF.id === X checks where X is a shelved ID.
+5. If you find existing dead code referencing a shelved ID, treat it as a CLEANUP task — remove it, don't extend it.
+6. The 36 canonical cards are the ONLY active cards in Volcanic Activity / Rolling Hills. Anything outside the canonical 36 plus the 113 imported originals is FAKE.
+
+Real Rolling Hills (16): Dylan(301), Maximo(302), Tweak and Twonk(303), Selene(305), Artemis(307), Kaplan(308), Aunt Susan(309), Granny(310), Pudge(311), Timpleton(312), Farmer Jeff(314), Harrison(315), Calvin(342), Jimmy(352), Finn(204) [moved from VA in v303], Timber(210).
+
+Real Volcanic Activity (15): Bouril(201), Death Howl(202), Benjamin(203), Shade's Shadow(205), Zain(206), Hank(207), Happy Crystal(208), Dart(209), The Ember Force(304), Nerina(306), Natalia(327), Humar(336), Red Hunter(345), Tyson(365), Fed and Hayden(406).
+
+Real Dark Castle expansion (5): Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404), Sylvia(313).
+
+Real originals (113): Set 1, Dark Castle, Frost Valley imports — IDs 1-114 minus 102.
+
+ANY OTHER ID (316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 328, 329, 330, 331, 332, 333, 334, 335, 337, 338, 339, 340, 341, 344, 346, 347, 348, 349, 350, 351, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 366, 367, 368) IS FAKE. DO NOT IMPLEMENT.
+
+
 - **v306 — Balance changes (Wyatt)**:
   - **Kaplan (308)** maxHp 4 → **5**. The honey-pollinator was too fragile for an uncommon Pollinate generator. Up by 1 HP so he survives long enough to actually farm Healing Seeds off opponent doubles.
   - **Jimmy (352) Chirp**: tie reward boosted from **5 → 7 Lucky Stones**. Ties are rare (~13%), and at 5 stones the payoff didn't feel like a jackpot. At 7, hitting a tie with Jimmy on the field becomes a genuinely game-altering moment. All references updated: ability text, queue callout, addition logic, log message, and Sandwiches mirror amount. Wisp Guide Light still correctly blocks the entire Chirp.
