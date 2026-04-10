@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 6,
-      "remaining_mins": 41,
+      "cycles": 7,
+      "remaining_mins": 39,
       "until": "12:22 AM",
-      "last_update": "2026-04-09T23:42:40.267533",
+      "last_update": "2026-04-09T23:43:58.415357",
       "status": "running",
-      "next_up": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch, t+1800ms) \u2014 `highlightWinnerDice` fires at t+10ms and `handleKOs()` at t+1800ms; verify tiebreaker dice glow doesn't still animate when the KO swap modal appears, and that the `if (!handleKOs())` immediate-ready path at line 4321-4325 also gets the 350ms narrate-first delay (it currently fires `B.phase='ready'` + `resetRollButtons()` + `narrate()` all at once with no delay)",
-      "after_that": "Audit narrator pacing in the KO auto-pick chain \u2014 `openKoSwap` fires \"X is down! Y steps up!\" via `narrate()`, then 800ms later `doKoSwap` fires `triggerEntry` which calls `narrate(\"[Y] enters the arena!\")` at t=0; since the first narrate's 1800ms lock won't expire until t=1800ms, the entry narrate at t=800ms queues properly \u2014 but verify the ghost HP bar update from `renderBattle()` in `doKoSwap` (which fires at t=800ms) is visible before any entry callout splash covers the arena"
+      "next_up": "Audit the `postRollDone` \u2192 `handleKOs()` path at line 3278 \u2014 when Shade's Shadow KOs mid-queue, `handleKOs()` returns `true` and `postRollDone` returns early; verify the path that reaches `handleKOs()` there (after moonstone/lucky stone flow) still narrates before enabling, and that the `lF.ko` KO landing at t+1800ms doesn't leave `highlightWinnerDice` glow still animating when the KO swap modal appears",
+      "after_that": "Audit narrator stagger in rapid damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if an ability callout then queues and drains, verify its 900ms post-drain buffer lands after the 1400ms splash window, not during it"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 7,
+      "summary": "`lF.ko` roll-button race fixed \u2014 round narration now fires 350ms before roll buttons enable, matching the no-KO path's breathing-room pattern and closing the last path where buttons went live simultaneously with the round announcement",
+      "next_up": "Audit the `postRollDone` \u2192 `handleKOs()` path at line 3278 \u2014 when Shade's Shadow KOs mid-queue, `handleKOs()` returns `true` and `postRollDone` returns early; verify the path that reaches `handleKOs()` there (after moonstone/lucky stone flow) still narrates before enabling, and that the `lF.ko` KO landing at t+1800ms doesn't leave `highlightWinnerDice` glow still animating when the KO swap modal appears",
+      "after_that": "Audit narrator stagger in rapid damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if an ability callout then queues and drains, verify its 900ms post-drain buffer lands after the 1400ms splash window, not during it",
+      "time": "23:44:04",
+      "timestamp": "2026-04-09T23:44:04.868812",
+      "roast": "Congratulations, you spent an entire cycle teaching a button to count to 350 \u2014 Garfield redesigned the mana system in less time than it took you to add a third of a second of delay."
+    },
     {
       "target": "testroom",
       "cycle": 6,
@@ -506,18 +516,9 @@
       "after_that": "Drifted-card playtesting audit for Mother Nature (366) Seasons \u2014 verify Winter's \u22121 die stacks correctly with Timber's \u22121 die via `Math.max(1,...)`, that the season narrates correctly each round, and that Summer/Autumn don't fire at wrong queue timing.",
       "time": "18:05:01",
       "timestamp": "2026-04-09T18:05:01.979796"
-    },
-    {
-      "target": "testroom",
-      "cycle": 16,
-      "summary": "Pressure Escape bypass patched \u2014 `pressureOverlay` removed from the Escape-key dismiss list and the stale `B.phase='ready'` restoration removed, so pressing Escape can no longer silently close the forced-pick modal without triggering `doPressureSwap` and setting `pressureUsed`.",
-      "next_up": "Doubles roll narration \u2014 `typeLabel('doubles')` currently returns `''` (empty string) so the most common strong hand (~42% of rolls) gets zero narrator feedback, unlike triples/quads/penta which all announce in gold. One-line fix.",
-      "after_that": "`res-tile.rerollable` pulse animation \u2014 the CSS rule `animation:rerollPulse` only targets `.die.rerollable`, so when JS adds the `rerollable` class to the Lucky Stone or Moonstone tile, no gold-pulse animation fires on the tile, leaving players unsure it's clickable.",
-      "time": "18:03:49",
-      "timestamp": "2026-04-09T18:03:49.785049"
     }
   ],
-  "last_update": "2026-04-09T23:42:47.383810",
+  "last_update": "2026-04-09T23:44:04.868854",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
