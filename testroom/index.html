@@ -1214,7 +1214,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v84';
+const TESTROOM_VERSION = 'v86';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2406,6 +2406,7 @@ function doTimberChoice(choice) {
   const tp = B.timberPending;
   if (!tp) return;
   const resume = tp._resumeCallback;
+  const oppLabel = tp.oppTeamName.charAt(0).toUpperCase() + tp.oppTeamName.slice(1);
   B.timberPending = null;
   document.getElementById('timberOverlay').classList.remove('active');
   if (choice === 'discard') {
@@ -2420,14 +2421,14 @@ function doTimberChoice(choice) {
         toDiscard--;
       }
     }
-    showAbilityCallout('HOWL!', 'var(--legendary)', `${tp.oppTeamName} discards 2 specials to keep all dice!`);
-    log(`<span class="log-ability">${tp.oppTeamName}</span> chose to discard 2 specials to avoid Timber's Howl!`);
+    showAbilityCallout('HOWL!', 'var(--legendary)', `${oppLabel} discards 2 specials to keep all dice!`);
+    log(`<span class="log-ability">${oppLabel}</span> chose to discard 2 specials to avoid Timber's Howl!`);
   } else {
     // Lose 1 die
     if (tp.oppTeamName === 'red') B.preRoll.red.count = Math.max(1, B.preRoll.red.count - 1);
     else B.preRoll.blue.count = Math.max(1, B.preRoll.blue.count - 1);
-    showAbilityCallout('HOWL!', 'var(--legendary)', `${tp.oppTeamName} rolls 1 fewer die!`);
-    log(`<span class="log-ability">${tp.oppTeamName}</span> chose to roll 1 fewer die under Timber's Howl!`);
+    showAbilityCallout('HOWL!', 'var(--legendary)', `${oppLabel} rolls 1 fewer die!`);
+    log(`<span class="log-ability">${oppLabel}</span> chose to roll 1 fewer die under Timber's Howl!`);
   }
   renderBattle();
   // showAbilityCallout auto-dismisses after 1400ms — wait 1600ms (1400 + 200ms buffer)
@@ -2765,8 +2766,9 @@ function doPreRollSetup() {
         B.timberDieReduction[oppTeamName] = true;
         if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
         else blueCount = Math.max(1, blueCount - 1);
-        preRollCallouts.push(['HOWL!', 'var(--legendary)', `${oppTeamName} has no specials — forced to roll 1 fewer die!`]);
-        log(`<span class="log-ability">${oppTeamName}</span> has no specials — forced to roll 1 fewer die under Timber's Howl!`);
+        const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);
+        preRollCallouts.push(['HOWL!', 'var(--legendary)', `${oppLabel} has no specials — forced to roll 1 fewer die!`]);
+        log(`<span class="log-ability">${oppLabel}</span> has no specials — forced to roll 1 fewer die under Timber's Howl!`);
       } else {
         // Opponent has resources — queue the choice modal
         B.timberPending = { team: oppTeam, oppTeamName, timberTeam: team, redCount, blueCount };
@@ -3419,9 +3421,12 @@ function resolveRound() {
   const blueDice = B.pendingResolve.blueDice;
 
   // Blackout (403) — remove named number from opponent's dice
+  // Only fires if Smudge is active and alive on the team that set the number
   ['red', 'blue'].forEach(team => {
     const oppTeam = team === 'red' ? 'blue' : 'red';
-    if (B.blackoutNum && B.blackoutNum[team]) {
+    const t = B[team];
+    const smudgeActive = active(t).id === 403 && !active(t).ko;
+    if (B.blackoutNum && B.blackoutNum[team] && smudgeActive) {
       const num = B.blackoutNum[team];
       const originalDice = team === 'red' ? blueDice : redDice;
       const filtered = [];
@@ -3433,12 +3438,10 @@ function resolveRound() {
       if (removed > 0) {
         if (team === 'red') { blueDice.splice(0, blueDice.length, ...filtered); }
         else { redDice.splice(0, redDice.length, ...filtered); }
-        showAbilityCallout('BLACKOUT!', 'var(--rare)', `Smudge — ${removed} dice showing ${num} removed!`);
+        showAbilityCallout('BLACKOUT!', 'var(--rare)', `Smudge — ${removed} dice showing ${num} vanished!`);
         log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
-      } else {
-        showAbilityCallout('BLACKOUT — MISS', 'var(--border)', `Smudge named ${num} — no dice matched!`);
-        log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — no matches.`);
       }
+      // No callout if opponent didn't roll the number — silent miss, don't interrupt the flow
     }
   });
   // Reset blackout picks
