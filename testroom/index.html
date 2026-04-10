@@ -499,8 +499,12 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   transform:scale(0.92) !important;
   transition:opacity 0.35s, filter 0.35s, transform 0.35s;
 }
-/* Tiebreaker: the matched/tied hand dice — visible but dimmer than the decisive kicker */
+/* Tiebreaker: the matched/tied hand dice — visible but dimmer than the decisive kicker.
+   opacity:0.8 !important is required: when the LOSER's matched group gets this class,
+   die-loser's opacity:0.3 !important is still in play. Since both rules share equal
+   specificity but this rule appears later in the sheet, the later !important wins. */
 .die.die-win-secondary {
+  opacity:0.8 !important;
   border-color:rgba(251,191,36,0.55) !important;
   background:rgba(251,191,36,0.07) !important;
   box-shadow:0 0 8px rgba(251,191,36,0.35) !important;
@@ -566,7 +570,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 /* Moonstone picker */
 .moonstone-picker {
   display:none; background:rgba(0,0,0,0.7); position:fixed; inset:0; z-index:150;
-  align-items:flex-start; justify-content:center; padding-top:28vh;
+  align-items:center; justify-content:center;
 }
 .moonstone-picker.active { display:flex; }
 .ms-modal { background:var(--surface); border:2px solid var(--moonstone); border-radius:14px; padding:28px 36px; text-align:center; box-shadow:0 0 50px var(--moonstone-glow), 0 0 100px rgba(126,232,250,0.15); }
@@ -960,7 +964,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 
   <div class="tabs" style="display:flex; align-items:center;">
     <div class="tab active" onclick="switchTab('browse')">Ghost Gallery</div>
-    <div class="tab" onclick="switchTab('battle')">The Arena</div>
+    <div class="tab" onclick="switchTab('battle')">Arena</div>
     <button class="standings-btn" onclick="openStandings()" style="margin-left:auto;">&#x1F3C6; Standings</button>
   </div>
 
@@ -1210,7 +1214,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v72';
+const TESTROOM_VERSION = 'v83';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1833,10 +1837,10 @@ function startBattle() {
       // Re-enable roll buttons and start pulse after splash
       if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
       if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
-      narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+      narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
     }, 2200);
   } else {
-    narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+    narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
     if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
     if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
   }
@@ -2345,7 +2349,7 @@ function showSeleneModal() {
   }
   const titleEl = document.getElementById('seleneTitle');
   if (titleEl) titleEl.textContent = `${f.name} — Heart of the Hills!`;
-  narrate(`<b class="${tName}-text">${f.name}</b>&nbsp;rolled <b class="gold">DOUBLES!</b>&nbsp; Choose your reward!`);
+  narrate(`<b class="${tName}-text">${f.name}</b>&nbsp;rolled <b class="gold">DOUBLES!</b>&nbsp;Choose your reward!`);
   document.getElementById('seleneOverlay').classList.add('active');
 }
 
@@ -2389,11 +2393,11 @@ function showTimberModal(tp, resumeCallback) {
   const discardBtn = document.getElementById('timberDiscardBtn');
   if (discardBtn) {
     const r = tp.team.resources;
-    const totalSpecials = ['surge','iceShard','healingSeed','luckyStone','sacredFire','moonstone']
+    const totalSpecials = ['surge','ice','healingSeed','luckyStone','fire','moonstone']
       .reduce((sum, t) => sum + (r[t] || 0), 0);
     discardBtn.disabled = totalSpecials < 2;
   }
-  narrate(`<b class="${tp.oppTeamName}-text">${oppLabel}</b>&nbsp;faces <b class="gold">TIMBER!</b>&nbsp; Discard 2 specials or lose a die!`);
+  narrate(`<b class="${tp.oppTeamName}-text">${oppLabel}</b>&nbsp;faces <b class="gold">TIMBER!</b>&nbsp;Discard 2 specials or lose a die!`);
   B.timberPending._resumeCallback = resumeCallback;
   document.getElementById('timberOverlay').classList.add('active');
 }
@@ -2404,13 +2408,11 @@ function doTimberChoice(choice) {
   const resume = tp._resumeCallback;
   B.timberPending = null;
   document.getElementById('timberOverlay').classList.remove('active');
-  // Unlock the opponent's roll button now that they've made their choice
-  if (tp._oppBtn) { tp._oppBtn.classList.remove('locked'); tp._oppBtn.disabled = false; }
   if (choice === 'discard') {
     // Discard 2 specials from most abundant first
     const r = tp.team.resources;
     let toDiscard = 2;
-    const types = ['surge','iceShard','healingSeed','luckyStone','sacredFire','moonstone'];
+    const types = ['surge','ice','healingSeed','luckyStone','fire','moonstone'];
     types.sort((a,b) => (r[b]||0) - (r[a]||0));
     for (const t of types) {
       while (toDiscard > 0 && (r[t]||0) > 0) {
@@ -2429,8 +2431,13 @@ function doTimberChoice(choice) {
   }
   renderBattle();
   // showAbilityCallout auto-dismisses after 1400ms — wait 1600ms (1400 + 200ms buffer)
-  // to avoid rolling phase overlapping the still-visible HOWL! splash (mirrors Selene fix v69)
-  setTimeout(() => { if (resume) resume(); }, 1600);
+  // before resuming rolling so neither team can roll while HOWL! is still visible.
+  // _oppBtn is also unlocked here (not at top of function) so the other team's roll button
+  // stays locked through the callout — prevents dice flying mid-splash (mirrors Selene v69).
+  setTimeout(() => {
+    if (tp._oppBtn) { tp._oppBtn.classList.remove('locked'); tp._oppBtn.disabled = false; }
+    if (resume) resume();
+  }, 1600);
 }
 
 // ============================================================
@@ -2461,14 +2468,18 @@ function rollReady(team) {
     if (B.timberPending) {
       const tp = B.timberPending;
       const timberDelay = (tp.preRollCalloutCount || 0) * 1500;
-      btn.classList.add('locked');
-      btn.disabled = true;
-      // BUGFIX: also lock opponent's roll button — they must choose BEFORE rolling,
-      // otherwise they can click Roll while the modal is open and bypass the die reduction
-      const oppBtnId = tp.oppTeamName === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
-      const oppBtn = document.getElementById(oppBtnId);
-      if (oppBtn) { oppBtn.classList.add('locked'); oppBtn.disabled = true; }
-      tp._oppBtn = oppBtn; // stash for cleanup in doTimberChoice
+      // Lock BOTH roll buttons — the modal must be resolved before anyone rolls,
+      // regardless of which team clicked first. If we only locked the clicking button
+      // and the opponent-calculated button, they could be the same element (when the
+      // opponent clicks first), leaving Timber's team free to roll during the modal.
+      const rBtn = document.getElementById('rollRedBtn');
+      const bBtn = document.getElementById('rollBlueBtn');
+      if (rBtn) { rBtn.classList.add('locked'); rBtn.disabled = true; }
+      if (bBtn) { bBtn.classList.add('locked'); bBtn.disabled = true; }
+      // Stash the NON-clicking button so doTimberChoice can unlock it after the choice
+      // (the clicking button stays locked — doTeamRoll fires immediately after the choice)
+      const otherBtnId = team === 'red' ? 'rollBlueBtn' : 'rollRedBtn';
+      tp._oppBtn = document.getElementById(otherBtnId); // stash for cleanup in doTimberChoice
       setTimeout(() => {
         showTimberModal(tp, () => {
           // Resume rolling after choice
@@ -2508,7 +2519,7 @@ function doTeamRoll(team, btn) {
     revealDice(team, dice);
     const roll = classify(dice);
     const tl = typeLabel(roll.type);
-    narrate(`<b class="${cls}">${f.name}</b>&nbsp; rolled [${dice.join(',')}]${tl ? ' &nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(',')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
     if (isTripleOrBetter(roll.type)) showTriplesEffect(team, roll.type);
 
     // Check if both have rolled — guard against double-resolution
@@ -2601,10 +2612,14 @@ function doPreRollSetup() {
       const shadeGhost = getSidelineGhost(team, 205);
       const ef = active(enemy);
       if (!ef.ko && ef.hp < 4) {
+        const preHp = ef.hp;
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        preRollCallouts.push(['MELTDOWN!', 'var(--accent)', `Shade's Shadow finishes ${ef.name}! (${ef.hp < 4 ? 'below 4 HP' : ''})`]);
+        const meltMsg = ef.ko
+          ? `Shade's Shadow finishes ${ef.name}! (${preHp} HP → KO!)`
+          : `Shade's Shadow chips ${ef.name}! (${preHp} → ${ef.hp} HP)`;
+        preRollCallouts.push(['MELTDOWN!', 'var(--accent)', meltMsg]);
         log(`<span class="log-ability">Shade's Shadow</span> (sideline) — Meltdown! Enemy below 4 HP — <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
         hitDamage(enemyName);
@@ -2744,7 +2759,7 @@ function doPreRollSetup() {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       const oppTeam = team === B.red ? B.blue : B.red;
       const r = oppTeam.resources;
-      const totalSpecials = (r.iceShard||0) + (r.sacredFire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
+      const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
       if (totalSpecials < 2) {
         // Not enough specials — forced to lose die
         B.timberDieReduction[oppTeamName] = true;
@@ -2953,7 +2968,7 @@ function showMoonstoneChoice(team, dice) {
   B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-resource' };
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b> &nbsp;Click it to use!`);
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b>&nbsp;Click it to use!`);
   log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to use — 5 seconds!`);
 
   const diceEl = document.getElementById(team + '-dice');
@@ -3167,7 +3182,7 @@ function startLuckyStoneWindow(team, callback) {
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
 
-  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b> &nbsp;Click it to use!`);
+  narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b>&nbsp;Click it to use!`);
 
   // Highlight the Lucky Stone resource tile — player clicks IT first
   const resEl = document.getElementById(team + '-resources');
@@ -3544,6 +3559,7 @@ function resolveRound() {
     B.blackoutNum = {};
     B.pressureUsed = { red: false, blue: false };
     B.motherNatureSummer = { red: false, blue: false };
+    B.selenePending = null; // discard any doubles-triggered Selene reward from this tie round — it must not ghost into the next round's post-roll flow
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -3555,7 +3571,7 @@ function resolveRound() {
     drainAbilityQueue(() => {
       B.phase = 'ready';
       resetRollButtons();
-      narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
+      narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
     });
     return;
@@ -3838,9 +3854,9 @@ function resolveRound() {
       dmgNarr = `<b class="${winColor}">${wF.name}</b> edges out <b class="${loseColor}">${lF.name}</b> — <b class="gold">${dmg} damage</b>!`;
     }
     if (lF.ko) {
-      dmgNarr += ` &nbsp;<b class="ko-text">${lF.name} goes down! ${wF.name} stands victorious!</b>`;
+      dmgNarr += `&nbsp;<b class="ko-text">${lF.name} goes down! ${wF.name} stands victorious!</b>`;
     } else {
-      dmgNarr += ` &nbsp;${lF.hp} HP left.`;
+      dmgNarr += `&nbsp;${lF.hp} HP left.`;
     }
     narrate(dmgNarr);
     playDamageSfx(dmg);
@@ -3885,7 +3901,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
-            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 1800);
@@ -3896,7 +3912,7 @@ function resolveRound() {
           if (!handleKOs()) {
             B.phase = 'ready';
             resetRollButtons();
-            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b> &nbsp;vs&nbsp; <b class="blue-text">${active(B.blue).name}</b>`);
+            narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
             renderBattle();
           }
         }, 750);
@@ -3944,6 +3960,8 @@ function openKoSwap() {
     B.koSwapQueue = null;
     resetRollButtons();
     renderBattle();
+    // Re-announce the round + new matchup so players know who's facing whom
+    narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
     return;
   }
   const team = B.koSwapQueue[0];
@@ -3953,12 +3971,14 @@ function openKoSwap() {
 
   // If only one option, auto-pick (no real choice)
   if (alive.length === 1) {
-    doKoSwap(team, t.ghosts.indexOf(alive[0]));
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+    narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
+    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(alive[0])), 800);
     return;
   }
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-  narrate(`<b class="ko-text">${fallen.name} is down!</b> &nbsp;<b class="${team}-text">${teamLabel}</b> — who answers the call?`);
+  narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> — who answers the call?`);
   renderBattle(); // sideline cards with ko-swap-pick class are now clickable
 }
 
@@ -4479,7 +4499,7 @@ function renderBattle() {
     let rh = '';
 
     if (r.moonstone > 0) {
-      rh += `<div class="res-tile moonstone"><span class="res-main">💎</span><span class="res-count">${r.moonstone}</span><span class="res-label">MS</span></div>`;
+      rh += `<div class="res-tile moonstone" title="Moonstone: after rolling, click it — then pick any die and set it to any value you choose"><span class="res-main">💎</span><span class="res-count">${r.moonstone}</span><span class="res-label">MS</span></div>`;
     }
     if (totalIce > 0) {
       const committed = c.ice > 0;
