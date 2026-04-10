@@ -96,6 +96,66 @@
         }
 
         /* === LIVE TICKER === */
+        .ticker-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 700px) {
+            .ticker-row { flex-direction: column; }
+        }
+
+        .gary-roasts-panel {
+            flex: 1;
+            background: linear-gradient(135deg, rgba(224, 176, 64, 0.08), rgba(180, 120, 40, 0.04));
+            border: 1px solid rgba(224, 176, 64, 0.2);
+            border-radius: 10px;
+            padding: 16px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gary-roasts-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--amber), transparent);
+            animation: tickerSweep 4s linear infinite;
+        }
+
+        .gary-roasts-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--amber);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .gary-roast-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(224, 176, 64, 0.1);
+            font-size: 0.75rem;
+            font-style: italic;
+            color: var(--amber);
+            line-height: 1.5;
+        }
+
+        .gary-roast-item:last-child { border-bottom: none; }
+
+        .gary-roast-cycle {
+            font-size: 0.6rem;
+            font-style: normal;
+            color: rgba(224, 176, 64, 0.4);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 2px;
+        }
+
         .ticker {
             background: linear-gradient(135deg, rgba(64, 200, 120, 0.06), rgba(80, 128, 224, 0.04));
             border: 1px solid rgba(64, 200, 120, 0.15);
@@ -542,10 +602,16 @@
     <div class="hb-summary" id="hbSummary" style="margin:0 24px;"></div>
 
     <div class="container">
-        <!-- Live ticker: most recent activity at a glance -->
-        <div class="ticker" id="ticker" style="display:none">
-            <div class="ticker-label"><span class="ticker-dot"></span> Latest Activity</div>
-            <div id="ticker-items"></div>
+        <!-- Live ticker: activity + Gary roasts side by side -->
+        <div class="ticker-row" id="ticker" style="display:none">
+            <div class="ticker" style="flex:1;margin-bottom:0;">
+                <div class="ticker-label"><span class="ticker-dot"></span> Latest Activity</div>
+                <div id="ticker-items"></div>
+            </div>
+            <div class="gary-roasts-panel" id="garyRoastsPanel">
+                <div class="gary-roasts-label">🐺 Gary's Roasts</div>
+                <div id="gary-roasts-list"></div>
+            </div>
         </div>
 
         <div class="section-label">Active Refiners</div>
@@ -640,9 +706,25 @@
                         <div class="ticker-item">
                             <div class="ticker-time">${formatTime(e.time)}</div>
                             <div class="ticker-agent">${esc(e.target)}</div>
-                            <div class="ticker-text">${esc(e.summary)}${e.roast ? '<div class="ticker-roast">' + esc(e.roast) + '</div>' : ''}</div>
+                            <div class="ticker-text">${esc(e.summary)}</div>
                         </div>
                     `).join('');
+
+                    // === GARY ROASTS: latest roasts in their own panel ===
+                    const roasts = feed.filter(e => e.roast).slice(0, 5);
+                    const roastListEl = document.getElementById('gary-roasts-list');
+                    const roastPanelEl = document.getElementById('garyRoastsPanel');
+                    if (roasts.length > 0 && roastListEl) {
+                        roastPanelEl.style.display = '';
+                        roastListEl.innerHTML = roasts.map(e => `
+                            <div class="gary-roast-item">
+                                <div class="gary-roast-cycle">${esc(e.target)} #${e.cycle}</div>
+                                ${esc(e.roast)}
+                            </div>
+                        `).join('');
+                    } else if (roastPanelEl) {
+                        roastPanelEl.style.display = 'none';
+                    }
                 }
 
                 // === REFINER CARDS: show last action + what's next ===
