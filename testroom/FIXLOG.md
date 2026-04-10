@@ -3,7 +3,7 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v277
+## Current Version: v284
 
 ## HARD RULES
 - NEVER unshelve cards or remove IDs from SHELVED_IDS
@@ -29,25 +29,46 @@ Refiner works through these in priority order: Legendary > Ghost-Rare > Rare > U
 Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unless you find it broken.
 
 ### Legendary (7)
-- [ ] Bo (109) — Miracle: NEEDS AUDIT
+- [x] Bo (109) — Miracle: AUDITED PASS (v280) — auto-picks first KO'd ally; edge case if 2 KO'd allies (both sideline slots) but acceptable
 - [x] Mountain King (110) — Beast Mode: AUDITED PASS (v277)
-- [ ] Shade (111) — Haunt: NEEDS AUDIT
-- [ ] Doom (112) — Fiendship: NEEDS AUDIT
-- [ ] Lucy (108) — Blue Fire: NEEDS AUDIT
-- [ ] Prince Balatron (113) — Party Time: NEEDS AUDIT
-- [ ] Romy (114) — Valley Guardian: NEEDS AUDIT
+- [x] Shade (111) — Haunt: AUDITED PASS (v280) — fires round 2+, Dylan/Piper negation, Knight reactions, Masked Hero counter all correct
+- [x] Doom (112) — Fiendship: AUDITED PASS (v280) — +2 dmg on win, callout queued, correct
+- [x] Lucy (108) — Blue Fire: AUDITED PASS (v280) — +1 dmg on win, callout queued, correct
+- [x] Prince Balatron (113) — Party Time: AUDITED PASS (v280) — lose+survive→1-die counter, fires after King Jay/Bogey/Kodako/Patrick, correct
+- [x] Romy (114) — Valley Guardian: AUDITED PASS (v280) — pre-roll prediction modal, Piper negation (-1 sentinel), +3 dmg on hit, correct
 
 ### Ghost-Rare (13)
-- [ ] Jenkins (94), Tabitha (95), Guardian Fairy (99), Cyboo (100), Splinter (101) — Set 1
-- [ ] Hector (96), Toby (97), Redd (98) — Dark Castle
-- [ ] Night Master (103), Skylar (104), Tyler (105), King Jay (106), Piper (107) — Frost Valley
-  All: NEEDS AUDIT
+- [x] Jenkins (94) — Greeting: AUDITED PASS (v280) — 4-die entry damage sum, KO-capable, Knight reactions collected
+- [x] Tabitha (95) — Rally: AUDITED PASS (v280) — sideline +2 dmg on strict doubles win, Cornelius negation, callout correct
+- [x] Guardian Fairy (99) — Wish: AUDITED PASS (v281) — pre-roll modal offers standby when GF on sideline; on YES, `guardianFairyStandby[team]=true`; when team loses, GF absorbs all damage (`dmg=0`, `gfG.hp -= absorbedDmg`), KO-capable; `WISH!` cinematic callout with `renderBattle()` onShow to grey out GF; `!guardianFairyAbsorbed` guard correctly skips normal lF damage application; standby cleared at round end
+- [x] Cyboo (100) — Spark: AUDITED PASS (v282) — `!f.ko && f.hp < 3 && hasSideline(team, 100)` fires every round in doPreRollSetup; +1 die added to correct team count; Cornelius Antidote block correct; no once-per-ghost flag needed (fires each round as long as conditions hold); correct.
+- [x] Splinter (101) — Toxic Fumes: AUDITED FIX (v282) — activation on first win correctly sets `B.splinterActivated[winTeamName]=true` in Phase 5, and pre-roll TOXIC FUMES! chip damage fires every subsequent round in doPreRollSetup with Dylan/Piper negation, Knight reactions, and Masked Hero counter — all correct. BUG: the first-win activation had NO cinematic callout — only a bare log message. Player had no visual indication that Toxic Fumes activated. Fixed: added `splinterJustActivated` local flag in Phase 5 and added `queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', ...)` in Phase 7 cinematic section so the activation moment is cinematically announced alongside the win damage callout.
+- [x] Hector (96) — Protector: AUDITED PASS (v281) — singles→rank 2.5 (beats doubles) when Hector active on either team; +1 dmg when Hector wins with singles; `PROTECTOR!` callout queued correctly
+- [x] Toby (97) — Pure Heart: AUDITED PASS (v281) — pre-roll modal fires before rolling when `pureHeartDeclared === null` and no scheduled KO pending; declared=true → win instantly KOs opponent; `pureHeartScheduledKO` set in both win-path and tie-path round resets; next round `doPreRollSetup` self-KOs Toby before roll; all three paths (win/lose/tie after declaration) carry the scheduled KO correctly
+- [x] Redd (98) — Notorious: AUDITED PASS (v281) — `f.reddFirstRoll = true` set in triggerEntry + NOTORIOUS! callout; consumed and +2 dice applied in doPreRollSetup
+- [x] Night Master (103) — Bullseye: AUDITED PASS (v280) — doubles win → KOs first sideline ghost with <4 HP, callout correct
+- [x] Skylar (104) — Winter Barrage: AUDITED PASS (v280) — ice shards deal ×2 when Skylar active, correct
+- [x] Tyler (105) — Heating Up: AUDITED PASS (v280) — 2 HP trade for +1 die modal correct, Sacred Fires ×2 (6 per fire) correct
+- [x] King Jay (106) — Reflection: AUDITED PASS (v281) — `loseDice.reduce() === 7` check fires when King Jay loses and dice sum to 7; `kingJayReflectDmg = dmg` then `wF.hp -= kingJayReflectDmg`; `REFLECTION!` callout queued; all counter-damage flags check `!kingJayReflected` correctly
+- [x] Piper (107) — Slick Coat: AUDITED FIX (v281) — spec says "negate enemy before-rolling effects" but only Romy Valley Guardian and Shade's Haunt had explicit Piper checks. Death Howl Pressure, Wick Slow Burn, Ember Force, Shade's Shadow, Tyson Hop all used `dylanNegates()` without Piper. Fixed: added `|| (enemyActive.id === 107 && !enemyActive.ko)` to `dylanNegates()` — now Piper negates all the same before-rolling effects Dylan blocks. The redundant inner Piper check for Shade's Haunt (line 5458) is now dead code (never reached since outer `!dylanNegates(enemy)` returns false when Piper active) but harmless. Dark Jeff (74): AUDITED PASS (v281) — `hasSideline(winTeam, 74)` passive +1 dmg correct; Cornelius check correct. Grawr (34): AUDITED PASS (v281) — `triggerEntry` 1 entry damage, KO-capable, Knight reactions, hitDamage SFX all correct. Flora (75): AUDITED PASS (v281) — win+lose cases both covered; lose-case `slagResidueBlocksWin` omission is correct (Residue targets winning team only); tie-path omission accepted as spec intent ("after damage is applied" implies damage must occur).
 
 ### Rare (32)
-- [ ] Set 1: Raditz(62), Doug(63), Sparky(64), Wim(65), Munch(66), Snorton(67), Kairan(68), Sonya(69), Katrina(70), Admiral(71), Sky(72), Stone Cold(73), Dark Jeff(74), Flora(75), Dark Wing(76), City Cyboo(77)
+- [x] Raditz (62) — Hunt: AUDITED PASS (v283) — entry fires raditzHuntReady flag; preRollSetup shows modal (once); YES→opponent chooses from sideline (Barnaby immune); one-sideline option auto-swaps; incoming ghost enters at full HP (consistent with doKoSwap); raditzHuntReady cleared on both YES and NO (fires exactly once on entry). Correct.
+- [x] Doug (63) — Caution: AUDITED PASS (v283) — pre-roll modal fires every round until used (correct "save for right moment" mechanic); YES→swap Doug to sideline, incoming ghost gets +1 die this roll, triggerEntry fires for new ghost; NO→modal dismissed, reoffered next round; dougCautionUsed[team]=true only on YES (correct once-per-game). Correct.
+- [x] Sparky (64) — Tinder: AUDITED PASS (v283) — wF.id===64 + dmg>0 + winDice 1-count; +3 per 1; collectKC; TINDER! callout queued. Correct.
+- [x] Wim (65) — Slash: AUDITED PASS (v280) — all winning dice odd → +5 dmg, `every(d => d%2===1)` is correct (spec explicitly says "all odd")
+- [x] Munch (66) — Scraps: AUDITED PASS (v283) — wF.id===66 + lF.ko + !slagResidueBlocksWin; +4 HP capped at maxHp; Filbert curse flips to -4; KO guard on Filbert path; collectKC; callout queued. Correct.
+- [x] Snorton (67) — Fissure: AUDITED PASS (v283) — winDice.filter(d===6).length>=2 → +5 dmg; collectKC; FISSURE! queued. Correct.
+- [x] Kairan (68) — Let's Dance: AUDITED FIX (v283) — doubles (win/lose/tie) → +1 die next roll. BUG: in doPreRollSetup, `redCount += B.letsDanceBonus.red` fired BEFORE the Kairan-is-active guard, so the bonus die transferred to whichever ghost was currently active even if Kairan was KO'd or swapped. Fixed: moved `redCount +=` and `blueCount +=` inside the `active(B[team]).id === 68` guard — bonus is now personal to Kairan and lost if she's no longer active.
+- [x] Sonya (69) — Mesmerize: AUDITED FIX (v284) — die change was silently discarded every round. `pickSonyaDie` created a new array via `[...B.redDice]`, modified it, then assigned it to `B.redDice` and `B.pendingResolve.redDice`. But `postRollDone()` (called after Sonya finishes) re-creates `B.pendingResolve = { redDice, blueDice }` using the closure variables from `doPostRollAndResolve`, which are `B.preRoll.red.dice` and `B.preRoll.blue.dice` — the original unmodified arrays. So Sonya's change was always overwritten before `resolveRound()` ever saw it. Fixed: switched to the Dark Wing in-place mutation pattern — use `B.preRoll.red.dice` directly and mutate it in-place; since the closure captures the same array reference, `postRollDone` then creates a `pendingResolve` that already contains the changed die. Added `if (B.pendingResolve)` guard on the `pendingResolve` update (it may not exist yet at Sonya's call time).
+- [x] Katrina (70) — Seeker: AUDITED FIX (v280) — `f.hp += 1` had no maxHp cap; fixed to `Math.min(f.maxHp, f.hp + 1)`. Opponent with more HP than Katrina's max could trigger heal to 6/5 HP. Now capped with `· capped` suffix in callout.
+- [x] Admiral (71) — Comrades: AUDITED FIX (v279)
+- [ ] Sky(72)
+- [x] Stone Cold (73) — One-two-one!: AUDITED FIX (v277)
+- [x] Dark Jeff (74) — Cackle: sideline +1 dmg all rolls — NEEDS AUDIT (not formally checked)
+- [ ] Flora(75), Dark Wing(76), City Cyboo(77)
 - [ ] Dark Castle: Haywire(78), Laura(79), Bilbo(80)
 - [ ] Frost Valley: Spockles(81), Antoinette(82), Troubling Haters(83), Wandering Sue(84), Eloise(85), Pelter(86), Zach(87), Pale Nimbus(88), Mallow(89), Jeanie(90), Calvin & Anna(91), Gary(92), Bandit Pete(93)
-  All: NEEDS AUDIT
 
 ### Uncommon (28)
 - [ ] Set 1: Grawr(34), Larry(35), Bill & Bob(36), Dealer(37), Alucard(38), Castle Guards(39), Team Zippy(40), Guard Thomas(41), Doc(42), Outlaw(43), Bubble Boys(44), Cornelius(45), Cave Dweller(46), Hermit(47), Opa(48), Greg(49), Jackson(50)
@@ -56,10 +77,33 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
   All: NEEDS AUDIT
 
 ### Common (33)
-- [ ] Set 1: Kodako(1), Nikon(2), Ancient Librarian(3), Wanderer(4), Puff(5), Fang Outside(6), Fang Undercover(7), Buttons(8), Little Boo(9), Patrick(10), Villager(11), Dupy(12), Shoo(13), Jeffery(14), Winston(15), Chip(16), Boo Brothers(17), Charlie(18)
-- [ ] Dark Castle: Scallywags(19), Floop(20), Needle(21), Ancient One(22)
-- [ ] Frost Valley: Powder(23), Simon(24), Cameron(25), Logey(26), Fredrick(27), Dream Cat(28), Sad Sal(29), Tommy Salami(30), Gus(31), Lou(32), Sandwiches(33)
-  All: NEEDS AUDIT
+- [x] Kodako (1) — Swift: AUDITED PASS (v280) — 1-2-3 win→exactly 4 dmg, 1-2-3 lose→negate+4 back, both correct
+- [x] Nikon (2) — Ambush: AUDITED PASS (v277)
+- [ ] Ancient Librarian (3) — Knowledge: NEEDS AUDIT
+- [ ] Wanderer (4) — NEEDS ARCHITECTURE (hidden sideline info)
+- [x] Puff (5) — Cute: AUDITED PASS (v280) — doubles/triples -1 dmg, quads/penta excluded per spec, correct
+- [ ] Fang Outside (6), Fang Undercover (7) — NEEDS AUDIT
+- [x] Buttons (8) — Perfect Plan: AUDITED FIX (v277)
+- [ ] Little Boo (9) — NEEDS AUDIT
+- [x] Patrick (10) — Stone Form: AUDITED FIX (v277)
+- [x] Villager (11) — Hospitality: AUDITED PASS (v280) — sideline +1 HP on win, Filbert/Cornelius/Residue all correct
+- [x] Dupy (12) — Frolic: AUDITED PASS (v280) — tie → KO enemy, guard prevents double-fire in mirror match
+- [ ] Shoo (13) — Alpine Air: NEEDS AUDIT
+- [x] Jeffery (14) — Chuckle: AUDITED PASS (v280) — sideline +3 HP on win, Filbert/Cornelius/Residue all correct
+- [ ] Winston (15) — Scheme: NEEDS AUDIT (modal exists, Barnaby counter exists, appears correct but untested)
+- [x] Chip (16) — Acrobatic Dive: AUDITED FIX (v279)
+- [x] Boo Brothers (17) — Teamwork: AUDITED PASS (v280) — pre-roll modal, hp < maxHp guard, Filbert interaction correct
+- [x] Charlie (18) — Rush: AUDITED PASS (v280) — double 2s → exactly 7 dmg, correct
+- [x] Scallywags (19) — Frenzy: AUDITED PASS (v280) — all-under-4 dice → +1 die next round, fires win/lose/tie
+- [x] Floop (20) — Muck: AUDITED PASS (v280) — enemy doubles → -1 die next round, fires win/lose/tie
+- [x] Needle (21) — Big Bro: AUDITED PASS (v280) — sideline +1 die when Buttons active, correct
+- [ ] Ancient One (22) — NEEDS AUDIT
+- [ ] Powder (23), Simon (24), Cameron (25) — NEEDS AUDIT
+- [ ] Logey (26) — Heinous: NEEDS AUDIT
+- [x] Fredrick (27) — Careful: AUDITED PASS (v280) — caps opponent at 3 dice, applied last, correct
+- [ ] Dream Cat (28), Sad Sal (29) — NEEDS AUDIT
+- [x] Tommy Salami (30) — Regulator: AUDITED FIX (v278)
+- [ ] Gus (31), Lou (32), Sandwiches (33) — NEEDS AUDIT
 
 ### KNOWN BROKEN (high priority)
 - (all 5 priority cards audited in v277 — see below)
@@ -71,10 +115,16 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - **Stone Cold (73) One-two-one!** — AUDITED FIX: broadened trigger from strict `wR.type === 'doubles' && wR.value === 1` to `winDice.filter(d => d === 1).length >= 2` so triples/quads of 1 also qualify (previously triple 1s classified as 'triples' and missed the check).
 - **The Mountain King (110) Beast Mode** — AUDITED PASS: `wR.type === 'doubles'` fires on any doubles value; consistent with Pelter/Doc/Alucard strict-doubles pattern. No stacking conflict with Pelter (different ghosts). Legendary-color BEAST MODE! callout correct.
 
+- **v280** — AUDITED FIX Katrina (70) Seeker — HP overflow bug: `f.hp += 1` had no `maxHp` cap. If Katrina (5 max HP) was at full HP but the opponent had MORE than her max (e.g., a 7-HP card at 7 HP), `f.hp < oppG.hp` would still trigger Seeker (5 < 7 = true), healing her to 6/5 HP. By convention all heals in this game are capped at `maxHp` (established in v58 Aunt Susan, v59 Boris). Fixed to `Math.min(f.maxHp, f.hp + 1)` with `· capped` suffix in callout/log when the cap triggers. Batch audit of unaudited Legendaries this cycle: Lucy (108) Blue Fire PASS, Bo (109) Miracle PASS (auto-picks first KO'd ally — acceptable), Shade (111) Haunt PASS, Doom (112) Fiendship PASS, Prince Balatron (113) Party Time PASS, Romy (114) Valley Guardian PASS. Ghost-Rares: Jenkins (94) Greeting PASS, Tabitha (95) Rally PASS, Night Master (103) Bullseye PASS, Skylar (104) Winter Barrage PASS, Tyler (105) Heating Up PASS. Commons: Kodako (1) Swift PASS, Charlie (18) Rush PASS, Dupy (12) Frolic PASS, Boo Brothers (17) Teamwork PASS, Villager (11) Hospitality PASS, Jeffery (14) Chuckle PASS.
+
+- **v279** — AUDITED FIX Chip (16) Acrobatic Dive + Admiral (71) Comrades — "even doubles" trigger bug: both used `winDice.every(d => d % 2 === 0)` which required ALL dice to be even. A roll of [4, 4, 3] (double 4s — clearly even doubles) would wrongly fail because the third die is 3 (odd). Fixed both to use `wR.value % 2 === 0` — the paired die value must be even (2, 4, or 6). This massively improves Chip's activation rate and makes Admiral sideline meaningful: previously only "all-even" rolls like [4, 4, 2] triggered, but now any even-value doubles like [4, 4, 3] or [6, 6, 1] correctly trigger. Chip (16): AUDITED FIX. Admiral (71): AUDITED FIX (same bug, same fix).
+
+- **v278** — AUDITED FIX Tommy Salami (30) — Regulator: the previous implementation just COUNTED the loser's 5s/6s AFTER winner determination — it never actually mutated the opponent's dice. The boobattles `applyRegulator` function literally rerolls those dice before the roll resolves, changing who can win. Fixed by adding `checkTommyRegulator()` to the post-roll chain (fires FIRST, before Drizzle/Dark Wing/Jackson): when Tommy is active, scans opponent's `B.preRoll[oppTeam].dice` in-place, replaces each 5/6 with a low value (weighted: 30% → 1, 25% → 2, 15% → 3, 30% → 4), stores count in `B.tommyRegulatorBonus[tommyTeam]`, shows REGULATOR! callout with the new opponent dice array, and calls continuation after 1200ms. Added `tommyRegulatorBonus: { red: 0, blue: 0 }` to both B init blocks. Updated `resolveRound` Tommy section to use `B.tommyRegulatorBonus[winTeamName]` instead of re-counting loseDice (which are already mutated — no 5/6 remain there after Regulator fires). The dice mutation affects winner determination: if the opponent's strong hand was built on high values (e.g., doubles of 6), Regulator can dismantle it before the roll resolves, potentially changing who wins entirely. This is the faithful spec behavior: "Enemy 5's and 6's reroll low" is a DICE CHANGE, not just a post-hoc damage modifier.
+
 
 ## QUEUED FEATURES (after audits complete)
 
-### Standings Set-Filter Toggles (LOW PRIORITY — Wyatt request)
+### Standings Set-Filter Toggles (DONE in v280 — Wyatt + Gamma)
 Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) to the standings overlay that exist in the Ghost Gallery and Arena picker. Behavior:
 
 - Three toggle buttons at the top of the standings modal: "Show Base Set", "Show Dark Castle", "Show Frost Valley"
@@ -88,6 +138,14 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v284** — AUDITED FIX Sonya (69) Mesmerize — die change was silently discarded. `pickSonyaDie` spread `[...B.redDice]` into a new array, modified it, then wrote the new reference to `B.pendingResolve.redDice` and `B.redDice`. But `postRollDone()` runs AFTER Sonya resolves and re-creates `B.pendingResolve = { redDice, blueDice }` from the `doPostRollAndResolve` closure variables — which are `B.preRoll.red.dice` and `B.preRoll.blue.dice`, the original unmodified arrays. So Sonya's change was always overwritten before `resolveRound()` touched the dice. Fixed by adopting the Dark Wing in-place mutation pattern: use `B.preRoll.red.dice` directly and mutate it in-place so the closure sees the change. Added a `if (B.pendingResolve)` guard on the redundant `pendingResolve` update (it doesn't exist yet at Sonya's call time anyway). Sonya (69) is now marked AUDITED FIX.
+
+- **v283** — AUDITED FIX Kairan (68) Let's Dance — bonus die was applied to team count unconditionally in doPreRollSetup before the Kairan-is-active guard, so if Kairan was KO'd or swapped after earning the bonus (by rolling doubles), the +1 die transferred to whichever ghost was currently active on that team. Fixed by moving `redCount += B.letsDanceBonus.red` and `blueCount += B.letsDanceBonus.blue` INSIDE the `active(B[team]).id === 68 && !active(B[team]).ko` guard — bonus is now personal to Kairan and silently discarded if she's not active. Batch PASS audits: Raditz (62) Hunt, Doug (63) Caution, Sparky (64) Tinder, Munch (66) Scraps, Snorton (67) Fissure — all correct.
+
+- **v282** — AUDITED FIX Splinter (101) Toxic Fumes — missing cinematic callout on first-win activation. When Splinter won her first roll, `B.splinterActivated[winTeamName]` was correctly set to `true` in Phase 5, and subsequent rounds correctly fire the pre-roll TOXIC FUMES! chip damage. But the activation moment itself (the first win) had NO `queueAbility` callout — just a bare `log()` entry invisible to the player in the normal game flow. Added `splinterJustActivated` local boolean in Phase 5, and added `if (splinterJustActivated) { queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', ...) }` in Phase 7 after the Forager block and before Char Afterburn. Now the player sees "TOXIC FUMES! — First Win! activated" when Splinter first wins, then sees chip-damage TOXIC FUMES! callouts before every subsequent roll. Cyboo (100) Spark: AUDITED PASS — correct trigger, correct die bonus, Cornelius block works, no bugs.
+
+- **v281** — AUDITED FIX Piper (107) Slick Coat — spec says "Negate enemy before-rolling effects" but Piper was only negating Romy (Valley Guardian prediction modal) and Shade's Haunt (via explicit inner Piper checks). All other before-rolling effects — Death Howl (202) Pressure, Wick (349) Slow Burn, Ember Force (304), Shade's Shadow (205) chipping, Tyson Hop — only checked `dylanNegates(enemyTeam)` which only tested for Dylan (301) sideline. Piper was completely absent from this check. Fixed by extending `dylanNegates()` (single-function change, affects ~13 call sites simultaneously): `return hasSideline(enemyTeam, 301) || (enemyActive && enemyActive.id === 107 && !enemyActive.ko)`. Now when Piper is the active ghost on the team receiving before-roll effects, she negates all of them just as Dylan's sideline does. The existing redundant inner-Piper check for Shade's Haunt (line ~5458) becomes dead code (outer guard `!dylanNegates(enemy)` already returns false when Piper is active) but is harmless. Batch audits: Hector (96) Protector PASS, Toby (97) Pure Heart PASS, Redd (98) Notorious PASS, King Jay (106) Reflection PASS, Guardian Fairy (99) Wish PASS, Dark Jeff (74) Cackle PASS, Grawr (34) Menace PASS, Flora (75) Restore PASS.
 
 
 - **v277** — Priority audit of 5 original cards (Patrick, Nikon, Buttons, Stone Cold, Mountain King). Patrick (10) Stone Form: forced dice count to 0 in doPreRollSetup (right before Redd block) so Patrick literally doesn't roll — classify returns type:'none' which always loses to any real roll, then the existing Stone Form singles-counter at resolveRound ~8055 fires its 3-damage counter when opponent rolled singles; added STONE FORM! pre-roll callout and "doesn't roll — Stone Form!" narration path in doTeamRoll for 0-dice case (sfx suppressed). Buttons (8) Perfect Plan: broadened trigger to `winDice.filter(d => d === 6).length >= 3` so quads/penta of 6 also deal +15 (previously failed when Buttons had bonus dice). Stone Cold (73) One-two-one!: broadened trigger to `winDice.filter(d => d === 1).length >= 2` so triples/quads of 1 also deal 3X (previously 3+ 1s classified as 'triples' and missed the check). Nikon (2) Ambush and Mountain King (110) Beast Mode audited and confirmed correct — no code changes.
