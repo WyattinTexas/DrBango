@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 1,
-      "remaining_mins": 239,
-      "until": "03:32 AM",
-      "last_update": "2026-04-09T23:39:21.321055",
+      "cycles": 5,
+      "remaining_mins": 45,
+      "until": "12:22 AM",
+      "last_update": "2026-04-09T23:40:01.357577",
       "status": "running",
-      "next_up": "Audit `Benjamin (203) Magic Touch` \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later, still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
-      "after_that": "`drainAbilityQueue` global 900ms callback delay \u2014 since it fires 500ms before the last splash clears, ALL drain callbacks are slightly early; consider bumping from 900ms \u2192 1500ms globally and removing the per-path `setTimeout` workarounds for a cleaner, more maintainable fix"
+      "next_up": "Audit `openKoSwap`'s all-swaps-done path \u2014 `resetRollButtons()` fires immediately alongside `narrate(\"Round N\")`, meaning roll buttons pulse and become clickable while the round-narration + entry narration are still draining; consider delaying `B.phase = 'ready'` + `resetRollButtons()` until the narrator queue is clear (or at least a fixed 1800ms after the last swap's entry narration)",
+      "after_that": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch) \u2014 `highlightWinnerDice` fires at t+10ms then `handleKOs()` at t+1800ms; verify the tiebreaker dice glow finishes before the KO swap modal appears, and that no narration from `handleKOs` overlaps with the still-draining ability queue"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 5,
+      "summary": "`drainNarrate` now holds its lock for the full 1800ms even for the last/only item, so narrator lines like \"X is down!\" can no longer be stomped by \"Y enters the arena!\" arriving 800ms later",
+      "next_up": "Audit `openKoSwap`'s all-swaps-done path \u2014 `resetRollButtons()` fires immediately alongside `narrate(\"Round N\")`, meaning roll buttons pulse and become clickable while the round-narration + entry narration are still draining; consider delaying `B.phase = 'ready'` + `resetRollButtons()` until the narrator queue is clear (or at least a fixed 1800ms after the last swap's entry narration)",
+      "after_that": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch) \u2014 `highlightWinnerDice` fires at t+10ms then `handleKOs()` at t+1800ms; verify the tiebreaker dice glow finishes before the KO swap modal appears, and that no narration from `handleKOs` overlaps with the still-draining ability queue",
+      "time": "23:40:07",
+      "timestamp": "2026-04-09T23:40:07.062682",
+      "roast": "Congratulations, you spent a whole cycle teaching the narrator not to interrupt itself \u2014 a lesson most humans learn by age four."
+    },
     {
       "target": "testroom",
       "cycle": 1,
@@ -504,18 +514,9 @@
       "after_that": "Persistent Meticulous Planning indicator cross-check \u2014 now that the `-1 Die \u00b7 Timber` label was added in v54, verify it correctly disappears when Timber is KO'd mid-battle (the `updateDicePenaltyLabels()` call in `renderBattle()` should handle this, but confirm the label clears when `active(t).id !== 210`)",
       "time": "17:56:40",
       "timestamp": "2026-04-09T17:56:40.120431"
-    },
-    {
-      "target": "testroom",
-      "cycle": 14,
-      "summary": "Added `title` tooltip to Moonstone resource tile \u2014 the only resource with no hover explanation, now reads \"Moonstone \u00d7N: after rolling, click this tile to pick any one of your dice and set it to any value (1\u20136)\" matching every other tile's tooltip style.",
-      "next_up": "KO swap chain-timing audit \u2014 verify the second `openKoSwap` call fires correctly after the first `doKoSwap` resolves in a double-KO round; specifically whether there's a timing gap between swaps that leaves the board in a stale mid-swap state, or if the deferred 1500ms re-entry correctly handles both KOs in sequence.",
-      "after_that": "Full drifted-card playtesting audit \u2014 Mother Nature (366) Seasons timing: does Winter's -1 die stack correctly with Timber's -1 die (both active simultaneously), and does `Math.max(1,...)` floor apply after both reductions? Also verify narrator reads the season correctly each round.",
-      "time": "17:53:57",
-      "timestamp": "2026-04-09T17:53:57.874712"
     }
   ],
-  "last_update": "2026-04-09T23:39:21.324454",
+  "last_update": "2026-04-09T23:40:07.062706",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
