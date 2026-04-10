@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 9,
-      "remaining_mins": 30,
+      "cycles": 10,
+      "remaining_mins": 28,
       "until": "12:22 AM",
-      "last_update": "2026-04-09T23:53:30.733423",
+      "last_update": "2026-04-09T23:54:57.042580",
       "status": "running",
-      "next_up": "Audit the `doKoSwap` multi-ghost picker path \u2014 `openKoSwap` fires `narrate(\"X is down! \u2014 who answers the call?\")` then immediately calls `renderBattle()` synchronously to mark sideline cards as clickable; verify the \"who answers the call?\" narration has fully displayed before picker cards become interactive (no 0ms race between narrate and renderBattle that makes the UI interactive before the player reads the prompt).",
-      "after_that": "Audit narrator pacing in rapid damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if an ability callout then queues and drains, verify its 900ms post-drain buffer lands after the 1400ms splash window, not during it (a dodge round with an ability like WARM BELLY! or HARVEST DANCE! could still show the callout while roll buttons re-enable)."
+      "next_up": "Audit narrator pacing in rapid-damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if a pre-queued ability callout drains at that point, verify the 900ms+1500ms post-drain buffer lands safely after the 1400ms splash window, not during it (a dodge round with WARM BELLY! or HARVEST DANCE! could still show the callout while roll buttons re-enable).",
+      "after_that": "Audit the `doPressureSwap` auto-pick entry chain for `renderBattle()` ordering \u2014 after the PRESSURE! splash (1500ms) and entry callouts finish, `renderBattle()` in the `if (!handleKOs())` path fires synchronously; verify the HP bar update for the newly-entered ghost is visible before any Knight reaction callout covers the arena."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 10,
+      "summary": "`openKoSwap` multi-ghost picker race fixed \u2014 `renderBattle()` (which lights up sideline cards as clickable) now fires 300ms after `narrate()` instead of synchronously before it, so the \"who answers the call?\" text is visible before picker cards go interactive.",
+      "next_up": "Audit narrator pacing in rapid-damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if a pre-queued ability callout drains at that point, verify the 900ms+1500ms post-drain buffer lands safely after the 1400ms splash window, not during it (a dodge round with WARM BELLY! or HARVEST DANCE! could still show the callout while roll buttons re-enable).",
+      "after_that": "Audit the `doPressureSwap` auto-pick entry chain for `renderBattle()` ordering \u2014 after the PRESSURE! splash (1500ms) and entry callouts finish, `renderBattle()` in the `if (!handleKOs())` path fires synchronously; verify the HP bar update for the newly-entered ghost is visible before any Knight reaction callout covers the arena.",
+      "time": "23:55:02",
+      "timestamp": "2026-04-09T23:55:02.727340",
+      "roast": "Congratulations, you spent a whole cycle discovering that players need to *read words* before they *click things* \u2014 truly the kind of breakthrough that keeps Richard Garfield up at night."
+    },
     {
       "target": "testroom",
       "cycle": 9,
@@ -511,18 +521,9 @@
       "after_that": "Full `hasSideline` cross-check for Granny (310) \u2014 confirm the Lucky Stone / Surge / Moonstone on-KO trigger correctly reads the *winner's* roll type via `wR.type` (not the loser's), and that it doesn't fire when Granny herself is the KO'd ghost.",
       "time": "18:18:21",
       "timestamp": "2026-04-09T18:18:21.793035"
-    },
-    {
-      "target": "testroom",
-      "cycle": 21,
-      "summary": "Smithy's active fighter card now shows \"\ud83d\udd28 Forge: dormant\" when he's fighting \u2014 the tag was silently disappearing on swap-in, leaving players with no explanation for why Forge stopped converting resources; the `else if` preserves the existing ready/idle path unchanged.",
-      "next_up": "Verify Calvin (342) Overclock callout message \u2014 the HP shown in the OVERCLOCK! callout reads from `wF.hp` after the `wF.hp++` increment at line 3474, but the drain message says \"Win heals 1 HP! X HP\" which could be improved to show \"X\u2192Y HP\" so the change is immediately legible. Small but resolves the ambiguity about whether the displayed number is before or after healing.",
-      "after_that": "Full audit of `hasSideline` in the context of Harrison (315), Boris (343), and Calvin (342) combo interactions \u2014 specifically whether Harrison's extra-die grant fires correctly in the queue order when multiple on-win abilities chain (Overclock + Harrison on same team), and whether Boris's Fortify correctly stacks with the pre-roll callout added in v52.",
-      "time": "18:17:31",
-      "timestamp": "2026-04-09T18:17:31.095827"
     }
   ],
-  "last_update": "2026-04-09T23:53:30.733699",
+  "last_update": "2026-04-09T23:55:02.727359",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
