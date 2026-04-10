@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v96';
+const TESTROOM_VERSION = 'v98';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1454,7 +1454,7 @@ const GHOSTS = [
   {id:337, name:"Fuego", rarity:"uncommon", maxHp:5, art:"art/fuego.webp", ability:"Fiesta", abilityDesc:"Win with triples: gain 1 of every resource.", category:"Resource Generation", set:"Volcanic Activity", designNote:"The jackpot card. Rare but massive payoff."},
   {id:339, name:"Slag Heap", art:"art/slag_heap.webp", rarity:"common", maxHp:3, ability:"Residue", abilityDesc:"When defeated: opponent's active ghost cannot heal for 2 rounds.", category:"Debuff", set:"Volcanic Activity", designNote:"Anti-healing death trigger."},
   {id:341, name:"Obsidian Throne", rarity:"ghost-rare", maxHp:7, art:"art/obsidian_throne.webp", ability:"Dominion", abilityDesc:"While active: opponent cannot use items (Surge, Surge, Healing Seeds).", category:"Debuff", set:"Volcanic Activity", designNote:"Item lockdown. Opponent hoards but can't spend."},
-  {id:343, name:"Boris", rarity:"uncommon", maxHp:6, art:"art/bastion.webp", ability:"Fortify", abilityDesc:"When you spend a Surge: Boris also gains 2 HP.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Surge for tankiness."},
+  {id:343, name:"Boris", rarity:"uncommon", maxHp:6, art:"art/bastion.webp", ability:"Fortify", abilityDesc:"When you spend a Surge: Boris gains 2 HP (can exceed max HP).", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Surge for tankiness. Overclocks past maxHp like Calvin — all heals overclock except Healing Seeds."},
   {id:345, name:"Red Hunter", art:"art/tremor.webp", rarity:"ghost-rare", maxHp:6, ability:"Rumble", abilityDesc:"If your opponent has any specials: deal +3 damage.", category:"Dice Modifier", set:"Volcanic Activity", designNote:"Entry disruption."},
   {id:347, name:"Eruption", rarity:"rare", maxHp:7, art:"art/eruption.webp", ability:"Blow", abilityDesc:"Spend 2 Silver Leaves: deal 4 damage immediately. No roll needed.", category:"Destruction/Instant Kill", set:"Volcanic Activity", designNote:"Direct damage. Guaranteed 4 for 2 Silver Leaves."},
   {id:349, name:"Wick", rarity:"uncommon", maxHp:5, art:"art/wick.webp", ability:"Slow Burn", abilityDesc:"Each round: deal 1 damage to opponent. But lose 1 HP yourself.", category:"Debuff", set:"Volcanic Activity", designNote:"Mutual destruction timer."},
@@ -1903,17 +1903,34 @@ function startBattle() {
 function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
   const enemy = opp(team);
-  if (skipEntryEffects) return; // Tyson's Hop: no entry effects
+  if (skipEntryEffects) return 0; // Tyson's Hop: no entry effects
 
   const entryTeamName = team === B.red ? 'red' : 'blue';
   narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
+  // Collect all entry callouts (entry ability + any Knight reactions) into a sequential array,
+  // then fire them with 1500ms spacing. This prevents HEAVY AIR! / RETRIBUTION! from
+  // instantly stomping the entry callout (same sequential-stomp pattern fixed in v90–v95
+  // for Selene, Timber modal, Timber forced-auto, and Harrison Ascend).
+  const entryCallouts = [];
+
+  // Helper: collect Knight reactions into entryCallouts via temporary queue mode
+  const collectKnightReactions = () => {
+    const savedQ = abilityQueue;
+    abilityQueue = [];
+    abilityQueueMode = true;
+    checkKnightEffects(entryTeamName, f.name);
+    abilityQueue.forEach(item => entryCallouts.push([item.name, item.color, item.desc]));
+    abilityQueue = savedQ;
+    abilityQueueMode = false;
+  };
+
   // Bouril (201) — Slumber: first roll is auto 1-2-3
   if (f.id === 201) {
     f.hankFirstRoll = true;
-    showAbilityCallout('SLUMBER!', 'var(--common)', `${f.name} — first roll locked to 1-2-3!`);
+    entryCallouts.push(['SLUMBER!', 'var(--common)', `${f.name} — first roll locked to 1-2-3!`]);
     log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
-    checkKnightEffects(entryTeamName, f.name);
+    collectKnightReactions();
   }
 
   // Zain (206) — Aquatic Wisdom: spend 2 ice for 1 moonstone
@@ -1921,9 +1938,9 @@ function triggerEntry(team, skipEntryEffects) {
     if (team.resources.ice >= 2) {
       team.resources.ice -= 2;
       team.resources.moonstone++;
-      showAbilityCallout('AQUATIC WISDOM!', 'var(--rare)', `${f.name} — 2 Ice → 1 Moonstone!`);
+      entryCallouts.push(['AQUATIC WISDOM!', 'var(--rare)', `${f.name} — 2 Ice → 1 Moonstone!`]);
       log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
-      checkKnightEffects(entryTeamName, f.name);
+      collectKnightReactions();
     }
   }
 
@@ -1934,25 +1951,25 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      showAbilityCallout('LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`);
+      entryCallouts.push(['LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
-      checkKnightEffects(entryTeamName, f.name);
+      collectKnightReactions();
     }
   }
 
   // Maximo (302) — Nap: first roll is 1 die
   if (f.id === 302) {
     f.maximoFirstRoll = true;
-    showAbilityCallout('NAP!', '#22c55e', `${f.name} — first roll is 1 die only!`);
+    entryCallouts.push(['NAP!', '#22c55e', `${f.name} — first roll is 1 die only!`]);
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
-    checkKnightEffects(entryTeamName, f.name);
+    collectKnightReactions();
   }
 
-  // Timber (210) — Howl: announce on entry
+  // Timber (210) — Howl: announce on entry (informational — no Knight reaction)
   if (f.id === 210) {
-    showAbilityCallout('HOWL!', 'var(--legendary)', `${f.name} — opponent must choose: discard 2 specials or lose 1 die each roll!`);
+    entryCallouts.push(['HOWL!', 'var(--legendary)', `${f.name} — opponent must choose: discard 2 specials or lose 1 die each roll!`]);
     log(`<span class="log-ability">${f.name}</span> — Howl! Each roll, opponent must discard 2 specials or roll 1 fewer die!`);
   }
 
@@ -1963,13 +1980,19 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      showAbilityCallout('BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`);
+      entryCallouts.push(['BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`]);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
-      checkKnightEffects(entryTeamName, f.name);
+      collectKnightReactions();
     }
   }
+
+  // Fire all entry callouts sequentially — each 1500ms after the previous
+  entryCallouts.forEach((c, i) => {
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2]), i * 1500);
+  });
+  return entryCallouts.length;
 }
 
 function rollDice(n) {
@@ -1978,18 +2001,45 @@ function rollDice(n) {
   return d.sort((a,b)=>a-b);
 }
 
-// Weighted roll — cinematic clutch moments (Feature 8)
+// Weighted roll — cinematic luck system
+// Subtle nudges that make tight moments more exciting:
+// - 1 HP: 25% chance of forced doubles (3-6 value) — clutch comeback energy
+// - 2 HP: 15% chance of forced doubles — still dangerous but not as desperate
+// - 5+ dice: 10% penta nudge — reward the player for earning extra dice
+// - General: low HP rolls get a slight quality boost (reroll lowest die if below average)
 function weightedRoll(team, count) {
   const dice = [];
   for (let i = 0; i < count; i++) dice.push(Math.floor(Math.random()*6)+1);
   if (!B || !B[team]) return dice.sort((a,b)=>a-b);
   const f = active(B[team]);
-  // Clutch mechanic: low HP (1-2) → 25% chance of forced doubles
-  if (f && f.hp <= 2 && f.hp > 0 && Math.random() < 0.25) {
+
+  // Penta nudge: 5+ dice → 10% chance all dice match (huge cinematic moment)
+  if (count >= 5 && Math.random() < 0.10) {
+    const v = Math.ceil(Math.random()*4)+2; // 3–6 for exciting penta
+    for (let i = 0; i < dice.length; i++) dice[i] = v;
+    return dice.sort((a,b)=>a-b);
+  }
+
+  // Clutch doubles: low HP → chance of forced doubles
+  if (f && f.hp === 1 && Math.random() < 0.25) {
     const v = Math.ceil(Math.random()*4)+2; // 3–6
     dice[0] = v;
     if (dice.length >= 2) dice[1] = v;
+  } else if (f && f.hp === 2 && Math.random() < 0.15) {
+    const v = Math.ceil(Math.random()*4)+2;
+    dice[0] = v;
+    if (dice.length >= 2) dice[1] = v;
   }
+
+  // Low HP quality boost: if at 1-2 HP, reroll the lowest die if it's below 3
+  // Subtle — just nudges the floor up slightly so you're less likely to get crushed
+  if (f && f.hp <= 2 && f.hp > 0 && dice.length >= 2) {
+    const minIdx = dice.indexOf(Math.min(...dice));
+    if (dice[minIdx] <= 2 && Math.random() < 0.30) {
+      dice[minIdx] = Math.ceil(Math.random()*3)+3; // reroll to 4-6
+    }
+  }
+
   return dice.sort((a,b)=>a-b);
 }
 
@@ -2083,15 +2133,13 @@ function hasDouble2sOr3s(dice) {
   return (c[2] >= 2) || (c[3] >= 2);
 }
 
-// Boris (343) — Fortify: when surge is spent, Boris gains 2 HP (capped at maxHp)
+// Boris (343) — Fortify: when surge is spent, Boris gains 2 HP (overclocks past maxHp)
 function triggerBorisHook(team) {
   team.ghosts.forEach(g => {
     if (g.id === 343 && !g.ko) {
       const before = g.hp;
-      g.hp = Math.min(g.maxHp, g.hp + 2);
-      const actual = g.hp - before;
-      const capped = before + 2 > g.maxHp;
-      log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → +${actual} HP (${before}→${g.hp}/${g.maxHp}${capped ? ', capped' : ''}).`);
+      g.hp += 2; // overclocks — no cap
+      log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → +2 HP (${before}→${g.hp}/${g.maxHp}${g.hp > g.maxHp ? ' · overclocked!' : ''}).`);
     }
   });
 }
@@ -2310,12 +2358,14 @@ function useTysonHop(team) {
   const aliveSideline = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
   if (aliveSideline.length === 0) return;
 
-  showAbilityCallout('HOP!', 'var(--magma)', `${f.name} hops to the bench — no entry triggers!`);
   log(`<span class="log-ability">${f.name}</span> — Hop! Swapping out, no entry effects for incoming ghost.`);
+  // Queue HOP! + any Knight reactions sequentially before opening the swap modal
+  abilityQueueMode = true;
+  queueAbility('HOP!', 'var(--magma)', `${f.name} hops to the bench — no entry triggers!`);
   checkKnightEffects(team, f.name);
-
-  // Open the standard swap modal — doSwap already skips entry when Tyson swaps out
-  openSwap(team);
+  abilityQueueMode = false;
+  // Open the standard swap modal only after all callouts finish playing
+  drainAbilityQueue(() => openSwap(team));
 }
 
 // ============================================================
@@ -2905,8 +2955,8 @@ function doPreRollSetup() {
     triggerBorisHook(B.red);
     const borisRed = B.red.ghosts.find(g => g.id === 343 && !g.ko);
     if (borisRed) {
-      const capped = borisRed.hp === borisRed.maxHp && borisRedPre + 2 > borisRed.maxHp;
-      preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP (${borisRedPre}→${borisRed.hp}/${borisRed.maxHp}${capped ? ' · capped' : ''})`]);
+      const oc = borisRed.hp > borisRed.maxHp;
+      preRollCallouts.push(['FORTIFY!', oc ? 'var(--moonstone)' : 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP (${borisRedPre}→${borisRed.hp}/${borisRed.maxHp}${oc ? ' · overclocked!' : ''})`]);
     }
   }
   if (B.committed.blue.surge > 0) {
@@ -2916,8 +2966,8 @@ function doPreRollSetup() {
     triggerBorisHook(B.blue);
     const borisBlue = B.blue.ghosts.find(g => g.id === 343 && !g.ko);
     if (borisBlue) {
-      const capped = borisBlue.hp === borisBlue.maxHp && borisBlueRePre + 2 > borisBlue.maxHp;
-      preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlue.hp}/${borisBlue.maxHp}${capped ? ' · capped' : ''})`]);
+      const oc = borisBlue.hp > borisBlue.maxHp;
+      preRollCallouts.push(['FORTIFY!', oc ? 'var(--moonstone)' : 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlue.hp}/${borisBlue.maxHp}${oc ? ' · overclocked!' : ''})`]);
     }
   }
 
@@ -4109,7 +4159,7 @@ function doKoSwap(team, idx) {
   f.hp = f.maxHp;
 
   log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters at full HP!</span>`);
-  triggerEntry(t, skipEntry);
+  const entryCalloutCount = triggerEntry(t, skipEntry);
 
   renderBattle();
 
@@ -4132,10 +4182,10 @@ function doKoSwap(team, idx) {
     }
   });
 
-  // If triggerEntry fired an ability callout (1400ms), wait for it to clear
-  // before showing the next KO swap picker so the two UIs don't overlap.
-  const splashEl = document.getElementById('abilitySplash');
-  const splashDelay = splashEl.classList.contains('active') ? 1500 : 0;
+  // Wait for all entry callouts to finish before showing the next KO swap picker.
+  // entryCalloutCount accounts for both the entry ability AND any Knight reactions
+  // (each 1500ms apart), so 2 callouts = 3000ms, 0 callouts = 0ms.
+  const splashDelay = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 0;
   setTimeout(openKoSwap, splashDelay);
 }
 
