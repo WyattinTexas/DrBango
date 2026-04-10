@@ -1165,7 +1165,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
     </div>
-    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th></tr></thead><tbody id="standingsBody"></tbody></table>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v103';
+const TESTROOM_VERSION = 'v104';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1580,7 +1580,7 @@ function sortStandings(col) {
   // Highlight active column header
   document.querySelectorAll('.st-sortable').forEach(th => th.classList.remove('st-sort-active'));
   const headers = document.querySelectorAll('#standingsTable thead th.st-sortable');
-  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'pct':4, 'gb':5, 'kills':6, 'kos':7};
+  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8};
   if (colMap[col] !== undefined && headers[colMap[col]]) headers[colMap[col]].classList.add('st-sort-active');
 }
 
@@ -1600,6 +1600,7 @@ function renderStandingsTable() {
     if (col === '#') return a.id - b.id;
     if (col === 'w') return b.w - a.w || b.pct - a.pct || a.name.localeCompare(b.name);
     if (col === 'l') return b.l - a.l || a.pct - b.pct || a.name.localeCompare(b.name);
+    if (col === 'gp') return b.total - a.total || b.pct - a.pct || a.name.localeCompare(b.name);
     if (col === 'kills') return b.kills - a.kills || b.w - a.w || a.name.localeCompare(b.name);
     if (col === 'kos') return b.kos - a.kos || b.l - a.l || a.name.localeCompare(b.name);
     if (col === 'gb') {
@@ -1637,6 +1638,7 @@ function renderStandingsTable() {
       <td class="st-name">${g.name}</td>
       <td class="st-stat st-w">${g.w}</td>
       <td class="st-stat st-l">${g.l}</td>
+      <td class="st-stat" style="color:var(--text2)">${g.total}</td>
       <td class="st-stat st-pct">${pctStr}</td>
       <td class="st-stat st-gb">${gbVal}</td>
       <td class="st-stat" style="color:var(--win)">${g.kills}</td>
@@ -1651,7 +1653,7 @@ function openStandings() {
   // Highlight default sort column
   document.querySelectorAll('.st-sortable').forEach(th => th.classList.remove('st-sort-active'));
   const headers = document.querySelectorAll('#standingsTable thead th.st-sortable');
-  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'pct':4, 'gb':5, 'kills':6, 'kos':7};
+  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8};
   if (colMap[standingsSortCol] !== undefined && headers[colMap[standingsSortCol]]) headers[colMap[standingsSortCol]].classList.add('st-sort-active');
   document.getElementById('standingsOverlay').classList.add('active');
 }
@@ -2616,8 +2618,12 @@ function doPressureSwap(attackerTeam, targetIdx) {
   newGhost.hp = newGhost.maxHp;
   showAbilityCallout('PRESSURE!', 'var(--magma)', `${oldName} forced out — ${newGhost.name} enters!`);
   log(`<span class="log-ability">${f.name}</span> — Pressure! Forced ${oldName} out, ${newGhost.name} enters at full HP!`);
-  triggerEntry(enemy, false);
-  if (!handleKOs()) renderBattle();
+  // Delay entry effects by 1500ms so PRESSURE! fully displays before the first entry callout
+  // fires (triggerEntry's first setTimeout is at i=0 → ~0ms, which stomped PRESSURE! instantly).
+  setTimeout(() => {
+    triggerEntry(enemy, false);
+    if (!handleKOs()) renderBattle();
+  }, 1500);
 }
 
 // ============================================================
