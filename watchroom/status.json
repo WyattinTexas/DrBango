@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 59,
-      "remaining_mins": 171,
+      "cycles": 60,
+      "remaining_mins": 168,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T16:40:11.626701",
+      "last_update": "2026-04-10T16:41:44.753898",
       "status": "running",
-      "next_up": "Check Puff Ball (355) Burst \u2014 `wF.hp = Math.max(0, wF.hp - puffBurstDmg)` at line ~8879 is still synchronous before the BURST! callout; same class of bug; also verify whether `lF.hp = 0` (self-KO) needs deferred treatment or is correctly synchronous (KO should be sync since Cameron checks `lF.ko`).",
-      "after_that": "After Puff Ball, sweep the remaining counter-damage blocks in the cinematic section for any further synchronous HP mutations \u2014 specifically check if any \"special\" attackers like Larry (35) Flying Kick (triples 3\u00d7 path), Masquerade (88) Mimic, or Eloise (85) HP swap still have synchronous mutations before their callouts."
+      "next_up": "Check Fang Undercover (7) Skilled Coward counter-damage and City Cyboo (77) Barrier absorption \u2014 both were flagged in cycle 56's AFTER as potential remaining synchronous HP-before-callout bugs in the cinematic section; if either still mutates HP before its callout, apply the same deferred-onShow fix.",
+      "after_that": "Audit the `doPreRollSetup` path for Eloise (85) doEloiseChoice and Tyler (105) doTylerChoice \u2014 both can reduce the active ghost to 0 HP mid-pre-roll (HP swap to 0, or -2 HP spend KO) and call `doTeamRoll` unconditionally afterward without routing through `handleKOs()`; cycle 46 confirmed Boris was fixed but Eloise/Tyler were left as AFTER items and never formally resolved."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 60,
+      "summary": "Puff Ball (355) Burst \u2014 attacker HP mutation now defers to `onShow` so the winner's HP bar drops when BURST! fires, not silently during beat 4's renderBattle (same fix pattern as 10 previous counter-damage cards)",
+      "next_up": "Check Fang Undercover (7) Skilled Coward counter-damage and City Cyboo (77) Barrier absorption \u2014 both were flagged in cycle 56's AFTER as potential remaining synchronous HP-before-callout bugs in the cinematic section; if either still mutates HP before its callout, apply the same deferred-onShow fix.",
+      "after_that": "Audit the `doPreRollSetup` path for Eloise (85) doEloiseChoice and Tyler (105) doTylerChoice \u2014 both can reduce the active ghost to 0 HP mid-pre-roll (HP swap to 0, or -2 HP spend KO) and call `doTeamRoll` unconditionally afterward without routing through `handleKOs()`; cycle 46 confirmed Boris was fixed but Eloise/Tyler were left as AFTER items and never formally resolved.",
+      "time": "16:41:51",
+      "timestamp": "2026-04-10T16:41:51.490185",
+      "roast": "Eleven cards deep into the same bug and you're still calling it a \"pattern\" instead of an architectural failure \u2014 Rosewater would call that a restriction, Garfield would call it a smell, and the Kickstarter calendar just calls it April."
+    },
     {
       "target": "testroom",
       "cycle": 59,
@@ -519,19 +529,9 @@
       "time": "12:56:32",
       "timestamp": "2026-04-10T12:56:32.017368",
       "roast": "Four months from Kickstarter and you just noticed Cornelius has been cosplaying as furniture while Needle and Buttons ran a protection racket on him."
-    },
-    {
-      "target": "testroom",
-      "cycle": 10,
-      "summary": "Fixed Nikon (2) Ambush and Cave Dweller (46) Lurk \"first roll\" check \u2014 replaced `B.round === 1` (broken for KO-swap replacements) with per-ghost `_rolledOnce` flag so any ghost entering mid-battle via KO swap still correctly fires their first-roll ability when they win their opening round.",
-      "next_up": "Audit Outlaw (43) Thief \u2014 the die-steal mechanic (doubles tie \u2192 steal 1 enemy die next roll) has a dedicated implementation block in doPreRollSetup; need to verify the per-team state tracking, that it stacks correctly with Suspicious Jeff (61) Snicker and Hugo (52) Wreckage, and that the penalty flag is correctly consumed and reset each round.",
-      "after_that": "Audit Bubble Boys (44) Pop and Cornelius (45) Antidote \u2014 Bubble Boys' \"opponent triples \u2192 instant KO\" is a reactive trigger that must fire at the right point in resolveRound; Cornelius blocks MANY sideline effects and any missed negation is a design flaw affecting multiple card interactions.",
-      "time": "12:51:38",
-      "timestamp": "2026-04-10T12:51:38.970163",
-      "roast": "Two months from Kickstarter and you're just now discovering that \"first round\" and \"first round for this specific ghost\" are different concepts \u2014 Rosewater wrote about this exact trap in 2003, Wyatt."
     }
   ],
-  "last_update": "2026-04-10T16:40:11.626956",
+  "last_update": "2026-04-10T16:41:51.490200",
   "orchestrator_check": {
     "timestamp": "2026-04-10T16:17:01.060805",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 50 cycles, 198m left | last [testroom c50]: Munch (66) Scraps and Troubling Haters (83) Growing Mob HP mutations now defer to `onShow` callbacks \u2014 HP bars no longer"
