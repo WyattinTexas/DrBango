@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 74,
-      "remaining_mins": 91,
+      "cycles": 75,
+      "remaining_mins": 82,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T18:05:40.449059",
+      "last_update": "2026-04-10T18:17:44.279258",
       "status": "running",
-      "next_up": "Audit whether there are any other `B.committed[team]` reset or object-creation sites outside of these 4 (startBattle \u00d72, tie-path, win/lose-path, refundCommitted) that might also be missing `zainBlade` \u2014 do a targeted grep for `committed.*=.*{` to find any stragglers, then shift focus to checking the `postRollDone` \u2192 `checkLuckyStones` flow when one team has both MS AND LS (e.g., Red has MS+LS while Blue has only LS): currently the cross-type window only fires when EXACTLY one team has MS and the other has LS; if Red has both, the cross-type condition fails and Red gets a sequential MS window followed by a simultaneous LS window, which may still save less time than a unified window could.",
-      "after_that": "Look at the Zain Ice Blade \"Swing Ice Blade\" button tooltip text \u2014 currently it shows a very long description in the `title` attribute; verify it's readable in both the swung and unswung states and doesn't get cut off by the browser tooltip; also verify that when Zain is KO'd mid-game, the blade button disappears from the UI correctly (`renderAbilityBar` checks `f.id === 206 && !f.ko` before rendering it)."
+      "next_up": "Continue stripping the remaining Slag Heap dead code \u2014 the pre-roll timer block (lines 6022-6031, runs every round but always no-ops since `slagHeapResidueRounds` starts at 0 and is only incremented from a dead `slagHeapResidueTriggered` path), the KO trigger check (`if (lF.id === 339 && lF.ko)` always false), the KO callout block, and the B-state `slagHeapResidueRounds`/`slagHeapResidueActive` initializations \u2014 together ~12 more lines of dead scaffolding.",
+      "after_that": "With Slag Heap dead code fully removed, audit whether the `ashPhoenixRebirth` scaffolding (Ash Phoenix id 361 is also shelved) needs the same treatment \u2014 `ashPhoenixRebirthTriggered` is always false, and its KO-trigger callout and `B.ashPhoenixUsed/B.ashPhoenixRebirth` state fields are all dead; 14 references total vs Slag Heap's 34."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 75,
+      "summary": "Stripped all `slagResidueBlocksWin` / `slagBlocksOpaTie` / `slagBlocksAO` dead-code branches (11 sites) \u2014 Slag Heap (339) is permanently shelved so these always-false guards were wrapping 5 win-path heal blocks (Opa, Villager, Jeffery, Biscuit, Calvin), 3 inline conditions (Flora, Growing Mob, Munch), and 2 tie-path heal blocks (Opa, Ancient One) with dead `if/else` structure that obscured real logic, same dead-code class as the Wisp (344) cleanup in v307\u2013v313.",
+      "next_up": "Continue stripping the remaining Slag Heap dead code \u2014 the pre-roll timer block (lines 6022-6031, runs every round but always no-ops since `slagHeapResidueRounds` starts at 0 and is only incremented from a dead `slagHeapResidueTriggered` path), the KO trigger check (`if (lF.id === 339 && lF.ko)` always false), the KO callout block, and the B-state `slagHeapResidueRounds`/`slagHeapResidueActive` initializations \u2014 together ~12 more lines of dead scaffolding.",
+      "after_that": "With Slag Heap dead code fully removed, audit whether the `ashPhoenixRebirth` scaffolding (Ash Phoenix id 361 is also shelved) needs the same treatment \u2014 `ashPhoenixRebirthTriggered` is always false, and its KO-trigger callout and `B.ashPhoenixUsed/B.ashPhoenixRebirth` state fields are all dead; 14 references total vs Slag Heap's 34.",
+      "time": "18:17:50",
+      "timestamp": "2026-04-10T18:17:50.604495",
+      "roast": "Four months to Kickstarter and you're still sweeping up corpses from a card you benched \u2014 at this rate Slag Heap will have a cleaner commit history than most of your playable roster."
+    },
     {
       "target": "testroom",
       "cycle": 74,
@@ -519,19 +529,9 @@
       "time": "14:18:45",
       "timestamp": "2026-04-10T14:18:45.211190",
       "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
-    },
-    {
-      "target": "testroom",
-      "cycle": 25,
-      "summary": "Jimmy (352) Chirp tie-path now defers the Lucky Stone grant to onShow timing, respects Wisp (344) Guide Light blocking, and mirrors to Sandwiches (33) Dependable \u2014 three bugs in one card, all same pattern family as Tweak and Twonk v303.",
-      "next_up": "Sweep the remaining tie-path resource blocks (around lines 7315\u20137540) for any others with synchronous grants still missing deferred-onShow + Wisp/Sandwiches treatment \u2014 specifically look at Outlaw (43) Thief (die-steal on doubles-tie, not a resource gain so no Wisp needed but check timing), Opa (48) Rest (tie HP heal, no Wisp needed per rules), and Haywire (78) Wild Chords (permanent die bonus, not a resource but check log timing).",
-      "after_that": "Do a targeted sweep of the win-path post-roll block for any original-card resource grants still missing the deferred-onShow pattern \u2014 specifically Gary (92) Lucky Novice win-path ice-per-1 grant (`wispBlocksWin` is set but check if the grant itself is inside onShow or still synchronous).",
-      "time": "14:10:47",
-      "timestamp": "2026-04-10T14:10:47.434287",
-      "roast": "Three lines changed. Fourteen lines of commit message. The ratio concerns me."
     }
   ],
-  "last_update": "2026-04-10T18:05:45.665320",
+  "last_update": "2026-04-10T18:17:50.604512",
   "orchestrator_check": {
     "timestamp": "2026-04-10T18:17:00.389783",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 74 cycles, 91m left | last [testroom c74]: Fixed `refundCommitted()` missing `zainBlade:0` in the reset object \u2014 the four per-round committed reset sites were inco"
