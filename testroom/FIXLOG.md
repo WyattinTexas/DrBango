@@ -3,7 +3,13 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v303
+## Current Version: v304
+
+## v304 — AUDITED FIX: Jimmy (352) Chirp tie-path — synchronous grant, missing Wisp block, missing Sandwiches mirror
+- Jimmy (352) Chirp BUG 1: `team.resources.luckyStone += 5` fired synchronously before the CHIRP! callout was displayed, so players saw the resource counter jump before seeing what caused it. Fixed: moved grant inside the `onShow` callback of `queueAbility` — Lucky Stones now appear exactly when the CHIRP! splash fires. Also moved `log()` and `checkKnightEffects()` inside the callback (same Tweak and Twonk v303 pattern).
+- Jimmy (352) Chirp BUG 2: No Wisp (344) Guide Light block. Lucky Stones are a resource; Wisp's spec says "opponent cannot gain resources this round." The Jimmy Chirp block had no `hasSideline(oppTeamJim, 344)` check, making Wisp completely ineffective against Jimmy. Fixed: added Wisp check — if Wisp is on opponent's sideline, shows GUIDE LIGHT! callout and blocks the grant.
+- Jimmy (352) Chirp BUG 3: No Sandwiches (33) Dependable mirror. When Jimmy gains +5 Lucky Stones on a tie, the opposing team's Sandwiches should mirror +5 Lucky Stones via DEPENDABLE! — this was completely missing. Fixed: added `hasSideline(oppTeamJim, 33) && !hasSideline(team, 344)` guard with DEPENDABLE! callout queued after CHIRP! (consistent with Tweak and Twonk v303, Maximo v298 patterns).
+- Also bumped TESTROOM_VERSION v303 → v304.
 
 ## v303 — AUDITED FIX: Tweak and Twonk (303) Warm Belly tie-path missing Sandwiches mirror + deferred grant
 - Tweak and Twonk (303) BUG 1: `team.resources.surge += 3` fired synchronously (before the callout was displayed), violating the deferred-onShow pattern used by every other resource grant. Fixed: surge grant moved inside the WARM BELLY! onShow callback so the tile updates exactly when the splash fires.
@@ -343,6 +349,25 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 **Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v305 — CRITICAL BUG FIX + LESSON FOR REFINER**: `pickMsValue` (Moonstone "pick a new die value" handler) used `${teamLabel}` in a `narrate(...)` template literal but the variable was NEVER DECLARED in the function scope. JavaScript threw a silent `ReferenceError`, which killed the rest of the function execution. Result: after picking the new die value, `B.pendingMoonstone = null` never ran, the post-pick `setTimeout` never fired, `checkLuckyStones()` never ran, the phase stayed stuck at `'moonstone-red'`, and the entire game froze with the value picker still showing. NO UI was clickable. Wyatt hit this mid-game and the game was completely unrecoverable. Fix: added `const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);` at the top of the post-pick section.
+
+  ### LESSON FOR THE REFINER — READ THIS BEFORE EVERY EDIT:
+  When you add or modify a `narrate(...)`, `log(...)`, `showAbilityCallout(...)`, or any template literal string, you MUST verify that EVERY `${variable}` reference in the template is defined in the current scope. JavaScript template literal errors are SILENT — they throw `ReferenceError` which kills the rest of the function execution without any visible error to the player. This is a class of bug that can FREEZE THE WHOLE GAME from a single missing `const`.
+
+  **Audit pattern after every edit you make:**
+  1. Look at every `${...}` interpolation in any string literal you touched.
+  2. For each one, scroll up in the function and confirm the variable is declared with `let`, `const`, or destructured from a parameter.
+  3. If a variable like `teamLabel`, `enemyName`, `winLabel`, etc. is missing, ADD a `const X = ...` line at the top of the relevant block.
+  4. Common missing variable patterns:
+     - `teamLabel` → `const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);`
+     - `enemyName` → `const enemyName = enemy === B.red ? 'red' : 'blue';`
+     - `oppLabel` → `const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);`
+     - `winLabel` / `loseLabel` → derived from `winTeamName`/`loseTeamName` similarly
+  5. If you're touching a function with multiple `narrate`/`log` calls, check that all template references are consistent — don't introduce a new variable name without declaring it.
+
+  **Why this matters:** Players cannot recover from a game freeze. They must reload the page and lose all standings progress for that session. A single missing `const` from a refiner cycle = unplayable game = wasted overnight refiner runs. This bug pattern has now happened once with `teamLabel` — DO NOT let it happen again with `enemyName`, `oppLabel`, or any other team-display variable.
+
 
 - **v293** — Finn (204) Forge converted from AUTO-FIRE to OPT-IN buttons. Removed the auto-conversion block in `doPreRollSetup`. Added `useFinnForge(team, kind)` click handler. When Finn is on a team's sideline, two buttons render in that team's ability bar before each roll: "Forge: 2 Ice → Moonstone" (cyan) and "Forge: 2 Fire → Moonstone" (orange). Buttons gray out when the team lacks 2 of that resource so the player can see the option exists. Click → -2 of the resource, +1 Moonstone, FORGE! callout, log entry, SFX. Buttons disappear entirely when Finn steps into play (sideline-only ability). Ability description updated to "you may convert..." reflecting the opt-in nature.
   - **WHY**: Auto-fire was free value with no decision attached. Opt-in turns Forge into a tempo question — bank a Moonstone now for the late game, or hold the shards for chip damage on a key roll. Gary approved.
