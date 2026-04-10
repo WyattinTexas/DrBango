@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 7,
-      "remaining_mins": 39,
-      "until": "12:22 AM",
-      "last_update": "2026-04-09T23:43:58.415357",
+      "cycles": 2,
+      "remaining_mins": 233,
+      "until": "03:32 AM",
+      "last_update": "2026-04-09T23:47:20.220308",
       "status": "running",
-      "next_up": "Audit the `postRollDone` \u2192 `handleKOs()` path at line 3278 \u2014 when Shade's Shadow KOs mid-queue, `handleKOs()` returns `true` and `postRollDone` returns early; verify the path that reaches `handleKOs()` there (after moonstone/lucky stone flow) still narrates before enabling, and that the `lF.ko` KO landing at t+1800ms doesn't leave `highlightWinnerDice` glow still animating when the KO swap modal appears",
-      "after_that": "Audit narrator stagger in rapid damage sequences \u2014 when `dmg === 0` (dodge), `totalDmgBeats` is only 800ms; if an ability callout then queues and drains, verify its 900ms post-drain buffer lands after the 1400ms splash window, not during it"
+      "next_up": "Benjamin (203) Magic Touch \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later via a direct setTimeout (not through the queue), still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
+      "after_that": "Narrator pacing audit \u2014 if multiple `narrate()` calls fire within 100ms of each other (e.g. \"X is down!\" immediately followed by \"Round N \u2014 X vs Y\"), the narrator div will visibly flicker between messages too fast to read; check all round-transition paths for stacked narrate() calls and add minimum 400ms stagger between them"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 2,
+      "summary": "`drainAbilityQueue` global 900ms\u21921500ms root-cause fix \u2014 callback now fires 100ms after the last splash clears instead of 500ms before it, eliminating callout/UI overlap across all drain paths; removed v111 TIE-path 600ms workaround that compensated for this exact gap",
+      "next_up": "Benjamin (203) Magic Touch \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later via a direct setTimeout (not through the queue), still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
+      "after_that": "Narrator pacing audit \u2014 if multiple `narrate()` calls fire within 100ms of each other (e.g. \"X is down!\" immediately followed by \"Round N \u2014 X vs Y\"), the narrator div will visibly flicker between messages too fast to read; check all round-transition paths for stacked narrate() calls and add minimum 400ms stagger between them",
+      "time": "23:47:30",
+      "timestamp": "2026-04-09T23:47:30.438673",
+      "roast": "Congratulations, you spent a whole cycle discovering that \"fire the callback after the animation finishes\" is not, in fact, a radical design insight \u2014 it's what the code should have done since v1, and Skaff Elias would weep that it took 111 versions of duct tape to get there."
+    },
     {
       "target": "testroom",
       "cycle": 7,
@@ -507,18 +517,9 @@
       "after_that": "Verify `hasSideline()` helper correctly excludes KO'd ghosts from Smithy Forge readiness check \u2014 if Smithy is KO'd on the sideline, the \"\ud83d\udd28 Forge: ready/idle\" tag should disappear, but `hasSideline(team, 204)` may not check `.ko` status before returning true.",
       "time": "18:07:56",
       "timestamp": "2026-04-09T18:07:56.012413"
-    },
-    {
-      "target": "testroom",
-      "cycle": 17,
-      "summary": "Doubles roll narration now fires \"DOUBLES!\" in gold on the narrator bar (typeLabel was missing the doubles case), and res-tile.rerollable now pulses gold like die.rerollable \u2014 both the missing CSS rule and the missing string were one-liners that closed two separate \"dead silent feedback\" gaps at once.",
-      "next_up": "General text overlap audit \u2014 the `fighter-status` badge row (status tags like `-1 Die`, `Overclock`, `Lazy`) at narrow widths (< 400px) may wrap incorrectly or clip behind the HP bar; verify it scrolls/wraps cleanly rather than overflowing its container.",
-      "after_that": "Drifted-card playtesting audit for Mother Nature (366) Seasons \u2014 verify Winter's \u22121 die stacks correctly with Timber's \u22121 die via `Math.max(1,...)`, that the season narrates correctly each round, and that Summer/Autumn don't fire at wrong queue timing.",
-      "time": "18:05:01",
-      "timestamp": "2026-04-09T18:05:01.979796"
     }
   ],
-  "last_update": "2026-04-09T23:44:04.868854",
+  "last_update": "2026-04-09T23:47:30.438681",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
