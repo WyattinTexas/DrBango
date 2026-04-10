@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 66,
-      "remaining_mins": 146,
+      "cycles": 67,
+      "remaining_mins": 135,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T17:12:41.513892",
+      "last_update": "2026-04-10T17:14:56.309347",
       "status": "running",
-      "next_up": "Audit the `Growing Mob (83) MASK MERCHANT!` and `Munch Scraps (66) MASK MERCHANT!` Filbert-flip `onShow` callbacks \u2014 both use `wF.hp = Math.max(0, wF.hp - N)` re-computation at callout time instead of their pre-computed `growingMobHpAfter`/`munchHpAfter` values, creating a potential subtitle-vs-HP discrepancy if Aunt Susan's Filbert-flip fires before them in the same ability queue and modifies `wF.hp` first.",
-      "after_that": "Audit the complete list of `onShow` Filbert-flip callbacks across all cards (Flora win/lose, Shoo, Katrina, Boris, Opa, Villager, Jeffery, Lou, Mallow, Boo Brothers, Ancient One) for consistency \u2014 some use absolute pre-computed values, others use relative decrements; standardize them all to use the same pattern (relative decrement `f.hp -= N; f.hp = Math.max(0, f.hp)`) so that multi-Filbert-flip rounds stack correctly without one callback overwriting another."
+      "next_up": "Audit the remaining `onShow` Filbert-flip callbacks across Opa, Villager, Jeffery, and Lou in the win/lose path \u2014 the AFTER from cycle #66 flagged these for consistency review; specifically, Lou's Bros callback at line ~9363 uses `wF.hp = Math.max(0, wF.hp - 1)` (relative, still re-computes at callout time) while all other recently-fixed cards now use pre-computed absolute values.",
+      "after_that": "Sweep the `doPostRollAndResolve` tie-path Filbert callbacks for the same relative-vs-absolute inconsistency \u2014 the Opa REST! and Ancient One FRIEND TO ALL! callbacks in the tie path were fixed in cycle #49 to use relative decrements, but those were fixed before the absolute-value pattern was fully established across the rest of the codebase."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 67,
+      "summary": "Growing Mob (83) and Munch (66) `onShow` callbacks now assign pre-computed absolute HP values (`growingMobGhost.hp = growingMobHpAfter` / `munchGhost.hp = munchHpAfter`) instead of re-computing relative to `wF.hp` at callout time \u2014 preventing HP bar / subtitle discrepancies when other ability callouts (e.g., Aunt Susan Harvest Dance) mutate `wF.hp` earlier in the same queue.",
+      "next_up": "Audit the remaining `onShow` Filbert-flip callbacks across Opa, Villager, Jeffery, and Lou in the win/lose path \u2014 the AFTER from cycle #66 flagged these for consistency review; specifically, Lou's Bros callback at line ~9363 uses `wF.hp = Math.max(0, wF.hp - 1)` (relative, still re-computes at callout time) while all other recently-fixed cards now use pre-computed absolute values.",
+      "after_that": "Sweep the `doPostRollAndResolve` tie-path Filbert callbacks for the same relative-vs-absolute inconsistency \u2014 the Opa REST! and Ancient One FRIEND TO ALL! callbacks in the tie path were fixed in cycle #49 to use relative decrements, but those were fixed before the absolute-value pattern was fully established across the rest of the codebase.",
+      "time": "17:14:56",
+      "timestamp": "2026-04-10T17:14:56.309608",
+      "roast": "That's not a fix. That's a bandaid on a bandaid. Buttons has more structural integrity."
+    },
     {
       "target": "testroom",
       "cycle": 66,
@@ -519,19 +529,9 @@
       "time": "13:34:34",
       "timestamp": "2026-04-10T13:34:34.874209",
       "roast": "Five months to Kickstarter and we're still retrofitting Wisp blocks onto forEach loops like it's a craft fair \u2014 Rosewater would call this \"elegant,\" I call it \"the interaction matrix finally getting the beating it deserved in January."
-    },
-    {
-      "target": "testroom",
-      "cycle": 17,
-      "summary": "Gus (31) Gale Force now correctly lets the losing player CHOOSE which sideline ghost to swap in \u2014 previously it auto-picked the first available ghost via `findIndex`. Added a `#galeForcePickerOverlay` modal (same Winston Scheme pattern) that fires after the ability queue drains; the picker shows all viable sideline ghosts with HP and ability info; the losing player clicks their choice, entry effects fire for the new ghost, then the game continues. Also fixed: old code never called `triggerEntry()` for the forced-in ghost \u2014 the new picker and auto-pick (1 sideline case) both fire `triggerEntry`.",
-      "next_up": "Audit Lou (32) Bros \u2014 sideline effect that boosts Grawr (+1 dmg + heal); verify Cornelius block, Filbert curse, and that the `wF.id === 34` check is correct.",
-      "after_that": "Audit Sandwiches (33) Dependable \u2014 resource mirror for all resource grants; verify all 14+ grant sites are covered and that none were missed in recent additions (Tadpole Splash, etc.).",
-      "time": "13:28:13",
-      "timestamp": "2026-04-10T13:28:13.481153",
-      "roast": "Five months past the Kickstarter deadline and you're just now letting players pick their own ghost on a forced swap \u2014 congratulations on discovering agency, Garfield wept."
     }
   ],
-  "last_update": "2026-04-10T17:12:47.901893",
+  "last_update": "2026-04-10T17:14:56.309613",
   "orchestrator_check": {
     "timestamp": "2026-04-10T16:17:01.060805",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 50 cycles, 198m left | last [testroom c50]: Munch (66) Scraps and Troubling Haters (83) Growing Mob HP mutations now defer to `onShow` callbacks \u2014 HP bars no longer"
