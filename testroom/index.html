@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v101';
+const TESTROOM_VERSION = 'v103';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3381,47 +3381,49 @@ function clearMsCountdown(el) {
 }
 
 function pickMsDie(idx) {
-  if (!B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-die') return;
+  if (!B || !B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-die') return;
   clearInterval(msCountdownTimer);
+  msCountdownTimer = null; // prevent any queued interval callbacks from firing
   const team = B.pendingMoonstone.team;
   B.pendingMoonstone.dieIndex = idx;
   B.pendingMoonstone.phase = 'pick-value';
 
-  // Clear die clickability, show value picker on the selected die
+  // Clear die clickability and countdowns immediately
   clearDiceClickable(team);
   const diceEl = document.getElementById(team + '-dice');
   const resEl = document.getElementById(team + '-resources');
   const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
   clearMsCountdown(msEl);
   clearMsCountdown(diceEl);
+  document.querySelectorAll('.reroll-countdown').forEach(el => el.remove());
 
   narrate(`Die ${idx+1} selected — pick a new value!`);
 
-  // Delay showing the value picker so the die-click event doesn't bleed through
-  setTimeout(() => {
-    if (!B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-value') return;
-    const el = document.getElementById('msPicker');
-    document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
-    const step2 = document.getElementById('msStep2');
-    step2.style.display = 'flex';
-    step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
-    el.classList.add('active');
+  // Show value picker immediately — no delay that can race with skip timers
+  const el = document.getElementById('msPicker');
+  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
+  const step2 = document.getElementById('msStep2');
+  step2.style.display = 'flex';
+  step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+  el.classList.add('active');
 
-    // Auto-skip after 7s if no value picked
-    let remaining = 7;
-    showLsCountdown(el, remaining);
-    msCountdownTimer = setInterval(() => {
-      remaining--;
-      if (remaining <= 0) {
-        clearInterval(msCountdownTimer);
-        el.classList.remove('active');
-        clearMsCountdown(el);
-        skipMoonstone();
-      } else {
-        showLsCountdown(el, remaining);
-      }
-    }, 1000);
-  }, 150);  // 150ms delay prevents click-through from die selection
+  // Scroll into view
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+
+  // Auto-skip after 7s if no value picked
+  let remaining = 7;
+  showLsCountdown(el, remaining);
+  msCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(msCountdownTimer);
+      el.classList.remove('active');
+      clearMsCountdown(el);
+      skipMoonstone();
+    } else {
+      showLsCountdown(el, remaining);
+    }
+  }, 1000);
 }
 
 function pickMsValue(val) {
@@ -3979,12 +3981,25 @@ function resolveRound() {
     log(`<span class="log-ability">${wF.name}</span> — Twilight! <span class="log-dmg">+1 bonus damage (Round ${B.round})!</span>`);
   }
 
+  // Collect Knight callouts deferred from all pre-cinematic ability triggers.
+  // All checkKnightEffects calls in the game-state section must use collectKC() instead of
+  // calling checkKnightEffects directly — otherwise they fire showAbilityCallout synchronously
+  // (abilityQueueMode is false here) and get stomped by the first cinematic queue entry at dmgDelay.
+  const resolveKnightCallouts = [];
+  const collectKC = (t, n, s) => {
+    const savedQ = abilityQueue, savedM = abilityQueueMode;
+    abilityQueue = []; abilityQueueMode = true;
+    checkKnightEffects(t, n, s);
+    resolveKnightCallouts.push(...abilityQueue);
+    abilityQueue = savedQ; abilityQueueMode = savedM;
+  };
+
   // Pudge (311) — doubles: +2 damage
   let pudgeSelfDmg = false;
   if (wF.id === 311 && wR.type === 'doubles') {
     dmg += 2;
     pudgeSelfDmg = true;
-    checkKnightEffects(winTeamName, wF.name);
+    collectKC(winTeamName, wF.name);
   }
 
   // Red Hunter (345) — if opponent has any specials (resources, including committed): +3 damage
@@ -4001,11 +4016,13 @@ function resolveRound() {
     if (hasSpecials) {
       dmg += 3;
       redHunterTriggered = true;
-      checkKnightEffects(winTeamName, wF.name);
+      collectKC(winTeamName, wF.name);
     }
   }
 
   // Sylvia (313) — loser dodge check: roll 2 dice, if either is a 6 negate all damage
+  // Note: callouts are intentionally NOT queued here — they are queued in the cinematic section
+  // (where abilityQueueMode=true) to prevent them firing synchronously and being stomped.
   let sylviaDodged = false;
   let sylviaDodgeRolls = []; // store for callout
   if (lF.id === 313 && !lF.ko) {
@@ -4013,13 +4030,11 @@ function resolveRound() {
     if (sylviaDodgeRolls.includes(6)) {
       dmg = 0;
       sylviaDodged = true;
-      queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`);
       log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled [${sylviaDodgeRolls.join(',')}] — <span class="log-ms">ALL DAMAGE NEGATED!</span>`);
     } else {
-      queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`);
       log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${sylviaDodgeRolls.join(',')}] (needed a 6).`);
     }
-    checkKnightEffects(loseTeamName, lF.name);
+    collectKC(loseTeamName, lF.name);
   }
 
   // --- APPLY DAMAGE (game state updates immediately) ---
@@ -4044,16 +4059,16 @@ function resolveRound() {
     log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
   }
 
-  // On-win resource gains (game state) — Knight effects fire after ability resolves
-  if (wF.id === 209 && !wF.ko) { winTeam.resources.surge += 2; checkKnightEffects(winTeamName, wF.name); }
-  if (wF.id === 307 && !wF.ko) { winTeam.resources.surge++; winTeam.resources.ice++; checkKnightEffects(winTeamName, wF.name); }
-  if (wF.id === 342 && !wF.ko) { wF.hp++; checkKnightEffects(winTeamName, wF.name); }
-  if (wF.id === 336 && !wF.ko) { winTeam.resources.fire++; checkKnightEffects(winTeamName, wF.name); }
-  if (wF.id === 309 && !wF.ko) { winTeam.resources.healingSeed++; checkKnightEffects(winTeamName, wF.name); }
-  if (wF.id === 362 && !wF.ko) { winTeam.resources.healingSeed += 2; loseTeam.resources.healingSeed += 1; checkKnightEffects(winTeamName, wF.name); }
+  // On-win resource gains (game state) — Knight callouts deferred to cinematic section
+  if (wF.id === 209 && !wF.ko) { winTeam.resources.surge += 2; collectKC(winTeamName, wF.name); }
+  if (wF.id === 307 && !wF.ko) { winTeam.resources.surge++; winTeam.resources.ice++; collectKC(winTeamName, wF.name); }
+  if (wF.id === 342 && !wF.ko) { wF.hp++; collectKC(winTeamName, wF.name); }
+  if (wF.id === 336 && !wF.ko) { winTeam.resources.fire++; collectKC(winTeamName, wF.name); }
+  if (wF.id === 309 && !wF.ko) { winTeam.resources.healingSeed++; collectKC(winTeamName, wF.name); }
+  if (wF.id === 362 && !wF.ko) { winTeam.resources.healingSeed += 2; loseTeam.resources.healingSeed += 1; collectKC(winTeamName, wF.name); }
   if (hasSideline(winTeam, 314)) {
     const sixes = countVal(winDice, 6);
-    if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314); winTeam.resources.healingSeed += sixes; checkKnightEffects(winTeamName, 'Farmer Jeff', jeffGhost); }
+    if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314); winTeam.resources.healingSeed += sixes; collectKC(winTeamName, 'Farmer Jeff', jeffGhost); }
   }
 
   // Aunt Susan heal bonus (game state — applies to whichever team committed it)
@@ -4073,8 +4088,8 @@ function resolveRound() {
     }
   });
 
-  // On-lose resource gains (game state)
-  if (lF.id === 404 && !lF.ko) { loseTeam.resources.surge++; checkKnightEffects(loseTeamName, lF.name); }
+  // On-lose resource gains (game state) — Knight callout deferred
+  if (lF.id === 404 && !lF.ko) { loseTeam.resources.surge++; collectKC(loseTeamName, lF.name); }
 
   // On-KO triggers (game state)
   if (lF.ko) {
@@ -4083,7 +4098,7 @@ function resolveRound() {
       if (wR.type === 'singles') loseTeam.resources.luckyStone++;
       else if (wR.type === 'doubles') loseTeam.resources.surge++;
       else if (isTripleOrBetter(wR.type)) loseTeam.resources.moonstone++;
-      checkKnightEffects(loseTeamName, 'Granny', grannyGhost);
+      collectKC(loseTeamName, 'Granny', grannyGhost);
     }
     if (lF.id === 404) { loseTeam.resources.surge++; }
   }
@@ -4093,14 +4108,14 @@ function resolveRound() {
     if (wR.type === 'singles') winTeam.resources.luckyStone++;
     else if (wR.type === 'doubles') winTeam.resources.surge++;
     else if (isTripleOrBetter(wR.type)) winTeam.resources.moonstone++;
-    checkKnightEffects(winTeamName, 'Granny', grannyGhost);
+    collectKC(winTeamName, 'Granny', grannyGhost);
   }
 
   // End-of-round (game state)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameMax2 = team === B.red ? 'red' : 'blue';
-    if (f.id === 302 && !f.ko) { team.resources.healingSeed++; checkKnightEffects(tNameMax2, f.name); }
+    if (f.id === 302 && !f.ko) { team.resources.healingSeed++; collectKC(tNameMax2, f.name); }
   });
 
   // (Eternal Flame game state already handled at line ~2657)
@@ -4135,7 +4150,11 @@ function resolveRound() {
   if (redHunterTriggered) {
     queueAbility('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
   }
-  // Sylvia callouts already queued in the dodge check block above
+  // Sylvia dodge callouts (queued here — abilityQueueMode=true — not in the game-state section)
+  if (lF.id === 313 && !lF.ko && sylviaDodgeRolls.length > 0) {
+    if (sylviaDodged) queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`);
+    else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`);
+  }
 
   // Eternal Flame callout
   if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
@@ -4181,6 +4200,11 @@ function resolveRound() {
     const f = active(team);
     if (f.id === 302 && !f.ko) queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`);
   });
+
+  // Knight reactions (HEAVY AIR!/RETRIBUTION!) collected from all pre-cinematic ability triggers.
+  // These play last in the queue — after all ability callouts — so each Knight reaction follows
+  // the full round's events rather than firing synchronously and being stomped.
+  resolveKnightCallouts.forEach(kc => queueAbility(kc.name, kc.color, kc.desc));
 
   abilityQueueMode = false;
 
