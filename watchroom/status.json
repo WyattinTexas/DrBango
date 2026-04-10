@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 5,
-      "remaining_mins": 45,
+      "cycles": 6,
+      "remaining_mins": 41,
       "until": "12:22 AM",
-      "last_update": "2026-04-09T23:40:01.357577",
+      "last_update": "2026-04-09T23:42:40.267533",
       "status": "running",
-      "next_up": "Audit `openKoSwap`'s all-swaps-done path \u2014 `resetRollButtons()` fires immediately alongside `narrate(\"Round N\")`, meaning roll buttons pulse and become clickable while the round-narration + entry narration are still draining; consider delaying `B.phase = 'ready'` + `resetRollButtons()` until the narrator queue is clear (or at least a fixed 1800ms after the last swap's entry narration)",
-      "after_that": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch) \u2014 `highlightWinnerDice` fires at t+10ms then `handleKOs()` at t+1800ms; verify the tiebreaker dice glow finishes before the KO swap modal appears, and that no narration from `handleKOs` overlaps with the still-draining ability queue"
+      "next_up": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch, t+1800ms) \u2014 `highlightWinnerDice` fires at t+10ms and `handleKOs()` at t+1800ms; verify tiebreaker dice glow doesn't still animate when the KO swap modal appears, and that the `if (!handleKOs())` immediate-ready path at line 4321-4325 also gets the 350ms narrate-first delay (it currently fires `B.phase='ready'` + `resetRollButtons()` + `narrate()` all at once with no delay)",
+      "after_that": "Audit narrator pacing in the KO auto-pick chain \u2014 `openKoSwap` fires \"X is down! Y steps up!\" via `narrate()`, then 800ms later `doKoSwap` fires `triggerEntry` which calls `narrate(\"[Y] enters the arena!\")` at t=0; since the first narrate's 1800ms lock won't expire until t=1800ms, the entry narrate at t=800ms queues properly \u2014 but verify the ghost HP bar update from `renderBattle()` in `doKoSwap` (which fires at t=800ms) is visible before any entry callout splash covers the arena"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 6,
+      "summary": "`openKoSwap` all-swaps-done path now fires `narrate(\"Round N\")` BEFORE enabling roll buttons (with 350ms delay), so buttons never go live while the entry or round narration is still visible \u2014 matching the v110 no-KO pattern",
+      "next_up": "Audit the `drainAbilityQueue` KO path (`lF.ko` branch, t+1800ms) \u2014 `highlightWinnerDice` fires at t+10ms and `handleKOs()` at t+1800ms; verify tiebreaker dice glow doesn't still animate when the KO swap modal appears, and that the `if (!handleKOs())` immediate-ready path at line 4321-4325 also gets the 350ms narrate-first delay (it currently fires `B.phase='ready'` + `resetRollButtons()` + `narrate()` all at once with no delay)",
+      "after_that": "Audit narrator pacing in the KO auto-pick chain \u2014 `openKoSwap` fires \"X is down! Y steps up!\" via `narrate()`, then 800ms later `doKoSwap` fires `triggerEntry` which calls `narrate(\"[Y] enters the arena!\")` at t=0; since the first narrate's 1800ms lock won't expire until t=1800ms, the entry narrate at t=800ms queues properly \u2014 but verify the ghost HP bar update from `renderBattle()` in `doKoSwap` (which fires at t=800ms) is visible before any entry callout splash covers the arena",
+      "time": "23:42:47",
+      "timestamp": "2026-04-09T23:42:47.383786",
+      "roast": "Congratulations, you spent a whole cycle making sure a text box disappears before a button appears \u2014 Richard Garfield solved the internet with cardboard and you're out here solving a race condition with a setTimeout."
+    },
     {
       "target": "testroom",
       "cycle": 5,
@@ -505,18 +515,9 @@
       "after_that": "`res-tile.rerollable` pulse animation \u2014 the CSS rule `animation:rerollPulse` only targets `.die.rerollable`, so when JS adds the `rerollable` class to the Lucky Stone or Moonstone tile, no gold-pulse animation fires on the tile, leaving players unsure it's clickable.",
       "time": "18:03:49",
       "timestamp": "2026-04-09T18:03:49.785049"
-    },
-    {
-      "target": "testroom",
-      "cycle": 15,
-      "summary": "KO swap \"answers the call!\" narrator no longer clobbered \u2014 `triggerEntry`'s generic \"enters the arena!\" was synchronously overwriting it in the same JS tick; added `suppressNarrate` param so `doKoSwap`'s richer confirmation message now actually displays",
-      "next_up": "Drifted-card playtesting audit for Mother Nature (366) Seasons \u2014 specifically verify Winter's \u22121 die stacks correctly with Timber's \u22121 die via `Math.max(1,...)`, that the season narrates correctly each round, and that Summer/Autumn don't fire at wrong queue timing",
-      "after_that": "Persistent Meticulous Planning indicator cross-check \u2014 now that the `-1 Die \u00b7 Timber` label was added in v54, verify it correctly disappears when Timber is KO'd mid-battle (the `updateDicePenaltyLabels()` call in `renderBattle()` should handle this, but confirm the label clears when `active(t).id !== 210`)",
-      "time": "17:56:40",
-      "timestamp": "2026-04-09T17:56:40.120431"
     }
   ],
-  "last_update": "2026-04-09T23:40:07.062706",
+  "last_update": "2026-04-09T23:42:47.383810",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
