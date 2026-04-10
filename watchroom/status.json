@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 12,
-      "remaining_mins": 22,
+      "cycles": 13,
+      "remaining_mins": 19,
       "until": "12:22 AM",
-      "last_update": "2026-04-10T00:02:33.005365",
+      "last_update": "2026-04-10T00:05:18.570390",
       "status": "running",
-      "next_up": "Audit `doPreRollSetup`'s Shade's Shadow Meltdown block \u2014 when Shade triggers mid-queue and KOs a ghost, `handleKOs()` returns true from inside `drainAbilityQueue`'s callback; verify the `postRollDone` \u2192 KO chain properly parks phase in 'ko-pause' and doesn't double-fire `openKoSwap` if it was already called by the queue callback",
-      "after_that": "Audit narrator pacing in the dmg=0 path for non-empty queues \u2014 ability callouts now fire at t=2600ms (after 0-damage narration clears), but if the queue drains and the callback fires (e.g. at t=5400ms for 1 ability), verify \"Round N \u2014 X vs Y\" narration immediately displays (no stale lock) and then roll buttons fire 350ms later with no overlap"
+      "next_up": "Audit the `dmg=0` path for non-empty queues \u2014 ability callouts fire at t=2600ms (after 0-damage narration clears), but verify \"Round N \u2014 X vs Y\" narration immediately displays (no stale lock) and roll buttons fire 350ms later with no overlap after the queue drains",
+      "after_that": "Audit the `doKoSwap` multi-KO chain \u2014 when a newly-entered ghost triggers another KO (entry ability KO's the opponent's active ghost), verify `openKoSwap` is not called a second time while the first swap's entry callouts are still playing"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 13,
+      "summary": "Shade's Shadow pre-roll KO no longer allows rolling to start mid-MELTDOWN! \u2014 `B.phase = 'ko-pause'` now prevents `rollReady` from proceeding before `handleKOs()` fires",
+      "next_up": "Audit the `dmg=0` path for non-empty queues \u2014 ability callouts fire at t=2600ms (after 0-damage narration clears), but verify \"Round N \u2014 X vs Y\" narration immediately displays (no stale lock) and roll buttons fire 350ms later with no overlap after the queue drains",
+      "after_that": "Audit the `doKoSwap` multi-KO chain \u2014 when a newly-entered ghost triggers another KO (entry ability KO's the opponent's active ghost), verify `openKoSwap` is not called a second time while the first swap's entry callouts are still playing",
+      "time": "00:05:18",
+      "timestamp": "2026-04-10T00:05:18.570649",
+      "roast": "Polish cycle. Also known as: admitting the first version shipped unfinished."
+    },
     {
       "target": "testroom",
       "cycle": 12,
@@ -516,18 +526,9 @@
       "after_that": "Harrison (315) extra-die grant queue-order audit \u2014 verify `B.harrisonBonus` applies before dice are rendered when multiple on-win abilities chain simultaneously (e.g. Overclock + Harrison on same team), and confirm the bonus die actually shows in the dice row rather than being silently granted.",
       "time": "18:45:19",
       "timestamp": "2026-04-09T18:45:19.937335"
-    },
-    {
-      "target": "testroom",
-      "cycle": 26,
-      "summary": "Aunt Susan (309) Harvest Dance heal is now capped at `maxHp` \u2014 previously `f.hp += healAmt` allowed unlimited HP overflow with no indicator; now uses `Math.min(f.maxHp, ...)`, logs the before\u2192after delta with a `(capped)` suffix when seeds were wasted on a full-health ghost, and the ability callout shows `X\u2192Y HP` like Calvin's Overclock.",
-      "next_up": "Boris (343) Fortify \u2014 same uncapped HP bug: `g.hp += 2` in `triggerBorisHook` has no `Math.min(g.maxHp, ...)` guard, so spending surge when Boris is at max HP silently inflates him to 8/6 or beyond with only the battle log showing the overflow; add a cap and match the log format just fixed for Aunt Susan.",
-      "after_that": "Shade's Shadow (205) fatal pre-roll KO \u2192 MELTDOWN! callout silently dropped \u2014 when Shade's Shadow kills the enemy in pre-roll, `preRollCallouts.push(['MELTDOWN!', ...])` is queued but the early-return at `handleKOs()` exits before `preRollCallouts.forEach(...)` runs, so the callout never fires; fix by firing `showAbilityCallout` immediately instead of pushing to the array (or flushing pending callouts before the early return).",
-      "time": "18:43:49",
-      "timestamp": "2026-04-09T18:43:49.127968"
     }
   ],
-  "last_update": "2026-04-10T00:02:39.280584",
+  "last_update": "2026-04-10T00:05:18.570655",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
