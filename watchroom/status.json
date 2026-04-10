@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 29,
-      "remaining_mins": 305,
+      "cycles": 30,
+      "remaining_mins": 298,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T14:30:07.965038",
+      "last_update": "2026-04-10T14:32:28.788266",
       "status": "running",
-      "next_up": "Audit whether Eternal Flame also needs a Wisp/Sandwiches guard \u2014 current implementation has neither, but the \"preserve fired resources\" mechanic is a refund not a gain, so Wisp probably shouldn't block and Sandwiches shouldn't mirror. Verify the design intent is correct and document it as intentional.",
-      "after_that": "Audit Igneous (331) Crystallize \u2014 the win-path resource grant at line 9513-9516 appears to have Wisp blocking and Sandwiches mirror (`wispBlocksWin`, `sandwichForLose`) but the tie-path Igneous at line 7560-7564 should also be checked for the same deferred-onShow pattern consistency."
+      "next_up": "Strip remaining Wisp dead code in the tie-path block (lines ~7356\u20137578: `wispBlocksTweak`, `wispBlocksJim`, `wispBlocksMax` declarations and their `if/else` wrappers) \u2014 same pattern, same fix: replace `hasSideline(X, 344)` with `false` and unwrap the else branches.",
+      "after_that": "Strip the entry-path Wisp dead code in Chad Sploop! (lines ~2993\u20133002) and Selene `doSeleneChoice` (line ~3616) \u2014 both wrap the resource grant in an `if (hasSideline(enemy, 344))` block that is always false, making the else branch (the actual grant) unconditional dead code that still compiles correctly but adds visual noise."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 30,
+      "summary": "Removed Wisp (344) Guide Light dead-code scaffolding from the main `resolveRound` win/lose path \u2014 Wisp is a shelved fake card that can never appear on a team, so `wispBlocksWin`/`wispBlocksLose` were always `false`; the 40+ `if (wispBlocksWin) { wispAnnWin(); } else { ... }` branches were always taking the else path at runtime anyway, but the dead check overhead and confusing conditional structure obscured the real behavior.",
+      "next_up": "Strip remaining Wisp dead code in the tie-path block (lines ~7356\u20137578: `wispBlocksTweak`, `wispBlocksJim`, `wispBlocksMax` declarations and their `if/else` wrappers) \u2014 same pattern, same fix: replace `hasSideline(X, 344)` with `false` and unwrap the else branches.",
+      "after_that": "Strip the entry-path Wisp dead code in Chad Sploop! (lines ~2993\u20133002) and Selene `doSeleneChoice` (line ~3616) \u2014 both wrap the resource grant in an `if (hasSideline(enemy, 344))` block that is always false, making the else branch (the actual grant) unconditional dead code that still compiles correctly but adds visual noise.",
+      "time": "14:32:34",
+      "timestamp": "2026-04-10T14:32:34.188605",
+      "roast": "Forty branches of dead code for a shelved card while Buttons and Doom wait for balance passes \u2014 truly the Guide Light this codebase deserved."
+    },
     {
       "target": "testroom",
       "cycle": 29,
@@ -519,19 +529,9 @@
       "time": "07:01:05",
       "timestamp": "2026-04-10T07:01:05.401994",
       "roast": "Three lines changed. Fourteen lines of commit message. The ratio concerns me."
-    },
-    {
-      "target": "testroom",
-      "cycle": 127,
-      "summary": "Implemented Scorch (317) \u2014 Singe: every win permanently reduces the opponent's active ghost's max HP by 1 (min 1), with `lF.hp` clamped to the new ceiling; `SINGE!` queued in `var(--common)` showing the before\u2192after max HP math \u2014 an attrition card that counters healing-heavy strategies by shrinking the ceiling over time.",
-      "next_up": "Implement Pumice (319) \u2014 Float: sideline passive that caps incoming damage at 2 when it would be 3 or more. Simple `hasSideline(loseTeam, 319) && dmg >= 3 \u2192 dmg = 2` check in the damage section after Sky Elusive, `FLOAT!` queued in `var(--common)` \u2014 a sideline damage-reduction guard that pairs with Cornelius to shut down burst strategies.",
-      "after_that": "Implement Fuego (337) \u2014 Fiesta: win with triples \u2192 gain 1 of every resource (Healing Seed + Sacred Fire + Surge). `wF.id === 337 && !wF.ko && wR.type === 'triples'` in the on-win callouts section, granting all three resources via deferred `onShow` callbacks with `FIESTA!` queued in `var(--uncommon)`.",
-      "time": "06:58:52",
-      "timestamp": "2026-04-10T06:58:52.477787",
-      "roast": "Seven months past the September deadline and you're inventing new status effects instead of printing the box \u2014 Scorch is elegant, but so was rearranging deck chairs on the Titanic."
     }
   ],
-  "last_update": "2026-04-10T14:30:07.965181",
+  "last_update": "2026-04-10T14:32:34.188621",
   "orchestrator_check": {
     "timestamp": "2026-04-10T14:17:00.381070",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 25 cycles, 319m left | last [testroom c25]: Jimmy (352) Chirp tie-path now defers the Lucky Stone grant to onShow timing, respects Wisp (344) Guide Light blocking, "
