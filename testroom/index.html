@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v320';
+const TESTROOM_VERSION = 'v322';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1712,7 +1712,7 @@ const GHOSTS = [
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
-    ability:"Aquatic Wisdom", abilityDesc:"Entry: spend 2 Ice Shards to gain 1 Moonstone (if available).",
+    ability:"Ice Blade", abilityDesc:"Before rolling: you may spend 2 Ice Shards + 1 Moonstone to forge an Ice Blade. Permanent — Zain deals +2 damage on every winning roll for the rest of the game.",
     category:"Resource Generation", set:"Volcanic Activity",
     designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Activity (the other is the whale, Nerina)."
   },
@@ -1874,7 +1874,7 @@ const GHOSTS = [
   {id:339, name:"Slag Heap", art:"art/slag_heap.webp", rarity:"common", maxHp:3, ability:"Residue", abilityDesc:"When defeated: opponent's active ghost cannot heal for 2 rounds.", category:"Debuff", set:"Volcanic Activity", designNote:"Anti-healing death trigger."},
   {id:341, name:"Obsidian Throne", rarity:"ghost-rare", maxHp:7, art:"art/obsidian_throne.webp", ability:"Dominion", abilityDesc:"While active: opponent cannot use items (Surge, Surge, Healing Seeds).", category:"Debuff", set:"Volcanic Activity", designNote:"Item lockdown. Opponent hoards but can't spend."},
   {id:343, name:"Boris", rarity:"uncommon", maxHp:6, art:"art/bastion.webp", ability:"Fortify", abilityDesc:"When you spend a Surge: Boris gains 2 HP (can exceed max HP).", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Surge for tankiness. Overclocks past maxHp like Calvin — all heals overclock except Healing Seeds."},
-  {id:345, name:"Red Hunter", art:"art/tremor.webp", rarity:"ghost-rare", maxHp:6, ability:"Rumble", abilityDesc:"If your opponent has any specials: deal +3 damage.", category:"Dice Modifier", set:"Volcanic Activity", designNote:"Entry disruption."},
+  {id:345, name:"Red Hunter", art:"art/tremor.webp", rarity:"ghost-rare", maxHp:6, ability:"Rumble", abilityDesc:"Win a roll: if your opponent has any specials, deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Punishes hoarders. Logic was already correct — only fires on a winning roll. Text now matches behavior."},
   {id:347, name:"Eruption", rarity:"rare", maxHp:7, art:"art/eruption.webp", ability:"Blow", abilityDesc:"Spend 2 Silver Leaves: deal 4 damage immediately. No roll needed.", category:"Destruction/Instant Kill", set:"Volcanic Activity", designNote:"Direct damage. Guaranteed 4 for 2 Silver Leaves."},
   {id:349, name:"Wick", rarity:"uncommon", maxHp:5, art:"art/wick.webp", ability:"Slow Burn", abilityDesc:"Each round: deal 1 damage to opponent. But lose 1 HP yourself.", category:"Debuff", set:"Volcanic Activity", designNote:"Mutual destruction timer."},
   {id:351, name:"Glow Worm", rarity:"common", maxHp:5, art:"art/glow_worm.webp", ability:"Tunnel", abilityDesc:"Spend 1 Surge: switch your active ghost. Free action, no swap triggers.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"Resource-powered free swap."},
@@ -2879,16 +2879,7 @@ function triggerEntry(team, skipEntryEffects) {
     collectKnightReactions();
   }
 
-  // Zain (206) — Aquatic Wisdom: spend 2 ice for 1 moonstone
-  if (f.id === 206) {
-    if (team.resources.ice >= 2) {
-      team.resources.ice -= 2;
-      team.resources.moonstone++;
-      entryCallouts.push(['AQUATIC WISDOM!', 'var(--ghost-rare)', `${f.name} — 2 Ice → 1 Moonstone!`]);
-      log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
-      collectKnightReactions();
-    }
-  }
+  // Zain (206) — Ice Blade: opt-in pre-roll forge button (see useZainForge), no entry effect
 
   // Nerina (306) — Leviathan: deal 3 damage to enemy active
   if (f.id === 306) {
@@ -3372,6 +3363,22 @@ function useFinnForge(team, kind) {
     return;
   }
   popSidelineCard(t, 204);
+  playSfx('sfxSpecial', 0.5);
+  renderBattle();
+}
+
+function useZainForge(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 206 || f.ko) return;
+  if (f.iceBladeForged) return; // already forged — permanent, can't re-forge
+  if (t.resources.ice < 2 || t.resources.moonstone < 1) return;
+  t.resources.ice -= 2;
+  t.resources.moonstone -= 1;
+  f.iceBladeForged = true;
+  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">2 Ice Shards</span> + <span class="log-ms">1 Moonstone</span>. Permanent +2 damage on wins!`);
+  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — permanent +2 damage on every winning roll!`);
   playSfx('sfxSpecial', 0.5);
   renderBattle();
 }
@@ -6015,14 +6022,22 @@ function doPreRollSetup() {
   let redCount = 3, blueCount = 3;
 
   // Knight Light Retribution — bonus dice from opponent abilities
+  // Guard: only apply if KL (402) is still the active ghost on that team — if KL was KO'd
+  // mid-round the stored dice are silently discarded (not inherited by the replacement ghost).
   if (B.retributionDice) {
     if (B.retributionDice.red > 0) {
-      redCount += B.retributionDice.red;
-      log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-ms">+${B.retributionDice.red} bonus dice!</span>`);
+      const klRed = active(B.red);
+      if (klRed.id === 402 && !klRed.ko) {
+        redCount += B.retributionDice.red;
+        log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-ms">+${B.retributionDice.red} bonus dice!</span>`);
+      }
     }
     if (B.retributionDice.blue > 0) {
-      blueCount += B.retributionDice.blue;
-      log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-ms">+${B.retributionDice.blue} bonus dice!</span>`);
+      const klBlue = active(B.blue);
+      if (klBlue.id === 402 && !klBlue.ko) {
+        blueCount += B.retributionDice.blue;
+        log(`<span class="log-ability">Knight Light</span> — Retribution! <span class="log-ms">+${B.retributionDice.blue} bonus dice!</span>`);
+      }
     }
     B.retributionDice = { red: 0, blue: 0 };
   }
@@ -8059,6 +8074,14 @@ function resolveRound() {
     log(`<span class="log-ability">${wF.name}</span> — Pure Heart! Instant KO — ${lF.name} is defeated!`);
   }
 
+  // Zain (206) — Ice Blade: +2 damage on every winning roll if forged (permanent)
+  let zainIceBladeTriggered = false;
+  if (wF.id === 206 && wF.iceBladeForged && !wF.ko) {
+    dmg += 2;
+    zainIceBladeTriggered = true;
+    collectKC(winTeamName, wF.name);
+  }
+
   // Red Hunter (345) — if opponent has any specials (resources, including committed): +3 damage
   let redHunterTriggered = false;
   if (wF.id === 345) {
@@ -9143,6 +9166,9 @@ function resolveRound() {
   if (tylerFireTriggered) {
     const firesUsed = B.committed[winTeamName].fire;
     queueAbility('HEATING UP!', 'var(--ghost-rare)', `${wF.name} — ${firesUsed} Sacred Fire${firesUsed>1?'s':''} × 2 = +${firesUsed*6} damage!`);
+  }
+  if (zainIceBladeTriggered) {
+    queueAbility('ICE BLADE!', 'var(--ghost-rare)', `${wF.name} — Ice Blade strikes! +2 damage!`);
   }
   if (redHunterTriggered) {
     queueAbility('RUMBLE!', 'var(--magma)', `${wF.name} — Enemy has resources! +3 damage!`);
@@ -10442,7 +10468,11 @@ function renderCardSlot(ghost, isFighter) {
       if (ghost.id === 364 && !ghost.ko && B.round > 5) {
         statusHtml += `<span class="status-tag" style="background:rgba(139,92,246,0.18);color:#c4b5fd;border:1px solid #c4b5fd44;">🌙 Twilight Active · +1 Dmg</span>`;
       }
-      // Smithy (204) Forge indicator:
+      // Zain (206) — Ice Blade: persistent forged status
+      if (ghost.id === 206 && !ghost.ko && ghost.iceBladeForged) {
+        statusHtml += `<span class="status-tag" style="background:rgba(103,232,249,0.18);color:#67e8f9;border:1px solid rgba(103,232,249,0.45);" title="Ice Blade forged — +2 damage on every winning roll">🗡️ Ice Blade</span>`;
+      }
+            // Smithy (204) Forge indicator:
       // • Smithy on sideline → show Forge state on the active fighter's card
       // • Smithy IS the active fighter → show "dormant" on his own card so players
       //   know they need to bench him for Forge to activate
@@ -10669,6 +10699,16 @@ function renderBattle() {
           // Show both as disabled so the player knows the option exists
           html += `<button class="ability-btn" disabled title="Need 2 Ice Shards" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🔨 Forge: 2❄️ → 💎</button>`;
           html += `<button class="ability-btn" disabled title="Need 2 Sacred Fires" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔨 Forge: 2🔥 → 💎</button>`;
+        }
+      }
+      // Zain (206) — Ice Blade: forge button (one-time, permanent)
+      if (f.id === 206 && !f.ko && !f.iceBladeForged) {
+        const r = B[team].resources;
+        const canForge = r.ice >= 2 && r.moonstone >= 1;
+        if (canForge) {
+          html += `<button class="ability-btn pressure" onclick="useZainForge('${team}')" title="Forge the Ice Blade — spend 2 Ice Shards + 1 Moonstone for permanent +2 damage on wins" style="border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (2❄️ + 1💎)</button>`;
+        } else {
+          html += `<button class="ability-btn" disabled title="Need 2 Ice Shards + 1 Moonstone to forge" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (2❄️ + 1💎)</button>`;
         }
       }
       // Smudge (403) — Blackout: name a number

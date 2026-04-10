@@ -3,7 +3,20 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v317
+## Current Version: v321
+
+## v321 — BUG FIX: Knight Light (402) Retribution — replacement ghost no longer inherits stored Retribution dice
+
+- **Knight Light (402) Retribution — FIXED**: The Retribution dice consumption block in `doPreRollSetup` (lines 6018-6028) applied `B.retributionDice.red/blue` unconditionally — no check that Knight Light was still the active ghost. If KL earned Retribution dice mid-round then was KO'd (e.g. by Knight Terror Heavy Air or Nicholas Sneak Attack damage), the replacement ghost would receive the stored bonus dice on the next roll even though they never earned them.
+- Fixed: added `const klRed = active(B.red); if (klRed.id === 402 && !klRed.ko)` guard before applying `redCount += B.retributionDice.red` (and same for blue side). If KL is not the active ghost, stored dice are silently discarded. `B.retributionDice` is still reset to `{ red: 0, blue: 0 }` regardless, so no stale carry-forward.
+- Also bumped TESTROOM_VERSION v320 → v321.
+
+## v320 — AUDITED FIX: Chagrin (404) Bitter End + batch Dark Castle audit (Knight Terror, Knight Light, Smudge)
+
+- **Chagrin (404) Bitter End — AUDITED FIX**: Loss path and KO path both grant 1 Surge correctly, but NEITHER had a Sandwiches (33) Dependable mirror. Every other Surge-generating lose-path ability (Clink Prospect, Igneous Crystallize) has a `sandwichForWin` mirror immediately after it. Fixed: added `if (lF.id === 404 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', ...)` after the loss-path BITTER END!, and `if (lF.id === 404 && sandwichForWin) queueAbility('DEPENDABLE!', ...)` after the KO-path BITTER END! (inside `if (lF.ko)` block). Both mirrors use `onShow` deferred-grant pattern (winTeam.resources.surge++; renderBattle()) — correct.
+- **Knight Terror (401) Heavy Air — AUDITED PASS**: checkKnightEffects() called from ~30 ability sites. In function: oppActive.id===401 && !oppActive.ko guard → target=active(abilityTeam) → !target.ko guard → hp=Math.max(0,hp-2) → KO-capable → callout queued or direct per abilityQueueMode. KO handled by handleKOs at end of round. Correct.
+- **Knight Light (402) Retribution — AUDITED PASS (design note)**: checkKnightEffects() increments B.retributionDice[oppTeamName] when opponent ability fires while KL active. Consumed in doPreRollSetup lines 6018-6027; reset to 0 after. Status tag in UI correct. NOTE: theoretical bleed edge-case (Retribution dice earned mid-round if KL KO'd before consumption next round apply to replacement ghost). Severity: low — not fixed this cycle.
+- **Smudge (403) Blackout — AUDITED PASS**: setBlackout toggles B.blackoutNum[team]; in resolveRound fires pre-classify, removes matching dice in-place via splice, renders updated dice; silent miss (no callout) per v281 intent. Correct.
 
 ## v317 — AUDITED FIX: Timpleton (312) Big Target entry callout color corrected + batch audit of Shade's Shadow, Artemis, Sylvia, Harrison
 
@@ -441,6 +454,24 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 **Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v322 — Red Hunter (345) ability text clarified + Zain (206) reworked to Ice Blade.**
+  
+  **Red Hunter (345) Rumble** — text changed from "If your opponent has any specials: deal +3 damage." → "Win a roll: if your opponent has any specials, deal +3 damage." Logic was already correct (only fires when wF.id === 345, i.e. Red Hunter is the winning fighter). Just a clarification so players understand the trigger. Category also updated from "Dice Modifier" → "Damage Multiplier" since that's what it actually does. DO NOT REVERT.
+  
+  **Zain (206)** — fully reworked from "Aquatic Wisdom" (auto-convert 2 ice → 1 moonstone on entry, duplicate of Finn's design space) to **"Ice Blade"** (permanent forged weapon). New ability text: *"Before rolling: you may spend 2 Ice Shards + 1 Moonstone to forge an Ice Blade. Permanent — Zain deals +2 damage on every winning roll for the rest of the game."*
+  
+  **Implementation details:**
+  - Removed the old Aquatic Wisdom entry effect from `triggerEntry`
+  - Added `useZainForge(team)` click handler — verifies resources, subtracts 2 ice + 1 moonstone, sets `f.iceBladeForged = true`, fires ICE BLADE! callout, plays sfxSpecial
+  - Added per-team forge button (cyan, 🗡️ Forge Ice Blade) in the ability bar — only renders when Zain is active and not yet forged. Grays out when resources insufficient
+  - Added `zainIceBladeTriggered` flag in resolveRound damage section: `if (wF.id === 206 && wF.iceBladeForged && !wF.ko) { dmg += 2; ... }`
+  - Added cinematic ICE BLADE! callout in the queue right before Red Hunter's RUMBLE!
+  - Added persistent "🗡️ Ice Blade" status badge on Zain's card after forging (cyan)
+  - Note: `f.iceBladeForged` is per-ghost state, NOT per-team. Per Gary's design note, the blade dies with Zain — it's HIS weapon, not the team's. This makes "forge early, protect Zain" the strategic tension.
+  - DO NOT REVERT this rework. Zain's old Aquatic Wisdom was a duplicate of Finn's Forge — this gives him his own design space.
+  - DO NOT add `Math.min` cap on the +2 damage — it's a flat additive bonus, not a healing cap.
+  
 
 - **v320 — Balance: Granny (310) Bedtime Story — doubles KO reward changed from 1 Surge → 1 Sacred Fire.**
   Wyatt change. Singles still gives 1 Lucky Stone, doubles now gives 1 Sacred Fire (was Surge), triples still gives 1 Moonstone. Updated everywhere: GHOSTS abilityDesc, both `loseTeam` and `winTeam` (Pudge Belly Flop self-KO) doubles branches in the on-KO callout section, and the Sandwiches Dependable mirror in both branches. Callout text shows "doubles KO → Sacred Fire!" instead of "→ Surge!".
