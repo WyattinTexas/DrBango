@@ -3,15 +3,480 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v332
+## Current Version: v376
 
-## v332 — BALANCE: Zain (206) Ice Blade — swing now grants +1 die in addition to +2 damage on win
+## v376 — BUG FIX: Knight Terror/Light reactions missing for 4 resource-generating abilities
 
-- **Diagnosis (Wyatt + Gary)**: Zain was "Doom with one less HP and a fuse." Two team slots are spent setting up Ice Blade (one for Ice Shard, one for Moonstone resources), but the payoff was only +2 damage IF Zain won his roll — roughly a coin flip. The bigger payoff wasn't reachable often enough to justify the forge cost.
+- **Root cause**: The game-state `collectKC` section (lines ~8802–8839) pre-computes Knight reactions before the cinematic queue starts. Only 6 win-path abilities had entries there: Dart (209), Artemis (307), Calvin (342), Humar (336), Aunt Susan (309), and Farmer Jeff (314). Three more win-path resource-generating abilities and one lose-path ability were missing, meaning Knight Terror's HEAVY AIR! and Knight Light's RETRIBUTION! could never fire in response to these abilities.
+- **4 fixes applied**:
+  1. **Spockles (81) Valley Magic** (win-path, +2 Ice Shards): Added `if (wF.id === 81 && !wF.ko) { collectKC(winTeamName, wF.name); }` to the game-state collectKC section.
+  2. **Ashley (58) Burning Soul** (win-path, +1 Sacred Fire): Added `if (wF.id === 58 && !wF.ko) { collectKC(winTeamName, wF.name); }` to the game-state collectKC section.
+  3. **Roger (54) Tempest** (win-path, +3 Sacred Fires on 2 pairs): Added `collectKC(winTeamName, wF.name)` inside the cinematic `if (_pairCount >= 2)` conditional, since the ability is only conditional on 2 pairs (unconditional game-state entry would wrongly fire Knight reactions even when Roger's condition isn't met).
+  4. **Sad Sal (29) Tough Job** (lose-path, +1 Ice Shard on loss): Added `if (lF.id === 29 && !lF.ko) { collectKC(loseTeamName, lF.name); }` to the game-state collectKC section.
+- **Behavioral impact**: In any matchup where the enemy has Knight Terror (401) or Knight Light (402) active AND the player's ghost is Spockles/Ashley/Roger/Sad Sal, the Knight reactions now correctly fire after those ability callouts instead of being silently skipped.
+- **Pattern confirmed correct**: `collectKC` pushes Knight reactions to `resolveKnightCallouts[]` which is flushed at line ~9594 AFTER all other abilities drain — so HEAVY AIR!/RETRIBUTION! correctly plays last in the sequence, not interleaved.
+- Also bumped TESTROOM_VERSION v375 → v376.
+
+## v375 — BUG FIX: 8 Volcanic Activity set callout colors corrected to proper rarity CSS variables
+
+- **Root cause**: All Volcanic Activity set cards initially used `'var(--magma)'` (orange-red) as their ability callout color under the "intentional set theming" rationale. However, Aunt Susan (309) was corrected to `var(--rare)` in v348, Harrison (315) to `var(--rare)` in v352, and Farmer Jeff (314) to `var(--ghost-rare)` in v352 — establishing that rarity color is the rule, not set color. Six VA cards were missed in those sweeps.
+- **8 callout instances corrected across 7 cards**:
+  1. **Tyson (365) HOP!** (line ~3375): `var(--magma)` → `var(--common)` — Tyson is `rarity:"common"`
+  2. **Death Howl (202) PRESSURE!** (line ~3456): `var(--magma)` → `var(--rare)` — Death Howl is `rarity:"rare"`
+  3. **The Ember Force (304) SWARM!** (line ~5233): `var(--magma)` → `var(--uncommon)` — Ember Force is `rarity:"uncommon"`
+  4. **Red Hunter (345) RUMBLE!** (line ~9127): `var(--magma)` → `var(--ghost-rare)` — Red Hunter is `rarity:"ghost-rare"` (previously "audited PASS" in v325 as intentional — now correctly fixed per same rule applied to Aunt Susan/Harrison/Farmer Jeff)
+  5. **Fed and Hayden (406) ETERNAL FLAME!** (line ~9139): `var(--magma)` → `var(--uncommon)` — Fed and Hayden is `rarity:"uncommon"`
+  6. **Dart (209) PLUNDER!** (line ~9272): `var(--magma)` → `var(--common)` — Dart is `rarity:"common"` (previously "audited PASS" in v327 as intentional — now correctly fixed)
+  7. **Chagrin (404) BITTER END!** (line ~9409, lose-path): `var(--magma)` → `var(--rare)` — Chagrin is `rarity:"rare"`
+  8. **Chagrin (404) BITTER END!** (line ~9425, KO-path): `var(--magma)` → `var(--rare)` — same card, KO trigger path
+- **Zero remaining `var(--magma)` callout instances** in active (non-CSS, non-shelved) ability callout code paths. All remaining `var(--magma)` references are CSS styling (header gradient, tab active state, set badge color, status tag, AFK timer, etc.) — not ability callout color arguments.
+- **Visual impact**: All 7 cards now flash their correct rarity-tier color during ability callouts, consistent with every other card in the game. Previously these cards falsely signaled "Volcanic Activity" orange when they should have shown common gray, uncommon green, rare blue, or ghost-rare purple.
+- Also bumped TESTROOM_VERSION v374 → v375.
+
+## v374 — BUG FIX: Tweak and Twonk (303) and Jimmy (352) tie-path Knight reactions fire during drain instead of being queued
+
+- **Bug**: Same class as v373 (Maximo). In the tie-path ROARING CROWD! ability (line ~7422), `checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost)` was called INSIDE the `queueAbility` onShow callback. In the CHIRP! ability (line ~7443), `checkKnightEffects(tNameJim, f.name)` was also inside the onShow callback. OnShow fires during `drainAbilityQueue` with `abilityQueueMode === false`, so Knight reactions were fired via `showAbilityCallout` directly — overlapping with and stomping the visible ROARING CROWD!/CHIRP! callout.
+- **Fix**: Moved both `checkKnightEffects` calls out of their respective onShow callbacks to immediately AFTER the `queueAbility(...)` call, while `abilityQueueMode` is still `true`. Reactions now drain sequentially: ROARING CROWD! → HEAVY AIR! / RETRIBUTION! (if applicable), and CHIRP! → HEAVY AIR! / RETRIBUTION! (if applicable).
+- **Affected scenarios**: Knight Terror or Knight Light on a team facing an opponent's Tweak and Twonk sideline OR active Jimmy on a tie round.
+
+## v373 — BUG FIX: Maximo (302) tie-path Knight reactions fire during drain instead of being queued
+
+- **Bug**: In the tie-path Maximo NAP! ability (line ~7603), `checkKnightEffects(tNameMax, f.name)` was called INSIDE the `queueAbility` onShow callback. OnShow fires during `drainAbilityQueue` playback, at which point `abilityQueueMode === false`. So `checkKnightEffects` would call `showAbilityCallout` directly — overlapping with and stomping the currently-visible NAP! callout. Knight Terror's HEAVY AIR! or Knight Light's RETRIBUTION! would appear simultaneously with NAP!, breaking the cinematic sequence.
+- **Root cause**: `collectKC` (which correctly temp-enables queue mode to capture Knight reactions) is defined inside the win/lose block of `resolveRound` and is not available in the tie block. So the tie-path code used `checkKnightEffects` inside onShow as a workaround — but that fires at the wrong time.
+- **Fix**: Moved `checkKnightEffects(tNameMax, f.name)` out of the onShow callback and placed it immediately AFTER the `queueAbility('NAP!', ...)` call, while `abilityQueueMode` is still `true`. `checkKnightEffects` internally checks `if (abilityQueueMode)` → true → calls `queueAbility`, adding HEAVY AIR!/RETRIBUTION! to the queue in order after NAP!. Knight reactions now drain sequentially: NAP! → HEAVY AIR! (if applicable) → DEPENDABLE! (if applicable). Win/lose-path Maximo already used `collectKC` correctly; tie-path now matches the same sequential ordering guarantee.
+
+## v372 — DEAD CODE REMOVAL: 6 shelved-card overlay HTML blocks + JS callbacks + clearAllOverlays refs stripped
+
+- **Six permanently-shelved cards had inert modal overlay HTML still in the DOM**: Forge Fire (321), Anvil (357), Magnolia (318), Old Mill (322), Pyrope (363), Patches (354). Their `doPreRollSetup` triggering code was removed in v365–v366 but the HTML overlay blocks, JS callback functions, and `clearAllOverlays()` references were intentionally left behind to avoid breaking `clearAllOverlays()`.
+- **Now confirmed safe to remove**: `clearAllOverlays()` only calls `classList.remove('active')` on DOM elements — it never calls the choice callback functions. Since the overlays are never shown (the triggering code was removed), the callback functions (`doForgeFireChoice`, `doPyrropeChoice`, `doPatchesQuiltChoice`, `doAnvilHeavyChoice`, `doMagnoliaBloomChoice`, `doOldMillChoice`) are completely unreachable dead code. The DOM elements themselves are also never shown, so removing them has no visible effect.
+- **Removed**: 6 HTML overlay blocks (~78 lines); 6 JS callback functions (~147 lines); 6 `classList.remove('active')` lines from `clearAllOverlays()`.
+- **Total: ~231 lines of dead code removed.**
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap/Ash Phoenix), v365 (Patches/Anvil/Magnolia/Old Mill B-state + logic), v366 (Pyrope/Forge Fire/Dragonclaw logic), v367 (Char/Bramble), v368 (Magma Heart/Pumice/Grandmother Willow), v369–v371 (Drizzle/Bumble/Dusk/Mother Nature). This completes the full shelved-card dead-code sweep — no more shelved-card overlays, callbacks, or clearAllOverlays refs remain.
+- **Zero behavior change**: Overlays were never shown, buttons were never clickable, functions were never called. `clearAllOverlays()` still works correctly for all 20 remaining active overlays.
+- Also bumped TESTROOM_VERSION v371 → v372.
+
+## v371 — DEAD CODE REMOVAL: Mother Nature (366) renderBattle dead-code blocks stripped
+
+- **Two remaining Mother Nature (366) dead-code blocks in `renderBattle()`** — missed by v370 which removed the B-state init, pre-roll forEach, and win-path boost blocks but overlooked the UI rendering section.
+- **Block 1 removed** (lines 10499–10502): Winter die-penalty indicator on opponent ghost cards — `if (oppActive && oppActive.id === 366 && !oppActive.ko && B.round % 4 === 0)` — always false; never rendered the `-1 Die (Winter)` status tag.
+- **Block 2 removed** (lines 10504–10514): Season cycle indicator on Mother Nature's own card — `if (ghost.id === 366 && !ghost.ko)` — always false; never rendered the Spring/Summer/Autumn/Winter season badge (a 7-line SEASONS array + badge render).
+- **14 lines removed total** from the hot `renderBattle` path — this function fires multiple times per round so removing dead checks in it has a small real runtime benefit.
+- **Zero behavior change**: `id === 366` is always false since Mother Nature is permanently shelved. The Timber (210) status tag immediately before and the Retribution (402) indicator immediately after are both unaffected.
+- **Completes v370's Mother Nature cleanup**: Zero `id === 366` or `motherNature*` references remain anywhere in active code paths (confirmed with grep).
+- Also bumped TESTROOM_VERSION v370 → v371.
+
+## v370 — DEAD CODE REMOVAL: Mother Nature (366) Seasons scaffolding fully stripped
+
+- **Mother Nature (366) is permanently shelved** (366 in SHELVED_IDS). Its B-state fields, pre-roll forEach block (4 SEASONS callouts), win-path damage boost block, and 2 per-round reset lines were all always-false dead code running every battle and every round.
+- **Removed 2 B-state init fields** (×2 startBattle blocks): `motherNatureSummer: { red: false, blue: false }` — 1 line × 2 sites = 2 dead lines.
+- **Removed Mother Nature (366) pre-roll forEach block** (32 lines): Full `[B.red, B.blue].forEach(team => { ... if (f.id === 366) { ... } })` block in `doPreRollSetup` — `f.id === 366` is always false; the four SEASONS callouts (SPRING!/SUMMER!/AUTUMN!/WINTER!) with their HP heal, damage boost, seed grant, and die-reduction side effects could never fire. The loop iterated both teams every round as a pure no-op.
+- **Removed Mother Nature (366) win-path damage boost block** (6 lines): `if (B.motherNatureSummer && B.motherNatureSummer[winTeamName]) { dmg += 1; ... }` in `resolveRound` game-state section — `B.motherNatureSummer[winTeamName]` was always `false` since the only setter (`B.motherNatureSummer[tName] = true`) was inside the now-removed pre-roll block.
+- **Removed 2 per-round reset lines**: `B.motherNatureSummer = { red: false, blue: false }` from both the tie-path reset block (line ~7901) and the win/lose-path reset block (line ~9946).
+- **Zero `motherNature*` runtime references remain** (verified with grep — zero matches).
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap/Ash Phoenix), v365 (Patches/Anvil/Magnolia/Old Mill), v366 (Pyrope/Forge Fire/Dragonclaw), v367 (Char/Bramble), v368 (Magma Heart/Pumice/Grandmother Willow), v369 (Drizzle/Penny/Clink/Snoozer/Igneous/Fuego/Scorch/Bumble/Dusk).
+- **Zero behavior change**: All removed branches were always-false; `f.id === 366` is trivially false when 366 is permanently shelved.
+- Also bumped TESTROOM_VERSION v369 → v370.
+
+## v369 — DEAD CODE REMOVAL: Drizzle (328), Snoozer (330), Penny (316), Clink (329), Igneous (331), Fuego (337), Scorch (317), Bumble (362), Dusk (364) cinematic + function dead-code strips
+
+- **All nine cards are permanently shelved** (316, 317, 328, 329, 330, 331, 337, 362, 364 all in SHELVED_IDS). Their cinematic callout entries, function, and call-site were always-false dead code running every round.
+- **`checkDrizzleRainDance` function removed** (36 lines, lines 4656–4691): The entire Rain Dance mechanic was a no-op since Drizzle (328) can never appear on a team. The check ran every round via the `checkTommyRegulator(() => checkDrizzleRainDance(afterDrizzle))` hot path. Call-site simplified to `checkTommyRegulator(afterDrizzle)` — saves a function call + 2 `active()` calls every roll.
+- **Win-path cinematic entries removed** (7 blocks, ~40 lines): `FORAGER!` (Penny 316), `PROSPECT! win` (Clink 329), `CRYSTALLIZE! win` (Igneous 331), `FIESTA!` (Fuego 337), `SINGE!` (Scorch 317), `POLLINATE!` (Bumble 362 — including its `collectKC` Knight-reaction line), `TWILIGHT!` (Dusk 364 — including `duskTwilight` variable + damage computation block in game-state section).
+- **Lose-path cinematic entries removed** (2 blocks, ~10 lines): `PROSPECT! lose` (Clink 329), `CRYSTALLIZE! lose` (Igneous 331).
+- **Tie-path cinematic entries removed** (2 blocks, ~18 lines): `NAP TIME!` forEach (Snoozer 330), `CRYSTALLIZE! tie` forEach (Igneous 331).
+- **renderBattle dead UI removed** (4 lines): Twilight indicator status-tag for Dusk (364) — `ghost.id === 364` always false, the status badge never rendered.
+- **Zero behavior change**: All removed branches were always-false; `wF.id === N` / `lF.id === N` / `hasSideline(X, N)` are trivially false when N is permanently shelved. Every affected code path runs identically with this dead code absent.
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap/Ash Phoenix), v365 (Patches/Anvil/Magnolia/Old Mill), v366 (Pyrope/Forge Fire/Dragonclaw), v367 (Char/Bramble), v368 (Magma Heart/Pumice/Grandmother Willow/Pyrope callouts).
+- Also bumped TESTROOM_VERSION v368 → v369.
+
+## v368 — DEAD CODE REMOVAL: Magma Heart (325), Pumice (319), Grandmother Willow (332), Pyrope (363) dead-code strips in damage resolution + ReferenceError fix
+
+- **All four cards are permanently shelved** (325, 319, 332, 363 all in SHELVED_IDS). Their damage-resolution scaffolding was dead code running every round.
+- **CRITICAL BUG FIXED**: `pyrropeGemArmor` was referenced 4 times (lines 8883, 8929, 9590, 9591) but was NEVER DECLARED — v366 removed the Pyrope pre-roll block and resolve-path block but forgot to remove the callout block and the two condition-chain references. Any game state where Cameron (25) wins with 0 damage AND no other negate flag is true would throw a JavaScript `ReferenceError: pyrropeGemArmor is not defined`, silently breaking the Cameron Force of Nature check and the 0-damage log line. Fixed by removing all 4 references.
+- **magmaCoreMelt (id 325) removed** — `const magmaCoreMelt = wF.id === 325 && ...` was always `false` (325 is shelved). Removed the declaration, the log block, the callout block (`CORE MELT!`), and 5 `&& !magmaCoreMelt` guards from Guard Thomas Stoic, Dealer House Rules, Sky Elusive, City Cyboo Barrier, and Puff Cute conditions.
+- **pumiceFloat (id 319) removed** — `hasSideline(loseTeam, 319)` always `false`. Removed 2 variable declarations, the if-block (including its `&& !magmaCoreMelt` guard), and the `FLOAT!` callout queue entry (10 lines).
+- **grandmotherWillowDeepRoots (id 332) removed** — `lF.id === 332` always `false`. Removed 3 variable declarations, the if-block (including its `&& !magmaCoreMelt` guard), the `!grandmotherWillowDeepRoots` term from the 0-damage log condition, and the `DEEP ROOTS!` callout queue entry (15 lines).
+- **Zero behavior change** for any active card: `magmaCoreMelt` was always `false` so `&& !magmaCoreMelt` was always `true` — removing it is an identity operation. `pumiceFloat` and `grandmotherWillowDeepRoots` were always `false` — their callout blocks never executed. `pyrropeGemArmor` was `undefined` (falsy) in the condition checks — removing it from `!pyrropeGemArmor` and `|| pyrropeGemArmor` is an identity operation; the `if (pyrropeGemArmor)` callout block never executed.
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap/Ash Phoenix), v365 (Patches/Anvil/Magnolia/Old Mill), v366 (Pyrope/Forge Fire/Dragonclaw), v367 (Char/Bramble).
+- Also bumped TESTROOM_VERSION v367 → v368.
+
+## v367 — DEAD CODE REMOVAL: Char (323) and Bramble (320) shelved-card scaffolding stripped
+
+- **Both cards are permanently shelved** (323 and 320 both in SHELVED_IDS). Their B-state fields, entry callout block, pre-roll forEach blocks, and win-path resolve block were all always-false dead code that ran every battle and every round.
+- **Removed 2 B-state init fields** (×2 startBattle blocks): `charAfterburnPending: { red: false, blue: false }` and `brambleThornPending: { red: false, blue: false }` — 2 lines × 2 sites = 4 dead lines.
+- **Removed Bramble (320) entry callout block** (7 lines): `if (f.id === 320)` in `triggerEntry` — `f.id === 320` is always false since 320 is shelved; `B.brambleThornPending[bTName] = true` was the only setter, now removed too.
+- **Removed Char (323) pre-roll forEach block** (51 lines): full `[B.red, B.blue].forEach(team => {...})` block that checked `B.charAfterburnPending[tNameChar]` — always false since the only setter (`wF.id === 323 && !wF.ko`) is now also removed; included dead Knight reaction temp-queue, Masked Hero Underdog counter, Dylan Scarecrow check, and damage callout.
+- **Removed Bramble (320) pre-roll forEach block** (48 lines): full `[B.red, B.blue].forEach(team => {...})` block that checked `B.brambleThornPending[tNameBramble]` — always false since `brambleThornPending` was only set from the now-removed entry block; included dead Knight reaction temp-queue, Masked Hero Underdog counter, Dylan Scarecrow check, and damage callout.
+- **Removed Char (323) win-path resolve block** (4 lines): `if (wF.id === 323 && !wF.ko)` — `wF.id === 323` is always false since 323 is shelved; removed `AFTERBURN!` queueAbility and the `B.charAfterburnPending[winTeamName] = true` setter.
+- **Zero `charAfterburnPending` or `brambleThornPending` references remain** (verified with grep).
+- **Kept**: HTML overlay definitions (inert DOM, none for these cards), GHOSTS array data entries, SHELVED_IDS entries — same pattern as v307-v313 (Wisp), v363-v364 (Slag Heap/Ash Phoenix), v365 (Patches/Anvil/Magnolia/Old Mill), v366 (Pyrope/Forge Fire/Dragonclaw).
+- **Zero behavior change**: All removed branches were always-false; each pre-roll forEach was iterating and immediately short-circuiting on the `B.charAfterburnPending/brambleThornPending[tName]` check. Every affected code path runs identically with this dead code absent.
+- Also bumped TESTROOM_VERSION v366 → v367.
+
+## v366 — DEAD CODE REMOVAL: Pyrope (363), Forge Fire (321), Dragonclaw (367) shelved-card scaffolding stripped
+
+- **All three cards are permanently shelved** (363, 321, 367 all in SHELVED_IDS). Their B-state fields, pre-roll check blocks, resolve-path blocks, callout queue entries, and per-round reset lines were all always-false dead code.
+- **Removed 4 B-state init fields** (×2 startBattle blocks): `forgeFireCharged`, `forgeFireDecided`, `pyrropeArmed`, `pyrropeDecided` — 4 lines × 2 sites = 8 dead lines. (`pyrropePending` and `forgeFirePending` are set only from the now-removed pre-roll blocks so they implicitly go dead too, but since they're assigned inside removed blocks no separate removal is needed.)
+- **Removed 2 doPreRollSetup blocks** (42 lines total): Forge Fire Temper (20 lines) and Pyrope Gem Armor (22 lines) — both `active(B[team]).id === N` checks were always false since N is shelved; the `return;` in each block would have locked the roll button forever if they somehow fired.
+- **Removed 3 resolve-path blocks**: Dragonclaw Rake (`dragonclawTriggered` + 11 lines), Forge Fire Temper (`forgeFireTriggered` + 10 lines), Pyrope Gem Armor (`pyrropeGemArmor` + 12 lines) — `wF.id === 367`, `wF.id === 321`, and `lF.id === 363` always false.
+- **Removed 2 cinematic callout queue entries**: `RAKE!` and `TEMPER!` (both `if (dragonclawTriggered/forgeFireTriggered)` — always false). Pyrope had no callout entry (damage was fully negated, no announce needed in its design).
+- **Removed 7 per-round reset lines**: Tie-path: `forgeFireDecided`, `pyrropeDecided`, `pyrropeArmed` (3 lines). Win/lose-path: `forgeFireDecided`, `pyrropeDecided`, the `// Note:` comment, and `pyrropeArmed` (4 lines).
+- **Kept**: HTML overlay definitions (`forgeFireOverlay`, `pyrropeOverlay` — inert DOM), GHOSTS array data entries, SHELVED_IDS entries, and callback functions (`doForgeFireChoice`, `doPyrropeChoice`) — callbacks can never be reached since their overlays are never shown, but leave them to avoid breaking the overlay `classList.remove('active')` in the reset function.
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap / Ash Phoenix), v365 (Patches / Anvil / Magnolia / Old Mill) — permanently shelved cards accumulate dead scaffolding that obscures real logic.
+- **Zero behavior change**: All removed branches were always-false; every affected code path now executes its real logic unconditionally.
+- Also bumped TESTROOM_VERSION v365 → v366.
+
+## v365 — DEAD CODE REMOVAL: Patches (354), Anvil (357), Magnolia (318), Old Mill (322) shelved-card scaffolding stripped
+
+- **All four cards are permanently shelved** (354, 357, 318, 322 all in SHELVED_IDS). Their B-state fields, pre-roll check blocks, resolve-path blocks, callout queue entries, per-round reset lines, and Cameron condition guards were all always-false dead code.
+- **Removed 8 B-state init fields** (×2 startBattle blocks): `anvilCharged`, `anvilDecided`, `magnoliaBloomCharged`, `magnoliaBloomDecided`, `oldMillDecided`, `patchesQuiltArmed`, `patchesQuiltDecided` — 7 lines × 2 sites = 14 dead lines.
+- **Removed 4 doPreRollSetup blocks** (83 lines total): Patches Quilt (20 lines), Anvil Heavy Strike (20 lines), Magnolia Bloom (20 lines), Old Mill Grindstone (20 lines) — all `active(B[team]).id === N` checks were always false since N is shelved; the `return;` in each block would have locked the roll button forever if they somehow fired.
+- **Removed 2 win-path resolve blocks**: Anvil Heavy Strike (`anvilHeavyTriggered` + 12 lines) and Magnolia Bloom (`magnoliaBloomTriggered` + 11 lines) — `wF.id === 357` and `wF.id === 318` always false.
+- **Removed 1 lose-path resolve block**: Patches Quilt (`patchesQuiltActive` + 11 lines) — `lF.id === 354` always false.
+- **Removed 2 cinematic callout queue entries**: `HEAVY STRIKE!` and `BLOOM!` (both `if (anvilHeavyTriggered/magnoliaBloomTriggered)` — always false).
+- **Removed 1 cinematic callout queue entry**: `QUILT!` (`if (patchesQuiltActive)` — always false).
+- **Removed 7 tie-path per-round reset lines**: `anvilDecided`, `anvilCharged`, `magnoliaBloomDecided`, `magnoliaBloomCharged`, `oldMillDecided`, `patchesQuiltDecided`, `patchesQuiltArmed`.
+- **Removed 10 win/lose-path per-round reset lines**: Same 7 fields plus their explaining comments.
+- **Cleaned 2 condition strings**: Removed `&& !patchesQuiltActive` from the 0-damage log guard and `|| patchesQuiltActive` from the Cameron Force of Nature trigger condition — both always-false terms that bloated these multi-condition expressions.
+- **Kept**: HTML overlay definitions (inert DOM), GHOSTS array data entries, SHELVED_IDS entries, and callback functions (`doPatchesQuiltChoice`, `doAnvilChoice`, `doMagnoliaBloomChoice`, `doOldMillChoice`) — callbacks can never be reached since their overlays are never shown, but leave them to avoid breaking the overlay `classList.remove('active')` in the reset function.
+- **Same pattern as** v307-v313 (Wisp), v363-v364 (Slag Heap / Ash Phoenix) — permanently shelved cards accumulate dead scaffolding that obscures real logic.
+- **Zero behavior change**: All removed branches were always-false; every affected code path now executes its real logic unconditionally.
+- Also bumped TESTROOM_VERSION v364 → v365.
+
+## v364 — DEAD CODE REMOVAL: Remaining Slag Heap (339) and Ash Phoenix (361) dead scaffolding fully stripped
+
+- **Removed 4 Slag Heap dead code sites** (339 is permanently shelved, so `slagHeapResidueRounds/Active` were always zero/false):
+  1. `slagHeapResidueRounds: { red: 0, blue: 0 }` and `slagHeapResidueActive: { red: false, blue: false }` removed from both `startBattle` B-state initializations (×2 sites).
+  2. Pre-roll timer block in `doPreRollSetup` (13-line forEach that counted down `slagHeapResidueRounds` each round and pushed `RESIDUE!` pre-roll callouts) — removed entirely; always no-op since `slagHeapResidueRounds` started at 0 and was only set from the dead KO trigger.
+  3. KO trigger block in `resolveRound` KO section: `let slagHeapResidueTriggered = false; if (lF.id === 339 && lF.ko) { ... }` — removed; `lF.id === 339` is always false.
+  4. Cinematic callout block: `if (slagHeapResidueTriggered) { queueAbility('RESIDUE!', ...) }` — removed.
+
+- **Removed 4 Ash Phoenix dead code sites** (361 is permanently shelved, so `ashPhoenixRebirth/Used` were always false):
+  1. `ashPhoenixRebirth: { red: false, blue: false }` and `ashPhoenixUsed: { red: false, blue: false }` removed from both `startBattle` B-state initializations (×2 sites).
+  2. Pre-roll resurrection block in `doPreRollSetup` (13-line forEach that checked `B.ashPhoenixRebirth[tNameAP]` and resurrected phoenix to sideline) — removed entirely; always no-op.
+  3. KO trigger block in `resolveRound` KO section: `let ashPhoenixRebirthTriggered = false; if (lF.id === 361 && lF.ko && ...) { ... }` — removed; `lF.id === 361` is always false.
+  4. Cinematic callout block: `if (ashPhoenixRebirthTriggered) { queueAbility('REBIRTH!', ...) }` — removed.
+
+**Result**: Zero `ashPhoenix*` or `slagHeap*` runtime references remain (GHOSTS array data entries and SHELVED_IDS comment lines preserved as expected). The B-state shape is now 4 fields smaller, and every pre-roll/resolve loop runs 2 fewer forEach iterations per round.
+
+## v363 — DEAD CODE REMOVAL: Slag Heap (339) slagResidueBlocksWin branches stripped from win/lose/tie paths
+
+- **Slag Heap (339) is permanently shelved** (listed in SHELVED_IDS). Its "Residue" mechanic sets `B.slagHeapResidueActive[team] = true` for 2 rounds after Slag Heap is KO'd — but Slag Heap can never be placed on a team, so `slagHeapResidueActive` is always `{ red: false, blue: false }`.
+- **Dead code removed**: `slagResidueBlocksWin` was always `false`, causing 8 dead code sites across the win/lose/tie paths:
+  1. **Declaration removed**: `const slagResidueBlocksWin = !!(B.slagHeapResidueActive && B.slagHeapResidueActive[winTeamName])` at line ~8336 — replaced with a one-line comment.
+  2. **Opa (48) Rest win-path**: Removed 3-line `if (slagResidueBlocksWin) { RESIDUE! }` branch — dead if-first arm stripped; `else if (filbertCursesWin)` promoted to `if`.
+  3. **Villager (11) Hospitality win-path**: Same removal — `else if (corneliusBlocksRally)` promoted to `if`.
+  4. **Jeffery (14) Chuckle win-path**: Same removal.
+  5. **Biscuit (324) Warm Up win-path**: Same removal.
+  6. **Calvin (342) Overclock win-path**: Removed branch; `else if (filbertCursesWin)` promoted to `if`.
+  7. **Flora (75) Restore condition**: Removed dead `&& !slagResidueBlocksWin` guard (always `&& true`).
+  8. **Growing Mob (83) condition**: Same removal.
+  9. **Munch (66) Scraps condition**: Same removal.
+  10. **Opa (48) Rest tie-path**: Removed `const slagBlocksOpaTie = ...` and its 3-line `if` block.
+  11. **Ancient One (22) Friend to All tie-path**: Removed `const slagBlocksAO = ...` and its 3-line `if` block.
+- **Same pattern as v307-v313 Wisp (344) dead-code cleanup** — permanently shelved cards accumulate dead scaffolding that obscures real logic. These 11 removals make the heal-ability blocks cleaner and faster to read.
+- **Zero behavior change**: All removed branches were always-false; every affected code path now executes its real logic unconditionally.
+- Also bumped TESTROOM_VERSION v362 → v363.
+
+## v362 — BUG FIX: refundCommitted() now includes zainBlade:0 in the reset object
+
+- **Problem**: `refundCommitted()` is called whenever a pre-roll KO interrupts a round before rolling occurs (Filbert curse on Mallow/Boo Brothers, Dallas Quick Draw window KO, etc.). Its job is to return committed resources (ice, fire, surge, seeds) to the team's resource pool and reset the committed object. However, the reset object at line 3266 was `{ ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }` — missing `zainBlade:0`. After `refundCommitted()`, `B.committed[team].zainBlade` would be `undefined` instead of `0`.
+- **Impact**: If Zain's player toggled "Swing Ice Blade" ON (`zainBlade = 1`) before an OPPONENT's pre-roll KO caused `refundCommitted()` to fire, Zain's blade commitment was silently reset to `undefined`. The player's toggle state was gone and they had to re-commit in the next round without any feedback. While `undefined > 0 = false` and `undefined ? 0 : 1 = 1` happen to work the same as `0 > 0 = false` / `0 ? 0 : 1 = 1` in all current checks, the object shape inconsistency between `refundCommitted` (missing `zainBlade`) and the round-end resets (lines 8262-8263, 10579-10580, which correctly include `zainBlade:0`) was a latent bug waiting to cause a subtle display issue.
+- **Fix**: Added `zainBlade:0` to the reset object in `refundCommitted()` — consistent with all other committed reset sites. `zainBlade` is not a real resource (nothing is refunded), just the per-round toggle flag that should be cleared on any round interruption.
+- Also bumped TESTROOM_VERSION v361 → v362.
+
+## v361 — BUG FIX: Simultaneous Lucky Stone window — multi-stone double-decrement bug
+
+- **Problem**: In `startSimultaneousLuckyStoneWindows`, after a player rerolled and still had more stones available, the callback at line 7578 performed an extra `B.lsAvailable[team]--` AFTER line 7573 already correctly set it to `savedAvail - 1`. This extra decrement caused the second re-activation to see `savedAvail - 2` instead of the correct `savedAvail - 1`, so a team with 3 Lucky Stones only got 2 uses in the simultaneous window (and 4 stones would still only give 2 uses). This was invisible in early testing because 1–2 stones work correctly, but becomes a real deficit with Selene accumulation (2 LS per doubles round) or Jimmy + Selene combos.
+- **Root cause**: The `savedAvail - 1` restoration at line 7573 accurately represents "how many stones remain authorized for this window." The extra `B.lsAvailable[team]--` on line 7578 was a confusion where the author thought this field needed to be decremented before re-activating the tile (likely copy-pasting from the sequential `doLuckyReroll` which decrements before calling `startLuckyStoneWindow`). In the simultaneous window, no pre-decrement is needed — the click handler of the re-activated tile will capture the correct `savedAvail` from `B.lsAvailable[team]` directly.
+- **Fix**: Removed the extra `B.lsAvailable[team]--` at line 7578 (now replaced with a comment explaining why it's absent). With this removed, the trace is correct:
+  - 1 stone: 1 use ✓
+  - 2 stones: 2 uses ✓
+  - 3 stones: 3 uses ✓ (was 2 before fix)
+  - 4 stones: 4 uses ✓ (was 2 before fix)
+- **Interaction with sequential mode**: Sequential `doLuckyReroll` is unchanged — it handles multi-stone re-offering correctly via its own `startLuckyStoneWindow` recursive pattern. The fix is isolated to the simultaneous window's callback.
+- Also bumped TESTROOM_VERSION v360 → v361.
+
+## v360 — FEATURE: Double-Moonstone simultaneous window — both teams' MS tiles now highlight at the same time
+
+- **Problem**: When both teams had Moonstones (a very common situation — Hank produces MS, Natalia produces MS, Kaplan produces MS, Benjamin holds it), the game ran sequential windows (Red 5s → Blue 5s = up to 10s total if neither acts). Players on one team had to wait for the other team's full 5-second window before their tile lit up.
+- **Fix**: Added `startSimultaneousMoonstoneWindows()` — called from `postRollDone` when BOTH `_redHasMS && _blueHasMS` are true (checked after the cross-type window check). Both MS tiles highlight simultaneously with a shared 5s countdown badge (reuses the `.reroll-countdown.ls-shared-cd` CSS class from v358/v359 simultaneous windows).
+  - **Neither acts in 5s**: Shared countdown expires → both skip → `checkLuckyStones()`. Saves ~5s vs sequential.
+  - **Red acts first**: `closeShared()` cleans both tiles. `showMoonstoneChoice('red', ...)` fires. The existing `skipMoonstone`/`pickMsValue` red→blue sequential chain automatically offers Blue afterward — no extra callback needed.
+  - **Blue acts first**: `closeShared()` fires. `showMoonstoneChoice('blue', ...)` fires. Sets `B.afterMoonstoneCallback` to offer Red afterward. Before showing Red's window, zeros `B.msAvailable.blue = 0` so the red→blue chain inside `skipMoonstone`/`pickMsValue` doesn't re-offer Blue (she already had her window).
+- **`state.closed` guard**: Both tile click handlers check `state.closed` before proceeding — prevents a race where both players click in the same 1s interval before the shared countdown removes highlights.
+- **Does NOT apply when**: One team has MS+LS (cross-type window handles MS-only vs LS-only); both teams have MS+LS (falls through to existing sequential logic). Only fires when both teams have Moonstone (either may also have LS, which checkLuckyStones handles after both MS windows complete).
+- **Time saving**: Up to ~5s per round when both teams have Moonstone and neither acts. In a late-game situation with both Hank AND Natalia on opposing teams (each generating 1 MS/round), this easily saves 30-40s over a 10-round game.
+- **Completes the simultaneous-specials trilogy**: v358 (both LS), v359 (cross-type MS+LS), v360 (both MS) — all three common special-combination cases now run simultaneous windows.
+- Also bumped TESTROOM_VERSION v359 → v360.
+
+## v359 — FEATURE: Cross-type simultaneous specials window — Moonstone + Lucky Stone now show simultaneously
+
+- **Problem**: When one team had a Moonstone and the other had a Lucky Stone (a very common situation given Hank/Natalia/Kaplan produce MS and Selene/Jimmy/Happy Crystal produce LS), the game ran sequential windows: Moonstone team gets 5s, then Lucky Stone team gets 5s = 10s total if neither acts. This was the most common special-combination case in actual games, and it added ~5s of dead waiting every round it appeared.
+- **Fix**: Added `startCrossTypeSpecialsWindow(msTeam, lsTeam)` — called when EXACTLY one team has Moonstone and the other team EXACTLY has Lucky Stone (neither team has both types). Both tiles highlight simultaneously with a shared 5s countdown badge on each tile.
+  - **Neither acts in 5s**: Shared countdown expires → both skip → `resolveRound()`. Saves ~5s vs sequential.
+  - **MS player acts first**: LS tile deactivated (MS overlay blocks interaction anyway). After MS completes (use or skip), LS player gets a fresh `startLuckyStoneWindow` window → `resolveRound()`.
+  - **LS player acts first**: MS tile deactivated. LS die-pick runs (3s max). After LS resolves, MS player gets `showMoonstoneChoice` → `resolveRound()`.
+- **`B.afterMoonstoneCallback` mechanism**: Added a hook to `pickMsValue()` and `skipMoonstone()` — after the Red→Blue MS chain check, both functions now check `B.afterMoonstoneCallback`. If set, they call it (and clear it) instead of `checkLuckyStones()`. This lets `startCrossTypeSpecialsWindow` redirect the post-MS flow to offer the LS player their window.
+- **Shared badge style**: Reuses the `.reroll-countdown.ls-shared-cd` pattern from v358's simultaneous LS window (same CSS class, same badge appearance, consistent with the established pattern).
+- **Does NOT apply when**: Both teams have MS (sequential MS→MS→LS is unchanged); both teams have LS (v358 simultaneous LS window handles this); or either team has both MS+LS (falls through to existing sequential logic to avoid complex multi-type interactions).
+- **Time saving**: Up to ~5s per round when cross-type specials appear and neither player acts. In a 10-round game with active card builds (Hank + Selene common combo), this easily saves 30-50s of waiting.
+- Also bumped TESTROOM_VERSION v358 → v359.
+
+## v358 — FEATURE: Lucky Stone simultaneous window — both teams' tiles now highlight at the same time
+
+- **Problem**: When both teams had Lucky Stones, the game ran sequential windows (Red 3s → Blue 3s = up to 6s total). Players on one team had to wait for the other team's window to fully expire before their own tile lit up. In a 10-round game with Hank (Tremor) or Selene on both teams, this easily adds 40+ seconds of waiting just for Lucky Stone windows.
+- **Fix**: Modified `checkLuckyStones()` to detect when BOTH teams have Lucky Stones and call the new `startSimultaneousLuckyStoneWindows()` instead of the sequential pattern. Single-team Lucky Stone windows are unchanged.
+- **`startSimultaneousLuckyStoneWindows()` design**:
+  1. Both teams' Lucky Stone tiles highlight immediately (both `.rerollable` at once)
+  2. A single shared 5-second countdown badge shows on both tiles simultaneously
+  3. Either player can click their tile at any point during the 5s window
+  4. Die-pick phases are **serialized**: if one team is already picking a die (their dice row is clickable), the other team's tile click is blocked until they finish — prevents `lsCountdownTimer` conflicts since only one team at a time is in the 3s die-pick sub-phase
+  5. After a team rerolls, the shared countdown resumes for the remaining team(s)
+  6. Multi-stone re-use: handled in the callback — `B.lsAvailable[team]` is temporarily zeroed before calling `doLuckyReroll` (prevents its recursive `startLuckyStoneWindow` call), then restored minus 1; if more stones remain, the tile re-activates and the shared countdown resets to 5s
+  7. When both teams are done (or shared countdown expires), `resolveRound()` fires
+- **Worst case time saving**: 6s → 5s (both players wait full 5s without using) — saves 1s
+- **Typical case time saving**: If Red uses in 2s and Blue uses in 3s (sequential: 5s), now: both can act in parallel, effectively saving the full 3s second-team window ≈ 40s per 10-round game with active LS usage
+- **Added module-level variable**: `let lsSharedTimer = null;` for the shared countdown interval, separate from `lsCountdownTimer` (die-pick sub-phase)
+- **No changes to**: `startLuckyStoneWindow`, `doLuckyReroll`, `clearLsCountdown`, `showLsCountdown`, `clearDiceClickable` — all used unchanged
+- Also bumped TESTROOM_VERSION v357 → v358.
+
+## v357 — BUG FIX: Maximo (302) NAP! — all 4 callout color instances still had hardcoded hex colors
+
+- **Root cause**: v349 logged "Maximo (302) NAP! — callout color BUG FIX (all 4 instances)" in FIXLOG but never applied the edits to the file — the TESTROOM_VERSION constant was stuck at v332 for many cycles, meaning all the version-bump claims from v333–v355 were not reflected in the code. The code changes themselves WERE applied (verified: Wisp dead-code cleanup and Filbert absolute-callback fixes are both in the file), but the version constant and several callout-color edits were missed.
+- **4 instances fixed** — Maximo is `rarity:"common"`, all NAP! callouts corrected to `'var(--common)'`:
+  1. **Entry callout** (`triggerEntry`, line ~2917): `'#22c55e'` → `'var(--common)'`
+  2. **Pre-roll callout** (`doPreRollSetup`, line ~6178): `'#22c55e'` → `'var(--common)'`
+  3. **Tie-path callout** (Healing Seed grant on tie, line ~7750): `'#22c55e'` → `'var(--common)'`
+  4. **Win/lose-path end-of-round callout** (line ~10003): `'#fbbf24'` (amber / Lucky Stone color!) → `'var(--common)'` — the amber was especially misleading because it matched the Lucky Stone color, making Maximo look like a Lucky Stone card.
+- **v349 claim re-evaluated**: v349 FIXLOG entry stated remaining hardcoded colors belonged to shelved dead code. That was incorrect — these four NAP! instances were active code. The v352 entry compounded the error by confirming "all remaining hardcoded hex colors belong to SHELVED cards." Both entries were wrong about Maximo.
+- **Version discrepancy resolved**: TESTROOM_VERSION was stuck at v332 before this session (the const never got updated despite the FIXLOG claiming bumps from v333→v355). Corrected to v357 this cycle. The code changes themselves were correctly applied — only the version constant lagged.
+- Also bumped TESTROOM_VERSION v356 → v357.
+
+## v356 — BALANCE: Zain (206) Ice Blade — swing now grants +1 die in addition to +2 damage on win
+
+- **Diagnosis**: Zain was "Doom with one less HP and a fuse." Two team slots are spent setting up Ice Blade (one for Ice Shard, one for Moonstone resources), but the payoff was only +2 damage IF Zain won his roll — roughly a coin flip. The bigger payoff wasn't reachable often enough to justify the forge cost.
 - **Fix (purely additive)**: When the Ice Blade swing flag is committed for the round (`B.committed[team].zainBlade > 0`), Zain gains +1 die on top of the existing +2-damage-on-win. No other changes — the blade still forges the same way, still costs the same, still persists until Zain falls, and the swing is still opt-in per round.
-- **Implementation**: Added a committed-resource dice bonus block in `doPreRollSetup` directly after the Committed Surge block. Mirrors the Surge/Retribution/Let's Dance/Haywire pattern — modifies `redCount`/`blueCount` locally before `B.preRoll` is stored, gated on `zainBlade` commit + `iceBladeForged` + active + not KO. Posts an ICE BLADE! pre-roll callout and a log line.
+- **Implementation**: Added a committed-resource dice bonus block in `doPreRollSetup` directly after the Committed Surge block (line ~6480). Mirrors the Surge/Retribution/Let's Dance/Haywire pattern — modifies `redCount`/`blueCount` locally before `B.preRoll` is stored, gated on `zainBlade` commit + `iceBladeForged` + active + not KO. Posts an ICE BLADE! pre-roll callout and a log line.
 - **UI / tooltip updates**: Zain's `abilityDesc` card text now reads "+1 die AND +2 damage on a win". The swing button tooltip and label show "+1 die, +2 dmg on win". The forged-status tag tooltip and the forge callout/log line also updated to mention +1 die.
 - **No round-to-round state added**. The +1 die rides the existing per-round `committed.zainBlade` flag, which is already reset at end of round alongside all other committed resources. Fully within the "everything resolves within the round" rule.
+- Also bumped TESTROOM_VERSION v355 → v356.
+
+## v355 — BUG FIX: Opa/Villager/Jeffery/Lou — Filbert-curse onShow callbacks used relative HP mutations instead of pre-computed absolute values
+
+- **Pattern**: All four cards had Filbert-curse `onShow` callbacks that re-computed `wF.hp - N` (or `f.hp - 1` in the tie path) at callout-display time using the *current* `wF.hp` value. If another ability callout (e.g., Aunt Susan Harvest Dance) mutated `wF.hp` earlier in the same queue drain, the actual HP result would silently diverge from the pre-computed `xFlipped` value shown in the subtitle — same class of bug as Growing Mob/Munch (v354).
+- **Opa (48) MASK MERCHANT! win-path**: Added `const opaGhost = wF;` closure capture. Changed `() => { wF.hp = Math.max(0, wF.hp - 1); ... }` → `() => { opaGhost.hp = opaFlipped; ... }` (absolute pre-computed).
+- **Opa (48) MASK MERCHANT! tie-path**: Added `const opaGhostTie = f;` closure capture. Changed `() => { f.hp = Math.max(0, f.hp - 1); ... }` → `() => { opaGhostTie.hp = opaFlippedTie; ... }`.
+- **Villager (11) MASK MERCHANT! win-path**: Added `const villagerGhost = wF;` capture. Changed relative decrement → `villagerGhost.hp = villagerFlipped`.
+- **Jeffery (14) MASK MERCHANT! win-path**: Added `const jeffGhost = wF;` capture. Changed relative `-= 3` → `jeffGhost.hp = jeffFlipped`.
+- **Lou (32) MASK MERCHANT! win-path**: Added `const louGhost = wF;` capture. Changed relative `-= 1` → `louGhost.hp = louFlipped`.
+- **Normal heal callbacks left as relative increments**: `wF.hp++` / `wF.hp += 3` in the REST!/HOSPITALITY!/CHUCKLE!/BROS! success paths remain relative — this is intentional (v334 decision) so that multiple simultaneous healers on the same team correctly stack rather than clobbering each other with pre-computed values.
+- Also bumped TESTROOM_VERSION v354 → v355.
+
+## v354 — BUG FIX: Growing Mob (83) + Munch (66) — onShow callbacks used relative HP mutations instead of pre-computed absolute values
+
+- **Troubling Haters (83) GROWING MOB! / MASK MERCHANT! — BUG FIX**: Both the normal (+2 HP) and Filbert-flip (-2 HP) `onShow` callbacks used relative mutations (`wF.hp += 2` / `wF.hp = Math.max(0, wF.hp - 2)`) that re-read `wF.hp` at callout display time. Since other ability callouts in the queue (e.g., Aunt Susan Harvest Dance) may have already mutated `wF.hp` before these fire, the actual HP result would silently diverge from the `growingMobHpAfter` value shown in the subtitle. Fixed: callbacks now assign `growingMobGhost.hp = growingMobHpAfter` (absolute pre-computed value), matching every other card in this series (Flora, Bogey, Kodako, Patrick, Aunt Susan, Guardian Fairy, King Jay, Pudge, Thistle, Balatron, Puff Ball).
+- **Munch (66) SCRAPS! / MASK MERCHANT! — BUG FIX**: Same class of bug. Both the normal (+4 HP) and Filbert-flip (-4 HP) callbacks used relative mutations; fixed to assign `munchGhost.hp = munchHpAfter`.
+- **Safe closure references added**: Both blocks now capture `growingMobGhost = wF` and `munchGhost = wF` as dedicated closure variables (same pattern as `floraGhost`, `pudgeGhost`, etc.) so the callbacks reference the correct ghost object even if `wF` is reassigned later.
+- **Cinematic result**: The HP bar for Growing Mob and Munch now always jumps to exactly the value shown in the callout subtitle, regardless of what other HP mutations preceded them in the same ability queue.
+- Also bumped TESTROOM_VERSION v353 → v354.
+
+## v353 — BUG FIX: Knight Terror (401) HEAVY AIR! + Shade's Shadow (205) MELTDOWN! — wrong callout colors
+
+- **Knight Terror (401) HEAVY AIR! — callout color BUG FIX (2 instances)**: `var(--accent)` (UI red, #e94560) → `var(--rare)` (blue). Knight Terror is `rarity:"rare"` — HEAVY AIR! is its reactive damage ability (fires when an opponent uses any ability); the red flash falsely communicated "danger/system alert" instead of the card's rarity tier. Fixed at both the `queueAbility` path (line ~3441) and the `showAbilityCallout` path (line ~3443) inside `checkKnightEffects`.
+- **Shade's Shadow (205) MELTDOWN! — callout color BUG FIX**: `var(--accent)` (UI red, #e94560) → `var(--rare)` (blue). Shade's Shadow is `rarity:"rare"` — its pre-roll chip-damage callout was flashing the same UI-accent red as Knight Terror, making players think this was an error/warning state rather than a rare-tier ability. Fixed at line ~5732 in `doPreRollSetup`.
+- **Pattern complete**: All `var(--accent)` uses in ability callouts are now fixed. The only remaining `var(--accent)` uses are in damage-SFX and UI state elements (HP bars, KO labels) — those are intentional and correct.
+- Also bumped TESTROOM_VERSION v352 → v353.
+
+## v352 — BUG FIX: Harrison (315) ASCEND! + Farmer Jeff (314) HARVEST! — wrong callout colors
+
+- **Harrison (315) ASCEND! — callout color BUG FIX**: `#22c55e` (hardcoded Tailwind green-500) → `var(--rare)` (blue). Harrison is `rarity:"rare"` — his ASCEND! pre-roll callout was flashing an arbitrary green hex, same class of bug as Kaplan (v349), Maximo/Jimmy (v349), Granny (v326), Bouril/Hank/Calvin (v325), Timpleton (v317), Zain/Nerina (v316), Finn (v315), Aunt Susan (v348).
+- **Farmer Jeff (314) HARVEST! — callout color BUG FIX**: `#22c55e` (hardcoded Tailwind green-500) → `var(--ghost-rare)` (purple). Farmer Jeff is `rarity:"ghost-rare"` — his HARVEST! sideline callout was flashing green (uncommon-looking), making it appear like a common card's effect when Jeff is actually a Ghost-Rare.
+- **Remaining hardcoded colors checked**: All other hardcoded hex colors in queueAbility/showAbilityCallout calls (`QUILT!` `#c97c3a`, `BLOOM!` `#22c55e`, `RAIN DANCE!` `#22c55e`, `FORAGER!` `#22c55e`, `POLLINATE!` `#22c55e`) belong to SHELVED cards (Patches 354, Magnolia 318, Drizzle 328, Forager 316, Bumble 362) and are dead code — intentionally left as-is since they can never display.
+- Also bumped TESTROOM_VERSION v351 → v352.
+
+## v351 — FIXLOG CLEANUP: Winston (15) stale [ ] duplicate entry removed
+
+- **Winston (15) Scheme — FIXLOG cleanup**: The AUDIT STATUS Common section had two entries for Winston (15): a stale `[ ] NEEDS AUDIT` at line 617 (the original placeholder from when the audit list was first populated) and a correct `[x] AUDITED PASS (v297)` added later at line 635 after Winston was actually audited. Any agent reading the checklist top-to-bottom would encounter the unchecked entry first and could waste a cycle re-auditing Winston. Fixed: updated line 617 from `[ ] NEEDS AUDIT` to `[x] AUDITED PASS (v297) — see entry below for full details`, making the status unambiguous.
+- Also bumped TESTROOM_VERSION v350 → v351.
+
+## v350 — BUG FIX: Tweak and Twonk (303) ROARING CROWD! — wrong callout color
+
+- **Tweak and Twonk (303) ROARING CROWD! — callout color BUG FIX**: `#a855f7` (hardcoded Tailwind purple-500) → `var(--common)`. Tweak and Twonk is `rarity:"common"` — their tie-path ability callout was flashing a vivid purple, making players think it was a Ghost-Rare or Legendary effect. The purple hex was not an intentional set-themed color (unlike VA set cards that intentionally use `var(--magma)`) — it was simply a wrong color left over from the overnight bulk implementation run. Same class of bug as Granny (v325), Jimmy/Maximo (v349), Bouril/Hank/Calvin (v323), etc.
+- Also bumped TESTROOM_VERSION v349 → v350.
+
+## v349 — BUG FIX: Kaplan (308) POLLINATE!, Maximo (302) NAP!, Jimmy (352) CHIRP! — wrong callout colors
+
+- **Kaplan (308) POLLINATE! — callout color BUG FIX**: `#22c55e` (hardcoded Tailwind green-500) → `var(--uncommon)`. Kaplan is `rarity:"uncommon"` — his callout was showing an arbitrary hex value instead of the correct CSS rarity variable.
+- **Maximo (302) NAP! — callout color BUG FIX (all 4 instances)**: Maximo is `rarity:"common"` — all four NAP! callout sites were using wrong colors:
+  1. Entry callout (`triggerEntry`): `#22c55e` → `var(--common)`
+  2. Pre-roll callout (`doPreRollSetup`): `#22c55e` → `var(--common)`
+  3. Tie-path callout (Healing Seed grant): `#22c55e` → `var(--common)`
+  4. Win/lose-path end-of-round callout: `#fbbf24` (amber / Lucky Stone color!) → `var(--common)` — this one was especially confusing because amber is the Lucky Stone color, making it look like Maximo was granting Lucky Stones rather than Healing Seeds.
+- **Jimmy (352) CHIRP! — callout color BUG FIX**: `#fbbf24` (amber / Lucky Stone color) → `var(--common)`. Jimmy is `rarity:"common"` — his tie-path Lucky Stone grant callout was flashing amber, which ironically *is* the Lucky Stone color but is not a CSS rarity variable and misleads players about Jimmy's rarity tier.
+- **Impact**: All three cards were visually misrepresenting their rarity tier to players via wrong callout colors. Now all six callout instances across the three cards correctly use their rarity CSS variable.
+- Also bumped TESTROOM_VERSION v348 → v349.
+
+## v348 — BUG FIX: Aunt Susan (309) HARVEST DANCE! callout colors — all three wrong
+
+- **Aunt Susan (309) Harvest Dance — callout color BUG FIX**: Same class of mis-coloring as Finn (v315), Zain (v316), Timpleton (v317), Bouril/Hank/Calvin (v325), Granny (v326), Red Hunter (v327). Aunt Susan is `rarity:"rare"` so all her ability callouts should flash `var(--rare)` (blue). Instead:
+  1. **Damage callout** (Phase 7, spend-seed-for-damage path, line ~9182): was `'var(--magma)'` (orange-red, the Volcanic Activity set color) → corrected to `'var(--rare)'`
+  2. **Heal callout** (Phase 7, spend-seed-for-heal path, line ~9198): was `'#22c55e'` (hardcoded Tailwind green-500, close to uncommon green but not a CSS variable and wrong rarity) → corrected to `'var(--rare)'`
+  3. **Win +1 seed callout** (Phase 7, win-grants-seed path, line ~9700): was `'#22c55e'` (same hardcoded green) → corrected to `'var(--rare)'`
+  - **Impact**: Every time Aunt Susan used a Healing Seed for damage, the callout flashed magma-orange (implying Volcanic Activity card). Every time she healed or earned a seed, the callout flashed near-uncommon green (implying a common/uncommon card). All three wrong colors; all three now flash the correct rare-tier blue.
+  - **MASK MERCHANT! override preserved** at line ~9193: stays `'var(--uncommon)'` (Mr. Filbert's rarity) — correct.
+  - **Sandwiches DEPENDABLE! mirror preserved** at line ~9701: stays `'var(--common)'` — correct.
+- Also bumped TESTROOM_VERSION v347 → v348.
+
+## v347 — BUG FIX: Puff Ball (355) Burst — synchronous HP mutation before callout
+
+- **Puff Ball (355) Burst — BUG FIX**: Same class of bug as Flora (v346), Pudge (v345), Thistle (v344), Balatron (v343), Guardian Fairy (v342), King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). The Burst block at line ~8879 mutated `wF.hp = Math.max(0, wF.hp - puffBurstDmg)` synchronously at game-state time, so the attacker's HP bar dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `BURST!` callout fired announcing the explosion.
+  - **Fix**: Added `let puffBurstHpAfter = 0;` alongside `let puffBallBurst`. Changed `wF.hp = Math.max(0, wF.hp - puffBurstDmg)` → `puffBurstHpAfter = Math.max(0, wF.hp - puffBurstDmg)` (compute only, no mutation). KO check updated to `if (puffBurstHpAfter <= 0)` (still synchronous — Cameron reads `wF.ko`). Log line updated to use `puffBurstHpAfter`. In callout section: captured `puffBurstVictim = wF` as closure reference; subtitle updated to use `puffBurstHpAfter`; `onShow` changed from `() => { renderBattle(); }` → `() => { puffBurstVictim.hp = puffBurstHpAfter; renderBattle(); }`.
+  - **lF self-KO preserved synchronously**: `lF.hp = 0; lF.ko = true;` remain synchronous since the self-destruct KO needs to be visible to the `handleKOs` chain immediately after queue drains.
+  - **Cameron interaction preserved**: `wF.ko` still set synchronously; if the 2-damage burst KOs the attacker, Cameron cannot fire Force of Nature (correct).
+  - **Cinematic result**: Puff Ball takes doubles → normal damage resolves → 1.2s pause → BURST! flashes → attacker's HP bar drops simultaneously with the explosion callout.
+- Also bumped TESTROOM_VERSION v346 → v347.
+
+## v346 — BUG FIX: Flora (75) Restore — synchronous HP mutations before callout (all 4 paths)
+
+- **Flora (75) Restore — BUG FIX**: Same class of bug as Pudge (v345), Thistle (v344), Balatron (v343), Guardian Fairy (v342), King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). Flora's Restore triggered on doubles (win OR lose) and also had a Mr. Filbert curse path (heal → -2 damage). All 4 code paths mutated HP synchronously at game-state time — before beat 4's `renderBattle()`, and roughly 800ms before the `RESTORE!`/`MASK MERCHANT!` callouts fired.
+  - **Win-normal path**: `wF.hp += 2` → changed to compute `floraRestoredHp = wF.hp + 2` (no mutation). Deferred `floraGhost.hp = floraRestoredHp` to RESTORE! `onShow` callback.
+  - **Win-Filbert path**: `wF.hp = Math.max(0, wF.hp - 2)` → changed to compute `floraFlippedTo = Math.max(0, wF.hp - 2)` (no mutation). KO flag still set synchronously. Deferred `floraGhost.hp = floraFlippedTo` to MASK MERCHANT! `onShow` callback.
+  - **Lose-normal path**: Same as win-normal but for `lF`.
+  - **Lose-Filbert path**: Same as win-Filbert but for `lF`.
+  - **Added `floraGhost` reference**: Captures `wF` or `lF` at game-state time so the `onShow` callback has the correct ghost reference regardless of which path fired.
+  - **Log lines updated**: Now use `floraRestoredHp` / `floraFlippedTo` (pre-computed target values) instead of post-mutation `wF.hp`/`lF.hp`, so the log message is accurate at computation time.
+  - **Cinematic result**: Flora rolls doubles → loser takes damage → 1.2s pause → RESTORE! flashes → Flora's HP bar jumps simultaneously. The reward lands when announced.
+- Also bumped TESTROOM_VERSION v345 → v346.
+
+## v345 — BUG FIX: Pudge (311) Belly Flop — synchronous self-damage HP mutation before callout
+
+- **Pudge (311) Belly Flop — BUG FIX**: Same class of bug as Thistle (v344), Balatron (v343), Guardian Fairy (v342), King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). The self-damage block at line ~8841 mutated `wF.hp = Math.max(0, wF.hp - 1)` synchronously at game-state time, so Pudge's HP bar dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `BELLY FLOP!` callout fired announcing the self-inflicted damage.
+  - **Fix**: Added `let pudgeHpAfter = 0;` alongside `pudgeSelfDmgApplied`. Changed `wF.hp = Math.max(0, wF.hp - 1)` → `pudgeHpAfter = Math.max(0, wF.hp - 1)` (compute only, no mutation). KO check updated to `if (pudgeHpAfter <= 0)` (still synchronous — Cameron Force of Nature check reads `wF.ko`). Log line updated to use `pudgeHpAfter`. In the callout section: subtitle updated to show remaining HP `(${pudgeHpAfter} HP left)` and added `onShow: () => { wF.hp = pudgeHpAfter; renderBattle(); }` when `pudgeSelfDmgApplied` is true (null otherwise, for the edge case where the condition fires but no damage was applied).
+  - **Animation ordering preserved**: The pudge hit animation at `pudgeDelay` (2300ms) still fires before the BELLY FLOP! callout (2700ms+), acting as a visual lead-in. HP bar drops exactly when BELLY FLOP! announces the self-damage.
+  - **Cameron interaction preserved**: `wF.ko` still set synchronously, so if Pudge self-KOs, Cameron cannot fire Force of Nature.
+- Also bumped TESTROOM_VERSION v344 → v345.
+
+## v344 — BUG FIX: Thistle (338) Barbed — synchronous HP mutation before callout
+
+- **Thistle (338) Barbed — BUG FIX**: Same class of bug as Prince Balatron (v343), Guardian Fairy (v342), King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338). The recoil block at line ~8866 mutated `wF.hp = Math.max(0, wF.hp - 1)` synchronously at game-state time, so the winner's HP bar dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `BARBED!` callout fired announcing the recoil that was already visible.
+  - **Fix**: Declared `let thistleHpAfter = 0;` alongside `thistleBarbed`. Changed `wF.hp = Math.max(0, wF.hp - 1)` → `thistleHpAfter = Math.max(0, wF.hp - 1)` (compute only, no mutation). KO check updated to use `thistleHpAfter <= 0` (synchronous — Cameron and Balatron guards read `wF.ko`). Log line updated to display `thistleHpAfter`. In the callout section: suffix changed from `${wF.hp}` → `${thistleHpAfter}` and added `onShow: () => { wF.hp = thistleHpAfter; renderBattle(); }` as 4th arg to `queueAbility`.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously, so if Thistle's barb KOs Cameron, Cameron cannot fire Force of Nature (correct). Balatron's post-barb guard `!wF.ko` also correctly reads the sync flag.
+  - **Cinematic result**: Thistle takes damage → 1.2s pause → BARBED! flashes → winner's HP bar drops simultaneously with the recoil callout. The counter-punch now lands when announced, not silently during the loser's death beat.
+- Also bumped TESTROOM_VERSION v343 → v344.
+
+## v343 — BUG FIX: Prince Balatron (113) Party Time — synchronous HP mutation before callout
+
+- **Prince Balatron (113) Party Time — BUG FIX**: Same class of bug as Guardian Fairy (v342), King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). The counter-die block at line ~8854 mutated `wF.hp = Math.max(0, wF.hp - balatronCounterDie)` synchronously at game-state time, so the winner's HP bar visually dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `PARTY TIME!` callout fired announcing the counter-attack that had already visually landed.
+  - **Fix**: Declared `let balatronHpAfter = 0;` alongside declarations. Changed `wF.hp = Math.max(0, wF.hp - balatronCounterDie)` → `balatronHpAfter = Math.max(0, wF.hp - balatronCounterDie)` (compute only, no mutation). KO check updated to use `balatronHpAfter <= 0` (still synchronous — Cameron Force of Nature check reads `wF.ko`). Log line updated to use `balatronHpAfter` for HP display. In the callout section: `counterKoSuffix` now uses `balatronHpAfter` (not `wF.hp`) and added `onShow: () => { wF.hp = balatronHpAfter; renderBattle(); }` as 4th arg to `queueAbility`.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously, so if Balatron's counter-die KOs Cameron, Cameron cannot fire Force of Nature (correct).
+  - **Cinematic result**: Winner takes main damage → Balatron loses → 1.2s pause → PARTY TIME! flashes → winner's HP bar drops simultaneously with the counter-punch callout. Players now see the counter land when it's announced, not silently during the death beat.
+- Also bumped TESTROOM_VERSION v342 → v343.
+
+## v342 — BUG FIX: Guardian Fairy (99) Wish — synchronous HP mutation before callout
+
+- **Guardian Fairy (99) Wish — BUG FIX**: Same class of bug as King Jay (v341), Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). The Wish intercept block at line ~8726 mutated `gfG.hp = Math.max(0, gfG.hp - dmg)` synchronously at game-state time, so GF's HP bar visually dropped on the sideline during beat 4's `renderBattle()` call — roughly 800ms BEFORE the `WISH!` callout fired announcing the sacrifice.
+  - **Fix**: Added `let gfHpAfter = 0;` alongside the block declarations. Changed `gfG.hp = Math.max(0, gfG.hp - dmg)` → `gfHpAfter = Math.max(0, gfG.hp - dmg)` (compute only, no mutation). KO check updated to `if (gfHpAfter <= 0)` (still synchronous — needed for Cameron Force of Nature and collectKC checks). Log line updated to use `gfHpAfter` (not `gfG.hp`) for display. In the callout section: `gfKoSuffix` now uses `gfHpAfter` (not `gfSacrifice.hp`) and the `onShow` callback changed from `() => { renderBattle(); }` → `() => { gfSacrifice.hp = gfHpAfter; renderBattle(); }` so the HP bar drops exactly when WISH! flashes.
+  - **Cinematic result**: Loser takes 0 damage → 1.2s pause → WISH! flashes → Guardian Fairy's HP bar drops simultaneously on the sideline. Players now see GF heroically sacrifice HP at the dramatic moment it's announced, not silently during the death beat. Same "sacrifice lands when announced" feel as Patrick Stone Form and Kodako Swift.
+- Also bumped TESTROOM_VERSION v341 → v342.
+
+## v341 — BUG FIX: King Jay (106) Reflection — synchronous HP mutation before callout
+
+- **King Jay (106) Reflection — BUG FIX**: Same class of bug as Bogey (v340), Kodako (v339), Patrick (v338), Aunt Susan (v337). The reflect-damage block at lines ~8785-8789 mutated `wF.hp = Math.max(0, wF.hp - kingJayReflectDmg)` synchronously at game-state time, so the winner's HP bar visually dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `REFLECTION!` callout fired announcing the damage already visible on-screen.
+  - **Fix**: Added `let kingJayHpAfter = 0;` alongside declarations. Changed `wF.hp = Math.max(0, wF.hp - kingJayReflectDmg)` → `kingJayHpAfter = Math.max(0, wF.hp - kingJayReflectDmg)` (compute only, no mutation). `wF.ko` still set synchronously (Cameron Force of Nature check reads `wF.ko`, not `wF.hp`). Log line updated to use `kingJayHpAfter`. In the callout section: `reflectKoSuffix` now uses `kingJayHpAfter` (not `wF.hp`) and added `onShow: () => { wF.hp = kingJayHpAfter; renderBattle(); }` as 4th arg to `queueAbility`.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously, so if King Jay's reflection KOs Cameron, Cameron cannot fire Force of Nature (correct).
+  - **Cinematic result**: King Jay reflects damage → 1.2s pause → REFLECTION! flashes → winner's HP bar drops simultaneously. Same "counter-punch lands when announced" feel as Patrick/Kodako/Bogey.
+- Also bumped TESTROOM_VERSION v340 → v341.
+
+## v340 — BUG FIX: Bogey (53) Bogus reflect — synchronous HP mutation before callout
+
+- **Bogey (53) Bogus reflect — BUG FIX**: Same class of bug as Kodako Swift (v339), Patrick Stone Form (v338), Aunt Susan (v337), Munch/TH (v336), Opa/Villager/Jeffery/Lou (v334). The reflect-damage block at lines ~8791-8795 mutated `wF.hp = Math.max(0, wF.hp - bogeyReflectDmg)` synchronously at game-state time, so the winner's HP bar visually dropped during beat 4's `renderBattle()` — roughly 800ms BEFORE the `BOGUS!` callout fired at queue-drain time announcing damage already visible on-screen.
+  - **Fix**: Declared `let bogeyHpAfter = 0;` alongside `bogeyReflectDmg`. Changed `wF.hp = Math.max(0, wF.hp - bogeyReflectDmg)` → `bogeyHpAfter = Math.max(0, wF.hp - bogeyReflectDmg)` (compute only, no mutation). KO check updated to use `bogeyHpAfter <= 0` (same pattern as Kodako v339). Log line updated to use `bogeyHpAfter` for display. In the callout section: `bogeyKoSuffix` now uses `bogeyHpAfter` (not `wF.hp`) and added `onShow: () => { wF.hp = bogeyHpAfter; renderBattle(); }` as 4th arg to `queueAbility`.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously, so if Bogey's reflect KOs Cameron, Cameron cannot fire Force of Nature (correct). Deferred `wF.hp` does not affect this check since Cameron reads `wF.ko`, not `wF.hp`.
+  - **Cinematic result**: Bogey reflects damage → 1.2s pause → BOGUS! flashes → winner's HP bar drops simultaneously with the callout. Same "counter-punch lands when announced" feel as Patrick Stone Form and Kodako Swift.
+- Also bumped TESTROOM_VERSION v339 → v340.
+
+## v339 — BUG FIX: Kodako (1) Swift lose-counter — synchronous HP mutation before callout
+
+- **Kodako (1) Swift LOSE counter — BUG FIX**: Same class of bug as Patrick Stone Form (v338), Aunt Susan (v337), Munch/TH (v336), Opa/Villager/Jeffery/Lou (v334). The Swift lose-counter block at lines ~8798-8802 mutated `wF.hp = Math.max(0, wF.hp - 4)` synchronously at game-state time, meaning the winner's HP bar visually dropped during beat 4's `renderBattle()` call (~t=1900ms) — roughly 800ms BEFORE the `SWIFT!` callout fired at queue-drain time announcing damage already shown on-screen.
+  - **Fix**: Declared `let swiftLoseHpAfter = 0;` alongside the guard block. Changed `wF.hp = Math.max(0, wF.hp - 4)` → `swiftLoseHpAfter = Math.max(0, wF.hp - 4)` (compute only, no mutation). `wF.ko` still set synchronously (required: Cameron Force of Nature check at line ~8817 reads `wF.ko`, not `wF.hp`). Log line updated to use `swiftLoseHpAfter` for display. In the callout section: suffix updated from `${wF.hp}` → `${swiftLoseHpAfter}` and added `onShow: () => { wF.hp = swiftLoseHpAfter; renderBattle(); }` as the 4th arg to `queueAbility`.
+  - **Cinematic result**: Kodako deflects incoming damage → 1.2s pause → SWIFT! flashes → winner's HP bar drops simultaneously with the callout. Same satisfying "counter-punch lands when announced" feel as Patrick Stone Form v338.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously, so if Swift's 4-counter KOs Cameron, Cameron cannot fire Force of Nature (correct). Deferred `wF.hp` does not affect this.
+- Also bumped TESTROOM_VERSION v338 → v339.
+
+## v338 — BUG FIX: Patrick (10) Stone Form counter-damage — synchronous HP mutation before callout
+
+- **Patrick (10) Stone Form counter-damage — BUG FIX**: Same class of bug as Munch/TH (v336), Aunt Susan (v337), Opa/Villager/Jeffery/Lou (v334). The Stone Form counter-damage (`wF.hp = Math.max(0, wF.hp - 3)`) fired synchronously at game-state time, so the winner's HP bar dropped silently during beat 4's `renderBattle()` — before the STONE FORM! callout fired ~800ms later announcing damage already visible on-screen.
+  - **Fix**: Split into two parts: (1) Game-state: declare `stoneFormHpAfter` at scope, compute `stoneFormHpAfter = Math.max(0, wF.hp - 3)`, set `wF.ko = true` synchronously if KO (required for Cameron (25) Force of Nature check that immediately follows at line ~8817). Do NOT set `wF.hp` yet. (2) Callout: `stoneFormKoSuffix` now uses `stoneFormHpAfter` (not `wF.hp`) for display text; added `onShow: () => { wF.hp = stoneFormHpAfter; renderBattle(); }` callback so the HP bar drops exactly when STONE FORM! fires.
+  - **Cameron interaction preserved**: `wF.ko` is still set synchronously before the Cameron Force of Nature check — if Patrick's 3 counter-damage KOs Cameron, Cameron cannot fire Force of Nature (correct). If it doesn't KO Cameron, Cameron Force of Nature destroys Patrick (correct). The deferred `wF.hp` does not break this check since Cameron reads `wF.ko`, not `wF.hp`.
+  - **Cinematic result**: Patrick blocks singles → 1.2s pause → STONE FORM! flashes → winner's HP bar drops simultaneously with the callout. The counter-punch now lands at the same moment it's announced.
+- Also bumped TESTROOM_VERSION v337 → v338.
+
+## v337 — BUG FIX: Aunt Susan (309) Harvest Dance heal-bonus — synchronous HP mutation + missing Filbert curse
+
+- **Aunt Susan (309) Harvest Dance heal-bonus — BUG FIX (two bugs):**
+
+  **Bug 1 — Synchronous HP mutation (same class as Munch/TH v336, Opa/Villager/Jeffery/Lou v334):**
+  The `auntSusanHealBonus` game-state block (previously lines 9052-9065) applied `f.hp += healAmt` synchronously — BEFORE the cinematic queue built or drained. This meant the HP bar visually jumped when the winner was first determined (at `renderBattle()` around t=1900ms / beat 4), while the HARVEST DANCE! callout didn't fire until ~t=2700ms+ after the queue drained. Players saw Aunt Susan's ghost gain HP silently during the death beat, then HARVEST DANCE! fired 800ms later announcing something already visible on-screen.
+  - **Fix**: Removed `f.hp += healAmt` from the game-state section. Changed to compute preview values only (`hpAfter = hpBefore + healAmt`, `susanOver = hpAfter > f.maxHp`) and store them in `B.auntSusanHealResult[tn]` alongside a captured `f` reference and `healAmt`. Added `onShow: () => { f.hp += healAmt; renderBattle(); }` callback to the HARVEST DANCE! `queueAbility` call, so the HP bar updates exactly when the callout fires.
+
+  **Bug 2 — Missing Mr. Filbert (59) Mask Merchant curse check:**
+  The Aunt Susan heal-bonus block had NO `hasSideline(enemy, 59)` check. Every other post-roll heal (Opa REST!, Villager HOSPITALITY!, Jeffery CHUCKLE!, Flora RESTORE!, Munch SCRAPS!, Troubling Haters GROWING MOB!) checks `filbertCursesWin/Lose` to flip heals to damage when Filbert is on the enemy sideline. Aunt Susan was the only post-roll heal that let the ghost heal unconditionally regardless of Filbert.
+  - **Fix**: Added `const filbertFlips = hasSideline(enemyT, 59)` check in the game-state section. If Filbert is present: stores `{ f, healAmt, before, after, filbertFlipped: true }` in `auntSusanHealResult` and logs the curse. If no Filbert: stores `{ f, healAmt, before, after, overclocked }` (normal). In the callout section: `filbertFlipped` path queues `MASK MERCHANT!` with onShow `f.hp = Math.max(0, f.hp - healAmt)` + KO-capable guard (`f.ko = true, f.killedBy = 59`) — identical pattern to Opa REST! Filbert path (v335). Normal path queues HARVEST DANCE! with onShow `f.hp += healAmt`.
+
+  **Result**: Both teams' HP bars no longer jump during the death beat; instead they update exactly when HARVEST DANCE! fires. Mr. Filbert now correctly curses Aunt Susan's committed heal into damage, with a cinematic MASK MERCHANT! callout.
+
+- Also bumped TESTROOM_VERSION v336 → v337.
+
+## v336 — BUG FIX: Munch (66) Scraps + Troubling Haters (83) Growing Mob — HP mutations deferred to onShow callbacks
+
+- **Munch (66) Scraps + Troubling Haters (83) Growing Mob — BUG FIX**: Same class of bug as v334 (Opa/Villager/Jeffery/Lou win-path) and v335 (Opa/Ancient One tie-path), but for kill-triggered and damage-triggered HP healers. Both cards synchronously mutated `wF.hp` at computation time, meaning the HP bar visually jumped during beat 4 (`renderBattle()` at t=1900ms) — BEFORE the ability callout fired at ~t=2700ms+. Players saw Munch gain 4 HP silently when the loser died, then SCRAPS! fired 800ms later announcing something that already happened on-screen. Same for Troubling Haters Growing Mob (+2 HP on 4+ damage win).
+  - **Fix**: Removed synchronous `wF.hp` mutations from computation phase for both cards (all 4 paths: normal and Filbert for each). Changed to capture preview display values (`munchHpAfter = wF.hp + 4`, `growingMobHpAfter = wF.hp + 2`, etc.) at queue-time, then added `onShow` callbacks to the `queueAbility` calls that actually perform the mutation. Pattern exactly matches Opa REST! in v334/v335.
+  - **Filbert curse paths**: Both Filbert paths now defer `wF.hp = Math.max(0, wF.hp - N)` + KO guard (`wF.ko = true, wF.killedBy = 59`) into the MASK MERCHANT! onShow callback — same as v335's Opa/Ancient One Filbert pattern. `handleKOs()` still fires after the queue drains, which correctly processes any KO set in an onShow callback.
+  - **Log messages**: Updated to use pre-computed preview values (`growingMobHpAfter`, `munchHpAfter`) instead of post-mutation `wF.hp`, so the log line fires at computation time and shows the same values that the callout will announce.
+  - **Comments updated**: Removed incorrect "capped at maxHp" from both card comments (HP overclocks per v294 hard rule).
+  - **Cinematic result**: Losing ghost dies (HP drops on beat 4), then SCRAPS! / GROWING MOB! fires and Munch/TH's HP bar jumps UP simultaneously with the callout. Much more satisfying "kill → reward" moment than the previous "silent HP jump then belated announcement."
+- Also bumped TESTROOM_VERSION v335 → v336.
+
+## v335 — BUG FIX: Opa (48) Rest tie-path + Ancient One (22) Friend to All — absolute-set callback stacking bug
+
+- **Tie-path HP-heal callback stacking bug — BUG FIX**: Same class of bug as v334 (win-path absolute-set), but in the tie-path block. Both `Opa (48) REST!` (tie path) and `Ancient One (22) FRIEND TO ALL!` used pre-computed absolute target values in their deferred `onShow` callbacks:
+  ```javascript
+  const opaNewHpTie = f.hp + 1;   // captured at queue-time
+  queueAbility('REST!', ..., () => { f.hp = opaNewHpTie; ... });  // absolute-set at show-time
+  const aoNewHp = f.hp + 3;       // captured at queue-time
+  queueAbility('FRIEND TO ALL!', ..., () => { f.hp = aoNewHp; ... });  // absolute-set at show-time
+  ```
+  When both Opa (active) and Ancient One (sideline) fire in the same tie round for the same ghost, the later callback's absolute-set clobbers the earlier one. Example: Ghost at 4 HP, Opa fires → `opaNewHpTie=5` captured → REST! queued. Ancient One fires → `aoNewHp=7` captured → FRIEND TO ALL! queued. At drain time: REST! fires → `f.hp = 5` (correct +1). FRIEND TO ALL! fires → `f.hp = 7` (should be 4+1+3=8, but captured old `f.hp=4` → result is only 4+3=7, dropping Opa's +1).
+  - **Fix**: Changed `f.hp = opaNewHpTie` → `f.hp++` (Opa tie REST!); changed `f.hp = aoNewHp` → `f.hp += 3` (Ancient One FRIEND TO ALL!). Both Filbert-curse absolute-decrement callbacks also fixed to relative: `f.hp = opaFlippedTie` → `f.hp = Math.max(0, f.hp - 1)`; `f.hp = aoFlipped` → `f.hp = Math.max(0, f.hp - 3)`. Callout text strings still pre-compute `opaNewHpTie`/`aoNewHp` for display (accurately showing each card's individual contribution), but the actual `f.hp` mutation is now relative so stacking is additive.
+  - **Why this matters**: A team with both Opa active AND Ancient One on sideline (a defensive heal-focus loadout) in a tie round was getting only the larger heal, dropping the smaller one silently. 4 HP + REST(+1) + FRIEND TO ALL(+3) → should be 8 HP, was 7 HP (lost 1 HP every tie round).
+- Also bumped TESTROOM_VERSION v334 → v335.
+
+## v334 — BUG FIX: Deferred HP healing callbacks used absolute-set instead of relative-increment — multi-healer stacking broken
+
+- **HP-heal callback stacking bug — BUG FIX**: Four win-path healing abilities used pre-computed absolute target values in their deferred `onShow` callbacks: Opa (48) REST!, Villager (11) HOSPITALITY!, Jeffery (14) CHUCKLE!, and Lou (32) BROS!. The pattern was:
+  ```javascript
+  const jeffNewHp = wF.hp + 3;  // computed at queue-time
+  queueAbility('CHUCKLE!', ..., () => { wF.hp = jeffNewHp; renderBattle(); });  // set absolute at show-time
+  ```
+  When multiple healing abilities fire sequentially (e.g., Villager and Jeffery both on same sideline, or Opa active + Villager on sideline), later callbacks **overwrote** earlier ones' HP changes with stale pre-computed values. Example: Opa at 4 HP wins, Villager heals (+1), Jeffery heals (+3). Queue-time captures: `opaNewHp=5, villagerNewHp=5, jeffNewHp=7`. After drain: REST! fires → hp=5; HOSPITALITY! fires → hp=5 (clobbered!); CHUCKLE! fires → hp=7 (clobbered again!). Expected: 4+1+1+3=9. Actual: 7.
+  - **Fix**: Changed all 4 normal-path callbacks to use relative increments: `wF.hp++` (Opa), `wF.hp++` (Villager), `wF.hp += 3` (Jeffery), `wF.hp++` (Lou). Changed all 4 Filbert-curse callbacks to use relative decrements: `wF.hp = Math.max(0, wF.hp - N)` instead of `wF.hp = preComputedFloorValue`. Both fixes preserve the KO-check logic (`if (wF.hp <= 0) { wF.ko = true; ... }`) which now correctly runs after the relative decrement. Callout text strings (`(${wF.hp}→${villagerNewHp})`) still show the queue-time values — they accurately represent each ability's **individual contribution** regardless of stacking order, and the HP bar correctly updates to the stacked total as each callout fires.
+  - **Why this was hard to catch**: Single-healer teams (common) never trigger the bug. It only manifests when 2+ HP-healing abilities fire in the same round — e.g., Villager + Jeffery both sideline (valid healing-focus team), Opa active + Villager sideline (Opa is one of few active-ghost healers), or Grawr + Lou + Villager (heal-and-attack team). The HP bar would show the wrong final value and the second/third callout texts would be internally consistent but show the wrong cumulative result.
+- Also bumped TESTROOM_VERSION v333 → v334.
+
+## v333 — BUG FIX: Dark Wing (76) Precision — `darkWingUsedThisRound` not reset after win/lose rounds
+
+- **Dark Wing (76) Precision — BUG FIX**: The win/lose-path reset block (inside the `drainAbilityQueue` callback at line ~10030) was missing `if (B.darkWingUsedThisRound) { B.darkWingUsedThisRound.red = false; B.darkWingUsedThisRound.blue = false; }`. Every other "used this round" flag (jacksonUsedThisRound, sonyaUsedThisRound, mallowDecided, forgeFireDecided, etc.) was correctly reset in BOTH the tie-path AND the win/lose-path. `darkWingUsedThisRound` was only reset in the tie-path (line 7775) but nowhere in the win/lose path.
+  - **Reproduction**: Dark Wing uses Precision reroll in any non-tie round → `darkWingUsedThisRound[team] = true` → round resolves normally → win/lose-path reset runs but doesn't clear the flag → next round, the `checkDarkWingPrecision` early-return at line 4609 fires (`darkWingUsedThisRound[team] === true`) → Dark Wing is silently denied her reroll. She could only reroll on tie rounds, effectively making Precision a once-per-game ability in most matches.
+  - **Fix**: Added `if (B.darkWingUsedThisRound) { B.darkWingUsedThisRound.red = false; B.darkWingUsedThisRound.blue = false; }` to the win/lose-path reset between `sonyaUsedThisRound` and `mallowDecided`, matching the position in the tie-path reset.
+  - **Audit**: Eloise (85) doEloiseChoice and Tyler (105) doTylerChoice — both formally verified PASS this cycle. Tyler's `f.hp >= 3` guard prevents self-KO (minimum result: 1 HP). Eloise's `!f.ko && !oppF.ko` guard prevents KO from HP swap (both ghosts have hp ≥ 1 when not ko'd). Neither has the mid-pre-roll-modal KO bypass issue flagged in previous AFTER notes.
+- Also bumped TESTROOM_VERSION v332 → v333.
+
+## v332 — BUG FIX: doPreRollSetup() late-phase KO guard — Boris Fortify + Katrina Seeker Filbert-KO now routes to handleKOs
+
+- **doPreRollSetup() late pre-roll KO guard — BUG FIX**: The early `preRollKO` check at line ~6070 only covers KOs from the **first half** of `doPreRollSetup` (Ember Force Swarm, Shade's Shadow Meltdown, Wandering Sue Hidden Weakness). Boris (343) Fortify committed-surge and Katrina (70) Seeker both run **after** that check. Both can KO the active ghost via Mr. Filbert (59) Mask Merchant curse: Boris Fortify (heal → -2 damage) at lines 6441-6478; Katrina Seeker (heal → -1 damage) at lines 6480-6502. When either KO'd the active ghost, `doPreRollSetup` continued, set `B.preRoll`, returned `preRollCallouts.length` — then `rollReady` saw `B.phase === 'ready'`, set it to `'rolling'`, and rolled dice for a dead ghost, bypassing all KO handling.
+  - **Scenarios**: (A) Active Boris ≤2 HP + enemy Filbert + committed Surge → Boris Fortify fires → Filbert flips +2 heal to -2 damage → Boris KO'd → game rolls dead ghost. (B) Active Katrina at 1 HP + enemy Filbert + Katrina HP < opponent HP → Seeker fires → Filbert flips +1 heal to -1 damage → Katrina KO'd → same bypass.
+  - **Fix**: Added `latePreRollKO` check (identical to early guard) immediately before `B.preRoll = {…}`. If any active ghost is KO'd and callouts are pending: set `B.phase = 'ko-pause'`, drain callouts sequentially, call `handleKOs()` after all callouts clear. If no callouts: call `handleKOs()` directly. Both paths call `refundCommitted()`. Same pattern as early guard (lines 6070-6090), Mallow (v329), Boo Brothers (v330).
 - Also bumped TESTROOM_VERSION v331 → v332.
 
 ## v331 — REWORK: Sylvia (313) Porpoise — player-rolled 1-die dodge modal (DO NOT REVERT)
@@ -379,7 +844,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Stone Cold (73) — One-two-one!: AUDITED FIX (v277)
 - [x] Dark Jeff (74) — Cackle: AUDITED PASS (v281) — sideline +1 dmg, Cornelius check, correct
 - [x] Flora (75) — Restore: AUDITED PASS (v281) — win+lose doubles paths, Filbert curse, maxHp cap, correct
-- [x] Dark Wing (76) — Precision: AUDITED PASS (v285) — post-roll modal, in-place splice, once-per-round, correct
+- [x] Dark Wing (76) — Precision: AUDITED FIX (v333) — post-roll modal, in-place splice, once-per-round. BUG: `darkWingUsedThisRound` was only reset in tie-path, not win/lose-path — Dark Wing could only reroll once per game in normal matches. Fixed: added reset to win/lose-path reset block.
 - [x] City Cyboo (77) — Barrier: AUDITED PASS (v285) — doubles negation, Cameron check, correct
 - [x] Haywire (78) — Wild Chords: AUDITED PASS (v285) — triples→+1 permanent die, win+tie paths, `haywireBonus` applied unconditionally in doPreRollSetup, correct
 - [x] Laura (79) — Catchy Tune: AUDITED PASS (v285) — sideline, all-dice consecutive ascending seq check, Cornelius, collectKC, correct
@@ -444,7 +909,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Dupy (12) — Frolic: AUDITED PASS (v280) — tie → KO enemy, guard prevents double-fire in mirror match
 - [x] Shoo (13) — Alpine Air: AUDITED PASS (v295) — f.hp+=2 (overclocks by design per v294 rule); Cornelius block; Filbert curse; once-per-ghost flag; correct.
 - [x] Jeffery (14) — Chuckle: AUDITED PASS (v280) — sideline +3 HP on win, Filbert/Cornelius/Residue all correct
-- [ ] Winston (15) — Scheme: NEEDS AUDIT (modal exists, Barnaby counter exists, appears correct but untested)
+- [x] Winston (15) — Scheme: AUDITED PASS (v297) — see entry below for full details
 - [x] Chip (16) — Acrobatic Dive: AUDITED FIX (v279)
 - [x] Boo Brothers (17) — Teamwork: AUDITED PASS (v280) — pre-roll modal, hp < maxHp guard, Filbert interaction correct
 - [x] Charlie (18) — Rush: AUDITED PASS (v280) — double 2s → exactly 7 dmg, correct
