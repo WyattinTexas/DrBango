@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 3,
-      "remaining_mins": 54,
+      "cycles": 4,
+      "remaining_mins": 52,
       "until": "12:22 AM",
-      "last_update": "2026-04-09T23:29:36.599516",
+      "last_update": "2026-04-09T23:36:34.213249",
       "status": "running",
-      "next_up": "Audit the `drainAbilityQueue` callback timing \u2014 `highlightWinnerDice` fires at t+10ms then KO check fires at t+750ms/t+1800ms; verify the tiebreaker dice glow isn't still animating when the KO swap picker appears, and that the round narration (\"Round N \u2014 X vs Y\") in the no-KO path has enough breathing room before roll buttons enable",
-      "after_that": "Audit narrator pacing \u2014 check for rapid-fire `narrate()` calls (within ~200ms of each other) in the KO chain and entry chain that could overwrite each other before the player reads the previous line"
+      "next_up": "Audit narrator pacing in the KO chain \u2014 `openKoSwap` narrates \"[Ghost] is down!\" then immediately `doKoSwap` fires (800ms auto-pick path) which calls `triggerEntry` which narrates \"[New Ghost] enters the arena!\" \u2014 check if both lines get their full 1800ms hold in `drainNarrate`, or if the entry narration stomps the KO narration before the player can read it",
+      "after_that": "Audit the `lF.ko` (KO path, 1800ms) branch of the same `drainAbilityQueue` callback \u2014 verify `highlightWinnerDice` at t+10ms and `handleKOs()` at t+1800ms produce clean visual separation, and that the KO path's `if (!handleKOs())` fallback (currently dead code in practice) is safe if somehow reached"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 4,
+      "summary": "No-KO round transition \u2014 `narrate(\"Round N\")` now fires 350ms before `resetRollButtons()` instead of simultaneously, so the round announcement is readable before roll buttons activate",
+      "next_up": "Audit narrator pacing in the KO chain \u2014 `openKoSwap` narrates \"[Ghost] is down!\" then immediately `doKoSwap` fires (800ms auto-pick path) which calls `triggerEntry` which narrates \"[New Ghost] enters the arena!\" \u2014 check if both lines get their full 1800ms hold in `drainNarrate`, or if the entry narration stomps the KO narration before the player can read it",
+      "after_that": "Audit the `lF.ko` (KO path, 1800ms) branch of the same `drainAbilityQueue` callback \u2014 verify `highlightWinnerDice` at t+10ms and `handleKOs()` at t+1800ms produce clean visual separation, and that the KO path's `if (!handleKOs())` fallback (currently dead code in practice) is safe if somehow reached",
+      "time": "23:36:39",
+      "timestamp": "2026-04-09T23:36:39.839635",
+      "roast": "Congratulations, you spent an entire cycle teaching the game to pause for breath between sentences \u2014 Garfield solved that in Alpha with a little thing called \"reading the card."
+    },
     {
       "target": "testroom",
       "cycle": 3,
@@ -502,18 +512,9 @@
       "after_that": "KO swap modal polish \u2014 verify the swap overlay transition and timing feel when a chain-KO happens (both sides KO in the same round), specifically whether the second `openKoSwap` call fires correctly after the first doKoSwap resolves, or if there's a timing gap that leaves the board in a stale state between swaps.",
       "time": "17:52:47",
       "timestamp": "2026-04-09T17:52:47.182426"
-    },
-    {
-      "target": "testroom",
-      "cycle": 12,
-      "summary": "Added persistent `\ud83d\udc3a \u22121 Die \u00b7 Timber` label on the affected team's dice row via new `updateDicePenaltyLabels()` called from `renderBattle()` \u2014 players rolling fewer dice now see the reason directly in the dice area, not just a buried status-tag on the fighter card.",
-      "next_up": "General text overlap audit \u2014 check the `fighter-status` badge row (the row of status-tags like `-1 Die`, `Lazy`, `Overclock`) at narrow widths to verify it wraps correctly and doesn't clip behind the card border or collide with the HP bar in the battle view.",
-      "after_that": "Full drifted-card playtesting audit \u2014 Mother Nature (366) Seasons timing verification: does Winter's -1 die stack correctly with Timber's -1 die (both active simultaneously), and does the `Math.max(1,...)` floor apply after both reductions? Also verify narrator reads the season correctly each round.",
-      "time": "17:44:58",
-      "timestamp": "2026-04-09T17:44:58.897530"
     }
   ],
-  "last_update": "2026-04-09T23:29:42.246264",
+  "last_update": "2026-04-09T23:36:39.839655",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
