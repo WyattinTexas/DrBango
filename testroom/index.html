@@ -1000,7 +1000,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </header>
 
   <div class="tabs" style="display:flex; align-items:center;">
-    <div class="tab active" onclick="switchTab('browse')">Spirit Kin Gallery</div>
+    <div class="tab active" onclick="switchTab('browse')">Spiritkin Gallery</div>
     <div class="tab" onclick="switchTab('battle')">Arena</div>
     <button class="standings-btn" onclick="openStandings()" style="margin-left:auto;">&#x1F3C6; Standings</button>
   </div>
@@ -1608,7 +1608,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v278';
+const TESTROOM_VERSION = 'v279';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4320,16 +4320,22 @@ function pickSonyaDie(idx) {
   document.getElementById('sonyaOverlay').classList.remove('active');
   if (!f || f.ko) { continuation(); return; }
 
-  const dice = team === 'red' ? [...B.redDice] : [...B.blueDice];
-  const oldVal = dice[idx];
+  // Mutate the preRoll dice array IN-PLACE so the doPostRollAndResolve closure captures
+  // the change. Creating a new array via [...B.redDice] does NOT work: postRollDone()
+  // captures B.preRoll.red.dice by reference, so when it later runs
+  //   B.pendingResolve = { redDice, blueDice, ... }
+  // it uses the original unmodified closure variable, silently discarding Sonya's edit.
+  // Dark Wing uses the same in-place splice pattern (see doDarkWingChoice ~line 4386).
+  const preRollDice = team === 'red' ? B.preRoll.red.dice : B.preRoll.blue.dice;
+  const oldVal = preRollDice[idx];
 
-  dice[idx] = 2;
-  dice.sort((a, b) => a - b);
+  preRollDice[idx] = 2;
+  preRollDice.sort((a, b) => a - b);
   if (B.sonyaUsedThisRound) B.sonyaUsedThisRound[team] = true;
 
-  // Update live dice state
-  if (team === 'red') { B.pendingResolve.redDice = dice; B.redDice = dice; }
-  else               { B.pendingResolve.blueDice = dice; B.blueDice = dice; }
+  // Keep B.redDice/B.blueDice and B.pendingResolve in sync (pendingResolve may not exist yet)
+  if (team === 'red') { B.redDice = preRollDice; if (B.pendingResolve) B.pendingResolve.redDice = preRollDice; }
+  else               { B.blueDice = preRollDice; if (B.pendingResolve) B.pendingResolve.blueDice = preRollDice; }
   renderDice(B.redDice, B.blueDice);
   renderBattle();
 
@@ -4337,8 +4343,8 @@ function pickSonyaDie(idx) {
     showAbilityCallout('MESMERIZE!', 'var(--rare)', `${f.name} — die already showing 2, no change!`);
     log(`<span class="log-ability">${f.name}</span> — Mesmerize! Die already a 2, no change.`);
   } else {
-    showAbilityCallout('MESMERIZE!', 'var(--rare)', `${f.name} — changed die: ${oldVal} → 2! New dice: [${dice.join(', ')}]`);
-    log(`<span class="log-ability">${f.name}</span> — Mesmerize! Changed die ${oldVal} → 2. Dice: [${dice.join(', ')}]`);
+    showAbilityCallout('MESMERIZE!', 'var(--rare)', `${f.name} — changed die: ${oldVal} → 2! New dice: [${preRollDice.join(', ')}]`);
+    log(`<span class="log-ability">${f.name}</span> — Mesmerize! Changed die ${oldVal} → 2. Dice: [${preRollDice.join(', ')}]`);
   }
 
   setTimeout(() => { continuation(); }, 1200);
