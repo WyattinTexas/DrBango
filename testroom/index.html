@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v294';
+const TESTROOM_VERSION = 'v303';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1701,7 +1701,7 @@ const GHOSTS = [
   {
     id:204, name:"Finn", rarity:"rare", maxHp:6, art:"art/finn.png",
     ability:"Forge", abilityDesc:"Sideline, before rolling: you may convert 2 Ice Shards or 2 Sacred Fires into 1 Moonstone. Each round.",
-    category:"Resource Generation", set:"Volcanic Activity",
+    category:"Resource Generation", set:"Rolling Hills",
     designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Activity's Moonstone plays. Deckbuilding archetype creator. (Originally named Smithy.)"
   },
   {
@@ -2987,11 +2987,24 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Chad (56) — Sploop!: on entry, gain 2 Ice Shards
+  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Sploop.
+  // Sandwiches (33) Dependable: opponent mirrors the Ice Shard gain.
   if (f.id === 56) {
-    team.resources.ice += 2;
-    entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`]);
-    log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
-    collectKnightReactions();
+    if (hasSideline(enemy, 344)) {
+      const wispGC = getSidelineGhost(enemy, 344);
+      entryCallouts.push(['GUIDE LIGHT!', 'var(--common)', `${wispGC ? wispGC.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Sploop! entry.`]);
+      log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Sploop! entry (2 Ice Shards blocked).`);
+    } else {
+      team.resources.ice += 2;
+      entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`]);
+      log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
+      collectKnightReactions();
+      if (hasSideline(enemy, 33) && !hasSideline(team, 344)) {
+        enemy.resources.ice += 2;
+        entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`]);
+        log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
+      }
+    }
   }
 
   // Raditz (62) — Hunt: on entry, may force opponent to swap their active ghost (one-time)
