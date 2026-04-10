@@ -1611,7 +1611,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v276';
+const TESTROOM_VERSION = 'v277';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -5218,8 +5218,12 @@ function doTeamRoll(team, btn) {
   const f = active(B[team]);
   const cls = team === 'red' ? 'red-text' : 'blue-text';
   showRolling(team, diceCount);
-  playSfx('sfxDiceRoll');
-  narrate(`<b class="${cls}">${f.name}</b> rolls...`);
+  if (diceCount > 0) playSfx('sfxDiceRoll');
+  if (diceCount === 0) {
+    narrate(`<b class="${cls}">${f.name}</b> doesn't roll — <b class="gold">Stone Form!</b>`);
+  } else {
+    narrate(`<b class="${cls}">${f.name}</b> rolls...`);
+  }
 
   setTimeout(() => {
     revealDice(team, dice);
@@ -6246,6 +6250,21 @@ function doPreRollSetup() {
         preRollCallouts.push(['CAREFUL!', 'var(--common)', `${fredF.name} — Careful! ${enemyF ? enemyF.name : 'Opponent'} capped at 3 dice!`]);
         log(`<span class="log-ability">${fredF.name}</span> — Careful! Opponent capped at 3 dice this round.`);
       }
+    }
+  });
+
+  // Patrick (10) — Stone Form: "Don't roll." Forced LAST so no other modifier restores dice.
+  // With 0 dice, classify returns type:'none' which auto-loses to any real roll. The existing
+  // Stone Form singles-counter at resolveRound ~8055 still fires: when opponent rolled singles,
+  // Patrick negates the damage and deals 3 back; other roll types deal normal damage to Patrick.
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 10 && !f.ko) {
+      if (tName === 'red') redCount = 0;
+      else blueCount = 0;
+      preRollCallouts.push(['STONE FORM!', 'var(--common)', `${f.name} — Don't roll! Singles → negate + 3 counter!`]);
+      log(`<span class="log-ability">${f.name}</span> — Stone Form! Doesn't roll this round.`);
     }
   });
 
@@ -7429,9 +7448,10 @@ function resolveRound() {
   }
 
   // Stone Cold (73) — One-two-one!: winning with double 1s → 3X damage
+  // Accept any roll containing two or more 1s (doubles, triples, quads of 1).
   let stoneColdTriggered = false;
   let stoneColdBaseDmg = 0;
-  if (wF.id === 73 && !wF.ko && wR.type === 'doubles' && wR.value === 1) {
+  if (wF.id === 73 && !wF.ko && winDice && winDice.filter(d => d === 1).length >= 2) {
     stoneColdBaseDmg = dmg;
     dmg *= 3;
     stoneColdTriggered = true;
@@ -7452,9 +7472,10 @@ function resolveRound() {
 
   // Buttons (8) — Perfect Plan: triple 6s deal +15 bonus damage.
   // The dream: 1 HP kamikaze — if it lands, it nukes anything. 3+15=18 damage minimum.
+  // Accept any roll with at least 3 sixes in the winning dice (triples/quads/penta of 6).
   let buttonsTriggered = false;
   let buttonsBaseDmg = 0;
-  if (wF.id === 8 && !wF.ko && wR.type === 'triples' && wR.value === 6) {
+  if (wF.id === 8 && !wF.ko && winDice && winDice.filter(d => d === 6).length >= 3) {
     buttonsBaseDmg = dmg;
     dmg += 15;
     buttonsTriggered = true;

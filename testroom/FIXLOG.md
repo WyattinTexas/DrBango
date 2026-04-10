@@ -3,7 +3,7 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v275
+## Current Version: v277
 
 ## HARD RULES
 - NEVER unshelve cards or remove IDs from SHELVED_IDS
@@ -30,7 +30,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 
 ### Legendary (7)
 - [ ] Bo (109) — Miracle: NEEDS AUDIT
-- [ ] Mountain King (110) — Beast Mode: NEEDS AUDIT
+- [x] Mountain King (110) — Beast Mode: AUDITED PASS (v277)
 - [ ] Shade (111) — Haunt: NEEDS AUDIT
 - [ ] Doom (112) — Fiendship: NEEDS AUDIT
 - [ ] Lucy (108) — Blue Fire: NEEDS AUDIT
@@ -62,8 +62,14 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
   All: NEEDS AUDIT
 
 ### KNOWN BROKEN (high priority)
-- **Patrick (10) Stone Form** — Current code lets Patrick roll normally and only counters on a losing singles roll. Spec says "Don't roll" — Patrick shouldn't roll dice at all. Full rework needed.
-- **Nikon (2) Ambush** — User reports not firing. Verify trigger condition and callout visibility.
+- (all 5 priority cards audited in v277 — see below)
+
+### v277 Priority Audit Results
+- **Patrick (10) Stone Form** — AUDITED FIX: forced dice count to 0 in doPreRollSetup + STONE FORM! pre-roll callout; doTeamRoll shows "doesn't roll — Stone Form!" narration on 0-dice. Existing singles-counter logic at resolveRound line ~8055 now fires correctly because Patrick always loses (except singles → counter). 0 dice → classify returns type:'none' which auto-loses to any real roll.
+- **Nikon (2) Ambush** — AUDITED PASS: trigger `wF.id === 2 && !wF.ko && B.round === 1` is correct; dmg *= 3 applies before Cave Dweller and later modifiers; AMBUSH! callout queued in cinematic section. Implementation was correct — no code change. If user saw it not fire, likely Nikon lost round 1.
+- **Buttons (8) Perfect Plan** — AUDITED FIX: broadened trigger from strict `wR.type === 'triples' && wR.value === 6` to `winDice.filter(d => d === 6).length >= 3` so quads/penta of 6 also qualify (matters when Buttons has bonus dice from Retribution/Redd).
+- **Stone Cold (73) One-two-one!** — AUDITED FIX: broadened trigger from strict `wR.type === 'doubles' && wR.value === 1` to `winDice.filter(d => d === 1).length >= 2` so triples/quads of 1 also qualify (previously triple 1s classified as 'triples' and missed the check).
+- **The Mountain King (110) Beast Mode** — AUDITED PASS: `wR.type === 'doubles'` fires on any doubles value; consistent with Pelter/Doc/Alucard strict-doubles pattern. No stacking conflict with Pelter (different ghosts). Legendary-color BEAST MODE! callout correct.
 
 
 ## QUEUED FEATURES (after audits complete)
@@ -83,6 +89,8 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
+
+- **v277** — Priority audit of 5 original cards (Patrick, Nikon, Buttons, Stone Cold, Mountain King). Patrick (10) Stone Form: forced dice count to 0 in doPreRollSetup (right before Redd block) so Patrick literally doesn't roll — classify returns type:'none' which always loses to any real roll, then the existing Stone Form singles-counter at resolveRound ~8055 fires its 3-damage counter when opponent rolled singles; added STONE FORM! pre-roll callout and "doesn't roll — Stone Form!" narration path in doTeamRoll for 0-dice case (sfx suppressed). Buttons (8) Perfect Plan: broadened trigger to `winDice.filter(d => d === 6).length >= 3` so quads/penta of 6 also deal +15 (previously failed when Buttons had bonus dice). Stone Cold (73) One-two-one!: broadened trigger to `winDice.filter(d => d === 1).length >= 2` so triples/quads of 1 also deal 3X (previously 3+ 1s classified as 'triples' and missed the check). Nikon (2) Ambush and Mountain King (110) Beast Mode audited and confirmed correct — no code changes.
 
 - **v275** — Implemented Patches (354) — Quilt: pre-roll `#patchesQuiltOverlay` modal (earthy brown 🪡 theme) fires each round when Patches is active with ≥2 Healing Seeds and hasn't decided yet; YES spends 2 Seeds and arms `B.patchesQuiltArmed[team]` with a `QUILT!` primer callout in `#c97c3a`; when Patches loses a roll while armed, all incoming damage is fully negated (shield consumed), `QUILT!` queued in `#c97c3a` in the cinematic section after `GEM ARMOR!`; Cameron Force of Nature check updated so full-negation triggers instant-destroy; `patchesQuiltActive` added to the 0-damage log exclusion; `patchesQuiltDecided`/`patchesQuiltArmed` cleared in both tie-path and win-path round resets so shields never carry forward; `patchesQuiltOverlay` added to `clearAllOverlays()`. A 5 HP Rolling Hills uncommon that uses Healing Seeds as a defensive shield — mirrors Pyrope Gem Armor's Surge-for-negate pattern but costs 2 Seeds instead of 1 Surge, creating a direct economy choice between the Rolling Hills seed-economy defense (Patches) and the Volcanic Activity surge-economy defense (Pyrope). Countered by Cameron (Force of Nature triggers on the negate), Magma Heart Core Melt (bypasses all passive reductions when <3 HP), and Wick Slow Burn (pre-roll chip damage can't be negated by Quilt — only the roll damage is covered).
 
