@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v98';
+const TESTROOM_VERSION = 'v100';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1665,6 +1665,188 @@ function resetStandings() {
   initStandings();
   saveStandingsToFirebase();
   openStandings(); // refresh the table
+}
+
+// ============================================================
+// AUTO-PLAY — simulate games for standings data
+// Usage: autoPlay(5) in browser console to run 5 games
+// ============================================================
+let autoPlayRunning = false;
+let autoPlayQueue = 0;
+let autoPlayTotal = 0;
+
+function autoPlay(numGames = 5) {
+  if (autoPlayRunning) { console.log('Auto-play already running'); return; }
+  autoPlayRunning = true;
+  autoPlayQueue = numGames;
+  autoPlayTotal = numGames;
+  console.log(`🎮 Auto-play: starting ${numGames} games...`);
+  autoPlayNext();
+}
+
+function autoPickTeam() {
+  const pool = GHOSTS.filter(g => !SHELVED_IDS.has(g.id));
+  const picks = [];
+  let hasLegendary = false;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  for (const g of shuffled) {
+    if (picks.length >= 3) break;
+    if (g.rarity === 'legendary') {
+      if (hasLegendary) continue;
+      hasLegendary = true;
+    }
+    picks.push(g.id);
+  }
+  return picks;
+}
+
+function autoPlayNext() {
+  if (autoPlayQueue <= 0) {
+    autoPlayRunning = false;
+    console.log(`✅ Auto-play complete! ${autoPlayTotal} games played.`);
+    // Clean up battle view
+    if (B) {
+      B = null;
+      document.getElementById('battle-view').style.display = 'none';
+      document.getElementById('team-select').style.display = '';
+      document.querySelector('.app').classList.remove('battle-active');
+      clearAllOverlays();
+    }
+    return;
+  }
+
+  const gameNum = autoPlayTotal - autoPlayQueue + 1;
+  autoPlayQueue--;
+
+  // Pick random teams
+  S.redPicks = autoPickTeam();
+  S.bluePicks = autoPickTeam();
+  // Ensure no overlap
+  while (S.bluePicks.some(id => S.redPicks.includes(id))) {
+    S.bluePicks = autoPickTeam();
+  }
+
+  const redNames = S.redPicks.map(id => ghostData(id).name);
+  const blueNames = S.bluePicks.map(id => ghostData(id).name);
+  console.log(`🎮 Game ${gameNum}/${autoPlayTotal}: Red [${redNames}] vs Blue [${blueNames}]`);
+
+  // Start battle silently (skip VS splash)
+  prevResources = { red: {}, blue: {} };
+  narrateQueue = []; narrateActive = false;
+  B = {
+    red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
+    round:1, log:[], phase:'ready',
+    pendingMoonstone:null, pendingSteal:null,
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
+    retributionDice: { red: 0, blue: 0 },
+    pressureUsed: { red: false, blue: false },
+    motherNatureSummer: { red: false, blue: false }
+  };
+  S.battle = B;
+
+  // Fire entry effects
+  triggerEntry(B.red);
+  triggerEntry(B.blue);
+
+  // Simulate rounds
+  autoSimRounds(gameNum);
+}
+
+function autoSimRounds(gameNum) {
+  if (!B || B.round > 50) {
+    // Safety: end as draw after 50 rounds
+    console.log(`  → Draw (50 round limit)`);
+    autoPlayNext();
+    return;
+  }
+
+  // Check for game over
+  const redAllDown = B.red.ghosts.every(g => g.ko);
+  const blueAllDown = B.blue.ghosts.every(g => g.ko);
+  if (redAllDown && blueAllDown) {
+    console.log(`  → Draw! (${B.round - 1} rounds)`);
+    autoRecordGame('draw');
+    return;
+  }
+  if (redAllDown) {
+    console.log(`  → Blue wins! (${B.round - 1} rounds)`);
+    autoRecordGame('blue');
+    return;
+  }
+  if (blueAllDown) {
+    console.log(`  → Red wins! (${B.round - 1} rounds)`);
+    autoRecordGame('red');
+    return;
+  }
+
+  // Auto-swap KO'd active ghosts
+  ['red','blue'].forEach(team => {
+    const t = B[team];
+    const f = active(t);
+    if (f.ko) {
+      const alive = t.ghosts.findIndex((g,i) => i !== t.activeIdx && !g.ko);
+      if (alive >= 0) {
+        t.activeIdx = alive;
+        triggerEntry(t);
+      }
+    }
+  });
+
+  // Roll dice
+  const redDice = weightedRoll('red', 3).sort((a,b)=>a-b);
+  const blueDice = weightedRoll('blue', 3).sort((a,b)=>a-b);
+
+  // Classify and determine winner
+  const rR = classify(redDice), bR = classify(blueDice);
+  const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
+  let winner = null;
+  if (typeRank[rR.type] > typeRank[bR.type]) winner = 'red';
+  else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
+  else if (rR.value > bR.value) winner = 'red';
+  else if (bR.value > rR.value) winner = 'blue';
+  // Tiebreaker on remaining dice
+  if (!winner) {
+    const rRemain = [...redDice], bRemain = [...blueDice];
+    const mc = {doubles:2,triples:3,quads:4,penta:5,singles:1,none:0}[rR.type]||0;
+    for (let i=0;i<mc;i++) { const ri=rRemain.indexOf(rR.value); if(ri>=0)rRemain.splice(ri,1); const bi=bRemain.indexOf(bR.value); if(bi>=0)bRemain.splice(bi,1); }
+    rRemain.sort((a,b)=>b-a); bRemain.sort((a,b)=>b-a);
+    for (let i=0;i<Math.max(rRemain.length,bRemain.length);i++) {
+      const rv=i<rRemain.length?rRemain[i]:0, bv=i<bRemain.length?bRemain[i]:0;
+      if(rv>bv){winner='red';break;} if(bv>rv){winner='blue';break;}
+    }
+  }
+
+  if (winner) {
+    const wTeam = B[winner], lTeamName = winner==='red'?'blue':'red', lTeam = B[lTeamName];
+    const wF = active(wTeam), lF = active(lTeam);
+    const wR = winner==='red'?rR:bR;
+    let dmg = wR.damage;
+    lF.hp = Math.max(0, lF.hp - dmg);
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = wF.id; }
+  }
+
+  B.round++;
+  // Use setTimeout to avoid stack overflow on long games
+  setTimeout(() => autoSimRounds(gameNum), 0);
+}
+
+function autoRecordGame(winner) {
+  if (winner === 'red' || winner === 'blue') {
+    const winTeam = B[winner];
+    const loseTeamName = winner === 'red' ? 'blue' : 'red';
+    const loseTeamObj = B[loseTeamName];
+    winTeam.ghosts.forEach(g => recordWin(g.id));
+    loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
+    const allGhosts = [...winTeam.ghosts, ...loseTeamObj.ghosts];
+    allGhosts.forEach(g => {
+      if (g.ko) {
+        recordKO(g.id);
+        if (g.killedBy && g.killedBy > 0) recordKill(g.killedBy);
+      }
+    });
+  }
+  B = null;
+  setTimeout(() => autoPlayNext(), 100);
 }
 
 function switchTab(t) {
@@ -2715,7 +2897,15 @@ function doPreRollSetup() {
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
         hitDamage(enemyName);
+        // Collect Knight reactions via temp queue mode so they splice AFTER SWARM! in preRollCallouts
+        // (not in queue mode → checkKnightEffects fires showAbilityCallout directly, stomping SWARM!)
+        const _swarmSavedKQ = abilityQueue;
+        abilityQueue = [];
+        abilityQueueMode = true;
         checkKnightEffects(tNamePre, f.name);
+        abilityQueueMode = false;
+        abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc]));
+        abilityQueue = _swarmSavedKQ;
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
       log(`<span class="log-ability">${f.name}</span> — Swarm blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
@@ -2742,7 +2932,15 @@ function doPreRollSetup() {
         playDamageSfx(1);
         hitDamage(enemyName);
         popSidelineCard(team, 205);
+        // Collect Knight reactions via temp queue mode so they splice AFTER MELTDOWN! in preRollCallouts
+        // (not in queue mode → checkKnightEffects fires showAbilityCallout directly, stomping MELTDOWN!)
+        const _meltSavedKQ = abilityQueue;
+        abilityQueue = [];
+        abilityQueueMode = true;
         checkKnightEffects(tNameShade, "Shade's Shadow", shadeGhost);
+        abilityQueueMode = false;
+        abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc]));
+        abilityQueue = _meltSavedKQ;
       }
     } else if (hasSideline(team, 205) && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade's Shadow</span> — Meltdown blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
@@ -3564,6 +3762,9 @@ function resolveRound() {
 
   // Blackout (403) — remove named number from opponent's dice
   // Only fires if Smudge is active and alive on the team that set the number
+  // Callouts are collected here and prepended to the post-roll ability queue below,
+  // so BLACKOUT! plays sequentially instead of being stomped by the first queued ability.
+  const blackoutCallouts = [];
   ['red', 'blue'].forEach(team => {
     const oppTeam = team === 'red' ? 'blue' : 'red';
     const t = B[team];
@@ -3580,7 +3781,7 @@ function resolveRound() {
       if (removed > 0) {
         if (team === 'red') { blueDice.splice(0, blueDice.length, ...filtered); }
         else { redDice.splice(0, redDice.length, ...filtered); }
-        showAbilityCallout('BLACKOUT!', 'var(--rare)', `Smudge — ${removed} dice showing ${num} vanished!`);
+        blackoutCallouts.push({ name: 'BLACKOUT!', color: 'var(--rare)', desc: `Smudge — ${removed} dice showing ${num} vanished!` });
         log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
       }
       // No callout if opponent didn't roll the number — silent miss, don't interrupt the flow
@@ -3909,6 +4110,9 @@ function resolveRound() {
   // ========================================
   abilityQueue = [];
   abilityQueueMode = true;
+
+  // BLACKOUT! fires before winner calc, so its callouts lead the queue
+  blackoutCallouts.forEach(b => queueAbility(b.name, b.color, b.desc));
 
   // Damage modifier callouts
   if (B.auntSusanBonus[winTeamName] > 0) {
