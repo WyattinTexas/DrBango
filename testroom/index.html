@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v322';
+const TESTROOM_VERSION = 'v324';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1712,7 +1712,7 @@ const GHOSTS = [
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
-    ability:"Ice Blade", abilityDesc:"Before rolling: you may spend 2 Ice Shards + 1 Moonstone to forge an Ice Blade. Permanent — Zain deals +2 damage on every winning roll for the rest of the game.",
+    ability:"Ice Blade", abilityDesc:"Before rolling: you may spend 1 Ice Shard + 1 Moonstone to forge an Ice Blade. Once forged, you may swing it before any roll for +2 damage on a win. The blade is permanent (until Zain falls), but each swing is your choice — hit hard or hit soft.",
     category:"Resource Generation", set:"Volcanic Activity",
     designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Activity (the other is the whale, Nerina)."
   },
@@ -2307,7 +2307,7 @@ function autoPlayNext() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     motherNatureSummer: { red: false, blue: false },
@@ -2730,7 +2730,7 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
-    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 } },
+    committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     motherNatureSummer: { red: false, blue: false },
@@ -2874,7 +2874,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Bouril (201) — Slumber: first roll is auto 1-2-3
   if (f.id === 201) {
     f.hankFirstRoll = true;
-    entryCallouts.push(['SLUMBER!', 'var(--common)', `${f.name} — first roll locked to 1-2-3!`]);
+    entryCallouts.push(['SLUMBER!', 'var(--uncommon)', `${f.name} — first roll locked to 1-2-3!`]);
     log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
     collectKnightReactions();
   }
@@ -3373,13 +3373,23 @@ function useZainForge(team) {
   const f = active(t);
   if (f.id !== 206 || f.ko) return;
   if (f.iceBladeForged) return; // already forged — permanent, can't re-forge
-  if (t.resources.ice < 2 || t.resources.moonstone < 1) return;
-  t.resources.ice -= 2;
+  if (t.resources.ice < 1 || t.resources.moonstone < 1) return;
+  t.resources.ice -= 1;
   t.resources.moonstone -= 1;
   f.iceBladeForged = true;
-  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">2 Ice Shards</span> + <span class="log-ms">1 Moonstone</span>. Permanent +2 damage on wins!`);
-  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — permanent +2 damage on every winning roll!`);
+  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Swing it before a roll for +2 damage on a win.`);
+  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — swing it before a roll for +2 damage on a win!`);
   playSfx('sfxSpecial', 0.5);
+  renderBattle();
+}
+
+// Per-round commit toggle: Zain (forged) chooses whether to swing the blade this round
+function toggleZainBlade(team) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  const f = active(t);
+  if (f.id !== 206 || f.ko || !f.iceBladeForged) return;
+  B.committed[team].zainBlade = B.committed[team].zainBlade ? 0 : 1;
   renderBattle();
 }
 
@@ -6556,7 +6566,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         const _tremFours = fours;
         const _tremTeam = team;
         const _tremName = f.name;
-        queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
+        queueAbility('TREMOR!', 'var(--common)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
           _tremTeam.resources.luckyStone += _tremFours;
           log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
           renderBattle();
@@ -7572,8 +7582,8 @@ function resolveRound() {
     abilityQueueMode = false;
 
     // Reset committed resources + Blackout picks + per-round ability flags
-    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
-    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
+    B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+    B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
     B.blackoutNum = {};
     B.pressureUsed = { red: false, blue: false };
     B.motherNatureSummer = { red: false, blue: false };
@@ -8074,9 +8084,9 @@ function resolveRound() {
     log(`<span class="log-ability">${wF.name}</span> — Pure Heart! Instant KO — ${lF.name} is defeated!`);
   }
 
-  // Zain (206) — Ice Blade: +2 damage on every winning roll if forged (permanent)
+  // Zain (206) — Ice Blade: +2 damage on win, but only if Zain swung the blade this round
   let zainIceBladeTriggered = false;
-  if (wF.id === 206 && wF.iceBladeForged && !wF.ko) {
+  if (wF.id === 206 && wF.iceBladeForged && !wF.ko && (B.committed[winTeamName].zainBlade || 0) > 0) {
     dmg += 2;
     zainIceBladeTriggered = true;
     collectKC(winTeamName, wF.name);
@@ -9449,7 +9459,7 @@ function resolveRound() {
       const calFlipped = Math.max(0, wF.hp - 1);
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Overclock cursed! ${wF.name} takes 1 damage! (${wF.hp}→${calFlipped} HP)`, () => { wF.hp = calFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
     } else {
-      queueAbility('OVERCLOCK!', 'var(--moonstone)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); });
+      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); });
     }
   }
   if (wF.id === 336 && !wF.ko) { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }); }
@@ -9828,8 +9838,8 @@ function resolveRound() {
   setTimeout(() => {
     drainAbilityQueue(() => {
       // Reset committed resources + per-round ability flags
-      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
-      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0 };
+      B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
       B.pressureUsed = { red: false, blue: false };
       B.motherNatureSummer = { red: false, blue: false };
       if (B.romyPrediction) { B.romyPrediction.red = null; B.romyPrediction.blue = null; }
@@ -10701,14 +10711,20 @@ function renderBattle() {
           html += `<button class="ability-btn" disabled title="Need 2 Sacred Fires" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔨 Forge: 2🔥 → 💎</button>`;
         }
       }
-      // Zain (206) — Ice Blade: forge button (one-time, permanent)
-      if (f.id === 206 && !f.ko && !f.iceBladeForged) {
-        const r = B[team].resources;
-        const canForge = r.ice >= 2 && r.moonstone >= 1;
-        if (canForge) {
-          html += `<button class="ability-btn pressure" onclick="useZainForge('${team}')" title="Forge the Ice Blade — spend 2 Ice Shards + 1 Moonstone for permanent +2 damage on wins" style="border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (2❄️ + 1💎)</button>`;
+      // Zain (206) — Ice Blade: forge button (one-time) OR swing toggle (per-round commit)
+      if (f.id === 206 && !f.ko) {
+        if (!f.iceBladeForged) {
+          const r = B[team].resources;
+          const canForge = r.ice >= 1 && r.moonstone >= 1;
+          if (canForge) {
+            html += `<button class="ability-btn pressure" onclick="useZainForge('${team}')" title="Forge the Ice Blade — spend 1 Ice Shard + 1 Moonstone, then swing it on any future roll" style="border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (1❄️ + 1💎)</button>`;
+          } else {
+            html += `<button class="ability-btn" disabled title="Need 1 Ice Shard + 1 Moonstone to forge" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (1❄️ + 1💎)</button>`;
+          }
         } else {
-          html += `<button class="ability-btn" disabled title="Need 2 Ice Shards + 1 Moonstone to forge" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🗡️ Forge Ice Blade (2❄️ + 1💎)</button>`;
+          // Already forged — show swing toggle
+          const swung = (B.committed[team].zainBlade || 0) > 0;
+          html += `<button class="ability-btn ${swung?'committed':'pressure'}" onclick="toggleZainBlade('${team}')" title="${swung?'Sheathing — click to swing for +2 damage on win':'Swing the Ice Blade — +2 damage if Zain wins this roll'}" style="border-color:#67e8f9;color:${swung?'#fff':'#67e8f9'};${swung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${swung?'Ice Blade SWINGING (+2 dmg on win)':'Swing Ice Blade'}</button>`;
         }
       }
       // Smudge (403) — Blackout: name a number

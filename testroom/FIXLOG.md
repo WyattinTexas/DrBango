@@ -3,7 +3,15 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v321
+## Current Version: v323
+
+## v323 — AUDITED FIX: Bouril (201) SLUMBER! + Hank (207) TREMOR! + Calvin (342) OVERCLOCK! — wrong rarity callout colors corrected
+
+- **Bouril (201) SLUMBER! — AUDITED FIX**: Entry callout used `'var(--common)'` (gray) but Bouril is `rarity:"uncommon"`. Fixed to `'var(--uncommon)'` (green). Functional implementation verified PASS: `f.hankFirstRoll = true` set on entry; `doPreRollSetup` consumes flag with `hankOverride[tName] = true`; `doTeamRoll` uses `[1,2,3]` when override is true; flag cleared on consumption (once-per-entry only). Correct.
+- **Hank (207) TREMOR! — AUDITED FIX**: Win-path cinematic callout used `'var(--uncommon)'` (green) but Hank is `rarity:"common"`. Fixed to `'var(--common)'` (gray). Note: Hank and Bouril had literally swapped each other's rarity colors — presumably a copy-paste error when both were implemented near each other. Functional implementation verified PASS: counts 4s in winDice, +1 Lucky Stone per 4, deferred onShow grant, Sandwiches mirror correct.
+- **Calvin (342) OVERCLOCK! — AUDITED FIX**: Win-path cinematic callout used `'var(--moonstone)'` (gold) but Calvin is `rarity:"uncommon"`. Fixed to `'var(--uncommon)'` (green). The moonstone color was likely chosen to signal "overclock = special" but it's visually misleading — players see a gold flash and assume it's a Legendary/Moonstone effect. Calvin's Filbert curse path (MASK MERCHANT!) correctly uses `'var(--uncommon)'` already. Functional implementation verified PASS: `wF.id===342 && !wF.ko && !filbertCursesWin` trigger; `wF.hp++` overclock (no cap, correct per v294); correct.
+- Same class of bug as Finn (v315), Zain+Nerina (v316), Timpleton (v317) — wrong rarity color misrepresents card tier to player.
+- Also bumped TESTROOM_VERSION v322 → v323.
 
 ## v321 — BUG FIX: Knight Light (402) Retribution — replacement ghost no longer inherits stored Retribution dice
 
@@ -454,6 +462,36 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 **Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v324 — Zain Ice Blade v2: cost reduced + opt-in per-round commit. NEW SPECIAL CONCEPT — refiner must understand.**
+  
+  **Changes from v322:**
+  1. Forge cost: **2 Ice + 1 Moonstone → 1 Ice Shard + 1 Moonstone**
+  2. Damage is now **opt-in per round**, not auto-fire. Once forged, the player must click "Swing Ice Blade" each round to commit the +2 damage for that roll.
+  3. Updated ability text: *"Before rolling: you may spend 1 Ice Shard + 1 Moonstone to forge an Ice Blade. Once forged, you may swing it before any roll for +2 damage on a win. The blade is permanent (until Zain falls), but each swing is your choice — hit hard or hit soft."*
+  
+  **Why opt-in:** Zain can choose to hit soft (1 damage past Sky Elusive's negation cap, ignored by Bogey, doesn't tip a King Jay sum-7 reflect) or hit hard (punch through tanks). Same character, two modes. This is intentional design depth.
+  
+  **Implementation:**
+  - `B.committed[team].zainBlade` (0 or 1) — per-round commit flag, resets each round with the rest of the committed state
+  - Added to all 4 committed init/reset sites (2 startBattle blocks, 2 round-end resets)
+  - `useZainForge(team)` — one-time forge button (1 Ice + 1 MS cost), sets `f.iceBladeForged = true`
+  - `toggleZainBlade(team)` — per-round commit toggle, only valid when forged
+  - Button in ability bar shows "Forge Ice Blade (1❄️ + 1💎)" when not forged, "Swing Ice Blade" when forged but not swung, and "Ice Blade SWINGING (+2 dmg on win)" when swung this round
+  - Damage modifier requires BOTH `f.iceBladeForged` AND `B.committed[winTeamName].zainBlade > 0`
+  - The blade dies with Zain (per-ghost state, not team state) — Guardian Fairy / sacrifice plays don't preserve it
+  
+  **DO NOT REVERT.** The orchestrator must understand this is a NEW SPECIAL CONCEPT — a permanent forged weapon with per-round commit toggle. There is no other special like this in the game. Do NOT add `Math.min` cap on the +2. Do NOT remove the per-round opt-in. Do NOT make it auto-fire.
+
+  **NEW SPECIAL TYPES INVENTORY (refiner, read this):**
+  - Moonstone (after-roll, change a die value)
+  - Lucky Stone (after-roll, reroll a die)
+  - Surge (pre-roll commit, +1 die per surge)
+  - Ice Shard (pre-roll commit, +1 dmg per shard)
+  - Sacred Fire (pre-roll commit, +3 dmg per fire)
+  - Healing Seed (pre-roll, heal 1 HP)
+  - **Ice Blade (NEW v324)** — Zain-only, forged once with 1 Ice + 1 MS, then per-round commit toggle for +2 damage on win. Permanent (until Zain dies). Not a resource — a per-ghost state flag.
+
 
 - **v322 — Red Hunter (345) ability text clarified + Zain (206) reworked to Ice Blade.**
   
