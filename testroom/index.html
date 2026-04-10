@@ -31,7 +31,7 @@
   --hp-green: #27ae60;
   --hp-yellow: #f1c40f;
   --hp-red: #e74c3c;
-  --win: #2ecc71;
+  --win: #4B9CD3;
   --lose: #e74c3c;
   --tie: #f1c40f;
 }
@@ -1210,7 +1210,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v70';
+const TESTROOM_VERSION = 'v72';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1530,8 +1530,8 @@ function saveStandingsToFirebase() {
   const toSave = {};
   Object.keys(standings).forEach(id => {
     const s = standings[id];
-    if (s.wins > 0 || s.losses > 0 || (s.kos || 0) > 0) {
-      toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0 };
+    if (s.wins > 0 || s.losses > 0 || (s.kos || 0) > 0 || (s.kills || 0) > 0) {
+      toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0, kills: s.kills || 0 };
     }
   });
   db.ref('testroom/standings').set(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
@@ -1598,8 +1598,8 @@ function openStandings() {
       <td class="st-stat st-l">${g.l}</td>
       <td class="st-stat st-pct">${pctStr}</td>
       <td class="st-stat st-gb">${gbVal}</td>
-      <td class="st-stat" style="color:var(--accent)">${g.kills}</td>
-      <td class="st-stat" style="color:var(--text2)">${g.kos}</td>
+      <td class="st-stat" style="color:var(--win)">${g.kills}</td>
+      <td class="st-stat" style="color:var(--lose)">${g.kos}</td>
     </tr>`;
   }).join('');
   document.getElementById('standingsOverlay').classList.add('active');
@@ -2428,7 +2428,9 @@ function doTimberChoice(choice) {
     log(`<span class="log-ability">${tp.oppTeamName}</span> chose to roll 1 fewer die under Timber's Howl!`);
   }
   renderBattle();
-  setTimeout(() => { if (resume) resume(); }, 900);
+  // showAbilityCallout auto-dismisses after 1400ms — wait 1600ms (1400 + 200ms buffer)
+  // to avoid rolling phase overlapping the still-visible HOWL! splash (mirrors Selene fix v69)
+  setTimeout(() => { if (resume) resume(); }, 1600);
 }
 
 // ============================================================
