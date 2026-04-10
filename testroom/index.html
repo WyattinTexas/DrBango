@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v303';
+const TESTROOM_VERSION = 'v305';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -6890,6 +6890,7 @@ function pickMsValue(val) {
   B.blueDice = B.pendingResolve.blueDice;
   renderDice(B.redDice, B.blueDice);
 
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(', ')}]`);
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
@@ -7319,14 +7320,31 @@ function resolveRound() {
     abilityQueueMode = true;
 
     // Tweak and Twonk (303) — sideline: tie → gain 3 Surge
+    // Wisp (344) — Guide Light: blocks the Surge grant.
+    // Sandwiches (33) — Dependable: mirrors the Surge grant to opponent.
     [B.red, B.blue].forEach(team => {
       const tNameTie = team === B.red ? 'red' : 'blue';
       if (hasSideline(team, 303)) {
         const tweakGhost = getSidelineGhost(team, 303);
-        team.resources.surge += 3;
-        queueAbility('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge!`, () => popSidelineCard(team, 303));
-        log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
-        checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
+        const oppTeamTweak = opp(team);
+        const wispBlocksTweak = hasSideline(oppTeamTweak, 344);
+        const sandwichMirrorsTweak = hasSideline(oppTeamTweak, 33);
+        const surgeTotal = team.resources.surge + 3;
+        if (wispBlocksTweak) {
+          queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks Tweak and Twonk's Warm Belly!`);
+          log(`<span class="log-ability">Wisp</span> — Guide Light blocks Tweak and Twonk's Warm Belly!`);
+        } else {
+          queueAbility('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge! (${surgeTotal} total)`, () => {
+            team.resources.surge += 3;
+            popSidelineCard(team, 303);
+            log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
+            checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
+            renderBattle();
+          });
+          if (sandwichMirrorsTweak && !hasSideline(team, 344)) {
+            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Warm Belly! +3 Surge! (${oppTeamTweak.resources.surge + 3} total)`, () => { oppTeamTweak.resources.surge += 3; renderBattle(); });
+          }
+        }
       }
     });
 
@@ -7335,10 +7353,25 @@ function resolveRound() {
       const f = active(team);
       const tNameJim = team === B.red ? 'red' : 'blue';
       if (f.id === 352 && !f.ko) {
-        team.resources.luckyStone += 5;
-        queueAbility('CHIRP!', '#fbbf24', `${f.name} — Tie! +5 Lucky Stones!`);
-        log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span>!`);
-        checkKnightEffects(tNameJim, f.name);
+        const oppTeamJim = team === B.red ? B.blue : B.red;
+        const wispBlocksJim = hasSideline(oppTeamJim, 344);
+        const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
+        const lsTotal = team.resources.luckyStone + 5;
+        if (wispBlocksJim) {
+          const wispNameJim = getSidelineGhost(oppTeamJim, 344);
+          queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispNameJim} — Guide Light! Blocks Jimmy's Chirp!`);
+          log(`<span class="log-ability">Wisp</span> — Guide Light blocks Jimmy's Chirp!`);
+        } else {
+          queueAbility('CHIRP!', '#fbbf24', `${f.name} — Tie! +5 Lucky Stones! (${lsTotal} total)`, () => {
+            team.resources.luckyStone += 5;
+            log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span>!`);
+            checkKnightEffects(tNameJim, f.name);
+            renderBattle();
+          });
+          if (sandwichMirrorsJim && !hasSideline(team, 344)) {
+            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +5 Lucky Stones! (${oppTeamJim.resources.luckyStone + 5} total)`, () => { oppTeamJim.resources.luckyStone += 5; renderBattle(); });
+          }
+        }
       }
     });
 
