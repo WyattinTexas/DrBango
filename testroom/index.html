@@ -1267,6 +1267,21 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </div>
 </div>
 
+<!-- Sylvia (313) — Porpoise dodge roll modal -->
+<div class="selene-overlay" id="sylviaOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" id="sylviaBanner" style="background:linear-gradient(135deg,#0ea5e9,#0369a1);">🌊 PORPOISE!</div>
+    <h3 id="sylviaTitle">Sylvia — Porpoise!</h3>
+    <p class="selene-sub" id="sylviaSub">Roll a <b>6</b> to dodge all damage!</p>
+    <div id="sylviaDieWrap" style="display:flex;justify-content:center;align-items:center;margin:18px 0;">
+      <div id="sylviaDie" style="width:84px;height:84px;border-radius:14px;background:linear-gradient(135deg,#bae6fd,#e0f2fe);color:#0c4a6e;font-size:3.2rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(14,165,233,.55),inset 0 2px 0 rgba(255,255,255,.6);border:3px solid #0ea5e9;">?</div>
+    </div>
+    <div class="selene-options">
+      <button class="selene-opt" id="sylviaRollBtn" onclick="doSylviaRoll()" style="background:linear-gradient(135deg,#0ea5e9,#0369a1);">🌊 Roll the Die!</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toby — Pure Heart declaration modal -->
 <div class="selene-overlay" id="tobyOverlay">
   <div class="selene-modal">
@@ -1640,7 +1655,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v324';
+const TESTROOM_VERSION = 'v331';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3710,6 +3725,85 @@ function doTimberChoice(choice) {
   });
 }
 
+// Sylvia (313) — Porpoise: when Sylvia loses a roll, player rolls 1 die.
+// A 6 negates all damage. Player-driven dice reveal so there's real agency.
+// Called from resolveRound right after winner determination, before any
+// damage computation (which reads B.sylviaPendingResult at line ~8141).
+function showSylviaModal(loseTeamName, resumeCallback) {
+  const lF = active(B[loseTeamName]);
+  B.phase = 'sylvia-roll';
+  B.sylviaPendingResult = null; // cleared so Sylvia block at 8141 knows to wait for this modal
+  B.sylviaResume = resumeCallback;
+  B.sylviaTeamName = loseTeamName;
+
+  const titleEl = document.getElementById('sylviaTitle');
+  if (titleEl) titleEl.textContent = `${lF ? lF.name : 'Sylvia'} — Porpoise!`;
+  const subEl = document.getElementById('sylviaSub');
+  if (subEl) subEl.innerHTML = `Roll a <b>6</b> to dodge all damage!`;
+  const dieEl = document.getElementById('sylviaDie');
+  if (dieEl) {
+    dieEl.textContent = '?';
+    dieEl.style.transform = 'rotate(0deg)';
+  }
+  const btn = document.getElementById('sylviaRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '🌊 Roll the Die!'; }
+
+  narrate(`<b class="${loseTeamName}-text">${lF ? lF.name : 'Sylvia'}</b>&nbsp;rolls for <b class="gold">PORPOISE!</b>&nbsp;A 6 dodges all damage!`);
+  document.getElementById('sylviaOverlay').classList.add('active');
+}
+
+function doSylviaRoll() {
+  const btn = document.getElementById('sylviaRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+
+  // Roll the actual die NOW (player click is the trigger)
+  const finalValue = Math.floor(Math.random() * 6) + 1;
+  const dieEl = document.getElementById('sylviaDie');
+  if (!dieEl) { finishSylviaRoll(finalValue); return; }
+
+  // Quick shuffle animation: flip through random values for ~800ms then reveal
+  let ticks = 0;
+  const totalTicks = 10;
+  const tickMs = 70;
+  const shuffle = setInterval(() => {
+    ticks++;
+    dieEl.textContent = String(Math.floor(Math.random() * 6) + 1);
+    dieEl.style.transform = `rotate(${ticks * 36}deg)`;
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      dieEl.textContent = String(finalValue);
+      dieEl.style.transform = 'rotate(0deg)';
+      if (finalValue === 6) {
+        dieEl.style.background = 'linear-gradient(135deg,#fde68a,#f59e0b)';
+        dieEl.style.borderColor = '#f59e0b';
+        dieEl.style.color = '#78350f';
+      } else {
+        dieEl.style.background = 'linear-gradient(135deg,#fecaca,#ef4444)';
+        dieEl.style.borderColor = '#b91c1c';
+        dieEl.style.color = '#7f1d1d';
+      }
+      setTimeout(() => finishSylviaRoll(finalValue), 850);
+    }
+  }, tickMs);
+}
+
+function finishSylviaRoll(value) {
+  const dodged = (value === 6);
+  B.sylviaPendingResult = { value, dodged };
+  const resume = B.sylviaResume;
+  B.sylviaResume = null;
+  document.getElementById('sylviaOverlay').classList.remove('active');
+  // Reset die visuals for next time
+  const dieEl = document.getElementById('sylviaDie');
+  if (dieEl) {
+    dieEl.style.background = 'linear-gradient(135deg,#bae6fd,#e0f2fe)';
+    dieEl.style.borderColor = '#0ea5e9';
+    dieEl.style.color = '#0c4a6e';
+  }
+  if (resume) resume();
+}
+
 // ============================================================
 // ROMY (114) — Valley Guardian: pre-roll number prediction modal
 // ============================================================
@@ -3859,7 +3953,12 @@ function doMallowChoice(choice) {
       log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}).`);
     }
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    if (f.ko) {
+      // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+    } else {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    }
   } else {
     log(`<span class="log-ability">Mallow</span> — holds the fire.`);
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
@@ -4067,7 +4166,12 @@ function doBooChoice(choice) {
       log(`<span class="log-ability">${f.name}</span> — Teamwork! Traded 1 die for +1 HP (${prevCount} → ${B.preRoll[team].count} dice, ${prevHp} → ${f.hp} HP${overTeam ? ' · overclocked!' : ''}).`);
     }
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    if (f.ko) {
+      // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+    } else {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    }
   } else {
     narrate(`<b class="${team}-text">Boo Brothers</b> hold — keeping all dice.`);
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
@@ -6111,6 +6215,13 @@ function doPreRollSetup() {
     if (f.id === 210 && !f.ko) {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       const oppTeam = team === B.red ? B.blue : B.red;
+      // Dylan (301) Scarecrow / Piper (107) Slick Coat: negate all enemy before-rolling effects
+      if (dylanNegates(oppTeam)) {
+        const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);
+        preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${oppLabel} — Scarecrow/Slick Coat negates Timber's Howl!`]);
+        log(`<span class="log-ability">${oppLabel}</span> — Dylan/Piper negates Timber's Howl!`);
+        return;
+      }
       const r = oppTeam.resources;
       const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
       if (totalSpecials < 2) {
@@ -6330,23 +6441,39 @@ function doPreRollSetup() {
   if (B.committed.red.surge > 0) {
     redCount += B.committed.red.surge;
     log(`<span class="log-ability">Red</span> committed <span class="log-ms">${B.committed.red.surge} Surge</span> → +${B.committed.red.surge} dice!`);
-    const borisRedPre = (B.red.ghosts.find(g => g.id === 343 && !g.ko) || {}).hp;
-    triggerBorisHook(B.red);
-    const borisRed = B.red.ghosts.find(g => g.id === 343 && !g.ko);
-    if (borisRed) {
-      const oc = borisRed.hp > borisRed.maxHp;
-      preRollCallouts.push(['FORTIFY!', oc ? 'var(--moonstone)' : 'var(--uncommon)', `${borisRed.name} — Surge spent! +2 HP (${borisRedPre}→${borisRed.hp}/${borisRed.maxHp}${oc ? ' · overclocked!' : ''})`]);
+    const borisRedG = B.red.ghosts.find(g => g.id === 343 && !g.ko);
+    if (borisRedG) {
+      const borisRedPre = borisRedG.hp;
+      if (hasSideline(B.blue, 59)) {
+        // Mr Filbert (59) — Mask Merchant: flip Boris Fortify heal to damage
+        borisRedG.hp = Math.max(0, borisRedG.hp - 2);
+        if (borisRedG.hp <= 0) { borisRedG.hp = 0; borisRedG.ko = true; borisRedG.killedBy = 59; }
+        preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Fortify cursed! ${borisRedG.name} takes 2 damage! (${borisRedPre}→${borisRedG.hp} HP)`]);
+        log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Boris Fortify flipped to damage. ${borisRedG.name} ${borisRedPre} → ${borisRedG.hp} HP.`);
+      } else {
+        triggerBorisHook(B.red);
+        const oc = borisRedG.hp > borisRedG.maxHp;
+        preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisRedG.name} — Surge spent! +2 HP (${borisRedPre}→${borisRedG.hp}/${borisRedG.maxHp}${oc ? ' · overclocked!' : ''})`]);
+      }
     }
   }
   if (B.committed.blue.surge > 0) {
     blueCount += B.committed.blue.surge;
     log(`<span class="log-ability">Blue</span> committed <span class="log-ms">${B.committed.blue.surge} Surge</span> → +${B.committed.blue.surge} dice!`);
-    const borisBlueRePre = (B.blue.ghosts.find(g => g.id === 343 && !g.ko) || {}).hp;
-    triggerBorisHook(B.blue);
-    const borisBlue = B.blue.ghosts.find(g => g.id === 343 && !g.ko);
-    if (borisBlue) {
-      const oc = borisBlue.hp > borisBlue.maxHp;
-      preRollCallouts.push(['FORTIFY!', oc ? 'var(--moonstone)' : 'var(--uncommon)', `${borisBlue.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlue.hp}/${borisBlue.maxHp}${oc ? ' · overclocked!' : ''})`]);
+    const borisBlueG = B.blue.ghosts.find(g => g.id === 343 && !g.ko);
+    if (borisBlueG) {
+      const borisBlueRePre = borisBlueG.hp;
+      if (hasSideline(B.red, 59)) {
+        // Mr Filbert (59) — Mask Merchant: flip Boris Fortify heal to damage
+        borisBlueG.hp = Math.max(0, borisBlueG.hp - 2);
+        if (borisBlueG.hp <= 0) { borisBlueG.hp = 0; borisBlueG.ko = true; borisBlueG.killedBy = 59; }
+        preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Fortify cursed! ${borisBlueG.name} takes 2 damage! (${borisBlueRePre}→${borisBlueG.hp} HP)`]);
+        log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Boris Fortify flipped to damage. ${borisBlueG.name} ${borisBlueRePre} → ${borisBlueG.hp} HP.`);
+      } else {
+        triggerBorisHook(B.blue);
+        const oc = borisBlueG.hp > borisBlueG.maxHp;
+        preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlueG.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlueG.hp}/${borisBlueG.maxHp}${oc ? ' · overclocked!' : ''})`]);
+      }
     }
   }
 
@@ -7213,6 +7340,12 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
 
 function resolveRound() {
   B.phase = 'resolving';
+  // v331: resolveRound can be re-entered after the Sylvia player-rolled modal resolves.
+  // When resuming, we skip the Blackout pass (already applied) and the header log line
+  // (already printed) so nothing double-fires. All downstream logic (winner determination,
+  // damage calc, cinematics) is pure w.r.t. dice state and safe to re-run.
+  const sylviaResuming = !!B.sylviaResuming;
+  B.sylviaResuming = false;
   // Clear any stale roll narrations ("X rolls...", "X rolled [...]") that built up in the
   // narrator queue while both teams were rolling. Without this, up to 4 queued items (each
   // holding 1800ms) delay the damage narration by 5–7 seconds after the HP bar has already
@@ -7227,31 +7360,35 @@ function resolveRound() {
   // Only fires if Smudge is active and alive on the team that set the number
   // Callouts are collected here and prepended to the post-roll ability queue below,
   // so BLACKOUT! plays sequentially instead of being stomped by the first queued ability.
-  const blackoutCallouts = [];
-  ['red', 'blue'].forEach(team => {
-    const oppTeam = team === 'red' ? 'blue' : 'red';
-    const t = B[team];
-    const smudgeActive = active(t).id === 403 && !active(t).ko;
-    if (B.blackoutNum && B.blackoutNum[team] && smudgeActive) {
-      const num = B.blackoutNum[team];
-      const originalDice = team === 'red' ? blueDice : redDice;
-      const filtered = [];
-      let removed = 0;
-      originalDice.forEach(d => {
-        if (d === num) { removed++; }
-        else { filtered.push(d); }
-      });
-      if (removed > 0) {
-        if (team === 'red') { blueDice.splice(0, blueDice.length, ...filtered); }
-        else { redDice.splice(0, redDice.length, ...filtered); }
-        blackoutCallouts.push({ name: 'BLACKOUT!', color: 'var(--rare)', desc: `Smudge — ${removed} dice showing ${num} vanished!` });
-        log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
+  // Use B.blackoutCallouts so the queue survives a Sylvia-resuming re-entry.
+  if (!sylviaResuming) B.blackoutCallouts = [];
+  const blackoutCallouts = B.blackoutCallouts || [];
+  if (!sylviaResuming) {
+    ['red', 'blue'].forEach(team => {
+      const oppTeam = team === 'red' ? 'blue' : 'red';
+      const t = B[team];
+      const smudgeActive = active(t).id === 403 && !active(t).ko;
+      if (B.blackoutNum && B.blackoutNum[team] && smudgeActive) {
+        const num = B.blackoutNum[team];
+        const originalDice = team === 'red' ? blueDice : redDice;
+        const filtered = [];
+        let removed = 0;
+        originalDice.forEach(d => {
+          if (d === num) { removed++; }
+          else { filtered.push(d); }
+        });
+        if (removed > 0) {
+          if (team === 'red') { blueDice.splice(0, blueDice.length, ...filtered); }
+          else { redDice.splice(0, redDice.length, ...filtered); }
+          blackoutCallouts.push({ name: 'BLACKOUT!', color: 'var(--rare)', desc: `Smudge — ${removed} dice showing ${num} vanished!` });
+          log(`<span class="log-ability">Smudge</span> — Blackout! Named ${num} — <span class="log-dmg">${removed} opponent dice removed!</span>`);
+        }
+        // No callout if opponent didn't roll the number — silent miss, don't interrupt the flow
       }
-      // No callout if opponent didn't roll the number — silent miss, don't interrupt the flow
-    }
-  });
-  // Reset blackout picks
-  B.blackoutNum = {};
+    });
+    // Reset blackout picks
+    B.blackoutNum = {};
+  }
 
   B.redDice = redDice; B.blueDice = blueDice;
   // Sync visual dice display after Blackout may have removed dice from either array.
@@ -7260,7 +7397,9 @@ function resolveRound() {
   renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
-  log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
+  if (!sylviaResuming) {
+    log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
+  }
 
   // Determine winner with cascading tiebreakers
   // Rule: compare best hand type first. If same type AND same value,
@@ -7310,6 +7449,26 @@ function resolveRound() {
     const loser = winner === 'red' ? 'blue' : 'red';
     const wRoll = winner === 'red' ? rR : bR;
     setTimeout(() => highlightWinnerDice(winner, wRoll, loser, tiebreaker), 80);
+  }
+
+  // ========================================
+  // SYLVIA (313) — PORPOISE PLAYER-ROLLED DODGE
+  // v331: if the losing fighter is Sylvia and no result is pending yet,
+  // show the Sylvia modal so the player rolls 1 die themselves. The modal
+  // stores B.sylviaPendingResult then re-enters resolveRound with
+  // B.sylviaResuming=true to pick up where we left off.
+  // Ties (winner === null) don't trigger — Sylvia only cares about losses.
+  // ========================================
+  if (winner !== null && !sylviaResuming && !B.sylviaPendingResult) {
+    const loserTeamName = winner === 'red' ? 'blue' : 'red';
+    const loserF = active(B[loserTeamName]);
+    if (loserF && loserF.id === 313 && !loserF.ko) {
+      showSylviaModal(loserTeamName, () => {
+        B.sylviaResuming = true;
+        resolveRound();
+      });
+      return;
+    }
   }
 
   if (winner === null) {
@@ -8110,19 +8269,31 @@ function resolveRound() {
     }
   }
 
-  // Sylvia (313) — loser dodge check: roll 2 dice, if either is a 6 negate all damage
+  // Sylvia (313) — loser dodge check: roll 1 die, if it's a 6 negate all damage.
+  // v331: the die is rolled by the PLAYER via the Sylvia modal (showSylviaModal) before
+  // resolveRound's second pass reaches this block. B.sylviaPendingResult = { value, dodged }
+  // is set by doSylviaRoll(). If it's missing (defensive fallback), we roll 1 die here.
   // Note: callouts are intentionally NOT queued here — they are queued in the cinematic section
   // (where abilityQueueMode=true) to prevent them firing synchronously and being stomped.
   let sylviaDodged = false;
-  let sylviaDodgeRolls = []; // store for callout
+  let sylviaDodgeRolls = []; // store for callout (array form for back-compat with callout)
   if (lF.id === 313 && !lF.ko) {
-    sylviaDodgeRolls = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1];
-    if (sylviaDodgeRolls.includes(6)) {
-      dmg = 0;
-      sylviaDodged = true;
-      log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled [${sylviaDodgeRolls.join(',')}] — <span class="log-ms">ALL DAMAGE NEGATED!</span>`);
+    let rolledValue;
+    if (B.sylviaPendingResult && typeof B.sylviaPendingResult.value === 'number') {
+      rolledValue = B.sylviaPendingResult.value;
+      sylviaDodged = !!B.sylviaPendingResult.dodged;
+      B.sylviaPendingResult = null; // consume
     } else {
-      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${sylviaDodgeRolls.join(',')}] (needed a 6).`);
+      // Defensive fallback — should never hit in normal flow
+      rolledValue = Math.floor(Math.random()*6)+1;
+      sylviaDodged = (rolledValue === 6);
+    }
+    sylviaDodgeRolls = [rolledValue];
+    if (sylviaDodged) {
+      dmg = 0;
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled [${rolledValue}] — <span class="log-ms">ALL DAMAGE NEGATED!</span>`);
+    } else {
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${rolledValue}] (needed a 6).`);
     }
     collectKC(loseTeamName, lF.name);
   }
@@ -8977,7 +9148,7 @@ function resolveRound() {
     }
   });
   if (pudgeSelfDmg || (wF.id === 311 && wR.type === 'doubles')) {
-    queueAbility('BELLY FLOP!', 'var(--uncommon)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
+    queueAbility('BELLY FLOP!', 'var(--common)', `${wF.name} — Doubles! +2 damage, 1 self-damage!`);
   }
   if (mountainKingTriggered) {
     queueAbility('BEAST MODE!', 'var(--legendary)', `${wF.name} — Doubles! ${mountainKingBaseDmg} × 2 = ${dmg} damage!`);
@@ -9557,13 +9728,13 @@ function resolveRound() {
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
       if (wR.type === 'singles') {
-        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); });
       } else if (wR.type === 'doubles') {
-        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Sacred Fire!`, () => { loseTeam.resources.fire++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { loseTeam.resources.fire++; popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
       } else if (isTripleOrBetter(wR.type)) {
-        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); });
       }
     }
@@ -9573,13 +9744,13 @@ function resolveRound() {
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
   if (wF.ko && hasSideline(winTeam, 310)) {
     if (wR.type === 'singles') {
-      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); });
     } else if (wR.type === 'doubles') {
-      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Sacred Fire!`, () => { winTeam.resources.fire++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { winTeam.resources.fire++; popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
     } else if (isTripleOrBetter(wR.type)) {
-      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); });
     }
   }
