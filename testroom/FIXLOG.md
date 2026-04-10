@@ -3,7 +3,13 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v301
+## Current Version: v302
+
+## v302 — AUDITED FIX: Chad (56) Sploop! entry grant missing Wisp block and Sandwiches mirror
+- Chad (56) Sploop! BUG: When Chad entered the field, `team.resources.ice += 2` fired unconditionally with no Wisp (344) Guide Light block and no Sandwiches (33) Dependable mirror. Every other post-roll resource grant has both guards (Hank Tremor, Natalia Materialization, Kaplan Pollinate, Selene Heart of the Hills, Spockles Valley Magic, etc.) but the entry-path grant was missed.
+- Fixed: wrapped in `hasSideline(enemy, 344)` check — if Wisp is on enemy sideline, shows GUIDE LIGHT! entry callout and blocks the 2 Ice Shards entirely. Otherwise grants the ice as before, then checks `hasSideline(enemy, 33) && !hasSideline(team, 344)` and mirrors +2 Ice Shards to the opponent's team with a DEPENDABLE! entry callout.
+- Also bumped TESTROOM_VERSION from v294 → v302 (was stale — cycles v295-v301 all forgot to bump the JS constant even though FIXLOG was updated).
+- Pattern: entry-path resource grants follow the same Wisp/Sandwiches pattern as post-roll grants. Any card that grants resources on entry should have both guards.
 
 ## v301 — BUG FIX: Sandwiches (33) Dependable now correctly mirrors Hank (207) Tremor, Natalia (327) Materialization, Kaplan (308) Pollinate, and Selene (305) Heart of the Hills choice
 - Hank (207) Tremor — the Wisp-guarded else branch now adds a DEPENDABLE! mirror for each Lucky Stone gained from 4s. Mirror blocked if Hank's team has Wisp on their own sideline.
@@ -119,7 +125,7 @@ This was introduced by the "narrate first, then enable buttons 350ms later" brea
 ## THE 36 REAL CARDS
 COMMON: Hank(207), Happy Crystal(208), Dart(209), Dylan(301), Maximo(302), Tweak and Twonk(303), Pudge(311), Jimmy(352), Tyson(365)
 UNCOMMON: Bouril(201), The Ember Force(304), Kaplan(308), Granny(310), Calvin(342), Boris(343), Fed and Hayden(406)
-RARE: Death Howl(202), Benjamin(203), Finn(204), Shade's Shadow(205), Artemis(307), Aunt Susan(309), Timpleton(312), Sylvia(313), Harrison(315), Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404)
+RARE: Death Howl(202), Benjamin(203), Shade's Shadow(205), Artemis(307), Aunt Susan(309), Timpleton(312), Sylvia(313), Finn(204), Harrison(315), Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404)
 GHOST RARE: Zain(206), Farmer Jeff(314), Natalia(327), Red Hunter(345)
 LEGENDARY: Timber(210), Selene(305), Nerina(306), Humar(336)
 **Mother Nature(366), Bumble(362), Dusk(364) are NOT real cards. Ignore them.**
@@ -213,7 +219,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Bogey (53) — Bogus: AUDITED PASS (v292) — arm modal pre-roll, armed flag set, resolve checks `lF.id===53 + armed + dmg>0`, dmg=0, wF.hp -= reflect, bogeyUsed once-per-game, BOGUS! cinematic callout queued, correct.
 - [x] Roger (54) — Tempest: AUDITED PASS (v292) — 4+ dice + 2 different pairs → +3 Sacred Fires, Sandwiches mirror, wispBlocksWin guard, correct.
 - [x] Masked Hero (55) — Underdog: AUDITED FIX (v292) — BUG: Shade's Shadow forEach had no `const f = active(team)` declaration; when Masked Hero was chip-damaged by Shade's Shadow and Underdog counter fired, `f` was undefined → ReferenceError crash. Fixed: added `const f = active(team)` as first line of Shade's Shadow forEach. All other Underdog instances (Ember Force, Shade, Splinter, Char, Bramble, Wick) correctly declare f. Underdog spec verified: fires on all pre-roll chip effects, 3 counter-damage, cinematic UNDERDOG! callout, correct.
-- [x] Chad (56) — Sploop!: AUDITED PASS (v293) — entry +2 ice, SPLOOP! callout, collectKnightReactions, correct.
+- [x] Chad (56) — Sploop!: AUDITED FIX (v302) — BUG: entry +2 ice grant had no Wisp (344) Guide Light block and no Sandwiches (33) Dependable mirror. Fixed: Wisp on enemy sideline now blocks Sploop! (shows GUIDE LIGHT! entry callout); Sandwiches on enemy sideline now mirrors +2 ice with DEPENDABLE! entry callout; Wisp on own team's sideline blocks the mirror. Same guard pattern as all post-roll resource grants.
 - [x] Marcus (57) — Glacial Pounding: AUDITED PASS (v293) — take 3+ dmg → +4 bonus dice next roll; consumed in doPreRollSetup when Marcus still active; cinematic callout queued; correct.
 - [x] Ashley (58) — Burning Soul: AUDITED PASS (v293) — win → queueAbility +1 Sacred Fire; wispBlocksWin guard; Sandwiches mirror; correct.
 - [x] Mr Filbert (59) — Mask Merchant: AUDITED PASS (v293) — passive sideline flip of heals to damage; distributed `filbertCursesWin/filbertCursesLose` flags cover all heal abilities (Opa, Villager, Jeffery, Munch, Troubling Haters, Mallow, Boo Brothers, Shoo, Katrina, Flora, Ancient One); correct.
@@ -297,6 +303,36 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 - Reuse the `.set-toggle-btn` CSS class from v276 so the visual style matches.
 
 Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
+
+
+### Shared Special Window — Moonstone + Lucky Stone (HIGH PRIORITY — Wyatt request)
+**Current bug:** When both teams have post-roll specials available (e.g., Red has Moonstone, Blue has Lucky Stone), the game shows a 5-second window for Red's Moonstone, then a SEPARATE 5-second window for Blue's Lucky Stone. Total wait: 10 seconds, even if neither player intends to use them. Players have to sit through two separate timeouts.
+
+**Wanted behavior — Single shared 5-second window:**
+1. After dice resolve, if EITHER team has any post-roll special available (Moonstone or Lucky Stone), open a SHARED 5-second decision window.
+2. The UI should show both teams' available specials simultaneously — Red's Moonstone button glows on Red's side, Blue's Lucky Stone button glows on Blue's side.
+3. Whichever player clicks first → handle their action immediately (Moonstone: pick a die + value; Lucky Stone: pick a die to reroll).
+4. After their action fully resolves, CHECK if there are still any unused specials available on either team. If yes → reset the 5-second timer and re-open the window for the remaining specials. If no → proceed to round resolution.
+5. If the 5-second timer expires with no clicks → all specials are skipped, proceed to resolution.
+
+**Example flows:**
+- Red has Moonstone, Blue has Lucky Stone:
+  - Window opens (5s timer), both buttons glow
+  - Red clicks Moonstone → die-picker → value-picker → resolves
+  - Window resets (5s timer), only Blue's Lucky Stone still glows
+  - Blue clicks → reroll → resolves
+  - Round proceeds
+- Both players ignore the window: 5s passes once → round resolves
+
+**Implementation hints:**
+- Find the current `B.phase = 'moonstone-red'`/`'moonstone-blue'`/`'luckystone-...'` state machine in `resolveRound`/`doPostRollAndResolve`.
+- Replace the sequential phases with a single `B.phase = 'specials-window'` state.
+- Track which specials are still available per team (`B.specialsAvailable = { red: [...], blue: [...] }`).
+- Re-evaluate after every action; close the window when both arrays empty OR timer expires.
+- The 5-second timer should reset after each successful action so a player who clicked late doesn't get penalized for the next decision.
+- AFK timer integration: don't let the global AFK timer cancel an active specials window.
+
+**Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
