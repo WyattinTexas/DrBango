@@ -1000,7 +1000,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </header>
 
   <div class="tabs" style="display:flex; align-items:center;">
-    <div class="tab active" onclick="switchTab('browse')">Ghost Gallery</div>
+    <div class="tab active" onclick="switchTab('browse')">Spirit Kin Gallery</div>
     <div class="tab" onclick="switchTab('battle')">Arena</div>
     <button class="standings-btn" onclick="openStandings()" style="margin-left:auto;">&#x1F3C6; Standings</button>
   </div>
@@ -1008,11 +1008,13 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   <!-- BROWSE -->
   <div id="browse-panel" class="panel active">
     <div class="moonstone-info">
-        <h3><span class="gem">&#x1F48E;</span> Set Resources</h3>
+        <h3><span class="gem">&#x1F48E;</span> Specials</h3>
         <p><strong>Moonstone:</strong> Spend before rolling to change ONE die to any value. Rare and game-changing.<br>
-        <strong>Healing Seeds:</strong> Spend to heal 1 HP. <em>Cannot exceed max HP.</em><br>
+        <strong>Healing Seed:</strong> Spend to heal 1 HP. <em>Cannot exceed max HP.</em><br>
         <strong>Surge:</strong> Versatile energy resource. Spend to power ghost abilities.<br>
-        <strong>Lucky Stone:</strong> Discard after any roll to reroll one die.</p>
+        <strong>Lucky Stone:</strong> Discard after any roll to reroll one die.<br>
+        <strong>Ice Shard:</strong> Adds +1 damage to a winning roll. Stacks across shards.<br>
+        <strong>Sacred Fire:</strong> Adds +3 damage to a winning roll. Stacks across fires.</p>
     </div>
     <div class="set-toggles">
       <span class="set-toggles-label">Original Sets:</span>
@@ -1025,11 +1027,6 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 
   <!-- BATTLE -->
   <div id="battle-panel" class="panel">
-    <div class="moonstone-info" style="margin-bottom:20px;">
-      <h3><span class="gem">&#x1F48E;</span> Moonstone</h3>
-      <p><strong>Spend before rolling:</strong> after you roll, change one die to any value (1-6). Click the glowing Moonstone button when available.</p>
-    </div>
-
     <div id="team-select">
       <!-- Team Roster Display -->
       <div class="team-rosters" id="teamRosters">
@@ -1611,7 +1608,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v277';
+const TESTROOM_VERSION = 'v278';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2267,6 +2264,7 @@ function autoPlayNext() {
     splinterActivated: { red: false, blue: false },
     guardianFairyStandby: { red: false, blue: false },
     letsDanceBonus: { red: 0, blue: 0 },
+    tommyRegulatorBonus: { red: 0, blue: 0 },
     eloiseUsedThisRound: { red: false, blue: false },
     outlawStolenDie: { red: 0, blue: 0 },
     bogeyArmed: { red: false, blue: false },
@@ -2688,6 +2686,7 @@ function startBattle() {
     splinterActivated: { red: false, blue: false },
     guardianFairyStandby: { red: false, blue: false },
     letsDanceBonus: { red: 0, blue: 0 },
+    tommyRegulatorBonus: { red: 0, blue: 0 },
     eloiseUsedThisRound: { red: false, blue: false },
     outlawStolenDie: { red: 0, blue: 0 },
     bogeyArmed: { red: false, blue: false },
@@ -3115,7 +3114,9 @@ function popSidelineCard(teamObj, ghostId) {
 
 // Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
 function dylanNegates(enemyTeam) {
-  return hasSideline(enemyTeam, 301);
+  // Dylan (301) sideline OR Piper (107) active — both negate enemy before-rolling effects
+  const enemyActive = active(enemyTeam);
+  return hasSideline(enemyTeam, 301) || (enemyActive && enemyActive.id === 107 && !enemyActive.ko);
 }
 
 // Helper: count occurrences of a value in dice array
@@ -4400,6 +4401,45 @@ function doDarkWingChoice(choice) {
 // Fires before Dark Wing in the post-roll chain.
 // Uses in-place splice/mutation so the postRollDone closure captures the new values.
 // ============================================================
+// Tommy Salami (30) — Regulator: post-roll dice mutation — rerolls opponent's 5s and 6s to low values (1-4).
+// Fires BEFORE Drizzle in the post-roll chain so Tommy's suppressed dice can't become 1s that Drizzle then rerolls separately.
+// Stores the reroll count in B.tommyRegulatorBonus[team] so resolveRound can apply +1 damage per regulated die when Tommy wins.
+function checkTommyRegulator(continuation) {
+  const rF = active(B.red), bF = active(B.blue);
+  const tommyTeamName = (rF && rF.id === 30 && !rF.ko) ? 'red' : (bF && bF.id === 30 && !bF.ko) ? 'blue' : null;
+  // Reset bonus both teams each round regardless of whether Tommy is active
+  if (B.tommyRegulatorBonus) { B.tommyRegulatorBonus.red = 0; B.tommyRegulatorBonus.blue = 0; }
+  if (!tommyTeamName) { continuation(); return; }
+  const oppTeamName = tommyTeamName === 'red' ? 'blue' : 'red';
+  const tommyF = tommyTeamName === 'red' ? rF : bF;
+  const oppPreRoll = B.preRoll[oppTeamName].dice;
+  if (!oppPreRoll || oppPreRoll.length === 0) { continuation(); return; }
+  let regulated = 0;
+  for (let i = 0; i < oppPreRoll.length; i++) {
+    if (oppPreRoll[i] === 5 || oppPreRoll[i] === 6) {
+      regulated++;
+      // Weighted low: 30% → 1, 25% → 2, 15% → 3, 30% → 4 (mirrors boobattles applyRegulator)
+      const r = Math.random();
+      oppPreRoll[i] = r < 0.30 ? 1 : r < 0.55 ? 2 : r < 0.70 ? 3 : 4;
+    }
+  }
+  oppPreRoll.sort((a, b) => a - b);
+  if (oppTeamName === 'red') { B.redDice = B.preRoll.red.dice; }
+  else { B.blueDice = B.preRoll.blue.dice; }
+  renderDice(B.redDice, B.blueDice);
+  renderBattle();
+  if (regulated > 0) {
+    B.tommyRegulatorBonus[tommyTeamName] = regulated;
+    const newDiceStr = (oppTeamName === 'red' ? B.redDice : B.blueDice).join(', ');
+    showAbilityCallout('REGULATOR!', 'var(--common)',
+      `${tommyF.name} — ${regulated} die${regulated > 1 ? 's' : ''} forced low! Opponent now rolling: [${newDiceStr}]`);
+    log(`<span class="log-ability">${tommyF.name}</span> — Regulator! ${regulated} opponent die${regulated > 1 ? 's' : ''} (5/6) forced low before roll resolves.`);
+    setTimeout(() => { continuation(); }, 1200);
+  } else {
+    continuation();
+  }
+}
+
 function checkDrizzleRainDance(continuation) {
   const redF  = active(B.red);
   const blueF = active(B.blue);
@@ -6019,17 +6059,19 @@ function doPreRollSetup() {
   if (B.harrisonExtraDie.blue) blueCount += B.harrisonExtraDie.blue;
 
   // Kairan (68) — Let's Dance: +1 die from previous round's doubles bonus
+  // Guard: only apply the bonus if Kairan is STILL the active ghost — die is personal to Kairan,
+  // not the team. If Kairan was KO'd or swapped since earning the bonus, the die is lost.
   if (B.letsDanceBonus && B.letsDanceBonus.red > 0) {
-    redCount += B.letsDanceBonus.red;
     if (active(B.red).id === 68 && !active(B.red).ko) {
+      redCount += B.letsDanceBonus.red;
       preRollCallouts.push(["LET'S DANCE!", 'var(--rare)', `${active(B.red).name} — Last round's doubles! +${B.letsDanceBonus.red} bonus die!`]);
       log(`<span class="log-ability">${active(B.red).name}</span> — Let's Dance! +${B.letsDanceBonus.red} bonus die from last doubles!`);
     }
     B.letsDanceBonus.red = 0;
   }
   if (B.letsDanceBonus && B.letsDanceBonus.blue > 0) {
-    blueCount += B.letsDanceBonus.blue;
     if (active(B.blue).id === 68 && !active(B.blue).ko) {
+      blueCount += B.letsDanceBonus.blue;
       preRollCallouts.push(["LET'S DANCE!", 'var(--rare)', `${active(B.blue).name} — Last round's doubles! +${B.letsDanceBonus.blue} bonus die!`]);
       log(`<span class="log-ability">${active(B.blue).name}</span> — Let's Dance! +${B.letsDanceBonus.blue} bonus die from last doubles!`);
     }
@@ -6119,9 +6161,11 @@ function doPreRollSetup() {
           preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Seeker cursed! ${f.name} takes 1 damage! (${seekerHpBefore}→${f.hp} HP)`]);
           log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Seeker flipped to damage. ${f.name} ${seekerHpBefore} → ${f.hp} HP.`);
         } else {
-          f.hp += 1;
-          preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp})`]);
-          log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp})`);
+          const seekerNewHp = Math.min(f.maxHp, f.hp + 1);
+          const seekerCapped = seekerNewHp === f.hp; // true if already at maxHp (shouldn't happen but guard)
+          f.hp = seekerNewHp;
+          preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp}${seekerCapped ? ' · capped' : ''})`]);
+          log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp}${seekerCapped ? ' capped' : ''})`);
         }
       }
     }
@@ -6437,7 +6481,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       }
       afterJackson();
     };
-    // Drizzle (328) — Rain Dance fires FIRST (before Dark Wing), then DW, then Jackson
+    // Drizzle (328) — Rain Dance fires AFTER Tommy (before Dark Wing), then DW, then Jackson
     const afterDrizzle = () => {
       const dwRed  = active(B.red);
       const dwBlue = active(B.blue);
@@ -6449,7 +6493,8 @@ function doPostRollAndResolve(redDice, blueDice) {
       }
       afterDarkWing();
     };
-    checkDrizzleRainDance(afterDrizzle);
+    // Tommy Salami (30) — Regulator: fires FIRST so 5s/6s are suppressed before Drizzle, Dark Wing, etc.
+    checkTommyRegulator(() => checkDrizzleRainDance(afterDrizzle));
   });
 }
 
@@ -7706,20 +7751,20 @@ function resolveRound() {
     log(`<span class="log-ability">${wF.name}</span> — Chase! Greg has ${wF.hp} HP vs enemy ${lF.hp} HP → 2X damage!`);
   }
 
-  // Tommy Salami (30) — Regulator: count how many of the loser's dice were 5 or 6 (the "regulated" dice).
-  // Each regulated die grants +1 bonus damage to Tommy if he wins. Faithfully ports boobattles
-  // `applyRegulator` — where those dice were literally rerolled low; here we capture the post-roll count.
+  // Tommy Salami (30) — Regulator: the opponent's 5s/6s were already force-rerolled low in checkTommyRegulator
+  // (post-roll chain, before winner determination). B.tommyRegulatorBonus[winTeamName] holds the count.
+  // +1 bonus damage per regulated die IF Tommy won — dice in loseDice are already mutated (no 5/6 left there).
   let tommyTriggered = false;
   let tommyBaseDmg = 0;
   let tommyRegulatedCount = 0;
-  if (wF.id === 30 && !wF.ko && loseDice && loseDice.length > 0) {
-    tommyRegulatedCount = loseDice.filter(d => d === 5 || d === 6).length;
+  if (wF.id === 30 && !wF.ko) {
+    tommyRegulatedCount = (B.tommyRegulatorBonus && B.tommyRegulatorBonus[winTeamName]) || 0;
     if (tommyRegulatedCount > 0) {
       tommyBaseDmg = dmg;
       dmg += tommyRegulatedCount;
       tommyTriggered = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Regulator! ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} regulated (5s/6s → low) → +${tommyRegulatedCount} damage!`);
+      log(`<span class="log-ability">${wF.name}</span> — Regulator! ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} were suppressed → +${tommyRegulatedCount} damage!`);
     }
   }
 
@@ -7809,10 +7854,12 @@ function resolveRound() {
   }
 
   // Admiral (71) — Comrades: while on the sideline, +2 damage to your even doubles rolls.
-  // "Even doubles" = win type is doubles AND every winning die is even (2, 4, or 6).
+  // "Even doubles" = win type is doubles AND the paired value is even (2, 4, or 6).
+  // FIX v279: was winDice.every(d => d%2===0) — that required ALL dice to be even, so [4,4,3]
+  // (double 4s with an odd third die) wrongly failed. Correct check is wR.value % 2 === 0.
   let admiralTriggered = false;
   let admiralBaseDmg = 0;
-  if (hasSideline(winTeam, 71) && !wF.ko && wR.type === 'doubles' && winDice && winDice.every(d => d % 2 === 0)) {
+  if (hasSideline(winTeam, 71) && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0) {
     if (!corneliusBlocksRally) {
       admiralBaseDmg = dmg;
       dmg += 2;
@@ -7949,11 +7996,12 @@ function resolveRound() {
   }
 
   // Chip (16) — Acrobatic Dive: even rolled doubles add +3 damage if you deal damage.
-  // "Even doubles" = win type is doubles AND every winning die is even (2, 4, or 6) AND dmg > 0.
-  // Mirrors Admiral Comrades but for the ACTIVE ghost rather than the sideline.
+  // "Even doubles" = win type is doubles AND the paired value is even (2, 4, or 6) AND dmg > 0.
+  // FIX v279: was winDice.every(d => d%2===0) — required ALL dice to be even, so [4,4,3]
+  // (double 4s with an odd third die) wrongly failed. Correct check is wR.value % 2 === 0.
   let chipTriggered = false;
   let chipBaseDmg = 0;
-  if (wF.id === 16 && !wF.ko && wR.type === 'doubles' && dmg > 0 && winDice && winDice.every(d => d % 2 === 0)) {
+  if (wF.id === 16 && !wF.ko && wR.type === 'doubles' && dmg > 0 && wR.value % 2 === 0) {
     chipBaseDmg = dmg;
     dmg += 3;
     chipTriggered = true;
@@ -7994,8 +8042,10 @@ function resolveRound() {
   }
 
   // Splinter (101) — Toxic Fumes: first win activates fumes; 1 pre-roll chip damage every subsequent round
+  let splinterJustActivated = false;
   if (wF.id === 101 && !wF.ko && B.splinterActivated && !B.splinterActivated[winTeamName]) {
     B.splinterActivated[winTeamName] = true;
+    splinterJustActivated = true;
     log(`<span class="log-ability">${wF.name}</span> — Toxic Fumes! Activated — 1 pre-roll damage every round from here on.`);
   }
 
@@ -9118,6 +9168,10 @@ function resolveRound() {
   // Penny (316) — Forager: win a roll → gain 1 Healing Seed
   if (wF.id === 316 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('FORAGER!', '#22c55e', `${wF.name} — Win! +1 Healing Seed! (${winTeam.resources.healingSeed + 1} total)`, () => { winTeam.resources.healingSeed++; renderBattle(); }); } }
   if (wF.id === 316 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Forager! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
+  // Splinter (101) — Toxic Fumes: first win triggers activation callout
+  if (splinterJustActivated) {
+    queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`);
+  }
   // Char (323) — Afterburn: win → deal 1 damage at the start of next round
   if (wF.id === 323 && !wF.ko) {
     B.charAfterburnPending[winTeamName] = true;
