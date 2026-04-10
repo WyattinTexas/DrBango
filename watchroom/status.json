@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 12,
-      "remaining_mins": 16,
+      "cycles": 13,
+      "remaining_mins": 13,
       "until": "11:00 PM",
-      "last_update": "2026-04-09T22:46:40.017270",
+      "last_update": "2026-04-09T22:56:42.830867",
       "status": "running",
-      "next_up": "Full combo playtesting pass \u2014 specifically Selene doubles + Moonstone in the same round (does the Moonstone prompt appear cleanly after HEART OF THE HILLS! clears via the drain callback?), and Smudge BLACKOUT! + Knight Light/Terror to verify the newly-queued callout correctly chains to HEAVY AIR!/RETRIBUTION! if a Knight is active.",
-      "after_that": "Audit `checkKnightEffects` calls in `resolveRound` that are made outside of queue mode (lines ~3802, ~3819, ~3837, ~3863-3871) \u2014 these call `showAbilityCallout` directly mid-game-state-setup, before the `abilityQueue = []` is even initialized; if a Knight is active those HEAVY AIR!/RETRIBUTION! callouts fire synchronously and get immediately stomped by the first queued ability at `dmgDelay`."
+      "next_up": "Full combo playtesting pass \u2014 specifically Selene doubles + Moonstone in the same round (does the Moonstone prompt appear cleanly after HEART OF THE HILLS! clears via the drain callback?), and verify the new Knight callout ordering (Dart PLUNDER! \u2192 round ends \u2192 HEAVY AIR! at tail of queue) feels correct and doesn't create a long awkward pause after the last ability if multiple Knight reactions fire.",
+      "after_that": "Audit the Tweak and Twonk/Jimmy/Maximo `checkKnightEffects` calls in the TIE path (lines 3872, 3884, 3896) \u2014 these ARE in `abilityQueueMode=true` context so they correctly queue, but verify that the TIE path's `drainAbilityQueue` callback includes the Knight callouts in the drain sequence (they should since queue mode is set before the calls and drained after, but the queue ordering should put WARM BELLY!/CHIRP!/NAP! before HEAVY AIR!/RETRIBUTION!)."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 13,
+      "summary": "All 14 `checkKnightEffects` calls in `resolveRound`'s pre-cinematic game-state section now use a `collectKC()` helper that captures Knight callouts in temp-queue-mode; Sylvia PORPOISE! callouts moved to the cinematic section \u2014 so every Knight HEAVY AIR!/RETRIBUTION! reaction now plays sequentially at the end of the ability queue instead of firing synchronously at t=0 (stomping each other or getting stomped by the first queued ability, especially fatal for Sylvia dodges where dmg=0 makes the queue fire at only 800ms).",
+      "next_up": "Full combo playtesting pass \u2014 specifically Selene doubles + Moonstone in the same round (does the Moonstone prompt appear cleanly after HEART OF THE HILLS! clears via the drain callback?), and verify the new Knight callout ordering (Dart PLUNDER! \u2192 round ends \u2192 HEAVY AIR! at tail of queue) feels correct and doesn't create a long awkward pause after the last ability if multiple Knight reactions fire.",
+      "after_that": "Audit the Tweak and Twonk/Jimmy/Maximo `checkKnightEffects` calls in the TIE path (lines 3872, 3884, 3896) \u2014 these ARE in `abilityQueueMode=true` context so they correctly queue, but verify that the TIE path's `drainAbilityQueue` callback includes the Knight callouts in the drain sequence (they should since queue mode is set before the calls and drained after, but the queue ordering should put WARM BELLY!/CHIRP!/NAP! before HEAVY AIR!/RETRIBUTION!).",
+      "time": "22:56:42",
+      "timestamp": "2026-04-09T22:56:42.831145",
+      "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
+    },
     {
       "target": "testroom",
       "cycle": 12,
@@ -497,18 +507,9 @@
       "after_that": "Full combo playtesting audit for the three drifted cards (Mother Nature 366, Bumble 362, Dusk 364) \u2014 specifically check whether Mother Nature's Winter die-count reduction stacks correctly with Timber's -1 die reduction (both active simultaneously would try to reduce the same opponent's count; verify the Math.max(1,...) floor is applied after both checks and the narrator correctly reads the season each round).",
       "time": "17:30:05",
       "timestamp": "2026-04-09T17:30:05.744319"
-    },
-    {
-      "target": "testroom",
-      "cycle": 7,
-      "summary": "Tiebreaker secondary glow is now symmetric \u2014 the loser's matched group (pair/triple/etc.) also gets dim-gold `die-win-secondary` so both rows tell the story (\"your 4s tied too, your kicker just lost\"), not just the winner's side.",
-      "next_up": "Pressure opponent-choice final verification \u2014 confirm `doPressureSwap` truly updates the **affected** team's `activeIdx` (not the pressuring team's), and that the modal \"RED/BLUE PICKS\" banner correctly labels the picking player in the Blue-pressures-Red edge case.",
-      "after_that": "Full combo playtesting for the three drifted cards (Mother Nature 366 Seasons, Bumble 362 Pollinate, Dusk 364 Twilight) \u2014 check timing, narrator feedback, and whether any ability fires at the wrong phase or conflicts with the queue.",
-      "time": "17:22:29",
-      "timestamp": "2026-04-09T17:22:29.772961"
     }
   ],
-  "last_update": "2026-04-09T22:46:40.017635",
+  "last_update": "2026-04-09T22:56:42.831152",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
