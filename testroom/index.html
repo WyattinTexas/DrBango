@@ -1613,6 +1613,16 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
   </div>
 </div>
 
+<!-- Gus (31) — Gale Force Picker: losing player chooses which sideline ghost to swap in -->
+<div class="pressure-overlay" id="galeForcePickerOverlay">
+  <div class="pressure-modal">
+    <div id="galeForcePickerBanner" class="pm-who-banner blue">💨 GALE FORCE!</div>
+    <h3>Gus — Gale Force!</h3>
+    <div class="pm-sub">Gus wins! Choose a Ghost from your sideline to swap in — the switch is forced!</div>
+    <div id="galeForcePickerOptions"></div>
+  </div>
+</div>
+
 <!-- Game Over -->
 <div class="game-over" id="gameOver">
   <div class="go-box">
@@ -1630,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v294';
+const TESTROOM_VERSION = 'v300';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1689,10 +1699,10 @@ const GHOSTS = [
     designNote:"Moonstone economy card. 3 HP is fragile, but his ability to use Moonstones without discarding them makes him incredibly valuable. Protect him and your Moonstones go twice as far."
   },
   {
-    id:204, name:"Smithy", rarity:"rare", maxHp:6, art:"art/smithy.webp",
+    id:204, name:"Finn", rarity:"rare", maxHp:6, art:"art/finn.png",
     ability:"Forge", abilityDesc:"Sideline: convert 2 Ice Shards or 2 Sacred Fires into 1 Moonstone each round.",
     category:"Resource Generation", set:"Volcanic Activity",
-    designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Activity's Moonstone plays. Deckbuilding archetype creator."
+    designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Activity's Moonstone plays. Deckbuilding archetype creator. (Originally named Smithy.)"
   },
   {
     id:205, name:"Shade's Shadow", rarity:"rare", maxHp:1, art:"art/kaboom.png",
@@ -2332,6 +2342,7 @@ function autoPlayNext() {
     fangUndercoverArmed: { red: false, blue: false },
     fangUndercoverSwapPending: null,
     winstonSchemePending: null,
+    galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
     charAfterburnPending: { red: false, blue: false },
@@ -2754,6 +2765,7 @@ function startBattle() {
     fangUndercoverArmed: { red: false, blue: false },
     fangUndercoverSwapPending: null,
     winstonSchemePending: null,
+    galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
     charAfterburnPending: { red: false, blue: false },
@@ -4858,6 +4870,65 @@ function doWinstonSchemeChoice(idx) {
 }
 
 // ============================================================
+// Gus (31) — Gale Force Picker: losing player chooses which sideline ghost to swap in
+// ============================================================
+function showGaleForcePickerModal(winTeamName, loseTeamName, sidelineGhosts, continuation) {
+  const banner = document.getElementById('galeForcePickerBanner');
+  if (banner) {
+    banner.className = `pm-who-banner ${loseTeamName}`;
+    banner.textContent = '💨 GALE FORCE!';
+  }
+  const loseTeam = B[loseTeamName];
+  const opts = document.getElementById('galeForcePickerOptions');
+  if (opts) {
+    opts.innerHTML = sidelineGhosts.map(g => {
+      const gd = ghostData(g.id);
+      const realIdx = loseTeam.ghosts.indexOf(g);
+      const hpRatio = g.hp / g.maxHp;
+      const hpColor = hpRatio > 0.6 ? 'var(--hp-green)' : hpRatio > 0.3 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+      return `<div class="pressure-opt" onclick="doGaleForcePickerChoice(${realIdx})">
+        ${gd.art ? `<img src="${gd.art}" style="width:50px;height:50px;border-radius:6px;object-fit:cover;border:1px solid var(--${gd.rarity});">` : ''}
+        <div>
+          <div style="font-weight:700;">${g.name}</div>
+          <div style="font-size:12px;color:var(--text2);"><span style="color:${hpColor};font-weight:700;">&hearts; ${g.hp}/${g.maxHp}</span> &middot; <span style="color:var(--${gd.rarity});">${gd.ability}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  B.galeForcePicker = { winTeamName, loseTeamName, continuation };
+  B.phase = 'ko-pause';
+  document.getElementById('galeForcePickerOverlay').classList.add('active');
+}
+
+function doGaleForcePickerChoice(idx) {
+  const gfp = B.galeForcePicker;
+  if (!gfp) return;
+  B.galeForcePicker = null;
+  document.getElementById('galeForcePickerOverlay').classList.remove('active');
+
+  const { winTeamName, loseTeamName, continuation } = gfp;
+  const loseTeam = B[loseTeamName];
+  const winTeamColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
+  const loseTeamColor = loseTeamName === 'red' ? 'red-text' : 'blue-text';
+
+  const oldName = active(loseTeam).name;
+  const newGhost = loseTeam.ghosts[idx];
+
+  loseTeam.activeIdx = idx;
+  renderBattle();
+
+  narrate(`<b class="${winTeamColor}">Gus</b> — Gale Force! <b class="${loseTeamColor}">${newGhost.name}</b> blown in to replace <b class="${loseTeamColor}">${oldName}</b>!`);
+  log(`<span class="log-ability">Gus</span> — Gale Force! ${oldName} forced to bench — ${newGhost.name} enters!`);
+
+  // Fire entry effects for the newly-active ghost, then continue
+  setTimeout(() => {
+    const entryCount = triggerEntry(loseTeam, false);
+    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
+    setTimeout(continuation, entryDelay);
+  }, 1500);
+}
+
+// ============================================================
 // TWO-BUTTON ROLL SYSTEM — each side rolls independently
 // ============================================================
 function rollReady(team) {
@@ -5900,18 +5971,18 @@ function doPreRollSetup() {
       if (forgeIce) {
         team.resources.ice -= 2;
         team.resources.moonstone++;
-        log(`<span class="log-ability">Smithy</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
+        log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
         parts.push('2 Ice Shards → 1 Moonstone');
       }
       if (forgeFire) {
         team.resources.fire -= 2;
         team.resources.moonstone++;
-        log(`<span class="log-ability">Smithy</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
+        log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
         parts.push('2 Sacred Fires → 1 Moonstone');
       }
 
       // Single callout covers both conversions — no second call stomping the first
-      const calloutDesc = `Smithy — ${parts.join(' + ')}!`;
+      const calloutDesc = `Finn — ${parts.join(' + ')}!`;
       preRollCallouts.push(['FORGE!', 'var(--legendary)', calloutDesc]);
       popSidelineCard(team, 204);
     }
@@ -6439,6 +6510,7 @@ function doPostRollAndResolve(redDice, blueDice) {
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
 
   // Hank (207) — each 4 rolled: gain 1 Lucky Stone (Tremor)
+  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Tremor.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
@@ -6446,47 +6518,74 @@ function doPostRollAndResolve(redDice, blueDice) {
     if (f.id === 207 && !f.ko) {
       const fours = countVal(dice, 4);
       if (fours > 0) {
-        team.resources.luckyStone += fours;
-        queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
-        log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
-        checkKnightEffects(tNameHank, f.name);
+        if (hasSideline(opp(team), 344)) {
+          const wispG = getSidelineGhost(opp(team), 344);
+          queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispG ? wispG.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Tremor!`);
+          log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Tremor (${fours} four${fours>1?'s':''})!`);
+        } else {
+          team.resources.luckyStone += fours;
+          queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
+          log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
+          checkKnightEffects(tNameHank, f.name);
+        }
       }
     }
   });
 
   // Selene (305) — doubles: choose 1 Healing Seed OR 2 Lucky Stones (deferred modal)
+  // Wisp (344) Guide Light: blocks Selene's resource choice — if opponent has Wisp, skip the modal offer.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameSel = team === B.red ? 'red' : 'blue';
     if (f.id === 305 && !f.ko && classify(dice).type === 'doubles') {
-      B.selenePending = { team, tName: tNameSel };
+      if (!hasSideline(opp(team), 344)) {
+        B.selenePending = { team, tName: tNameSel };
+      } else {
+        const wispGSel = getSidelineGhost(opp(team), 344);
+        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGSel ? wispGSel.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s doubles reward!`);
+        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Selene bonus!`);
+      }
     }
   });
 
   // Natalia (327) — even doubles (2s, 4s, 6s): gain 1 Moonstone
+  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Materialization.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameNat = team === B.red ? 'red' : 'blue';
     if (f.id === 327 && !f.ko && hasEvenDoubles(dice)) {
-      team.resources.moonstone++;
-      queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`);
-      log(`<span class="log-ability">${f.name}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
-      checkKnightEffects(tNameNat, f.name);
+      if (hasSideline(opp(team), 344)) {
+        const wispGNat = getSidelineGhost(opp(team), 344);
+        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGNat ? wispGNat.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Materialization!`);
+        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Materialization!`);
+      } else {
+        team.resources.moonstone++;
+        queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`);
+        log(`<span class="log-ability">${f.name}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
+        checkKnightEffects(tNameNat, f.name);
+      }
     }
   });
 
   // Kaplan (308) — when OPPONENT rolls doubles: gain 1 Healing Seed
+  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Pollinate.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const oppDice = team === B.red ? blueDice : redDice;
     const tNameKap = team === B.red ? 'red' : 'blue';
     if (f.id === 308 && !f.ko && classify(oppDice).type === 'doubles') {
-      team.resources.healingSeed++;
-      queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
-      log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
-      checkKnightEffects(tNameKap, f.name);
+      if (hasSideline(opp(team), 344)) {
+        const wispGKap = getSidelineGhost(opp(team), 344);
+        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGKap ? wispGKap.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Pollinate!`);
+        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Pollinate!`);
+      } else {
+        team.resources.healingSeed++;
+        queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
+        log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
+        checkKnightEffects(tNameKap, f.name);
+      }
     }
   });
 
@@ -7378,14 +7477,30 @@ function resolveRound() {
     });
 
     // Maximo (302) — end of round: gain 1 Healing Seed
+    // Wisp (344) — Guide Light: opponent cannot gain resources this round → blocks Maximo's seed.
+    // Sandwiches (33) — Dependable: if opponent gains a seed, mirror it.
     [B.red, B.blue].forEach(team => {
       const f = active(team);
       const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
-        team.resources.healingSeed++;
-        queueAbility('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`);
-        log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
-        checkKnightEffects(tNameMax, f.name);
+        const oppTeamMax    = opp(team);
+        const wispBlocksMax = hasSideline(oppTeamMax, 344);
+        const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
+        const wispBlocksMirror   = hasSideline(team, 344);
+        if (wispBlocksMax) {
+          queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks ${f.name}'s Nap seed!`);
+          log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Nap seed!`);
+        } else {
+          queueAbility('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`, () => {
+            team.resources.healingSeed++;
+            log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
+            checkKnightEffects(tNameMax, f.name);
+            renderBattle();
+          });
+          if (sandwichMirrorsMax && !wispBlocksMirror) {
+            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeamMax.resources.healingSeed + 1} total)`, () => { oppTeamMax.resources.healingSeed++; renderBattle(); });
+          }
+        }
       }
     });
 
@@ -8404,7 +8519,7 @@ function resolveRound() {
         dmg = 0; // override ALL computed damage — no hit
         galeForceSwap = true;
         collectKC(winTeamName, wF.name);
-        log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeam.ghosts[galeForceSLIdx].name} forced into battle!`);
+        log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeamName} must choose a replacement ghost!`);
       }
     }
   }
@@ -8702,10 +8817,10 @@ function resolveRound() {
       if (!f.ko) {
         const healAmt = B.auntSusanHealBonus[tn] * 2;
         const hpBefore = f.hp;
-        f.hp = Math.min(f.maxHp, f.hp + healAmt);
-        const actualHeal = f.hp - hpBefore;
-        B.auntSusanHealResult[tn] = { before: hpBefore, after: f.hp };
-        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +${actualHeal} HP (${hpBefore}→${f.hp}/${f.maxHp})${actualHeal < healAmt ? ' (capped)' : ''}!`);
+        f.hp += healAmt;
+        const susanOver = f.hp > f.maxHp;
+        B.auntSusanHealResult[tn] = { before: hpBefore, after: f.hp, overclocked: susanOver };
+        log(`<span class="log-heal">${f.name}</span> — Harvest Dance! Healed +${healAmt} HP (${hpBefore}→${f.hp}/${f.maxHp})${susanOver ? ' · overclocked!' : ''}!`);
       }
     }
   });
@@ -8804,7 +8919,7 @@ function resolveRound() {
       const cnt = B.auntSusanHealBonus[tn];
       const f = active(B[tn]);
       const res = (B.auntSusanHealResult || {})[tn];
-      const hpDelta = res ? `${res.before}→${res.after} HP` : `${f.hp} HP`;
+      const hpDelta = res ? `${res.before}→${res.after} HP${res.overclocked ? ' · overclocked!' : ''}` : `${f.hp} HP`;
       queueAbility('HARVEST DANCE!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} HP! ${hpDelta}`);
     }
   });
@@ -9146,15 +9261,11 @@ function resolveRound() {
     queueAbility('STUBBORN!', 'var(--uncommon)', `Barnaby resists! ${wF.name}'s Gale Force is blocked — damage goes through!`);
   }
 
-  // Gus (31) — Gale Force: win + primed → zero damage, swap enemy's active ghost for a sideline ghost.
-  // Fires after all defense callouts so the cinematic arc reads: damage modifiers → defenses → GALE FORCE!.
-  if (galeForceSwap && galeForceSLIdx >= 0 && !wF.ko) {
-    const galeForcedName = loseTeam.ghosts[galeForceSLIdx].name;
-    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${galeForcedName} blown in to replace ${lF.name}!`, () => {
-      loseTeam.activeIdx = galeForceSLIdx;
-      log(`<span class="log-ability">${wF.name}</span> — Gale Force! ${galeForcedName} is now active for the ${loseTeamName} team.`);
-      renderBattle();
-    });
+  // Gus (31) — Gale Force: win + primed → zero damage, opponent CHOOSES which sideline ghost to swap in.
+  // Fires after all defense callouts. The actual swap is deferred to a picker modal that opens after
+  // the queue drains (same post-drain pattern as Winston Scheme) — opponent gets to pick, not auto-pick.
+  if (galeForceSwap && !wF.ko) {
+    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`);
   }
 
   // Thistle (338) — Barbed: took real damage → 1 recoil damage to attacker
@@ -9564,9 +9675,23 @@ function resolveRound() {
   }
 
   // End-of-round callouts — Maximo seed granted with NAP! splash via onShow
+  // Wisp (344) — Guide Light: opponent cannot gain resources this round → blocks Maximo's seed.
+  // Sandwiches (33) — Dependable: if opponent gains a seed, you mirror it.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
-    if (f.id === 302 && !f.ko) queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
+    if (f.id === 302 && !f.ko) {
+      const isWinSide = team === winTeam;
+      const wispBlocksMaximo = isWinSide ? wispBlocksWin : wispBlocksLose;
+      const sandwichMirrors   = isWinSide ? sandwichForLose : sandwichForWin;
+      const oppTeam           = isWinSide ? loseTeam : winTeam;
+      const oppWispBlocks     = isWinSide ? wispBlocksLose : wispBlocksWin;
+      if (wispBlocksMaximo) {
+        queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks ${f.name}'s Nap seed!`);
+      } else {
+        queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
+        if (sandwichMirrors && !oppWispBlocks) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeam.resources.healingSeed + 1} total)`, () => { oppTeam.resources.healingSeed++; renderBattle(); });
+      }
+    }
   });
 
   // Knight reactions (HEAVY AIR!/RETRIBUTION!) collected from all pre-cinematic ability triggers.
@@ -9626,7 +9751,7 @@ function resolveRound() {
         }, BEAT_HP);
       }, BEAT_DAMAGE);
     } else {
-      if (galeForceSwap && galeForceSLIdx >= 0) {
+      if (galeForceSwap) {
         narrate(`<b class="${winColor}">${wF.name}</b> wins! <b class="gold">GALE FORCE!</b> — forcing a swap instead of damage!`);
       } else {
         narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
@@ -9767,17 +9892,40 @@ function resolveRound() {
         }
       };
 
+      // Gus (31) — Gale Force: if triggered, offer the LOSING player a ghost picker before other post-drain logic.
+      // Spec: "force your opponent to CHOOSE a different ghost" — the opponent decides which sideline ghost enters.
+      // If only 1 sideline option, auto-swap (no real choice). If multiple, show picker modal (same as Winston pattern).
+      const checkGaleForcePicker = () => {
+        if (galeForceSwap && !wF.ko && !galeForceBlockedByBarnaby) {
+          const gfAlive = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko);
+          if (gfAlive.length > 1) {
+            showGaleForcePickerModal(winTeamName, loseTeamName, gfAlive, afterFangUndercover);
+            return;
+          } else if (gfAlive.length === 1) {
+            // Only 1 option — auto-swap, fire entry effects, then continue
+            loseTeam.activeIdx = loseTeam.ghosts.indexOf(gfAlive[0]);
+            renderBattle();
+            log(`<span class="log-ability">Gus</span> — Gale Force! ${gfAlive[0].name} was the only option — enters automatically!`);
+            const entryCount = triggerEntry(loseTeam, false);
+            const delay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
+            setTimeout(afterFangUndercover, delay);
+            return;
+          }
+        }
+        afterFangUndercover();
+      };
+
       if (fuSwapTeam) {
         const fuTeam = B[fuSwapTeam];
         const fuSidelineGhosts = fuTeam.ghosts.filter((g, i) => i !== fuTeam.activeIdx && !g.ko);
         if (fuSidelineGhosts.length > 0) {
-          showFangUndercoverSwapModal(fuSwapTeam, fuSidelineGhosts, afterFangUndercover);
+          showFangUndercoverSwapModal(fuSwapTeam, fuSidelineGhosts, checkGaleForcePicker);
         } else {
           // No sideline ghosts (all KO'd since the arm was set) — just proceed
-          afterFangUndercover();
+          checkGaleForcePicker();
         }
       } else {
-        afterFangUndercover();
+        checkGaleForcePicker();
       }
     });
   }, dmgDelay);
@@ -10282,7 +10430,7 @@ function renderCardSlot(ghost, isFighter) {
       // • Smithy IS the active fighter → show "dormant" on his own card so players
       //   know they need to bench him for Forge to activate
       if (ghost.id === 204) {
-        statusHtml += `<span class="status-tag" style="background:rgba(100,116,139,0.18);color:#94a3b8;" title="Forge only works when Smithy is on the sideline">🔨 Forge: dormant</span>`;
+        statusHtml += `<span class="status-tag" style="background:rgba(100,116,139,0.18);color:#94a3b8;" title="Forge only works when Finn is on the sideline">🔨 Forge: dormant</span>`;
       } else if (hasSideline(thisTeam, 204)) {
         const canForge = (thisTeam.resources.ice >= 2) || (thisTeam.resources.fire >= 2);
         if (canForge) {
@@ -10615,6 +10763,7 @@ function clearAllOverlays() {
   document.getElementById('fangUndercoverArmOverlay').classList.remove('active');
   document.getElementById('fangUndercoverSwapOverlay').classList.remove('active');
   document.getElementById('winstonSchemeOverlay').classList.remove('active');
+  document.getElementById('galeForcePickerOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
   document.getElementById('abilitySplash').classList.remove('active');
   const vsSplash = document.getElementById('vsSplash');

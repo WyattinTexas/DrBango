@@ -3,7 +3,37 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v294
+## Current Version: v299
+
+## v299 — AUDITED FIX: Aunt Susan (309) Harvest Dance heal — uncapped (overclock restored); AUDITED PASS: Villager (11) Hospitality (no wispBlocksWin needed — Wisp blocks resources, not HP heals); AUDITED PASS: Opa (48) Rest
+- Aunt Susan (309) AUDITED FIX — BUG: Harvest Dance heal path at line ~8792 used `f.hp = Math.min(f.maxHp, f.hp + healAmt)` — capped at maxHp in violation of the v294 HARD RULE ("HEALING OVERCLOCKS BY DEFAULT"). Aunt Susan's card text says "heal +2 HP" with no explicit cap — not the Healing Seed resource-panel button (the only seed-heal exception). Fixed: changed to `f.hp += healAmt`, added `susanOver = f.hp > f.maxHp`, updated log to show `· overclocked!` tag, stored `overclocked` flag in `B.auntSusanHealResult[tn]`, updated cinematic HARVEST DANCE! callout to show `· overclocked!` when HP exceeds maxHp. Aunt Susan was absent from the v294 12-card revert list — this was a missed site.
+- Villager (11) AUDITED PASS (re-confirmed) — `hasSideline(winTeam, 11)` win-heal has slagResidueBlocksWin + corneliusBlocksRally + filbertCursesWin guards; no `wispBlocksWin` guard needed because Wisp (344) Guide Light specifically blocks RESOURCE gains (ice/fire/surge/seeds/etc.), not HP heals. The HP gain from Hospitality is not a resource. Correct.
+- Opa (48) AUDITED PASS — "If Opa wins the roll or ties, gain +1 health." Win path (`wF.id === 48`) checks slagResidueBlocksWin + filbertCursesWin (no Cornelius needed — active ghost, not sideline); `f.hp += 1` (overclock, v294 revert applied). Tie path forEach both teams checks `f.id === 48`, slagBlocksOpaTie per team, hasSideline(opaEnemy, 59) for Filbert, `f.hp + 1` (overclock). Both paths: REST! cinematic callout with overclocked! tag; correct.
+
+## v298 — AUDITED FIX: Maximo (302) Nap TIE path — missing Wisp block and Sandwiches mirror
+- Maximo (302) TIE PATH AUDITED FIX — BUG: The tie path Maximo forEach (line ~7451) granted the Healing Seed directly (`team.resources.healingSeed++`) with no Wisp (344) Guide Light block and no Sandwiches (33) Dependable mirror, while the win/lose path at line ~9636 already had both. This meant that in tie rounds, Wisp was completely ineffective against Maximo's Nap, and Sandwiches could not mirror the seed. Fixed: replaced the simple block with the full pattern — compute `oppTeamMax`, `wispBlocksMax` (`hasSideline(oppTeamMax, 344)`), `sandwichMirrorsMax` (`hasSideline(oppTeamMax, 33)`), `wispBlocksMirror` (`hasSideline(team, 344)`); if Wisp blocks → queue GUIDE LIGHT! + log; otherwise move seed grant into NAP! onShow callback (cinematic timing consistency) + conditionally queue DEPENDABLE! mirror if Sandwiches is on sideline and not blocked by team's own Wisp.
+
+## v297 — AUDITED FIX: Sandwiches (33) Dependable + Maximo (302) Nap — missing Wisp block and Sandwiches mirror
+- Lou (32) AUDITED PASS — `hasSideline(winTeam, 32) && wF.id===34` trigger correct; Cornelius block correct; `dmg += 1` correct; BROS! callout defers HP grant via onShow (overclock allowed per v294); Filbert curse path present; correct.
+- Winston (15) AUDITED PASS — `wF.id===15 && wR.type==='doubles'` trigger; post-drain `checkWinstonScheme` fires correctly; `showWinstonSchemeModal` shows opponent's sideline options; skip button present ("may" mechanic); Barnaby (326) immunity block present (`oldGhost.id===326`); `triggerEntry` fires for forced-in ghost; correct.
+- Sandwiches (33) AUDITED FIX — BUG 1: Maximo (302) Nap's end-of-round Healing Seed grant (win/lose path, line ~9636) had no Wisp (344) Guide Light block — opponent with Wisp could not prevent Maximo's seed grant, making Wisp ineffective against Maximo. BUG 2: Same Maximo grant had no Sandwiches mirror — if opponent's Maximo generates a Healing Seed each round, a team with Sandwiches on sideline should mirror it but never did. Fixed: expanded the Maximo forEach to compute `isWinSide`, `wispBlocksMaximo` (using existing `wispBlocksWin/wispBlocksLose` flags in scope), `sandwichMirrors` (using `sandwichForLose/sandwichForWin`), `oppTeam`, and `oppWispBlocks`; if Wisp blocks → queue GUIDE LIGHT! and skip grant; otherwise queue NAP! seed grant then conditionally queue DEPENDABLE! mirror. Note: the TIE path Maximo instance (line ~7456) has the same Wisp+Sandwiches gap but requires a separate fix since the tie path has no win/lose team structure and `wispBlocksWin/sandwichForLose` aren't defined there.
+
+## v296 — AUDITED FIX: Gus (31) Gale Force — opponent must CHOOSE which ghost to swap in
+- Gus (31) AUDITED FIX — BUG: Gale Force auto-picked the first available sideline ghost via `findIndex` (line 8402) instead of letting the losing player choose. Spec says "force your opponent to CHOOSE a different ghost from their sideline." Fixed: (1) Removed the `onShow` auto-swap from the GALE FORCE! cinematic callout — it now only announces the effect. (2) Added `checkGaleForcePicker` step in the post-drain callback chain (fires before `afterFangUndercover` → Winston → KO handling), which either auto-swaps when only 1 sideline option exists (no real choice) or shows a new `#galeForcePickerOverlay` modal listing all available sideline ghosts. Losing player clicks their choice. (3) Added `showGaleForcePickerModal` + `doGaleForcePickerChoice` JS functions (modeled after `showWinstonSchemeModal` pattern). (4) Fixed missing `triggerEntry()` call — old code never fired entry effects for the forced-in ghost; new picker and auto-pick paths both call `triggerEntry(loseTeam, false)` and wait for its callouts before continuing. Added `#galeForcePickerOverlay` HTML, `galeForcePicker: null` to both B init blocks, and overlay to `clearAllOverlays()`.
+
+## v295 — AUDITED FIX: Dream Cat (28) Jinx missing from tie path + batch Common audit
+- Dream Cat (28) AUDITED FIX — BUG: Jinx (+1 die when both teams roll doubles) only triggered in the win/lose path. In a tie where both teams rolled doubles (rR.type===bR.type==='doubles'), Jinx was silently ignored. Fixed: added Dream Cat check in the tie path after the Logey (26) Heinous block using `if (rR.type==='doubles')` guard. Now fires consistently across win/lose/tie.
+- Ancient Librarian (3) AUDITED PASS — both-teams 2-count +N dmg; collectKC; KNOWLEDGE! queued; correct.
+- Fang Outside (6) AUDITED PASS — wF.id===6 win trigger; showFangOutsideModal chains into Winston/KO; triggerEntry for new ghost; correct.
+- Fang Undercover (7) AUDITED PASS — pre-roll arm modal; fangUndercoverActivated negates damage; swap picker after queue drains; Cameron Force of Nature includes fangUndercoverActivated; arm cleared on all paths; correct.
+- Little Boo (9) AUDITED PASS — triples→singles conversion before all multiplier checks; collectKC; MERCY! queued; correct.
+- Shoo (13) AUDITED PASS — v294 reverted Alpine Air to f.hp+=2 (overclocks by design); Cornelius block; Filbert curse; once-per-ghost flag; correct.
+- Ancient One (22) AUDITED PASS — tie sideline +3 HP; Cornelius block; Filbert curse; deferred onShow; correct.
+- Powder (23) AUDITED PASS — lF.id===23 KO path; +3 ice deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
+- Simon (24) AUDITED PASS — lF.id===24+dmg>0; +1 Sacred Fire deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
+- Cameron (25) AUDITED PASS — all negation flags covered (guardThomas, patrick, kodako, bogey, kingJay, dealer, sky, cityCyboo, pyrope, patches, fangUndercover); instant KO; FORCE OF NATURE! queued; correct.
+- Logey (26) AUDITED PASS — win/lose/tie all count opponent 5+ dice; logeyLockout consumed in doPreRollSetup; HEINOUS! callout; correct.
+- Sad Sal (29) AUDITED PASS — lF.id===29 lose; +1 ice deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
 
 ## v294 — CRITICAL DESIGN RULE FIX: Healing overclocks by default
 **Why:** Wyatt corrected: "There is no capping max HP. All healing overclocks, except the special use of healing seeds, can never overclock." The refiner had been wrongly capping heal abilities at maxHp across the audit (Katrina v280, Mallow v283, Troubling Haters v285, plus other prior bad fixes). Anti-overclock counterplay (Wandering Sue 84 destroying enemies at 12+ HP) only works as designed if heals actually overclock — capping defangs the whole meta-game these counter cards are built around.
@@ -75,7 +105,7 @@ This was introduced by the "narrate first, then enable buttons 350ms later" brea
 ## THE 36 REAL CARDS
 COMMON: Hank(207), Happy Crystal(208), Dart(209), Dylan(301), Maximo(302), Tweak and Twonk(303), Pudge(311), Jimmy(352), Tyson(365)
 UNCOMMON: Bouril(201), The Ember Force(304), Kaplan(308), Granny(310), Calvin(342), Boris(343), Fed and Hayden(406)
-RARE: Death Howl(202), Benjamin(203), Smithy(204), Shade's Shadow(205), Artemis(307), Aunt Susan(309), Timpleton(312), Sylvia(313), Harrison(315), Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404)
+RARE: Death Howl(202), Benjamin(203), Finn(204), Shade's Shadow(205), Artemis(307), Aunt Susan(309), Timpleton(312), Sylvia(313), Harrison(315), Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404)
 GHOST RARE: Zain(206), Farmer Jeff(314), Natalia(327), Red Hunter(345)
 LEGENDARY: Timber(210), Selene(305), Nerina(306), Humar(336)
 **Mother Nature(366), Bumble(362), Dusk(364) are NOT real cards. Ignore them.**
@@ -160,7 +190,8 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Outlaw (43) — Thief: AUDITED PASS (v288) — doubles in tie path + doubles in win/lose path both set `B.outlawStolenDie[tNameOut]++`; doPreRollSetup consumes and applies -1 to ENEMY die count (direction correct: red Outlaw steals → blueCount decreases); reset on consume; no Cornelius needed (active ghost effect, not sideline); correct.
 - [x] Bubble Boys (44) — Pop: AUDITED PASS (v288) — Case 1 (BB lost, enemy triples → BB KO); Case 2 (BB won but enemy rolled triples → BB KO even in victory); Little Boo Mercy only modifies wR.type (winner's), not lR.type, so no interference; POP! callout + renderBattle onShow; correct.
 - [x] Cornelius (45) — Antidote: AUDITED PASS (v288) — passive; implemented as distributed `hasSideline(enemyTeam, 45)` checks at each sideline effect; covers: Cyboo Spark, Shoo Alpine Air (doPreRollSetup), Tabitha Rally, Admiral Comrades, Dark Jeff Cackle, Bilbo Little Buddy, Pale Nimbus Hidden Storm, Laura Catchy Tune, Bandit Pete Bandit, Zach Craftsman, Gary Lucky Novice (win+lose), Villager Hospitality, Jeffery Chuckle, Ancient One Friend to All (tie path) — all correct. BUG found: Needle (21) Big Bro was missing the Cornelius check — fixed in v288.
-- [x] Hermit (47) — Solitude: AUDITED PASS (v289) — `triggerEntry` counts all KO'd ghosts on both teams; `koCount * 2` HP gain; allows overclock above maxHp by design ("late-game scaling tank"); entryCallouts.push SOLITUDE! callout; no-ghost path shows waiting message; correct.
+- [x] Hermit (47) — Solitude: AUDITED PASS (v289)
+- [x] Opa (48) — Rest: AUDITED PASS (v299) — win+tie paths both correct; `f.hp += 1` (overclock by v294 rule); slagResidue + Filbert guards on both paths; no Cornelius needed (active ghost, not sideline). Correct. — `triggerEntry` counts all KO'd ghosts on both teams; `koCount * 2` HP gain; allows overclock above maxHp by design ("late-game scaling tank"); entryCallouts.push SOLITUDE! callout; no-ghost path shows waiting message; correct.
 - [x] Greg (49) — Chase: AUDITED PASS (v289) — `wF.id===49 && !wF.ko && wF.hp > lF.hp` → `dmg *= 2`; `collectKC`; `queueAbility('CHASE!', ...)` in Phase 7 cinematic section; correct.
 - [x] Jackson (50) — Regrow: AUDITED FIX (v289) — BUG: `pickJacksonDie` stored `dice: [...dice]` (copy) in `B.jacksonPending`, mutated the copy, then assigned `B.pendingResolve.redDice = dice` and `B.redDice = dice`. But `postRollDone()` runs AFTER Jackson and recreates `B.pendingResolve = { redDice, blueDice }` using the closure's `B.preRoll.*.dice` reference — silently overwriting Jackson's rerolled die. Identical to the Sonya (v284) / Jeanie (v285) / Dark Wing (v285) bug. Fixed: switched to in-place mutation on `B.preRoll.*.dice` (same pattern as Sonya/DarkWing). `B.pendingResolve` guarded with `if (B.pendingResolve)`. Log message now uses `preRollDice.join(', ')`. Dropped unused `dice` destructure from `B.jacksonPending`.
 - [x] Nicholas (51) — Sneak Attack: AUDITED FIX (v290) — 2 entry damage to entering ghost, hasSideline check, KO guard all correct. BUG: no Knight reactions after dealing damage. Every other entry ability that deals damage (Grawr, Jenkins, Nerina) calls collectKnightReactions() or equivalent. Fixed: added inline Knight reaction collection using `checkKnightEffects(nicholasTeamName, nicholasGhost.name)` — using Nicholas's team (enemy) as the abilityTeam, so the ENTERING team can counter with Knight Terror (punishes enemy active) or Knight Light (gains +1 die). Using entryTeamName would be backwards (would let enemy double-punish the entering ghost).
@@ -178,16 +209,17 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 ### Common (33)
 - [x] Kodako (1) — Swift: AUDITED PASS (v280) — 1-2-3 win→exactly 4 dmg, 1-2-3 lose→negate+4 back, both correct
 - [x] Nikon (2) — Ambush: AUDITED FIX (v287) — was `B.round === 1`; corrected to per-ghost `_rolledOnce` flag; see v287 entry for full details.
-- [ ] Ancient Librarian (3) — Knowledge: NEEDS AUDIT
+- [x] Ancient Librarian (3) — Knowledge: AUDITED PASS (v295) — both-teams 2-count +N dmg; collectKC; KNOWLEDGE! queued; correct.
 - [ ] Wanderer (4) — NEEDS ARCHITECTURE (hidden sideline info)
 - [x] Puff (5) — Cute: AUDITED PASS (v280) — doubles/triples -1 dmg, quads/penta excluded per spec, correct
-- [ ] Fang Outside (6), Fang Undercover (7) — NEEDS AUDIT
+- [x] Fang Outside (6) — Skillful Coward: AUDITED PASS (v295) — wF.id===6 win trigger; post-win swap modal; triggerEntry for new ghost; correct.
+- [x] Fang Undercover (7) — Skilled Coward: AUDITED PASS (v295) — pre-roll arm modal; fangUndercoverActivated negates damage; swap picker after queue; Cameron FoN covers fangUndercover; correct.
 - [x] Buttons (8) — Perfect Plan: AUDITED FIX (v277)
-- [ ] Little Boo (9) — NEEDS AUDIT
+- [x] Little Boo (9) — Mercy: AUDITED PASS (v295) — triples→singles conversion before all multiplier checks; collectKC; MERCY! queued; correct.
 - [x] Patrick (10) — Stone Form: AUDITED FIX (v277)
 - [x] Villager (11) — Hospitality: AUDITED PASS (v280) — sideline +1 HP on win, Filbert/Cornelius/Residue all correct
 - [x] Dupy (12) — Frolic: AUDITED PASS (v280) — tie → KO enemy, guard prevents double-fire in mirror match
-- [ ] Shoo (13) — Alpine Air: NEEDS AUDIT
+- [x] Shoo (13) — Alpine Air: AUDITED PASS (v295) — f.hp+=2 (overclocks by design per v294 rule); Cornelius block; Filbert curse; once-per-ghost flag; correct.
 - [x] Jeffery (14) — Chuckle: AUDITED PASS (v280) — sideline +3 HP on win, Filbert/Cornelius/Residue all correct
 - [ ] Winston (15) — Scheme: NEEDS AUDIT (modal exists, Barnaby counter exists, appears correct but untested)
 - [x] Chip (16) — Acrobatic Dive: AUDITED FIX (v279)
@@ -196,13 +228,19 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Scallywags (19) — Frenzy: AUDITED PASS (v280) — all-under-4 dice → +1 die next round, fires win/lose/tie
 - [x] Floop (20) — Muck: AUDITED PASS (v280) — enemy doubles → -1 die next round, fires win/lose/tie
 - [x] Needle (21) — Big Bro: AUDITED FIX (v288) — re-audited: sideline +1 die when Buttons active was correct but MISSING Cornelius block. Every other doPreRollSetup sideline effect (Cyboo Spark, Shoo Alpine Air) has `hasSideline(enemyTeamObj, 45)` Cornelius guard, but Needle had none. Fixed: added Cornelius check inside the `hasSideline(team, 21)` branch; if enemy has Cornelius, shows ANTIDOTE! pre-roll callout and skips the die bonus; else fires BIG BRO! as before.
-- [ ] Ancient One (22) — NEEDS AUDIT
-- [ ] Powder (23), Simon (24), Cameron (25) — NEEDS AUDIT
-- [ ] Logey (26) — Heinous: NEEDS AUDIT
+- [x] Ancient One (22) — Friend to All: AUDITED PASS (v295) — tie sideline +3 HP; Cornelius block; Filbert curse; deferred onShow; correct.
+- [x] Powder (23) — Final Gift: AUDITED PASS (v295) — KO path +3 ice deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
+- [x] Simon (24) — Brew Time: AUDITED PASS (v295) — lF.id===24+dmg>0; +1 Sacred Fire deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
+- [x] Cameron (25) — Force of Nature: AUDITED PASS (v295) — all 11 negation flags covered; instant KO; FORCE OF NATURE! queued; correct.
+- [x] Logey (26) — Heinous: AUDITED PASS (v295) — win/lose/tie count opponent 5+ dice; logeyLockout consumed in doPreRollSetup; HEINOUS! callout; correct.
 - [x] Fredrick (27) — Careful: AUDITED PASS (v280) — caps opponent at 3 dice, applied last, correct
-- [ ] Dream Cat (28), Sad Sal (29) — NEEDS AUDIT
+- [x] Dream Cat (28) — Jinx: AUDITED FIX (v295) — BUG: missing from tie path. Fixed: added `if (rR.type==='doubles')` check in tie path so Jinx fires when both tied with doubles.
+- [x] Sad Sal (29) — Tough Job: AUDITED PASS (v295) — lF.id===29 lose; +1 ice deferred onShow; wispBlocksLose; Sandwiches mirror; correct.
 - [x] Tommy Salami (30) — Regulator: AUDITED FIX (v278)
-- [ ] Gus (31), Lou (32), Sandwiches (33) — NEEDS AUDIT
+- [x] Gus (31) — Gale Force: AUDITED FIX (v296) — auto-picked first sideline ghost; spec says opponent CHOOSES. Fixed: added `#galeForcePickerOverlay` modal + `showGaleForcePickerModal`/`doGaleForcePickerChoice` (Winston pattern); picker fires in post-drain `checkGaleForcePicker` step; `triggerEntry` now correctly fires for forced-in ghost; 1-option case auto-swaps with narration. Correct.
+- [x] Lou (32) — Bros: AUDITED PASS (v297) — `hasSideline(winTeam, 32) && wF.id===34 && !wF.ko` trigger; Cornelius block (`!corneliusBlocksRally`); `dmg += 1`; BROS! callout defers HP grant via onShow (`wF.hp = wF.hp + 1`, no cap = overclock by design per v294); Filbert curse flips heal to damage; correct.
+- [x] Winston (15) — Scheme: AUDITED PASS (v297) — `wF.id===15 && !wF.ko && wR.type==='doubles'` trigger; post-drain `checkWinstonScheme` → `showWinstonSchemeModal`; skip button present ("may"); Barnaby (326) immunity check (`oldGhost.id===326`); `triggerEntry` fires for forced ghost; correct.
+- [x] Sandwiches (33) — Dependable: AUDITED FIX (v297) — main mirror logic correct across all 22+ resource-grant sites. BUG: Maximo (302) Nap end-of-round Healing Seed grant had no Wisp block OR Sandwiches mirror. Fixed: expanded the win/lose-path Maximo forEach to add (a) Wisp check using existing `wispBlocksWin/wispBlocksLose` flags and (b) DEPENDABLE! mirror using existing `sandwichForLose/sandwichForWin` and `oppWispBlocks` guards. Note: TIE path Maximo (line ~7456) still lacks Wisp/Sandwich handling — needs separate fix.
 
 ### KNOWN BROKEN (high priority)
 - (all 5 priority cards audited in v277 — see below)
@@ -237,6 +275,9 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v292** — Renamed Smithy → Finn (id 204). Art swapped from `art/smithy.webp` to `art/finn.png`. All in-game callouts/log entries updated. Forge ability and design unchanged. Reason: Wyatt wanted a fresh name + new art for the Frost-Valley-to-Volcanic-Activity resource bridge ghost. Canonical 36-card roster updated in FIXLOG and refiner.py system prompt. Memory updated.
+
 
 - **v290** — AUDITED FIX Nicholas (51) Sneak Attack — missing Knight reactions after entry damage. Nicholas is on the ENEMY sideline, so Knight reactions should fire from the ENTERING team's perspective (entering team has Knight Terror → punishes enemy active; entering team has Knight Light → entering team gains +1 die). Previous code had no Knight reaction call at all. Fixed: inline temp-queue pattern calling `checkKnightEffects(nicholasTeamName, nicholasGhost.name)` where `nicholasTeamName = enteringTeamName === 'red' ? 'blue' : 'red'`. AUDITED PASS Hugo (52) Wreckage — trigger, flag storage, doPreRollSetup consumption, cinematic callout, collectKC, and reset all correct.
 
