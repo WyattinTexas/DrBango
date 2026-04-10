@@ -65,6 +65,22 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - **Patrick (10) Stone Form** — Current code lets Patrick roll normally and only counters on a losing singles roll. Spec says "Don't roll" — Patrick shouldn't roll dice at all. Full rework needed.
 - **Nikon (2) Ambush** — User reports not firing. Verify trigger condition and callout visibility.
 
+
+## QUEUED FEATURES (after audits complete)
+
+### Standings Set-Filter Toggles (LOW PRIORITY — Wyatt request)
+Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) to the standings overlay that exist in the Ghost Gallery and Arena picker. Behavior:
+
+- Three toggle buttons at the top of the standings modal: "Show Base Set", "Show Dark Castle", "Show Frost Valley"
+- Click to include cards from that set in the standings table. Click again to exclude.
+- The canonical testroom cards (Volcanic Activity, Rolling Hills) are ALWAYS shown — the toggles only control originals.
+- When a toggle changes, the standings table re-renders with only the included cards, and ALL existing sort logic (W, L, GP, PCT, GB, KO, KO'D, KO/G) works against the filtered pool.
+- GB (Games Behind) and leader detection should recompute against the filtered pool — e.g., if only Dark Castle is showing, the Dark Castle leader gets GB=- and everyone else is relative to that leader.
+- Use the existing `visibleOriginalSets` Set from v276 so the state is shared across gallery/picker/standings, OR give standings its own independent toggle state. Either is fine — pick whichever is cleaner.
+- Reuse the `.set-toggle-btn` CSS class from v276 so the visual style matches.
+
+Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
+
 ## Completed Fixes — Wyatt + Gamma (this session)
 
 
