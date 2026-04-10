@@ -1630,7 +1630,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v282';
+const TESTROOM_VERSION = 'v291';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3025,11 +3025,22 @@ function triggerEntry(team, skipEntryEffects) {
     f.hp = Math.max(0, f.hp - 2);
     if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
     const enteringTeamName = team === B.red ? 'red' : 'blue';
+    const nicholasTeamName = enteringTeamName === 'red' ? 'blue' : 'red';
     entryCallouts.push(['SNEAK ATTACK!', 'var(--uncommon)',
       `${nicholasGhost.name} — 2 damage to ${f.name} on entry!`]);
     log(`<span class="log-ability">${nicholasGhost.name}</span> — Sneak Attack! <span class="log-dmg">2 damage to ${f.name} on entry!</span> ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
     playDamageSfx(2);
     hitDamage(enteringTeamName);
+    // Knight reactions: Nicholas's ability belongs to the enemy team — the entering team may counter.
+    // Use nicholasTeamName (not entryTeamName) so Knight Terror/Light on the ENTERING side
+    // correctly punish/reward in response to the enemy ability (not double-punish the entering ghost).
+    const savedQN = abilityQueue;
+    abilityQueue = [];
+    abilityQueueMode = true;
+    checkKnightEffects(nicholasTeamName, nicholasGhost.name);
+    abilityQueue.forEach(item => entryCallouts.push([item.name, item.color, item.desc]));
+    abilityQueue = savedQN;
+    abilityQueueMode = false;
   }
 
   // Fire all entry callouts sequentially — each 1500ms after the previous
@@ -3498,7 +3509,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
     // If handleKOs() returns true (entry caused a KO), openKoSwap manages its own restoration.
     const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
     setTimeout(() => {
-      if (!handleKOs()) { B.phase = 'ready'; renderBattle(); resetRollButtons(); }
+      if (!handleKOs()) { B.phase = 'ready'; resetRollButtons(); renderBattle(); }
     }, afterEntry);
   }, 1500);
 }
@@ -4226,7 +4237,7 @@ function pickJacksonDie(idx) {
   const jp = B.jacksonPending;
   if (!jp) return;
   B.jacksonPending = null;
-  const { team, dice, continuation } = jp;
+  const { team, continuation } = jp;
   const t = B[team];
   const f = active(t);
   document.getElementById('jacksonOverlay').classList.remove('active');
@@ -4237,20 +4248,25 @@ function pickJacksonDie(idx) {
   f.hp -= 1;
   B.jacksonUsedThisRound[team] = true;
 
-  // Reroll chosen die — random 1-6
-  const oldVal = dice[idx];
+  // Mutate the preRoll dice array IN-PLACE so postRollDone's closure sees the change.
+  // (Same pattern as Sonya v284 / Jeanie v285 / Dark Wing v285)
+  // Creating a new array via [...B.redDice] does NOT work: postRollDone() closes over
+  // B.preRoll.*.dice by reference, so its B.pendingResolve = { redDice, blueDice }
+  // would silently overwrite Jackson's rerolled die before resolveRound ever sees it.
+  const preRollDice = team === 'red' ? B.preRoll.red.dice : B.preRoll.blue.dice;
+  const oldVal = preRollDice[idx];
   const newVal = Math.floor(Math.random() * 6) + 1;
-  dice[idx] = newVal;
-  dice.sort((a, b) => a - b);
+  preRollDice[idx] = newVal;
+  preRollDice.sort((a, b) => a - b);
 
-  // Update live dice state
-  if (team === 'red') { B.pendingResolve.redDice = dice; B.redDice = dice; }
-  else               { B.pendingResolve.blueDice = dice; B.blueDice = dice; }
+  // Keep B.redDice/B.blueDice and B.pendingResolve in sync (pendingResolve may not exist yet)
+  if (team === 'red') { B.redDice = preRollDice; if (B.pendingResolve) B.pendingResolve.redDice = preRollDice; }
+  else               { B.blueDice = preRollDice; if (B.pendingResolve) B.pendingResolve.blueDice = preRollDice; }
   renderDice(B.redDice, B.blueDice);
   renderBattle();
 
   showAbilityCallout('REGROW!', 'var(--uncommon)', `${f.name} — die rerolled: ${oldVal} → ${newVal}! (${prevHp} → ${f.hp} HP)`);
-  log(`<span class="log-ability">${f.name}</span> — Regrow! Spent 1 HP, rerolled die: ${oldVal} → ${newVal} (${prevHp} → ${f.hp} HP). New dice: [${dice.join(', ')}]`);
+  log(`<span class="log-ability">${f.name}</span> — Regrow! Spent 1 HP, rerolled die: ${oldVal} → ${newVal} (${prevHp} → ${f.hp} HP). New dice: [${preRollDice.join(', ')}]`);
 
   // Short pause for callout, then continue to moonstone/lucky stones
   setTimeout(() => { continuation(); }, 1200);
@@ -6102,15 +6118,23 @@ function doPreRollSetup() {
   });
 
   // Needle (21) — Big Bro: while on the sideline, if Buttons (ID 8) is the active ghost, +1 die
+  // Negated by Cornelius (45) — Antidote: if the enemy team has Cornelius on their sideline, Big Bro is blocked.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
+    const enemyTeamObjNeedle = team === B.red ? B.blue : B.red;
     if (!f.ko && f.id === 8 && hasSideline(team, 21)) {
-      if (tName === 'red') redCount += 1;
-      else blueCount += 1;
-      const needleGhost = getSidelineGhost(team, 21);
-      preRollCallouts.push(['BIG BRO!', 'var(--common)', `${needleGhost ? needleGhost.name : 'Needle'} (sideline) — ${f.name} is in play! +1 bonus die!`]);
-      log(`<span class="log-ability">Needle</span> (sideline) — Big Bro! ${f.name} is in play → +1 die!`);
+      if (hasSideline(enemyTeamObjNeedle, 45)) {
+        const cornGhostNeedle = getSidelineGhost(enemyTeamObjNeedle, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostNeedle ? cornGhostNeedle.name : 'Cornelius'} (sideline) — blocks Needle's Big Bro on ${f.name}!`]);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Needle Big Bro blocked for ${f.name}.`);
+      } else {
+        if (tName === 'red') redCount += 1;
+        else blueCount += 1;
+        const needleGhost = getSidelineGhost(team, 21);
+        preRollCallouts.push(['BIG BRO!', 'var(--common)', `${needleGhost ? needleGhost.name : 'Needle'} (sideline) — ${f.name} is in play! +1 bonus die!`]);
+        log(`<span class="log-ability">Needle</span> (sideline) — Big Bro! ${f.name} is in play → +1 die!`);
+      }
     }
   });
 
@@ -7142,6 +7166,9 @@ function resolveRound() {
       });
     });
 
+    // Mark both active ghosts as having rolled (so Ambush/Lurk don't fire next round).
+    active(B.red)._rolledOnce = true;
+    active(B.blue)._rolledOnce = true;
     log(`<span class="log-ability">TIE!</span> No damage dealt.`);
     narrate(`Both roll ${describeRoll(rR)} — <b class="gold">a standoff!</b> No damage dealt.`);
     playSfx('sfxSpecial', 0.3);
@@ -7411,7 +7438,7 @@ function resolveRound() {
       }
       narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
-      setTimeout(() => { B.phase = 'ready'; resetRollButtons(); }, 350);
+      setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
     });
     return;
   }
@@ -7445,6 +7472,15 @@ function resolveRound() {
   const wispAnnLose = () => { if (!wispGuideLose) { wispGuideLose = true; const wN = getSidelineGhost(winTeam, 344); queueAbility('GUIDE LIGHT!', 'var(--common)', `${wN ? wN.name : 'Wisp'} (sideline) — ${loseTeam.name} cannot gain resources this round!`); } };
   const wF = active(winTeam);
   const lF = active(loseTeam);
+  // Per-ghost first-roll tracking for Nikon (2) Ambush and Cave Dweller (46) Lurk.
+  // B.round === 1 is WRONG for KO-swap replacements — a ghost brought in round 4 has their
+  // "first roll" in round 4, not round 1. Solution: tag each ghost object with _rolledOnce
+  // (falsy until they've resolved their first roll as either winner or loser). Checked here,
+  // BEFORE being set to true, so the first call into resolveRound correctly captures state.
+  const nikonIsFirstRoll = (wF.id === 2 && !wF._rolledOnce);
+  const caveDwellerIsFirstRoll = (wF.id === 46 && !wF._rolledOnce);
+  wF._rolledOnce = true;
+  lF._rolledOnce = true;
   const wR = winner==='red' ? rR : bR;
   const lR = winner==='red' ? bR : rR;
   const winDice = winner==='red' ? redDice : blueDice;
@@ -7589,9 +7625,10 @@ function resolveRound() {
   }
 
   // Nikon (2) — Ambush: first roll win deals 3X damage
+  // nikonIsFirstRoll is captured above (before _rolledOnce is set) — works for starters AND KO-swap replacements.
   let nikonTriggered = false;
   let nikonBaseDmg = 0;
-  if (wF.id === 2 && !wF.ko && B.round === 1) {
+  if (wF.id === 2 && !wF.ko && nikonIsFirstRoll) {
     nikonBaseDmg = dmg;
     dmg *= 3;
     nikonTriggered = true;
@@ -7600,9 +7637,10 @@ function resolveRound() {
   }
 
   // Cave Dweller (46) — Lurk: first roll win deals 3X damage
+  // caveDwellerIsFirstRoll captured above — correct for starters AND KO-swap replacements.
   let caveDwellerTriggered = false;
   let caveDwellerBaseDmg = 0;
-  if (wF.id === 46 && !wF.ko && B.round === 1) {
+  if (wF.id === 46 && !wF.ko && caveDwellerIsFirstRoll) {
     caveDwellerBaseDmg = dmg;
     dmg *= 3;
     caveDwellerTriggered = true;
@@ -9656,7 +9694,7 @@ function resolveRound() {
               // same breathing-room pattern as the no-KO path (v110/v114 fix).
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); }, 350);
+              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
             }
           }, 1800);
         } else {
@@ -9668,7 +9706,7 @@ function resolveRound() {
               // gives the player a beat to read "Round N — X vs Y" before the game unblocks.
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); }, 350);
+              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
             }
           }, 750);
         }
@@ -9756,7 +9794,7 @@ function openKoSwap() {
     B.koSwapQueue = null;
     renderBattle();
     narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
-    setTimeout(() => { B.phase = 'ready'; resetRollButtons(); }, 350);
+    setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
     return;
   }
   const team = B.koSwapQueue[0];

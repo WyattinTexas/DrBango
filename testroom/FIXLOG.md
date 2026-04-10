@@ -3,7 +3,25 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v284
+## Current Version: v291
+
+## v291 — CRITICAL REGRESSION FIX: Harrison button + resource specials dead mid-game
+
+**Bug:** Mid-game, between rolls, the Harrison Ascend button disappeared and resource specials (Healing Seeds, Surge, Ice Shards, Sacred Fire) became unclickable. Roll buttons still worked.
+
+**Root cause:** The five "restore to ready" round-end paths (tie path ~7441, KO path ~9697, no-KO path ~9709, openKoSwap all-done ~9797) all followed this pattern:
+```js
+renderBattle();                                                              // ← renders while phase is still 'ko-pause'
+setTimeout(() => { B.phase = 'ready'; resetRollButtons(); }, 350);           // ← phase flips 350ms later, NO renderBattle
+```
+Because `renderBattle()` gates the Harrison button on `if (B.phase === 'ready')` and the resource tiles on `const isReady = B.phase === 'ready'`, and because the last renderBattle call happened BEFORE phase flipped, the UI was stuck rendering the Harrison/specials as if we were still mid-round. Roll buttons worked because `resetRollButtons()` manipulates button DOM directly (doesn't depend on renderBattle).
+
+This was introduced by the "narrate first, then enable buttons 350ms later" breathing-room pattern that reordered the phase flip to happen AFTER renderBattle. Adding more pre-roll choice modals (Forge Fire, Pyrope, Patches Quilt, Anvil, Magnolia, Old Mill, etc.) made the bug more visible because players noticed it when trying to commit resources before rolls.
+
+**Fix:** Added trailing `renderBattle();` inside each of the four setTimeout callbacks so the UI re-renders immediately after phase flips to 'ready'. Also reordered the Pressure restore at line ~3512 for consistency. No new features, no ability logic changes, no card data touched.
+
+**Files:** testroom/index.html (5 sites, ~10 lines changed total)
+
 
 ## HARD RULES
 - NEVER unshelve cards or remove IDs from SHELVED_IDS
@@ -63,22 +81,55 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Sonya (69) — Mesmerize: AUDITED FIX (v284) — die change was silently discarded every round. `pickSonyaDie` created a new array via `[...B.redDice]`, modified it, then assigned it to `B.redDice` and `B.pendingResolve.redDice`. But `postRollDone()` (called after Sonya finishes) re-creates `B.pendingResolve = { redDice, blueDice }` using the closure variables from `doPostRollAndResolve`, which are `B.preRoll.red.dice` and `B.preRoll.blue.dice` — the original unmodified arrays. So Sonya's change was always overwritten before `resolveRound()` ever saw it. Fixed: switched to the Dark Wing in-place mutation pattern — use `B.preRoll.red.dice` directly and mutate it in-place; since the closure captures the same array reference, `postRollDone` then creates a `pendingResolve` that already contains the changed die. Added `if (B.pendingResolve)` guard on the `pendingResolve` update (it may not exist yet at Sonya's call time).
 - [x] Katrina (70) — Seeker: AUDITED FIX (v280) — `f.hp += 1` had no maxHp cap; fixed to `Math.min(f.maxHp, f.hp + 1)`. Opponent with more HP than Katrina's max could trigger heal to 6/5 HP. Now capped with `· capped` suffix in callout.
 - [x] Admiral (71) — Comrades: AUDITED FIX (v279)
-- [ ] Sky(72)
+- [x] Sky (72) — Elusive: AUDITED PASS (v285) — `lF.id===72 && dmg>2 && !magmaCoreMelt` → dmg=0; Cameron check; `ELUSIVE!` queued; correct
 - [x] Stone Cold (73) — One-two-one!: AUDITED FIX (v277)
-- [x] Dark Jeff (74) — Cackle: sideline +1 dmg all rolls — NEEDS AUDIT (not formally checked)
-- [ ] Flora(75), Dark Wing(76), City Cyboo(77)
-- [ ] Dark Castle: Haywire(78), Laura(79), Bilbo(80)
-- [ ] Frost Valley: Spockles(81), Antoinette(82), Troubling Haters(83), Wandering Sue(84), Eloise(85), Pelter(86), Zach(87), Pale Nimbus(88), Mallow(89), Jeanie(90), Calvin & Anna(91), Gary(92), Bandit Pete(93)
+- [x] Dark Jeff (74) — Cackle: AUDITED PASS (v281) — sideline +1 dmg, Cornelius check, correct
+- [x] Flora (75) — Restore: AUDITED PASS (v281) — win+lose doubles paths, Filbert curse, maxHp cap, correct
+- [x] Dark Wing (76) — Precision: AUDITED PASS (v285) — post-roll modal, in-place splice, once-per-round, correct
+- [x] City Cyboo (77) — Barrier: AUDITED PASS (v285) — doubles negation, Cameron check, correct
+- [x] Haywire (78) — Wild Chords: AUDITED PASS (v285) — triples→+1 permanent die, win+tie paths, `haywireBonus` applied unconditionally in doPreRollSetup, correct
+- [x] Laura (79) — Catchy Tune: AUDITED PASS (v285) — sideline, all-dice consecutive ascending seq check, Cornelius, collectKC, correct
+- [x] Bilbo (80) — Little Buddy: AUDITED PASS (v285) — sideline singles win +2 dmg, Cornelius, correct
+- [x] Spockles (81) — Valley Magic: AUDITED PASS (v285) — win→+2 ice deferred onShow, Sandwiches mirror, Wisp block, correct
+- [x] Antoinette (82) — Grace: AUDITED PASS (v285) — mirrors opponent count upward only, applied last in doPreRollSetup, correct
+- [x] Troubling Haters (83) — Growing Mob: AUDITED PASS (v285) — win+dmg>=4→+2 HP capped, Filbert flip, Residue guard, correct
+- [x] Wandering Sue (84) — Hidden Weakness: AUDITED PASS (v285) — pre-roll both teams, enemy hp>=12→instant KO, callout queued, correct
+- [x] Eloise (85) — Change of Heart: AUDITED PASS (v286) — pre-roll modal fires when Eloise active + ≥1 Ice Shard; modal preview shows both HP values accurately; YES path spends 1 ice and raw-swaps HP values (no cap by design — "swap HP" means literal exchange); NO path marks used; `eloiseUsedThisRound` resets each round; both round-end reset blocks covered; continuation calls `doTeamRoll` consistent with all other modal patterns. Raw swap is correct: a swap is not a heal, and the design intent is to take the enemy's exact HP value (potentially above Eloise's max for a power play costing an ice shard). Correct.
+- [x] Pelter (86) — Snowball: AUDITED PASS (v285) — doubles win→+2 dmg, collectKC, correct
+- [x] Zach (87) — Craftsman: AUDITED PASS (v285) — sideline+Guard Thomas active+doubles→+3 dmg, Cornelius, correct
+- [x] Pale Nimbus (88) — Hidden Storm: AUDITED PASS (v285) — sideline, winDice sum<7→+2 dmg, Cornelius, correct
+- [x] Mallow (89) — Dozy Cozy: AUDITED FIX (v286) — BUG: YES path used `f.hp += 3` with no maxHp cap — a ghost at maxHp could be healed to 8/5 HP (overflow). Convention: all heals are capped at maxHp. Fixed: changed to `f.hp = Math.min(f.maxHp, f.hp + 3)` with `· capped` suffix in callout/log when cap triggers. Also fixed: modal preview showed `mF.hp + 3` (uncapped) — changed to `Math.min(mF.maxHp, mF.hp + 3)` with italic `· capped` hint when overflow would occur. Filbert curse path (`Math.max(0, f.hp - 3)`) was already correct. `mallowDecided` reset is correct in both round-end blocks. Note: no Cornelius check on modal trigger — this is a secondary gap; Cyboo (100) and other auto-sideline effects have Cornelius blocks, but modal-based sideline abilities (Guardian Fairy, Jeanie) do not — consistency favors leaving it without for now.
+- [x] Jeanie (90) — Hidden Treasure: AUDITED FIX (v285) — BUG: `doJeanieChoice` wrote `B.pendingResolve.redDice/blueDice = newDice` (new array) and `B.redDice = newDice`, but `postRollDone()` runs AFTER Jeanie and creates a fresh `B.pendingResolve = { redDice, blueDice }` using the closure's `B.preRoll.*.dice` references — permanently overwriting Jeanie's assignment. Forced reroll appeared on-screen but `resolveRound()` still used the original pre-reroll dice. Fixed: switched to in-place splice on `B.preRoll.*.dice` (same Dark Wing/Sonya v284 pattern); `B.pendingResolve` guarded with `if (B.pendingResolve)`. Also fixed stale source for `oldDice`: was `team==='red' ? [...B.blueDice]` (using wrong team variable), changed to `oppTeam==='red' ? [...B.preRoll.red.dice]`.
+- [x] Calvin & Anna (91) — Toboggan: AUDITED PASS (v287) — trigger `wF.id===91 && !wF.ko && lF.ko` correct; sideline filter excludes current active and KO'd ghosts; `doTobogganChoice` swaps `winTeam.activeIdx`, fires `triggerEntry` for new ghost, uses `showAbilityCallout` directly (called after drainAbilityQueue completes — correct pattern); NO path calls continuation immediately; modal shown with `B.phase='ko-pause'` to keep roll buttons locked; `B.tobogganPending` continuation closure pattern correct.
+- [x] Gary (92) — Lucky Novice: AUDITED PASS (v285) — sideline, 1s in winDice/loseDice→+1 ice per 1, Cornelius, onShow deferred grant, correct
+- [x] Bandit Pete (93) — Bandit: AUDITED PASS (v285) — sideline, either team 2 dice→+3 dmg, Cornelius, correct
 
 ### Uncommon (28)
-- [ ] Set 1: Grawr(34), Larry(35), Bill & Bob(36), Dealer(37), Alucard(38), Castle Guards(39), Team Zippy(40), Guard Thomas(41), Doc(42), Outlaw(43), Bubble Boys(44), Cornelius(45), Cave Dweller(46), Hermit(47), Opa(48), Greg(49), Jackson(50)
-- [ ] Dark Castle: Nicholas(51), Hugo(52)
+- [x] Grawr (34) — Menace: AUDITED PASS (v287) — entry 1-dmg to enemy active, KO guard, hitDamage SFX, Knight reactions collected, MENACE! entryCallout correct.
+- [x] Larry (35) — Flying Kick: AUDITED PASS (v287) — triples→3X dmg, collectKC, FLYING KICK! queued, correct.
+- [x] Bill & Bob (36) — Bait n Switch: AUDITED PASS (v287) — hp<4→2X dmg, collectKC, correct.
+- [x] Dealer (37) — House Rules: AUDITED PASS (v287) — loseDice sorted+consecutive ascending→dmg=0, magmaCoreMelt guard, HOUSE RULES! queued with die sequence display, correct.
+- [x] Alucard (38) — Colony Call: AUDITED PASS (v287) — doubles+once-per-game (`B.alucardUsed[team]`)+alive sideline count×2 dmg, COLONY CALL! queued, correct.
+- [x] Guard Thomas (41) — Stoic: AUDITED PASS (v287) — lF.id===41+hp<6+singles+dmg>0+!magmaCoreMelt→dmg=0, STOIC! queued, correct.
+- [x] Nikon (2) — Ambush: AUDITED FIX (v287) — was `B.round === 1` (wrong for KO-swap replacements). Fixed to per-ghost `_rolledOnce` flag: `nikonIsFirstRoll = wF.id===2 && !wF._rolledOnce` captured at top of Phase 5 BEFORE `wF._rolledOnce = true` is set. Tie path also marks active ghosts as rolled. Ghost objects persist across rounds; sideline ghosts naturally have `_rolledOnce = undefined` until their first appearance as wF/lF.
+- [x] Cave Dweller (46) — Lurk: AUDITED FIX (v287) — same `B.round === 1` bug as Nikon. Fixed with `caveDwellerIsFirstRoll = wF.id===46 && !wF._rolledOnce` pattern. Same per-ghost `_rolledOnce` tracking fix as Nikon.
+- [x] Castle Guards (39) — Flamethrower: AUDITED PASS (v288) — `wF.id===39 + winDice.filter(d===3).length` → each 3 doubles dmg; `for` loop multiplies by 2 per 3; FLAMETHROWER! queued; correct.
+- [x] Team Zippy (40) — Teamwork: AUDITED PASS (v288) — `wF.id===40 + wR.type==='singles'` → +2 dmg; TEAMWORK! queued; correct. "Single damage" in spec = singles roll type per design note.
+- [x] Doc (42) — Savage: AUDITED PASS (v288) — `wF.id===42 + wR.type==='doubles'` → +5 dmg; SAVAGE! queued; correct.
+- [x] Outlaw (43) — Thief: AUDITED PASS (v288) — doubles in tie path + doubles in win/lose path both set `B.outlawStolenDie[tNameOut]++`; doPreRollSetup consumes and applies -1 to ENEMY die count (direction correct: red Outlaw steals → blueCount decreases); reset on consume; no Cornelius needed (active ghost effect, not sideline); correct.
+- [x] Bubble Boys (44) — Pop: AUDITED PASS (v288) — Case 1 (BB lost, enemy triples → BB KO); Case 2 (BB won but enemy rolled triples → BB KO even in victory); Little Boo Mercy only modifies wR.type (winner's), not lR.type, so no interference; POP! callout + renderBattle onShow; correct.
+- [x] Cornelius (45) — Antidote: AUDITED PASS (v288) — passive; implemented as distributed `hasSideline(enemyTeam, 45)` checks at each sideline effect; covers: Cyboo Spark, Shoo Alpine Air (doPreRollSetup), Tabitha Rally, Admiral Comrades, Dark Jeff Cackle, Bilbo Little Buddy, Pale Nimbus Hidden Storm, Laura Catchy Tune, Bandit Pete Bandit, Zach Craftsman, Gary Lucky Novice (win+lose), Villager Hospitality, Jeffery Chuckle, Ancient One Friend to All (tie path) — all correct. BUG found: Needle (21) Big Bro was missing the Cornelius check — fixed in v288.
+- [x] Hermit (47) — Solitude: AUDITED PASS (v289) — `triggerEntry` counts all KO'd ghosts on both teams; `koCount * 2` HP gain; allows overclock above maxHp by design ("late-game scaling tank"); entryCallouts.push SOLITUDE! callout; no-ghost path shows waiting message; correct.
+- [x] Greg (49) — Chase: AUDITED PASS (v289) — `wF.id===49 && !wF.ko && wF.hp > lF.hp` → `dmg *= 2`; `collectKC`; `queueAbility('CHASE!', ...)` in Phase 7 cinematic section; correct.
+- [x] Jackson (50) — Regrow: AUDITED FIX (v289) — BUG: `pickJacksonDie` stored `dice: [...dice]` (copy) in `B.jacksonPending`, mutated the copy, then assigned `B.pendingResolve.redDice = dice` and `B.redDice = dice`. But `postRollDone()` runs AFTER Jackson and recreates `B.pendingResolve = { redDice, blueDice }` using the closure's `B.preRoll.*.dice` reference — silently overwriting Jackson's rerolled die. Identical to the Sonya (v284) / Jeanie (v285) / Dark Wing (v285) bug. Fixed: switched to in-place mutation on `B.preRoll.*.dice` (same pattern as Sonya/DarkWing). `B.pendingResolve` guarded with `if (B.pendingResolve)`. Log message now uses `preRollDice.join(', ')`. Dropped unused `dice` destructure from `B.jacksonPending`.
+- [x] Nicholas (51) — Sneak Attack: AUDITED FIX (v290) — 2 entry damage to entering ghost, hasSideline check, KO guard all correct. BUG: no Knight reactions after dealing damage. Every other entry ability that deals damage (Grawr, Jenkins, Nerina) calls collectKnightReactions() or equivalent. Fixed: added inline Knight reaction collection using `checkKnightEffects(nicholasTeamName, nicholasGhost.name)` — using Nicholas's team (enemy) as the abilityTeam, so the ENTERING team can counter with Knight Terror (punishes enemy active) or Knight Light (gains +1 die). Using entryTeamName would be backwards (would let enemy double-punish the entering ghost).
+- [x] Hugo (52) — Wreckage: AUDITED PASS (v290) — `lF.id===52 && dmg>0` trigger correct; flag stored on winTeamName (attacker); doPreRollSetup consumes and reduces attacker's die count; callout queued; `collectKC(loseTeamName, lF.name)` Knight reactions correct; reset on consume; fires on KO blow by design ("attacking Hugo costs you a die even in the kill round"). Correct.
 - [ ] Frost Valley: Bogey(53), Roger(54), Masked Hero(55), Chad(56), Marcus(57), Ashley(58), Mr Filbert(59), Dallas(60), Suspicious Jeff(61)
   All: NEEDS AUDIT
 
 ### Common (33)
 - [x] Kodako (1) — Swift: AUDITED PASS (v280) — 1-2-3 win→exactly 4 dmg, 1-2-3 lose→negate+4 back, both correct
-- [x] Nikon (2) — Ambush: AUDITED PASS (v277)
+- [x] Nikon (2) — Ambush: AUDITED FIX (v287) — was `B.round === 1`; corrected to per-ghost `_rolledOnce` flag; see v287 entry for full details.
 - [ ] Ancient Librarian (3) — Knowledge: NEEDS AUDIT
 - [ ] Wanderer (4) — NEEDS ARCHITECTURE (hidden sideline info)
 - [x] Puff (5) — Cute: AUDITED PASS (v280) — doubles/triples -1 dmg, quads/penta excluded per spec, correct
@@ -96,7 +147,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Charlie (18) — Rush: AUDITED PASS (v280) — double 2s → exactly 7 dmg, correct
 - [x] Scallywags (19) — Frenzy: AUDITED PASS (v280) — all-under-4 dice → +1 die next round, fires win/lose/tie
 - [x] Floop (20) — Muck: AUDITED PASS (v280) — enemy doubles → -1 die next round, fires win/lose/tie
-- [x] Needle (21) — Big Bro: AUDITED PASS (v280) — sideline +1 die when Buttons active, correct
+- [x] Needle (21) — Big Bro: AUDITED FIX (v288) — re-audited: sideline +1 die when Buttons active was correct but MISSING Cornelius block. Every other doPreRollSetup sideline effect (Cyboo Spark, Shoo Alpine Air) has `hasSideline(enemyTeamObj, 45)` Cornelius guard, but Needle had none. Fixed: added Cornelius check inside the `hasSideline(team, 21)` branch; if enemy has Cornelius, shows ANTIDOTE! pre-roll callout and skips the die bonus; else fires BIG BRO! as before.
 - [ ] Ancient One (22) — NEEDS AUDIT
 - [ ] Powder (23), Simon (24), Cameron (25) — NEEDS AUDIT
 - [ ] Logey (26) — Heinous: NEEDS AUDIT
@@ -138,6 +189,16 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v290** — AUDITED FIX Nicholas (51) Sneak Attack — missing Knight reactions after entry damage. Nicholas is on the ENEMY sideline, so Knight reactions should fire from the ENTERING team's perspective (entering team has Knight Terror → punishes enemy active; entering team has Knight Light → entering team gains +1 die). Previous code had no Knight reaction call at all. Fixed: inline temp-queue pattern calling `checkKnightEffects(nicholasTeamName, nicholasGhost.name)` where `nicholasTeamName = enteringTeamName === 'red' ? 'blue' : 'red'`. AUDITED PASS Hugo (52) Wreckage — trigger, flag storage, doPreRollSetup consumption, cinematic callout, collectKC, and reset all correct.
+
+- **v288** — AUDITED FIX Needle (21) Big Bro — missing Cornelius block. Every other doPreRollSetup sideline effect (Cyboo Spark, Shoo Alpine Air) has `hasSideline(enemyTeamObj, 45)` guard so that Cornelius on the enemy sideline negates the die bonus. Needle had no such check — the +1 die for Buttons always fired even when the enemy had Cornelius on their sideline. Fixed by adding the Cornelius guard inside the `hasSideline(team, 21)` branch: if `hasSideline(enemyTeamObjNeedle, 45)`, push ANTIDOTE! pre-roll callout and skip the die bonus; else fire BIG BRO! as before. Batch PASS audits: Castle Guards (39) Flamethrower — each 3 in winDice doubles dmg, for-loop multiplies, callout queued, correct; Team Zippy (40) Teamwork — singles win +2, callout queued, correct; Doc (42) Savage — doubles win +5, callout queued, correct; Outlaw (43) Thief — doubles in tie+win/lose paths both set stolenDie flag, doPreRollSetup applies to ENEMY die count (direction correct), reset on consume, no Cornelius needed (active ghost), correct; Bubble Boys (44) Pop — Case 1 (BB lost enemy triples) + Case 2 (BB won enemy triples) both covered, Little Boo Mercy no interference (different roll refs), callout+renderBattle correct; Cornelius (45) Antidote — passive, distributed checks at all 14+ sideline effects, all correct except Needle bug fixed this cycle.
+
+- **v287** — AUDITED FIX Nikon (2) Ambush + Cave Dweller (46) Lurk — both used `B.round === 1` as their "first roll" trigger, which is wrong for KO-swap replacements (a ghost brought in at round 4 has their first roll in round 4, not round 1). Fixed by adding a per-ghost `_rolledOnce` flag on each ghost object: `wF._rolledOnce = true; lF._rolledOnce = true;` is set at the TOP of Phase 5 in resolveRound, and both ties (via the tie path) also mark both active ghosts as having rolled. The checks `nikonIsFirstRoll` and `caveDwellerIsFirstRoll` are captured BEFORE the flag is set, so the first call into resolveRound correctly identifies the first-roll state. Since ghost objects persist across rounds, `_rolledOnce` starts as `undefined` (falsy) for each ghost and stays `true` thereafter — naturally correct when a ghost is KO-swapped in (they have their own object that hasn't rolled yet). Batch PASS audits: Calvin & Anna (91) Toboggan — trigger correct (`wF.id===91 && lF.ko`), swap to sideline correct, `triggerEntry` fires for new ghost, `showAbilityCallout` after queue drains is correct pattern; Grawr (34) Menace — entry 1-dmg, KO guard, hitDamage SFX, Knight reactions, all correct; Larry (35) Flying Kick — triples→3X correct; Bill & Bob (36) Bait n Switch — hp<4→2X correct; Dealer (37) House Rules — loseDice consecutive ascending → dmg=0, magmaCoreMelt guard, HOUSE RULES! queued correct; Alucard (38) Colony Call — doubles+once-per-game+sideline count×2 correct; Guard Thomas (41) Stoic — hp<6+singles+magmaCoreMelt guard correct.
+
+- **v286** — AUDITED PASS Eloise (85) Change of Heart — flow, timing, and modal correct; raw HP swap (no maxHp cap) is intentional for the "swap" mechanic. AUDITED FIX Mallow (89) Dozy Cozy — YES path used `f.hp += 3` with no maxHp cap: a ghost already at max HP would overflow to 8/5. Fixed to `Math.min(f.maxHp, f.hp + 3)` with `· capped` note in callout/log. Also fixed the modal preview to show `Math.min(mF.maxHp, mF.hp + 3)` with italic `· capped` hint when overflow would occur.
+
+- **v285** — AUDITED FIX Jeanie (90) Hidden Treasure — forced reroll was silently discarded. `doJeanieChoice` (YES path) rolled new dice, wrote them to `B.pendingResolve.redDice/blueDice = newDice` and `B.redDice/blueDice = newDice`. The screen updated correctly (player could see the new dice), but `resolveRound()` used the original dice anyway. Why: Jeanie fires before `postRollDone()` runs; `postRollDone()` creates a brand-new `B.pendingResolve = { redDice, blueDice }` using the closure variables from `doPostRollAndResolve` — which are the `B.preRoll.red.dice` and `B.preRoll.blue.dice` references. Since Jeanie never updated those arrays, the new `pendingResolve` silently overwrote Jeanie's assignment with the original dice. Fixed: switched to in-place `.splice()` on `B.preRoll.*.dice` (the opponent's array) so the closure reference already has the new values when `postRollDone()` runs — exact same Dark Wing / Sonya v284 pattern. Also fixed: `oldDice` was sourced with `team==='red' ? [...B.blueDice]` (using the WRONG team variable as discriminant); changed to `oppTeam==='red' ? [...B.preRoll.red.dice]`. Also added `if (B.pendingResolve)` guard on the redundant pendingResolve update. Batch PASS audits this cycle: Sky (72) Elusive, Flora (75) Restore, Dark Wing (76) Precision, City Cyboo (77) Barrier, Haywire (78) Wild Chords, Laura (79) Catchy Tune, Bilbo (80) Little Buddy, Spockles (81) Valley Magic, Antoinette (82) Grace, Troubling Haters (83) Growing Mob, Wandering Sue (84) Hidden Weakness, Pelter (86) Snowball, Zach (87) Craftsman, Pale Nimbus (88) Hidden Storm, Gary (92) Lucky Novice, Bandit Pete (93) Bandit — all correct.
 
 - **v284** — AUDITED FIX Sonya (69) Mesmerize — die change was silently discarded. `pickSonyaDie` spread `[...B.redDice]` into a new array, modified it, then wrote the new reference to `B.pendingResolve.redDice` and `B.redDice`. But `postRollDone()` runs AFTER Sonya resolves and re-creates `B.pendingResolve = { redDice, blueDice }` from the `doPostRollAndResolve` closure variables — which are `B.preRoll.red.dice` and `B.preRoll.blue.dice`, the original unmodified arrays. So Sonya's change was always overwritten before `resolveRound()` touched the dice. Fixed by adopting the Dark Wing in-place mutation pattern: use `B.preRoll.red.dice` directly and mutate it in-place so the closure sees the change. Added a `if (B.pendingResolve)` guard on the redundant `pendingResolve` update (it doesn't exist yet at Sonya's call time anyway). Sonya (69) is now marked AUDITED FIX.
 
