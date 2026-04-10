@@ -857,6 +857,20 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 .standings-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:250; overflow-y:auto; }
 .standings-overlay.active { display:block; }
 .standings-box { max-width:900px; margin:30px auto; padding:24px; }
+.standings-set-filters { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:10px 0 14px; margin-bottom:6px; border-bottom:1px solid var(--border); }
+.standings-set-filters .ssf-label { font-size:11px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-right:6px; }
+.standings-set-filters .ssf-btn {
+  padding:4px 10px; border:1.5px solid var(--border); border-radius:6px;
+  background:var(--surface); color:var(--text2); font-size:10px; font-weight:700;
+  cursor:pointer; transition:all .15s; text-transform:uppercase; letter-spacing:0.5px;
+}
+.standings-set-filters .ssf-btn:hover { border-color:var(--text); color:var(--text); }
+.standings-set-filters .ssf-btn.active { color:white; }
+.standings-set-filters .ssf-btn.active[data-set="va"] { background:var(--magma); border-color:var(--magma); }
+.standings-set-filters .ssf-btn.active[data-set="rh"] { background:var(--uncommon); border-color:var(--uncommon); }
+.standings-set-filters .ssf-btn.active[data-set="s1"] { background:#c084fc; border-color:#c084fc; }
+.standings-set-filters .ssf-btn.active[data-set="dc"] { background:#f87171; border-color:#f87171; }
+.standings-set-filters .ssf-btn.active[data-set="fv"] { background:#67e8f9; border-color:#67e8f9; color:#0a0a0f; }
 .standings-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
 .standings-header h2 {
   font-size:24px; font-weight:900; letter-spacing:1px;
@@ -1205,6 +1219,14 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
         <button class="standings-close" onclick="resetStandings()" style="color:var(--accent);border-color:var(--accent);">Reset All</button>
         <button class="standings-close" onclick="closeStandings()">Close</button>
       </div>
+    </div>
+    <div class="standings-set-filters">
+      <span class="ssf-label">Sets:</span>
+      <button class="ssf-btn active" data-set="va" onclick="toggleStandingsSet('Volcanic Activity', this)">Volcanic Activity</button>
+      <button class="ssf-btn active" data-set="rh" onclick="toggleStandingsSet('Rolling Hills', this)">Rolling Hills</button>
+      <button class="ssf-btn active" data-set="s1" onclick="toggleStandingsSet('Set 1', this)">Base Set</button>
+      <button class="ssf-btn active" data-set="dc" onclick="toggleStandingsSet('Dark Castle', this)">Dark Castle</button>
+      <button class="ssf-btn active" data-set="fv" onclick="toggleStandingsSet('Frost Valley', this)">Frost Valley</button>
     </div>
     <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th><th class="stat-col st-sortable" title="KOs per Game" onclick="sortStandings('kopg')">KO/G</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
@@ -1608,7 +1630,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v279';
+const TESTROOM_VERSION = 'v280';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2084,6 +2106,19 @@ function recordKill(ghostId) {
   saveStandingsToFirebase();
 }
 
+let standingsVisibleSets = new Set(['Volcanic Activity','Rolling Hills','Set 1','Dark Castle','Frost Valley']); // all on by default
+
+function toggleStandingsSet(setName, btn) {
+  if (standingsVisibleSets.has(setName)) {
+    standingsVisibleSets.delete(setName);
+    btn.classList.remove('active');
+  } else {
+    standingsVisibleSets.add(setName);
+    btn.classList.add('active');
+  }
+  renderStandingsTable();
+}
+
 let standingsSortCol = 'pct'; // default sort
 
 function sortStandings(col) {
@@ -2098,7 +2133,10 @@ function sortStandings(col) {
 
 function renderStandingsTable() {
   const body = document.getElementById('standingsBody');
-  const ghosts = GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => {
+  const ghosts = GHOSTS
+    .filter(g => !SHELVED_IDS.has(g.id))
+    .filter(g => standingsVisibleSets.has(g.set))
+    .map(g => {
     const s = standings[g.id] || { wins:0, losses:0, kos:0, kills:0 };
     const total = s.wins + s.losses;
     const pct = total > 0 ? (s.wins / total) : 0;
@@ -2129,7 +2167,12 @@ function renderStandingsTable() {
     return b.pct - a.pct || b.w - a.w || a.l - b.l || a.name.localeCompare(b.name);
   });
 
-  // Find leader stats for GB calc (always by PCT regardless of sort)
+  if (ghosts.length === 0) {
+    body.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text2);font-size:14px;">No sets selected — toggle a set above to see standings.</td></tr>';
+    return;
+  }
+
+  // Find leader stats for GB calc (always by PCT regardless of sort) — uses filtered pool
   const byPct = [...ghosts].sort((a, b) => b.pct - a.pct || b.w - a.w || a.l - b.l);
   const leader = byPct[0];
 
