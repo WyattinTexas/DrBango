@@ -1630,7 +1630,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v291';
+const TESTROOM_VERSION = 'v294';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3776,11 +3776,11 @@ function doMallowChoice(choice) {
         `Mr Filbert — Dozy Cozy cursed! ${f.name} takes 3 damage! (${hpBefore} → ${f.hp} HP)`);
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Dozy Cozy flipped to damage. ${f.name} ${hpBefore} → ${f.hp} HP.`);
     } else {
-      f.hp = Math.min(f.maxHp, f.hp + 3);
-      const cappedMallow = f.hp === f.maxHp && hpBefore + 3 > f.maxHp;
+      f.hp += 3;
+      const overMallow = f.hp > f.maxHp;
       showAbilityCallout('DOZY COZY!', 'var(--rare)',
-        `${mallowName} — spent 1 🔥 Sacred Fire! ${f.name} +3 HP (${hpBefore} → ${f.hp}${cappedMallow ? ' · capped' : ''})!`);
-      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${cappedMallow ? ' · capped' : ''}).`);
+        `${mallowName} — spent 1 🔥 Sacred Fire! ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''})!`);
+      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}).`);
     }
     renderBattle();
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
@@ -3985,9 +3985,10 @@ function doBooChoice(choice) {
       showAbilityCallout('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Teamwork cursed! ${f.name} takes 1 damage! (${prevHp} → ${f.hp} HP)`);
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Teamwork flipped to damage. ${f.name} ${prevHp} → ${f.hp} HP.`);
     } else {
-      f.hp = Math.min(f.maxHp, f.hp + 1);
-      showAbilityCallout('TEAMWORK!', 'var(--common)', `${f.name} — trade 1 die for +1 HP! (${prevCount} → ${B.preRoll[team].count} dice | ${prevHp} → ${f.hp} HP)`);
-      log(`<span class="log-ability">${f.name}</span> — Teamwork! Traded 1 die for +1 HP (${prevCount} → ${B.preRoll[team].count} dice, ${prevHp} → ${f.hp} HP).`);
+      f.hp += 1;
+      const overTeam = f.hp > f.maxHp;
+      showAbilityCallout('TEAMWORK!', 'var(--common)', `${f.name} — trade 1 die for +1 HP! (${prevCount} → ${B.preRoll[team].count} dice | ${prevHp} → ${f.hp} HP${overTeam ? ' · overclocked!' : ''})`);
+      log(`<span class="log-ability">${f.name}</span> — Teamwork! Traded 1 die for +1 HP (${prevCount} → ${B.preRoll[team].count} dice, ${prevHp} → ${f.hp} HP${overTeam ? ' · overclocked!' : ''}).`);
     }
     renderBattle();
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
@@ -5026,11 +5027,11 @@ function rollReady(team) {
       const mallowDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
       setTimeout(() => {
         const mF = active(B[team]);
-        const mallowHpAfter = mF ? Math.min(mF.maxHp, mF.hp + 3) : '?';
-        const mallowCapped = mF && (mF.hp + 3 > mF.maxHp) ? ' <i>· capped</i>' : '';
+        const mallowHpAfter = mF ? mF.hp + 3 : '?';
+        const mallowOver = mF && (mF.hp + 3 > mF.maxHp) ? ' <i>· overclocks!</i>' : '';
         document.getElementById('mallowSub').innerHTML =
           `Spend 1 🔥 Sacred Fire to give <b>${mF ? mF.name : 'your ghost'}</b> +3 HP?<br>` +
-          `(${mF ? mF.hp : '?'} HP → ${mallowHpAfter} HP${mallowCapped} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
+          `(${mF ? mF.hp : '?'} HP → ${mallowHpAfter} HP${mallowOver} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
         document.getElementById('mallowOverlay').classList.add('active');
       }, mallowDelay);
       return;
@@ -5041,7 +5042,7 @@ function rollReady(team) {
     {
       const booG = active(B[team]);
       if (booG && booG.id === 17 && !booG.ko && B.preRoll && B.preRoll[team] &&
-          B.preRoll[team].count >= 2 && booG.hp < booG.maxHp) {
+          B.preRoll[team].count >= 2) {
         btn.classList.add('locked');
         btn.disabled = true;
         B.booPending = { team, btn };
@@ -5051,7 +5052,7 @@ function rollReady(team) {
           document.getElementById('booSub').innerHTML =
             `Remove 1 die to gain +1 HP?<br>` +
             `<b>${B.preRoll[team].count}</b> dice → <b>${B.preRoll[team].count - 1}</b> dice` +
-            `&nbsp;|&nbsp;<b>${bF.hp}</b> HP → <b>${Math.min(bF.maxHp, bF.hp + 1)}</b> HP`;
+            `&nbsp;|&nbsp;<b>${bF.hp}</b> HP → <b>${bF.hp + 1}</b> HP${bF.hp + 1 > bF.maxHp ? ' <i>· overclocks!</i>' : ''}`;
           document.getElementById('booOverlay').classList.add('active');
         }, booDelay);
         return;
@@ -5475,6 +5476,7 @@ function doPreRollSetup() {
 
   // Shade's Shadow (205) — sideline: deal 1 dmg before each roll IF enemy active < 4 HP (negated by Dylan)
   [B.red, B.blue].forEach(team => {
+    const f = active(team);
     const enemy = opp(team);
     const tNameShade = team === B.red ? 'red' : 'blue';
     if (hasSideline(team, 205) && !dylanNegates(enemy)) {
@@ -6109,9 +6111,10 @@ function doPreRollSetup() {
           preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Alpine Air cursed! ${f.name} takes 2 damage! (${shooHpBefore}→${f.hp} HP)`]);
           log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Alpine Air flipped to damage. ${f.name} ${shooHpBefore} → ${f.hp} HP.`);
         } else {
-          f.hp = Math.min(f.maxHp, f.hp + 2);
-          preRollCallouts.push(['ALPINE AIR!', 'var(--common)', `${shooGhost ? shooGhost.name : 'Shoo'} (sideline) — ${f.name} below 4 HP! +2 HP! (${shooHpBefore}→${f.hp}/${f.maxHp})`]);
-          log(`<span class="log-ability">Shoo</span> (sideline) — Alpine Air! ${f.name} at ${shooHpBefore} HP → +2 HP (${f.hp}/${f.maxHp}). Used!`);
+          f.hp += 2;
+          const overShoo = f.hp > f.maxHp;
+          preRollCallouts.push(['ALPINE AIR!', 'var(--common)', `${shooGhost ? shooGhost.name : 'Shoo'} (sideline) — ${f.name} below 4 HP! +2 HP! (${shooHpBefore}→${f.hp}/${f.maxHp}${overShoo ? ' · overclocked!' : ''})`]);
+          log(`<span class="log-ability">Shoo</span> (sideline) — Alpine Air! ${f.name} at ${shooHpBefore} HP → +2 HP (${f.hp}/${f.maxHp}${overShoo ? ' overclocked!' : ''}). Used!`);
         }
       }
     }
@@ -6245,11 +6248,10 @@ function doPreRollSetup() {
           preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Seeker cursed! ${f.name} takes 1 damage! (${seekerHpBefore}→${f.hp} HP)`]);
           log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Seeker flipped to damage. ${f.name} ${seekerHpBefore} → ${f.hp} HP.`);
         } else {
-          const seekerNewHp = Math.min(f.maxHp, f.hp + 1);
-          const seekerCapped = seekerNewHp === f.hp; // true if already at maxHp (shouldn't happen but guard)
-          f.hp = seekerNewHp;
-          preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp}${seekerCapped ? ' · capped' : ''})`]);
-          log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp}${seekerCapped ? ' capped' : ''})`);
+          f.hp += 1;
+          const seekerOver = f.hp > f.maxHp;
+          preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp}${seekerOver ? ' · overclocked!' : ''})`]);
+          log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp}${seekerOver ? ' overclocked!' : ''})`);
         }
       }
     }
@@ -6289,17 +6291,27 @@ function doPreRollSetup() {
   });
 
   // Suspicious Jeff (61) — Snicker: sideline die-theft from last round's win (stacks with Outlaw)
+  // Cornelius (45) Antidote blocks the die theft if on the enemy's sideline.
   [B.red, B.blue].forEach(team => {
     const tName = team === B.red ? 'red' : 'blue';
     if (B.jeffSnicker && B.jeffSnicker[tName] > 0) {
       const enemyTName = tName === 'red' ? 'blue' : 'red';
-      if (enemyTName === 'red') redCount = Math.max(1, redCount - B.jeffSnicker[tName]);
-      else blueCount = Math.max(1, blueCount - B.jeffSnicker[tName]);
-      const jeffF = getSidelineGhost(team, 61);
-      const enemyF = active(enemyTName === 'red' ? B.red : B.blue);
-      const jeffName = jeffF ? jeffF.name : 'Suspicious Jeff';
-      preRollCallouts.push(['SNICKER!', 'var(--uncommon)', `${jeffName} (sideline) — Win stole 1 die from ${enemyF ? enemyF.name : 'opponent'}! They roll 1 fewer die!`]);
-      log(`<span class="log-ability">${jeffName}</span> — Snicker! ${enemyF ? enemyF.name : 'Opponent'} rolls 1 fewer die this round!`);
+      const enemyTeamObj = enemyTName === 'red' ? B.red : B.blue;
+      const cornBlocksJeff = hasSideline(enemyTeamObj, 45);
+      if (cornBlocksJeff) {
+        const cornF = getSidelineGhost(enemyTeamObj, 45);
+        const cornName = cornF ? cornF.name : 'Cornelius';
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornName} neutralizes Suspicious Jeff's Snicker — die theft blocked!`]);
+        log(`<span class="log-ability">Cornelius</span> — Antidote! Suspicious Jeff's Snicker die theft blocked!`);
+      } else {
+        if (enemyTName === 'red') redCount = Math.max(1, redCount - B.jeffSnicker[tName]);
+        else blueCount = Math.max(1, blueCount - B.jeffSnicker[tName]);
+        const jeffF = getSidelineGhost(team, 61);
+        const enemyF = active(enemyTeamObj);
+        const jeffName = jeffF ? jeffF.name : 'Suspicious Jeff';
+        preRollCallouts.push(['SNICKER!', 'var(--uncommon)', `${jeffName} (sideline) — Win stole 1 die from ${enemyF ? enemyF.name : 'opponent'}! They roll 1 fewer die!`]);
+        log(`<span class="log-ability">${jeffName}</span> — Snicker! ${enemyF ? enemyF.name : 'Opponent'} rolls 1 fewer die this round!`);
+      }
       B.jeffSnicker[tName] = 0;
     }
   });
@@ -7281,6 +7293,20 @@ function resolveRound() {
       }
     });
 
+    // Dream Cat (28) — Jinx: tie where BOTH teams rolled doubles → +1 die next round
+    // In a tie rR.type === bR.type, so rR.type === 'doubles' means both had doubles.
+    if (rR.type === 'doubles') {
+      [B.red, B.blue].forEach(team => {
+        const f = active(team);
+        if (f.id === 28 && !f.ko) {
+          const tNameDC = team === B.red ? 'red' : 'blue';
+          B.dreamCatBonus[tNameDC] = (B.dreamCatBonus[tNameDC] || 0) + 1;
+          queueAbility('JINX!', 'var(--common)', `${f.name} — Both teams rolled doubles on a tie! +1 die next round!`);
+          log(`<span class="log-ability">${f.name}</span> — Jinx! Both rolled doubles (tie) → +1 die next round.`);
+        }
+      });
+    }
+
     // Opa (48) — Rest: tie → gain +1 HP (capped at maxHp)
     // Mr Filbert (59) — Mask Merchant: flips heal to -1 damage when on enemy sideline.
     [B.red, B.blue].forEach(team => {
@@ -7297,9 +7323,10 @@ function resolveRound() {
           queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Rest cursed! ${f.name} takes 1 damage! (${f.hp}→${opaFlippedTie} HP)`, () => { f.hp = opaFlippedTie; if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; } renderBattle(); });
           log(`<span class="log-ability">${f.name}</span> — Rest! Mr Filbert curses → -1 HP (${opaFlippedTie} HP).`);
         } else {
-          const opaNewHpTie = Math.min(f.maxHp, f.hp + 1);
-          queueAbility('REST!', 'var(--uncommon)', `${f.name} — Tie! +1 HP! (${f.hp}→${opaNewHpTie} HP)`, () => { f.hp = opaNewHpTie; renderBattle(); });
-          log(`<span class="log-ability">${f.name}</span> — Rest! Tie → +1 HP (${opaNewHpTie} HP).`);
+          const opaNewHpTie = f.hp + 1;
+          const opaOverTie = opaNewHpTie > f.maxHp;
+          queueAbility('REST!', 'var(--uncommon)', `${f.name} — Tie! +1 HP! (${f.hp}→${opaNewHpTie} HP${opaOverTie ? ' · overclocked!' : ''})`, () => { f.hp = opaNewHpTie; renderBattle(); });
+          log(`<span class="log-ability">${f.name}</span> — Rest! Tie → +1 HP (${opaNewHpTie} HP${opaOverTie ? ' overclocked!' : ''}).`);
         }
       }
     });
@@ -7325,9 +7352,10 @@ function resolveRound() {
         queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Friend to All cursed! ${f.name} takes 3 damage! (${f.hp}→${aoFlipped} HP)`, () => { f.hp = aoFlipped; if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; } renderBattle(); });
         log(`<span class="log-ability">${f.name}</span> — Friend to All! Mr Filbert curses → -3 HP (${aoFlipped} HP).`);
       } else {
-        const aoNewHp = Math.min(f.maxHp, f.hp + 3);
-        queueAbility('FRIEND TO ALL!', 'var(--common)', `Ancient One — Tie! ${f.name} gains +3 HP! (${f.hp}→${aoNewHp} HP)`, () => { f.hp = aoNewHp; renderBattle(); });
-        log(`<span class="log-ability">${f.name}</span> — Friend to All! Tie → +3 HP (${aoNewHp} HP).`);
+        const aoNewHp = f.hp + 3;
+        const aoOver = aoNewHp > f.maxHp;
+        queueAbility('FRIEND TO ALL!', 'var(--common)', `Ancient One — Tie! ${f.name} gains +3 HP! (${f.hp}→${aoNewHp} HP${aoOver ? ' · overclocked!' : ''})`, () => { f.hp = aoNewHp; renderBattle(); });
+        log(`<span class="log-ability">${f.name}</span> — Friend to All! Tie → +3 HP (${aoNewHp} HP${aoOver ? ' overclocked!' : ''}).`);
       }
     });
 
@@ -8548,10 +8576,10 @@ function resolveRound() {
       collectKC(winTeamName, wF.name);
       log(`<span class="log-ability">${wF.name}</span> — Restore! Mr Filbert curses it → -2 HP! (${flBefore} → ${wF.hp})`);
     } else {
-      wF.hp = Math.min(wF.maxHp, wF.hp + 2);
+      wF.hp += 2;
       floraRestoredHp = wF.hp; floraRestoredName = wF.name; floraRestored = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Restore! Doubles win → +2 HP! (${flBefore} → ${wF.hp}/${wF.maxHp})`);
+      log(`<span class="log-ability">${wF.name}</span> — Restore! Doubles win → +2 HP! (${flBefore} → ${wF.hp}/${wF.maxHp}${wF.hp > wF.maxHp ? ' overclocked!' : ''})`);
     }
   }
   if (lF.id === 75 && !lF.ko && lR.type === 'doubles') {
@@ -8563,10 +8591,10 @@ function resolveRound() {
       collectKC(loseTeamName, lF.name);
       log(`<span class="log-ability">${lF.name}</span> — Restore! Mr Filbert curses it → -2 HP! (${flBefore} → ${lF.hp})`);
     } else {
-      lF.hp = Math.min(lF.maxHp, lF.hp + 2);
+      lF.hp += 2;
       floraRestoredHp = lF.hp; floraRestoredName = lF.name; floraRestored = true;
       collectKC(loseTeamName, lF.name);
-      log(`<span class="log-ability">${lF.name}</span> — Restore! Rolled doubles → +2 HP even in defeat! (${flBefore} → ${lF.hp}/${lF.maxHp})`);
+      log(`<span class="log-ability">${lF.name}</span> — Restore! Rolled doubles → +2 HP even in defeat! (${flBefore} → ${lF.hp}/${lF.maxHp}${lF.hp > lF.maxHp ? ' overclocked!' : ''})`);
     }
   }
 
@@ -8622,10 +8650,10 @@ function resolveRound() {
       collectKC(winTeamName, wF.name);
       log(`<span class="log-ability">${wF.name}</span> — Growing Mob! Mr Filbert curses it → -2 HP! (${gmBefore} → ${wF.hp})`);
     } else {
-      wF.hp = Math.min(wF.maxHp, wF.hp + 2);
+      wF.hp += 2;
       growingMobHpAfter = wF.hp; growingMobTriggered = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Growing Mob! Dealt ${dmg} damage → +2 HP! (${gmBefore} → ${wF.hp}/${wF.maxHp})`);
+      log(`<span class="log-ability">${wF.name}</span> — Growing Mob! Dealt ${dmg} damage → +2 HP! (${gmBefore} → ${wF.hp}/${wF.maxHp}${wF.hp > wF.maxHp ? ' overclocked!' : ''})`);
     }
   }
 
@@ -8644,10 +8672,10 @@ function resolveRound() {
       collectKC(winTeamName, wF.name);
       log(`<span class="log-ability">${wF.name}</span> — Scraps! Mr Filbert curses it → -4 HP! (${munchHpBefore} → ${munchHpAfter})`);
     } else {
-      wF.hp = Math.min(wF.maxHp, wF.hp + 4);
+      wF.hp += 4;
       munchHpAfter = wF.hp; munchScrapTriggered = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Scraps! ${lF.name} defeated → +4 HP! (${munchHpBefore} → ${munchHpAfter}/${wF.maxHp})`);
+      log(`<span class="log-ability">${wF.name}</span> — Scraps! ${lF.name} defeated → +4 HP! (${munchHpBefore} → ${munchHpAfter}/${wF.maxHp}${munchHpAfter > wF.maxHp ? ' overclocked!' : ''})`);
     }
   }
 
@@ -8936,14 +8964,15 @@ function resolveRound() {
   if (louBrosTriggered) {
     // HP heal deferred so the tile updates exactly as the BROS! splash fires — same pattern as Opa Rest / Calvin Overclock
     const louHpBefore = wF.hp;
-    const louHpAfter = Math.min(wF.maxHp, wF.hp + 1);
+    const louHpAfter = wF.hp + 1;
+    const louOver = louHpAfter > wF.maxHp;
     if (filbertCursesWin) {
       const louFlipped = Math.max(0, wF.hp - 1);
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Bros heal cursed! ${wF.name} takes 1 damage instead! (${wF.hp}→${louFlipped} HP)`, () => { wF.hp = louFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
       log(`<span class="log-ability">Lou</span> (sideline) — Bros heal cursed by Mr Filbert! ${wF.name} loses 1 HP.`);
     } else {
-      queueAbility('BROS!', 'var(--common)', `Lou (sideline) — ${wF.name} wins! ${louBrosBaseDmg} + 1 = ${dmg} damage! +1 HP! (${louHpBefore}→${louHpAfter} HP)`, () => { wF.hp = louHpAfter; renderBattle(); });
-      log(`<span class="log-ability">Lou</span> (sideline) — Bros! Grawr wins → +1 HP (${louHpBefore}→${louHpAfter}).`);
+      queueAbility('BROS!', 'var(--common)', `Lou (sideline) — ${wF.name} wins! ${louBrosBaseDmg} + 1 = ${dmg} damage! +1 HP! (${louHpBefore}→${louHpAfter} HP${louOver ? ' · overclocked!' : ''})`, () => { wF.hp = louHpAfter; renderBattle(); });
+      log(`<span class="log-ability">Lou</span> (sideline) — Bros! Grawr wins → +1 HP (${louHpBefore}→${louHpAfter}${louOver ? ' overclocked!' : ''}).`);
     }
   }
   if (chipTriggered) {
@@ -9180,9 +9209,10 @@ function resolveRound() {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Rest cursed! ${wF.name} takes 1 damage! (${wF.hp}→${opaFlipped} HP)`, () => { wF.hp = opaFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
       log(`<span class="log-ability">${wF.name}</span> — Rest! Mr Filbert curses → -1 HP (${opaFlipped} HP).`);
     } else {
-      const opaNewHp = Math.min(wF.maxHp, wF.hp + 1);
-      queueAbility('REST!', 'var(--uncommon)', `${wF.name} — Won! +1 HP! (${wF.hp}→${opaNewHp} HP)`, () => { wF.hp = opaNewHp; renderBattle(); });
-      log(`<span class="log-ability">${wF.name}</span> — Rest! Win → +1 HP (${opaNewHp} HP).`);
+      const opaNewHp = wF.hp + 1;
+      const opaOver = opaNewHp > wF.maxHp;
+      queueAbility('REST!', 'var(--uncommon)', `${wF.name} — Won! +1 HP! (${wF.hp}→${opaNewHp} HP${opaOver ? ' · overclocked!' : ''})`, () => { wF.hp = opaNewHp; renderBattle(); });
+      log(`<span class="log-ability">${wF.name}</span> — Rest! Win → +1 HP (${opaNewHp} HP${opaOver ? ' overclocked!' : ''}).`);
     }
   }
   // Villager (11) — Hospitality: sideline passive — active ghost gains +1 HP every winning roll (Filbert-aware, Cornelius-aware).
@@ -9200,9 +9230,10 @@ function resolveRound() {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Hospitality cursed! ${wF.name} takes 1 damage! (${wF.hp}→${villagerFlipped} HP)`, () => { wF.hp = villagerFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
       log(`<span class="log-ability">${wF.name}</span> — Hospitality! Filbert curses → -1 HP (${villagerFlipped} HP).`);
     } else {
-      const villagerNewHp = Math.min(wF.maxHp, wF.hp + 1);
-      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP)`, () => { wF.hp = villagerNewHp; renderBattle(); });
-      log(`<span class="log-ability">${wF.name}</span> — Hospitality! Villager sideline → +1 HP (${villagerNewHp} HP).`);
+      const villagerNewHp = wF.hp + 1;
+      const vilOver = villagerNewHp > wF.maxHp;
+      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP${vilOver ? ' · overclocked!' : ''})`, () => { wF.hp = villagerNewHp; renderBattle(); });
+      log(`<span class="log-ability">${wF.name}</span> — Hospitality! Villager sideline → +1 HP (${villagerNewHp} HP${vilOver ? ' overclocked!' : ''}).`);
     }
   }
   // Jeffery (14) — Chuckle: sideline passive — active ghost gains +3 HP every winning roll (Filbert-aware, Cornelius-aware).
@@ -9220,9 +9251,10 @@ function resolveRound() {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Chuckle cursed! ${wF.name} takes 3 damage! (${wF.hp}→${jeffFlipped} HP)`, () => { wF.hp = jeffFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
       log(`<span class="log-ability">${wF.name}</span> — Chuckle! Filbert curses → -3 HP (${jeffFlipped} HP).`);
     } else {
-      const jeffNewHp = Math.min(wF.maxHp, wF.hp + 3);
-      queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${wF.name} wins! +3 HP from the sideline! (${wF.hp}→${jeffNewHp} HP)`, () => { wF.hp = jeffNewHp; renderBattle(); });
-      log(`<span class="log-ability">${wF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP).`);
+      const jeffNewHp = wF.hp + 3;
+      const jeffOver = jeffNewHp > wF.maxHp;
+      queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${wF.name} wins! +3 HP from the sideline! (${wF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { wF.hp = jeffNewHp; renderBattle(); });
+      log(`<span class="log-ability">${wF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
     }
   }
   // Biscuit (324) — Warm Up: sideline passive — active ghost gains +1 HP on wins (no overclock, Filbert-aware, Cornelius-aware).

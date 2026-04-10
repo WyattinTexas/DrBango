@@ -3,7 +3,47 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v291
+## Current Version: v294
+
+## v294 — CRITICAL DESIGN RULE FIX: Healing overclocks by default
+**Why:** Wyatt corrected: "There is no capping max HP. All healing overclocks, except the special use of healing seeds, can never overclock." The refiner had been wrongly capping heal abilities at maxHp across the audit (Katrina v280, Mallow v283, Troubling Haters v285, plus other prior bad fixes). Anti-overclock counterplay (Wandering Sue 84 destroying enemies at 12+ HP) only works as designed if heals actually overclock — capping defangs the whole meta-game these counter cards are built around.
+
+**Fixed (16 sites — all reverted from `Math.min(maxHp, hp+N)` to `hp += N` with `· overclocked!` tag):**
+- Mallow (89) Dozy Cozy — doMallowChoice + modal preview text
+- Boo Brothers (17) Teamwork — doBooChoice + modal preview text + REMOVED `booG.hp < booG.maxHp` offer-gate so Teamwork is now offered even at full HP (overclocks)
+- Shoo (13) Alpine Air — pre-roll sideline heal
+- Katrina (70) Seeker — pre-roll underdog heal (Seeker still gated by `f.hp < oppG.hp` — that's a trigger spec, not a cap)
+- Opa (48) Rest — both tie path and win path
+- Ancient One (22) Friend to All — tie sideline heal
+- Flora (75) Restore — both win and lose doubles paths
+- Troubling Haters (83) Growing Mob — 4+ damage win heal
+- Munch (66) Scraps — defeat-a-ghost heal
+- Lou (32) Bros — sideline win heal
+- Villager (11) Hospitality — sideline win heal
+- Jeffery (14) Chuckle — sideline win heal
+
+**Unchanged (correct exceptions):**
+- Healing Seed resource use (line ~3252) — Wyatt's explicit exception
+- Biscuit (324) Warm Up (line ~9254) — explicit "Cannot exceed max" in spec text
+- Mother Nature (366) Spring — shelved/fake card, do not touch
+
+**Hard rule added** to FIXLOG hard-rules section AND `~/corkscrew-agents/refiner.py` system prompt (rule #9) so the refiner stops capping heals next cycle. Memory file `feedback_healing-overclocks.md` saved. Gary's brain `~/buddy/jeeves_brain.txt` updated with the rule under HARD RULES section.
+
+
+
+## v293 — AUDITED FIX: Suspicious Jeff (61) Snicker missing Cornelius block + batch audit of Chad/Marcus/Ashley/Filbert/Dallas
+- Chad (56) AUDITED PASS — `team.resources.ice += 2` on entry, SPLOOP! entryCallout, collectKnightReactions — correct.
+- Marcus (57) AUDITED PASS — `lF.id===57 && !lF.ko && dmg>=3` → `B.marcusGlacialBonus[loseTeamName] += 4`; consumed next round in doPreRollSetup when Marcus still active; GLACIAL POUNDING! preRollCallout + cinematic queue callout both present; correct.
+- Ashley (58) AUDITED PASS — `wF.id===58 && !wF.ko` → queueAbility BURNING SOUL! +1 Sacred Fire onShow; wispBlocksWin guard; Sandwiches mirror; correct.
+- Mr Filbert (59) AUDITED PASS — passive sideline debuff implemented as distributed `filbertCursesWin/filbertCursesLose` flags throughout resolveRound; covers Opa Rest, Villager Hospitality, Jeffery Chuckle, Munch Scraps, Troubling Haters Growing Mob, Mallow Dozy Cozy, Boo Brothers Teamwork, Shoo Alpine Air, Katrina Seeker, Flora Restore, Ancient One Friend to All — comprehensive coverage verified. Correct.
+- Dallas (60) AUDITED PASS — entry sets `f.dallasQuickDraw = 2`; doPreRollSetup consumes 1 per round, reduces enemy die count by 1; QUICK DRAW! preRollCallout; `dallasQuickDraw` decrements to 0 after 2 uses; active ghost effect (not sideline) so no Cornelius needed. Correct.
+- Suspicious Jeff (61) AUDITED FIX — BUG: Snicker die-theft in doPreRollSetup had no Cornelius (45) Antidote block. Every other sideline die-modifier (Cyboo Spark, Shoo Alpine Air, Needle Big Bro) has a Cornelius check, but Jeff's block silently reduced the enemy's die count even when Cornelius was on their sideline. Fixed: added `hasSideline(enemyTeamObj, 45)` check in the doPreRollSetup consume path; if Cornelius is present, shows ANTIDOTE! preRollCallout and resets the flag without applying the die penalty.
+
+## v292 — AUDITED FIX: Masked Hero (55) Underdog crash vs Shade's Shadow
+- Shade's Shadow (205) forEach in doPreRollSetup was missing `const f = active(team)` — when Masked Hero was targeted by Shade's Shadow chip damage and `ef.id === 55` triggered, `f` was undefined causing a ReferenceError crash. Fixed: added `const f = active(team)` as the first line of the Shade's Shadow forEach callback.
+- Bogey (53) AUDITED PASS — arm modal, reflect logic, once-per-game flag, cinematic callout all correct.
+- Roger (54) AUDITED PASS — 4+ dice with 2 pairs → +3 Sacred Fires, Sandwiches mirror, correct.
+- Masked Hero (55) AUDITED FIX — all other Underdog instances (Ember Force, Shade, Splinter, Char, Bramble, Wick) correctly use a declared `f` variable; only Shade's Shadow was missing it.
 
 ## v291 — CRITICAL REGRESSION FIX: Harrison button + resource specials dead mid-game
 
@@ -30,6 +70,7 @@ This was introduced by the "narrate first, then enable buttons 350ms later" brea
 - Always bump TESTROOM_VERSION on every push
 - Always update this file after pushing a fix
 - The ONLY real cards are the 36 below. Any card NOT on this list is FAKE — do NOT audit, test, or reference it.
+- **HEALING OVERCLOCKS BY DEFAULT.** All healing abilities can take a ghost above maxHp. NEVER cap a heal with `Math.min(maxHp, hp + N)` — write `hp += N` and let it overclock. The Calvin (342) Overclock and Boris (343) Fortify pattern (`hp += N` with no cap, plus an `overclocked!` log tag when `hp > maxHp`) is the canonical pattern. **Two and ONLY two exceptions:** (1) the special use of the **Healing Seed** resource (the `f.hp >= f.maxHp` early-return at line ~3252) cannot overclock, and (2) any card whose ability text *explicitly* says "Cannot exceed max" — currently only **Biscuit (324) Warm Up**. EVERY OTHER healing ability — Katrina, Mallow, Troubling Haters, Boo Brothers, Shoo, Opa, Ancient One, Flora, Munch, Lou, Villager, Jeffery — must overclock. If you see a `Math.min(.maxHp, .hp + N)` cap on a non-Biscuit non-Healing-Seed heal, it is a bug — REVERT it to `hp += N` and tag the log line with `overclocked!` when `hp > maxHp`. The HP bar UI already supports overclock (`.hp-overclock` class) and the status panel renders `+N Overheal` automatically.
 
 ## THE 36 REAL CARDS
 COMMON: Hank(207), Happy Crystal(208), Dart(209), Dylan(301), Maximo(302), Tweak and Twonk(303), Pudge(311), Jimmy(352), Tyson(365)
@@ -124,8 +165,15 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Jackson (50) — Regrow: AUDITED FIX (v289) — BUG: `pickJacksonDie` stored `dice: [...dice]` (copy) in `B.jacksonPending`, mutated the copy, then assigned `B.pendingResolve.redDice = dice` and `B.redDice = dice`. But `postRollDone()` runs AFTER Jackson and recreates `B.pendingResolve = { redDice, blueDice }` using the closure's `B.preRoll.*.dice` reference — silently overwriting Jackson's rerolled die. Identical to the Sonya (v284) / Jeanie (v285) / Dark Wing (v285) bug. Fixed: switched to in-place mutation on `B.preRoll.*.dice` (same pattern as Sonya/DarkWing). `B.pendingResolve` guarded with `if (B.pendingResolve)`. Log message now uses `preRollDice.join(', ')`. Dropped unused `dice` destructure from `B.jacksonPending`.
 - [x] Nicholas (51) — Sneak Attack: AUDITED FIX (v290) — 2 entry damage to entering ghost, hasSideline check, KO guard all correct. BUG: no Knight reactions after dealing damage. Every other entry ability that deals damage (Grawr, Jenkins, Nerina) calls collectKnightReactions() or equivalent. Fixed: added inline Knight reaction collection using `checkKnightEffects(nicholasTeamName, nicholasGhost.name)` — using Nicholas's team (enemy) as the abilityTeam, so the ENTERING team can counter with Knight Terror (punishes enemy active) or Knight Light (gains +1 die). Using entryTeamName would be backwards (would let enemy double-punish the entering ghost).
 - [x] Hugo (52) — Wreckage: AUDITED PASS (v290) — `lF.id===52 && dmg>0` trigger correct; flag stored on winTeamName (attacker); doPreRollSetup consumes and reduces attacker's die count; callout queued; `collectKC(loseTeamName, lF.name)` Knight reactions correct; reset on consume; fires on KO blow by design ("attacking Hugo costs you a die even in the kill round"). Correct.
-- [ ] Frost Valley: Bogey(53), Roger(54), Masked Hero(55), Chad(56), Marcus(57), Ashley(58), Mr Filbert(59), Dallas(60), Suspicious Jeff(61)
-  All: NEEDS AUDIT
+- [x] Bogey (53) — Bogus: AUDITED PASS (v292) — arm modal pre-roll, armed flag set, resolve checks `lF.id===53 + armed + dmg>0`, dmg=0, wF.hp -= reflect, bogeyUsed once-per-game, BOGUS! cinematic callout queued, correct.
+- [x] Roger (54) — Tempest: AUDITED PASS (v292) — 4+ dice + 2 different pairs → +3 Sacred Fires, Sandwiches mirror, wispBlocksWin guard, correct.
+- [x] Masked Hero (55) — Underdog: AUDITED FIX (v292) — BUG: Shade's Shadow forEach had no `const f = active(team)` declaration; when Masked Hero was chip-damaged by Shade's Shadow and Underdog counter fired, `f` was undefined → ReferenceError crash. Fixed: added `const f = active(team)` as first line of Shade's Shadow forEach. All other Underdog instances (Ember Force, Shade, Splinter, Char, Bramble, Wick) correctly declare f. Underdog spec verified: fires on all pre-roll chip effects, 3 counter-damage, cinematic UNDERDOG! callout, correct.
+- [x] Chad (56) — Sploop!: AUDITED PASS (v293) — entry +2 ice, SPLOOP! callout, collectKnightReactions, correct.
+- [x] Marcus (57) — Glacial Pounding: AUDITED PASS (v293) — take 3+ dmg → +4 bonus dice next roll; consumed in doPreRollSetup when Marcus still active; cinematic callout queued; correct.
+- [x] Ashley (58) — Burning Soul: AUDITED PASS (v293) — win → queueAbility +1 Sacred Fire; wispBlocksWin guard; Sandwiches mirror; correct.
+- [x] Mr Filbert (59) — Mask Merchant: AUDITED PASS (v293) — passive sideline flip of heals to damage; distributed `filbertCursesWin/filbertCursesLose` flags cover all heal abilities (Opa, Villager, Jeffery, Munch, Troubling Haters, Mallow, Boo Brothers, Shoo, Katrina, Flora, Ancient One); correct.
+- [x] Dallas (60) — Quick Draw: AUDITED PASS (v293) — entry `f.dallasQuickDraw = 2`; doPreRollSetup reduces enemy die count, decrements counter; 2-roll window; active ghost effect so no Cornelius needed; correct.
+- [x] Suspicious Jeff (61) — Snicker: AUDITED FIX (v293) — sideline win → steal 1 enemy die next roll; BUG: missing Cornelius (45) Antidote block at consumption in doPreRollSetup. Fixed: added `hasSideline(enemyTeamObj, 45)` check; if blocked, shows ANTIDOTE! and resets flag without penalizing die count.
 
 ### Common (33)
 - [x] Kodako (1) — Swift: AUDITED PASS (v280) — 1-2-3 win→exactly 4 dmg, 1-2-3 lose→negate+4 back, both correct
