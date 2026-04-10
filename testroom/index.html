@@ -502,9 +502,13 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 /* Tiebreaker: the matched/tied hand dice — visible but dimmer than the decisive kicker.
    opacity:0.8 !important is required: when the LOSER's matched group gets this class,
    die-loser's opacity:0.3 !important is still in play. Since both rules share equal
-   specificity but this rule appears later in the sheet, the later !important wins. */
+   specificity but this rule appears later in the sheet, the later !important wins.
+   filter:none !important is also required: die-loser sets filter:grayscale(0.8) (no !important),
+   but without an explicit override the grayscale still applies, washing out the dim-gold
+   secondary glow and making it nearly invisible on the loser's matched dice. */
 .die.die-win-secondary {
   opacity:0.8 !important;
+  filter:none !important;
   border-color:rgba(251,191,36,0.55) !important;
   background:rgba(251,191,36,0.07) !important;
   box-shadow:0 0 8px rgba(251,191,36,0.35) !important;
@@ -1217,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v87';
+const TESTROOM_VERSION = 'v93';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1845,28 +1849,19 @@ function startBattle() {
   document.querySelector('.app').classList.add('battle-active');
   startMusic();
   log('<span class="log-round">Battle begins!</span>');
-  // Entry abilities — stagger if first entry shows a callout
-  triggerEntry(B.red);
-  const splashActive = document.getElementById('abilitySplash').classList.contains('active');
-  if (splashActive) {
-    setTimeout(() => { triggerEntry(B.blue); renderBattle(); }, 1500);
-  } else {
-    triggerEntry(B.blue);
-  }
   renderBattle();
 
-  // Disable roll buttons until VS splash is done
+  // Disable roll buttons until everything is done
   const rBtn = document.getElementById('rollRedBtn');
   const bBtn = document.getElementById('rollBlueBtn');
   if (rBtn) { rBtn.disabled = true; }
   if (bBtn) { bBtn.disabled = true; }
 
-  // Show VS splash
+  // Show VS splash FIRST, then entry abilities cinematic sequence
   const splash = document.getElementById('vsSplash');
   if (splash) {
     document.getElementById('vsRedName').textContent = active(B.red).name;
     document.getElementById('vsBlueName').textContent = active(B.blue).name;
-    // Show full rosters under active fighter
     const redBench = B.red.ghosts.filter((g,i) => i !== B.red.activeIdx).map(g => g.name);
     const blueBench = B.blue.ghosts.filter((g,i) => i !== B.blue.activeIdx).map(g => g.name);
     document.getElementById('vsRedRoster').textContent = redBench.join(' / ');
@@ -1874,15 +1869,31 @@ function startBattle() {
     splash.classList.add('active');
     setTimeout(() => {
       splash.classList.remove('active');
-      // Check for entry-effect KOs (e.g. Leviathan, Big Target) before enabling roll
-      // buttons — if handleKOs() returns true it owns the flow (ko-swap or game-over)
-      if (handleKOs()) return;
-      // Re-enable roll buttons and start pulse after splash
-      if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
-      if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
-      narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+      // VS splash done — now fire entry abilities cinematically
+      triggerEntry(B.red);
+      renderBattle();
+      const redSplashActive = document.getElementById('abilitySplash').classList.contains('active');
+      const redEntryDelay = redSplashActive ? 1500 : 300;
+      setTimeout(() => {
+        triggerEntry(B.blue);
+        renderBattle();
+        const blueSplashActive = document.getElementById('abilitySplash').classList.contains('active');
+        const blueEntryDelay = blueSplashActive ? 1500 : 300;
+        setTimeout(() => {
+          // All entry effects done — check for KOs, then enable rolling
+          if (handleKOs()) return;
+          if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
+          if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+          narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+        }, blueEntryDelay);
+      }, redEntryDelay);
     }, 2200);
   } else {
+    // No splash — fire entries sequentially then enable
+    triggerEntry(B.red);
+    triggerEntry(B.blue);
+    renderBattle();
+    if (handleKOs()) return;
     narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
     if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
     if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
@@ -2403,20 +2414,27 @@ function doSeleneChoice(choice) {
   B.selenePending = null;
   document.getElementById('seleneOverlay').classList.remove('active');
   const f = active(sp.team);
+  // Apply game-state change first, then build a sequential callout queue so
+  // HEART OF THE HILLS! and any knight effects (HEAVY AIR!, RETRIBUTION!) drain
+  // one-at-a-time instead of the second callout instantly wiping out the first.
   if (choice === 'seed') {
     sp.team.resources.healingSeed++;
-    showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 🌱 1 Healing Seed!`);
     log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
   } else {
     sp.team.resources.luckyStone += 2;
-    showAbilityCallout('HEART OF THE HILLS!', 'var(--legendary)', `${f.name} — Doubles! Chose 🍀 2 Lucky Stones!`);
     log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
   }
-  checkKnightEffects(sp.tName, f.name);
+  const subtitle = choice === 'seed'
+    ? `${f.name} — Doubles! Chose 🌱 1 Healing Seed!`
+    : `${f.name} — Doubles! Chose 🍀 2 Lucky Stones!`;
+  // Queue mode: HEART OF THE HILLS first, then knight reactions, then drain sequentially
+  abilityQueueMode = true;
+  queueAbility('HEART OF THE HILLS!', 'var(--legendary)', subtitle);
+  checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
+  abilityQueueMode = false;
   renderBattle();
-  // Resume post-roll flow (moonstone → lucky stones → damage) after splash fully clears.
-  // showAbilityCallout auto-dismisses after 1400ms — wait 1600ms to avoid overlap.
-  setTimeout(() => { if (cont) cont(); }, 1600);
+  // drainAbilityQueue plays each splash 1300ms apart and calls cont() after all finish.
+  drainAbilityQueue(() => { if (cont) cont(); });
 }
 
 // Timber (210) — Howl choice modal
@@ -2450,8 +2468,11 @@ function doTimberChoice(choice) {
   if (!tp) return;
   const resume = tp._resumeCallback;
   const oppLabel = tp.oppTeamName.charAt(0).toUpperCase() + tp.oppTeamName.slice(1);
+  const timberGhost = active(B[tp.timberTeam]);
+  const timberName = timberGhost ? timberGhost.name : 'Timber';
   B.timberPending = null;
   document.getElementById('timberOverlay').classList.remove('active');
+  let subtitle;
   if (choice === 'discard') {
     // Discard 2 specials from most abundant first
     const r = tp.team.resources;
@@ -2464,24 +2485,27 @@ function doTimberChoice(choice) {
         toDiscard--;
       }
     }
-    showAbilityCallout('HOWL!', 'var(--legendary)', `${oppLabel} discards 2 specials to keep all dice!`);
+    subtitle = `${oppLabel} discards 2 specials to keep all dice!`;
     log(`<span class="log-ability">${oppLabel}</span> chose to discard 2 specials to avoid Timber's Howl!`);
   } else {
     // Lose 1 die
     if (tp.oppTeamName === 'red') B.preRoll.red.count = Math.max(1, B.preRoll.red.count - 1);
     else B.preRoll.blue.count = Math.max(1, B.preRoll.blue.count - 1);
-    showAbilityCallout('HOWL!', 'var(--legendary)', `${oppLabel} rolls 1 fewer die!`);
+    subtitle = `${oppLabel} rolls 1 fewer die!`;
     log(`<span class="log-ability">${oppLabel}</span> chose to roll 1 fewer die under Timber's Howl!`);
   }
   renderBattle();
-  // showAbilityCallout auto-dismisses after 1400ms — wait 1600ms (1400 + 200ms buffer)
-  // before resuming rolling so neither team can roll while HOWL! is still visible.
-  // _oppBtn is also unlocked here (not at top of function) so the other team's roll button
-  // stays locked through the callout — prevents dice flying mid-splash (mirrors Selene v69).
-  setTimeout(() => {
+  // Queue mode: HOWL! first, then any knight reactions (HEAVY AIR! / RETRIBUTION!),
+  // then drain sequentially. Mirrors the doSeleneChoice pattern from v90.
+  // _oppBtn unlocked and resume() called only after the full callout chain completes.
+  abilityQueueMode = true;
+  queueAbility('HOWL!', 'var(--legendary)', subtitle);
+  checkKnightEffects(tp.timberTeam, timberName); // queues HEAVY AIR! or RETRIBUTION! if applicable
+  abilityQueueMode = false;
+  drainAbilityQueue(() => {
     if (tp._oppBtn) { tp._oppBtn.classList.remove('locked'); tp._oppBtn.disabled = false; }
     if (resume) resume();
-  }, 1600);
+  });
 }
 
 // ============================================================
@@ -2563,7 +2587,7 @@ function doTeamRoll(team, btn) {
     revealDice(team, dice);
     const roll = classify(dice);
     const tl = typeLabel(roll.type);
-    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(',')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
     if (isTripleOrBetter(roll.type)) showTriplesEffect(team, roll.type);
 
     // Check if both have rolled — guard against double-resolution
@@ -2910,7 +2934,7 @@ function doPostRollAndResolve(redDice, blueDice) {
 
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
 
-  // Dart (207) — each 4 rolled: gain 1 Lucky Stone
+  // Hank (207) — each 4 rolled: gain 1 Lucky Stone (Tremor)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
@@ -3163,7 +3187,7 @@ function pickMsValue(val) {
   B.blueDice = B.pendingResolve.blueDice;
   renderDice(B.redDice, B.blueDice);
 
-  log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(',')}]`);
+  log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
   // Check if other team also has moonstone (pre-round only)
@@ -3354,7 +3378,7 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
       team === 'blue' ? dice : B.pendingResolve.blueDice
     );
 
-    log(`<span class="log-ms">Lucky Stone!</span> ${team.charAt(0).toUpperCase()+team.slice(1)} rerolled ${oldVal} → <b>${newVal}</b> → [${dice.join(',')}]`);
+    log(`<span class="log-ms">Lucky Stone!</span> ${team.charAt(0).toUpperCase()+team.slice(1)} rerolled ${oldVal} → <b>${newVal}</b> → [${dice.join(', ')}]`);
     narrate(`<b class="gold">Lucky Stone!</b> Rerolled ${oldVal} → <b>${newVal}</b>!`);
     renderBattle();
 
