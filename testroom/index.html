@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v318';
+const TESTROOM_VERSION = 'v320';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1797,7 +1797,7 @@ const GHOSTS = [
   },
   {
     id:310, name:"Granny", rarity:"uncommon", maxHp:3, art:"art/granny.jpg",
-    ability:"Bedtime Story", abilityDesc:"Sideline: when one of your ghosts is defeated — by singles: gain 1 Lucky Stone. By doubles: gain 1 Surge. By triples: gain 1 Moonstone.",
+    ability:"Bedtime Story", abilityDesc:"Sideline: when one of your ghosts is defeated — by singles: gain 1 Lucky Stone. By doubles: gain 1 Sacred Fire. By triples: gain 1 Moonstone.",
     category:"HP Recovery", set:"Rolling Hills",
     designNote:"The porch reader. Gentle passive healing from the sideline. Max 2 keeps it within the healing cap rule."
   },
@@ -9506,6 +9506,7 @@ function resolveRound() {
 
   // On-lose callouts — onShow applies the surge grant with the splash
   if (lF.id === 404 && !lF.ko) { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
+  if (lF.id === 404 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
   // Clink (329) — Prospect: lose → gain 1 Surge
   if (lF.id === 329 && !lF.ko) { queueAbility('PROSPECT!', 'var(--common)', `${lF.name} — Lost the roll but gained 1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); }); }
   if (lF.id === 329 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Prospect (lose)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
@@ -9523,14 +9524,15 @@ function resolveRound() {
         queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); });
       } else if (wR.type === 'doubles') {
-        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { loseTeam.resources.surge++; popSidelineCard(loseTeam, 310); renderBattle(); });
-        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
+        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Sacred Fire!`, () => { loseTeam.resources.fire++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
       } else if (isTripleOrBetter(wR.type)) {
         queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); });
       }
     }
     if (lF.id === 404) { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
+    if (lF.id === 404 && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End (KO)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
   }
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
   if (wF.ko && hasSideline(winTeam, 310)) {
@@ -9538,8 +9540,8 @@ function resolveRound() {
       queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); });
     } else if (wR.type === 'doubles') {
-      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { winTeam.resources.surge++; popSidelineCard(winTeam, 310); renderBattle(); });
-      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
+      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Sacred Fire!`, () => { winTeam.resources.fire++; popSidelineCard(winTeam, 310); renderBattle(); });
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
     } else if (isTripleOrBetter(wR.type)) {
       queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); });

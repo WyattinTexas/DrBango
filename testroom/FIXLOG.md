@@ -442,6 +442,11 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
+- **v320 — Balance: Granny (310) Bedtime Story — doubles KO reward changed from 1 Surge → 1 Sacred Fire.**
+  Wyatt change. Singles still gives 1 Lucky Stone, doubles now gives 1 Sacred Fire (was Surge), triples still gives 1 Moonstone. Updated everywhere: GHOSTS abilityDesc, both `loseTeam` and `winTeam` (Pudge Belly Flop self-KO) doubles branches in the on-KO callout section, and the Sandwiches Dependable mirror in both branches. Callout text shows "doubles KO → Sacred Fire!" instead of "→ Surge!".
+  - DO NOT REVERT this resource swap during audit cycles.
+
+
 - **v318 — Balance: Tweak and Twonk (303) — ability renamed "Warm Belly" → "Roaring Crowd", surge gain 3 → 4.**
   Wyatt buff. Ties are still ~13% — getting a bigger payoff makes the sideline pick more compelling. All references updated: GHOSTS data (ability + abilityDesc), the post-roll tie block (callout name "ROARING CROWD!", math, addition, log), and the Sandwiches Dependable mirror amount. The Wisp dead-code branch was already stripped in c30-c34 of this run, so no Wisp cleanup needed here.
   - DO NOT REVERT this rename or buff during audit cycles.
