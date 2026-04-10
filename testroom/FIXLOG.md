@@ -3,7 +3,14 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v302
+## Current Version: v303
+
+## v303 — AUDITED FIX: Tweak and Twonk (303) Warm Belly tie-path missing Sandwiches mirror + deferred grant
+- Tweak and Twonk (303) BUG 1: `team.resources.surge += 3` fired synchronously (before the callout was displayed), violating the deferred-onShow pattern used by every other resource grant. Fixed: surge grant moved inside the WARM BELLY! onShow callback so the tile updates exactly when the splash fires.
+- Tweak and Twonk (303) BUG 2: No Sandwiches (33) Dependable mirror. When T&T grants +3 Surge to its team on a tie, the opposing team's Sandwiches should mirror +3 Surge via DEPENDABLE! — this was completely missing. Fixed: added `hasSideline(oppTeamTweak, 33) && !hasSideline(team, 344)` guard with DEPENDABLE! callout queued after WARM BELLY!.
+- Added Wisp (344) Guide Light block for future-proofing (Wisp is shelved so dead code today, consistent with established pattern).
+- Also moved `log()` and `checkKnightEffects()` inside the onShow callback (Maximo tie-path pattern) so Knight Terror/Light reactions queue AFTER WARM BELLY fires, not before.
+- Winston (15) AUDITED PASS — already resolved at v297; stale `[ ]` checkbox at line 244 was the only open item.
 
 ## v302 — AUDITED FIX: Chad (56) Sploop! entry grant missing Wisp block and Sandwiches mirror
 - Chad (56) Sploop! BUG: When Chad entered the field, `team.resources.ice += 2` fired unconditionally with no Wisp (344) Guide Light block and no Sandwiches (33) Dependable mirror. Every other post-roll resource grant has both guards (Hank Tremor, Natalia Materialization, Kaplan Pollinate, Selene Heart of the Hills, Spockles Valley Magic, etc.) but the entry-path grant was missed.
@@ -330,6 +337,7 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 - Track which specials are still available per team (`B.specialsAvailable = { red: [...], blue: [...] }`).
 - Re-evaluate after every action; close the window when both arrays empty OR timer expires.
 - The 5-second timer should reset after each successful action so a player who clicked late doesn't get penalized for the next decision.
+- **CRITICAL — multi-Lucky-Stone case:** Same bug applies WITHIN a single team's stack. If a player has 3 Lucky Stones and uses the first one with 4 seconds left, they currently get only ~3 seconds for the second, ~1 second for the third — the timer keeps counting down across uses. After EACH Lucky Stone reroll resolves, if the same team still has more Lucky Stones available (and at least one die unrerolled this window), reset the 5s timer. Same for any future multi-use special. The rule is: ANY successful special use → reset the timer to 5.0s if there are still actionable specials remaining.
 - AFK timer integration: don't let the global AFK timer cancel an active specials window.
 
 **Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
