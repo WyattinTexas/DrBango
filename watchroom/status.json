@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 4,
-      "remaining_mins": 52,
-      "until": "12:22 AM",
-      "last_update": "2026-04-09T23:36:34.213249",
+      "cycles": 1,
+      "remaining_mins": 239,
+      "until": "03:32 AM",
+      "last_update": "2026-04-09T23:39:21.321055",
       "status": "running",
-      "next_up": "Audit narrator pacing in the KO chain \u2014 `openKoSwap` narrates \"[Ghost] is down!\" then immediately `doKoSwap` fires (800ms auto-pick path) which calls `triggerEntry` which narrates \"[New Ghost] enters the arena!\" \u2014 check if both lines get their full 1800ms hold in `drainNarrate`, or if the entry narration stomps the KO narration before the player can read it",
-      "after_that": "Audit the `lF.ko` (KO path, 1800ms) branch of the same `drainAbilityQueue` callback \u2014 verify `highlightWinnerDice` at t+10ms and `handleKOs()` at t+1800ms produce clean visual separation, and that the KO path's `if (!handleKOs())` fallback (currently dead code in practice) is safe if somehow reached"
+      "next_up": "Audit `Benjamin (203) Magic Touch` \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later, still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
+      "after_that": "`drainAbilityQueue` global 900ms callback delay \u2014 since it fires 500ms before the last splash clears, ALL drain callbacks are slightly early; consider bumping from 900ms \u2192 1500ms globally and removing the per-path `setTimeout` workarounds for a cleaner, more maintainable fix"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 1,
+      "summary": "TIE-path roll buttons now wait for the last tie-round ability callout to fully clear (600ms wrapper in drain callback) before `B.phase = 'ready'`",
+      "next_up": "Audit `Benjamin (203) Magic Touch` \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later, still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
+      "after_that": "`drainAbilityQueue` global 900ms callback delay \u2014 since it fires 500ms before the last splash clears, ALL drain callbacks are slightly early; consider bumping from 900ms \u2192 1500ms globally and removing the per-path `setTimeout` workarounds for a cleaner, more maintainable fix",
+      "time": "23:39:21",
+      "timestamp": "2026-04-09T23:39:21.324448",
+      "roast": "Polish cycle. Also known as: admitting the first version shipped unfinished."
+    },
     {
       "target": "testroom",
       "cycle": 4,
@@ -503,18 +513,9 @@
       "after_that": "Full drifted-card playtesting audit \u2014 Mother Nature (366) Seasons timing: does Winter's -1 die stack correctly with Timber's -1 die (both active simultaneously), and does `Math.max(1,...)` floor apply after both reductions? Also verify narrator reads the season correctly each round.",
       "time": "17:53:57",
       "timestamp": "2026-04-09T17:53:57.874712"
-    },
-    {
-      "target": "testroom",
-      "cycle": 13,
-      "summary": "Fixed dice preview glow bleed-through \u2014 `highlightRollPreview`'s inline `boxShadow`/`borderColor`/`transform` styles now get explicitly cleared in both `highlightWinnerDice` and the TIE cleanup path, so the losing team's matching dice go properly grey instead of retaining a faint gold tinge under the `die-loser` dim.",
-      "next_up": "Add a `title` tooltip to the Moonstone resource tile \u2014 it's the only tile without one (`\ud83d\udc8e MS` shows no hover explanation), leaving new players guessing what MS stands for or how to use it, while every other resource has a descriptive tooltip already.",
-      "after_that": "KO swap modal polish \u2014 verify the swap overlay transition and timing feel when a chain-KO happens (both sides KO in the same round), specifically whether the second `openKoSwap` call fires correctly after the first doKoSwap resolves, or if there's a timing gap that leaves the board in a stale state between swaps.",
-      "time": "17:52:47",
-      "timestamp": "2026-04-09T17:52:47.182426"
     }
   ],
-  "last_update": "2026-04-09T23:36:39.839655",
+  "last_update": "2026-04-09T23:39:21.324454",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
