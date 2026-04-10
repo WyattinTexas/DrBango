@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v93';
+const TESTROOM_VERSION = 'v96';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2728,7 +2728,15 @@ function doPreRollSetup() {
       B.committed[tName].harrison = 0; // reset after use
       preRollCallouts.push(['ASCEND!', '#22c55e', `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt} dice!`]);
       log(`<span class="log-ability">${f.name}</span> — Ascend! Spent ${cnt} Healing Seed${cnt>1?'s':''} for +${cnt} extra dice!`);
+      // Knight reactions to Ascend — collect via temporary queue then splice into preRollCallouts
+      // so HEAVY AIR! / RETRIBUTION! plays sequentially AFTER ASCEND!, not as a simultaneous stomp
+      const _savedAscendAQ = abilityQueue;
+      abilityQueue = [];
+      abilityQueueMode = true;
       checkKnightEffects(tName, f.name);
+      abilityQueueMode = false;
+      abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc]));
+      abilityQueue = _savedAscendAQ;
     }
   });
 
@@ -2836,6 +2844,15 @@ function doPreRollSetup() {
         const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);
         preRollCallouts.push(['HOWL!', 'var(--legendary)', `${oppLabel} has no specials — forced to roll 1 fewer die!`]);
         log(`<span class="log-ability">${oppLabel}</span> has no specials — forced to roll 1 fewer die under Timber's Howl!`);
+        // Knight reactions to forced Howl — collect via temporary queue then splice into preRollCallouts
+        const timberTeamName = team === B.red ? 'red' : 'blue';
+        const _savedKQ = abilityQueue;
+        abilityQueue = [];
+        abilityQueueMode = true;
+        checkKnightEffects(timberTeamName, f.name);
+        abilityQueueMode = false;
+        abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc]));
+        abilityQueue = _savedKQ;
       } else {
         // Opponent has resources — queue the choice modal
         B.timberPending = { team: oppTeam, oppTeamName, timberTeam: team, redCount, blueCount };
@@ -3042,6 +3059,10 @@ function showMoonstoneChoice(team, dice) {
 
   const diceEl = document.getElementById(team + '-dice');
   const resEl = document.getElementById(team + '-resources');
+
+  // Scroll dice area into view so the Moonstone UI is visible
+  const arenaEl = document.getElementById('arena') || diceEl;
+  arenaEl.scrollIntoView({ behavior:'smooth', block:'center' });
   const msEl = resEl.querySelector('.res-tile.moonstone') || diceEl;
 
   // Highlight the Moonstone resource — player clicks IT first
@@ -3188,17 +3209,21 @@ function pickMsValue(val) {
   renderDice(B.redDice, B.blueDice);
 
   log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(', ')}]`);
+  narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
-  // Check if other team also has moonstone (pre-round only)
-  const blueMsLeft = B.msAvailable ? B.msAvailable.blue : 0;
-  if (team==='red' && blueMsLeft > 0 && B.blue.resources.moonstone > 0) {
-    B.phase = 'moonstone-blue';
-    showMoonstoneChoice('blue', B.blueDice);
-    return;
-  }
+  // Pause to let the changed dice register visually before continuing
+  setTimeout(() => {
+    // Check if other team also has moonstone (pre-round only)
+    const blueMsLeft = B.msAvailable ? B.msAvailable.blue : 0;
+    if (team==='red' && blueMsLeft > 0 && B.blue.resources.moonstone > 0) {
+      B.phase = 'moonstone-blue';
+      showMoonstoneChoice('blue', B.blueDice);
+      return;
+    }
 
-  checkLuckyStones();
+    checkLuckyStones();
+  }, 1200);
 }
 
 function skipMoonstone() {
@@ -3908,49 +3933,69 @@ function resolveRound() {
   // ========================================
   // CINEMATIC PLAYBACK — damage hits first, then abilities sequence
   // ========================================
-  // Step 1: Narration + damage hit
-  if (dmg > 0) {
-    // Cinematic narration based on roll type
-    let dmgNarr = '';
-    if (wR.type === 'penta') {
-      dmgNarr = `IMPOSSIBLE! FIVE ${wR.value}'s! <b class="${winColor}">${wF.name}</b> unleashes <b class="gold">${dmg} damage</b>!`;
-    } else if (wR.type === 'quads') {
-      dmgNarr = `DEVASTATING! <b class="${winColor}">${wF.name}</b> slams FOUR ${wR.value}'s! <b class="gold">${dmg} damage</b>!`;
-    } else if (wR.type === 'triples') {
-      dmgNarr = `<b class="${winColor}">${wF.name}</b> CRUSHES with triple ${wR.value}'s! <b class="gold">${dmg} damage</b> rocks <b class="${loseColor}">${lF.name}</b>!`;
-    } else if (wR.type === 'doubles') {
-      dmgNarr = `<b class="${winColor}">${wF.name}</b> lands a solid hit with double ${wR.value}'s — <b class="gold">${dmg} damage</b> to <b class="${loseColor}">${lF.name}</b>!`;
-    } else {
-      dmgNarr = `<b class="${winColor}">${wF.name}</b> edges out <b class="${loseColor}">${lF.name}</b> — <b class="gold">${dmg} damage</b>!`;
-    }
-    if (lF.ko) {
-      dmgNarr += `&nbsp;<b class="ko-text">${lF.name} goes down! ${wF.name} stands victorious!</b>`;
-    } else {
-      dmgNarr += `&nbsp;${lF.hp} HP left.`;
-    }
-    narrate(dmgNarr);
-    playDamageSfx(dmg);
-    if (lF.ko) setTimeout(() => playSfx('sfxShatter', 0.7), 300);
-    const hitEl = document.getElementById(loseTeamName + '-fighter');
-    hitEl.classList.add('hit');
-    setTimeout(() => hitEl.classList.remove('hit'), 500);
-    updateHpBar(loseTeamName, lF.hp, lF.maxHp);
-  } else {
-    narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
-  }
+  // ========================================
+  // CINEMATIC BEATS — pauses let each moment land
+  // ========================================
+  // Beat 1: Announce the winner (pause to let dice highlight register)
+  let beatTimer = 0;
+  const BEAT_ANNOUNCE = 600;  // pause after dice highlight, before narration
+  const BEAT_DAMAGE  = 800;   // pause after narration, before damage hit
+  const BEAT_HP      = 500;   // pause after hit animation, before HP bar drops
+  const BEAT_POST    = 800;   // pause after HP update, before ability queue
 
-  // Step 2: Pudge self-damage visual (after hit lands)
-  // Use pudgeSelfDmgApplied (not pudgeSelfDmg && !wF.ko) so the animation fires even when
-  // the self-damage was lethal — wF.ko is already true but hitDamage() is safe to call.
+  setTimeout(() => {
+    // Beat 2: Narration
+    if (dmg > 0) {
+      let dmgNarr = '';
+      if (wR.type === 'penta') {
+        dmgNarr = `IMPOSSIBLE! FIVE ${wR.value}'s! <b class="${winColor}">${wF.name}</b> unleashes <b class="gold">${dmg} damage</b>!`;
+      } else if (wR.type === 'quads') {
+        dmgNarr = `DEVASTATING! <b class="${winColor}">${wF.name}</b> slams FOUR ${wR.value}'s! <b class="gold">${dmg} damage</b>!`;
+      } else if (wR.type === 'triples') {
+        dmgNarr = `<b class="${winColor}">${wF.name}</b> CRUSHES with triple ${wR.value}'s! <b class="gold">${dmg} damage</b> rocks <b class="${loseColor}">${lF.name}</b>!`;
+      } else if (wR.type === 'doubles') {
+        dmgNarr = `<b class="${winColor}">${wF.name}</b> lands a solid hit with double ${wR.value}'s — <b class="gold">${dmg} damage</b> to <b class="${loseColor}">${lF.name}</b>!`;
+      } else {
+        dmgNarr = `<b class="${winColor}">${wF.name}</b> edges out <b class="${loseColor}">${lF.name}</b> — <b class="gold">${dmg} damage</b>!`;
+      }
+      narrate(dmgNarr);
+
+      // Beat 3: Damage hit (after narration sinks in)
+      setTimeout(() => {
+        playDamageSfx(dmg);
+        const hitEl = document.getElementById(loseTeamName + '-fighter');
+        hitEl.classList.add('hit');
+        setTimeout(() => hitEl.classList.remove('hit'), 500);
+
+        // Beat 4: HP bar drops (after hit animation)
+        setTimeout(() => {
+          updateHpBar(loseTeamName, lF.hp, lF.maxHp);
+          if (lF.ko) {
+            playSfx('sfxShatter', 0.7);
+            narrate(`<b class="ko-text">${lF.name} goes down!</b>&nbsp;<b class="${winColor}">${wF.name}</b> stands victorious!`);
+          } else {
+            narrate(`<b class="${loseColor}">${lF.name}</b> holds on — <b class="gold">${lF.hp} HP</b> remaining.`);
+          }
+          renderBattle();
+        }, BEAT_HP);
+      }, BEAT_DAMAGE);
+    } else {
+      narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
+    }
+  }, BEAT_ANNOUNCE);
+
+  // Pudge self-damage visual (after all damage beats)
+  const pudgeDelay = BEAT_ANNOUNCE + BEAT_DAMAGE + BEAT_HP + 400;
   if (pudgeSelfDmgApplied) {
     setTimeout(() => {
       playDamageSfx(1);
       hitDamage(winTeamName);
-    }, 600);
+    }, pudgeDelay);
   }
 
-  // Step 3: Drain ability queue, then do end-of-round
-  const dmgDelay = dmg > 0 ? 800 : 200;
+  // Ability queue drains after all damage beats finish
+  const totalDmgBeats = dmg > 0 ? (BEAT_ANNOUNCE + BEAT_DAMAGE + BEAT_HP + BEAT_POST) : (BEAT_ANNOUNCE + 200);
+  const dmgDelay = totalDmgBeats;
   setTimeout(() => {
     drainAbilityQueue(() => {
       // Reset committed resources + per-round ability flags
