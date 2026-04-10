@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v306';
+const TESTROOM_VERSION = 'v309';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3591,33 +3591,40 @@ function doSeleneChoice(choice) {
   B.selenePending = null;
   document.getElementById('seleneOverlay').classList.remove('active');
   const f = active(sp.team);
-  // Apply game-state change first, then build a sequential callout queue so
-  // HEART OF THE HILLS! and any knight effects (HEAVY AIR!, RETRIBUTION!) drain
-  // one-at-a-time instead of the second callout instantly wiping out the first.
-  if (choice === 'seed') {
-    sp.team.resources.healingSeed++;
-    log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
-  } else {
-    sp.team.resources.luckyStone += 2;
-    log(`<span class="log-ability">${f.name}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
-  }
+  const _selTeam = sp.team;
+  const _selName = f.name;
   const subtitle = choice === 'seed'
     ? `${f.name} — Doubles! Chose 🌱 1 Healing Seed!`
     : `${f.name} — Doubles! Chose 🍀 2 Lucky Stones!`;
-  // Queue mode: HEART OF THE HILLS first, then knight reactions, then drain sequentially
+  // Queue mode: HEART OF THE HILLS first, then knight reactions, then drain sequentially.
+  // Grant is deferred into onShow so the resource counter updates exactly when the callout
+  // fires — same deferred-onShow pattern as Hank Tremor (v307), Natalia/Kaplan (v308).
   abilityQueueMode = true;
-  queueAbility('HEART OF THE HILLS!', 'var(--legendary)', subtitle);
+  queueAbility('HEART OF THE HILLS!', 'var(--legendary)', subtitle, () => {
+    if (choice === 'seed') {
+      _selTeam.resources.healingSeed++;
+      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
+    } else {
+      _selTeam.resources.luckyStone += 2;
+      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
+    }
+    renderBattle();
+  });
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
-  // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline
+  // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline.
+  // Capture totals at queue-build time (before any grant fires) so the preview subtitle is correct.
   if (hasSideline(opp(sp.team), 33) && !hasSideline(sp.team, 344)) {
     if (choice === 'seed') {
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +1 Healing Seed! (${opp(sp.team).resources.healingSeed + 1} total)`, () => { opp(sp.team).resources.healingSeed++; renderBattle(); });
+      const _sandSeedOpp = opp(sp.team);
+      const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 1;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +1 Healing Seed! (${_sandSeedTotal} total)`, () => { _sandSeedOpp.resources.healingSeed++; renderBattle(); });
     } else {
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +2 Lucky Stones! (${opp(sp.team).resources.luckyStone + 2} total)`, () => { opp(sp.team).resources.luckyStone += 2; renderBattle(); });
+      const _sandLSOpp = opp(sp.team);
+      const _sandLSTotal = _sandLSOpp.resources.luckyStone + 2;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +2 Lucky Stones! (${_sandLSTotal} total)`, () => { _sandLSOpp.resources.luckyStone += 2; renderBattle(); });
     }
   }
   abilityQueueMode = false;
-  renderBattle();
   // drainAbilityQueue plays each splash 1300ms apart and calls cont() after all finish.
   drainAbilityQueue(() => { if (cont) cont(); });
 }
@@ -6544,12 +6551,19 @@ function doPostRollAndResolve(redDice, blueDice) {
           queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispG ? wispG.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Tremor!`);
           log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Tremor (${fours} four${fours>1?'s':''})!`);
         } else {
-          team.resources.luckyStone += fours;
-          queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
-          log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
+          const _tremFours = fours;
+          const _tremTeam = team;
+          const _tremName = f.name;
+          queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
+            _tremTeam.resources.luckyStone += _tremFours;
+            log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
+            renderBattle();
+          });
           checkKnightEffects(tNameHank, f.name);
           if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${opp(team).resources.luckyStone + fours} total)`, () => { opp(team).resources.luckyStone += fours; renderBattle(); });
+            const _sandOpp = opp(team);
+            const _sandTotal = _sandOpp.resources.luckyStone + fours;
+            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); });
           }
         }
       }
@@ -6585,12 +6599,18 @@ function doPostRollAndResolve(redDice, blueDice) {
         queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGNat ? wispGNat.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Materialization!`);
         log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Materialization!`);
       } else {
-        team.resources.moonstone++;
-        queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`);
-        log(`<span class="log-ability">${f.name}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
+        const _natTeam = team;
+        const _natName = f.name;
+        const _natSandOpp = opp(team);
+        const _natSandTotal = _natSandOpp.resources.moonstone + 1;
+        queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`, () => {
+          _natTeam.resources.moonstone++;
+          log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
+          renderBattle();
+        });
         checkKnightEffects(tNameNat, f.name);
         if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${opp(team).resources.moonstone + 1} total)`, () => { opp(team).resources.moonstone++; renderBattle(); });
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone++; renderBattle(); });
         }
       }
     }
@@ -6608,12 +6628,18 @@ function doPostRollAndResolve(redDice, blueDice) {
         queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGKap ? wispGKap.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Pollinate!`);
         log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Pollinate!`);
       } else {
-        team.resources.healingSeed++;
-        queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
-        log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
+        const _kapTeam = team;
+        const _kapName = f.name;
+        const _kapSandOpp = opp(team);
+        const _kapSandTotal = _kapSandOpp.resources.healingSeed + 1;
+        queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`, () => {
+          _kapTeam.resources.healingSeed++;
+          log(`<span class="log-ability">${_kapName}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
+          renderBattle();
+        });
         checkKnightEffects(tNameKap, f.name);
         if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${opp(team).resources.healingSeed + 1} total)`, () => { opp(team).resources.healingSeed++; renderBattle(); });
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); });
         }
       }
     }

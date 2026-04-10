@@ -3,7 +3,27 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v304
+## Current Version: v309
+
+## v309 — BUG FIX: Selene (305) Heart of the Hills — synchronous resource grant decoupled from callout
+- Selene (305) Heart of the Hills BUG: `sp.team.resources.healingSeed++` (seed path) and `sp.team.resources.luckyStone += 2` (Lucky Stone path) both fired synchronously inside `doSeleneChoice` before `queueAbility('HEART OF THE HILLS!', ...)` was even called. The resource counter jumped in the UI the instant the player clicked their choice — before the HEART OF THE HILLS! splash appeared. This was the last remaining synchronous grant in the post-roll ability chain.
+- Fixed: removed both synchronous grants. Moved them (and their `log()` calls + `renderBattle()`) into the HEART OF THE HILLS! `onShow` callback, so the counter updates exactly when the splash fires. Captured `_selTeam` and `_selName` as closure variables at call time (same Hank v307 / Natalia+Kaplan v308 pattern).
+- Also captured `_sandSeedOpp` / `_sandSeedTotal` and `_sandLSOpp` / `_sandLSTotal` at queue-build time for DEPENDABLE! subtitle accuracy (totals are computed before either grant fires, so the preview correctly shows the expected final value).
+- Removed the now-redundant `renderBattle()` call before `drainAbilityQueue` (render already happens inside onShow).
+- Pattern: every `doPostRollAndResolve` and choice-modal resource grant now follows deferred-onShow (Tweak+Twonk v303, Jimmy v304, Hank v307, Natalia+Kaplan v308, Selene v309). Counter updates the moment the splash fires, not before.
+- Also bumped TESTROOM_VERSION v308 → v309.
+
+## v308 — BUG FIX: Natalia (327) Materialization + Kaplan (308) Pollinate — synchronous resource grants decoupled from callouts
+- Natalia (327) Materialization BUG: `team.resources.moonstone++` fired synchronously (before the queue drained), so the Moonstone counter jumped in the UI before the MATERIALIZATION! callout ever appeared. Fixed: moved grant + log into MATERIALIZATION! `onShow` callback. Also captured `_natSandOpp` and `_natSandTotal` at build time so the DEPENDABLE! preview total is correct. `checkKnightEffects` stays synchronous so Knight reactions queue AFTER MATERIALIZATION! and BEFORE DEPENDABLE!.
+- Kaplan (308) Pollinate BUG: identical pattern — `team.resources.healingSeed++` fired before POLLINATE! appeared. Fixed: same deferred-onShow approach with captured closure vars. `checkKnightEffects` stays synchronous.
+- Pattern: all `doPostRollAndResolve` resource grants now follow deferred-onShow (Hank v307, Tweak+Twonk v303, Jimmy v304, Natalia/Kaplan v308). Counter updates the moment the splash fires, not before.
+- Also bumped TESTROOM_VERSION v307 → v308.
+
+## v307 — BUG FIX: Hank (207) Tremor — synchronous Lucky Stone grant decoupled from callout
+- Hank (207) Tremor BUG: `team.resources.luckyStone += fours` was executed synchronously at queue-build time (before `drainAbilityQueue` ran), so the Lucky Stone counter jumped in the UI before the TREMOR! callout ever fired. The Sandwiches (33) DEPENDABLE! mirror already used the correct deferred-onShow pattern, making Tremor inconsistent.
+- Fixed: moved `team.resources.luckyStone += fours` and `log(...)` into a new TREMOR! `onShow` callback, so the counter update and log entry happen at the exact moment the TREMOR! splash appears on screen. `checkKnightEffects()` remains in its synchronous pre-drain position (while `abilityQueueMode` is still true) so Knight reactions still queue AFTER TREMOR! and BEFORE DEPENDABLE! — correct order preserved.
+- Pattern: same deferred-onShow fix applied to Tweak and Twonk Warm Belly (v303) and Jimmy Chirp (v304). All `doPostRollAndResolve` resource grants should follow this pattern.
+- Also bumped TESTROOM_VERSION v306 → v307.
 
 ## v304 — AUDITED FIX: Jimmy (352) Chirp tie-path — synchronous grant, missing Wisp block, missing Sandwiches mirror
 - Jimmy (352) Chirp BUG 1: `team.resources.luckyStone += 5` fired synchronously before the CHIRP! callout was displayed, so players saw the resource counter jump before seeing what caused it. Fixed: moved grant inside the `onShow` callback of `queueAbility` — Lucky Stones now appear exactly when the CHIRP! splash fires. Also moved `log()` and `checkKnightEffects()` inside the callback (same Tweak and Twonk v303 pattern).
