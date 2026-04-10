@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 57,
-      "remaining_mins": 179,
+      "cycles": 58,
+      "remaining_mins": 174,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T16:33:25.193468",
+      "last_update": "2026-04-10T16:36:29.801515",
       "status": "running",
-      "next_up": "Sweep for any remaining synchronous HP mutations in the cinematic pipeline \u2014 specifically Pudge (311) Belly Flop's `wF.hp -= 1` at line ~8842 (same class of bug; callout at line ~9198 has no HP display so lower priority but still fires early) and Puff Ball (355) Burst `wF.hp -= puffBurstDmg` at line ~8877 which fires before its callout.",
-      "after_that": "After clearing the deferred-HP sweep, audit the `doPreRollSetup` path for any remaining synchronous HP mutations in pre-roll modals that can KO ghosts \u2014 specifically Eloise (85) HP swap setting ghost to 0 HP before calling `doTeamRoll` unconditionally (noted in cycle 46's AFTER as still unfixed), and Tyler's `doTylerChoice` -2 HP spend path."
+      "next_up": "Sweep for any remaining synchronous HP mutations before callouts \u2014 specifically check Fang Undercover (7) Skilled Coward counter-damage and City Cyboo (77) Barrier absorption path, both of which were flagged in the cycle 56 AFTER note as potential targets for the same deferred-HP pattern.",
+      "after_that": "Audit the `doPreRollSetup` path for any remaining pre-roll modal handlers that can KO ghosts without routing to `handleKOs()` \u2014 specifically Eloise (85) and Tyler (105) were verified PASS in v333, but confirm Dallas (Quick Draw) and other damage-dealing pre-roll modals also have proper guards."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 58,
+      "summary": "Pudge (311) Belly Flop self-damage HP mutation now defers to `onShow` \u2014 `wF.hp` no longer drops silently during beat 4's `renderBattle()` (at t=1900ms); instead, it updates exactly when `BELLY FLOP!` flashes (t=2700ms+), matching the same cinematic fix applied to Thistle, Balatron, Guardian Fairy, King Jay, Bogey, Kodako, Patrick, and Aunt Susan.",
+      "next_up": "Sweep for any remaining synchronous HP mutations before callouts \u2014 specifically check Fang Undercover (7) Skilled Coward counter-damage and City Cyboo (77) Barrier absorption path, both of which were flagged in the cycle 56 AFTER note as potential targets for the same deferred-HP pattern.",
+      "after_that": "Audit the `doPreRollSetup` path for any remaining pre-roll modal handlers that can KO ghosts without routing to `handleKOs()` \u2014 specifically Eloise (85) and Tyler (105) were verified PASS in v333, but confirm Dallas (Quick Draw) and other damage-dealing pre-roll modals also have proper guards.",
+      "time": "16:36:36",
+      "timestamp": "2026-04-10T16:36:36.010688",
+      "roast": "Nine cards deep into the same \"defer HP to onShow\" patch and you're telling me nobody thought to just centralize it before hand-fixing Pudge's belly flop at 2700ms \u2014 September's going to love that copy-paste speedrun."
+    },
     {
       "target": "testroom",
       "cycle": 57,
@@ -519,19 +529,9 @@
       "time": "12:43:41",
       "timestamp": "2026-04-10T12:43:41.221014",
       "roast": "Third time patching the exact same overheal bug is less \"polish\" and more \"maybe read your own commit history before September, champ."
-    },
-    {
-      "target": "testroom",
-      "cycle": 8,
-      "summary": "Jeanie (90) Hidden Treasure forced reroll was silently discarded \u2014 `doJeanieChoice` wrote a new dice array to `B.pendingResolve` and `B.redDice/blueDice`, but `postRollDone()` (which runs after Jeanie) overwrote `B.pendingResolve` with `B.preRoll.*.dice` references that Jeanie never updated. Fixed by in-place `.splice()` on `B.preRoll.*.dice` (same Dark Wing/Sonya pattern), so the closure already has the new values when `postRollDone` runs.",
-      "next_up": "Audit Eloise (85) Change of Heart \u2014 pre-roll HP swap for 1 Ice Shard; need to verify the swap is symmetric, HP cap behavior (should the new HP be capped at maxHp or truly swapped raw?), and that the continuation/Selene chain is called correctly after the modal resolves.",
-      "after_that": "Audit Mallow (89) Dozy Cozy \u2014 sideline Sacred Fire-to-HP modal; verify the fire resource is properly decremented, HP is capped, Filbert curse flips to damage, and that it fires at the right point in doPreRollSetup.",
-      "time": "12:38:07",
-      "timestamp": "2026-04-10T12:38:07.746830",
-      "roast": "Three cards deep into the same closure bug and you're still rediscovering \"mutate the array Rosewater himself warned you about\" \u2014 at this rate Jeanie's Hidden Treasure will ship in October."
     }
   ],
-  "last_update": "2026-04-10T16:33:25.193723",
+  "last_update": "2026-04-10T16:36:36.010704",
   "orchestrator_check": {
     "timestamp": "2026-04-10T16:17:01.060805",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 50 cycles, 198m left | last [testroom c50]: Munch (66) Scraps and Troubling Haters (83) Growing Mob HP mutations now defer to `onShow` callbacks \u2014 HP bars no longer"
