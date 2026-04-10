@@ -1221,7 +1221,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v100';
+const TESTROOM_VERSION = 'v101';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1446,7 +1446,7 @@ const GHOSTS = [
   {id:321, name:"Forge Fire", rarity:"uncommon", maxHp:5, art:"art/forge_fire.webp", ability:"Temper", abilityDesc:"Spend 1 Surge: your next win deals double damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Surge as offensive fuel."},
   {id:323, name:"Char", rarity:"common", maxHp:4, art:"art/char.webp", ability:"Afterburn", abilityDesc:"Win: deal 1 damage at the start of next round.", category:"Debuff", set:"Volcanic Activity", designNote:"Delayed damage."},
   {id:325, name:"Magma Heart", rarity:"rare", maxHp:7, art:"art/magma_heart.webp", ability:"Core Melt", abilityDesc:"Below 3 HP: all your damage ignores damage reduction effects.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Eruption trigger — true damage when near death."},
-  {id:327, name:"Natalia", rarity:"ghost-rare", maxHp:6, art:"art/geode.jpg", ability:"Crack Open", abilityDesc:"When you roll double 2s or double 3s: gain 1 Moonstone.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Turns disaster into treasure."},
+  {id:327, name:"Natalia", rarity:"ghost-rare", maxHp:6, art:"art/geode.jpg", ability:"Materialization", abilityDesc:"When you roll even doubles (2s, 4s, or 6s): gain 1 Moonstone.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Even doubles reward. 2s, 4s, and 6s each trigger a Moonstone — covers weak and strong doubles alike."},
   {id:329, name:"Clink", rarity:"common", maxHp:3, art:"art/clink.webp", ability:"Prospect", abilityDesc:"Win: gain 1 Surge. Lose: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Always generates something."},
   {id:331, name:"Igneous", rarity:"uncommon", maxHp:5, art:"art/igneous.webp", ability:"Crystallize", abilityDesc:"Each round you don't take damage: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Rewards defense."},
   {id:333, name:"Smoke Signal", rarity:"common", maxHp:4, art:"art/smoke_signal.webp", ability:"Warning", abilityDesc:"Sideline: reveal opponent's sideline abilities.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"Information card. Passive recon."},
@@ -2308,11 +2308,11 @@ function hasDoubles(dice) {
   return Object.values(c).some(v => v >= 2);
 }
 
-// Helper: check if dice have double 2s or double 3s
-function hasDouble2sOr3s(dice) {
+// Helper: check if dice have even doubles (2s, 4s, or 6s)
+function hasEvenDoubles(dice) {
   const c = {};
   dice.forEach(d => c[d] = (c[d]||0)+1);
-  return (c[2] >= 2) || (c[3] >= 2);
+  return (c[2] >= 2) || (c[4] >= 2) || (c[6] >= 2);
 }
 
 // Boris (343) — Fortify: when surge is spent, Boris gains 2 HP (overclocks past maxHp)
@@ -3225,15 +3225,15 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Natalia (327) — double 2s or double 3s: gain 1 Moonstone
+  // Natalia (327) — even doubles (2s, 4s, 6s): gain 1 Moonstone
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameNat = team === B.red ? 'red' : 'blue';
-    if (f.id === 327 && !f.ko && hasDouble2sOr3s(dice)) {
+    if (f.id === 327 && !f.ko && hasEvenDoubles(dice)) {
       team.resources.moonstone++;
-      queueAbility('CRACK OPEN!', 'var(--ghost-rare)', `${f.name} — gained 1 Moonstone!`);
-      log(`<span class="log-ms">${f.name}</span> — Crack Open! Double 2s/3s → gained <span class="log-ms">1 Moonstone</span>!`);
+      queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`);
+      log(`<span class="log-ability">${f.name}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
       checkKnightEffects(tNameNat, f.name);
     }
   });
