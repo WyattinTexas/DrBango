@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v309';
+const TESTROOM_VERSION = 'v318';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1755,7 +1755,7 @@ const GHOSTS = [
   },
   {
     id:303, name:"Tweak and Twonk", rarity:"common", maxHp:6, art:"art/nugget.jpg",
-    ability:"Warm Belly", abilityDesc:"Sideline: if your active ghost ties, gain 3 Surge.",
+    ability:"Roaring Crowd", abilityDesc:"Sideline: if your active ghost ties, gain 4 Surge.",
     category:"Resource Generation", set:"Rolling Hills",
     designNote:"The wholesome chunky guy. Ties are ~13% — rare but 3 Surge is a jackpot."
   },
@@ -2884,7 +2884,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (team.resources.ice >= 2) {
       team.resources.ice -= 2;
       team.resources.moonstone++;
-      entryCallouts.push(['AQUATIC WISDOM!', 'var(--rare)', `${f.name} — 2 Ice → 1 Moonstone!`]);
+      entryCallouts.push(['AQUATIC WISDOM!', 'var(--ghost-rare)', `${f.name} — 2 Ice → 1 Moonstone!`]);
       log(`<span class="log-ability">${f.name}</span> — Aquatic Wisdom! Spent 2 Ice Shards, gained <span class="log-ms">1 Moonstone</span>!`);
       collectKnightReactions();
     }
@@ -2897,7 +2897,7 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['LEVIATHAN!', 'var(--rare)', `${f.name} — 3 entry damage to ${ef.name}!`]);
+      entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
@@ -2948,7 +2948,7 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['BIG TARGET!', 'var(--moonstone)', `${f.name} — 3 damage to ${ef.name}!`]);
+      entryCallouts.push(['BIG TARGET!', 'var(--rare)', `${f.name} — 3 damage to ${ef.name}!`]);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
@@ -2987,23 +2987,16 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Chad (56) — Sploop!: on entry, gain 2 Ice Shards
-  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Sploop.
   // Sandwiches (33) Dependable: opponent mirrors the Ice Shard gain.
   if (f.id === 56) {
-    if (hasSideline(enemy, 344)) {
-      const wispGC = getSidelineGhost(enemy, 344);
-      entryCallouts.push(['GUIDE LIGHT!', 'var(--common)', `${wispGC ? wispGC.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Sploop! entry.`]);
-      log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Sploop! entry (2 Ice Shards blocked).`);
-    } else {
-      team.resources.ice += 2;
-      entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`]);
-      log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
-      collectKnightReactions();
-      if (hasSideline(enemy, 33) && !hasSideline(team, 344)) {
-        enemy.resources.ice += 2;
-        entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`]);
-        log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
-      }
+    team.resources.ice += 2;
+    entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`]);
+    log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
+    collectKnightReactions();
+    if (hasSideline(enemy, 33)) {
+      enemy.resources.ice += 2;
+      entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`]);
+      log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
     }
   }
 
@@ -3368,13 +3361,13 @@ function useFinnForge(team, kind) {
     t.resources.ice -= 2;
     t.resources.moonstone++;
     log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
-    showAbilityCallout('FORGE!', 'var(--legendary)', 'Finn — 2 Ice Shards → 1 Moonstone!');
+    showAbilityCallout('FORGE!', 'var(--rare)', 'Finn — 2 Ice Shards → 1 Moonstone!');
   } else if (kind === 'fire') {
     if (t.resources.fire < 2) return;
     t.resources.fire -= 2;
     t.resources.moonstone++;
     log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
-    showAbilityCallout('FORGE!', 'var(--legendary)', 'Finn — 2 Sacred Fires → 1 Moonstone!');
+    showAbilityCallout('FORGE!', 'var(--rare)', 'Finn — 2 Sacred Fires → 1 Moonstone!');
   } else {
     return;
   }
@@ -3613,7 +3606,7 @@ function doSeleneChoice(choice) {
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
   // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline.
   // Capture totals at queue-build time (before any grant fires) so the preview subtitle is correct.
-  if (hasSideline(opp(sp.team), 33) && !hasSideline(sp.team, 344)) {
+  if (hasSideline(opp(sp.team), 33)) {
     if (choice === 'seed') {
       const _sandSeedOpp = opp(sp.team);
       const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 1;
@@ -6538,7 +6531,6 @@ function doPostRollAndResolve(redDice, blueDice) {
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
 
   // Hank (207) — each 4 rolled: gain 1 Lucky Stone (Tremor)
-  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Tremor.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
@@ -6546,101 +6538,74 @@ function doPostRollAndResolve(redDice, blueDice) {
     if (f.id === 207 && !f.ko) {
       const fours = countVal(dice, 4);
       if (fours > 0) {
-        if (hasSideline(opp(team), 344)) {
-          const wispG = getSidelineGhost(opp(team), 344);
-          queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispG ? wispG.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Tremor!`);
-          log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Tremor (${fours} four${fours>1?'s':''})!`);
-        } else {
-          const _tremFours = fours;
-          const _tremTeam = team;
-          const _tremName = f.name;
-          queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
-            _tremTeam.resources.luckyStone += _tremFours;
-            log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
-            renderBattle();
-          });
-          checkKnightEffects(tNameHank, f.name);
-          if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-            const _sandOpp = opp(team);
-            const _sandTotal = _sandOpp.resources.luckyStone + fours;
-            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); });
-          }
+        const _tremFours = fours;
+        const _tremTeam = team;
+        const _tremName = f.name;
+        queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
+          _tremTeam.resources.luckyStone += _tremFours;
+          log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
+          renderBattle();
+        });
+        checkKnightEffects(tNameHank, f.name);
+        if (hasSideline(opp(team), 33)) {
+          const _sandOpp = opp(team);
+          const _sandTotal = _sandOpp.resources.luckyStone + fours;
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); });
         }
       }
     }
   });
 
   // Selene (305) — doubles: choose 1 Healing Seed OR 2 Lucky Stones (deferred modal)
-  // Wisp (344) Guide Light: blocks Selene's resource choice — if opponent has Wisp, skip the modal offer.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameSel = team === B.red ? 'red' : 'blue';
     if (f.id === 305 && !f.ko && classify(dice).type === 'doubles') {
-      if (!hasSideline(opp(team), 344)) {
-        B.selenePending = { team, tName: tNameSel };
-      } else {
-        const wispGSel = getSidelineGhost(opp(team), 344);
-        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGSel ? wispGSel.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s doubles reward!`);
-        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Selene bonus!`);
-      }
+      B.selenePending = { team, tName: tNameSel };
     }
   });
 
   // Natalia (327) — even doubles (2s, 4s, 6s): gain 1 Moonstone
-  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Materialization.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameNat = team === B.red ? 'red' : 'blue';
     if (f.id === 327 && !f.ko && hasEvenDoubles(dice)) {
-      if (hasSideline(opp(team), 344)) {
-        const wispGNat = getSidelineGhost(opp(team), 344);
-        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGNat ? wispGNat.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Materialization!`);
-        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Materialization!`);
-      } else {
-        const _natTeam = team;
-        const _natName = f.name;
-        const _natSandOpp = opp(team);
-        const _natSandTotal = _natSandOpp.resources.moonstone + 1;
-        queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`, () => {
-          _natTeam.resources.moonstone++;
-          log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
-          renderBattle();
-        });
-        checkKnightEffects(tNameNat, f.name);
-        if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone++; renderBattle(); });
-        }
+      const _natTeam = team;
+      const _natName = f.name;
+      const _natSandOpp = opp(team);
+      const _natSandTotal = _natSandOpp.resources.moonstone + 1;
+      queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`, () => {
+        _natTeam.resources.moonstone++;
+        log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
+        renderBattle();
+      });
+      checkKnightEffects(tNameNat, f.name);
+      if (hasSideline(opp(team), 33)) {
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone++; renderBattle(); });
       }
     }
   });
 
   // Kaplan (308) — when OPPONENT rolls doubles: gain 1 Healing Seed
-  // Wisp (344) Guide Light: opponent cannot gain resources this round — blocks Pollinate.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const oppDice = team === B.red ? blueDice : redDice;
     const tNameKap = team === B.red ? 'red' : 'blue';
     if (f.id === 308 && !f.ko && classify(oppDice).type === 'doubles') {
-      if (hasSideline(opp(team), 344)) {
-        const wispGKap = getSidelineGhost(opp(team), 344);
-        queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispGKap ? wispGKap.name : 'Wisp'} — Guide Light! Blocks ${f.name}'s Pollinate!`);
-        log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Pollinate!`);
-      } else {
-        const _kapTeam = team;
-        const _kapName = f.name;
-        const _kapSandOpp = opp(team);
-        const _kapSandTotal = _kapSandOpp.resources.healingSeed + 1;
-        queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`, () => {
-          _kapTeam.resources.healingSeed++;
-          log(`<span class="log-ability">${_kapName}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
-          renderBattle();
-        });
-        checkKnightEffects(tNameKap, f.name);
-        if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); });
-        }
+      const _kapTeam = team;
+      const _kapName = f.name;
+      const _kapSandOpp = opp(team);
+      const _kapSandTotal = _kapSandOpp.resources.healingSeed + 1;
+      queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`, () => {
+        _kapTeam.resources.healingSeed++;
+        log(`<span class="log-ability">${_kapName}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
+        renderBattle();
+      });
+      checkKnightEffects(tNameKap, f.name);
+      if (hasSideline(opp(team), 33)) {
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); });
       }
     }
   });
@@ -7345,31 +7310,24 @@ function resolveRound() {
     abilityQueue = [];
     abilityQueueMode = true;
 
-    // Tweak and Twonk (303) — sideline: tie → gain 3 Surge
-    // Wisp (344) — Guide Light: blocks the Surge grant.
+    // Tweak and Twonk (303) — sideline: tie → gain 4 Surge (Roaring Crowd)
     // Sandwiches (33) — Dependable: mirrors the Surge grant to opponent.
     [B.red, B.blue].forEach(team => {
       const tNameTie = team === B.red ? 'red' : 'blue';
       if (hasSideline(team, 303)) {
         const tweakGhost = getSidelineGhost(team, 303);
         const oppTeamTweak = opp(team);
-        const wispBlocksTweak = hasSideline(oppTeamTweak, 344);
         const sandwichMirrorsTweak = hasSideline(oppTeamTweak, 33);
-        const surgeTotal = team.resources.surge + 3;
-        if (wispBlocksTweak) {
-          queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks Tweak and Twonk's Warm Belly!`);
-          log(`<span class="log-ability">Wisp</span> — Guide Light blocks Tweak and Twonk's Warm Belly!`);
-        } else {
-          queueAbility('WARM BELLY!', '#a855f7', `Tweak and Twonk — Tie! +3 Surge! (${surgeTotal} total)`, () => {
-            team.resources.surge += 3;
-            popSidelineCard(team, 303);
-            log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Warm Belly! Tie → gained <span class="log-ms">3 Surge</span>!`);
-            checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
-            renderBattle();
-          });
-          if (sandwichMirrorsTweak && !hasSideline(team, 344)) {
-            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Warm Belly! +3 Surge! (${oppTeamTweak.resources.surge + 3} total)`, () => { oppTeamTweak.resources.surge += 3; renderBattle(); });
-          }
+        const surgeTotal = team.resources.surge + 4;
+        queueAbility('ROARING CROWD!', '#a855f7', `Tweak and Twonk — Tie! +4 Surge! (${surgeTotal} total)`, () => {
+          team.resources.surge += 4;
+          popSidelineCard(team, 303);
+          log(`<span class="log-ability">Tweak and Twonk</span> (sideline) — Roaring Crowd! Tie → gained <span class="log-ms">4 Surge</span>!`);
+          checkKnightEffects(tNameTie, 'Tweak and Twonk', tweakGhost);
+          renderBattle();
+        });
+        if (sandwichMirrorsTweak) {
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Roaring Crowd! +4 Surge! (${oppTeamTweak.resources.surge + 4} total)`, () => { oppTeamTweak.resources.surge += 4; renderBattle(); });
         }
       }
     });
@@ -7380,23 +7338,16 @@ function resolveRound() {
       const tNameJim = team === B.red ? 'red' : 'blue';
       if (f.id === 352 && !f.ko) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
-        const wispBlocksJim = hasSideline(oppTeamJim, 344);
         const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
         const lsTotal = team.resources.luckyStone + 7;
-        if (wispBlocksJim) {
-          const wispNameJim = getSidelineGhost(oppTeamJim, 344);
-          queueAbility('GUIDE LIGHT!', 'var(--common)', `${wispNameJim} — Guide Light! Blocks Jimmy's Chirp!`);
-          log(`<span class="log-ability">Wisp</span> — Guide Light blocks Jimmy's Chirp!`);
-        } else {
-          queueAbility('CHIRP!', '#fbbf24', `${f.name} — Tie! +7 Lucky Stones! (${lsTotal} total)`, () => {
-            team.resources.luckyStone += 7;
-            log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">7 Lucky Stones</span>!`);
-            checkKnightEffects(tNameJim, f.name);
-            renderBattle();
-          });
-          if (sandwichMirrorsJim && !hasSideline(team, 344)) {
-            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +7 Lucky Stones! (${oppTeamJim.resources.luckyStone + 7} total)`, () => { oppTeamJim.resources.luckyStone += 7; renderBattle(); });
-          }
+        queueAbility('CHIRP!', '#fbbf24', `${f.name} — Tie! +7 Lucky Stones! (${lsTotal} total)`, () => {
+          team.resources.luckyStone += 7;
+          log(`<span class="log-ability">${f.name}</span> — Chirp! Tie → gained <span class="log-ms">7 Lucky Stones</span>!`);
+          checkKnightEffects(tNameJim, f.name);
+          renderBattle();
+        });
+        if (sandwichMirrorsJim) {
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +7 Lucky Stones! (${oppTeamJim.resources.luckyStone + 7} total)`, () => { oppTeamJim.resources.luckyStone += 7; renderBattle(); });
         }
       }
     });
@@ -7573,22 +7524,15 @@ function resolveRound() {
       const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
-        const wispBlocksMax = hasSideline(oppTeamMax, 344);
         const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
-        const wispBlocksMirror   = hasSideline(team, 344);
-        if (wispBlocksMax) {
-          queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks ${f.name}'s Nap seed!`);
-          log(`<span class="log-ability">Wisp</span> — Guide Light blocks ${f.name}'s Nap seed!`);
-        } else {
-          queueAbility('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`, () => {
-            team.resources.healingSeed++;
-            log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
-            checkKnightEffects(tNameMax, f.name);
-            renderBattle();
-          });
-          if (sandwichMirrorsMax && !wispBlocksMirror) {
-            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeamMax.resources.healingSeed + 1} total)`, () => { oppTeamMax.resources.healingSeed++; renderBattle(); });
-          }
+        queueAbility('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`, () => {
+          team.resources.healingSeed++;
+          log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
+          checkKnightEffects(tNameMax, f.name);
+          renderBattle();
+        });
+        if (sandwichMirrorsMax) {
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeamMax.resources.healingSeed + 1} total)`, () => { oppTeamMax.resources.healingSeed++; renderBattle(); });
         }
       }
     });
@@ -7693,15 +7637,6 @@ function resolveRound() {
   // sandwichForWin  = Sandwiches on winTeam bench  → mirrors loseTeam Special grants to winTeam.
   const sandwichForLose = hasSideline(loseTeam, 33);
   const sandwichForWin  = hasSideline(winTeam, 33);
-  // Wisp (344) — Guide Light: sideline passive — opponent cannot gain resources this round.
-  // wispBlocksWin  = Wisp on loseTeam bench → winTeam (loseTeam's opponent) cannot gain resources.
-  // wispBlocksLose = Wisp on winTeam bench  → loseTeam (winTeam's opponent) cannot gain resources.
-  const wispBlocksWin  = hasSideline(loseTeam, 344);
-  const wispBlocksLose = hasSideline(winTeam, 344);
-  let wispGuideWin  = false; // tracks if GUIDE LIGHT! has fired for winTeam block this round
-  let wispGuideLose = false; // tracks if GUIDE LIGHT! has fired for loseTeam block this round
-  const wispAnnWin  = () => { if (!wispGuideWin)  { wispGuideWin  = true; const wN = getSidelineGhost(loseTeam, 344); queueAbility('GUIDE LIGHT!', 'var(--common)', `${wN ? wN.name : 'Wisp'} (sideline) — ${winTeam.name} cannot gain resources this round!`); } };
-  const wispAnnLose = () => { if (!wispGuideLose) { wispGuideLose = true; const wN = getSidelineGhost(winTeam, 344); queueAbility('GUIDE LIGHT!', 'var(--common)', `${wN ? wN.name : 'Wisp'} (sideline) — ${loseTeam.name} cannot gain resources this round!`); } };
   const wF = active(winTeam);
   const lF = active(loseTeam);
   // Per-ghost first-roll tracking for Nikon (2) Ambush and Cave Dweller (46) Lurk.
@@ -7746,11 +7681,7 @@ function resolveRound() {
     }
     log(`<span class="log-ms">Sacred Fires committed!</span> <span class="log-dmg">+${fireDmg} damage!</span>${tylerWins ? ' (Heating Up ×2!)' : ''}`);
 
-    // Eternal Flame (406) — Sacred Fires not discarded (callout is queued later)
-    if (winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
-      winTeam.resources.fire += B.committed[winTeamName].fire;
-      log(`<span class="log-ability">Fed and Hayden</span> — Eternal Flame! Sacred Fires not discarded!`);
-    }
+    // Eternal Flame (406) — Sacred Fires not discarded (grant deferred to ETERNAL FLAME! onShow)
   }
 
   // Aunt Susan (309) — +2 damage per seed committed
@@ -9109,15 +9040,13 @@ function resolveRound() {
   }
   // Harvest Moon (346) — Reaping: defeat a ghost → gain 1 Healing Seed, 1 Sacred Fire, 1 Surge
   if (harvestMoonTriggered) {
-    if (wispBlocksWin) { wispAnnWin(); } else {
-      queueAbility('REAPING!', 'var(--rare)', `${wF.name} — ${lF.name} defeated! The harvest comes in: +1 Healing Seed, +1 Sacred Fire, +1 Surge!`, () => {
+    queueAbility('REAPING!', 'var(--rare)', `${wF.name} — ${lF.name} defeated! The harvest comes in: +1 Healing Seed, +1 Sacred Fire, +1 Surge!`, () => {
         winTeam.resources.healingSeed++;
         winTeam.resources.fire++;
         winTeam.resources.surge++;
         renderBattle();
       });
-    }
-    if (sandwichForLose && !wispBlocksLose) {
+    if (sandwichForLose) {
       queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Reaping! +1 Healing Seed, +1 Sacred Fire, +1 Surge!`, () => {
         loseTeam.resources.healingSeed++;
         loseTeam.resources.fire++;
@@ -9155,8 +9084,8 @@ function resolveRound() {
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards
   if (garyOnesWin > 0) {
     const garyWinIceTotal = winTeam.resources.ice + garyOnesWin;
-    if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesWin} rolled 1${garyOnesWin > 1 ? 's' : ''}! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${garyWinIceTotal} total)`, () => { winTeam.resources.ice += garyOnesWin; renderBattle(); }); }
-    if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${loseTeam.resources.ice + garyOnesWin} total)`, () => { loseTeam.resources.ice += garyOnesWin; renderBattle(); });
+    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesWin} rolled 1${garyOnesWin > 1 ? 's' : ''}! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${garyWinIceTotal} total)`, () => { winTeam.resources.ice += garyOnesWin; renderBattle(); });
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${loseTeam.resources.ice + garyOnesWin} total)`, () => { loseTeam.resources.ice += garyOnesWin; renderBattle(); });
   }
   if (banditPeteTriggered) {
     const bpWhoQ = winDice && winDice.length === 2 ? 'Your ghost rolled only 2 dice!' : 'Opponent rolled only 2 dice!';
@@ -9224,9 +9153,15 @@ function resolveRound() {
     else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`);
   }
 
-  // Eternal Flame callout
+  // Eternal Flame callout — grant fires in onShow so counter updates when the splash fires, not before
   if (B.committed[winTeamName].fire > 0 && winTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
-    queueAbility('ETERNAL FLAME!', 'var(--magma)', `Fed and Hayden — Sacred Fires preserved!`);
+    const _etFlameTeam = winTeam;
+    const _etFlameCount = B.committed[winTeamName].fire;
+    queueAbility('ETERNAL FLAME!', 'var(--magma)', `Fed and Hayden — ${_etFlameCount} Sacred Fire${_etFlameCount > 1 ? 's' : ''} preserved!`, () => {
+      _etFlameTeam.resources.fire += _etFlameCount;
+      log(`<span class="log-ability">Fed and Hayden</span> — Eternal Flame! ${_etFlameCount} Sacred Fire${_etFlameCount > 1 ? 's' : ''} not discarded! (${_etFlameTeam.resources.fire} total)`);
+      renderBattle();
+    });
   }
 
   // Prince Balatron (113) — Party Time counter-attack callout (loser fires back after main damage)
@@ -9378,12 +9313,12 @@ function resolveRound() {
   }
 
   // On-win callouts — onShow grants the resource the moment the splash appears (not 800ms earlier at Beat 4)
-  if (wF.id === 209 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`, () => { winTeam.resources.surge += 2; renderBattle(); }); } }
-  if (wF.id === 209 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Plunder! +2 Surge! (${loseTeam.resources.surge + 2} total)`, () => { loseTeam.resources.surge += 2; renderBattle(); });
-  if (wF.id === 307 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`, () => { winTeam.resources.surge++; winTeam.resources.ice++; renderBattle(); }); } }
-  if (wF.id === 307 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; renderBattle(); });
-  if (wF.id === 81 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('VALLEY MAGIC!', 'var(--rare)', `${wF.name} — Win! +2 Ice Shards! (${winTeam.resources.ice + 2} total)`, () => { winTeam.resources.ice += 2; renderBattle(); }); } }
-  if (wF.id === 81 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; renderBattle(); });
+  if (wF.id === 209 && !wF.ko) { queueAbility('PLUNDER!', 'var(--magma)', `${wF.name} — Win! +2 Surge!`, () => { winTeam.resources.surge += 2; renderBattle(); }); }
+  if (wF.id === 209 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Plunder! +2 Surge! (${loseTeam.resources.surge + 2} total)`, () => { loseTeam.resources.surge += 2; renderBattle(); });
+  if (wF.id === 307 && !wF.ko) { queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`, () => { winTeam.resources.surge++; winTeam.resources.ice++; renderBattle(); }); }
+  if (wF.id === 307 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; renderBattle(); });
+  if (wF.id === 81 && !wF.ko) { queueAbility('VALLEY MAGIC!', 'var(--rare)', `${wF.name} — Win! +2 Ice Shards! (${winTeam.resources.ice + 2} total)`, () => { winTeam.resources.ice += 2; renderBattle(); }); }
+  if (wF.id === 81 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; renderBattle(); });
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
     const _dieCounts = {};
@@ -9391,13 +9326,13 @@ function resolveRound() {
     const _pairCount = Object.values(_dieCounts).filter(c => c >= 2).length;
     if (_pairCount >= 2) {
       const _newFires = winTeam.resources.fire + 3;
-      if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('TEMPEST!', 'var(--uncommon)', `${wF.name} — 2 pairs! Boom shaka laka! +3 Sacred Fires! (${_newFires} total)`, () => { winTeam.resources.fire += 3; renderBattle(); }); }
-      if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tempest! +3 Sacred Fires! (${loseTeam.resources.fire + 3} total)`, () => { loseTeam.resources.fire += 3; renderBattle(); });
+      queueAbility('TEMPEST!', 'var(--uncommon)', `${wF.name} — 2 pairs! Boom shaka laka! +3 Sacred Fires! (${_newFires} total)`, () => { winTeam.resources.fire += 3; renderBattle(); });
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tempest! +3 Sacred Fires! (${loseTeam.resources.fire + 3} total)`, () => { loseTeam.resources.fire += 3; renderBattle(); });
     }
   }
   // Ashley (58) — Burning Soul: win a roll → gain +1 Sacred Fire
-  if (wF.id === 58 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('BURNING SOUL!', 'var(--uncommon)', `${wF.name} — Win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }); } }
-  if (wF.id === 58 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Burning Soul! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
+  if (wF.id === 58 && !wF.ko) { queueAbility('BURNING SOUL!', 'var(--uncommon)', `${wF.name} — Win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }); }
+  if (wF.id === 58 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Burning Soul! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
   // Opa (48) — Rest: win → gain +1 HP (capped at maxHp)
   // Mr Filbert (59) — Mask Merchant: flips the +1 heal to -1 damage when on enemy sideline.
   if (wF.id === 48 && !wF.ko) {
@@ -9491,13 +9426,13 @@ function resolveRound() {
       queueAbility('OVERCLOCK!', 'var(--moonstone)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); });
     }
   }
-  if (wF.id === 336 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }); } }
-  if (wF.id === 336 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sacred Flame! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
-  if (wF.id === 309 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }); } }
-  if (wF.id === 309 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
+  if (wF.id === 336 && !wF.ko) { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }); }
+  if (wF.id === 336 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sacred Flame! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
+  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', '#22c55e', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }); }
+  if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
   // Penny (316) — Forager: win a roll → gain 1 Healing Seed
-  if (wF.id === 316 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('FORAGER!', '#22c55e', `${wF.name} — Win! +1 Healing Seed! (${winTeam.resources.healingSeed + 1} total)`, () => { winTeam.resources.healingSeed++; renderBattle(); }); } }
-  if (wF.id === 316 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Forager! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
+  if (wF.id === 316 && !wF.ko) { queueAbility('FORAGER!', '#22c55e', `${wF.name} — Win! +1 Healing Seed! (${winTeam.resources.healingSeed + 1} total)`, () => { winTeam.resources.healingSeed++; renderBattle(); }); }
+  if (wF.id === 316 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Forager! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
   // Splinter (101) — Toxic Fumes: first win triggers activation callout
   if (splinterJustActivated) {
     queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`);
@@ -9508,26 +9443,24 @@ function resolveRound() {
     queueAbility('AFTERBURN!', 'var(--common)', `${wF.name} — Win! The afterburn is primed — 1 damage coming next round!`);
   }
   // Clink (329) — Prospect: win → gain 1 Surge
-  if (wF.id === 329 && !wF.ko) { if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('PROSPECT!', 'var(--common)', `${wF.name} — Win! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }); } }
-  if (wF.id === 329 && !wF.ko && sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Prospect (win)! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
+  if (wF.id === 329 && !wF.ko) { queueAbility('PROSPECT!', 'var(--common)', `${wF.name} — Win! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }); }
+  if (wF.id === 329 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Prospect (win)! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
   // Igneous (331) — Crystallize: won (no damage taken) → gain 1 Surge
   if (wF.id === 331 && !wF.ko) {
-    if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('CRYSTALLIZE!', 'var(--uncommon)', `${wF.name} — Won! Took no damage — Crystallize! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }); }
-    if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Crystallize! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
+    queueAbility('CRYSTALLIZE!', 'var(--uncommon)', `${wF.name} — Won! Took no damage — Crystallize! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Crystallize! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
     log(`<span class="log-ability">${wF.name}</span> — Crystallize! Won → +1 Surge.`);
   }
   // Fuego (337) — Fiesta: win with triples → gain 1 of every resource (Fire + Ice Shard + Healing Seed + Surge)
   if (wF.id === 337 && !wF.ko && wR.type === 'triples') {
-    if (wispBlocksWin) { wispAnnWin(); } else {
-      queueAbility('FIESTA!', 'var(--uncommon)', `${wF.name} — TRIPLES JACKPOT! +1 Sacred Fire, +1 Ice Shard, +1 Healing Seed, +1 Surge!`, () => {
+    queueAbility('FIESTA!', 'var(--uncommon)', `${wF.name} — TRIPLES JACKPOT! +1 Sacred Fire, +1 Ice Shard, +1 Healing Seed, +1 Surge!`, () => {
         winTeam.resources.fire++;
         winTeam.resources.ice++;
         winTeam.resources.healingSeed++;
         winTeam.resources.surge++;
         renderBattle();
       });
-    }
-    if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Fiesta! +1 of every resource!`, () => {
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Fiesta! +1 of every resource!`, () => {
       loseTeam.resources.fire++;
       loseTeam.resources.ice++;
       loseTeam.resources.healingSeed++;
@@ -9546,40 +9479,40 @@ function resolveRound() {
   if (duskTwilight) queueAbility('TWILIGHT!', 'var(--uncommon)', `${wF.name} — Round ${B.round}: Twilight! +1 bonus damage!`);
   if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
-    if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('HARVEST!', '#22c55e', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; popSidelineCard(winTeam, 314); renderBattle(); }); }
-    if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; renderBattle(); });
+    queueAbility('HARVEST!', '#22c55e', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; popSidelineCard(winTeam, 314); renderBattle(); });
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; renderBattle(); });
   }
 
   // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
   if (simonBrewTriggered) {
     const simonFireTotal = loseTeam.resources.fire + 1;
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
+    queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
   }
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {
     const sadSalIceTotal = loseTeam.resources.ice + 1;
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('TOUGH JOB!', 'var(--common)', `${lF.name} — Lost the roll... but gained 1 Ice Shard! (${sadSalIceTotal} total)`, () => { loseTeam.resources.ice++; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tough Job! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; renderBattle(); });
+    queueAbility('TOUGH JOB!', 'var(--common)', `${lF.name} — Lost the roll... but gained 1 Ice Shard! (${sadSalIceTotal} total)`, () => { loseTeam.resources.ice++; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tough Job! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; renderBattle(); });
   }
 
   // Gary (92) — Lucky Novice: lose-team Gary — 1s in losing dice still grant ice shards (you rolled them!)
   if (garyOnesLose > 0) {
     const garyLoseIceTotal = loseTeam.resources.ice + garyOnesLose;
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''}! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${garyLoseIceTotal} total)`, () => { loseTeam.resources.ice += garyOnesLose; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${winTeam.resources.ice + garyOnesLose} total)`, () => { winTeam.resources.ice += garyOnesLose; renderBattle(); });
+    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''}! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${garyLoseIceTotal} total)`, () => { loseTeam.resources.ice += garyOnesLose; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${winTeam.resources.ice + garyOnesLose} total)`, () => { winTeam.resources.ice += garyOnesLose; renderBattle(); });
   }
 
   // On-lose callouts — onShow applies the surge grant with the splash
-  if (lF.id === 404 && !lF.ko) { if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); } }
+  if (lF.id === 404 && !lF.ko) { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
   // Clink (329) — Prospect: lose → gain 1 Surge
-  if (lF.id === 329 && !lF.ko) { if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('PROSPECT!', 'var(--common)', `${lF.name} — Lost the roll but gained 1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); }); } }
-  if (lF.id === 329 && !lF.ko && sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Prospect (lose)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
+  if (lF.id === 329 && !lF.ko) { queueAbility('PROSPECT!', 'var(--common)', `${lF.name} — Lost the roll but gained 1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); }); }
+  if (lF.id === 329 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Prospect (lose)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
   // Igneous (331) — Crystallize: lost the roll but damage was fully negated (dmg === 0) → gain 1 Surge
   if (lF.id === 331 && !lF.ko && dmg === 0) {
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('CRYSTALLIZE!', 'var(--uncommon)', `${lF.name} — Lost but took no damage — Crystallize! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Crystallize! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
+    queueAbility('CRYSTALLIZE!', 'var(--uncommon)', `${lF.name} — Lost but took no damage — Crystallize! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Crystallize! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
     log(`<span class="log-ability">${lF.name}</span> — Crystallize! Damage negated → +1 Surge.`);
   }
 
@@ -9587,44 +9520,44 @@ function resolveRound() {
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
       if (wR.type === 'singles') {
-        if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); }); }
-        if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); });
+        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); });
       } else if (wR.type === 'doubles') {
-        if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { loseTeam.resources.surge++; popSidelineCard(loseTeam, 310); renderBattle(); }); }
-        if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
+        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { loseTeam.resources.surge++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
       } else if (isTripleOrBetter(wR.type)) {
-        if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); }); }
-        if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); });
+        queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); });
       }
     }
-    if (lF.id === 404) { if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); } }
+    if (lF.id === 404) { queueAbility('BITTER END!', 'var(--magma)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
   }
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
   if (wF.ko && hasSideline(winTeam, 310)) {
     if (wR.type === 'singles') {
-      if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); }); }
-      if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); });
+      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); });
     } else if (wR.type === 'doubles') {
-      if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { winTeam.resources.surge++; popSidelineCard(winTeam, 310); renderBattle(); }); }
-      if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
+      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — doubles KO → Surge!`, () => { winTeam.resources.surge++; popSidelineCard(winTeam, 310); renderBattle(); });
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Surge! (${loseTeam.resources.surge + 1} total)`, () => { loseTeam.resources.surge++; renderBattle(); });
     } else if (isTripleOrBetter(wR.type)) {
-      if (wispBlocksWin) { wispAnnWin(); } else { queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); }); }
-      if (sandwichForLose && !wispBlocksLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); });
+      queueAbility('BEDTIME STORY!', '#fbbf24', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); });
     }
   }
 
   // Powder (23) — Final Gift: KO'd → loseTeam gains 3 Ice Shards (onShow deferred for visual sync)
   if (powderFinalGiftTriggered) {
     const powderIceTotal = loseTeam.resources.ice + 3;
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; renderBattle(); });
+    queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; renderBattle(); });
   }
 
   // Mulch (348) — Decompose: KO'd → loseTeam gains 2 Healing Seeds (onShow deferred for visual sync)
   if (mulchDecomposeTriggered) {
     const mulchSeedTotal = loseTeam.resources.healingSeed + 2;
-    if (wispBlocksLose) { wispAnnLose(); } else { queueAbility('DECOMPOSE!', 'var(--common)', `${lF.name} — Defeated... but leaves 2 Healing Seeds behind! (${mulchSeedTotal} total)`, () => { loseTeam.resources.healingSeed += 2; renderBattle(); }); }
-    if (sandwichForWin && !wispBlocksWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Decompose! +2 Healing Seeds! (${winTeam.resources.healingSeed + 2} total)`, () => { winTeam.resources.healingSeed += 2; renderBattle(); });
+    queueAbility('DECOMPOSE!', 'var(--common)', `${lF.name} — Defeated... but leaves 2 Healing Seeds behind! (${mulchSeedTotal} total)`, () => { loseTeam.resources.healingSeed += 2; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Decompose! +2 Healing Seeds! (${winTeam.resources.healingSeed + 2} total)`, () => { winTeam.resources.healingSeed += 2; renderBattle(); });
   }
 
   // Ash Phoenix (361) — Rebirth primer: announce the upcoming resurrection so players know it's coming
@@ -9764,22 +9697,15 @@ function resolveRound() {
   }
 
   // End-of-round callouts — Maximo seed granted with NAP! splash via onShow
-  // Wisp (344) — Guide Light: opponent cannot gain resources this round → blocks Maximo's seed.
   // Sandwiches (33) — Dependable: if opponent gains a seed, you mirror it.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     if (f.id === 302 && !f.ko) {
       const isWinSide = team === winTeam;
-      const wispBlocksMaximo = isWinSide ? wispBlocksWin : wispBlocksLose;
-      const sandwichMirrors   = isWinSide ? sandwichForLose : sandwichForWin;
-      const oppTeam           = isWinSide ? loseTeam : winTeam;
-      const oppWispBlocks     = isWinSide ? wispBlocksLose : wispBlocksWin;
-      if (wispBlocksMaximo) {
-        queueAbility('GUIDE LIGHT!', 'var(--common)', `Wisp — Guide Light! Blocks ${f.name}'s Nap seed!`);
-      } else {
-        queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
-        if (sandwichMirrors && !oppWispBlocks) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeam.resources.healingSeed + 1} total)`, () => { oppTeam.resources.healingSeed++; renderBattle(); });
-      }
+      const sandwichMirrors = isWinSide ? sandwichForLose : sandwichForWin;
+      const oppTeam         = isWinSide ? loseTeam : winTeam;
+      queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
+      if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeam.resources.healingSeed + 1} total)`, () => { oppTeam.resources.healingSeed++; renderBattle(); });
     }
   });
 

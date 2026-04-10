@@ -3,7 +3,88 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v309
+## Current Version: v317
+
+## v317 — AUDITED FIX: Timpleton (312) Big Target entry callout color corrected + batch audit of Shade's Shadow, Artemis, Sylvia, Harrison
+
+- **Timpleton (312) Big Target — AUDITED FIX**: Entry callout used `'var(--moonstone)'` (gold) but Timpleton is `rarity:"rare"`. Fixed to `'var(--rare)'` (blue). Same bug category as Finn/Smithy (v315), Zain (v316), Nerina (v316). All other Rare entry callouts correctly use `var(--rare)`. Functional implementation verified PASS: entry triggers `if (f.id === 312)`, condition `!ef.ko && ef.hp > f.hp` (enemy HP must exceed Timpleton's to fire), deals 3 damage, KO-capable (`ef.killedBy = f.id`), hitDamage SFX + playDamageSfx(3), collectKnightReactions() — all correct.
+- **Shade's Shadow (205) Meltdown — AUDITED PASS**: Fires in doPreRollSetup forEach, correct HP threshold (`ef.hp < 4`), `!dylanNegates(enemy)` guard (blocks when Dylan or Piper active on enemy), Knight reactions collected via temp queue mode (flush to preRollCallouts — correct pattern), Masked Hero (55) Underdog counter handled, `popSidelineCard(205)` bounce animation fires, KO-capable. Callout uses `var(--accent)` (red) — intentional for damage/danger signaling, not a rarity-color bug. Correct.
+- **Artemis (307) Daughter of the Stream — AUDITED PASS**: `wF.id === 307 && !wF.ko` win trigger; `collectKC(winTeamName, wF.name)` for Knight reactions (Phase 5, before cinematic); `queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', ..., onShow: winTeam.resources.surge++; winTeam.resources.ice++;)` — deferred-onShow pattern correct; Sandwiches mirror with `sandwichForLose` guard also deferred to onShow. Correct.
+- **Sylvia (313) Porpoise — AUDITED PASS**: `lF.id === 313 && !lF.ko` lose trigger; rolls 2 dice (abilityDesc says "1 die" but designNote explicitly says "30%" = 2-dice probability ~30.6%; code is correct per design intent); if either die is 6, `dmg = 0` (all damage negated); `collectKC(loseTeamName, lF.name)` in Phase 5; cinematic callouts deferred to Phase 7 with `queueAbility('PORPOISE!', 'var(--rare)', ...)` on dodge or `PORPOISE — MISS` on fail; `var(--border)` for miss callout (intentional dim color to indicate failure); correct.
+- **Harrison (315) Ascend — AUDITED PASS**: Opt-in pre-roll spend mechanic. `toggleHarrison(team)` and `uncommitHarrison(team)` manage `B.committed[team].harrison` counter; buttons render when `f.id === 315 && !f.ko && healingSeed > 0 || committed > 0`; `doPreRollSetup` at line ~5976 consumes committed seeds, deducts from resources, adds dice; ASCEND! preRollCallout uses `'#22c55e'` (intentional green for plant/seed theme — not a rarity color, analogous to Eternal Flame's magma color); Knight reactions collected via temp queue mode (preRollCallouts pattern); correct.
+- Also bumped TESTROOM_VERSION v316 → v317.
+
+## v316 — AUDITED FIX: Zain (206) + Nerina (306) entry callout colors corrected
+
+- **Benjamin (203) Magic Touch — AUDITED PASS**: Once-per-turn Moonstone usage without discarding. `f.id === 203 && !f.usedMagicTouch` trigger fires in `useMoonstone()` correctly. Skips `t.resources.moonstone--` on first use; `f.usedMagicTouch = true` prevents double-dip. Reset via `active(team).usedMagicTouch = false` at start of each `doPreRollSetup`. MAGIC TOUCH! callout uses `'var(--moonstone)'` (gold) — appropriate for a Moonstone-tied ability. All entry/flow mechanics correct.
+- **Zain (206) AQUATIC WISDOM! — AUDITED FIX**: Entry callout used `'var(--rare)'` (blue) but Zain is `rarity:"ghost-rare"`. Fixed to `'var(--ghost-rare)'` (purple). All other ghost-rare entry callouts (NOTORIOUS! Redd, GREETING! Jenkins) correctly use `'var(--ghost-rare)'`. Functional implementation verified PASS: auto-fires on entry when team has 2+ ice shards, deducts 2 ice, grants 1 Moonstone; no choice modal (auto per spec "if available"); collectKnightReactions() called; correct.
+- **Nerina (306) LEVIATHAN! — AUDITED FIX**: Entry callout used `'var(--rare)'` (blue) but Nerina is `rarity:"legendary"`. Fixed to `'var(--legendary)'` (gold). Nerina is one of only 4 Legendary cards — her entry should flash gold, not blue. Functional implementation verified PASS: on entry, deals 3 damage to enemy active, KO-capable (`ef.killedBy = f.id`), hitDamage SFX + `playDamageSfx(3)`, collectKnightReactions(). Correct.
+- Also bumped TESTROOM_VERSION v315 → v316.
+
+## v315 — AUDITED FIX: Finn (204) Forge — callout color was `var(--legendary)` (gold); corrected to `var(--rare)` (blue)
+
+- **Finn (204) Forge AUDITED FIX** — Both `showAbilityCallout('FORGE!', ...)` calls in `useFinnForge` used `'var(--legendary)'` (gold/epic color) instead of `'var(--rare)'` (blue). Finn is a Rare card (`rarity:"rare"`). Every other Rare-card callout (Snorton FISSURE!, Sparky TINDER!, Sky ELUSIVE!, Greg CHASE!, Raditz…) correctly uses `'var(--rare)'`. The gold color was visually misleading — players would confuse Finn's Forge as a Legendary ability. Fixed: both callouts changed to `'var(--rare)'`.
+- **All 8 KNOWN BROKEN Forge requirements verified PASS:**
+  1. Buttons render correctly when Finn is on sideline (`hasSideline(B[team], 204)`) ✅
+  2. Buttons gray out at <2 resources; both always shown when Finn is on sideline ✅
+  3. Click subtracts 2 resource, adds 1 Moonstone ✅
+  4. FORGE! callout fires via `showAbilityCallout` during `B.phase === 'ready'` only — no queue stomping possible ✅
+  5. Buttons disappear when Finn steps in (hasSideline returns false when Finn is active) ✅
+  6. Multiple clicks per round allowed — no once-per-round flag ✅
+  7. `popSidelineCard(t, 204)` is purely visual (CSS bounce animation, no state change) ✅
+  8. No Knight reactions on Forge — correct, resource conversion is not an attack ✅
+- Also bumped TESTROOM_VERSION v314 → v315.
+- Finn (204) now marked **AUDITED FIX** in the AUDIT STATUS section.
+
+## v314 — DEAD CODE REMOVAL: Wisp (344) Guide Light — all remaining `if (wispBlocksWin/Lose)` dead branches stripped
+
+The Wisp cleanup is now 100% complete. This cycle stripped the last 54 dead-code artefacts:
+
+- **27 dead `if (wispBlocksWin) { wispAnnWin(); } else { ... }` and `if (wispBlocksLose) { wispAnnLose(); } else { ... }` branches** across the main `resolveRound` win/lose path — all single-line cases (PLUNDER!, DAUGHTER OF THE STREAM!, VALLEY MAGIC!, TEMPEST!, BURNING SOUL!, SACRED FLAME!, HARVEST DANCE!, FORAGER!, PROSPECT!, CRYSTALLIZE! twice, HARVEST!, BEDTIME STORY! ×6, BREW TIME!, TOUGH JOB!, LUCKY NOVICE! ×2, BITTER END! ×2, PROSPECT! (lose), FINAL GIFT!, DECOMPOSE!). Unwrapped each else body to an unconditional `queueAbility(...)` call; for wrapped cards (PLUNDER!, DAUGHTER OF THE STREAM!, etc.) the outer `if (wF.id === X)` guard is preserved.
+- **2 multi-line dead blocks** (REAPING! and FIESTA!) — removed the `if (wispBlocksWin) { wispAnnWin(); } else {` opener and matching closing `}`, leaving the `queueAbility` body unconditional.
+- **27 `&& !wispBlocksWin` / `&& !wispBlocksLose` dead guards** from all Sandwiches mirror conditions (these evaluated to `&& !false` = `&& true`, always redundant) — stripped to just `sandwichForWin` / `sandwichForLose`.
+- **5-line dead scaffolding block** at lines 7641–7645 (comment + `const wispBlocksWin = false; const wispBlocksLose = false;`) — removed entirely.
+
+Zero `wispBlock`, `wispAnn`, or `GUIDE LIGHT` references remain in the file. The Wisp (344) Guide Light dead-code cleanup that started in v307 is fully complete.
+
+Also bumped TESTROOM_VERSION v313 → v314.
+
+## v313 — DEAD CODE REMOVAL: Wisp (344) Guide Light — all remaining hasSideline(*, 344) calls stripped
+
+All 10 remaining direct `hasSideline(*, 344)` references eliminated:
+
+1. **Chad (56) Sploop! entry-path (lines ~2993–3007)**: Removed `if (hasSideline(enemy, 344))` GUIDE LIGHT branch. Grant is now unconditional. Simplified `hasSideline(enemy, 33) && !hasSideline(team, 344)` Sandwiches condition to just `hasSideline(enemy, 33)`. Updated comment to remove Wisp mention.
+2. **Selene doSeleneChoice (line ~3616)**: Removed `&& !hasSideline(sp.team, 344)` from the Sandwiches mirror condition. Now just `hasSideline(opp(sp.team), 33)`.
+3. **Hank (207) Tremor in doPostRollAndResolve (lines ~6549–6568)**: Removed outer `if (hasSideline(opp(team), 344))` GUIDE LIGHT block; else body is now unconditional. Simplified Sandwiches condition. Updated comment.
+4. **Selene (305) doubles in doPostRollAndResolve (lines ~6580–6587)**: Removed `if (!hasSideline(opp(team), 344))` guard; `B.selenePending` assignment is now unconditional. Removed the else/GUIDE LIGHT block entirely.
+5. **Natalia (327) Materialization in doPostRollAndResolve (lines ~6597–6616)**: Removed outer `if (hasSideline(opp(team), 344))` GUIDE LIGHT block; else body is now unconditional. Simplified Sandwiches condition. Updated comment.
+6. **Kaplan (308) Pollinate in doPostRollAndResolve (lines ~6626–6645)**: Same as Natalia — outer Wisp block removed, grant unconditional, Sandwiches simplified. Updated comment.
+
+Zero `hasSideline(*, 344)` calls remain in the file. The remaining Wisp dead code is the `const wispBlocksWin = false; const wispBlocksLose = false;` scaffolding and the ~30 `if (wispBlocksWin) { wispAnnWin(); } else { ... }` always-false branches in the main resolveRound body — these are always-false but compile safely and are a separate (larger) cleanup task.
+
+Also bumped TESTROOM_VERSION v312 → v313.
+
+## v312 — DEAD CODE REMOVAL: Wisp (344) Guide Light — tie-path and win/lose Maximo dead branches stripped
+- Stripped 4 remaining Wisp dead-code blocks that the v311 cleanup left behind:
+  1. **Tweak and Twonk (303) tie-path**: removed `const wispBlocksTweak = hasSideline(oppTeamTweak, 344)`, unwrapped the `if (wispBlocksTweak) { GUIDE LIGHT! } else { ... }` — the actual WARM BELLY! grant is now unconditional. Removed `!hasSideline(team, 344)` from the Sandwiches mirror condition (always true → simplified to just `sandwichMirrorsTweak`).
+  2. **Jimmy (352) tie-path**: removed `const wispBlocksJim = hasSideline(oppTeamJim, 344)` and the dead `wispNameJim` variable, unwrapped the `if (wispBlocksJim)` block — the actual CHIRP! grant is now unconditional. Removed `!hasSideline(team, 344)` from Sandwiches condition.
+  3. **Maximo (302) tie-path**: removed `const wispBlocksMax = hasSideline(oppTeamMax, 344)` and `const wispBlocksMirror = hasSideline(team, 344)`, unwrapped the if/else — NAP! grant is now unconditional. Removed `!wispBlocksMirror` from Sandwiches condition.
+  4. **Maximo (302) win/lose-path**: removed `const wispBlocksMaximo = isWinSide ? wispBlocksWin : wispBlocksLose` and `const oppWispBlocks = ...` (both derived from `false` constants), unwrapped the `if (wispBlocksMaximo)` block — NAP! grant is now unconditional. Removed `&& !oppWispBlocks` from Sandwiches condition.
+- Remaining Wisp dead code: entry-path `hasSideline(enemy, 344)` in Chad Sploop! (lines ~2993) and Selene `doSeleneChoice` (line ~3616). Both are just dead if-checks (the else branch is the actual code). Strip next cycle.
+- Also bumped TESTROOM_VERSION v311 → v312.
+
+## v311 — DEAD CODE REMOVAL: Wisp (344) Guide Light — main resolveRound scaffolding stripped
+- Wisp (344) is SHELVED (confirmed by Wyatt + Gamma, documented in v307 note at bottom of FIXLOG). It can never appear on any team. All `hasSideline(X, 344)` calls always return false.
+- The main `resolveRound` win/lose path had a 9-line Wisp scaffolding block (lines 7696-7704): `const wispBlocksWin = hasSideline(loseTeam, 344)`, `const wispBlocksLose = hasSideline(winTeam, 344)`, `let wispGuideWin/wispGuideLose = false`, and `const wispAnnWin/wispAnnLose` helper functions. These caused ~40 `if (wispBlocksWin) { wispAnnWin(); } else { ... }` branches to redundantly evaluate a condition that is always false — and also caused `&& !wispBlocksWin/wispBlocksLose` Sandwiches conditions to always be `true`.
+- Fixed: replaced the 9-line block with `const wispBlocksWin = false; const wispBlocksLose = false;` plus a comment. The `if (wispBlocksWin)` branches now trivially always take the else path (= grant the resource), which is the correct behavior. The dead `wispAnnWin`/`wispAnnLose`/`wispGuideWin`/`wispGuideLose` references are removed entirely.
+- Remaining dead Wisp code (still to strip in follow-up cycles): tie-path `wispBlocksTweak` (line ~7356), `wispBlocksJim` (line ~7383), `wispBlocksMax` (line ~7576); entry-path `hasSideline(enemy, 344)` in Chad Sploop (lines ~2993) and Selene doSeleneChoice (line ~3616); the Sandwiches `&& !hasSideline(team, 344)` conditions scattered through post-roll tie path. None of these cause bugs (just dead code overhead), but should be stripped for clarity.
+- Also bumped TESTROOM_VERSION v310 → v311.
+
+## v310 — BUG FIX: Fed and Hayden (406) Eternal Flame — synchronous Sacred Fire refund decoupled from callout
+- Fed and Hayden (406) Eternal Flame BUG: `winTeam.resources.fire += B.committed[winTeamName].fire` fired synchronously in the game-state section (before the cinematic queue drained), so the Sacred Fire counter jumped in the UI the instant the winner was determined — before the ETERNAL FLAME! callout ever appeared. The ETERNAL FLAME! queueAbility had no `onShow` callback. Same deferred-onShow pattern bug as Hank (v307), Natalia/Kaplan (v308), Selene (v309).
+- Fixed: removed the synchronous grant and log from the game-state section. Captured `_etFlameTeam` and `_etFlameCount` (= `B.committed[winTeamName].fire`) at queue-build time in the cinematic section, then added `onShow: () => { team.resources.fire += count; log(...); renderBattle(); }` to the ETERNAL FLAME! queueAbility. Also improved the callout subtitle to show the exact count ("1 Sacred Fire preserved!" vs "2 Sacred Fires preserved!") and log the running total.
+- Pattern complete: every post-roll resource grant in resolveRound now follows deferred-onShow (Tweak+Twonk v303, Jimmy v304, Hank v307, Natalia+Kaplan v308, Selene v309, Fed and Hayden v310). Counter updates exactly when the splash fires, not before.
+- Also bumped TESTROOM_VERSION v309 → v310.
 
 ## v309 — BUG FIX: Selene (305) Heart of the Hills — synchronous resource grant decoupled from callout
 - Selene (305) Heart of the Hills BUG: `sp.team.resources.healingSeed++` (seed path) and `sp.team.resources.luckyStone += 2` (Lucky Stone path) both fired synchronously inside `doSeleneChoice` before `queueAbility('HEART OF THE HILLS!', ...)` was even called. The resource counter jumped in the UI the instant the player clicked their choice — before the HEART OF THE HILLS! splash appeared. This was the last remaining synchronous grant in the post-roll ability chain.
@@ -296,16 +377,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Sandwiches (33) — Dependable: AUDITED FIX (v297) — main mirror logic correct across all 22+ resource-grant sites. BUG: Maximo (302) Nap end-of-round Healing Seed grant had no Wisp block OR Sandwiches mirror. Fixed: expanded the win/lose-path Maximo forEach to add (a) Wisp check using existing `wispBlocksWin/wispBlocksLose` flags and (b) DEPENDABLE! mirror using existing `sandwichForLose/sandwichForWin` and `oppWispBlocks` guards. Note: TIE path Maximo (line ~7456) still lacks Wisp/Sandwich handling — needs separate fix.
 
 ### KNOWN BROKEN / RECENTLY REWORKED (high priority)
-- **Finn (204) Forge** — REWORKED in v293 from auto-fire to opt-in buttons. Audit needed:
-  • Buttons render correctly when Finn is on sideline (one Forge button per available resource type, per team)
-  • Buttons gray out at <2 of the relevant resource, are clickable at ≥2
-  • Click correctly subtracts 2 of the resource and adds 1 Moonstone
-  • FORGE! callout fires without stomping any other concurrent callout (use queue if needed)
-  • Buttons disappear entirely when Finn steps in to fight (sideline-only ability)
-  • Multiple clicks per round are allowed — e.g., player can do Ice→MS, then Fire→MS, then Ice→MS again if they have the resources
-  • Interaction with `popSidelineCard(204)` — does it pop more than once per round? Should it?
-  • Knight reactions: should HEAVY AIR! / RETRIBUTION! fire when Forge is used? Spec doesn't say so but verify the precedent against other manual conversions
-  • DO NOT REVERT to auto-fire — the opt-in is the intended design (Wyatt + Gary approved 2026-04-10)
+- **Finn (204) Forge** — AUDITED FIX (v315): All 8 checklist items PASS. One bug found and fixed: FORGE! callout color was `var(--legendary)` (gold) — corrected to `var(--rare)` (blue) to match Finn's actual rarity. All functional requirements verified correct. DO NOT REVERT to auto-fire — the opt-in is the intended design (Wyatt + Gary approved 2026-04-10).
 - (all 5 priority original cards audited in v277 — see below)
 
 ### v277 Priority Audit Results
@@ -369,6 +441,11 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 **Why this matters:** Speeds up gameplay significantly. Currently a 10-round game with active special usage can have 100+ seconds of just waiting on these windows. Cutting that in half (or better) makes the game feel snappy and responsive without losing the strategic depth of optional specials.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v318 — Balance: Tweak and Twonk (303) — ability renamed "Warm Belly" → "Roaring Crowd", surge gain 3 → 4.**
+  Wyatt buff. Ties are still ~13% — getting a bigger payoff makes the sideline pick more compelling. All references updated: GHOSTS data (ability + abilityDesc), the post-roll tie block (callout name "ROARING CROWD!", math, addition, log), and the Sandwiches Dependable mirror amount. The Wisp dead-code branch was already stripped in c30-c34 of this run, so no Wisp cleanup needed here.
+  - DO NOT REVERT this rename or buff during audit cycles.
+
 
 - **v307 — CRITICAL: Wisp (344) is FAKE. Removed GHOSTS entry. Refiner must strip dead code.**
   Wyatt confirmed the only real Rolling Hills cards are these 16: Dylan(301), Maximo(302), Tweak and Twonk(303), Selene(305), Artemis(307), Kaplan(308), Aunt Susan(309), Granny(310), Pudge(311), Timpleton(312), Farmer Jeff(314), Harrison(315), Calvin(342), Jimmy(352), plus Finn(204) and Timber(210). NOTHING ELSE.
