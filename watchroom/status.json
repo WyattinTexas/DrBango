@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 56,
-      "remaining_mins": 181,
+      "cycles": 57,
+      "remaining_mins": 179,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T16:28:59.864565",
+      "last_update": "2026-04-10T16:33:25.193468",
       "status": "running",
-      "next_up": "Audit Prince Balatron (113) Party Time counter-die \u2014 `wF.hp = Math.max(0, wF.hp - balatronCounterDie)` is still synchronous at line ~8850; same class of bug; should be deferred to `onShow` so the counter-die damage lands cinematically with the PARTY TIME! callout.",
-      "after_that": "After Balatron, sweep for any remaining synchronous HP mutations before callouts in the cinematic pipeline \u2014 specifically check Fang Undercover (7) Skilled Coward (it fires right after Guardian Fairy in the same section and also deals damage) and City Cyboo (77) Barrier (damage-negation path may have a log-vs-callout timing issue)."
+      "next_up": "Sweep for any remaining synchronous HP mutations in the cinematic pipeline \u2014 specifically Pudge (311) Belly Flop's `wF.hp -= 1` at line ~8842 (same class of bug; callout at line ~9198 has no HP display so lower priority but still fires early) and Puff Ball (355) Burst `wF.hp -= puffBurstDmg` at line ~8877 which fires before its callout.",
+      "after_that": "After clearing the deferred-HP sweep, audit the `doPreRollSetup` path for any remaining synchronous HP mutations in pre-roll modals that can KO ghosts \u2014 specifically Eloise (85) HP swap setting ghost to 0 HP before calling `doTeamRoll` unconditionally (noted in cycle 46's AFTER as still unfixed), and Tyler's `doTylerChoice` -2 HP spend path."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 57,
+      "summary": "Thistle (338) Barbed and Prince Balatron (113) Party Time \u2014 both counter-damage HP mutations now defer to `onShow` callbacks, so winners' HP bars drop exactly when BARBED!/PARTY TIME! callouts fire instead of silently 800ms earlier during beat 4's renderBattle.",
+      "next_up": "Sweep for any remaining synchronous HP mutations in the cinematic pipeline \u2014 specifically Pudge (311) Belly Flop's `wF.hp -= 1` at line ~8842 (same class of bug; callout at line ~9198 has no HP display so lower priority but still fires early) and Puff Ball (355) Burst `wF.hp -= puffBurstDmg` at line ~8877 which fires before its callout.",
+      "after_that": "After clearing the deferred-HP sweep, audit the `doPreRollSetup` path for any remaining synchronous HP mutations in pre-roll modals that can KO ghosts \u2014 specifically Eloise (85) HP swap setting ghost to 0 HP before calling `doTeamRoll` unconditionally (noted in cycle 46's AFTER as still unfixed), and Tyler's `doTylerChoice` -2 HP spend path.",
+      "time": "16:33:25",
+      "timestamp": "2026-04-10T16:33:25.193717",
+      "roast": "Three lines changed. Fourteen lines of commit message. The ratio concerns me."
+    },
     {
       "target": "testroom",
       "cycle": 56,
@@ -519,19 +529,9 @@
       "time": "12:38:07",
       "timestamp": "2026-04-10T12:38:07.746830",
       "roast": "Three cards deep into the same closure bug and you're still rediscovering \"mutate the array Rosewater himself warned you about\" \u2014 at this rate Jeanie's Hidden Treasure will ship in October."
-    },
-    {
-      "target": "testroom",
-      "cycle": 7,
-      "summary": "Sonya (69) Mesmerize die change was silently discarded every round \u2014 `pickSonyaDie` created a new array copy that `postRollDone` immediately overwrote; fixed by mutating `B.preRoll.red.dice` in-place (same Dark Wing pattern) so the closure sees the change.",
-      "next_up": "Audit Sky (72) \u2014 next unaudited Rare card; need to find its abilityDesc in the GHOSTS array and verify the implementation matches spec.",
-      "after_that": "Audit Flora (75), Dark Wing (76), and City Cyboo (77) \u2014 all three are in the Rare tier, marked NEEDS AUDIT, and may have similar closure/mutation bugs given they're post-roll dice modifiers.",
-      "time": "12:30:45",
-      "timestamp": "2026-04-10T12:30:45.585186",
-      "roast": "Five months to Kickstarter and we just discovered that Sonya's signature ability has been quietly committing sudoku every round because someone forgot JavaScript passes references like a hot potato \u2014 at least Dark Wing left you a recipe."
     }
   ],
-  "last_update": "2026-04-10T16:29:08.071050",
+  "last_update": "2026-04-10T16:33:25.193723",
   "orchestrator_check": {
     "timestamp": "2026-04-10T16:17:01.060805",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 50 cycles, 198m left | last [testroom c50]: Munch (66) Scraps and Troubling Haters (83) Growing Mob HP mutations now defer to `onShow` callbacks \u2014 HP bars no longer"
