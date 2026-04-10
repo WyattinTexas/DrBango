@@ -1640,7 +1640,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v300';
+const TESTROOM_VERSION = 'v293';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1700,7 +1700,7 @@ const GHOSTS = [
   },
   {
     id:204, name:"Finn", rarity:"rare", maxHp:6, art:"art/finn.png",
-    ability:"Forge", abilityDesc:"Sideline: convert 2 Ice Shards or 2 Sacred Fires into 1 Moonstone each round.",
+    ability:"Forge", abilityDesc:"Sideline: you may convert 2 Ice Shards or 2 Sacred Fires into 1 Moonstone each round.",
     category:"Resource Generation", set:"Volcanic Activity",
     designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Activity's Moonstone plays. Deckbuilding archetype creator. (Originally named Smithy.)"
   },
@@ -3344,6 +3344,32 @@ function toggleHarrison(team) {
   renderBattle();
 }
 
+function useFinnForge(team, kind) {
+  if (!B || B.phase !== 'ready') return;
+  const t = B[team];
+  // Finn must still be on the sideline (alive)
+  if (!hasSideline(t, 204)) return;
+  // Must have enough of the chosen resource
+  if (kind === 'ice') {
+    if (t.resources.ice < 2) return;
+    t.resources.ice -= 2;
+    t.resources.moonstone++;
+    log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
+    showAbilityCallout('FORGE!', 'var(--legendary)', 'Finn — 2 Ice Shards → 1 Moonstone!');
+  } else if (kind === 'fire') {
+    if (t.resources.fire < 2) return;
+    t.resources.fire -= 2;
+    t.resources.moonstone++;
+    log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
+    showAbilityCallout('FORGE!', 'var(--legendary)', 'Finn — 2 Sacred Fires → 1 Moonstone!');
+  } else {
+    return;
+  }
+  popSidelineCard(t, 204);
+  playSfx('sfxSpecial', 0.5);
+  renderBattle();
+}
+
 function uncommitHarrison(team) {
   if (!B || B.phase !== 'ready') return;
   const t = B[team];
@@ -3569,6 +3595,14 @@ function doSeleneChoice(choice) {
   abilityQueueMode = true;
   queueAbility('HEART OF THE HILLS!', 'var(--legendary)', subtitle);
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
+  // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline
+  if (hasSideline(opp(sp.team), 33) && !hasSideline(sp.team, 344)) {
+    if (choice === 'seed') {
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +1 Healing Seed! (${opp(sp.team).resources.healingSeed + 1} total)`, () => { opp(sp.team).resources.healingSeed++; renderBattle(); });
+    } else {
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +2 Lucky Stones! (${opp(sp.team).resources.luckyStone + 2} total)`, () => { opp(sp.team).resources.luckyStone += 2; renderBattle(); });
+    }
+  }
   abilityQueueMode = false;
   renderBattle();
   // drainAbilityQueue plays each splash 1300ms apart and calls cont() after all finish.
@@ -5960,33 +5994,7 @@ function doPreRollSetup() {
     }
   });
 
-  // Smithy (204) — sideline: convert 2 Ice Shards or 2 Sacred Fires into 1 Moonstone
-  [B.red, B.blue].forEach(team => {
-    if (hasSideline(team, 204)) {
-      const forgeIce  = team.resources.ice  >= 2;
-      const forgeFire = team.resources.fire >= 2;
-      if (!forgeIce && !forgeFire) return;
-
-      let parts = [];
-      if (forgeIce) {
-        team.resources.ice -= 2;
-        team.resources.moonstone++;
-        log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
-        parts.push('2 Ice Shards → 1 Moonstone');
-      }
-      if (forgeFire) {
-        team.resources.fire -= 2;
-        team.resources.moonstone++;
-        log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
-        parts.push('2 Sacred Fires → 1 Moonstone');
-      }
-
-      // Single callout covers both conversions — no second call stomping the first
-      const calloutDesc = `Finn — ${parts.join(' + ')}!`;
-      preRollCallouts.push(['FORGE!', 'var(--legendary)', calloutDesc]);
-      popSidelineCard(team, 204);
-    }
-  });
+  // Finn (204) — Forge: now an OPT-IN button (see useFinnForge), no auto-conversion
 
   // ========================================
   // PHASE 2: COMPUTE DICE COUNTS (rolled later per-click)
@@ -6527,6 +6535,9 @@ function doPostRollAndResolve(redDice, blueDice) {
           queueAbility('TREMOR!', 'var(--uncommon)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`);
           log(`<span class="log-ability">${f.name}</span> — Tremor! Gained <span class="log-ms">${fours} Lucky Stone${fours>1?'s':''}</span>!`);
           checkKnightEffects(tNameHank, f.name);
+          if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
+            queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${opp(team).resources.luckyStone + fours} total)`, () => { opp(team).resources.luckyStone += fours; renderBattle(); });
+          }
         }
       }
     }
@@ -6565,6 +6576,9 @@ function doPostRollAndResolve(redDice, blueDice) {
         queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 1 Moonstone!`);
         log(`<span class="log-ability">${f.name}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
         checkKnightEffects(tNameNat, f.name);
+        if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${opp(team).resources.moonstone + 1} total)`, () => { opp(team).resources.moonstone++; renderBattle(); });
+        }
       }
     }
   });
@@ -6585,6 +6599,9 @@ function doPostRollAndResolve(redDice, blueDice) {
         queueAbility('POLLINATE!', '#22c55e', `${f.name} — opponent's doubles = free Healing Seed!`);
         log(`<span class="log-ability">${f.name}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
         checkKnightEffects(tNameKap, f.name);
+        if (hasSideline(opp(team), 33) && !hasSideline(team, 344)) {
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${opp(team).resources.healingSeed + 1} total)`, () => { opp(team).resources.healingSeed++; renderBattle(); });
+        }
       }
     }
   });
@@ -10631,6 +10648,28 @@ function renderBattle() {
       if (f.id === 315 && !f.ko && (B[team].resources.healingSeed > 0 || B.committed[team].harrison > 0)) {
         const cnt = B.committed[team].harrison;
         html += `<button class="ability-btn ${cnt>0?'committed':'pressure'}" onclick="toggleHarrison('${team}')" oncontextmenu="event.preventDefault();uncommitHarrison('${team}')" style="${cnt>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${cnt>0?' (+'+cnt+' dice)':''}</button>`;
+      }
+      // Finn (204) — Forge: opt-in conversion buttons when Finn is on sideline
+      if (hasSideline(B[team], 204)) {
+        const r = B[team].resources;
+        const canIce  = r.ice  >= 2;
+        const canFire = r.fire >= 2;
+        if (canIce || canFire) {
+          if (canIce) {
+            html += `<button class="ability-btn pressure" onclick="useFinnForge('${team}','ice')" title="Finn (sideline) — convert 2 Ice Shards into 1 Moonstone" style="border-color:#67e8f9;color:#67e8f9;">🔨 Forge: 2❄️ → 💎</button>`;
+          } else {
+            html += `<button class="ability-btn" disabled title="Need 2 Ice Shards" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🔨 Forge: 2❄️ → 💎</button>`;
+          }
+          if (canFire) {
+            html += `<button class="ability-btn pressure" onclick="useFinnForge('${team}','fire')" title="Finn (sideline) — convert 2 Sacred Fires into 1 Moonstone" style="border-color:#fb923c;color:#fb923c;">🔨 Forge: 2🔥 → 💎</button>`;
+          } else {
+            html += `<button class="ability-btn" disabled title="Need 2 Sacred Fires" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔨 Forge: 2🔥 → 💎</button>`;
+          }
+        } else {
+          // Show both as disabled so the player knows the option exists
+          html += `<button class="ability-btn" disabled title="Need 2 Ice Shards" style="opacity:0.4;border-color:#67e8f9;color:#67e8f9;">🔨 Forge: 2❄️ → 💎</button>`;
+          html += `<button class="ability-btn" disabled title="Need 2 Sacred Fires" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔨 Forge: 2🔥 → 💎</button>`;
+        }
       }
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
