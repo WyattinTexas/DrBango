@@ -1655,7 +1655,7 @@ header .sub { color:var(--text2); font-size:13px; margin-top:4px; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v331';
+const TESTROOM_VERSION = 'v332';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -1727,7 +1727,7 @@ const GHOSTS = [
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
-    ability:"Ice Blade", abilityDesc:"Before rolling: you may spend 1 Ice Shard + 1 Moonstone to forge an Ice Blade. Once forged, you may swing it before any roll for +2 damage on a win. The blade is permanent (until Zain falls), but each swing is your choice — hit hard or hit soft.",
+    ability:"Ice Blade", abilityDesc:"Before rolling: you may spend 1 Ice Shard + 1 Moonstone to forge an Ice Blade. Once forged, you may swing it before any roll for +1 die AND +2 damage on a win. The blade is permanent (until Zain falls), but each swing is your choice — hit hard or hit soft.",
     category:"Resource Generation", set:"Volcanic Activity",
     designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Activity (the other is the whale, Nerina)."
   },
@@ -2914,7 +2914,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Maximo (302) — Nap: first roll is 1 die
   if (f.id === 302) {
     f.maximoFirstRoll = true;
-    entryCallouts.push(['NAP!', '#22c55e', `${f.name} — first roll is 1 die only!`]);
+    entryCallouts.push(['NAP!', 'var(--common)', `${f.name} — first roll is 1 die only!`]);
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
     collectKnightReactions();
   }
@@ -3392,8 +3392,8 @@ function useZainForge(team) {
   t.resources.ice -= 1;
   t.resources.moonstone -= 1;
   f.iceBladeForged = true;
-  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Swing it before a roll for +2 damage on a win.`);
-  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — swing it before a roll for +2 damage on a win!`);
+  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Swing it before a roll for +1 die and +2 damage on a win.`);
+  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — swing it before a roll for +1 die and +2 damage on a win!`);
   playSfx('sfxSpecial', 0.5);
   renderBattle();
 }
@@ -6175,7 +6175,7 @@ function doPreRollSetup() {
       if (tName === 'red') redCount = 1;
       else blueCount = 1;
       f.maximoFirstRoll = false;
-      preRollCallouts.push(['NAP!', '#22c55e', `${f.name} — still napping, rolling only 1 die!`]);
+      preRollCallouts.push(['NAP!', 'var(--common)', `${f.name} — still napping, rolling only 1 die!`]);
       log(`<span class="log-ability">${f.name}</span> is still napping — rolling only 1 die!`);
     }
   });
@@ -6474,6 +6474,24 @@ function doPreRollSetup() {
         const oc = borisBlueG.hp > borisBlueG.maxHp;
         preRollCallouts.push(['FORTIFY!', 'var(--uncommon)', `${borisBlueG.name} — Surge spent! +2 HP (${borisBlueRePre}→${borisBlueG.hp}/${borisBlueG.maxHp}${oc ? ' · overclocked!' : ''})`]);
       }
+    }
+  }
+
+  // Zain (206) — Ice Blade swing: +1 die while the blade is swinging (in addition to the post-roll +2 dmg on win)
+  if (B.committed.red.zainBlade > 0) {
+    const zainRed = active(B.red);
+    if (zainRed && zainRed.id === 206 && !zainRed.ko && zainRed.iceBladeForged) {
+      redCount += 1;
+      preRollCallouts.push(['ICE BLADE!', 'var(--ghost-rare)', `${zainRed.name} swings the Ice Blade — +1 die this roll!`]);
+      log(`<span class="log-ability">${zainRed.name}</span> — Ice Blade swinging! <span class="log-ice">+1 die</span> this roll (and +2 damage on win).`);
+    }
+  }
+  if (B.committed.blue.zainBlade > 0) {
+    const zainBlue = active(B.blue);
+    if (zainBlue && zainBlue.id === 206 && !zainBlue.ko && zainBlue.iceBladeForged) {
+      blueCount += 1;
+      preRollCallouts.push(['ICE BLADE!', 'var(--ghost-rare)', `${zainBlue.name} swings the Ice Blade — +1 die this roll!`]);
+      log(`<span class="log-ability">${zainBlue.name}</span> — Ice Blade swinging! <span class="log-ice">+1 die</span> this roll (and +2 damage on win).`);
     }
   }
 
@@ -7709,7 +7727,7 @@ function resolveRound() {
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
         const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
-        queueAbility('NAP!', '#22c55e', `${f.name} — Healing Seed while napping!`, () => {
+        queueAbility('NAP!', 'var(--common)', `${f.name} — Healing Seed while napping!`, () => {
           team.resources.healingSeed++;
           log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
           checkKnightEffects(tNameMax, f.name);
@@ -9913,7 +9931,7 @@ function resolveRound() {
       const isWinSide = team === winTeam;
       const sandwichMirrors = isWinSide ? sandwichForLose : sandwichForWin;
       const oppTeam         = isWinSide ? loseTeam : winTeam;
-      queueAbility('NAP!', '#fbbf24', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
+      queueAbility('NAP!', 'var(--common)', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); });
       if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeam.resources.healingSeed + 1} total)`, () => { oppTeam.resources.healingSeed++; renderBattle(); });
     }
   });
@@ -10651,7 +10669,7 @@ function renderCardSlot(ghost, isFighter) {
       }
       // Zain (206) — Ice Blade: persistent forged status
       if (ghost.id === 206 && !ghost.ko && ghost.iceBladeForged) {
-        statusHtml += `<span class="status-tag" style="background:rgba(103,232,249,0.18);color:#67e8f9;border:1px solid rgba(103,232,249,0.45);" title="Ice Blade forged — +2 damage on every winning roll">🗡️ Ice Blade</span>`;
+        statusHtml += `<span class="status-tag" style="background:rgba(103,232,249,0.18);color:#67e8f9;border:1px solid rgba(103,232,249,0.45);" title="Ice Blade forged — swing for +1 die and +2 damage on win">🗡️ Ice Blade</span>`;
       }
             // Smithy (204) Forge indicator:
       // • Smithy on sideline → show Forge state on the active fighter's card
@@ -10895,7 +10913,7 @@ function renderBattle() {
         } else {
           // Already forged — show swing toggle
           const swung = (B.committed[team].zainBlade || 0) > 0;
-          html += `<button class="ability-btn ${swung?'committed':'pressure'}" onclick="toggleZainBlade('${team}')" title="${swung?'Sheathing — click to swing for +2 damage on win':'Swing the Ice Blade — +2 damage if Zain wins this roll'}" style="border-color:#67e8f9;color:${swung?'#fff':'#67e8f9'};${swung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${swung?'Ice Blade SWINGING (+2 dmg on win)':'Swing Ice Blade'}</button>`;
+          html += `<button class="ability-btn ${swung?'committed':'pressure'}" onclick="toggleZainBlade('${team}')" title="${swung?'Sheathing — click to swing for +1 die AND +2 damage on win':'Swing the Ice Blade — +1 die to your roll AND +2 damage if Zain wins this roll'}" style="border-color:#67e8f9;color:${swung?'#fff':'#67e8f9'};${swung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${swung?'Ice Blade SWINGING (+1 die, +2 dmg on win)':'Swing Ice Blade'}</button>`;
         }
       }
       // Smudge (403) — Blackout: name a number

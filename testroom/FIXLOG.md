@@ -3,7 +3,16 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v331
+## Current Version: v332
+
+## v332 — BALANCE: Zain (206) Ice Blade — swing now grants +1 die in addition to +2 damage on win
+
+- **Diagnosis (Wyatt + Gary)**: Zain was "Doom with one less HP and a fuse." Two team slots are spent setting up Ice Blade (one for Ice Shard, one for Moonstone resources), but the payoff was only +2 damage IF Zain won his roll — roughly a coin flip. The bigger payoff wasn't reachable often enough to justify the forge cost.
+- **Fix (purely additive)**: When the Ice Blade swing flag is committed for the round (`B.committed[team].zainBlade > 0`), Zain gains +1 die on top of the existing +2-damage-on-win. No other changes — the blade still forges the same way, still costs the same, still persists until Zain falls, and the swing is still opt-in per round.
+- **Implementation**: Added a committed-resource dice bonus block in `doPreRollSetup` directly after the Committed Surge block. Mirrors the Surge/Retribution/Let's Dance/Haywire pattern — modifies `redCount`/`blueCount` locally before `B.preRoll` is stored, gated on `zainBlade` commit + `iceBladeForged` + active + not KO. Posts an ICE BLADE! pre-roll callout and a log line.
+- **UI / tooltip updates**: Zain's `abilityDesc` card text now reads "+1 die AND +2 damage on a win". The swing button tooltip and label show "+1 die, +2 dmg on win". The forged-status tag tooltip and the forge callout/log line also updated to mention +1 die.
+- **No round-to-round state added**. The +1 die rides the existing per-round `committed.zainBlade` flag, which is already reset at end of round alongside all other committed resources. Fully within the "everything resolves within the round" rule.
+- Also bumped TESTROOM_VERSION v331 → v332.
 
 ## v331 — REWORK: Sylvia (313) Porpoise — player-rolled 1-die dodge modal (DO NOT REVERT)
 
