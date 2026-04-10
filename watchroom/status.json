@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 10,
-      "remaining_mins": 26,
+      "cycles": 11,
+      "remaining_mins": 17,
       "until": "08:56 PM",
-      "last_update": "2026-04-09T20:38:14.565480",
+      "last_update": "2026-04-09T20:40:38.043279",
       "status": "running",
-      "next_up": "Audit the `wF.ko` (winner self-KO via Pudge Belly Flop) KO path \u2014 when Pudge KOs themselves on doubles, `handleKOs()` fires the swap flow but the new-round narration at line 3907 is skipped just like the `lF.ko` path was; verify the Pudge-self-KO scenario now gets a round narration via the openKoSwap fix, or if it needs a separate narration for Pudge's own team",
-      "after_that": "Overclock HP visual \u2014 check that the `hp-overclock` class (cyan pulsing bar) properly clears when an overclocked ghost is KO'd in pre-roll (Shade's Shadow) \u2014 the `hitDamage()` call at line 2618 updates the bar, but the status tag's `renderCardSlot` check at line 4400 uses `ghost.hp > ghost.maxHp` which would be false for a KO'd ghost (hp \u2264 0), so the tag should clear correctly; verify no stale visual remains"
+      "next_up": "Overclock HP visual audit \u2014 verify the `hp-overclock` cyan pulsing tag and bar correctly clear when Calvin's overclocked ghost is KO'd mid-battle (especially the pre-roll Shade's Shadow KO path where `hitDamage()` fires at line 2618 but the status tag render path goes through `renderCardSlot` which reads `ghost.hp > ghost.maxHp`; if the HP was already set to 0 before the re-render, the tag should clear \u2014 but confirm no stale `hp-overclock` class lingers on the health bar element itself)",
+      "after_that": "Full timing audit of the tie-round path \u2014 when a round ends in a TIE, the flow goes through `drainAbilityQueue` at line 3563 before resetting to `ready`; verify that if Selene has already queued a doubles callout (from a prior roll that was doubles and tied), the queue drain doesn't double-fire the callout or leave Selene's `continueAfterSelene` closure stale and blocking the next round's post-roll flow"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 11,
+      "summary": "Fixed round narration double-space around \"vs\" \u2014 all 5 `narrate()` calls that fire \"Round N \u2014 X vs Y\" had ` &nbsp;vs&nbsp; ` (space on each side of the &nbsp;s), rendering as a visible double-gap in the flex narrator every round; collapsed to clean `&nbsp;vs&nbsp;` matching the pattern already used in the Cycle #10 `openKoSwap` narration",
+      "next_up": "Overclock HP visual audit \u2014 verify the `hp-overclock` cyan pulsing tag and bar correctly clear when Calvin's overclocked ghost is KO'd mid-battle (especially the pre-roll Shade's Shadow KO path where `hitDamage()` fires at line 2618 but the status tag render path goes through `renderCardSlot` which reads `ghost.hp > ghost.maxHp`; if the HP was already set to 0 before the re-render, the tag should clear \u2014 but confirm no stale `hp-overclock` class lingers on the health bar element itself)",
+      "after_that": "Full timing audit of the tie-round path \u2014 when a round ends in a TIE, the flow goes through `drainAbilityQueue` at line 3563 before resetting to `ready`; verify that if Selene has already queued a doubles callout (from a prior roll that was doubles and tied), the queue drain doesn't double-fire the callout or leave Selene's `continueAfterSelene` closure stale and blocking the next round's post-roll flow",
+      "time": "20:40:44",
+      "timestamp": "2026-04-09T20:40:44.603732",
+      "roast": "You mass-mobilized five agents and a full debug cycle to kill two spaces that no playtester would ever notice while Selene's whole ability kit is still held together with prayers and TODO comments."
+    },
     {
       "target": "testroom",
       "cycle": 10,
@@ -480,18 +490,9 @@
       "after_that": "Audit `doPreRollSetup` for the case where both teams have Mother Nature active simultaneously \u2014 the current loop iterates `[B.red, B.blue]` and each Winter reduces the opponent's count, but if both had MN active, the second loop iteration uses the already-reduced count for the opponent; verify this stacks correctly or add a guard",
       "time": "16:25:49",
       "timestamp": "2026-04-09T16:25:49.100923"
-    },
-    {
-      "target": "testroom",
-      "cycle": 28,
-      "summary": "Added a persistent `\ud83c\udf19 Twilight Active \u00b7 +1 Dmg` purple status tag on Dusk's fighter card once `B.round > 5` \u2014 players now get clear visual confirmation the late-game scaling has kicked in, instead of being confused when their damage number is unexpectedly higher than expected.",
-      "next_up": "Add \"Round 1 \u2014 \" to the opening narration in `startBattle` so the battle counter starts consistently at 1 (matching the \"Round N \u2014 X vs Y\" format used from Round 2 onward), which matters for Seasons tracking and Dusk's Twilight countdown.",
-      "after_that": "Audit the broken single-slash comment on the \"Dusk (364)\" line (`/ Dusk (364)` at line ~3321) \u2014 that stray `/` at the start of a line is a latent JS parse hazard that should be `//` before it bites during a minification or strict-mode pass.",
-      "time": "16:22:33",
-      "timestamp": "2026-04-09T16:22:33.666507"
     }
   ],
-  "last_update": "2026-04-09T20:38:20.797410",
+  "last_update": "2026-04-09T20:40:44.603753",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
