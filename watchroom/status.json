@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! Battle Simulator Testroom",
-      "cycles": 11,
-      "remaining_mins": 17,
+      "cycles": 12,
+      "remaining_mins": 15,
       "until": "08:56 PM",
-      "last_update": "2026-04-09T20:40:38.043279",
+      "last_update": "2026-04-09T20:42:40.494453",
       "status": "running",
-      "next_up": "Overclock HP visual audit \u2014 verify the `hp-overclock` cyan pulsing tag and bar correctly clear when Calvin's overclocked ghost is KO'd mid-battle (especially the pre-roll Shade's Shadow KO path where `hitDamage()` fires at line 2618 but the status tag render path goes through `renderCardSlot` which reads `ghost.hp > ghost.maxHp`; if the HP was already set to 0 before the re-render, the tag should clear \u2014 but confirm no stale `hp-overclock` class lingers on the health bar element itself)",
-      "after_that": "Full timing audit of the tie-round path \u2014 when a round ends in a TIE, the flow goes through `drainAbilityQueue` at line 3563 before resetting to `ready`; verify that if Selene has already queued a doubles callout (from a prior roll that was doubles and tied), the queue drain doesn't double-fire the callout or leave Selene's `continueAfterSelene` closure stale and blocking the next round's post-roll flow"
+      "next_up": "Overclock HP visual audit \u2014 verify the `hp-overclock` cyan pulsing bar and `status-tag.overclock` amber tag both clear correctly when a Calvin-overclocked ghost is KO'd via Shade's Shadow pre-roll; `updateHpBar` uses `toggle` so it should self-correct, but confirm no stale class survives the swap path's `renderBattle()` if `hitDamage()` fires before `handleKOs()`",
+      "after_that": "Timber modal edge-case \u2014 verify the \"Discard 2 Specials\" button state recalculates correctly each time `showTimberModal` fires (it fires each round Timber is active), confirming it doesn't cache a stale `totalSpecials` count from a prior round where the opponent burned resources between the check and the click"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 12,
+      "summary": "Fixed stale `B.selenePending` leak through TIE rounds \u2014 Selene's doubles reward was not cleared in the TIE-path reset block, causing the Heart of the Hills choice modal to fire in the next non-TIE round after Selene tied on doubles",
+      "next_up": "Overclock HP visual audit \u2014 verify the `hp-overclock` cyan pulsing bar and `status-tag.overclock` amber tag both clear correctly when a Calvin-overclocked ghost is KO'd via Shade's Shadow pre-roll; `updateHpBar` uses `toggle` so it should self-correct, but confirm no stale class survives the swap path's `renderBattle()` if `hitDamage()` fires before `handleKOs()`",
+      "after_that": "Timber modal edge-case \u2014 verify the \"Discard 2 Specials\" button state recalculates correctly each time `showTimberModal` fires (it fires each round Timber is active), confirming it doesn't cache a stale `totalSpecials` count from a prior round where the opponent burned resources between the check and the click",
+      "time": "20:42:47",
+      "timestamp": "2026-04-09T20:42:47.975246",
+      "roast": "Congratulations, you found the bug where Selene was haunting rounds she wasn't even in \u2014 Richard Garfield called, he says state management is not a keyword ability."
+    },
     {
       "target": "testroom",
       "cycle": 11,
@@ -481,18 +491,9 @@
       "after_that": "Add a Smithy status tag on the team's resource panel when Smithy is on their sideline showing \"\ud83d\udd28 Forge: ready\" so players remember this passive is ticking each round \u2014 otherwise they may not notice the moonstone appeared and miss the strategic implication.",
       "time": "16:27:33",
       "timestamp": "2026-04-09T16:27:33.446260"
-    },
-    {
-      "target": "testroom",
-      "cycle": 29,
-      "summary": "Made Healing Seed tooltip context-aware (shows current HP and explains \"HP is already full \u2014 can't use now\" when the tile is greyed out) and added a first-time-player-readable tooltip to the Lucky Stone tile explaining it's used post-roll to reroll any one die",
-      "next_up": "Add Smithy (204) \"Forge\" sideline ability \u2014 at round start, if Smithy is on the sideline and the team has \u22652 Ice Shards or \u22652 Sacred Fires, automatically convert 2 of either into 1 Moonstone; this is the last un-shelved \"resource conversion\" design in the set and fills empty design space around cross-resource economy",
-      "after_that": "Audit `doPreRollSetup` for the case where both teams have Mother Nature active simultaneously \u2014 the current loop iterates `[B.red, B.blue]` and each Winter reduces the opponent's count, but if both had MN active, the second loop iteration uses the already-reduced count for the opponent; verify this stacks correctly or add a guard",
-      "time": "16:25:49",
-      "timestamp": "2026-04-09T16:25:49.100923"
     }
   ],
-  "last_update": "2026-04-09T20:40:44.603753",
+  "last_update": "2026-04-09T20:42:47.975267",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
