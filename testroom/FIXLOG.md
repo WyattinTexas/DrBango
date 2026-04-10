@@ -256,8 +256,18 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Winston (15) — Scheme: AUDITED PASS (v297) — `wF.id===15 && !wF.ko && wR.type==='doubles'` trigger; post-drain `checkWinstonScheme` → `showWinstonSchemeModal`; skip button present ("may"); Barnaby (326) immunity check (`oldGhost.id===326`); `triggerEntry` fires for forced ghost; correct.
 - [x] Sandwiches (33) — Dependable: AUDITED FIX (v297) — main mirror logic correct across all 22+ resource-grant sites. BUG: Maximo (302) Nap end-of-round Healing Seed grant had no Wisp block OR Sandwiches mirror. Fixed: expanded the win/lose-path Maximo forEach to add (a) Wisp check using existing `wispBlocksWin/wispBlocksLose` flags and (b) DEPENDABLE! mirror using existing `sandwichForLose/sandwichForWin` and `oppWispBlocks` guards. Note: TIE path Maximo (line ~7456) still lacks Wisp/Sandwich handling — needs separate fix.
 
-### KNOWN BROKEN (high priority)
-- (all 5 priority cards audited in v277 — see below)
+### KNOWN BROKEN / RECENTLY REWORKED (high priority)
+- **Finn (204) Forge** — REWORKED in v293 from auto-fire to opt-in buttons. Audit needed:
+  • Buttons render correctly when Finn is on sideline (one Forge button per available resource type, per team)
+  • Buttons gray out at <2 of the relevant resource, are clickable at ≥2
+  • Click correctly subtracts 2 of the resource and adds 1 Moonstone
+  • FORGE! callout fires without stomping any other concurrent callout (use queue if needed)
+  • Buttons disappear entirely when Finn steps in to fight (sideline-only ability)
+  • Multiple clicks per round are allowed — e.g., player can do Ice→MS, then Fire→MS, then Ice→MS again if they have the resources
+  • Interaction with `popSidelineCard(204)` — does it pop more than once per round? Should it?
+  • Knight reactions: should HEAVY AIR! / RETRIBUTION! fire when Forge is used? Spec doesn't say so but verify the precedent against other manual conversions
+  • DO NOT REVERT to auto-fire — the opt-in is the intended design (Wyatt + Gary approved 2026-04-10)
+- (all 5 priority original cards audited in v277 — see below)
 
 ### v277 Priority Audit Results
 - **Patrick (10) Stone Form** — AUDITED FIX: forced dice count to 0 in doPreRollSetup + STONE FORM! pre-roll callout; doTeamRoll shows "doesn't roll — Stone Form!" narration on 0-dice. Existing singles-counter logic at resolveRound line ~8055 now fires correctly because Patrick always loses (except singles → counter). 0 dice → classify returns type:'none' which auto-loses to any real roll.
