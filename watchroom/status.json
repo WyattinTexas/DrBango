@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 5,
-      "remaining_mins": 216,
-      "until": "03:32 AM",
-      "last_update": "2026-04-09T23:58:30.325819",
+      "cycles": 11,
+      "remaining_mins": 27,
+      "until": "12:22 AM",
+      "last_update": "2026-04-09T23:59:07.156932",
       "status": "running",
-      "next_up": "Moonstone/Lucky Stone resource-grant timing audit \u2014 when abilities like Tremor!, Materialization!, or Pollinate! grant resources, `renderBattle()` runs synchronously inside `resolveRound`, visually updating the resource tile BEFORE the ability callout splash plays; the tile update should land AFTER the callout clears, not before it fires",
-      "after_that": "Narrator pacing \u2014 trace all KO\u2192swap\u2192entry\u2192round-narrate chains to ensure no two `narrate()` calls fire within less than 400ms of each other; the drainNarrate system protects sequential calls but if a new `narrate()` fires while one is mid-display, the reader needs the full hold window before the next line appears"
+      "next_up": "Audit the `dmg === 0` (dodge) round-transition timing \u2014 when the queue is empty, the callback fires at t=800ms, `narrate(\"Round N\")` fires at t=1550ms but is queued behind the still-active \"deals 0 damage\" narration (held until t=2550ms), so roll buttons go live at t=1900ms while the round announcement text doesn't appear until t=2550ms \u2014 a 650ms window where buttons are active but no round context is shown",
+      "after_that": "Audit `doPreRollSetup`'s Shade's Shadow Meltdown block \u2014 when Shade triggers mid-queue and KOs a ghost, `handleKOs()` returns true from inside `drainAbilityQueue`'s callback; verify the `postRollDone` \u2192 KO chain properly parks phase in 'ko-pause' and doesn't double-fire `openKoSwap` if it was already called by the queue callback"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 11,
+      "summary": "`doPressureSwap` no-KO path now calls `resetRollButtons()` so AFK timer restarts, stale button classes clear, and button state is consistent with every other roll-enabling path",
+      "next_up": "Audit the `dmg === 0` (dodge) round-transition timing \u2014 when the queue is empty, the callback fires at t=800ms, `narrate(\"Round N\")` fires at t=1550ms but is queued behind the still-active \"deals 0 damage\" narration (held until t=2550ms), so roll buttons go live at t=1900ms while the round announcement text doesn't appear until t=2550ms \u2014 a 650ms window where buttons are active but no round context is shown",
+      "after_that": "Audit `doPreRollSetup`'s Shade's Shadow Meltdown block \u2014 when Shade triggers mid-queue and KOs a ghost, `handleKOs()` returns true from inside `drainAbilityQueue`'s callback; verify the `postRollDone` \u2192 KO chain properly parks phase in 'ko-pause' and doesn't double-fire `openKoSwap` if it was already called by the queue callback",
+      "time": "23:59:12",
+      "timestamp": "2026-04-09T23:59:12.239219",
+      "roast": "Congratulations on spending an entire cycle discovering that buttons should act like buttons \u2014 Garfield wept."
+    },
     {
       "target": "testroom",
       "cycle": 5,
@@ -514,18 +524,9 @@
       "after_that": "Full `hasSideline` cross-check for Granny (310) \u2014 confirm the Lucky Stone / Surge / Moonstone on-KO trigger correctly reads `wR.type` (the winner's roll type) rather than defaulting to a stale value, and that it doesn't fire when Granny herself is the KO'd ghost.",
       "time": "18:35:19",
       "timestamp": "2026-04-09T18:35:19.522567"
-    },
-    {
-      "target": "testroom",
-      "cycle": 24,
-      "summary": "Granny (310) Bedtime Story now fires for Pudge self-KO \u2014 added `wF.ko` check for both the resource grant and the ability-queue callout so Granny correctly grants Surge when Pudge KOs himself via Belly Flop doubles.",
-      "next_up": "Verify Selene's `confirm()` dialog doesn't block the ability queue \u2014 the synchronous `confirm()` fires while `abilityQueueMode = true`, which could interrupt queue drain if it resolves mid-chain; audit whether it needs to be deferred via a `queueAbility` callback instead of blocking JS execution.",
-      "after_that": "Harrison (315) extra-die grant queue-order audit \u2014 verify `B.harrisonBonus` applies before dice are rendered (not after) when multiple on-win abilities chain simultaneously (e.g. Overclock + Harrison on the same team in the same round).",
-      "time": "18:30:15",
-      "timestamp": "2026-04-09T18:30:15.106220"
     }
   ],
-  "last_update": "2026-04-09T23:58:36.770968",
+  "last_update": "2026-04-09T23:59:12.239236",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
