@@ -3,7 +3,21 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v299
+## Current Version: v301
+
+## v301 — BUG FIX: Sandwiches (33) Dependable now correctly mirrors Hank (207) Tremor, Natalia (327) Materialization, Kaplan (308) Pollinate, and Selene (305) Heart of the Hills choice
+- Hank (207) Tremor — the Wisp-guarded else branch now adds a DEPENDABLE! mirror for each Lucky Stone gained from 4s. Mirror blocked if Hank's team has Wisp on their own sideline.
+- Natalia (327) Materialization — the Wisp-guarded else branch now adds a DEPENDABLE! mirror for the Moonstone gained on even doubles. Mirror blocked by Natalia's own team's Wisp.
+- Kaplan (308) Pollinate — the Wisp-guarded else branch now adds a DEPENDABLE! mirror for the Healing Seed gained when opponent rolls doubles. Mirror blocked by Kaplan's own team's Wisp.
+- Selene (305) Heart of the Hills — inside `doSeleneChoice`, after the HEART OF THE HILLS! and Knight reactions are queued, a DEPENDABLE! callout is now queued if opponent has Sandwiches; mirrors either +1 Healing Seed or +2 Lucky Stones depending on what Selene's player chose. Mirror blocked if Selene's team has Wisp on their own sideline.
+- Pattern consistent with all other Sandwiches mirrors: `hasSideline(opp(team), 33) && !hasSideline(team, 344)`.
+
+## v300 — BUG FIX: Wisp (344) Guide Light now correctly blocks Hank (207) Tremor, Natalia (327) Materialization, Kaplan (308) Pollinate, and Selene (305) doubles reward in the post-roll section
+- Hank (207) Tremor — BUG: `doPostRollAndResolve` granted Lucky Stones from rolled 4s with no `hasSideline(opp(team), 344)` Wisp check. Wisp's spec says "opponent cannot gain resources this round" but Tremor fired every time Hank rolled 4s regardless. Fixed: added Wisp check — if opponent has Wisp on sideline, queue GUIDE LIGHT! callout and skip grant; else grant as before with Knight reactions.
+- Natalia (327) Materialization — same bug: `team.resources.moonstone++` had no Wisp check. Fixed: same pattern — hasSideline(opp(team), 344) guard added.
+- Kaplan (308) Pollinate — same bug: `team.resources.healingSeed++` had no Wisp check. Fixed: same pattern.
+- Selene (305) doubles reward — same bug: `B.selenePending` was set unconditionally (would offer Selene's choice modal even when Wisp was blocking). Fixed: if opponent has Wisp, queue GUIDE LIGHT! and skip the modal offer; else set selenePending as before.
+- All four fixes use the canonical `getSidelineGhost(opp(team), 344)` pattern for the callout ghost name, consistent with other Wisp announcements in the codebase.
 
 ## v299 — AUDITED FIX: Aunt Susan (309) Harvest Dance heal — uncapped (overclock restored); AUDITED PASS: Villager (11) Hospitality (no wispBlocksWin needed — Wisp blocks resources, not HP heals); AUDITED PASS: Opa (48) Rest
 - Aunt Susan (309) AUDITED FIX — BUG: Harvest Dance heal path at line ~8792 used `f.hp = Math.min(f.maxHp, f.hp + healAmt)` — capped at maxHp in violation of the v294 HARD RULE ("HEALING OVERCLOCKS BY DEFAULT"). Aunt Susan's card text says "heal +2 HP" with no explicit cap — not the Healing Seed resource-panel button (the only seed-heal exception). Fixed: changed to `f.hp += healAmt`, added `susanOver = f.hp > f.maxHp`, updated log to show `· overclocked!` tag, stored `overclocked` flag in `B.auntSusanHealResult[tn]`, updated cinematic HARVEST DANCE! callout to show `· overclocked!` when HP exceeds maxHp. Aunt Susan was absent from the v294 12-card revert list — this was a missed site.
@@ -275,6 +289,11 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 Why: lets Wyatt compare the new characters against a specific original set (e.g., "How do the new Rolling Hills cards stack up against Dark Castle alone?") without the whole Set 1 roster drowning out the signal.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
+
+- **v293** — Finn (204) Forge converted from AUTO-FIRE to OPT-IN buttons. Removed the auto-conversion block in `doPreRollSetup`. Added `useFinnForge(team, kind)` click handler. When Finn is on a team's sideline, two buttons render in that team's ability bar before each roll: "Forge: 2 Ice → Moonstone" (cyan) and "Forge: 2 Fire → Moonstone" (orange). Buttons gray out when the team lacks 2 of that resource so the player can see the option exists. Click → -2 of the resource, +1 Moonstone, FORGE! callout, log entry, SFX. Buttons disappear entirely when Finn steps into play (sideline-only ability). Ability description updated to "you may convert..." reflecting the opt-in nature.
+  - **WHY**: Auto-fire was free value with no decision attached. Opt-in turns Forge into a tempo question — bank a Moonstone now for the late game, or hold the shards for chip damage on a key roll. Gary approved.
+  - **DO NOT REVERT** to auto-fire during audit cycles. If you find Finn (id 204) and his ability looks "missing" from `doPreRollSetup`, that's intentional — the logic lives in `useFinnForge` and the button rendering in the per-team ability buttons section near Harrison's Ascend block.
+
 
 - **v292** — Renamed Smithy → Finn (id 204). Art swapped from `art/smithy.webp` to `art/finn.png`. All in-game callouts/log entries updated. Forge ability and design unchanged. Reason: Wyatt wanted a fresh name + new art for the Frost-Valley-to-Volcanic-Activity resource bridge ghost. Canonical 36-card roster updated in FIXLOG and refiner.py system prompt. Memory updated.
 
