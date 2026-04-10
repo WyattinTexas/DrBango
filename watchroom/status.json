@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 73,
-      "remaining_mins": 96,
+      "cycles": 74,
+      "remaining_mins": 91,
       "until": "07:28 PM",
-      "last_update": "2026-04-10T17:56:54.423200",
+      "last_update": "2026-04-10T18:05:40.449059",
       "status": "running",
-      "next_up": "Audit the cross-type specials window (`startCrossTypeSpecialsWindow`) for the same class of multi-stone bug \u2014 when the LS player acts first in a cross-type window, the `afterLs` callback calls `startLuckyStoneWindow(lsTeam, ...)` which handles multi-stone correctly via recursive calls, but verify `doLuckyReroll` in this path correctly sees non-zero `lsAvailable` (it wasn't zeroed for this path like the simultaneous window does).",
-      "after_that": "Sweep for any remaining hardcoded color hex values in non-shelved card callouts \u2014 a final `#[0-9a-fA-F]{6}` scan of all `queueAbility`/`showAbilityCallout` calls in active code paths (not inside `SHELVED_IDS` card blocks) to confirm the v352 \"all remaining hex colors are dead code\" claim is actually correct after the v357 correction that found 4 more were still live."
+      "next_up": "Audit whether there are any other `B.committed[team]` reset or object-creation sites outside of these 4 (startBattle \u00d72, tie-path, win/lose-path, refundCommitted) that might also be missing `zainBlade` \u2014 do a targeted grep for `committed.*=.*{` to find any stragglers, then shift focus to checking the `postRollDone` \u2192 `checkLuckyStones` flow when one team has both MS AND LS (e.g., Red has MS+LS while Blue has only LS): currently the cross-type window only fires when EXACTLY one team has MS and the other has LS; if Red has both, the cross-type condition fails and Red gets a sequential MS window followed by a simultaneous LS window, which may still save less time than a unified window could.",
+      "after_that": "Look at the Zain Ice Blade \"Swing Ice Blade\" button tooltip text \u2014 currently it shows a very long description in the `title` attribute; verify it's readable in both the swung and unswung states and doesn't get cut off by the browser tooltip; also verify that when Zain is KO'd mid-game, the blade button disappears from the UI correctly (`renderAbilityBar` checks `f.id === 206 && !f.ko` before rendering it)."
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 74,
+      "summary": "Fixed `refundCommitted()` missing `zainBlade:0` in the reset object \u2014 the four per-round committed reset sites were inconsistent (3 had `zainBlade:0`, 1 didn't), so a pre-roll KO could silently discard Zain's per-round blade commitment and produce an object with `undefined` instead of `0` for `zainBlade`, breaking the committed-state shape invariant.",
+      "next_up": "Audit whether there are any other `B.committed[team]` reset or object-creation sites outside of these 4 (startBattle \u00d72, tie-path, win/lose-path, refundCommitted) that might also be missing `zainBlade` \u2014 do a targeted grep for `committed.*=.*{` to find any stragglers, then shift focus to checking the `postRollDone` \u2192 `checkLuckyStones` flow when one team has both MS AND LS (e.g., Red has MS+LS while Blue has only LS): currently the cross-type window only fires when EXACTLY one team has MS and the other has LS; if Red has both, the cross-type condition fails and Red gets a sequential MS window followed by a simultaneous LS window, which may still save less time than a unified window could.",
+      "after_that": "Look at the Zain Ice Blade \"Swing Ice Blade\" button tooltip text \u2014 currently it shows a very long description in the `title` attribute; verify it's readable in both the swung and unswung states and doesn't get cut off by the browser tooltip; also verify that when Zain is KO'd mid-game, the blade button disappears from the UI correctly (`renderAbilityBar` checks `f.id === 206 && !f.ko` before rendering it).",
+      "time": "18:05:45",
+      "timestamp": "2026-04-10T18:05:45.665296",
+      "roast": "Four identical reset sites, three got the memo, one didn't \u2014 that's not a bug, that's a cry for a constant, and Rosewater would ship you back to design school before September."
+    },
     {
       "target": "testroom",
       "cycle": 73,
@@ -519,19 +529,9 @@
       "time": "14:10:47",
       "timestamp": "2026-04-10T14:10:47.434287",
       "roast": "Three lines changed. Fourteen lines of commit message. The ratio concerns me."
-    },
-    {
-      "target": "testroom",
-      "cycle": 24,
-      "summary": "Tweak and Twonk (303) Warm Belly tie-path now correctly defers the +3 Surge grant to onShow timing AND adds the missing Sandwiches (33) Dependable mirror, fixing both a visual timing glitch and a functional resource-economy bug.",
-      "next_up": "Audit the Jimmy (352) Chirp tie-path for the same deferred-onShow pattern \u2014 Lucky Stones are granted synchronously on line 7338 before the CHIRP! callout fires. Lucky Stones don't need a Sandwiches mirror (they're not a \"Special resource\"), but the deferred-grant visual timing should be consistent.",
-      "after_that": "Sweep the full tie-path block (lines 7315\u20137535) for any remaining synchronous resource grants that should be deferred, then check the pre-roll section (`doPreRollSetup`) for any original-card resource grants that are still missing Wisp/Sandwiches guards.",
-      "time": "14:08:46",
-      "timestamp": "2026-04-10T14:08:46.952805",
-      "roast": "Two bugs down, only the entire September Kickstarter to go \u2014 but hey, Warm Belly now defers with the solemn dignity of a man rearranging deck chairs on the Twonktanic."
     }
   ],
-  "last_update": "2026-04-10T17:56:59.415836",
+  "last_update": "2026-04-10T18:05:45.665320",
   "orchestrator_check": {
     "timestamp": "2026-04-10T17:17:00.852219",
     "summary": "2 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 67 cycles, 135m left | last [testroom c67]: Growing Mob (83) and Munch (66) `onShow` callbacks now assign pre-computed absolute HP values (`growingMobGhost.hp = gro"
