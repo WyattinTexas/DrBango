@@ -20,16 +20,26 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 2,
-      "remaining_mins": 233,
+      "cycles": 3,
+      "remaining_mins": 225,
       "until": "03:32 AM",
-      "last_update": "2026-04-09T23:47:20.220308",
+      "last_update": "2026-04-09T23:49:09.606588",
       "status": "running",
-      "next_up": "Benjamin (203) Magic Touch \u2014 `showAbilityCallout('MAGIC TOUCH!')` fires then `checkLuckyStones()`/`showMoonstoneChoice` is called 1200ms later via a direct setTimeout (not through the queue), still 200ms before the 1400ms splash clears; branch the delay to 1600ms when Magic Touch fires",
-      "after_that": "Narrator pacing audit \u2014 if multiple `narrate()` calls fire within 100ms of each other (e.g. \"X is down!\" immediately followed by \"Round N \u2014 X vs Y\"), the narrator div will visibly flicker between messages too fast to read; check all round-transition paths for stacked narrate() calls and add minimum 400ms stagger between them"
+      "next_up": "Narrator pacing audit \u2014 multiple `narrate()` calls can fire within ~100ms of each other on round-transition paths (e.g. \"X is down!\" immediately followed by \"Round N \u2014 X vs Y\" in the KO\u2192swap\u2192entry\u2192narrate chain), visibly flickering the narrator div too fast to read; trace all paths where two `narrate()` calls fire within 400ms and add minimum stagger between them",
+      "after_that": "Triples/Quads/Penta celebration pacing \u2014 verify the banner + screen shake plays for its full dramatic duration before the damage resolution 4-beat sequence begins; if the celebration and the dice-highlight beat can overlap, the big moment gets undercut"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 3,
+      "summary": "Benjamin (203) Magic Touch splash overlap fixed \u2014 `commitMoonstone` now waits 1600ms (not 1200ms) before `checkLuckyStones()` when Magic Touch fires, so the MAGIC TOUCH! callout fully clears before the next picker appears",
+      "next_up": "Narrator pacing audit \u2014 multiple `narrate()` calls can fire within ~100ms of each other on round-transition paths (e.g. \"X is down!\" immediately followed by \"Round N \u2014 X vs Y\" in the KO\u2192swap\u2192entry\u2192narrate chain), visibly flickering the narrator div too fast to read; trace all paths where two `narrate()` calls fire within 400ms and add minimum stagger between them",
+      "after_that": "Triples/Quads/Penta celebration pacing \u2014 verify the banner + screen shake plays for its full dramatic duration before the damage resolution 4-beat sequence begins; if the celebration and the dice-highlight beat can overlap, the big moment gets undercut",
+      "time": "23:49:15",
+      "timestamp": "2026-04-09T23:49:15.793047",
+      "roast": "Adding 400 milliseconds of delay to fix a visual overlap is the game design equivalent of solving a leaky faucet by putting a bucket under it \u2014 Garfield would be proud you shipped a race condition fix that's literally just \"wait longer."
+    },
     {
       "target": "testroom",
       "cycle": 2,
@@ -508,18 +518,9 @@
       "after_that": "Verify Smithy Forge tag shows on Smithy's own active fighter card when he's fighting (currently `hasSideline` returns false when Smithy is active, so no tag appears \u2014 the Forge ability description should probably show differently when Smithy IS the active fighter vs when he's on the sideline)",
       "time": "18:11:53",
       "timestamp": "2026-04-09T18:11:53.094160"
-    },
-    {
-      "target": "testroom",
-      "cycle": 18,
-      "summary": "Status tags no longer word-wrap mid-phrase at mobile widths \u2014 added `white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 10px)` to `.status-tag` so \"\ud83c\udf19 Twilight Active \u00b7 +1 Dmg\" stays on one line and clips cleanly instead of breaking awkwardly across two lines inside a 150px card.",
-      "next_up": "Mother Nature (366) Seasons audit \u2014 the season index uses `B.round % 4` but the SEASONS array is ordered `[Winter, Spring, Summer, Autumn]` meaning Round 1 = Winter (index 1 mod 4 = 1 = Spring \u2014 mismatch). Verify the index math is correct and the season displayed on the tag matches what actually fires in the ability queue that round.",
-      "after_that": "Verify `hasSideline()` helper correctly excludes KO'd ghosts from Smithy Forge readiness check \u2014 if Smithy is KO'd on the sideline, the \"\ud83d\udd28 Forge: ready/idle\" tag should disappear, but `hasSideline(team, 204)` may not check `.ko` status before returning true.",
-      "time": "18:07:56",
-      "timestamp": "2026-04-09T18:07:56.012413"
     }
   ],
-  "last_update": "2026-04-09T23:47:30.438681",
+  "last_update": "2026-04-09T23:49:15.793076",
   "orchestrator_check": {
     "timestamp": "2026-04-09T20:32:54.199753",
     "summary": "Refiner running (9 cycles, 1hr run). v76. Timber+Selene choice re-authorized. On-task polish: narrator spacing, tiebreaker glow, modal race fix."
