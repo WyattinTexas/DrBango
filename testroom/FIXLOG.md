@@ -1,5 +1,1044 @@
 # Testroom Coordination Log
 
+## v601 — SIM FIX: Outlaw (43) THIEF! added to smartAutoPlay.js — doubles → steal 1 enemy die next round
+
+**Problem**: Outlaw (43) THIEF! had ZERO implementation in smartAutoPlay.js. The sim modeled Outlaw as a plain 4 HP uncommon in every simulation — no doubles-triggered die drain, no Farewell pattern for dying Outlaws planting the penalty.
+
+**Fix** (smartAutoPlay.js, 4 changes):
+1. **B-state init** (line 75): added `outlawStolenDie: { red: 0, blue: 0 }` — matches index.html lines 2930, 3347.
+2. **COMPUTE DICE consume** (before Scallywags FRENZY block): reads `B.outlawStolenDie[tName]` keyed by Outlaw's own team, subtracts from the ENEMY team's die count, then clears — matches index.html lines 7201–7216.
+3. **Tie-path trigger** (after Logey HEINOUS tie block): `f.id === 43 && !f.ko && myR.type === 'doubles'` → `B.outlawStolenDie[teamKey]++` — matches index.html lines 8774–8783.
+4. **Win/loss-path trigger** (after Logey HEINOUS win/loss block): `[[wF, wR, winTeamName], [lF, lR, loseTeamName]]` loop with no `!f.ko` gate (Farewell pattern — dying Outlaw still plants penalty) — matches index.html lines 10800–10813.
+
+**AUDIT STATUS**: Outlaw (43) — sim gap fixed (THIEF! now correctly modeled in smartAutoPlay.js)
+
+---
+
+## v600 — ART SWAP: Gary (92) new Photoshop card art + digital text matched to physical card
+
+**Milestone**: v600 🎉 — Gary gets the first physical-art-to-digital-art swap of the testroom, landing on the round number.
+
+**Art**: Wyatt's updated Gary card (1-page sRGB PDF at `~/Updated_Card/Gary.pdf`, 198×270pt, 21.5MB Photoshop export) was converted and placed at `testroom/art/originals/gary.jpg` (440×600 sRGB, 116KB, quality 92). Conversion command: `magick -density 300 "Gary.pdf[0]" -colorspace sRGB -resize 440x600 -quality 92 -strip gary.jpg`. The old sketch art is preserved at `art/originals/gary-pre-v599.jpg` in case rollback is ever needed. No ICC profile gymnastics required — the PDF is already sRGB, so the `feedback_cmyk-conversion` rules did not apply.
+
+**Card visual** (verified via Read tool): Gary as a sheet-ghost in the Frost Valley blue scarf + gloves, mid-wave, ice shards spiraling around him. Title bar says "GARY" in Frost Valley ice-blue, "Rare" badge with HP 6, ability name "Lucky Novice", and the card text block at the bottom. Reads cleanly at 440×600.
+
+**Digital/physical text parity fix**: The physical card text reads *"Sideline & In Play, gain +2 Ice Shards for each 1 you roll."* (comma + lowercase "gain"). The v599 `abilityDesc` had a colon + capital "Gain". Fixed to match exactly. This closes out the `feedback_card-capitalization.md` class of digital-vs-physical drift for Gary specifically — **every future art-swap from Wyatt should trigger a parity check of `abilityDesc` vs the card text in the PDF**.
+
+**No code logic change**: v600 is art + text only. The v598 (sideline + in play) + v599 (+2 shards) mechanical changes are unchanged. Nothing in the ability flow needed touching.
+
+**Version bump**: v599 → v600
+
+---
+
+## v600 — SIM FIX: Bubble Boys (44) POP! added to smartAutoPlay.js — instant KO on any opponent triples (win or lose path)
+
+**Problem**: Bubble Boys (44) had ZERO implementation in smartAutoPlay.js. As a 9 HP uncommon, the sim treated them as a near-unkillable tank every simulation. Their actual identity is a glass-cannon disguised as a tank — any opponent rolling triples instantly pops them, even if Bubble Boys won the roll.
+
+**Fix** (smartAutoPlay.js, after damage application block):
+- Case 1: `lF.id === 44 && !lF.ko && wR.type === 'triples'` → instant KO (BB lost, opponent rolled triples)
+- Case 2: `wF.id === 44 && !wF.ko && lR.type === 'triples'` → instant KO (BB won, opponent rolled triples — "burst even in victory!")
+- Matches index.html lines 9962–9988 (two-case `bubbleBoysPopped` flag pattern)
+
+**AUDIT STATUS**: Bubble Boys (44) — sim gap fixed (POP! now correctly modeled in smartAutoPlay.js)
+
+---
+
+## v599 — BALANCE BUFF: Gary (92) Lucky Novice grants +2 Ice Shards per 1 rolled (was +1) + card text finalized (Wyatt)
+
+**Change**: Stacked on top of the v598 mechanical buff (sideline + in play). Gary now grants **+2 Ice Shards per 1 rolled**, double the previous rate. Card text also finalized to Wyatt's preferred phrasing.
+
+**Card text (final)**: *"Sideline & In Play: Gain +2 Ice Shards for each 1 you roll."* — 12 words, leads with the location clause so the player's first question ("does this work from the bench?") is answered before the effect clause. Photoshop art update in progress (Wyatt, parallel).
+
+**Code changes** (atomic Python write, refiner running):
+
+1. **Derived counts** (~line 9556): Added `const garyIceWin = garyOnesWin * 2;` and `const garyIceLose = garyOnesLose * 2;` immediately after the existing `garyOnes*` counts. Kept `garyOnes*` for the display text ("2 rolled 1s → +4 Ice Shards") — the ones-count is what the player sees, the ice-count is what actually lands.
+
+2. **Log lines** (9560, 9566): Both log lines now use `${garyIceWin}`/`${garyIceLose}` for the granted amount and drop the singular/plural ternary since the granted amount is always ≥ 2 when the block fires.
+
+3. **Win-team queueAbility block** (~10358): `garyWinIceTotal`, the callout text, the `winTeam.resources.ice +=` grant, the `creditGhost` MVP stat, and the Sandwiches (33) Dependable mirror — all four now use `garyIceWin`. MVP scoring correctly credits the doubled shard output.
+
+4. **Lose-team queueAbility block** (~10720): mirror of #3. `garyIceLose` replaces `garyOnesLose` in 5 places within the block.
+
+5. **designNote**: Updated to record both buffs and flag the Zain(206) + Skylar(104) seam. *"Ice Shard gen — v598 buff: fires whether Gary is in play or on the sideline. v599 buff: +2 Ice Shards per 1 rolled (was +1). Balance comp: Zain Ice Blade + Skylar Winter Barrage lines just got a serious fuel injection."*
+
+**Balance impact — why this matters**: Ice Shards feed Zain (206) Ice Blade (commits 3 ice for the +2 dmg weapon) and Skylar (104) Winter Barrage (each committed ice shard now deals +2 damage instead of +1). Pre-buff sideline Gary was generating ~1.2 ice shards per round (~0.6 per team's dice times 2 teams, factoring in 1-count distribution). Post-buff Gary generates ~2.4 ice shards per round — and can do so while actively fighting. That's enough fuel for a Skylar/Zain ice comp to swing a round every 2-3 turns instead of every 4-5. The Frost Valley ice archetype just became meta-relevant.
+
+**Cornelius (45) Antidote** still only blocks sideline Gary (unchanged from v598). An active Gary is immune to Antidote.
+
+**Sandwiches (33) Dependable** mirror now correctly doubles — if a win-team Gary grants +4 Ice Shards via 2 rolled 1s, sideline Sandwiches on the lose-team also gets +4, not +2. Verified both branches of the Sandwiches mirror.
+
+**Audit #1 (template literals)**: `garyIceWin`, `garyIceLose` are `const`s at the pre-compute block scope, available in every downstream template literal that references them. `winLoc`, `loseLoc`, `_garyWinLoc`, `_garyLoseLoc` already scoped correctly from v598 ✓
+**Audit #2 (block scope)**: All new variables live at the pre-compute block scope (same as `garyOnesWin`/`garyOnesLose` they derive from), never leak beyond the two `if (garyOnes* > 0)` blocks that use them ✓
+**Audit #3 (family-audit)** — No new family members this cycle. This is a pure numeric tuning change within an existing card, not a family pattern.
+
+**Version bump**: v598 → v599
+
+**Art update**: Wyatt is updating `art/originals/gary.jpg` in Photoshop separately. Card text on the physical card will be *"Sideline & In Play: Gain +2 Ice Shards for each 1 you roll."* Image path unchanged — no code touch needed on art swap.
+
+---
+
+## v602 — BUG FIX: smartAutoPlay.js Skylar (104) WINTER BARRAGE! — Ice Shard ×2 multiplier missing from sim
+
+**Bug**: `smartAutoPlay.js` line 1231 always added 1 damage per committed Ice Shard (`dmg += B.committed[winTeamName].ice || 0`), with no check for whether Skylar (id 104) was the active winner. Skylar's WINTER BARRAGE! ability doubles Ice Shard damage to +2 each — but the sim always used the default +1 rate, making every Zain/Spockles/Artemis Ice Shard economy synergy with Skylar systematically half as effective in all balance simulations.
+
+**Ability (index.html line 2475)**: "Ice Shards deal +2 damage instead of +1." Implemented in index.html lines 9059–9071: `const perShard = skylarActive ? 2 : 1; const iceDmg = B.committed[winTeamName].ice * perShard; dmg += iceDmg;`
+
+**Fix**: Replaced flat `dmg += B.committed[winTeamName].ice || 0` with:
+```js
+const iceCommitted = B.committed[winTeamName].ice || 0;
+const icePerShard = (wF.id === 104 && !wF.ko) ? 2 : 1;
+dmg += iceCommitted * icePerShard;
+```
+Matches index.html `perShard` pattern exactly. No B-state needed (Skylar identity is read live from `wF.id`).
+
+**Audit #1**: No template literals added ✓  
+**Audit #2**: `iceCommitted` and `icePerShard` are `const` in the same block as `dmg` — no scope leak ✓  
+**Audit #3**: FAMILY: none — Skylar's WINTER BARRAGE! (per-shard damage multiplier for active winner) is unique; no other card modifies Ice Shard damage rate.
+
+**Version bump**: v601 → v602
+
+---
+
+## v600 — BUG FIX: smartAutoPlay.js Eloise (85) CHANGE OF HEART! — pre-roll HP swap mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Eloise (85) CHANGE OF HEART!. Every simulation with Eloise active modeled her as a plain 5 HP rare with no pre-roll action — she never swapped HP with the enemy, never spent Ice Shards, and her key identity (HP redistribution for Ice Shard cost) was invisible in every balance simulation.
+
+**Ability (from index.html line 2465)**: "Spend 1 Ice Shard to swap HP with enemy before rolling." Pre-roll, once per round. Fires when Eloise is active, team has ≥1 Ice Shard, and `eloiseUsedThisRound[team]` is false.
+
+**Fix** (4 changes to `smartAutoPlay.js`):
+1. **B-state init** (line 73): added `eloiseUsedThisRound: { red: false, blue: false }` — matches index.html lines 2929 and 3346.
+2. **Pre-roll block** (after Tyler HEATING UP!, before Zain Ice Blade): `['red','blue'].forEach` — if active is Eloise (85), not KO'd, enemy not KO'd, unused this round, and `team.resources.ice >= 1 && f.hp < ef.hp` → swap HPs, spend 1 ice, mark used. AI heuristic: only swap when enemy HP > Eloise HP (strictly EV-positive). If conditions not met, mark used anyway (no re-offer). Matches index.html doEloiseChoice('yes') path (lines 4574–4586).
+3. **Post-roll reset (Jackson block)** (line ~947): added `B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false;` — matches index.html round-end reset at lines 8961 and 11021.
+4. **End-of-round reset** (line ~1920): added same reset alongside `jacksonUsedThisRound` reset.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `temp` declared inside forEach callback; `eloiseUsedThisRound[teamKey]` read from B-state only within the callback scope ✓
+**Audit #3 (family-audit)**: FAMILY: none — Eloise's CHANGE OF HEART! (pre-roll HP swap for Ice Shard) is unique; Mallow (89) spends Sacred Fire for HP, Tyler (105) spends HP for dice — resource-trade pre-roll siblings but use entirely different resources, effects, and trigger conditions; no shared code path.
+
+**Version bump**: v599 → v600
+
+---
+
+## v598 — BUFF: Gary (92) Lucky Novice now fires when Gary is in play OR on the sideline (Wyatt design directive)
+
+**Change**: Gary's Lucky Novice was gated on `hasSideline(team, 92)` — the ice shard per-1 grant only fired while Gary was benched. Wyatt's call: *"His ability works while he's on the sideline and it works while he's in play."* The card should be more fun to run, not penalize the player for bringing Gary into active slots.
+
+**Three code sites updated** (atomic write — refiner was running):
+
+1. **Pre-compute block** (~line 9545): Added `winGaryActive` / `loseGaryActive` flags (`f.id === 92 && !f.ko` against `wF`/`lF`) alongside the existing `winGarySide`/`loseGarySide`. `garyOnesWin` / `garyOnesLose` now fire when either flag is true. When Gary is active, the dice being counted are *his own* — which just happens to be the same `winDice`/`loseDice` the code already has, so no new dice reference needed. The `collectKC` ghost reference resolves to `wF`/`lF` for active Gary or `getSidelineGhost` for sideline Gary.
+
+2. **Win-team queueAbility** (~line 10349): callout tag now reads `Gary (active)` or `Gary (sideline)` via a `_garyWinLoc` ternary. `_garyWinId` short-circuits to `92` when Gary is active (no sideline lookup needed).
+
+3. **Lose-team queueAbility** (~line 10710): mirror of the win-team change. Active Gary on a losing roll still grants ice shards per 1 rolled.
+
+4. **Card data** (~line 2472): `abilityDesc` updated from *"While on the sideline, gain +1 Ice Shards for each 1 you roll."* to *"Gain +1 Ice Shard for each 1 your active ghost rolls. Works in play and on the sideline."* designNote now notes the v598 buff and attributes it to Wyatt.
+
+**Cornelius (45) Antidote interaction**: Cornelius is a sideline-ability blocker. An **active** Gary is not a sideline ability, so Cornelius does NOT block active Gary — his ice shards flow normally even if Cornelius is on the enemy sideline. Sideline Gary continues to be blocked exactly as before (`corneliusBlocksRally` / `corneliusOnWinTeam` guards preserved only on the sideline path). This matches the mental model: Cornelius neutralizes *sideline chatter*, and an active Gary is just a fighter rolling dice.
+
+**Sandwiches (33) Dependable mirror**: preserved. When win-team Gary triggers (active or sideline), sideline Sandwiches on the loseTeam mirrors the ice shard grant. Same for the lose-team branch.
+
+**Knight reactions**: `collectKC` already runs in the game-state section (lines ~9526 and ~9531) and takes the ghost reference we pass in. Active Gary's collectKC now passes `wF`/`lF` directly, so Knight Terror HEAVY AIR! and Knight Light RETRIBUTION! correctly target Gary's slot whether he's active or sideline.
+
+**Audit #1 (template literals)**: `winLoc`, `loseLoc`, `_garyWinLoc`, `_garyLoseLoc` are all `const`s declared inside their respective `if`-blocks immediately before the template literal references ✓
+**Audit #2 (block scope)**: `winGaryActive`, `winGarySide`, `loseGaryActive`, `loseGarySide` are all `const`s at the pre-compute block scope and only referenced within that scope and the two downstream `if`-blocks in resolveRound ✓
+**Audit #3 (family-audit)** — FAMILY: sideline-only-boosters. Other members of this family that Wyatt may decide to buff the same way later:
+- Pale Nimbus, Laura (Catchy Tune), Bandit Pete, Zach (Craftsman), Lou (Bros) — all currently sideline-only boosters. NOT touched this cycle. If Wyatt decides these should also work in play, the same pattern applies: add `xxxActive` flag, OR with `hasSideline`, gate Cornelius only on the sideline path.
+- Farmer Jeff (314), Granny (310) — sideline resource generators. Same family pattern, NOT touched.
+
+**Photoshop note**: Wyatt is updating Gary's physical card art/text in Photoshop separately. When the new art ships to `art/originals/gary.jpg`, no code change needed — path is the same.
+
+**Version bump**: v597 → v598
+
+---
+
+## v599 — BUG FIX: smartAutoPlay.js Hermit (47) SOLITUDE! — entry HP-scaling mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Hermit (47) SOLITUDE!. The `smartTriggerEntry()` function had no `f.id === 47` check, so Hermit never gained any HP on entry regardless of how many ghosts had been KO'd. In the real game, Hermit is a late-game scaling tank who gains +2 HP per defeated ghost across both teams — making him potentially very tanky in long battles. Without this, the sim modeled Hermit as a plain 3 HP uncommon with zero identity in every simulation, severely undervaluing him in late-game roster compositions.
+
+**Ability (from index.html line 2391)**: "Upon entry, gain +2 health for each ghost defeated on both teams." Overclock allowed — no Math.min cap (rule #9, late-game scaling tank). No collectKnightReactions() call in index.html for this ability.
+
+**Fix** (1 change to `smartAutoPlay.js`):
+Added to `smartTriggerEntry()` (before the Nicholas (51) block):
+```js
+// Hermit (47) — Solitude: on entry, gain +2 HP per KO'd ghost on both teams.
+// Overclock allowed — no Math.min cap. No knight reaction in index.html.
+if (f.id === 47) {
+  const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
+  if (koCount > 0) { f.hp += koCount * 2; } // overclocked! when hp > maxHp
+}
+```
+Matches index.html lines 3567–3580.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `koCount` declared inside `if (f.id === 47)` block, only used inside that block ✓
+**Audit #3 (family-audit)**: FAMILY: none — Hermit's SOLITUDE! (entry HP scaling by total KO count) is unique; no other card scales HP based on total fallen ghosts on entry.
+
+**AUDIT STATUS**: Hermit (47) — AUDITED FIX (SOLITUDE! was entirely absent from sim; now correctly grants +2 HP per KO'd ghost on entry with overclock support)
+**Version bump:** v598 → v599
+
+---
+
+## v628 — BUG FIX: smartAutoPlay.js Jackson (50) REGROW! — post-roll HP-for-reroll mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Jackson (50) REGROW!. Every simulation with Jackson active modeled him as a plain 3 HP uncommon who never spent HP to improve his dice. The real game fires `checkJacksonRegrow()` post-roll (after Dark Wing reroll and Tommy mutation) whenever Jackson is active, HP >= 2, and hasn't used it this round — letting the player spend 1 HP to reroll one die. Without this, Jackson's only identity (HP-for-dice-quality trade) was completely invisible in every balance simulation.
+
+**Ability (from index.html line 2394)**: "After your roll, you may remove 1 of Jackson's health to reroll 1 of the dice." Fires once per round, requires HP >= 2 (index.html guard: `f.hp < 2` → skip), player picks which die to reroll.
+
+**Fix** (3 changes to `smartAutoPlay.js`):
+1. **B-state init** (line 73): added `jacksonUsedThisRound: { red: false, blue: false }` — matches index.html's `jacksonUsedThisRound` init at lines 2939 and 3356.
+2. **Post-roll REGROW! block** (after Tommy Salami mutation, before `// ===== POST-ROLL TRIGGERS =====`): resets flag, then for each team — if active is Jackson (50), not KO'd, HP >= 2, unused this round: reroll `jDice[0]` (the lowest die after sort), spend 1 HP, mark used. AI heuristic: always spend — rerolling the lowest die is almost always EV-positive. Matches `checkJacksonRegrow` + `doJacksonChoice('yes')` + `pickJacksonDie(lowestIdx)` flow.
+3. **Per-round reset** (end-of-round block): added `B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false;` — matches index.html lines 8967 and 11014 which reset `jacksonUsedThisRound` each round.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `jF` and `jDice` and `newVal` all declared inside `forEach` callback — scoped to the callback, no leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Jackson's REGROW! (once-per-round HP-for-single-die-reroll) is unique; Dark Wing (76) PRECISION! (once-per-game full reroll on singles) and Lucky Stone (post-round reroll resource) are die-reroll siblings but use completely different trigger conditions, resources, and timing — no shared code path.
+
+**AUDIT STATUS**: Jackson (50) — AUDITED FIX (REGROW! was entirely absent from sim; now correctly models HP-trade die reroll with AI heuristic)
+**Version bump:** v627 → v628
+
+---
+
+## v626 — BUG FIX: smartAutoPlay.js Nicholas (51) SNEAK ATTACK! — entry 2-damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Nicholas (51) SNEAK ATTACK!. Nicholas is a sideline entry-punisher: while on the enemy sideline, he deals 2 damage to any ghost the opponent brings into play. The `smartTriggerEntry()` function never called `hasSideline(enemy, 51)`, so every ghost that entered against a team fielding Nicholas took zero entry damage in the sim. Nicholas's entire identity as a 1 HP entry-punisher was invisible — he was modeled as dead weight (1 HP, no ability, instant KO liability) rather than a pressure-through-rotation threat.
+
+**Ability (from index.html line 2428)**: "While on the sideline, deal 2 damage to the enemy ghost when they enter play." Fires automatically on every enemy ghost entry, no Cornelius (45) block in index.html.
+
+**Fix** (1 change to `smartAutoPlay.js`):
+Added to the end of `smartTriggerEntry()` (after Redd id 98 block, before closing `}`):
+```javascript
+if (hasSideline(enemy, 51) && !f.ko) {
+  f.hp = Math.max(0, f.hp - 2);
+  if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
+}
+```
+Matches index.html lines 3617–3639. No Cornelius block — index.html does not block Nicholas with Cornelius. Knight-reaction edge case (entering-team Knight Terror/Light reacting to Nicholas) is omitted from the sim as it requires reverse-direction reaction logic not supported by the existing `applyEntryKnightRxn()` helper; the core 2-damage mechanic is now correctly modeled.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variable declarations — only `f.hp` and `f.ko` mutations via existing references ✓
+**Audit #3 (family-audit)**: FAMILY: none — Nicholas's entry-from-sideline damage is a unique pattern; Grawr (34) MENACE!, Jenkins (94) GREETING!, Nerina (306) LEVIATHAN!, and Timpleton (312) BIG TARGET! are all entry-damage siblings but they fire from the ACTIVE slot (f.id === X), not from the enemy sideline; no shared code path.
+
+**AUDIT STATUS**: Nicholas (51) — AUDITED FIX (entry 2-damage now fires in sim; previously absent)
+**Version bump:** v625 → v626
+
+---
+
+## v625 — BUG FIX: smartAutoPlay.js Dark Wing (76) PRECISION! — `darkWingUsedThisRound` (per-round reset) → `darkWingUsedThisGame` (once per game, never reset)
+
+**Bug**: `smartAutoPlay.js` used `B.darkWingUsedThisRound` (initialized at B-state init AND reset at the end of every round at line 1857). `index.html` uses `B.darkWingUsedThisGame` (initialized at battle start, never cleared between rounds). The card's `abilityDesc` explicitly says **"Once per game"**. Because the sim flag was reset every round, Dark Wing could reroll singles on every round he faced them — not just once per game. This inflated his effective dice quality across multi-round simulations, making his 2 HP survivability look more balanced than it truly is.
+
+**Fix** (3 changes to `smartAutoPlay.js`):
+1. **B-state init** (line 58): renamed `darkWingUsedThisRound` → `darkWingUsedThisGame`
+2. **COMPUTE DICE block** (lines 873, 879): renamed both references to `darkWingUsedThisGame` — gate and set
+3. **Per-round reset block** (line 1857): removed `B.darkWingUsedThisRound = { red: false, blue: false };` — replaced with a comment explaining the intentional omission
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: Only a rename — no new declarations, no scope change ✓  
+**Audit #3 (family-audit)**: FAMILY: none — once-per-game reroll flag rename; no card-ability logic changed, only flag lifecycle fixed.
+
+**AUDIT STATUS**: Dark Wing (76) — AUDITED FIX (sim flag reset every round instead of once per game; now matches card text and index.html)  
+**Version bump:** v624 → v625
+
+---
+
+## v624 — BUG FIX: smartAutoPlay.js Stone Cold (73) ONE-TWO-ONE! — double-1s 3X multiplier completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Stone Cold (73) ONE-TWO-ONE!. Every simulation with Stone Cold active modeled him as a plain 7 HP rare who took and dealt damage normally — the signature double-1s 3X multiplier never fired. The real game (index.html lines 9128–9138) checks `winDice.filter(d => d === 1).length >= 2` and multiplies damage by 3, then queues the ONE-TWO-ONE! callout. Without this, Stone Cold's finishing-power identity was completely invisible in every balance simulation.
+
+**Ability (from index.html line 2406)**: "Roll double 1's: deal 3X damage." Fires when Stone Cold wins and rolling dice include two or more 1s (doubles, triples, or quads of 1 all qualify per index.html guard).
+
+**Fix** (2 changes to `smartAutoPlay.js`):
+1. **Win-path damage block** — added before Mountain King BEAST MODE! block: `if (wF.id === 73 && !wF.ko && winDice.filter(d => d === 1).length >= 2) { dmg *= 3; }` — matches index.html lines 9132–9135 exactly
+2. **Knight-reaction entry** — added before Mountain King BEAST MODE! reaction: `if (ef.id === 73 && !ef.ko && _eD.filter(d => d === 1).length >= 2) rxns++;` — matches index.html line 9134 collectKC call
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: No new variable declarations; all guards are single-line inline expressions — no scope leak ✓  
+**Audit #3 (family-audit)**: FAMILY: none — Stone Cold's ONE-TWO-ONE! (two-or-more 1s → 3X multiplier) is unique; Larry (35) FLYING KICK! (triples 3X), Mountain King (110) BEAST MODE! (doubles 2X), Bill & Bob (36) BAIT N SWITCH! (low-HP 2X), and Greg (49) CHASE! (HP-advantage 2X) are all win-path multipliers but gate on entirely different roll conditions with no shared code path.
+
+**AUDIT STATUS**: Stone Cold (73) — AUDITED FIX (sim was missing entire ability; now correctly implemented)  
+**Version bump:** v623 → v624
+
+---
+
+## v623 — BUG FIX: smartAutoPlay.js Kairan (68) LET'S DANCE! — doubles die-growth mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Kairan (68) LET'S DANCE!. Every simulation with Kairan active modeled him as a plain 3 HP rare who rolled 3 dice every round with no escalation — the entire dice-growth identity (rolling doubles → +1 die next roll, can accumulate) never fired. The real game (index.html lines 7036–7054 consume, 8758–8770 tie trigger, 10762–10770 win/loss trigger) applies the bonus pre-roll gated on Kairan still being the active ghost, clears it regardless.
+
+**Fix** (5 changes to `smartAutoPlay.js`):
+1. **B-state init** — added `letsDanceBonus: { red: 0, blue: 0 }` after `tommyRegulatorBonus`
+2. **COMPUTE DICE consume** — added before Knight Light RETRIBUTION! block: consume `B.letsDanceBonus[tName]` if Kairan is still active, always clear after (matches index.html's Kairan-still-active guard)
+3. **Tie-path trigger** — added before Fang Undercover arm clear: each team checked independently, fires when Kairan is active and rolled doubles
+4. **Win/loss-path trigger** — added after Flora (75) loss-path block: checks BOTH winner and loser independently — Kairan may be on either team
+5. **Knight reaction** — added in post-roll passive triggers section: `if (ef.id === 68 && !ef.ko && classify(_eD).type === 'doubles') rxns++;` — fires win/loss/tie when Kairan (on enemy side) rolls doubles
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: `kaiF` declared inside forEach callback, used only within it; `kaiRoll` declared inside forEach callbacks, used only within them — no scope leak ✓  
+**Audit #3 (family-audit)**: FAMILY: none — Kairan's LET'S DANCE! (active-ghost doubles → accumulating personal die bonus) is unique; Haywire (78) WILD CHORDS! (triples → permanent team die bonus) and Scallywags (19) FRENZY! (all-under-4 → die bonus) are die-growth siblings but use different trigger conditions, different accumulation rules, and different active-ghost guards — no shared code path.
+
+**AUDIT STATUS**: Kairan (68) — AUDITED FIX (sim was missing entire ability; now correctly implemented)
+**Version bump:** v622 → v623
+
+---
+
+## v622 — BUG FIX: smartAutoPlay.js Cameron (25) FORCE OF NATURE! — damage-negation instant-KO completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Cameron (25) FORCE OF NATURE!. Every simulation with Cameron active modeled him as a plain 6 HP common who took and dealt damage normally — his defining anti-negation nuke never fired. The real game (index.html lines 9887–9896, 10541–10543) detects when Cameron wins but a defensive ability (Sylvia dodge, Patrick Stone Form, Kodako Swift, Sky Elusive, Dealer House Rules, City Cyboo Barrier, Bogey Bogus, Fang Undercover) zeroed the damage and instantly destroys the loser. Without this, Cameron's presence on a team had zero strategic deterrent against defensive ghosts, completely misrepresenting his matchup against Patrick, Sky, Dealer, Bogey, and Fang Undercover.
+
+**Fix** (2 changes to `smartAutoPlay.js`):
+1. **Snapshot before negation block** — added `const preCamDmg = dmg;` immediately before the Sylvia dodge check, capturing the pre-negation damage value so we can detect "was positive, ended at zero after defense"
+2. **Post-negation instant-KO check** — inserted after Fang Undercover arm clear and before "Apply damage": `if (wF.id === 25 && !wF.ko && !lF.ko && preCamDmg > 0 && dmg === 0) { lF.hp = 0; lF.ko = true; lF.killedBy = wF.id; }` — matches index.html force-of-nature condition exactly; Guard: `!lF.ko` prevents double-KO when Bogey's counter-reflect already killed Cameron and the loser's `lF.ko` is set synchronously.
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: `preCamDmg` is declared at the same scope level as `dmg` (inside the `if (winner)` block) and referenced only within that same block — no scope leak ✓  
+**Audit #3 (family-audit)**: FAMILY: none — Cameron's FORCE OF NATURE! (win + negation → instant KO) is unique; no other card conditional-instant-KOs based on an opponent's defensive ability zeroing damage.
+
+**Version bump:** v621 → v622
+
+---
+
+## v621 — BUG FIX: smartAutoPlay.js Tommy Salami (30) REGULATOR! — post-roll dice mutation + win bonus completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Tommy Salami (30) REGULATOR!. Every simulation with Tommy active modeled him as a plain 4 HP common who rolled dice and received full damage — no dice mutation, no regulated-die bonus, no suppression of opponent high rolls. The real game's `checkTommyRegulator()` (index.html lines 5163–5196) rerolls all of the opponent's 5s and 6s to weighted low values (1–4) BEFORE winner determination, stores the regulated count in `B.tommyRegulatorBonus[team]`, and then adds +1 damage per regulated die when Tommy wins (resolveRound lines 9328–9343). Without this, Tommy never altered the opponent's dice, never gained bonus damage, and was systematically undervalued in every balance simulation.
+
+**Fix** (3 changes to `smartAutoPlay.js`):
+1. **B-state init** — added `tommyRegulatorBonus: { red: 0, blue: 0 }` to the B object (after `fangUndercoverArmed`)
+2. **Post-roll mutation block** — inserted after Dark Wing reroll, before `// ===== POST-ROLL TRIGGERS =====`:  mutates opponent's 5s/6s in-place using the same weighted distribution as `checkTommyRegulator` (30% → 1, 25% → 2, 15% → 3, 30% → 4), re-sorts, stores count; resets both teams' bonus each round regardless of whether Tommy fired
+3. **Win-path damage block** — inserted after Bilbo (80) Little Buddy: `if (wF.id === 30 && !wF.ko) { dmg += B.tommyRegulatorBonus[winTeamName] || 0; }`
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: `_tommyReg` is declared inside the `if (wF.id === 30)` block and not referenced outside; `tKey`, `tF`, `oppKey`, `oppDice`, `regulated`, `r` are all inside the forEach callback — no scope leak ✓  
+**Audit #3 (family-audit)**: FAMILY: none — Tommy's REGULATOR! (post-roll opponent-dice mutation + win-path bonus per regulated die) is unique; no other card mutates dice values after rolling.
+
+**Version bump**: v620 → v621
+
+---
+
+## v620 — BUG FIX: smartAutoPlay.js Fredrick (27) CAREFUL! — opponent dice cap completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Fredrick (27) CAREFUL!. Every simulation with Fredrick active rolled the opponent's full (uncapped) dice count regardless of bonuses. In the real game, Fredrick's CAREFUL! caps the opponent at exactly 3 dice and is applied LAST in `doPreRollSetup` (index.html lines 7305–7319) so it overrides all bonuses — Surge dice, retribution dice, Scallywags/Dream Cat bonuses, etc. Without this cap in the sim, opponents facing Fredrick could roll 4, 5, or 6 dice every round, making Fredrick systematically undervalued in every balance simulation.
+
+**Ability (from index.html line 2445)**: "Opponent may only roll up to 3 dice." Fires whenever Fredrick is the active ghost and not KO'd. No Dylan (301) guard — the cap is a passive persistent effect, not a pre-roll trigger.
+
+**Fix**: Added Fredrick's 3-dice cap to the end of the COMPUTE DICE block in `smartAutoPlay.js`, immediately before the `// ===== ROLL DICE =====` comment, matching index.html's "applied last" semantics:
+```js
+['red','blue'].forEach(tName => {
+  const f = active(B[tName]);
+  if (f.id === 27 && !f.ko) {
+    const oppKey = tName === 'red' ? 'blue' : 'red';
+    if (oppKey === 'red' && redCount > 3) redCount = 3;
+    else if (oppKey === 'blue' && blueCount > 3) blueCount = 3;
+  }
+});
+```
+
+**Audit #1 (template literals)**: No template literals added ✓  
+**Audit #2 (block scope)**: No new variables declared; `tName`, `f`, `oppKey` are all inline inside the forEach callback — no scope leak ✓  
+**Audit #3 (family-audit)**: FAMILY: none — Fredrick's CAREFUL! (active dice cap on opponent) is unique; Logey (26) HEINOUS! (count 5+ dice → lock next round) and Hugo (52) WRECKAGE! (attacker loses 1 die) are die-reduction siblings but use completely different trigger conditions, state tracking, and timing — no shared code path.
+
+**Version bump**: v619 → v620
+
+---
+
+## v619 — BUG FIX: smartAutoPlay.js Prince Balatron (113) PARTY TIME! — lose-path counter die completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Prince Balatron (113) PARTY TIME! — id 113 did not appear anywhere in the file. A Python sweep of all original-113 ids confirmed it was the only card with a zero-match count. Every simulation with Balatron active modeled him as a plain 6 HP legendary that took damage and did nothing in return. The lose-path counter die (1–6 damage to the winner, capable of KO) never fired, making every Balatron simulation fundamentally wrong about his survival/threat identity.
+
+**Ability (from index.html lines 9913–9938)**: When Balatron loses a roll and survives (`!lF.ko && !wF.ko`), pre-compute 1 counter die (1–6) and apply that damage to the winner. If the counter die KOs the winner, set `wF.ko = true; wF.killedBy = lF.id`. The real game defers the reveal to a player-click modal (showBalatronModal → finishBalatronRoll), but the damage computation and KO flag are synchronous.
+
+**Fix**:
+1. **Lose-path counter-die block** — added after the "Apply damage" block (line ~1297):
+   ```js
+   if (lF.id === 113 && !lF.ko && !wF.ko) {
+     const balatronDie = Math.floor(Math.random() * 6) + 1;
+     wF.hp = Math.max(0, wF.hp - balatronDie);
+     if (wF.hp <= 0) { wF.ko = true; wF.killedBy = lF.id; }
+   }
+   ```
+2. **Knight-reaction loserWasEnemy entry** — added after Sky (72) ELUSIVE! reaction: `if (ef.id === 113 && !ef.ko && !active(B[teamKey]).ko) rxns++;` — Balatron fires a knight reaction any time he loses and survives.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `balatronDie` is a `const` declared inside the `if (lF.id === 113)` block with no references outside that block — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Balatron's PARTY TIME! (lose-path counter die, every round, no once-per-game flag) is unique; Bogey (53) BOGUS! (once-per-game reflect, same-damage-back), Sylvia (313) PORPOISE! (random dodge %, no counter damage), and Patrick (10) STONE FORM! (singles-only negate + fixed 3 damage) are lose-path damage mechanics with completely different trigger conditions and state.
+
+**Version bump**: v618 → v619
+
+---
+
+## v618 — BUG FIX: smartAutoPlay.js Bilbo (80) LITTLE BUDDY! — sideline singles +2 damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Bilbo (80) LITTLE BUDDY!. The AUDIT STATUS marked the index.html implementation as AUDITED PASS (v285), but `smartAutoPlay.js` had no `hasSideline(wTeam, 80)` check anywhere — id 80 did not appear in the sim at all. Every simulation with Bilbo on the sideline modeled him as a 2 HP vanilla ghost with zero ability identity. The +2 singles-win damage bonus never fired, making teams pairing Bilbo with singles-heavy builds (Team Zippy, Hector, Guard Thomas) systematically undervalued in balance data.
+
+**Ability (from index.html lines 9484–9496)**: While Bilbo is on the sideline, if your active ghost wins with a singles roll, deal +2 damage. Blocked by Cornelius (45) on enemy sideline.
+
+**Fix**:
+1. **Win-path damage block** — added after Laura (79) CATCHY TUNE! and before Kodako (1) Swift WIN case:
+   `if (hasSideline(wTeam, 80) && !wF.ko && wR.type === 'singles' && !hasSideline(lTeam, 45)) { dmg += 2; }`
+2. **Knight-reaction entry** — added after Laura (79) reaction and before the closing `}` of the win-path reaction block:
+   `if (hasSideline(enemyTeam, 80) && classify(_eD).type === 'singles') rxns++;`
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables declared; inline condition only — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: sideline-win-damage | siblings: Dark Jeff(74), Admiral(71), Tabitha(95), Lou(32), Laura(79), Bilbo(80) | Bilbo was the only missing member; family now complete.
+
+**Version bump**: v617 → v618
+
+---
+
+## v617 — BUG FIX: smartAutoPlay.js Tyler (105) HEATING UP! — HP-trade die bonus and Sacred Fires ×2 multiplier completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Tyler (105) HEATING UP!. Tyler was a plain 6 HP ghost-rare with zero ability identity in every simulation — the pre-roll 2 HP → +1 die trade never fired and Sacred Fires always dealt 3 damage instead of 6 when Tyler won.
+
+**Ability (from GHOSTS entry line 2476)**: "Before rolling, spend 2 HP to gain +1 die. Sacred Fires deal x2."
+
+**Fix**:
+1. **COMPUTE DICE block** — added Tyler HP-trade section after Boo Brothers: if active ghost is Tyler with HP ≥ 3, deduct 2 HP and add +1 die (capped at 6). AI always trades — die bonus is consistently valuable.
+2. **Win-path Sacred Fires block** — changed `fireCommitted * 3` to `fireCommitted * firePerUnit` where `firePerUnit = (wF.id === 105 && !wF.ko) ? 6 : 3`. Matches index.html lines 9069–9083.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables in scope-leak positions; `firePerUnit` is a `const` declared in the same block as its only use ✓
+**Audit #3 (family-audit)**: FAMILY: none — Tyler's HP-for-dice mechanic and Sacred Fires doubling are unique; Boo Brothers (17) also trades a resource for a die but uses a completely different trigger and state pattern.
+
+**Version bump**: v616 → v617
+
+---
+
+## v616 — BUG FIX: smartAutoPlay.js Laura (79) CATCHY TUNE! — sideline consecutive-ascending-dice +3 damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Laura (79) CATCHY TUNE!. She was listed as AUDITED PASS (v285) in FIXLOG for the index.html implementation, but the smartAutoPlay.js sim had no `hasSideline(wTeam, 79)` check anywhere. Every simulation with Laura on the sideline used her as a 4 HP vanilla ghost with zero ability identity — the consecutive-dice +3 bonus never fired.
+
+**Ability (from index.html lines 9515–9531)**: While Laura is on the winner's sideline and the winner has ≥2 dice, if the winning dice sorted ascending form a strict consecutive run (each die = prev+1), deal +3 damage. Blocked by Cornelius (45) on enemy sideline.
+
+**Fix**:
+1. **Win-path damage block** — added after Zach (87) CRAFTSMAN! and before Kodako (1) Swift WIN override:
+   `hasSideline(wTeam, 79) && !wF.ko && winDice && winDice.length >= 2 && !hasSideline(lTeam, 45)` → sort dice ascending, check consecutive run → `dmg += 3`.
+2. **Knight-reaction entry** — added after Zach's reaction entry in the win-path knight block: `hasSideline(enemyTeam, 79) && _eD.length >= 2` → sort `_eD`, check consecutive → `rxns++`.
+
+**Version bump**: v615 → v616
+
+## v615 — BUG FIX: smartAutoPlay.js Pale Nimbus (88) HIDDEN STORM! + Zach (87) CRAFTSMAN! — both sideline damage boosters completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for either Pale Nimbus (88) HIDDEN STORM! or Zach (87) CRAFTSMAN!. The explore agent in cycle 23 incorrectly reported Pale Nimbus as "already implemented at line 1164" — that line contains Nikon's AMBUSH!, not Pale Nimbus. Both were vanilla ghosts in every simulation.
+
+**Pale Nimbus (88) HIDDEN STORM!**: While on sideline, +2 damage if winning dice sum < 7. Blocked by Cornelius (45). Matches index.html lines 9499–9511.
+
+**Zach (87) CRAFTSMAN!**: While on sideline, Guard Thomas (41) active wins with doubles → +3 damage. Blocked by Cornelius (45). Matches index.html lines 9566–9578.
+
+**Fix**: Added 4 lines to `smartAutoPlay.js`:
+1. Win-path damage block (after Bandit Pete line): `if (hasSideline(wTeam, 88) && !wF.ko && winDice && winDice.reduce((s,d)=>s+d,0) < 7 && !hasSideline(lTeam, 45)) { dmg += 2; }`
+2. Win-path damage block (after Pale Nimbus line): `if (hasSideline(wTeam, 87) && wF.id === 41 && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 3; }`
+3. Knight-reactions winnerWasEnemy block (after Bandit Pete): `if (hasSideline(enemyTeam, 88) && _eD.reduce((s,d)=>s+d,0) < 7) rxns++;`
+4. Knight-reactions winnerWasEnemy block (after Pale Nimbus): `if (hasSideline(enemyTeam, 87) && ef.id === 41 && classify(_eD).type === 'doubles') rxns++;`
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables declared; inline conditions only — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — both are distinct sideline-damage-boosters with unique trigger conditions (sum-threshold and identity+doubles-type) not shared with any other card.
+
+**Version bump**: v614 → v615
+
+---
+
+## v614 — BUG FIX: smartAutoPlay.js Bandit Pete (93) BANDIT! — sideline +3 damage on 2-dice rolls completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Bandit Pete (93) BANDIT!. Bandit Pete's ability: while on the sideline, if either player rolls only 2 dice, your active ghost gains +3 damage. Without this:
+1. Every match with Bandit Pete on the sideline completely ignored his counter-die-drain identity — he was a plain 5 HP ghost that contributed nothing.
+2. Balance data for teams pairing Bandit Pete with Piper (die-drain) or Hugo (WRECKAGE!) — the exact builds that would trigger BANDIT! every round — showed none of the +3 damage bonus.
+3. The Cornelius (45) ANTIDOTE! block which lists Bandit Pete couldn't counter an ability that never fired.
+
+**Ability (from index.html lines 9550–9564, resolveRound):**
+- Trigger: `hasSideline(winTeam, 93) && !wF.ko && (winDice.length === 2 || loseDice.length === 2)`
+- Blocked by `corneliusBlocksRally` (Cornelius 45 on losing team's sideline)
+- Effect: `dmg += 3`
+
+**Fix**: Added two lines to `smartAutoPlay.js`:
+1. Win-path damage block (after Dark Jeff CACKLE!): `if (hasSideline(wTeam, 93) && !wF.ko && (redDice.length === 2 || blueDice.length === 2) && !hasSideline(lTeam, 45)) { dmg += 3; }` — uses `redDice`/`blueDice` directly (both in scope at line 814) since `loseDice` isn't declared until line 1384.
+2. Knight-reactions win block (after Dark Jeff CACKLE!): `if (hasSideline(enemyTeam, 93) && (_eD.length === 2 || _kD.length === 2)) rxns++;`
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables declared; inline condition only — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Bandit Pete's BANDIT! (sideline +3 on low dice count) is unique; Dark Jeff (74), Admiral (71), Tabitha (95) are sideline damage-buffers but gate on different conditions (all-wins, even-doubles, doubles) — no shared code path.
+
+**Version bump**: v613 → v614
+
+---
+
+## v613 — BUG FIX: smartAutoPlay.js Admiral (71) COMRADES! — sideline +2 even-doubles win damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Admiral (71) COMRADES!. Admiral's ability: while on the sideline, +2 damage to your active ghost's even-doubles wins. Without this:
+1. Every match with Admiral on the sideline was modeled as if he contributed nothing — his 3 HP sideline-booster identity was invisible.
+2. Balance data for teams running Admiral (especially paired with even-roll-favoring ghosts like Chip or Mountain King) understated their doubles win-path damage by 2 every relevant round.
+3. The Cornelius (45) ANTIDOTE! block — which lists Admiral — couldn't counter an ability that never fired.
+
+**Ability (from index.html lines 9452–9467, resolveRound):**
+- Trigger: `hasSideline(winTeam, 71) && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0`
+- Note from line 9454: correct check is `wR.value % 2 === 0` (the paired face is even), NOT all dice even
+- Blocked by `corneliusBlocksRally` (Cornelius 45 on losing team's sideline)
+- Effect: `dmg += 2`
+
+**Fix**: Added two lines to `smartAutoPlay.js`:
+1. Win-path damage block (after Tabitha RALLY! line): `if (hasSideline(wTeam, 71) && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0 && !hasSideline(lTeam, 45)) { dmg += 2; }`
+2. Knight-reactions win block (after Ancient Librarian): `if (hasSideline(enemyTeam, 71) && classify(_eD).type === 'doubles' && classify(_eD).value % 2 === 0) rxns++;`
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables declared; inline condition only — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: sideline-win-damage | siblings: Dark Jeff(74), Admiral(71), Tabitha(95), Lou(32) | Admiral was the remaining broken sibling — now fixed; family complete.
+
+**Version bump**: v612 → v613
+
+---
+
+## v612 — BUG FIX: smartAutoPlay.js Dark Jeff (74) CACKLE! — sideline +1 damage on all wins completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Dark Jeff (74) CACKLE!. Dark Jeff's ability: while on sideline, +1 damage to ALL your wins (any roll type). Without this:
+1. Every match with Dark Jeff on the sideline was modeled as if he contributed nothing — his 3 HP passive identity was invisible.
+2. Balance data for teams running Dark Jeff (paired with high-damage active ghosts) understated their win-path damage by 1 every round.
+3. The Cornelius (45) ANTIDOTE! block — which specifically lists Dark Jeff — couldn't counter an ability that never fired.
+
+**Fix**: Added two lines to `smartAutoPlay.js`:
+1. Win-path damage block (after Pelter line 1180): `if (hasSideline(wTeam, 74) && !wF.ko && !hasSideline(lTeam, 45)) { dmg += 1; }`
+2. Knight-reactions win block (after Ancient Librarian): `if (hasSideline(enemyTeam, 74)) rxns++;`
+
+Matches index.html lines 9469–9482 (`collectKC` call, `dmg += 1`, Cornelius block).
+
+**Files changed**: `smartAutoPlay.js` (2 lines added), `index.html` TESTROOM_VERSION v611→v612.
+
+---
+
+## v611 — BUG FIX: smartAutoPlay.js Pelter (86) SNOWBALL! — doubles-win +2 damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Pelter (86) SNOWBALL!. Pelter's ability: doubles win → +2 bonus damage. Without this:
+1. Pelter never received his doubles-win damage bonus in any simulation.
+2. His "Damage Multiplier" identity was completely invisible — simulated identically to a vanilla 5 HP ghost.
+3. Any balance data pairing Pelter against low-HP targets or with doubles-rewarding support (Tabitha, Dream Cat) was wrong.
+
+**Fix**: Added one line to the win-path damage block in `smartAutoPlay.js`, after the Tabitha (95) RALLY! sideline bonus:
+```js
+// Pelter (86) — Snowball: doubles win → +2 bonus damage. Matches index.html lines 9228–9234.
+if (wF.id === 86 && !wF.ko && wR.type === 'doubles') { dmg += 2; }
+```
+
+**Files changed**: `smartAutoPlay.js` (1 line added after Tabitha block), `index.html` TESTROOM_VERSION v610→v611.
+
+---
+
+## v610 — BUG FIX: smartAutoPlay.js Wandering Sue (84) HIDDEN WEAKNESS! — pre-roll instant KO on enemy 12+ HP completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Wandering Sue (84) HIDDEN WEAKNESS!. Wandering Sue's ability: before rolling, if the active enemy ghost has 12 or more HP, instantly KO them. Without this:
+1. Wandering Sue never triggered her pre-roll assassin ability.
+2. Any opponent who stacked HP via Katrina SEEKER!, Boris FORTIFY!, Shoo ALPINE AIR!, Mallow DOZY COZY!, etc. had no threat from Wandering Sue in any simulation.
+3. Wandering Sue was modeled as a plain 4 HP ghost that rolled dice normally every round — her entire anti-overclock identity absent.
+
+Wandering Sue is specifically designed to punish HP-stacking teams. With overclock-capable healers in the set (Katrina, Boris, Calvin, Shoo, Mallow, Aunt Susan), the 12+ HP threshold is reachable in practice — especially in long games. Wandering Sue's threat forces opponents to manage HP carefully.
+
+**Ability (from index.html lines 6738–6754, doPreRollSetup):**
+- forEach both teams: if `f.id === 84 && !f.ko`, check enemy active ghost
+- If `!ef.ko && ef.hp >= 12`: `ef.hp = 0; ef.ko = true; ef.killedBy = 84`
+- No Dylan Scarecrow guard in index.html — this targets the enemy directly, not a buffable damage effect
+- The pre-roll KO handler at lines 469–480 brings in the replacement ghost automatically
+
+**Fix** (1 targeted block added to `smartAutoPlay.js` pre-roll section, after Fang Undercover arm):
+```js
+['red','blue'].forEach(teamKey => {
+  const team = B[teamKey];
+  const f = active(team);
+  if (f.id !== 84 || f.ko) return;
+  const enemy = opp(team);
+  const ef = active(enemy);
+  if (!ef.ko && ef.hp >= 12) {
+    ef.hp = 0; ef.ko = true; ef.killedBy = 84;
+  }
+});
+```
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `team`, `f`, `enemy`, `ef` declared inside forEach arrow body and used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Wandering Sue's HIDDEN WEAKNESS! (pre-roll instant KO on ≥12 HP) is unique; Toby (97) PURE HEART! (pre-roll declared KO on win), Bogey (53) BOGUS! (reactive reflect on any damage), and Shade (111) HAUNT! (chip damage every round) are other pre-roll KO/damage mechanics but use completely different trigger conditions — no shared code path.
+
+**Version bump**: v609 → v610
+
+---
+
+## v609 — BUG FIX: smartAutoPlay.js Fang Undercover (7) SKILLED COWARD! — pre-roll arm+dodge mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Fang Undercover (7) SKILLED COWARD!. Fang Undercover's ability: each round (when a sideline ghost is available), opt to arm the dodge; if armed and Fang takes damage > 0, negate all incoming damage and swap Fang to the sideline. Without this:
+1. `B.fangUndercoverArmed` was never initialized in B-state.
+2. The pre-roll arm logic never fired — Fang was never marked as armed.
+3. The tie-path never cleared the armed flag.
+4. The win-path never checked the armed flag — Fang took full damage every round, with no dodge and no sideline swap.
+
+Fang Undercover was modeled as a plain 5 HP ghost fighting straight rounds — the entire hit-and-run / damage-negation identity completely absent from every simulation.
+
+**Ability (from index.html lines 5863–5882, 8968, 9812–9822):**
+- Pre-roll: arm the dodge if Fang is active with sideline ghost available (player modal; AI always arms)
+- Tie path: clear arm (no damage taken)
+- Win/loss path: if armed + dmg > 0 → negate damage → Fang swaps to sideline, picks best replacement
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init**: Added `fangUndercoverArmed: { red: false, blue: false }` — mirrors index.html line 2951.
+2. **Pre-roll arm block** (after Tyson Hop): `f.id === 7 && !f.ko && !B.fangUndercoverArmed[teamKey] && hasSl` → `B.fangUndercoverArmed[teamKey] = true` — mirrors doPreRollSetup lines 5863–5882. AI always arms (no cost).
+3. **Tie-path clear** (after Haywire WILD CHORDS!): `B.fangUndercoverArmed.red = false; B.fangUndercoverArmed.blue = false` — mirrors index.html line 8968.
+4. **Win-path negate + swap** (after Bogey, before Apply damage): `lF.id === 7 && !lF.ko && B.fangUndercoverArmed[lTeamName] && dmg > 0` → `dmg = 0` → pick best sideline ghost → `lTeam.activeIdx = fuBest.i; smartTriggerEntry(lTeam)` — mirrors index.html lines 9812–9822 + 11080–11081. Post-check clear mirrors line 9822.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `fuSlots`, `fuBest` declared inside the win-path `if` block, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Fang Undercover's SKILLED COWARD! (pre-roll opt-in arm + incoming-damage negate + sideline swap) is unique; Bogey (53) BOGUS! (once-per-game reactive reflect without sideline swap) and Sylvia (313) PORPOISE! (lose-path random dodge) are similar damage-negate mechanisms but use completely different trigger conditions, modal types, and no swap — no shared code path.
+
+**Version bump**: v608 → v609
+
+---
+
+## v608 — BUG FIX: smartAutoPlay.js Haywire (78) WILD CHORDS! — triples-or-better once-per-game permanent +1 die completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Haywire (78) WILD CHORDS!. Haywire's ability: once per game, if Haywire rolls triples or better (on ANY path — tie, win, or loss), permanently gain +1 die for all future rolls. Without this:
+1. `B.haywireBonus` and `B.haywireUsed` were never initialized in B-state.
+2. The tie-path trigger (triples or better on a tie) never fired.
+3. The win/loss-path trigger (winner or loser Haywire hitting triples+) never fired.
+4. The COMPUTE DICE block never added the permanent bonus.
+
+Haywire was modeled as a vanilla 5 HP rare with zero ability identity — the entire point of Haywire (dice escalation through elite rolls) never materialized in any simulation.
+
+**Ability (from index.html lines 2942–2943, 7057–7058, 8784–8796, 10801–10813):**
+- B-state: `haywireBonus: {red:0, blue:0}`, `haywireUsed: {red:false, blue:false}`
+- COMPUTE DICE: `if haywireBonus > 0: redCount/blueCount += bonus` (permanent, NOT cleared each round)
+- Tie path: triples/quads/penta → `haywireBonus[team]++`, `haywireUsed[team] = true` (once only)
+- Win/loss path: same trigger independently for both `wF` and `lF` rolls — fires regardless of who won
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init**: Added `haywireBonus: { red: 0, blue: 0 }` and `haywireUsed: { red: false, blue: false }` after `dreamCatBonus`.
+2. **COMPUTE DICE block** (after dreamCatBonus consume): Added unconditional `redCount += B.haywireBonus.red` / `blueCount += B.haywireBonus.blue` — permanent, not cleared, mirrors index.html lines 7057–7058.
+3. **Tie path** (after Dream Cat JINX! block): `['triples','quads','penta'].includes(rR.type)` → forEach both teams → `!haywireUsed[teamKey]` guard → set bonus+1, used=true — mirrors index.html lines 8784–8796.
+4. **Win/loss path** (after Dream Cat JINX! block): Separate `wF.id===78` and `lF.id===78` checks with own rolls → mirrors index.html lines 10801–10813.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: All new variables (`f`, `teamKey`) declared inside forEach arrow bodies; inline checks on `wF`/`lF`/`wR`/`lR` are pre-existing scope — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Haywire's WILD CHORDS! (triples-or-better → once-per-game permanent +1 die) is unique; Alucard COLONY CALL! (once-per-game triggered on KO) and Bogey BOGUS! (once-per-game reactive on incoming damage) are other once-per-game flags but use completely different trigger conditions and game phases — no shared code path.
+
+**Version bump**: v607 → v608
+
+---
+
+## v607 — BUG FIX: smartAutoPlay.js Toby (97) PURE HEART! — all-in declaration mechanic completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Toby (97) PURE HEART!. Toby's entire identity is a once-per-appearance all-in gamble: declare the final roll, win → instant KO enemy ghost, but Toby is sacrificed next round regardless. Without this:
+1. `B.pureHeartDeclared` and `B.pureHeartScheduledKO` were never initialized in B-state.
+2. The AI never declared (no pre-roll decision block).
+3. The sacrifice (Toby KO'd before rolling next round) never fired.
+4. Win with declaration never overrode `dmg = lF.hp` for the instant KO.
+5. The state transition (carry `pureHeartScheduledKO` forward, reset `pureHeartDeclared`) never ran.
+6. Knight reaction for PURE HEART! on win never counted a reaction.
+
+Toby was modeled as a plain 7 HP ghost-rare that rolled dice and fought normally every round — no gamble, no sacrifice, no instant KO. His entire design identity was absent.
+
+**Ability (from index.html lines 5653–5667, 6724–6734, 9366–9372, 8971–8976, 11010–11015):**
+- Pre-roll declaration (each round, fresh): `pureHeartDeclared[team] = true/false` (AI always declares when enemy has >2 HP)
+- Pre-roll sacrifice (next round after any declaration): `pureHeartScheduledKO[team]` → KO Toby before rolling (`killedBy = -1`, self-sacrifice, no enemy kill credit)
+- Win with declaration: `dmg = lF.hp` (guaranteed instant KO regardless of HP)
+- Post-round state transition: `declared[true] → scheduledKO[true]`, then `declared = null` (both tie and win/loss paths)
+
+**Fix** (6 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init**: Added `pureHeartDeclared: { red: null, blue: null }` and `pureHeartScheduledKO: { red: false, blue: false }` — mirrors index.html lines 2923–2924, 3339–3340.
+2. **Pre-roll sacrifice block** (after Lucy Blue Fire, before Katrina): `['red','blue'].forEach` — `f.id === 97 && !f.ko && B.pureHeartScheduledKO[teamKey]` → `f.ko = true; f.killedBy = -1` — mirrors index.html lines 6724–6734.
+3. **Pre-roll declaration block** (after sacrifice block): AI declares when `pureHeartDeclared[teamKey] === null && !pureHeartScheduledKO[teamKey]` and enemy active HP > 2 — mirrors doTobyPureHeart(true) path.
+4. **Win-path instant KO** (after `let dmg = wR.damage;`): `if (wF.id === 97 && !wF.ko && B.pureHeartDeclared[winTeamName] === true) { dmg = lF.hp; }` — mirrors index.html lines 9366–9372.
+5. **Knight reaction** (winnerWasEnemy block, after Hector PROTECTOR!): `if (ef.id === 97 && !ef.ko && B.pureHeartDeclared[enemyKey] === true) rxns++;` — mirrors index.html line 9371 collectKC call. Checked before state transition so `pureHeartDeclared` is still true at this point.
+6. **Post-round state transition** (after `darkWingUsedThisRound` reset): `['red','blue'].forEach(tk => { if (declared[tk]===true) scheduledKO[tk]=true; declared[tk]=null; })` — mirrors index.html lines 8971–8976 (tie) + 11010–11015 (win/loss). Placed after knight block so reaction check (#5) sees the true value.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: All new variables (`f`, `ef`, `enemy`, `teamKey`, `tk`) declared inside forEach arrow bodies and used only within them — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Toby's PURE HEART! (pre-roll declaration → instant KO on win + self-sacrifice next round) is unique; Bogey (53) BOGUS! (once-per-game reactive reflect) and Sylvia (313) PORPOISE! (lose-path die roll dodge) are other modal-driven all-in mechanics but both use completely different trigger conditions, state keys, and game phases — no shared code path.
+
+**Version bump**: v606 → v607
+
+---
+
+## v606 — BUG FIX: smartAutoPlay.js Redd (98) NOTORIOUS! — entry +2 dice flag never set or consumed in sim
+
+**Bug**: `smartAutoPlay.js` `smartTriggerEntry` had zero implementation for Redd (98) NOTORIOUS!. Redd's ability: when entering battle, gain +2 dice for the first roll (one-time burst, flag cleared after use). Without this: Redd rolled a plain 3 dice on entry just like any vanilla ghost — the entire point of swapping Redd in (the explosive first-roll burst) never materialized in any simulation. Redd's 7 HP ghost-rare identity is completely entry-timing: you bring him in as a KO replacement to spike 5 dice on the next roll. Missing this made Redd systematically undervalued in all balance data.
+
+**Ability (from index.html lines 3502–3508, 6875–6884):**
+- Entry: `f.id === 98` → `f.reddFirstRoll = true` → knight reaction fires
+- COMPUTE DICE: `f.id === 98 && f.reddFirstRoll` → `+2 dice` → `f.reddFirstRoll = false`
+
+**Fix** (2 additions to `smartAutoPlay.js`):
+1. **`smartTriggerEntry`** (after Jenkins block): `if (f.id === 98) { f.reddFirstRoll = true; applyEntryKnightRxn(); }` — sets flag and triggers knight reaction on entry, mirrors index.html lines 3502–3508.
+2. **COMPUTE DICE block** (after Cyboo SPARK! block): `['red','blue'].forEach` — `f.id === 98 && f.reddFirstRoll` → `redCount += 2` / `blueCount += 2` → `f.reddFirstRoll = false` — consumes flag and grants +2 dice, mirrors index.html lines 6879–6882.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `f` declared inside arrow body, used only within it; flag set/consumed on `f` which persists on the ghost object — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Redd's NOTORIOUS! (entry → first-roll +2 dice via boolean flag) is unique; Maximo (302) NAP! (entry → 1 die first roll) and Bouril (201) SLUMBER! (entry → locked [1,2,3]) both use first-roll flags but with fundamentally different mechanics and no shared code path.
+
+**Version bump**: v605 → v606
+
+---
+
+## v605 — BUG FIX: smartAutoPlay.js Cyboo (100) SPARK! — sideline <3 HP die bonus completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Cyboo (100) SPARK!. Cyboo's ability: while on sideline, if the own active ghost has fewer than 3 HP, they gain +1 die this roll. Blocked by Cornelius (45) on the enemy sideline. Without this, the COMPUTE DICE block never checked for the Cyboo/low-HP condition — every match where Cyboo was on the sideline and the active ghost was critically wounded (1–2 HP) systematically under-rolled by 1 die. The die bonus is Cyboo's entire design identity: a sideline life-support specialist that gives a last-ditch roll advantage to critically wounded fighters.
+
+**Ability (from index.html lines 6960–6978):**
+- Fires in COMPUTE DICE (pre-roll): active ghost `f.hp < 3` (so 1 or 2 HP), Cyboo (id 100) is on own sideline, no Cornelius (id 45) on enemy sideline → `+1 die` this roll.
+
+**Fix** (1 addition to `smartAutoPlay.js`):
+- **COMPUTE DICE block** (after Needle BIG BRO! block, before Harrison extra dice): `['red','blue'].forEach` — `!f.ko && f.hp < 3 && hasSideline(B[teamKey], 100) && !hasSideline(B[enemyKey], 45)` → `redCount++` / `blueCount++` — mirrors index.html lines 6960–6978. Pattern identical to Needle BIG BRO! (same Cornelius block structure, same die-grant method).
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `f` and `enemyKey` declared inside arrow body, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Cyboo's SPARK! (sideline low-HP die bonus for active ghost) is unique. Needle (21) BIG BRO! (sideline die bonus gated on specific active ghost id) and Shoo (13) ALPINE AIR! (sideline HP heal gated on low HP) are the closest sideline-triggered passives but Needle gates on identity and Shoo grants HP not dice — no shared code path.
+
+**Version bump**: v604 → v605
+
+---
+
+## v604 — BUG FIX: smartAutoPlay.js Tabitha (95) RALLY! — sideline doubles +2 damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Tabitha (95) RALLY!. Tabitha's ability: while on sideline, +2 damage to active ghost's doubles wins. Cornelius (45) on the losing team's sideline blocks it. Without this, every Tabitha sim treated her as a 1 HP ghost with absolutely zero offensive identity — the whole reason she's played (doubles pressure from sideline) never fired.
+
+**Fix**: Added one line in the win-path damage block, right after Lou (32) BROS!:
+```
+if (hasSideline(wTeam, 95) && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 2; }
+```
+Matches index.html lines 9439–9450. Cornelius check (`!hasSideline(lTeam, 45)`) matches the `corneliusBlocksRally` guard in index.html.
+
+**Audit #1**: No template literals added ✓
+**Audit #2**: Single inline expression, no new variables declared ✓
+**Audit #3**: FAMILY: none — Tabitha's RALLY! (sideline doubles-win +2 damage) is a unique sideline buff; Dark Jeff (74) CACKLE! (sideline +1 all wins), Admiral (71) COMRADES! (sideline +2 even doubles), and Lou (32) BROS! (Grawr-specific sideline +1) are all sideline damage-buff siblings with different trigger conditions and no shared code path.
+
+**Version bump**: v603 → v604
+
+---
+
+## v603 — BUG FIX: smartAutoPlay.js Jenkins (94) GREETING! — 4-dice entry nuke completely absent from sim
+
+**Bug**: `smartAutoPlay.js` `smartTriggerEntry` had zero implementation for Jenkins (94) GREETING!. Jenkins rolls 4 dice on entry and deals damage by roll TYPE (singles=1, doubles=2, triples=3, quads=4, penta=5). Without this: Jenkins entered as a passive 5 HP ghost with zero entry pressure — every sim matchup treated him as a plain attacker. On average, 4 dice hit doubles or better ~68% of the time, meaning Jenkins averaged ~1.8 entry damage per swap-in, a significant missing edge in any mid-game substitution scenario.
+
+**Ability (from index.html lines 3510–3531):**
+- Fires on entry: `f.id === 94` → `rollDice(4)` → `classify().damage` → applied to enemy active ghost
+- KO guard on enemy, KO on death, `collectKnightReactions()` fires after damage
+
+**Fix** (2 additions to `smartAutoPlay.js`):
+1. **`smartTriggerEntry` block** (after Grawr Menace): `if (f.id === 94)` → `rollDice(4)` → `classify().damage` → apply to enemy → `applyEntryKnightRxn()` — mirrors index.html lines 3514–3531. `rollDice` and `classify` are both globally available from index.html scope.
+2. **`smartPickSwap` scoring**: `if (c.g.id === 94) score += 3;` — Jenkins' expected entry damage (~1.8) is close to Timpleton's conditional 3, so +3 is appropriate; AI will correctly prefer Jenkins as a KO-swap option when available.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `jenkinsDice`, `jenkinsDmg`, `ef` all declared inside the `if (f.id === 94)` guard block and used only within it — no external references, no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Jenkins' GREETING! (dice-roll entry nuke with random damage) is unique; Nerina (306) LEVIATHAN! (fixed 3 damage), Timpleton (312) BIG TARGET! (conditional 3 damage), and Grawr (34) MENACE! (fixed 1 damage) are all entry-damage siblings but use fixed values not dice rolls — no shared code path.
+
+**Version bump**: v602 → v603
+
+---
+
+## v602 — BUG FIX: smartAutoPlay.js Doom (112) FIENDSHIP! — +2 win damage completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Doom (112) FIENDSHIP!. Doom's ability deals +2 bonus damage on every win, unconditionally. Without this: Doom was modeled as a plain 7 HP legendary ghost with zero offensive identity — every winning roll underdelivered by 2 damage, making Doom appear far weaker than reality in all balance simulations.
+
+**Ability (from index.html lines 9188–9193):**
+- Fires in win-path damage block: `wF.id === 112 && !wF.ko` → `dmg += 2`
+- Calls `collectKC(winTeamName, wF.name)` → Knight Terror HEAVY AIR! and Knight Light RETRIBUTION! react on any Doom win.
+
+**Fix** (2 additions to `smartAutoPlay.js`):
+1. **Damage block** (after Mountain King Beast Mode): `if (wF.id === 112 && !wF.ko) { dmg += 2; }` — unconditional +2, mirrors index.html lines 9188–9193.
+2. **Knight-reaction block** (after Mountain King BEAST MODE! entry): `if (ef.id === 112 && !ef.ko) rxns++;` — fires on any Doom win, matching the unconditional `collectKC` call in index.html.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: Both additions are inline one-liners with no new variable declarations — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Doom's FIENDSHIP! (+2 flat additive on every win, unconditional) is unique; Mountain King BEAST MODE! (doubles 2X multiplicative), Larry FLYING KICK! (triples 3X), Greg CHASE! (HP-advantage 2X), and Bill & Bob BAIT N SWITCH! (low-HP 2X) are all win-path damage modifiers but every one has a specific condition — Doom is the only flat-unconditional damage adder among the win-path cards.
+
+**Version bump**: v601 → v602
+
+---
+
+## v601 — BUG FIX: smartAutoPlay.js Mountain King (110) BEAST MODE! — doubles 2X damage multiplier completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for The Mountain King (110) BEAST MODE!. Mountain King's ability doubles all winning damage when he rolls doubles. Without this: Mountain King was modeled as a plain 9 HP legendary ghost with zero ability identity — every doubles win dealt base damage only (no 2X), completely misrepresenting his offensive power. Mountain King is the largest HP card in the original set (9 HP) and his doubles doubling is the central reason he's legendary.
+
+**Ability (from index.html lines 9118–9126):**
+- Fires in win-path damage block: `wF.id === 110 && !wF.ko && wR.type === 'doubles'` → `dmg *= 2`
+- Calls `collectKC(winTeamName, wF.name)` → Knight Terror HEAVY AIR! and Knight Light RETRIBUTION! react.
+
+**Fix** (2 additions to `smartAutoPlay.js`):
+1. **Damage block** (before Doc (42) Savage): `if (wF.id === 110 && !wF.ko && wR.type === 'doubles') { dmg *= 2; }` — matches index.html line 9121–9123. Inserted BEFORE Doc's +5 additive so the multiplier correctly applies to base damage first (matching index.html's ordering at line 9118 vs Doc at ~9224).
+2. **Knight-reaction block** (after Buttons PERFECT PLAN): `if (ef.id === 110 && !ef.ko && classify(_eD).type === 'doubles') rxns++;` — matches index.html line 9125 `collectKC` call.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: Both additions are inline one-liners with no new variable declarations — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Mountain King's BEAST MODE! (active doubles 2X) is unique; Bill & Bob (36) Bait n Switch (below-4-HP 2X), Greg (49) Chase (HP-advantage 2X), and Larry (35) Flying Kick (triples 3X) are other multiplicative win-path modifiers but use entirely different trigger conditions with no shared code path.
+
+**Version bump**: v600 → v601
+
+---
+
+## v600 — BUG FIX: smartAutoPlay.js Needle (21) BIG BRO! — sideline +1 die for Buttons completely absent from sim
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Needle (21) BIG BRO!. Needle's ability grants +1 die to the team while Needle is on the sideline and Buttons (id 8) is the active ghost, blocked by Cornelius (45) on the enemy sideline. Without this: the COMPUTE DICE block never checked for the Needle/Buttons pairing, so every match where both cards were deployed systematically under-rolled Buttons' dice count by 1. Buttons is already a high-roll-dependent card (Perfect Plan needs triple 6s) — missing the +1 die makes Buttons significantly weaker in sim than reality.
+
+**Ability (from index.html lines 7011–7030):**
+- Fires in COMPUTE DICE (pre-roll): active ghost is Buttons (id 8), Needle (id 21) is on own sideline, no Cornelius (id 45) on enemy sideline → +1 die this roll.
+
+**Fix** (1 addition to `smartAutoPlay.js`):
+- **COMPUTE DICE block** (after Zain Ice Blade block, before Harrison extra dice): `['red','blue'].forEach` — `!f.ko && f.id === 8 && hasSideline(B[teamKey], 21) && !hasSideline(B[enemyKey], 45)` → `redCount++` / `blueCount++` — mirrors index.html lines 7011–7030.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `enemyKey` declared inside arrow body, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Needle's BIG BRO! (sideline-Buttons synergy die bonus) is unique. Shoo Alpine Air (sideline heal) and Cornelius Antidote (sideline block) are other sideline-triggered passive abilities but use entirely different trigger conditions, different beneficiaries, and different state keys — no shared code path.
+
+**Version bump**: v599 → v600
+
+---
+
+## v599 — BUG FIX: smartAutoPlay.js Dream Cat (28) JINX! — both-doubles die bonus completely absent from sim; B-state never initialized, bonus never stored or consumed
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Dream Cat (28) JINX!. Dream Cat's ability grants +1 die next round whenever BOTH teams roll doubles in the same round (tie OR non-tie). Without this: `B.dreamCatBonus` was never initialized in B-state, never set on the tie path or non-tie path, and never consumed in COMPUTE DICE. Dream Cat was modeled as a plain 4 HP ghost with no ability identity in every simulation.
+
+**Ability (from index.html lines 7060–7078, 8844–8854, 10815–10827):**
+- **Consume** (7060–7078): start of round — add `dreamCatBonus[team]` to dice count unconditionally, then clear. Callout fires only if Dream Cat is alive, but die grant is unconditional.
+- **Tie path** (8844–8854): `rR.type === 'doubles'` — in a tie, both teams always roll the same type so checking one side is sufficient → any Dream Cat on either team gets +1.
+- **Win/loss path** (10815–10827): `ownRoll.type === 'doubles' && foeRoll.type === 'doubles'` — both wR AND lR must be doubles → any Dream Cat (win or loss side) gets +1.
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init** (line 63): Added `dreamCatBonus: { red: 0, blue: 0 }` alongside `scallywagsFrenzyBonus`.
+2. **COMPUTE DICE consume block** (before Marcus glacial bonus): `['red','blue'].forEach` consumes and clears `B.dreamCatBonus[tName]` — matches index.html lines 7060–7078.
+3. **Tie path trigger** (after Scallywags tie block): `if (rR.type === 'doubles')` → iterate both teams → `f.id === 28 && !f.ko` → `B.dreamCatBonus[teamKey]++` — mirrors index.html lines 8844–8854.
+4. **Win/loss path trigger** (after Scallywags win/loss lines): `if (wR.type === 'doubles' && lR.type === 'doubles')` → check wF and lF for id 28 with `!f.ko` gate — mirrors index.html lines 10815–10827.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: All additions are inline one-liners or self-contained `forEach` bodies with no external variable declarations — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Dream Cat's JINX! (mutual-doubles reward) is unique. Haywire (78) WILD CHORDS! (own-triples → permanent +1 die once), Scallywags (19) FRENZY! (own-all-under-4 → +1 die), and Logey (26) HEINOUS! (5+-count lockout) all use entirely different trigger conditions and state keys — no shared code path.
+
+**Version bump**: v598 → v599
+
+---
+
+## v597 — FAMILY FIX: "Farewell" pattern — Scallywags, Outlaw, Logey fire even when the owner dies this round (Wyatt spec) + version number restored after rollback
+
+**Design rule (Wyatt 2026-04-11)**: *"It's like a little farewell thing."* When a ghost's post-roll ability depends on a team-level resource the ghost earns (extra die, enemy die removal, enemy lockout), the ability fires **even if the ghost is KO'd by this very roll** — as a parting gift to the team. The one exception is when the card's ability text explicitly names the ghost as the beneficiary (e.g. Kairan/Let's Dance: the +1 die is *Kairan's*, not the team's), in which case the ability dies with the ghost.
+
+**Members fixed in this cycle** (all in the non-tie branch of resolveRound; tie branches left alone because ties deal no damage):
+
+1. **Scallywags (19) Frenzy** (line ~10830). Rewrote the `[B.red, B.blue].forEach(team => { const f = active(team); if (f.id === 19 && !f.ko && ...) })` block to iterate `[[wF, winDice, winTeamName], [lF, loseDice, loseTeamName]]`. Uses `wF`/`lF` captured pre-damage at line 9025, so a Scallywags KO'd by a losing roll still grants his +1 die bonus to the team. `ctx` label extended to `'Down'` when `f.ko` is true at render time.
+
+2. **Outlaw (43) Thief** (line ~10776). Same rewrite as Scallywags — iterate `[[wF, wR, winTeamName], [lF, lR, loseTeamName]]`. Preserves the existing keying convention: `B.outlawStolenDie[myTName]` is indexed by Outlaw's own team (confirmed at line 7202 which reads `B.outlawStolenDie[tName]` for team iter then decrements the enemy's dice). Dying Outlaw rolling doubles still plants the enemy-die penalty for next round. `ctx` shows `'Final doubles'` on the KO'd-loser branch.
+
+3. **Logey (26) Heinous** (lines ~10861 + ~10869). Already used `wF`/`lF` correctly (pre-damage capture), so the fix was only dropping the `!wF.ko` / `!lF.ko` gates from the two `if`-guards. A dying Logey still locks out the enemy's 5+ dice. Both branches now emit `'Down'` / `'Win'` / `'Loss'` ctx tags. This handles counter-damage edge cases (e.g. Bogey reflect killing Logey on a winning roll).
+
+**Left alone — Kairan (68) Let's Dance**: the existing `!f.ko` gate at line 10767 is correct per spec. Kairan's pre-roll consumption block at line 7036-7038 already carries the comment *"die is personal to Kairan, not the team. If Kairan was KO'd or swapped since earning the bonus, the die is lost"*, and the post-roll gate prevents a dead Kairan from even planting the bonus in the first place. Wyatt's ruling: *"Kyren's text specifically says Kyren gains +1 dice."* Symmetric with the farewell rule — if the card text attributes the grant to the ghost personally, dying cancels the grant; if the grant is team-wide, dying is a parting gift.
+
+**Floop (20) Muck** already fixed in the earlier v433 entry (which stays in FIXLOG history). The pattern description above retroactively explains *why* the Floop fix was the right shape.
+
+**Audit #1 (template literals)**: All three rewritten blocks declare `ctx` and supporting names as `const`s inside their forEach arrow scope, immediately above the template literal uses. No new references to undeclared variables ✓
+**Audit #2 (block scope)**: Every new destructured parameter (`f`, `dice`, `roll`, `myTName`, `enemyTName`) lives inside the arrow body or if-block and never leaks out. `wCtx` and `lCtx` for Logey are block-scoped to each respective if-body ✓
+**Audit #3 (family-audit)** — FAMILY: **post-roll-farewell-grants** (new family, seed entry added to family_map.json).
+
+*Family definition*: Post-roll abilities in the non-tie branch that grant a team-level resource (bonus die, die penalty, lockout, stolen die, next-round debuff) based on what the ghost rolled or caused this round. Must check `f.id` and a roll condition, and the grant must target a team-wide state (`B.*[teamName]` counter / flag / bonus). Fires regardless of whether the ghost survives the damage resolution that happens between the roll and the post-roll block.
+
+*Members verified* (all post-roll grants in the non-tie branch of resolveRound ~9800-11100):
+- ✅ Floop (20) Muck — fixed v433
+- ✅ Scallywags (19) Frenzy — fixed this cycle
+- ✅ Outlaw (43) Thief — fixed this cycle
+- ✅ Logey (26) Heinous — fixed this cycle
+- ❌ Kairan (68) Let's Dance — personal grant, NOT a family member (text attributes die to Kairan himself)
+- ⚠️ Haywire (17) Wild Chords — tie-branch only (line 8788), tie branches excluded from family
+- ⚠️ Dream Cat (28) Jinx — tie-branch only (line 8847), excluded
+- ⚠️ Nikon (2) Ambush, Buttons (8) Perfect Plan, and other damage-modifier post-roll abilities — these modify damage dealt *this* round rather than granting next-round team state, different family (immediate-damage-modifier), not affected by the farewell rule
+
+**Version bump**: v433 → v597 (restoring the version counter after the earlier rollback from v596 → v430s range caused by a git state discrepancy this afternoon; the code fixes in the 430s range are preserved, the TESTROOM_VERSION string is just jumping forward to the correct monotonic counter). Next cycle will bump to v598+.
+
+---
+
+## v598 — BUG FIX: smartAutoPlay.js Calvin & Anna (91) TOBOGGAN! — post-KO voluntary swap completely absent from sim; C&A never retreated after scoring a KO
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Calvin & Anna (91) TOBOGGAN!. C&A's entire identity is post-KO board rotation — when they score a kill, they may retreat to the sideline and bring in any available ghost. Without this: `wF.id === 91` was never checked in the On-KO block, `wTeam.activeIdx` was never updated after a C&A KO, and C&A was modeled as a plain 6 HP rare ghost that stays in after every kill. This systematically mis-valued C&A by treating their 6 HP as perpetually exposed rather than a preserved resource cycled safely to sideline after each kill.
+
+**Ability (from index.html lines 11031–11034, doTobogganChoice lines 5237–5275):**
+- Trigger: `wF.id === 91 && !wF.ko && lF.ko` — C&A won and the loser was KO'd
+- Action: player picks any alive sideline ghost → `winTeam.activeIdx = idx`; C&A keeps their remaining HP on sideline
+- Optional (skip allowed) — but AI always swaps when alive sideline exists (preserving C&A's HP is nearly always optimal)
+
+**Fix** (1 addition to `smartAutoPlay.js`):
+- **Post-KO swap block** (inside `if (lF.ko)` after Bo MIRACLE!): `if (wF.id === 91 && !wF.ko)` → find alive sideline ghosts on `wTeam` → pick highest HP one (`wTeam.activeIdx = best.i`). AI selects best (highest HP) replacement — matches dominant strategy of bringing in the healthiest available ghost.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `tobogganSideline` and `best` declared inside `if (wF.id === 91 && !wF.ko)` block, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — C&A's TOBOGGAN! (post-KO voluntary self-swap) is unique. Fang Outside (6) swaps after any WIN (not KO-only), Bo (109) revives an ally (not a swap), Winston (15) force-swaps the OPPONENT — no card shares the post-KO voluntary self-retreat pattern.
+
+**Version bump**: v597 → v598
+
+## v439 — BUG FIX: smartAutoPlay.js Scallywags (19) FRENZY! — all-under-4 die bonus completely absent from sim; B-state never initialized, bonus never stored or consumed
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Scallywags (19) FRENZY!. Scallywags' entire identity is rewarding low-roll variance — when ALL of their own dice come up under 4, they gain +1 bonus die for the next turn. Without this: `B.scallywagsFrenzyBonus` was never initialized, never set on tie/win/loss paths, and never consumed in the COMPUTE DICE block. Every Scallywags simulation was a plain 5 HP common ghost with no ability identity.
+
+**Ability (from index.html lines 7080–7098, 8798–8809, 10830–10841):**
+- **Consume** (7080–7098): start of round — if `scallywagsFrenzyBonus[team] > 0`, add to `redCount`/`blueCount` unconditionally, then clear. Callout only fires if Scallywags is still alive, but the die bonus is granted regardless (dying Scallywags' stored bonus still fires).
+- **Tie path** (8798–8809): `f.id === 19 && !f.ko && scDice.every(d => d < 4)` → `scallywagsFrenzyBonus[tNameSC]++`
+- **Win/loss path** (10830–10841): same trigger — `f.id === 19 && !f.ko && scDice.every(d => d < 4)` → `scallywagsFrenzyBonus[tNameSC]++`. Uses `active(team)` in index.html, but sim correctly uses pre-damage `wF`/`lF` captures.
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init** (line 62): Added `scallywagsFrenzyBonus: { red: 0, blue: 0 }` — matches index.html lines 2955 and 3371.
+2. **COMPUTE DICE consume block** (before Marcus glacial bonus): `['red','blue'].forEach` consumes and clears `B.scallywagsFrenzyBonus[tName]` to add to dice count — matches index.html lines 7080–7098. Added BEFORE Marcus block to maintain ordering consistency.
+3. **TIE path trigger** (after Logey tie block): `['red','blue'].forEach` — `f.id === 19 && !f.ko` → `scDice.every(d < 4)` → `B.scallywagsFrenzyBonus[teamKey]++` — mirrors index.html lines 8798–8809.
+4. **WIN/LOSS path trigger** (after Logey win/loss lines): Two one-liners — `wF.id===19 && !wF.ko && winDice.every(d<4)` → bonus++; `lF.id===19 && !lF.ko && loseDice.every(d<4)` → bonus++ — mirrors index.html lines 10830–10841.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: All additions are self-contained `forEach` bodies or inline one-liners — no variable declarations that leak outside their blocks ✓
+**Audit #3 (family-audit)**: FAMILY: none — Scallywags' FRENZY! (all-own-dice-under-4 → +1 bonus die) is unique. Floop MUCK! (doubles-opponent-penalty), Logey HEINOUS! (5+-count lockout), Dream Cat JINX! (doubles-both reward), and Haywire TURBO! (doubles-both reward) all use entirely different trigger conditions and state keys — no shared code path.
+
+**Version bump**: v438 → v439
+
+## v438 — BUG FIX: smartAutoPlay.js Winston (15) SCHEME! — post-doubles-win force-swap completely absent from sim; opponent's active ghost never changed
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Winston (15) SCHEME!. Winston's entire identity is punishing opponents when he rolls doubles — on a doubles win, the Winston player force-swaps the opponent's current active ghost with any ghost from their sideline. Without this, the sim never changed `lTeam.activeIdx` after a Winston doubles win. Every simulated match treated Winston as a plain 5 HP common ghost with no board-control identity, systematically mispricing his ability to drag out a wounded opponent ghost or deny a key anchor entry.
+
+**Ability (from index.html lines 11041–11084):**
+- Win path only: `wF.id === 15 && !wF.ko && wR.type === 'doubles'`
+- Winston player picks any alive sideline ghost from the opponent → that ghost becomes the new `loseTeam.activeIdx`
+- Optional (skip is allowed) but AI always swaps when sideline exists — bringing in weakest ghost is strictly dominant
+
+**Fix** (1 addition to `smartAutoPlay.js`):
+- **Post-win swap block** (after Fang Outside SKILLFUL COWARD! block, before closing `}` of win-path): `if (wF.id === 15 && !wF.ko && wR.type === 'doubles')` → find alive sideline ghosts on `lTeam` → pick lowest HP one (`lTeam.activeIdx = weakest.i`). AI selects weakest (lowest HP) replacement — easiest target for next round, consistent with dominant strategy.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `winstonTargets` and `weakest` declared inside `if (wF.id === 15 && ...)` block, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Winston's SCHEME! (doubles-win force-swap of opponent ghost) is unique. Fang Outside (6) swaps own team (self-retreat), Tyson (365) Hop is a pre-roll self-swap, Toboggan (21) is a win-path self-swap — no card shares the opponent-force-swap-on-doubles pattern.
+
+**Version bump**: v437 → v438
+
+## v437 — BUG FIX: smartAutoPlay.js Logey (26) HEINOUS! — completely absent from sim; 5+-die lockout never initialized, set, or consumed
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Logey (26) HEINOUS!. Logey's entire identity is counting the opponent's rolled 5s and 6s and locking those dice out of next round's pool — a meta-pressure ability that degrades large die pools over time. Without this: `B.logeyLockout` was never in B-state init, never set in the tie/win/loss paths, and never consumed in the COMPUTE DICE block. Every simulated match with Logey was a plain 4 HP ghost with zero combat identity — no lockout pressure, no die-pool degradation, no threat level.
+
+**Ability (from index.html lines 7288–7303, 8827–8842, 10860–10876):**
+- **Tie path** (8827–8842): `f.id === 26 && !f.ko` → count enemy dice ≥5 → `B.logeyLockout[enemyTName] += locked`
+- **Win path** (10860–10868): `wF.id === 26 && !wF.ko` → count loseDice ≥5 → `B.logeyLockout[loseTeamName] += locked`
+- **Loss path** (10869–10876): `lF.id === 26 && !lF.ko` → count winDice ≥5 → `B.logeyLockout[winTeamName] += locked`
+- **Consume** (7288–7303): start of COMPUTE DICE block — `B.logeyLockout[tName] > 0` → reduce dice count (min 1), clear to 0
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init** (line 62): Added `logeyLockout: { red: 0, blue: 0 }` — matches index.html lines 2934 and 3350.
+2. **COMPUTE DICE consume block** (after floopMuck block, before marcusGlacialBonus): `['red','blue'].forEach` consumes and clears `B.logeyLockout[tName]` to reduce dice count (min 1) — matches index.html lines 7288–7303.
+3. **TIE path trigger** (after Floop tie block): `['red','blue'].forEach` — `f.id === 26 && !f.ko` → count `enemyDice.filter(d >= 5)` → `B.logeyLockout[enemyKey] += locked` — mirrors index.html lines 8827–8842.
+4. **WIN/LOSS path trigger** (after Floop win/loss triggers): Two one-liners — `wF.id===26 && !wF.ko` → count loseDice 5+; `lF.id===26 && !lF.ko` → count winDice 5+ — mirrors index.html lines 10860–10876. Uses `wF`/`lF` pre-damage captures (no post-KO-swap reread, consistent with Floop fix).
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `locked26w`/`locked26l` declared inside same single-line `if` block they're used in. `locked` in tie-path forEach arrow body — per-iteration scope only. No leaks ✓
+**Audit #3 (family-audit)**: FAMILY: none — Logey's HEINOUS! (5+-die lockout) is unique. Hugo WRECKAGE! (attacker loses 1 die), Floop MUCK! (doubles → -1 die), Fredrick CAREFUL! (opponent capped at 3 dice) are die-reduction siblings but use entirely different trigger conditions with no shared code path.
+
+**Version bump**: v436 → v437
+
+## v436 — BUG FIX: smartAutoPlay.js Fang Outside (6) SKILLFUL COWARD! — post-win swap completely absent from sim; Fang never retreated
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Fang Outside (6) SKILLFUL COWARD!. After winning any roll, Fang's entire identity is to immediately retreat to the sideline and bring in the best available ghost — a 2 HP hit-and-run specialist. Without this, the sim kept Fang in as the active fighter every round until death, never modeling the swap. This systematically mis-valued Fang (treating 2 HP as a fatal liability rather than the intended strategic rotation tool) and under-counted the incoming ghost's impact on every match involving Fang Outside.
+
+**Ability (from index.html `showFangOutsideModal` / `doFangOutsideChoice`):**
+- Win path: `wF.id === 6` post-win → modal fires → player chooses a sideline ghost → `wTeam.activeIdx` updated → `triggerEntry` for new ghost.
+- AI sim: always swaps when alive sideline ghost exists (retreating is optimal for a 2 HP ghost).
+- Entry effects for the swapped-in ghost are cinematic-only and not modeled in the sim (consistent with Tyson Hop pattern).
+
+**Fix** (1 addition to `smartAutoPlay.js`):
+- **Post-win swap block** (after `wF.ko && hasSideline(wTeam, 310)` Granny block, before closing `}` of win-path): `if (wF.id === 6 && !wF.ko)` → find alive sideline ghosts → swap to highest-HP one (`wTeam.activeIdx = best.i`). Uses same heuristic as Tyson Hop and Death Howl Pressure swap (highest HP from alive sideline).
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `fangSideline` and `best` declared inside `if (wF.id === 6 && !wF.ko)` block, used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Fang Outside's post-win voluntary swap is unique. Fang Undercover (7) has a different mechanic (pre-roll arm + damage-negate + forced swap). Winston (15) Scheme is also a post-win swap but modal-driven with a different trigger (doubles only). Tyson (365) Hop is a pre-roll self-swap. No shared code path.
+
+**Version bump**: v435 → v436
+
+## v435 — BUG FIX: smartAutoPlay.js Floop (20) MUCK! — completely absent from sim; die-penalty never applied on any path
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Floop (20) MUCK!. The ability fires whenever Floop is the active fighter and the opponent rolled doubles — on win, loss, KO, or tie — penalizing the opponent with -1 die next round. None of this existed in the sim: `floopMuck` state was never initialized, never set post-round, and never consumed. Every Floop simulation was a plain 4 HP common ghost with no combat identity.
+
+**Ability (from index.html lines 8811–8825 for tie, 10844–10858 for win/loss):**
+- Tie path: Floop active + opponent rolled doubles → `B.floopMuck[enemyTName]++`
+- Win/loss path: Floop was the active fighter (`wF.id===20` or `lF.id===20`), opponent rolled doubles → `B.floopMuck[enemyTName]++`
+- No `!f.ko` gate (Wyatt spec: "no ifs, ands, or buts" — a dying Floop still punishes)
+- Penalty consumed at top of NEXT round in the die-count computation block
+
+**Fix** (4 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init**: Added `floopMuck: { red: 0, blue: 0 }` — matches `index.html` lines 2956 and 3372.
+2. **COMPUTE DICE COUNTS block** (after hugoWreckage): Consume and clear `B.floopMuck[tName]` to subtract 1 die (min 1) — matches index.html lines 7262–7270.
+3. **TIE path** (after `_rolledOnce` marks): forEach both teams — if `f.id === 20 && !f.ko` and enemy rolled doubles → `B.floopMuck[enemyKey]++` — mirrors index.html lines 8811–8825.
+4. **WIN/LOSS path** (after Marcus glacial bonus): Two one-liners — `wF.id===20 && lR.type==='doubles'` → `floopMuck[loseTeam]++`; `lF.id===20 && wR.type==='doubles'` → `floopMuck[winTeam]++` — mirrors index.html lines 10849–10851.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: No new variables declared — all ops inline on B.floopMuck ✓
+**Audit #3 (family-audit)**: FAMILY: none — Floop's MUCK! (doubles-punisher die reduction) is unique in the die-penalty family. Logey (26) HEINOUS! (5+dice lockout) and Hugo (52) WRECKAGE! (attacker die reduction) use different triggers and different B-state keys — no shared code path.
+
+**Version bump**: v434 → v435
+
+## v434 — BUG FIX: smartAutoPlay.js Bogey (53) BOGUS! — reactive reflect completely absent from sim (v430 redesign left sim with zero Bogey logic)
+
+**Bug**: `smartAutoPlay.js` had zero implementation for Bogey (53) BOGUS!. When Bogey's ability was redesigned in v430 from pre-roll arm → reactive reflect, the old `bogeyArmed` pre-roll block was removed but no new sim logic was added to replace it. Every simulated match with Bogey as the active loser applied full incoming damage with no reflect — Bogey was modeled as a plain 4 HP ghost with no combat identity.
+
+**Ability (from index.html lines 9675–9697):**
+- Lose path: if Bogey (`lF.id === 53`) is the loser, `dmg > 0`, and `bogeyUsed[loseTeam]` is false → reflect all incoming damage back to the winner (`dmg = 0`, winner takes `bogeyReflDmg`), mark `bogeyUsed[loseTeam] = true` (once per game). Modal in real game always offers the choice; AI sim always reflects.
+
+**Fix** (3 coordinated additions to `smartAutoPlay.js`):
+1. **B-state init** (after `alucardUsed`): Added `bogeyUsed: { red: false, blue: false }` — matches `index.html` lines 2931 and 3347 where `bogeyUsed` is initialized on battle start.
+2. **Lose-path reflect block** (after Guard Thomas STOIC!, before "Apply damage"): `if (lF.id === 53 && !lF.ko && !B.bogeyUsed[lTeamName] && dmg > 0) { const bogeyReflDmg = dmg; dmg = 0; B.bogeyUsed[lTeamName] = true; wF.hp = Math.max(0, wF.hp - bogeyReflDmg); if (wF.hp <= 0) { wF.ko = true; wF.killedBy = lF.id; } }` — matches index.html lines 9691–9696. AI always reflects (no modal — sim assumes optimal play).
+3. **Knight-reaction loserWasEnemy block** (after Guard Thomas reaction): `if (loserWasEnemy && ef.id === 53 && !ef.ko && !B.bogeyUsed[enemyKey]) rxns++;` — matches index.html line 9694 `collectKC(loseTeamName, lF.name)` call. Guard `!bogeyUsed` ensures reaction only estimated in rounds where reflect is still available.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `bogeyReflDmg` declared inside the `if (lF.id === 53...)` block and used only within it — no scope leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — Bogey's BOGUS! (once-per-game reactive reflect) is unique. Patrick STONE FORM! (singles counter), Kodako SWIFT! ([1,2,3] counter), Sky ELUSIVE! (threshold block), Dealer HOUSE RULES! (sequential block), City Cyboo BARRIER! (doubles block), and Guard Thomas STOIC! (singles immunity) are lose-path defensive siblings but implement entirely different trigger conditions.
+
+**Version bump**: v433 → v434
+
+## v433 — BUG FIX: Floop (20) Muck didn't fire when Floop lost the roll or got KO'd (Wyatt spec — "no ifs, ands, or buts")
+
+**Bug**: The non-tie Floop block at line 10844 used `const f = active(team); if (f.id === 20 && !f.ko)`. Two distinct failures:
+1. **Post-KO-swap reread**: `active(team)` re-reads the team's active slot *after* damage application. If Floop was KO'd by the losing roll and auto-swapped, `active(team)` returns the replacement ghost and `f.id !== 20` — Muck silently drops.
+2. **`!f.ko` gate**: even without a swap, a Floop that died from the incoming damage has `f.ko === true` by the time this block runs, so the ability skips itself.
+
+Wyatt's spec is unambiguous: if the opponent rolls doubles and Floop was the active fighter at roll time, the opponent loses a die next round. Period. Win, lose, or die.
+
+**Fix** (line 10844, ~16 lines): rewrite the block to iterate over `[wF, lF]` (captured at line ~9025 *before* any damage or KO logic) instead of calling `active(team)` in the post-damage section. Drop the `!f.ko` gate entirely — Floop can be mid-KO and the ability still fires. Callout `ctx` tag now shows `Win` / `Loss` / `Down` (the latter when `f.ko` is true at render time, to cue the player visually that a dying Floop just punished the enemy). `enemyName` is resolved from `wF.name`/`lF.name` directly instead of `active(enemyTeam).name`, for the same "no post-damage reread" reason.
+
+**Scope**: only the non-tie branch. The tie branch at line 8811 is left alone — ties don't deal damage in this sim, so Floop can't die mid-tie and `active(team)` is safe there.
+
+**Audit #1 (template literals)**: `ctx` and `enemyName` are `const`s declared inside the forEach arrow scope, immediately before the template literal uses them ✓
+**Audit #2 (block scope)**: Each iteration of the `[[wF, ...], [lF, ...]].forEach` has its own arrow-body scope; `f`, `myTName`, `enemyRoll`, `enemyTName`, `ctx`, `enemyName` never leak out ✓
+**Audit #3 (family-audit)** — FAMILY: active-fighter-post-roll-state-reread. Searched for the same anti-pattern (`const f = active(team); if (f.id === N && !f.ko)`) in the non-tie branch:
+- **Scallywags (19) FRENZY!** line 10833 — uses `active(team)` + `!f.ko`, same shape. NOT fixed this cycle (Wyatt's request was Floop-specific; Scallywags needs its own spec decision — does a dying Scallywags still grant +1 die to the replacement? Flag for follow-up).
+- **Logey (26) HEINOUS!** line 10862 — uses `wF.id === 26 && !wF.ko`. Uses `wF` correctly (pre-damage capture) but still has the `!wF.ko` gate. Win-only ability per spec so "dying Logey" on the win path is rare but possible via counter-damage; same flag-for-follow-up status.
+- **Dream Cat (28) JINX!** tie-branch only, not affected.
+- **Haywire (17)** tie-branch only, not affected.
+- FAMILY members to audit next: Scallywags (19), Logey (26). FIXLOG entry will be added when Wyatt confirms the spec for each.
+
+**Version bump**: v432 → v433
+
+---
+
+## v432 — BUG FIX: smartAutoPlay.js Lucy (108) BLUE FIRE — pending-damage state and pre-roll fire both absent from sim
+
+**Bug**: Lucy (108) BLUE FIRE was completely absent from `smartAutoPlay.js`. Lucy's entire identity is a delayed chip shot: win a roll → the opponent takes 1 damage before their *next* roll. Without this, Lucy was modeled as a plain 5 HP legendary dealing base damage only — zero passive ability, no delayed pressure, no Dylan-guard interaction. The v592 fix to index.html reworked the mechanic from bundled `dmg += 1` to a pre-roll pending flag (`B.pendingLucyDmg`), but smartAutoPlay.js was never updated to match, so the sim still had zero Lucy logic.
+
+**Fix** (3 coordinated additions to `smartAutoPlay.js`):
+1. **B init**: Added `pendingLucyDmg: { red: 0, blue: 0 }` after `splinterActivated`. Matches the pending-flag pattern from index.html state-init blocks.
+2. **Pre-roll consumer block** (after Splinter's Toxic Fumes block, before Katrina): `['red','blue'].forEach` checks `B.pendingLucyDmg[teamKey] > 0`. Always clears the flag (consumed whether fired or negated). If Dylan (301) is on enemy sideline → negated (early return). Otherwise applies 1 damage to `ef`; KO if ≤ 0. Matches index.html lines 6665–6690.
+3. **Win-path trigger** (after Splinter activation line): `if (wF.id === 108 && !wF.ko) { B.pendingLucyDmg[lTeamName] = 1; }` — sets pending on the *losing* team (they take the hit before their next roll). Matches index.html lines 9183–9188.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `team`, `enemy`, `ef` declared inside `forEach` callback — per-iteration scope only. No leaks ✓
+**Audit #3 (family-audit)**: FAMILY: pre-roll-chip-damage | siblings: Shade(111), Splinter(101), Shade's Shadow(205), Ember Force(304), Lucy(108) | all five members now implemented in sim. Family complete.
+
+**Version bump**: v431 → v432
+
+---
+
+## v597 — BUG FIX: smartAutoPlay.js Splinter (101) TOXIC FUMES — chip-damage state and pre-roll fire both absent from sim
+
+**Bug**: Splinter (101) TOXIC FUMES was completely absent from `smartAutoPlay.js`. Splinter's entire identity is a snowballing poison: after winning the first roll, deal 1 chip damage to the enemy before every subsequent roll. Without this, Splinter was modeled as a vanilla 6 HP ghost-rare with zero passive — `B.splinterActivated` was never initialized, poison never activated, no chip damage ever fired.
+
+**Fix** (3 coordinated additions to `smartAutoPlay.js`):
+1. **B init**: Added `splinterActivated: { red: false, blue: false }` to match index.html lines 2925 + 3341.
+2. **Pre-roll block** (after Shade's HAUNT block): `['red','blue'].forEach` checks `f.id === 101 && !f.ko && B.splinterActivated[teamKey] && !hasSideline(enemy, 301)`. Applies 1 damage to `ef`; KO if ≤ 0. Matches index.html lines 6700–6714.
+3. **First-win activation** (on-win block): `if (wF.id === 101 && !wF.ko && !B.splinterActivated[winTeamName]) { B.splinterActivated[winTeamName] = true; }` — matches index.html lines 9658–9659.
+
+**Audit #1 (template literals)**: No template literals added ✓
+**Audit #2 (block scope)**: `f`, `ef`, `team`, `enemy` declared inside `forEach` callbacks — per-iteration scope only ✓
+**Audit #3 (family-audit)**: FAMILY: pre-roll-chip-damage | siblings: Shade(111), Splinter(101), Shade's Shadow(205), Ember Force(304), Lucy(108) | Shade fixed in Cycle #1, Splinter fixed now. Lucy (108) BLUE FIRE pending damage still queued.
+
+**Version bump**: v430 → v431 (TESTROOM_VERSION in index.html)
+
+---
+
 ## v430 — DESIGN FIX: Bogey (53) Bogus reworked from pre-roll arm → reactive reflect (Wyatt correction)
 
 **Problem**: Bogey's Bogus ability was implemented as a pre-roll modal ("arm a reflect before rolling"). This was wrong per Wyatt's rule: Bogey should MAY reflect incoming damage *when it's about to land* — a reactive, in-situ decision, not a pre-committed one. The player sees the actual damage number and decides whether to burn the once-per-game reflect or save it for a bigger hit later.
@@ -6055,3 +7094,33 @@ No Sandwiches (33) DEPENDABLE! mirror needed — Boris's FORTIFY! is a HP heal, 
    - Both correctly use `_eD` (enemy's actual dice this round) for accuracy.
 
 **Version bump:** `TESTROOM_VERSION` v574 → v575
+
+---
+
+## Fix: Antoinette (82) GRACE! — upward dice-mirror completely absent from sim (v601, 2026-04-11)
+
+**File:** `smartAutoPlay.js`
+
+**Problem:** Antoinette (82) GRACE! — "Roll as many dice as your opponent" — was completely absent from the smartAutoPlay.js COMPUTE DICE block. Every match where Antoinette faced an opponent with a higher dice count (from Surge, Retribution, Redd burst, etc.) she rolled her base count instead of mirroring up. Her entire identity as a dice-equalizer was invisible in every balance simulation.
+
+**Ability (from index.html lines 7184–7199):**
+- Applied AFTER all other die modifiers (Surge, Retribution, Redd, Haywire, etc.) are baked in.
+- If Antoinette (id 82) is active and opponent has MORE dice, set Antoinette's team dice count to match the opponent's (upward mirror only — never reduces).
+- Fredrick (27) cap still applies after Grace.
+
+**Fix:** Added Antoinette GRACE! block in COMPUTE DICE, positioned after all bonus die grants and immediately before the Fredrick cap:
+```javascript
+['red','blue'].forEach(tName => {
+  const f = active(B[tName]);
+  if (f.id === 82 && !f.ko) {
+    const myCount  = tName === 'red' ? redCount  : blueCount;
+    const oppCount = tName === 'red' ? blueCount : redCount;
+    if (oppCount > myCount) {
+      if (tName === 'red') redCount  = oppCount;
+      else                 blueCount = oppCount;
+    }
+  }
+});
+```
+
+**Version bump:** `TESTROOM_VERSION` v600 → v601
