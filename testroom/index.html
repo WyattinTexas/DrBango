@@ -1606,7 +1606,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
       <button class="ssf-btn active" data-set="dc" onclick="toggleStandingsSet('Dark Castle', this)">Dark Castle</button>
       <button class="ssf-btn active" data-set="fv" onclick="toggleStandingsSet('Frost Valley', this)">Frost Valley</button>
     </div>
-    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th><th class="stat-col st-sortable" title="KOs per Game" onclick="sortStandings('kopg')">KO/G</th></tr></thead><tbody id="standingsBody"></tbody></table>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th><th class="stat-col st-sortable" title="KOs per Game" onclick="sortStandings('kopg')">KO/G</th><th class="stat-col st-sortable" title="Match MVPs" onclick="sortStandings('mvp')">MVP</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
@@ -1955,7 +1955,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v386';
+const TESTROOM_VERSION = 'v387';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2363,7 +2363,7 @@ let standingsLoaded = false;
 function initStandings() {
   standings = {};
   GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).forEach(g => {
-    standings[g.id] = { wins: 0, losses: 0, kos: 0, kills: 0 };
+    standings[g.id] = { wins: 0, losses: 0, kos: 0, kills: 0, mvp: 0 };
   });
 }
 initStandings();
@@ -2375,7 +2375,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0, mvp: data[id].mvp || 0 };
       });
     }
     standingsLoaded = true;
@@ -2387,7 +2387,7 @@ function loadStandingsFromFirebase() {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
-        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0 };
+        standings[id] = { wins: data[id].wins || 0, losses: data[id].losses || 0, kos: data[id].kos || 0, kills: data[id].kills || 0, mvp: data[id].mvp || 0 };
       });
     }
   });
@@ -2400,35 +2400,166 @@ function saveStandingsToFirebase() {
   const toSave = {};
   Object.keys(standings).forEach(id => {
     const s = standings[id];
-    if (s.wins > 0 || s.losses > 0 || (s.kos || 0) > 0 || (s.kills || 0) > 0) {
-      toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0, kills: s.kills || 0 };
+    if (s.wins > 0 || s.losses > 0 || (s.kos || 0) > 0 || (s.kills || 0) > 0 || (s.mvp || 0) > 0) {
+      toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0, kills: s.kills || 0, mvp: s.mvp || 0 };
     }
   });
   db.ref('testroom/standings').set(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
 }
 
 function recordWin(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0, mvp:0 };
   standings[ghostId].wins++;
   saveStandingsToFirebase();
 }
 
 function recordLoss(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0, mvp:0 };
   standings[ghostId].losses++;
   saveStandingsToFirebase();
 }
 
 function recordKO(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0, mvp:0 };
   standings[ghostId].kos = (standings[ghostId].kos || 0) + 1;
   saveStandingsToFirebase();
 }
 
 function recordKill(ghostId) {
-  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0 };
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0, mvp:0 };
   standings[ghostId].kills = (standings[ghostId].kills || 0) + 1;
   saveStandingsToFirebase();
+}
+
+function recordMvp(ghostId) {
+  if (!standings[ghostId]) standings[ghostId] = { wins:0, losses:0, kos:0, kills:0, mvp:0 };
+  standings[ghostId].mvp = (standings[ghostId].mvp || 0) + 1;
+  saveStandingsToFirebase();
+}
+
+// ============================================================
+// MVP TRACKING — per-match score for the winning-team fighter
+// ============================================================
+// Scoring weights (Wyatt's):
+//   KO scored = +5, roll won = +1, damage dealt = +0.5/HP,
+//   finishing blow bonus = +5, survived match = +3,
+//   resources gained: LS +1, MS +3, Fire +3, Ice +1, Seed +1
+// One MVP per match, from the winning team. Tiebreakers:
+// (1) most KOs, (2) most damage, (3) alphabetical name.
+
+function initMatchStats() {
+  B.matchStats = {
+    red: {}, blue: {},
+    finishingBlowGhostId: null,
+    finishingBlowTeam: null,
+    snapshot: null
+  };
+}
+
+function ensureMatchStat(team, ghostId) {
+  if (!B.matchStats[team][ghostId]) {
+    B.matchStats[team][ghostId] = {
+      rollsWon: 0,
+      kosScored: 0,
+      damageDealt: 0,
+      ls: 0, ms: 0, ice: 0, fire: 0, seed: 0
+    };
+  }
+  return B.matchStats[team][ghostId];
+}
+
+function snapshotRound() {
+  if (!B || !B.matchStats) return;
+  B.matchStats.snapshot = {
+    red: {
+      res: { ...B.red.resources },
+      ghosts: B.red.ghosts.map(g => ({ id: g.id, hp: g.hp, ko: g.ko }))
+    },
+    blue: {
+      res: { ...B.blue.resources },
+      ghosts: B.blue.ghosts.map(g => ({ id: g.id, hp: g.hp, ko: g.ko }))
+    }
+  };
+}
+
+function creditRoundDelta(roundWinner) {
+  if (!B || !B.matchStats || !B.matchStats.snapshot) return;
+  const snap = B.matchStats.snapshot;
+  ['red', 'blue'].forEach(team => {
+    const t = B[team];
+    const activeF = active(t);
+    if (!activeF) return;
+    const stat = ensureMatchStat(team, activeF.id);
+    // Resource deltas — credit the currently-active ghost
+    const rNow = t.resources;
+    const rBefore = snap[team].res;
+    const clampPos = (a, b) => Math.max(0, (a || 0) - (b || 0));
+    stat.ls   += clampPos(rNow.luckyStone, rBefore.luckyStone);
+    stat.ms   += clampPos(rNow.moonstone, rBefore.moonstone);
+    stat.ice  += clampPos(rNow.ice, rBefore.ice);
+    stat.fire += clampPos(rNow.fire, rBefore.fire);
+    stat.seed += clampPos(rNow.healingSeed, rBefore.healingSeed);
+    // Damage dealt / KOs scored: enemy ghosts took damage credited to this active
+    const enemyTeam = team === 'red' ? 'blue' : 'red';
+    const enemyBefore = snap[enemyTeam].ghosts;
+    const enemyNow = B[enemyTeam].ghosts;
+    enemyNow.forEach((g, i) => {
+      const before = enemyBefore[i];
+      if (!before) return;
+      const dmg = Math.max(0, (before.hp || 0) - (g.hp || 0));
+      if (dmg > 0) stat.damageDealt += dmg;
+      if (!before.ko && g.ko) {
+        stat.kosScored++;
+        // Track the LAST KO seen so the final-round KO gets the finishing-blow bonus
+        B.matchStats.finishingBlowGhostId = activeF.id;
+        B.matchStats.finishingBlowTeam = team;
+      }
+    });
+  });
+  // Roll won: credit the winning team's active
+  if (roundWinner === 'red' || roundWinner === 'blue') {
+    const wActive = active(B[roundWinner]);
+    if (wActive) {
+      const wStat = ensureMatchStat(roundWinner, wActive.id);
+      wStat.rollsWon++;
+    }
+  }
+}
+
+function computeMvpScore(stat, isSurvivor, isFinishingBlow) {
+  const ko = (stat.kosScored || 0) * 5;
+  const rw = (stat.rollsWon || 0) * 1;
+  const dmg = (stat.damageDealt || 0) * 0.5;
+  const res = (stat.ls || 0) * 1 + (stat.ms || 0) * 3 + (stat.fire || 0) * 3 + (stat.ice || 0) * 1 + (stat.seed || 0) * 1;
+  const surv = isSurvivor ? 3 : 0;
+  const fb = isFinishingBlow ? 5 : 0;
+  return ko + rw + dmg + res + surv + fb;
+}
+
+function pickMatchMvp(winnerTeamName) {
+  if (!B || !B.matchStats || (winnerTeamName !== 'red' && winnerTeamName !== 'blue')) return null;
+  const team = B[winnerTeamName];
+  const stats = B.matchStats[winnerTeamName] || {};
+  const fbId = B.matchStats.finishingBlowGhostId;
+  const fbTeam = B.matchStats.finishingBlowTeam;
+  let best = null;
+  team.ghosts.forEach(g => {
+    const s = stats[g.id] || { rollsWon:0, kosScored:0, damageDealt:0, ls:0, ms:0, ice:0, fire:0, seed:0 };
+    const survived = !g.ko;
+    const finishing = (g.id === fbId && fbTeam === winnerTeamName);
+    const score = computeMvpScore(s, survived, finishing);
+    const candidate = { id: g.id, name: g.name, score, kos: s.kosScored || 0, dmg: s.damageDealt || 0 };
+    if (!best) { best = candidate; return; }
+    if (candidate.score > best.score) { best = candidate; return; }
+    if (candidate.score === best.score) {
+      if (candidate.kos > best.kos) { best = candidate; return; }
+      if (candidate.kos === best.kos) {
+        if (candidate.dmg > best.dmg) { best = candidate; return; }
+        if (candidate.dmg === best.dmg && candidate.name.localeCompare(best.name) < 0) { best = candidate; return; }
+      }
+    }
+  });
+  return best;
 }
 
 let standingsVisibleSets = new Set(['Volcanic Activity','Rolling Hills','Set 1','Dark Castle','Frost Valley']); // all on by default
@@ -2452,7 +2583,7 @@ function sortStandings(col) {
   // Highlight active column header
   document.querySelectorAll('.st-sortable').forEach(th => th.classList.remove('st-sort-active'));
   const headers = document.querySelectorAll('#standingsTable thead th.st-sortable');
-  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8, 'kopg':9};
+  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8, 'kopg':9, 'mvp':10};
   if (colMap[col] !== undefined && headers[colMap[col]]) headers[colMap[col]].classList.add('st-sort-active');
 }
 
@@ -2462,11 +2593,11 @@ function renderStandingsTable() {
     .filter(g => !SHELVED_IDS.has(g.id))
     .filter(g => standingsVisibleSets.has(g.set))
     .map(g => {
-    const s = standings[g.id] || { wins:0, losses:0, kos:0, kills:0 };
+    const s = standings[g.id] || { wins:0, losses:0, kos:0, kills:0, mvp:0 };
     const total = s.wins + s.losses;
     const pct = total > 0 ? (s.wins / total) : 0;
     const kopg = total > 0 ? ((s.kills || 0) / total) : 0;
-    return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, kills: s.kills || 0, total, pct, kopg };
+    return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, kills: s.kills || 0, mvp: s.mvp || 0, total, pct, kopg };
   });
 
   // Sort based on active column
@@ -2488,12 +2619,13 @@ function renderStandingsTable() {
       const gbB = ((ldr.w - b.w) + (b.l - ldr.l)) / 2;
       return gbA - gbB || a.name.localeCompare(b.name);
     }
+    if (col === 'mvp') return (b.mvp || 0) - (a.mvp || 0) || b.w - a.w || a.name.localeCompare(b.name);
     // Default: PCT
     return b.pct - a.pct || b.w - a.w || a.l - b.l || a.name.localeCompare(b.name);
   });
 
   if (ghosts.length === 0) {
-    body.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text2);font-size:14px;">No sets selected — toggle a set above to see standings.</td></tr>';
+    body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--text2);font-size:14px;">No sets selected — toggle a set above to see standings.</td></tr>';
     return;
   }
 
@@ -2526,6 +2658,7 @@ function renderStandingsTable() {
       <td class="st-stat" style="color:var(--win)">${g.kills}</td>
       <td class="st-stat" style="color:var(--lose)">${g.kos}</td>
       <td class="st-stat" style="color:var(--moonstone)">${g.total > 0 ? g.kopg.toFixed(2) : '-'}</td>
+      <td class="st-stat" style="color:var(--legendary);font-weight:900;">${g.mvp > 0 ? g.mvp : '-'}</td>
     </tr>`;
   }).join('');
 }
@@ -2536,7 +2669,7 @@ function openStandings() {
   // Highlight default sort column
   document.querySelectorAll('.st-sortable').forEach(th => th.classList.remove('st-sort-active'));
   const headers = document.querySelectorAll('#standingsTable thead th.st-sortable');
-  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8, 'kopg':9};
+  const colMap = {'#':0, 'name':1, 'w':2, 'l':3, 'gp':4, 'pct':5, 'gb':6, 'kills':7, 'kos':8, 'kopg':9, 'mvp':10};
   if (colMap[standingsSortCol] !== undefined && headers[colMap[standingsSortCol]]) headers[colMap[standingsSortCol]].classList.add('st-sort-active');
   document.getElementById('standingsOverlay').classList.add('active');
 }
@@ -3066,6 +3199,7 @@ function startBattle() {
     floopMuck: { red: 0, blue: 0 },
   };
   S.battle = B;
+  initMatchStats();
   document.getElementById('team-select').style.display = 'none';
   document.getElementById('battle-view').style.display = 'block';
   document.querySelector('.app').classList.add('battle-active');
@@ -5587,6 +5721,8 @@ function doPreRollSetup() {
   if (!B || B.phase !== 'ready') return;
   const rF = active(B.red), bF = active(B.blue);
   if (rF.ko || bF.ko) return;
+  // MVP snapshot: capture team resources + ghost HPs so we can credit deltas at round end
+  snapshotRound();
 
   // Collect pre-roll callouts — drained sequentially after setup so none stomp each other
   const preRollCallouts = [];
@@ -10131,6 +10267,9 @@ function _resolveRoundImpl() {
         B.pureHeartDeclared.blue = null;
       }
 
+      // MVP round credit: diff team resources + ghost HPs against the pre-roll snapshot
+      try { creditRoundDelta(winTeamName); } catch (e) { console.warn('[MVP] credit failed:', e); }
+
       B.round++;
       B.preRoll = null;
       renderDice(redDice, blueDice);
@@ -10366,6 +10505,7 @@ function showGameOver(winner) {
   disableRollButtons();
 
   // Record standings
+  let matchMvp = null;
   if (winner === 'red' || winner === 'blue') {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
@@ -10380,6 +10520,11 @@ function showGameOver(winner) {
         if (g.killedBy && g.killedBy > 0) recordKill(g.killedBy); // credit the killer
       }
     });
+    // MVP: pick the winning team's top scorer and record
+    try {
+      matchMvp = pickMatchMvp(winner);
+      if (matchMvp) recordMvp(matchMvp.id);
+    } catch (e) { console.warn('[MVP] pick failed:', e); }
   }
 
   const el = document.getElementById('gameOver');
