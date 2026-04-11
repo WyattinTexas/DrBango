@@ -20,16 +20,27 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 87,
-      "remaining_mins": 79,
+      "cycles": 88,
+      "remaining_mins": 76,
       "until": "08:44 AM",
-      "last_update": "2026-04-11T07:27:59.834403",
+      "last_update": "2026-04-11T07:30:27.893304",
       "status": "running",
-      "next_up": "Check whether the `autoRecordGame` path in smartAutoPlay.js correctly uses `killedBy = -1` for Happy Crystal (208) self-sacrifice \u2014 line 282 already sets `killedBy = -1` correctly; verify Nerina (306) entry damage at line 84 uses `killedBy = f.id` which is correct (Nerina is the actual killer); then look for any remaining divergences between smartAutoPlay.js ability logic and the actual game implementation (e.g., Sylvia 313 dodge check in the sim only checks `.includes(6)` but the actual game rolls 2 dice and checks if highest beats lowest \u2014 verify the condition matches)",
-      "after_that": "Audit the smartAutoPlay.js Granny (310) KO-path block (lines 579\u2013590) \u2014 the sim grants resources based on `wR.type` but the actual game at line 10117+ calls Granny's consolation resource from `loseRollType`, which is the LOSING team's roll type, not the winner's; verify the sim is checking the right roll type or document the divergence"
+      "next_up": "Audit whether smartAutoPlay.js Farmer Jeff (314) sideline correctly grants seeds to the LOSING side \u2014 the current code at line 568 only checks `hasSideline(wTeam, 314)` (winner side), but Jeff's abilityDesc says \"each 6 you roll = +1 Healing Seed\" regardless of win/loss; if lF rolls sixes on a losing round, the sim silently discards those seeds; add a corresponding `hasSideline(lTeam, 314)` block for the losing team's dice",
+      "after_that": "Audit whether smartAutoPlay.js Kaplan (308) INSPIRE! sideline ability is implemented \u2014 grep for `hasSideline.*308` in smartAutoPlay.js and compare to actual game behavior (Kaplan grants Surge to winning team's active ghost per win round); if missing, add the grant at the appropriate point in the win-path resource section"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 88,
+      "summary": "Fixed smartAutoPlay.js Granny (310) BEDTIME STORY! KO-path resource grants \u2014 `doubles` was giving `surge` (should be `moonstone`) and `triples+` was giving `moonstone` (should be `fire += 3`), corrupting auto-play simulation statistics for every Granny matchup; fixed all 4 affected lines in both the `lF.ko` and `wF.ko` paths (v519)",
+      "family": "none",
+      "next_up": "Audit whether smartAutoPlay.js Farmer Jeff (314) sideline correctly grants seeds to the LOSING side \u2014 the current code at line 568 only checks `hasSideline(wTeam, 314)` (winner side), but Jeff's abilityDesc says \"each 6 you roll = +1 Healing Seed\" regardless of win/loss; if lF rolls sixes on a losing round, the sim silently discards those seeds; add a corresponding `hasSideline(lTeam, 314)` block for the losing team's dice",
+      "after_that": "Audit whether smartAutoPlay.js Kaplan (308) INSPIRE! sideline ability is implemented \u2014 grep for `hasSideline.*308` in smartAutoPlay.js and compare to actual game behavior (Kaplan grants Surge to winning team's active ghost per win round); if missing, add the grant at the appropriate point in the win-path resource section",
+      "time": "07:30:33",
+      "timestamp": "2026-04-11T07:30:33.727894",
+      "roast": "Four lines of copy-paste sloppiness silently poisoned every Granny stat since who-knows-when, and we're calling it a \"fix\" instead of asking why nobody noticed surge materializing out of a bedtime story for months."
+    },
     {
       "target": "testroom",
       "cycle": 87,
@@ -568,20 +579,9 @@
       "time": "02:46:24",
       "timestamp": "2026-04-11T02:46:24.963391",
       "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
-    },
-    {
-      "target": "testroom",
-      "cycle": 38,
-      "summary": "Dallas (60) Quick Draw now truly STEALS a die \u2014 enemy loses 1 AND Dallas gains 1 \u2014 matching the abilityDesc \"steal 1 of your opponents die\" and Wyatt's explicit design feedback in family_map.json; previously the die just disappeared (subtract-only, no transfer)",
-      "family": "steal-dice-transfer | siblings: Outlaw(43), Dallas(60), Suspicious Jeff(61) | also broken: Suspicious Jeff(61) Snicker \u2014 same subtract-only bug, needs same one-line `if (tName === 'red') redCount += B.jeffSnicker[tName]; else blueCount += B.jeffSnicker[tName];` addition after the enemy-subtract block at line 7218",
-      "next_up": "[FAMILY:steal-dice-transfer] Suspicious Jeff (61) Snicker \u2014 abilityDesc says \"steal 1 of the enemy dice\" but implementation only subtracts from enemy (same subtract-only bug as Dallas); fix: add `if (tName === 'red') redCount += B.jeffSnicker[tName]; else blueCount += B.jeffSnicker[tName];` after line 7218's enemy-subtract block; `tName` already declared two lines above in same forEach scope",
-      "after_that": "Verify Outlaw (43) Thief is correctly NOT a transfer \u2014 abilityDesc says \"remove 1 opponent die\" (not \"steal\"), so subtract-only IS correct for Outlaw; mark that distinction explicitly in FIXLOG to prevent future auditors from trying to \"fix\" it the same way as Dallas/Jeff; then audit whether the log message for Dallas Quick Draw should be updated to say \"Rolled 1 extra die!\" to reflect the transfer",
-      "time": "02:45:20",
-      "timestamp": "2026-04-11T02:45:20.488919",
-      "roast": "Six months past the card text's ship date and we're just now discovering \"steal\" means the other guy loses it *and* you get it \u2014 Garfield wept."
     }
   ],
-  "last_update": "2026-04-11T07:28:05.749141",
+  "last_update": "2026-04-11T07:30:33.727923",
   "orchestrator_check": {
     "timestamp": "2026-04-11T07:17:01.154480",
     "summary": "1 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 83 cycles, 99m left | last [testroom c83]: Calvin (342) OVERCLOCK! win-path now writes to the battle log \u2014 both the normal heal branch and the Filbert-curse branch"
