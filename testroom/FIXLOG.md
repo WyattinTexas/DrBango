@@ -1,7 +1,96 @@
 # Testroom Coordination Log
 
 All agents working on testroom/index.html should read this before making changes.
-After fixing something, log it here so other agents don't duplicate work.
+After fixing something, log it here so other caller agents don't duplicate work.
+
+## v429 — Tyler (105) + Boo Brothers (17) primers now fire in Duel Phase
+
+Completes the v406 sweep. Both primers were deferred because they depended on
+`B.preRoll[team].count` which isn't initialized until `doPreRollSetup` fires at
+roll-click time (Approach B: gate rewritten to use `ghostData(id)?.dice ?? 3`).
+
+**What changed:**
+
+- **New state flags** (both game-init locations + both round-reset sites):
+  - `B.tylerDecidedThisRound { red, blue }` — prevents rollReady double-fire (Raditz pattern)
+  - `B.booTeamworkDecidedThisRound { red, blue }` — same for Boo Brothers
+  - `B.tylerHeatUpDieBonus { red, blue }` — deferred +1 die bonus storage
+  - `B.booTeamworkDieDebt { red, blue }` — deferred -1 die debt storage
+
+- **`_installDuelPhasePreRollWrapper()`** (new global helper before openDuelPhasePrimers):
+  Wraps `doPreRollSetup` once per round. After doPreRollSetup initializes `B.preRoll`,
+  applies any stored `tylerHeatUpDieBonus` / `booTeamworkDieDebt` adjustments. Idempotent
+  (guard: `window._duelDiePatchInstalled`). Auto-removes after firing once.
+
+- **`openDuelPhasePrimers`** — added two new sections (after Fang Undercover):
+  - **Tyler (105)**: gate `f.hp >= 3 && !tylerDecidedThisRound[team]`. Sets the flag first
+    (Raditz pattern). Pre-initializes `B.preRoll[team]` with a getter/setter interceptor
+    that captures doTylerChoice's count write → stores delta in `tylerHeatUpDieBonus`.
+    Installs the doPreRollSetup wrapper. Opens `tylerOverlay` with the duelDoneBtn.
+  - **Boo Brothers (17)**: gate `ghostData(17).dice ?? 3 >= 2 && !booTeamworkDecidedThisRound[team]`.
+    Same pattern. Auto-skips with narrator if base dice < 2 (currently impossible — safety only).
+    Interceptor stores count reduction in `booTeamworkDieDebt` for the wrapper to apply.
+
+- **`hasAnyDecision`**: Added Tyler and Boo Brothers conditions (updated stale comment).
+
+- **`rollReady`** (minimal additive gate additions, Raditz pattern):
+  - Tyler gate: `&& !(B.tylerDecidedThisRound && B.tylerDecidedThisRound[team])`
+  - Boo Brothers gate: `&& !(B.booTeamworkDecidedThisRound && B.booTeamworkDecidedThisRound[team])`
+
+**Die-effect correctness**: Both Tyler's +1 die and Boo Brothers' -1 die are correctly
+applied at roll time (post-doPreRollSetup) via the wrapper. HP effects are immediate.
+Double-fire at roll-click is fully prevented by the decided-this-round flags.
+
+---
+
+## v426 — Card glow: Calvin (342) OVERCLOCK! + Aunt Susan (309) HARVEST DANCE! win-seed + 3 more missing team args
+
+Five `queueAbility` callsites in `resolveRound` were still missing the 5th `team` arg despite v412/v420/v423/v424 sweep passes. All five are for real testroom cards. Purely additive — no new variables, no logic changes.
+
+**Callsites fixed:**
+1. **OVERCLOCK!** (Calvin 342, win-path) → `, winTeamName` — Calvin's card now glows Uncommon green when he heals on a win.
+2. **MASK MERCHANT!** (Mr Filbert cursing Calvin's Overclock, win-path) → `, winTeamName` — Filbert curse spotlight now correctly targets Calvin's slot.
+3. **DEPENDABLE!** (Sandwiches mirroring Humar Sacred Flame!, lose-path) → `, loseTeamName` — the only DEPENDABLE! mirror for a Legendary ability; now spotlights Sandwiches' slot.
+4. **HARVEST DANCE!** (Aunt Susan 309 win → +1 Healing Seed, win-path) → `, winTeamName` — Aunt Susan's card now glows Rare blue when she earns a seed on win.
+5. **DEPENDABLE!** (Sandwiches mirroring Aunt Susan's Harvest Dance seed grant) → `, loseTeamName` — mirror spotlight now correct.
+
+Note: the *damage* HARVEST DANCE! callout at line ~10024 (`seeds → +damage`) already had `winTeamName` since v412. This was the *seed-grant* HARVEST DANCE! at the win-path tail section — a completely separate callsite that all previous sweeps missed.
+
+`winTeamName` and `loseTeamName` are already in scope at all 5 callsites. Zero new variables, zero new scope.
+
+---
+
+## v425 — Card glow: HEAVY AIR! + RETRIBUTION! now spotlight Knight Terror's / Knight Light's card
+
+`checkKnightEffects()` had both `queueAbility` and `showAbilityCallout` calls for HEAVY AIR! (Knight Terror 401) and RETRIBUTION! (Knight Light 402) without the `team` arg — these two reactive abilities fire on *every opponent ability trigger*, making them the highest-frequency callouts in the game, yet they were spotlighting no card at all.
+
+**Fix**: added `oppTeamName` as the 5th arg to both `queueAbility` and both `showAbilityCallout` calls inside `checkKnightEffects`. `oppTeamName` is the team that OWNS Knight Terror/Light (the opponent of the ability-using team) — already declared at the top of the function.
+
+- **HEAVY AIR! queued path**: `, null, oppTeamName`
+- **HEAVY AIR! direct path**: `showAbilityCallout(..., oppTeamName)`
+- **RETRIBUTION! queued path**: `, null, oppTeamName`
+- **RETRIBUTION! direct path**: `showAbilityCallout(..., oppTeamName)`
+
+`checkKnightEffects` is not on the blacklist. Zero new variables, zero new scope.
+
+---
+
+## v423 — Card glow: threaded `team` into all remaining tie-path + win/lose-path queueAbility callsites
+
+Completed full `queueAbility` 5th-arg threading for every callsite that v409/v412/v413/v420 missed. All purely additive — no new variables, no logic changes, zero new scope.
+
+**Tie-path callsites fixed (all get the caster's `tName*` or inline `team === B.red ? 'red' : 'blue'`):**
+ROARING CROWD! (Tweak sideline), DEPENDABLE! (Tweak mirror), CHIRP! (Jimmy), DEPENDABLE! (Jimmy mirror), LET'S DANCE! (Kairan tie doubles), THIEF! (Outlaw tie doubles), WILD CHORDS! (Haywire tie triples+), FRENZY! (Scallywags tie), MUCK! (Floop tie), HEINOUS! (Logey tie), JINX! (Dream Cat tie), MASK MERCHANT! (Opa Rest cursed by Filbert), REST! (Opa tie +1 HP), ANTIDOTE! (Cornelius blocks AO Friend to All), MASK MERCHANT! (AO Friend to All cursed by Filbert), FRIEND TO ALL! (Ancient One tie +3 HP), NAP! (Maximo tie Healing Seed), DEPENDABLE! (Maximo tie mirror), FROLIC! (Dupy tie KO)
+
+**Win/lose-path callsites fixed (remaining from v420 pass):**
+LET'S DANCE! (Kairan win/lose doubles), THIEF! (Outlaw win/lose doubles), SNICKER! (Suspicious Jeff sideline → winTeamName), WILD CHORDS! (Haywire win/lose triples+), JINX! (Dream Cat win/lose both-doubles), FRENZY! (Scallywags win/lose), MUCK! (Floop win/lose), HEINOUS! win path (→ winTeamName), HEINOUS! lose path (→ loseTeamName), NAP! end-of-round (Maximo, → team === B.red ? 'red' : 'blue'), DEPENDABLE! NAP mirror (→ isWinSide ? loseTeamName : winTeamName)
+
+**useTysonHop:**
+HOP! (→ team param, already in scope as function arg)
+
+**Result**: Card glow is now fully threaded for ALL queueAbility callsites. Every ability that fires (tie, win, lose, entry, pre-roll, end-of-round) now correctly spotlights the caster's fighter card with a colored pulse. Card spotlight system is complete.
+
+---
 
 ## v421 — 25 NEW gallery-only cards merged (IDs 407-431)
 
@@ -111,6 +200,18 @@ The `team` variable is already in scope (it is the forEach arg). `isPreRollActiv
 ### WHY THIS IS TOP PRIORITY
 
 Wyatt explicitly identified this as blocking the core gameplay loop. **Duel Phase exists so players can stage their specials BEFORE rolling.** If the buttons do not render, the entire feature is shipped-but-broken. This jumps Directive #5 (dice color) and #4 (splash overhaul) for tonight's overnight refiner. **Ship this first, then loop back to #5 and #4.**
+
+---
+
+## v422 — Card glow: BITTER END! (Chagrin 404) missing `loseTeamName` — both callsites fixed
+
+`BITTER END!` was missed in the v412/v413/v420 threading sweeps. Chagrin (404, rare) fires on two paths:
+1. **Non-KO lose path**: `lF.id === 404 && !lF.ko` → `queueAbility('BITTER END!', ...)` — was missing 5th arg
+2. **KO path**: inside `if (lF.ko)` → `queueAbility('BITTER END!', ...)` — was missing 5th arg
+
+Both now get `, loseTeamName` as the 5th arg. Chagrin's fighter-slot card now pulses a rare-blue glow when BITTER END! fires — whether lost normally or KO'd. v420 claimed "full coverage" but Chagrin's two callouts used bare 4-arg form, falling through to narrator-only spotlight.
+
+No new variables, no scope changes — `loseTeamName` already in scope at both callsites. Zero logic changes.
 
 ---
 
@@ -455,7 +556,58 @@ Touch points:
 
 Do NOT touch any other Granny logic (sideline tracking, popSidelineCard, getSidelineGhost). Just swap the reward branches.
 
-## Current Version: v420
+## Current Version: v427
+
+## v428 — FIXLOG + code comment: Corrected stale Boo Brothers (17) overclock note
+
+**Problem**: The Boo Brothers (17) AUDIT STATUS entry still described "hp < maxHp guard... correct" — implying the `hp < maxHp` offer-gate was present and intentional. But that guard was explicitly **removed** in v294 ("REMOVED `booG.hp < booG.maxHp` offer-gate so Teamwork is now offered even at full HP (overclocks)"). A future refiner reading the stale note would conclude "the current code missing this guard is a regression" and re-add it — breaking Boo Brothers' intended overclock behavior. Same class of trap as the Mallow (89) stale note fixed in v427.
+
+Also fixed the inline comment in `rollReady`'s Boo Brothers block (line ~5743) which said `"and HP is below max"` — now corrected to document that NO hp-gate exists and why (Hard Rule #9 overclock).
+
+**Changes**:
+1. **AUDIT STATUS entry** (Boo Brothers line): Replaced "hp < maxHp guard, Filbert interaction correct" with full STALE NOTE WARNING matching the v427/v402 pattern. Documents `f.hp += 1` (no cap), modal preview `· overclocks!` hint, and explicit "do NOT re-add" directive.
+2. **index.html comment** (line ~5743): Replaced stale `"HP is below max"` condition description with clear documentation that there is no hp gate and overclock is intentional.
+
+**Verified**: Current code at `rollReady` Boo Brothers block (line ~5747) has NO `booG.hp < booG.maxHp` condition — correct. `doBooChoice` YES path uses `f.hp += 1` with `overTeam = f.hp > f.maxHp` and `· overclocked!` tag — correct. Zero logic changes; purely documentation fixes.
+
+**Completes the stale-overclock-note audit**: v402 fixed 4 notes (Munch 66, Katrina 70, Flora 75, Troubling Haters 83), v427 fixed Mallow 89, v428 fixes Boo Brothers 17. All 6 known stale overclock notes in the AUDIT STATUS section are now corrected.
+
+---
+
+## v427 — FIXLOG AUDIT STATUS: Corrected stale Mallow (89) overclock note
+
+**Problem**: The Mallow (89) AUDIT STATUS entry (and the v286 changelog note) both described `f.hp += 3` (no maxHp cap) as the "bug" and `Math.min(f.maxHp, f.hp + 3)` as the "fix" — but Mallow is explicitly listed as an overclock healer in Hard Rule #9 ("Mallow (89)"). The Math.min cap applied in v286 was itself incorrect and was reverted in v294 when overclock-by-default was established. Any future refiner reading the stale notes would think the current `f.hp += 3` is a regression and re-apply the cap, breaking Mallow's intended overclock behavior.
+
+**Fix** (documentation-only, zero JS changes):
+1. **AUDIT STATUS entry** (line ~1679): Replaced the misleading "Fixed: changed to Math.min" phrasing with a STALE NOTE WARNING matching the pattern established in v402 for Munch/Katrina/Flora/Troubling Haters. Now correctly states the current `f.hp += 3` is intentional, the modal preview's `· overclocks!` hint is correct, and the Math.min must NOT be re-applied.
+2. **v286 changelog entry** (line ~1972): Replaced the misleading "Fixed to Math.min" text with a HISTORICAL NOTE explaining the v294 revert and directing readers to the v423 correction.
+
+**Verified**: Current code at `doMallowChoice` line ~4604 uses `f.hp += 3` with `overMallow = f.hp > f.maxHp` and `· overclocked!` callout tag — correct. Modal preview at line ~5733 uses uncapped `mF.hp + 3` with `· overclocks!` hint — correct. No `Math.min` anywhere in the Mallow path.
+
+**Same class of fix as v402** (which corrected 4 stale overclock notes for Munch 66, Katrina 70, Flora 75, Troubling Haters 83). Mallow was missed in that pass. This completes the set of known stale overclock notes in the AUDIT STATUS section.
+
+---
+
+## v424 — Card glow: threaded `team` into 9 remaining Sandwiches DEPENDABLE! mirrors
+
+The final batch of DEPENDABLE! mirrors missing the `team` 5th arg — all 9 are now threaded:
+
+**`sandwichForWin` mirrors (Sandwiches on winning team → spotlight `winTeamName`):**
+1. Chagrin BITTER END! non-KO mirror (line ~10477)
+2. Granny BEDTIME STORY! singles KO mirror (line ~10483)
+3. Granny BEDTIME STORY! doubles KO mirror (line ~10486)
+4. Granny BEDTIME STORY! triples-or-better KO mirror (line ~10489)
+5. Chagrin BITTER END! KO mirror (line ~10493)
+6. Powder FINAL GIFT! mirror (line ~10513)
+
+**`sandwichForLose` mirrors (Sandwiches on losing team → spotlight `loseTeamName`):**
+7. Granny BEDTIME STORY! singles winner-self-KO mirror (line ~10499)
+8. Granny BEDTIME STORY! doubles winner-self-KO mirror (line ~10502)
+9. Granny BEDTIME STORY! triples-or-better winner-self-KO mirror (line ~10505)
+
+`winTeamName` and `loseTeamName` are already in scope at all 9 callsites — zero new variables, zero logic changes. Completes the Sandwiches DEPENDABLE! mirror card-glow coverage sweep started in v409/v412/v413/v420/v422.
+
+---
 
 ## v412 — DEAD CODE REMOVAL: Wick (349) Slow Burn block stripped from doPreRollSetup
 
@@ -1594,7 +1746,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Pelter (86) — Snowball: AUDITED PASS (v285) — doubles win→+2 dmg, collectKC, correct
 - [x] Zach (87) — Craftsman: AUDITED PASS (v285) — sideline+Guard Thomas active+doubles→+3 dmg, Cornelius, correct
 - [x] Pale Nimbus (88) — Hidden Storm: AUDITED PASS (v285) — sideline, winDice sum<7→+2 dmg, Cornelius, correct
-- [x] Mallow (89) — Dozy Cozy: AUDITED FIX (v286) — BUG: YES path used `f.hp += 3` with no maxHp cap — a ghost at maxHp could be healed to 8/5 HP (overflow). Convention: all heals are capped at maxHp. Fixed: changed to `f.hp = Math.min(f.maxHp, f.hp + 3)` with `· capped` suffix in callout/log when cap triggers. Also fixed: modal preview showed `mF.hp + 3` (uncapped) — changed to `Math.min(mF.maxHp, mF.hp + 3)` with italic `· capped` hint when overflow would occur. Filbert curse path (`Math.max(0, f.hp - 3)`) was already correct. `mallowDecided` reset is correct in both round-end blocks. Note: no Cornelius check on modal trigger — this is a secondary gap; Cyboo (100) and other auto-sideline effects have Cornelius blocks, but modal-based sideline abilities (Guardian Fairy, Jeanie) do not — consistency favors leaving it without for now.
+- [x] Mallow (89) — Dozy Cozy: AUDITED FIX (v286, overclock re-confirmed v423) — current code correctly uses `f.hp += 3` (overclocks, no cap) with `overMallow = f.hp > f.maxHp` and `· overclocked!` callout tag. Modal preview correctly shows uncapped `mF.hp + 3` with `· overclocks!` hint. Filbert curse path correct. `mallowDecided` reset correct in both round-end blocks. No Cornelius check on modal trigger — consistent with Guardian Fairy and Jeanie (modal-based sideline abilities). **STALE NOTE WARNING**: the original v286 entry said `Math.min(f.maxHp, f.hp + 3)` was the fix — that was wrong; Mallow is an overclock healer (Hard Rule #9: "Mallow (89)"). The cap was reverted in v294. Do NOT re-apply Math.min. Mallow's overclock is correct and intentional.
 - [x] Jeanie (90) — Hidden Treasure: AUDITED FIX (v285) — BUG: `doJeanieChoice` wrote `B.pendingResolve.redDice/blueDice = newDice` (new array) and `B.redDice = newDice`, but `postRollDone()` runs AFTER Jeanie and creates a fresh `B.pendingResolve = { redDice, blueDice }` using the closure's `B.preRoll.*.dice` references — permanently overwriting Jeanie's assignment. Forced reroll appeared on-screen but `resolveRound()` still used the original pre-reroll dice. Fixed: switched to in-place splice on `B.preRoll.*.dice` (same Dark Wing/Sonya v284 pattern); `B.pendingResolve` guarded with `if (B.pendingResolve)`. Also fixed stale source for `oldDice`: was `team==='red' ? [...B.blueDice]` (using wrong team variable), changed to `oppTeam==='red' ? [...B.preRoll.red.dice]`.
 - [x] Calvin & Anna (91) — Toboggan: AUDITED PASS (v287) — trigger `wF.id===91 && !wF.ko && lF.ko` correct; sideline filter excludes current active and KO'd ghosts; `doTobogganChoice` swaps `winTeam.activeIdx`, fires `triggerEntry` for new ghost, uses `showAbilityCallout` directly (called after drainAbilityQueue completes — correct pattern); NO path calls continuation immediately; modal shown with `B.phase='ko-pause'` to keep roll buttons locked; `B.tobogganPending` continuation closure pattern correct.
 - [x] Gary (92) — Lucky Novice: AUDITED PASS (v285) — sideline, 1s in winDice/loseDice→+1 ice per 1, Cornelius, onShow deferred grant, correct
@@ -1648,7 +1800,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Jeffery (14) — Chuckle: AUDITED PASS (v280) — sideline +3 HP on win, Filbert/Cornelius/Residue all correct
 - [x] Winston (15) — Scheme: AUDITED PASS (v297) — see entry below for full details
 - [x] Chip (16) — Acrobatic Dive: AUDITED FIX (v279)
-- [x] Boo Brothers (17) — Teamwork: AUDITED PASS (v280) — pre-roll modal, hp < maxHp guard, Filbert interaction correct
+- [x] Boo Brothers (17) — Teamwork: AUDITED PASS (v280, overclock re-confirmed v428) — pre-roll modal fires when active + ≥2 dice. `f.hp += 1` **overclocks** (no maxHp cap — Hard Rule #9; guard removed in v294). Filbert curse flips to -1 dmg; KO guard on Filbert path correct. Modal preview shows `· overclocks!` when `bF.hp + 1 > bF.maxHp` — correct. **STALE NOTE WARNING**: the original v280 entry said "hp < maxHp guard... correct" — that guard was **removed** in v294 when overclock-by-default was established. Do NOT re-add the `hp < booG.maxHp` condition to the offer trigger or a `Math.min(maxHp)` cap to `doBooChoice`. The current code offering Teamwork even at full HP is correct and intentional.
 - [x] Charlie (18) — Rush: AUDITED PASS (v280) — double 2s → exactly 7 dmg, correct
 - [x] Scallywags (19) — Frenzy: AUDITED PASS (v280) — all-under-4 dice → +1 die next round, fires win/lose/tie
 - [x] Floop (20) — Muck: AUDITED PASS (v280) — enemy doubles → -1 die next round, fires win/lose/tie
@@ -1887,7 +2039,7 @@ ANY OTHER ID (316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 328, 329, 3
 
 - **v287** — AUDITED FIX Nikon (2) Ambush + Cave Dweller (46) Lurk — both used `B.round === 1` as their "first roll" trigger, which is wrong for KO-swap replacements (a ghost brought in at round 4 has their first roll in round 4, not round 1). Fixed by adding a per-ghost `_rolledOnce` flag on each ghost object: `wF._rolledOnce = true; lF._rolledOnce = true;` is set at the TOP of Phase 5 in resolveRound, and both ties (via the tie path) also mark both active ghosts as having rolled. The checks `nikonIsFirstRoll` and `caveDwellerIsFirstRoll` are captured BEFORE the flag is set, so the first call into resolveRound correctly identifies the first-roll state. Since ghost objects persist across rounds, `_rolledOnce` starts as `undefined` (falsy) for each ghost and stays `true` thereafter — naturally correct when a ghost is KO-swapped in (they have their own object that hasn't rolled yet). Batch PASS audits: Calvin & Anna (91) Toboggan — trigger correct (`wF.id===91 && lF.ko`), swap to sideline correct, `triggerEntry` fires for new ghost, `showAbilityCallout` after queue drains is correct pattern; Grawr (34) Menace — entry 1-dmg, KO guard, hitDamage SFX, Knight reactions, all correct; Larry (35) Flying Kick — triples→3X correct; Bill & Bob (36) Bait n Switch — hp<4→2X correct; Dealer (37) House Rules — loseDice consecutive ascending → dmg=0, magmaCoreMelt guard, HOUSE RULES! queued correct; Alucard (38) Colony Call — doubles+once-per-game+sideline count×2 correct; Guard Thomas (41) Stoic — hp<6+singles+magmaCoreMelt guard correct.
 
-- **v286** — AUDITED PASS Eloise (85) Change of Heart — flow, timing, and modal correct; raw HP swap (no maxHp cap) is intentional for the "swap" mechanic. AUDITED FIX Mallow (89) Dozy Cozy — YES path used `f.hp += 3` with no maxHp cap: a ghost already at max HP would overflow to 8/5. Fixed to `Math.min(f.maxHp, f.hp + 3)` with `· capped` note in callout/log. Also fixed the modal preview to show `Math.min(mF.maxHp, mF.hp + 3)` with italic `· capped` hint when overflow would occur.
+- **v286** — AUDITED PASS Eloise (85) Change of Heart — flow, timing, and modal correct; raw HP swap (no maxHp cap) is intentional for the "swap" mechanic. AUDITED FIX Mallow (89) Dozy Cozy — (HISTORICAL NOTE: v286 applied Math.min cap, but this was reverted in v294 when overclock-by-default was established. Mallow is explicitly an overclock healer per Hard Rule #9. Current code correctly uses `f.hp += 3` with no cap. Do NOT re-apply Math.min — see v423 stale-note correction.)
 
 - **v285** — AUDITED FIX Jeanie (90) Hidden Treasure — forced reroll was silently discarded. `doJeanieChoice` (YES path) rolled new dice, wrote them to `B.pendingResolve.redDice/blueDice = newDice` and `B.redDice/blueDice = newDice`. The screen updated correctly (player could see the new dice), but `resolveRound()` used the original dice anyway. Why: Jeanie fires before `postRollDone()` runs; `postRollDone()` creates a brand-new `B.pendingResolve = { redDice, blueDice }` using the closure variables from `doPostRollAndResolve` — which are the `B.preRoll.red.dice` and `B.preRoll.blue.dice` references. Since Jeanie never updated those arrays, the new `pendingResolve` silently overwrote Jeanie's assignment with the original dice. Fixed: switched to in-place `.splice()` on `B.preRoll.*.dice` (the opponent's array) so the closure reference already has the new values when `postRollDone()` runs — exact same Dark Wing / Sonya v284 pattern. Also fixed: `oldDice` was sourced with `team==='red' ? [...B.blueDice]` (using the WRONG team variable as discriminant); changed to `oppTeam==='red' ? [...B.preRoll.red.dice]`. Also added `if (B.pendingResolve)` guard on the redundant pendingResolve update. Batch PASS audits this cycle: Sky (72) Elusive, Flora (75) Restore, Dark Wing (76) Precision, City Cyboo (77) Barrier, Haywire (78) Wild Chords, Laura (79) Catchy Tune, Bilbo (80) Little Buddy, Spockles (81) Valley Magic, Antoinette (82) Grace, Troubling Haters (83) Growing Mob, Wandering Sue (84) Hidden Weakness, Pelter (86) Snowball, Zach (87) Craftsman, Pale Nimbus (88) Hidden Storm, Gary (92) Lucky Novice, Bandit Pete (93) Bandit — all correct.
 

@@ -2056,7 +2056,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v425';
+const TESTROOM_VERSION = 'v429';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2173,7 +2173,7 @@ const GHOSTS = [
     id:303, name:"Tweak and Twonk", rarity:"common", maxHp:6, art:"art/nugget.jpg",
     ability:"Roaring Crowd", abilityDesc:"Sideline: if your active ghost ties, gain 4 Surge.",
     category:"Resource Generation", set:"Rolling Hills",
-    designNote:"The wholesome chunky guy. Ties are ~13% — rare but 3 Surge is a jackpot."
+    designNote:"The wholesome chunky guy. Ties are ~13% — rare but 4 Surge is a jackpot."
   },
   {
     id:304, name:"The Ember Force", rarity:"uncommon", maxHp:3, art:"art/the_flickers.jpg",
@@ -2954,6 +2954,10 @@ function autoPlayNext() {
     galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
+    tylerDecidedThisRound: { red: false, blue: false },
+    booTeamworkDecidedThisRound: { red: false, blue: false },
+    tylerHeatUpDieBonus: { red: 0, blue: 0 },
+    booTeamworkDieDebt: { red: 0, blue: 0 },
   };
   S.battle = B;
 
@@ -3366,6 +3370,10 @@ function startBattle() {
     galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
+    tylerDecidedThisRound: { red: false, blue: false },
+    booTeamworkDecidedThisRound: { red: false, blue: false },
+    tylerHeatUpDieBonus: { red: 0, blue: 0 },
+    booTeamworkDieDebt: { red: 0, blue: 0 },
   };
   S.battle = B;
   initMatchStats();
@@ -5666,8 +5674,10 @@ function rollReady(team) {
 
     // Tyler (105) — Heating Up: opt-in 2 HP trade for +1 die
     // Only offered when Tyler has ≥ 3 HP (prevents self-KO via trade)
+    // v429: skip if already decided in Duel Phase (tylerDecidedThisRound flag, Raditz pattern)
     const tylerActiveG = active(B[team]);
-    if (tylerActiveG && tylerActiveG.id === 105 && !tylerActiveG.ko && tylerActiveG.hp >= 3) {
+    if (tylerActiveG && tylerActiveG.id === 105 && !tylerActiveG.ko && tylerActiveG.hp >= 3 &&
+        !(B.tylerDecidedThisRound && B.tylerDecidedThisRound[team])) {
       btn.classList.add('locked');
       btn.disabled = true;
       B.tylerPending = { team, btn };
@@ -5741,11 +5751,15 @@ function rollReady(team) {
     }
 
     // Boo Brothers (17) — Teamwork: trade 1 die for 1 HP before rolling
-    // Offered each round when Boo Brothers is active, has ≥ 2 dice, and HP is below max.
+    // Offered each round when Boo Brothers is active and has ≥ 2 dice.
+    // NOTE: NO hp < maxHp gate — trading at full HP overclocks (v294 Hard Rule #9).
+    // Do NOT re-add a maxHp cap here. Overclock is intentional by design.
+    // v429: skip if already decided in Duel Phase (booTeamworkDecidedThisRound, Raditz pattern)
     {
       const booG = active(B[team]);
       if (booG && booG.id === 17 && !booG.ko && B.preRoll && B.preRoll[team] &&
-          B.preRoll[team].count >= 2) {
+          B.preRoll[team].count >= 2 &&
+          !(B.booTeamworkDecidedThisRound && B.booTeamworkDecidedThisRound[team])) {
         btn.classList.add('locked');
         btn.disabled = true;
         B.booPending = { team, btn };
@@ -5970,9 +5984,8 @@ const _RARITY_RANK = { 'common':0, 'uncommon':1, 'rare':2, 'ghost-rare':3, 'lege
 // during their Duel Phase turn: a modal primer that needs input, or a
 // committable resource tile. Used by computeDuelPriority (skip-if-both-
 // empty) and enterDuelPhase/_runDuelTeamTurn (auto-advance single team).
-// NOTE: Tyler (105) and Boo Brothers (17) are omitted because they
-//       require B.preRoll.count which isn't set until doPreRollSetup
-//       (fires at roll-click time); they remain accessible in rollReady.
+// v429: Tyler (105) and Boo Brothers (17) now included — Approach B decouples
+//       their gates from B.preRoll (uses ghostData base dice ?? 3 instead).
 // -----------------------------------------------------------------------
 function hasAnyDecision(team) {
   if (!B) return false;
@@ -6012,6 +6025,12 @@ function hasAnyDecision(team) {
   // Fang Undercover (7) — Skilled Coward
   if (f.id === 7 && B.fangUndercoverArmed && !B.fangUndercoverArmed[team] &&
       B[team].ghosts.some((g, i) => i !== B[team].activeIdx && !g.ko)) return true;
+  // Tyler (105) — Heating Up: spend 2 HP for +1 die
+  if (f.id === 105 && !f.ko && f.hp >= 3 &&
+      !(B.tylerDecidedThisRound && B.tylerDecidedThisRound[team])) return true;
+  // Boo Brothers (17) — Teamwork: trade 1 die for +1 HP (gate uses base dice, no preRoll dep)
+  if (f.id === 17 && !f.ko && (ghostData(17)?.dice ?? 3) >= 2 &&
+      !(B.booTeamworkDecidedThisRound && B.booTeamworkDecidedThisRound[team])) return true;
 
   // — Committable resource tiles (interactive during Duel Phase via isPreRollActive) —
   if (r && c) {
@@ -6028,6 +6047,41 @@ function hasAnyDecision(team) {
       (r.healingSeed > 0 || (c && (c.auntSusan > 0 || c.auntSusanHeal > 0)))) return true;
 
   return false;
+}
+
+// -----------------------------------------------------------------------
+// _installDuelPhasePreRollWrapper — single-use doPreRollSetup wrapper that
+// applies deferred die adjustments from Duel Phase Tyler/Boo Brothers choices.
+// Tyler's +1 die and Boo Brothers' -1 die are captured via getter/setter
+// interceptors on the pre-initialized B.preRoll[team] objects, then stored
+// in B.tylerHeatUpDieBonus / B.booTeamworkDieDebt. This wrapper applies them
+// AFTER doPreRollSetup initializes the real B.preRoll. Idempotent — safe to
+// call from both Tyler and Boo Brothers sections in the same round.
+// -----------------------------------------------------------------------
+function _installDuelPhasePreRollWrapper() {
+  if (window._duelDiePatchInstalled) return; // already installed this round
+  window._duelDiePatchInstalled = true;
+  const _origDPS = doPreRollSetup;
+  window.doPreRollSetup = function() {
+    window.doPreRollSetup = _origDPS;        // restore before calling (single-use)
+    window._duelDiePatchInstalled = false;
+    const result = _origDPS.apply(this, arguments);
+    // Apply deferred die adjustments AFTER doPreRollSetup has initialized B.preRoll
+    if (B && B.preRoll) {
+      ['red', 'blue'].forEach(t => {
+        if (!B.preRoll[t]) return;
+        if (B.tylerHeatUpDieBonus && B.tylerHeatUpDieBonus[t] > 0) {
+          B.preRoll[t].count = Math.min(6, B.preRoll[t].count + B.tylerHeatUpDieBonus[t]);
+          B.tylerHeatUpDieBonus[t] = 0;
+        }
+        if (B.booTeamworkDieDebt && B.booTeamworkDieDebt[t] > 0) {
+          B.preRoll[t].count = Math.max(1, B.preRoll[t].count - B.booTeamworkDieDebt[t]);
+          B.booTeamworkDieDebt[t] = 0;
+        }
+      });
+    }
+    return result;
+  };
 }
 
 // -----------------------------------------------------------------------
@@ -6196,6 +6250,80 @@ function openDuelPhasePrimers(team) {
       `Arm the dodge? If Fang takes damage this round, they swap to the sideline and negate all damage.`;
     document.getElementById('fangUndercoverArmOverlay').classList.add('active');
     return true;
+  }
+
+  // — TYLER (105) — Heating Up: spend 2 HP for +1 die (Approach B: gate uses hp, not preRoll)
+  // Raditz pattern: set tylerDecidedThisRound BEFORE opening so rollReady skips after Duel Phase.
+  // Pre-initialize B.preRoll[team] with a getter/setter interceptor so doTylerChoice's count
+  // write is captured into B.tylerHeatUpDieBonus; the _installDuelPhasePreRollWrapper applies
+  // it after doPreRollSetup initializes the real B.preRoll object.
+  if (f.id === 105 && !f.ko && f.hp >= 3 &&
+      !(B.tylerDecidedThisRound && B.tylerDecidedThisRound[team])) {
+    if (B.tylerDecidedThisRound) B.tylerDecidedThisRound[team] = true; // clear — Raditz pattern
+    if (!B.preRoll) B.preRoll = { red: null, blue: null };
+    if (!B.preRoll[team]) {
+      const _tylerTeam = team; // capture for setter closure
+      const _baseDiceT = ghostData(f.id)?.dice ?? 3;
+      B.preRoll[team] = {
+        _count: _baseDiceT, override: false, dice: null,
+        get count() { return this._count; },
+        set count(v) {
+          const delta = v - this._count;
+          if (delta > 0 && B && B.tylerHeatUpDieBonus)
+            B.tylerHeatUpDieBonus[_tylerTeam] = (B.tylerHeatUpDieBonus[_tylerTeam] || 0) + delta;
+          this._count = v;
+        }
+      };
+      _installDuelPhasePreRollWrapper();
+    }
+    disableDone();
+    B.tylerPending = { team, btn: doneBtn };
+    document.getElementById('tylerSub').textContent =
+      `Spend 2 HP for +1 die this roll? (${f.hp} HP → ${f.hp - 2} HP)`;
+    document.getElementById('tylerOverlay').classList.add('active');
+    return true;
+  }
+
+  // — BOO BROTHERS (17) — Teamwork: trade 1 die for +1 HP (Approach B: gate uses base dice)
+  // Auto-skip if the ghost's base dice count < 2 — can't trade a die they don't have.
+  // Raditz pattern: set booTeamworkDecidedThisRound BEFORE opening so rollReady skips.
+  // Pre-initialize B.preRoll[team] interceptor; doBooChoice's count write is captured
+  // into B.booTeamworkDieDebt; the _installDuelPhasePreRollWrapper applies it post-setup.
+  {
+    const _baseDiceBoo = ghostData(17)?.dice ?? 3;
+    if (f.id === 17 && !f.ko &&
+        !(B.booTeamworkDecidedThisRound && B.booTeamworkDecidedThisRound[team])) {
+      if (B.booTeamworkDecidedThisRound) B.booTeamworkDecidedThisRound[team] = true; // Raditz pattern
+      if (_baseDiceBoo < 2) {
+        // Auto-skip: no dice to trade
+        narrate(`<b class="${team}-text">Boo Brothers</b> — Teamwork ready, but base dice (${_baseDiceBoo}) too low to trade.`);
+        log(`Boo Brothers — Teamwork auto-skipped in Duel Phase: base dice ${_baseDiceBoo} < 2.`);
+        return false;
+      }
+      if (!B.preRoll) B.preRoll = { red: null, blue: null };
+      if (!B.preRoll[team]) {
+        const _booTeam = team; // capture for setter closure
+        B.preRoll[team] = {
+          _count: _baseDiceBoo, override: false, dice: null,
+          get count() { return this._count; },
+          set count(v) {
+            const delta = this._count - v;
+            if (delta > 0 && B && B.booTeamworkDieDebt)
+              B.booTeamworkDieDebt[_booTeam] = (B.booTeamworkDieDebt[_booTeam] || 0) + delta;
+            this._count = v;
+          }
+        };
+        _installDuelPhasePreRollWrapper();
+      }
+      disableDone();
+      B.booPending = { team, btn: doneBtn };
+      document.getElementById('booSub').innerHTML =
+        `Remove 1 die to gain +1 HP?<br>` +
+        `<b>${_baseDiceBoo}</b> dice → <b>${_baseDiceBoo - 1}</b> dice` +
+        `&nbsp;|&nbsp;<b>${f.hp}</b> HP → <b>${f.hp + 1}</b> HP${f.hp + 1 > f.maxHp ? ' <i>· overclocks!</i>' : ''}`;
+      document.getElementById('booOverlay').classList.add('active');
+      return true;
+    }
   }
 
   return false; // no primer matched
@@ -8810,6 +8938,8 @@ function _resolveRoundImpl() {
     if (B.darkWingUsedThisRound) { B.darkWingUsedThisRound.red = false; B.darkWingUsedThisRound.blue = false; }
     if (B.mallowDecided) { B.mallowDecided.red = false; B.mallowDecided.blue = false; }
     if (B.fangUndercoverArmed) { B.fangUndercoverArmed.red = false; B.fangUndercoverArmed.blue = false; } // clear — tied, no damage taken
+    if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
+    if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
     // Toby — Pure Heart: carry forward scheduled KO, then clear declaration (tie path)
     if (B.pureHeartDeclared) {
       if (B.pureHeartDeclared.red === true && B.pureHeartScheduledKO) B.pureHeartScheduledKO.red = true;
@@ -10430,15 +10560,15 @@ function _resolveRoundImpl() {
   if (wF.id === 342 && !wF.ko) {
     if (filbertCursesWin) {
       const calFlipped = Math.max(0, wF.hp - 1);
-      queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Overclock cursed! ${wF.name} takes 1 damage! (${wF.hp}→${calFlipped} HP)`, () => { wF.hp = calFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); });
+      queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Overclock cursed! ${wF.name} takes 1 damage! (${wF.hp}→${calFlipped} HP)`, () => { wF.hp = calFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); }, winTeamName);
     } else {
-      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); });
+      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); }, winTeamName);
     }
   }
   if (wF.id === 336 && !wF.ko) { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName); }
-  if (wF.id === 336 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sacred Flame! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
-  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }); }
-  if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
+  if (wF.id === 336 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sacred Flame! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
+  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }, winTeamName); }
+  if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); }, loseTeamName);
   // Splinter (101) — Toxic Fumes: first win triggers activation callout
   if (splinterJustActivated) {
     queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`);
@@ -10759,6 +10889,8 @@ function _resolveRoundImpl() {
       if (B.mallowDecided) { B.mallowDecided.red = false; B.mallowDecided.blue = false; }
       // fangUndercoverSwapPending already consumed above; clear arm flag for safety
       if (B.fangUndercoverArmed) { B.fangUndercoverArmed.red = false; B.fangUndercoverArmed.blue = false; }
+      if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
+      if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
       // Toby — Pure Heart: carry forward the scheduled KO flag, then clear declaration
       if (B.pureHeartDeclared) {
         if (B.pureHeartDeclared.red === true && B.pureHeartScheduledKO) B.pureHeartScheduledKO.red = true;
