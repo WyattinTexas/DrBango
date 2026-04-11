@@ -20,16 +20,27 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 37,
-      "remaining_mins": 370,
+      "cycles": 38,
+      "remaining_mins": 368,
       "until": "08:44 AM",
-      "last_update": "2026-04-11T02:36:16.947767",
+      "last_update": "2026-04-11T02:45:14.893727",
       "status": "running",
-      "next_up": "Begin original-card logic audit for unaudited 36-card real cards \u2014 highest rarity first; next candidates are Humar (336) Legendary and Red Hunter (345) Ghost-Rare; grep for `f.id === 336` and `f.id === 345` in resolveRound / doPreRollSetup / triggerEntry and compare to their GHOSTS abilityDesc",
-      "after_that": "Audit remaining unaudited Rare-tier 36-card real cards: Artemis (307), Aunt Susan (309), Timpleton (312), Sylvia (313), Harrison (315), Knight Terror (401), Knight Light (402), Smudge (403), Chagrin (404) \u2014 grep for their IDs in resolveRound and compare implementation to abilityDesc"
+      "next_up": "[FAMILY:steal-dice-transfer] Suspicious Jeff (61) Snicker \u2014 abilityDesc says \"steal 1 of the enemy dice\" but implementation only subtracts from enemy (same subtract-only bug as Dallas); fix: add `if (tName === 'red') redCount += B.jeffSnicker[tName]; else blueCount += B.jeffSnicker[tName];` after line 7218's enemy-subtract block; `tName` already declared two lines above in same forEach scope",
+      "after_that": "Verify Outlaw (43) Thief is correctly NOT a transfer \u2014 abilityDesc says \"remove 1 opponent die\" (not \"steal\"), so subtract-only IS correct for Outlaw; mark that distinction explicitly in FIXLOG to prevent future auditors from trying to \"fix\" it the same way as Dallas/Jeff; then audit whether the log message for Dallas Quick Draw should be updated to say \"Rolled 1 extra die!\" to reflect the transfer"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 38,
+      "summary": "Dallas (60) Quick Draw now truly STEALS a die \u2014 enemy loses 1 AND Dallas gains 1 \u2014 matching the abilityDesc \"steal 1 of your opponents die\" and Wyatt's explicit design feedback in family_map.json; previously the die just disappeared (subtract-only, no transfer)",
+      "family": "steal-dice-transfer | siblings: Outlaw(43), Dallas(60), Suspicious Jeff(61) | also broken: Suspicious Jeff(61) Snicker \u2014 same subtract-only bug, needs same one-line `if (tName === 'red') redCount += B.jeffSnicker[tName]; else blueCount += B.jeffSnicker[tName];` addition after the enemy-subtract block at line 7218",
+      "next_up": "[FAMILY:steal-dice-transfer] Suspicious Jeff (61) Snicker \u2014 abilityDesc says \"steal 1 of the enemy dice\" but implementation only subtracts from enemy (same subtract-only bug as Dallas); fix: add `if (tName === 'red') redCount += B.jeffSnicker[tName]; else blueCount += B.jeffSnicker[tName];` after line 7218's enemy-subtract block; `tName` already declared two lines above in same forEach scope",
+      "after_that": "Verify Outlaw (43) Thief is correctly NOT a transfer \u2014 abilityDesc says \"remove 1 opponent die\" (not \"steal\"), so subtract-only IS correct for Outlaw; mark that distinction explicitly in FIXLOG to prevent future auditors from trying to \"fix\" it the same way as Dallas/Jeff; then audit whether the log message for Dallas Quick Draw should be updated to say \"Rolled 1 extra die!\" to reflect the transfer",
+      "time": "02:45:20",
+      "timestamp": "2026-04-11T02:45:20.488919",
+      "roast": "Six months past the card text's ship date and we're just now discovering \"steal\" means the other guy loses it *and* you get it \u2014 Garfield wept."
+    },
     {
       "target": "testroom",
       "cycle": 37,
@@ -556,19 +567,9 @@
       "time": "23:57:58",
       "timestamp": "2026-04-10T23:57:58.704669",
       "roast": "Congratulations, you spent a cycle deleting code for cards that don't exist \u2014 Rosewater calls that \"restrictions breed creativity,\" I call it April in 2026 with a September deadline and a 36-card roster that still needs Buttons to feel like Buttons."
-    },
-    {
-      "target": "testroom",
-      "cycle": 7,
-      "summary": "Threaded `loseTeamName` into 10 lose-path `queueAbility()` callsites \u2014 PORPOISE! (both hit and miss), WISH!, STOIC!, BOGUS!, GLACIAL POUNDING!, BREW TIME!, TOUGH JOB!, SWIFT!, STONE FORM!, and REFLECTION! \u2014 so defense/counter/resource-gain callouts on the losing fighter's card now correctly spotlight that card with a colored glow instead of narrator-only fallback",
-      "next_up": "Thread `team` into the remaining sideline-boost callsites still missing it \u2014 GROWING MOB!, SCRAPS!, REAPING!, BULLSEYE!, POP!, PURE HEART!, WINTER BARRAGE!, HEATING UP!, ICE BLADE!, RUMBLE! \u2014 so sideline-triggered callouts also glow the correct team's card",
-      "after_that": "Thread `team` into the GALE FORCE! callout (uses `loseTeamName` since it's the loser's team being forced to swap) and HOUSE RULES!, ELUSIVE!, BARRIER!, CUTE!, MERCY!, SKILLED COWARD!, FORCE OF NATURE! \u2014 completing the full callout-glow coverage for all post-roll ability types",
-      "time": "23:57:15",
-      "timestamp": "2026-04-10T23:57:15.056864",
-      "roast": "Congrats on doing what the code should have done from day one. September claps slowly."
     }
   ],
-  "last_update": "2026-04-11T02:36:21.922092",
+  "last_update": "2026-04-11T02:45:20.488946",
   "orchestrator_check": {
     "timestamp": "2026-04-11T02:17:00.896947",
     "summary": "1 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 33 cycles, 389m left | last [testroom c33]: Card glow: HUNT! (Raditz) + CAUTION! (Doug) + REGROW! (Jackson) \u2014 3 missing 4th team args added to `showAbilityCallout` "
