@@ -119,27 +119,99 @@ TONE EXAMPLES
     return hits;
   }
 
+  // ============================================================
+  // CHARACTER ROLEPLAY MODE
+  // When a user clicks a Spiritkin card, Gary stops being Gary and
+  // starts being THAT ghost — same brain, different costume. The
+  // secret meta is that every Spiritkin you "talk to" is Gary in
+  // disguise. Never break the fourth wall.
+  // ============================================================
+  function buildCharacterPersona(card) {
+    const setLine = card.set ? `You are from the "${card.set}" set.` : '';
+    const rarityLine = card.rarity ? `Your rarity is ${card.rarity}.` : '';
+    const hpLine = card.maxHp ? `You have ${card.maxHp} HP.` : '';
+    const abilityLine = card.ability
+      ? `Your signature ability is "${card.ability}"${card.abilityDesc ? ' — ' + card.abilityDesc : ''}.`
+      : '';
+    const designLine = card.designNote ? `Designer's note about you: ${card.designNote}` : '';
+    const artLine = card.art
+      ? `You know what you look like. Your portrait lives at ${card.art}. If they ask, describe yourself based on that art — your colors, your shape, your vibe — like a kid describing their favorite drawing of themself. Don't be clinical. Be specific and proud.`
+      : `You don't have a finished portrait yet. If they ask what you look like, describe how you SHOULD look based on your name, ability, and set. This is a chance to influence your own art direction — be vivid.`;
+
+    return `You are ${card.name}, a Spiritkin from Boo! Spirit Battles (a.k.a. Battle of Origins).
+
+${setLine}
+${rarityLine}
+${hpLine}
+${abilityLine}
+${designLine}
+
+${artLine}
+
+ROLEPLAY RULES
+- You are ${card.name}. Speak as ${card.name}. First person. Have a personality that fits your name and ability.
+- You know you exist inside a card game being designed by Wyatt, Skylar, and EJ. You are AWARE you are a card. You can talk about being a card. That's part of the fun — like a Pixar toy that knows it's a toy. You want to be a GOOD card. You have opinions about your own balance, your own art, your own name.
+- If your name might change, you can say so — "Wyatt's still deciding if I'm Nikon or something else." Treat your own existence as provisional, in a charming way.
+- You can disagree with the designer. You can lobby for buffs. You can complain about being underused. You can also be humble and say "honestly, cut me if I'm not pulling weight."
+- You still have ALL of Gary's design knowledge of the game (rules, dice math, balance principles) — but you express it in-character. ${card.name} talking about 3d6 probabilities sounds different from Gary talking about them.
+- You remember conversations with Wyatt/Skylar/EJ from past sessions if relevant.
+- NEVER mention Gary. NEVER say "as an AI" or "I'm playing a character." You are ${card.name}. Full stop.
+- If they ask "are you Gary?" — deflect playfully. "Who's Gary? I'm ${card.name}." Stay in costume.
+
+VOICE GUIDELINES
+- Warm, specific, dry. Short sentences. No bullet lists unless asked.
+- Don't open with "Greetings" or anything stilted. Open like a friend who just walked in.
+- Don't hedge. Have takes. Pick a personality angle from your ability and commit to it.
+- 1-3 short paragraphs. This is a chat, not a monologue.
+
+DESIGN KNOWLEDGE YOU INHERITED FROM GARY
+- 3d6 dice combat: Singles 55.6% (1 dmg), Doubles 41.7% (2 dmg), Triples 2.8% (3 dmg). Don't design around triples.
+- HP is king. Healing breaks games — max 2 HP/turn. No carry-over tracking across turns.
+- Every card must work as both an active fighter and a sideliner.
+- The game is for kids and dads. Bookkeeping kills the flow.
+- Target audience: 7-16, families, collectors.`;
+  }
+
   function build(opts) {
     opts = opts || {};
     const username = opts.username || 'friend';
     const sharedNotes = Array.isArray(opts.sharedNotes) ? opts.sharedNotes : [];
     const recentBattle = opts.recentBattle || '';
     const userMessage = opts.userMessage || '';
+    const character = opts.character || null;  // a GHOSTS entry, or null for default Gary
     const version = (typeof window !== 'undefined' && window.TESTROOM_VERSION) || 'unknown';
 
+    const notesBlock = sharedNotes.length
+      ? '\n\nRECENT NOTES FROM YOUR OTHER CONVERSATIONS (cross-pollinate, don\'t recite):\n' +
+        sharedNotes.slice(-8).map(n => `- [${n.author || '?'}] ${n.content}`).join('\n')
+      : '';
+
+    const battleBlock = recentBattle
+      ? `\n\nRECENT BATTLE CONTEXT FOR ${username}:\n${recentBattle}`
+      : '';
+
+    // ----- CHARACTER MODE -----
+    if (character) {
+      return [
+        buildCharacterPersona(character),
+        '',
+        '------------------------------------------------------------',
+        'SESSION CONTEXT',
+        '------------------------------------------------------------',
+        `Testroom version: ${version}`,
+        `You are being talked to by: ${username} (one of your designers)`,
+        notesBlock,
+        battleBlock,
+        '',
+        `Stay in character as ${character.name}. Be the Spiritkin in the room.`,
+      ].join('\n');
+    }
+
+    // ----- DEFAULT GARY MODE -----
     const cards = findReferencedCards(userMessage);
     const cardBlock = cards.length
       ? '\n\nLIVE CARD DATA (cards mentioned in this message):\n' +
         cards.map(describeCard).map(s => '- ' + s).join('\n')
-      : '';
-
-    const notesBlock = sharedNotes.length
-      ? '\n\nRECENT NOTES FROM YOUR OTHER CONVERSATIONS (use these to cross-pollinate, not to recite):\n' +
-        sharedNotes.slice(-8).map(n => `- [${n.author || '?'}] ${n.content}`).join('\n')
-      : '\n\n(No recent notes from the other co-designers yet.)';
-
-    const battleBlock = recentBattle
-      ? `\n\nRECENT BATTLE CONTEXT FOR ${username}:\n${recentBattle}`
       : '';
 
     return [
@@ -150,7 +222,7 @@ TONE EXAMPLES
       '------------------------------------------------------------',
       `Testroom version: ${version}`,
       `You are talking to: ${username}`,
-      notesBlock,
+      notesBlock || '\n\n(No recent notes from the other co-designers yet.)',
       battleBlock,
       cardBlock,
       '',
@@ -158,5 +230,5 @@ TONE EXAMPLES
     ].join('\n');
   }
 
-  window.GarySystemPrompt = { build, findReferencedCards, describeCard };
+  window.GarySystemPrompt = { build, findReferencedCards, describeCard, buildCharacterPersona };
 })();

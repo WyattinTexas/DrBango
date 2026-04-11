@@ -17,9 +17,7 @@
   // ============================================================
   // CONFIG
   // ============================================================
-  // TODO(wyatt): paste your deployed Worker URL here after running `wrangler deploy`
-  // Example: 'https://gary-chat-proxy.yourname.workers.dev'
-  const GARY_WORKER_URL = '';
+  const GARY_WORKER_URL = 'https://gary-chat-proxy.drbango.workers.dev';
 
   const KNOWN_USERS = ['wyatt', 'skylar', 'ej'];
   const STORAGE_KEY = 'testroom.garyUser';
@@ -33,10 +31,30 @@
   // STATE
   // ============================================================
   let currentUser = null;          // lowercased string
+  let currentCharacter = null;     // GHOSTS entry, or null = default Gary
   let history = [];                // [{role, content, ts}]
   let sharedNotes = [];            // [{author, content, ts}]
   let sending = false;
   let garyDb = null;               // firebase.database() handle
+
+  // History storage key — character chats are namespaced per user+card
+  function historyKey(user, character) {
+    if (!character) return user;
+    return `${user}_as_${character.id}`;
+  }
+
+  // Look up a ghost by id from the GHOSTS const declared in index.html
+  function findGhost(id) {
+    try {
+      if (typeof GHOSTS !== 'undefined' && Array.isArray(GHOSTS)) {
+        return GHOSTS.find(g => g && g.id === id) || null;
+      }
+    } catch(e) {}
+    if (Array.isArray(window.GHOSTS)) {
+      return window.GHOSTS.find(g => g && g.id === id) || null;
+    }
+    return null;
+  }
 
   // ============================================================
   // FIREBASE — reuse the existing testroom Firebase app
@@ -51,25 +69,26 @@
     return garyDb;
   }
 
-  async function loadUserHistory(user) {
+  async function loadUserHistory(user, character) {
     const db = getDb();
     if (!db) return [];
     try {
-      const snap = await db.ref('garyChats/' + user).once('value');
+      const snap = await db.ref('garyChats/' + historyKey(user, character)).once('value');
       const val = snap.val();
       if (val && Array.isArray(val.messages)) return val.messages;
     } catch(e) { console.warn('[Gary] loadUserHistory failed:', e); }
     return [];
   }
 
-  async function saveUserHistory(user, messages) {
+  async function saveUserHistory(user, character, messages) {
     const db = getDb();
     if (!db) return;
     const capped = messages.slice(-MAX_HISTORY);
     try {
-      await db.ref('garyChats/' + user).set({
+      await db.ref('garyChats/' + historyKey(user, character)).set({
         messages: capped,
         lastSeen: Date.now(),
+        character: character ? { id: character.id, name: character.name } : null,
       });
     } catch(e) { console.warn('[Gary] saveUserHistory failed:', e); }
   }
@@ -183,10 +202,10 @@
 
     // Chat panel
     const panel = el('div', { id: 'garyPanel', class: 'gary-panel' });
-    const header = el('div', { class: 'gary-header' }, [
-      el('img', { src: 'art/gary.png', alt: 'Gary' }),
+    const header = el('div', { class: 'gary-header', id: 'garyHeader' }, [
+      el('img', { id: 'garyHeaderImg', src: 'art/gary.png', alt: 'Gary' }),
       el('div', { class: 'gary-title' }, [
-        el('div', { class: 'gary-name' }, ['Gary']),
+        el('div', { class: 'gary-name', id: 'garyHeaderName' }, ['Gary']),
         el('div', { class: 'gary-sub', id: 'garySubtitle' }, ['the friend in the chair']),
       ]),
       el('button', { class: 'gary-close', id: 'garyClose', title: 'Close' }, ['x']),
@@ -225,14 +244,49 @@
     if (!box) return;
     box.innerHTML = '';
     if (history.length === 0) {
-      const welcome = currentUser && KNOWN_USERS.includes(currentUser)
-        ? `Hey ${currentUser.charAt(0).toUpperCase() + currentUser.slice(1)}. What are we looking at?`
-        : `Hey. I'm Gary. Ask me about a card, a matchup, or whatever's bugging you.`;
-      box.appendChild(renderMsg({ role: 'assistant', content: welcome }));
+      let welcome;
+      if (currentCharacter) {
+        // Character mode — let the model write the first line itself by leaving
+        // a soft opener. We don't fake dialogue from the character.
+        welcome = `(You're talking to ${currentCharacter.name}. Say hi.)`;
+        box.appendChild(renderMsg({ role: 'system', content: welcome }));
+      } else {
+        welcome = currentUser && KNOWN_USERS.includes(currentUser)
+          ? `Hey ${currentUser.charAt(0).toUpperCase() + currentUser.slice(1)}. What are we looking at?`
+          : `Hey. I'm Gary. Ask me about a card, a matchup, or whatever's bugging you.`;
+        box.appendChild(renderMsg({ role: 'assistant', content: welcome }));
+      }
     } else {
       history.forEach(m => box.appendChild(renderMsg(m)));
     }
     box.scrollTop = box.scrollHeight;
+  }
+
+  // Swap the chat header between Gary and a Spiritkin character.
+  function applyHeader() {
+    const img = document.getElementById('garyHeaderImg');
+    const name = document.getElementById('garyHeaderName');
+    const sub = document.getElementById('garySubtitle');
+    const panel = document.getElementById('garyPanel');
+    if (!img || !name || !sub || !panel) return;
+    if (currentCharacter) {
+      const c = currentCharacter;
+      if (c.art) { img.src = c.art; img.style.display = ''; }
+      else { img.src = 'art/gary.png'; }
+      img.alt = c.name;
+      name.textContent = c.name;
+      const bits = [];
+      if (c.ability) bits.push(c.ability);
+      if (c.set) bits.push(c.set);
+      sub.textContent = bits.join(' \u2022 ') || 'a Spiritkin in the room';
+      panel.classList.add('gary-character-mode');
+    } else {
+      img.src = 'art/gary.png';
+      img.alt = 'Gary';
+      name.textContent = 'Gary';
+      sub.textContent = currentUser ? `talking to ${currentUser}` : 'the friend in the chair';
+      panel.classList.remove('gary-character-mode');
+    }
   }
 
   function renderMsg(m) {
@@ -268,16 +322,16 @@
   // ============================================================
   // OPEN / CLOSE
   // ============================================================
-  async function openPanel() {
+  async function openPanel(character) {
     buildPanel();
     const user = await ensureUser();
+    currentCharacter = character || null;
     document.getElementById('garyPanel').classList.add('active');
-    const sub = document.getElementById('garySubtitle');
-    if (sub) sub.textContent = `talking to ${user}`;
+    applyHeader();
 
-    // Load state (parallel)
+    // Load state (parallel) — character chats use a per-character history namespace
     const [userHist, shared] = await Promise.all([
-      loadUserHistory(user),
+      loadUserHistory(user, currentCharacter),
       loadSharedNotes(),
     ]);
     history = userHist;
@@ -289,9 +343,20 @@
     }, 50);
   }
 
+  async function openAsCharacter(cardId) {
+    const ghost = findGhost(cardId);
+    if (!ghost) {
+      console.warn('[Gary] openAs: no ghost with id', cardId);
+      return openPanel();
+    }
+    return openPanel(ghost);
+  }
+
   function closePanel() {
     const p = document.getElementById('garyPanel');
     if (p) p.classList.remove('active');
+    // Clear character so the next default open is Gary, not the last ghost
+    currentCharacter = null;
   }
 
   // ============================================================
@@ -340,12 +405,13 @@
     const userMsg = { role: 'user', content: text, ts: Date.now() };
     appendMsg(userMsg);
 
-    // Build system prompt with freshly loaded shared notes
+    // Build system prompt with freshly loaded shared notes (and character, if any)
     const system = window.GarySystemPrompt.build({
       username: currentUser,
       sharedNotes,
       recentBattle: getRecentBattleContext(),
       userMessage: text,
+      character: currentCharacter,
     });
 
     // Trim history to last N turns, strip ts, keep only role+content
@@ -379,11 +445,16 @@
 
       const assistantMsg = { role: 'assistant', content: assistantText, ts: Date.now() };
       appendMsg(assistantMsg);
-      await saveUserHistory(currentUser, history);
+      await saveUserHistory(currentUser, currentCharacter, history);
 
-      // Cross-pollination: cheap heuristic summary, no second LLM call
+      // Cross-pollination: tag character chats so Gary knows the source
       const summary = heuristicSummary(text, assistantText);
-      if (summary) appendSharedNote(currentUser, summary);
+      if (summary) {
+        const author = currentCharacter
+          ? `${currentUser} -> ${currentCharacter.name}`
+          : currentUser;
+        appendSharedNote(author, summary);
+      }
     } catch (e) {
       hideTyping();
       appendMsg({ role: 'error', content: 'Gary is offline: ' + (e.message || e) });
@@ -424,14 +495,15 @@
   // PUBLIC API
   // ============================================================
   window.Gary = {
-    open: openPanel,
+    open: () => openPanel(),
+    openAs: openAsCharacter,
     close: closePanel,
     identify: async (user) => {
       const u = normalizeUser(user);
       if (u) { setStoredUser(u); currentUser = u; }
       return currentUser;
     },
-    _state: () => ({ currentUser, history, sharedNotes }),
+    _state: () => ({ currentUser, currentCharacter, history, sharedNotes }),
   };
 
   // Auto-open via URL param ?gary=open (handy for testing)
