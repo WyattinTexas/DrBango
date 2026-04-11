@@ -23,13 +23,23 @@
       "cycles": 51,
       "remaining_mins": 27,
       "until": "10:49 PM",
-      "last_update": "2026-04-10T22:29:07.198784",
+      "last_update": "2026-04-10T22:32:59.611568",
       "status": "running",
-      "next_up": "DALLAS FIX #1 (steal semantics): Quick Draw currently just SUBTRACTS from opponent dice count at line 6443-6456 (redCount = Math.max(1, redCount - 1)). Intended behavior: STEAL = transfer. Dallas's team gains that die, opponent loses it. If Dallas is red, one blue die becomes a red die for the roll. Implementation: when stealing, do BOTH sides \u2014 e.g. if enemyTName=='blue': blueCount = Math.max(1, blueCount-1); redCount++; Only the count transfer matters \u2014 dice are rolled fresh each round, there's no persistent 'which die' ownership. --- DALLAS FIX #2 (sideline-only trigger): Ability should ONLY fire when Dallas enters from the sideline (KO-swap or forced swap), NOT when he's the starting fighter in position 0. Currently triggerEntry() runs for starting fighters at battle-start (index.html line 3395-3399), which unconditionally sets f.dallasQuickDraw=2 at line 3585-3590. Compare to Raditz (62) at line 3573 which uses '!skipEntryEffects' guard \u2014 but that flag only covers Tyson's Hop, not starting-position. Need a new signal: either (a) set a per-team flag in startBattle() that suppresses sideline-only entry abilities on the first entry call, or (b) gate Dallas on something like 'this isn't round 1 starter' \u2014 check if B.round > 0 or use a battleStarted flag. Audit whole class: check other 'on entry from sideline' cards (Redd 98 Notorious, Jenkins 94 Greeting, Raditz 62 Hunt, Tadpole 358 Splash) \u2014 some may also be firing incorrectly for starting fighters.",
-      "after_that": "After Dallas fixes, continue with Wyatt Directive #2 part B (Zain Ice Shard generation in resolveRound)"
+      "next_up": "SUSPICIOUS JEFF (61) FIX \u2014 three issues: (1) TRIGGER TIMING: Current code at line 10358-10365 fires via 'hasSideline(winTeam, 61)' inside resolveRound's per-round winner path, meaning it stacks +1 steal EVERY time your ghost wins a roll. Intended: fires only when your active ghost DEFEATS (KOs) the enemy ghost. Move the trigger out of the per-round-win path and into the KO detection path \u2014 look for where enemy.ko transitions false\u2192true via winTeam's damage, and fire Snicker there. hasSideline(winTeam, 61) check still applies. (2) STEAL SEMANTICS: Line 6784-6785 just subtracts: 'redCount = Math.max(1, redCount - B.jeffSnicker[tName])'. Same bug as Dallas \u2014 a steal should TRANSFER. When Jeff's team is blue, one red die becomes a blue die for the next roll: 'redCount = Math.max(1, redCount - N); blueCount += N'. (3) CARD TEXT REWORD: 'While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.' \u2192 'While on the sideline, when your active ghost defeats an enemy ghost, steal 1 of the enemy's dice for the next roll.' Update the abilityDesc at line 2452. --- NOTE: Jeff has same underlying 'steal = transfer' bug as Dallas. Fix both with a shared helper or consistent pattern \u2014 do not patch Dallas in isolation if the same bad pattern lives in Jeff.",
+      "after_that": "After Jeff + Dallas fixes, continue with Wyatt Directive #2 part B (Zain Ice Shard generation in resolveRound)"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 51,
+      "summary": "WITHDRAW audit-whole-class flag on Jenkins/Raditz/Redd \u2014 none of their ability text says 'sideline', they're meant to fire on initial entry as starters. Dallas is UNIQUE in having the sideline-only restriction because its card text literally says 'When coming off the sideline.' + NEW BUG REPORT: Suspicious Jeff (61) Snicker is broken in multiple ways \u2014 see NEXT UP",
+      "next_up": "SUSPICIOUS JEFF (61) FIX \u2014 three issues: (1) TRIGGER TIMING: Current code at line 10358-10365 fires via 'hasSideline(winTeam, 61)' inside resolveRound's per-round winner path, meaning it stacks +1 steal EVERY time your ghost wins a roll. Intended: fires only when your active ghost DEFEATS (KOs) the enemy ghost. Move the trigger out of the per-round-win path and into the KO detection path \u2014 look for where enemy.ko transitions false\u2192true via winTeam's damage, and fire Snicker there. hasSideline(winTeam, 61) check still applies. (2) STEAL SEMANTICS: Line 6784-6785 just subtracts: 'redCount = Math.max(1, redCount - B.jeffSnicker[tName])'. Same bug as Dallas \u2014 a steal should TRANSFER. When Jeff's team is blue, one red die becomes a blue die for the next roll: 'redCount = Math.max(1, redCount - N); blueCount += N'. (3) CARD TEXT REWORD: 'While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.' \u2192 'While on the sideline, when your active ghost defeats an enemy ghost, steal 1 of the enemy's dice for the next roll.' Update the abilityDesc at line 2452. --- NOTE: Jeff has same underlying 'steal = transfer' bug as Dallas. Fix both with a shared helper or consistent pattern \u2014 do not patch Dallas in isolation if the same bad pattern lives in Jeff.",
+      "after_that": "After Jeff + Dallas fixes, continue with Wyatt Directive #2 part B (Zain Ice Shard generation in resolveRound)",
+      "time": "22:32:59",
+      "timestamp": "2026-04-10T22:32:59.615761",
+      "roast": "Three lines changed. Fourteen lines of commit message. The ratio concerns me."
+    },
     {
       "target": "testroom",
       "cycle": 51,
@@ -519,19 +529,9 @@
       "time": "15:29:00",
       "timestamp": "2026-04-10T15:29:00.167456",
       "roast": "Eight months past the Kickstarter deadline and we're just now noticing that Filbert was rolling dice for corpses \u2014 Mallow, that's not a bug fix, that's an exorcism."
-    },
-    {
-      "target": "testroom",
-      "cycle": 43,
-      "summary": "Timber (210) Howl now correctly respects Dylan (301) Scarecrow and Piper (107) Slick Coat \u2014 the missing `dylanNegates(oppTeam)` check means opponents with these negators were still forced to face the Howl choice every round despite having a \"blocks all enemy before-rolling effects\" card active.",
-      "next_up": "Audit the Shoo (13) Alpine Air `dylanNegates` check direction \u2014 Shoo's effect is a self-heal (heals Shoo's own team), not a targeted enemy effect, so `dylanNegates` may be incorrectly blocking Shoo's heal when the opponent has Dylan (Shoo's heal shouldn't be blocked by the enemy's Scarecrow since it doesn't target the enemy).",
-      "after_that": "Audit remaining unaudited original cards in the AUDIT STATUS section \u2014 check for any cards still marked NEEDS AUDIT that haven't been touched yet, starting with the highest tier (Ghost-Rare and Rare) that might have been skipped during the mass batch audits.",
-      "time": "15:23:59",
-      "timestamp": "2026-04-10T15:23:59.023878",
-      "roast": "Three months to Kickstarter and we're just now noticing Scarecrow doesn't actually scare crows \u2014 Rosewater would frame this as \"elegant late-stage discovery,\" but we both know it's the bug equivalent of finding a typo on your wedding invitations at the reception."
     }
   ],
-  "last_update": "2026-04-10T22:29:12.675469",
+  "last_update": "2026-04-10T22:32:59.615763",
   "orchestrator_check": {
     "timestamp": "2026-04-10T22:17:00.906651",
     "summary": "0 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 88 cycles, 3m left | last [testroom c88]: Added missing `collectKC` Knight reaction calls for Spockles (81) Valley Magic, Ashley (58) Burning Soul, Roger (54) Tem"
