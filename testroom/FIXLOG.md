@@ -3,7 +3,31 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v376
+## Current Version: v378
+
+## v378 — FEATURE: Gary embedded in testroom — clickable chat with Cloudflare Worker proxy, Firebase persistence, cross-user campfire
+
+- **The vision**: Wyatt, Skylar, and EJ are co-designing Battle of Origins from three different cities. They share the testroom but don't share a design partner. Gary now lives inside the testroom as the shared friend-in-the-chair — one persona across all three users, carrying context between them. Click his portrait in the tab bar, chat with him, and the next co-designer who opens their browser will get a Gary who already knows what you were chewing on.
+- **Architecture (strictly additive, no existing code touched)**:
+  - **gary-worker/** (new directory) — Cloudflare Worker that proxies the Anthropic Messages API. API key lives only as a Cloudflare secret, never in the browser. CORS-locked to drbango.com + localhost, per-IP rate limit (20 req / 5 min), model allowlist (claude-sonnet-4-6, claude-haiku-4-5). Includes wrangler.toml and a README with step-by-step deploy instructions for Wyatt.
+  - **gary-chat.js** (new file) — chat client. Handles identity prompt (Wyatt / Skylar / EJ / guest), Firebase RTDB persistence at `garyChats/<user>` and `garyChats/_shared`, message history (capped 50 stored per user, 20 sent per request), typing indicator, error states, mobile-friendly slide-out panel. Exposes `window.Gary.open()`.
+  - **gary-system-prompt.js** (new file) — builds Gary's system prompt at request time from: brain voice (snapshot of `~/buddy/jeeves_brain.txt`), username, last 8 shared campfire notes, recent battle context, and live card data for any card names mentioned in the message (scans the `GHOSTS` global). Isolated from chat plumbing so Gary's voice can be iterated without touching the rest.
+  - **gary-chat.css** (new file) — slide-out panel styling, cyan-accented to match the existing testroom aesthetic.
+  - **art/gary.png** (new asset) — copied from `~/buddy/jeeves_avatar.png`.
+- **index.html touches (minimal, surgical)**:
+  1. Added `<link rel="stylesheet" href="gary-chat.css">` in the head next to the Firebase script tags.
+  2. Added a Gary portrait button next to the Standings button in the tab row. Uses `art/gary.png` + "Gary" label + green online dot.
+  3. Added two `<script>` tags at the end of `<body>`: `gary-system-prompt.js` then `gary-chat.js`.
+  4. Bumped `TESTROOM_VERSION` v377 → v378.
+  5. No other lines changed. Game logic and all existing features untouched.
+- **Cross-pollination (the campfire, v1)**: After every Gary reply, a one-line summary is dropped into `garyChats/_shared` (shape `{notes: [{author, content, ts}]}`, capped 30). Before every request, the last 8 shared notes are injected into Gary's system prompt as "recent notes from your other conversations." Summaries use a cheap JS heuristic (first sentence of user msg + first sentence of Gary's reply) to avoid a second LLM call per message.
+- **Model**: `claude-sonnet-4-6` for Gary chat. `max_tokens: 1024`. Worker rejects other models.
+- **Security**: The Anthropic API key is a Cloudflare secret. Never in the repo. Never in browser code. `wrangler.toml` references `ANTHROPIC_API_KEY` as an env var — the actual value is set via `wrangler secret put`.
+- **Deployment status**: Worker code + wrangler.toml + README are in place. Wrangler CLI is NOT installed on Wyatt's machine, so the Worker has NOT been deployed by the agent. Wyatt needs to run the 6 steps in `gary-worker/README.md`, then paste the deployed Worker URL into `GARY_WORKER_URL` at the top of `gary-chat.js`. Until then, clicking Gary shows a friendly "not wired up yet" error.
+- **Known limits of v1 (for v2 later)**:
+  - The heuristic summarizer is dumb — it just grabs first sentences. Good enough for "Wyatt asked about Zain" but won't catch nuanced takes. Upgrade to a Haiku call later if the notes feel empty.
+  - Firebase RTDB rules weren't touched — inherits whatever the testroom already uses. Chat history is readable by anyone with the Firebase config, which is the same posture as standings.
+  - The `recentBattle` context hook looks for `window.getLastBattleSummary()` or `#battle-log`; testroom may not expose either yet. If it doesn't find one, Gary just gets no battle context. Not a regression — just an opportunity.
 
 ## v376 — BUG FIX: Knight Terror/Light reactions missing for 4 resource-generating abilities
 
