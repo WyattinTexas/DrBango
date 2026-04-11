@@ -23,13 +23,23 @@
       "cycles": 51,
       "remaining_mins": 27,
       "until": "10:49 PM",
-      "last_update": "2026-04-10T22:32:59.611568",
+      "last_update": "2026-04-10T22:34:50.488562",
       "status": "running",
-      "next_up": "SUSPICIOUS JEFF (61) FIX \u2014 three issues: (1) TRIGGER TIMING: Current code at line 10358-10365 fires via 'hasSideline(winTeam, 61)' inside resolveRound's per-round winner path, meaning it stacks +1 steal EVERY time your ghost wins a roll. Intended: fires only when your active ghost DEFEATS (KOs) the enemy ghost. Move the trigger out of the per-round-win path and into the KO detection path \u2014 look for where enemy.ko transitions false\u2192true via winTeam's damage, and fire Snicker there. hasSideline(winTeam, 61) check still applies. (2) STEAL SEMANTICS: Line 6784-6785 just subtracts: 'redCount = Math.max(1, redCount - B.jeffSnicker[tName])'. Same bug as Dallas \u2014 a steal should TRANSFER. When Jeff's team is blue, one red die becomes a blue die for the next roll: 'redCount = Math.max(1, redCount - N); blueCount += N'. (3) CARD TEXT REWORD: 'While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.' \u2192 'While on the sideline, when your active ghost defeats an enemy ghost, steal 1 of the enemy's dice for the next roll.' Update the abilityDesc at line 2452. --- NOTE: Jeff has same underlying 'steal = transfer' bug as Dallas. Fix both with a shared helper or consistent pattern \u2014 do not patch Dallas in isolation if the same bad pattern lives in Jeff.",
-      "after_that": "After Jeff + Dallas fixes, continue with Wyatt Directive #2 part B (Zain Ice Shard generation in resolveRound)"
+      "next_up": "DALLAS (60) + SUSPICIOUS JEFF (61) shared fix \u2014 both cards have the 'steal = subtract only' bug. Fix together as a class: (A) Dallas line 6449-6450, (B) Jeff line 6784-6785. Steal must TRANSFER: enemy -1, self +1. PLUS Dallas needs sideline-only gate (add battleStarted flag in startBattle, gate line 3585 on it). PLUS Jeff needs trigger moved from per-round-win to KO path. PLUS Jeff abilityDesc reword at line 2452: 'wins a battle' \u2192 'defeats an enemy ghost'.",
+      "after_that": "Playtest Duel Phase (v390) with Grawr vs Nerina, tie rounds, mirror matches per testroom-orchestrator.md next session priorities"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 51,
+      "summary": "ZAIN STATUS: ALREADY IMPLEMENTED \u2014 verified in _resolveRoundImpl at line 10136-10138. 'Win any roll \u2192 +1 Ice Shard' queues the ICE SHARD! callout, increments winTeam.resources.ice, credits Zain via creditGhost for MVP, fires Knight Reactions at line 9662, and mirrors through Sandwiches. The 'after_that' queue entry was stale \u2014 written by an older cycle that never re-verified before promoting. PROCESS BUG: refiner should re-verify any 'after_that' task against current code before moving it to 'next_up'. Do not execute stale queue items blindly.",
+      "next_up": "DALLAS (60) + SUSPICIOUS JEFF (61) shared fix \u2014 both cards have the 'steal = subtract only' bug. Fix together as a class: (A) Dallas line 6449-6450, (B) Jeff line 6784-6785. Steal must TRANSFER: enemy -1, self +1. PLUS Dallas needs sideline-only gate (add battleStarted flag in startBattle, gate line 3585 on it). PLUS Jeff needs trigger moved from per-round-win to KO path. PLUS Jeff abilityDesc reword at line 2452: 'wins a battle' \u2192 'defeats an enemy ghost'.",
+      "after_that": "Playtest Duel Phase (v390) with Grawr vs Nerina, tie rounds, mirror matches per testroom-orchestrator.md next session priorities",
+      "time": "22:34:56",
+      "timestamp": "2026-04-10T22:34:56.291874",
+      "roast": "Nothing flexes design discipline quite like a triumphant forensic report concluding that the work was already done four thousand lines ago \u2014 Rosewater calls that \"elegant restraint,\" Gary calls it \"Tuesday."
+    },
     {
       "target": "testroom",
       "cycle": 51,
@@ -519,19 +529,9 @@
       "time": "15:31:01",
       "timestamp": "2026-04-10T15:31:01.039541",
       "roast": "Forty-four cycles in and we're still teaching the engine that dead ghosts don't roll dice \u2014 Kickstarter's five months out and you're copy-pasting Mallow's homework onto Filbert."
-    },
-    {
-      "target": "testroom",
-      "cycle": 44,
-      "summary": "Mallow (89) Dozy Cozy \u2014 Filbert curse KO no longer rolls dice for the dead ghost; now correctly triggers `handleKOs()` when the curse kills the active pre-roll ghost.",
-      "next_up": "Audit the `doMallowChoice` pattern more broadly \u2014 check other sideline pre-roll modals that can deal damage (Boris Fortify in `doPreRollSetup`, Dallas Quick Draw in `doPreRollSetup`) to confirm they also route KOs to `handleKOs()` rather than falling through to the roll phase, since these are the same class of \"mid pre-roll KO\" bug.",
-      "after_that": "Check if Boo Brothers (17) Teamwork modal's `doBooChoice` path has a similar gap \u2014 the modal can reduce HP (remove a die, gain HP) but if Filbert flips the gain to damage, the same unconditional `doTeamRoll` pattern may exist there too.",
-      "time": "15:29:00",
-      "timestamp": "2026-04-10T15:29:00.167456",
-      "roast": "Eight months past the Kickstarter deadline and we're just now noticing that Filbert was rolling dice for corpses \u2014 Mallow, that's not a bug fix, that's an exorcism."
     }
   ],
-  "last_update": "2026-04-10T22:32:59.615763",
+  "last_update": "2026-04-10T22:34:56.291885",
   "orchestrator_check": {
     "timestamp": "2026-04-10T22:17:00.906651",
     "summary": "0 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 88 cycles, 3m left | last [testroom c88]: Added missing `collectKC` Knight reaction calls for Spockles (81) Valley Magic, Ashley (58) Burning Soul, Roger (54) Tem"
