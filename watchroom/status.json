@@ -20,16 +20,27 @@
     },
     "testroom": {
       "name": "BOO! The Arena Testroom",
-      "cycles": 110,
-      "remaining_mins": 9,
+      "cycles": 111,
+      "remaining_mins": 6,
       "until": "08:44 AM",
-      "last_update": "2026-04-11T08:38:16.944179",
+      "last_update": "2026-04-11T08:45:56.109482",
       "status": "running",
-      "next_up": "Audit whether any remaining on-win or on-lose resource/heal blocks in smartAutoPlay.js are missing for the 36 real cards \u2014 specifically check Fed and Hayden (406) ETERNAL FLAME! lose-path: in index.html the win-path preserves committed Sacred Fires, but verify whether the lose-path (F&H on losing team, winner uses fires) has any mirror; grep `hasSideline.*406` in smartAutoPlay.js to confirm coverage; then check Dart (209) PLUNDER! for lose-path (abilityDesc says win only \u2192 AUDITED PASS); then shift to a fresh CSS/UX or narrator text improvement",
-      "after_that": "Audit whether smartAutoPlay.js handles Kaplan (308) POLLINATE! active-ghost win condition correctly \u2014 the real game fires POLLINATE! when the OPPONENT rolls doubles (not when Kaplan wins); grep the classify-based pre-damage block at lines 407\u2013412 and verify the condition checks `oppRollType === 'doubles'` against the enemy's roll, not Kaplan's own roll type"
+      "next_up": "Audit Mallow (89) DOZY COZY! in smartAutoPlay.js \u2014 this opt-in pre-roll ability (spend 1 Sacred Fire for +3 HP) is completely absent from the sim; since the real game offers it as a player-choice modal, the sim could model a simple AI heuristic (use when HP < maxHp AND fire \u2265 1) to approximate Mallow's defensive value; check whether the sim should include or exclude it, and document the decision in FIXLOG as either AUDITED PASS (opt-in, intentionally omitted like Finn/Zain) or a new implementation",
+      "after_that": "Audit whether smartAutoPlay.js handles Selene (305) HEART OF THE HILLS! correctly \u2014 Selene grants 1 Healing Seed OR 2 Lucky Stones on doubles (player choice); check if the sim has any Selene doubles-bonus logic in the post-roll block, and verify whether it models the player-choice or auto-selects one branch"
     }
   },
   "feed": [
+    {
+      "target": "testroom",
+      "cycle": 111,
+      "summary": "smartAutoPlay.js knight-reaction post-roll triggers (Hank TREMOR!, Natalia MATERIALIZATION!, Kaplan POLLINATE!) are now dice-conditional instead of unconditional \u2014 the three-way `[207,327,308].includes(ef.id)` check that fired every round is replaced with per-card dice checks using the actual rolled results (`_eD.includes(4)` for Hank, `hasEvenDoubles(_eD)` for Natalia, `classify(_kD).type==='doubles'` for Kaplan), reducing knight reaction overestimates of up to 18\u00d7 for these three active ghosts (v542)",
+      "family": "knight-reaction | siblings: Knight Terror (401) and Knight Light (402) affect all named ability callouts | also broken: none \u2014 all three post-roll passive triggers are now fixed in this pass",
+      "next_up": "Audit Mallow (89) DOZY COZY! in smartAutoPlay.js \u2014 this opt-in pre-roll ability (spend 1 Sacred Fire for +3 HP) is completely absent from the sim; since the real game offers it as a player-choice modal, the sim could model a simple AI heuristic (use when HP < maxHp AND fire \u2265 1) to approximate Mallow's defensive value; check whether the sim should include or exclude it, and document the decision in FIXLOG as either AUDITED PASS (opt-in, intentionally omitted like Finn/Zain) or a new implementation",
+      "after_that": "Audit whether smartAutoPlay.js handles Selene (305) HEART OF THE HILLS! correctly \u2014 Selene grants 1 Healing Seed OR 2 Lucky Stones on doubles (player choice); check if the sim has any Selene doubles-bonus logic in the post-roll block, and verify whether it models the player-choice or auto-selects one branch",
+      "time": "08:46:12",
+      "timestamp": "2026-04-11T08:46:12.850708",
+      "roast": "Three unconditional triggers finally reading the dice they were supposedly reacting to \u2014 congratulations, the simulator is now roughly 18 times less confidently wrong, which is the kind of glow-up you put on a Kickstarter update and pray nobody asks how long it was lying."
+    },
     {
       "target": "testroom",
       "cycle": 110,
@@ -568,20 +579,9 @@
       "time": "05:06:32",
       "timestamp": "2026-04-11T05:06:32.238357",
       "roast": "One more tooltip and the game basically plays itself. For nobody. Because nobody's reading tooltips."
-    },
-    {
-      "target": "testroom",
-      "cycle": 61,
-      "summary": "Logey (26) HEINOUS! tie-path \u2014 added missing `checkKnightEffects(team === B.red ? 'red' : 'blue', f.name)` inside the `if (locked > 0)` block so Knight Terror HEAVY AIR! and Knight Light RETRIBUTION! now correctly react whenever Logey locks out enemy 5+ dice on a tie round (v492)",
-      "family": "knight-reaction | siblings: Logey (26) HEINOUS! tie-path was the last flagged member from Cycle #60's AFTER; Dream Cat (28) and all other doubles-family members already fixed | also broken: none remaining in the flagged list",
-      "next_up": "Audit Sandwiches (33) DEPENDABLE! tie-path mirrors (lines ~8717, ~8740, ~8912) \u2014 decide whether these should trigger knight reactions (win-path mirrors already have `checkKnightEffects`; consistency says tie-path mirrors should too); if yes, add one `checkKnightEffects` after each `queueAbility` in those three tie-path mirror blocks",
-      "after_that": "Audit the `committed-resource-gating` family \u2014 verify every committed-resource ability (Zain Ice Blade, Boris Fortify, Humar Sacred Flame, Chagrin Darkness, Sylvia Sylvan Arrow, Aunt Susan Harvest Dance, Harrison Ascend) correctly early-returns if the resource was unspent/zero, and that none silently fire on a zero-spend; check `family_map.json` for current member list and grep anchor lines",
-      "time": "04:55:11",
-      "timestamp": "2026-04-11T04:55:11.905091",
-      "roast": "Twenty-six cycles to remember that tie rounds also need to tell the Knights about it \u2014 Rosewater would call that a \"lenticular bug,\" I call it Tuesday."
     }
   ],
-  "last_update": "2026-04-11T08:38:22.682833",
+  "last_update": "2026-04-11T08:46:12.850733",
   "orchestrator_check": {
     "timestamp": "2026-04-11T08:17:00.817822",
     "summary": "1 refiner(s) alive \u2014 test: 1 cycles, 30m left | jeeves: 74 cycles, 385m left | testroom: 104 cycles, 30m left | last [testroom c104]: Fixed Calvin (342) OVERCLOCK! missing Filbert (59) curse check in smartAutoPlay.js \u2014 when Filbert is on the losing team'"
