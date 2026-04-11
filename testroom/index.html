@@ -1955,7 +1955,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v387';
+const TESTROOM_VERSION = 'v389';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2452,7 +2452,11 @@ function initMatchStats() {
     red: {}, blue: {},
     finishingBlowGhostId: null,
     finishingBlowTeam: null,
-    snapshot: null
+    snapshot: null,
+    // Per-round side-band: resource amounts that have been explicitly credited
+    // to a specific ghost (via creditGhost). Subtracted from the delta in
+    // creditRoundDelta so we don't double-count them to the active fighter.
+    explicit: { red: { ls:0, ms:0, ice:0, fire:0, seed:0 }, blue: { ls:0, ms:0, ice:0, fire:0, seed:0 } }
   };
 }
 
@@ -2468,8 +2472,24 @@ function ensureMatchStat(team, ghostId) {
   return B.matchStats[team][ghostId];
 }
 
+// Explicit per-ghost credit. Call this inside any sideline onShow callback
+// that grants a resource, so the sideline ghost (not the active fighter)
+// gets the MVP points. The amount is added to B.matchStats.explicit so
+// creditRoundDelta's snapshot-diff doesn't also credit the active fighter
+// for the same grant.
+function creditGhost(team, ghostId, resource, amount) {
+  if (!B || !B.matchStats || !ghostId || amount <= 0) return;
+  if (team !== 'red' && team !== 'blue') return;
+  if (!['ls','ms','ice','fire','seed'].includes(resource)) return;
+  const stat = ensureMatchStat(team, ghostId);
+  stat[resource] = (stat[resource] || 0) + amount;
+  B.matchStats.explicit[team][resource] = (B.matchStats.explicit[team][resource] || 0) + amount;
+}
+
 function snapshotRound() {
   if (!B || !B.matchStats) return;
+  // Reset the explicit side-band — credits accumulate per-round only
+  B.matchStats.explicit = { red: { ls:0, ms:0, ice:0, fire:0, seed:0 }, blue: { ls:0, ms:0, ice:0, fire:0, seed:0 } };
   B.matchStats.snapshot = {
     red: {
       res: { ...B.red.resources },
@@ -2490,15 +2510,19 @@ function creditRoundDelta(roundWinner) {
     const activeF = active(t);
     if (!activeF) return;
     const stat = ensureMatchStat(team, activeF.id);
-    // Resource deltas — credit the currently-active ghost
+    // Resource deltas — credit the currently-active ghost for the non-explicit leftover.
+    // Sideline generators (Gary, Farmer Jeff, Granny, etc.) call creditGhost() directly
+    // inside their onShow callbacks, populating B.matchStats.explicit[team]. We subtract
+    // those amounts here so the active fighter only gets credit for resources they earned.
     const rNow = t.resources;
     const rBefore = snap[team].res;
-    const clampPos = (a, b) => Math.max(0, (a || 0) - (b || 0));
-    stat.ls   += clampPos(rNow.luckyStone, rBefore.luckyStone);
-    stat.ms   += clampPos(rNow.moonstone, rBefore.moonstone);
-    stat.ice  += clampPos(rNow.ice, rBefore.ice);
-    stat.fire += clampPos(rNow.fire, rBefore.fire);
-    stat.seed += clampPos(rNow.healingSeed, rBefore.healingSeed);
+    const explicit = B.matchStats.explicit[team] || { ls:0, ms:0, ice:0, fire:0, seed:0 };
+    const clampPos = (a, b, sub) => Math.max(0, (a || 0) - (b || 0) - (sub || 0));
+    stat.ls   += clampPos(rNow.luckyStone, rBefore.luckyStone, explicit.ls);
+    stat.ms   += clampPos(rNow.moonstone, rBefore.moonstone, explicit.ms);
+    stat.ice  += clampPos(rNow.ice, rBefore.ice, explicit.ice);
+    stat.fire += clampPos(rNow.fire, rBefore.fire, explicit.fire);
+    stat.seed += clampPos(rNow.healingSeed, rBefore.healingSeed, explicit.seed);
     // Damage dealt / KOs scored: enemy ghosts took damage credited to this active
     const enemyTeam = team === 'red' ? 'blue' : 'red';
     const enemyBefore = snap[enemyTeam].ghosts;
@@ -3756,12 +3780,14 @@ function useFinnForge(team, kind) {
     if (t.resources.ice < 2) return;
     t.resources.ice -= 2;
     t.resources.moonstone++;
+    creditGhost(team, 204, 'ms', 1); // Finn earns the MVP point for the moonstone
     log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Ice Shards → <span class="log-ms">1 Moonstone!</span>`);
     showAbilityCallout('FORGE!', 'var(--rare)', 'Finn — 2 Ice Shards → 1 Moonstone!');
   } else if (kind === 'fire') {
     if (t.resources.fire < 2) return;
     t.resources.fire -= 2;
     t.resources.moonstone++;
+    creditGhost(team, 204, 'ms', 1); // Finn earns the MVP point for the moonstone
     log(`<span class="log-ability">Finn</span> (sideline) — Forge! 2 Sacred Fires → <span class="log-ms">1 Moonstone!</span>`);
     showAbilityCallout('FORGE!', 'var(--rare)', 'Finn — 2 Sacred Fires → 1 Moonstone!');
   } else {
@@ -9624,8 +9650,9 @@ function _resolveRoundImpl() {
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards
   if (garyOnesWin > 0) {
     const garyWinIceTotal = winTeam.resources.ice + garyOnesWin;
-    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesWin} rolled 1${garyOnesWin > 1 ? 's' : ''}! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${garyWinIceTotal} total)`, () => { winTeam.resources.ice += garyOnesWin; renderBattle(); });
-    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${loseTeam.resources.ice + garyOnesWin} total)`, () => { loseTeam.resources.ice += garyOnesWin; renderBattle(); });
+    const _garyWinId = (getSidelineGhost(winTeam, 92) || { id: 92 }).id;
+    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesWin} rolled 1${garyOnesWin > 1 ? 's' : ''}! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${garyWinIceTotal} total)`, () => { winTeam.resources.ice += garyOnesWin; creditGhost(winTeamName, _garyWinId, 'ice', garyOnesWin); renderBattle(); });
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesWin} Ice Shard${garyOnesWin > 1 ? 's' : ''}! (${loseTeam.resources.ice + garyOnesWin} total)`, () => { loseTeam.resources.ice += garyOnesWin; creditGhost(loseTeamName, 33, 'ice', garyOnesWin); renderBattle(); });
   }
   if (banditPeteTriggered) {
     const bpWhoQ = winDice && winDice.length === 2 ? 'Your ghost rolled only 2 dice!' : 'Opponent rolled only 2 dice!';
@@ -9837,9 +9864,9 @@ function _resolveRoundImpl() {
   if (wF.id === 209 && !wF.ko) { queueAbility('PLUNDER!', 'var(--common)', `${wF.name} — Win! +2 Surge!`, () => { winTeam.resources.surge += 2; renderBattle(); }); }
   if (wF.id === 209 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Plunder! +2 Surge! (${loseTeam.resources.surge + 2} total)`, () => { loseTeam.resources.surge += 2; renderBattle(); });
   if (wF.id === 307 && !wF.ko) { queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`, () => { winTeam.resources.surge++; winTeam.resources.ice++; renderBattle(); }); }
-  if (wF.id === 307 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; renderBattle(); });
+  if (wF.id === 307 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); });
   if (wF.id === 81 && !wF.ko) { queueAbility('VALLEY MAGIC!', 'var(--rare)', `${wF.name} — Win! +2 Ice Shards! (${winTeam.resources.ice + 2} total)`, () => { winTeam.resources.ice += 2; renderBattle(); }); }
-  if (wF.id === 81 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; renderBattle(); });
+  if (wF.id === 81 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; creditGhost(loseTeamName, 33, 'ice', 2); renderBattle(); });
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
     const _dieCounts = {};
@@ -9946,29 +9973,31 @@ function _resolveRoundImpl() {
   }
   if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
-    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; popSidelineCard(winTeam, 314); renderBattle(); });
-    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; renderBattle(); });
+    const _jeffId = (getSidelineGhost(winTeam, 314) || { id: 314 }).id;
+    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; creditGhost(winTeamName, _jeffId, 'seed', sx); popSidelineCard(winTeam, 314); renderBattle(); });
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; creditGhost(loseTeamName, 33, 'seed', sx); renderBattle(); });
   }
 
   // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
   if (simonBrewTriggered) {
     const simonFireTotal = loseTeam.resources.fire + 1;
     queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; creditGhost(winTeamName, 33, 'fire', 1); renderBattle(); });
   }
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {
     const sadSalIceTotal = loseTeam.resources.ice + 1;
     queueAbility('TOUGH JOB!', 'var(--common)', `${lF.name} — Lost the roll... but gained 1 Ice Shard! (${sadSalIceTotal} total)`, () => { loseTeam.resources.ice++; renderBattle(); });
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tough Job! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tough Job! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 33, 'ice', 1); renderBattle(); });
   }
 
   // Gary (92) — Lucky Novice: lose-team Gary — 1s in losing dice still grant ice shards (you rolled them!)
   if (garyOnesLose > 0) {
     const garyLoseIceTotal = loseTeam.resources.ice + garyOnesLose;
-    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''}! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${garyLoseIceTotal} total)`, () => { loseTeam.resources.ice += garyOnesLose; renderBattle(); });
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${winTeam.resources.ice + garyOnesLose} total)`, () => { winTeam.resources.ice += garyOnesLose; renderBattle(); });
+    const _garyLoseId = (getSidelineGhost(loseTeam, 92) || { id: 92 }).id;
+    queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (sideline) — ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''}! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${garyLoseIceTotal} total)`, () => { loseTeam.resources.ice += garyOnesLose; creditGhost(loseTeamName, _garyLoseId, 'ice', garyOnesLose); renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyOnesLose} Ice Shard${garyOnesLose > 1 ? 's' : ''}! (${winTeam.resources.ice + garyOnesLose} total)`, () => { winTeam.resources.ice += garyOnesLose; creditGhost(winTeamName, 33, 'ice', garyOnesLose); renderBattle(); });
   }
 
   // On-lose callouts — onShow applies the surge grant with the splash
@@ -9978,13 +10007,13 @@ function _resolveRoundImpl() {
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
       if (wR.type === 'singles') {
-        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; creditGhost(loseTeamName, 310, 'ls', 1); popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); });
       } else if (wR.type === 'doubles') {
-        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { loseTeam.resources.fire++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { loseTeam.resources.fire++; creditGhost(loseTeamName, 310, 'fire', 1); popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); });
       } else if (isTripleOrBetter(wR.type)) {
-        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; popSidelineCard(loseTeam, 310); renderBattle(); });
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { loseTeam.resources.moonstone++; creditGhost(loseTeamName, 310, 'ms', 1); popSidelineCard(loseTeam, 310); renderBattle(); });
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); });
       }
     }
@@ -9994,13 +10023,13 @@ function _resolveRoundImpl() {
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
   if (wF.ko && hasSideline(winTeam, 310)) {
     if (wR.type === 'singles') {
-      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; creditGhost(winTeamName, 310, 'ls', 1); popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); });
     } else if (wR.type === 'doubles') {
-      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { winTeam.resources.fire++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Sacred Fire!`, () => { winTeam.resources.fire++; creditGhost(winTeamName, 310, 'fire', 1); popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
     } else if (isTripleOrBetter(wR.type)) {
-      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; popSidelineCard(winTeam, 310); renderBattle(); });
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → MOONSTONE!`, () => { winTeam.resources.moonstone++; creditGhost(winTeamName, 310, 'ms', 1); popSidelineCard(winTeam, 310); renderBattle(); });
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); });
     }
   }
@@ -10008,8 +10037,8 @@ function _resolveRoundImpl() {
   // Powder (23) — Final Gift: KO'd → loseTeam gains 3 Ice Shards (onShow deferred for visual sync)
   if (powderFinalGiftTriggered) {
     const powderIceTotal = loseTeam.resources.ice + 3;
-    queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; renderBattle(); });
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; renderBattle(); });
+    queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; creditGhost(loseTeamName, 23, 'ice', 3); renderBattle(); });
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; creditGhost(winTeamName, 33, 'ice', 3); renderBattle(); });
   }
 
   // Mulch (348) — Decompose: KO'd → loseTeam gains 2 Healing Seeds (onShow deferred for visual sync)
