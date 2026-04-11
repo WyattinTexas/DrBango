@@ -3,6 +3,170 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
+## v407 — Doug (63) Caution duel-phase order-of-operations fix
+
+Wyatt reported: Doug's Caution swap modal was popping AFTER the player clicked the duel Done button instead of during their duel sub-phase. The whole point of Caution is to make the swap decision before committing to the roll.
+
+Investigation found Doug WAS already wired into `openDuelPhasePrimers(team)` (line 6201) so the modal does open during the team's duel sub-phase. Two real bugs were silently breaking the flow:
+
+**Bug A — `doDougCautionChoice('no')` never marked the use as consumed.**
+The comment said "once-per-game skip counts as use" but the line `B.dougCautionUsed[team] = true` was missing. Picking "No" once during duel phase left Doug primed → the legacy `rollReady` Doug fallback at line 5863-5896 fired AGAIN after the player clicked Done → modal pops a second time, AFTER Ready. **This is exactly Wyatt's "after Ready" bug.** Fixed: added `if (B.dougCautionUsed) B.dougCautionUsed[team] = true;` to the 'no' branch.
+
+**Bug B — `doDougCautionSwap` lost the +1 die bonus during duel phase.**
+The swap handler tried to apply the bonus via `B.preRoll[team].count++`, but `B.preRoll` is built later by `doPreRollSetup` which only runs after duel phase ends. During duel phase `B.preRoll` is null → bonus silently dropped. Fixed: added `B.dougCautionDieBonus[team] = true` stash for the duel-phase path; `doPreRollSetup` picks it up at the top after `let redCount = 3, blueCount = 3` and increments accordingly.
+
+**State init:** added `dougCautionDieBonus: { red: false, blue: false }` to both battle init sites.
+
+**Touch points:**
+- `B.dougCautionDieBonus` state init (2 sites)
+- `doPreRollSetup` line ~6779: bonus pickup right after `let redCount = 3, blueCount = 3;`
+- `doDougCautionChoice` 'no' branch: mark used
+- `doDougCautionSwap`: stash bonus when `B.preRoll` is null
+- `TESTROOM_VERSION` → v407
+
+**Did NOT touch:** `openDuelPhasePrimers`, `_runDuelTeamTurn`, `enterDuelPhase`, `duelPhaseReady`, `doTeamRoll` Duel Phase intercept — all already wired correctly.
+
+## ⚡ WYATT DIRECTIVE (2026-04-10 #5) — Loser dice keep their team color (no more grayscale)
+
+**Wyatt's exact words (with screenshot of a Red row showing winner=3 highlighted gold and losers 1+4 desaturated to gray):**
+> "We're fading out the losing dice like this, but we don't need to keep them the dark color. If they're blue, keep them blue; they don't need to get this dark color. When they 'lose', they can just remain blue even though they lost. Does that make sense?"
+
+The losing dice currently desaturate to a washed-out gray because of `filter: grayscale(0.55) brightness(0.82)` on `.die.die-loser`. The intent is recede-but-don't-mute-the-team-identity: a blue team's losing dice should still read as blue, just dimmer/smaller than the winners. Same for red. The team color is information — losing it costs the player a glance to figure out who rolled what.
+
+---
+
+### TOUCH POINTS (file: `~/DrBango/testroom/index.html`)
+
+**A. CSS — `.die.die-loser` rule at lines ~837–843**
+- **Remove** `filter: grayscale(0.55) brightness(0.82);` entirely. The grayscale is the offender; the brightness drop also flattens the team gradient.
+- **Keep** `opacity: 0.38 !important;` and `transform: scale(0.94) !important;` — these are the recede signals and they're correct.
+- **Keep** the transition.
+- If the winners no longer pop enough against opacity-0.38 losers without the desaturation, soften opacity slightly (e.g. 0.42–0.48) instead of bringing back grayscale. Do NOT re-introduce any color-stripping filter.
+
+**B. CSS — confirm `.die.die-win-secondary` (line ~849) still works**
+- The tiebreaker matched-pair glow already uses `filter: none !important;` to override `die-loser`. With the grayscale removed it remains a no-op override; no change needed but verify nothing breaks visually.
+
+**C. Screenshot reference**
+- Wyatt's screenshot: `/Users/drbango/Desktop/Screenshot 2026-04-10 at 11.31.06 PM.png`. The "1" and "4" at the bottom should look like blue dice that got smaller and fainter, not gray dice.
+
+**D. Sanity check across both teams**
+- Red dice base color is the rose/coral gradient (see `.die.team-red` family); blue is the pale-cyan gradient. Test at least one Red roll AND one Blue roll after the change. The losing dice should still read as their team color at a glance from across the room.
+
+---
+
+### CONSTRAINTS
+
+- ✅ **CSS-only change** — squarely inside Hard Rule #11 allowed list. No JS, no scope concerns, no TDZ risk.
+- ❌ Do NOT touch the winner highlight (`.die.die-winner` / forged-gold gradient) — that's locked in as of v391.
+- ❌ Do NOT touch `highlightWinnerDice()` — it's the consumer of these classes, not the source of the visual problem.
+- Bump `TESTROOM_VERSION`. Log under a new `## v???` section in this file. Push.
+
+### TESTING
+
+1. Start a battle, roll dice, observe a round where one team loses.
+2. ✅ The losing dice retain their team color (blue stays blue, red stays red).
+3. ✅ The losing dice are still clearly subordinate (smaller, more transparent) — the winner still reads as the winner at a glance.
+4. ❌ No grayscale wash. No brown-gray dead-look on the losing row.
+
+---
+
+## ⚡ WYATT DIRECTIVE (2026-04-10 #4) — VERY HIGH PRIORITY: Kill the screen-takeover ability splash, highlight the cards instead
+
+**Wyatt's exact words from his seat (with screenshot):**
+> "The pop-up UIs when specials go off are just too distracting. It should just highlight the individual cards themselves, so that they look special when they go off, and then the narrator could pop up, but not take up the whole screen and stuff. It just blocks everything and it's a little epileptic and disorienting. This is not good for the game; it makes people lose focus."
+
+The current `.ability-splash` is a full-width gilt-bordered horizontal proscenium strip that descends across the **middle of the screen** with backdrop blur, gradient backdrop, 3.6rem gold text, and a violent rotate/scale/blur descent animation. It plays for 1400ms per ability, then chains into the next one 1300ms later. With multi-ability rounds (Knight Light + Knight Terror + entry effects + post-roll effects) it's 4–6+ seconds of strobing screen takeover. **It has to go.**
+
+**The new model:**
+1. **The card itself glows** in the ability's theme color when its ability fires — the active fighter slot pulses a colored border + outer glow + a subtle scale lift, like a spotlight on the card on stage.
+2. **The narrator strip at the bottom of the screen** receives the ability text (name + description) for the duration. It's already there; it's already styled; it just needs to become the channel for the callout instead of the giant overlay.
+3. **No more full-screen takeover.** No more horizontal gradient strip across the middle. No more 3.6rem text. No more backdrop blur. No more border-top/border-bottom strobe.
+
+---
+
+### TOUCH POINTS (file: `~/DrBango/testroom/index.html`)
+
+**A. CSS — strip the splash**
+- `.ability-splash` (lines **~1092–1105**) — REMOVE: `background` gradient, `border-top`, `border-bottom`, `box-shadow`, `backdrop-filter`, the `padding:28px 0`, the `position:fixed; left:0; right:0` full-width geometry. Either delete the rule entirely or reduce it to a hidden no-op so existing JS calls don't crash. The DOM element `#abilitySplash` (line **~1689**) can stay in place — just make it invisible / non-rendering. **Do NOT delete the element**, downstream code references `getElementById('abilitySplash')` in 3+ places (lines ~11211, ~11526, ~11960) and the refiner whitelist forbids touching most of those callsites — leaving the element + neutering the styles is the safe shape.
+- `.ability-splash-inner` (line **~1107**) and `.ability-splash.active .ability-splash-inner` (line **~1114**) — strip the `transform:translateY(-260%) rotate(-1.8deg) scale(0.92)` descent and the `callout-descend` animation reference. Keep the rule shells if you want the JS hooks to still work, but they should be visually inert.
+- `@keyframes callout-descend` (lines **~1117–1124**) — can be deleted; nothing else uses it.
+- `.ability-splash-name` / `.ability-splash-desc` (lines **~1125–1141**) — drop the 3.6rem font, the gold drop-shadows, the 1.05rem desc font. They no longer need to be visible; they're not the channel anymore.
+- `.ability-splash.theme-*` rules (lines **~1143–1159**) — can stay or go; they're just color overrides on the (now hidden) text.
+- Mobile breakpoint `.ability-splash-name` rules (lines **~1442, ~1491**) — delete or leave; they're now redundant.
+
+**B. CSS — add the card-glow channel**
+Add a new `.fighter-slot.ability-fire` class (next to the existing `.fighter-slot.hit` shake at line **~885**) that pulses a colored ring + outer glow on whichever fighter card owns the firing ability. Theme-aware via modifier classes (`ability-fire-gold`, `ability-fire-red`, `ability-fire-blue`, `ability-fire-fire`, `ability-fire-green`, `ability-fire-purple`) — match the existing `SPLASH_THEMES` color names so the JS can map cleanly.
+- Animation duration: ~1.2s (matches the current 1300ms per-callout cadence).
+- Animation should be a calm pulse, NOT a flash. Two beats: brighten outer glow + lift `scale(1.02)` → settle. Subtle. **Not epileptic.** Wyatt called the current behavior epileptic; the new one must feel premium and intentional, like a stage spotlight finding the actor.
+- Theme colors:
+  - gold (legendary) → `var(--legendary)` glow
+  - red (rare/Knight Terror/etc) → `var(--accent)` glow
+  - blue (rare) → `var(--rare)` glow
+  - fire (magma) → `var(--magma)` glow
+  - green (uncommon) → `#4ade80`
+  - purple (ghost-rare) → `#c084fc`
+- Default fallback (no theme) → moonstone glow.
+- The pulse must coexist with the existing `.team-red` / `.team-blue` border colors — overlay, not replace.
+
+**C. CSS — narrator gets a "highlight" mode**
+Add a `.narrator-inner.ability-active` modifier (line **~1078**) that:
+- Slightly increases font weight + size (~14–15px) for the duration of the callout
+- Adds a soft gold accent border or glow around the strip
+- Optionally surfaces the ability NAME in larger gold text with the description below it inline
+- Returns to the default state when the callout finishes
+
+The narrator strip (`#narrator`, line **~1649**) is the new home for ability text. Currently `setNarrator()` writes generic round narration there — keep that working and let `showAbilityCallout` temporarily override it during the 1300ms ability beat, then restore the prior narration.
+
+**D. JS — `showAbilityCallout` (line ~11525) becomes a router**
+Current behavior: writes name+desc into the splash, plays sfx, fades small callout in after.
+New behavior:
+1. Still play `playSfx('sfxSpecial', 0.85)` — the audio cue is good, keep it.
+2. Resolve a theme key from the `color` arg via `SPLASH_THEMES` (already exists).
+3. Find the firing fighter's `.fighter-slot` element. Use the new optional `team` parameter (see step E). If team='red', target `#red-fighter`; if 'blue', target `#blue-fighter`. If team is null/undefined, fall back to a softer behavior: just write to the narrator without glowing a card. (Don't crash, don't pick the wrong card.)
+4. Add `ability-fire ability-fire-<theme>` to that fighter slot for ~1200ms, then remove. Use `clearTimeout` on a per-element timer key (e.g. `el._abilityFireTimer`) so back-to-back fires re-trigger cleanly without stomping each other.
+5. Push name+desc into the narrator strip with the new `.ability-active` styling. Stash the previous narrator innerHTML in a local var so it can be restored after the beat ends — but ONLY if a subsequent narrator update hasn't already happened. (Use a per-call sequence number; check the existing `setNarrator` for prior art if available.)
+6. The small inline `.ability-callout` (line **~868**, the moonstone-colored hype-pop strip under the header) — Wyatt didn't complain about this one. Leave it alone OR repurpose it. Recommend: leave it as-is, it's small and unobtrusive.
+7. Keep the `el.classList.add('active')` toggles on `#abilitySplash` so any external code reading `.active` doesn't break — they're now visual no-ops because the CSS is gutted.
+
+**E. JS — thread `team` through `queueAbility` (line ~11479) as an optional 5th arg**
+- New signature: `function queueAbility(name, color, desc, onShow, team)` (team optional, default `null`).
+- `abilityQueue.push({ name, color, desc, onShow, team })`.
+- In `drainAbilityQueue` at line **~11516**, pass `a.team` into `showAbilityCallout(a.name, a.color, a.desc, a.team)`.
+- In the `else` branch of `queueAbility` (line **~11483**), pass `team` through too.
+- **DO NOT** mass-update every existing `queueAbility(...)` callsite (there are ~40+). Existing 4-arg calls will still work — `team` will be `undefined` and `showAbilityCallout` will gracefully fall back to "narrator only, no card glow." The 5-arg form is opt-in.
+
+**F. Threading `team` into the highest-traffic callsites — INCLUDED IN THIS DIRECTIVE**
+The single highest-value callsites to thread `team` into during this same cycle (so the demo case from Wyatt's screenshot — Doug Caution + Natalia Materialization — actually glows the right card the next time he plays):
+1. **Entry effect callouts** in `triggerEntry()` / the entry-effect chain around lines **~3451–3641**. Each entry effect knows which team's fighter is entering — pass that team into `queueAbility`. Search for `queueAbility(` calls inside `triggerEntry`/entry helpers and add the team arg.
+2. **Post-roll callouts** in the resolveRound chain around lines **~7283–7464** (TREMOR, MATERIALIZATION, POLLINATE, DEPENDABLE mirrors, etc.). The winner/loser team is in scope as `winTeamName` / `loseTeamName` / similar — pass it.
+3. **Knight Light/Knight Terror reactions** at lines **~4014, ~4027** — these know whose ghost is reacting; pass that team.
+
+If threading every callsite blows the cycle budget, **prioritize entry effects + the resolveRound winner-path callouts** (TREMOR, MATERIALIZATION, POLLINATE) — those are the most frequently visible. Other callsites can be threaded in a follow-up cycle and will gracefully fall back to "narrator-only" until then.
+
+---
+
+### CONSTRAINTS (refiner whitelist + safety)
+
+- ✅ **Allowed by Hard Rule #11:** CSS edits, narrator text, callout colors, dead-code cleanup. The directive is mostly CSS + a 2-line param thread + a contained `showAbilityCallout` rewrite.
+- ❌ **Forbidden:** rollReady, resolveRound, doPostRollAndResolve, doPreRollSetup, triggerEntry. **You may NOT restructure these functions.** You MAY add an optional 5th arg to a `queueAbility(...)` call inside them (one-token addition per callsite, no new variables, no new branches) — that's the only edit allowed inside a blacklisted function for this directive.
+- The pre-commit JS syntax hook will reject any TDZ/scope leaks. Don't introduce new `let`/`const` inside if/else/try blocks.
+- The `#abilitySplash` element MUST stay in the DOM. Three callsites (lines ~11211, ~11526, ~11960) reference it; deleting the element risks a freeze.
+- Bump `TESTROOM_VERSION`. Log under a new `## v???` section in this file. Push.
+
+### TESTING
+
+Open testroom, start a battle that triggers multiple abilities in one round (Knight Terror + Knight Light, or any duo with entry effects + post-roll effects). Confirm:
+1. ❌ No more full-width gilt strip across the middle of the screen.
+2. ❌ No more 3.6rem gold text descent animation.
+3. ✅ The active fighter card pulses a soft colored glow when its ability fires.
+4. ✅ The narrator strip at the bottom shows the ability name + description for ~1.2s, then returns to round narration.
+5. ✅ Multi-ability chains feel like a sequence of spotlights moving between cards, not a strobe in the middle of the screen.
+6. ✅ Wyatt's quality bar: "does it light up eyes" — the new model should feel premium and theatrical without being assaultive.
+
+**Why this is very high priority:** Wyatt explicitly called this out as blocking the game's feel. Gary, EJ, and Skylar all use the testroom — if the visual layer is disorienting, the playtesting and design conversations suffer. This is a Disney-bar polish issue: the current behavior actively hurts the experience.
+
+---
+
 ## ⚡ WYATT DIRECTIVE (2026-04-10 #3) — Duel Phase playability: Raditz modal + Ready-button auto-skip
 
 **Live repro from Wyatt's seat:**
