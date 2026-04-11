@@ -1089,6 +1089,27 @@ Why: lets Wyatt compare the new characters against a specific original set (e.g.
 
 ## Completed Fixes — Wyatt + Gamma (this session)
 
+- **PREVENTION INFRASTRUCTURE — pre-commit JS syntax hook + refiner whitelist (post-v386).**
+  After three production game-freezing bugs in the same class (v305 `teamLabel`, v377 `calloutCount`, v386 `collectKC` TDZ), Wyatt's expert call: stop relying on aspirational system-prompt audits, install actual mechanical guardrails. Two fixes shipped:
+
+  **1. Pre-commit JS syntax hook** at `~/DrBango/.git/hooks/pre-commit`. Extracts every inline `<script>` block from `testroom/index.html`, wraps in a function (so top-level await/return don't false-positive), runs `node --check`. Any commit that ships invalid JS — including silent ReferenceError class bugs — is REJECTED at the git layer before push. Verified against v386. The hook is opt-in per developer (lives in .git/hooks, not the repo) — anyone cloning DrBango fresh won't have it until they install. Cost: ~200ms per testroom commit. Catches: TDZ bugs, undeclared variable references, scope leaks, template literal undefined refs.
+
+  **2. Refiner scope whitelist** in `~/corkscrew-agents/refiner.py` system prompt as Hard Rule #11. Hard whitelist of what the refiner CAN edit (CSS, card data, FIXLOG, narrator text, dead-code cleanup, callouts) and hard BLACKLIST of what it CANNOT touch:
+  - `rollReady()`, `resolveRound()`, `doPostRollAndResolve()`, `doPreRollSetup()`, `triggerEntry()`
+  - `pickMsValue()`, `pickMsDie()`, `spendMs()`, `checkLuckyStones()`, `spendLuckyStone()`
+  - `handleKOs()`, `doKoSwap()`, `openKoSwap()`
+  - All modal handlers (showTimberModal, doSeleneChoice, doBogeyChoice, doSylviaRoll, etc.)
+  - Any function with "Resuming", "Pending", or "Choice" in the name
+  - Adding NEW const/let inside if/else/try blocks where they could leak scope
+  - Adding NEW template literal references
+
+  If a bug fix in a blacklisted function is genuinely needed, the refiner must constrain itself to a one-character or one-line change with no new variables, no scope reorganization, no template literal additions. Anything bigger = revert.
+
+  **Why both:** the audit prompts (Audit #1 + #2) have been in place since v305 and v377 respectively, and the refiner STILL introduced v386. Aspirational rules don't bind reliably. The pre-commit hook is the technical backstop — if the refiner ever again refactors `resolveRound` and breaks scope, the hook catches it before push. The whitelist is the social backstop — the refiner is told plainly "do not touch state-machine functions" with a list of named functions and a "ANY refactor = revert" stake.
+
+  **Outcome target:** v386 should be the LAST silent-ReferenceError freeze. Future freezes either don't happen (whitelist holds) or get caught at commit time (hook rejects).
+
+
 - **v324 — Zain Ice Blade v2: cost reduced + opt-in per-round commit. NEW SPECIAL CONCEPT — refiner must understand.**
   
   **Changes from v322:**
