@@ -834,12 +834,11 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   100% { background-position: -100% -100%; opacity: 0; }
 }
 
-/* Loser dice — soft recede, not aggressive kill */
+/* Loser dice — soft recede, team color preserved (no grayscale per Wyatt v419) */
 .die.die-loser {
-  opacity: 0.38 !important;
-  filter: grayscale(0.55) brightness(0.82);
+  opacity: 0.42 !important;
   transform: scale(0.94) !important;
-  transition: opacity 0.4s, filter 0.4s, transform 0.4s;
+  transition: opacity 0.4s, transform 0.4s;
 }
 
 /* Tiebreaker matched-pair glow — dim gold, still clearly readable.
@@ -1088,75 +1087,39 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .narrator-inner b.gold { color:var(--legendary); }
 .narrator-inner b.ko-text { color:var(--accent); font-size:16px; }
 
-/* Ability Splash — Théâtre proscenium descent */
-.ability-splash {
-  position:fixed; left:0; right:0; top:50%; transform:translateY(-50%);
-  z-index:900; display:flex; align-items:center; justify-content:center;
-  opacity:0; pointer-events:none; transition:opacity 0.3s ease-out;
-  background:
-    linear-gradient(180deg, transparent 0%, rgba(8, 18, 38, 0.88) 18%, rgba(8, 18, 38, 0.95) 50%, rgba(8, 18, 38, 0.88) 82%, transparent 100%);
-  padding:28px 0;
-  border-top:2px solid rgba(212, 160, 64, 0.35);
-  border-bottom:2px solid rgba(212, 160, 64, 0.35);
-  box-shadow:
-    0 0 80px rgba(212, 160, 64, 0.25),
-    0 30px 80px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
-}
-.ability-splash.active { opacity:1; pointer-events:auto; transition:opacity 0.2s ease-in; }
-.ability-splash-inner {
-  text-align:center;
-  transform:translateY(-260%) rotate(-1.8deg) scale(0.92);
-  opacity:0;
-  filter:blur(4px);
-  padding:0 20px; position:relative; z-index:910;
-}
-.ability-splash.active .ability-splash-inner {
-  animation: callout-descend 1.15s cubic-bezier(0.34, 1.40, 0.50, 1) forwards;
-}
-@keyframes callout-descend {
-  0%   { transform:translateY(-260%) rotate(-1.8deg) scale(0.92); opacity:0; filter:blur(4px); }
-  25%  { opacity:1; filter:blur(0); }
-  55%  { transform:translateY(8%) rotate(0.9deg) scale(1.05); }
-  72%  { transform:translateY(-10%) rotate(-0.4deg) scale(0.985); }
-  86%  { transform:translateY(-2%) rotate(0.2deg) scale(1.012); }
-  100% { transform:translateY(0) rotate(0deg) scale(1); opacity:1; filter:blur(0); }
-}
-.ability-splash-name {
-  font-family:'Inter', sans-serif;
-  font-size:3.6rem; font-weight:900;
-  letter-spacing:0.06em; line-height:1;
-  text-transform:uppercase; color:var(--gold-bright);
-  text-shadow:
-    0 0 40px rgba(240, 197, 96, 0.75),
-    0 0 80px rgba(240, 197, 96, 0.4),
-    0 4px 24px rgba(0, 0, 0, 0.95);
-}
-.ability-splash-desc {
-  font-family:'Inter', sans-serif;
-  font-size:1.05rem; font-weight:600;
-  margin-top:14px; color:var(--text-warm);
-  text-shadow:0 2px 10px rgba(0,0,0,0.9);
-  letter-spacing:0.2em; text-transform:uppercase;
-}
-/* Splash color themes — banner tint + subtle glow */
-.ability-splash.theme-fire .ability-splash-name { color:var(--magma); text-shadow:0 0 20px rgba(255,99,72,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-fire .ability-splash-desc { color:#ffd4aa; }
+/* Ability Splash — neutered per Wyatt Directive #4 (v407): no more full-screen takeover.
+   DOM element kept for JS compatibility (.active toggling still works). Visually inert. */
+.ability-splash { display:none; position:fixed; z-index:900; opacity:0; pointer-events:none; }
+.ability-splash.active { opacity:0; pointer-events:none; }
+.ability-splash-inner { display:none; }
+.ability-splash-name { display:none; }
+.ability-splash-desc { display:none; }
 
-.ability-splash.theme-green .ability-splash-name { color:#4ade80; text-shadow:0 0 20px rgba(34,197,94,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-green .ability-splash-desc { color:#bbf7d0; }
+/* Card glow — fires on the active fighter slot when its ability triggers (v407) */
+.fighter-slot.ability-fire {
+  animation: abilityFireScale 1.2s ease-out forwards;
+}
+@keyframes abilityFireScale {
+  0%   { transform:scale(1); }
+  30%  { transform:scale(1.025); }
+  80%  { transform:scale(1.01); }
+  100% { transform:scale(1); }
+}
+.fighter-slot.ability-fire-fire   { filter:brightness(1.1) drop-shadow(0 0 18px rgba(255,99,72,0.85)); }
+.fighter-slot.ability-fire-blue   { filter:brightness(1.1) drop-shadow(0 0 18px rgba(52,152,219,0.85)); }
+.fighter-slot.ability-fire-purple { filter:brightness(1.1) drop-shadow(0 0 18px rgba(192,132,252,0.85)); }
+.fighter-slot.ability-fire-green  { filter:brightness(1.1) drop-shadow(0 0 18px rgba(74,222,128,0.85)); }
+.fighter-slot.ability-fire-gold   { filter:brightness(1.1) drop-shadow(0 0 18px rgba(212,160,64,0.85)); }
+.fighter-slot.ability-fire-red    { filter:brightness(1.1) drop-shadow(0 0 18px rgba(233,69,96,0.85)); }
+.fighter-slot.ability-fire-default { filter:brightness(1.1) drop-shadow(0 0 18px rgba(240,197,96,0.85)); }
 
-.ability-splash.theme-purple .ability-splash-name { color:#c084fc; text-shadow:0 0 20px rgba(168,85,247,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-purple .ability-splash-desc { color:#e9d5ff; }
-
-.ability-splash.theme-gold .ability-splash-name { color:var(--legendary); text-shadow:0 0 20px rgba(243,156,18,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-gold .ability-splash-desc { color:#fef3c7; }
-
-.ability-splash.theme-red .ability-splash-name { color:var(--accent); text-shadow:0 0 20px rgba(233,69,96,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-red .ability-splash-desc { color:#fda4af; }
-
-.ability-splash.theme-blue .ability-splash-name { color:var(--rare); text-shadow:0 0 20px rgba(52,152,219,0.6), 0 2px 4px rgba(0,0,0,0.8); }
-.ability-splash.theme-blue .ability-splash-desc { color:#bae6fd; }
+/* Narrator highlight mode — ability name + desc appear here during the callout beat (v407) */
+.narrator-inner.ability-active {
+  font-size:14px; font-weight:800;
+  border-color:rgba(212,160,64,0.45);
+  box-shadow:0 0 14px rgba(212,160,64,0.28), 0 4px 16px rgba(0,0,0,0.5);
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
 
 /* Triples/Quads/Penta Banner */
 .triples-banner {
@@ -1439,8 +1402,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   .die { width:42px; height:42px; font-size:20px; }
   .narrator-inner { font-size:12px; padding:8px 12px; min-height:30px; }
   .log-wrap { max-height:120px !important; }
-  .ability-splash-name { font-size:2.2rem; letter-spacing:2px; }
-  .ability-splash-desc { font-size:0.95rem; }
+  /* ability-splash-name / desc removed (v407) — element is now display:none */
   .vs-text { font-size:3.5rem; }
   .vs-fighter-name { font-size:1.6rem; max-width:140px; }
   .vs-inner { gap:20px; }
@@ -1488,8 +1450,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   .rarity-filter-btn { padding:5px 10px; font-size:10px; }
   header h1 { font-size:20px; }
   header .sub { font-size:11px; }
-  .ability-splash-name { font-size:1.6rem; letter-spacing:1px; }
-  .ability-splash-desc { font-size:0.85rem; }
+  /* ability-splash-name / desc removed (v407) — element is now display:none */
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -2095,7 +2056,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v407';
+const TESTROOM_VERSION = 'v422';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2314,6 +2275,36 @@ const GHOSTS = [
   {id:364, name:"Dusk", art:"art/dusk.webp", rarity:"uncommon", maxHp:4, ability:"Twilight", abilityDesc:"After round 5: all your damage gains +1.", category:"Damage Multiplier", set:"Rolling Hills", designNote:"Late-game scaling."},
   {id:366, name:"Mother Nature", art:"art/mother_nature.webp", rarity:"legendary", maxHp:8, ability:"Seasons", abilityDesc:"Each round cycles: Spring (+1 HP), Summer (+1 dmg), Autumn (+1 resource), Winter (opponent -1 die).", category:"Prediction/Reaction", set:"Rolling Hills", designNote:"The legendary. Predictable but unstoppable cycle."},
   {id:368, name:"Scarecrow King", art:"art/scarecrow_king.webp", rarity:"rare", maxHp:4, ability:"Command", abilityDesc:"Sideline: all your other sideline ghosts' abilities trigger twice.", category:"Prediction/Reaction", set:"Rolling Hills", designNote:"Sideline amplifier. Low HP if forced to fight."},
+  // === WYATT APRIL 11 2026 STAGING (IDs 407-431) — GALLERY ONLY, NO BATTLE LOGIC ===
+  // These 25 cards (12 Volcanic Activity + 13 Rolling Hills) were designed by the cards
+  // agent overnight. abilityDesc is written but NO handlers, entry effects, or sideline
+  // checks exist for any of these IDs. Wyatt designs battle logic next session.
+  // Refiner: DO NOT IMPLEMENT abilities for IDs 407-431 until Wyatt explicitly approves.
+  {id:407, name:"Glorp", rarity:"common", maxHp:3, ability:"Pop", abilityDesc:"Entry: gain 2 Lucky Stones.", category:"Resource Generation", set:"Volcanic Activity", designNote:"A perfectly round lava bubble that surfaces from the magma field and pops with pure glee the moment it arrives. Low HP means it's a quick resource spike — bring it in, collect luck, move on. Art direction: a glossy orange-red sphere hovering just above a lava pool, big wide eyes, caught mid-pop like a soap bubble, warm and ridiculous."},
+  {id:408, name:"Brimstone", rarity:"common", maxHp:4, ability:"Sulfur Sting", abilityDesc:"Win: deal +1 damage. If opponent spent a resource this round: deal +2 damage instead.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"A stinky little sulfur sprite from the volcanic gas vents — permanently smug, permanently smells awful. Reliable +1 on all wins; scales to +2 when the opponent is playing fancy. Punishes resource-heavy decks passively. Art direction: a small wispy yellow-green creature trailing wisps of gas, crinkled nose, perpetual half-grin, floating just above a sulfur vent crack."},
+  {id:409, name:"Cindergrub", rarity:"common", maxHp:4, ability:"Underpass", abilityDesc:"Win: deal +1 damage if your opponent's active ghost currently has more HP than you.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"A fat, plump magma worm that tunnels through the lava tube networks beneath the volcano. Classic underdog puncher — hits harder when outmatched. HP comparison is live and visible, zero tracking needed. Art direction: a plump segmented worm with coal-black exterior, glowing orange between segments like cooling lava cracks, genuinely friendly caterpillar face, peek-a-boo emerging from a dark tunnel mouth."},
+  {id:410, name:"Glass Fang", rarity:"common", maxHp:3, ability:"Shatter", abilityDesc:"Win: deal +2 damage. Then take 1 damage yourself. Volcanic glass cuts both ways.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"A being made of obsidian volcanic glass — impossibly beautiful, impossibly sharp. Big burst damage but punishes itself on every win. At 3HP the self-damage is genuinely consequential. Wyatt flag: combined with other VA self-damage sources (Wick, Glass Fang loops) this could snowball; worth watching. Art direction: a translucent jet-black glass creature with razor edges catching lava-light like a prism, ethereal and beautiful, backlit in deep orange."},
+  {id:411, name:"Fumarole", rarity:"uncommon", maxHp:5, ability:"Vent Burst", abilityDesc:"Win with doubles or better: gain 2 Surges.", category:"Resource Generation", set:"Volcanic Activity", designNote:"A geothermal vent spirit — patient, still, and then suddenly screaming with pressure. Doubles trigger fires ~44% of wins so it's a reliable engine; 2 Surges at once is a meaningful burst that fuels Forge Fire and Pyroclast combos. VA's Surge generator. Art direction: a column of steam and mineral-white deposits rising from a cracked earth vent, face forming mid-burst in the gas cloud, expression permanently mid-surprise."},
+  {id:412, name:"Fluxling", rarity:"uncommon", maxHp:5, ability:"Flow State", abilityDesc:"Win: change one of your winning dice to any value you choose.", category:"Dice Modifier", set:"Volcanic Activity", designNote:"A lava river spirit that never stops moving and flows around every obstacle. On-win die manipulation without spending a Moonstone — upgrade a near-double into a double, or set a specific number for a Spout prediction. Wyatt flag: free die-change on every win may be slightly undercosted at uncommon — effectively a free Moonstone each time. Worth watching. Art direction: a fluid constantly morphing figure made of flowing lava, half-formed face always mid-shift, trailing slow orange-red drips."},
+  {id:413, name:"Obsidian Eel", rarity:"uncommon", maxHp:5, ability:"Glass Scales", abilityDesc:"Win with doubles or better: gain 1 Moonstone.", category:"Resource Generation", set:"Volcanic Activity", designNote:"A long sinuous being made of polished black volcanic glass that swims through lava streams — beautiful and alien. Doubles → Moonstone (~44% trigger on wins) creates the first real Moonstone generation engine in VA. Synergizes with Fluxling: nudge dice into doubles, Eel refills the Moonstone you spent nudging. Art direction: a sleek eel of polished obsidian glass, semi-transparent, cool blue-white glow pulsing along its spine, slow and hypnotic."},
+  {id:414, name:"Ember Mole", rarity:"uncommon", maxHp:5, ability:"Warm Pocket", abilityDesc:"Entry: gain 1 Healing Seed.", category:"Resource Generation", set:"Volcanic Activity", designNote:"THE cozy card of Volcanic Activity. A stubby little mole who has lived underground in the lava tubes for so long it radiates warmth and contentment. Modest entry Healing Seed — not flashy, just warm and helpful. Bridges VA into cross-set Healing Seed strategies. The card that makes players go 'aww' before dropping it. Art direction: a plump mole with velvety ashen-grey fur, tiny pink claws, eyes glowing like embers, wears a small dirt-stained waistcoat, peering up from a tunnel mouth."},
+  {id:415, name:"Spout", rarity:"uncommon", maxHp:6, ability:"Pressure Release", abilityDesc:"Before rolling: declare a number 1–6. If any of your dice show that number this roll, deal +2 damage.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"A geyser spirit — builds pressure and erupts when the right conditions align. Calling a specific number fires ~42% of time (1-(5/6)^3), so it rewards prediction skill. Skilled players use Moonstones or Fluxling to guarantee a trigger; beginners will miss often but love it when they hit. 6HP gives the gambler some staying power. Art direction: a tall narrow pressure-column creature made of superheated steam and white mineral deposits, wide-open mouth, always on the verge of going off, slightly panicked energy."},
+  {id:416, name:"Pyroclast", rarity:"rare", maxHp:6, ability:"Blow Your Stack", abilityDesc:"Spend 1 Sacred Fire before rolling: if you win this round, singles deal 3 damage and doubles deal 5 damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Born from eruption itself — a jagged lava fragment given explosive, furious life. Transforms your entire damage profile at Sacred Fire cost. 5 damage on a doubles win can one-shot most ghosts. Best deployed as a finisher once resources are banked. Wyatt flag: Pyroclast + Humar (336 — generates Sacred Fire on wins) is a very powerful loop. Worth dedicated testing. Art direction: a jagged irregular mass of cooling-and-glowing lava rock, mid-explosion state, chunks of magma orbiting it, furious and alive."},
+  {id:417, name:"Hesta", rarity:"rare", maxHp:6, ability:"Hearthkeeper", abilityDesc:"Win: heal 1 HP. Win with doubles or better: heal 2 HP instead. Heals can exceed max HP.", category:"HP Recovery", set:"Volcanic Activity", designNote:"The grandmother of the volcano — an ancient hearth spirit who has been keeping the fire alive since the first eruption. Named for Hestia (goddess of the hearth) but gentler and more lived-in. Clean tiered healer: singles win = 1HP, doubles+ = 2HP. Overclock allowed per Gary's rules. Gives VA critical sustain to counterbalance the set's glass-cannon tendencies. Art direction: a warm ancient figure made of low-banked hearthfire and old stone, like a grandmother literally made of embers — kind expression, soft orange glow, not scary, radiates warmth."},
+  {id:418, name:"Pip", rarity:"ghost-rare", maxHp:5, ability:"Ember Loop", abilityDesc:"Win: deal +1 damage. Win with triples: deal +3 bonus damage instead, and Pip heals 2 HP from pure elation (can exceed max HP).", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"THE one. A tiny ember dragon who passed away mid-giggle while doing a delighted spin-jump near a hot geyser. The ghost still does the spin. Cannot stop. Genuinely does not understand death and has no plans to start. The +1 on all wins is the reliable floor; the triples payoff (+3 damage + 2HP from sheer joy) is the unforgettable jackpot at 2.8% — rare but legendary when it lands. NOT Dragonclaw. Dragonclaw rakes. Pip giggles. Mandatory holo foil. Midjourney art direction: tiny translucent ember dragon ghost mid-loop-de-loop, wings spread in delight, open-mouthed giggle with tiny smoke puffs from nostrils, surrounded by floating warm sparks, Spiritkin ghost transparency, warm orange-gold backlight, pure JOY."},
+  {id:419, name:"Hedgeling", rarity:"common", maxHp:4, ability:"Hedge Magic", abilityDesc:"Sideline: whenever your active ghost spends a Healing Seed, gain 1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", designNote:"A tiny sprite that lives inside the hedgerows between fields — you can only see it if you know to look. Passive synergy that rewards Healing Seed builds: every seed spent also generates luck. Combos with Chester, Gourdling, Beewick, and The Overcast naturally. Art direction: a 6-inch figure peering through a gap in a thorny green hedgerow, mossy green skin, bright curious eyes, small acorn cap, nearly invisible against the hedge."},
+  {id:420, name:"Gourdling", rarity:"common", maxHp:4, ability:"Autumn Offering", abilityDesc:"Entry: gain 2 Healing Seeds.", category:"Resource Generation", set:"Rolling Hills", designNote:"A pumpkin-spirit — round, orange, genuinely delighted by autumn. Entry 2 Healing Seeds is a resource burst that fuels The Overcast, Magnolia, Beewick, and Chester combos. Feels like opening a harvest basket. Pairs naturally with any Healing Seed payoff card. Art direction: a round gently glowing jack-o-lantern creature with an authentically HAPPY carved expression (not spooky — joyful), autumn leaves orbiting it, warm amber light from within."},
+  {id:421, name:"Boggart", rarity:"common", maxHp:3, ability:"Mischief Night", abilityDesc:"Win: opponent loses 1 resource of your choice. Boggart gains 1 Lucky Stone.", category:"Disruption", set:"Rolling Hills", designNote:"A classic Rolling Hills fiend — not evil, just deeply committed to harmless trouble. On a win it steals something from the opponent AND pockets a Lucky Stone for itself. The dual payoff makes this feel gleefully chaotic. 3HP keeps it honest — it's a pest, not a monster. Art direction: a small hunched figure with crinkle-eyed mischievous grin, pockets stuffed with stolen goods (pie crust sticking out, a turnip, a pocket watch), twinkling troublemaker eyes."},
+  {id:422, name:"Bracken", rarity:"common", maxHp:4, ability:"Cover", abilityDesc:"Sideline: your active ghost takes -1 damage from all hits while Bracken has more HP than they do.", category:"Defense/Negation", set:"Rolling Hills", designNote:"A rustle-in-the-undergrowth spirit — bracken fern given quiet watchful form. Protects a weakened teammate from the bench in a way that scales naturally: when your fighter is battered below Bracken's HP (both face-up, no tracking), the bracken covers them. Grows more valuable as the battle wears on. Art direction: a creature woven from bracken ferns and undergrowth, half-visible against a green hillside, protective earthy-brown eyes, nearly camouflaged."},
+  {id:423, name:"Beewick", rarity:"uncommon", maxHp:5, ability:"Swarm Share", abilityDesc:"Win: gain 1 Lucky Stone for each Healing Seed your team currently holds.", category:"Resource Generation", set:"Rolling Hills", designNote:"A beekeeper spirit who has become, over time, more bees than person. The bees represent the Healing Seeds; when the swarm wins they bring back luck. Can whiff entirely (0 Seeds = 0 Lucky Stones) so it actively rewards stacking the Healing Seed economy before swinging. Hard synergy with Gourdling and Chester. Wyatt flag: in a full Healing Seed stack (4–5 seeds) this generates a lot of Lucky Stones per win. Art direction: a small humanoid wrapped in a living golden cloak of bees, beekeeper veil half-raised, calm expression, warm golden buzzing light from the swarm."},
+  {id:424, name:"Digby", rarity:"uncommon", maxHp:5, ability:"Lucky Find", abilityDesc:"Entry: gain 1 Moonstone.", category:"Resource Generation", set:"Rolling Hills", designNote:"A mole farmer who has dug through enough hills to know exactly where the shiny things are. Moonstone on entry is clean uncommon-level power — fuels any Moonstone strategy, bridges RH into the Fluxling/Obsidian Eel VA cross-play, and rewards deckbuilders who value die control. Art direction: a stout mole in a dirt-stained work vest, holding a discovered moonstone triumphantly, still has mud on his snout, enormously pleased with himself."},
+  {id:425, name:"Rushwick", rarity:"uncommon", maxHp:5, ability:"Rush Light", abilityDesc:"Sideline: your active ghost is immune to debuff abilities while Rushwick is on the bench.", category:"Defense/Negation", set:"Rolling Hills", designNote:"A lantern-bearer who lights safe paths through the hills at night. Rush light is an old English candle made from rush-grass — the humblest and most reliable light there is. Sideline debuff immunity is soft but meaningful: counters Scorch's permanent HP reduction, Slag Heap's burn, and Brimstone's resource-spend punishment. The card whose name makes you say 'of course that's its name.' Art direction: a small robed figure carrying a glowing rush-light, walking a nighttime hill path, warm circle of light pushing back the dark, deeply cozy."},
+  {id:426, name:"Chester", rarity:"uncommon", maxHp:6, ability:"Aged to Perfection", abilityDesc:"Win: gain 1 Healing Seed. Win with doubles or better: gain 2 Healing Seeds instead.", category:"Resource Generation", set:"Rolling Hills", designNote:"A cheese-cellar dweller who has been down there with the wheels of cheese for a very long time and is extremely satisfied about this. Tiered Healing Seed gen: modest on singles wins, bursts to 2 on doubles+. At 6HP he stays in the fight long enough for those seeds to stack into something meaningful. Core engine for Beewick and The Overcast builds. Art direction: a round softly luminous figure shaped somewhat like a wheel of aged cheese, impossibly dignified expression, surrounded by floating cheese wheels in a warm candlelit stone cellar, moonlight through a cellar grate."},
+  {id:427, name:"Brock", rarity:"uncommon", maxHp:6, ability:"Sett Warden", abilityDesc:"Win: deal +1 damage. Lose: take -1 damage.", category:"Defense/Negation", set:"Rolling Hills", designNote:"The rolling hills' unofficial guardian — a badger, specifically. 'Brock' is the old English name for badger. The sett is the stable center of any field. Win or lose, Brock cushions every exchange: hits harder when ahead, takes less when behind. Reliable two-way modifier on a 6HP body. Works as a fighter or a bench presence that makes your active ghost feel safer. Art direction: a dignified badger in a dark well-worn coat, standing on a hillside at dusk, protective expression, white stripe catching the last light."},
+  {id:428, name:"Pickwick", rarity:"rare", maxHp:6, ability:"Traveller's Pack", abilityDesc:"Entry: gain 1 Lucky Stone, 1 Healing Seed, and 1 Surge.", category:"Resource Generation", set:"Rolling Hills", designNote:"The ghost of a joyful wanderer who never stopped moving in life and hasn't stopped in death either. Entry resource burst — one of each immediately usable resource (no Sacred Fire keeps it balanced). 6HP means he can fight, not just be hit-and-swap. RH's merchant hero. Wyatt flag: Pickwick + The Shepherd resurrection loop could refuel resources repeatedly — worth testing. Art direction: a round happy wanderer in a well-worn travelling coat, bulging pack slung over one shoulder, big grin, glowing footsteps trailing behind him on a rolling hill path."},
+  {id:429, name:"Old Cap", rarity:"rare", maxHp:5, ability:"Final Bloom", abilityDesc:"When Old Cap is KO'd: your next ghost enters play with +3 HP (can exceed max HP).", category:"HP Recovery", set:"Rolling Hills", designNote:"An ancient mushroom spirit — slow, unremarkable, deeply wise, and quietly spectacular at the very end. The death trigger creates a genuine sacrifice archetype: deliberately send Old Cap into danger, let it die, empower the next ghost with an HP surge. Risk-reward deckbuilding that rewards planning. +3HP overclocks per Gary's rules. Art direction: a large ancient mushroom cap creature in earthy browns and mossy greens, face like a very old tree, slowly releasing spores as it begins to fade, gentle and warm, not dramatic — just quietly complete."},
+  {id:430, name:"Millicent", rarity:"rare", maxHp:5, ability:"Cunning Folk", abilityDesc:"Spend 1 Moonstone: look at all of your opponent's current resources, then take 1 of your choice. They lose it.", category:"Disruption", set:"Rolling Hills", designNote:"The cunning folk of the Rolling Hills — hedge-witch, wise-woman, someone you bring a pie to before you bring a problem. Moonstone-powered full information + theft: see everything they have, take the worst thing for them to lose. Spending Moonstone (rare resource) for information and theft is elegant. Active, decisive, satisfying for the person playing it. Art direction: a sharp-eyed older woman-shaped figure in a patchwork cloak, standing at a fork in the hill paths, wisps of blue-grey smoke curling from her hands, deeply knowing expression — she already knows what you're going to say."},
+  {id:431, name:"The Overcast", rarity:"ghost-rare", maxHp:7, ability:"For The King", abilityDesc:"Win: spend any number of Healing Seeds. Deal +2 damage for each Healing Seed spent.", category:"Damage Multiplier", set:"Rolling Hills", designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
   // === VOLCANIC ACTIVITY — Designed Cards ===
   {id:317, name:"Scorch", art:"art/scorch.webp", rarity:"common", maxHp:3, ability:"Singe", abilityDesc:"Win: opponent's active ghost loses 1 max HP permanently.", category:"Debuff", set:"Volcanic Activity", designNote:"Permanent max HP reduction. Shrinks opponent over time."},
   {id:319, name:"Pumice", art:"art/pumice.webp", rarity:"common", maxHp:4, ability:"Float", abilityDesc:"Sideline: if your ghost would take 3+ damage, reduce to 2.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Damage cap from sideline."},
@@ -3470,7 +3461,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Bouril (201) — Slumber: first roll is auto 1-2-3
   if (f.id === 201) {
     f.hankFirstRoll = true;
-    entryCallouts.push(['SLUMBER!', 'var(--uncommon)', `${f.name} — first roll locked to 1-2-3!`]);
+    entryCallouts.push(['SLUMBER!', 'var(--uncommon)', `${f.name} — first roll locked to 1-2-3!`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> enters lazily — first roll will be 1-2-3.`);
     collectKnightReactions();
   }
@@ -3484,7 +3475,7 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`]);
+      entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
@@ -3495,7 +3486,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Maximo (302) — Nap: first roll is 1 die
   if (f.id === 302) {
     f.maximoFirstRoll = true;
-    entryCallouts.push(['NAP!', 'var(--common)', `${f.name} — first roll is 1 die only!`]);
+    entryCallouts.push(['NAP!', 'var(--common)', `${f.name} — first roll is 1 die only!`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> is napping... first roll will be only 1 die.`);
     collectKnightReactions();
   }
@@ -3503,7 +3494,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Redd (98) — Notorious: first roll after entry gets +2 extra dice
   if (f.id === 98) {
     f.reddFirstRoll = true;
-    entryCallouts.push(['NOTORIOUS!', 'var(--ghost-rare)', `${f.name} — +2 dice for this roll!`]);
+    entryCallouts.push(['NOTORIOUS!', 'var(--ghost-rare)', `${f.name} — +2 dice for this roll!`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Notorious! Enters with +2 bonus dice for the first roll!`);
     collectKnightReactions();
   }
@@ -3518,7 +3509,7 @@ function triggerEntry(team, skipEntryEffects) {
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       entryCallouts.push(['GREETING!', 'var(--ghost-rare)',
-        `${f.name} — rolled [${jenkinsDice.join(', ')}] = ${jenkinsSum} entry damage to ${ef.name}!`]);
+        `${f.name} — rolled [${jenkinsDice.join(', ')}] = ${jenkinsSum} entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Greeting! Rolled [${jenkinsDice.join(', ')}] = <span class="log-dmg">${jenkinsSum} entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
       playDamageSfx(jenkinsSum);
       hitDamage(enemyName);
@@ -3535,7 +3526,7 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 3);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['BIG TARGET!', 'var(--rare)', `${f.name} — 3 damage to ${ef.name}!`]);
+      entryCallouts.push(['BIG TARGET!', 'var(--rare)', `${f.name} — 3 damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
       hitDamage(enemyName);
@@ -3550,7 +3541,7 @@ function triggerEntry(team, skipEntryEffects) {
       ef.hp = Math.max(0, ef.hp - 1);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
       const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['MENACE!', 'var(--uncommon)', `${f.name} — 1 entry damage to ${ef.name}!`]);
+      entryCallouts.push(['MENACE!', 'var(--uncommon)', `${f.name} — 1 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Menace! <span class="log-dmg">1 entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
       playDamageSfx(1);
       hitDamage(enemyName);
@@ -3565,10 +3556,10 @@ function triggerEntry(team, skipEntryEffects) {
       const gain = koCount * 2;
       const before = f.hp;
       f.hp += gain; // allow overclock — late-game scaling tank
-      entryCallouts.push(['SOLITUDE!', 'var(--uncommon)', `${f.name} — +${gain} HP from ${koCount} fallen ghost${koCount > 1 ? 's' : ''}! (${before}→${f.hp} HP)`]);
+      entryCallouts.push(['SOLITUDE!', 'var(--uncommon)', `${f.name} — +${gain} HP from ${koCount} fallen ghost${koCount > 1 ? 's' : ''}! (${before}→${f.hp} HP)`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Solitude! +${gain} HP from ${koCount} fallen ghosts. (${before}→${f.hp} HP)`);
     } else {
-      entryCallouts.push(['SOLITUDE!', 'var(--uncommon)', `${f.name} — No fallen ghosts yet. Waiting...`]);
+      entryCallouts.push(['SOLITUDE!', 'var(--uncommon)', `${f.name} — No fallen ghosts yet. Waiting...`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Solitude! No fallen ghosts yet.`);
     }
   }
@@ -3577,12 +3568,12 @@ function triggerEntry(team, skipEntryEffects) {
   // Sandwiches (33) Dependable: opponent mirrors the Ice Shard gain.
   if (f.id === 56) {
     team.resources.ice += 2;
-    entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`]);
+    entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
     collectKnightReactions();
     if (hasSideline(enemy, 33)) {
       enemy.resources.ice += 2;
-      entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`]);
+      entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`, entryTeamName === 'red' ? 'blue' : 'red']);
       log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
     }
   }
@@ -3595,7 +3586,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (enemySideline.length > 0) {
       if (!B.raditzHuntReady) B.raditzHuntReady = { red: false, blue: false };
       B.raditzHuntReady[teamName] = true;
-      entryCallouts.push(['HUNT!', 'var(--rare)', `${f.name} — may force an opponent swap before rolling!`]);
+      entryCallouts.push(['HUNT!', 'var(--rare)', `${f.name} — may force an opponent swap before rolling!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Hunt! Primed — choose to force an opponent swap before rolling.`);
     }
   }
@@ -3603,16 +3594,8 @@ function triggerEntry(team, skipEntryEffects) {
   // Dallas (60) — Quick Draw: on entry from sideline, prime die theft for first 2 rolls
   if (f.id === 60) {
     f.dallasQuickDraw = 2;
-    entryCallouts.push(['QUICK DRAW!', 'var(--uncommon)', `${f.name} — stealing 1 opponent die for the next 2 rolls!`]);
+    entryCallouts.push(['QUICK DRAW!', 'var(--uncommon)', `${f.name} — stealing 1 opponent die for the next 2 rolls!`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Quick Draw! Steals 1 opponent die for the first 2 rolls.`);
-    collectKnightReactions();
-  }
-
-  // Tadpole (358) — Splash: on entry, gain 1 Surge
-  if (f.id === 358) {
-    team.resources.surge++;
-    entryCallouts.push(['SPLASH!', 'var(--common)', `${f.name} — +1 Surge on entry! (${team.resources.surge} total)`]);
-    log(`<span class="log-ability">${f.name}</span> — Splash! Gained <span class="log-surge">1 Surge</span>! (${team.resources.surge} total)`);
     collectKnightReactions();
   }
 
@@ -3624,7 +3607,7 @@ function triggerEntry(team, skipEntryEffects) {
     const enteringTeamName = team === B.red ? 'red' : 'blue';
     const nicholasTeamName = enteringTeamName === 'red' ? 'blue' : 'red';
     entryCallouts.push(['SNEAK ATTACK!', 'var(--uncommon)',
-      `${nicholasGhost.name} — 2 damage to ${f.name} on entry!`]);
+      `${nicholasGhost.name} — 2 damage to ${f.name} on entry!`, nicholasTeamName]);
     log(`<span class="log-ability">${nicholasGhost.name}</span> — Sneak Attack! <span class="log-dmg">2 damage to ${f.name} on entry!</span> ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
     playDamageSfx(2);
     hitDamage(enteringTeamName);
@@ -3641,8 +3624,9 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Fire all entry callouts sequentially — each 1500ms after the previous
+  // c[3] = team string for card-glow spotlight; undefined = narrator-only fallback
   entryCallouts.forEach((c, i) => {
-    setTimeout(() => showAbilityCallout(c[0], c[1], c[2]), i * 1500);
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
   });
   return entryCallouts.length;
 }
@@ -4746,17 +4730,6 @@ function doRaditzHuntChoice(choice) {
   const enemy = B[enemyTeamName];
   const aliveSideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
 
-  // Barnaby (326) — Stubborn: immune to forced switches — Raditz Hunt fails
-  const huntTargetActive = active(enemy);
-  if (huntTargetActive && huntTargetActive.id === 326) {
-    narrate(`<b class="${team}-text">Raditz</b> — Hunt! <b class="${enemyTeamName}-text">Barnaby</b> resists — cannot be forced out!`);
-    showAbilityCallout('STUBBORN!', 'var(--uncommon)', `Barnaby resists Raditz's Hunt!`);
-    log(`Barnaby — Stubborn! Immune to Raditz's Hunt.`);
-    if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1800);
-    return;
-  }
-
   if (aliveSideline.length === 0) {
     // No valid swap targets (shouldn't happen, but guard it)
     narrate(`<b class="${team}-text">Raditz</b> — Hunt! No sideline ghosts to swap in.`);
@@ -5501,15 +5474,6 @@ function doWinstonSchemeChoice(idx) {
   const oldName = oldGhost.name;
   const newGhost = loseTeam.ghosts[idx];
 
-  // Barnaby (326) — Stubborn: immune to forced switches
-  if (oldGhost.id === 326) {
-    narrate(`<b class="${winTeamColor}">Winston</b> — Scheme blocked! <b class="${loseTeamColor}">Barnaby</b> cannot be forced out!`);
-    showAbilityCallout('STUBBORN!', 'var(--uncommon)', `Barnaby resists Winston's Scheme!`);
-    log(`Barnaby — Stubborn! Immune to Winston's Scheme.`);
-    setTimeout(() => { continuation(); }, 1500);
-    return;
-  }
-
   loseTeam.activeIdx = idx; // old active goes to sideline, chosen ghost becomes active
   renderBattle();
 
@@ -6181,13 +6145,6 @@ function openDuelPhasePrimers(team) {
     const huntTargetActive = active(enemy);
     const aliveSideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
 
-    // Auto-skip: Barnaby (326) — Stubborn: immune to forced switches
-    if (huntTargetActive && huntTargetActive.id === 326) {
-      narrate(`<b class="${team}-text">Raditz</b> — Hunt! <b class="${oppTeamName}-text">${huntTargetActive.name}</b> is Stubborn — cannot be forced out!`);
-      showAbilityCallout('STUBBORN!', 'var(--uncommon)', `${huntTargetActive.name} resists Raditz's Hunt!`);
-      log(`Barnaby — Stubborn! Raditz's Hunt blocked in Duel Phase.`);
-      return false; // auto-skipped, no primer opened
-    }
     // Auto-skip: opponent has no alive sideline ghosts
     if (aliveSideline.length === 0) {
       narrate(`<b class="${team}-text">Raditz</b> — Hunt primed, but the opponent has no sideline ghosts to swap in.`);
@@ -6622,59 +6579,6 @@ function doPreRollSetup() {
             hitDamage(tNameSplinter);
           }
         }
-      }
-    }
-  });
-
-  // Wick (349) — Slow Burn: each round, deal 1 chip to enemy + pay 1 HP self-cost before rolling
-  [B.red, B.blue].forEach(team => {
-    const wickGhost = active(team);
-    if (wickGhost.id === 349 && !wickGhost.ko) {
-      const enemy = opp(team);
-      const ef = active(enemy);
-      const tNameWick = team === B.red ? 'red' : 'blue';
-      const enemyName = enemy === B.red ? 'red' : 'blue';
-      if (!ef.ko) {
-        if (dylanNegates(enemy)) {
-          log(`<span class="log-ability">Slow Burn</span> blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
-        } else {
-          const preHpEnemy = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 349; }
-          const wickMsg = ef.ko
-            ? `Slow Burn scorches ${ef.name}! (${preHpEnemy} HP → KO!)`
-            : `Slow Burn scorches ${ef.name}! (${preHpEnemy} → ${ef.hp} HP)`;
-          preRollCallouts.push(['SLOW BURN!', 'var(--uncommon)', wickMsg]);
-          log(`<span class="log-ability">Wick</span> — Slow Burn! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
-          playDamageSfx(1);
-          hitDamage(enemyName);
-          // Collect Knight reactions via temp queue so they splice AFTER SLOW BURN! in preRollCallouts
-          const _wickSavedKQ = abilityQueue;
-          abilityQueue = [];
-          abilityQueueMode = true;
-          checkKnightEffects(tNameWick, wickGhost.name);
-          abilityQueueMode = false;
-          abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc]));
-          abilityQueue = _wickSavedKQ;
-          // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
-          if (ef.id === 55 && !ef.ko) {
-            const undPreWick = wickGhost.hp;
-            wickGhost.hp = Math.max(0, wickGhost.hp - 3);
-            if (wickGhost.hp <= 0) { wickGhost.ko = true; wickGhost.killedBy = 55; }
-            const undMsgWick = wickGhost.ko
-              ? `${ef.name} counters! 3 damage to ${wickGhost.name}! (${undPreWick} HP → KO!)`
-              : `${ef.name} counters! 3 damage to ${wickGhost.name}! (${undPreWick} → ${wickGhost.hp} HP)`;
-            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsgWick]);
-            log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${wickGhost.name}!`);
-            playDamageSfx(3);
-            hitDamage(tNameWick);
-          }
-        }
-      }
-      // Self-cost: Wick loses 1 HP each round but cannot self-KO
-      if (!wickGhost.ko && wickGhost.hp > 1) {
-        wickGhost.hp -= 1;
-        log(`<span class="log-ability">Wick</span> — Slow Burn self-cost! ${wickGhost.name} loses 1 HP (${wickGhost.hp + 1} → ${wickGhost.hp} HP)`);
       }
     }
   });
@@ -7351,12 +7255,12 @@ function doPostRollAndResolve(redDice, blueDice) {
           _tremTeam.resources.luckyStone += _tremFours;
           log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
           renderBattle();
-        });
+        }, tNameHank);
         checkKnightEffects(tNameHank, f.name);
         if (hasSideline(opp(team), 33)) {
           const _sandOpp = opp(team);
           const _sandTotal = _sandOpp.resources.luckyStone + fours;
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); });
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); }, tNameHank === 'red' ? 'blue' : 'red');
         }
       }
     }
@@ -7386,10 +7290,10 @@ function doPostRollAndResolve(redDice, blueDice) {
         _natTeam.resources.moonstone++;
         log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → gained <span class="log-ms">1 Moonstone</span>!`);
         renderBattle();
-      });
+      }, tNameNat);
       checkKnightEffects(tNameNat, f.name);
       if (hasSideline(opp(team), 33)) {
-        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone++; renderBattle(); });
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone++; renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
       }
     }
   });
@@ -7408,10 +7312,10 @@ function doPostRollAndResolve(redDice, blueDice) {
         _kapTeam.resources.healingSeed++;
         log(`<span class="log-ability">${_kapName}</span> — Pollinate! Opponent rolled doubles → gained <span class="log-ms">1 Healing Seed</span>!`);
         renderBattle();
-      });
+      }, tNameKap);
       checkKnightEffects(tNameKap, f.name);
       if (hasSideline(opp(team), 33)) {
-        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); });
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); }, tNameKap === 'red' ? 'blue' : 'red');
       }
     }
   });
@@ -9249,18 +9153,6 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Teamwork! Singles win → +2 damage!`);
   }
 
-  // Cluck (340) — Peck: singles win deals +2 bonus damage.
-  // Ported from GHOSTS abilityDesc: "Win with singles: deal +2 damage."
-  let cluckTriggered = false;
-  let cluckBaseDmg = 0;
-  if (wF.id === 340 && !wF.ko && wR.type === 'singles') {
-    cluckBaseDmg = dmg;
-    dmg += 2;
-    cluckTriggered = true;
-    collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Peck! Singles win → +2 damage!`);
-  }
-
   // Greg (49) — Chase: if Greg has more HP than the opposing ghost, rolls deal 2X damage.
   // Faithfully ported from GHOSTS abilityDesc: "If Greg has more health than the opposing ghost, Greg's rolls do x2 damage."
   let gregTriggered = false;
@@ -9751,20 +9643,13 @@ function _resolveRoundImpl() {
   // Fires after Guardian Fairy (GF absorption irrelevant here since Gus is the winner).
   let galeForceSwap = false;
   let galeForceSLIdx = -1;
-  let galeForceBlockedByBarnaby = false;
   if (wF.id === 31 && !wF.ko && B.galeForcePending && B.galeForcePending[winTeamName]) {
-    if (lF.id === 326) {
-      // Barnaby (326) — Stubborn: immune to forced switches — Gale Force fails, normal damage applies
-      galeForceBlockedByBarnaby = true;
-      log(`<span class="log-ability">Barnaby</span> — Stubborn! Gale Force blocked — cannot be forced out!`);
-    } else {
-      galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
-      if (galeForceSLIdx >= 0) {
-        dmg = 0; // override ALL computed damage — no hit
-        galeForceSwap = true;
-        collectKC(winTeamName, wF.name);
-        log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeamName} must choose a replacement ghost!`);
-      }
+    galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
+    if (galeForceSLIdx >= 0) {
+      dmg = 0; // override ALL computed damage — no hit
+      galeForceSwap = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeamName} must choose a replacement ghost!`);
     }
   }
   if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; } // consumed or unused
@@ -9868,33 +9753,6 @@ function _resolveRoundImpl() {
       wFName: wF.name,
       loseTeamName: loseTeamName
     };
-  }
-
-  // Thistle (338) — Barbed: when Thistle takes damage, the attacker takes 1 damage back. Always.
-  // Fires even on the KO hit — the barbs are still there.
-  let thistleBarbed = false;
-  let thistleHpAfter = 0;
-  if (lF.id === 338 && dmg > 0) {
-    thistleHpAfter = Math.max(0, wF.hp - 1); // compute only — HP bar deferred to onShow
-    if (thistleHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; } // ko flag synchronous (Cameron/Balatron check)
-    thistleBarbed = true;
-    log(`<span class="log-ability">${lF.name}</span> — Barbed! 1 recoil damage to ${wF.name}! ${wF.ko ? '<span class="log-ko">KO!</span>' : thistleHpAfter + ' HP left'}`);
-  }
-
-  // Puff Ball (355) — Burst: when hit by doubles, explode for 2 damage to the attacker then self-KO.
-  // Fires even if normal damage already KO'd Puff Ball — the explosion is its final act.
-  let puffBallBurst = false;
-  let puffBurstHpAfter = 0;
-  if (lF.id === 355 && wR.type === 'doubles') {
-    const puffBurstDmg = 2;
-    puffBurstHpAfter = Math.max(0, wF.hp - puffBurstDmg); // compute only — defer mutation to onShow
-    if (puffBurstHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; } // KO flag sync (Cameron reads wF.ko)
-    lF.hp = 0;
-    lF.ko = true;
-    lF.killedBy = 355; // self-destruct
-    puffBallBurst = true;
-    collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Burst! ${wF.name} rolled doubles — ${lF.name} explodes for ${puffBurstDmg} damage! ${wF.ko ? '<span class="log-ko">KO!</span>' : puffBurstHpAfter + ' HP left'} ${lF.name} self-destructs!`);
   }
 
   // Bubble Boys (44) — Pop: if the opposing ghost rolled triples, Bubble Boys are instantly defeated.
@@ -10111,7 +9969,6 @@ function _resolveRoundImpl() {
 
   // On-KO triggers (game state) — resource grants deferred to BEDTIME STORY!/BITTER END! onShow
   let powderFinalGiftTriggered = false;
-  let mulchDecomposeTriggered = false;
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
       const grannyGhost = getSidelineGhost(loseTeam, 310);
@@ -10122,20 +9979,7 @@ function _resolveRoundImpl() {
       powderFinalGiftTriggered = true;
       log(`<span class="log-ability">${lF.name}</span> — Final Gift! KO'd... leaving 3 Ice Shards for the next ghost.`);
     }
-    // Mulch (348) — Decompose: KO'd → team gains 2 Healing Seeds
-    if (lF.id === 348) {
-      mulchDecomposeTriggered = true;
-      log(`<span class="log-ability">${lF.name}</span> — Decompose! KO'd... leaving 2 Healing Seeds for the team.`);
-    }
     // Chagrin on-KO surge deferred to BITTER END! onShow below
-  }
-
-  // Harvest Moon (346) — Reaping: defeat a ghost → gain 1 Healing Seed, 1 Sacred Fire, 1 Surge
-  // abilityDesc note: "Healing Seed, Surge, Surge" is a typo — implemented as all 3 distinct resources.
-  let harvestMoonTriggered = false;
-  if (wF.id === 346 && !wF.ko && lF.ko) {
-    harvestMoonTriggered = true;
-    log(`<span class="log-ability">${wF.name}</span> — Reaping! ${lF.name} defeated → +1 Healing Seed, +1 Sacred Fire, +1 Surge!`);
   }
 
   // Granny Bedtime Story fires for the WINNER's team too when the winner self-KOs (Pudge Belly Flop)
@@ -10177,7 +10021,7 @@ function _resolveRoundImpl() {
   // Damage modifier callouts
   if (B.auntSusanBonus[winTeamName] > 0) {
     const cnt = B.auntSusanBonus[winTeamName];
-    queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} damage!`);
+    queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} damage!`, null, winTeamName);
   }
   // Aunt Susan heal callouts (both teams) — actual HP mutation happens inside onShow so the bar
   // jumps exactly when HARVEST DANCE! (or MASK MERCHANT!) fires, not before.
@@ -10201,37 +10045,37 @@ function _resolveRoundImpl() {
     }
   });
   if (pudgeSelfDmg || (wF.id === 311 && wR.type === 'doubles')) {
-    queueAbility('BELLY FLOP!', 'var(--common)', `${wF.name} — Doubles! +2 damage, 1 self-damage! (${pudgeHpAfter} HP left)`, pudgeSelfDmgApplied ? () => { wF.hp = pudgeHpAfter; renderBattle(); } : null);
+    queueAbility('BELLY FLOP!', 'var(--common)', `${wF.name} — Doubles! +2 damage, 1 self-damage! (${pudgeHpAfter} HP left)`, pudgeSelfDmgApplied ? () => { wF.hp = pudgeHpAfter; renderBattle(); } : null, winTeamName);
   }
   if (mountainKingTriggered) {
-    queueAbility('BEAST MODE!', 'var(--legendary)', `${wF.name} — Doubles! ${mountainKingBaseDmg} × 2 = ${dmg} damage!`);
+    queueAbility('BEAST MODE!', 'var(--legendary)', `${wF.name} — Doubles! ${mountainKingBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (stoneColdTriggered) {
-    queueAbility('ONE-TWO-ONE!', 'var(--rare)', `${wF.name} — Double 1s! ${stoneColdBaseDmg} × 3 = ${dmg} damage!`);
+    queueAbility('ONE-TWO-ONE!', 'var(--rare)', `${wF.name} — Double 1s! ${stoneColdBaseDmg} × 3 = ${dmg} damage!`, null, winTeamName);
   }
   if (larryTriggered) {
-    queueAbility('FLYING KICK!', 'var(--uncommon)', `${wF.name} — Triples! ${larryBaseDmg} × 3 = ${dmg} damage!`);
+    queueAbility('FLYING KICK!', 'var(--uncommon)', `${wF.name} — Triples! ${larryBaseDmg} × 3 = ${dmg} damage!`, null, winTeamName);
   }
   if (buttonsTriggered) {
-    queueAbility('PERFECT PLAN!', 'var(--common)', `${wF.name} — TRIPLE 6s!!! ${buttonsBaseDmg} + 15 = ${dmg} damage!!`);
+    queueAbility('PERFECT PLAN!', 'var(--common)', `${wF.name} — TRIPLE 6s!!! ${buttonsBaseDmg} + 15 = ${dmg} damage!!`, null, winTeamName);
   }
   if (nikonTriggered) {
-    queueAbility('AMBUSH!', 'var(--common)', `${wF.name} — First roll! ${nikonBaseDmg} × 3 = ${dmg} damage!`);
+    queueAbility('AMBUSH!', 'var(--common)', `${wF.name} — First roll! ${nikonBaseDmg} × 3 = ${dmg} damage!`, null, winTeamName);
   }
   if (caveDwellerTriggered) {
-    queueAbility('LURK!', 'var(--uncommon)', `${wF.name} — First roll ambush! ${caveDwellerBaseDmg} × 3 = ${dmg} damage!`);
+    queueAbility('LURK!', 'var(--uncommon)', `${wF.name} — First roll ambush! ${caveDwellerBaseDmg} × 3 = ${dmg} damage!`, null, winTeamName);
   }
   if (doomTriggered) {
-    queueAbility('FIENDSHIP!', 'var(--legendary)', `${wF.name} — Win! +2 bonus damage dealt!`);
+    queueAbility('FIENDSHIP!', 'var(--legendary)', `${wF.name} — Win! +2 bonus damage dealt!`, null, winTeamName);
   }
   if (lucyTriggered) {
-    queueAbility('BLUE FIRE!', 'var(--legendary)', `${wF.name} — Win! +1 bonus damage dealt!`);
+    queueAbility('BLUE FIRE!', 'var(--legendary)', `${wF.name} — Win! +1 bonus damage dealt!`, null, winTeamName);
   }
   if (wimTriggered) {
-    queueAbility('SLASH!', 'var(--rare)', `${wF.name} — All dice odd! ${wimBaseDmg} + 5 = ${dmg} damage!`);
+    queueAbility('SLASH!', 'var(--rare)', `${wF.name} — All dice odd! ${wimBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
   if (snortonTriggered) {
-    queueAbility('FISSURE!', 'var(--rare)', `${wF.name} — Two 6s! ${snortonBaseDmg} + 5 = ${dmg} damage!`);
+    queueAbility('FISSURE!', 'var(--rare)', `${wF.name} — Two 6s! ${snortonBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
   if (floraRestored) {
     queueAbility('RESTORE!', 'var(--rare)', `${floraRestoredName} — Doubles! +2 HP! Now at ${floraRestoredHp} HP!`, () => { floraGhost.hp = floraRestoredHp; renderBattle(); });
@@ -10240,41 +10084,38 @@ function _resolveRoundImpl() {
     queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Restore cursed! ${floraFlippedName} takes 2 damage instead! (${floraFlippedFrom} → ${floraFlippedTo} HP)`, () => { floraGhost.hp = floraFlippedTo; renderBattle(); });
   }
   if (pelterTriggered) {
-    queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`);
+    queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (docTriggered) {
-    queueAbility('SAVAGE!', 'var(--uncommon)', `${wF.name} — Doubles! ${docBaseDmg} + 5 = ${dmg} damage!`);
+    queueAbility('SAVAGE!', 'var(--uncommon)', `${wF.name} — Doubles! ${docBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
   if (charlieTriggered) {
-    queueAbility('RUSH!', 'var(--common)', `${wF.name} — Double 2s! Override → exactly 7 damage!`);
+    queueAbility('RUSH!', 'var(--common)', `${wF.name} — Double 2s! Override → exactly 7 damage!`, null, winTeamName);
   }
   if (billBobTriggered) {
-    queueAbility('BAIT N SWITCH!', 'var(--uncommon)', `${wF.name} — Below 4 HP! ${billBobBaseDmg} × 2 = ${dmg} damage!`);
+    queueAbility('BAIT N SWITCH!', 'var(--uncommon)', `${wF.name} — Below 4 HP! ${billBobBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (alucardTriggered) {
-    queueAbility('COLONY CALL!', 'var(--uncommon)', `${wF.name} — Doubles! ${alucardSidelineCount} sideline ghost${alucardSidelineCount>1?'s':''} × 2 = ${alucardBaseDmg} + ${alucardSidelineCount*2} = ${dmg} damage! (Once per game used)`);
+    queueAbility('COLONY CALL!', 'var(--uncommon)', `${wF.name} — Doubles! ${alucardSidelineCount} sideline ghost${alucardSidelineCount>1?'s':''} × 2 = ${alucardBaseDmg} + ${alucardSidelineCount*2} = ${dmg} damage! (Once per game used)`, null, winTeamName);
   }
   if (castleGuardsTriggered) {
-    queueAbility('FLAMETHROWER!', 'var(--uncommon)', `${wF.name} — ${castleGuardsThreeCount} three${castleGuardsThreeCount>1?'s':''} rolled! ${castleGuardsBaseDmg} × ${Math.pow(2,castleGuardsThreeCount)} = ${dmg} damage!`);
+    queueAbility('FLAMETHROWER!', 'var(--uncommon)', `${wF.name} — ${castleGuardsThreeCount} three${castleGuardsThreeCount>1?'s':''} rolled! ${castleGuardsBaseDmg} × ${Math.pow(2,castleGuardsThreeCount)} = ${dmg} damage!`, null, winTeamName);
   }
   if (teamZippyTriggered) {
-    queueAbility('TEAMWORK!', 'var(--uncommon)', `${wF.name} — Singles win! ${teamZippyBaseDmg} + 2 = ${dmg} damage!`);
-  }
-  if (cluckTriggered) {
-    queueAbility('PECK!', 'var(--common)', `${wF.name} — Singles win! ${cluckBaseDmg} + 2 = ${dmg} damage!`);
+    queueAbility('TEAMWORK!', 'var(--uncommon)', `${wF.name} — Singles win! ${teamZippyBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (gregTriggered) {
-    queueAbility('CHASE!', 'var(--uncommon)', `${wF.name} — More HP than ${lF.name}! (${wF.hp} vs ${lF.hp}) ${gregBaseDmg} × 2 = ${dmg} damage!`);
+    queueAbility('CHASE!', 'var(--uncommon)', `${wF.name} — More HP than ${lF.name}! (${wF.hp} vs ${lF.hp}) ${gregBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (tommyTriggered) {
-    queueAbility('REGULATOR!', 'var(--common)', `${wF.name} — ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} regulated! ${tommyBaseDmg} + ${tommyRegulatedCount} = ${dmg} damage!`);
+    queueAbility('REGULATOR!', 'var(--common)', `${wF.name} — ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} regulated! ${tommyBaseDmg} + ${tommyRegulatedCount} = ${dmg} damage!`, null, winTeamName);
   }
   if (growingMobTriggered) {
     const growingMobGhost = wF; // safe closure reference
     if (growingMobFlipped) {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Growing Mob cursed! ${growingMobGhost.name} takes 2 damage instead! (→ ${growingMobHpAfter} HP)`, () => { growingMobGhost.hp = growingMobHpAfter; if (growingMobGhost.hp <= 0) { growingMobGhost.hp = 0; growingMobGhost.ko = true; growingMobGhost.killedBy = 59; } renderBattle(); });
     } else {
-      queueAbility('GROWING MOB!', 'var(--rare)', `${growingMobGhost.name} — ${dmg} damage dealt! +2 HP! Now at ${growingMobHpAfter} HP!`, () => { growingMobGhost.hp = growingMobHpAfter; renderBattle(); });
+      queueAbility('GROWING MOB!', 'var(--rare)', `${growingMobGhost.name} — ${dmg} damage dealt! +2 HP! Now at ${growingMobHpAfter} HP!`, () => { growingMobGhost.hp = growingMobHpAfter; renderBattle(); }, winTeamName);
     }
   }
   if (munchScrapTriggered) {
@@ -10282,51 +10123,34 @@ function _resolveRoundImpl() {
     if (munchFlipped) {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Scraps cursed! ${munchGhost.name} takes 4 damage instead! (${munchHpBefore} → ${munchHpAfter} HP)`, () => { munchGhost.hp = munchHpAfter; if (munchGhost.hp <= 0) { munchGhost.hp = 0; munchGhost.ko = true; munchGhost.killedBy = 59; } renderBattle(); });
     } else {
-      queueAbility('SCRAPS!', 'var(--rare)', `${munchGhost.name} — ${lF.name} defeated! +4 HP! (${munchHpBefore} → ${munchHpAfter}/${munchGhost.maxHp})`, () => { munchGhost.hp = munchHpAfter; renderBattle(); });
-    }
-  }
-  // Harvest Moon (346) — Reaping: defeat a ghost → gain 1 Healing Seed, 1 Sacred Fire, 1 Surge
-  if (harvestMoonTriggered) {
-    queueAbility('REAPING!', 'var(--rare)', `${wF.name} — ${lF.name} defeated! The harvest comes in: +1 Healing Seed, +1 Sacred Fire, +1 Surge!`, () => {
-        winTeam.resources.healingSeed++;
-        winTeam.resources.fire++;
-        winTeam.resources.surge++;
-        renderBattle();
-      });
-    if (sandwichForLose) {
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Reaping! +1 Healing Seed, +1 Sacred Fire, +1 Surge!`, () => {
-        loseTeam.resources.healingSeed++;
-        loseTeam.resources.fire++;
-        loseTeam.resources.surge++;
-        renderBattle();
-      });
+      queueAbility('SCRAPS!', 'var(--rare)', `${munchGhost.name} — ${lF.name} defeated! +4 HP! (${munchHpBefore} → ${munchHpAfter}/${munchGhost.maxHp})`, () => { munchGhost.hp = munchHpAfter; renderBattle(); }, winTeamName);
     }
   }
   if (romyTriggered) {
-    queueAbility('VALLEY GUARDIAN!', 'var(--legendary)', `${wF.name} — Predicted ${romyWinPred}... HIT! +3 damage!`);
+    queueAbility('VALLEY GUARDIAN!', 'var(--legendary)', `${wF.name} — Predicted ${romyWinPred}... HIT! +3 damage!`, null, winTeamName);
   }
   if (hectorTriggered) {
-    queueAbility('PROTECTOR!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 bonus damage!`);
+    queueAbility('PROTECTOR!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 bonus damage!`, null, winTeamName);
   }
   if (tabithaTriggered) {
-    queueAbility('RALLY!', 'var(--ghost-rare)', `Tabitha cheers from the sideline — Doubles! +2 damage!`);
+    queueAbility('RALLY!', 'var(--ghost-rare)', `Tabitha cheers from the sideline — Doubles! +2 damage!`, null, winTeamName);
   }
   if (darkJeffTriggered) {
-    queueAbility('CACKLE!', 'var(--rare)', `Dark Jeff (sideline) — ${darkJeffBaseDmg} + 1 = ${dmg} damage!`);
+    queueAbility('CACKLE!', 'var(--rare)', `Dark Jeff (sideline) — ${darkJeffBaseDmg} + 1 = ${dmg} damage!`, null, winTeamName);
   }
   if (admiralTriggered) {
-    queueAbility('COMRADES!', 'var(--rare)', `Admiral (sideline) — Even doubles! ${admiralBaseDmg} + 2 = ${dmg} damage!`);
+    queueAbility('COMRADES!', 'var(--rare)', `Admiral (sideline) — Even doubles! ${admiralBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (bilboTriggered) {
-    queueAbility('LITTLE BUDDY!', 'var(--rare)', `Bilbo (sideline) — Singles win! ${bilboBaseDmg} + 2 = ${dmg} damage!`);
+    queueAbility('LITTLE BUDDY!', 'var(--rare)', `Bilbo (sideline) — Singles win! ${bilboBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (paleNimbusTriggered) {
     const pnSum = winDice ? winDice.reduce((s, d) => s + d, 0) : '?';
-    queueAbility('HIDDEN STORM!', 'var(--rare)', `Pale Nimbus (sideline) — Roll sum ${pnSum} < 7! ${paleNimbusBaseDmg} + 2 = ${dmg} damage!`);
+    queueAbility('HIDDEN STORM!', 'var(--rare)', `Pale Nimbus (sideline) — Roll sum ${pnSum} < 7! ${paleNimbusBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (lauraCatchyTriggered) {
     const _lSeq = winDice ? [...winDice].sort((a, b) => a - b).join('-') : '?';
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura (sideline) — [${_lSeq}] In order! ${lauraCatchyBaseDmg} + 3 = ${dmg} damage!`);
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura (sideline) — [${_lSeq}] In order! ${lauraCatchyBaseDmg} + 3 = ${dmg} damage!`, null, winTeamName);
   }
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards
   if (garyOnesWin > 0) {
@@ -10383,26 +10207,26 @@ function _resolveRoundImpl() {
     queueAbility('SWIFT!', 'var(--common)', `${wF.name} — 1-2-3! Combo locked in → exactly 4 damage!`);
   }
   if (pureHeartKO) {
-    queueAbility('PURE HEART!', 'var(--ghost-rare)', `${wF.name} — All-in! ${lF.name} instantly defeated!`);
+    queueAbility('PURE HEART!', 'var(--ghost-rare)', `${wF.name} — All-in! ${lF.name} instantly defeated!`, null, winTeamName);
   }
   if (skylarTriggered) {
     const shardsUsed = B.committed[winTeamName].ice;
-    queueAbility('WINTER BARRAGE!', 'var(--ghost-rare)', `${wF.name} — ${shardsUsed} Ice Shard${shardsUsed>1?'s':''} × 2 = +${shardsUsed*2} damage!`);
+    queueAbility('WINTER BARRAGE!', 'var(--ghost-rare)', `${wF.name} — ${shardsUsed} Ice Shard${shardsUsed>1?'s':''} × 2 = +${shardsUsed*2} damage!`, null, winTeamName);
   }
   if (tylerFireTriggered) {
     const firesUsed = B.committed[winTeamName].fire;
-    queueAbility('HEATING UP!', 'var(--ghost-rare)', `${wF.name} — ${firesUsed} Sacred Fire${firesUsed>1?'s':''} × 2 = +${firesUsed*6} damage!`);
+    queueAbility('HEATING UP!', 'var(--ghost-rare)', `${wF.name} — ${firesUsed} Sacred Fire${firesUsed>1?'s':''} × 2 = +${firesUsed*6} damage!`, null, winTeamName);
   }
   if (zainIceBladeTriggered) {
-    queueAbility('ICE BLADE!', 'var(--ghost-rare)', `${wF.name} — Ice Blade strikes! +2 damage!`);
+    queueAbility('ICE BLADE!', 'var(--ghost-rare)', `${wF.name} — Ice Blade strikes! +2 damage!`, null, winTeamName);
   }
   if (redHunterTriggered) {
-    queueAbility('RUMBLE!', 'var(--ghost-rare)', `${wF.name} — Enemy has resources! +3 damage!`);
+    queueAbility('RUMBLE!', 'var(--ghost-rare)', `${wF.name} — Enemy has resources! +3 damage!`, null, winTeamName);
   }
   // Sylvia dodge callouts (queued here — abilityQueueMode=true — not in the game-state section)
   if (lF.id === 313 && !lF.ko && sylviaDodgeRolls.length > 0) {
-    if (sylviaDodged) queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`);
-    else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`);
+    if (sylviaDodged) queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`, null, loseTeamName);
+    else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`, null, loseTeamName);
   }
 
   // Eternal Flame callout — grant fires in onShow so counter updates when the splash fires, not before
@@ -10423,30 +10247,30 @@ function _resolveRoundImpl() {
 
   // Night Master (103) — Bullseye: sideline snipe callout — onShow updates sideline display
   if (bullseyeTarget) {
-    queueAbility('BULLSEYE!', 'var(--ghost-rare)', `${wF.name} — Doubles! ${bullseyeTarget.ghost.name} (${bullseyeTarget.priorHp} HP) sniped from the enemy sideline!`, () => { renderBattle(); });
+    queueAbility('BULLSEYE!', 'var(--ghost-rare)', `${wF.name} — Doubles! ${bullseyeTarget.ghost.name} (${bullseyeTarget.priorHp} HP) sniped from the enemy sideline!`, () => { renderBattle(); }, winTeamName);
   }
 
   // Bubble Boys (44) — Pop: callout fires after Bullseye, onShow re-renders so KO greys out BB
   if (bubbleBoysPopped) {
-    queueAbility('POP!', 'var(--uncommon)', `${bubbleBoysName} — ${bubbleBoysEnemyName} rolled triples! Bubble Boys burst!`, () => { renderBattle(); });
+    queueAbility('POP!', 'var(--uncommon)', `${bubbleBoysName} — ${bubbleBoysEnemyName} rolled triples! Bubble Boys burst!`, () => { renderBattle(); }, loseTeamName);
   }
 
   // King Jay (106) — Reflection: lost + dice total 7 → damage reflected to winner
   // onShow defers wF.hp mutation so the HP bar drops exactly when REFLECTION! fires, not silently during beat 4.
   if (kingJayReflected) {
     const reflectKoSuffix = wF.ko ? ' — KO!' : ` — ${kingJayHpAfter} HP left`;
-    queueAbility('REFLECTION!', 'var(--ghost-rare)', `${lF.name} — Lucky 7! ${kingJayReflectDmg} damage reflected back!${reflectKoSuffix}`, () => { wF.hp = kingJayHpAfter; renderBattle(); });
+    queueAbility('REFLECTION!', 'var(--ghost-rare)', `${lF.name} — Lucky 7! ${kingJayReflectDmg} damage reflected back!${reflectKoSuffix}`, () => { wF.hp = kingJayHpAfter; renderBattle(); }, loseTeamName);
   }
 
   // Guardian Fairy (99) — Wish: absorbed damage callout (onShow re-renders sideline to grey out GF if KO'd)
   if (guardianFairyAbsorbed && gfSacrifice) {
     const gfKoSuffix = guardianFairyKOd ? ' — GUARDIAN FAIRY FALLS!' : ` — ${gfHpAfter} HP remaining.`;
-    queueAbility('WISH!', 'var(--ghost-rare)', `${gfSacrifice.name} — Takes ${guardianFairyAbsorbedDmg} damage for ${lF.name}!${gfKoSuffix}`, () => { gfSacrifice.hp = gfHpAfter; renderBattle(); });
+    queueAbility('WISH!', 'var(--ghost-rare)', `${gfSacrifice.name} — Takes ${guardianFairyAbsorbedDmg} damage for ${lF.name}!${gfKoSuffix}`, () => { gfSacrifice.hp = gfHpAfter; renderBattle(); }, loseTeamName);
   }
 
   // Guard Thomas (41) — Stoic: immunity callout fires after Wish so defenses resolve in order
   if (guardThomasStoic) {
-    queueAbility('STOIC!', 'var(--uncommon)', `${lF.name} — Below 6 HP! Singles roll negated — taking no damage!`);
+    queueAbility('STOIC!', 'var(--uncommon)', `${lF.name} — Below 6 HP! Singles roll negated — taking no damage!`, null, loseTeamName);
   }
 
   // Bogey (53) — Bogus: reflect callout fires after Stoic — shows the reflected amount and winner's remaining HP
@@ -10454,12 +10278,12 @@ function _resolveRoundImpl() {
   if (bogeyReflected) {
     const bogeyKoSuffix = wF.ko ? ' — KO!' : ` — ${bogeyHpAfter} HP left`;
     queueAbility('BOGUS!', 'var(--uncommon)', `${lF.name} — REFLECT! ${bogeyReflectDmg} damage bounced back to ${wF.name}!${bogeyKoSuffix}`,
-      () => { wF.hp = bogeyHpAfter; renderBattle(); });
+      () => { wF.hp = bogeyHpAfter; renderBattle(); }, loseTeamName);
   }
   if (kodakoSwiftLose) {
     const swiftLoseKoSuffix = wF.ko ? ' — KO!' : ` — ${swiftLoseHpAfter} HP left`;
     queueAbility('SWIFT!', 'var(--common)', `${lF.name} — 1-2-3! Negate damage, deal 4 back to ${wF.name}!${swiftLoseKoSuffix}`,
-      () => { wF.hp = swiftLoseHpAfter; renderBattle(); });
+      () => { wF.hp = swiftLoseHpAfter; renderBattle(); }, loseTeamName);
   }
 
   // Patrick (10) — Stone Form: singles negated + 3 counter-damage callout
@@ -10467,67 +10291,51 @@ function _resolveRoundImpl() {
   if (patrickStoneForm) {
     const stoneFormKoSuffix = wF.ko ? ' — KO!' : ` — ${stoneFormHpAfter} HP left`;
     queueAbility('STONE FORM!', 'var(--common)', `${lF.name} — Singles blocked! ${patrickStoneDmg} damage to ${wF.name}!${stoneFormKoSuffix}`,
-      () => { wF.hp = stoneFormHpAfter; renderBattle(); });
+      () => { wF.hp = stoneFormHpAfter; renderBattle(); }, loseTeamName);
   }
 
   // Dealer (37) — House Rules: dice in consecutive order → damage negated callout
   if (dealerHouseRules) {
     const _dealerSorted = [...loseDice].sort((a, b) => a - b);
-    queueAbility('HOUSE RULES!', 'var(--uncommon)', `${lF.name} — [${_dealerSorted.join('-')}] In order! ${wF.name}'s attack is nullified!`);
+    queueAbility('HOUSE RULES!', 'var(--uncommon)', `${lF.name} — [${_dealerSorted.join('-')}] In order! ${wF.name}'s attack is nullified!`, null, loseTeamName);
   }
 
   // Sky (72) — Elusive: incoming big damage (>2) negated callout
   if (skyElusive) {
-    queueAbility('ELUSIVE!', 'var(--rare)', `${lF.name} — ${skyElusiveBlockedDmg} damage? Too much! ${wF.name}'s attack negated!`);
+    queueAbility('ELUSIVE!', 'var(--rare)', `${lF.name} — ${skyElusiveBlockedDmg} damage? Too much! ${wF.name}'s attack negated!`, null, loseTeamName);
   }
 
   // City Cyboo (77) — Barrier: enemy doubles negated callout
   if (cityCybooBarrier) {
-    queueAbility('BARRIER!', 'var(--rare)', `${lF.name} — Enemy doubles BLOCKED! ${cityCybooBlockedDmg} damage negated!`);
+    queueAbility('BARRIER!', 'var(--rare)', `${lF.name} — Enemy doubles BLOCKED! ${cityCybooBlockedDmg} damage negated!`, null, loseTeamName);
   }
 
   // Puff (5) — Cute: doubles/triples softened by 1 callout
   if (puffCute) {
     const puffSuffix = dmg === 0 ? ` — 0 damage! Fully absorbed!` : ` — ${wF.name} deals ${dmg} instead!`;
-    queueAbility('CUTE!', 'var(--common)', `${lF.name} — ${wR.type}! -1 damage (${puffCuteOriginalDmg} → ${dmg})${puffSuffix}`);
+    queueAbility('CUTE!', 'var(--common)', `${lF.name} — ${wR.type}! -1 damage (${puffCuteOriginalDmg} → ${dmg})${puffSuffix}`, null, loseTeamName);
   }
 
   // Little Boo (9) — Mercy: enemy triples converted to [1,2,3] singles callout
   if (mercyTriggered) {
-    queueAbility('MERCY!', 'var(--common)', `${lF.name} — Enemy triples count as [1,2,3]! Base damage: 3 → 1. ${wF.name}'s big roll softened!`);
+    queueAbility('MERCY!', 'var(--common)', `${lF.name} — Enemy triples count as [1,2,3]! Base damage: 3 → 1. ${wF.name}'s big roll softened!`, null, loseTeamName);
   }
 
   // Fang Undercover (7) — Skilled Coward: dodge activated → negate hit, ghost-picker fires after queue drains
   if (fangUndercoverActivated) {
-    queueAbility('SKILLED COWARD!', 'var(--common)', `${lF.name} — Dodge! ${wF.name}'s attack negated! Fang slips to the sideline...`);
+    queueAbility('SKILLED COWARD!', 'var(--common)', `${lF.name} — Dodge! ${wF.name}'s attack negated! Fang slips to the sideline...`, null, loseTeamName);
   }
 
   // Cameron (25) — Force of Nature: damage negated → loser instantly destroyed (queued after defense callouts)
   if (cameronForceOfNature) {
-    queueAbility('FORCE OF NATURE!', 'var(--common)', `${wF.name} — Damage negated... ${lF.name} is instantly DESTROYED!`, () => { renderBattle(); });
-  }
-
-  // Barnaby (326) — Stubborn: blocked Gale Force — announce the resist
-  if (galeForceBlockedByBarnaby) {
-    queueAbility('STUBBORN!', 'var(--uncommon)', `Barnaby resists! ${wF.name}'s Gale Force is blocked — damage goes through!`);
+    queueAbility('FORCE OF NATURE!', 'var(--common)', `${wF.name} — Damage negated... ${lF.name} is instantly DESTROYED!`, () => { renderBattle(); }, loseTeamName);
   }
 
   // Gus (31) — Gale Force: win + primed → zero damage, opponent CHOOSES which sideline ghost to swap in.
   // Fires after all defense callouts. The actual swap is deferred to a picker modal that opens after
   // the queue drains (same post-drain pattern as Winston Scheme) — opponent gets to pick, not auto-pick.
   if (galeForceSwap && !wF.ko) {
-    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`);
-  }
-
-  // Thistle (338) — Barbed: took real damage → 1 recoil damage to attacker
-  if (thistleBarbed) {
-    queueAbility('BARBED!', 'var(--rare)', `${lF.name} — ${dmg} damage? ${wF.name} takes 1 recoil! (${thistleHpAfter} HP left)${wF.ko ? ' KO!' : ''}`, () => { wF.hp = thistleHpAfter; renderBattle(); });
-  }
-
-  // Puff Ball (355) — Burst: hit by doubles → 2-damage explosion + self-KO
-  if (puffBallBurst) {
-    const puffBurstVictim = wF; // capture reference for onShow closure
-    queueAbility('BURST!', 'var(--common)', `${lF.name} — Hit by doubles! Explodes for 2 damage on ${wF.name}! ${wF.ko ? 'KO!' : puffBurstHpAfter + ' HP left'} 💥 Self-destruct!`, () => { puffBurstVictim.hp = puffBurstHpAfter; renderBattle(); });
+    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`, null, winTeamName);
   }
 
   // Hugo (52) — Wreckage: took real damage → attacker loses 1 die next roll
@@ -10537,19 +10345,19 @@ function _resolveRoundImpl() {
 
   // Marcus (57) — Glacial Pounding: taking 3+ damage charges up +4 bonus dice for next roll
   if (marcusGlacialTriggered) {
-    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! Charging up... +4 bonus dice next roll!`);
+    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! Charging up... +4 bonus dice next roll!`, null, loseTeamName);
   }
 
   // On-win callouts — onShow grants the resource the moment the splash appears (not 800ms earlier at Beat 4)
-  if (wF.id === 209 && !wF.ko) { queueAbility('PLUNDER!', 'var(--common)', `${wF.name} — Win! +2 Surge!`, () => { winTeam.resources.surge += 2; renderBattle(); }); }
-  if (wF.id === 209 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Plunder! +2 Surge! (${loseTeam.resources.surge + 2} total)`, () => { loseTeam.resources.surge += 2; renderBattle(); });
-  if (wF.id === 307 && !wF.ko) { queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`, () => { winTeam.resources.surge++; winTeam.resources.ice++; renderBattle(); }); }
-  if (wF.id === 307 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); });
-  if (wF.id === 81 && !wF.ko) { queueAbility('VALLEY MAGIC!', 'var(--rare)', `${wF.name} — Win! +2 Ice Shards! (${winTeam.resources.ice + 2} total)`, () => { winTeam.resources.ice += 2; renderBattle(); }); }
-  if (wF.id === 81 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; creditGhost(loseTeamName, 33, 'ice', 2); renderBattle(); });
+  if (wF.id === 209 && !wF.ko) { queueAbility('PLUNDER!', 'var(--common)', `${wF.name} — Win! +2 Surge!`, () => { winTeam.resources.surge += 2; renderBattle(); }, winTeamName); }
+  if (wF.id === 209 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Plunder! +2 Surge! (${loseTeam.resources.surge + 2} total)`, () => { loseTeam.resources.surge += 2; renderBattle(); }, loseTeamName);
+  if (wF.id === 307 && !wF.ko) { queueAbility('DAUGHTER OF THE STREAM!', 'var(--rare)', `${wF.name} — Win! Surge + Ice Shard!`, () => { winTeam.resources.surge++; winTeam.resources.ice++; renderBattle(); }, winTeamName); }
+  if (wF.id === 307 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Daughter of the Stream! +1 Surge, +1 Ice Shard!`, () => { loseTeam.resources.surge++; loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
+  if (wF.id === 81 && !wF.ko) { queueAbility('VALLEY MAGIC!', 'var(--rare)', `${wF.name} — Win! +2 Ice Shards! (${winTeam.resources.ice + 2} total)`, () => { winTeam.resources.ice += 2; renderBattle(); }, winTeamName); }
+  if (wF.id === 81 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Valley Magic! +2 Ice Shards! (${loseTeam.resources.ice + 2} total)`, () => { loseTeam.resources.ice += 2; creditGhost(loseTeamName, 33, 'ice', 2); renderBattle(); }, loseTeamName);
   // Zain (206) — Ice Blade: win any roll → gain 1 Ice Shard (fires every win, regardless of blade swing)
-  if (wF.id === 206 && !wF.ko) { queueAbility('ICE SHARD!', 'var(--ghost-rare)', `${wF.name} — Win! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 206, 'ice', 1); renderBattle(); }); }
-  if (wF.id === 206 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Ice Shard! +1 Ice Shard! (${loseTeam.resources.ice + 1} total)`, () => { loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); });
+  if (wF.id === 206 && !wF.ko) { queueAbility('ICE SHARD!', 'var(--ghost-rare)', `${wF.name} — Win! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 206, 'ice', 1); renderBattle(); }, winTeamName); }
+  if (wF.id === 206 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Ice Shard! +1 Ice Shard! (${loseTeam.resources.ice + 1} total)`, () => { loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
     const _dieCounts = {};
@@ -10627,7 +10435,7 @@ function _resolveRoundImpl() {
       queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' (overclocked!)' : ''}`, () => { wF.hp++; renderBattle(); });
     }
   }
-  if (wF.id === 336 && !wF.ko) { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }); }
+  if (wF.id === 336 && !wF.ko) { queueAbility('SACRED FLAME!', 'var(--legendary)', `${wF.name} — Win! Sacred Fire generated!`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName); }
   if (wF.id === 336 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sacred Flame! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
   if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }); }
   if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); });
@@ -10638,21 +10446,21 @@ function _resolveRoundImpl() {
   if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
     const _jeffId = (getSidelineGhost(winTeam, 314) || { id: 314 }).id;
-    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; creditGhost(winTeamName, _jeffId, 'seed', sx); popSidelineCard(winTeam, 314); renderBattle(); });
-    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; creditGhost(loseTeamName, 33, 'seed', sx); renderBattle(); });
+    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; creditGhost(winTeamName, _jeffId, 'seed', sx); popSidelineCard(winTeam, 314); renderBattle(); }, winTeamName);
+    if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; creditGhost(loseTeamName, 33, 'seed', sx); renderBattle(); }, loseTeamName);
   }
 
   // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
   if (simonBrewTriggered) {
     const simonFireTotal = loseTeam.resources.fire + 1;
-    queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); });
+    queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; creditGhost(winTeamName, 33, 'fire', 1); renderBattle(); });
   }
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {
     const sadSalIceTotal = loseTeam.resources.ice + 1;
-    queueAbility('TOUGH JOB!', 'var(--common)', `${lF.name} — Lost the roll... but gained 1 Ice Shard! (${sadSalIceTotal} total)`, () => { loseTeam.resources.ice++; renderBattle(); });
+    queueAbility('TOUGH JOB!', 'var(--common)', `${lF.name} — Lost the roll... but gained 1 Ice Shard! (${sadSalIceTotal} total)`, () => { loseTeam.resources.ice++; renderBattle(); }, loseTeamName);
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tough Job! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 33, 'ice', 1); renderBattle(); });
   }
 
@@ -10665,7 +10473,7 @@ function _resolveRoundImpl() {
   }
 
   // On-lose callouts — onShow applies the surge grant with the splash
-  if (lF.id === 404 && !lF.ko) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
+  if (lF.id === 404 && !lF.ko) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }, loseTeamName); }
   if (lF.id === 404 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
   // On-KO callouts — onShow applies the Granny resource grant with the splash
   if (lF.ko) {
@@ -10681,7 +10489,7 @@ function _resolveRoundImpl() {
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Sacred Fires! (${winTeam.resources.fire + 3} total)`, () => { winTeam.resources.fire += 3; renderBattle(); });
       }
     }
-    if (lF.id === 404) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }); }
+    if (lF.id === 404) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }, loseTeamName); }
     if (lF.id === 404 && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End (KO)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); });
   }
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
@@ -10703,13 +10511,6 @@ function _resolveRoundImpl() {
     const powderIceTotal = loseTeam.resources.ice + 3;
     queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; creditGhost(loseTeamName, 23, 'ice', 3); renderBattle(); });
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; creditGhost(winTeamName, 33, 'ice', 3); renderBattle(); });
-  }
-
-  // Mulch (348) — Decompose: KO'd → loseTeam gains 2 Healing Seeds (onShow deferred for visual sync)
-  if (mulchDecomposeTriggered) {
-    const mulchSeedTotal = loseTeam.resources.healingSeed + 2;
-    queueAbility('DECOMPOSE!', 'var(--common)', `${lF.name} — Defeated... but leaves 2 Healing Seeds behind! (${mulchSeedTotal} total)`, () => { loseTeam.resources.healingSeed += 2; renderBattle(); });
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Decompose! +2 Healing Seeds! (${winTeam.resources.healingSeed + 2} total)`, () => { winTeam.resources.healingSeed += 2; renderBattle(); });
   }
 
   // Bo (109) — Miracle callout: fires after enemy KO effects; onShow applies the revive so the
@@ -11054,7 +10855,7 @@ function _resolveRoundImpl() {
       // Spec: "force your opponent to CHOOSE a different ghost" — the opponent decides which sideline ghost enters.
       // If only 1 sideline option, auto-swap (no real choice). If multiple, show picker modal (same as Winston pattern).
       const checkGaleForcePicker = () => {
-        if (galeForceSwap && !wF.ko && !galeForceBlockedByBarnaby) {
+        if (galeForceSwap && !wF.ko) {
           const gfAlive = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko);
           if (gfAlive.length > 1) {
             showGaleForcePickerModal(winTeamName, loseTeamName, gfAlive, afterFangUndercover);
@@ -11486,11 +11287,11 @@ const SPLASH_THEMES = {
 let abilityQueue = [];
 let abilityQueueMode = false;
 
-function queueAbility(name, color, desc, onShow) {
+function queueAbility(name, color, desc, onShow, team) {
   if (abilityQueueMode) {
-    abilityQueue.push({ name, color, desc, onShow });
+    abilityQueue.push({ name, color, desc, onShow, team });
   } else {
-    showAbilityCallout(name, color, desc);
+    showAbilityCallout(name, color, desc, team);
     if (onShow) onShow();
   }
 }
@@ -11523,7 +11324,7 @@ function drainAbilityQueue(callback) {
     const a = abilityQueue[i++];
     // v386: wrap each ability's onShow in try/catch — a single broken closure must not
     // kill the whole cinematic queue and freeze the game.
-    try { showAbilityCallout(a.name, a.color, a.desc); } catch (e) { console.error('[showAbilityCallout CRASH]', a, e); }
+    try { showAbilityCallout(a.name, a.color, a.desc, a.team); } catch (e) { console.error('[showAbilityCallout CRASH]', a, e); }
     if (a.onShow) {
       try { a.onShow(); } catch (e) { console.error('[ability onShow CRASH]', a.name, e); try { log(`<span class="log-dmg">ERROR in ${a.name} onShow:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {} }
     }
@@ -11532,23 +11333,60 @@ function drainAbilityQueue(callback) {
   next();
 }
 
-function showAbilityCallout(name, color, desc) {
+// showAbilityCallout — v407: no more full-screen proscenium splash.
+// Instead: the firing fighter's card glows with a themed spotlight pulse,
+// and the narrator strip shows the ability name + desc for the callout beat.
+// #abilitySplash DOM element kept (display:none) so .active toggling still works
+// for any external code that reads it (3 callsites) — safe no-op.
+function showAbilityCallout(name, color, desc, team) {
+  // Maintain splash .active compatibility (visual no-op — CSS sets display:none)
   const el = document.getElementById('abilitySplash');
   const theme = SPLASH_THEMES[color] || '';
   el.className = 'ability-splash ' + theme;
-  document.getElementById('splashName').textContent = name;
-  document.getElementById('splashDesc').textContent = desc || '';
-  playSfx('sfxSpecial', 0.85);
   el.classList.add('active');
   clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
 
-  // Hide the small callout while the big splash is showing — prevents doubled text
+  // Play the ability SFX — audio cue is good, keep it
+  playSfx('sfxSpecial', 0.85);
+
+  // Card spotlight glow — pulse the firing fighter's slot
+  if (team) {
+    const slotId = team === 'red' ? 'red-fighter' : 'blue-fighter';
+    const slot = document.getElementById(slotId);
+    if (slot) {
+      const fireTheme = theme.replace('theme-', '') || 'default';
+      clearTimeout(slot._abilityFireTimer);
+      slot.classList.remove(
+        'ability-fire', 'ability-fire-fire', 'ability-fire-blue',
+        'ability-fire-purple', 'ability-fire-green', 'ability-fire-gold',
+        'ability-fire-red', 'ability-fire-default'
+      );
+      void slot.offsetWidth; // force reflow so re-trigger restarts the animation
+      slot.classList.add('ability-fire', 'ability-fire-' + fireTheme);
+      slot._abilityFireTimer = setTimeout(() => {
+        slot.classList.remove(
+          'ability-fire', 'ability-fire-fire', 'ability-fire-blue',
+          'ability-fire-purple', 'ability-fire-green', 'ability-fire-gold',
+          'ability-fire-red', 'ability-fire-default'
+        );
+      }, 1200);
+    }
+  }
+
+  // Narrator strip — ability name (colored) + desc for the duration of the beat
+  const narrator = document.getElementById('narrator');
+  if (narrator) {
+    clearTimeout(narrator._abilityTimer);
+    narrator.classList.add('ability-active');
+    narrator.innerHTML = '<b style="color:' + (color || 'var(--moonstone)') + '">' + name + '</b>' +
+      (desc ? ' <span style="opacity:0.72;font-size:12px;font-weight:500">\u2014 ' + desc + '</span>' : '');
+    narrator._abilityTimer = setTimeout(() => { narrator.classList.remove('ability-active'); }, 1300);
+  }
+
+  // Small hype-pop callout strip — unobtrusive, keep it
   const small = document.getElementById('abilityCallout');
-  small.style.visibility = 'hidden';
-
-  el._timer = setTimeout(() => {
-    el.classList.remove('active');
-    // Show the small callout AFTER the big splash fades
+  if (small) {
     small.style.visibility = '';
     small.textContent = name;
     small.style.color = color || 'var(--moonstone)';
@@ -11557,7 +11395,7 @@ function showAbilityCallout(name, color, desc) {
     small.classList.add('hype-pop');
     clearTimeout(small._timer);
     small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
-  }, 1400);
+  }
 }
 
 // ============================================================
@@ -11781,7 +11619,7 @@ function renderBattle() {
     const f = active(B[team]);
     const enemy = opp(B[team]);
     let html = '';
-    if (B.phase === 'ready') {
+    if (isPreRollActive(team)) {
       // Death Howl (202) — Pressure button (once per round)
       if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);

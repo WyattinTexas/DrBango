@@ -3,6 +3,235 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
+## v421 — 25 NEW gallery-only cards merged (IDs 407-431)
+
+The cards agent finished its overnight design run. 25 cards staged into the GHOSTS array right after Scarecrow King (368), before the SHELVED_IDS comment block. **12 Volcanic Activity + 13 Rolling Hills, all gallery-only, zero battle logic.**
+
+Distribution: 8 common / 10 uncommon / 5 rare / 2 ghost-rare.
+
+**Volcanic Activity (407-418):**
+- 407 Glorp (common) • 408 Brimstone (common) • 409 Cindergrub (common) • 410 Glass Fang (common)
+- 411 Fumarole (uncommon) • 412 Fluxling (uncommon) • 413 Obsidian Eel (uncommon) • 414 Ember Mole (uncommon) • 415 Spout (uncommon)
+- 416 Pyroclast (rare) • 417 Hesta (rare)
+- **418 Pip (ghost-rare)** — THE happy ember dragon. Tiny, giggles, loop-de-loops mid-battle.
+
+**Rolling Hills (419-431):**
+- 419 Hedgeling (common) • 420 Gourdling (common) • 421 Boggart (common) • 422 Bracken (common)
+- 423 Beewick (uncommon) • 424 Digby (uncommon) • 425 Rushwick (uncommon) • 426 Chester (uncommon) • 427 Brock (uncommon)
+- 428 Pickwick (rare) • 429 Old Cap (rare) • 430 Millicent (rare)
+- **431 The Overcast (ghost-rare)** — THE cumulus cloud giant herald of the Mountain King. Payoff card for the Healing Seed economy.
+
+**Refiner: DO NOT implement battle logic for any ID in 407-431.** No `hasSideline(team, X)`, no `f.id === X`, no entry effects, no modal handlers, no sideline checks. You MAY polish abilityDesc text or fix typos. Wyatt designs abilities next session.
+
+All 25 abilityDesc strings carry "Wyatt flag:" notes in their designNotes for abilities that may be undercosted or create loops — don't touch those flags, they're his balance notes for tomorrow.
+
+## ⚡ WYATT OVERNIGHT BATCH (2026-04-10) — refiner queue priorities (6h run)
+
+The next 6 hours are an autonomous polish window. Refiner: work this list top-down. Pick the highest-impact unaddressed item per cycle. Bump TESTROOM_VERSION on every push. Log every change here.
+
+**1. ORIGINAL-CARD AUDIT — continue the 113-card audit (your declared focus).**
+Patrick Stone Form (10), Nikon Ambush (2), Buttons Perfect Plan (8) are the listed top priorities. After those, work through originals top-down by rarity (Legendary → Ghost-Rare → Rare → Uncommon → Common). For each: read abilityDesc, find the implementation, compare faithfully, fix or flag NEEDS ARCHITECTURE. Log status per card. Reference ~/DrBango/boobattles/ for any card that exists in the live nuzlocke engine.
+
+**2. DRIFT HUNTING — keep finding "triples" vs "triples or better" mismatches.**
+v397/v398 caught Granny + Haywire. There may be more. `isTripleOrBetter()` fires on triples + quads + pentas. Any abilityDesc that says "triples" but whose implementation calls `isTripleOrBetter()` needs the description corrected. Same audit pattern for "doubles" vs "doubles or better".
+
+**3. DEAD CODE STRIPPING — shelved/fake card cleanup.**
+v400 stripped Biscuit (324). The full named-fake list in your system prompt has 45+ IDs. Each cycle, pick ONE and grep for `hasSideline(team, X)`, `f.id === X`, `id===X` patterns, and strip any battle logic block referencing it. Do NOT remove the GHOSTS array entry — those are gallery placeholders.
+
+**4. CINEMATIC POLISH from AUDIT_TODO.md.**
+Read ~/DrBango/testroom/AUDIT_TODO.md "PACING & STORYTELLING" section. Pick ONE concrete UI moment per cycle: KO pacing (1.5s pause before swap picker), narrator beat sequencing, dice highlight on win, ability callout staggering.
+
+**5. NEW: GALLERY-ONLY CARD SET — IDs 407-431 (incoming via cards agent right now).**
+Wyatt is staging 25 NEW cards (12 Volcanic Activity + 13 Rolling Hills) via the cards agent. They will appear in the GHOSTS array with NO battle logic, NO entries in any handlers. Treat IDs 407-431 as **GALLERY-ONLY**. **DO NOT IMPLEMENT BATTLE LOGIC for any of these IDs.** Wyatt designs abilities tomorrow. You may polish their `abilityDesc` text or fix typos, but never add `hasSideline(team, 407..431)`, `f.id === 407..431`, modal handlers, entry effects, or anything else.
+
+**Gallery-only ID list (battle-logic immutable until Wyatt approves):** 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431.
+
+**6. PRIORITY ORDER for the 6h run:**
+- Hours 0-2: original-card audit (#1)
+- Hours 2-4: drift hunting (#2) interleaved with dead code (#3)
+- Hours 4-6: cinematic polish (#4)
+- Skip #5 entirely — those cards are off-limits
+
+---
+
+## ⚡ WYATT DIRECTIVE (2026-04-10 #6) — TOP PRIORITY: Pre-roll ability BUTTONS don't render during Duel Phase
+
+**Wyatt's exact words (live, while testing):**
+> "Is it going to fix the order of operations — like allowing players to use the specials before they hit ready? That's really the whole point. You have the option to use your specials and your before-roll abilities before you hit ready, and currently I'm not seeing the before-you-roll abilities being able to be used right now."
+
+**The whole point of Duel Phase is broken.** Pre-roll ability buttons (Pressure, Tyson Hop, Harrison Ascend, Finn Forge, Zain Forge/Swing Ice Blade, Smudge Blackout) do not appear in the DOM during `duel-1` / `duel-2` phases, so the player cannot use them before hitting Ready. The handlers all correctly gate on `isPreRollActive(team)` — but the buttons themselves never render, so there is nothing to click.
+
+**This is the same class of bug as v399 + v407** — `renderBattle()`'s ability-button block is gated on `B.phase === 'ready'`, which is `false` during Duel Phase. v399 patched the resource-tile renderer (line 11696) by switching to `isPreRollActive(team)`. v407 patched Doug's Caution flow. This sister block at line 11783 was missed in both passes. **Drift between two near-identical render blocks 90 lines apart.**
+
+Note: This is a renderer bug, NOT a handler bug. `usePressure`, `useTysonHop`, `toggleHarrison`, `useFinnForge`, `useZainForge`, `setBlackout` all already check `isPreRollActive(team)` correctly. The fix is purely in `renderBattle`.
+
+---
+
+### TOUCH POINT (file: `~/DrBango/testroom/index.html`)
+
+**Line 11783** (inside the `['red','blue'].forEach(team => { ... })` ability-button block in `renderBattle`):
+
+Current:
+```js
+if (B.phase === 'ready') {
+```
+
+Fix:
+```js
+if (isPreRollActive(team)) {
+```
+
+The `team` variable is already in scope (it is the forEach arg). `isPreRollActive(team)` already handles all three valid cases:
+- `'ready'` → returns `true` for both teams (mirror match / no Duel Phase fallback)
+- `'duel-1'` / `'duel-2'` → returns `true` only for `B.duelActiveTeam` (the team currently making decisions)
+
+**No new variables. No new scope. One token change inside the existing block.** The inactive team's buttons will correctly suppress because `isPreRollActive` returns false for them.
+
+---
+
+### CONSTRAINTS
+
+- ✅ One-line, one-token change. `renderBattle` is not on the blacklist, but even if it were, this would qualify as the minimum surgical edit allowed under Hard Rule #11.
+- ❌ Do NOT touch any of the per-button conditionals INSIDE the block — they are correct as-is.
+- ❌ Do NOT touch the resource-tile block at line 11696 — that is already fixed (v399).
+- ❌ Do NOT introduce a `const isReady = ...` variable here — `isPreRollActive(team)` is cheap and inlining keeps the diff to a single line. (The resource block at 11696 has its own `isReady` const because it uses the value 5+ times; this block uses it exactly once.)
+- ❌ Do NOT mass-update other `B.phase === 'ready'` checks elsewhere in the file. Some of them are correct (e.g. the `rollReady` early-return at line 6370 SHOULD only fire in `'ready'` state because Duel Phase has its own Ready button). Audit before generalizing — but for THIS directive, fix only line 11783.
+- The pre-commit JS hook will validate the change ships clean.
+- Bump `TESTROOM_VERSION`. Log under a new `## v???` section.
+
+### TESTING
+
+1. Start a battle that triggers Duel Phase (pick a fighter with lower max HP on one team — e.g. Tyson 365 (3 HP) vs anything heavier).
+2. When Duel Phase begins and Tyson is the active team, **the "🐰 Hop" button must appear** under the fighter card. Click it → swap fires correctly. Inactive team has no buttons.
+3. Repeat with Death Howl (202) Pressure: opponent has sideline ghosts → "🔥 Pressure" appears during that team's duel sub-phase → click works.
+4. Repeat for Harrison (315) Ascend, Finn (204) sideline Forge, Zain (206) Forge/Swing Ice Blade, Smudge (403) Blackout picker.
+5. Confirm the inactive team's buttons do NOT appear during their opponent's sub-phase (the `.duel-locked` column class plus `isPreRollActive` returning false should both contribute to suppression).
+6. Confirm Round 1 mirror match (same max HP, no Duel Phase, falls through to `'ready'`) still shows buttons for BOTH teams as before — the fix must not regress the no-Duel-Phase path.
+
+### WHY THIS IS TOP PRIORITY
+
+Wyatt explicitly identified this as blocking the core gameplay loop. **Duel Phase exists so players can stage their specials BEFORE rolling.** If the buttons do not render, the entire feature is shipped-but-broken. This jumps Directive #5 (dice color) and #4 (splash overhaul) for tonight's overnight refiner. **Ship this first, then loop back to #5 and #4.**
+
+---
+
+## v420 — Card glow: threaded `team` into 25 remaining post-roll queueAbility callsites
+
+Added `winTeamName` or `loseTeamName` as the 5th arg to all remaining `queueAbility()` callsites that were still falling back to narrator-only spotlight. This completes full card-glow coverage for all post-roll ability types.
+
+**Win-path callsites fixed (all get `winTeamName`):**
+GROWING MOB!, SCRAPS!, VALLEY GUARDIAN!, PROTECTOR!, RALLY!, CACKLE!, COMRADES!, LITTLE BUDDY!, HIDDEN STORM!, CATCHY TUNE!, PURE HEART!, WINTER BARRAGE!, HEATING UP!, ICE BLADE! (Zain swing), RUMBLE! (Red Hunter), BULLSEYE!, GALE FORCE! (Gus wins → spotlight on Gus)
+
+**Lose-path / defense callsites fixed (all get `loseTeamName`):**
+POP! (Bubble Boys burst — they're on the losing team), HOUSE RULES!, ELUSIVE!, BARRIER!, CUTE!, MERCY!, SKILLED COWARD!, FORCE OF NATURE!
+
+Zero logic changes — purely additive 5th-arg threading. `winTeamName` and `loseTeamName` are already in scope at all callsites (they're the standard resolveRound win/lose team name variables). All existing 4-arg callsites that already had a `null` 4th arg were updated to `null, winTeamName/loseTeamName`.
+
+---
+
+## v419 — Wyatt Directive #5 FIXED: Loser dice keep team color (removed grayscale)
+
+**Root cause**: `.die.die-loser` had `filter: grayscale(0.55) brightness(0.82)` which stripped all team color from losing dice — red dice went brown-gray, blue dice went flat gray. Wyatt explicitly asked: "If they're blue, keep them blue; they don't need to get this dark color."
+
+**Fix**: CSS-only — removed the `filter` line entirely. Kept `opacity: 0.42 !important` (softened from 0.38 to compensate for no desaturation) and `transform: scale(0.94) !important` — these are the correct recede signals. Losing dice now visually recede (smaller + more transparent) while preserving their team gradient. Updated `transition` to remove the `filter` property since it's no longer used.
+
+**Result**: Blue team's losing dice read as blue at a glance, red team's as red. The winner/loser distinction is still crystal clear via opacity+scale — Wyatt's "keep the team color as information" requirement met.
+
+---
+
+## v418 — Strip Barnaby (326) Stubborn dead code from 6 locations
+
+Barnaby (326) is permanently shelved (ID 326 in SHELVED_IDS + Hard Rule #12 named fake card). Its "Stubborn" immunity-to-forced-switch mechanic had dead code in six locations:
+
+1. **Raditz Hunt button handler (~line 4704)**: `const huntTargetActive = active(enemy)` + `if (huntTargetActive.id === 326)` block stripped — was causing a false narration + early return on every Raditz Hunt press.
+2. **Winston Scheme swap function (~line 5459)**: `if (oldGhost.id === 326)` block stripped — was checking before every forced-switch execution.
+3. **Raditz Duel Phase pre-roll block (~line 6139)**: `if (huntTargetActive.id === 326)` block stripped from the `raditzHuntReady` section.
+4. **Gus Gale Force in resolveRound (~line 9644)**: `let galeForceBlockedByBarnaby = false;` variable removed; the `if (lF.id === 326)` branch + wrapping `else` unwrapped — Gale Force now always executes the swap logic directly.
+5. **Gale Force callout queue (~line 10339)**: `if (galeForceBlockedByBarnaby)` STUBBORN! queueAbility block stripped.
+6. **Gale Force picker guard (~line 10868)**: `&& !galeForceBlockedByBarnaby` removed from `checkGaleForcePicker` condition.
+
+Total: ~40 lines of dead code stripped across 6 call sites. No remaining `326` references in battle logic (only SHELVED_IDS array and GHOSTS data entry). Bumped to v418.
+
+---
+
+## v417 — Strip Mulch (348) Decompose and Harvest Moon (346) Reaping dead code from resolveRound
+
+Removed all six code blocks for Mulch (348) and Harvest Moon (346) — both are permanently shelved fake cards (SHELVED_IDS + Hard Rule #12):
+
+**Mulch (348) Decompose (3 blocks stripped):**
+- `let mulchDecomposeTriggered = false;` declaration (~line 9977)
+- `if (lF.id === 348)` detection block in the on-KO triggers section (~line 9988–9992)
+- `if (mulchDecomposeTriggered)` queueAbility DECOMPOSE! callout block with Sandwiches mirror (~line 10557–10561)
+
+**Harvest Moon (346) Reaping (3 blocks stripped):**
+- `let harvestMoonTriggered = false;` declaration + comment (~line 9996–9998)
+- `if (wF.id === 346 && !wF.ko && lF.ko)` detection block (~line 9999–10002)
+- `if (harvestMoonTriggered)` queueAbility REAPING! callout block with Sandwiches mirror (~line 10134–10164, 18 lines)
+
+Total: ~28 lines of dead code removed. Both variables were evaluated on every combat round's KO path. Bumped to v417.
+
+---
+
+## v416 — Strip Puff Ball (355) Burst dead code from resolveRound
+
+Removed the 16-line Puff Ball (355) Burst detection block (`puffBallBurst`, `puffBurstHpAfter` vars + if-block at ~line 9763) and the matching 5-line queueAbility callout block (~line 10398) from `resolveRound`. Puff Ball is permanently shelved (ID 355 is in SHELVED_IDS and the fake-card list) — this reactive explosion logic (`lF.id === 355 && wR.type === 'doubles'`) was evaluating on every losing-fighter path of every round. Dead code stripped cleanly; no references to `puffBallBurst`, `puffBurstHpAfter`, or `puffBurstVictim` remain. Bumped to v416.
+
+---
+
+## v415 — Strip Thistle (338) Barbed dead code from resolveRound
+
+Removed the 10-line Thistle (338) Barbed detection block (`thistleBarbed`, `thistleHpAfter` vars + if-block at ~line 9763) and the matching 3-line queueAbility callout block (~line 10409) from `resolveRound`. Thistle is permanently shelved (ID 338 is in SHELVED_IDS and the fake-card list) — this recoil damage logic was evaluating on every losing-fighter path of every round. Dead code stripped cleanly; no references to `thistleBarbed` or `thistleHpAfter` remain. Bumped to v415.
+
+---
+
+## v414 — Strip Cluck (340) Peck dead code from resolveRound
+
+Removed the 11-line Cluck (340) Peck detection block (`cluckTriggered`, `cluckBaseDmg` vars + if-block at ~line 9154) and the matching 3-line queueAbility callout block (~line 10165) from `resolveRound`. Cluck is permanently shelved (ID 340 is in SHELVED_IDS and the fake-card list) — this singles-win +2 damage logic was evaluating on every winning-fighter path of every round. Dead code stripped cleanly; no references to `cluckTriggered` or `cluckBaseDmg` remain. Bumped to v414.
+
+---
+
+## v413 — Thread `loseTeamName` into 10 lose-path queueAbility callsites
+
+Added `loseTeamName` as the 5th arg to 10 lose-path `queueAbility()` callsites that were still falling back to narrator-only spotlight. Defense, counter, and resource-gain callouts on the losing team's fighter now correctly spotlight the loser's card:
+
+**Lose-path callouts fixed (all get `loseTeamName`):**
+PORPOISE! (Sylvia dodge), PORPOISE — MISS (Sylvia fail), WISH! (Guardian Fairy absorb), STOIC! (Guard Thomas singles immunity), BOGUS! (Bogey reflect), GLACIAL POUNDING! (Marcus charge), BREW TIME! (Simon fire gain), TOUGH JOB! (Sad Sally ice gain), SWIFT! (Kodako counter-deal), STONE FORM! (Patrick counter), REFLECTION! (King Jay reflect)
+
+No new variables, no new scope — pure 5th-arg threading on already-in-scope `loseTeamName`. Zero logic changes.
+
+---
+
+## v412 — Thread `team` into 20 remaining win-path queueAbility callsites
+
+Added `winTeamName` (or `loseTeamName` for Sandwiches DEPENDABLE! mirrors) as the 5th arg to 20 win-path `queueAbility()` callsites that were still falling back to narrator-only spotlight. Callouts now correctly glow the winning fighter's card:
+
+**Win-path callouts fixed (all get `winTeamName`):**
+HARVEST DANCE!, BELLY FLOP!, BEAST MODE!, ONE-TWO-ONE!, FLYING KICK!, PERFECT PLAN!, AMBUSH!, LURK!, FIENDSHIP!, BLUE FIRE!, SLASH!, FISSURE!, SNOWBALL!, SAVAGE!, RUSH!, BAIT N SWITCH!, COLONY CALL!, FLAMETHROWER!, TEAMWORK!, PECK!, CHASE!, REGULATOR!, PLUNDER!, DAUGHTER OF THE STREAM!, VALLEY MAGIC!, HARVEST!
+
+**Sandwiches DEPENDABLE! mirrors fixed (get `loseTeamName`):**
+DEPENDABLE! mirrors for PLUNDER!, DAUGHTER OF THE STREAM!, VALLEY MAGIC!, HARVEST!
+
+No new variables, no new scope — pure 5th-arg threading. Completes the session's NEXT/AFTER items from Cycles 4-5. Card spotlight glow now fires on the correct fighter card for all these high-frequency abilities.
+
+---
+
+## v411 — Wyatt Directive #6 FIXED: Pre-roll ability buttons now render during Duel Phase
+
+**Root cause**: `renderBattle()`'s ability-button block (line 11776) was gated on `B.phase === 'ready'`. During Duel Phase the phase is `'duel-1'` or `'duel-2'`, not `'ready'` — so all pre-roll ability buttons (Pressure, Tyson Hop, Harrison Ascend, Finn Forge, Zain Ice Blade, Smudge Blackout) never rendered. Wyatt reported: "I'm not seeing the before-you-roll abilities being able to be used right now." The resource-tile block 90 lines above was already fixed in v399 (`isPreRollActive(team)`), but this sister block was missed in both v399 and v407.
+
+**Fix**: One-token change — `if (B.phase === 'ready')` → `if (isPreRollActive(team))`. The `team` variable is already in scope as the forEach arg. `isPreRollActive(team)` handles all three valid states:
+- `'ready'` → returns true for both teams (mirror-HP / no-Duel-Phase path) — no regression
+- `'duel-1'` / `'duel-2'` → returns true only for `B.duelActiveTeam` — inactive team's buttons correctly suppressed
+
+**Result**: Pressure, Hop, Ascend, Forge (sideline), Ice Blade, and Blackout buttons now appear correctly during each team's Duel Phase sub-turn so players can use their specials before hitting Ready — the core gameplay loop Wyatt built Duel Phase for.
+
+---
+
+## v410 — Strip dead Tadpole (358) SPLASH! entry block from triggerEntry()
+
+Removed the 7-line `if (f.id === 358)` block from `triggerEntry()`. Tadpole is a named fake card (SHELVED_IDS, Hard Rules #10 + #12) — this block could never fire but ran on every entry. Dead code eliminated; entry loop is now cleaner.
+
+---
+
 ## v407 — Doug (63) Caution duel-phase order-of-operations fix
 
 Wyatt reported: Doug's Caution swap modal was popping AFTER the player clicked the duel Done button instead of during their duel sub-phase. The whole point of Caution is to make the swap decision before committing to the roll.
@@ -226,7 +455,78 @@ Touch points:
 
 Do NOT touch any other Granny logic (sideline tracking, popSidelineCard, getSidelineGhost). Just swap the reward branches.
 
-## Current Version: v406
+## Current Version: v420
+
+## v412 — DEAD CODE REMOVAL: Wick (349) Slow Burn block stripped from doPreRollSetup
+
+Wick (349) is a named fake card (permanently shelved — Hard Rules #10 + #12). Its 52-line `[B.red, B.blue].forEach` block in `doPreRollSetup` (lines ~6584–6635) was dead code that iterated both teams every single pre-roll setup and checked if the active ghost was Wick. Since Wick can never be active, the `if (wickGhost.id === 349)` condition could never be true — but the forEach and `const wickGhost = active(team)` call still ran on every round.
+
+**Block removed**: full `// Wick (349) — Slow Burn` comment + 51-line forEach (chip damage to enemy, Dylan negation check, KO flag, SLOW BURN! preRollCallout push, Knight reaction temp-queue pattern, Masked Hero Underdog counter, self-cost HP drain). Zero behavior change — this code was unreachable.
+
+**Same pattern as**: v410 (Tadpole 358 triggerEntry block), v400 (Biscuit 324 win-path block), v363–v372 (Slag Heap, Ash Phoenix, Patches, Anvil, etc.).
+
+---
+
+## v409 — Post-roll card glow: threaded `team` into TREMOR!, MATERIALIZATION!, POLLINATE!, ICE SHARD!, SACRED FLAME! + their DEPENDABLE! mirrors
+
+**Root cause**: v407 added the card-glow system (`showAbilityCallout` 4th `team` arg + `queueAbility` 5th `team` arg), and v408 threaded `team` into all `triggerEntry` callouts. But the highest-frequency post-roll callsites — the `[B.red, B.blue].forEach` pre-win loops and the on-win section — were still calling `queueAbility` without a `team` argument, so the spotlight never reached those cards.
+
+**Fix**: 9 one-arg additions, no new variables:
+1. **TREMOR!** (line ~7313, Hank 207) → `, tNameHank` (already in forEach scope)
+2. **TREMOR! DEPENDABLE mirror** (line ~7322, Sandwiches 33) → `, tNameHank === 'red' ? 'blue' : 'red'`
+3. **MATERIALIZATION!** (line ~7348, Natalia 327) → `, tNameNat`
+4. **MATERIALIZATION! DEPENDABLE mirror** (line ~7355) → `, tNameNat === 'red' ? 'blue' : 'red'`
+5. **POLLINATE!** (line ~7370, Kaplan 308) → `, tNameKap`
+6. **POLLINATE! DEPENDABLE mirror** (line ~7377) → `, tNameKap === 'red' ? 'blue' : 'red'`
+7. **ICE SHARD!** (line ~10514, Zain 206 win-path) → `, winTeamName`
+8. **ICE SHARD! DEPENDABLE mirror** (line ~10515) → `, loseTeamName`
+9. **SACRED FLAME!** (line ~10593, Humar 336) → `, winTeamName`
+
+**Result**: All 9 callsites now spotlight the correct fighter card with a colored glow. MATERIALIZATION fires ghost-rare purple on Natalia's card. TREMOR fires common green on Hank's card. POLLINATE fires uncommon green on Kaplan's card. ICE SHARD fires ghost-rare purple on Zain's card. SACRED FLAME fires legendary gold on Humar's card. DEPENDABLE mirrors spotlight Sandwiches' slot on the opposing team. Zero logic changes — purely additive data threading.
+
+---
+
+## v408 — Entry effect card glow: threaded `team` into all `triggerEntry` callout pushes
+
+**Root cause**: `showAbilityCallout` gained a `team` parameter in v407 so it can spotlight the firing fighter's card with a colored glow instead of just writing to the narrator. But the `entryCallouts` array in `triggerEntry()` was still storing 3-element tuples `[name, color, desc]` and the flush loop called `showAbilityCallout(c[0], c[1], c[2])` — `team` was never passed. All entry abilities (LEVIATHAN!, GREETING!, BIG TARGET!, MENACE!, SLUMBER!, NAP!, NOTORIOUS!, SOLITUDE!, SPLOOP!, HUNT!, QUICK DRAW!) were falling back to narrator-only with no card spotlight.
+
+**Fix**: Two-part minimal change inside `triggerEntry()`:
+1. **Flush loop** (1 token): `showAbilityCallout(c[0], c[1], c[2])` → `showAbilityCallout(c[0], c[1], c[2], c[3])`.
+2. **Each push**: added `entryTeamName` as the 4th array element for all entering-ghost abilities (Bouril, Nerina, Maximo, Redd, Jenkins, Timpleton, Grawr, Hermit, Chad, Dallas, Raditz, Quick Draw). DEPENDABLE! (Sandwiches mirror) gets `entryTeamName === 'red' ? 'blue' : 'red'` — the enemy slot. SNEAK ATTACK! (Nicholas from sideline) gets `nicholasTeamName`. Knight reaction items remain 3-element (no team) → narrator-only fallback as intended.
+
+**Result**: When Nerina enters and fires LEVIATHAN!, her fighter card glows legendary gold. When Grawr enters with MENACE!, his slot pulses uncommon green. When Timpleton fires BIG TARGET!, rare blue spotlight on his card. All of this was already wired in v407 CSS + JS — it just needed the team string to reach `showAbilityCallout`.
+
+**No new variables, no restructuring** — `entryTeamName` was already in scope at line 3412. Zero logic changes; purely additive data threading.
+
+---
+
+## v407 — WYATT DIRECTIVE #4: Killed full-screen ability splash; replaced with card glow + narrator highlight
+
+**Root cause**: `.ability-splash` was a full-width gilt-bordered proscenium strip that descended across the middle of the screen with backdrop blur, 3.6rem gold text, and a violent `callout-descend` bounce animation — playing for 1400ms per ability, 1300ms gap, chaining into 4–6+ seconds of screen-takeover on multi-ability rounds. Wyatt called it "epileptic and disorienting."
+
+**CSS changes:**
+- `.ability-splash` neutered to `display:none` — all gradient, border, box-shadow, backdrop-filter, animation removed. Element kept in DOM for JS compatibility; `.active` toggling is now a visual no-op.
+- `.ability-splash-inner`, `.ability-splash-name`, `.ability-splash-desc`, `@keyframes callout-descend`, all 6 `theme-*` splash color rules — stripped entirely.
+- Mobile breakpoint `.ability-splash-name` / `.ability-splash-desc` rules (two breakpoints) — removed.
+- **NEW: `.fighter-slot.ability-fire`** + `@keyframes abilityFireScale` — when a card's ability fires, its fighter slot gets a 1.2s scale pulse (1→1.025→1.01→1) with themed drop-shadow glow. Six theme variants: `ability-fire-fire`, `-blue`, `-purple`, `-green`, `-gold`, `-red`, `-default`. Uses `filter: brightness(1.1) drop-shadow(...)` so it overlays on top of the existing team-color box-shadow without replacing it.
+- **NEW: `.narrator-inner.ability-active`** — when ability text is in the narrator, the strip gets a soft gold border + glow accent (font-size 14px, font-weight 800).
+
+**JS changes (3 functions):**
+1. **`queueAbility(name, color, desc, onShow, team)`** — added optional 5th `team` param. Pushes `{ name, color, desc, onShow, team }` to queue. All existing 4-arg callsites still work — `team` will be `undefined` → graceful narrator-only fallback (no card glow).
+2. **`drainAbilityQueue`** — line 11558: passes `a.team` to `showAbilityCallout`. One-token addition.
+3. **`showAbilityCallout(name, color, desc, team)`** — fully rewritten per directive:
+   - Keeps `el.classList.add('active')` toggle (visual no-op, compatibility preserved)
+   - Still plays `playSfx('sfxSpecial', 0.85)` — audio cue is good
+   - If `team` is provided: finds `#red-fighter` or `#blue-fighter`, clears prior glow timer, removes all `ability-fire-*` classes, forces reflow, adds `ability-fire ability-fire-<theme>`, sets `_abilityFireTimer` to remove after 1200ms
+   - Writes `<b style="color:...">NAME</b> — desc` into `#narrator` + adds `.ability-active` class; clears after 1300ms via `_abilityTimer`
+   - Small `.hype-pop` hype strip preserved unchanged (Wyatt didn't complain about it)
+   - No longer hides the small callout while splash shows (splash is gone)
+
+**Timing preserved:** drain cycle is still 1300ms/ability. Card glow ends at 1200ms (before next ability starts). Narrator resets at 1300ms (as next ability begins). Drain callback still fires 1500ms after last ability — unchanged.
+
+**Backward compatibility:** All 40+ existing `queueAbility(...)` 4-arg callsites continue to work. They'll show narrator text + small hype-pop but no card glow (team is undefined). Opt-in: future cycles can thread `team` into high-traffic callsites (entry effects, resolveRound winner path) for the full spotlight effect.
+
+---
 
 ## v406 — Duel Phase: all 10 modal primers now open during Duel Phase; Ready auto-skips when no decisions
 
