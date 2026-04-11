@@ -1106,6 +1106,45 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
   50% { box-shadow:0 0 24px var(--moonstone), 0 0 48px rgba(126,232,250,0.3); transform:scale(1.05); }
 }
 #rollRedBtn.pulse { animation:rollPulse 1.5s ease-in-out infinite; }
+
+/* ============================================================
+   DUEL PHASE — pre-roll commit sequencing
+   ============================================================ */
+.duel-done-btn {
+  background: linear-gradient(135deg, #fbbf24 0%, #d4a040 60%, #8a6b20 100%);
+  color: #0a0612 !important;
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 12px 28px;
+  border: 2px solid #fce598 !important;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
+  margin-top: 8px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  animation: duelDonePulse 1.8s ease-in-out infinite;
+}
+.duel-done-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 26px rgba(251, 191, 36, 0.8), 0 12px 30px rgba(0, 0, 0, 0.55);
+}
+@keyframes duelDonePulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(251, 191, 36, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5); }
+  50% { box-shadow: 0 0 30px rgba(251, 191, 36, 0.9), 0 8px 24px rgba(0, 0, 0, 0.5); }
+}
+
+/* When a team column is not the active Duel Phase player, gate it */
+.team-column.duel-locked {
+  pointer-events: none;
+  opacity: 0.42;
+  filter: grayscale(0.35);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.team-column.duel-locked .action-btn {
+  box-shadow: none !important;
+  animation: none !important;
+}
 #rollBlueBtn.pulse { animation:rollPulse 1.5s ease-in-out infinite; }
 
 /* VS Splash — pre-battle start screen */
@@ -1470,7 +1509,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
     <div id="battle-view" style="display:none;">
       <div class="arena-board">
         <!-- RED Team — Left -->
-        <div class="team-column">
+        <div class="team-column" id="red-team-column">
           <div class="team-battle-row">
             <div class="sideline-stack">
               <div id="red-sl-left" class="arena-card sideline-slot"></div>
@@ -1485,6 +1524,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
           </div>
           <div id="red-ability-buttons" class="ability-buttons"></div>
           <button class="action-btn roll-red team-roll" id="rollRedBtn" onclick="rollReady('red')">Red Roll</button>
+          <button class="action-btn duel-done-btn" id="duelDoneRedBtn" onclick="duelPhaseReady('red')" style="display:none;">✓ Ready</button>
         </div>
 
         <!-- Center — Dice + Round -->
@@ -1500,7 +1540,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
         </div>
 
         <!-- BLUE Team — Right -->
-        <div class="team-column">
+        <div class="team-column" id="blue-team-column">
           <div class="team-battle-row">
             <div id="blue-fighter" class="arena-card fighter-slot"></div>
             <div class="sideline-stack">
@@ -1515,6 +1555,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
           </div>
           <div id="blue-ability-buttons" class="ability-buttons"></div>
           <button class="action-btn roll-blue team-roll" id="rollBlueBtn" onclick="rollReady('blue')">Blue Roll</button>
+          <button class="action-btn duel-done-btn" id="duelDoneBlueBtn" onclick="duelPhaseReady('blue')" style="display:none;">✓ Ready</button>
         </div>
       </div>
 
@@ -1955,7 +1996,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v389';
+const TESTROOM_VERSION = 'v390';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2779,6 +2820,12 @@ function autoPlayNext() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
+    // === DUEL PHASE ===
+    // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
+    duelPhaseMode: true,
+    duelPriority: null,     // 'red' | 'blue' | null — who goes first THIS round's Duel Phase (null = simultaneous)
+    duelActiveTeam: null,   // who is currently acting during Duel Phase (gates clicks)
+    duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
@@ -3184,6 +3231,12 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
+    // === DUEL PHASE ===
+    // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
+    duelPhaseMode: true,
+    duelPriority: null,     // 'red' | 'blue' | null — who goes first THIS round's Duel Phase (null = simultaneous)
+    duelActiveTeam: null,   // who is currently acting during Duel Phase (gates clicks)
+    duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
@@ -3265,8 +3318,8 @@ function startBattle() {
         setTimeout(() => {
           // All entry effects done — check for KOs, then enable rolling
           if (handleKOs()) return;
-          if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
-          if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+          // Duel Phase v1: check for priority before unlocking rolls
+          startNextRound();
           narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
         }, blueEntryDelay);
       }, redEntryDelay);
@@ -3643,7 +3696,7 @@ function triggerBorisHook(team) {
 // RESOURCE SPENDING
 // ========================================
 function cycleCommit(team, type) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const c = B.committed[team];
   const total = t.resources[type] + c[type];
@@ -3682,7 +3735,7 @@ function refundCommitted() {
 }
 
 function spendHealingSeed(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (t.resources.healingSeed <= 0 || f.hp >= f.maxHp) return;
@@ -3694,7 +3747,7 @@ function spendHealingSeed(team) {
 }
 
 function sacrificeHappyCrystal(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.id !== 208 || f.ko) return;
@@ -3706,7 +3759,7 @@ function sacrificeHappyCrystal(team) {
 }
 
 function toggleAuntSusan(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const tName = team;
   const t = B[team];
   const f = active(t);
@@ -3720,7 +3773,7 @@ function toggleAuntSusan(team) {
 }
 
 function uncommitAuntSusan(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const tName = team;
   const t = B[team];
   if (B.committed[tName].auntSusan > 0) {
@@ -3731,7 +3784,7 @@ function uncommitAuntSusan(team) {
 }
 
 function toggleAuntSusanHeal(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const tName = team;
   const t = B[team];
   const f = active(t);
@@ -3744,7 +3797,7 @@ function toggleAuntSusanHeal(team) {
 }
 
 function uncommitAuntSusanHeal(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const tName = team;
   const t = B[team];
   if (B.committed[tName].auntSusanHeal > 0) {
@@ -3758,7 +3811,7 @@ function uncommitAuntSusanHeal(team) {
 // HARRISON (315) — opt-in: spend 1 Healing Seed for +1 die
 // ============================================================
 function toggleHarrison(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.id !== 315 || f.ko) return;
@@ -3771,7 +3824,7 @@ function toggleHarrison(team) {
 }
 
 function useFinnForge(team, kind) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   // Finn must still be on the sideline (alive)
   if (!hasSideline(t, 204)) return;
@@ -3799,7 +3852,7 @@ function useFinnForge(team, kind) {
 }
 
 function useZainForge(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.id !== 206 || f.ko) return;
@@ -3816,7 +3869,7 @@ function useZainForge(team) {
 
 // Per-round commit toggle: Zain (forged) chooses whether to swing the blade this round
 function toggleZainBlade(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.id !== 206 || f.ko || !f.iceBladeForged) return;
@@ -3825,7 +3878,7 @@ function toggleZainBlade(team) {
 }
 
 function uncommitHarrison(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   if (B.committed[team].harrison > 0) {
     B.committed[team].harrison--;
@@ -3879,7 +3932,7 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
 // BLACKOUT — Smudge (403): name a number
 // ============================================================
 function setBlackout(team, num) {
-  if (!B || B.phase !== 'ready') return; // Blackout is pre-roll only
+  if (!isPreRollActive(team)) return; // Blackout is pre-roll only
   if (!B.blackoutNum) B.blackoutNum = {};
   if (B.blackoutNum[team] === num) {
     delete B.blackoutNum[team]; // toggle off
@@ -3893,7 +3946,7 @@ function setBlackout(team, num) {
 // TYSON HOP — manual pre-roll swap (Tyson 365)
 // ============================================================
 function useTysonHop(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.id !== 365 || f.ko) return;
@@ -3921,7 +3974,7 @@ function useTysonHop(team) {
 // PRESSURE — manual pre-roll ability (Death Howl 202)
 // ============================================================
 function usePressure(team) {
-  if (!B || B.phase !== 'ready') return;
+  if (!isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   const enemy = opp(t);
@@ -4001,7 +4054,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
     // If handleKOs() returns true (entry caused a KO), openKoSwap manages its own restoration.
     const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
     setTimeout(() => {
-      if (!handleKOs()) { B.phase = 'ready'; resetRollButtons(); renderBattle(); }
+      if (!handleKOs()) { startNextRound(); }
     }, afterEntry);
   }, 1500);
 }
@@ -5330,7 +5383,10 @@ function doGaleForcePickerChoice(idx) {
 // TWO-BUTTON ROLL SYSTEM — each side rolls independently
 // ============================================================
 function rollReady(team) {
-  if (!B || (B.phase !== 'ready' && B.phase !== 'rolling')) return;
+  if (!B) return;
+  // Duel Phase locks rolls until both players click Done
+  if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
+  if (B.phase !== 'ready' && B.phase !== 'rolling') return;
   const btn = document.getElementById(team === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
   if (btn.classList.contains('locked')) return;
 
@@ -5719,6 +5775,128 @@ function doTeamRoll(team, btn) {
       }, eitherTripled ? 1800 : 1400);
     }
   }, 700);
+}
+
+// ============================================================
+// DUEL PHASE — sequenced pre-roll commits
+// "Loser of previous exchange goes first. Round 1 uses lower max HP (underdog)."
+// Dice rolls remain simultaneous; only pre-roll DECISIONS are ordered.
+// ============================================================
+const _RARITY_RANK = { 'common':0, 'uncommon':1, 'rare':2, 'ghost-rare':3, 'legendary':4 };
+
+function computeDuelPriority() {
+  if (!B || B.duelPhaseMode === false) return null;
+  const isRoundOne = (B.round === 1);
+  if (isRoundOne) {
+    const rF = active(B.red);
+    const bF = active(B.blue);
+    if (!rF || !bF || rF.ko || bF.ko) return null;
+    if (rF.id === bF.id) return null; // mirror match — simultaneous
+    // Max HP comparison: lower goes first
+    if (rF.maxHp !== bF.maxHp) return rF.maxHp < bF.maxHp ? 'red' : 'blue';
+    // Max HP tie — rarity tiebreak (lower rarity goes first — underdog)
+    const rR = _RARITY_RANK[rF.rarity] != null ? _RARITY_RANK[rF.rarity] : 0;
+    const bR = _RARITY_RANK[bF.rarity] != null ? _RARITY_RANK[bF.rarity] : 0;
+    if (rR !== bR) return rR < bR ? 'red' : 'blue';
+    return null; // fully symmetric — fall back to simultaneous
+  }
+  // Round 2+: previous-round loser goes first. Null if last round was a tie.
+  return B.duelLastLoser || null;
+}
+
+function isPreRollActive(team) {
+  if (!B) return false;
+  if (B.phase === 'ready') return true;
+  if (B.phase === 'duel-1' || B.phase === 'duel-2') {
+    return B.duelActiveTeam === team;
+  }
+  return false;
+}
+
+function enterDuelPhase(priority) {
+  if (!B) return;
+  B.phase = 'duel-1';
+  B.duelPriority = priority;
+  B.duelActiveTeam = priority;
+  // Lock both roll buttons — rolls don't unlock until both players click Done
+  const r = document.getElementById('rollRedBtn');
+  const b = document.getElementById('rollBlueBtn');
+  if (r) { r.classList.add('locked'); r.classList.remove('pulse'); r.disabled = true; }
+  if (b) { b.classList.add('locked'); b.classList.remove('pulse'); b.disabled = true; }
+  const activeF = active(B[priority]);
+  const activeName = activeF ? activeF.name : priority;
+  const oppName = priority === 'red' ? 'blue' : 'red';
+  // Narrator framing: R1 is "underdog", R2+ is "wounded"
+  const isR1 = (B.round === 1);
+  const msg = isR1
+    ? `<b class="${priority}-text">${activeName}</b> stands as the underdog — first move!`
+    : `<b class="${priority}-text">${activeName}</b> licks their wounds — first move this round!`;
+  narrate(msg);
+  log(`<span class="log-ability">DUEL PHASE</span> — ${activeName} (${priority}) moves first.`);
+  renderBattle();
+  renderDuelUI();
+}
+
+function duelPhaseReady(team) {
+  if (!B) return;
+  if (B.phase !== 'duel-1' && B.phase !== 'duel-2') return;
+  if (team !== B.duelActiveTeam) return;
+  if (B.phase === 'duel-1') {
+    // Advance to phase 2 — opponent's turn
+    const nextTeam = team === 'red' ? 'blue' : 'red';
+    B.phase = 'duel-2';
+    B.duelActiveTeam = nextTeam;
+    const nextActive = active(B[nextTeam]);
+    const nextName = nextActive ? nextActive.name : nextTeam;
+    narrate(`<b class="${nextTeam}-text">${nextName}</b> — your response!`);
+    log(`<span class="log-ability">DUEL PHASE</span> — ${nextName} (${nextTeam}) responds.`);
+    renderBattle();
+    renderDuelUI();
+  } else {
+    // End Duel Phase — unlock rolls for simultaneous resolution
+    endDuelPhase();
+  }
+}
+
+function endDuelPhase() {
+  if (!B) return;
+  B.phase = 'ready';
+  B.duelActiveTeam = null;
+  narrate(`<b class="gold">Both ready!</b> Roll the dice!`);
+  resetRollButtons();
+  renderBattle();
+  renderDuelUI();
+}
+
+function renderDuelUI() {
+  // Show/hide Done buttons and apply .duel-locked class to the inactive team column
+  const inDuel = (B && (B.phase === 'duel-1' || B.phase === 'duel-2'));
+  const rDone = document.getElementById('duelDoneRedBtn');
+  const bDone = document.getElementById('duelDoneBlueBtn');
+  const rCol = document.getElementById('red-team-column');
+  const bCol = document.getElementById('blue-team-column');
+  if (rDone) rDone.style.display = (inDuel && B.duelActiveTeam === 'red') ? 'block' : 'none';
+  if (bDone) bDone.style.display = (inDuel && B.duelActiveTeam === 'blue') ? 'block' : 'none';
+  if (rCol) rCol.classList.toggle('duel-locked', inDuel && B.duelActiveTeam !== 'red');
+  if (bCol) bCol.classList.toggle('duel-locked', inDuel && B.duelActiveTeam !== 'blue');
+}
+
+// startNextRound — called from every "round ends" site instead of the direct
+// B.phase = 'ready'; resetRollButtons(); pattern. Checks for Duel Phase priority
+// and either enters the Duel Phase or falls back to simultaneous ready.
+function startNextRound() {
+  if (!B) return;
+  const priority = computeDuelPriority();
+  if (priority) {
+    enterDuelPhase(priority);
+  } else {
+    B.phase = 'ready';
+    B.duelActiveTeam = null;
+    B.duelPriority = null;
+    resetRollButtons();
+    renderBattle();
+    renderDuelUI();
+  }
 }
 
 function resetRollButtons() {
@@ -8233,6 +8411,8 @@ function _resolveRoundImpl() {
     if (B.guardianFairyStandby) { B.guardianFairyStandby.red = false; B.guardianFairyStandby.blue = false; }
     if (B.eloiseUsedThisRound) { B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false; }
     if (B.bogeyArmed) { B.bogeyArmed.red = false; B.bogeyArmed.blue = false; } // clear armed flag — not used if it was a tie
+    // Duel Phase: tie rounds do NOT set a loser; next round falls back to simultaneous
+    B.duelLastLoser = null;
     if (B.galeForceDecided) { B.galeForceDecided.red = false; B.galeForceDecided.blue = false; }
     if (B.jacksonUsedThisRound) { B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false; }
     if (B.sonyaUsedThisRound) { B.sonyaUsedThisRound.red = false; B.sonyaUsedThisRound.blue = false; }
@@ -8271,7 +8451,7 @@ function _resolveRoundImpl() {
       }
       narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
-      setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
+      setTimeout(() => { startNextRound(); }, 350);
     });
     return;
   }
@@ -10299,6 +10479,9 @@ function _resolveRoundImpl() {
       // MVP round credit: diff team resources + ghost HPs against the pre-roll snapshot
       try { creditRoundDelta(winTeamName); } catch (e) { console.warn('[MVP] credit failed:', e); }
 
+      // Duel Phase: record this round's loser so they get first move next round
+      B.duelLastLoser = loseTeamName;
+
       B.round++;
       B.preRoll = null;
       renderDice(redDice, blueDice);
@@ -10329,7 +10512,7 @@ function _resolveRoundImpl() {
               // same breathing-room pattern as the no-KO path (v110/v114 fix).
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
+              setTimeout(() => { startNextRound(); }, 350);
             }
           }, 1800);
         } else {
@@ -10341,7 +10524,7 @@ function _resolveRoundImpl() {
               // gives the player a beat to read "Round N — X vs Y" before the game unblocks.
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
+              setTimeout(() => { startNextRound(); }, 350);
             }
           }, 750);
         }
@@ -10452,7 +10635,7 @@ function openKoSwap() {
     B.koSwapQueue = null;
     renderBattle();
     narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
-    setTimeout(() => { B.phase = 'ready'; resetRollButtons(); renderBattle(); }, 350);
+    setTimeout(() => { startNextRound(); }, 350);
     return;
   }
   const team = B.koSwapQueue[0];
