@@ -190,6 +190,13 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .set-toggle-btn.active[data-set="set1"] { background:#c084fc; border-color:#c084fc; box-shadow:0 0 12px rgba(192,132,252,0.4); }
 .set-toggle-btn.active[data-set="darkcastle"] { background:#f87171; border-color:#f87171; box-shadow:0 0 12px rgba(248,113,113,0.4); }
 .set-toggle-btn.active[data-set="frostvalley"] { background:#67e8f9; border-color:#67e8f9; color:#0a0a0f; box-shadow:0 0 12px rgba(103,232,249,0.4); }
+.random-pick-row { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; align-items:center; }
+.random-pick-btn {
+  padding:8px 16px; border:2px solid #b45309; border-radius:8px;
+  background:var(--surface); color:#d97706; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .15s; text-transform:uppercase; letter-spacing:0.5px;
+}
+.random-pick-btn:hover { background:#b45309; color:#fff; box-shadow:0 0 10px rgba(180,83,9,0.4); }
 .ghost-card .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); }
 .ghost-card .card-category { font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
 .ghost-card .card-set { font-size:10px; font-weight:600; }
@@ -1516,6 +1523,13 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         </div>
       </div>
 
+      <!-- Quick-fill random team buttons -->
+      <div class="random-pick-row">
+        <button class="random-pick-btn" onclick="pickRandomTeam('red')">🎲 Random Red</button>
+        <button class="random-pick-btn" onclick="pickRandomTeam('blue')">🎲 Random Blue</button>
+        <button class="random-pick-btn" onclick="pickRandomBoth()">🎲 Random Both</button>
+      </div>
+
       <!-- Original Set Toggles -->
       <div class="set-toggles">
         <span class="set-toggles-label">Original Sets:</span>
@@ -2056,7 +2070,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v601';
+const TESTROOM_VERSION = 'v641';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2213,9 +2227,9 @@ const GHOSTS = [
   },
   {
     id:310, name:"Granny", rarity:"uncommon", maxHp:3, art:"art/granny.jpg",
-    ability:"Bedtime Story", abilityDesc:"Sideline: when one of your ghosts is defeated — by singles: gain 1 Lucky Stone. By doubles: gain 1 Moonstone. By triples or better: gain 3 Sacred Fires.",
+    ability:"Bedtime Story", abilityDesc:"Sideline: when one of your ghosts is defeated — by singles: gain 2 Lucky Stones. By doubles: gain 1 Moonstone. By triples or better: gain 3 Sacred Fires.",
     category:"HP Recovery", set:"Rolling Hills",
-    designNote:"The porch reader. Gentle passive healing from the sideline. Max 2 keeps it within the healing cap rule."
+    designNote:"The porch reader. Gentle passive healing from the sideline. Max 2 keeps it within the healing cap rule. v637 buff (Wyatt 2026-04-11): singles KO now grants 2 Lucky Stones (was 1) — rewards the most common KO type."
   },
   {
     id:311, name:"Pudge", rarity:"common", maxHp:7, art:"art/pudge.webp",
@@ -2225,9 +2239,9 @@ const GHOSTS = [
   },
   {
     id:312, name:"Timpleton", rarity:"rare", maxHp:4, art:"art/lurk.jpg",
-    ability:"Big Target", abilityDesc:"Entry: if the enemy ghost's current HP is higher than Timpleton's, deal 3 damage.",
-    category:"Prediction/Reaction", set:"Rolling Hills",
-    designNote:"The swamp shadow. Low HP means it almost always triggers — 4 HP vs most opponents = guaranteed 3 entry damage. A surgical strike."
+    ability:"Big Target", abilityDesc:"Win a roll: deal +3 damage if the enemy ghost's HP is higher than Timpleton's.",
+    category:"Damage Multiplier", set:"Rolling Hills",
+    designNote:"The swamp shadow. v640 rework (Wyatt 2026-04-11): was an Entry strike (automatic 3 damage on entry if enemy HP > his), now a Win-roll damage multiplier. Must actually win the roll to collect the +3. Keeps the 'punching up' fantasy without the free-damage ambush."
   },
   {
     id:313, name:"Sylvia", rarity:"rare", maxHp:5, art:"art/ripple.jpg",
@@ -2237,9 +2251,9 @@ const GHOSTS = [
   },
   {
     id:314, name:"Farmer Jeff", rarity:"ghost-rare", maxHp:5, art:"art/farmer_jeff.jpg",
-    ability:"Harvest", abilityDesc:"Sideline: when your ghost wins, gain 1 Healing Seed for each 6 in your roll.",
+    ability:"Harvest", abilityDesc:"Sideline: gain 1 Healing Seed for each 6 your active ghost rolls.",
     category:"Resource Generation", set:"Rolling Hills",
-    designNote:"The 4th Jeff. Farm life suits him — hardworking, reliable, always producing. Named synergy with Jeffery (Chuckle) for a wholesome sideline duo."
+    designNote:"The 4th Jeff. Farm life suits him — hardworking, reliable, always producing. Named synergy with Jeffery (Chuckle) for a wholesome sideline duo. v636 buff (Wyatt 2026-04-11): no longer requires the active ghost to win — any 6 rolled produces a seed, win or lose."
   },
   {
     id:315, name:"Harrison", rarity:"rare", maxHp:5, art:"art/moonreach.jpg",
@@ -2305,6 +2319,8 @@ const GHOSTS = [
   {id:429, name:"Old Cap", rarity:"rare", maxHp:5, ability:"Final Bloom", abilityDesc:"When Old Cap is KO'd: your next ghost enters play with +3 HP (can exceed max HP).", category:"HP Recovery", set:"Rolling Hills", tags:["Final 50"], designNote:"An ancient mushroom spirit — slow, unremarkable, deeply wise, and quietly spectacular at the very end. The death trigger creates a genuine sacrifice archetype: deliberately send Old Cap into danger, let it die, empower the next ghost with an HP surge. Risk-reward deckbuilding that rewards planning. +3HP overclocks per Gary's rules. Art direction: a large ancient mushroom cap creature in earthy browns and mossy greens, face like a very old tree, slowly releasing spores as it begins to fade, gentle and warm, not dramatic — just quietly complete."},
   {id:430, name:"Millicent", rarity:"rare", maxHp:5, ability:"Cunning Folk", abilityDesc:"Spend 1 Moonstone: look at all of your opponent's current resources, then take 1 of your choice. They lose it.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"The cunning folk of the Rolling Hills — hedge-witch, wise-woman, someone you bring a pie to before you bring a problem. Moonstone-powered full information + theft: see everything they have, take the worst thing for them to lose. Spending Moonstone (rare resource) for information and theft is elegant. Active, decisive, satisfying for the person playing it. Art direction: a sharp-eyed older woman-shaped figure in a patchwork cloak, standing at a fork in the hill paths, wisps of blue-grey smoke curling from her hands, deeply knowing expression — she already knows what you're going to say."},
   {id:431, name:"The Overcast", rarity:"ghost-rare", maxHp:7, ability:"For The King", abilityDesc:"Win: spend any number of Healing Seeds. Deal +2 damage for each Healing Seed spent.", category:"Damage Multiplier", set:"Rolling Hills", tags:["Final 50"], designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
+  {id:432, name:"Vela", rarity:"rare", maxHp:4, ability:"Second Breath", abilityDesc:"Sideline: When one of your defeated ghosts returns to your sideline, they immediately enter play at double their maximum health.", category:"HP Recovery", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #1. Flame-family Spiritkin: humanoid body, amber ember-shaped head, warm gold accessories. Triggers on any resurrection source (Bo's Miracle; Shepherd's Flock when implemented). Revived ghost swaps into the active slot at 2x maxHp — e.g. Stone Cold (7 maxHp) charges back in at 14 HP. Cinematic single-life entry. Pairs with Vigil (433) as the resurrection archetype anchors."},
+  {id:433, name:"Vigil", rarity:"rare", maxHp:5, ability:"Kindling", abilityDesc:"Sideline: When one of your defeated ghosts returns to your sideline, gain 6 Sacred Fires.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
   // === VOLCANIC ACTIVITY — Designed Cards ===
   {id:317, name:"Scorch", art:"art/scorch.webp", rarity:"common", maxHp:3, ability:"Singe", abilityDesc:"Win: opponent's active ghost loses 1 max HP permanently.", category:"Debuff", set:"Volcanic Activity", designNote:"Permanent max HP reduction. Shrinks opponent over time."},
   {id:319, name:"Pumice", art:"art/pumice.webp", rarity:"common", maxHp:4, ability:"Float", abilityDesc:"Sideline: if your ghost would take 3+ damage, reduce to 2.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Damage cap from sideline."},
@@ -3294,6 +3310,38 @@ function togglePick(team, id) {
   }, 100);
 }
 
+// --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
+// Fills one team randomly, excluding the other team's picks and respecting the
+// legendary cap. Reuses autoPickTeam() pool/shuffle logic — no duplication.
+function pickRandomTeam(team) {
+  const other = S[team === 'red' ? 'bluePicks' : 'redPicks'];
+  const pool = GHOSTS.filter(g => !SHELVED_IDS.has(g.id) && !other.includes(g.id));
+  const picks = [];
+  let hasLegendary = false;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  for (const g of shuffled) {
+    if (picks.length >= 3) break;
+    if (g.rarity === 'legendary') {
+      if (hasLegendary) continue;
+      hasLegendary = true;
+    }
+    picks.push(g.id);
+  }
+  S[`${team}Picks`] = picks;
+  renderPicks();
+}
+
+// Fills both teams at once, re-rolling Blue until there's no overlap.
+// Mirrors the autoPlayNext() overlap-check pattern exactly.
+function pickRandomBoth() {
+  S.redPicks = autoPickTeam();
+  S.bluePicks = autoPickTeam();
+  while (S.bluePicks.some(id => S.redPicks.includes(id))) {
+    S.bluePicks = autoPickTeam();
+  }
+  renderPicks();
+}
+
 // ============================================================
 // BATTLE ENGINE
 // ============================================================
@@ -3534,20 +3582,8 @@ function triggerEntry(team, skipEntryEffects) {
 
   // Timber (210) — Howl: no entry callout; the pre-roll Howl modal/callout handles it every round
 
-  // Timpleton (312) — Big Target: if enemy HP > Timpleton's HP, deal 3 damage
-  if (f.id === 312) {
-    const ef = active(enemy);
-    if (!ef.ko && ef.hp > f.hp) {
-      ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
-      const enemyName = enemy === B.red ? 'red' : 'blue';
-      entryCallouts.push(['BIG TARGET!', 'var(--rare)', `${f.name} — 3 damage to ${ef.name}!`, entryTeamName]);
-      log(`<span class="log-ability">${f.name}</span> — Big Target! Enemy HP ${ef.hp+3} > ${f.hp}. <span class="log-dmg">3 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
-      playDamageSfx(3);
-      hitDamage(enemyName);
-      collectKnightReactions();
-    }
-  }
+  // Timpleton (312) — Big Target: v640 rework — moved from Entry strike to Win-roll damage multiplier.
+  // New logic lives in _resolveRoundImpl near Red Hunter (345) (search: "Timpleton (312) — Big Target").
 
   // Grawr (34) — Menace: on entry, deal 1 damage to the enemy active ghost
   if (f.id === 34) {
@@ -6486,6 +6522,10 @@ function doPreRollSetup() {
   [B.red, B.blue].forEach(team => {
     active(team).usedMagicTouch = false;
   });
+  // v640 — Piper (107) Slick Coat reactive: flag true when an auto-fire before-roll ability
+  // is negated this round. Only then does Piper apply the -1 enemy die penalty.
+  // Prevents the old behavior where Slick Coat fired unconditionally every round.
+  B.piperBlockedThisRound = { red: false, blue: false };
 
   // ========================================
   // PHASE 1: PRE-ROLL TRIGGERS
@@ -6531,6 +6571,7 @@ function doPreRollSetup() {
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
       log(`<span class="log-ability">${f.name}</span> — Swarm blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+      B.piperBlockedThisRound[tNamePre] = true; // v640: Slick Coat gate
     }
   });
 
@@ -6580,6 +6621,7 @@ function doPreRollSetup() {
       }
     } else if (hasSideline(team, 205) && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade's Shadow</span> — Meltdown blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+      B.piperBlockedThisRound[tNameShade] = true; // v640: Slick Coat gate
     }
   });
 
@@ -6631,6 +6673,7 @@ function doPreRollSetup() {
       }
     } else if (f.id === 111 && !f.ko && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade</span> — Haunt blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+      B.piperBlockedThisRound[tNameHaunt] = true; // v640: Slick Coat gate
     }
   });
 
@@ -6670,6 +6713,7 @@ function doPreRollSetup() {
       }
     } else {
       log(`<span class="log-ability">Lucy</span> — Blue Fire blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+      B.piperBlockedThisRound[tNameLucyActor] = true; // v640: Slick Coat gate
     }
     B.pendingLucyDmg[tNameLucyTarget] = 0; // consume regardless (applied, negated, or target KO'd)
   });
@@ -6685,6 +6729,7 @@ function doPreRollSetup() {
       if (!ef.ko) {
         if (dylanNegates(enemy)) {
           log(`<span class="log-ability">Splinter</span> — Toxic Fumes blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+          B.piperBlockedThisRound[tNameSplinter] = true; // v640: Slick Coat gate
         } else {
           const preHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
@@ -6915,6 +6960,7 @@ function doPreRollSetup() {
         const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);
         preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${oppLabel} — Scarecrow/Slick Coat negates Timber's Howl!`, oppTeamName]);
         log(`<span class="log-ability">${oppLabel}</span> — Dylan/Piper negates Timber's Howl!`);
+        B.piperBlockedThisRound[team === B.red ? 'red' : 'blue'] = true; // v640: Slick Coat gate
         return;
       }
       const r = oppTeam.resources;
@@ -6943,16 +6989,19 @@ function doPreRollSetup() {
     }
   });
 
-  // Piper (107) — Slick Coat: -1 enemy die each round when Piper is the active ghost
+  // Piper (107) — Slick Coat: -1 enemy die IF an enemy auto-fire before-roll ability was
+  // actually negated this round. v640 (Wyatt 2026-04-11): reactive, not unconditional.
+  // Previously Slick Coat fired the -1 die every single round whenever Piper was active,
+  // even when the enemy had nothing to negate — Wyatt's playtest observation.
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
     const oppTeamName = tName === 'red' ? 'blue' : 'red';
-    if (f.id === 107 && !f.ko) {
+    if (f.id === 107 && !f.ko && B.piperBlockedThisRound[oppTeamName]) {
       if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
       else blueCount = Math.max(1, blueCount - 1);
-      preRollCallouts.push(['SLICK COAT!', 'var(--ghost-rare)', `${f.name} — enemy rolls 1 fewer die this round!`, team === B.red ? 'red' : 'blue']);
-      log(`<span class="log-ability">${f.name}</span> — Slick Coat! Enemy rolls 1 fewer die.`);
+      preRollCallouts.push(['SLICK COAT!', 'var(--ghost-rare)', `${f.name} — negation + enemy rolls 1 fewer die!`, team === B.red ? 'red' : 'blue']);
+      log(`<span class="log-ability">${f.name}</span> — Slick Coat! Negated enemy effect + -1 enemy die.`);
     }
   });
 
@@ -9411,6 +9460,15 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Timpleton (312) — Big Target: v640 rework — Win a roll, deal +3 damage if enemy HP > Timpleton's HP.
+  // Was an Entry strike (triggerEntry) until v640. Now a Win-path damage multiplier, patterned after Red Hunter.
+  let timpletonTriggered = false;
+  if (wF.id === 312 && !wF.ko && lF && !lF.ko && lF.hp > wF.hp) {
+    dmg += 3;
+    timpletonTriggered = true;
+    collectKC(winTeamName, wF.name);
+  }
+
   // Sylvia (313) — loser dodge check: roll 1 die, if it's a 6 negate all damage.
   // v331: the die is rolled by the PLAYER via the Sylvia modal (showSylviaModal) before
   // resolveRound's second pass reaches this block. B.sylviaPendingResult = { value, dodged }
@@ -10137,9 +10195,14 @@ function _resolveRoundImpl() {
   if (wF.id === 81 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Spockles Valley Magic
   if (wF.id === 58 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Ashley Burning Soul
   if (wF.id === 206 && !wF.ko) { collectKC(winTeamName, wF.name); }  // Zain Ice Blade — win grants +1 Ice Shard
+  // Farmer Jeff (314) — Harvest: sideline fires on any 6 rolled, win OR lose (v636 buff).
   if (hasSideline(winTeam, 314)) {
     const sixes = countVal(winDice, 6);
     if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314); collectKC(winTeamName, 'Farmer Jeff', jeffGhost); }
+  }
+  if (hasSideline(loseTeam, 314)) {
+    const sixesLose = countVal(loseDice, 6);
+    if (sixesLose > 0) { const jeffGhostLose = getSidelineGhost(loseTeam, 314); collectKC(loseTeamName, 'Farmer Jeff', jeffGhostLose); }
   }
 
   // Aunt Susan heal bonus (game state — preview only; actual HP mutation deferred to HARVEST DANCE! onShow)
@@ -10442,6 +10505,10 @@ function _resolveRoundImpl() {
     queueAbility('RUMBLE!', 'var(--ghost-rare)', `${wF.name} — Enemy has resources! +3 damage!`, null, winTeamName);
   }
   // Red Hunter knight reactions already collected via collectKC at game-state section (line ~9384) — do NOT double-fire here
+  if (timpletonTriggered) {
+    queueAbility('BIG TARGET!', 'var(--rare)', `${wF.name} — ${lF.name}'s HP higher than Timpleton! +3 damage!`, null, winTeamName);
+  }
+  // Timpleton knight reactions already collected via collectKC in the game-state Big Target block above — do NOT double-fire here
   // Sylvia dodge callouts (queued here — abilityQueueMode=true — not in the game-state section)
   if (lF.id === 313 && !lF.ko && sylviaDodgeRolls.length > 0) {
     if (sylviaDodged) queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`, null, loseTeamName);
@@ -10695,12 +10762,20 @@ function _resolveRoundImpl() {
   if (splinterJustActivated) {
     queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`, null, winTeamName);
   }
+  // Farmer Jeff (314) — Harvest: sideline fires on any 6 rolled, win OR lose (v636 buff).
   if (hasSideline(winTeam, 314) && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
     const _jeffId = (getSidelineGhost(winTeam, 314) || { id: 314 }).id;
-    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; creditGhost(winTeamName, _jeffId, 'seed', sx); popSidelineCard(winTeam, 314); renderBattle(); }, winTeamName);
-    // Farmer Jeff knight reactions already collected via collectKC at game-state section (line ~10085) — do NOT double-fire here
+    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff (sideline) — ${sx} six${sx>1?'es':''} = ${sx} Healing Seed${sx>1?'s':''}!`, () => { winTeam.resources.healingSeed += sx; creditGhost(winTeamName, _jeffId, 'seed', sx); popSidelineCard(winTeam, 314); renderBattle(); }, winTeamName);
+    // Farmer Jeff knight reactions already collected via collectKC at game-state section — do NOT double-fire here
     if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sx} Healing Seed${sx>1?'s':''}! (${loseTeam.resources.healingSeed + sx} total)`, () => { loseTeam.resources.healingSeed += sx; creditGhost(loseTeamName, 33, 'seed', sx); renderBattle(); }, loseTeamName);
+  }
+  if (hasSideline(loseTeam, 314) && countVal(loseDice, 6) > 0) {
+    const sxL = countVal(loseDice, 6);
+    const _jeffIdLose = (getSidelineGhost(loseTeam, 314) || { id: 314 }).id;
+    queueAbility('HARVEST!', 'var(--ghost-rare)', `Farmer Jeff (sideline) — ${sxL} six${sxL>1?'es':''} = ${sxL} Healing Seed${sxL>1?'s':''}!`, () => { loseTeam.resources.healingSeed += sxL; creditGhost(loseTeamName, _jeffIdLose, 'seed', sxL); popSidelineCard(loseTeam, 314); renderBattle(); }, loseTeamName);
+    // Farmer Jeff lose-path knight reactions already collected via collectKC at game-state section — do NOT double-fire here
+    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sxL} Healing Seed${sxL>1?'s':''}! (${winTeam.resources.healingSeed + sxL} total)`, () => { winTeam.resources.healingSeed += sxL; creditGhost(winTeamName, 33, 'seed', sxL); renderBattle(); }, winTeamName);
   }
 
   // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
@@ -10737,8 +10812,8 @@ function _resolveRoundImpl() {
   if (lF.ko) {
     if (hasSideline(loseTeam, 310)) {
       if (wR.type === 'singles') {
-        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { loseTeam.resources.luckyStone++; creditGhost(loseTeamName, 310, 'ls', 1); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
-        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${winTeam.resources.luckyStone + 1} total)`, () => { winTeam.resources.luckyStone++; renderBattle(); }, winTeamName);
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 2 Lucky Stones!`, () => { loseTeam.resources.luckyStone += 2; creditGhost(loseTeamName, 310, 'ls', 2); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +2 Lucky Stones! (${winTeam.resources.luckyStone + 2} total)`, () => { winTeam.resources.luckyStone += 2; renderBattle(); }, winTeamName);
       } else if (wR.type === 'doubles') {
         queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Moonstone!`, () => { loseTeam.resources.moonstone++; creditGhost(loseTeamName, 310, 'ms', 1); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); }, winTeamName);
@@ -10753,8 +10828,8 @@ function _resolveRoundImpl() {
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
   if (wF.ko && hasSideline(winTeam, 310)) {
     if (wR.type === 'singles') {
-      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → Lucky Stone!`, () => { winTeam.resources.luckyStone++; creditGhost(winTeamName, 310, 'ls', 1); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
-      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Lucky Stone! (${loseTeam.resources.luckyStone + 1} total)`, () => { loseTeam.resources.luckyStone++; renderBattle(); }, loseTeamName);
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 2 Lucky Stones!`, () => { winTeam.resources.luckyStone += 2; creditGhost(winTeamName, 310, 'ls', 2); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +2 Lucky Stones! (${loseTeam.resources.luckyStone + 2} total)`, () => { loseTeam.resources.luckyStone += 2; renderBattle(); }, loseTeamName);
     } else if (wR.type === 'doubles') {
       queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Moonstone!`, () => { winTeam.resources.moonstone++; creditGhost(winTeamName, 310, 'ms', 1); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); }, loseTeamName);
@@ -10773,12 +10848,32 @@ function _resolveRoundImpl() {
 
   // Bo (109) — Miracle callout: fires after enemy KO effects; onShow applies the revive so the
   // resurrection is visually synchronized with the legendary splash rather than jumping the HP bar.
+  // Vela (432) sideline — Second Breath: revived ghost swaps into the active slot at 2x maxHp,
+  //   pushing the current active (usually Bo) onto the sideline via activeIdx swap.
+  // Vigil (433) sideline — Kindling: +6 Sacred Fires on any resurrection.
+  // Both triggers also fire for any future resurrection sources (e.g. Shepherd's Flock 360 when implemented).
   if (boMiracleTarget) {
     const bt = boMiracleTarget; // capture for closure
-    queueAbility('MIRACLE!', 'var(--legendary)', `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP!`, () => {
+    const velaActive = hasSideline(winTeam, 432);
+    const vigilActive = hasSideline(winTeam, 433);
+    const calloutText = velaActive
+      ? `${wF.name} — KO! ${bt.name} charges back into play at ${bt.maxHp * 2} HP!`
+      : `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP!`;
+    queueAbility('MIRACLE!', 'var(--legendary)', calloutText, () => {
       bt.ko = false;
-      bt.hp = 1;
-      log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span>`);
+      if (velaActive) {
+        bt.hp = bt.maxHp * 2;
+        const revivedIdx = winTeam.ghosts.indexOf(bt);
+        if (revivedIdx !== -1) winTeam.activeIdx = revivedIdx;
+        log(`<span class="log-ability">Vela</span> — Second Breath! ${bt.name} charges into play at <span class="log-heal">${bt.hp} HP!</span>`);
+      } else {
+        bt.hp = 1;
+        log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span>`);
+      }
+      if (vigilActive) {
+        winTeam.resources.fire = (winTeam.resources.fire || 0) + 6;
+        log(`<span class="log-ability">Vigil</span> — Kindling! <span class="log-ms">+6 Sacred Fires!</span>`);
+      }
       renderBattle();
     }, winTeamName);
   }
@@ -12163,7 +12258,7 @@ renderDice(null,null);
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
 <audio id="sfxShatter" src="../boo/Shatter.mp3" preload="auto"></audio>
 <audio id="sfxVictory" src="../boo/winningwhistle.mp3" preload="auto"></audio>
-<script src="gary-system-prompt.js?v=v404"></script>
-<script src="gary-chat.js?v=v404"></script>
+<script src="gary-system-prompt.js?v=v641"></script>
+<script src="gary-chat.js?v=v641"></script>
 </body>
 </html>

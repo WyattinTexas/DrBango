@@ -1,5 +1,276 @@
 # Testroom Coordination Log
 
+## ⚡ WYATT DIRECTIVE (2026-04-11) — Orchestrator FYI: testroom Gary got a roster brain (v641)
+
+**Summary:** Wyatt asked testroom Gary to "list all cards with 5 health" and he punted — couldn't do it. Root cause was in `gary-system-prompt.js → build()`: card data was ONLY injected when the user message contained literal ghost names (via `findReferencedCards`). Roster-wide / filter / aggregate questions got zero card data and Gary had to guess. Shipped in v641.
+
+**Files touched (refiner: leave alone, this is settled):**
+- `gary-system-prompt.js` — added `detectRosterIntent(text)` and `buildRosterIndex()` helpers; `build()` now injects a compact `FULL ROSTER INDEX` block whenever either (a) the user message matches roster-intent regex (keywords: all/every/which/list/how many/count + card-ish noun, `\d+ (hp|health)`, rarity roundups, set roundups, "cards that/which/with", healers/tanks/closers) or (b) the user name-dropped 3+ cards in one message. Both CHARACTER MODE and DEFAULT GARY MODE branches receive `rosterBlock`. New helpers exported on `window.GarySystemPrompt` for future reuse.
+- `index.html:2073` — `TESTROOM_VERSION` bumped `v640 → v641`.
+- `index.html:12261-12262` — `gary-system-prompt.js` and `gary-chat.js` cache-bust query bumped `?v=v404 → ?v=v641` (GH Pages serves stale JS without this).
+
+**Format of each roster-index line:** `id | name | HP | rarity | set | ability`. ~227 cards × ~70 chars ≈ ~16 KB — within Sonnet budget, only fires on filter-intent turns so typical chat cost is unchanged.
+
+**Why this matters:** The goal per `gary-vision.md` is for testroom Gary to be "as smart as R. Gary" (the desktop buddy). Desktop Gary can reach into `~/DrBango/testroom/index.html` directly for keyword matches; testroom Gary is a stateless worker call, so everything it knows has to come from the system prompt. Roster injection is how it catches up on roster-level awareness.
+
+**Do not touch / out of scope for refiner:**
+- `gary-system-prompt.js` and `gary-chat.js` — not in the refiner whitelist (they're not card data / CSS / narrator text / dead-code). Leave them alone.
+- The GARY_BRAIN string snapshot at top of `gary-system-prompt.js` — deliberately frozen; only update when `~/buddy/jeeves_brain.txt` changes.
+
+**Follow-ups (next session, not now):**
+- Maybe push the GARY_BRAIN snapshot refresh onto a periodic sync instead of manual.
+- Consider routing the roster index through the worker instead of per-request, if token cost on always-listed filter turns starts mattering.
+
+---
+
+## v640 — WYATT PLAYTEST FIXES: Piper (107) Slick Coat reactive + Timpleton (312) Big Target rework
+
+**Context:** Wyatt mid-playtest, routed two bug reports through the orchestrator. Both fixes touch blacklisted functions (`doPreRollSetup`, `triggerEntry`, `_resolveRoundImpl`) so they were handled by the main assistant directly rather than by the refiner. Refiner should skip these entries and pick up v641+ drift/polish priorities instead.
+
+### Bug #1 — Piper (107) Slick Coat firing unconditionally
+
+**Observation:** Wyatt — *"Slick Coat seems to be going off no matter what turn it is. I don't know why."* And earlier — *"It's going off just because the enemy has a before-rolling ability. They're not even using it. Like Death Howl has pressure, but he's not using it. He shouldn't have to pay the price of Slick Coat."*
+
+**Root cause:** The -1 enemy die block at `index.html:6994-7005` (inside `doPreRollSetup`) had no gate at all. It fired whenever `f.id === 107 && !f.ko`, regardless of whether the enemy had any before-roll ability to negate. Meanwhile, the preemptive `dylanNegates()` check at `index.html:3814` hid opt-in buttons (Pressure, Tyson Hop, Finn/Zain Forge) — so cards like Death Howl couldn't even *try* to use their ability, yet still paid the -1 die price every round.
+
+**Fix design (reactive flag):**
+- New per-round flag `B.piperBlockedThisRound = { red: false, blue: false }`, initialized at the top of `doPreRollSetup` alongside other per-round flag resets (~line 6533).
+- At each auto-fire before-roll negation site where `dylanNegates()` blocks an effect, the flag is set for **the team whose ability was blocked** (Piper's enemy). Six sites in total:
+  1. Ember Force (304) Swarm — `~6580-6583`, sets for `tNamePre`
+  2. Shade's Shadow (205) Meltdown — `~6629-6632`, sets for `tNameShade`
+  3. Shade (111) Haunt — `~6680-6683`, sets for `tNameHaunt`
+  4. Lucy (108) Blue Fire pending — `~6719-6722`, sets for `tNameLucyActor`
+  5. Splinter (101) Toxic Fumes — `~6734-6736`, sets for `tNameSplinter`
+  6. Timber (210) Howl — `~6961-6967`, sets for Timber's team
+- The Piper -1 die block at `~6994-7005` gated on `B.piperBlockedThisRound[oppTeamName]`. Only fires when an auto-fire enemy ability was actually negated this round.
+- Callout text updated to reflect the dual purpose: *"SLICK COAT! negation + enemy rolls 1 fewer die!"*
+
+**Behavior matrix after fix:**
+| Enemy situation | Old -1 die | New -1 die |
+|---|---|---|
+| Timber active (auto Howl negated) | ✅ fired | ✅ fires |
+| Ember Force active (auto Swarm negated) | ✅ fired | ✅ fires |
+| Shade(111) active, Haunt negated | ✅ fired | ✅ fires |
+| Splinter activated, Fumes negated | ✅ fired | ✅ fires |
+| Lucy pending Blue Fire negated | ✅ fired | ✅ fires |
+| Shade's Shadow sideline (trigger conditions met) | ✅ fired | ✅ fires |
+| Death Howl active, Pressure button hidden (not used) | ❌ fired | ✅ doesn't fire |
+| Tyson active, Hop hidden (not used) | ❌ fired | ✅ doesn't fire |
+| Enemy has nothing (any other active) | ❌ fired | ✅ doesn't fire |
+
+**Note on opt-in abilities:** Pressure / Tyson Hop / Finn/Zain Forge buttons are still *preemptively hidden* by `dylanNegates()` when Piper is opposite. They can't be clicked to "attempt" and trigger a reactive penalty. This matches Wyatt's literal rule *"if they're not using it, they shouldn't pay the price"* — non-use means no penalty. If we later want a reactive attempt-penalty (enemy tries to click → penalty), that's a separate pass.
+
+**AUDIT STATUS**: Piper (107) — `AUDITED FIX (v640)` — surgical flag-based gate, 7 edits inside `doPreRollSetup`. No new functions, no scope leaks, no template literal references added beyond existing ones. Behavior-preserving for Dylan-only negation (flag is set regardless but line 6999's `f.id === 107` filter makes it irrelevant when Piper isn't active).
+
+### Bug #2 — Timpleton (312) Big Target auto-damage on entry
+
+**Observation:** Wyatt — *"His ability is a little off. The idea is that he has +3 damage to his rolls if the enemy's ghost HP is higher than his. Not that he automatically does."*
+
+**Root cause:** Timpleton was coded as an Entry strike in `triggerEntry()` at `index.html:3585-3598`. Fired automatically on entry if enemy HP > Timpleton HP, dealing 3 damage directly with no roll involved. Card text also said *"Entry: if the enemy ghost's current HP is higher than Timpleton's, deal 3 damage."* — meaning the designer intent was originally the Entry strike. Wyatt reversed the design: should be a **Win-roll +3 damage multiplier**, same HP condition.
+
+**Fix design (Red Hunter pattern):**
+- **abilityDesc** (`index.html:2242`): *"Entry: if the enemy ghost's current HP is higher than Timpleton's, deal 3 damage."* → *"Win a roll: deal +3 damage if the enemy ghost's HP is higher than Timpleton's."*
+- **category**: `"Prediction/Reaction"` → `"Damage Multiplier"` (matches new mechanic)
+- **Entry block removed** (`triggerEntry()` at ~`3585-3598`): replaced with a 2-line breadcrumb comment pointing at the new win-path handler.
+- **Win-path handler added** in `_resolveRoundImpl` immediately after Red Hunter's `redHunterTriggered` block (~line 9460):
+  ```js
+  let timpletonTriggered = false;
+  if (wF.id === 312 && !wF.ko && lF && !lF.ko && lF.hp > wF.hp) {
+    dmg += 3;
+    timpletonTriggered = true;
+    collectKC(winTeamName, wF.name);
+  }
+  ```
+- **Callout** queued after `RUMBLE!`:
+  ```js
+  if (timpletonTriggered) {
+    queueAbility('BIG TARGET!', 'var(--rare)', `${wF.name} — ${lF.name}'s HP higher than Timpleton! +3 damage!`, null, winTeamName);
+  }
+  ```
+
+**Behavior change:**
+- Before: free 3 damage on entry whenever enemy HP > 4 (almost always). No roll required.
+- After: Timpleton must *win* the roll to collect +3. Loses the roll → nothing happens. Ties — it never wins the condition branch so no +3 (consistent with Red Hunter).
+
+**AUDIT STATUS**: Timpleton (312) — `AUDITED FIX (v640)` — Red Hunter pattern mirrored exactly. `collectKC` uses same name-string arg so knight reactions fire through the standard game-state path. No double-fire (callout block has same guard comment as Rumble). `dmg` and `wF`/`lF` all in scope from the winner-path context. Category updated to `"Damage Multiplier"` for gallery filtering consistency.
+
+### Out-of-scope / follow-ups queued for refiner:
+- **Piper preemptive-vs-reactive opt-in policy**: Should clicking an opt-in before-roll ability (Pressure, Hop, Forge) against Piper fire Slick Coat reactively instead of hiding the button? Open design question — flagged for Wyatt.
+- **Timpleton sim parity**: `smartAutoPlay.js` still has Timpleton as an Entry strike (wherever it's coded). Needs a matching move from entry to win-path in the sim. High priority for next refiner cycle — affects all sim data with Timpleton.
+- **Dead Piper-inner-check code at `6643-6644`**: The inner `if (ef.id === 107) { log("Slick Coat! Haunt negated") }` inside the `!dylanNegates(enemy)` branch of Shade Haunt is unreachable (since `dylanNegates` already returns true for Piper). Pure log drift. Low priority.
+
+**Version bump**: v639 → v640
+
+---
+
+## v639 — SIM FIX: Farmer Jeff (314) HARVEST! — lose-team path absent from smartAutoPlay.js after v636 buff
+
+**Bug**: The v636 buff changed Farmer Jeff from a "win-only" seed granter to "any 6 rolled, win OR lose". `index.html` lines 10193–10195 (game-state `collectKC`) and 10759–10764 (cinematic `queueAbility`) both have the lose-team path. But `smartAutoPlay.js` at line 1619 only had `if (hasSideline(wTeam, 314))` — the losing team's Jeff was completely absent. Every simulated round where Farmer Jeff's team lost but rolled sixes yielded 0 Healing Seeds, diverging from the real game. Teams pairing Jeff with high-roller ghosts on the losing side (Marcus, Hugo, Sylvia) were systematically undervalued in all auto-play data collected after v636.
+
+**Fix** (smartAutoPlay.js, 5 lines inserted after Gary lose-team block at line 1701):
+```js
+// Farmer Jeff (314) lose-team sideline: sixes in loseDice = seeds (v636 buff: fires on ANY 6, win OR lose).
+// Matches index.html lines 10193–10195 (game-state collectKC) and 10759–10764 (cinematic queueAbility + sandwichForWin mirror).
+if (hasSideline(lTeam, 314)) {
+  const sixesLose = loseDice.filter(d => d === 6).length;
+  if (sixesLose > 0) { lTeam.resources.healingSeed += sixesLose; if (sandwichWin) wTeam.resources.healingSeed += sixesLose; }
+}
+```
+
+**AUDIT STATUS**: Farmer Jeff (314) — `AUDITED FIX (v639)` — sim now matches both paths of the v636 buffed ability. Win-team path (line 1619) was already correct. Lose-team path added. `sandwichWin` mirror matches index.html `sandwichForWin` pattern.
+
+**Note**: The `rxns++` knight-reaction block (line 1906) still only counts Jeff in `winnerWasEnemy`. With the v636 buff, Jeff also fires when the enemy LOSES and rolls sixes — so there's a second missing `rxns++` entry in the `loserWasEnemy` block. Queued as NEXT cycle.
+
+---
+
+## v637 — SIM FIX: Lou (32) BROS! — phantom knight reactions on every enemy win (missing Grawr guard)
+
+**Bug**: `smartAutoPlay.js` line 1915 fired `rxns++` for Lou BROS! on any enemy win whenever Lou (32) was on the sideline — missing the `ef.id === 34` (Grawr) guard. Lou's abilityDesc says *"While on the sideline, Grawr gains +1 Damage and +1 Health on Winning Rolls"* — the ability is **Grawr-specific**, not a universal sideline heal for any active ghost. `index.html` line 9655 correctly has `wF.id === 34` as a guard. The sim's incomplete condition inflated Knight Terror HEAVY AIR and Knight Light RETRIBUTION by +1 reaction per round every time the Lou-team won, even with a non-Grawr active ghost.
+
+**Fix** (smartAutoPlay.js, 1 line):
+```js
+// Before:
+if (hasSideline(enemyTeam, 32))  rxns++;           // Lou BROS! (sideline win-path healer)
+// After:
+if (hasSideline(enemyTeam, 32) && ef.id === 34)  rxns++;  // Lou BROS! fires ONLY when Grawr (34) is the active ghost
+```
+
+**Design note**: Same class of phantom-fire bug as Jeffery (14) CHUCKLE! fixed in v635. The pattern: a sideline card with a named-ghost target has its knight-reaction counter checking only sideline presence, not whether the named ghost is actually active. The fix adds the `ef.id` guard to match the index.html condition exactly.
+
+**Contrast with Villager (11)**: Villager HOSPITALITY! is intentionally *any* active ghost ("the ghost in battle gains") — its `hasSideline(enemyTeam, 11)` check with no `ef.id` guard is **correct**.
+
+**Audit #1 (template literals)**: no template literals added ✓
+**Audit #2 (block scope)**: `ef.id` is already in scope as the active enemy ghost — no new variables ✓
+**Audit #3 (family-audit)**: FAMILY: phantom-knight-reaction-named-ghost | Checked Villager(11) — correct (any ghost). Checked other sideline rxns++ entries — none have a similar named-ghost-specific trigger without the guard. Lou(32) was the only one. Family exhausted.
+
+**Version bump**: v636 → v637
+
+---
+
+## ⚡ WYATT DIRECTIVE (2026-04-11) — "Pick Random" button on team-select screen
+
+**Goal:** Cure analysis paralysis on the arena team-select screen. Wyatt wants a one-click "Pick Random" button that fills a team (or both teams) faster than clicking through the grid. This is a QoL shortcut for the arena pick UI, NOT a replacement for manual picking.
+
+**What to ship (single version bump, one cycle):**
+
+1. **Add `pickRandomTeam(team)` helper** next to `togglePick` (index.html line 3270). Body: reuse the existing `autoPickTeam()` logic at line 2862 (filters `SHELVED_IDS`, max 1 legendary, 3 picks). For single-team random-fill, also exclude IDs already on the other team so we never produce an overlap. Write the result to `S.redPicks` / `S.bluePicks`, then `renderPicks()`.
+2. **Add `pickRandomBoth()` helper** that fills both slots at once: mirror the `autoPlayNext()` pattern at line 2896–2902 (pick red, pick blue, re-roll blue if any overlap). Call `renderPicks()`.
+3. **Add three buttons to the team-select DOM** at `index.html` line 1517 (inside `#team-select`, just after the `.team-rosters` block and before the `.set-toggles` row):
+   - `🎲 Random Red` → `onclick="pickRandomTeam('red')"`
+   - `🎲 Random Blue` → `onclick="pickRandomTeam('blue')"`
+   - `🎲 Random Both` → `onclick="pickRandomBoth()"`
+   Use a small action-button row. A new class like `.random-pick-row` is fine — small gilt-accented buttons, roughly the visual weight of `.set-toggle-btn` but distinct (slightly warmer tint is fine). Do NOT steal attention from the main `#startBtn` CTA.
+4. **The point is SPEED**: after a random fill, do NOT auto-scroll or animate — just render. The whole appeal is "click, see teams, hit BATTLE." `renderPicks()` already updates the start button label + enables it when both teams are full, so no extra wiring needed.
+5. **Respect the legendary cap** (already enforced inside `autoPickTeam`) and the no-overlap rule (Red/Blue cannot share a ghost — `autoPlayNext` already has the re-roll loop, copy that pattern).
+6. **Version bump** + log entry in FIXLOG.
+
+**Touch points (file + line):**
+- `~/DrBango/testroom/index.html` line 1506–1552 (team-select DOM, add button row after line 1517)
+- `~/DrBango/testroom/index.html` line 2862–2875 (reuse `autoPickTeam` — do NOT duplicate the shuffle logic)
+- `~/DrBango/testroom/index.html` line 2896–2902 (reference for both-teams pattern)
+- `~/DrBango/testroom/index.html` line 3270 (add new helpers next to `togglePick`)
+- CSS block around line 1519 (`.set-toggles`) — add `.random-pick-row` sibling class
+
+**Do NOT touch:**
+- `autoPickTeam()`, `autoPlayNext()`, or any auto-play machinery — copy the pattern, don't refactor it.
+- `togglePick()`, `renderPicks()`, or `startBattle()` internals.
+- Anything in the refiner blacklist (rollReady, resolveRound, modal handlers, etc.) — this work is purely team-select UI, so none of that should even be near the diff.
+
+**Why:** Wyatt wants the testroom to feel frictionless for playtesters (EJ, Skylar, himself during iteration). The existing auto-play flow is silent/background — a visible "🎲 Random" button on the pick screen gives the same speed without committing to headless auto-play. The "little bit faster" framing means: no animations, no delays, no confirmations. Click → filled → BATTLE.
+
+---
+
+## v634 — SIM FIX: Suspicious Jeff (61) SNICKER! — zero implementation in smartAutoPlay.js
+
+**Bug**: `smartAutoPlay.js` had ZERO lines for Suspicious Jeff (61). The sim treated him as a plain 4 HP uncommon with no ability in every simulation. His SNICKER! sideline die-steal was completely absent — no B-state, no COMPUTE DICE consume, no win-path trigger. Every balance simulation with Suspicious Jeff on a sideline showed him as an inert slot, producing no die economy pressure.
+
+**Fix** (smartAutoPlay.js, 3 targeted additions):
+1. **B-state init** (line ~76): added `jeffSnicker: { red: 0, blue: 0 }` alongside `outlawStolenDie`.
+2. **COMPUTE DICE consume block** (after Outlaw block, before Scallywags): `['red','blue'].forEach` — consume `B.jeffSnicker[tName]`: subtract from enemy die count AND add to Jeff's team die count (true TRANSFER — matches index.html lines 7280–7283, unlike Outlaw which is subtract-only).
+3. **Win-path trigger** (after Outlaw win/loss blocks): `if (hasSideline(wTeam, 61) && !wF.ko && lF.ko)` → `B.jeffSnicker[winTeamName]++`. Includes `lF.ko` gate per v593 Wyatt clarification ("wins a battle" = KO, not win-a-roll). Matches index.html lines 10883–10891.
+
+**Design note**: Suspicious Jeff is a TRUE steal (transfer): enemy rolls fewer dice AND Jeff's team rolls more. This is different from Outlaw (43) Thief which is subtract-only. The COMPUTE DICE block adds both subtract-from-enemy AND add-to-Jeff's-team — matching the index.html `doPreRollSetup` implementation at lines 7280–7283 exactly.
+
+**Audit #1 (template literals)**: no template literals added ✓
+**Audit #2 (block scope)**: `enemyTName` is `const` inside the `forEach` callback — no leak. `B.jeffSnicker` lives on B-state, accessible everywhere ✓
+**Audit #3 (family-audit)**: FAMILY: wins-a-battle-defeat-gate | siblings: Jeffery(14), Suspicious Jeff(61), Calvin & Anna(91) | already correct: Jeffery(14) fixed v633, Calvin & Anna(91) confirmed correct (uses wF.ko self-KO path). All three siblings now resolved ✓
+
+**Version bump**: v633 → v634
+
+---
+
+## v633 — SIM FIX: Jeffery (14) CHUCKLE! — "wins a battle" gate missing from smartAutoPlay.js
+
+**Bug**: `smartAutoPlay.js` Jeffery (14) CHUCKLE! triggered on every winning roll (`hasSideline(wTeam, 14) && !wF.ko`), massively overhealing the active ghost — up to +3 HP per round instead of only on KO rounds. Jeffery's abilityDesc says "if your ghost **wins a battle**" which per v593 Wyatt clarification means defeating the enemy ghost (KO), not just winning a single roll. index.html was fixed in v593 to add `&& lF.ko` (line 10712), but smartAutoPlay.js was never updated.
+
+**Fix**: Added `&& lF.ko` to the smartAutoPlay.js Jeffery condition:
+```js
+// Before: if (hasSideline(wTeam, 14) && !wF.ko)
+// After:  if (hasSideline(wTeam, 14) && !wF.ko && lF.ko)
+```
+Now matches index.html line 10712 exactly. Cornelius/Filbert branches unchanged.
+
+**FAMILY**: wins-a-battle-defeat-gate | siblings: Jeffery(14), Suspicious Jeff(61), Calvin & Anna(91) | Suspicious Jeff (61) has no implementation in smartAutoPlay.js at all (separate issue — queue for future cycle).
+
+**Audit #1 (template literals)**: no template literals added ✓  
+**Audit #2 (block scope)**: `lF` is a parameter-scoped variable throughout the win-resolution block; adding it to a condition introduces no new scope ✓  
+**Audit #3 (family-audit)**: FAMILY: wins-a-battle-defeat-gate — checked Calvin & Anna (91): uses `wF.ko && hasSideline(wTeam, 91)` (KO self-KO path), already correct per family_map "already_correct: [91]". Villager (11) correctly has NO lF.ko gate (its text says "every winning roll", not "wins a battle") — NOT in this family.
+
+**Version bump**: v632 → v633
+
+---
+
+## v632 — FEATURE: "Pick Random" buttons added to team-select screen (Wyatt Directive 2026-04-11)
+
+**What ships:**
+1. **`pickRandomTeam(team)`** — fills one team slot randomly, excluding the other team's current picks and respecting the legendary cap. Uses the same pool/shuffle/legendary-cap logic as `autoPickTeam()` but filtered against the opposing team's picks so Red and Blue can never share a ghost. No DOM scroll, no animation — pure fill + `renderPicks()`.
+2. **`pickRandomBoth()`** — fills both teams at once using `autoPickTeam()` twice with the same overlap-check re-roll loop as `autoPlayNext()`.
+3. **Three buttons** in `#team-select`, after the `.team-rosters` block and before `.set-toggles`: 🎲 Random Red | 🎲 Random Blue | 🎲 Random Both. Class `.random-pick-row` (flex row, `margin:12px 0`).
+4. **CSS** — `.random-pick-btn`: amber tint (`#d97706` text, `#b45309` border), same padding/weight/uppercase as `.set-toggle-btn` but visually distinct. Hover fills amber + glow.
+
+**Design intent**: speed. No confirmation, no scroll, no animation. Click → teams filled → hit BATTLE. `renderPicks()` auto-enables #startBtn when both teams are 3/3.
+
+**Touch points**: CSS lines ~189-196 (new class), DOM line ~1519 (new `.random-pick-row` div), JS line ~3319 (new `pickRandomTeam` + `pickRandomBoth` helpers after `togglePick`).
+
+**Audit #1 (template literals)**: no template literals added ✓
+**Audit #2 (block scope)**: `picks`, `hasLegendary`, `shuffled`, `g` all local to `pickRandomTeam` function scope; no variables leak ✓
+**Audit #3 (family-audit)**: FAMILY: none — pure UI/pick helpers with no battle state interaction.
+
+**Version bump**: v631 → v632
+
+---
+
+## v603 — SIM FIX: King Jay (106) REFLECTION! + Night Master (103) BULLSEYE! added to smartAutoPlay.js
+
+**Problem**: Both cards had zero implementation in smartAutoPlay.js.
+- King Jay (106): a 6 HP ghost-rare with a lucky-7 reflect mechanic that could redirect damage to any winner — completely absent; every round he took full damage with no chance of reflection.
+- Night Master (103): a 5 HP ghost-rare whose sideline-sniper doubles ability was absent; never KO'd a sideline ghost in any simulation.
+
+**Fix** (smartAutoPlay.js):
+1. **`kingJayReflected` / `kingJayReflectDmg` declarations** alongside `preCamDmg` — needed to guard Cameron Force of Nature (King Jay reflection is NOT a Cameron trigger per index.html's explicit flag list).
+2. **King Jay detection block** (after Fang Undercover clear, before Cameron): `if (lF.id === 106 && !lF.ko && dmg > 0)` → compute losing dice total (`winner === 'red' ? blueDice : redDice`); if sum === 7 → `dmg = 0; kingJayReflected = true; wF.hp -= kingJayReflectDmg` with KO check. Matches index.html lines 9799–9805 (detection) and 9875–9879 (winner HP drop).
+3. **Cameron guard**: `&& !kingJayReflected` added to Cameron Force of Nature condition — prevents false instant-KO when King Jay zeroes dmg via reflection (Cameron's index.html flag list: sky/stone/kodako/dealer/cityCyboo/bogey/fangUndercover/sylvia — King Jay excluded).
+4. **Night Master block** (after Bubble Boys, before Balatron): `if (wF.id === 103 && !wF.ko && wR.type === 'doubles')` → find first `lTeam.ghosts` non-active, non-ko'd ghost with `hp < 4`; set `ko=true, killedBy=103`. Matches index.html lines 9990–10003.
+
+**Version bump:** `TESTROOM_VERSION` v602 → v603
+
+---
+
+## v602 — SIM FIX: Romy (114) VALLEY GUARDIAN! added to smartAutoPlay.js — pre-roll prediction + win-path +3 damage
+
+**Problem**: Romy (114) VALLEY GUARDIAN! had ZERO implementation in smartAutoPlay.js. The sim modeled Romy as a plain 8 HP legendary with zero prediction identity in every simulation — no pre-roll number pick, no +3 win-path damage on a hit, no Piper (107) suppression, no knight reactions.
+
+**Fix** (smartAutoPlay.js, 5 changes):
+1. **B-state init**: added `romyPrediction: { red: null, blue: null }` — matches index.html B-state lines 2922, 3339.
+2. **Pre-round prediction** (after Toby Pure Heart declaration block): `['red','blue'].forEach` — if Romy is active and prediction is null, pick a random 1–6 (all equally likely); if Piper (107) is active enemy, set -1 sentinel (blocked) — matches index.html rollReady lines 5622–5654 + doRomyPrediction line 4480.
+3. **Win-path damage**: `if (wF.id === 114 && !wF.ko && _romyPred != null && _romyPred !== -1 && winDice.includes(_romyPred)) { dmg += 3; }` — matches index.html lines 9357–9367.
+4. **Knight-reaction entry**: Romy win + prediction hit → `rxns++` in the enemy-is-winner knight reaction block — matches index.html line 9366 collectKC call.
+5. **End-of-round cleanup**: `B.romyPrediction.red = null; B.romyPrediction.blue = null;` — matches index.html lines 9357–9360 (capture-and-clear at round start).
+
+**AUDIT STATUS**: Romy (114) — sim gap fixed (VALLEY GUARDIAN! now correctly modeled in smartAutoPlay.js)
+
+---
+
 ## v601 — SIM FIX: Outlaw (43) THIEF! added to smartAutoPlay.js — doubles → steal 1 enemy die next round
 
 **Problem**: Outlaw (43) THIEF! had ZERO implementation in smartAutoPlay.js. The sim modeled Outlaw as a plain 4 HP uncommon in every simulation — no doubles-triggered die drain, no Farewell pattern for dying Outlaws planting the penalty.
@@ -7124,3 +7395,32 @@ No Sandwiches (33) DEPENDABLE! mirror needed — Boris's FORTIFY! is a HP heal, 
 ```
 
 **Version bump:** `TESTROOM_VERSION` v600 → v601
+
+---
+
+## Fix: Jeffery (14) CHUCKLE! — phantom knight-reaction rxns++ removed from smartAutoPlay.js (v635, 2026-04-11)
+
+**File:** `smartAutoPlay.js`
+
+**Bug:** In the knight-reaction estimation block (the `['red','blue'].forEach(teamKey => {...})` loop that computes `rxns` for Knight Terror/Light), line 1909 had:
+```js
+if (hasSideline(enemyTeam, 14))  rxns++;  // Jeffery CHUCKLE! (sideline win-path healer)
+```
+This fired on **every** enemy win where the enemy had Jeffery on the sideline — including non-KO wins. But CHUCKLE! only fires when `lF.ko = true` (the enemy KO'd the friendly ghost). And when `lF.ko = true`, `checkKnightEffects()` in index.html immediately silences the reaction via `!oppActive.ko` guard (because `oppActive = lF` = the KO'd ghost). So in the real game, CHUCKLE! **never** triggers a knight reaction.
+
+**Impact:** Every sim round where the enemy team won + had Jeffery on the sideline, the sim incorrectly applied:
+- Knight Terror: 2 extra HP damage to the enemy active ghost (phantom Heavy Air)
+- Knight Light: +1 die to their next roll (phantom Retribution)
+This inflated Knight Terror's apparent strength against Jeffery-paired teams, biasing balance data.
+
+**Fix:** Removed the `rxns++` line for Jeffery (14). Replaced with a 5-line comment block explaining:
+1. CHUCKLE! is KO-only (`lF.ko` required)
+2. On KO wins, `checkKnightEffects()`'s `!oppActive.ko` guard blocks the reaction
+3. Net real-game effect: 0 reactions from CHUCKLE!, always
+4. Counting rxns++ here was pure phantom inflation
+
+**AUDIT STATUS:** Jeffery (14) knight-reaction sim accuracy — **AUDITED FIX (v635)**. All other CHUCKLE! sim behavior (win-path `hasSideline(wTeam, 14) && !wF.ko && lF.ko` HP grant, Cornelius/Filbert interaction) remains correct and is unchanged.
+
+**FAMILY audit:** wins-a-battle-defeat-gate family (Jeffery 14, Suspicious Jeff 61, Calvin & Anna 91). This cycle fixes the knight-reaction overcount for Jeffery. Suspicious Jeff has no rxns++ entry (correct — Snicker die theft doesn't call checkKnightEffects). Calvin & Anna's Toboggan also has no rxns++ entry (correct). Family fully resolved.
+
+**Version bump:** `TESTROOM_VERSION` v634 → v635

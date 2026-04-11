@@ -120,6 +120,48 @@ TONE EXAMPLES
   }
 
   // ============================================================
+  // ROSTER-LEVEL INTENT DETECTION
+  // When the user asks a question that can only be answered by
+  // scanning the whole roster ("list all 5 HP cards", "which
+  // commons heal?", "how many Rolling Hills ghost-rares?"), we
+  // inject a compact one-line-per-card index of GHOSTS instead
+  // of waiting for individual name matches. Without this Gary is
+  // flying blind on filter/aggregate questions and has to guess.
+  // ============================================================
+  function detectRosterIntent(text) {
+    if (!text) return false;
+    const t = text.toLowerCase();
+    // "list/all/every/which/how many/count" + card-ish noun
+    if (/\b(all|every|which|list|count|how many|number of|total)\b[^.?!]*\b(card|cards|ghost|ghosts|spiritkin|spirit|spirits|legendary|legendaries|common|commons|uncommon|uncommons|rare|rares|ghost[- ]?rare|ghost[- ]?rares)\b/.test(t)) return true;
+    // HP / health filters: "5 hp", "with 5 health", "1hp", "at 7 hp"
+    if (/\b\d+\s*(hp|health)\b/.test(t)) return true;
+    // Rarity roundups
+    if (/\b(all|every|the)\s+(common|uncommon|rare|ghost[- ]?rare|legendar)/.test(t)) return true;
+    // Set roundups
+    if (/\b(frost valley|rolling hills|volcanic activity|dark castle|set ?1)\b[^.?!]*\b(roster|all|every|list|cards|ghosts)\b/.test(t)) return true;
+    // Ability-family sweeps: "healers", "cards that heal", "cards with X"
+    if (/\bcards?\s+(that|which|with)\b/.test(t)) return true;
+    if (/\b(healers?|tanks?|closers?|sideliners?|finishers?)\b/.test(t)) return true;
+    return false;
+  }
+
+  function buildRosterIndex() {
+    const list = getGhosts();
+    if (!list || !list.length) return '';
+    const lines = [];
+    for (const g of list) {
+      if (!g || !g.name) continue;
+      const id = g.id != null ? g.id : '?';
+      const hp = g.maxHp != null ? g.maxHp + 'HP' : '?HP';
+      const rarity = g.rarity || '?';
+      const set = g.set || '?';
+      const ability = g.ability ? ' | ' + g.ability : '';
+      lines.push(`${id} | ${g.name} | ${hp} | ${rarity} | ${set}${ability}`);
+    }
+    return lines.join('\n');
+  }
+
+  // ============================================================
   // CHARACTER EASTER EGGS
   // Extra personality injection fired when a specific user talks
   // to a specific card. Designed to be expanded — add a new case
@@ -255,6 +297,19 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
       ? `\n\nRECENT BATTLE CONTEXT FOR ${username}:\n${recentBattle}`
       : '';
 
+    // Roster-level queries get the full compact index injected, so Gary
+    // can answer filter/aggregate questions ("all 5 HP cards", "every
+    // healer", "how many Rolling Hills rares") without guessing.
+    // Also triggers when the user name-dropped 3+ cards in one message —
+    // at that point they're clearly comparing across the roster.
+    const namedCards = findReferencedCards(userMessage);
+    const wantsRoster = detectRosterIntent(userMessage) || namedCards.length >= 3;
+    const rosterBlock = wantsRoster
+      ? '\n\nFULL ROSTER INDEX (use this to answer filter/list/aggregate questions — format: id | name | HP | rarity | set | ability):\n' +
+        buildRosterIndex() +
+        '\n\nWhen the user asks a filter/list/count question, consult this index before answering. Do not invent cards that are not in the list. If your answer is a list, keep it tight — group or summarize rather than reciting every line.'
+      : '';
+
     // ----- CHARACTER MODE -----
     if (character) {
       const easterEgg = getEasterEgg(character, username, isFirstMeeting);
@@ -268,6 +323,7 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
         `You are being talked to by: ${username} (one of your designers)`,
         notesBlock,
         battleBlock,
+        rosterBlock,
         easterEgg,
         '',
         `Stay in character as ${character.name}. Be the Spiritkin in the room.`,
@@ -275,10 +331,9 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
     }
 
     // ----- DEFAULT GARY MODE -----
-    const cards = findReferencedCards(userMessage);
-    const cardBlock = cards.length
+    const cardBlock = namedCards.length
       ? '\n\nLIVE CARD DATA (cards mentioned in this message):\n' +
-        cards.map(describeCard).map(s => '- ' + s).join('\n')
+        namedCards.map(describeCard).map(s => '- ' + s).join('\n')
       : '';
 
     return [
@@ -292,10 +347,11 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
       notesBlock || '\n\n(No recent notes from the other co-designers yet.)',
       battleBlock,
       cardBlock,
+      rosterBlock,
       '',
       'Be the friend in the room, not a chatbot. 1-3 paragraphs unless they ask for depth.',
     ].join('\n');
   }
 
-  window.GarySystemPrompt = { build, findReferencedCards, describeCard, buildCharacterPersona, getEasterEgg };
+  window.GarySystemPrompt = { build, findReferencedCards, describeCard, buildCharacterPersona, getEasterEgg, detectRosterIntent, buildRosterIndex };
 })();
