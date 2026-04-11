@@ -3,7 +3,187 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v386
+## ⚡ WYATT DIRECTIVE (2026-04-10 #3) — Duel Phase playability: Raditz modal + Ready-button auto-skip
+
+**Live repro from Wyatt's seat:**
+Battle start — "DUEL PHASE — Raditz (red) responds. / DUEL PHASE — Patrick (blue) moves first. / Raditz — Hunt! Primed — choose to force an opponent swap before rolling. / Battle begins!" Narrator said the ability was primed but **nothing opened** — no clickable opponent island, no swap picker, no modal. The ability is "visible" in the narrator strip but not actually playable. We've taken a step back on order of operations and the game has to be playable end-to-end, not just narrated.
+
+**ISSUE #1 — Raditz Hunt swap picker never opens during Duel Phase**
+1. Raditz (id ???) is in the known caveat list in testroom-orchestrator.md: "Modals still open at roll-click time, not during Duel Phase." The v2 pass referenced there ("move modal openings into enterDuelPhase") is now required, not optional — Wyatt hit it on the very first battle.
+2. In `enterDuelPhase(team)` (or the priority-team-ready transition), detect whether the priority team's active fighter is one of the modal-driven primers: Bogey Bogus, Toby Pure Heart, Eloise, Mallow, Boo Brothers, Tyler, Guardian Fairy, Romy, **Raditz**, Doug, Fang Undercover.
+3. For each, open its existing modal/picker **before** `rollReady` is clickable, not at roll-click time. Reuse the existing handlers (toggleRaditzHunt / openRaditzPicker / whatever the function is named — grep for `raditz` / `Raditz` / `Hunt` in index.html to find the current callsite and its gating with `isPreRollActive(team)`).
+4. Ready button should stay disabled until the required primer choice is made (or the player explicitly skips the optional ones). Narrator should announce the picker clearly: "Raditz — choose an opponent sideline to force into the arena."
+5. Raditz specifically: the opponent's sideline cards on their island must become clickable targets. If the opponent has no valid swap targets, auto-skip the primer with a narrator line and flow straight to Ready.
+6. **Test it:** start a battle with Raditz as red's active fighter, confirm the picker actually opens during Duel Phase, confirm clicking a blue sideline commits the swap, confirm ready unlocks after.
+
+**ISSUE #2 — Ready button is pointless when priority team has no decisions**
+Wyatt's exact words: *"There are times when people don't have specials or anything, and in those times, if they don't have an ability going off and there's no special, why not just hit the roll dice button? What's the point of the ready button?"*
+
+1. In `enterDuelPhase(team)` / `computeDuelPriority()`, compute `hasAnyDecision(team)`:
+   - any priming ability modal pending (Raditz/Bogey/Toby/Eloise/Mallow/Boo Brothers/Tyler/Guardian Fairy/Romy/Doug/Fang Undercover, or any ability with an optional pre-roll commit)
+   - any resource they can optionally spend before the roll (Harrison, Aunt Susan, Zain Ice Blade forge/swing, Finn forge, Pressure, Tyson Hop, Blackout, Happy Crystal sacrifice, Healing Seed, cycleCommit, etc.)
+   - any committed-but-uncommittable state worth toggling
+2. If `hasAnyDecision(team) === false`, **auto-advance** that team's phase immediately — skip Ready, go straight to the next phase. If both teams have no decisions, skip Duel Phase entirely and unlock rolls so Wyatt can just click Roll Dice.
+3. If only one team has no decisions, that team's Ready click is auto-fired after a short beat (250-400ms) so the narrator still reads naturally — *"<Opponent> has nothing to commit — your move!"* → auto-advance → other team's phase.
+4. This matches testroom-orchestrator.md's Next Session Priority #2: "Auto-advance Duel Phase when the active team has no decisions to commit (saves 3s per round)." — promote this to now.
+
+**Both issues are blocking playability.** The game has to flow smoothly or EJ/Skylar can't playtest it. Do not refactor the Duel Phase state machine — only additive changes in `enterDuelPhase`, a new `hasAnyDecision(team)` helper, and lifting the modal primers into the Duel Phase entry. Refiner whitelist blocks editing `rollReady`, `doPreRollSetup`, `resolveRound` directly, so plan the entry-point changes around those blacklists. Bump TESTROOM_VERSION, log here under a v??? section, push.
+
+---
+
+## ⚡ WYATT DIRECTIVE (2026-04-10 #2) — Zain (206) cleanup + battle page polish
+
+**A. Zain text shorten + win-generates-Ice-Shards**
+1. Zain's `abilityDesc` (line ~2071) is too long. Shorten to something like:
+   `"Win any roll: gain 1 Ice Shard. Before rolling: spend 1 Ice Shard + 1 Moonstone to forge an Ice Blade. Once forged, swing it on any roll for +1 die and +2 damage on a win."`
+   (Keep the meaning, drop the prose. Final wording is a refiner judgment call but it MUST stay short.)
+2. The "Win any roll → gain 1 Ice Shard" generation is **not currently implemented** for Zain — Wyatt thought it was. ADD it. Fire it inside `resolveRound()` on the winner's path whenever Zain (id 206) is the active fighter on the winning team. Use the cinematic queue (`queueAbility`) with a callout like `ICE SHARD!` and `creditGhost(winTeamName, 206, 'iceShard', 1)` (or whatever the matching key is — verify against the resources object). It must fire on EVERY type of win (singles, doubles, triples), not just doubles.
+3. Verify it doesn't double-credit if Zain also forges/swings the blade in the same round.
+
+**B. Battle page polish (resumes a prior interrupted task — Wyatt called this out)**
+1. **Add space between the sideline column and the active fighter slot.** `team-battle-row` at line 346 currently has `gap:8px`. Bump it to `gap:24px` (or whatever visually breathes — try 20-28px range). The sideline cards are crowding Zain in the screenshot.
+2. **REMOVE the gilt "theatre crest" / crown above the active fighter.** It's the `.fighter-slot::before` rule at line 408 with the SVG data URL — plus the team-red and team-blue overrides at lines 424 and 427. Wyatt finds it weird-looking. Strip the entire `::before` (default + both team variants) and remove the `margin-top:22px /* leave room for the crest */` from the `.fighter-slot` rule above (line ~405) since the crest is gone. Test that nothing else relies on this pseudo-element.
+
+These three polish items belong together — do them in ONE cycle if possible so the version bump captures the whole battle-page facelift.
+
+---
+
+## ⚡ WYATT DIRECTIVE (2026-04-10) — Granny (310) ability rebalance
+Change Granny's "Bedtime Story" reward table:
+- **Doubles KO** → grant **1 Moonstone** (was: 1 Sacred Fire)
+- **Triples KO** → grant **3 Sacred Fires** (was: 1 Moonstone)
+- Singles KO → unchanged (still 1 Lucky Stone)
+
+Touch points:
+1. `GHOSTS` array entry at line ~2115 — update `abilityDesc` text to match.
+2. `resolveRound()` Bedtime Story callouts (~lines 10010, 10013, 10016 for loser-team path; ~lines 10026, 10029, 10032 for winner self-KO path). Both code paths must change. Triples path needs to add `loseTeam.resources.fire += 3` (or 3× increment) and credit 3 fires via `creditGhost(..., 'fire', 3)`.
+3. Update callout strings ("doubles KO → MOONSTONE!", "triples KO → 3 SACRED FIRES!").
+4. Bump TESTROOM_VERSION and log under a new version section in this FIXLOG.
+
+Do NOT touch any other Granny logic (sideline tracking, popSidelineCard, getSidelineGhost). Just swap the reward branches.
+
+## Current Version: v406
+
+## v406 — Duel Phase: all 10 modal primers now open during Duel Phase; Ready auto-skips when no decisions
+
+### ISSUE #1 — Raditz Hunt (and all other modal primers) now open during Duel Phase
+
+**Root cause confirmed:** The Duel Phase intercepted the pre-roll flow BEFORE `rollReady` ran, so `raditzHuntReady`, `dougCautionPending`, `gusOverlay`, and all other primer modals were unreachable during Duel Phase. The narrator would say "Hunt! Primed" but no picker ever opened.
+
+**Fix — three new functions added (~line 5980 in index.html):**
+
+1. **`hasAnyDecision(team)`** — returns `true` if the team has any of: a pending modal primer (Romy, Toby, Guardian Fairy, Eloise, Mallow, Bogey, Gus, Raditz, Doug, Fang Undercover), or a committable resource tile (ice/fire/surge cycleCommit, Healing Seed when HP < max, Happy Crystal sac, Aunt Susan seeds). *Tyler (105) and Boo Brothers (17) omitted — they depend on `B.preRoll.count` which isn't set until `doPreRollSetup` fires at roll-click time; they remain accessible in `rollReady`.*
+
+2. **`openDuelPhasePrimers(team)`** — called at the start of each team's Duel Phase slot. Checks each primer condition (same guards as the `rollReady` equivalents), disables the "✓ Ready" button, sets up the corresponding `B.*Pending` state with `btn = duelDoneBtn` (not the roll button), and opens the overlay. Returns `true` if a primer was opened, `false` if nothing applies. **Raditz-specific:** clears `B.raditzHuntReady[team] = false` immediately before opening the overlay so `rollReady` can never double-fire. Auto-skips with narrator lines if Barnaby (326 Stubborn) is opposing or opponent has no alive sideline.
+
+3. **`_runDuelTeamTurn(team)`** — called after `renderDuelUI()` in both `enterDuelPhase` and the duel-1→duel-2 transition inside `duelPhaseReady`. Calls `openDuelPhasePrimers` first; if no primer and `hasAnyDecision` is also false, auto-fires a narrator beat ("*Ghost has nothing to commit — rolling!*") then calls `duelPhaseReady(team)` after 350ms.
+
+**`doTeamRoll(team, btn)` guard added (~line 6095):**
+All choice handlers (`doRaditzHuntChoice`, `doBogeyChoice`, `doEloiseChoice`, etc.) call `doTeamRoll(team, btn)` to signal "done — proceed." During Duel Phase, `doTeamRoll` now intercepts that call: re-enables the Ready button (`duelDoneRedBtn`/`duelDoneBlueBtn`) and returns without rolling. This lets the player commit resource tiles (ice/fire/surge) after the primer resolves, then click Ready manually. The handler already called `btn.disabled = false` for handlers that use `pending.btn` (Bogey, Mallow, Eloise, GF, Gus, Raditz, Doug, Fang) — the intercept covers the remaining handlers that fetch the roll button by ID (Romy `doRomyPrediction`, Toby `doTobyPureHeart`).
+
+**No double-fire:** Each primer clears its state flag before/during the handler, so `rollReady`'s primer blocks are no-ops by the time the player clicks Roll after Duel Phase ends:
+- `B.raditzHuntReady[team] = false` → cleared in `openDuelPhasePrimers` (before overlay opens)
+- `B.romyPrediction[team]` → set to prediction value in `doRomyPrediction`
+- `B.pureHeartDeclared[team]` → set in `doTobyPureHeart`
+- `B.bogeyArmed[team]` / `B.mallowDecided[team]` / `B.eloiseUsedThisRound[team]` / `B.guardianFairyStandby[team]` / `B.galeForceDecided[team]` / `B.dougCautionUsed[team]` / `B.fangUndercoverArmed[team]` → all set by their respective choice handlers
+
+### ISSUE #2 — Ready auto-skips when priority team has no decisions
+
+**`computeDuelPriority()`** now checks `hasAnyDecision('red') && hasAnyDecision('blue')` — if **both** teams have zero decisions, returns `null` early, bypassing Duel Phase entirely and falling through to simultaneous ready (both roll buttons unlock immediately).
+
+**`_runDuelTeamTurn(team)`** handles the single-team case: if only one team has no decisions, it auto-fires `duelPhaseReady(team)` after a 250ms + 350ms narrator beat, skipping the manual Ready click for that team.
+
+### Files changed
+- `testroom/index.html`: TESTROOM_VERSION v405 → v406; three new functions (~265 lines); `doTeamRoll` guard (+10 lines); `enterDuelPhase` +1 line; `duelPhaseReady` +1 line; `computeDuelPriority` +3 lines.
+- `testroom/FIXLOG.md`: this entry.
+
+### Primer blacklist coverage (10/12 primers now open in Duel Phase)
+| Ghost | Primer | Duel Phase? |
+|---|---|---|
+| Romy (114) | Valley Guardian (prediction) | ✅ v406 |
+| Toby (97) | Pure Heart (declare) | ✅ v406 |
+| Guardian Fairy (99) | Wish (standby) | ✅ v406 |
+| Eloise (85) | Change of Heart (HP swap) | ✅ v406 |
+| Mallow (89) | Dozy Cozy (fire heal) | ✅ v406 |
+| Bogey (53) | Bogus (reflect arm) | ✅ v406 |
+| Gus (31) | Gale Force (swap-on-win) | ✅ v406 |
+| Raditz (62) | Hunt (force swap) | ✅ v406 |
+| Doug (63) | Caution (self-swap +1 die) | ✅ v406 |
+| Fang Undercover (7) | Skilled Coward (arm dodge) | ✅ v406 |
+| Tyler (105) | Heating Up (2 HP → +1 die) | ⏳ needs `B.preRoll.count` — fires at roll time |
+| Boo Brothers (17) | Teamwork (die → +1 HP) | ⏳ needs `B.preRoll.count` — fires at roll time |
+
+---
+
+## v402 — FIXLOG AUDIT STATUS: Corrected 4 stale overclock notes (Munch 66, Katrina 70, Flora 75, Troubling Haters 83)
+
+- **Problem**: Four AUDIT STATUS entries in the checklist described those cards as having `Math.min(maxHp, hp+N)` HP caps — but all four are listed as overclock healers in Hard Rule #9, and the actual current code for each correctly uses the uncapped `hp += N` pattern (with `overclocked!` callout tags where applicable). These stale notes were a trap: any future refiner reading them would incorrectly conclude that removing the `Math.min` cap is the bug, and re-apply it — breaking gameplay for all four cards.
+- **Most dangerous**: Katrina (70) at AUDIT STATUS line 1024 — it said "AUDITED FIX (v280) — fixed to `Math.min(f.maxHp, f.hp + 1)`", implying the cap was the *fix* and the current overclock is a *regression*. Confirmed: current code is `f.hp += 1` with `seekerOver` detection — correct per Hard Rule #9.
+- **Four AUDIT STATUS notes updated** (pure documentation; zero JS or logic changes):
+  1. Munch (66) — note clarified: "+4 HP overclocks" + warning: "do NOT re-apply Math.min."
+  2. Katrina (70) — note clarified: "current code correctly uses `f.hp += 1`" + warning: stale v280 note was wrong, do NOT re-apply cap.
+  3. Flora (75) — note clarified: "HP heal overclocks (no maxHp cap)" + warning: original v281 note was wrong.
+  4. Troubling Haters (83) — note clarified: "+2 HP overclocks" + warning: original v285 note was wrong.
+- **Zero behavior change.** Only FIXLOG.md text was modified. Bumped TESTROOM_VERSION v400 → v402 (v401 was consumed by a simultaneous gary-script cache-buster bump).
+
+## v400 — DEAD CODE REMOVAL: Biscuit (324) Warm Up win-path block stripped
+
+- **Biscuit (324) is permanently shelved** (324 in SHELVED_IDS). Its `hasSideline(winTeam, 324)` block in `resolveRound()` (win-path) was always-false dead code executing every winning round.
+- **19 lines removed**: full `if (hasSideline(winTeam, 324) && !wF.ko)` block including the Cornelius ANTIDOTE! branch, the Mr Filbert MASK MERCHANT! branch, and the standard WARM UP! callout branch (which used the correct `Math.min(wF.maxHp, wF.hp + 1)` cap, irrelevant since the block never ran).
+- **Same pattern as** v363 (slagResidueBlocksWin guard removed from Biscuit), v363–v372 (full shelved-card sweeps for Slag Heap, Ash Phoenix, Patches, Anvil, Magnolia, Old Mill, Pyrope, Forge Fire, Dragonclaw, Char, Bramble, Magma Heart, Pumice, Grandmother Willow, Snoozer, Drizzle, etc.). The v363 pass stripped the `slagResidueBlocksWin` guard from Biscuit's if-block but left the outer `hasSideline(winTeam, 324)` block itself in place — this cycle completes the cleanup.
+- **Zero behavior change**: `hasSideline(winTeam, 324)` is trivially false since 324 is permanently shelved; the callout branches could never execute.
+- Also bumped TESTROOM_VERSION v399 → v400. (Note: v399 was a silent bump with no logged changes — same pattern as v396.)
+
+## v399 — (unlogged version bump — no functional change recorded)
+
+- TESTROOM_VERSION bumped to v399 between sessions without a corresponding FIXLOG entry. No known functional changes at this version. See v400 for next logged change.
+
+## v398 — TEXT FIX: Haywire (78) Wild Chords — abilityDesc + callout + log text "triples" → "triples or better"
+
+- **Haywire (78) Wild Chords abilityDesc accuracy fix**: The abilityDesc said "Upon rolling triples, gain +1 dice for the rest of the game." but the code uses `isTripleOrBetter(hwRoll.type)` in both the win/lose path (line ~10374) and tie path (line ~8338), which fires on triples, quads, AND penta rolls. A player who triggers Wild Chords via quad 6s (possible with bonus dice from Retribution, Tyler, Redd, Marcus bonus, etc.) would see the callout say "Triples or better!" but their card text only said "triples" — inconsistent and misleading.
+- Fixed 5 sites: (1) `abilityDesc` string in the GHOSTS array, (2) tie-path `queueAbility` callout description, (3) tie-path `log()` message, (4) win/lose-path `queueAbility` callout description, (5) win/lose-path `log()` message. Also fixed minor grammar in abilityDesc: "+1 dice" → "+1 die".
+- Same class of bug as Granny (310) v397 — `isTripleOrBetter()` covers triples/quads/penta but card text only mentioned triples. Pattern: always audit abilityDesc when a card uses `isTripleOrBetter()` rather than a strict `=== 'triples'` check.
+- Zero logic changes. The `isTripleOrBetter` behavior is correct by design (bigger roll = same reward) — only the display text was wrong.
+- Also bumped TESTROOM_VERSION v397 → v398.
+
+## v397 — TEXT FIX: Granny (310) Bedtime Story abilityDesc "triples" → "triples or better"
+
+- **Granny (310) Bedtime Story abilityDesc accuracy fix**: The abilityDesc said "By triples: gain 3 Sacred Fires." but the code uses `isTripleOrBetter(wR.type)` which fires on triples, quads, AND penta rolls. If an opponent is KO'd by quad 6s (possible with bonus dice from Retribution, Redd, Haywire, etc.), the game callout correctly announces "quads KO → 3 Sacred Fires!" but the card text only mentioned triples — misleading to players with 4+ dice. Fixed: updated abilityDesc to "By triples or better: gain 3 Sacred Fires." — now accurate. The `isTripleOrBetter` behavior is correct per design (bigger roll = same max reward), only the text description was wrong.
+- TESTROOM_VERSION was already at v397 when this cycle ran (v396 appears to have been an unlogged minor bump between sessions — no known functional change at v396).
+
+## v396 — (unlogged version bump — no functional change recorded)
+
+- TESTROOM_VERSION bumped to v396 between sessions without a corresponding FIXLOG entry. No known functional changes at this version. See v397 for next logged change.
+
+## v395 — WYATT DIRECTIVE #2: Zain (206) battle-page facelift + ice shard generation
+
+**A. Battle page polish (CSS-only, no JS touched):**
+- `.team-battle-row` gap: `8px` → `24px` — sideline cards no longer crowd the active fighter slot.
+- Removed the gilt theatre crest entirely: stripped `.fighter-slot::before` (all 22 lines of SVG data URI), `.fighter-slot.team-red::before`, `.fighter-slot.team-blue::before`, the no-op `.team-red::before svg circle` fallback rule, and the `margin-top:22px; /* leave room for the crest */` from `.fighter-slot`. Wyatt found it weird — gone.
+
+**B. Zain (206) Ice Blade ability — win-generates-Ice-Shards implemented:**
+- "Win any roll: gain 1 Ice Shard" was missing. Now fires every win (singles/doubles/triples) via the on-win `collectKC` + `queueAbility('ICE SHARD!', ...)` pattern matching Dart/Ashley/Valley Magic.
+- `onShow` callback does `winTeam.resources.ice++` + `creditGhost(winTeamName, 206, 'ice', 1)` so the resource tile updates WITH the splash (Beat-4 deferral preserved).
+- Sandwiches DEPENDABLE! mirror included.
+- Does NOT interfere with Ice Blade swing (+2 dmg) which fires separately via `zainIceBladeTriggered`.
+
+**C. Zain `abilityDesc` shortened** per directive: dropped the verbose prose, kept all mechanical information.
+
+Bumped v394 → v395.
+
+---
+
+## v392 — WYATT DIRECTIVE: Granny (310) Bedtime Story reward table rebalanced
+
+- **Doubles KO**: was 1 Sacred Fire → now **1 Moonstone**
+- **Triples KO**: was 1 Moonstone → now **3 Sacred Fires**
+- **Singles KO**: unchanged (still 1 Lucky Stone)
+
+All 4 code sites updated (loser-team KO path doubles + triples branches; winner self-KO path doubles + triples branches). Sandwiches DEPENDABLE! mirrors updated to match new rewards at all 4 sites. `abilityDesc` text updated on Granny's GHOSTS entry. Also bumped version v391 → v392.
+
+Touch points: lines ~2261 (abilityDesc), ~10298–10302 (loser-team KO path), ~10314–10318 (winner self-KO path).
+
+---
 
 ## v386 — CRITICAL: game-freeze recovery net + .dice TypeError fixes
 
@@ -927,16 +1107,16 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Doug (63) — Caution: AUDITED PASS (v283) — pre-roll modal fires every round until used (correct "save for right moment" mechanic); YES→swap Doug to sideline, incoming ghost gets +1 die this roll, triggerEntry fires for new ghost; NO→modal dismissed, reoffered next round; dougCautionUsed[team]=true only on YES (correct once-per-game). Correct.
 - [x] Sparky (64) — Tinder: AUDITED PASS (v283) — wF.id===64 + dmg>0 + winDice 1-count; +3 per 1; collectKC; TINDER! callout queued. Correct.
 - [x] Wim (65) — Slash: AUDITED PASS (v280) — all winning dice odd → +5 dmg, `every(d => d%2===1)` is correct (spec explicitly says "all odd")
-- [x] Munch (66) — Scraps: AUDITED PASS (v283) — wF.id===66 + lF.ko + !slagResidueBlocksWin; +4 HP capped at maxHp; Filbert curse flips to -4; KO guard on Filbert path; collectKC; callout queued. Correct.
+- [x] Munch (66) — Scraps: AUDITED PASS (v283, overclock re-confirmed v401) — wF.id===66 + lF.ko + !slagResidueBlocksWin; +4 HP **overclocks** (no maxHp cap — v294 hard rule; v336 fixed relative→absolute mutation; v354 fixed onShow clobber); Filbert curse flips to -4; KO guard on Filbert path; collectKC; callout queued. NOTE: the original v283 note said "capped at maxHp" — that cap was stripped in v294 and is NOT correct; do NOT re-apply Math.min.
 - [x] Snorton (67) — Fissure: AUDITED PASS (v283) — winDice.filter(d===6).length>=2 → +5 dmg; collectKC; FISSURE! queued. Correct.
 - [x] Kairan (68) — Let's Dance: AUDITED FIX (v283) — doubles (win/lose/tie) → +1 die next roll. BUG: in doPreRollSetup, `redCount += B.letsDanceBonus.red` fired BEFORE the Kairan-is-active guard, so the bonus die transferred to whichever ghost was currently active even if Kairan was KO'd or swapped. Fixed: moved `redCount +=` and `blueCount +=` inside the `active(B[team]).id === 68` guard — bonus is now personal to Kairan and lost if she's no longer active.
 - [x] Sonya (69) — Mesmerize: AUDITED FIX (v284) — die change was silently discarded every round. `pickSonyaDie` created a new array via `[...B.redDice]`, modified it, then assigned it to `B.redDice` and `B.pendingResolve.redDice`. But `postRollDone()` (called after Sonya finishes) re-creates `B.pendingResolve = { redDice, blueDice }` using the closure variables from `doPostRollAndResolve`, which are `B.preRoll.red.dice` and `B.preRoll.blue.dice` — the original unmodified arrays. So Sonya's change was always overwritten before `resolveRound()` ever saw it. Fixed: switched to the Dark Wing in-place mutation pattern — use `B.preRoll.red.dice` directly and mutate it in-place; since the closure captures the same array reference, `postRollDone` then creates a `pendingResolve` that already contains the changed die. Added `if (B.pendingResolve)` guard on the `pendingResolve` update (it may not exist yet at Sonya's call time).
-- [x] Katrina (70) — Seeker: AUDITED FIX (v280) — `f.hp += 1` had no maxHp cap; fixed to `Math.min(f.maxHp, f.hp + 1)`. Opponent with more HP than Katrina's max could trigger heal to 6/5 HP. Now capped with `· capped` suffix in callout.
+- [x] Katrina (70) — Seeker: AUDITED FIX (v280, overclock re-confirmed v401) — current code correctly uses `f.hp += 1` (overclocks) with `seekerOver = f.hp > f.maxHp` and `· overclocked!` callout tag. STALE NOTE WARNING: the original v280 entry said the cap `Math.min(f.maxHp, f.hp + 1)` was *applied* as a fix — that was wrong; Katrina is an overclock healer (Hard Rule #9 list: "Calvin (342), Boris (343), Katrina (70), Mallow (89)..."). The cap was reverted before v294. Do NOT re-apply Math.min. Katrina's overclock is correct and intentional.
 - [x] Admiral (71) — Comrades: AUDITED FIX (v279)
 - [x] Sky (72) — Elusive: AUDITED PASS (v285) — `lF.id===72 && dmg>2 && !magmaCoreMelt` → dmg=0; Cameron check; `ELUSIVE!` queued; correct
 - [x] Stone Cold (73) — One-two-one!: AUDITED FIX (v277)
 - [x] Dark Jeff (74) — Cackle: AUDITED PASS (v281) — sideline +1 dmg, Cornelius check, correct
-- [x] Flora (75) — Restore: AUDITED PASS (v281) — win+lose doubles paths, Filbert curse, maxHp cap, correct
+- [x] Flora (75) — Restore: AUDITED PASS (v281, overclock re-confirmed v401) — win+lose doubles paths, Filbert curse, correct. HP heal **overclocks** (no maxHp cap — Hard Rule #9; v346 deferred mutations to onShow; current: `floraRestoredHp = wF.hp + 2`). NOTE: original v281 note said "maxHp cap" — that cap was removed in v294. Do NOT re-apply Math.min.
 - [x] Dark Wing (76) — Precision: AUDITED FIX (v333) — post-roll modal, in-place splice, once-per-round. BUG: `darkWingUsedThisRound` was only reset in tie-path, not win/lose-path — Dark Wing could only reroll once per game in normal matches. Fixed: added reset to win/lose-path reset block.
 - [x] City Cyboo (77) — Barrier: AUDITED PASS (v285) — doubles negation, Cameron check, correct
 - [x] Haywire (78) — Wild Chords: AUDITED PASS (v285) — triples→+1 permanent die, win+tie paths, `haywireBonus` applied unconditionally in doPreRollSetup, correct
@@ -944,7 +1124,7 @@ Within a tier, lowest ID first. Do NOT re-audit a card already marked PASS unles
 - [x] Bilbo (80) — Little Buddy: AUDITED PASS (v285) — sideline singles win +2 dmg, Cornelius, correct
 - [x] Spockles (81) — Valley Magic: AUDITED PASS (v285) — win→+2 ice deferred onShow, Sandwiches mirror, Wisp block, correct
 - [x] Antoinette (82) — Grace: AUDITED PASS (v285) — mirrors opponent count upward only, applied last in doPreRollSetup, correct
-- [x] Troubling Haters (83) — Growing Mob: AUDITED PASS (v285) — win+dmg>=4→+2 HP capped, Filbert flip, Residue guard, correct
+- [x] Troubling Haters (83) — Growing Mob: AUDITED PASS (v285, overclock re-confirmed v401) — win+dmg>=4→+2 HP **overclocks** (no maxHp cap — Hard Rule #9; v336/v354 fixed relative→absolute onShow mutations); Filbert flip to -2 dmg; Residue guard; correct. NOTE: original v285 note said "capped" — that cap was removed in v294. Do NOT re-apply Math.min.
 - [x] Wandering Sue (84) — Hidden Weakness: AUDITED PASS (v285) — pre-roll both teams, enemy hp>=12→instant KO, callout queued, correct
 - [x] Eloise (85) — Change of Heart: AUDITED PASS (v286) — pre-roll modal fires when Eloise active + ≥1 Ice Shard; modal preview shows both HP values accurately; YES path spends 1 ice and raw-swaps HP values (no cap by design — "swap HP" means literal exchange); NO path marks used; `eloiseUsedThisRound` resets each round; both round-end reset blocks covered; continuation calls `doTeamRoll` consistent with all other modal patterns. Raw swap is correct: a swap is not a heal, and the design intent is to take the enemy's exact HP value (potentially above Eloise's max for a power play costing an ice shard). Correct.
 - [x] Pelter (86) — Snowball: AUDITED PASS (v285) — doubles win→+2 dmg, collectKC, correct
