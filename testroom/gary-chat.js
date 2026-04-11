@@ -408,6 +408,11 @@
     const userMsg = { role: 'user', content: text, ts: Date.now() };
     appendMsg(userMsg);
 
+    // First meeting = no prior assistant replies in this user+character thread.
+    // The new user message has already been pushed to history, so we check
+    // whether any assistant turn exists yet.
+    const isFirstMeeting = history.filter(m => m.role === 'assistant').length === 0;
+
     // Build system prompt with freshly loaded shared notes (and character, if any)
     const system = window.GarySystemPrompt.build({
       username: currentUser,
@@ -415,6 +420,7 @@
       recentBattle: getRecentBattleContext(),
       userMessage: text,
       character: currentCharacter,
+      isFirstMeeting,
     });
 
     // Trim history to last N turns, strip ts, keep only role+content

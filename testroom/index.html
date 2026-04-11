@@ -2095,7 +2095,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v402';
+const TESTROOM_VERSION = 'v404';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4373,6 +4373,102 @@ function finishSylviaRoll(value) {
     dieEl.style.background = 'linear-gradient(135deg,#bae6fd,#e0f2fe)';
     dieEl.style.borderColor = '#0ea5e9';
     dieEl.style.color = '#0c4a6e';
+  }
+  if (resume) resume();
+}
+
+// ============================================================
+// PRINCE BALATRON (113) — Party Time counter-die reveal
+// ============================================================
+// Counter-die value + post-counter HP are computed synchronously in
+// _resolveRoundImpl so downstream KO-cascade logic sees the correct state.
+// The modal is purely cinematic — it shuffles and lands on the pre-computed
+// value, then applies the deferred wF.hp mutation so the bar drops the
+// instant the reveal lands. B.balatronPending carries the precomputed data.
+function showBalatronModal(resumeCallback) {
+  const bp = B.balatronPending;
+  if (!bp) { if (resumeCallback) resumeCallback(); return; }
+  B.balatronResume = resumeCallback;
+
+  const titleEl = document.getElementById('balatronTitle');
+  if (titleEl) titleEl.textContent = `${bp.lFName} — Party Time!`;
+  const subEl = document.getElementById('balatronSub');
+  if (subEl) subEl.innerHTML = `${bp.lFName} lost the roll — but the party's not over.<br>Roll the counter die for damage to <b>${bp.wFName}</b>!`;
+  const dieEl = document.getElementById('balatronDie');
+  if (dieEl) {
+    dieEl.textContent = '?';
+    dieEl.style.transform = 'rotate(0deg)';
+    dieEl.style.background = 'linear-gradient(135deg,#e9d5ff,#c4b5fd)';
+    dieEl.style.borderColor = '#a855f7';
+    dieEl.style.color = '#4c1d95';
+  }
+  const btn = document.getElementById('balatronRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '🎲 Roll the Counter Die!'; }
+
+  narrate(`<b class="${bp.loseTeamName}-text">${bp.lFName}</b>&nbsp;retaliates — <b class="gold">PARTY TIME!</b>`);
+  document.getElementById('balatronOverlay').classList.add('active');
+}
+
+function doBalatronRoll() {
+  const btn = document.getElementById('balatronRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+
+  const bp = B.balatronPending;
+  if (!bp) { finishBalatronRoll(); return; }
+  const finalValue = bp.counterDie;
+
+  const dieEl = document.getElementById('balatronDie');
+  if (!dieEl) { finishBalatronRoll(); return; }
+
+  // Shuffle animation — land on the pre-computed counter value
+  let ticks = 0;
+  const totalTicks = 10;
+  const tickMs = 70;
+  const shuffle = setInterval(() => {
+    ticks++;
+    dieEl.textContent = String(Math.floor(Math.random() * 6) + 1);
+    dieEl.style.transform = `rotate(${ticks * 36}deg)`;
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      dieEl.textContent = String(finalValue);
+      dieEl.style.transform = 'rotate(0deg)';
+      // Color the die by hit size
+      if (finalValue >= 5) {
+        dieEl.style.background = 'linear-gradient(135deg,#fde68a,#f59e0b)';
+        dieEl.style.borderColor = '#f59e0b';
+        dieEl.style.color = '#78350f';
+      } else if (finalValue >= 3) {
+        dieEl.style.background = 'linear-gradient(135deg,#fbbf24,#d97706)';
+        dieEl.style.borderColor = '#b45309';
+        dieEl.style.color = '#78350f';
+      } else {
+        dieEl.style.background = 'linear-gradient(135deg,#fecaca,#ef4444)';
+        dieEl.style.borderColor = '#b91c1c';
+        dieEl.style.color = '#7f1d1d';
+      }
+      setTimeout(() => finishBalatronRoll(), 900);
+    }
+  }, tickMs);
+}
+
+function finishBalatronRoll() {
+  const bp = B.balatronPending;
+  const resume = B.balatronResume;
+  B.balatronPending = null;
+  B.balatronResume = null;
+  document.getElementById('balatronOverlay').classList.remove('active');
+
+  if (bp) {
+    // Apply the deferred HP mutation + log so the bar drops exactly now.
+    const wTeamName = bp.loseTeamName === 'red' ? 'blue' : 'red';
+    const wTeamObj = B[wTeamName];
+    const wF = wTeamObj ? active(wTeamObj) : null;
+    if (wF && wF.name === bp.wFName) {
+      wF.hp = bp.hpAfter;
+    }
+    log(`<span class="log-ability">${bp.lFName}</span> — Party Time! Counter die: <b>${bp.counterDie}</b> damage to ${bp.wFName}! ${bp.wasKo?'<span class="log-ko">KO!</span>':bp.hpAfter+' HP left'}`);
+    renderBattle();
   }
   if (resume) resume();
 }
@@ -9458,18 +9554,31 @@ function _resolveRoundImpl() {
     log(`<span class="log-dmg">${wF.name} takes 1 self-damage from Belly Flop!</span> ${wF.ko?'<span class="log-ko">KO!</span>':pudgeHpAfter+' HP left'}`);
   }
 
-  // Prince Balatron (113) — Party Time: lose & survive → roll 1 counter die for damage
+  // Prince Balatron (113) — Party Time: lose & survive → player rolls 1 counter die
   // Counter fires even if wF is not KO'd by the main roll — Balatron always fights back when alive.
+  // The counter die is pre-computed here (so wF.ko/Cameron cascade stays accurate) but the
+  // reveal + HP mutation + log are deferred to showBalatronModal → finishBalatronRoll so the
+  // player gets the dramatic click-to-roll moment. See function block near showSylviaModal.
   let balatronCounterDie = 0;
   let balatronHpAfter = 0;
   let balatronTriggered = false;
   if (lF.id === 113 && !lF.ko && !wF.ko) {
     balatronCounterDie = Math.floor(Math.random() * 6) + 1;
-    balatronHpAfter = Math.max(0, wF.hp - balatronCounterDie); // compute only — HP bar deferred to onShow
-    if (balatronHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; } // ko flag synchronous (Cameron check)
+    balatronHpAfter = Math.max(0, wF.hp - balatronCounterDie); // compute only — HP bar deferred to modal
+    const willKo = balatronHpAfter <= 0;
+    if (willKo) { wF.ko = true; wF.killedBy = lF.id; } // ko flag synchronous (Cameron check)
     balatronTriggered = true;
     collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Party Time! Counter die: <b>${balatronCounterDie}</b> damage to ${wF.name}! ${wF.ko?'<span class="log-ko">KO!</span>':balatronHpAfter+' HP left'}`);
+    // Stash everything the modal will need. Log is deferred to finishBalatronRoll so the
+    // combat log doesn't spoil the reveal before the player clicks the roll button.
+    B.balatronPending = {
+      counterDie: balatronCounterDie,
+      hpAfter: balatronHpAfter,
+      wasKo: willKo,
+      lFName: lF.name,
+      wFName: wF.name,
+      loseTeamName: loseTeamName
+    };
   }
 
   // Thistle (338) — Barbed: when Thistle takes damage, the attacker takes 1 damage back. Always.
@@ -10018,11 +10127,10 @@ function _resolveRoundImpl() {
     });
   }
 
-  // Prince Balatron (113) — Party Time counter-attack callout (loser fires back after main damage)
-  if (balatronTriggered) {
-    const counterKoSuffix = wF.ko ? ' — KO!' : ` — ${balatronHpAfter} HP left`;
-    queueAbility('PARTY TIME!', 'var(--legendary)', `${lF.name} — Lost but fights back! Counter roll: ${balatronCounterDie} damage!${counterKoSuffix}`, () => { wF.hp = balatronHpAfter; renderBattle(); });
-  }
+  // Prince Balatron (113) — Party Time: NO auto-callout here. B.balatronPending was set in
+  // the compute block above; the interactive reveal modal fires at the START of the
+  // drainAbilityQueue post-callback (see showBalatronModal injection below), giving the
+  // player a click-to-roll moment instead of a flat combat-log line.
 
   // Night Master (103) — Bullseye: sideline snipe callout — onShow updates sideline display
   if (bullseyeTarget) {
@@ -10540,6 +10648,12 @@ function _resolveRoundImpl() {
   const dmgDelay = totalDmgBeats;
   setTimeout(() => {
     drainAbilityQueue(() => {
+      // Prince Balatron (113) — Party Time: if the loser is Balatron, fire the
+      // interactive counter-die modal FIRST (before any round state is reset)
+      // so the reveal lands on top of the current scene. Once the player clicks
+      // and the shuffle finishes, finishBalatronRoll() calls runPostDrain() to
+      // continue with the normal reset + modal chain.
+      const runPostDrain = () => {
       // Reset committed resources + per-round ability flags
       B.committed.red = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
       B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
@@ -10674,6 +10788,15 @@ function _resolveRoundImpl() {
         }
       } else {
         checkGaleForcePicker();
+      }
+      }; // end runPostDrain
+
+      // Balatron modal injection: if the pending flag is set, play the interactive
+      // counter-die reveal first, then runPostDrain() continues the normal flow.
+      if (B.balatronPending) {
+        showBalatronModal(runPostDrain);
+      } else {
+        runPostDrain();
       }
     });
   }, dmgDelay);
@@ -11625,7 +11748,7 @@ renderDice(null,null);
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
 <audio id="sfxShatter" src="../boo/Shatter.mp3" preload="auto"></audio>
 <audio id="sfxVictory" src="../boo/winningwhistle.mp3" preload="auto"></audio>
-<script src="gary-system-prompt.js?v=v402"></script>
-<script src="gary-chat.js?v=v402"></script>
+<script src="gary-system-prompt.js?v=v404"></script>
+<script src="gary-chat.js?v=v404"></script>
 </body>
 </html>
