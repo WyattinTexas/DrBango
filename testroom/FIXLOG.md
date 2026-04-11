@@ -3,7 +3,31 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v383
+## Current Version: v386
+
+## v386 — CRITICAL: game-freeze recovery net + .dice TypeError fixes
+
+Wyatt reported a fully frozen game: Blue rolled triples 1 against Red's doubles 2, won the round, but the cinematic never fired — no damage applied, no callouts, no roll buttons re-enabled. State: Skylar (104) just entered Blue after KO swap, Bogey (53) active on Red with `bogeyUsed[red]=true`, Gary (92) on Blue sideline, Sandwiches (33)+Dallas (60) on Red sideline.
+
+Root cause of the freeze could not be pinpointed in the 25-minute window (neither the known `collectKC` TDZ at lines 8131/8144 nor the `.dice` TypeError bugs at 7895/7924/9932/9958/9966 should fire in that exact ghost roster). However, several real latent bugs were found and fixed, AND the whole resolveRound pipeline was wrapped in a recovery net so any future silent crash cannot brick the game.
+
+**Fixes applied:**
+1. **`resolveRound()` → `_resolveRoundImpl()` + try/catch wrapper.** Any thrown error in the 2000-line damage/cinematic body now:
+   - logs the error to console + log panel + narrator (so the actual error message is visible to the player / Wyatt)
+   - clears `abilityQueue`, `narrateQueue`, `B.phase`, `B.preRoll`, `B.pendingResolve`, `B.sylviaPendingResult`
+   - forces `B.phase='ready'` and calls `resetRollButtons()` so buttons come back alive
+   - the player can roll again instead of having to refresh the page
+2. **`drainAbilityQueue` every-path recovery.** Wrapped the empty-callback path, the last-splash callback, each `showAbilityCallout`, and each ability `onShow` closure in individual try/catches. A single broken ability closure (e.g. a typo in a template literal, a stale variable reference) can no longer kill the whole cinematic queue.
+3. **`.dice` TypeError bugs (5 sites).** `classify()` returns `{type, value, damage}` — no `dice` property — but Scallywags Frenzy, Logey Heinous (tie and non-tie paths, plus the non-tie winner/loser variants) were reading `scRoll.dice.every(...)` / `enemyRoll.dice.filter(...)` / `lR.dice.filter(...)` / `wR.dice.filter(...)`. These would throw `TypeError: Cannot read properties of undefined (reading 'every'/'filter')` the first time a Scallywags or Logey ghost entered play. Swapped to the raw `redDice`/`blueDice`/`winDice`/`loseDice` arrays that are in scope.
+
+4. **`collectKC` Temporal Dead Zone fix (latent time bomb).** `collectKC` was declared as `const` at line ~8163 but referenced at line ~8131 (Skylar Winter Barrage) and line ~8144 (Tyler Heating Up). Any round where Skylar was active with committed ice shards OR Tyler was active with committed fire shards would throw `ReferenceError: Cannot access 'collectKC' before initialization` — same class as the v305 teamLabel and v377 calloutCount freezes. Moved the declaration up before the damage-modifier section. Did not hit the specific scenario Wyatt reported (0 shards committed this round) but it was sitting in the code waiting to brick a future round.
+
+**Sanity checks Wyatt should run:**
+- Roll triples 1 with Skylar active and Gary on sideline — LUCKY NOVICE! should fire, 3 Ice Shards should be granted, the cinematic should complete, roll buttons should come back.
+- If anything still crashes, the log panel will show `INTERNAL ERROR in resolveRound: <message>` and the game will recover — copy the error message so the exact line can be fixed.
+- `/loop` tests of Scallywags (19) and Logey (26) abilities that previously would have thrown on first play.
+
+## Current Version (prior): v383
 
 ## v379–v383 — FEATURE: Théâtre des Esprits visual port (battle-mockup.html → live testroom)
 

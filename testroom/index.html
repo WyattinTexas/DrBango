@@ -1955,7 +1955,7 @@ header .sub { font-family:'Cormorant SC', serif; color:var(--text-warm); font-si
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v385';
+const TESTROOM_VERSION = 'v386';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -7646,7 +7646,37 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
   }
 }
 
+// v386: Safe wrapper — catches any thrown error in the damage/cinematic pipeline
+// and recovers the game to a rollable state. Without this, a ReferenceError or
+// TypeError anywhere inside the 2000-line resolveRound body silently kills the
+// round and freezes the UI (no damage applied, no callouts, no roll buttons).
+// The wrapper surfaces the error to the log/narrator so it can be diagnosed AND
+// forces B.phase='ready' + resetRollButtons() so the game keeps running.
 function resolveRound() {
+  try {
+    _resolveRoundImpl();
+  } catch (err) {
+    console.error('[resolveRound CRASH]', err);
+    try { log(`<span class="log-dmg">INTERNAL ERROR</span> in resolveRound: ${err && err.message ? err.message : String(err)} — game recovered, please roll again.`); } catch (_) {}
+    try { narrate(`<b class="gold">⚠ Round resolution crashed</b> — <span style="color:var(--text2)">${err && err.message ? err.message : 'unknown error'}</span>`); } catch (_) {}
+    // Force the game out of 'resolving' so roll buttons come back alive
+    try {
+      if (typeof B !== 'undefined' && B) {
+        B.phase = 'ready';
+        B.preRoll = null;
+        B.pendingResolve = null;
+        B.sylviaPendingResult = null;
+        B.sylviaResuming = false;
+      }
+      abilityQueue = [];
+      abilityQueueMode = false;
+      if (typeof narrateQueue !== 'undefined') narrateQueue = [];
+      if (typeof resetRollButtons === 'function') resetRollButtons();
+      if (typeof renderBattle === 'function') renderBattle();
+    } catch (_) {}
+  }
+}
+function _resolveRoundImpl() {
   B.phase = 'resolving';
   // v331: resolveRound can be re-entered after the Sylvia player-rolled modal resolves.
   // When resuming, we skip the Blackout pass (already applied) and the header log line
@@ -7891,8 +7921,8 @@ function resolveRound() {
     [B.red, B.blue].forEach(team => {
       const f = active(team);
       const tNameSC = team === B.red ? 'red' : 'blue';
-      const scRoll = team === B.red ? rR : bR;
-      if (f.id === 19 && !f.ko && scRoll.dice.every(d => d < 4)) {
+      const scDice = team === B.red ? redDice : blueDice;
+      if (f.id === 19 && !f.ko && scDice && scDice.length > 0 && scDice.every(d => d < 4)) {
         B.scallywagsFrenzyBonus[tNameSC] = (B.scallywagsFrenzyBonus[tNameSC] || 0) + 1;
         queueAbility('FRENZY!', 'var(--common)', `${f.name} — All dice under 4 on a tie! +1 die next roll!`);
         log(`<span class="log-ability">${f.name}</span> — Frenzy! Tie: all dice under 4 → +1 die next round.`);
@@ -7920,8 +7950,8 @@ function resolveRound() {
       if (f.id === 26 && !f.ko) {
         const enemyTeam = opp(team);
         const enemyTName = enemyTeam === B.red ? 'red' : 'blue';
-        const enemyRoll = enemyTeam === B.red ? rR : bR;
-        const locked = enemyRoll.dice.filter(d => d >= 5).length;
+        const enemyDice = enemyTeam === B.red ? redDice : blueDice;
+        const locked = (enemyDice || []).filter(d => d >= 5).length;
         if (locked > 0) {
           B.logeyLockout[enemyTName] = (B.logeyLockout[enemyTName] || 0) + locked;
           queueAbility('HEINOUS!', 'var(--common)', `${f.name} — Tie! ${locked} of ${active(enemyTeam).name}'s dice (5+) locked out next roll!`);
@@ -8119,6 +8149,19 @@ function resolveRound() {
 
   let dmg = wR.damage;
 
+  // v386: collectKC defined BEFORE any ability block that might call it (was TDZ-declared
+  // at line ~8163 but referenced by Skylar Winter Barrage at 8131 and Tyler Heating Up
+  // at 8144 — would throw ReferenceError if either fighter was active with ice/fire
+  // committed. Same bug class as v305 teamLabel and v377 calloutCount.)
+  const resolveKnightCallouts = [];
+  const collectKC = (t, n, s) => {
+    const savedQ = abilityQueue, savedM = abilityQueueMode;
+    abilityQueue = []; abilityQueueMode = true;
+    checkKnightEffects(t, n, s);
+    resolveKnightCallouts.push(...abilityQueue);
+    abilityQueue = savedQ; abilityQueueMode = savedM;
+  };
+
   // Committed Ice Shards: +1 per shard (Skylar Winter Barrage: +2 each)
   let skylarTriggered = false;
   if (B.committed[winTeamName].ice > 0) {
@@ -8155,18 +8198,9 @@ function resolveRound() {
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
   }
 
-  // Collect Knight callouts deferred from all pre-cinematic ability triggers.
-  // All checkKnightEffects calls in the game-state section must use collectKC() instead of
-  // calling checkKnightEffects directly — otherwise they fire showAbilityCallout synchronously
-  // (abilityQueueMode is false here) and get stomped by the first cinematic queue entry at dmgDelay.
-  const resolveKnightCallouts = [];
-  const collectKC = (t, n, s) => {
-    const savedQ = abilityQueue, savedM = abilityQueueMode;
-    abilityQueue = []; abilityQueueMode = true;
-    checkKnightEffects(t, n, s);
-    resolveKnightCallouts.push(...abilityQueue);
-    abilityQueue = savedQ; abilityQueueMode = savedM;
-  };
+  // v386: collectKC + resolveKnightCallouts moved to ~line 8125, before any ability
+  // block that might reference them. (Was: `const collectKC = …` here, which created
+  // a Temporal Dead Zone for Skylar/Tyler at lines ~8131/~8144.)
 
   // Little Boo (9) — Mercy: enemy rolled triples count as a 1,2,3 roll instead.
   // Override wR.type to 'singles' BEFORE all damage-multiplier checks so Larry Flying Kick,
@@ -9928,8 +9962,8 @@ function resolveRound() {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameSC = team === B.red ? 'red' : 'blue';
-    const scRoll = team === B.red ? rR : bR;
-    if (f.id === 19 && !f.ko && scRoll.dice.every(d => d < 4)) {
+    const scDice = team === B.red ? redDice : blueDice;
+    if (f.id === 19 && !f.ko && scDice && scDice.length > 0 && scDice.every(d => d < 4)) {
       B.scallywagsFrenzyBonus[tNameSC] = (B.scallywagsFrenzyBonus[tNameSC] || 0) + 1;
       const ctx = f === wF ? 'Win' : 'Loss';
       queueAbility('FRENZY!', 'var(--common)', `${f.name} — ${ctx}! All dice under 4! +1 die next roll!`);
@@ -9955,7 +9989,7 @@ function resolveRound() {
 
   // Logey (26) — Heinous: win/lose — count opponent's 5+ dice, lock them out next roll
   if (wF.id === 26 && !wF.ko) {
-    const locked = lR.dice.filter(d => d >= 5).length;
+    const locked = (loseDice || []).filter(d => d >= 5).length;
     if (locked > 0) {
       B.logeyLockout[loseTeamName] = (B.logeyLockout[loseTeamName] || 0) + locked;
       queueAbility('HEINOUS!', 'var(--common)', `${wF.name} — Win! ${locked} of ${lF.name}'s 5+ dice locked out next roll!`);
@@ -9963,7 +9997,7 @@ function resolveRound() {
     }
   }
   if (lF.id === 26 && !lF.ko) {
-    const locked = wR.dice.filter(d => d >= 5).length;
+    const locked = (winDice || []).filter(d => d >= 5).length;
     if (locked > 0) {
       B.logeyLockout[winTeamName] = (B.logeyLockout[winTeamName] || 0) + locked;
       queueAbility('HEINOUS!', 'var(--common)', `${lF.name} — Loss! ${locked} of ${wF.name}'s 5+ dice locked out next roll!`);
@@ -10601,7 +10635,7 @@ function queueAbility(name, color, desc, onShow) {
 function drainAbilityQueue(callback) {
   abilityQueueMode = false;
   if (abilityQueue.length === 0) {
-    callback();
+    try { callback(); } catch (e) { console.error('[drainAbilityQueue empty-callback CRASH]', e); try { log(`<span class="log-dmg">ERROR in post-drain callback:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {} try { B.phase = 'ready'; resetRollButtons(); renderBattle(); } catch (_) {} }
     return;
   }
   let i = 0;
@@ -10613,12 +10647,23 @@ function drainAbilityQueue(callback) {
       // the callback ran — causing roll buttons, modals, and narration to appear
       // while the callout was still visible.  1500ms gives 100ms of clearance after
       // the last splash auto-dismisses, eliminating the race across ALL drain paths.
-      setTimeout(callback, 1500);
+      // v386: wrap callback in try/catch so a broken post-drain handler never freezes the game
+      setTimeout(() => {
+        try { callback(); } catch (e) {
+          console.error('[drainAbilityQueue callback CRASH]', e);
+          try { log(`<span class="log-dmg">ERROR in post-drain callback:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {}
+          try { B.phase = 'ready'; resetRollButtons(); renderBattle(); } catch (_) {}
+        }
+      }, 1500);
       return;
     }
     const a = abilityQueue[i++];
-    showAbilityCallout(a.name, a.color, a.desc);
-    if (a.onShow) a.onShow();
+    // v386: wrap each ability's onShow in try/catch — a single broken closure must not
+    // kill the whole cinematic queue and freeze the game.
+    try { showAbilityCallout(a.name, a.color, a.desc); } catch (e) { console.error('[showAbilityCallout CRASH]', a, e); }
+    if (a.onShow) {
+      try { a.onShow(); } catch (e) { console.error('[ability onShow CRASH]', a.name, e); try { log(`<span class="log-dmg">ERROR in ${a.name} onShow:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {} }
+    }
     setTimeout(next, 1300);
   }
   next();
