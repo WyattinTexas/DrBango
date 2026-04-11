@@ -268,6 +268,7 @@
     const name = document.getElementById('garyHeaderName');
     const sub = document.getElementById('garySubtitle');
     const panel = document.getElementById('garyPanel');
+    const input = document.getElementById('garyInput');
     if (!img || !name || !sub || !panel) return;
     if (currentCharacter) {
       const c = currentCharacter;
@@ -279,12 +280,14 @@
       if (c.ability) bits.push(c.ability);
       if (c.set) bits.push(c.set);
       sub.textContent = bits.join(' \u2022 ') || 'a Spiritkin in the room';
+      if (input) input.placeholder = `Talk to ${c.name}...`;
       panel.classList.add('gary-character-mode');
     } else {
       img.src = 'art/gary.png';
       img.alt = 'Gary';
       name.textContent = 'Gary';
       sub.textContent = currentUser ? `talking to ${currentUser}` : 'the friend in the chair';
+      if (input) input.placeholder = 'Talk to Gary...';
       panel.classList.remove('gary-character-mode');
     }
   }
