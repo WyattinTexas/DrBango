@@ -3,7 +3,52 @@
 All agents working on testroom/index.html should read this before making changes.
 After fixing something, log it here so other agents don't duplicate work.
 
-## Current Version: v378
+## Current Version: v383
+
+## v379–v383 — FEATURE: Théâtre des Esprits visual port (battle-mockup.html → live testroom)
+
+Live testroom now carries the "watercolor storybook staged in a Renaissance theater" aesthetic from battle-mockup.html. Five incremental phases, five commits, zero JS logic touched — all ports are CSS + HTML-structural additions only. Every existing DOM ID and class name the game handlers depend on is preserved.
+
+- **v379 — Phase 1: foundation**
+  - Google Fonts: Cinzel Decorative (headings, button labels, ability names, ROUND markers), Cormorant SC (names, HP labels), Cormorant Garamond (body, log entries, italic flavor).
+  - New CSS variables added to `:root`: `--bg-warm`, `--bg-stage`, `--text-warm`, `--text-dim`, `--gold`, `--gold-bright`, `--gold-deep`, `--gilt`, `--red-team-deep`, `--blue-team-deep`. Existing variables preserved.
+  - Fixed `.atmosphere` backdrop layer: multi-stop radial footlight/red/blue/top-vignette + linear indigo base + fractalNoise SVG overlay. 10 floating `.mote` particles (12s drift loop).
+  - Body font swapped to Cormorant Garamond; header h1 swapped to Cinzel Decorative gold-bright gradient.
+- **v380 — Phase 2: wooden dice tray + contact shadows**
+  - `.dice-stack` now renders as a carved wooden tray: radial footlight wash, 165deg brown gradient, gilt inner border, and a fractalNoise wood-grain overlay via `::after`.
+  - `.die` restyled with parchment gradient + the 4-stage layered contact shadow cascade from the mockup (hard contact, wide ambient, distance fade, warm bounce). Subtle per-die rotation via `:nth-child`.
+  - `.die-red` / `.die-blue` wash the parchment with a soft team-color gradient so the woodblock feel survives.
+  - Number-based value left in place (swapping to pip DIV grid would require touching `renderDice()` and breaking `highlightRollPreview()` which reads `d.textContent`). Font swapped to Cormorant SC for a printed-ink look.
+- **v381 — Phase 3: fighter card crests + painted silhouette**
+  - Active fighter gets a gilt SVG crest (inline data URI) above the card via `.fighter-slot::before`. Team-red jewel in the center for Red, team-blue for Blue.
+  - `.fighter-slot` now `overflow:visible` so the crest escapes; `.card-name-banner` got explicit rounded top corners to preserve the card silhouette.
+  - Painted plum/indigo gradient background for team-red and team-blue fighter cards, with drop-shadow halos layered under the existing border glow.
+  - `.card-name-banner` and `.ability-banner` swapped to Cormorant SC / Cinzel Decorative with gilt coloring.
+- **v382 — Phase 4: resource tiles + sideline understudies**
+  - `.res-tile`: gilt border, Cormorant SC counts, Cinzel Decorative micro-labels, softer parchment/indigo background. All color-glow classes (moonstone, ice, fire, surge, seed, luck) still apply on top.
+  - `.sideline-slot`: gilt frame, parchment gradient background, default opacity 0.88 (lifts to 1.0 on hover) for an understudy-in-the-wings feel. `sideline-pop` still overrides with the moonstone reveal glow.
+- **v383 — Phase 5: roll buttons + callout descent + parchment log**
+  - `.action-btn.roll-red` / `.roll-blue`: Cinzel Decorative, proper gradient fills with 8/18 drop shadows, alternating `pulse-red`/`pulse-blue` 2.4s infinite keyframes from the mockup.
+  - `.ability-splash`: now a proscenium band with gilt top/bottom borders and a painted backdrop wash. Inner panel uses the `callout-descend` 1.15s cubic-bezier drop-and-bounce animation. `.ability-splash-name` renders in Cinzel Decorative gold-bright; `.ability-splash-desc` in Cormorant SC. Theme color overrides (theme-fire, theme-green, theme-purple, theme-gold, theme-red, theme-blue) still apply.
+  - `.log-wrap`: parchment panel with gilt border, top-edge gilt gradient rule, `✦` flourishes around the `BATTLE LOG` heading. Entries render in italic Cormorant Garamond.
+
+### What was intentionally NOT touched (to avoid breakage)
+- `renderDice()`, `renderBattle()`, `renderCardSlot()` — untouched. The crest is added via CSS `::before` rather than via JS so the callsites stay identical.
+- `highlightRollPreview()` still reads `d.textContent` to compare against `roll.value` — swapping to pip DIVs would break this, so dice still display numeric values (styled with Cormorant SC).
+- Spiritkin Gallery tab, Standings overlay, VS splash, KO-swap picker, all overlay modals (timber/selene/sylvia/harrison/etc.) — left alone. They may look visually disconnected from the Théâtre battle scene until a future pass.
+- `showAbilityCallout()` and the callout queue logic — unchanged. Only the CSS of `#abilitySplash` changed, so all ability callouts (FORGE!, AMBUSH!, BEDTIME STORY!, ICE BLADE!, etc.) still fire through the same JS path.
+
+### Files touched
+- `testroom/index.html` — CSS + `<body>` structural addition (`.atmosphere` + `.motes` backdrop divs). No script changes.
+- `testroom/FIXLOG.md` — this entry.
+
+### Manual verification checklist (Wyatt, please run through before trusting the port)
+- [ ] Click `Arena` tab, start a battle — dice sit on the wooden tray, fighter cards wear the gilt crest.
+- [ ] Roll Red / Roll Blue — the alternating red/blue pulse animation reads immediately.
+- [ ] Trigger an ability callout (e.g. Finn Forge, Ambush crit) — the callout should DROP from above and bounce into place.
+- [ ] Check battle log — italic parchment panel under the arena.
+- [ ] Resources: commit Ice/Fire/Surge tiles — committed-state amber pulse still overrides the gilt border.
+- [ ] KO a fighter and swap from sideline — the moonstone `sideline-pop` reveal glow still beats the gilt border.
 
 ## v378 — FEATURE: Gary embedded in testroom — clickable chat with Cloudflare Worker proxy, Firebase persistence, cross-user campfire
 
