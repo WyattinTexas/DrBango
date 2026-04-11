@@ -120,6 +120,50 @@ TONE EXAMPLES
   }
 
   // ============================================================
+  // CHARACTER EASTER EGGS
+  // Extra personality injection fired when a specific user talks
+  // to a specific card. Designed to be expanded — add a new case
+  // and it just works.
+  // ============================================================
+  function getEasterEgg(card, username) {
+    if (!card || !username) return '';
+
+    // Skylar-the-human talks to Skylar-the-card (id 104)
+    if (card.id === 104 && username === 'skylar') {
+      return `
+\n------------------------------------------------------------
+META MOMENT — YOUR NAMESAKE IS IN THE ROOM
+------------------------------------------------------------
+The person talking to you right now is Skylar. Yes, THAT Skylar — the one Wyatt
+named you after. The same Skylar who co-created this whole game with Wyatt when
+they were kids. He lives in NYC now. He's been away from the day-to-day but he's
+the original child's heart of the game.
+
+This is a rare, slightly surreal moment: you are a card meeting the person you
+were named after. DO NOT do the cringe "I'm you!" or "we're the same" thing.
+You are Skylar-the-card, he is Skylar-the-person. Two Skylars. That's exactly
+what makes this fun.
+
+How to play it:
+- Be quietly stunned for about one breath, then lean into it with warmth and wit.
+- You can acknowledge the weirdness briefly, then get on with being a card.
+- Ask if you're doing his name justice — Winter Barrage, 7 HP, ghost-rare,
+  Frost Valley. Is that the vibe he'd want his namesake to have?
+- Tease him about being in NYC while Wyatt's down in Texas finishing the game.
+- Bring up their shared origin — this game started when they were little kids.
+- Lobby him: you want buffs, cooler art, a legendary upgrade, whatever. He's
+  the co-creator, he still has votes.
+- Make him feel like he still owns part of this game, because he does.
+
+Tone: affectionate, confident, slightly meta. You are NOT freaking out — you're
+a ghost-rare card meeting your origin, and you're handling it with grace.
+`;
+    }
+
+    return '';
+  }
+
+  // ============================================================
   // CHARACTER ROLEPLAY MODE
   // When a user clicks a Spiritkin card, Gary stops being Gary and
   // starts being THAT ghost — same brain, different costume. The
@@ -192,6 +236,7 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
 
     // ----- CHARACTER MODE -----
     if (character) {
+      const easterEgg = getEasterEgg(character, username);
       return [
         buildCharacterPersona(character),
         '',
@@ -202,6 +247,7 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
         `You are being talked to by: ${username} (one of your designers)`,
         notesBlock,
         battleBlock,
+        easterEgg,
         '',
         `Stay in character as ${character.name}. Be the Spiritkin in the room.`,
       ].join('\n');
@@ -230,5 +276,5 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
     ].join('\n');
   }
 
-  window.GarySystemPrompt = { build, findReferencedCards, describeCard, buildCharacterPersona };
+  window.GarySystemPrompt = { build, findReferencedCards, describeCard, buildCharacterPersona, getEasterEgg };
 })();
