@@ -2205,7 +2205,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v686';
+const TESTROOM_VERSION = 'v687';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3123,6 +3123,7 @@ function autoPlayNext() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
     burn: { red: {}, blue: {} },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
@@ -3587,6 +3588,7 @@ function startBattle() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
     burn: { red: {}, blue: {} },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
@@ -7278,6 +7280,14 @@ function doPreRollSetup() {
   // PHASE 1: PRE-ROLL TRIGGERS
   // ========================================
 
+  // v687: Pre-roll chip damage abilities fire ONCE per turn. If they KO a ghost and
+  // a replacement swaps in, doPreRollSetup re-runs — but the replacement is NOT hit
+  // again. The flag is set before the first ability fires and checked on re-entry.
+  const preRollAlreadyFired = B.preRollAbilitiesFiredThisTurn.red && B.preRollAbilitiesFiredThisTurn.blue;
+  if (!preRollAlreadyFired) {
+  B.preRollAbilitiesFiredThisTurn.red = true;
+  B.preRollAbilitiesFiredThisTurn.blue = true;
+
   // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
@@ -7572,6 +7582,8 @@ function doPreRollSetup() {
       }
     }
   });
+
+  } // end pre-roll once-per-turn guard (v687)
 
   // Toby (97) — Pure Heart: if declared last round, KO Toby before rolling (the sacrifice)
   [B.red, B.blue].forEach(team => {
@@ -10095,6 +10107,7 @@ function _resolveRoundImpl() {
     if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
     if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
     // Willow (435) — Joy of Painting: tie = nobody lost, clear both flags
     if (B.willowLostLast) { B.willowLostLast.red = false; B.willowLostLast.blue = false; }
     // Reset item swing toggles each round (player must actively choose to swing)
@@ -12542,6 +12555,7 @@ function _resolveRoundImpl() {
       if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
       if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
       if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
       // Willow (435) — Joy of Painting: winner didn't lose, loser did
       if (B.willowLostLast) { B.willowLostLast[winTeamName] = false; B.willowLostLast[loseTeamName] = true; }
       // Reset item swing toggles each round (player must actively choose to swing)

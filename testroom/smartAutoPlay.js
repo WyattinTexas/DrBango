@@ -79,6 +79,7 @@ function smartPlayNext() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
     burn: { red: {}, blue: {} },
     chowExtraDie: { red: 0, blue: 0 },
     lucasKindlingBonus: { red: 0, blue: 0 },
@@ -316,6 +317,12 @@ function smartSimRounds(gameNum) {
 
   // ===== PRE-ROLL EFFECTS =====
 
+  // v687: Pre-roll chip damage abilities fire ONCE per turn (mirrors index.html guard)
+  const preRollAlreadyFired = B.preRollAbilitiesFiredThisTurn.red && B.preRollAbilitiesFiredThisTurn.blue;
+  if (!preRollAlreadyFired) {
+  B.preRollAbilitiesFiredThisTurn.red = true;
+  B.preRollAbilitiesFiredThisTurn.blue = true;
+
   // Ember Force (304) — 1 pre-roll damage
   ['red','blue'].forEach(teamKey => {
     const team = B[teamKey];
@@ -426,6 +433,8 @@ function smartSimRounds(gameNum) {
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
     }
   });
+
+  } // end pre-roll once-per-turn guard (v687)
 
   // Toby (97) — Pure Heart SACRIFICE: if declaration was made last round, KO Toby before rolling.
   // Mirrors index.html doPreRollSetup lines 6724–6734: f.ko=true, killedBy=-1 (self-sacrifice, no enemy kill credit).
@@ -1605,6 +1614,7 @@ function smartSimRounds(gameNum) {
     });
     // Reset luckyStoneSpentThisTurn on tie (mirrors index.html line 9168)
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
     // Reset item swing toggles on tie
     if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
     if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
@@ -2625,6 +2635,7 @@ function smartSimRounds(gameNum) {
   B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false;
   // Reset Lucky Stone tracking for Twyla (417) Lucky Dance (matches index.html line 11486)
   if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+  if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
   // Reset item swing toggles each round (player must actively choose to swing)
   if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
   if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
