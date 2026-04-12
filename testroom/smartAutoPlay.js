@@ -312,6 +312,11 @@ function smartSimRounds(gameNum) {
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+        if (!ef.ko && hasSideline(team, 436)) {
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+        }
         // Masked Hero (55) — Underdog: counter 3 damage to the attacker (matches index.html line 6547)
         if (ef.id === 55 && !ef.ko) {
           f.hp = Math.max(0, f.hp - 3);
@@ -330,6 +335,11 @@ function smartSimRounds(gameNum) {
       if (!ef.ko && ef.hp < 4) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
+        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+        if (!ef.ko && hasSideline(team, 436)) {
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+        }
         // Masked Hero (55) — Underdog: counter 3 damage to attacker's active (matches index.html line 6596)
         if (ef.id === 55 && !ef.ko) {
           const att = active(team);
@@ -353,6 +363,11 @@ function smartSimRounds(gameNum) {
     if (ef.ko || ef.id === 107) return; // Piper Slick Coat negates
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
+    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+    if (!ef.ko && hasSideline(team, 436)) {
+      ef.hp = Math.max(0, ef.hp - 1);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+    }
     // Masked Hero (55) — Underdog: counter 3 damage back to Shade (matches index.html line 6655)
     if (ef.id === 55 && !ef.ko) {
       f.hp = Math.max(0, f.hp - 3);
@@ -371,6 +386,11 @@ function smartSimRounds(gameNum) {
     if (ef.ko) return;
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
+    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+    if (!ef.ko && hasSideline(team, 436)) {
+      ef.hp = Math.max(0, ef.hp - 1);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+    }
   });
 
   // Lucy (108) — Blue Fire: pending 1 damage fires before the enemy's next roll (set on Lucy's win).
@@ -385,6 +405,12 @@ function smartSimRounds(gameNum) {
     if (ef.ko) return;
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 108; }
+    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+    // Lucy damage targets active(enemy); attacker is team (B[teamKey])
+    if (!ef.ko && hasSideline(team, 436)) {
+      ef.hp = Math.max(0, ef.hp - 1);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+    }
   });
 
   // Toby (97) — Pure Heart SACRIFICE: if declaration was made last round, KO Toby before rolling.
@@ -1237,6 +1263,35 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Rascals (437) — Stampede: after rolling, gain 2 Burn
+  ['red','blue'].forEach(teamKey => {
+    const t = B[teamKey]; const f = active(t);
+    if (f.id === 437 && !f.ko) {
+      if (!t.resources.burn) t.resources.burn = 0;
+      t.resources.burn += 2;
+    }
+  });
+
+  // Gom Gom Gom (440) — Spark: doubles → gain 1 Sacred Fire
+  ['red','blue'].forEach(teamKey => {
+    const t = B[teamKey]; const f = active(t);
+    const dice = teamKey === 'red' ? redDice : blueDice;
+    if (f.id === 440 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(dice).type)) {
+      t.resources.fire++;
+    }
+  });
+
+  // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
+  ['red','blue'].forEach(teamKey => {
+    const t = B[teamKey]; const f = active(t);
+    if (f.id === 438 && !f.ko) {
+      const redRoll = classify(redDice);
+      const blueRoll = classify(blueDice);
+      const eitherDoubles = ['doubles','triples','quads','penta'].includes(redRoll.type) || ['doubles','triples','quads','penta'].includes(blueRoll.type);
+      if (eitherDoubles) { t.resources.surge++; }
+    }
+  });
+
   // ===== AI: MOONSTONE (change a die to improve hand) =====
   // Only use moonstones that existed BEFORE this round (snapshot), not mid-roll gains (Natalia etc.)
   ['red','blue'].forEach(teamKey => {
@@ -1333,6 +1388,24 @@ function smartSimRounds(gameNum) {
     for (let i=0;i<Math.max(rRemain.length,bRemain.length);i++) {
       const rv=i<rRemain.length?rRemain[i]:0, bv=i<bRemain.length?bRemain[i]:0;
       if(rv>bv){winner='red';break;} if(bv>rv){winner='blue';break;}
+    }
+  }
+
+  // DCKnight (443) — Final Strike: four of a kind = instant win
+  for (const dcTeamKey of ['red','blue']) {
+    const dcTeam = B[dcTeamKey];
+    const dcF = active(dcTeam);
+    const dcDice = dcTeamKey === 'red' ? redDice : blueDice;
+    if (dcF.id === 443 && !dcF.ko && dcDice && dcDice.length >= 4) {
+      const dcCounts = {};
+      dcDice.forEach(d => dcCounts[d] = (dcCounts[d]||0)+1);
+      if (Object.values(dcCounts).some(c => c >= 4)) {
+        // INSTANT WIN — KO all enemy ghosts
+        const dcEnemy = opp(dcTeam);
+        dcEnemy.ghosts.forEach(g => { if (!g.ko) { g.ko = true; g.hp = 0; g.killedBy = 443; } });
+        autoRecordGame(dcTeamKey);
+        return;
+      }
     }
   }
 
@@ -1524,15 +1597,19 @@ function smartSimRounds(gameNum) {
     const _romyPred = B.romyPrediction ? B.romyPrediction[winTeamName] : null;
     if (wF.id === 114 && !wF.ko && _romyPred != null && _romyPred !== -1 && winDice.includes(_romyPred)) { dmg += 3; }
 
+    // Champ (438) — Overpower (A): immune to damage from Specials (committed resources)
+    const champImmuneToSpecials = lF.id === 438 && !lF.ko;
     // Ice Shards (+1 each; Skylar (104) WINTER BARRAGE! doubles to +2 each when Skylar wins)
     // Matches index.html lines 9059–9071: `const perShard = skylarActive ? 2 : 1;`
     const iceCommitted = B.committed[winTeamName].ice || 0;
-    const icePerShard = (wF.id === 104 && !wF.ko) ? 2 : 1;
-    dmg += iceCommitted * icePerShard;
+    if (!champImmuneToSpecials) {
+      const icePerShard = (wF.id === 104 && !wF.ko) ? 2 : 1;
+      dmg += iceCommitted * icePerShard;
+    }
     // Sacred Fire (+3 each; Tyler (105) Heating Up doubles to +6 each when Tyler wins)
     // Rook (416) — Charcoal: immune to Sacred Fire damage when Rook is the loser
     const fireCommitted = B.committed[winTeamName].fire || 0;
-    if (fireCommitted > 0 && lF.id !== 416) {
+    if (fireCommitted > 0 && lF.id !== 416 && !champImmuneToSpecials) {
       const firePerUnit = (wF.id === 105 && !wF.ko) ? 6 : 3;
       dmg += fireCommitted * firePerUnit;
     }
@@ -1540,14 +1617,14 @@ function smartSimRounds(gameNum) {
     if (fireCommitted > 0 && wTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
       wTeam.resources.fire += fireCommitted;
     }
-    // Aunt Susan damage bonus (+2 per seed)
-    if (B.auntSusanBonus[winTeamName] > 0) dmg += B.auntSusanBonus[winTeamName] * 2;
+    // Aunt Susan damage bonus (+2 per seed) — blocked by Champ Overpower
+    if (B.auntSusanBonus[winTeamName] > 0 && !champImmuneToSpecials) dmg += B.auntSusanBonus[winTeamName] * 2;
     // Haywire (78) — Wild Chords permanent +2 damage on any winning roll after the trigger
     if (wF.id === 78 && !wF.ko && (B.haywireDamageBonus[winTeamName] || 0) > 0) {
       dmg += B.haywireDamageBonus[winTeamName];
     }
-    // Rook (416) — Charcoal: Win: +1 dmg per Surge committed
-    if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0) {
+    // Rook (416) — Charcoal: Win: +1 dmg per Surge committed — blocked by Champ Overpower
+    if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0 && !champImmuneToSpecials) {
       dmg += B.committed[winTeamName].surge;
     }
     // Bigsby (424) — Omen: Win: +1 damage
@@ -2129,6 +2206,14 @@ function smartSimRounds(gameNum) {
       } else {
         wTeam.resources.healingSeed++;
       }
+    }
+    // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
+    if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
+      wTeam.resources.moonstone++;
+      wTeam.resources.firefly = (wTeam.resources.firefly || 0) + 1;
+      // Sandwiches mirror for Moonstone only (Fireflies are not mirrorable)
+      const sandwichLose = hasSideline(lTeam, 33);
+      if (sandwichLose) { lTeam.resources.moonstone++; }
     }
     // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section
 
