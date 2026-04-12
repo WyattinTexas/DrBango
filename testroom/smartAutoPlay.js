@@ -1885,7 +1885,7 @@ function smartSimRounds(gameNum) {
     // abilityDesc: "When you lose a roll: roll 1 die. If you roll a 6, negate all damage."
     // doSylviaRoll() in index.html uses Math.floor(Math.random()*6)+1 — exactly 1 die.
     if (lF.id === 313 && !lF.ko) {
-      if ((Math.floor(Math.random()*6)+1) % 2 === 0) dmg = 0; // evens (2, 4, 6) dodge
+      if ((Math.floor(Math.random()*6)+1) % 2 === 0) dmg = 0; // 5 or 6 dodge
     }
     // Patrick (10) — Stone Form: losing to a singles roll → negate ALL incoming damage and deal 3 counter-damage to the winner.
     // In index.html lines 9680–9684: `if (lF.id===10 && !lF.ko && wR.type==='singles' && dmg>0) { dmg=0; collectKC(...); }`
