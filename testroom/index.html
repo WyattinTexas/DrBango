@@ -571,6 +571,8 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .res-tile.healingSeed .res-count { color:#22c55e; }
 .res-tile.luckyStone { border-color:rgba(251,191,36,0.4); box-shadow:0 0 8px rgba(251,191,36,0.15); }
 .res-tile.luckyStone .res-count { color:#fbbf24; }
+.res-tile.burn { border-color:rgba(239,68,68,0.5); box-shadow:0 0 8px rgba(239,68,68,0.2); }
+.res-tile.burn .res-count { color:#ef4444; }
 .res-tile.clickable { cursor:pointer; }
 .res-tile.clickable:hover { transform:scale(1.08); border-color:rgba(255,255,255,0.4); }
 .res-tile.committed {
@@ -1727,8 +1729,8 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
     <h3 id="seleneTitle">Selene — Heart of the Hills!</h3>
     <p class="selene-sub">Doubles! Choose your reward:</p>
     <div class="selene-options">
-      <button class="selene-opt seed" onclick="doSeleneChoice('seed')">🌱 1 Healing Seed</button>
-      <button class="selene-opt ls" onclick="doSeleneChoice('ls')">🍀 2 Lucky Stones</button>
+      <button class="selene-opt seed" onclick="doSeleneChoice('seed')">🌱 2 Healing Seeds</button>
+      <button class="selene-opt ls" onclick="doSeleneChoice('ls')">🍀 3 Lucky Stones</button>
     </div>
   </div>
 </div>
@@ -1818,15 +1820,15 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
-<!-- Guardian Fairy — Wish standby modal -->
+<!-- Guardian Fairy — Wish reactive swap modal -->
 <div class="selene-overlay" id="guardianFairyOverlay">
   <div class="selene-modal">
     <div class="selene-banner" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);">🧚 WISH</div>
     <h3>Guardian Fairy — Wish!</h3>
-    <p class="selene-sub" id="guardianFairySub">Put Guardian Fairy on standby?<br><i>If you lose this roll, Guardian Fairy absorbs all incoming damage.</i></p>
+    <p class="selene-sub" id="guardianFairySub">Guardian Fairy can take this hit! Switch her in?</p>
     <div class="selene-options">
-      <button class="selene-opt" onclick="doGuardianFairyChoice('yes')" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);">🧚 Yes — standby!</button>
-      <button class="selene-opt" onclick="doGuardianFairyChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — roll normally</button>
+      <button class="selene-opt" onclick="doGuardianFairyReactive('yes')" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);">🧚 Yes — Guardian Fairy takes it!</button>
+      <button class="selene-opt" onclick="doGuardianFairyReactive('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — take the damage</button>
     </div>
   </div>
 </div>
@@ -1891,6 +1893,44 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
     <div class="selene-options">
       <button class="selene-opt" onclick="doMallowChoice('yes')" style="background:linear-gradient(135deg,#be185d,#f472b6);">🌸 Yes — spend 1 fire for +3 HP!</button>
       <button class="selene-opt" onclick="doMallowChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — save the fire</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chow (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice -->
+<div class="selene-overlay" id="chowOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#92400e,#d97706);">🍳 SECRET INGREDIENT</div>
+    <h3>Chow — Secret Ingredient!</h3>
+    <p class="selene-sub" id="chowSub">Discard 1 Healing Seed for +2 dice this roll?</p>
+    <div class="selene-options">
+      <button class="selene-opt" onclick="doChowChoice('yes')" style="background:linear-gradient(135deg,#92400e,#d97706);">🍳 Yes — spend 1 seed for +2 dice!</button>
+      <button class="selene-opt" onclick="doChowChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — save the seeds</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nick & Knack (409) — Knick Knack: steal 1 resource from opponent -->
+<div class="selene-overlay" id="nickKnackOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#065f46,#059669);">🔧 KNICK KNACK</div>
+    <h3>Nick & Knack — Knick Knack!</h3>
+    <p class="selene-sub" id="nickKnackSub">Choose a resource to steal from the opponent!</p>
+    <div class="selene-options" id="nickKnackOptions"></div>
+  </div>
+</div>
+
+<!-- Jasper (428) — Flame Dive: interactive bonus die reveal -->
+<div class="selene-overlay" id="jasperOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#c2410c,#ea580c);">🔥 FLAME DIVE</div>
+    <h3 id="jasperTitle">Jasper — Flame Dive!</h3>
+    <p class="selene-sub" id="jasperSub">Jasper won — roll the bonus die for extra damage!</p>
+    <div id="jasperDieWrap" style="display:flex;justify-content:center;align-items:center;margin:18px 0;">
+      <div id="jasperDie" style="width:84px;height:84px;border-radius:14px;background:linear-gradient(135deg,#fed7aa,#f97316);color:#7c2d12;font-size:3.2rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(249,115,22,.55),inset 0 2px 0 rgba(255,255,255,.6);border:3px solid #ea580c;">?</div>
+    </div>
+    <div class="selene-options">
+      <button class="selene-opt" id="jasperRollBtn" onclick="doJasperRoll()" style="background:linear-gradient(135deg,#c2410c,#ea580c);">🔥 Roll the Bonus Die!</button>
     </div>
   </div>
 </div>
@@ -2070,7 +2110,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v672';
+const TESTROOM_VERSION = 'v673';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2197,7 +2237,7 @@ const GHOSTS = [
   },
   {
     id:305, name:"Selene", rarity:"legendary", maxHp:6, art:"art/luna.jpg",
-    ability:"Heart of the Hills", abilityDesc:"Roll doubles: choose — gain 1 Healing Seed OR 2 Lucky Stones.",
+    ability:"Heart of the Hills", abilityDesc:"Roll doubles: choose — gain 2 Healing Seeds OR 3 Lucky Stones.",
     category:"Resource Generation", set:"Rolling Hills",
     designNote:"Wyatt's fix for dual-resource problem. Player chooses 1 Healing Seed OR 2 Lucky Stones on doubles (~42%). No more double-dipping — forces a decision between sustain and reroll economy. Selene's creek runs through the hills — Artemis is her messenger."
   },
@@ -2295,7 +2335,7 @@ const GHOSTS = [
   // checks exist for any of these IDs. Wyatt designs battle logic next session.
   // Refiner: DO NOT IMPLEMENT abilities for IDs 407-431 until Wyatt explicitly approves.
   {id:409, name:"Nick & Knack", rarity:"common", maxHp:4, art:"art/originals/Cindergrub.png", ability:"Knick Knack", abilityDesc:"Before rolling: you may steal 1 special from the other player.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Twin glowing green tunnel-worms curled in a yin-yang formation. Nick steals, Knack holds. Pre-roll resource theft — take 1 of whatever the opponent has committed or banked (Sacred Fire, Ice Shard, Lucky Stone, Moonstone, Healing Seed, or Surge). Common-tier disruption. 4HP is fragile but the steal fires BEFORE rolling so you get value even if you lose. Rolling Hills cave-dwellers. Art: bioluminescent green worms in a dark tunnel, updated 2026-04-11."},
-  {id:410, name:"Mirror Matt", rarity:"common", maxHp:1, art:"art/originals/MirrorMatt.png", ability:"Seven Years", abilityDesc:"If the opponent wins with doubles or better, the damage is reflected to the attacker instead.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A being made of obsidian volcanic glass — impossibly beautiful, impossibly sharp. Big burst damage but punishes itself on every win. At 3HP the self-damage is genuinely consequential. Wyatt flag: combined with other VA self-damage sources (Wick, Glass Fang loops) this could snowball; worth watching. Art direction: a translucent jet-black glass creature with razor edges catching lava-light like a prism, ethereal and beautiful, backlit in deep orange."},
+  {id:410, name:"Mirror Matt", rarity:"common", maxHp:1, art:"art/originals/MirrorMatt.png", ability:"Seven Years", abilityDesc:"If the opponent wins with doubles, the damage is reflected to the attacker instead.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A being made of obsidian volcanic glass — impossibly beautiful, impossibly sharp. Big burst damage but punishes itself on every win. At 3HP the self-damage is genuinely consequential. Wyatt flag: combined with other VA self-damage sources (Wick, Glass Fang loops) this could snowball; worth watching. Art direction: a translucent jet-black glass creature with razor edges catching lava-light like a prism, ethereal and beautiful, backlit in deep orange."},
   {id:413, name:"Sable", rarity:"uncommon", maxHp:5, art:"art/originals/ObsidianEel.png", ability:"Smoldering Soul", abilityDesc:"Sideline & In Play: Rolling all odd numbers, gain 1 Sacred Fire.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"A long sinuous being made of polished black volcanic glass that swims through lava streams — beautiful and alien. Doubles → Moonstone (~44% trigger on wins) creates the first real Moonstone generation engine in VA. Synergizes with Fluxling: nudge dice into doubles, Eel refills the Moonstone you spent nudging. Art direction: a sleek eel of polished obsidian glass, semi-transparent, cool blue-white glow pulsing along its spine, slow and hypnotic."},
   {id:414, name:"Chow", rarity:"uncommon", maxHp:5, art:"art/originals/Chow.png", ability:"Secret Ingredient", abilityDesc:"Before rolling: spend 1 Healing Seed to gain +2 dice this roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"THE cozy card of Volcanic Activity. A stubby little mole who has lived underground in the lava tubes for so long it radiates warmth and contentment. Modest entry Healing Seed — not flashy, just warm and helpful. Bridges VA into cross-set Healing Seed strategies. The card that makes players go 'aww' before dropping it. Art direction: a plump mole with velvety ashen-grey fur, tiny pink claws, eyes glowing like embers, wears a small dirt-stained waistcoat, peering up from a tunnel mouth."},
   {id:415, name:"Nyx & Bessie", rarity:"common", maxHp:6, art:"art/originals/NyxAndBessie.png", ability:"Moo! Caw!", abilityDesc:"While on the sideline, gain 3 Healing Seeds if you defeat a Ghost.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Cow + crow duo. Wyatt's Photoshop original 2026-04-11. A white-faced cow with antlers and a perched crow — farmstead spirits of the Rolling Hills. Sideline payoff: KO an enemy ghost and Nyx & Bessie drop 3 Healing Seeds into your lap. Big burst but requires a kill — parallels Bo's Miracle as a KO-triggered payoff at common rarity. 6HP is generous for a common but justified since sideline-only ability means HP is rarely tested."},
@@ -2313,7 +2353,7 @@ const GHOSTS = [
   {id:430, name:"Gordok", rarity:"rare", maxHp:6, art:"art/originals/Millicent.png", ability:"River Terror", abilityDesc:"Win: you may take 2 specials from your opponent instead of dealing damage.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"The cunning folk of the Rolling Hills — hedge-witch, wise-woman, someone you bring a pie to before you bring a problem. Moonstone-powered full information + theft: see everything they have, take the worst thing for them to lose. Spending Moonstone (rare resource) for information and theft is elegant. Active, decisive, satisfying for the person playing it. Art direction: a sharp-eyed older woman-shaped figure in a patchwork cloak, standing at a fork in the hill paths, wisps of blue-grey smoke curling from her hands, deeply knowing expression — she already knows what you're going to say."},
   {id:431, name:"Wise Al", rarity:"ghost-rare", maxHp:5, art:"art/originals/TheOvercast.png", ability:"Squall", abilityDesc:"Win: you may gain 3 Ice Shards instead of dealing damage.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
   {id:432, name:"Valkin the Grand", rarity:"legendary", maxHp:8, art:"art/originals/ValkinTheGrand.png", ability:"Grand Spoils", abilityDesc:"When you KO an enemy ghost: gain 1 Sacred Fire, 2 Ice Shards, 1 Lucky Stone, 1 Moonstone, 2 Healing Seeds.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"THE ANTAGONIST LEGENDARY. Valkin the Grand is the main villain of the BOO: Battle of Origins lore — the tyrant who trapped Toby's grandfather and seeks to control the BOO itself. Grand Spoils embodies his greed: every KO pays him the full resource suite. 6 HP is modest-legendary so the snowball has to be earned. Art: Gemini-generated regal spirit monarch on a blue-flame throne. NOTE: this slot previously held Vela (Second Breath resurrection mechanic) — resolver code at lines ~10776 and smartAutoPlay ~1759 still references id 432 for Vela's resurrection trigger. Needs cleanup: either reassign Vela to a new ID or remove the resurrection hook from id 432."},
-  {id:433, name:"Lucas", rarity:"rare", maxHp:5, art:"art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: When one of your defeated ghosts returns to your sideline, gain 6 Sacred Fires.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
+  {id:433, name:"Lucas", rarity:"rare", maxHp:5, art:"art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: When Bo resurrects a ghost, the revived ghost enters play, Bo goes to the sideline, and the revived ghost gains +1 die next roll.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
   // === SKYLAR SEED — PLAGUE/DECAY MECHANIC (2026-04-11) — GALLERY ONLY, NO BATTLE LOGIC ===
   // First ghost to target the opposing sideline. Working name, working numbers — pending 20-ghost name review.
   // === VOLCANIC ACTIVITY — Designed Cards ===
@@ -2421,7 +2461,7 @@ const GHOSTS = [
   {id:77, name:"City Cyboo", rarity:"rare", maxHp:1, art:"art/originals/CityCyboo.png", ability:"Barrier", abilityDesc:"Takes no damage from Enemy Doubles.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. 1 HP doubles immune."},
   {id:94, name:"Jenkins", rarity:"ghost-rare", maxHp:5, art:"art/originals/Jenkins.png", ability:"Greeting", abilityDesc:"When Jenkins enters the battle, roll 4 dice to inflict damage once.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Entry nuke."},
   {id:95, name:"Tabitha", rarity:"ghost-rare", maxHp:1, art:"art/originals/Tabitha.png", ability:"Rally", abilityDesc:"While on the sideline, +2 damage to your doubles rolls.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Sideline doubles buff."},
-  {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"While on the sideline, you may switch the Guardian Fairy into play and receive the incoming damage.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
+  {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"Sideline: when your active ghost is about to take damage, Guardian Fairy can leap in and take the hit instead.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
   {id:100, name:"Cyboo", rarity:"ghost-rare", maxHp:3, art:"art/originals/Cyboo.png", ability:"Spark", abilityDesc:"While on the sideline, your ghost in play gains +1 dice if they have less than 3 health.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. Low HP dice boost."},
   {id:101, name:"Splinter", rarity:"ghost-rare", maxHp:6, art:"art/originals/Splinter.png", ability:"Toxic Fumes", abilityDesc:"After winning a roll, deal 1 damage before every roll until defeated.", category:"Debuff", set:"Set 1", designNote:"Original card. Stacking poison."},
   {id:109, name:"Bo", rarity:"legendary", maxHp:5, art:"art/originals/Bo.png", ability:"Miracle", abilityDesc:"Upon defeating a Ghost, return one of your defeated Ghosts to your sideline.", category:"HP Recovery", set:"Set 1", designNote:"Original legendary. Resurrection on kill."},
@@ -2974,6 +3014,8 @@ function autoPlayNext() {
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
     burn: { red: {}, blue: {} },
+    lucasKindlingBonus: { red: 0, blue: 0 },
+    iceBladeForgedPermanent: { red: false, blue: false },
   };
   S.battle = B;
 
@@ -3427,6 +3469,8 @@ function startBattle() {
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
     burn: { red: {}, blue: {} },
+    lucasKindlingBonus: { red: 0, blue: 0 },
+    iceBladeForgedPermanent: { red: false, blue: false },
   };
   S.battle = B;
   initMatchStats();
@@ -3503,6 +3547,7 @@ function triggerEntry(team, skipEntryEffects) {
   narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
   // Castle Guide (420) — Burn: check if the entering ghost has burn on it
+  let burnEntryFired = false;
   if (B.burn && B.burn[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const burnCount = B.burn[entryTeamName][activeIdx] || 0;
@@ -3511,6 +3556,8 @@ function triggerEntry(team, skipEntryEffects) {
       f.hp = Math.max(0, f.hp - burnCount);
       if (f.hp <= 0) { f.ko = true; f.killedBy = -2; } // burn kill
       delete B.burn[entryTeamName][activeIdx];
+      burnEntryFired = true;
+      showAbilityCallout('BURN!', 'var(--accent)', `${f.name} takes ${burnCount} burn damage on entry! (${burnPre} → ${f.hp} HP)${f.ko ? ' KO!' : ''}`, entryTeamName);
       log(`<span class="log-dmg">${f.name}</span> — Burn! <span class="log-dmg">${burnCount} damage on entry!</span> (${burnPre} → ${f.hp} HP)${f.ko ? ' <span class="log-ko">KO!</span>' : ''}`);
     }
   }
@@ -4056,8 +4103,9 @@ function useZainForge(team) {
   t.resources.ice -= 1;
   t.resources.moonstone -= 1;
   f.iceBladeForged = true;
-  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Swing it before a roll for +1 die and +2 damage on a win.`);
-  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — swing it before a roll for +1 die and +2 damage on a win!`, team);
+  B.iceBladeForgedPermanent[team] = true; // permanent +2 damage for the rest of the game
+  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Permanent +2 damage on ALL winning rolls for the rest of the game!`);
+  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — permanent +2 damage on ALL wins!`, team);
   playSfx('sfxSpecial', 0.5);
   renderBattle();
 }
@@ -4283,19 +4331,19 @@ function doSeleneChoice(choice) {
   const _selTeam = sp.team;
   const _selName = f.name;
   const subtitle = choice === 'seed'
-    ? `${f.name} — Doubles! Chose 🌱 1 Healing Seed!`
-    : `${f.name} — Doubles! Chose 🍀 2 Lucky Stones!`;
+    ? `${f.name} — Doubles! Chose 🌱 2 Healing Seeds!`
+    : `${f.name} — Doubles! Chose 🍀 3 Lucky Stones!`;
   // Queue mode: HEART OF THE HILLS first, then knight reactions, then drain sequentially.
   // Grant is deferred into onShow so the resource counter updates exactly when the callout
   // fires — same deferred-onShow pattern as Hank Tremor (v307), Natalia/Kaplan (v308).
   abilityQueueMode = true;
   queueAbility('HEART OF THE HILLS!', 'var(--legendary)', subtitle, () => {
     if (choice === 'seed') {
-      _selTeam.resources.healingSeed++;
-      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">1 Healing Seed</span>!`);
+      _selTeam.resources.healingSeed += 2;
+      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Healing Seeds</span>!`);
     } else {
-      _selTeam.resources.luckyStone += 2;
-      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Lucky Stones</span>!`);
+      _selTeam.resources.luckyStone += 3;
+      log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">3 Lucky Stones</span>!`);
     }
     renderBattle();
   }, sp.tName);
@@ -4305,12 +4353,12 @@ function doSeleneChoice(choice) {
   if (hasSideline(opp(sp.team), 33)) {
     if (choice === 'seed') {
       const _sandSeedOpp = opp(sp.team);
-      const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 1;
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +1 Healing Seed! (${_sandSeedTotal} total)`, () => { _sandSeedOpp.resources.healingSeed++; renderBattle(); }, sp.tName === 'red' ? 'blue' : 'red');
+      const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 2;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +2 Healing Seeds! (${_sandSeedTotal} total)`, () => { _sandSeedOpp.resources.healingSeed += 2; renderBattle(); }, sp.tName === 'red' ? 'blue' : 'red');
     } else {
       const _sandLSOpp = opp(sp.team);
-      const _sandLSTotal = _sandLSOpp.resources.luckyStone + 2;
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +2 Lucky Stones! (${_sandLSTotal} total)`, () => { _sandLSOpp.resources.luckyStone += 2; renderBattle(); }, sp.tName === 'red' ? 'blue' : 'red');
+      const _sandLSTotal = _sandLSOpp.resources.luckyStone + 3;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Heart of the Hills! +3 Lucky Stones! (${_sandLSTotal} total)`, () => { _sandLSOpp.resources.luckyStone += 3; renderBattle(); }, sp.tName === 'red' ? 'blue' : 'red');
     }
   }
   abilityQueueMode = false;
@@ -4628,24 +4676,195 @@ function doTylerChoice(choice) {
 }
 
 // ============================================================
-// GUARDIAN FAIRY (99) — Wish: standby modal handler
+// GUARDIAN FAIRY (99) — Wish: reactive damage swap handler
 // ============================================================
-function doGuardianFairyChoice(choice) {
-  const gfp = B.guardianFairyPending;
+function doGuardianFairyReactive(choice) {
+  const gfp = B.guardianFairyReactivePending;
   if (!gfp) return;
-  B.guardianFairyPending = null;
+  B.guardianFairyReactivePending = null;
   document.getElementById('guardianFairyOverlay').classList.remove('active');
-  const { team, btn } = gfp;
+  const { loseTeamName, gfGhost, dmg, lF, resume } = gfp;
+  const loseTeam = B[loseTeamName];
   if (choice === 'yes') {
-    B.guardianFairyStandby[team] = true;
-    const gfG = getSidelineGhost(B[team], 99);
-    const gfName = gfG ? gfG.name : 'Guardian Fairy';
-    showAbilityCallout('WISH!', 'var(--ghost-rare)', `${gfName} — on standby! Will absorb incoming damage!`, team);
-    log(`<span class="log-ability">${gfName}</span> — Wish! Standing by to absorb damage this round.`);
+    // Guardian Fairy takes the damage instead
+    const gfIdx = loseTeam.ghosts.indexOf(gfGhost);
+    gfGhost.hp = Math.max(0, gfGhost.hp - dmg);
+    if (gfGhost.hp <= 0) { gfGhost.ko = true; gfGhost.killedBy = -1; }
+    // Swap GF to active, original ghost to sideline at current HP
+    if (gfIdx !== -1) loseTeam.activeIdx = gfIdx;
+    const gfName = gfGhost.name || 'Guardian Fairy';
+    queueAbility('WISH!', 'var(--ghost-rare)', `${gfName} — leaps in to absorb ${dmg} damage for ${lF.name}!${gfGhost.ko ? ' GF falls!' : ' ' + gfGhost.hp + ' HP left'}`, null, loseTeamName);
+    log(`<span class="log-ability">${gfName}</span> — Wish! Absorbed ${dmg} damage for ${lF.name}! ${gfGhost.ko ? '<span class="log-ko">GF falls!</span>' : gfGhost.hp + ' HP left'}`);
+    renderBattle();
+    if (resume) setTimeout(resume, 1500);
+  } else {
+    // Damage applies to the original ghost
+    lF.hp = Math.max(0, lF.hp - dmg);
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = gfp.wFId; }
+    log(`<span class="log-dmg">${gfp.wFName} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+    renderBattle();
+    if (resume) setTimeout(resume, 200);
+  }
+}
+
+// ============================================================
+// CHOW (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice
+// ============================================================
+function doChowChoice(choice) {
+  const cp = B.chowPending;
+  if (!cp) return;
+  B.chowPending = null;
+  document.getElementById('chowOverlay').classList.remove('active');
+  const { team, btn } = cp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 414 && !f.ko && B[team].resources.healingSeed >= 1) {
+    B[team].resources.healingSeed--;
+    B.chowExtraDie[team] = (B.chowExtraDie[team] || 0) + 2;
+    // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
+    if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
+    showAbilityCallout('SECRET INGREDIENT!', 'var(--uncommon)',
+      `${f.name} — discarded 1 Healing Seed for +2 dice! (total +${B.chowExtraDie[team]})`, team);
+    log(`<span class="log-ability">${f.name}</span> — Secret Ingredient! Discarded 1 Healing Seed → +${B.chowExtraDie[team]} dice total!`);
+    renderBattle();
+    // If more seeds available, allow another use (re-offer after callout clears)
+    if (B[team].resources.healingSeed >= 1) {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    } else {
+      B.chowDecided[team] = true;
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    }
+  } else {
+    B.chowDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+  }
+}
+
+// ============================================================
+// NICK & KNACK (409) — Knick Knack: steal 1 resource from opponent
+// ============================================================
+function showNickKnackPicker(team, oppTeam) {
+  const oppRes = B[oppTeam].resources;
+  const resTypes = [
+    { key: 'ice', label: 'Ice Shard', emoji: '❄️' },
+    { key: 'fire', label: 'Sacred Fire', emoji: '🔥' },
+    { key: 'surge', label: 'Surge', emoji: '⚡' },
+    { key: 'luckyStone', label: 'Lucky Stone', emoji: '🍀' },
+    { key: 'moonstone', label: 'Moonstone', emoji: '💎' },
+    { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' }
+  ];
+  const available = resTypes.filter(r => (oppRes[r.key] || 0) > 0);
+  const optionsEl = document.getElementById('nickKnackOptions');
+  let html = '';
+  available.forEach(r => {
+    html += `<button class="selene-opt" onclick="doNickKnackSteal('${team}','${r.key}')" style="background:linear-gradient(135deg,#065f46,#059669);">${r.emoji} ${r.label} (${oppRes[r.key]})</button>`;
+  });
+  html += `<button class="selene-opt" onclick="doNickKnackSteal('${team}','skip')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Skip</button>`;
+  optionsEl.innerHTML = html;
+  document.getElementById('nickKnackOverlay').classList.add('active');
+}
+
+function doNickKnackSteal(team, resKey) {
+  const nnp = B.nickKnackPending;
+  if (!nnp) return;
+  B.nickKnackPending = null;
+  document.getElementById('nickKnackOverlay').classList.remove('active');
+  const { btn, oppTeam } = nnp;
+  B.nickKnackDecided[team] = true;
+  if (resKey !== 'skip') {
+    B[oppTeam].resources[resKey]--;
+    B[team].resources[resKey] = (B[team].resources[resKey] || 0) + 1;
+    const resLabel = resKey === 'luckyStone' ? 'Lucky Stone' : resKey === 'moonstone' ? 'Moonstone' : resKey === 'healingSeed' ? 'Healing Seed' : resKey === 'ice' ? 'Ice Shard' : resKey === 'fire' ? 'Sacred Fire' : 'Surge';
+    const f = active(B[team]);
+    showAbilityCallout('KNICK KNACK!', 'var(--uncommon)',
+      `${f.name} — stole 1 ${resLabel} from the opponent!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span> from opponent!`);
+    renderBattle();
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
   } else {
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
   }
+}
+
+// ============================================================
+// JASPER (428) — Flame Dive: interactive bonus die reveal modal
+// ============================================================
+function showJasperModal(resumeCallback) {
+  const jp = B.jasperPending;
+  if (!jp) { if (resumeCallback) resumeCallback(); return; }
+  B.jasperResume = resumeCallback;
+  const titleEl = document.getElementById('jasperTitle');
+  if (titleEl) titleEl.textContent = `${jp.wFName} — Flame Dive!`;
+  const subEl = document.getElementById('jasperSub');
+  if (subEl) subEl.innerHTML = `${jp.wFName} won — roll the bonus die for extra damage to <b>${jp.lFName}</b>!<br><i>Jasper takes 1 recoil damage.</i>`;
+  const dieEl = document.getElementById('jasperDie');
+  if (dieEl) { dieEl.textContent = '?'; dieEl.style.transform = 'rotate(0deg)'; }
+  const btn = document.getElementById('jasperRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔥 Roll the Bonus Die!'; }
+  narrate(`<b class="${jp.winTeamName}-text">${jp.wFName}</b>&nbsp;unleashes <b class="gold">FLAME DIVE!</b>`);
+  document.getElementById('jasperOverlay').classList.add('active');
+}
+
+function doJasperRoll() {
+  const btn = document.getElementById('jasperRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const jp = B.jasperPending;
+  if (!jp) { finishJasperRoll(); return; }
+  const finalValue = jp.bonusDie;
+  const dieEl = document.getElementById('jasperDie');
+  if (!dieEl) { finishJasperRoll(); return; }
+  // Shuffle animation — same as Balatron
+  let ticks = 0;
+  const totalTicks = 10;
+  const tickMs = 70;
+  const shuffle = setInterval(() => {
+    ticks++;
+    dieEl.textContent = String(Math.floor(Math.random() * 6) + 1);
+    dieEl.style.transform = `rotate(${ticks * 36}deg)`;
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      dieEl.textContent = String(finalValue);
+      dieEl.style.transform = 'rotate(0deg)';
+      if (finalValue >= 5) {
+        dieEl.style.background = 'linear-gradient(135deg,#fde68a,#f59e0b)';
+        dieEl.style.borderColor = '#f59e0b';
+      } else if (finalValue >= 3) {
+        dieEl.style.background = 'linear-gradient(135deg,#fbbf24,#d97706)';
+        dieEl.style.borderColor = '#b45309';
+      } else {
+        dieEl.style.background = 'linear-gradient(135deg,#fecaca,#ef4444)';
+        dieEl.style.borderColor = '#b91c1c';
+      }
+      setTimeout(() => finishJasperRoll(), 900);
+    }
+  }, tickMs);
+}
+
+function finishJasperRoll() {
+  const jp = B.jasperPending;
+  const resume = B.jasperResume;
+  B.jasperPending = null;
+  B.jasperResume = null;
+  document.getElementById('jasperOverlay').classList.remove('active');
+  if (jp) {
+    const wTeamName = jp.winTeamName;
+    const wTeamObj = B[wTeamName];
+    const lTeamName = wTeamName === 'red' ? 'blue' : 'red';
+    const lTeamObj = B[lTeamName];
+    const wF = wTeamObj ? active(wTeamObj) : null;
+    const lF = lTeamObj ? active(lTeamObj) : null;
+    if (lF && lF.name === jp.lFName) {
+      lF.hp = Math.max(0, lF.hp - jp.bonusDie);
+      if (lF.hp <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
+    }
+    if (wF && wF.name === jp.wFName) {
+      wF.hp = Math.max(0, wF.hp - 1);
+      if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; }
+    }
+    log(`<span class="log-ability">${jp.wFName}</span> — Flame Dive! Bonus die: <span class="log-dmg">${jp.bonusDie} extra damage</span> to ${jp.lFName}! Self-damage: <span class="log-dmg">1 HP</span>.`);
+    renderBattle();
+  }
+  if (resume) setTimeout(resume, 300);
 }
 
 // ============================================================
@@ -5778,21 +5997,50 @@ function rollReady(team) {
       return;
     }
 
-    // Guardian Fairy (99) — Wish: offer standby before rolling (sideline-only)
-    // Only shows once per round; standby flag cleared at round reset.
-    if (hasSideline(B[team], 99) && B.guardianFairyStandby && !B.guardianFairyStandby[team]) {
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.guardianFairyPending = { team, btn };
-      const gfDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        const gfG = getSidelineGhost(B[team], 99);
-        document.getElementById('guardianFairySub').innerHTML =
-          `Put <b>${gfG ? gfG.name : 'Guardian Fairy'}</b> on standby? (${gfG ? gfG.hp : '?'} HP)<br><i>If you lose this roll, Guardian Fairy absorbs all incoming damage.</i>`;
-        document.getElementById('guardianFairyOverlay').classList.add('active');
-      }, gfDelay);
-      return;
+    // Chow (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice (interactive button)
+    {
+      const chowG = active(B[team]);
+      if (chowG && chowG.id === 414 && !chowG.ko && B.chowDecided && !B.chowDecided[team] &&
+          B[team].resources && B[team].resources.healingSeed >= 1) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.chowPending = { team, btn };
+        const chowDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          const cF = active(B[team]);
+          document.getElementById('chowSub').innerHTML =
+            `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
+            `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
+          document.getElementById('chowOverlay').classList.add('active');
+        }, chowDelay);
+        return;
+      }
     }
+
+    // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent (interactive picker)
+    {
+      const nnG = active(B[team]);
+      const oppTeamNN = team === 'red' ? 'blue' : 'red';
+      if (nnG && nnG.id === 409 && !nnG.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
+        const oppRes = B[oppTeamNN].resources;
+        const resTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+        const available = resTypes.filter(r => (oppRes[r] || 0) > 0);
+        if (available.length > 0) {
+          btn.classList.add('locked');
+          btn.disabled = true;
+          B.nickKnackPending = { team, btn, oppTeam: oppTeamNN };
+          const nnDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+          setTimeout(() => {
+            showNickKnackPicker(team, oppTeamNN);
+          }, nnDelay);
+          return;
+        } else {
+          B.nickKnackDecided[team] = true;
+        }
+      }
+    }
+
+    // Guardian Fairy (99) — Wish: now reactive (post-damage modal), no pre-roll standby needed
 
     // Eloise (85) — Change of Heart: spend 1 Ice Shard to swap HP with enemy before rolling
     // Offered once per round when Eloise is active and team has ≥1 Ice Shard.
@@ -6074,8 +6322,7 @@ function hasAnyDecision(team) {
   // Toby (97) — Pure Heart
   if (f.id === 97 && B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
       !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) return true;
-  // Guardian Fairy (99) — Wish (sideline)
-  if (hasSideline(B[team], 99) && B.guardianFairyStandby && !B.guardianFairyStandby[team]) return true;
+  // Guardian Fairy (99) — Wish: now reactive (post-damage), no pre-roll check needed
   // Eloise (85) — Change of Heart
   if (f.id === 85 && B.eloiseUsedThisRound && !B.eloiseUsedThisRound[team] &&
       r && r.ice >= 1 && oppF && !oppF.ko) return true;
@@ -6198,16 +6445,34 @@ function openDuelPhasePrimers(team) {
     return true;
   }
 
-  // — GUARDIAN FAIRY (99) — Wish: put on standby (sideline)
-  if (hasSideline(B[team], 99) && B.guardianFairyStandby && !B.guardianFairyStandby[team]) {
+  // — CHOW (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice (Duel Phase)
+  if (f.id === 414 && !f.ko && B.chowDecided && !B.chowDecided[team] &&
+      B[team].resources && B[team].resources.healingSeed >= 1) {
     disableDone();
-    B.guardianFairyPending = { team, btn: doneBtn };
-    const gfG = getSidelineGhost(B[team], 99);
-    document.getElementById('guardianFairySub').innerHTML =
-      `Put <b>${gfG ? gfG.name : 'Guardian Fairy'}</b> on standby? (${gfG ? gfG.hp : '?'} HP)<br><i>If you lose this roll, Guardian Fairy absorbs all incoming damage.</i>`;
-    document.getElementById('guardianFairyOverlay').classList.add('active');
+    B.chowPending = { team, btn: doneBtn };
+    document.getElementById('chowSub').innerHTML =
+      `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
+      `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
+    document.getElementById('chowOverlay').classList.add('active');
     return true;
   }
+
+  // — NICK & KNACK (409) — Knick Knack: steal 1 resource from opponent (Duel Phase)
+  if (f.id === 409 && !f.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
+    const nnOppRes = B[oppTeamName].resources;
+    const nnResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    const nnAvailable = nnResTypes.filter(r => (nnOppRes[r] || 0) > 0);
+    if (nnAvailable.length > 0) {
+      disableDone();
+      B.nickKnackPending = { team, btn: doneBtn, oppTeam: oppTeamName };
+      showNickKnackPicker(team, oppTeamName);
+      return true;
+    } else {
+      B.nickKnackDecided[team] = true;
+    }
+  }
+
+  // Guardian Fairy (99) — Wish: now reactive (post-damage modal), no pre-roll standby
 
   // — ELOISE (85) — Change of Heart: spend 1 Ice Shard to swap HP
   {
@@ -6902,40 +7167,12 @@ function doPreRollSetup() {
     }
   });
 
-  // Nick & Knack (409) — Knick Knack: auto-steal 1 random resource from opponent before rolling
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    const oppTName = tName === 'red' ? 'blue' : 'red';
-    const oppTeam = B[oppTName];
-    if (f.id === 409 && !f.ko) {
-      const resTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
-      const available = resTypes.filter(r => (oppTeam.resources[r] || 0) > 0);
-      if (available.length > 0) {
-        const stolen = available[Math.floor(Math.random() * available.length)];
-        oppTeam.resources[stolen]--;
-        team.resources[stolen] = (team.resources[stolen] || 0) + 1;
-        const resLabel = stolen === 'luckyStone' ? 'Lucky Stone' : stolen === 'moonstone' ? 'Moonstone' : stolen === 'healingSeed' ? 'Healing Seed' : stolen === 'ice' ? 'Ice Shard' : stolen === 'fire' ? 'Sacred Fire' : 'Surge';
-        preRollCallouts.push(['KNICK KNACK!', 'var(--uncommon)', `${f.name} — stole 1 ${resLabel} from ${active(oppTeam).name}!`, tName]);
-        log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span> from opponent!`);
-        checkKnightEffects(tName, f.name);
-      }
-    }
-  });
+  // Nick & Knack (409) — Knick Knack: now an interactive picker (see doNickKnackSteal)
+  B.nickKnackDecided = { red: false, blue: false };
 
-  // Chow (414) — Secret Ingredient: auto-discard 1 Healing Seed for +2 dice (no healing)
+  // Chow (414) — Secret Ingredient: now an interactive button (see doChowChoice)
   B.chowExtraDie = { red: 0, blue: 0 };
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 414 && !f.ko && team.resources.healingSeed >= 1) {
-      team.resources.healingSeed--;
-      B.chowExtraDie[tName] = 2;
-      preRollCallouts.push(['SECRET INGREDIENT!', 'var(--uncommon)', `${f.name} — discarded 1 Healing Seed for +2 dice!`, tName]);
-      log(`<span class="log-ability">${f.name}</span> — Secret Ingredient! Discarded 1 Healing Seed → +2 dice!`);
-      checkKnightEffects(tName, f.name);
-    }
-  });
+  B.chowDecided = { red: false, blue: false };
 
   // Aunt Susan (309)
   B.auntSusanBonus = { red: false, blue: false };
@@ -7207,6 +7444,20 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${active(B.blue).name}</span> — Let's Dance! +${B.letsDanceBonus.blue} bonus die from last doubles!`);
     }
     B.letsDanceBonus.blue = 0;
+  }
+
+  // Lucas (433) — Kindling: +1 die next roll after Miracle resurrection (consumed after use)
+  if (B.lucasKindlingBonus && B.lucasKindlingBonus.red > 0) {
+    redCount += B.lucasKindlingBonus.red;
+    preRollCallouts.push(['KINDLING!', 'var(--rare)', `Lucas — Kindling! +${B.lucasKindlingBonus.red} bonus die!`, 'red']);
+    log(`<span class="log-ability">Lucas</span> — Kindling! +${B.lucasKindlingBonus.red} bonus die this roll.`);
+    B.lucasKindlingBonus.red = 0;
+  }
+  if (B.lucasKindlingBonus && B.lucasKindlingBonus.blue > 0) {
+    blueCount += B.lucasKindlingBonus.blue;
+    preRollCallouts.push(['KINDLING!', 'var(--rare)', `Lucas — Kindling! +${B.lucasKindlingBonus.blue} bonus die!`, 'blue']);
+    log(`<span class="log-ability">Lucas</span> — Kindling! +${B.lucasKindlingBonus.blue} bonus die this roll.`);
+    B.lucasKindlingBonus.blue = 0;
   }
 
   // Haywire (78) — Wild Chords: permanent +1 die bonus (awarded once per game on triples, always applied)
@@ -7922,6 +8173,18 @@ function pickMsValue(val) {
   log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(', ')}]`);
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
+
+  // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used,
+  // Bigsby MUST be sacrificed and replaced with Doom (id 112). Mandatory transformation.
+  if (f.id === 424 && !f.ko) {
+    const g = f; // mutate the ghost object in-place
+    g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
+    g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
+    g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
+    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    renderBattle();
+  }
 
   // When Magic Touch fired, showAbilityCallout is on screen for 1400ms — wait 1600ms
   // so the splash fully clears before the next picker / Lucky Stones appear.
@@ -9609,12 +9872,10 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Pure Heart! Instant KO — ${lF.name} is defeated!`);
   }
 
-  // Zain (206) — Ice Blade: +2 damage on win, but only if Zain swung the blade this round
-  // NOTE: no collectKC here — the ice shard collectKC at line ~10065 already covers the knight
-  // reaction for all Zain wins. Adding a second collectKC here would cause HEAVY AIR! to deal
-  // 4 HP (2+2) and RETRIBUTION! to grant 2 dice instead of 1 when blade swings on a win.
+  // Zain (206) — Ice Blade: permanent +2 damage on ALL winning rolls once forged
+  // Fires for ANY ghost on the team, not just Zain.
   let zainIceBladeTriggered = false;
-  if (wF.id === 206 && wF.iceBladeForged && !wF.ko && (B.committed[winTeamName].zainBlade || 0) > 0) {
+  if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName]) {
     dmg += 2;
     zainIceBladeTriggered = true;
   }
@@ -10039,30 +10300,30 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Reflection! Dice total = 7! ${kingJayReflectDmg} damage reflected back to ${wF.name}!`);
   }
 
-  // Guardian Fairy (99) — Wish: if this team committed GF as standby and they lost, GF absorbs the damage
-  // GF intercepts BEFORE damage is applied to lF — lF takes 0, GF takes the hit instead.
+  // Guardian Fairy (99) — Wish: REACTIVE — if losing team has GF on sideline and damage > 0,
+  // defer damage application and show a modal letting the player choose to swap GF in.
+  // GF intercepts BEFORE damage is applied to lF.
   let guardianFairyAbsorbed = false;
   let guardianFairyAbsorbedDmg = 0;
   let guardianFairyKOd = false;
   let gfSacrifice = null;
   let gfHpAfter = 0;
-  if (!kingJayReflected && B.guardianFairyStandby && B.guardianFairyStandby[loseTeamName] && dmg > 0) {
+  let guardianFairyReactiveTriggered = false;
+  if (!kingJayReflected && dmg > 0) {
     const gfG = getSidelineGhost(loseTeam, 99);
-    if (gfG) {
-      B.guardianFairyStandby[loseTeamName] = false;
+    if (gfG && !gfG.ko) {
+      // Store pending state — damage deferred to modal handler
+      guardianFairyReactiveTriggered = true;
       gfSacrifice = gfG;
       guardianFairyAbsorbedDmg = dmg;
-      gfHpAfter = Math.max(0, gfG.hp - dmg); // compute only — defer mutation to onShow
-      if (gfHpAfter <= 0) { gfG.ko = true; gfG.killedBy = wF.id; guardianFairyKOd = true; }
-      dmg = 0; // lF is protected — takes no damage this round
-      guardianFairyAbsorbed = true;
-      collectKC(loseTeamName, gfG.name, gfG);
-      log(`<span class="log-ability">${gfG.name}</span> — Wish! Stepped in to absorb ${guardianFairyAbsorbedDmg} damage for ${lF.name}! ${gfG.ko ? '<span class="log-ko">GF falls!</span>' : gfHpAfter + ' HP left'}`);
+      B.guardianFairyReactivePending = {
+        loseTeamName, gfGhost: gfG, dmg, lF, wFName: wF.name, wFId: wF.id,
+        resume: null // set later during drain
+      };
+      dmg = 0; // defer ALL damage — modal handler will apply it
+      guardianFairyAbsorbed = true; // flag so "0 damage" log doesn't fire
     }
   }
-  // Clear any unused standby flag at round end (win path — team won, GF not needed)
-  if (B.guardianFairyStandby && B.guardianFairyStandby[loseTeamName]) B.guardianFairyStandby[loseTeamName] = false;
-  if (B.guardianFairyStandby && B.guardianFairyStandby[winTeamName]) B.guardianFairyStandby[winTeamName] = false;
 
   // Fang Undercover (7) — Skilled Coward: armed → negate all incoming damage, trigger post-round swap
   // Fires after Guardian Fairy (GF takes priority if both are in play; Fang Undercover fires only if GF didn't absorb)
@@ -10093,11 +10354,10 @@ function _resolveRoundImpl() {
   }
   if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; } // consumed or unused
 
-  // --- Mirror Matt (410) — Seven Years: doubles+ damage reflected to winner ---
+  // --- Mirror Matt (410) — Seven Years: doubles ONLY damage reflected to winner ---
   let mirrorMattReflected = false;
   let mirrorMattReflectDmg = 0;
-  if (lF.id === 410 && !lF.ko && dmg > 0 &&
-      (wR.type === 'doubles' || wR.type === 'triples' || wR.type === 'quads' || wR.type === 'penta')) {
+  if (lF.id === 410 && !lF.ko && dmg > 0 && wR.type === 'doubles') {
     mirrorMattReflectDmg = dmg;
     wF.hp = Math.max(0, wF.hp - dmg);
     if (wF.hp <= 0) { wF.ko = true; wF.killedBy = 410; }
@@ -10162,19 +10422,21 @@ function _resolveRoundImpl() {
     log(`${wF.name} wins but deals 0 damage.`);
   }
 
-  // Jasper (428) — Flame Dive: Win: roll bonus die, deal extra damage, take 1 self-damage
+  // Jasper (428) — Flame Dive: Win: interactive bonus die reveal (Balatron-style)
+  // HP mutations deferred to showJasperModal → finishJasperRoll.
   let jasperTriggered = false;
   let jasperBonusDie = 0;
   if (wF.id === 428 && !wF.ko) {
     jasperBonusDie = Math.floor(Math.random() * 6) + 1;
-    lF.hp = Math.max(0, lF.hp - jasperBonusDie);
-    if (lF.hp <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
-    // Self-damage
-    wF.hp = Math.max(0, wF.hp - 1);
-    if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; } // self-inflicted
     jasperTriggered = true;
     collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Flame Dive! Bonus die: <span class="log-dmg">${jasperBonusDie} extra damage</span> to ${lF.name}! Self-damage: <span class="log-dmg">1 HP</span>. ${lF.ko?lF.name+' KO!':lF.hp+' HP left'} | ${wF.ko?wF.name+' self-KO!':wF.hp+' HP left'}`);
+    // Stash for modal — HP mutations deferred to finishJasperRoll
+    B.jasperPending = {
+      bonusDie: jasperBonusDie,
+      wFName: wF.name,
+      lFName: lF.name,
+      winTeamName: winTeamName
+    };
   }
 
   // Mirror Matt (410) — Seven Years reflected damage callout (deferred to cinematic)
@@ -10833,10 +11095,8 @@ function _resolveRoundImpl() {
     queueAbility('SEVEN YEARS!', 'var(--uncommon)', `${lF.name} — REFLECT! ${wR.type} → ${mirrorMattReflectDmg} damage bounced to ${wF.name}!${mmKoSuffix}`, null, loseTeamName);
   }
 
-  // Jasper (428) — Flame Dive callout
-  if (jasperTriggered) {
-    queueAbility('FLAME DIVE!', 'var(--uncommon)', `${wF.name} — Bonus die: ${jasperBonusDie}! +${jasperBonusDie} damage to ${lF.name}, 1 self-damage!`, null, winTeamName);
-  }
+  // Jasper (428) — Flame Dive: NO auto-callout here. B.jasperPending was set in the
+  // resolver; the interactive modal (showJasperModal) fires in the post-drain callback.
 
   // Twyla (417) — Lucky Dance callout (twylaBonus captured at resolution time, safe from reset)
   if (twylaTriggered) {
@@ -11187,15 +11447,20 @@ function _resolveRoundImpl() {
   // Both triggers also fire for any future resurrection sources (e.g. Shepherd's Flock 360 when implemented).
   if (boMiracleTarget) {
     const bt = boMiracleTarget; // capture for closure
-    const vigilActive = hasSideline(winTeam, 433);
+    const lucasActive = hasSideline(winTeam, 433);
     const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP!`;
     queueAbility('MIRACLE!', 'var(--legendary)', calloutText, () => {
       bt.ko = false;
       bt.hp = 1;
       log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span>`);
-      if (vigilActive) {
-        winTeam.resources.fire = (winTeam.resources.fire || 0) + 6;
-        log(`<span class="log-ability">Vigil</span> — Kindling! <span class="log-ms">+6 Sacred Fires!</span>`);
+      if (lucasActive) {
+        // Lucas (433) — Kindling: revived ghost enters play, Bo to sideline, +1 die next roll
+        const revivedIdx = winTeam.ghosts.indexOf(bt);
+        if (revivedIdx !== -1) winTeam.activeIdx = revivedIdx; // swap revived ghost to active
+        if (!B.lucasKindlingBonus) B.lucasKindlingBonus = { red: 0, blue: 0 };
+        B.lucasKindlingBonus[winTeamName] = 1; // +1 die next roll
+        log(`<span class="log-ability">Lucas</span> — Kindling! <span class="log-heal">${bt.name} charges into play! +1 die next roll!</span>`);
+        queueAbility('KINDLING!', 'var(--rare)', `Lucas — ${bt.name} charges into play! +1 die next roll!`, null, winTeamName);
       }
       renderBattle();
     }, winTeamName);
@@ -11613,12 +11878,40 @@ function _resolveRoundImpl() {
       }
       }; // end runPostDrain
 
-      // Balatron modal injection: if the pending flag is set, play the interactive
-      // counter-die reveal first, then runPostDrain() continues the normal flow.
-      if (B.balatronPending) {
-        showBalatronModal(runPostDrain);
-      } else {
+      // Jasper Flame Dive modal: show after Balatron if pending
+      const afterJasper = () => {
         runPostDrain();
+      };
+      const afterBalatron = () => {
+        if (B.jasperPending) {
+          showJasperModal(afterJasper);
+        } else {
+          afterJasper();
+        }
+      };
+
+      // Guardian Fairy reactive modal: show before Balatron/postDrain if GF pending
+      const afterGfReactive = () => {
+        // Balatron modal injection: if the pending flag is set, play the interactive
+        // counter-die reveal first, then runPostDrain() continues the normal flow.
+        if (B.balatronPending) {
+          showBalatronModal(afterBalatron);
+        } else {
+          afterBalatron();
+        }
+      };
+
+      if (B.guardianFairyReactivePending) {
+        const gfp = B.guardianFairyReactivePending;
+        gfp.resume = afterGfReactive;
+        const gfG = gfp.gfGhost;
+        const gfName = gfG.name || 'Guardian Fairy';
+        document.getElementById('guardianFairySub').innerHTML =
+          `<b>${gfName}</b> (${gfG.hp} HP) can take this ${gfp.dmg} damage hit for <b>${gfp.lF.name}</b>!<br>` +
+          `<i>Guardian Fairy swaps in and absorbs the damage. ${gfp.lF.name} goes to sideline at current HP.</i>`;
+        document.getElementById('guardianFairyOverlay').classList.add('active');
+      } else {
+        afterGfReactive();
       }
     });
   }, dmgDelay);
@@ -12316,6 +12609,19 @@ function renderBattle() {
     }
     if (r.luckyStone > 0) {
       rh += `<div class="res-tile luckyStone" title="Lucky Stone: use after rolling to reroll any one of your dice"><span class="res-main">🍀</span><span class="res-count">${r.luckyStone}</span><span class="res-label">LUCK</span></div>`;
+    }
+    // Castle Guide (420) — Burn: show total burn placed on enemy sideline ghosts
+    if (B.burn) {
+      const enemyTeam = team === 'red' ? 'blue' : 'red';
+      const burnObj = B.burn[enemyTeam] || {};
+      const totalBurn = Object.values(burnObj).reduce((s, v) => s + v, 0);
+      if (totalBurn > 0) {
+        const burnDetails = Object.entries(burnObj).map(([idx, cnt]) => {
+          const g = B[enemyTeam].ghosts[parseInt(idx)];
+          return g ? `${g.name}: ${cnt}` : '';
+        }).filter(Boolean).join(', ');
+        rh += `<div class="res-tile fire" title="Burn placed on enemy: ${burnDetails}"><span class="res-main">💥</span><span class="res-count">${totalBurn}</span><span class="res-label">BURN</span></div>`;
+      }
     }
     // Happy Crystal (208) — sacrifice tile
     if (isReady && f.id === 208 && !f.ko) {

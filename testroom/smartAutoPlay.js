@@ -80,7 +80,9 @@ function smartPlayNext() {
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
     burn: { red: {}, blue: {} },
-    chowExtraDie: { red: 0, blue: 0 }
+    chowExtraDie: { red: 0, blue: 0 },
+    lucasKindlingBonus: { red: 0, blue: 0 },
+    iceBladeForgedPermanent: { red: false, blue: false }
   };
   S.battle = B;
 
@@ -596,6 +598,7 @@ function smartSimRounds(gameNum) {
       r.ice--;
       r.moonstone--;
       f.iceBladeForged = true;
+      B.iceBladeForgedPermanent[teamKey] = true; // permanent +2 damage for all wins
     }
 
     // Surge: spend up to 2
@@ -820,6 +823,10 @@ function smartSimRounds(gameNum) {
   });
   redCount += B.harrisonExtraDie.red || 0;
   blueCount += B.harrisonExtraDie.blue || 0;
+
+  // Lucas (433) — Kindling: +1 die next roll after Miracle resurrection (consumed after use)
+  if (B.lucasKindlingBonus && B.lucasKindlingBonus.red > 0) { redCount += B.lucasKindlingBonus.red; B.lucasKindlingBonus.red = 0; }
+  if (B.lucasKindlingBonus && B.lucasKindlingBonus.blue > 0) { blueCount += B.lucasKindlingBonus.blue; B.lucasKindlingBonus.blue = 0; }
 
   // Chow (414) — Secret Ingredient: +2 dice from discarded seed
   if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
@@ -1128,6 +1135,13 @@ function smartSimRounds(gameNum) {
         }
         if (teamKey === 'red') { redDice.splice(0, redDice.length, ...improved); }
         else { blueDice.splice(0, blueDice.length, ...improved); }
+        // Bigsby (424) — Omen: Moonstone use → sacrifice Bigsby, replace with Doom (112)
+        const msF = active(t);
+        if (msF.id === 424 && !msF.ko) {
+          msF.id = 112; msF.name = "Doom"; msF.maxHp = 7; msF.hp = 7;
+          msF.ability = "Fiendship"; msF.abilityDesc = "+2 bonus damage!";
+          msF.art = "art/originals/doom.jpg"; msF.rarity = "legendary"; msF.ko = false;
+        }
       }
     }
   });
@@ -1404,9 +1418,8 @@ function smartSimRounds(gameNum) {
       wF.hp = Math.max(0, wF.hp - 1);
       if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; } // self-inflicted (Belly Flop) — no kill credit to enemy; matches index.html line 9873
     }
-    // Zain (206) — Ice Blade: +2 damage on win while swinging (forged + zainBlade committed)
-    // Matches index.html resolveRound line 9365: wF.id===206 && wF.iceBladeForged && committed[winTeam].zainBlade > 0.
-    if (wF.id === 206 && wF.iceBladeForged && (B.committed[winTeamName].zainBlade || 0) > 0) dmg += 2;
+    // Zain (206) — Ice Blade: permanent +2 damage on ALL wins once forged (team-wide)
+    if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName]) dmg += 2;
     // Red Hunter (345) — enemy has resources (pool + committed ice/fire/surge): +3 damage
     // Matches index.html lines 9372–9385: checks both eRes AND B.committed[loseTeamName].
     // In the sim, ice/fire/surge are moved to committed BEFORE this block runs — checking
@@ -1526,10 +1539,9 @@ function smartSimRounds(gameNum) {
     if (wF.id === 1 && !wF.ko && [1,2,3].every(v => winDice.includes(v))) {
       dmg = 4;
     }
-    // Mirror Matt (410) — Seven Years: doubles+ damage reflected to attacker (1 HP, so singles kill him normally)
+    // Mirror Matt (410) — Seven Years: doubles ONLY damage reflected to attacker (1 HP, so singles kill him normally)
     let mirrorMattReflected = false;
-    if (lF.id === 410 && !lF.ko && dmg > 0 &&
-        (wR.type === 'doubles' || wR.type === 'triples' || wR.type === 'quads' || wR.type === 'penta')) {
+    if (lF.id === 410 && !lF.ko && dmg > 0 && wR.type === 'doubles') {
       wF.hp = Math.max(0, wF.hp - dmg);
       if (wF.hp <= 0) { wF.ko = true; wF.killedBy = 410; }
       dmg = 0;
@@ -1673,6 +1685,20 @@ function smartSimRounds(gameNum) {
       lF.killedBy = wF.id;
     }
 
+    // Guardian Fairy (99) — Wish: reactive — AI auto-activates GF when damage would KO the active ghost
+    // and fairy has more HP than the damage
+    if (dmg > 0 && !kingJayReflected) {
+      const gfG = getSidelineGhost(lTeam, 99);
+      if (gfG && !gfG.ko && lF.hp - dmg <= 0 && gfG.hp > dmg) {
+        // GF absorbs the damage instead
+        const gfIdx = lTeam.ghosts.indexOf(gfG);
+        gfG.hp = Math.max(0, gfG.hp - dmg);
+        if (gfG.hp <= 0) { gfG.ko = true; gfG.killedBy = wF.id; }
+        if (gfIdx !== -1) lTeam.activeIdx = gfIdx; // swap GF to active
+        dmg = 0; // lF protected
+      }
+    }
+
     // Apply damage
     if (dmg > 0) {
       lF.hp = Math.max(0, lF.hp - dmg);
@@ -1763,8 +1789,8 @@ function smartSimRounds(gameNum) {
     // Sandwiches (33) on loser's sideline mirrors the chosen resources. Matches index.html doSeleneChoice.
     if (wF.id === 305 && !wF.ko && wR.type === 'doubles') {
       const _selSeed = wF.hp < Math.ceil(wF.maxHp / 2);
-      if (_selSeed) { wTeam.resources.healingSeed++;   if (sandwichLose) lTeam.resources.healingSeed++;   }
-      else          { wTeam.resources.luckyStone += 2; if (sandwichLose) lTeam.resources.luckyStone += 2; }
+      if (_selSeed) { wTeam.resources.healingSeed += 2;   if (sandwichLose) lTeam.resources.healingSeed += 2;   }
+      else          { wTeam.resources.luckyStone += 3; if (sandwichLose) lTeam.resources.luckyStone += 3; }
     }
     if (wF.id === 54  && !wF.ko && winDice.length >= 4) {                                                                    // Roger: TEMPEST! +3 Sacred Fires if 2+ pairs — matches index.html lines 10545-10556
       const _rc = {}; winDice.forEach(d => _rc[d] = (_rc[d]||0)+1);
@@ -1987,15 +2013,19 @@ function smartSimRounds(gameNum) {
       // Matches index.html Miracle block. Critical for sim accuracy: without this, Bo sims systematically
       // undervalue her legendary ability to refuel the team after a KO.
       // v672 fix: removed Vela (432) Second Breath — id 432 is now Valkin the Grand (Grand Spoils, handled above).
-      // Lucas/Vigil (433) sideline — Kindling: +6 Sacred Fires on resurrection.
+      // Lucas (433) sideline — Kindling: revived ghost enters play, Bo to sideline, +1 die next roll.
       if (wF.id === 109 && !wF.ko) {
         const boReviveTarget = wTeam.ghosts.find((g, i) => i !== wTeam.activeIdx && g.ko);
         if (boReviveTarget) {
           boReviveTarget.ko = false;
           boReviveTarget.hp = 1;
-          const vigilActive = hasSideline(wTeam, 433);
-          if (vigilActive) {
-            wTeam.resources.fire = (wTeam.resources.fire || 0) + 6;
+          const lucasActive = hasSideline(wTeam, 433);
+          if (lucasActive) {
+            // Lucas Kindling: revived ghost enters play, Bo to sideline, +1 die
+            const revivedIdx = wTeam.ghosts.indexOf(boReviveTarget);
+            if (revivedIdx !== -1) wTeam.activeIdx = revivedIdx;
+            if (!B.lucasKindlingBonus) B.lucasKindlingBonus = { red: 0, blue: 0 };
+            B.lucasKindlingBonus[wTeamName] = 1;
           }
         }
       }
