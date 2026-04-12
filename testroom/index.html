@@ -625,6 +625,11 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   100% { transform:scale(1); }
 }
 
+/* Persistent permanent effect badges */
+.permanent-buff { display:inline-block; padding:2px 8px; margin:2px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(34,197,94,0.15); color:#22c55a; border:1px solid rgba(34,197,94,0.3); }
+.permanent-debuff { display:inline-block; padding:2px 8px; margin:2px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+.permanent-effects-row { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; justify-content:center; }
+
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }
 /* Wooden dice tray — Théâtre des Esprits */
@@ -2248,7 +2253,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v695';
+const TESTROOM_VERSION = 'v696';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -8803,6 +8808,25 @@ function doPostRollAndResolve(redDice, blueDice) {
       return;
     }
 
+    // Same-team unified specials: one team has BOTH Moonstone + Lucky Stone
+    // Show a single reaction window with both resource tiles highlighted, one shared timer.
+    if (_redHasMS && _redHasLS) {
+      startSameTeamSpecialsWindow('red', () => {
+        // After red's unified window, check if blue has anything
+        if (_blueHasLS) checkLuckyStones();
+        else resolveRound();
+      });
+      return;
+    }
+    if (_blueHasMS && _blueHasLS) {
+      startSameTeamSpecialsWindow('blue', () => {
+        // After blue's unified window, check if red has anything
+        if (_redHasLS) checkLuckyStones();
+        else resolveRound();
+      });
+      return;
+    }
+
   if (_redHasMS) {
     B.phase = 'moonstone-red';
     showMoonstoneChoice('red', redDice);
@@ -9236,6 +9260,339 @@ function startSimultaneousMoonstoneWindows() {
       };
     };
   }
+}
+
+// ============================================================
+// SAME-TEAM UNIFIED SPECIALS WINDOW
+// One team has BOTH Moonstone + Lucky Stone(s).
+// Show a single reaction window with both tiles highlighted, one shared timer.
+// Player can use Moonstone once AND Lucky Stones multiple times, all in the same window.
+// Timer resets briefly after each action (3s extension).
+// ============================================================
+function startSameTeamSpecialsWindow(team, finalCallback) {
+  B.phase = 'specials-unified-' + team;
+  const tLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  narrate(`<b class="${team}-text">${tLabel}</b> has a <b style="color:var(--moonstone)">Moonstone</b> and a <b class="gold">Lucky Stone!</b> Click either to use!`);
+
+  const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+  const diceEl = document.getElementById(team + '-dice');
+  const resEl = document.getElementById(team + '-resources');
+  const msTile = resEl && resEl.querySelector('.res-tile.moonstone');
+  const lsTile = resEl && resEl.querySelector('.res-tile.luckyStone');
+
+  const state = { closed: false, msUsed: false, picking: false, lsUsedCount: 0 };
+  let sharedTimer = null;
+
+  // Helper to get fresh DOM refs (renderBattle rebuilds innerHTML, stale refs break)
+  const getMsTile = () => { const el = document.getElementById(team + '-resources'); return el && el.querySelector('.res-tile.moonstone'); };
+  const getLsTile = () => { const el = document.getElementById(team + '-resources'); return el && el.querySelector('.res-tile.luckyStone'); };
+
+  const updateBadge = (tile, val) => {
+    if (!tile) return;
+    let cd = tile.querySelector('.unified-cd');
+    if (!cd) { cd = document.createElement('div'); cd.className = 'reroll-countdown unified-cd'; tile.style.position = 'relative'; tile.appendChild(cd); }
+    cd.textContent = val;
+    cd.style.animation = 'none'; requestAnimationFrame(() => { cd.style.animation = ''; });
+  };
+  const updateAllBadges = (val) => {
+    const ms = getMsTile(); const ls = getLsTile();
+    if (!state.msUsed && ms && ms.classList.contains('rerollable')) updateBadge(ms, val);
+    if (ls && ls.classList.contains('rerollable')) updateBadge(ls, val);
+  };
+  const clearAllBadges = () => { document.querySelectorAll('.unified-cd').forEach(el => el.remove()); };
+
+  const closeWindow = () => {
+    if (state.closed) return;
+    state.closed = true;
+    clearInterval(sharedTimer); sharedTimer = null;
+    clearAllBadges();
+    const ms = getMsTile(); const ls = getLsTile();
+    if (ms) { ms.classList.remove('rerollable'); ms.onclick = null; ms.style.cursor = ''; clearMsCountdown(ms); }
+    if (ls) { ls.classList.remove('rerollable'); ls.onclick = null; ls.style.cursor = ''; }
+    clearDiceClickable(team);
+    document.querySelectorAll('.reroll-countdown').forEach(el => el.remove());
+    finalCallback();
+  };
+
+  const startTimer = (secs) => {
+    clearInterval(sharedTimer); sharedTimer = null;
+    clearAllBadges();
+    let remaining = secs;
+    updateAllBadges(remaining);
+    sharedTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0 || state.closed) {
+        clearInterval(sharedTimer); sharedTimer = null;
+        if (!state.closed) {
+          log(`<span style="color:var(--text2)">${team.toUpperCase()} specials window expired.</span>`);
+          closeWindow();
+        }
+      } else {
+        updateAllBadges(remaining);
+      }
+    }, 1000);
+  };
+
+  // Check if LS is still available and re-activate tile (with onclick re-bound)
+  const refreshLsTile = () => {
+    const ls = getLsTile();
+    const lsAvail = B.lsAvailable ? B.lsAvailable[team] : 0;
+    if (lsAvail > 0 && B[team].resources.luckyStone > 0 && ls) {
+      ls.classList.add('rerollable');
+      ls.style.cursor = 'pointer';
+      ls.onclick = lsTileClick; // re-bind the click handler
+    } else if (ls) {
+      ls.classList.remove('rerollable');
+      ls.onclick = null;
+      ls.style.cursor = '';
+    }
+  };
+
+  // Check if any action is still available, if not close
+  const checkStillAvailable = () => {
+    const hasMs = !state.msUsed && B[team].resources.moonstone > 0;
+    const lsAvail = B.lsAvailable ? B.lsAvailable[team] : 0;
+    const hasLs = lsAvail > 0 && B[team].resources.luckyStone > 0;
+    if (!hasMs && !hasLs) {
+      setTimeout(closeWindow, 400);
+      return false;
+    }
+    return true;
+  };
+
+  // ─── Moonstone tile click ───
+  const msTileClick = () => {
+      if (state.closed || state.picking || state.msUsed) return;
+      state.picking = true;
+      clearInterval(sharedTimer); sharedTimer = null;
+      clearAllBadges();
+      const msCur = getMsTile();
+      if (msCur) { msCur.classList.remove('rerollable'); msCur.onclick = null; msCur.style.cursor = ''; }
+
+      // Enter die-pick phase for Moonstone
+      B.pendingMoonstone = { team, dice: [...dice], dieIndex: null, phase: 'pick-die' };
+      narrate(`<b class="${team}-text">${tLabel}</b> — pick a die to change!`);
+      diceEl.querySelectorAll('.die').forEach((d, i) => {
+        d.classList.add('rerollable');
+        d.style.borderColor = 'var(--moonstone)';
+        d.onclick = () => {
+          clearInterval(msCountdownTimer);
+          clearMsCountdown(diceEl);
+          clearDiceClickable(team);
+          document.querySelectorAll('.reroll-countdown').forEach(el => el.remove());
+
+          // Now pick value via the standard picker
+          B.pendingMoonstone.dieIndex = i;
+          B.pendingMoonstone.phase = 'pick-value';
+          narrate(`Die ${i+1} selected — pick a new value!`);
+          const el = document.getElementById('msPicker');
+          document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${i+1}:</p>`;
+          const step2 = document.getElementById('msStep2');
+          step2.style.display = 'flex';
+          step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValueUnified(${v})">${v}</div>`).join('');
+          el.classList.add('active');
+          el.scrollIntoView({ behavior:'smooth', block:'center' });
+
+          let valRem = 7;
+          showLsCountdown(el, valRem);
+          msCountdownTimer = setInterval(() => {
+            valRem--;
+            if (valRem <= 0) {
+              clearInterval(msCountdownTimer);
+              el.classList.remove('active');
+              clearMsCountdown(el);
+              // Skip moonstone, mark as used phase
+              state.msUsed = true;
+              state.picking = false;
+              B.pendingMoonstone = null;
+              log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
+              if (checkStillAvailable()) {
+                refreshLsTile();
+                startTimer(3);
+              }
+            } else {
+              showLsCountdown(el, valRem);
+            }
+          }, 1000);
+        };
+      });
+
+      // Die-pick countdown
+      let pickRem = 5;
+      showLsCountdown(diceEl, pickRem);
+      clearInterval(msCountdownTimer);
+      msCountdownTimer = setInterval(() => {
+        pickRem--;
+        if (pickRem <= 0) {
+          clearInterval(msCountdownTimer);
+          clearMsCountdown(diceEl);
+          clearDiceClickable(team);
+          state.msUsed = true;
+          state.picking = false;
+          B.pendingMoonstone = null;
+          log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
+          if (checkStillAvailable()) {
+            refreshLsTile();
+            startTimer(3);
+          }
+        } else {
+          showLsCountdown(diceEl, pickRem);
+        }
+      }, 1000);
+  };
+
+  if (msTile) {
+    msTile.classList.add('rerollable');
+    msTile.style.cursor = 'pointer';
+    msTile.onclick = msTileClick;
+  }
+
+  // ─── Lucky Stone tile click ───
+  const lsTileClick = () => {
+    if (state.closed || state.picking) return;
+    state.picking = true;
+    clearInterval(sharedTimer); sharedTimer = null;
+    clearAllBadges();
+    const lsCur = getLsTile();
+    if (lsCur) { lsCur.classList.remove('rerollable'); lsCur.onclick = null; lsCur.style.cursor = ''; }
+
+    narrate(`<b class="${team}-text">${tLabel}</b> — pick a die to reroll!`);
+    const liveDice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+    diceEl.querySelectorAll('.die').forEach((d, i) => {
+      d.classList.add('rerollable');
+      d.onclick = () => {
+        clearLsCountdown();
+        clearDiceClickable(team);
+
+        // Perform the reroll (prevent doLuckyReroll's own chaining — we handle it here)
+        const savedAvail = B.lsAvailable ? B.lsAvailable[team] : 0;
+        if (B.lsAvailable) B.lsAvailable[team] = 0;
+
+        doLuckyReroll(team, i, liveDice, () => {
+          state.picking = false;
+          state.lsUsedCount++;
+          if (B.lsAvailable) B.lsAvailable[team] = Math.max(0, savedAvail - 1);
+          if (checkStillAvailable()) {
+            refreshLsTile();
+            // Re-activate MS tile if not used yet
+            if (!state.msUsed && B[team].resources.moonstone > 0) {
+              const msR = getMsTile();
+              if (msR) { msR.classList.add('rerollable'); msR.style.cursor = 'pointer'; msR.onclick = msTileClick; }
+            }
+            startTimer(3);
+          }
+        });
+      };
+    });
+
+    let pickRem = 3;
+    showLsCountdown(diceEl, pickRem);
+    clearInterval(lsCountdownTimer); lsCountdownTimer = null;
+    lsCountdownTimer = setInterval(() => {
+      pickRem--;
+      if (pickRem <= 0) {
+        clearInterval(lsCountdownTimer); lsCountdownTimer = null;
+        clearLsCountdown();
+        clearDiceClickable(team);
+        state.picking = false;
+        log(`<span style="color:var(--text2)">${team.toUpperCase()} didn't pick a die in time.</span>`);
+        if (checkStillAvailable()) {
+          refreshLsTile();
+          if (!state.msUsed && B[team].resources.moonstone > 0) {
+            const msR2 = getMsTile();
+            if (msR2) { msR2.classList.add('rerollable'); msR2.style.cursor = 'pointer'; msR2.onclick = msTileClick; }
+          }
+          startTimer(3);
+        }
+      } else {
+        showLsCountdown(diceEl, pickRem);
+      }
+    }, 1000);
+  };
+
+  if (lsTile) {
+    lsTile.classList.add('rerollable');
+    lsTile.style.cursor = 'pointer';
+    lsTile.onclick = lsTileClick;
+  }
+
+  // Listen for Moonstone value selection completion
+  const onMsDone = (e) => {
+    if (e.detail.team !== team || state.closed) return;
+    document.removeEventListener('unifiedMsDone', onMsDone);
+    state.msUsed = true;
+    state.picking = false;
+    renderBattle();
+    if (checkStillAvailable()) {
+      refreshLsTile();
+      startTimer(3);
+    }
+  };
+  document.addEventListener('unifiedMsDone', onMsDone);
+
+  // Start the initial shared timer
+  startTimer(5);
+}
+
+// Moonstone value picker callback for the unified specials window
+// (separate from pickMsValue to avoid interfering with the standard MS flow)
+function pickMsValueUnified(val) {
+  clearInterval(msCountdownTimer);
+  const ms = B.pendingMoonstone;
+  if (!ms) return;
+  const team = ms.team;
+  const t = B[team];
+  const f = active(t);
+
+  const el = document.getElementById('msPicker');
+  el.classList.remove('active');
+  clearMsCountdown(el);
+
+  // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
+  let magicTouchFired = false;
+  if (f.id === 203 && !f.usedMagicTouch) {
+    f.usedMagicTouch = true;
+    magicTouchFired = true;
+    showAbilityCallout('MAGIC TOUCH!', 'var(--moonstone)', `${f.name} — Moonstone used without discarding!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Magic Touch! Used Moonstone without discarding it!`);
+  } else {
+    t.resources.moonstone--;
+    playSfx('sfxSpecial', 0.5);
+  }
+
+  ms.dice[ms.dieIndex] = val;
+  ms.dice.sort((a,b)=>a-b);
+
+  if (team==='red') B.pendingResolve.redDice = ms.dice;
+  else B.pendingResolve.blueDice = ms.dice;
+  B.redDice = B.pendingResolve.redDice;
+  B.blueDice = B.pendingResolve.blueDice;
+  renderDice(B.redDice, B.blueDice);
+
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  log(`<span class="log-ms">Moonstone used!</span> ${team.toUpperCase()} changed die to ${val} → [${ms.dice.join(', ')}]`);
+  narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
+  B.pendingMoonstone = null;
+
+  // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used
+  if (f.id === 424 && !f.ko) {
+    const g = f;
+    g.originalId = g.id; g.originalName = g.name; g.originalArt = g.art;
+    g.originalMaxHp = g.maxHp; g.originalAbility = g.ability;
+    g.originalAbilityDesc = g.abilityDesc; g.originalRarity = g.rarity;
+    g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
+    g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
+    g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
+    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    renderBattle();
+  }
+
+  // Dispatch a custom event so the unified window picks up the completion
+  const msPostDelay = magicTouchFired ? 1600 : 1200;
+  setTimeout(() => {
+    document.dispatchEvent(new CustomEvent('unifiedMsDone', { detail: { team } }));
+  }, msPostDelay);
 }
 
 // ============================================================
@@ -9765,11 +10122,35 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
     narrate(`<b class="gold">Lucky Stone!</b> Rerolled ${oldVal} → <b>${newVal}</b>!`);
     renderBattle();
 
-    // If player has more Lucky Stones available, offer another use (countdown resets)
+    // If player has more Lucky Stones available, go directly to dice-pick mode
+    // (skip the tile-click step — keep the flow seamless within the same window)
     const stillAvail = B.lsAvailable ? B.lsAvailable[team] : 0;
     if (t.resources.luckyStone > 0 && stillAvail > 0) {
       B.lsAvailable[team]--;
-      setTimeout(() => startLuckyStoneWindow(team, callback), 600);
+      setTimeout(() => {
+        const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+        narrate(`<b class="${team}-text">${teamLabel}</b> has <b class="gold">${t.resources.luckyStone} Lucky Stone${t.resources.luckyStone>1?'s':''}!</b> Pick a die to reroll!`);
+        const diceElInner = document.getElementById(team + '-dice');
+        const liveDice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+        diceElInner.querySelectorAll('.die').forEach((d, i) => {
+          d.classList.add('rerollable');
+          d.onclick = () => doLuckyReroll(team, i, liveDice, callback);
+        });
+        // Brief 3s countdown for the next die pick
+        let pickRem = 3;
+        showLsCountdown(diceElInner, pickRem);
+        lsCountdownTimer = setInterval(() => {
+          pickRem--;
+          if (pickRem <= 0) {
+            clearLsCountdown();
+            clearDiceClickable(team);
+            log(`<span style="color:var(--text2)">${team.toUpperCase()} didn't pick a die in time.</span>`);
+            callback();
+          } else {
+            showLsCountdown(diceElInner, pickRem);
+          }
+        }, 1000);
+      }, 600);
     } else {
       setTimeout(callback, 600);
     }
@@ -13778,6 +14159,20 @@ function renderBattle() {
       }
     });
     prevResources[team] = newSnap;
+
+    // Persistent permanent effect badges
+    const opp_team = team === 'red' ? 'blue' : 'red';
+    let permHtml = '';
+    if (B.haywireBonus && B.haywireBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireBonus[team]} Die (Wild Chords)</div>`;
+    if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
+    if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[team]) permHtml += `<div class="permanent-buff">\u{1F5E1}\uFE0F +2 Dmg (Ice Blade)</div>`;
+    if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">\u{1F525} -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
+    if (permHtml) {
+      const permRow = document.createElement('div');
+      permRow.className = 'permanent-effects-row';
+      permRow.innerHTML = permHtml;
+      resEl.appendChild(permRow);
+    }
   });
 
   document.getElementById('turnIndicator').textContent = '';
