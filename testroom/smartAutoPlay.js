@@ -89,7 +89,6 @@ function smartPlayNext() {
     iceBladeSwing: { red: false, blue: false },
     gordokDieBonus: { red: 0, blue: 0 },
     hexDieRemoval: { red: 0, blue: 0 },
-    forestSpiritDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false }
   };
   S.battle = B;
@@ -688,9 +687,8 @@ function smartSimRounds(gameNum) {
   });
 
   // Forest Spirit (446) — Hex: AI auto-spends Burn to remove enemy dice + gain Sacred Fire per Burn spent
-  // Matches index.html doHexChoice: spend 1 Burn → -1 enemy die + +1 Sacred Fire
+  // Matches index.html useHex: spend 1 Burn → -1 enemy die + +1 Sacred Fire
   B.hexDieRemoval = { red: 0, blue: 0 };
-  B.forestSpiritDecided = { red: false, blue: false };
   ['red','blue'].forEach(teamKey => {
     const f = active(B[teamKey]);
     const oppKey = teamKey === 'red' ? 'blue' : 'red';

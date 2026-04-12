@@ -2248,7 +2248,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v693';
+const TESTROOM_VERSION = 'v694';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3175,7 +3175,6 @@ function autoPlayNext() {
     iceBladeSwing: { red: false, blue: false },
     gordokDieBonus: { red: 0, blue: 0 },
     hexDieRemoval: { red: 0, blue: 0 },
-    forestSpiritDecided: { red: false, blue: false },
   };
   S.battle = B;
 
@@ -3655,7 +3654,6 @@ function startBattle() {
     iceBladeSwing: { red: false, blue: false },
     gordokDieBonus: { red: 0, blue: 0 },
     hexDieRemoval: { red: 0, blue: 0 },
-    forestSpiritDecided: { red: false, blue: false },
   };
   S.battle = B;
   initMatchStats();
@@ -5070,35 +5068,21 @@ function doCultivateChoice(choice) {
 }
 
 // ============================================================
-// FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die
+// FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die (pre-roll button)
 // ============================================================
-function doHexChoice(choice) {
-  const hp = B.hexPending;
-  if (!hp) return;
-  B.hexPending = null;
-  document.getElementById('hexOverlay').classList.remove('active');
-  const { team, btn } = hp;
+function useHex(team) {
   const f = active(B[team]);
+  if (!f || f.id !== 446 || f.ko) return;
+  if ((B[team].resources.burn || 0) < 1) return;
+
   const oppTeamName = team === 'red' ? 'blue' : 'red';
-  if (choice === 'yes' && f && f.id === 446 && !f.ko && (B[team].resources.burn || 0) >= 1) {
-    B[team].resources.burn--;
-    B.hexDieRemoval[oppTeamName] = (B.hexDieRemoval[oppTeamName] || 0) + 1;
-    B[team].resources.fire++;
-    showAbilityCallout('HEX!', 'var(--uncommon)',
-      `${f.name} — spent 1 Burn! -1 enemy die + 1 Sacred Fire!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Hex! Spent 1 Burn → opponent loses 1 die + <span class="log-ms">+1 Sacred Fire!</span>`);
-    renderBattle();
-    // If more burn available, allow another use (re-offer after callout clears)
-    if ((B[team].resources.burn || 0) >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
-    } else {
-      B.forestSpiritDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
-    }
-  } else {
-    B.forestSpiritDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
-  }
+  B[team].resources.burn--;
+  B.hexDieRemoval[oppTeamName] = (B.hexDieRemoval[oppTeamName] || 0) + 1;
+  B[team].resources.fire = (B[team].resources.fire || 0) + 1;
+
+  showAbilityCallout('HEX!', 'var(--uncommon)', `${f.name} — -1 Burn → -1 enemy die + 1 Sacred Fire!`, team);
+  log(`<span class="log-ability">${f.name}</span> — Hex! -1 Burn → opponent -1 die + <span class="log-ms">+1 Sacred Fire!</span>`);
+  renderBattle(); // re-renders the button with updated burn count
 }
 
 // ============================================================
@@ -6629,24 +6613,7 @@ function rollReady(team) {
       }
     }
 
-    // Forest Spirit (446) — Hex: spend 1 Burn to remove 1 enemy die (interactive button)
-    {
-      const hexG = active(B[team]);
-      if (hexG && hexG.id === 446 && !hexG.ko && B.forestSpiritDecided && !B.forestSpiritDecided[team] &&
-          B[team].resources && (B[team].resources.burn || 0) >= 1) {
-        btn.classList.add('locked');
-        btn.disabled = true;
-        B.hexPending = { team, btn };
-        const hexDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-        setTimeout(() => {
-          document.getElementById('hexSub').innerHTML =
-            `Spend 1 🔥 Burn to remove 1 enemy die this roll?<br>` +
-            `(Burn: ${B[team].resources.burn || 0} | Dice removed: ${B.hexDieRemoval[team === 'red' ? 'blue' : 'red'] || 0})`;
-          document.getElementById('hexOverlay').classList.add('active');
-        }, hexDelay);
-        return;
-      }
-    }
+    // Forest Spirit (446) — Hex: now handled by pre-roll button (useHex)
 
     // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent (interactive picker)
     {
@@ -7100,17 +7067,7 @@ function openDuelPhasePrimers(team) {
     return true;
   }
 
-  // — FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die (Duel Phase)
-  if (f.id === 446 && !f.ko && B.forestSpiritDecided && !B.forestSpiritDecided[team] &&
-      B[team].resources && (B[team].resources.burn || 0) >= 1) {
-    disableDone();
-    B.hexPending = { team, btn: doneBtn };
-    document.getElementById('hexSub').innerHTML =
-      `Spend 1 🔥 Burn to remove 1 enemy die this roll?<br>` +
-      `(Burn: ${B[team].resources.burn || 0} | Dice removed: ${B.hexDieRemoval[oppTeamName] || 0})`;
-    document.getElementById('hexOverlay').classList.add('active');
-    return true;
-  }
+  // — FOREST SPIRIT (446) — Hex: now handled by pre-roll button (useHex)
 
   // — NICK & KNACK (409) — Knick Knack: steal 1 resource from opponent (Duel Phase)
   if (f.id === 409 && !f.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
@@ -7962,7 +7919,6 @@ function doPreRollSetup() {
 
   // Forest Spirit (446) — Hex: reset per round
   B.hexDieRemoval = { red: 0, blue: 0 };
-  B.forestSpiritDecided = { red: false, blue: false };
 
   // Aunt Susan (309)
   B.auntSusanBonus = { red: false, blue: false };
@@ -13824,6 +13780,10 @@ function renderBattle() {
       if (f.id === 315 && !f.ko && (B[team].resources.healingSeed > 0 || B.committed[team].harrison > 0)) {
         const cnt = B.committed[team].harrison;
         html += `<button class="ability-btn ${cnt>0?'committed':'pressure'}" onclick="toggleHarrison('${team}')" oncontextmenu="event.preventDefault();uncommitHarrison('${team}')" style="${cnt>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${cnt>0?' (+'+cnt+' dice)':''}</button>`;
+      }
+      // Mable Stadango (446) — Hex: spend Burn for die removal + Sacred Fire
+      if (f.id === 446 && !f.ko && (B[team].resources.burn || 0) >= 1) {
+        html += `<button class="ability-btn pressure" onclick="useHex('${team}')">🌿 Hex (${B[team].resources.burn} Burn)</button>`;
       }
       // Finn (204) — Flame Blade: forge button (2 Healing Seeds + 1 Sacred Fire) OR swing toggle if forged
       if (B[team].ghosts.some(g => g.id === 204 && !g.ko)) {
