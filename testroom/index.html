@@ -4321,16 +4321,18 @@ function toggleIceBlade(team) {
 function useZainForge(team) {
   if (!isPreRollActive(team)) return;
   const t = B[team];
-  const f = active(t);
-  if (f.id !== 206 || f.ko) return;
-  if (f.iceBladeForged) return; // already forged — permanent, can't re-forge
+  // Zain can forge from sideline or active — find him wherever he is
+  const zain = t.ghosts.find(g => g.id === 206 && !g.ko);
+  if (!zain) return;
+  if (zain.iceBladeForged) return; // already forged — permanent, can't re-forge
+  if (B.iceBladeForgedPermanent[team]) return;
   if (t.resources.ice < 1 || t.resources.moonstone < 1) return;
   t.resources.ice -= 1;
   t.resources.moonstone -= 1;
-  f.iceBladeForged = true;
+  zain.iceBladeForged = true;
   B.iceBladeForgedPermanent[team] = true; // permanent +2 damage for the rest of the game
-  log(`<span class="log-ability">${f.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Permanent +2 damage on ALL winning rolls for the rest of the game!`);
-  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${f.name} forges the Ice Blade — permanent +2 damage on ALL wins!`, team);
+  log(`<span class="log-ability">${zain.name}</span> — Ice Blade forged! Spent <span class="log-ice">1 Ice Shard</span> + <span class="log-ms">1 Moonstone</span>. Permanent +2 damage on ALL winning rolls for the rest of the game!`);
+  showAbilityCallout('ICE BLADE!', 'var(--ghost-rare)', `${zain.name} forges the Ice Blade — permanent +2 damage on ALL wins!`, team);
   playSfx('sfxSpecial', 0.5);
   renderBattle();
 }
