@@ -2319,11 +2319,11 @@ function smartSimRounds(gameNum) {
     }
     // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
     if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
-      wTeam.resources.moonstone++;
+      wTeam.resources.luckyStone++;
       wTeam.resources.firefly = (wTeam.resources.firefly || 0) + 1;
-      // Sandwiches mirror for Moonstone only (Fireflies are not mirrorable)
+      // Sandwiches mirror for Lucky Stone only (Fireflies are not mirrorable)
       const sandwichLose = hasSideline(lTeam, 33);
-      if (sandwichLose) { lTeam.resources.moonstone++; }
+      if (sandwichLose) { lTeam.resources.luckyStone++; }
     }
     // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section
 
