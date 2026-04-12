@@ -214,7 +214,8 @@ function smartTriggerEntry(team) {
   // Nicholas (51) — Sneak Attack: while on the enemy sideline, deal 2 damage to the entering ghost.
   // Matches index.html lines 3617–3639 (hasSideline(enemy, 51) && !f.ko → f.hp -= 2, KO check).
   // No Cornelius (45) block — index.html does not block Nicholas with Cornelius.
-  if (hasSideline(enemy, 51) && !f.ko) {
+  // Does NOT fire at battle start (round 1) — only mid-battle swaps
+  if (hasSideline(enemy, 51) && !f.ko && B.round > 1) {
     f.hp = Math.max(0, f.hp - 2);
     if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
   }
