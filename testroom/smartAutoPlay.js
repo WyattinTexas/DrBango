@@ -688,6 +688,18 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Castle Gardener (442) — Cultivate: auto-convert all Healing Seeds to Sacred Fire
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 442 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
+      const seeds = B[teamKey].resources.healingSeed;
+      B[teamKey].resources.healingSeed = 0;
+      B[teamKey].resources.fire = (B[teamKey].resources.fire || 0) + seeds;
+      // Boopies (419) sideline mirror
+      if (hasSideline(B[teamKey], 419)) B[teamKey].resources.luckyStone = (B[teamKey].resources.luckyStone || 0) + seeds;
+    }
+  });
+
   // Young Cap (429) — Energize: AI auto-heals with seeds when active (+1 HP, +1 die, +1 Ice Shard, +1 Surge per seed used)
   // Matches index.html useHealingSeed() → Energize block. AI uses 1 seed per round (same as manual play).
   ['red','blue'].forEach(teamKey => {

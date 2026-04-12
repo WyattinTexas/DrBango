@@ -1972,6 +1972,19 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire -->
+<div class="selene-overlay" id="cultivateOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#2d6a4f,#40916c);">🌱 CULTIVATE!</div>
+    <h3>Castle Gardener — Cultivate!</h3>
+    <p class="selene-sub" id="cultivateSub">Discard 1 Healing Seed for 1 Sacred Fire?</p>
+    <div class="selene-options">
+      <button class="selene-opt" onclick="doCultivateChoice('yes')" style="background:linear-gradient(135deg,#2d6a4f,#40916c);">🌱 Yes — trade seed for fire!</button>
+      <button class="selene-opt" onclick="doCultivateChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">&#10006; No — keep seeds</button>
+    </div>
+  </div>
+</div>
+
 <!-- Forest Spirit (446) — Hex: spend 1 Burn to remove 1 enemy die -->
 <div class="selene-overlay" id="hexOverlay">
   <div class="selene-modal">
@@ -2205,7 +2218,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v688';
+const TESTROOM_VERSION = 'v689';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4980,6 +4993,38 @@ function doChowChoice(choice) {
 }
 
 // ============================================================
+// CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire
+// ============================================================
+function doCultivateChoice(choice) {
+  const cp = B.cultivatePending;
+  if (!cp) return;
+  B.cultivatePending = null;
+  document.getElementById('cultivateOverlay').classList.remove('active');
+  const { team, btn } = cp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 442 && !f.ko && B[team].resources.healingSeed >= 1) {
+    B[team].resources.healingSeed--;
+    B[team].resources.fire = (B[team].resources.fire || 0) + 1;
+    // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
+    if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
+    showAbilityCallout('CULTIVATE!', 'var(--uncommon)',
+      `${f.name} — discarded 1 Healing Seed → +1 Sacred Fire!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Cultivate! Discarded 1 Healing Seed → +1 Sacred Fire!`);
+    renderBattle();
+    // If more seeds available, re-offer (repeatable)
+    if (B[team].resources.healingSeed >= 1) {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    } else {
+      B.cultivateDecided[team] = true;
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    }
+  } else {
+    B.cultivateDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+  }
+}
+
+// ============================================================
 // FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die
 // ============================================================
 function doHexChoice(choice) {
@@ -6421,6 +6466,25 @@ function rollReady(team) {
       }
     }
 
+    // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
+    {
+      const cultG = active(B[team]);
+      if (cultG && cultG.id === 442 && !cultG.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
+          B[team].resources && B[team].resources.healingSeed >= 1) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.cultivatePending = { team, btn };
+        const cultDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          document.getElementById('cultivateSub').innerHTML =
+            `Discard 1 🌱 Healing Seed for 1 🔥 Sacred Fire?<br>` +
+            `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
+          document.getElementById('cultivateOverlay').classList.add('active');
+        }, cultDelay);
+        return;
+      }
+    }
+
     // Forest Spirit (446) — Hex: spend 1 Burn to remove 1 enemy die (interactive button)
     {
       const hexG = active(B[team]);
@@ -6877,6 +6941,18 @@ function openDuelPhasePrimers(team) {
       `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
       `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
     document.getElementById('chowOverlay').classList.add('active');
+    return true;
+  }
+
+  // — CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (Duel Phase)
+  if (f.id === 442 && !f.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
+      B[team].resources && B[team].resources.healingSeed >= 1) {
+    disableDone();
+    B.cultivatePending = { team, btn: doneBtn };
+    document.getElementById('cultivateSub').innerHTML =
+      `Discard 1 🌱 Healing Seed for 1 🔥 Sacred Fire?<br>` +
+      `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
+    document.getElementById('cultivateOverlay').classList.add('active');
     return true;
   }
 
@@ -7676,6 +7752,9 @@ function doPreRollSetup() {
   // Chow (414) — Secret Ingredient: now an interactive button (see doChowChoice)
   B.chowExtraDie = { red: 0, blue: 0 };
   B.chowDecided = { red: false, blue: false };
+
+  // Castle Gardener (442) — Cultivate: reset per round
+  B.cultivateDecided = { red: false, blue: false };
 
   // Forest Spirit (446) — Hex: reset per round
   B.hexDieRemoval = { red: 0, blue: 0 };
@@ -13683,6 +13762,13 @@ function clearAllOverlays() {
   document.getElementById('wiseAlOverlay').classList.remove('active');
   document.getElementById('gordokOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
+  document.getElementById('cultivateOverlay').classList.remove('active');
+  document.getElementById('chowOverlay').classList.remove('active');
+  document.getElementById('hexOverlay').classList.remove('active');
+  document.getElementById('nickKnackOverlay').classList.remove('active');
+  document.getElementById('jasperOverlay').classList.remove('active');
+  document.getElementById('balatronOverlay').classList.remove('active');
+  document.getElementById('sylviaOverlay').classList.remove('active');
   document.getElementById('burnOverlay').classList.remove('active');
   document.getElementById('fireflyOverlay').classList.remove('active');
   document.getElementById('abilitySplash').classList.remove('active');
