@@ -3401,6 +3401,19 @@ function renderGallery() {
 // TEAM PICKS
 // ============================================================
 let pickRarityFilter = 'all';
+let pickSetFilter = 'all';
+let pickSearchFilter = '';
+
+function filterPicks(set) {
+  if (set !== undefined) {
+    pickSetFilter = set;
+    document.querySelectorAll('.set-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.set === set);
+    });
+  }
+  pickSearchFilter = (document.getElementById('pickSearch')?.value || '').toLowerCase().trim();
+  renderPicks();
+}
 
 function setRarityFilter(rarity) {
   pickRarityFilter = rarity;
@@ -3445,6 +3458,8 @@ function renderPicks() {
     const filtered = GHOSTS.filter(g => !SHELVED_IDS.has(g.id))
       .filter(g => !isOriginalSet(g.set) || visibleOriginalSets.has(g.set))
       .filter(g => pickRarityFilter === 'all' || g.rarity === pickRarityFilter)
+      .filter(g => pickSetFilter === 'all' || g.set === pickSetFilter)
+      .filter(g => !pickSearchFilter || g.name.toLowerCase().includes(pickSearchFilter))
       .sort(sortBySetThenRarity);
     let pickHtml = '';
     let lastPickSet = null;
@@ -5949,7 +5964,7 @@ function doDarkWingChoice(choice) {
 // ============================================================
 // Tommy Salami (30) — Regulator: when Tommy rolls a 6, gain +1 bonus die rolled immediately.
 // Chains as long as bonus dice keep rolling 6s. Fires BEFORE Drizzle in the post-roll chain.
-// Modifies Tommy's own dice array, then updates B.redDice/B.blueDice and re-renders.
+// Interactive modal version: each 6 triggers a click-to-roll bonus die. Chains on 6s.
 // B.tommyRegulatorBonus[team] stores total bonus dice added (used for callouts/log only).
 function checkTommyRegulator(continuation) {
   const rF = active(B.red), bF = active(B.blue);
@@ -5961,32 +5976,130 @@ function checkTommyRegulator(continuation) {
   const tommyDice = B.preRoll[tommyTeamName].dice;
   if (!tommyDice || tommyDice.length === 0) { continuation(); return; }
   // Count 6s in Tommy's initial roll
-  let newSixes = tommyDice.filter(d => d === 6).length;
-  let totalBonus = 0;
-  while (newSixes > 0) {
-    const bonusDice = [];
-    for (let i = 0; i < newSixes; i++) {
-      bonusDice.push(Math.floor(Math.random() * 6) + 1);
+  const initialSixes = tommyDice.filter(d => d === 6).length;
+  if (initialSixes === 0) { continuation(); return; }
+
+  // AutoPlay: silent auto-roll (AI doesn't need the modal)
+  if (autoPlayRunning) {
+    let newSixes = initialSixes;
+    let totalBonus = 0;
+    while (newSixes > 0) {
+      const bonusDice = [];
+      for (let i = 0; i < newSixes; i++) {
+        bonusDice.push(Math.floor(Math.random() * 6) + 1);
+      }
+      tommyDice.push(...bonusDice);
+      totalBonus += bonusDice.length;
+      newSixes = bonusDice.filter(d => d === 6).length;
     }
-    tommyDice.push(...bonusDice);
-    totalBonus += bonusDice.length;
-    newSixes = bonusDice.filter(d => d === 6).length; // chain on new 6s
-  }
-  if (totalBonus > 0) {
-    B.tommyRegulatorBonus[tommyTeamName] = totalBonus;
-    tommyDice.sort((a, b) => a - b);
-    // Update the main dice arrays
-    if (tommyTeamName === 'red') { B.redDice = tommyDice; }
-    else { B.blueDice = tommyDice; }
-    renderDice(B.redDice, B.blueDice);
-    renderBattle();
-    showAbilityCallout('REGULATOR!', 'var(--common)',
-      `${tommyF.name} — Rolled 6s! +${totalBonus} bonus dice! Now rolling [${tommyDice.join(', ')}]`, tommyTeamName);
-    log(`<span class="log-ability">${tommyF.name}</span> — Regulator! Rolled 6s → +${totalBonus} bonus dice! [${tommyDice.join(', ')}]`);
-    setTimeout(() => { continuation(); }, 1200);
-  } else {
+    if (totalBonus > 0) {
+      B.tommyRegulatorBonus[tommyTeamName] = totalBonus;
+      tommyDice.sort((a, b) => a - b);
+      if (tommyTeamName === 'red') { B.redDice = tommyDice; }
+      else { B.blueDice = tommyDice; }
+      renderDice(B.redDice, B.blueDice);
+      renderBattle();
+    }
     continuation();
+    return;
   }
+
+  // Interactive modal: chain one die at a time
+  B.tommyChainPending = {
+    team: tommyTeamName,
+    dice: tommyDice,
+    pendingSixes: initialSixes,
+    totalBonus: 0,
+    tommyF: tommyF,
+    continuation: continuation
+  };
+  // Show modal
+  const sub = document.getElementById('tommySub');
+  sub.textContent = `You rolled ${initialSixes} six${initialSixes > 1 ? 'es' : ''}! Roll a bonus die!`;
+  const dieEl = document.getElementById('tommyDieDisplay');
+  dieEl.textContent = '🎲';
+  const btn = document.getElementById('tommyRollBtn');
+  btn.disabled = false;
+  btn.textContent = '🎲 Roll the Bonus Die!';
+  document.getElementById('tommyOverlay').classList.add('active');
+}
+
+function doTommyRoll() {
+  const btn = document.getElementById('tommyRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+
+  const tp = B.tommyChainPending;
+  if (!tp) return;
+
+  const finalValue = Math.floor(Math.random() * 6) + 1;
+  const dieEl = document.getElementById('tommyDieDisplay');
+
+  // Shuffle animation: cycle through random values for ~600ms then land
+  let ticks = 0;
+  const totalTicks = 10;
+  const tickMs = 60;
+  const shuffle = setInterval(() => {
+    ticks++;
+    dieEl.textContent = String(Math.floor(Math.random() * 6) + 1);
+    dieEl.style.transform = `rotate(${ticks * 36}deg)`;
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      dieEl.textContent = String(finalValue);
+      dieEl.style.transform = 'rotate(0deg) scale(1.3)';
+      setTimeout(() => { dieEl.style.transform = 'rotate(0deg) scale(1)'; }, 200);
+
+      // Add die to Tommy's array
+      tp.dice.push(finalValue);
+      tp.totalBonus++;
+      tp.pendingSixes--;
+
+      if (finalValue === 6) {
+        // Chain continues! This 6 adds another pending roll
+        tp.pendingSixes++;
+      }
+
+      const sub = document.getElementById('tommySub');
+      if (tp.pendingSixes > 0) {
+        // More rolls to do
+        if (finalValue === 6) {
+          sub.innerHTML = `<b>ANOTHER 6!</b> +${tp.totalBonus} bonus dice so far! Keep rolling!`;
+        } else {
+          sub.innerHTML = `Rolled a ${finalValue}! +${tp.totalBonus} bonus dice so far! ${tp.pendingSixes} more to roll!`;
+        }
+        btn.disabled = false;
+        btn.textContent = '🎲 Roll the Bonus Die!';
+      } else {
+        // Chain ends
+        if (finalValue === 6) {
+          sub.innerHTML = `<b>ANOTHER 6!</b> +${tp.totalBonus} bonus dice total! Chain complete!`;
+        } else {
+          sub.innerHTML = `Rolled a ${finalValue}! Chain ends! <b>+${tp.totalBonus} bonus dice total!</b>`;
+        }
+        // Close modal after delay and finalize
+        setTimeout(() => { finishTommyChain(); }, 1000);
+      }
+    }
+  }, tickMs);
+}
+
+function finishTommyChain() {
+  const tp = B.tommyChainPending;
+  if (!tp) return;
+  B.tommyChainPending = null;
+  document.getElementById('tommyOverlay').classList.remove('active');
+
+  const { team, dice, totalBonus, tommyF, continuation } = tp;
+  B.tommyRegulatorBonus[team] = totalBonus;
+  dice.sort((a, b) => a - b);
+  if (team === 'red') { B.redDice = dice; }
+  else { B.blueDice = dice; }
+  renderDice(B.redDice, B.blueDice);
+  renderBattle();
+  showAbilityCallout('REGULATOR!', 'var(--common)',
+    `${tommyF.name} — Rolled 6s! +${totalBonus} bonus dice! Now rolling [${dice.join(', ')}]`, team);
+  log(`<span class="log-ability">${tommyF.name}</span> — Regulator! Rolled 6s → +${totalBonus} bonus dice! [${dice.join(', ')}]`);
+  setTimeout(() => { continuation(); }, 800);
 }
 
 // ============================================================
@@ -13879,6 +13992,7 @@ function clearAllOverlays() {
   document.getElementById('nickKnackOverlay').classList.remove('active');
   document.getElementById('jasperOverlay').classList.remove('active');
   document.getElementById('balatronOverlay').classList.remove('active');
+  document.getElementById('tommyOverlay').classList.remove('active');
   document.getElementById('sylviaOverlay').classList.remove('active');
   document.getElementById('burnOverlay').classList.remove('active');
   document.getElementById('fireflyOverlay').classList.remove('active');
