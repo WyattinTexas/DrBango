@@ -2196,7 +2196,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v684';
+const TESTROOM_VERSION = 'v685';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3840,23 +3840,23 @@ function triggerEntry(team, skipEntryEffects) {
     collectKnightReactions();
   }
 
-  // Castle Guide (420) — Light the Way: entry → +1 Surge, +1 Lucky Stone, auto-place 1 Burn
+  // Lars (420) — Light the Way: entry → +1 Surge, +1 Lucky Stone, +1 Burn (as resource — player clicks to place)
   if (f.id === 420) {
     team.resources.surge++;
     team.resources.luckyStone++;
-    entryCallouts.push(['LIGHT THE WAY!', 'var(--uncommon)', `${f.name} — Entry! +1 Surge, +1 Lucky Stone!`, entryTeamName]);
-    log(`<span class="log-ability">${f.name}</span> — Light the Way! <span class="log-ms">+1 Surge, +1 Lucky Stone!</span>`);
-    // Auto-place 1 Burn on a random non-KO'd enemy sideline ghost
-    const enemyTeamName = entryTeamName === 'red' ? 'blue' : 'red';
-    const enemySideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
-    if (enemySideline.length > 0) {
-      const burnTarget = enemySideline[Math.floor(Math.random() * enemySideline.length)];
-      const burnIdx = enemy.ghosts.indexOf(burnTarget);
-      if (!B.burn) B.burn = { red: {}, blue: {} };
-      B.burn[enemyTeamName][burnIdx] = (B.burn[enemyTeamName][burnIdx] || 0) + 1;
-      entryCallouts.push(['BURN!', 'var(--rare)', `${f.name} places Burn on ${burnTarget.name}! (${B.burn[enemyTeamName][burnIdx]} total)`, entryTeamName]);
-      log(`<span class="log-ability">${f.name}</span> — Burn placed on <span class="log-dmg">${burnTarget.name}!</span>`);
-    }
+    if (!team.resources.burn) team.resources.burn = 0;
+    team.resources.burn++;
+    entryCallouts.push(['LIGHT THE WAY!', 'var(--uncommon)', `${f.name} — Entry! +1 Surge, +1 Lucky Stone, +1 Burn!`, entryTeamName]);
+    log(`<span class="log-ability">${f.name}</span> — Light the Way! <span class="log-ms">+1 Surge, +1 Lucky Stone, +1 Burn!</span>`);
+    collectKnightReactions();
+  }
+
+  // Rascals (437) — Stampede: Entry → gain 3 Burn
+  if (f.id === 437 && !f.ko) {
+    if (!team.resources.burn) team.resources.burn = 0;
+    team.resources.burn += 3;
+    entryCallouts.push(['STAMPEDE!', 'var(--common)', `${f.name} — Entry! +3 Burn!`, entryTeamName]);
+    log(`<span class="log-ability">${f.name}</span> — Stampede! Entry → <span class="log-dmg">+3 Burn!</span>`);
     collectKnightReactions();
   }
 
@@ -8416,38 +8416,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Rascals (437) — Stampede: after rolling, gain 2 Burn
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tNameRas = team === B.red ? 'red' : 'blue';
-    if (f.id === 437 && !f.ko) {
-      const _rasTeam = team;
-      queueAbility('STAMPEDE!', 'var(--common)', `${f.name} — Stampede! +2 Burn!`, () => {
-        if (!_rasTeam.resources.burn) _rasTeam.resources.burn = 0;
-        _rasTeam.resources.burn += 2;
-        log(`<span class="log-ability">${f.name}</span> — Stampede! +2 Burn!`);
-        renderBattle();
-      }, tNameRas);
-      checkKnightEffects(tNameRas, f.name);
-    }
-  });
-
-  // Gom Gom Gom (440) — Spark: doubles → gain 1 Sacred Fire
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const dice = team === B.red ? redDice : blueDice;
-    const tNameGom = team === B.red ? 'red' : 'blue';
-    if (f.id === 440 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(dice).type)) {
-      const _gomTeam = team;
-      const _gomName = f.name;
-      queueAbility('SPARK!', 'var(--common)', `${f.name} — Doubles! +1 Sacred Fire!`, () => {
-        _gomTeam.resources.fire++;
-        log(`<span class="log-ability">${_gomName}</span> — Spark! Doubles → gained <span class="log-ms">1 Sacred Fire</span>!`);
-        renderBattle();
-      }, tNameGom);
-      checkKnightEffects(tNameGom, f.name);
-    }
-  });
+  // Gom Gom Gom (440) — REMOVED from post-roll (moved to WIN-path only in v685)
 
   // Captain James (443) — Final Strike: triples+ → gain 2 Sacred Fires (win or lose)
   [B.red, B.blue].forEach(team => {
@@ -10371,15 +10340,26 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
   }
 
-  // Lucy (108) — Blue Fire: winning sets a pending 1-damage tick on the opponent's
-  // active ghost that fires at the start of their next roll (pre-roll phase).
-  // The damage is NOT bundled with this roll's dmg — it arrives as a separate beat.
   // Lucy (108) — Blue Fire: Win → gain 1 Sacred Fire (REWORKED 2026-04-12, swapped with Humar)
   let lucyTriggered = false;
+  let lucyShadowExtraFire = false;
   if (wF.id === 108 && !wF.ko) {
     lucyTriggered = true;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Blue Fire! Gain <span class="log-ms">1 Sacred Fire</span>!`);
+    // Lucy's Shadow (439) — Mentor: +1 extra Sacred Fire when Lucy wins
+    if (hasSideline(winTeam, 439)) {
+      lucyShadowExtraFire = true;
+      log(`<span class="log-ability">Lucy's Shadow</span> — Mentor! +1 extra Sacred Fire!`);
+    }
+  }
+
+  // Gom Gom Gom (440) — Chaos: Win with doubles → gain 1 Sacred Fire (v685: moved from post-roll to win-path only)
+  let gomTriggered = false;
+  if (wF.id === 440 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
+    gomTriggered = true;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Chaos! Win with doubles → <span class="log-ms">+1 Sacred Fire</span>!`);
   }
 
   // Humar (336) — Meteor: Win → opponent takes 2 damage before next roll + gain 1 Burn (was Lucy's old ability, buffed 1→2 dmg)
