@@ -2432,9 +2432,9 @@ const GHOSTS = [
   {id:432, name:"Valkin the Grand", rarity:"legendary", maxHp:8, art:"art/originals/ValkinTheGrand.png", ability:"Grand Spoils", abilityDesc:"When you KO an enemy ghost: gain 1 Sacred Fire, 2 Ice Shards, 1 Lucky Stone, 1 Moonstone, 2 Healing Seeds.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"THE ANTAGONIST LEGENDARY. Valkin the Grand is the main villain of the BOO: Battle of Origins lore — the tyrant who trapped Toby's grandfather and seeks to control the BOO itself. Grand Spoils embodies his greed: every KO pays him the full resource suite. 6 HP is modest-legendary so the snowball has to be earned. Art: Gemini-generated regal spirit monarch on a blue-flame throne. NOTE: this slot previously held Vela (Second Breath resurrection mechanic) — resolver code at lines ~10776 and smartAutoPlay ~1759 still references id 432 for Vela's resurrection trigger. Needs cleanup: either reassign Vela to a new ID or remove the resurrection hook from id 432."},
   {id:433, name:"Lucas", rarity:"rare", maxHp:5, art:"art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: When a ghost is revived, it charges into play with +3 HP and +1 die next roll. The reviver steps to the sideline.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
   {id:435, name:"Willow", rarity:"ghost-rare", maxHp:4, art:"art/originals/Willow.png", ability:"Joy of Painting", abilityDesc:"Sideline & In Play: gain +1 die if you lost the last roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"A ghost painter at her easel by a moonlit window. Paints through the night, finds joy in every loss. The comeback mechanic — every defeat fuels the next roll. Bob Ross energy meets Dark Castle. 4HP ghost-rare, fragile but inspiring."},
-  {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Royal Decree", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
+  {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Bounty", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
   {id:437, name:"Rascals", rarity:"common", maxHp:3, art:"art/originals/Rascals.png", ability:"Stampede", abilityDesc:"After you roll: gain 2 Burn.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Four tiny colorful imp fiends — purple, red, orange, blue — racing through a gorgeous ornate castle hallway. Pure chaos energy. A pack card. The common troublemakers of the Dark Castle."},
-  {id:443, name:"Simon", rarity:"rare", maxHp:6, art:"art/originals/DCKnight.png", ability:"Final Strike", abilityDesc:"Roll: if your dice pool shows four of a kind, you win the game.", category:"Destruction/Instant Kill", set:"Dark Castle", tags:["Final 50"], designNote:"Tall flame-headed Spiritkin knight in white-gold armor with golden scarf, holding blue magic. The hero of Dark Castle. Likable, heroic, aspirational."},
+  {id:443, name:"James", rarity:"rare", maxHp:6, art:"art/originals/DCKnight.png", ability:"Final Strike", abilityDesc:"Roll: if your dice pool shows four of a kind, you win the game.", category:"Destruction/Instant Kill", set:"Dark Castle", tags:["Final 50"], designNote:"Tall flame-headed Spiritkin knight in white-gold armor with golden scarf, holding blue magic. The hero of Dark Castle. Likable, heroic, aspirational."},
   {id:442, name:"Gardener", rarity:"common", maxHp:2, art:"art/originals/Gardener.png", ability:"Cultivate", abilityDesc:"Before rolling: you may discard Healing Seeds to gain 1 Sacred Fire each.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A tiny innocent spirit with a watering can tending glowing crystal flowers in a secret castle garden. Converts Healing Seeds into Sacred Fire — the garden fuels the flames. 2HP glass cannon resource converter."},
   {id:440, name:"Gom Gom Gom", rarity:"common", maxHp:5, art:"art/originals/DCFlameball.png", ability:"Spark", abilityDesc:"Roll: when you roll doubles, gain 1 Sacred Fire.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Angry blue flame ball fiend in a castle corridor. Jagged teeth, menacing glow. Classic Dark Castle common."},
   {id:441, name:"Wendy", rarity:"rare", maxHp:5, art:"art/originals/DCMoonDragon.png", ability:"Moonbeam", abilityDesc:"Win with doubles or better: gain 1 Moonstone and 1 Magic Firefly.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Cute pale lavender dragon floating by a full moon over castle spires. Gentle, beautiful, moonlit. Dark Castle rare."},
@@ -10055,9 +10055,15 @@ function _resolveRoundImpl() {
     abilityQueue = savedQ; abilityQueueMode = savedM;
   };
 
+  // Champ (438) — Overpower (A): immune to damage from Specials (committed resources)
+  const champImmuneToSpecials = lF.id === 438 && !lF.ko;
+  if (champImmuneToSpecials && (B.committed[winTeamName].ice > 0 || B.committed[winTeamName].fire > 0 || B.committed[winTeamName].surge > 0)) {
+    log(`<span class="log-ability">${lF.name}</span> — Overpower! Immune to all committed resource damage!`);
+  }
+
   // Committed Ice Shards: +1 per shard (Skylar Winter Barrage: +2 each)
   let skylarTriggered = false;
-  if (B.committed[winTeamName].ice > 0) {
+  if (B.committed[winTeamName].ice > 0 && !champImmuneToSpecials) {
     const skylarActive = wF.id === 104 && !wF.ko;
     const perShard = skylarActive ? 2 : 1;
     const iceDmg = B.committed[winTeamName].ice * perShard;
@@ -10071,7 +10077,7 @@ function _resolveRoundImpl() {
   // Committed Sacred Fires: +3 per fire (Tyler 105 Heating Up: ×2 = +6 per fire)
   // Rook (416) — Charcoal: immune to Sacred Fire damage when Rook is the LOSER/target
   let tylerFireTriggered = false;
-  if (B.committed[winTeamName].fire > 0 && lF.id !== 416) {
+  if (B.committed[winTeamName].fire > 0 && lF.id !== 416 && !champImmuneToSpecials) {
     const tylerWins = wF.id === 105 && !wF.ko;
     const perFire = tylerWins ? 6 : 3;
     const fireDmg = B.committed[winTeamName].fire * perFire;
@@ -10089,15 +10095,15 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Charcoal! Immune to Sacred Fire damage!`);
   }
 
-  // Aunt Susan (309) — +2 damage per seed committed
-  if (B.auntSusanBonus[winTeamName] > 0) {
+  // Aunt Susan (309) — +2 damage per seed committed (also blocked by Champ Overpower)
+  if (B.auntSusanBonus[winTeamName] > 0 && !champImmuneToSpecials) {
     const susanDmg = B.auntSusanBonus[winTeamName] * 2;
     dmg += susanDmg;
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
   }
 
-  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round
-  if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0) {
+  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round (also blocked by Champ Overpower)
+  if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0 && !champImmuneToSpecials) {
     const rookSurgeDmg = B.committed[winTeamName].surge;
     dmg += rookSurgeDmg;
     collectKC(winTeamName, wF.name);
@@ -11985,6 +11991,23 @@ function _resolveRoundImpl() {
   }
 
   // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section (before rolling, gain Lucky Stones for Healing Seeds held)
+
+  // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
+  if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
+    const _starWTeam = winTeam;
+    const _starSandOpp = opp(winTeam);
+    queueAbility('MOONBEAM!', 'var(--rare)', `${wF.name} — Doubles+ Win! +1 Moonstone + 1 Magic Firefly!`, () => {
+      _starWTeam.resources.moonstone++;
+      _starWTeam.resources.firefly = (_starWTeam.resources.firefly || 0) + 1;
+      log(`<span class="log-ability">${wF.name}</span> — Moonbeam! +1 Moonstone + 1 Magic Firefly!`);
+      renderBattle();
+    }, winTeamName);
+    checkKnightEffects(winTeamName, wF.name);
+    // Sandwiches mirror for Moonstone only (Fireflies are not mirrorable)
+    if (sandwichForLose) {
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Moonbeam! +1 Moonstone!`, () => { _starSandOpp.resources.moonstone++; renderBattle(); }, loseTeamName);
+    }
+  }
 
   // Gordok (430) — River Terror: callout for steal (logic applied pre-damage) — only for autoPlay (human uses modal)
   if (gordokStole && !B.gordokPending) {
