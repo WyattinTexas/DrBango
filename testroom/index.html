@@ -2605,7 +2605,7 @@ const GHOSTS = [
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Dice cap."},
   {id:28, name:"Dream Cat", rarity:"common", maxHp:4, art:"art/originals/dream_cat.jpg", ability:"Jinx", abilityDesc:"Both roll doubles: gain +1 die next turn.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Mutual doubles reward."},
   {id:29, name:"Sad Sal", rarity:"common", maxHp:5, art:"art/originals/sad_sal.jpg", ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Loss-triggered resources."},
-  {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6, gain +1 die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Enemy high-die suppression."},
+  {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6, gain +1 die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Chain-6s bonus dice."},
   {id:31, name:"Gus", rarity:"common", maxHp:7, art:"art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"If you win a roll, you may force your opponent to choose a different ghost from their sideline instead of dealing damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Win-to-swap instead of damage."},
   {id:32, name:"Lou", rarity:"common", maxHp:7, art:"art/originals/lou.jpg", ability:"Bros", abilityDesc:"While on the sideline, Grawr gains +1 Damage and +1 Health on Winning Rolls.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Grawr synergy."},
   {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"While on the sideline, if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
@@ -5872,39 +5872,42 @@ function doDarkWingChoice(choice) {
 // Fires before Dark Wing in the post-roll chain.
 // Uses in-place splice/mutation so the postRollDone closure captures the new values.
 // ============================================================
-// Tommy Salami (30) — Regulator: post-roll dice mutation — rerolls opponent's 5s and 6s to low values (1-4).
-// Fires BEFORE Drizzle in the post-roll chain so Tommy's suppressed dice can't become 1s that Drizzle then rerolls separately.
-// Stores the reroll count in B.tommyRegulatorBonus[team] so resolveRound can apply +1 damage per regulated die when Tommy wins.
+// Tommy Salami (30) — Regulator: when Tommy rolls a 6, gain +1 bonus die rolled immediately.
+// Chains as long as bonus dice keep rolling 6s. Fires BEFORE Drizzle in the post-roll chain.
+// Modifies Tommy's own dice array, then updates B.redDice/B.blueDice and re-renders.
+// B.tommyRegulatorBonus[team] stores total bonus dice added (used for callouts/log only).
 function checkTommyRegulator(continuation) {
   const rF = active(B.red), bF = active(B.blue);
   const tommyTeamName = (rF && rF.id === 30 && !rF.ko) ? 'red' : (bF && bF.id === 30 && !bF.ko) ? 'blue' : null;
   // Reset bonus both teams each round regardless of whether Tommy is active
   if (B.tommyRegulatorBonus) { B.tommyRegulatorBonus.red = 0; B.tommyRegulatorBonus.blue = 0; }
   if (!tommyTeamName) { continuation(); return; }
-  const oppTeamName = tommyTeamName === 'red' ? 'blue' : 'red';
   const tommyF = tommyTeamName === 'red' ? rF : bF;
-  const oppPreRoll = B.preRoll[oppTeamName].dice;
-  if (!oppPreRoll || oppPreRoll.length === 0) { continuation(); return; }
-  let regulated = 0;
-  for (let i = 0; i < oppPreRoll.length; i++) {
-    if (oppPreRoll[i] === 5 || oppPreRoll[i] === 6) {
-      regulated++;
-      // Weighted low: 30% → 1, 25% → 2, 15% → 3, 30% → 4 (mirrors boobattles applyRegulator)
-      const r = Math.random();
-      oppPreRoll[i] = r < 0.30 ? 1 : r < 0.55 ? 2 : r < 0.70 ? 3 : 4;
+  const tommyDice = B.preRoll[tommyTeamName].dice;
+  if (!tommyDice || tommyDice.length === 0) { continuation(); return; }
+  // Count 6s in Tommy's initial roll
+  let newSixes = tommyDice.filter(d => d === 6).length;
+  let totalBonus = 0;
+  while (newSixes > 0) {
+    const bonusDice = [];
+    for (let i = 0; i < newSixes; i++) {
+      bonusDice.push(Math.floor(Math.random() * 6) + 1);
     }
+    tommyDice.push(...bonusDice);
+    totalBonus += bonusDice.length;
+    newSixes = bonusDice.filter(d => d === 6).length; // chain on new 6s
   }
-  oppPreRoll.sort((a, b) => a - b);
-  if (oppTeamName === 'red') { B.redDice = B.preRoll.red.dice; }
-  else { B.blueDice = B.preRoll.blue.dice; }
-  renderDice(B.redDice, B.blueDice);
-  renderBattle();
-  if (regulated > 0) {
-    B.tommyRegulatorBonus[tommyTeamName] = regulated;
-    const newDiceStr = (oppTeamName === 'red' ? B.redDice : B.blueDice).join(', ');
+  if (totalBonus > 0) {
+    B.tommyRegulatorBonus[tommyTeamName] = totalBonus;
+    tommyDice.sort((a, b) => a - b);
+    // Update the main dice arrays
+    if (tommyTeamName === 'red') { B.redDice = tommyDice; }
+    else { B.blueDice = tommyDice; }
+    renderDice(B.redDice, B.blueDice);
+    renderBattle();
     showAbilityCallout('REGULATOR!', 'var(--common)',
-      `${tommyF.name} — ${regulated} die${regulated > 1 ? 's' : ''} forced low! Opponent now rolling: [${newDiceStr}]`, tommyTeamName);
-    log(`<span class="log-ability">${tommyF.name}</span> — Regulator! ${regulated} opponent die${regulated > 1 ? 's' : ''} (5/6) forced low before roll resolves.`);
+      `${tommyF.name} — Rolled 6s! +${totalBonus} bonus dice! Now rolling [${tommyDice.join(', ')}]`, tommyTeamName);
+    log(`<span class="log-ability">${tommyF.name}</span> — Regulator! Rolled 6s → +${totalBonus} bonus dice! [${tommyDice.join(', ')}]`);
     setTimeout(() => { continuation(); }, 1200);
   } else {
     continuation();
@@ -10544,21 +10547,13 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Chase! Greg has ${wF.hp} HP vs enemy ${lF.hp} HP → 2X damage!`);
   }
 
-  // Tommy Salami (30) — Regulator: the opponent's 5s/6s were already force-rerolled low in checkTommyRegulator
-  // (post-roll chain, before winner determination). B.tommyRegulatorBonus[winTeamName] holds the count.
-  // +1 bonus damage per regulated die IF Tommy won — dice in loseDice are already mutated (no 5/6 left there).
+  // Tommy Salami (30) — Regulator: bonus dice from chain-6s were already added in checkTommyRegulator.
+  // No win-path damage bonus — the extra dice ARE the benefit (more dice = higher hand type / more damage).
   let tommyTriggered = false;
-  let tommyBaseDmg = 0;
-  let tommyRegulatedCount = 0;
-  if (wF.id === 30 && !wF.ko) {
-    tommyRegulatedCount = (B.tommyRegulatorBonus && B.tommyRegulatorBonus[winTeamName]) || 0;
-    if (tommyRegulatedCount > 0) {
-      tommyBaseDmg = dmg;
-      dmg += tommyRegulatedCount;
-      tommyTriggered = true;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Regulator! ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} were suppressed → +${tommyRegulatedCount} damage!`);
-    }
+  let tommyRegulatedCount = (B.tommyRegulatorBonus && B.tommyRegulatorBonus[winTeamName]) || 0;
+  if (wF.id === 30 && !wF.ko && tommyRegulatedCount > 0) {
+    tommyTriggered = true;
+    collectKC(winTeamName, wF.name);
   }
 
   // Romy (114) — Valley Guardian: if prediction matches any winning die, +3 damage
@@ -11654,7 +11649,7 @@ function _resolveRoundImpl() {
     queueAbility('CHASE!', 'var(--uncommon)', `${wF.name} — More HP than ${lF.name}! (${wF.hp} vs ${lF.hp}) ${gregBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);
   }
   if (tommyTriggered) {
-    queueAbility('REGULATOR!', 'var(--common)', `${wF.name} — ${tommyRegulatedCount} die${tommyRegulatedCount>1?'s':''} regulated! ${tommyBaseDmg} + ${tommyRegulatedCount} = ${dmg} damage!`, null, winTeamName);
+    queueAbility('REGULATOR!', 'var(--common)', `${wF.name} — Rolled 6s! +${tommyRegulatedCount} bonus dice added!`, null, winTeamName);
   }
   if (growingMobTriggered) {
     const growingMobGhost = wF; // safe closure reference

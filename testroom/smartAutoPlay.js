@@ -89,7 +89,8 @@ function smartPlayNext() {
     iceBladeSwing: { red: false, blue: false },
     gordokDieBonus: { red: 0, blue: 0 },
     hexDieRemoval: { red: 0, blue: 0 },
-    forestSpiritDecided: { red: false, blue: false }
+    forestSpiritDecided: { red: false, blue: false },
+    willowLostLast: { red: false, blue: false }
   };
   S.battle = B;
 
@@ -661,7 +662,8 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Forest Spirit (446) — Hex: AI auto-spends Burn to remove enemy dice (if opponent has 4+ dice base)
+  // Forest Spirit (446) — Hex: AI auto-spends Burn to remove enemy dice + gain Sacred Fire per Burn spent
+  // Matches index.html doHexChoice: spend 1 Burn → -1 enemy die + +1 Sacred Fire
   B.hexDieRemoval = { red: 0, blue: 0 };
   B.forestSpiritDecided = { red: false, blue: false };
   ['red','blue'].forEach(teamKey => {
@@ -672,6 +674,7 @@ function smartSimRounds(gameNum) {
       const burnToSpend = B[teamKey].resources.burn;
       B[teamKey].resources.burn = 0;
       B.hexDieRemoval[oppKey] = (B.hexDieRemoval[oppKey] || 0) + burnToSpend;
+      B[teamKey].resources.fire += burnToSpend; // +1 Sacred Fire per Burn spent
     }
   });
 
@@ -1102,6 +1105,16 @@ function smartSimRounds(gameNum) {
       B.dreamCatBonus[tName] = 0;
     }
   });
+  // Willow (435) — Joy of Painting: Sideline & In Play: +1 die if you lost the last roll
+  // Matches index.html lines 8044–8057. willowLostLast[team] set in win/loss/tie paths below.
+  ['red','blue'].forEach(tName => {
+    const _wf = active(B[tName]);
+    const hasWillowActive = _wf.id === 435 && !_wf.ko;
+    const hasWillowSideline = hasSideline(B[tName], 435);
+    if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tName]) {
+      if (tName === 'red') redCount++; else blueCount++;
+    }
+  });
   // Haywire (78) — WILD CHORDS!: permanent +1 die bonus added every round once triggered (never consumed/cleared).
   // Mirrors index.html lines 7057–7058: `if (haywireBonus.red > 0) redCount += haywireBonus.red` (permanent, not reset).
   if ((B.haywireBonus.red || 0) > 0) redCount += B.haywireBonus.red;
@@ -1230,26 +1243,30 @@ function smartSimRounds(gameNum) {
     B.darkWingUsedThisGame[teamKey] = true;
   });
 
-  // Tommy Salami (30) — REGULATOR!: after dice are rolled (and Dark Wing rerolled), if Tommy is active,
-  // mutate ALL of the opponent's 5s and 6s to low values (1-4 weighted). Store regulated count in
-  // B.tommyRegulatorBonus[tommyTeam] — win-path damage block adds +1 dmg per regulated die if Tommy wins.
-  // Reset both teams' bonus each round regardless of whether Tommy fired. Matches index.html checkTommyRegulator (lines 5163–5196).
+  // Tommy Salami (30) — REGULATOR!: when Tommy rolls a 6, gain +1 bonus die rolled immediately.
+  // Chains as long as bonus dice keep rolling 6s. Modifies Tommy's own dice array.
+  // B.tommyRegulatorBonus[tommyTeam] stores total bonus dice added (for callouts only, no win-path damage).
+  // Matches index.html checkTommyRegulator.
   B.tommyRegulatorBonus.red = 0; B.tommyRegulatorBonus.blue = 0;
   ['red','blue'].forEach(tKey => {
     const tF = active(B[tKey]);
     if (tF.id !== 30 || tF.ko) return;
-    const oppKey = tKey === 'red' ? 'blue' : 'red';
-    const oppDice = oppKey === 'red' ? redDice : blueDice;
-    let regulated = 0;
-    for (let i = 0; i < oppDice.length; i++) {
-      if (oppDice[i] === 5 || oppDice[i] === 6) {
-        regulated++;
-        const r = Math.random();
-        oppDice[i] = r < 0.30 ? 1 : r < 0.55 ? 2 : r < 0.70 ? 3 : 4;
+    const tommyDice = tKey === 'red' ? redDice : blueDice;
+    let newSixes = tommyDice.filter(d => d === 6).length;
+    let totalBonus = 0;
+    while (newSixes > 0) {
+      const bonusDice = [];
+      for (let i = 0; i < newSixes; i++) {
+        bonusDice.push(Math.floor(Math.random() * 6) + 1);
       }
+      tommyDice.push(...bonusDice);
+      totalBonus += bonusDice.length;
+      newSixes = bonusDice.filter(d => d === 6).length;
     }
-    oppDice.sort((a, b) => a - b);
-    B.tommyRegulatorBonus[tKey] = regulated;
+    if (totalBonus > 0) {
+      tommyDice.sort((a, b) => a - b);
+      B.tommyRegulatorBonus[tKey] = totalBonus;
+    }
   });
 
   // Jackson (50) — Regrow: after rolling (and Dark Wing reroll + Tommy mutation), may spend 1 HP to reroll
@@ -1463,8 +1480,8 @@ function smartSimRounds(gameNum) {
         }
       }
     });
-    // Goob Party (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 of every resource
-    // Fire once even if both teams have Goob Party
+    // Goob Party (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 Magic Firefly
+    // Fire once even if both teams have Goob Party. Matches index.html tie-path Goob Party block.
     {
       let goobFired = false;
       ['red','blue'].forEach(teamKey => {
@@ -1475,14 +1492,6 @@ function smartSimRounds(gameNum) {
         if (hasGoobActive || hasGoobSideline) {
           goobFired = true;
           [B.red, B.blue].forEach(t => {
-            t.resources.fire++;
-            t.resources.ice++;
-            t.resources.luckyStone++;
-            t.resources.moonstone++;
-            t.resources.healingSeed++;
-            t.resources.surge++;
-            if (!t.resources.burn) t.resources.burn = 0;
-            t.resources.burn++;
             if (!t.resources.firefly) t.resources.firefly = 0;
             t.resources.firefly++;
           });
@@ -1616,6 +1625,8 @@ function smartSimRounds(gameNum) {
     // Reset luckyStoneSpentThisTurn on tie (mirrors index.html line 9168)
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
     if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+    // Willow (435) — Joy of Painting: tie = nobody lost, clear both flags (mirrors index.html line 10115)
+    if (B.willowLostLast) { B.willowLostLast.red = false; B.willowLostLast.blue = false; }
     // Reset item swing toggles on tie
     if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
     if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
@@ -1808,13 +1819,8 @@ function smartSimRounds(gameNum) {
     // Bilbo (80) — Little Buddy: while on sideline, +2 damage to active ghost's singles wins.
     // Cornelius (45) on losing team sideline blocks it. Matches index.html lines 9484–9496.
     if (hasSideline(wTeam, 80) && !wF.ko && wR.type === 'singles' && !hasSideline(lTeam, 45)) { dmg += 2; }
-    // Tommy Salami (30) — REGULATOR! win bonus: +1 damage per die that was regulated (5/6 → low) this round.
-    // B.tommyRegulatorBonus[winTeamName] was set in the post-roll mutation block above, reset each round.
-    // Matches index.html lines 9328–9343: `if (wF.id===30 && !wF.ko && regulated>0) { dmg += regulated; }`
-    if (wF.id === 30 && !wF.ko) {
-      const _tommyReg = B.tommyRegulatorBonus[winTeamName] || 0;
-      if (_tommyReg > 0) { dmg += _tommyReg; }
-    }
+    // Tommy Salami (30) — REGULATOR!: bonus dice from chain-6s were already added in the post-roll mutation block.
+    // No win-path damage bonus — the extra dice ARE the benefit (more dice = higher hand type / more damage).
     // Kodako (1) — Swift WIN case: rolling 1-2-3 (all three values present in winDice) while winning → set dmg to exactly 4 (overrides all modifiers).
     // Matches index.html lines 9633–9640: `if (wF.id===1 && !wF.ko && winDice && [1,2,3].every(v=>winDice.includes(v))) { dmg=4; ... }`
     if (wF.id === 1 && !wF.ko && [1,2,3].every(v => winDice.includes(v))) {
@@ -2637,6 +2643,8 @@ function smartSimRounds(gameNum) {
   // Reset Lucky Stone tracking for Twyla (417) Lucky Dance (matches index.html line 11486)
   if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
   if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+  // Willow (435) — Joy of Painting: winner didn't lose, loser did (mirrors index.html line 12563)
+  if (B.willowLostLast && winner) { B.willowLostLast[winner] = false; const loser = winner === 'red' ? 'blue' : 'red'; B.willowLostLast[loser] = true; }
   // Reset item swing toggles each round (player must actively choose to swing)
   if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
   if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
