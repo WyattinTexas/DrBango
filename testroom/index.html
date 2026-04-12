@@ -573,6 +573,9 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .res-tile.luckyStone .res-count { color:#fbbf24; }
 .res-tile.burn { border-color:rgba(239,68,68,0.5); box-shadow:0 0 8px rgba(239,68,68,0.2); }
 .res-tile.burn .res-count { color:#ef4444; }
+.res-tile.firefly { border-color:rgba(255,215,0,0.5); box-shadow:0 0 10px rgba(255,215,0,0.25); }
+.res-tile.firefly .res-count { color:#ffd700; }
+.res-tile.firefly.clickable:hover { border-color:rgba(255,215,0,0.8); box-shadow:0 0 18px rgba(255,215,0,0.5); }
 .res-tile.clickable { cursor:pointer; }
 .res-tile.clickable:hover { transform:scale(1.08); border-color:rgba(255,255,255,0.4); }
 .res-tile.committed {
@@ -1949,6 +1952,16 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Firefly Picker — convert Magic Fireflies to any resource -->
+<div class="selene-overlay" id="fireflyOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#b8860b,#ffd700);">✨ MAGIC FIREFLIES</div>
+    <h3>Convert a Magic Firefly!</h3>
+    <p class="selene-sub" id="fireflySub">Choose a resource to gain.</p>
+    <div class="selene-options" id="fireflyOptions"></div>
+  </div>
+</div>
+
 <!-- Jasper (428) — Flame Dive: interactive bonus die reveal -->
 <div class="selene-overlay" id="jasperOverlay">
   <div class="selene-modal">
@@ -2139,7 +2152,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v678';
+const TESTROOM_VERSION = 'v679';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2248,7 +2261,7 @@ const GHOSTS = [
   },
   {
     id:302, name:"Maximo", rarity:"common", maxHp:4, art:"art/toadstool.jpg",
-    ability:"Nap", abilityDesc:"Entry: roll only 1 die on your first roll. After each round: gain 2 Healing Seeds.",
+    ability:"Nap", abilityDesc:"Entry: roll only 1 die on your first roll. After each round: gain 1 Healing Seed and 1 Lucky Stone.",
     category:"Defense/Negation", set:"Rolling Hills",
     designNote:"Sleepy mushroom. Starts slow with only 1 die on entry, but generates a Healing Seed every round. 5 HP seed farm — the longer he stays, the richer your team gets."
   },
@@ -2493,7 +2506,7 @@ const GHOSTS = [
   {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"Sideline: when your active ghost is about to take damage, Guardian Fairy can leap in and take the hit instead.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
   {id:100, name:"Cyboo", rarity:"ghost-rare", maxHp:3, art:"art/originals/Cyboo.png", ability:"Spark", abilityDesc:"While on the sideline, your ghost in play gains +1 dice if they have less than 3 health.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. Low HP dice boost."},
   {id:101, name:"Splinter", rarity:"ghost-rare", maxHp:6, art:"art/originals/Splinter.png", ability:"Toxic Fumes", abilityDesc:"After winning a roll, deal 1 damage before every roll until defeated.", category:"Debuff", set:"Set 1", designNote:"Original card. Stacking poison."},
-  {id:109, name:"Bo", rarity:"legendary", maxHp:5, art:"art/originals/Bo.png", ability:"Miracle", abilityDesc:"Upon defeating a Ghost, return one of your defeated Ghosts to your sideline.", category:"HP Recovery", set:"Set 1", designNote:"Original legendary. Resurrection on kill."},
+  {id:109, name:"Bo", rarity:"legendary", maxHp:5, art:"art/originals/Bo.png", ability:"Miracle", abilityDesc:"Upon defeating a Ghost, return one of your defeated Ghosts to your sideline with 3 Magic Fireflies.", category:"HP Recovery", set:"Set 1", designNote:"Original legendary. Resurrection on kill."},
   {id:110, name:"The Mountain King", rarity:"legendary", maxHp:9, art:"art/originals/mountain_king_leg.jpg", ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original legendary. Doubles doubler."},
   {id:111, name:"Shade", rarity:"legendary", maxHp:5, art:"art/originals/shade.jpg", ability:"Haunt", abilityDesc:"Before each roll, opponent takes 1 damage.", category:"Debuff", set:"Set 1", designNote:"Original legendary. Tick damage every round, including round 1."},
   {id:112, name:"Doom", rarity:"legendary", maxHp:7, art:"art/originals/doom.jpg", ability:"Fiendship", abilityDesc:"+2 bonus damage!", category:"Damage Multiplier", set:"Set 1", designNote:"Original legendary. Raw power."},
@@ -3429,7 +3442,7 @@ function makeTeam(ids) {
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0 }
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 }
   };
 }
 
@@ -4918,6 +4931,65 @@ function doBurnPlace(team, ghostIndex) {
 function closeBurnPicker() {
   document.getElementById('burnOverlay').classList.remove('active');
   B.burnPickerTeam = null;
+}
+
+// ============================================================
+// MAGIC FIREFLIES — Convert wildcard firefly to any resource
+// ============================================================
+function showFireflyPicker(team) {
+  const t = B[team];
+  const ffCount = t.resources.firefly || 0;
+  if (ffCount <= 0) return;
+
+  B.fireflyPickerTeam = team;
+
+  const resources = [
+    { key: 'fire', label: 'Sacred Fire', emoji: '🔥' },
+    { key: 'ice', label: 'Ice Shard', emoji: '❄️' },
+    { key: 'luckyStone', label: 'Lucky Stone', emoji: '🍀' },
+    { key: 'moonstone', label: 'Moonstone', emoji: '🌙' },
+    { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' },
+    { key: 'surge', label: 'Surge', emoji: '⚡' },
+    { key: 'burn', label: 'Burn', emoji: '🔥' }
+  ];
+
+  const optionsEl = document.getElementById('fireflyOptions');
+  let html = '';
+  resources.forEach(r => {
+    html += `<button class="selene-opt" onclick="doFireflyConvert('${team}','${r.key}')" style="background:linear-gradient(135deg,#8b6914,#daa520);">${r.emoji} ${r.label}</button>`;
+  });
+  html += `<button class="selene-opt" onclick="closeFireflyPicker()" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
+  optionsEl.innerHTML = html;
+  document.getElementById('fireflySub').innerHTML = `You have <b>${ffCount}</b> Magic Firefl${ffCount === 1 ? 'y' : 'ies'}. Each converts to 1 resource of your choice.`;
+  document.getElementById('fireflyOverlay').classList.add('active');
+}
+
+function doFireflyConvert(team, resourceKey) {
+  const t = B[team];
+  if (!t.resources.firefly || t.resources.firefly <= 0) { closeFireflyPicker(); return; }
+
+  t.resources.firefly--;
+  if (!t.resources[resourceKey]) t.resources[resourceKey] = 0;
+  t.resources[resourceKey]++;
+
+  const labelMap = { fire:'Sacred Fire', ice:'Ice Shard', luckyStone:'Lucky Stone', moonstone:'Moonstone', healingSeed:'Healing Seed', surge:'Surge', burn:'Burn' };
+  const resLabel = labelMap[resourceKey] || resourceKey;
+  log(`<span class="log-ability">MAGIC FIREFLIES!</span> Converted to <span class="log-ms">${resLabel}</span>!`);
+  showAbilityCallout('MAGIC FIREFLIES!', '#ffd700', `Converted to ${resLabel}!`, team);
+
+  renderBattle();
+
+  // If still have fireflies, re-open picker after a brief delay
+  if (t.resources.firefly > 0) {
+    setTimeout(() => showFireflyPicker(team), 800);
+  } else {
+    closeFireflyPicker();
+  }
+}
+
+function closeFireflyPicker() {
+  document.getElementById('fireflyOverlay').classList.remove('active');
+  B.fireflyPickerTeam = null;
 }
 
 // ============================================================
@@ -9575,9 +9647,10 @@ function _resolveRoundImpl() {
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
         const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
-        queueAbility('NAP!', 'var(--common)', `${f.name} — 2 Healing Seeds while napping!`, () => {
-          team.resources.healingSeed += 2;
-          log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">2 Healing Seeds</span>.`);
+        queueAbility('NAP!', 'var(--common)', `${f.name} — +1 Healing Seed and +1 Lucky Stone while napping!`, () => {
+          team.resources.healingSeed++;
+          team.resources.luckyStone++;
+          log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span> + <span class="log-ms">1 Lucky Stone</span>.`);
           renderBattle();
         }, tNameMax);
         // Knight reactions must be queued WHILE abilityQueueMode===true (not inside onShow
@@ -9585,7 +9658,7 @@ function _resolveRoundImpl() {
         // directly, stomping the NAP! callout still on screen).
         checkKnightEffects(tNameMax, f.name);
         if (sandwichMirrorsMax) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +2 Healing Seeds! (${oppTeamMax.resources.healingSeed + 2} total)`, () => { oppTeamMax.resources.healingSeed += 2; renderBattle(); }, tNameMax === 'red' ? 'blue' : 'red');
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed + 1 Lucky Stone!`, () => { oppTeamMax.resources.healingSeed++; oppTeamMax.resources.luckyStone++; renderBattle(); }, tNameMax === 'red' ? 'blue' : 'red');
         }
       }
     });
@@ -11674,11 +11747,12 @@ function _resolveRoundImpl() {
   if (boMiracleTarget) {
     const bt = boMiracleTarget; // capture for closure
     const lucasActive = hasSideline(winTeam, 433);
-    const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP!`;
+    const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP + 3 Magic Fireflies!`;
     queueAbility('MIRACLE!', 'var(--legendary)', calloutText, () => {
       bt.ko = false;
       bt.hp = 1;
-      log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span>`);
+      winTeam.resources.firefly = (winTeam.resources.firefly || 0) + 3;
+      log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span> <span class="log-ms">+3 Magic Fireflies!</span>`);
       if (lucasActive) {
         // Lucas (433) — Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die next roll
         bt.hp += 3; // 1 + 3 = 4 HP total
@@ -11856,9 +11930,9 @@ function _resolveRoundImpl() {
       const isWinSide = team === winTeam;
       const sandwichMirrors = isWinSide ? sandwichForLose : sandwichForWin;
       const oppTeam         = isWinSide ? loseTeam : winTeam;
-      queueAbility('NAP!', 'var(--common)', `${f.name} — round ends, 2 Healing Seeds collected!`, () => { team.resources.healingSeed += 2; renderBattle(); }, team === B.red ? 'red' : 'blue');
+      queueAbility('NAP!', 'var(--common)', `${f.name} — round ends, +1 Healing Seed and +1 Lucky Stone!`, () => { team.resources.healingSeed++; team.resources.luckyStone++; renderBattle(); }, team === B.red ? 'red' : 'blue');
       // Maximo knight reactions already collected via collectKC at game-state section (line ~10155) — do NOT double-fire here
-      if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +2 Healing Seeds! (${oppTeam.resources.healingSeed + 2} total)`, () => { oppTeam.resources.healingSeed += 2; renderBattle(); }, isWinSide ? loseTeamName : winTeamName);
+      if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed + 1 Lucky Stone!`, () => { oppTeam.resources.healingSeed++; oppTeam.resources.luckyStone++; renderBattle(); }, isWinSide ? loseTeamName : winTeamName);
     }
   });
 
@@ -12846,6 +12920,11 @@ function renderBattle() {
     if (r.luckyStone > 0) {
       rh += `<div class="res-tile luckyStone" title="Lucky Stone: use after rolling to reroll any one of your dice"><span class="res-main">🍀</span><span class="res-count">${r.luckyStone}</span><span class="res-label">LUCK</span></div>`;
     }
+    // Magic Fireflies — clickable wildcard resource (pre-roll only)
+    if (r.firefly > 0) {
+      const ffClick = isReady ? `onclick="showFireflyPicker('${team}')"` : '';
+      rh += `<div class="res-tile firefly ${isReady?'clickable':''}" ${ffClick} title="Magic Fireflies: ${r.firefly} available — click to convert to any resource"><span class="res-main">✨</span><span class="res-count">${r.firefly}</span><span class="res-label">FIREFLY</span></div>`;
+    }
     // Burn resource pool — clickable to place on enemy sideline ghosts (pre-roll only)
     if (r.burn > 0) {
       const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
@@ -12874,12 +12953,12 @@ function renderBattle() {
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal>0?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusanHeal('${team}')" title="Click: +2 HP per seed. Right-click: remove" style="${c.auntSusanHeal>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">${c.auntSusanHeal>0?'+'+c.auntSusanHeal*2+'hp':'+2hp'}</span></div>`;
     }
     // Snapshot current resources for flash detection
-    const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone };
+    const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0 };
     const prev = prevResources[team] || {};
     document.getElementById(`${team}-resources`).innerHTML = rh;
     // Flash any resource tile that increased
     const resEl = document.getElementById(`${team}-resources`);
-    ['moonstone','ice','fire','surge','healingSeed','luckyStone'].forEach(key => {
+    ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly'].forEach(key => {
       if ((newSnap[key]||0) > (prev[key]||0)) {
         const tile = resEl.querySelector(`.res-tile.${key}`);
         if (tile) { tile.classList.remove('res-gained'); void tile.offsetWidth; tile.classList.add('res-gained'); }
@@ -13079,6 +13158,8 @@ function clearAllOverlays() {
   document.getElementById('winstonSchemeOverlay').classList.remove('active');
   document.getElementById('galeForcePickerOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
+  document.getElementById('burnOverlay').classList.remove('active');
+  document.getElementById('fireflyOverlay').classList.remove('active');
   document.getElementById('abilitySplash').classList.remove('active');
   const vsSplash = document.getElementById('vsSplash');
   if (vsSplash) vsSplash.classList.remove('active');

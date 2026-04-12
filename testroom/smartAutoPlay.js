@@ -459,6 +459,35 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Magic Fireflies — AI converts all fireflies to the most-needed resource (pre-roll).
+  // Priority: Sacred Fire if team has a fire payoff card and none → Ice if team has ice synergy and none → lowest count resource.
+  ['red','blue'].forEach(teamKey => {
+    const team = B[teamKey];
+    while ((team.resources.firefly || 0) > 0) {
+      const r = team.resources;
+      const hasFirePayoff = team.ghosts.some(g => !g.ko && [58, 89, 420, 428, 429].includes(g.id)); // Flicker, Mallow, Castle Guide, Jasper, Pip
+      const hasIceSynergy = team.ghosts.some(g => !g.ko && [206, 305, 424, 204].includes(g.id)); // Zain, Selene, Bigsby, Finn
+      let chosen = 'fire'; // default
+      if (hasFirePayoff && (r.fire || 0) === 0) { chosen = 'fire'; }
+      else if (hasIceSynergy && (r.ice || 0) === 0) { chosen = 'ice'; }
+      else {
+        // Pick the resource with the lowest count
+        const candidates = [
+          { key: 'fire', count: r.fire || 0 },
+          { key: 'ice', count: r.ice || 0 },
+          { key: 'moonstone', count: r.moonstone || 0 },
+          { key: 'luckyStone', count: r.luckyStone || 0 },
+          { key: 'healingSeed', count: r.healingSeed || 0 },
+          { key: 'surge', count: r.surge || 0 }
+        ];
+        candidates.sort((a, b) => a.count - b.count);
+        chosen = candidates[0].key;
+      }
+      r.firefly--;
+      r[chosen] = (r[chosen] || 0) + 1;
+    }
+  });
+
   // Mallow (89) — Dozy Cozy: sideline → spend 1 Sacred Fire to give active ghost +3 HP (pre-roll).
   // Sim always says "yes" when fire is available — net +3 HP for 1 fire is strictly positive.
   // Filbert (59) on enemy sideline flips +3 heal → -3 damage (MASK MERCHANT curse).
@@ -1165,6 +1194,12 @@ function smartSimRounds(gameNum) {
     B.jacksonUsedThisRound[tKey] = true;
   });
 
+  // Snapshot Moonstones + Lucky Stones BEFORE post-roll triggers grant new ones.
+  // Resources gained mid-round (Natalia, Hank, etc.) should NOT be usable this turn.
+  // Mirrors index.html B.msAvailable / B.lsAvailable snapshot (line 6966–6973).
+  const simMsAvailable = { red: B.red.resources.moonstone, blue: B.blue.resources.moonstone };
+  const simLsAvailable = { red: B.red.resources.luckyStone, blue: B.blue.resources.luckyStone };
+
   // ===== POST-ROLL TRIGGERS =====
   // Hank (207) — each 4 = +1 Lucky Stone (+ Sandwiches DEPENDABLE! mirror — index.html line 7392)
   ['red','blue'].forEach(teamKey => {
@@ -1203,9 +1238,10 @@ function smartSimRounds(gameNum) {
   });
 
   // ===== AI: MOONSTONE (change a die to improve hand) =====
+  // Only use moonstones that existed BEFORE this round (snapshot), not mid-roll gains (Natalia etc.)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey];
-    if (t.resources.moonstone > 0) {
+    if (simMsAvailable[teamKey] > 0 && t.resources.moonstone > 0) {
       const dice = teamKey === 'red' ? redDice : blueDice;
       const improved = smartMoonstoneChange(dice);
       // Only use if it actually improves the hand
@@ -1220,6 +1256,7 @@ function smartSimRounds(gameNum) {
           active(t).usedMagicTouch = true;
         } else {
           t.resources.moonstone--;
+          simMsAvailable[teamKey]--;
         }
         if (teamKey === 'red') { redDice.splice(0, redDice.length, ...improved); }
         else { blueDice.splice(0, blueDice.length, ...improved); }
@@ -1235,12 +1272,14 @@ function smartSimRounds(gameNum) {
   });
 
   // ===== AI: LUCKY STONE (reroll lowest die) =====
+  // Only use lucky stones that existed BEFORE this round (snapshot), not mid-roll gains (Hank etc.)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey];
-    if (t.resources.luckyStone > 0) {
+    if (simLsAvailable[teamKey] > 0 && t.resources.luckyStone > 0) {
       const dice = teamKey === 'red' ? redDice : blueDice;
       const improved = smartLuckyStone(dice);
       t.resources.luckyStone--;
+      simLsAvailable[teamKey]--;
       // Track Lucky Stone usage for Twyla (417) Lucky Dance
       if (B.luckyStoneSpentThisTurn) B.luckyStoneSpentThisTurn[teamKey] = (B.luckyStoneSpentThisTurn[teamKey] || 0) + 1;
       // Boopies (419) — Boopie Magic: sideline — when active spends Healing Seed... (Lucky Stone spending, not seed — no trigger here)
@@ -2126,6 +2165,7 @@ function smartSimRounds(gameNum) {
         if (boReviveTarget) {
           boReviveTarget.ko = false;
           boReviveTarget.hp = 1;
+          wTeam.resources.firefly = (wTeam.resources.firefly || 0) + 3;
           const lucasActive = hasSideline(wTeam, 433);
           if (lucasActive) {
             // Lucas Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die
@@ -2194,13 +2234,14 @@ function smartSimRounds(gameNum) {
     }
   }
 
-  // End-of-round: Maximo (302) +2 seeds + Sandwiches (33) DEPENDABLE! mirror
+  // End-of-round: Maximo (302) +1 seed + 1 Lucky Stone + Sandwiches (33) DEPENDABLE! mirror
   ['red','blue'].forEach(teamKey => {
     const f = active(B[teamKey]);
     if (f.id === 302 && !f.ko) {
-      B[teamKey].resources.healingSeed += 2;
+      B[teamKey].resources.healingSeed++;
+      B[teamKey].resources.luckyStone++;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.healingSeed += 2;
+      if (hasSideline(B[oppKey], 33)) { B[oppKey].resources.healingSeed++; B[oppKey].resources.luckyStone++; }
     }
   });
 
