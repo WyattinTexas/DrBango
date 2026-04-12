@@ -1391,23 +1391,14 @@ function smartSimRounds(gameNum) {
     }
   }
 
-  // DCKnight (443) — Final Strike: four of a kind = instant win
-  for (const dcTeamKey of ['red','blue']) {
-    const dcTeam = B[dcTeamKey];
-    const dcF = active(dcTeam);
-    const dcDice = dcTeamKey === 'red' ? redDice : blueDice;
-    if (dcF.id === 443 && !dcF.ko && dcDice && dcDice.length >= 4) {
-      const dcCounts = {};
-      dcDice.forEach(d => dcCounts[d] = (dcCounts[d]||0)+1);
-      if (Object.values(dcCounts).some(c => c >= 4)) {
-        // INSTANT WIN — KO all enemy ghosts
-        const dcEnemy = opp(dcTeam);
-        dcEnemy.ghosts.forEach(g => { if (!g.ko) { g.ko = true; g.hp = 0; g.killedBy = 443; } });
-        autoRecordGame(dcTeamKey);
-        return;
-      }
+  // Captain James (443) — Final Strike: triples+ → gain 2 Sacred Fires (win or lose)
+  ['red','blue'].forEach(cjKey => {
+    const cjF = active(B[cjKey]);
+    const cjDice = cjKey === 'red' ? redDice : blueDice;
+    if (cjF.id === 443 && !cjF.ko && ['triples','quads','penta'].includes(classify(cjDice).type)) {
+      B[cjKey].resources.fire += 2;
     }
-  }
+  });
 
   // ===== TIE EFFECTS =====
   if (!winner) {
