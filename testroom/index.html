@@ -197,6 +197,14 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   cursor:pointer; transition:all .15s; text-transform:uppercase; letter-spacing:0.5px;
 }
 .random-pick-btn:hover { background:#b45309; color:#fff; box-shadow:0 0 10px rgba(180,83,9,0.4); }
+.start-battle-inline {
+  padding:10px 24px; border:2px solid #16a34a; border-radius:8px;
+  background:linear-gradient(135deg, #16a34a, #22c55e); color:#fff; font-size:14px; font-weight:800;
+  cursor:pointer; transition:all .15s; text-transform:uppercase; letter-spacing:1px;
+  margin-left:6px;
+}
+.start-battle-inline:hover { background:linear-gradient(135deg, #15803d, #16a34a); box-shadow:0 0 14px rgba(22,163,74,0.5); }
+.start-battle-inline:disabled { opacity:0.4; cursor:not-allowed; }
 .ghost-card .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); }
 .ghost-card .card-category { font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
 .ghost-card .card-set { font-size:10px; font-weight:600; }
@@ -1557,6 +1565,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <button class="random-pick-btn" onclick="pickRandomTeam('red')">🎲 Random Red</button>
         <button class="random-pick-btn" onclick="pickRandomTeam('blue')">🎲 Random Blue</button>
         <button class="random-pick-btn" onclick="pickRandomBoth()">🎲 Random Both</button>
+        <button class="start-battle-inline" id="startBtnInline" disabled onclick="startBattle()">⚔️ START BATTLE</button>
       </div>
 
       <!-- Original Set Toggles -->
@@ -2196,7 +2205,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v685';
+const TESTROOM_VERSION = 'v686';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2596,7 +2605,7 @@ const GHOSTS = [
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Dice cap."},
   {id:28, name:"Dream Cat", rarity:"common", maxHp:4, art:"art/originals/dream_cat.jpg", ability:"Jinx", abilityDesc:"Both roll doubles: gain +1 die next turn.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Mutual doubles reward."},
   {id:29, name:"Sad Sal", rarity:"common", maxHp:5, art:"art/originals/sad_sal.jpg", ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Loss-triggered resources."},
-  {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6, gain +1 die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Enemy high-die suppression."},
+  {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6, gain +1 die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Enemy high-die suppression."},
   {id:31, name:"Gus", rarity:"common", maxHp:7, art:"art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"If you win a roll, you may force your opponent to choose a different ghost from their sideline instead of dealing damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Win-to-swap instead of damage."},
   {id:32, name:"Lou", rarity:"common", maxHp:7, art:"art/originals/lou.jpg", ability:"Bros", abilityDesc:"While on the sideline, Grawr gains +1 Damage and +1 Health on Winning Rolls.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Grawr synergy."},
   {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"While on the sideline, if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
@@ -3427,6 +3436,8 @@ function renderPicks() {
   const btn = document.getElementById('startBtn');
   btn.disabled = !ok;
   btn.textContent = ok ? '⚔️ BATTLE!' : `Pick ${3-S.redPicks.length} red, ${3-S.bluePicks.length} blue`;
+  const inlineBtn = document.getElementById('startBtnInline');
+  if (inlineBtn) inlineBtn.disabled = !ok;
 }
 
 function togglePick(team, id) {
