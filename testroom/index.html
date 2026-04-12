@@ -3149,6 +3149,8 @@ function autoPlayNext() {
     darkWingUsedThisGame: { red: false, blue: false },
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
+    chowDecided: { red: false, blue: false },
+    cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
     mallowDecided: { red: false, blue: false },
@@ -3628,6 +3630,8 @@ function startBattle() {
     darkWingUsedThisGame: { red: false, blue: false },
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
+    chowDecided: { red: false, blue: false },
+    cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
     mallowDecided: { red: false, blue: false },
@@ -7937,8 +7941,10 @@ function doPreRollSetup() {
   // Nick & Knack (409) — Knick Knack: now an interactive picker (see doNickKnackSteal)
   B.nickKnackDecided = { red: false, blue: false };
 
-  // Chow (414) — Secret Ingredient: now an interactive button (see doChowChoice)
-  B.chowExtraDie = { red: 0, blue: 0 };
+  // Chow (414) — Secret Ingredient: reset decided flag only, NOT chowExtraDie
+  // chowExtraDie persists until consumed in the dice count section (lines ~8207-8208)
+  // Resetting it here would kill the bonus before the roll uses it
+  if (!B.chowExtraDie) B.chowExtraDie = { red: 0, blue: 0 };
   B.chowDecided = { red: false, blue: false };
 
   // Castle Gardener (442) — Cultivate: reset per round
@@ -8199,9 +8205,9 @@ function doPreRollSetup() {
   if (B.harrisonExtraDie.red) redCount += B.harrisonExtraDie.red;
   if (B.harrisonExtraDie.blue) blueCount += B.harrisonExtraDie.blue;
 
-  // Chow (414) — Secret Ingredient: +2 dice from discarded seed
-  if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
-  if (B.chowExtraDie && B.chowExtraDie.blue > 0) blueCount += B.chowExtraDie.blue;
+  // Chow (414) — Secret Ingredient: +2 dice from discarded seed, then consume
+  if (B.chowExtraDie && B.chowExtraDie.red > 0) { redCount += B.chowExtraDie.red; B.chowExtraDie.red = 0; }
+  if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
 
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
