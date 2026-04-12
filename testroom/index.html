@@ -1524,6 +1524,9 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <strong>Sacred Fire</strong> <em>(before rolling):</em> Adds +3 damage to a winning roll. Stacks across fires.<br>
         <strong>Burn</strong> &#x1F525; &mdash; Place on enemy sideline ghosts before rolling. When the burned ghost enters play, it takes damage equal to its burn count. Stacks. Consumed on entry.<br>
         <strong>Magic Fireflies</strong> &#x2728; &mdash; Before rolling, trade 1 Firefly for any resource of your choice. The ultimate wildcard resource.</p>
+        <p style="margin-top:8px;"><strong>&#x2694;&#xFE0F; Items</strong> <em>(permanent, toggle on/off before rolling)</em><br>
+        <strong>Ice Blade</strong> &mdash; Crafted by Zain (1 Ice Shard + 1 Moonstone). +1 die and +2 damage on wins when swinging. One per game.<br>
+        <strong>Flame Blade</strong> &mdash; Crafted by Finn (2 Healing Seeds + 1 Sacred Fire). +1 die and +5 Burn on wins when swinging. One per game.</p>
     </div>
     <div class="set-toggles">
       <span class="set-toggles-label">Original Sets:</span>
@@ -2193,7 +2196,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v683';
+const TESTROOM_VERSION = 'v684';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3656,11 +3659,20 @@ function triggerEntry(team, skipEntryEffects) {
   narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
   // Castle Guide (420) — Burn: check if the entering ghost has burn on it
+  // Mike (445) — Torrent: while Mike is on the team (sideline), entering ghosts are immune to Burn
   let burnEntryFired = false;
   if (B.burn && B.burn[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const burnCount = B.burn[entryTeamName][activeIdx] || 0;
-    if (burnCount > 0 && !f.ko && f.id !== 416) {
+    // Mike (445) — Torrent: if Mike is on the sideline of this team, burn is consumed but deals 0
+    const mikeProtects = hasSideline(team, 445);
+    if (burnCount > 0 && !f.ko && mikeProtects) {
+      // Mike's Torrent: sideline immune to Burn — consume burn, deal 0
+      delete B.burn[entryTeamName][activeIdx];
+      burnEntryFired = true;
+      showAbilityCallout('TORRENT!', 'var(--rare)', `Mike — Torrent! Sideline immune to Burn! ${f.name} takes no damage.`, entryTeamName);
+      log(`<span class="log-ability">Mike</span> — Torrent! <span class="log-heal">Sideline immune to Burn!</span> ${f.name} takes no damage.`);
+    } else if (burnCount > 0 && !f.ko && f.id !== 416) {
       const burnPre = f.hp;
       f.hp = Math.max(0, f.hp - burnCount);
       if (f.hp <= 0) { f.ko = true; f.killedBy = -2; } // burn kill
@@ -4947,6 +4959,37 @@ function doChowChoice(choice) {
     }
   } else {
     B.chowDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+  }
+}
+
+// ============================================================
+// FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die
+// ============================================================
+function doHexChoice(choice) {
+  const hp = B.hexPending;
+  if (!hp) return;
+  B.hexPending = null;
+  document.getElementById('hexOverlay').classList.remove('active');
+  const { team, btn } = hp;
+  const f = active(B[team]);
+  const oppTeamName = team === 'red' ? 'blue' : 'red';
+  if (choice === 'yes' && f && f.id === 446 && !f.ko && (B[team].resources.burn || 0) >= 1) {
+    B[team].resources.burn--;
+    B.hexDieRemoval[oppTeamName] = (B.hexDieRemoval[oppTeamName] || 0) + 1;
+    showAbilityCallout('HEX!', 'var(--uncommon)',
+      `${f.name} — spent 1 Burn to remove 1 enemy die this roll!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Hex! Spent 1 Burn → opponent loses 1 die this roll!`);
+    renderBattle();
+    // If more burn available, allow another use (re-offer after callout clears)
+    if ((B[team].resources.burn || 0) >= 1) {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    } else {
+      B.forestSpiritDecided[team] = true;
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    }
+  } else {
+    B.forestSpiritDecided[team] = true;
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
   }
 }
@@ -6358,6 +6401,25 @@ function rollReady(team) {
       }
     }
 
+    // Forest Spirit (446) — Hex: spend 1 Burn to remove 1 enemy die (interactive button)
+    {
+      const hexG = active(B[team]);
+      if (hexG && hexG.id === 446 && !hexG.ko && B.forestSpiritDecided && !B.forestSpiritDecided[team] &&
+          B[team].resources && (B[team].resources.burn || 0) >= 1) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.hexPending = { team, btn };
+        const hexDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          document.getElementById('hexSub').innerHTML =
+            `Spend 1 🔥 Burn to remove 1 enemy die this roll?<br>` +
+            `(Burn: ${B[team].resources.burn || 0} | Dice removed: ${B.hexDieRemoval[team === 'red' ? 'blue' : 'red'] || 0})`;
+          document.getElementById('hexOverlay').classList.add('active');
+        }, hexDelay);
+        return;
+      }
+    }
+
     // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent (interactive picker)
     {
       const nnG = active(B[team]);
@@ -6795,6 +6857,18 @@ function openDuelPhasePrimers(team) {
       `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
       `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
     document.getElementById('chowOverlay').classList.add('active');
+    return true;
+  }
+
+  // — FOREST SPIRIT (446) — Hex: spend 1 Burn to remove 1 enemy die (Duel Phase)
+  if (f.id === 446 && !f.ko && B.forestSpiritDecided && !B.forestSpiritDecided[team] &&
+      B[team].resources && (B[team].resources.burn || 0) >= 1) {
+    disableDone();
+    B.hexPending = { team, btn: doneBtn };
+    document.getElementById('hexSub').innerHTML =
+      `Spend 1 🔥 Burn to remove 1 enemy die this roll?<br>` +
+      `(Burn: ${B[team].resources.burn || 0} | Dice removed: ${B.hexDieRemoval[oppTeamName] || 0})`;
+    document.getElementById('hexOverlay').classList.add('active');
     return true;
   }
 
@@ -7913,6 +7987,31 @@ function doPreRollSetup() {
   // Pip (418) — Toasted: permanent die removal applied to opponent
   if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
   if (B.pipDieRemoval && B.pipDieRemoval.blue > 0) blueCount = Math.max(1, blueCount - B.pipDieRemoval.blue);
+
+  // Forest Spirit (446) — Hex: consume die removal from Burn spend (applied to opponent's count)
+  if (B.hexDieRemoval && B.hexDieRemoval.red > 0) {
+    redCount = Math.max(1, redCount - B.hexDieRemoval.red);
+    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Forest Spirit — Hex! Red loses ${B.hexDieRemoval.red} die this roll!`, 'blue']);
+    log(`<span class="log-ability">Forest Spirit</span> — Hex! <span class="log-dmg">Red loses ${B.hexDieRemoval.red} die this roll!</span>`);
+    B.hexDieRemoval.red = 0;
+  }
+  if (B.hexDieRemoval && B.hexDieRemoval.blue > 0) {
+    blueCount = Math.max(1, blueCount - B.hexDieRemoval.blue);
+    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Forest Spirit — Hex! Blue loses ${B.hexDieRemoval.blue} die this roll!`, 'red']);
+    log(`<span class="log-ability">Forest Spirit</span> — Hex! <span class="log-dmg">Blue loses ${B.hexDieRemoval.blue} die this roll!</span>`);
+    B.hexDieRemoval.blue = 0;
+  }
+
+  // Professor Hawking (447) — Wisdom: +2 dice while holding a Moonstone (not consumed)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 447 && !f.ko && team.resources.moonstone > 0) {
+      if (tName === 'red') redCount += 2; else blueCount += 2;
+      preRollCallouts.push(['WISDOM!', 'var(--rare)', `${f.name} — Holding Moonstone! +2 dice!`, tName]);
+      log(`<span class="log-ability">${f.name}</span> — Wisdom! Holding <span class="log-ms">Moonstone</span> → +2 dice!`);
+    }
+  });
 
   // Dream Cat (28) — Jinx: consume last round's both-doubles bonus
   if (B.dreamCatBonus && B.dreamCatBonus.red > 0) {
@@ -9723,6 +9822,41 @@ function _resolveRoundImpl() {
       }
     });
 
+    // Goob Party (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 of every resource
+    // Check BOTH teams; fire once even if both teams have Goob Party
+    {
+      let goobFired = false;
+      [B.red, B.blue].forEach(team => {
+        if (goobFired) return;
+        const f = active(team);
+        const tNameGoob = team === B.red ? 'red' : 'blue';
+        const hasGoobActive = f.id === 444 && !f.ko;
+        const hasGoobSideline = hasSideline(team, 444);
+        if (hasGoobActive || hasGoobSideline) {
+          goobFired = true;
+          const goobGhost = hasGoobActive ? f : team.ghosts.find(g => g.id === 444);
+          const goobName = goobGhost ? goobGhost.name : 'Goob Party';
+          queueAbility('DANCE BREAK!', 'var(--uncommon)', `${goobName} — Tie! Both players gain 1 of every resource!`, () => {
+            [B.red, B.blue].forEach(t => {
+              t.resources.fire++;
+              t.resources.ice++;
+              t.resources.luckyStone++;
+              t.resources.moonstone++;
+              t.resources.healingSeed++;
+              t.resources.surge++;
+              if (!t.resources.burn) t.resources.burn = 0;
+              t.resources.burn++;
+              if (!t.resources.firefly) t.resources.firefly = 0;
+              t.resources.firefly++;
+            });
+            log(`<span class="log-ability">${goobName}</span> — Dance Break! Both teams gain <span class="log-ms">+1 of every resource!</span>`);
+            renderBattle();
+          }, tNameGoob);
+          checkKnightEffects(tNameGoob, goobName);
+        }
+      });
+    }
+
     // Kairan (68) — Let's Dance: doubles (win, lose, or tie) → +1 die next roll
     [B.red, B.blue].forEach(team => {
       const f = active(team);
@@ -10148,6 +10282,13 @@ function _resolveRoundImpl() {
     dmg += 1;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Omen! <span class="log-dmg">+1 damage!</span>`);
+  }
+
+  // Mike (445) — Torrent: Win: +1 damage
+  if (wF.id === 445 && !wF.ko) {
+    dmg += 1;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Torrent! <span class="log-dmg">+1 damage!</span>`);
   }
 
   // Twyla (417) — Lucky Dance: MOVED to dice count section (v674 rework: Lucky Stones give dice + Healing Seeds, not damage + HP)
@@ -12013,6 +12154,23 @@ function _resolveRoundImpl() {
     // Sandwiches mirror for Moonstone only (Fireflies are not mirrorable)
     if (sandwichForLose) {
       queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Moonbeam! +1 Moonstone!`, () => { _starSandOpp.resources.moonstone++; renderBattle(); }, loseTeamName);
+    }
+  }
+
+  // Harvey (448) — Harvest Moon: Win: gain +1 Moonstone for each 5 you rolled
+  if (wF.id === 448 && !wF.ko) {
+    const fives = winDice.filter(d => d === 5).length;
+    if (fives > 0) {
+      queueAbility('HARVEST MOON!', 'var(--uncommon)', `${wF.name} — Win! ${fives} five${fives>1?'s':''} rolled = +${fives} Moonstone${fives>1?'s':''}!`, () => {
+        winTeam.resources.moonstone += fives;
+        renderBattle();
+      }, winTeamName);
+      log(`<span class="log-ability">${wF.name}</span> — Harvest Moon! ${fives}x 5s → <span class="log-ms">+${fives} Moonstone${fives>1?'s':''}!</span>`);
+      checkKnightEffects(winTeamName, wF.name);
+      // Sandwiches mirror for Moonstone
+      if (sandwichForLose) {
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Moon! +${fives} Moonstone${fives>1?'s':''}!`, () => { loseTeam.resources.moonstone += fives; renderBattle(); }, loseTeamName);
+      }
     }
   }
 
