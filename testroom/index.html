@@ -2187,7 +2187,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v682';
+const TESTROOM_VERSION = 'v683';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2434,10 +2434,10 @@ const GHOSTS = [
   {id:435, name:"Willow", rarity:"ghost-rare", maxHp:4, art:"art/originals/Willow.png", ability:"Joy of Painting", abilityDesc:"Sideline & In Play: gain +1 die if you lost the last roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"A ghost painter at her easel by a moonlit window. Paints through the night, finds joy in every loss. The comeback mechanic — every defeat fuels the next roll. Bob Ross energy meets Dark Castle. 4HP ghost-rare, fragile but inspiring."},
   {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Royal Decree", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
   {id:437, name:"Rascals", rarity:"common", maxHp:3, art:"art/originals/Rascals.png", ability:"Stampede", abilityDesc:"After you roll: gain 2 Burn.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Four tiny colorful imp fiends — purple, red, orange, blue — racing through a gorgeous ornate castle hallway. Pure chaos energy. A pack card. The common troublemakers of the Dark Castle."},
-  {id:443, name:"DCKnight", rarity:"rare", maxHp:6, art:"art/originals/DCKnight.png", ability:"Final Strike", abilityDesc:"Roll: if your dice pool shows four of a kind, you win the game.", category:"Destruction/Instant Kill", set:"Dark Castle", tags:["Final 50"], designNote:"Tall flame-headed Spiritkin knight in white-gold armor with golden scarf, holding blue magic. The hero of Dark Castle. Likable, heroic, aspirational."},
+  {id:443, name:"Simon", rarity:"rare", maxHp:6, art:"art/originals/DCKnight.png", ability:"Final Strike", abilityDesc:"Roll: if your dice pool shows four of a kind, you win the game.", category:"Destruction/Instant Kill", set:"Dark Castle", tags:["Final 50"], designNote:"Tall flame-headed Spiritkin knight in white-gold armor with golden scarf, holding blue magic. The hero of Dark Castle. Likable, heroic, aspirational."},
   {id:442, name:"Gardener", rarity:"common", maxHp:2, art:"art/originals/Gardener.png", ability:"Cultivate", abilityDesc:"Before rolling: you may discard Healing Seeds to gain 1 Sacred Fire each.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A tiny innocent spirit with a watering can tending glowing crystal flowers in a secret castle garden. Converts Healing Seeds into Sacred Fire — the garden fuels the flames. 2HP glass cannon resource converter."},
   {id:440, name:"Gom Gom Gom", rarity:"common", maxHp:5, art:"art/originals/DCFlameball.png", ability:"Spark", abilityDesc:"Roll: when you roll doubles, gain 1 Sacred Fire.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Angry blue flame ball fiend in a castle corridor. Jagged teeth, menacing glow. Classic Dark Castle common."},
-  {id:441, name:"Starling", rarity:"rare", maxHp:5, art:"art/originals/DCMoonDragon.png", ability:"Moonbeam", abilityDesc:"Win with doubles or better: gain 1 Moonstone and 1 Magic Firefly.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Cute pale lavender dragon floating by a full moon over castle spires. Gentle, beautiful, moonlit. Dark Castle rare."},
+  {id:441, name:"Wendy", rarity:"rare", maxHp:5, art:"art/originals/DCMoonDragon.png", ability:"Moonbeam", abilityDesc:"Win with doubles or better: gain 1 Moonstone and 1 Magic Firefly.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Cute pale lavender dragon floating by a full moon over castle spires. Gentle, beautiful, moonlit. Dark Castle rare."},
   {id:439, name:"Lucy's Shadow", rarity:"rare", maxHp:4, art:"art/originals/LucysShadow.png", ability:"Devotion", abilityDesc:"Sideline: while Lucy is in play, Lucy gains 2 Sacred Fires on wins instead of 1.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A dark contemplative dragon-spirit sitting in a castle archway, devoted to Lucy's blue fire. Doubles Lucy's Sacred Fire output from the bench. The loyal shadow that amplifies the queen."},
   {id:438, name:"Champ", rarity:"uncommon", maxHp:6, art:"art/originals/Champ.png", ability:"Overpower", abilityDesc:"Immune to damage from Specials. Gains +1 Surge when you or the enemy rolls doubles or higher.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A hulking blue-grey flame beast with orange fire mane standing in a grand cathedral hall. Fierce fanged grin, powerful stance. The mid-tier brawler of Dark Castle. Watercolor meets Pokemon Gengar energy."},
   // === SKYLAR SEED — PLAGUE/DECAY MECHANIC (2026-04-11) — GALLERY ONLY, NO BATTLE LOGIC ===
@@ -7200,6 +7200,17 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _swarmSavedKQ;
+        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+        if (!ef.ko && hasSideline(B[tNamePre], 436)) {
+          const psPreHp = ef.hp;
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          preRollCallouts.push(['ROYAL DECREE!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNamePre]);
+          log(`<span class="log-ability">Princess Shade</span> (sideline) — Royal Decree! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+          playDamageSfx(1);
+          hitDamage(enemyName);
+          popSidelineCard(B[tNamePre], 436);
+        }
         // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
         if (ef.id === 55 && !ef.ko) {
           const undPre1 = f.hp;
@@ -7250,6 +7261,17 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _meltSavedKQ;
+        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+        if (!ef.ko && hasSideline(B[tNameShade], 436)) {
+          const psPreHp2 = ef.hp;
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          preRollCallouts.push(['ROYAL DECREE!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameShade]);
+          log(`<span class="log-ability">Princess Shade</span> (sideline) — Royal Decree! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+          playDamageSfx(1);
+          hitDamage(enemyName);
+          popSidelineCard(B[tNameShade], 436);
+        }
         // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
         if (ef.id === 55 && !ef.ko) {
           const undPre2 = f.hp;
@@ -7301,6 +7323,17 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _hauntSavedKQ;
+          // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+          if (!ef.ko && hasSideline(B[tNameHaunt], 436)) {
+            const psPreHp3 = ef.hp;
+            ef.hp = Math.max(0, ef.hp - 1);
+            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            preRollCallouts.push(['ROYAL DECREE!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameHaunt]);
+            log(`<span class="log-ability">Princess Shade</span> (sideline) — Royal Decree! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+            playDamageSfx(1);
+            hitDamage(enemyName);
+            popSidelineCard(B[tNameHaunt], 436);
+          }
           // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
           if (ef.id === 55 && !ef.ko) {
             const undPre3 = f.hp;
@@ -7349,6 +7382,17 @@ function doPreRollSetup() {
         log(`<span class="log-ability">${abilityLabel}</span> — <span class="log-dmg">${pendingDmg} damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
         playDamageSfx(pendingDmg);
         hitDamage(tNameLucyTarget);
+        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+        if (!f.ko && hasSideline(B[tNameLucyActor], 436)) {
+          const psPreHpL = f.hp;
+          f.hp = Math.max(0, f.hp - 1);
+          if (f.hp <= 0) { f.ko = true; f.killedBy = 436; }
+          preRollCallouts.push(['ROYAL DECREE!', 'var(--rare)', `Princess Shade — +1 additional damage to ${f.name}!`, tNameLucyActor]);
+          log(`<span class="log-ability">Princess Shade</span> (sideline) — Royal Decree! <span class="log-dmg">+1 additional damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
+          playDamageSfx(1);
+          hitDamage(tNameLucyTarget);
+          popSidelineCard(B[tNameLucyActor], 436);
+        }
         // Knight reactions on Lucy's side (the actor). Temp queue mode so reactions
         // splice AFTER BLUE FIRE! in preRollCallouts instead of stomping it.
         const _lucySavedKQ = abilityQueue;
@@ -7398,6 +7442,17 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _splinterSavedKQ;
+          // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
+          if (!ef.ko && hasSideline(B[tNameSplinter], 436)) {
+            const psPreHp4 = ef.hp;
+            ef.hp = Math.max(0, ef.hp - 1);
+            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            preRollCallouts.push(['ROYAL DECREE!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
+            log(`<span class="log-ability">Princess Shade</span> (sideline) — Royal Decree! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+            playDamageSfx(1);
+            hitDamage(enemyName);
+            popSidelineCard(B[tNameSplinter], 436);
+          }
           // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
           if (ef.id === 55 && !ef.ko) {
             const undPre4 = f.hp;
@@ -8239,6 +8294,60 @@ function doPostRollAndResolve(redDice, blueDice) {
       checkKnightEffects(tNameKap, f.name);
       if (hasSideline(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); }, tNameKap === 'red' ? 'blue' : 'red');
+      }
+    }
+  });
+
+  // Rascals (437) — Stampede: after rolling, gain 2 Burn
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameRas = team === B.red ? 'red' : 'blue';
+    if (f.id === 437 && !f.ko) {
+      const _rasTeam = team;
+      queueAbility('STAMPEDE!', 'var(--common)', `${f.name} — Stampede! +2 Burn!`, () => {
+        if (!_rasTeam.resources.burn) _rasTeam.resources.burn = 0;
+        _rasTeam.resources.burn += 2;
+        log(`<span class="log-ability">${f.name}</span> — Stampede! +2 Burn!`);
+        renderBattle();
+      }, tNameRas);
+      checkKnightEffects(tNameRas, f.name);
+    }
+  });
+
+  // Gom Gom Gom (440) — Spark: doubles → gain 1 Sacred Fire
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const dice = team === B.red ? redDice : blueDice;
+    const tNameGom = team === B.red ? 'red' : 'blue';
+    if (f.id === 440 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(dice).type)) {
+      const _gomTeam = team;
+      const _gomName = f.name;
+      queueAbility('SPARK!', 'var(--common)', `${f.name} — Doubles! +1 Sacred Fire!`, () => {
+        _gomTeam.resources.fire++;
+        log(`<span class="log-ability">${_gomName}</span> — Spark! Doubles → gained <span class="log-ms">1 Sacred Fire</span>!`);
+        renderBattle();
+      }, tNameGom);
+      checkKnightEffects(tNameGom, f.name);
+    }
+  });
+
+  // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameChamp = team === B.red ? 'red' : 'blue';
+    if (f.id === 438 && !f.ko) {
+      const redRoll = classify(redDice);
+      const blueRoll = classify(blueDice);
+      const eitherDoubles = ['doubles','triples','quads','penta'].includes(redRoll.type) || ['doubles','triples','quads','penta'].includes(blueRoll.type);
+      if (eitherDoubles) {
+        const _champTeam = team;
+        const _champName = f.name;
+        queueAbility('OVERPOWER!', 'var(--uncommon)', `${f.name} — Doubles detected! +1 Surge!`, () => {
+          _champTeam.resources.surge++;
+          log(`<span class="log-ability">${_champName}</span> — Overpower! Doubles → gained <span class="log-ms">1 Surge</span>!`);
+          renderBattle();
+        }, tNameChamp);
+        checkKnightEffects(tNameChamp, f.name);
       }
     }
   });
@@ -9430,6 +9539,38 @@ function _resolveRoundImpl() {
   const rR = classify(redDice), bR = classify(blueDice);
   if (!sylviaResuming) {
     log(`Red [${redDice.join(',')}] <span style="color:var(--text2)">(${rR.type} ${rR.value})</span> vs Blue [${blueDice.join(',')}] <span style="color:var(--text2)">(${bR.type} ${bR.value})</span>`);
+  }
+
+  // DCKnight (443) — Final Strike: four of a kind in your dice = instant win
+  ['red','blue'].forEach(dcTeamKey => {
+    const dcTeam = B[dcTeamKey];
+    const dcF = active(dcTeam);
+    const dcDice = dcTeamKey === 'red' ? redDice : blueDice;
+    if (dcF.id === 443 && !dcF.ko && dcDice && dcDice.length >= 4) {
+      const dcCounts = {};
+      dcDice.forEach(d => dcCounts[d] = (dcCounts[d]||0)+1);
+      const dcHasQuads = Object.values(dcCounts).some(c => c >= 4);
+      if (dcHasQuads) {
+        // INSTANT WIN — KO all enemy ghosts
+        const dcEnemy = opp(dcTeam);
+        dcEnemy.ghosts.forEach(g => { if (!g.ko) { g.ko = true; g.hp = 0; g.killedBy = 443; } });
+        log(`<span class="log-ability">${dcF.name}</span> — FINAL STRIKE! FOUR OF A KIND! <span class="log-ko">${dcF.name} WINS THE GAME!</span>`);
+        // Massive dramatic callout then game over
+        abilityQueue = [];
+        abilityQueueMode = true;
+        queueAbility('FINAL STRIKE!', 'var(--legendary)', `${dcF.name} — FOUR OF A KIND! ${dcF.name} WINS THE GAME!`, () => {
+          handleKOs();
+        }, dcTeamKey);
+        abilityQueueMode = false;
+        drainAbilityQueue(() => {});
+        return;
+      }
+    }
+  });
+  // If DCKnight triggered instant win, game is over — check and bail
+  if (B.red.ghosts.every(g => g.ko) || B.blue.ghosts.every(g => g.ko)) {
+    if (!handleKOs()) renderBattle();
+    return;
   }
 
   // Determine winner with cascading tiebreakers
