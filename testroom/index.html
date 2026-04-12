@@ -2218,7 +2218,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v690';
+const TESTROOM_VERSION = 'v691';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3227,7 +3227,7 @@ function autoSimRounds(gameNum) {
     const wR = winner==='red'?rR:bR;
     let dmg = wR.damage;
     lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = wF.id; }
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
   }
 
   B.round++;
@@ -3240,12 +3240,12 @@ function autoRecordGame(winner) {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];
-    winTeam.ghosts.forEach(g => recordWin(g.id));
-    loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
+    winTeam.ghosts.forEach(g => recordWin(g.originalId || g.id));
+    loseTeamObj.ghosts.forEach(g => recordLoss(g.originalId || g.id));
     const allGhosts = [...winTeam.ghosts, ...loseTeamObj.ghosts];
     allGhosts.forEach(g => {
       if (g.ko) {
-        recordKO(g.id);
+        recordKO(g.originalId || g.id);
         if (g.killedBy && g.killedBy > 0) recordKill(g.killedBy);
       }
     });
@@ -3749,7 +3749,7 @@ function triggerEntry(team, skipEntryEffects) {
     const ef = active(enemy);
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -3786,7 +3786,7 @@ function triggerEntry(team, skipEntryEffects) {
       const jenkinsRoll = classify(jenkinsDice);
       const jenkinsDmg = jenkinsRoll.damage; // 1/2/3/4/5 by roll type
       ef.hp = Math.max(0, ef.hp - jenkinsDmg);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       const rollLabel = describeRoll(jenkinsRoll);
       entryCallouts.push(['GREETING!', 'var(--ghost-rare)',
@@ -3808,7 +3808,7 @@ function triggerEntry(team, skipEntryEffects) {
     const ef = active(enemy);
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 1);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       entryCallouts.push(['MENACE!', 'var(--uncommon)', `${f.name} — 1 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Menace! <span class="log-dmg">1 entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
@@ -4567,7 +4567,7 @@ function doWiseAlChoice(choice) {
   } else {
     // Deal the stashed damage
     wp.lF.hp = Math.max(0, wp.lF.hp - wp.dmg);
-    if (wp.lF.hp <= 0) { wp.lF.ko = true; wp.lF.killedBy = wp.wF.id; }
+    if (wp.lF.hp <= 0) { wp.lF.ko = true; wp.lF.killedBy = (wp.wF.originalId || wp.wF.id); }
     log(`<span class="log-dmg">${wp.wF.name} deals ${wp.dmg} to ${wp.lF.name}!</span> ${wp.lF.ko?'<span class="log-ko">KO!</span>':wp.lF.hp+' HP left'}`);
     renderBattle();
   }
@@ -4612,7 +4612,7 @@ function doGordokChoice(choice) {
   } else {
     // Deal the stashed damage
     gp.lF.hp = Math.max(0, gp.lF.hp - gp.dmg);
-    if (gp.lF.hp <= 0) { gp.lF.ko = true; gp.lF.killedBy = gp.wF.id; }
+    if (gp.lF.hp <= 0) { gp.lF.ko = true; gp.lF.killedBy = (gp.wF.originalId || gp.wF.id); }
     log(`<span class="log-dmg">${gp.wF.name} deals ${gp.dmg} to ${gp.lF.name}!</span> ${gp.lF.ko?'<span class="log-ko">KO!</span>':gp.lF.hp+' HP left'}`);
     renderBattle();
   }
@@ -7379,7 +7379,7 @@ function doPreRollSetup() {
       const ef = active(enemy);
       if (!ef.ko) {
         ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
         const enemyName = enemy === B.red ? 'red' : 'blue';
         preRollCallouts.push(['SWARM!', 'var(--uncommon)', `${f.name} — 1 damage to ${ef.name}!`, tNamePre]);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -8887,6 +8887,14 @@ function pickMsValue(val) {
   // Bigsby MUST be sacrificed and replaced with Doom (id 112). Mandatory transformation.
   if (f.id === 424 && !f.ko) {
     const g = f; // mutate the ghost object in-place
+    // Preserve original identity for MVP/results/resurrection/standings
+    g.originalId = g.id;
+    g.originalName = g.name;
+    g.originalArt = g.art;
+    g.originalMaxHp = g.maxHp;
+    g.originalAbility = g.ability;
+    g.originalAbilityDesc = g.abilityDesc;
+    g.originalRarity = g.rarity;
     g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
     g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
     g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
@@ -11125,7 +11133,7 @@ function _resolveRoundImpl() {
       gfSacrifice = gfG;
       guardianFairyAbsorbedDmg = dmg;
       B.guardianFairyReactivePending = {
-        loseTeamName, gfGhost: gfG, dmg, lF, wFName: wF.name, wFId: wF.id,
+        loseTeamName, gfGhost: gfG, dmg, lF, wFName: wF.name, wFId: (wF.originalId || wF.id),
         resume: null // set later during drain
       };
       dmg = 0; // defer ALL damage — modal handler will apply it
@@ -11243,7 +11251,7 @@ function _resolveRoundImpl() {
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
   if (dmg > 0) {
     lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = wF.id; }
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
   } else if (!mirrorMattReflected && !gordokStole && !wiseAlSqualled && !kingJayReflected && !guardianFairyAbsorbed && !bogeyReflected && !kodakoSwiftLose && !patrickStoneForm && !dealerHouseRules && !skyElusive && !cityCybooBarrier && !puffCute && !fangUndercoverActivated) {
     log(`${wF.name} wins but deals 0 damage.`);
@@ -11368,7 +11376,7 @@ function _resolveRoundImpl() {
   if (lF.id === 44 && !lF.ko && wR.type === 'triples') {
     lF.hp = 0;
     lF.ko = true;
-    lF.killedBy = wF.id;
+    lF.killedBy = (wF.originalId || wF.id);
     bubbleBoysPopped = true;
     bubbleBoysName = lF.name;
     bubbleBoysEnemyName = wF.name;
@@ -12329,6 +12337,14 @@ function _resolveRoundImpl() {
   // Both triggers also fire for any future resurrection sources (e.g. Shepherd's Flock 360 when implemented).
   if (boMiracleTarget) {
     const bt = boMiracleTarget; // capture for closure
+    // If resurrecting a transformed ghost (Bigsby→Doom), restore original identity
+    if (bt.originalId) {
+      bt.id = bt.originalId; bt.name = bt.originalName; bt.art = bt.originalArt;
+      bt.maxHp = bt.originalMaxHp; bt.ability = bt.originalAbility;
+      bt.abilityDesc = bt.originalAbilityDesc; bt.rarity = bt.originalRarity;
+      delete bt.originalId; delete bt.originalName; delete bt.originalArt;
+      delete bt.originalMaxHp; delete bt.originalAbility; delete bt.originalAbilityDesc; delete bt.originalRarity;
+    }
     const lucasActive = hasSideline(winTeam, 433);
     const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP + 3 Magic Fireflies!`;
     queueAbility('MIRACLE!', 'var(--legendary)', calloutText, () => {
@@ -12956,20 +12972,20 @@ function showGameOver(winner) {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];
-    winTeam.ghosts.forEach(g => recordWin(g.id));
-    loseTeamObj.ghosts.forEach(g => recordLoss(g.id));
+    winTeam.ghosts.forEach(g => recordWin(g.originalId || g.id));
+    loseTeamObj.ghosts.forEach(g => recordLoss(g.originalId || g.id));
     // Record KO'D (times defeated) and Kills (KOs scored) from killedBy tags
     const allGhosts = [...winTeam.ghosts, ...loseTeamObj.ghosts];
     allGhosts.forEach(g => {
       if (g.ko) {
-        recordKO(g.id); // this ghost was defeated
+        recordKO(g.originalId || g.id); // this ghost was defeated
         if (g.killedBy && g.killedBy > 0) recordKill(g.killedBy); // credit the killer
       }
     });
     // MVP: pick the winning team's top scorer and record in standings
     try {
       matchMvp = pickMatchMvp(winner);
-      if (matchMvp) recordMvp(matchMvp.id);
+      if (matchMvp) recordMvp(matchMvp.originalId || matchMvp.id);
       // Compute stats-based MVPs for BOTH teams for the end-of-match display.
       // The losing team gets an MVP too — even if every ghost was KO'd — based
       // on who actually contributed most (KOs scored, damage, rolls won,
@@ -12997,12 +13013,16 @@ function showGameOver(winner) {
     const gd = id => ghostData(id);
 
     const rows = teamObj.ghosts.map((g, i) => {
-      const data = gd(g.id);
+      const displayId = g.originalId || g.id;
+      const displayName = g.originalName || g.name;
+      const displayArt = g.originalArt || g.art;
+      const data = gd(displayId);
       // MVP badge follows the stats-based pick from pickMatchMvp() — awarded
       // even if the MVP ghost was KO'd (wiped-team case).
-      const isMvp = (mvpId != null && g.id === mvpId);
-      const artHtml = data.art
-        ? `<img class="go-ghost-art" src="${data.art}" alt="${g.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'go-ghost-art-placeholder\\'>👻</div>'">`
+      const isMvp = (mvpId != null && (g.id === mvpId || g.originalId === mvpId));
+      const artSrc = displayArt || (data && data.art);
+      const artHtml = artSrc
+        ? `<img class="go-ghost-art" src="${artSrc}" alt="${displayName}" loading="lazy" onerror="this.outerHTML='<div class=\\'go-ghost-art-placeholder\\'>👻</div>'">`
         : `<div class="go-ghost-art-placeholder">&#128123;</div>`;
       const statusText = g.ko
         ? "KO'd"
@@ -13012,7 +13032,7 @@ function showGameOver(winner) {
       return `<div class="go-ghost-row${isMvp ? ' mvp' : ''}">
         ${artHtml}
         <div class="go-ghost-info">
-          <div class="go-ghost-name">${g.name}</div>
+          <div class="go-ghost-name">${displayName}</div>
           <div class="go-ghost-status ${statusClass}">${statusText}</div>
         </div>
         ${mvpBadge}

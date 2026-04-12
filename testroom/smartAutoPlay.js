@@ -1383,6 +1383,14 @@ function smartSimRounds(gameNum) {
         // Bigsby (424) — Omen: Moonstone use → sacrifice Bigsby, replace with Doom (112)
         const msF = active(t);
         if (msF.id === 424 && !msF.ko) {
+          // Preserve original identity for standings/results
+          msF.originalId = msF.id;
+          msF.originalName = msF.name;
+          msF.originalArt = msF.art;
+          msF.originalMaxHp = msF.maxHp;
+          msF.originalAbility = msF.ability;
+          msF.originalAbilityDesc = msF.abilityDesc;
+          msF.originalRarity = msF.rarity;
           msF.id = 112; msF.name = "Doom"; msF.maxHp = 7; msF.hp = 7;
           msF.ability = "Fiendship"; msF.abilityDesc = "+2 bonus damage!";
           msF.art = "art/originals/doom.jpg"; msF.rarity = "legendary"; msF.ko = false;
