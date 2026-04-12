@@ -2248,7 +2248,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v694';
+const TESTROOM_VERSION = 'v695';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -7474,6 +7474,7 @@ function doPreRollSetup() {
   B.preRollAbilitiesFiredThisTurn.blue = true;
 
   // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
+  // Phase 4: Masked Hero (55) Underdog fires BEFORE pre-roll damage — if attacker KO'd, skip damage
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const enemy = opp(team);
@@ -7481,9 +7482,23 @@ function doPreRollSetup() {
     if (f.id === 304 && !f.ko && !dylanNegates(enemy)) {
       const ef = active(enemy);
       if (!ef.ko) {
+        const enemyName = enemy === B.red ? 'red' : 'blue';
+        // Masked Hero (55) — Underdog: counter 3 damage BEFORE the pre-roll effect fires
+        if (ef.id === 55 && !ef.ko) {
+          const undPre1 = f.hp;
+          f.hp = Math.max(0, f.hp - 3);
+          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+          const undMsg1 = f.ko
+            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} HP → KO!)`
+            : `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} → ${f.hp} HP)`;
+          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg1, enemyName]);
+          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
+          playDamageSfx(3);
+          hitDamage(tNamePre);
+          if (f.ko) return; // Attacker KO'd by Underdog — skip pre-roll damage entirely
+        }
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
-        const enemyName = enemy === B.red ? 'red' : 'blue';
         preRollCallouts.push(['SWARM!', 'var(--uncommon)', `${f.name} — 1 damage to ${ef.name}!`, tNamePre]);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
@@ -7495,7 +7510,6 @@ function doPreRollSetup() {
           log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
         }
         // Collect Knight reactions via temp queue mode so they splice AFTER SWARM! in preRollCallouts
-        // (not in queue mode → checkKnightEffects fires showAbilityCallout directly, stomping SWARM!)
         const _swarmSavedKQ = abilityQueue;
         abilityQueue = [];
         abilityQueueMode = true;
@@ -7513,25 +7527,11 @@ function doPreRollSetup() {
           playDamageSfx(1);
           hitDamage(enemyName);
           popSidelineCard(B[tNamePre], 436);
-          // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
           if (ef.id === 24 && !ef.ko) {
             B[enemyName].resources.fire++;
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
-        }
-        // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
-        if (ef.id === 55 && !ef.ko) {
-          const undPre1 = f.hp;
-          f.hp = Math.max(0, f.hp - 3);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-          const undMsg1 = f.ko
-            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} HP → KO!)`
-            : `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} → ${f.hp} HP)`;
-          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg1, enemyName]);
-          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-          playDamageSfx(3);
-          hitDamage(tNamePre);
         }
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
@@ -7549,6 +7549,21 @@ function doPreRollSetup() {
       const shadeGhost = getSidelineGhost(team, 205);
       const ef = active(enemy);
       if (!ef.ko && ef.hp < 4) {
+        // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Shadow damage
+        if (ef.id === 55 && !ef.ko) {
+          const undPreSS = f.hp;
+          f.hp = Math.max(0, f.hp - 3);
+          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+          const enemyNameSS = enemy === B.red ? 'red' : 'blue';
+          const undMsgSS = f.ko
+            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPreSS} HP → KO!)`
+            : `${ef.name} counters! 3 damage to ${f.name}! (${undPreSS} → ${f.hp} HP)`;
+          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsgSS, enemyNameSS]);
+          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
+          playDamageSfx(3);
+          hitDamage(tNameShade);
+          if (f.ko) return; // Attacker KO'd by Underdog — skip Shade's Shadow damage
+        }
         const preHp = ef.hp;
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
@@ -7593,19 +7608,6 @@ function doPreRollSetup() {
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
         }
-        // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
-        if (ef.id === 55 && !ef.ko) {
-          const undPre2 = f.hp;
-          f.hp = Math.max(0, f.hp - 3);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-          const undMsg2 = f.ko
-            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre2} HP → KO!)`
-            : `${ef.name} counters! 3 damage to ${f.name}! (${undPre2} → ${f.hp} HP)`;
-          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg2, enemyName]);
-          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-          playDamageSfx(3);
-          hitDamage(tNameShade);
-        }
       }
     } else if (hasSideline(team, 205) && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade's Shadow</span> — Meltdown blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
@@ -7625,10 +7627,24 @@ function doPreRollSetup() {
         if (ef.id === 107 && !ef.ko) {
           log(`<span class="log-ability">Piper</span> — Slick Coat! Shade's Haunt is negated.`);
         } else {
+          const enemyName = enemy === B.red ? 'red' : 'blue';
+          // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Haunt damage
+          if (ef.id === 55 && !ef.ko) {
+            const undPre3 = f.hp;
+            f.hp = Math.max(0, f.hp - 3);
+            if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+            const undMsg3 = f.ko
+              ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} HP → KO!)`
+              : `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} → ${f.hp} HP)`;
+            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg3, enemyName]);
+            log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
+            playDamageSfx(3);
+            hitDamage(tNameHaunt);
+            if (f.ko) return; // Attacker KO'd by Underdog — skip Haunt damage
+          }
           const preHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
-          const enemyName = enemy === B.red ? 'red' : 'blue';
           const hauntMsg = ef.ko
             ? `Shade haunts ${ef.name}! (${preHp} HP → KO!)`
             : `Shade haunts ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -7660,25 +7676,11 @@ function doPreRollSetup() {
             playDamageSfx(1);
             hitDamage(enemyName);
             popSidelineCard(B[tNameHaunt], 436);
-            // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
             if (ef.id === 24 && !ef.ko) {
               B[enemyName].resources.fire++;
               preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
-          }
-          // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
-          if (ef.id === 55 && !ef.ko) {
-            const undPre3 = f.hp;
-            f.hp = Math.max(0, f.hp - 3);
-            if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-            const undMsg3 = f.ko
-              ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} HP → KO!)`
-              : `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} → ${f.hp} HP)`;
-            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg3, enemyName]);
-            log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-            playDamageSfx(3);
-            hitDamage(tNameHaunt);
           }
         }
       }
@@ -7705,6 +7707,26 @@ function doPreRollSetup() {
     if (!dylanNegates(team)) {
       const f = active(team);
       if (!f.ko) {
+        // Phase 4: Masked Hero (55) Underdog fires BEFORE Lucy/Humar delayed damage
+        if (f.id === 55 && !f.ko) {
+          const lucyAttacker = active(B[tNameLucyActor]);
+          if (lucyAttacker && !lucyAttacker.ko) {
+            const undPreL = lucyAttacker.hp;
+            lucyAttacker.hp = Math.max(0, lucyAttacker.hp - 3);
+            if (lucyAttacker.hp <= 0) { lucyAttacker.ko = true; lucyAttacker.killedBy = 55; }
+            const undMsgL = lucyAttacker.ko
+              ? `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} HP → KO!)`
+              : `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} → ${lucyAttacker.hp} HP)`;
+            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsgL, tNameLucyTarget]);
+            log(`<span class="log-ability">${f.name}</span> — Underdog! 3 counter-damage to ${lucyAttacker.name}!`);
+            playDamageSfx(3);
+            hitDamage(tNameLucyActor);
+            if (lucyAttacker.ko) {
+              B.pendingLucyDmg[tNameLucyTarget] = 0; // consume the flag
+              return; // Attacker KO'd by Underdog — skip Lucy/Humar damage
+            }
+          }
+        }
         const preHp = f.hp;
         f.hp = Math.max(0, f.hp - pendingDmg);
         if (f.hp <= 0) { f.ko = true; f.killedBy = isHumar ? 336 : 108; }
@@ -7768,49 +7790,8 @@ function doPreRollSetup() {
           log(`<span class="log-ability">Splinter</span> — Toxic Fumes blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
           B.piperBlockedThisRound[tNameSplinter] = true; // v640: Slick Coat gate
         } else {
-          const preHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
           const enemyName = enemy === B.red ? 'red' : 'blue';
-          const fumesMsg = ef.ko
-            ? `Toxic Fumes choke ${ef.name}! (${preHp} HP → KO!)`
-            : `Toxic Fumes choke ${ef.name}! (${preHp} → ${ef.hp} HP)`;
-          preRollCallouts.push(['TOXIC FUMES!', 'var(--ghost-rare)', fumesMsg, tNameSplinter]);
-          log(`<span class="log-ability">Splinter</span> — Toxic Fumes! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
-          playDamageSfx(1);
-          hitDamage(enemyName);
-          // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-          if (ef.id === 24 && !ef.ko) {
-            B[enemyName].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
-            log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
-          }
-          // Collect Knight reactions via temp queue so they splice AFTER TOXIC FUMES! in preRollCallouts
-          const _splinterSavedKQ = abilityQueue;
-          abilityQueue = [];
-          abilityQueueMode = true;
-          checkKnightEffects(tNameSplinter, f.name);
-          abilityQueueMode = false;
-          abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
-          abilityQueue = _splinterSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip
-          if (!ef.ko && hasSideline(B[tNameSplinter], 436)) {
-            const psPreHp4 = ef.hp;
-            ef.hp = Math.max(0, ef.hp - 1);
-            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-            preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
-            log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
-            playDamageSfx(1);
-            hitDamage(enemyName);
-            popSidelineCard(B[tNameSplinter], 436);
-            // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-            if (ef.id === 24 && !ef.ko) {
-              B[enemyName].resources.fire++;
-              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
-              log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
-            }
-          }
-          // Masked Hero (55) — Underdog: counter 3 damage when targeted by a pre-roll effect
+          // Phase 4: Masked Hero (55) Underdog fires BEFORE Splinter's Toxic Fumes damage
           if (ef.id === 55 && !ef.ko) {
             const undPre4 = f.hp;
             f.hp = Math.max(0, f.hp - 3);
@@ -7822,6 +7803,44 @@ function doPreRollSetup() {
             log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
             playDamageSfx(3);
             hitDamage(tNameSplinter);
+            if (f.ko) return; // Attacker KO'd by Underdog — skip Toxic Fumes damage
+          }
+          const preHp = ef.hp;
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
+          const fumesMsg = ef.ko
+            ? `Toxic Fumes choke ${ef.name}! (${preHp} HP → KO!)`
+            : `Toxic Fumes choke ${ef.name}! (${preHp} → ${ef.hp} HP)`;
+          preRollCallouts.push(['TOXIC FUMES!', 'var(--ghost-rare)', fumesMsg, tNameSplinter]);
+          log(`<span class="log-ability">Splinter</span> — Toxic Fumes! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+          playDamageSfx(1);
+          hitDamage(enemyName);
+          if (ef.id === 24 && !ef.ko) {
+            B[enemyName].resources.fire++;
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+            log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+          }
+          const _splinterSavedKQ = abilityQueue;
+          abilityQueue = [];
+          abilityQueueMode = true;
+          checkKnightEffects(tNameSplinter, f.name);
+          abilityQueueMode = false;
+          abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
+          abilityQueue = _splinterSavedKQ;
+          if (!ef.ko && hasSideline(B[tNameSplinter], 436)) {
+            const psPreHp4 = ef.hp;
+            ef.hp = Math.max(0, ef.hp - 1);
+            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
+            log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+            playDamageSfx(1);
+            hitDamage(enemyName);
+            popSidelineCard(B[tNameSplinter], 436);
+            if (ef.id === 24 && !ef.ko) {
+              B[enemyName].resources.fire++;
+              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+              log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+            }
           }
         }
       }
@@ -8261,17 +8280,18 @@ function doPreRollSetup() {
   if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
   if (B.pipDieRemoval && B.pipDieRemoval.blue > 0) blueCount = Math.max(1, blueCount - B.pipDieRemoval.blue);
 
-  // Forest Spirit (446) — Hex: consume die removal from Burn spend (applied to opponent's count)
+  // Mable Stadango (446) — Hex: consume die removal from Burn spend (applied to opponent's count)
+  // FIX: callout name corrected from "Forest Spirit" to "Mable Stadango"
   if (B.hexDieRemoval && B.hexDieRemoval.red > 0) {
     redCount = Math.max(1, redCount - B.hexDieRemoval.red);
-    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Forest Spirit — Hex! Red loses ${B.hexDieRemoval.red} die this roll!`, 'blue']);
-    log(`<span class="log-ability">Forest Spirit</span> — Hex! <span class="log-dmg">Red loses ${B.hexDieRemoval.red} die this roll!</span>`);
+    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Mable Stadango — Hex! Red loses ${B.hexDieRemoval.red} die this roll!`, 'blue']);
+    log(`<span class="log-ability">Mable Stadango</span> — Hex! <span class="log-dmg">Red loses ${B.hexDieRemoval.red} die this roll!</span>`);
     B.hexDieRemoval.red = 0;
   }
   if (B.hexDieRemoval && B.hexDieRemoval.blue > 0) {
     blueCount = Math.max(1, blueCount - B.hexDieRemoval.blue);
-    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Forest Spirit — Hex! Blue loses ${B.hexDieRemoval.blue} die this roll!`, 'red']);
-    log(`<span class="log-ability">Forest Spirit</span> — Hex! <span class="log-dmg">Blue loses ${B.hexDieRemoval.blue} die this roll!</span>`);
+    preRollCallouts.push(['HEX!', 'var(--uncommon)', `Mable Stadango — Hex! Blue loses ${B.hexDieRemoval.blue} die this roll!`, 'red']);
+    log(`<span class="log-ability">Mable Stadango</span> — Hex! <span class="log-dmg">Blue loses ${B.hexDieRemoval.blue} die this roll!</span>`);
     B.hexDieRemoval.blue = 0;
   }
 
@@ -12275,6 +12295,14 @@ function _resolveRoundImpl() {
   if (hasSideline(winTeam, 11) && !wF.ko) checkKnightEffects(winTeamName, wF.name); // Knight Terror/Light react to HOSPITALITY! (all branches)
   // Jeffery (14) — Chuckle: sideline passive — active ghost gains +3 HP when the winning roll DEFEATS the enemy ghost (lF.ko).
   // "Wins a battle" = KO an enemy ghost, NOT merely winning a roll. Filbert-aware, Cornelius-aware.
+  // Phase 3 debug breadcrumb — helps Wyatt verify the Chuckle path fires correctly
+  console.log('[CHUCKLE DEBUG]', {
+    hasSideline: hasSideline(winTeam, 14),
+    wFko: wF.ko,
+    lFko: lF.ko,
+    cornelius: corneliusBlocksRally,
+    filbert: filbertCursesWin
+  });
   if (hasSideline(winTeam, 14) && !wF.ko && lF.ko) {
     if (corneliusBlocksRally) {
       const cornJeffery = getSidelineGhost(loseTeam, 45);

@@ -171,18 +171,13 @@ function smartTriggerEntry(team) {
     if (koCount > 0) { f.hp += koCount * 2; } // overclocked! when hp > maxHp
   }
 
-  // Castle Guide (420) — Light the Way: entry → +1 Surge, +1 Lucky Stone, auto-place 1 Burn on random enemy sideline ghost
+  // Castle Guide (420) — Light the Way: entry → +1 Surge, +1 Lucky Stone, +1 Burn (as resource)
+  // FIX: aligned with index.html — gives Burn as a team resource, NOT placed on enemy sideline
   if (f.id === 420) {
     team.resources.surge++;
     team.resources.luckyStone++;
-    const enemyTeamName = team === B.red ? 'blue' : 'red';
-    const enemySideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
-    if (enemySideline.length > 0) {
-      const burnTarget = enemySideline[Math.floor(Math.random() * enemySideline.length)];
-      const burnIdx = enemy.ghosts.indexOf(burnTarget);
-      if (!B.burn) B.burn = { red: {}, blue: {} };
-      B.burn[enemyTeamName][burnIdx] = (B.burn[enemyTeamName][burnIdx] || 0) + 1;
-    }
+    if (!team.resources.burn) team.resources.burn = 0;
+    team.resources.burn++;
     applyEntryKnightRxn();
   }
 
@@ -333,21 +328,19 @@ function smartSimRounds(gameNum) {
     if (f.id === 304 && !f.ko && !hasSideline(enemy, 301)) {
       const ef = active(enemy);
       if (!ef.ko) {
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
-        // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-        if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
-        if (!ef.ko && hasSideline(team, 436)) {
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-          // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-          if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        }
-        // Masked Hero (55) — Underdog: counter 3 damage to the attacker (matches index.html line 6547)
+        // Phase 4: Masked Hero (55) Underdog fires BEFORE Ember Force damage — if attacker KO'd, skip
         if (ef.id === 55 && !ef.ko) {
           f.hp = Math.max(0, f.hp - 3);
           if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+          if (f.ko) return; // Attacker KO'd by Underdog — skip Ember Force damage
+        }
+        ef.hp = Math.max(0, ef.hp - 1);
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
+        if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
+        if (!ef.ko && hasSideline(team, 436)) {
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
         }
       }
     }
@@ -361,22 +354,20 @@ function smartSimRounds(gameNum) {
     if (hasSideline(team, 205) && !hasSideline(enemy, 301)) {
       const ef = active(enemy);
       if (!ef.ko && ef.hp < 4) {
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
-        // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-        if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
-        if (!ef.ko && hasSideline(team, 436)) {
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-          // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-          if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        }
-        // Masked Hero (55) — Underdog: counter 3 damage to attacker's active (matches index.html line 6596)
+        // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Shadow damage
         if (ef.id === 55 && !ef.ko) {
           const att = active(team);
           att.hp = Math.max(0, att.hp - 3);
           if (att.hp <= 0) { att.ko = true; att.killedBy = 55; }
+          if (att.ko) return; // Attacker KO'd by Underdog — skip Shade's Shadow damage
+        }
+        ef.hp = Math.max(0, ef.hp - 1);
+        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
+        if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
+        if (!ef.ko && hasSideline(team, 436)) {
+          ef.hp = Math.max(0, ef.hp - 1);
+          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
         }
       }
     }
@@ -394,22 +385,19 @@ function smartSimRounds(gameNum) {
     if (f.id !== 111 || f.ko || hasSideline(enemy, 301)) return;
     const ef = active(enemy);
     if (ef.ko || ef.id === 107) return; // Piper Slick Coat negates
-    ef.hp = Math.max(0, ef.hp - 1);
-    if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
-    // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-    if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
-    if (!ef.ko && hasSideline(team, 436)) {
-      ef.hp = Math.max(0, ef.hp - 1);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-      // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-      if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    }
-    // Masked Hero (55) — Underdog: counter 3 damage back to Shade (matches index.html line 6655)
+    // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Haunt damage
     if (ef.id === 55 && !ef.ko) {
       f.hp = Math.max(0, f.hp - 3);
       if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+      if (f.ko) return; // Shade KO'd by Underdog — skip Haunt damage
     }
+    ef.hp = Math.max(0, ef.hp - 1);
+    if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
+    if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
+    if (!ef.ko && hasSideline(team, 436)) {
+      ef.hp = Math.max(0, ef.hp - 1);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+      if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
   });
 
   // Splinter (101) — Toxic Fumes: once activated (first win), deal 1 chip damage to enemy before every roll.
@@ -422,41 +410,53 @@ function smartSimRounds(gameNum) {
     if (f.id !== 101 || f.ko || !B.splinterActivated[teamKey] || hasSideline(enemy, 301)) return;
     const ef = active(enemy);
     if (ef.ko) return;
+    // Phase 4: Masked Hero (55) Underdog fires BEFORE Splinter's Toxic Fumes damage
+    if (ef.id === 55 && !ef.ko) {
+      f.hp = Math.max(0, f.hp - 3);
+      if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
+      if (f.ko) return; // Splinter KO'd by Underdog — skip Toxic Fumes damage
+    }
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
-    // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
     if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
     if (!ef.ko && hasSideline(team, 436)) {
       ef.hp = Math.max(0, ef.hp - 1);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-      // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
       if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
     }
   });
 
-  // Lucy (108) — Blue Fire: pending 1 damage fires before the enemy's next roll (set on Lucy's win).
-  // Dylan Scarecrow (301) on enemy sideline negates (same guard as Shade/Splinter). Matches index.html lines 6665–6690.
+  // Lucy (108) / Humar (336) — pending delayed damage fires before the target's next roll.
+  // FIX: damage now correctly targets active(team) where teamKey holds the flag (the target team).
+  // Previous code incorrectly damaged active(enemy) — the WRONG team.
+  // Dylan Scarecrow (301) on target's sideline negates. Matches index.html lines 7696–7756.
   ['red','blue'].forEach(teamKey => {
     const team = B[teamKey];
     const enemy = opp(team);
     const enemyKey = teamKey === 'red' ? 'blue' : 'red';
     if (B.pendingLucyDmg[teamKey] <= 0) return;
+    const pendingDmg = B.pendingLucyDmg[teamKey];
     B.pendingLucyDmg[teamKey] = 0;                                    // always consume the flag
-    if (hasSideline(enemy, 301)) return;                              // Dylan negates
-    const ef = active(enemy);
-    if (ef.ko) return;
-    ef.hp = Math.max(0, ef.hp - 1);
-    if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 108; }
-    // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-    if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    // Princess Shade (436) — Royal Decree: +1 additional damage on pre-roll chip
-    // Lucy damage targets active(enemy); attacker is team (B[teamKey])
-    if (!ef.ko && hasSideline(team, 436)) {
-      ef.hp = Math.max(0, ef.hp - 1);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
-      // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
-      if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
+    if (hasSideline(team, 301)) return;                               // Dylan on TARGET team negates
+    const tf = active(team);                                          // target = the team holding the flag
+    if (tf.ko) return;
+    // Phase 4: Masked Hero (55) Underdog fires BEFORE Lucy/Humar delayed damage
+    if (tf.id === 55 && !tf.ko) {
+      const lucyAtt = active(enemy);
+      if (lucyAtt && !lucyAtt.ko) {
+        lucyAtt.hp = Math.max(0, lucyAtt.hp - 3);
+        if (lucyAtt.hp <= 0) { lucyAtt.ko = true; lucyAtt.killedBy = 55; }
+        if (lucyAtt.ko) return; // Attacker KO'd by Underdog — skip Lucy/Humar damage
+      }
+    }
+    tf.hp = Math.max(0, tf.hp - pendingDmg);
+    if (tf.hp <= 0) { tf.ko = true; tf.killedBy = pendingDmg >= 2 ? 336 : 108; }
+    if (tf.id === 24 && !tf.ko) { B[teamKey].resources.fire++; }
+    // Princess Shade (436) — Royal Decree: attacker (enemy) has Princess Shade on sideline
+    if (!tf.ko && hasSideline(enemy, 436)) {
+      tf.hp = Math.max(0, tf.hp - 1);
+      if (tf.hp <= 0) { tf.ko = true; tf.killedBy = 436; }
+      if (tf.id === 24 && !tf.ko) { B[teamKey].resources.fire++; }
     }
   });
 
