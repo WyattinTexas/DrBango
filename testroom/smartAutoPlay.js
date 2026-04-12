@@ -86,7 +86,9 @@ function smartPlayNext() {
     flameBlade: { red: false, blue: false },
     flameBladeSwing: { red: false, blue: false },
     iceBladeSwing: { red: false, blue: false },
-    gordokDieBonus: { red: 0, blue: 0 }
+    gordokDieBonus: { red: 0, blue: 0 },
+    hexDieRemoval: { red: 0, blue: 0 },
+    forestSpiritDecided: { red: false, blue: false }
   };
   S.battle = B;
 
@@ -184,9 +186,14 @@ function smartTriggerEntry(team) {
   }
 
   // Castle Guide (420) — Burn: check if the entering ghost has burn stacked on it
+  // Mike (445) — Torrent: sideline ghosts immune to Burn while Mike is on the team
   if (B.burn && B.burn[tName]) {
     const burnCount = B.burn[tName][team.activeIdx] || 0;
-    if (burnCount > 0 && !f.ko && f.id !== 416) {
+    const mikeProtects = hasSideline(team, 445);
+    if (burnCount > 0 && !f.ko && mikeProtects) {
+      // Mike's Torrent: sideline immune to Burn — consume burn, deal 0
+      delete B.burn[tName][team.activeIdx];
+    } else if (burnCount > 0 && !f.ko && f.id !== 416) {
       f.hp = Math.max(0, f.hp - burnCount);
       if (f.hp <= 0) { f.ko = true; f.killedBy = -2; }
       delete B.burn[tName][team.activeIdx];
@@ -637,6 +644,20 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Forest Spirit (446) — Hex: AI auto-spends Burn to remove enemy dice (if opponent has 4+ dice base)
+  B.hexDieRemoval = { red: 0, blue: 0 };
+  B.forestSpiritDecided = { red: false, blue: false };
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    const oppKey = teamKey === 'red' ? 'blue' : 'red';
+    if (f.id === 446 && !f.ko && (B[teamKey].resources.burn || 0) >= 1) {
+      // AI: spend all available burn (opponent always has 3+ base dice)
+      const burnToSpend = B[teamKey].resources.burn;
+      B[teamKey].resources.burn = 0;
+      B.hexDieRemoval[oppKey] = (B.hexDieRemoval[oppKey] || 0) + burnToSpend;
+    }
+  });
+
   // Chow (414) — Secret Ingredient: auto-discard 1 Healing Seed for +2 dice
   B.chowExtraDie = { red: 0, blue: 0 };
   ['red','blue'].forEach(teamKey => {
@@ -978,6 +999,18 @@ function smartSimRounds(gameNum) {
   // Pip (418) — Toasted: permanent die removal
   if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
   if (B.pipDieRemoval && B.pipDieRemoval.blue > 0) blueCount = Math.max(1, blueCount - B.pipDieRemoval.blue);
+
+  // Forest Spirit (446) — Hex: consume die removal from Burn spend
+  if (B.hexDieRemoval && B.hexDieRemoval.red > 0) { redCount = Math.max(1, redCount - B.hexDieRemoval.red); B.hexDieRemoval.red = 0; }
+  if (B.hexDieRemoval && B.hexDieRemoval.blue > 0) { blueCount = Math.max(1, blueCount - B.hexDieRemoval.blue); B.hexDieRemoval.blue = 0; }
+
+  // Professor Hawking (447) — Wisdom: +2 dice while holding a Moonstone (not consumed)
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 447 && !f.ko && B[teamKey].resources.moonstone > 0) {
+      if (teamKey === 'red') redCount += 2; else blueCount += 2;
+    }
+  });
 
   // Committed Surge adds dice
   redCount += B.committed.red.surge || 0;
@@ -1427,6 +1460,32 @@ function smartSimRounds(gameNum) {
         }
       }
     });
+    // Goob Party (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 of every resource
+    // Fire once even if both teams have Goob Party
+    {
+      let goobFired = false;
+      ['red','blue'].forEach(teamKey => {
+        if (goobFired) return;
+        const f = active(B[teamKey]);
+        const hasGoobActive = f.id === 444 && !f.ko;
+        const hasGoobSideline = hasSideline(B[teamKey], 444);
+        if (hasGoobActive || hasGoobSideline) {
+          goobFired = true;
+          [B.red, B.blue].forEach(t => {
+            t.resources.fire++;
+            t.resources.ice++;
+            t.resources.luckyStone++;
+            t.resources.moonstone++;
+            t.resources.healingSeed++;
+            t.resources.surge++;
+            if (!t.resources.burn) t.resources.burn = 0;
+            t.resources.burn++;
+            if (!t.resources.firefly) t.resources.firefly = 0;
+            t.resources.firefly++;
+          });
+        }
+      });
+    }
     // Ancient One (22) — Friend to All: sideline passive → active ghost gains +3 HP on ties
     // Cornelius (45) on enemy sideline blocks. Filbert (59) on enemy sideline flips to -3 damage.
     // Overclocks per Rule #9 — no Math.min cap. Matches index.html lines 8868–8893.
@@ -1620,6 +1679,8 @@ function smartSimRounds(gameNum) {
     }
     // Bigsby (424) — Omen: Win: +1 damage
     if (wF.id === 424 && !wF.ko) { dmg += 1; }
+    // Mike (445) — Torrent: Win: +1 damage
+    if (wF.id === 445 && !wF.ko) { dmg += 1; }
     // Twyla (417) — Lucky Dance: v674 rework — moved to dice count section (Lucky Stones give dice + Healing Seeds, not damage + HP)
     // Pudge (311) — doubles: +2 damage, 1 self-damage
     if (wF.id === 311 && wR.type === 'doubles') {
@@ -2207,6 +2268,17 @@ function smartSimRounds(gameNum) {
       if (sandwichLose) { lTeam.resources.moonstone++; }
     }
     // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section
+
+    // Harvey (448) — Harvest Moon: Win: gain +1 Moonstone for each 5 you rolled
+    if (wF.id === 448 && !wF.ko) {
+      const fives = winDice.filter(d => d === 5).length;
+      if (fives > 0) {
+        wTeam.resources.moonstone += fives;
+        // Sandwiches mirror for Moonstone
+        const sandwichLoseH = hasSideline(lTeam, 33);
+        if (sandwichLoseH) { lTeam.resources.moonstone += fives; }
+      }
+    }
 
     // On-KO triggers
     // Granny (310) BEDTIME STORY! — resource based on WINNER's roll type (matches index.html lines 10811–10826)
