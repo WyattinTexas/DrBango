@@ -2253,7 +2253,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v696';
+const TESTROOM_VERSION = 'v697';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3534,12 +3534,137 @@ function togglePick(team, id) {
   }, 100);
 }
 
+// --- Curated Team Compositions (Wyatt Directive 2026-04-11) ---
+// Each team is [starter, sideline1, sideline2]. Order matters:
+//   starter  = the fighter who battles first
+//   sideline1 = primary support / second fighter
+//   sideline2 = backup / synergy piece
+const CURATED_TEAMS = [
+  // ===================== HIGH TIER (15 teams) =====================
+
+  // #1  Valkin's Grand Conquest — Valkin KOs for full resource suite, Bigsby evolves into Doom on Moonstone, Willow +1 die after losses
+  [432, 424, 435],
+  // #2  Blue Fire Burn Chain — Lucy wins for Sacred Fires, Rascals entry 3 Burn, Mable spends Burn to remove dice + gain Sacred Fire
+  [108, 437, 446],
+  // #3  Ice Blade Forge — Zain forges Ice Blade from wins, Sylvia free Ice Shards, Finn forges Flame Blade from seeds+fire
+  [206, 313, 431],
+  // #4  Resurrection Engine — Bo revives on KO + 3 Fireflies, Lucas buffs revived ghost +3HP/+1die, Granny gains resources on ally KO
+  [109, 433, 310],
+  // #5  Dice Destroyer — Pip triples remove opponent dice permanently, Haywire triples gain permanent die, Willow +1 die after losses
+  [418, 78, 435],
+  // #6  Resource Avalanche — Chester wins for seeds/fireflies, Twyla spends Lucky Stones for +dice/+seeds, Zippa converts seeds to stones
+  [426, 417, 423],
+  // #7  Mountain King Doubles — TMK 2X doubles damage, Tabitha +2 doubles damage from sideline, Admiral +2 even doubles from sideline
+  [110, 95, 71],
+  // #8  Shade Pressure — Shade deals 1 before every roll, Shade's Shadow deals 1 to <4HP from sideline, Princess Shade +1 to pre-roll damage
+  [111, 205, 436],
+  // #9  Nerina Blitz — Nerina entry 3 damage, Nicholas 2 damage on enemy entry from sideline, Grawr entry 1 damage
+  [306, 51, 34],
+  // #10 Timber Lockdown — Timber forces discard or -1 die, Dylan blocks enemy before-roll effects + gains Burn, Piper negates effects/-1 die
+  [210, 301, 107],
+  // #11 Humar Burn Assault — Humar wins for 2 pre-roll damage + Burn, Mable spends Burn to remove dice, Princess Shade +1 pre-roll damage
+  [336, 446, 436],
+  // #12 Red Hunter Aggro — Red Hunter +3 damage if enemy holds specials, Gordok steals 2 specials on win, Dark Jeff +1 all damage from sideline
+  [345, 430, 74],
+  // #13 Sacred Fire Engine — Lucy wins for Sacred Fire, Fed & Hayden Sacred Fires don't discard, Lucy's Shadow doubles Lucy's fire damage
+  [108, 406, 439],
+  // #14 Toby All-In — Toby declares final roll for KO, Guardian Fairy takes hits from sideline, Hector singles beat doubles
+  [97, 99, 96],
+  // #15 Frost Blade Master — Skylar Ice Shards deal +2, Wise Al wins for 4 Ice Shards, Spockles wins for 2 Ice Shards
+  [104, 431, 81],
+
+  // ===================== MID TIER (25 teams) =====================
+
+  // #16 Dark Castle Control — Captain James triples for 2 Sacred Fires, Garrick -1 damage on loss + Sacred Fire on KO, Champ immune to specials
+  [443, 427, 438],
+  // #17 Rolling Hills Harvest — Farmer Jeff 6s gain Healing Seeds, Aunt Susan spends seeds for +2 damage/heal, Boopies seeds → stones
+  [314, 309, 419],
+  // #18 Frost Valley Blizzard — Romy predicts die for +3, Marcus 3+ damage taken → 4 extra dice, Pale Nimbus +2 if roll <7 from sideline
+  [114, 57, 88],
+  // #19 Tank & Spank — Bubble Boys 9HP wall, Bilbo +2 singles damage from sideline, Dark Jeff +1 all damage from sideline
+  [44, 80, 74],
+  // #20 Volcanic Disruption — Knight Terror enemy loses 2HP on ability trigger, Knight Light gains +1 die on enemy ability, Smudge names number to negate
+  [401, 402, 403],
+  // #21 Doubles Delight — Doc +5 doubles damage, Tabitha +2 doubles from sideline, Flora +2HP on doubles
+  [42, 95, 75],
+  // #22 Defensive Wall — Stone Cold 7HP + 3X double-1s, Puff -1 from enemy doubles/triples, Guard Thomas immune to singles below 6HP
+  [73, 5, 41],
+  // #23 Healing Seed Engine — Young Cap seeds give +1die/+1shard/+1surge, Chow spends seed for +2 dice, Kaplan gains seeds on enemy doubles
+  [429, 414, 308],
+  // #24 Frost Valley Thieves — Dallas steals 1 die for 2 rolls on entry, Suspicious Jeff steals 1 die on ally win, Outlaw doubles remove 1 die
+  [60, 61, 43],
+  // #25 Moonstone Madness — Benjamin free Moonstone use, Natalia even doubles → 2 Moonstones, Harvey wins → Moonstones per 5 rolled
+  [203, 327, 448],
+  // #26 Lucky Stone Payoff — Hank 4s gain Lucky Stones, Twyla spends stones for +dice/+seeds, Selene doubles → 2 seeds or 3 stones
+  [305, 417, 207],
+  // #27 Burn & Punish — Sable odd rolls gain Sacred Fire, The Ember Force 1 damage before rolling, Rook immune to fire + Surge damage bonus
+  [304, 413, 416],
+  // #28 Entry Damage Blitz — Grawr 1 damage on entry, Jenkins rolls 4 dice damage on entry, Nicholas 2 damage to enemy on entry
+  [34, 94, 51],
+  // #29 Simon's Fire Factory — Simon gains Sacred Fire when taking damage, Marcus 3+ damage → 4 extra dice, Mallow removes fire for 3HP from sideline
+  [24, 57, 89],
+  // #30 Surge Builder — Dart wins for 2 Surge, Boris spends Surge for +2HP, Chagrin loses for 1 Surge
+  [209, 343, 404],
+  // #31 Chow Kitchen — Chow spends seeds for +2 dice, Farmer Jeff 6s → seeds, Maximo gains seed + stone each round
+  [414, 314, 302],
+  // #32 Gordok Pirate — Gordok steals 2 specials on win + Moonstone, Nick & Knack steals 1 special + 3HP, Sandwiches mirrors enemy specials
+  [430, 409, 33],
+  // #33 Frost Valley Snipers — Night Master doubles+win → destroy <4HP sideline ghost, Pelter +2 doubles damage, Bogey reflects damage once
+  [103, 86, 53],
+  // #34 Redd Entrance — Redd entry +2 dice, Hugo enemy loses die on hit, Floop enemy loses die on doubles
+  [98, 52, 20],
+  // #35 Volcanic Activity Core — Rook immune to fire + Surge bonus, Sable odd rolls Sacred Fire, The Ember Force 1 pre-roll damage
+  [416, 413, 304],
+  // #36 HP Swap Gambit — Eloise spends Ice Shard to swap HP, Chad entry 2 Ice Shards, Sad Sal loses → Ice Shard
+  [85, 56, 29],
+  // #37 Wandering Sue Sniper — Sue destroys 12+ HP enemies, Villager +1HP on wins from sideline, Shoo +2HP when <4HP from sideline
+  [84, 11, 13],
+  // #38 Midrange Doubles — Prince Balatron counter die on survive loss, Kairan doubles → +1 die, Laura numeric order → +3 damage
+  [113, 68, 79],
+  // #39 Castle Guards Threes — Castle Guards 3s multiply damage by 2, Zach +3 doubles damage for Guard Thomas (but Guards benefit from 3s), Lou +1dmg/+1HP for Grawr from sideline
+  [39, 87, 88],
+  // #40 Jasper Glass Cannon — Jasper wins → bonus die damage + self-damage, Bilbo +2 singles from sideline, Dark Jeff +1 all damage
+  [428, 80, 74],
+
+  // ===================== FUN / MEME TIER (10 teams) =====================
+
+  // #41 Glass Cannon Squad — all tiny HP, maximum chaos
+  [8, 205, 410],   // Buttons 1HP triple-6 dream + Shade's Shadow <4HP poke + Mirror Matt reflects doubles
+  // #42 Mirror Theft — Mirror Matt reflects doubles, Nick & Knack steals specials, Outlaw removes dice on doubles
+  [410, 409, 43],
+  // #43 Tie Party — Jimmy ties for 5 stones + firefly, Goob Party ties for 2 fireflies each, Ancient One +3HP on ties from sideline
+  [352, 444, 22],
+  // #44 Tommy Salami Chain-6s — Tommy 6s chain extra dice, Rascals entry 3 Burn for fuel, Lars entry resources
+  [30, 437, 420],
+  // #45 All Legendary Showdown — Bo revives, Shade pre-roll damage, Selene doubles for resources
+  [109, 111, 305],
+  // #46 Buttons & Needle Dream — Buttons triple-6 for +15, Needle gives Buttons +1 die from sideline, Tabitha +2 doubles from sideline
+  [8, 21, 95],
+  // #47 Dupy Coin Flip — Dupy ties instant KO, Hermit entry HP per defeated ghosts, Little Boo turns enemy triples into 1-2-3
+  [12, 47, 9],
+  // #48 Fang Tag Team — Fang Outside swaps on win, Fang Undercover swaps on damage, Doug swaps once + gains die
+  [6, 7, 63],
+  // #49 Chaos Reroll — Jackson removes HP to reroll dice, Sonya changes die to 2, Dealer numeric order negates damage
+  [50, 69, 37],
+  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron negated damage destroys enemy, Masked Hero punishes before-roll effects
+  [4, 25, 55],
+];
+
 // --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
-// Fills one team randomly, excluding the other team's picks and respecting the
-// legendary cap. Reuses autoPickTeam() pool/shuffle logic — no duplication.
-function pickRandomTeam(team) {
-  const other = S[team === 'red' ? 'bluePicks' : 'redPicks'];
-  const pool = GHOSTS.filter(g => !SHELVED_IDS.has(g.id) && !other.includes(g.id));
+// Picks a curated 3-ghost composition. excludeIds prevents overlap with the other team.
+function getCuratedTeam(excludeIds = []) {
+  const validIds = new Set(GHOSTS.filter(g => !SHELVED_IDS.has(g.id)).map(g => g.id));
+  const available = CURATED_TEAMS.filter(team =>
+    team.every(id => validIds.has(id)) &&
+    !team.some(id => excludeIds.includes(id))
+  );
+  if (available.length === 0) return getRandomTeamFallback(excludeIds);
+  return [...available[Math.floor(Math.random() * available.length)]];
+}
+
+// Fallback: purely random team when no curated team fits (e.g. extreme overlap)
+function getRandomTeamFallback(excludeIds = []) {
+  const pool = GHOSTS.filter(g => !SHELVED_IDS.has(g.id) && !excludeIds.includes(g.id));
   const picks = [];
   let hasLegendary = false;
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -3551,18 +3676,19 @@ function pickRandomTeam(team) {
     }
     picks.push(g.id);
   }
-  S[`${team}Picks`] = picks;
+  return picks;
+}
+
+function pickRandomTeam(team) {
+  const other = S[team === 'red' ? 'bluePicks' : 'redPicks'];
+  S[`${team}Picks`] = getCuratedTeam(other);
   renderPicks();
 }
 
-// Fills both teams at once, re-rolling Blue until there's no overlap.
-// Mirrors the autoPlayNext() overlap-check pattern exactly.
+// Fills both teams at once with two non-overlapping curated teams.
 function pickRandomBoth() {
-  S.redPicks = autoPickTeam();
-  S.bluePicks = autoPickTeam();
-  while (S.bluePicks.some(id => S.redPicks.includes(id))) {
-    S.bluePicks = autoPickTeam();
-  }
+  S.redPicks = getCuratedTeam([]);
+  S.bluePicks = getCuratedTeam(S.redPicks);
   renderPicks();
 }
 
