@@ -1536,7 +1536,7 @@ function smartSimRounds(gameNum) {
           goobFired = true;
           [B.red, B.blue].forEach(t => {
             if (!t.resources.firefly) t.resources.firefly = 0;
-            t.resources.firefly++;
+            t.resources.firefly += 2;
           });
         }
       });
