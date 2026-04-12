@@ -3092,6 +3092,7 @@ function autoPlayNext() {
     darkWingUsedThisGame: { red: false, blue: false },
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
+    willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
     mallowDecided: { red: false, blue: false },
     jeanieUsed: { red: false, blue: false },
@@ -3553,6 +3554,7 @@ function startBattle() {
     darkWingUsedThisGame: { red: false, blue: false },
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
+    willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
     mallowDecided: { red: false, blue: false },
     jeanieUsed: { red: false, blue: false },
@@ -8013,6 +8015,21 @@ function doPreRollSetup() {
     }
   });
 
+  // Willow (435) — Joy of Painting: Sideline & In Play: +1 die if you lost the last roll
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameW = team === B.red ? 'red' : 'blue';
+    const hasWillowActive = f.id === 435 && !f.ko;
+    const hasWillowSideline = hasSideline(team, 435);
+    if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tNameW]) {
+      if (tNameW === 'red') redCount++; else blueCount++;
+      const wName = hasWillowActive ? f.name : (getSidelineGhost(team, 435) || {}).name || 'Willow';
+      const wLabel = hasWillowActive ? '' : ' (sideline)';
+      preRollCallouts.push(['JOY OF PAINTING!', 'var(--ghost-rare)', `${wName}${wLabel} — Lost last roll! +1 die!`, tNameW]);
+      log(`<span class="log-ability">${wName}${wLabel}</span> — Joy of Painting! Lost last roll → +1 die!`);
+    }
+  });
+
   // Dream Cat (28) — Jinx: consume last round's both-doubles bonus
   if (B.dreamCatBonus && B.dreamCatBonus.red > 0) {
     const dcRed = active(B.red);
@@ -10067,6 +10084,8 @@ function _resolveRoundImpl() {
     if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
     if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+    // Willow (435) — Joy of Painting: tie = nobody lost, clear both flags
+    if (B.willowLostLast) { B.willowLostLast.red = false; B.willowLostLast.blue = false; }
     // Reset item swing toggles each round (player must actively choose to swing)
     if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
     if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
@@ -12505,6 +12524,8 @@ function _resolveRoundImpl() {
       if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
       if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
       if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+      // Willow (435) — Joy of Painting: winner didn't lose, loser did
+      if (B.willowLostLast) { B.willowLostLast[winTeamName] = false; B.willowLostLast[loseTeamName] = true; }
       // Reset item swing toggles each round (player must actively choose to swing)
       if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
       if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
