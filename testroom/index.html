@@ -2110,7 +2110,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v674';
+const TESTROOM_VERSION = 'v675';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -7442,18 +7442,7 @@ function doPreRollSetup() {
   if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) blueCount += B.chowExtraDie.blue;
 
-  // Twyla (417) — Lucky Dance: each Lucky Stone spent this turn adds +1 die AND gains +1 Healing Seed
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 417 && !f.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[tName] > 0) {
-      const twylaBonus = B.luckyStoneSpentThisTurn[tName];
-      if (tName === 'red') redCount += twylaBonus; else blueCount += twylaBonus;
-      team.resources.healingSeed += twylaBonus;
-      preRollCallouts.push(['LUCKY DANCE!', 'var(--rare)', `${f.name} — ${twylaBonus} Lucky Stone${twylaBonus>1?'s':''} spent! +${twylaBonus} dice + ${twylaBonus} Healing Seed${twylaBonus>1?'s':''}!`, tName]);
-      log(`<span class="log-ability">${f.name}</span> — Lucky Dance! ${twylaBonus} Lucky Stone${twylaBonus>1?'s':''} → <span class="log-ice">+${twylaBonus} dice</span> + <span class="log-heal">+${twylaBonus} Healing Seed${twylaBonus>1?'s':''}!</span>`);
-    }
-  });
+  // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
   // Gordok (430) — River Terror: +1 die next roll after stealing (consumed after use)
   if (B.gordokDieBonus && B.gordokDieBonus.red > 0) {
@@ -8904,6 +8893,28 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
 
     // Track Lucky Stone usage for Twyla (417) Lucky Dance
     if (B.luckyStoneSpentThisTurn) B.luckyStoneSpentThisTurn[team] = (B.luckyStoneSpentThisTurn[team] || 0) + 1;
+
+    // Twyla (417) — Lucky Dance: each Lucky Stone spent adds +1 bonus die AND +1 Healing Seed LIVE
+    const twylaFighter = active(B[team]);
+    if (twylaFighter.id === 417 && !twylaFighter.ko) {
+      // Add bonus die to the live dice array
+      const lsRoll2 = Math.random();
+      const bonusDie = lsRoll2 < 0.12 ? 1 : lsRoll2 < 0.22 ? 2 : lsRoll2 < 0.34 ? 3 : lsRoll2 < 0.50 ? 4 : lsRoll2 < 0.70 ? 5 : 6;
+      dice.push(bonusDie);
+      dice.sort((a, b) => a - b);
+      // Sync dice back to battle state
+      if (team === 'red') { B.pendingResolve.redDice = dice; B.redDice = dice; }
+      else { B.pendingResolve.blueDice = dice; B.blueDice = dice; }
+      // Grant Healing Seed
+      B[team].resources.healingSeed++;
+      log(`<span class="log-ability">${twylaFighter.name}</span> — Lucky Dance! <span class="log-heal">+1 Healing Seed!</span> <span class="log-ice">+1 bonus die (${bonusDie})!</span>`);
+      showAbilityCallout('LUCKY DANCE!', 'var(--rare)', `${twylaFighter.name} — +1 die and +1 Healing Seed!`, team);
+      // Re-render dice to show the new bonus die
+      renderDice(
+        team === 'red' ? dice : B.pendingResolve.redDice,
+        team === 'blue' ? dice : B.pendingResolve.blueDice
+      );
+    }
 
     log(`<span class="log-ms">Lucky Stone!</span> ${team.charAt(0).toUpperCase()+team.slice(1)} rerolled ${oldVal} → <b>${newVal}</b> → [${dice.join(', ')}]`);
     narrate(`<b class="gold">Lucky Stone!</b> Rerolled ${oldVal} → <b>${newVal}</b>!`);

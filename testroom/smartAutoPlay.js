@@ -862,15 +862,7 @@ function smartSimRounds(gameNum) {
   if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) blueCount += B.chowExtraDie.blue;
 
-  // Twyla (417) — Lucky Dance: each Lucky Stone spent this turn adds +1 die AND gains +1 Healing Seed
-  ['red','blue'].forEach(teamKey => {
-    const f = active(B[teamKey]);
-    if (f.id === 417 && !f.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[teamKey] > 0) {
-      const twylaBonus = B.luckyStoneSpentThisTurn[teamKey];
-      if (teamKey === 'red') redCount += twylaBonus; else blueCount += twylaBonus;
-      B[teamKey].resources.healingSeed += twylaBonus;
-    }
-  });
+  // Twyla (417) — Lucky Dance: MOVED to Lucky Stone section (v675) — bonus dice + seeds granted when each stone is spent
 
   // Gordok (430) — River Terror: +1 die next roll after stealing (consumed after use)
   if (B.gordokDieBonus && B.gordokDieBonus.red > 0) { redCount += B.gordokDieBonus.red; B.gordokDieBonus.red = 0; }
@@ -1206,6 +1198,16 @@ function smartSimRounds(gameNum) {
       // Boopies (419) — Boopie Magic: sideline — when active spends Healing Seed... (Lucky Stone spending, not seed — no trigger here)
       if (teamKey === 'red') { redDice.splice(0, redDice.length, ...improved); }
       else { blueDice.splice(0, blueDice.length, ...improved); }
+      // Twyla (417) — Lucky Dance: each stone spent adds +1 bonus die + +1 Healing Seed (v675)
+      const twylaF = active(B[teamKey]);
+      if (twylaF.id === 417 && !twylaF.ko) {
+        const lsRoll2 = Math.random();
+        const bonusDie = lsRoll2 < 0.12 ? 1 : lsRoll2 < 0.22 ? 2 : lsRoll2 < 0.34 ? 3 : lsRoll2 < 0.50 ? 4 : lsRoll2 < 0.70 ? 5 : 6;
+        const tDice = teamKey === 'red' ? redDice : blueDice;
+        tDice.push(bonusDie);
+        tDice.sort((a, b) => a - b);
+        B[teamKey].resources.healingSeed++;
+      }
     }
   });
 
