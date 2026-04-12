@@ -288,6 +288,14 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .rarity-filter-btn.active[data-rarity="ghost-rare"] { background:var(--ghost-rare); border-color:var(--ghost-rare); }
 .rarity-filter-btn.active[data-rarity="legendary"] { background:var(--legendary); border-color:var(--legendary); }
 
+.set-filter-btn {
+  padding:7px 14px; border-radius:8px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text2); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+  cursor:pointer; transition:all .2s;
+}
+.set-filter-btn:hover { border-color:var(--text2); color:var(--text); }
+.set-filter-btn.active { color:white; background:linear-gradient(135deg,var(--gold-deep),var(--gold)); border-color:var(--gold); }
+
 /* Team Roster Panels */
 .team-rosters { display:flex; gap:20px; margin-bottom:24px; }
 .team-roster {
@@ -1586,6 +1594,17 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <button class="rarity-filter-btn" data-rarity="legendary" onclick="setRarityFilter('legendary')">Legendary</button>
       </div>
 
+      <!-- Set Filters -->
+      <div class="picker-filters" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <button class="set-filter-btn active" data-set="all" onclick="filterPicks('all')">All Sets</button>
+        <button class="set-filter-btn" data-set="Set 1" onclick="filterPicks('Set 1')">Set 1</button>
+        <button class="set-filter-btn" data-set="Frost Valley" onclick="filterPicks('Frost Valley')">Frost Valley</button>
+        <button class="set-filter-btn" data-set="Dark Castle" onclick="filterPicks('Dark Castle')">Dark Castle</button>
+        <button class="set-filter-btn" data-set="Volcanic Activity" onclick="filterPicks('Volcanic Activity')">Volcanic Activity</button>
+        <button class="set-filter-btn" data-set="Rolling Hills" onclick="filterPicks('Rolling Hills')">Rolling Hills</button>
+        <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;margin-left:auto;">
+      </div>
+
       <div style="margin-bottom:24px;">
         <div class="team-label red" style="font-size:18px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
           <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px rgba(233,69,96,0.5);"></span>
@@ -1836,6 +1855,17 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
     <div class="selene-options">
       <button class="selene-opt" id="balatronRollBtn" onclick="doBalatronRoll()" style="background:linear-gradient(135deg,#a855f7,#6b21a8);">🎲 Roll the Counter Die!</button>
     </div>
+  </div>
+</div>
+
+<!-- Tommy Salami (30) — Regulator chain-dice interactive modal -->
+<div class="selene-overlay" id="tommyOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#92400e,#d97706);">🎲 REGULATOR!</div>
+    <h3 id="tommyTitle">Tommy Salami — Regulator!</h3>
+    <p class="selene-sub" id="tommySub">You rolled a 6! Roll a bonus die!</p>
+    <div id="tommyDieDisplay" style="font-size:48px;text-align:center;margin:12px 0;">🎲</div>
+    <button class="selene-opt" id="tommyRollBtn" onclick="doTommyRoll()" style="background:linear-gradient(135deg,#92400e,#d97706);">🎲 Roll the Bonus Die!</button>
   </div>
 </div>
 
@@ -2218,7 +2248,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v692';
+const TESTROOM_VERSION = 'v693';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -2624,7 +2654,7 @@ const GHOSTS = [
   {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"While on the sideline, if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
   {id:53, name:"Bogey", rarity:"uncommon", maxHp:5, art:"art/originals/bogey.jpg", ability:"Bogus", abilityDesc:"When damage would hit Bogey, you may reflect it back at the attacker. Once per game.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley. One-shot reactive reflect."},
   {id:54, name:"Roger", rarity:"uncommon", maxHp:6, art:"art/originals/roger.jpg", ability:"Tempest", abilityDesc:"Roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Double-pair jackpot."},
-  {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Anti-pre-roll punisher."},
+  {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage before the effect happens. If this KOs the enemy, their effect is cancelled.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Anti-pre-roll punisher."},
   {id:56, name:"Chad", rarity:"uncommon", maxHp:6, art:"art/originals/chad.jpg", ability:"Sploop!", abilityDesc:"On entry, gain 2 Ice Shards.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Entry resource gen."},
   {id:57, name:"Marcus", rarity:"uncommon", maxHp:7, art:"art/originals/marcus.jpg", ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: gain 4 extra dice next roll.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Big hit = big retaliation."},
   {id:58, name:"Ashley", rarity:"uncommon", maxHp:3, art:"art/originals/ashley.jpg", ability:"Burning Soul", abilityDesc:"Win a roll: gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Win-triggered Sacred Fire."},
