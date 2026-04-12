@@ -657,6 +657,24 @@ function smartSimRounds(gameNum) {
       }
     }
 
+    // Burn resource: auto-place all burn on highest-HP enemy sideline ghost
+    if (r.burn && r.burn > 0) {
+      const oppKey = team === 'red' ? 'blue' : 'red';
+      const opp = B[oppKey];
+      const sidelineGhosts = opp.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== opp.activeIdx && !x.ghost.ko);
+      if (sidelineGhosts.length > 0) {
+        // Pick highest HP target
+        sidelineGhosts.sort((a, b) => b.ghost.hp - a.ghost.hp);
+        const target = sidelineGhosts[0];
+        if (!B.burn) B.burn = { red: {}, blue: {} };
+        if (!B.burn[oppKey]) B.burn[oppKey] = {};
+        B.burn[oppKey][target.index] = (B.burn[oppKey][target.index] || 0) + r.burn;
+        r.burn = 0;
+      }
+    }
+
     // Happy Crystal (208): sacrifice if we have 0 moonstones and HP > 1
     if (f.id === 208 && !f.ko && r.moonstone === 0 && f.hp > 1) {
       f.hp = 0; f.ko = true; f.killedBy = -1;

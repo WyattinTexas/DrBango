@@ -1274,6 +1274,25 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   0%,100% { box-shadow:0 0 0 2px gold, 0 0 18px rgba(255,215,0,0.6); }
   50%      { box-shadow:0 0 0 3px gold, 0 0 32px rgba(255,215,0,0.95); }
 }
+.burn-badge {
+  position:absolute; top:4px; right:4px; z-index:5;
+  background:linear-gradient(135deg,#b91c1c,#ef4444); color:#fff;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:8px;
+  box-shadow:0 0 8px rgba(239,68,68,0.7); pointer-events:none;
+  display:flex; align-items:center; gap:2px;
+}
+.sideline-slot.burn-pick {
+  cursor:pointer !important;
+  border-color:#ef4444 !important;
+  box-shadow:0 0 0 2px #ef4444, 0 0 22px rgba(239,68,68,0.7) !important;
+  animation:burnPickPulse 0.75s ease-in-out infinite;
+  transform:scale(1.04); z-index:2;
+}
+.sideline-slot.burn-pick:hover { box-shadow:0 0 0 3px #ef4444, 0 0 36px rgba(239,68,68,1) !important; }
+@keyframes burnPickPulse {
+  0%,100% { box-shadow:0 0 0 2px #ef4444, 0 0 18px rgba(239,68,68,0.6); }
+  50%      { box-shadow:0 0 0 3px #ef4444, 0 0 32px rgba(239,68,68,0.95); }
+}
 .so-name { font-weight:700; }
 .so-info { font-size:12px; color:var(--text2); }
 
@@ -1920,6 +1939,16 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Burn Picker — place burn on enemy sideline ghost -->
+<div class="selene-overlay" id="burnOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#7c1a1a,#c0392b);">🔥 PLACE BURN</div>
+    <h3>Choose an enemy sideline ghost to Burn!</h3>
+    <p class="selene-sub" id="burnPickerSub">The selected ghost takes damage when it enters battle.</p>
+    <div class="selene-options" id="burnPickerOptions"></div>
+  </div>
+</div>
+
 <!-- Jasper (428) — Flame Dive: interactive bonus die reveal -->
 <div class="selene-overlay" id="jasperOverlay">
   <div class="selene-modal">
@@ -2110,7 +2139,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v675';
+const TESTROOM_VERSION = 'v676';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4796,6 +4825,74 @@ function doNickKnackSteal(team, resKey) {
   } else {
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
   }
+}
+
+// ============================================================
+// BURN — Place burn resource on enemy sideline ghost (pre-roll)
+// ============================================================
+function showBurnPicker(team) {
+  const t = B[team];
+  const burnCount = t.resources.burn || 0;
+  if (burnCount <= 0) return;
+
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+  const enemyTeam = B[enemyTeamName];
+
+  // Find non-KO'd sideline ghosts on enemy team
+  const sidelineGhosts = enemyTeam.ghosts
+    .map((g, i) => ({ ghost: g, index: i }))
+    .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+
+  if (sidelineGhosts.length === 0) {
+    log('<span class="log-ability">BURN</span> — No enemy sideline ghosts to burn!');
+    return;
+  }
+
+  B.burnPickerTeam = team;
+
+  const optionsEl = document.getElementById('burnPickerOptions');
+  let html = '';
+  sidelineGhosts.forEach(({ ghost, index }) => {
+    const gd = ghostData(ghost.id);
+    const existingBurn = (B.burn && B.burn[enemyTeamName] && B.burn[enemyTeamName][index]) || 0;
+    const burnLabel = existingBurn > 0 ? ` (${existingBurn} Burn already)` : '';
+    html += `<button class="selene-opt" onclick="doBurnPlace('${team}',${index})" style="background:linear-gradient(135deg,#7c1a1a,#c0392b);">🔥 ${ghost.name} — ${ghost.hp}/${ghost.maxHp} HP${burnLabel}</button>`;
+  });
+  html += `<button class="selene-opt" onclick="closeBurnPicker()" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
+  optionsEl.innerHTML = html;
+  document.getElementById('burnPickerSub').innerHTML = `You have <b>${burnCount}</b> Burn to place. Each Burn deals 1 damage when the ghost enters battle.`;
+  document.getElementById('burnOverlay').classList.add('active');
+}
+
+function doBurnPlace(team, ghostIndex) {
+  const t = B[team];
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+
+  if (!t.resources.burn || t.resources.burn <= 0) { closeBurnPicker(); return; }
+
+  t.resources.burn--;
+  if (!B.burn) B.burn = { red: {}, blue: {} };
+  if (!B.burn[enemyTeamName]) B.burn[enemyTeamName] = {};
+  B.burn[enemyTeamName][ghostIndex] = (B.burn[enemyTeamName][ghostIndex] || 0) + 1;
+
+  const targetGhost = B[enemyTeamName].ghosts[ghostIndex];
+  const totalBurn = B.burn[enemyTeamName][ghostIndex];
+  log(`<span class="log-ability">BURN!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalBurn} total)`);
+  showAbilityCallout('BURN!', 'var(--rare)', `${targetGhost.name} has been marked! ${totalBurn} Burn on entry!`, team);
+
+  renderBattle();
+
+  // If still have burn to place, re-open picker after a brief delay
+  if (t.resources.burn > 0) {
+    setTimeout(() => showBurnPicker(team), 800);
+  } else {
+    closeBurnPicker();
+  }
+}
+
+function closeBurnPicker() {
+  document.getElementById('burnOverlay').classList.remove('active');
+  B.burnPickerTeam = null;
 }
 
 // ============================================================
@@ -12625,7 +12722,13 @@ function renderBattle() {
         const isPick = isKoPickTeam && !sl[i].ko;
         const realIdx = t.ghosts.indexOf(sl[i]);
         el.className = `arena-card sideline-slot rarity-${slData.rarity} ${sl[i].ko?'ko':''} ${isPick?'ko-swap-pick':''}`;
-        el.innerHTML = renderCardSlot(sl[i], false);
+        let slCardHtml = renderCardSlot(sl[i], false);
+        // Burn badge: show how much burn is stacked on this sideline ghost
+        if (B.burn && B.burn[team] && B.burn[team][realIdx]) {
+          const bc = B.burn[team][realIdx];
+          slCardHtml += `<div class="burn-badge">🔥${bc}</div>`;
+        }
+        el.innerHTML = slCardHtml;
         el.onclick = isPick ? () => doKoSwap(team, realIdx) : null;
       } else {
         el.style.visibility = 'hidden';
@@ -12692,7 +12795,12 @@ function renderBattle() {
     if (r.luckyStone > 0) {
       rh += `<div class="res-tile luckyStone" title="Lucky Stone: use after rolling to reroll any one of your dice"><span class="res-main">🍀</span><span class="res-count">${r.luckyStone}</span><span class="res-label">LUCK</span></div>`;
     }
-    // Castle Guide (420) — Burn: show total burn placed on enemy sideline ghosts
+    // Burn resource pool — clickable to place on enemy sideline ghosts (pre-roll only)
+    if (r.burn > 0) {
+      const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
+      rh += `<div class="res-tile fire ${isReady?'clickable':''}" ${burnClick} title="Burn: ${r.burn} available — click to place on an enemy sideline ghost (deals damage on entry)"><span class="res-main">🔥</span><span class="res-count">${r.burn}</span><span class="res-label">BURN</span></div>`;
+    }
+    // Castle Guide (420) — Burn: show total burn already placed on enemy sideline ghosts
     if (B.burn) {
       const enemyTeam = team === 'red' ? 'blue' : 'red';
       const burnObj = B.burn[enemyTeam] || {};
@@ -12702,7 +12810,7 @@ function renderBattle() {
           const g = B[enemyTeam].ghosts[parseInt(idx)];
           return g ? `${g.name}: ${cnt}` : '';
         }).filter(Boolean).join(', ');
-        rh += `<div class="res-tile fire" title="Burn placed on enemy: ${burnDetails}"><span class="res-main">💥</span><span class="res-count">${totalBurn}</span><span class="res-label">BURN</span></div>`;
+        rh += `<div class="res-tile fire" title="Burn placed on enemy: ${burnDetails}"><span class="res-main">💥</span><span class="res-count">${totalBurn}</span><span class="res-label">PLACED</span></div>`;
       }
     }
     // Happy Crystal (208) — sacrifice tile
