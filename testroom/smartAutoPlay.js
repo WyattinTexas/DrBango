@@ -1930,7 +1930,9 @@ function smartSimRounds(gameNum) {
     if (wF.id === 206 && !wF.ko) { wTeam.resources.ice++;             if (sandwichLose) lTeam.resources.ice++;   }           // Zain: ICE SHARD! +1 Ice on win — matches index.html line 10541
     if (wF.id === 58  && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Ashley: BURNING SOUL! +1 Sacred Fire on win — matches index.html line 10557
     // Dylan (301) — Stained Glass: Win → gain 1 Burn
-    if (wF.id === 301 && !wF.ko) { if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
+    // Dylan (301) Stained Glass — Sideline & In Play: winning rolls gain +1 Burn
+    const hasDylanWinSim = (wF.id === 301 && !wF.ko) || hasSideline(wTeam, 301);
+    if (hasDylanWinSim) { if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
     // Selene (305) — Heart of the Hills: doubles win → choose 1 Healing Seed OR 2 Lucky Stones.
     // AI heuristic: pick 2 Lucky Stones (2 post-roll rerolls > 1 seed) unless Selene is at <½ HP,
     // in which case prefer a Healing Seed for future recovery value.
@@ -2140,7 +2142,7 @@ function smartSimRounds(gameNum) {
       // Garrick (427) — Watchfire: Win + KO → +1 Sacred Fire
       if (wF.id === 427 && !wF.ko) { wTeam.resources.fire++; }
       // Nyx & Bessie (415) — Moo! Caw!: sideline KO → 3 Healing Seeds
-      if (hasSideline(wTeam, 415) && !wF.ko) { wTeam.resources.healingSeed += 3; }
+      if (hasSideline(wTeam, 415) && !wF.ko) { wTeam.resources.healingSeed += 4; }
       // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite
       if (wF.id === 432 && !wF.ko) {
         wTeam.resources.fire += 1;
