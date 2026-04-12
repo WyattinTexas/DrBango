@@ -82,7 +82,11 @@ function smartPlayNext() {
     burn: { red: {}, blue: {} },
     chowExtraDie: { red: 0, blue: 0 },
     lucasKindlingBonus: { red: 0, blue: 0 },
-    iceBladeForgedPermanent: { red: false, blue: false }
+    iceBladeForgedPermanent: { red: false, blue: false },
+    flameBlade: { red: false, blue: false },
+    flameBladeSwing: { red: false, blue: false },
+    iceBladeSwing: { red: false, blue: false },
+    gordokDieBonus: { red: 0, blue: 0 }
   };
   S.battle = B;
 
@@ -562,6 +566,17 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Zippa (423) — Glimmer: before rolling, gain Lucky Stones equal to Healing Seeds held (v674: moved from win to pre-roll)
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 423 && !f.ko) {
+      const seeds = B[teamKey].resources.healingSeed || 0;
+      if (seeds > 0) {
+        B[teamKey].resources.luckyStone += seeds;
+      }
+    }
+  });
+
   // Chow (414) — Secret Ingredient: auto-discard 1 Healing Seed for +2 dice
   B.chowExtraDie = { red: 0, blue: 0 };
   ['red','blue'].forEach(teamKey => {
@@ -598,7 +613,7 @@ function smartSimRounds(gameNum) {
       r.ice--;
       r.moonstone--;
       f.iceBladeForged = true;
-      B.iceBladeForgedPermanent[teamKey] = true; // permanent +2 damage for all wins
+      B.iceBladeForgedPermanent[team] = true; // permanent +2 damage for all wins
     }
 
     // Surge: spend up to 2
@@ -667,9 +682,24 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Finn (204) — Forge: opt-in pre-roll button (see useFinnForge in index.html), no auto-trigger
-  // The player clicks the Forge button to convert 2 ice→moonstone or 2 fire→moonstone.
-  // Do NOT auto-spend here — same pattern as Zain (206) Ice Blade (see line 74).
+  // Finn (204) — Flame Blade: auto-forge if Finn alive on team, have 2+ Healing Seeds + 1+ Sacred Fire, not yet forged
+  ['red','blue'].forEach(teamKey => {
+    const team = B[teamKey];
+    const finnAlive = team.ghosts.some(g => g.id === 204 && !g.ko);
+    if (finnAlive && (!B.flameBlade || !B.flameBlade[teamKey]) && (team.resources.healingSeed || 0) >= 2 && (team.resources.fire || 0) >= 1) {
+      team.resources.healingSeed -= 2;
+      team.resources.fire -= 1;
+      if (!B.flameBlade) B.flameBlade = { red: false, blue: false };
+      B.flameBlade[teamKey] = true;
+    }
+  });
+  // Flame Blade: AI always swings when forged (maximises die count and enables +5 Burn on win)
+  ['red','blue'].forEach(teamKey => {
+    if (B.flameBlade && B.flameBlade[teamKey]) {
+      if (!B.flameBladeSwing) B.flameBladeSwing = { red: false, blue: false };
+      B.flameBladeSwing[teamKey] = true;
+    }
+  });
 
   // ===== COMPUTE DICE COUNTS =====
   let redCount = 3, blueCount = 3;
@@ -772,13 +802,13 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Zain (206) — Ice Blade swing: always swing when forged → +1 die for that roll.
+  // Ice Blade swing: always swing when forged → +1 die for that roll (fires for any active ghost, not just Zain).
   // Sim always swings when forged (maximises die count and enables +2 dmg on win).
-  // Matches index.html doPreRollSetup lines 7130–7144 (B.committed[team].zainBlade > 0 → +1 die).
   ['red','blue'].forEach(teamKey => {
-    const f = active(B[teamKey]);
-    if (f.id === 206 && !f.ko && f.iceBladeForged) {
+    if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[teamKey]) {
       B.committed[teamKey].zainBlade = 1;
+      if (!B.iceBladeSwing) B.iceBladeSwing = { red: false, blue: false };
+      B.iceBladeSwing[teamKey] = true;
       if (teamKey === 'red') redCount++; else blueCount++;
     }
   });
@@ -831,6 +861,24 @@ function smartSimRounds(gameNum) {
   // Chow (414) — Secret Ingredient: +2 dice from discarded seed
   if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) blueCount += B.chowExtraDie.blue;
+
+  // Twyla (417) — Lucky Dance: each Lucky Stone spent this turn adds +1 die AND gains +1 Healing Seed
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 417 && !f.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[teamKey] > 0) {
+      const twylaBonus = B.luckyStoneSpentThisTurn[teamKey];
+      if (teamKey === 'red') redCount += twylaBonus; else blueCount += twylaBonus;
+      B[teamKey].resources.healingSeed += twylaBonus;
+    }
+  });
+
+  // Gordok (430) — River Terror: +1 die next roll after stealing (consumed after use)
+  if (B.gordokDieBonus && B.gordokDieBonus.red > 0) { redCount += B.gordokDieBonus.red; B.gordokDieBonus.red = 0; }
+  if (B.gordokDieBonus && B.gordokDieBonus.blue > 0) { blueCount += B.gordokDieBonus.blue; B.gordokDieBonus.blue = 0; }
+
+  // Flame Blade item: when swinging, +1 die
+  if (B.flameBladeSwing && B.flameBladeSwing.red) redCount += 1;
+  if (B.flameBladeSwing && B.flameBladeSwing.blue) blueCount += 1;
 
   // Pip (418) — Toasted: permanent die removal
   if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
@@ -1346,6 +1394,9 @@ function smartSimRounds(gameNum) {
     });
     // Reset luckyStoneSpentThisTurn on tie (mirrors index.html line 9168)
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+    // Reset item swing toggles on tie
+    if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
+    if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
     // Fang Undercover (7) — clear arm on tie (no damage taken this round). Mirrors index.html line 8968.
     B.fangUndercoverArmed.red = false;
     B.fangUndercoverArmed.blue = false;
@@ -1406,20 +1457,20 @@ function smartSimRounds(gameNum) {
     }
     // Bigsby (424) — Omen: Win: +1 damage
     if (wF.id === 424 && !wF.ko) { dmg += 1; }
-    // Twyla (417) — Lucky Dance: Win: each Lucky Stone spent this turn → +1 dmg + +1 HP
-    if (wF.id === 417 && !wF.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[winTeamName] > 0) {
-      const twylaBonus = B.luckyStoneSpentThisTurn[winTeamName];
-      dmg += twylaBonus;
-      wF.hp += twylaBonus;
-    }
+    // Twyla (417) — Lucky Dance: v674 rework — moved to dice count section (Lucky Stones give dice + Healing Seeds, not damage + HP)
     // Pudge (311) — doubles: +2 damage, 1 self-damage
     if (wF.id === 311 && wR.type === 'doubles') {
       dmg += 2;
       wF.hp = Math.max(0, wF.hp - 1);
       if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; } // self-inflicted (Belly Flop) — no kill credit to enemy; matches index.html line 9873
     }
-    // Zain (206) — Ice Blade: permanent +2 damage on ALL wins once forged (team-wide)
-    if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName]) dmg += 2;
+    // Zain (206) — Ice Blade: permanent +2 damage on ALL wins once forged AND swinging (team-wide)
+    if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName] && (B.committed[winTeamName].zainBlade > 0 || (B.iceBladeSwing && B.iceBladeSwing[winTeamName]))) dmg += 2;
+    // Flame Blade: +5 Burn on win when swinging
+    if (B.flameBlade && B.flameBlade[winTeamName] && B.flameBladeSwing && B.flameBladeSwing[winTeamName]) {
+      if (!wTeam.resources.burn) wTeam.resources.burn = 0;
+      wTeam.resources.burn += 5;
+    }
     // Red Hunter (345) — enemy has resources (pool + committed ice/fire/surge): +3 damage
     // Matches index.html lines 9372–9385: checks both eRes AND B.committed[loseTeamName].
     // In the sim, ice/fire/surge are moved to committed BEFORE this block runs — checking
@@ -1568,13 +1619,16 @@ function smartSimRounds(gameNum) {
         }
         dmg = 0;
         gordokStole = true;
+        // v674: Gordok gains +1 die next roll when he steals
+        if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
+        B.gordokDieBonus[winTeamName] = 1;
       }
     }
-    // Wise Al (431) — Squall: Win: gain 3 Ice Shards instead of dealing damage (auto when ice < 6)
+    // Wise Al (431) — Squall: Win: gain 4 Ice Shards instead of dealing damage (auto when ice < 6)
     let wiseAlSqualled = false;
     if (wF.id === 431 && !wF.ko && dmg > 0) {
       if ((wTeam.resources.ice || 0) < 6) {
-        wTeam.resources.ice += 3;
+        wTeam.resources.ice += 4;
         dmg = 0;
         wiseAlSqualled = true;
       }
@@ -1762,7 +1816,7 @@ function smartSimRounds(gameNum) {
     // On-win resource gains — Sandwiches (33) DEPENDABLE! mirrors Specials to lTeam when on their sideline
     const sandwichLose = hasSideline(lTeam, 33);
     if (wF.id === 209 && !wF.ko) { wTeam.resources.surge += 2;       if (sandwichLose) lTeam.resources.surge += 2; }       // Dart: +2 Surge
-    if (wF.id === 307 && !wF.ko) { wTeam.resources.surge++; wTeam.resources.ice++; if (sandwichLose) { lTeam.resources.surge++; lTeam.resources.ice++; } } // Artemis
+    if (wF.id === 307 && !wF.ko) { wTeam.resources.ice += 3; if (sandwichLose) { lTeam.resources.ice += 3; } } // Artemis: v674 — +3 Ice Shards (was Surge+Ice)
     if (wF.id === 342 && !wF.ko) {
       if (hasSideline(lTeam, 59)) {
         // Filbert (59) — Mask Merchant: flips Overclock heal → 1 damage (matches index.html filbertCursesWin path at line 10619)
@@ -1770,6 +1824,7 @@ function smartSimRounds(gameNum) {
         if (wF.hp <= 0) { wF.ko = true; wF.killedBy = 59; }
       } else {
         wF.hp++; // overclocks! Rule #9 — no cap
+        wTeam.resources.healingSeed++; // v674: Calvin gains +1 Healing Seed on win
       }
     }
     if (wF.id === 336 && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Humar Sacred Flame
@@ -1780,7 +1835,7 @@ function smartSimRounds(gameNum) {
     if (wF.id === 101 && !wF.ko && !B.splinterActivated[winTeamName]) { B.splinterActivated[winTeamName] = true; }
     // Lucy (108) — Blue Fire: win → opponent takes 1 damage before their next roll.
     // Set pending flag on the LOSING team (they take the hit before their next roll). Matches index.html lines 9183–9188.
-    if (wF.id === 108 && !wF.ko) { B.pendingLucyDmg[lTeamName] = 1; }
+    if (wF.id === 108 && !wF.ko) { B.pendingLucyDmg[lTeamName] = 1; if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
     if (wF.id === 206 && !wF.ko) { wTeam.resources.ice++;             if (sandwichLose) lTeam.resources.ice++;   }           // Zain: ICE SHARD! +1 Ice on win — matches index.html line 10541
     if (wF.id === 58  && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Ashley: BURNING SOUL! +1 Sacred Fire on win — matches index.html line 10557
     // Selene (305) — Heart of the Hills: doubles win → choose 1 Healing Seed OR 2 Lucky Stones.
@@ -1968,11 +2023,7 @@ function smartSimRounds(gameNum) {
       const chesterSeeds = ['doubles','triples','quads','penta'].includes(wR.type) ? 2 : 1;
       wTeam.resources.healingSeed += chesterSeeds;
     }
-    // Zippa (423) — Glimmer: Win: 1 Lucky Stone per Healing Seed held
-    if (wF.id === 423 && !wF.ko) {
-      const zippaStones = wTeam.resources.healingSeed || 0;
-      if (zippaStones > 0) wTeam.resources.luckyStone += zippaStones;
-    }
+    // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section
 
     // On-KO triggers
     // Granny (310) BEDTIME STORY! — resource based on WINNER's roll type (matches index.html lines 10811–10826)
@@ -2318,6 +2369,9 @@ function smartSimRounds(gameNum) {
   B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false;
   // Reset Lucky Stone tracking for Twyla (417) Lucky Dance (matches index.html line 11486)
   if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
+  // Reset item swing toggles each round (player must actively choose to swing)
+  if (B.flameBladeSwing) { B.flameBladeSwing.red = false; B.flameBladeSwing.blue = false; }
+  if (B.iceBladeSwing) { B.iceBladeSwing.red = false; B.iceBladeSwing.blue = false; }
   // NOTE: B.darkWingUsedThisGame is intentionally NOT reset here — once per game, matches index.html darkWingUsedThisGame.
   // Toby (97) — Pure Heart: carry scheduled KO forward if declaration was active, then reset declaration.
   // Mirrors index.html lines 8971–8976 (tie path) + 11010–11015 (win/loss path): both run after the round resolves.
