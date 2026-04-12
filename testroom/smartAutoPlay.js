@@ -203,6 +203,13 @@ function smartTriggerEntry(team) {
     }
   }
 
+  // Rascals (437) — Stampede: Entry → gain 3 Burn (v685: moved from post-roll to entry)
+  if (f.id === 437 && !f.ko) {
+    if (!team.resources.burn) team.resources.burn = 0;
+    team.resources.burn += 3;
+    applyEntryKnightRxn();
+  }
+
   // Nicholas (51) — Sneak Attack: while on the enemy sideline, deal 2 damage to the entering ghost.
   // Matches index.html lines 3617–3639 (hasSideline(enemy, 51) && !f.ko → f.hp -= 2, KO check).
   // No Cornelius (45) block — index.html does not block Nicholas with Cornelius.
@@ -1296,23 +1303,9 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Rascals (437) — Stampede: after rolling, gain 2 Burn
-  ['red','blue'].forEach(teamKey => {
-    const t = B[teamKey]; const f = active(t);
-    if (f.id === 437 && !f.ko) {
-      if (!t.resources.burn) t.resources.burn = 0;
-      t.resources.burn += 2;
-    }
-  });
+  // Rascals (437) — Stampede: MOVED to entry in v685 (see smartTriggerEntry)
 
-  // Gom Gom Gom (440) — Spark: doubles → gain 1 Sacred Fire
-  ['red','blue'].forEach(teamKey => {
-    const t = B[teamKey]; const f = active(t);
-    const dice = teamKey === 'red' ? redDice : blueDice;
-    if (f.id === 440 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(dice).type)) {
-      t.resources.fire++;
-    }
-  });
+  // Gom Gom Gom (440) — Chaos: MOVED to win-path only in v685 (was post-roll both teams)
 
   // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
   ['red','blue'].forEach(teamKey => {
@@ -1661,7 +1654,9 @@ function smartSimRounds(gameNum) {
     const fireCommitted = B.committed[winTeamName].fire || 0;
     if (fireCommitted > 0 && lF.id !== 416 && !champImmuneToSpecials) {
       const firePerUnit = (wF.id === 105 && !wF.ko) ? 6 : 3;
-      dmg += fireCommitted * firePerUnit;
+      // Lucy's Shadow (439) — Mentor: doubles Sacred Fire damage when Lucy (108) is active winner
+      const lucyShadowBoost = (wF.id === 108 && hasSideline(wTeam, 439)) ? 2 : 1;
+      dmg += fireCommitted * firePerUnit * lucyShadowBoost;
     }
     // Eternal Flame (406) — don't discard sacred fires
     if (fireCommitted > 0 && wTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
@@ -2059,9 +2054,12 @@ function smartSimRounds(gameNum) {
     // Splinter (101) — Toxic Fumes: first win activates poison (chip damage fires pre-roll every subsequent round).
     // Matches index.html lines 9656–9661: `if (wF.id===101 && !wF.ko && !B.splinterActivated[winTeamName]) { B.splinterActivated[winTeamName]=true; }`
     if (wF.id === 101 && !wF.ko && !B.splinterActivated[winTeamName]) { B.splinterActivated[winTeamName] = true; }
-    // Lucy (108) — Blue Fire: win → opponent takes 1 damage before their next roll.
-    // Set pending flag on the LOSING team (they take the hit before their next roll). Matches index.html lines 9183–9188.
-    if (wF.id === 108 && !wF.ko) { B.pendingLucyDmg[lTeamName] = 1; if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
+    // Lucy (108) — Blue Fire: Win → gain 1 Sacred Fire (REWORKED 2026-04-12, swapped with Humar)
+    if (wF.id === 108 && !wF.ko) { wTeam.resources.fire++;             if (sandwichLose) lTeam.resources.fire++; }
+    // Lucy's Shadow (439) — Mentor: +1 extra Sacred Fire when Lucy (108) wins
+    if (wF.id === 108 && !wF.ko && hasSideline(wTeam, 439)) { wTeam.resources.fire++; }
+    // Gom Gom Gom (440) — Chaos: Win with doubles → gain 1 Sacred Fire (v685: moved from post-roll to win-path only)
+    if (wF.id === 440 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) { wTeam.resources.fire++; if (sandwichLose) lTeam.resources.fire++; }
     if (wF.id === 206 && !wF.ko) { wTeam.resources.ice++;             if (sandwichLose) lTeam.resources.ice++;   }           // Zain: ICE SHARD! +1 Ice on win — matches index.html line 10541
     if (wF.id === 58  && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Ashley: BURNING SOUL! +1 Sacred Fire on win — matches index.html line 10557
     // Dylan (301) — Stained Glass: Win → gain 1 Burn

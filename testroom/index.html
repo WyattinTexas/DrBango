@@ -10182,13 +10182,16 @@ function _resolveRoundImpl() {
   if (B.committed[winTeamName].fire > 0 && lF.id !== 416 && !champImmuneToSpecials) {
     const tylerWins = wF.id === 105 && !wF.ko;
     const perFire = tylerWins ? 6 : 3;
-    const fireDmg = B.committed[winTeamName].fire * perFire;
+    // Lucy's Shadow (439) — Mentor: doubles Sacred Fire damage when Lucy (108) is active winner
+    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439)) ? 2 : 1;
+    const fireDmg = B.committed[winTeamName].fire * perFire * lucyShadowBoost;
     dmg += fireDmg;
     if (tylerWins) {
       tylerFireTriggered = true;
       collectKC(winTeamName, wF.name);
     }
-    log(`<span class="log-ms">Sacred Fires committed!</span> <span class="log-dmg">+${fireDmg} damage!</span>${tylerWins ? ' (Heating Up ×2!)' : ''}`);
+    const lucyShadowTag = lucyShadowBoost === 2 ? ' (Mentor ×2!)' : '';
+    log(`<span class="log-ms">Sacred Fires committed!</span> <span class="log-dmg">+${fireDmg} damage!</span>${tylerWins ? ' (Heating Up ×2!)' : ''}${lucyShadowTag}`);
 
     // Eternal Flame (406) — Sacred Fires not discarded (grant deferred to ETERNAL FLAME! onShow)
   }
@@ -11556,6 +11559,12 @@ function _resolveRoundImpl() {
   }
   if (lucyTriggered) {
     queueAbility('BLUE FIRE!', 'var(--legendary)', `${wF.name} — Win! +1 Sacred Fire!`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
+  }
+  if (lucyShadowExtraFire) {
+    queueAbility('MENTOR!', 'var(--rare)', `Lucy's Shadow — Mentor! +1 extra Sacred Fire!`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
+  }
+  if (gomTriggered) {
+    queueAbility('CHAOS!', 'var(--common)', `${wF.name} — Win with doubles! +1 Sacred Fire!`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
   }
   if (wimTriggered) {
     queueAbility('SLASH!', 'var(--rare)', `${wF.name} — All dice odd! ${wimBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
