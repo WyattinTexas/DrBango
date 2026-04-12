@@ -1766,6 +1766,32 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Wise Al (431) — Squall choice modal -->
+<div class="selene-overlay" id="wiseAlOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#1a3a5c,#2e7dba);">❄️ SQUALL!</div>
+    <h3>Wise Al wins! Choose:</h3>
+    <p class="selene-sub" id="wiseAlSub">Deal damage or gain Ice Shards?</p>
+    <div class="selene-options">
+      <button class="selene-opt" id="wiseAlDmgBtn" onclick="doWiseAlChoice('damage')">⚔️ Deal Damage</button>
+      <button class="selene-opt" onclick="doWiseAlChoice('ice')" style="background:linear-gradient(135deg,#1a3a5c,#2e7dba);">❄️ Gain 4 Ice Shards</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gordok (430) — River Terror choice modal -->
+<div class="selene-overlay" id="gordokOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#2a1a0a,#6b3a1a);">🌊 RIVER TERROR!</div>
+    <h3>Gordok wins! Choose:</h3>
+    <p class="selene-sub" id="gordokSub">Deal damage or steal resources?</p>
+    <div class="selene-options">
+      <button class="selene-opt" id="gordokDmgBtn" onclick="doGordokChoice('damage')">⚔️ Deal Damage</button>
+      <button class="selene-opt" onclick="doGordokChoice('steal')" style="background:linear-gradient(135deg,#2a1a0a,#6b3a1a);">🌊 Steal 2 Specials</button>
+    </div>
+  </div>
+</div>
+
 <div class="selene-overlay" id="timberOverlay">
   <div class="selene-modal">
     <div class="selene-banner" id="timberBanner" style="background:linear-gradient(135deg,#4a2c0a,#7c4a1a);">🐺 HOWL</div>
@@ -2161,7 +2187,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v681';
+const TESTROOM_VERSION = 'v682';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -4460,6 +4486,81 @@ function doSeleneChoice(choice) {
   abilityQueueMode = false;
   // drainAbilityQueue plays each splash 1300ms apart and calls cont() after all finish.
   drainAbilityQueue(() => { if (cont) cont(); });
+}
+
+// Wise Al (431) — Squall: show choice modal
+function showWiseAlModal(resumeCallback) {
+  const wp = B.wiseAlPending;
+  if (!wp) { resumeCallback(); return; }
+  wp.resume = resumeCallback;
+  document.getElementById('wiseAlSub').textContent = `Deal ${wp.dmg} damage or gain 4 Ice Shards?`;
+  document.getElementById('wiseAlDmgBtn').textContent = `⚔️ Deal ${wp.dmg} Damage`;
+  document.getElementById('wiseAlOverlay').classList.add('active');
+}
+
+function doWiseAlChoice(choice) {
+  const wp = B.wiseAlPending;
+  if (!wp) return;
+  B.wiseAlPending = null;
+  document.getElementById('wiseAlOverlay').classList.remove('active');
+  if (choice === 'ice') {
+    wp.winTeam.resources.ice += 4;
+    collectKC(wp.winTeamName, wp.wF.name);
+    log(`<span class="log-ability">${wp.wF.name}</span> — Squall! <span class="log-ice">+4 Ice Shards</span> instead of dealing damage!`);
+    queueAbility('SQUALL!', 'var(--rare)', `${wp.wF.name} — +4 Ice Shards instead of dealing damage!`, () => { renderBattle(); }, wp.winTeamName);
+  } else {
+    // Deal the stashed damage
+    wp.lF.hp = Math.max(0, wp.lF.hp - wp.dmg);
+    if (wp.lF.hp <= 0) { wp.lF.ko = true; wp.lF.killedBy = wp.wF.id; }
+    log(`<span class="log-dmg">${wp.wF.name} deals ${wp.dmg} to ${wp.lF.name}!</span> ${wp.lF.ko?'<span class="log-ko">KO!</span>':wp.lF.hp+' HP left'}`);
+    renderBattle();
+  }
+  drainAbilityQueue(() => { if (wp.resume) wp.resume(); });
+}
+
+// Gordok (430) — River Terror: show choice modal
+function showGordokModal(resumeCallback) {
+  const gp = B.gordokPending;
+  if (!gp) { resumeCallback(); return; }
+  gp.resume = resumeCallback;
+  document.getElementById('gordokSub').textContent = `Deal ${gp.dmg} damage or steal 2 resources?`;
+  document.getElementById('gordokDmgBtn').textContent = `⚔️ Deal ${gp.dmg} Damage`;
+  document.getElementById('gordokOverlay').classList.add('active');
+}
+
+function doGordokChoice(choice) {
+  const gp = B.gordokPending;
+  if (!gp) return;
+  B.gordokPending = null;
+  document.getElementById('gordokOverlay').classList.remove('active');
+  if (choice === 'steal') {
+    const gordokOppRes = gp.loseTeam.resources;
+    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    let gordokStolen = 0;
+    const gordokStolenList = [];
+    for (let i = 0; i < 2 && gordokStolen < 2; i++) {
+      const avail = gordokResTypes.filter(r => (gordokOppRes[r] || 0) > 0);
+      if (avail.length === 0) break;
+      const pick = avail[Math.floor(Math.random() * avail.length)];
+      gordokOppRes[pick]--;
+      gp.winTeam.resources[pick] = (gp.winTeam.resources[pick] || 0) + 1;
+      gordokStolenList.push(pick);
+      gordokStolen++;
+    }
+    if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
+    B.gordokDieBonus[gp.winTeamName] = 1;
+    gp.winTeam.resources.moonstone++;
+    collectKC(gp.winTeamName, gp.wF.name);
+    log(`<span class="log-ability">${gp.wF.name}</span> — River Terror! Stole ${gordokStolenList.join(', ')} instead of dealing damage! <span class="log-ice">+1 die next roll!</span> <span class="log-ms">+1 Moonstone!</span>`);
+    queueAbility('RIVER TERROR!', 'var(--rare)', `${gp.wF.name} — stole resources instead of dealing damage! +1 Moonstone!`, () => { renderBattle(); }, gp.winTeamName);
+  } else {
+    // Deal the stashed damage
+    gp.lF.hp = Math.max(0, gp.lF.hp - gp.dmg);
+    if (gp.lF.hp <= 0) { gp.lF.ko = true; gp.lF.killedBy = gp.wF.id; }
+    log(`<span class="log-dmg">${gp.wF.name} deals ${gp.dmg} to ${gp.lF.name}!</span> ${gp.lF.ko?'<span class="log-ko">KO!</span>':gp.lF.hp+' HP left'}`);
+    renderBattle();
+  }
+  drainAbilityQueue(() => { if (gp.resume) gp.resume(); });
 }
 
 // Timber (210) — Howl choice modal
@@ -9734,6 +9835,8 @@ function _resolveRoundImpl() {
       B.pureHeartDeclared.blue = null;
     }
     B.selenePending = null; // discard any doubles-triggered Selene reward from this tie round — it must not ghost into the next round's post-roll flow
+    B.wiseAlPending = null;
+    B.gordokPending = null;
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -10682,46 +10785,60 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Watchfire! Absorbs 1 damage. (${dmg > 0 ? dmg + ' damage remaining' : 'All damage absorbed!'})`);
   }
 
-  // Gordok (430) — River Terror: Win: steal 2 resources instead of dealing damage (auto: steal if opponent has 2+)
+  // Gordok (430) — River Terror: Win: you MAY steal 2 resources instead of dealing damage (player choice)
   let gordokStole = false;
   if (wF.id === 430 && !wF.ko && dmg > 0) {
     const gordokOppRes = loseTeam.resources;
     const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
     const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (gordokOppRes[r] || 0), 0);
     if (gordokTotalRes >= 2) {
-      let gordokStolen = 0;
-      const gordokStolenList = [];
-      for (let i = 0; i < 2 && gordokStolen < 2; i++) {
-        const avail = gordokResTypes.filter(r => (gordokOppRes[r] || 0) > 0);
-        if (avail.length === 0) break;
-        const pick = avail[Math.floor(Math.random() * avail.length)];
-        gordokOppRes[pick]--;
-        winTeam.resources[pick] = (winTeam.resources[pick] || 0) + 1;
-        gordokStolenList.push(pick);
-        gordokStolen++;
+      if (autoPlayRunning) {
+        // AI auto-picks: always steal
+        let gordokStolen = 0;
+        const gordokStolenList = [];
+        for (let i = 0; i < 2 && gordokStolen < 2; i++) {
+          const avail = gordokResTypes.filter(r => (gordokOppRes[r] || 0) > 0);
+          if (avail.length === 0) break;
+          const pick = avail[Math.floor(Math.random() * avail.length)];
+          gordokOppRes[pick]--;
+          winTeam.resources[pick] = (winTeam.resources[pick] || 0) + 1;
+          gordokStolenList.push(pick);
+          gordokStolen++;
+        }
+        dmg = 0;
+        gordokStole = true;
+        if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
+        B.gordokDieBonus[winTeamName] = 1;
+        winTeam.resources.moonstone++;
+        collectKC(winTeamName, wF.name);
+        log(`<span class="log-ability">${wF.name}</span> — River Terror! Stole ${gordokStolenList.join(', ')} instead of dealing damage! <span class="log-ice">+1 die next roll!</span> <span class="log-ms">+1 Moonstone!</span>`);
+      } else {
+        // Human player: defer to modal choice
+        B.gordokPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
+        dmg = 0; // defer damage — modal handler will apply
+        gordokStole = true; // flag so "0 damage" log doesn't fire
       }
-      dmg = 0; // steal replaces damage
-      gordokStole = true;
-      // v674: Gordok gains +1 die next roll when he steals
-      if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
-      B.gordokDieBonus[winTeamName] = 1;
-      // v677: Gordok also gains +1 Moonstone on steal
-      winTeam.resources.moonstone++;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — River Terror! Stole ${gordokStolenList.join(', ')} instead of dealing damage! <span class="log-ice">+1 die next roll!</span> <span class="log-ms">+1 Moonstone!</span>`);
     }
   }
 
-  // Wise Al (431) — Squall: Win: gain 4 Ice Shards instead of dealing damage (auto: ice if < 6 ice)
+  // Wise Al (431) — Squall: Win: you MAY gain 4 Ice Shards instead of dealing damage (player choice)
   let wiseAlSqualled = false;
   if (wF.id === 431 && !wF.ko && dmg > 0) {
-    const wiseAlIce = winTeam.resources.ice || 0;
-    if (wiseAlIce < 6) {
-      winTeam.resources.ice += 4;
-      dmg = 0;
-      wiseAlSqualled = true;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Squall! <span class="log-ice">+4 Ice Shards</span> instead of dealing damage!`);
+    if (autoPlayRunning) {
+      // AI auto-picks: take ice if < 6
+      const wiseAlIce = winTeam.resources.ice || 0;
+      if (wiseAlIce < 6) {
+        winTeam.resources.ice += 4;
+        dmg = 0;
+        wiseAlSqualled = true;
+        collectKC(winTeamName, wF.name);
+        log(`<span class="log-ability">${wF.name}</span> — Squall! <span class="log-ice">+4 Ice Shards</span> instead of dealing damage!`);
+      }
+    } else {
+      // Human player: defer to modal choice
+      B.wiseAlPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
+      dmg = 0; // defer damage — modal handler will apply
+      wiseAlSqualled = true; // flag so "0 damage" log doesn't fire
     }
   }
 
@@ -11728,13 +11845,13 @@ function _resolveRoundImpl() {
 
   // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section (before rolling, gain Lucky Stones for Healing Seeds held)
 
-  // Gordok (430) — River Terror: callout for steal (logic applied pre-damage)
-  if (gordokStole) {
+  // Gordok (430) — River Terror: callout for steal (logic applied pre-damage) — only for autoPlay (human uses modal)
+  if (gordokStole && !B.gordokPending) {
     queueAbility('RIVER TERROR!', 'var(--rare)', `${wF.name} — stole resources instead of dealing damage! +1 Moonstone!`, null, winTeamName);
   }
 
-  // Wise Al (431) — Squall: callout for ice gain (logic applied pre-damage)
-  if (wiseAlSqualled) {
+  // Wise Al (431) — Squall: callout for ice gain (logic applied pre-damage) — only for autoPlay (human uses modal)
+  if (wiseAlSqualled && !B.wiseAlPending) {
     queueAbility('SQUALL!', 'var(--rare)', `${wF.name} — +4 Ice Shards instead of dealing damage!`, null, winTeamName);
   }
 
@@ -12233,17 +12350,34 @@ function _resolveRoundImpl() {
         }
       };
 
-      if (B.guardianFairyReactivePending) {
-        const gfp = B.guardianFairyReactivePending;
-        gfp.resume = afterGfReactive;
-        const gfG = gfp.gfGhost;
-        const gfName = gfG.name || 'Guardian Fairy';
-        document.getElementById('guardianFairySub').innerHTML =
-          `<b>${gfName}</b> (${gfG.hp} HP) can take this ${gfp.dmg} damage hit for <b>${gfp.lF.name}</b>!<br>` +
-          `<i>Guardian Fairy swaps in and absorbs the damage. ${gfp.lF.name} goes to sideline at current HP.</i>`;
-        document.getElementById('guardianFairyOverlay').classList.add('active');
+      // Wise Al / Gordok choice modals: fire before Guardian Fairy (winner decides first)
+      const afterWiseAlGordok = () => {
+        if (B.guardianFairyReactivePending) {
+          const gfp = B.guardianFairyReactivePending;
+          gfp.resume = afterGfReactive;
+          const gfG = gfp.gfGhost;
+          const gfName = gfG.name || 'Guardian Fairy';
+          document.getElementById('guardianFairySub').innerHTML =
+            `<b>${gfName}</b> (${gfG.hp} HP) can take this ${gfp.dmg} damage hit for <b>${gfp.lF.name}</b>!<br>` +
+            `<i>Guardian Fairy swaps in and absorbs the damage. ${gfp.lF.name} goes to sideline at current HP.</i>`;
+          document.getElementById('guardianFairyOverlay').classList.add('active');
+        } else {
+          afterGfReactive();
+        }
+      };
+
+      const afterGordokChoice = () => {
+        if (B.wiseAlPending) {
+          showWiseAlModal(afterWiseAlGordok);
+        } else {
+          afterWiseAlGordok();
+        }
+      };
+
+      if (B.gordokPending) {
+        showGordokModal(afterGordokChoice);
       } else {
-        afterGfReactive();
+        afterGordokChoice();
       }
     });
   }, dmgDelay);
@@ -13185,6 +13319,8 @@ function clearAllOverlays() {
   document.getElementById('fangUndercoverSwapOverlay').classList.remove('active');
   document.getElementById('winstonSchemeOverlay').classList.remove('active');
   document.getElementById('galeForcePickerOverlay').classList.remove('active');
+  document.getElementById('wiseAlOverlay').classList.remove('active');
+  document.getElementById('gordokOverlay').classList.remove('active');
   document.getElementById('standingsOverlay').classList.remove('active');
   document.getElementById('burnOverlay').classList.remove('active');
   document.getElementById('fireflyOverlay').classList.remove('active');
