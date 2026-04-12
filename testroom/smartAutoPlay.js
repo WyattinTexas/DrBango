@@ -74,7 +74,13 @@ function smartPlayNext() {
     eloiseUsedThisRound: { red: false, blue: false },
     outlawStolenDie: { red: 0, blue: 0 },
     jeffSnicker: { red: 0, blue: 0 },
-    romyPrediction: { red: null, blue: null }
+    romyPrediction: { red: null, blue: null },
+    // v672: state for 20 new cards (409–433)
+    pipToastedUsed: { red: false, blue: false },
+    pipDieRemoval: { red: 0, blue: 0 },
+    luckyStoneSpentThisTurn: { red: 0, blue: 0 },
+    burn: { red: {}, blue: {} },
+    chowExtraDie: { red: 0, blue: 0 }
   };
   S.battle = B;
 
@@ -154,6 +160,31 @@ function smartTriggerEntry(team) {
   if (f.id === 47) {
     const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
     if (koCount > 0) { f.hp += koCount * 2; } // overclocked! when hp > maxHp
+  }
+
+  // Castle Guide (420) — Light the Way: entry → +1 Surge, +1 Lucky Stone, auto-place 1 Burn on random enemy sideline ghost
+  if (f.id === 420) {
+    team.resources.surge++;
+    team.resources.luckyStone++;
+    const enemyTeamName = team === B.red ? 'blue' : 'red';
+    const enemySideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
+    if (enemySideline.length > 0) {
+      const burnTarget = enemySideline[Math.floor(Math.random() * enemySideline.length)];
+      const burnIdx = enemy.ghosts.indexOf(burnTarget);
+      if (!B.burn) B.burn = { red: {}, blue: {} };
+      B.burn[enemyTeamName][burnIdx] = (B.burn[enemyTeamName][burnIdx] || 0) + 1;
+    }
+    applyEntryKnightRxn();
+  }
+
+  // Castle Guide (420) — Burn: check if the entering ghost has burn stacked on it
+  if (B.burn && B.burn[tName]) {
+    const burnCount = B.burn[tName][team.activeIdx] || 0;
+    if (burnCount > 0 && !f.ko) {
+      f.hp = Math.max(0, f.hp - burnCount);
+      if (f.hp <= 0) { f.ko = true; f.killedBy = -2; }
+      delete B.burn[tName][team.activeIdx];
+    }
   }
 
   // Nicholas (51) — Sneak Attack: while on the enemy sideline, deal 2 damage to the entering ghost.
@@ -512,6 +543,33 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Nick & Knack (409) — Knick Knack: auto-steal 1 random resource from opponent before rolling
+  ['red','blue'].forEach(teamKey => {
+    const team = B[teamKey];
+    const f = active(team);
+    const oppKey = teamKey === 'red' ? 'blue' : 'red';
+    const oppTeam = B[oppKey];
+    if (f.id === 409 && !f.ko) {
+      const resTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+      const available = resTypes.filter(r => (oppTeam.resources[r] || 0) > 0);
+      if (available.length > 0) {
+        const stolen = available[Math.floor(Math.random() * available.length)];
+        oppTeam.resources[stolen]--;
+        team.resources[stolen] = (team.resources[stolen] || 0) + 1;
+      }
+    }
+  });
+
+  // Chow (414) — Secret Ingredient: auto-discard 1 Healing Seed for +2 dice
+  B.chowExtraDie = { red: 0, blue: 0 };
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 414 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
+      B[teamKey].resources.healingSeed--;
+      B.chowExtraDie[teamKey] = 2;
+    }
+  });
+
   // Handle any pre-roll KOs
   ['red','blue'].forEach(team => {
     const t = B[team];
@@ -763,6 +821,14 @@ function smartSimRounds(gameNum) {
   redCount += B.harrisonExtraDie.red || 0;
   blueCount += B.harrisonExtraDie.blue || 0;
 
+  // Chow (414) — Secret Ingredient: +2 dice from discarded seed
+  if (B.chowExtraDie && B.chowExtraDie.red > 0) redCount += B.chowExtraDie.red;
+  if (B.chowExtraDie && B.chowExtraDie.blue > 0) blueCount += B.chowExtraDie.blue;
+
+  // Pip (418) — Toasted: permanent die removal
+  if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
+  if (B.pipDieRemoval && B.pipDieRemoval.blue > 0) blueCount = Math.max(1, blueCount - B.pipDieRemoval.blue);
+
   // Committed Surge adds dice
   redCount += B.committed.red.surge || 0;
   blueCount += B.committed.blue.surge || 0;
@@ -785,7 +851,7 @@ function smartSimRounds(gameNum) {
       B.floopMuck[tName] = 0;
     }
   });
-  / Logey (26) — HEINOUS!: count opponent's 5+ dice from last round → lock them out this roll (matches index.html lines 7288–7303).
+  // Logey (26) — HEINOUS!: count opponent's 5+ dice from last round → lock them out this roll (matches index.html lines 7288–7303).
   // B.logeyLockout[tName] is set when Logey counts 5+ dice on the enemy roll; consumed here and cleared.
   ['red','blue'].forEach(tName => {
     if ((B.logeyLockout[tName] || 0) > 0) {
@@ -1073,6 +1139,9 @@ function smartSimRounds(gameNum) {
       const dice = teamKey === 'red' ? redDice : blueDice;
       const improved = smartLuckyStone(dice);
       t.resources.luckyStone--;
+      // Track Lucky Stone usage for Twyla (417) Lucky Dance
+      if (B.luckyStoneSpentThisTurn) B.luckyStoneSpentThisTurn[teamKey] = (B.luckyStoneSpentThisTurn[teamKey] || 0) + 1;
+      // Boopies (419) — Boopie Magic: sideline — when active spends Healing Seed... (Lucky Stone spending, not seed — no trigger here)
       if (teamKey === 'red') { redDice.splice(0, redDice.length, ...improved); }
       else { blueDice.splice(0, blueDice.length, ...improved); }
     }
@@ -1240,6 +1309,29 @@ function smartSimRounds(gameNum) {
         B.letsDanceBonus[teamKey] = (B.letsDanceBonus[teamKey] || 0) + 1;
       }
     });
+    // Sable (413) — Smoldering Soul: all odd dice → +1 Sacred Fire (active or sideline, tie path)
+    ['red','blue'].forEach(teamKey => {
+      const f = active(B[teamKey]);
+      const sableDice = teamKey === 'red' ? redDice : blueDice;
+      const hasSableActive = f.id === 413 && !f.ko;
+      const hasSableSideline = hasSideline(B[teamKey], 413);
+      if ((hasSableActive || hasSableSideline) && sableDice && sableDice.length > 0 && sableDice.every(d => d % 2 === 1)) {
+        B[teamKey].resources.fire++;
+      }
+    });
+    // Pip (418) — Toasted: triples+ → remove 1 enemy die permanently + 2 Sacred Fires (once per game, tie path)
+    ['red','blue'].forEach(teamKey => {
+      const f = active(B[teamKey]);
+      const pipRoll = teamKey === 'red' ? rR : bR;
+      if (f.id === 418 && !f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[teamKey]) {
+        B.pipToastedUsed[teamKey] = true;
+        const oppName = teamKey === 'red' ? 'blue' : 'red';
+        B.pipDieRemoval[oppName] = (B.pipDieRemoval[oppName] || 0) + 1;
+        B[teamKey].resources.fire += 2;
+      }
+    });
+    // Reset luckyStoneSpentThisTurn on tie (mirrors index.html line 9168)
+    if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
     // Fang Undercover (7) — clear arm on tie (no damage taken this round). Mirrors index.html line 8968.
     B.fangUndercoverArmed.red = false;
     B.fangUndercoverArmed.blue = false;
@@ -1259,6 +1351,7 @@ function smartSimRounds(gameNum) {
     wF._rolledOnce = true;
     lF._rolledOnce = true;
     const wR = winner==='red'?rR:bR;
+    const lR = winner==='red'?bR:rR; // v672 fix: lR was used but never defined — crashed sim on Bubble Boys/Floop/Outlaw/Dream Cat
     const winDice = winner==='red' ? redDice : blueDice;
     let dmg = wR.damage;
 
@@ -1277,9 +1370,12 @@ function smartSimRounds(gameNum) {
     const icePerShard = (wF.id === 104 && !wF.ko) ? 2 : 1;
     dmg += iceCommitted * icePerShard;
     // Sacred Fire (+3 each; Tyler (105) Heating Up doubles to +6 each when Tyler wins)
+    // Rook (416) — Charcoal: immune to Sacred Fire damage when Rook is the loser
     const fireCommitted = B.committed[winTeamName].fire || 0;
-    const firePerUnit = (wF.id === 105 && !wF.ko) ? 6 : 3;
-    dmg += fireCommitted * firePerUnit;
+    if (fireCommitted > 0 && lF.id !== 416) {
+      const firePerUnit = (wF.id === 105 && !wF.ko) ? 6 : 3;
+      dmg += fireCommitted * firePerUnit;
+    }
     // Eternal Flame (406) — don't discard sacred fires
     if (fireCommitted > 0 && wTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
       wTeam.resources.fire += fireCommitted;
@@ -1289,6 +1385,18 @@ function smartSimRounds(gameNum) {
     // Haywire (78) — Wild Chords permanent +2 damage on any winning roll after the trigger
     if (wF.id === 78 && !wF.ko && (B.haywireDamageBonus[winTeamName] || 0) > 0) {
       dmg += B.haywireDamageBonus[winTeamName];
+    }
+    // Rook (416) — Charcoal: Win: +1 dmg per Surge committed
+    if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0) {
+      dmg += B.committed[winTeamName].surge;
+    }
+    // Bigsby (424) — Omen: Win: +1 damage
+    if (wF.id === 424 && !wF.ko) { dmg += 1; }
+    // Twyla (417) — Lucky Dance: Win: each Lucky Stone spent this turn → +1 dmg + +1 HP
+    if (wF.id === 417 && !wF.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[winTeamName] > 0) {
+      const twylaBonus = B.luckyStoneSpentThisTurn[winTeamName];
+      dmg += twylaBonus;
+      wF.hp += twylaBonus;
     }
     // Pudge (311) — doubles: +2 damage, 1 self-damage
     if (wF.id === 311 && wR.type === 'doubles') {
@@ -1418,6 +1526,47 @@ function smartSimRounds(gameNum) {
     if (wF.id === 1 && !wF.ko && [1,2,3].every(v => winDice.includes(v))) {
       dmg = 4;
     }
+    // Mirror Matt (410) — Seven Years: doubles+ damage reflected to attacker (1 HP, so singles kill him normally)
+    let mirrorMattReflected = false;
+    if (lF.id === 410 && !lF.ko && dmg > 0 &&
+        (wR.type === 'doubles' || wR.type === 'triples' || wR.type === 'quads' || wR.type === 'penta')) {
+      wF.hp = Math.max(0, wF.hp - dmg);
+      if (wF.hp <= 0) { wF.ko = true; wF.killedBy = 410; }
+      dmg = 0;
+      mirrorMattReflected = true;
+    }
+    // Garrick (427) — Watchfire: Lose: -1 damage (damage reduction)
+    if (lF.id === 427 && !lF.ko && dmg > 0) {
+      dmg = Math.max(0, dmg - 1);
+    }
+    // Gordok (430) — River Terror: Win: steal 2 resources instead of dealing damage
+    let gordokStole = false;
+    if (wF.id === 430 && !wF.ko && dmg > 0) {
+      const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+      const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (lTeam.resources[r] || 0), 0);
+      if (gordokTotalRes >= 2) {
+        let gordokStolen = 0;
+        for (let i = 0; i < 2 && gordokStolen < 2; i++) {
+          const avail = gordokResTypes.filter(r => (lTeam.resources[r] || 0) > 0);
+          if (avail.length === 0) break;
+          const pick = avail[Math.floor(Math.random() * avail.length)];
+          lTeam.resources[pick]--;
+          wTeam.resources[pick] = (wTeam.resources[pick] || 0) + 1;
+          gordokStolen++;
+        }
+        dmg = 0;
+        gordokStole = true;
+      }
+    }
+    // Wise Al (431) — Squall: Win: gain 3 Ice Shards instead of dealing damage (auto when ice < 6)
+    let wiseAlSqualled = false;
+    if (wF.id === 431 && !wF.ko && dmg > 0) {
+      if ((wTeam.resources.ice || 0) < 6) {
+        wTeam.resources.ice += 3;
+        dmg = 0;
+        wiseAlSqualled = true;
+      }
+    }
     // Cameron (25) — Force of Nature: if Cameron wins but the loser's defensive ability negates damage → instantly destroy the loser.
     // We capture dmg BEFORE any negation so we can detect "started > 0, ended at 0 after defense".
     // Matches index.html lines 9887–9896: cameronForceOfNature fires when skyBlocked|stoneFormFired|kodakoNegated|
@@ -1528,6 +1677,15 @@ function smartSimRounds(gameNum) {
     if (dmg > 0) {
       lF.hp = Math.max(0, lF.hp - dmg);
       if (lF.hp <= 0) { lF.ko = true; lF.killedBy = wF.id; }
+    }
+
+    // Jasper (428) — Flame Dive: Win: roll 1d6 bonus damage + 1 self-damage
+    if (wF.id === 428 && !wF.ko) {
+      const jasperBonusDie = Math.floor(Math.random() * 6) + 1;
+      lF.hp = Math.max(0, lF.hp - jasperBonusDie);
+      if (lF.hp <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
+      wF.hp = Math.max(0, wF.hp - 1);
+      if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; }
     }
 
     // Bubble Boys (44) — Pop: whenever the opponent rolled triples on this round, Bubble Boys are instantly
@@ -1758,6 +1916,38 @@ function smartSimRounds(gameNum) {
       B.haywireUsed[loseTeamName] = true;
     }
 
+    // Sable (413) — Smoldering Soul: all odd dice → +1 Sacred Fire (active or sideline, win/loss path)
+    ['red','blue'].forEach(teamKey => {
+      const _f = active(B[teamKey]);
+      const sableDice = teamKey === 'red' ? redDice : blueDice;
+      const hasSableActive = _f.id === 413 && !_f.ko;
+      const hasSableSideline = hasSideline(B[teamKey], 413);
+      if ((hasSableActive || hasSableSideline) && sableDice && sableDice.length > 0 && sableDice.every(d => d % 2 === 1)) {
+        B[teamKey].resources.fire++;
+      }
+    });
+    // Pip (418) — Toasted: triples+ → remove 1 enemy die permanently + 2 Sacred Fires (once per game, win/loss path)
+    ['red','blue'].forEach(teamKey => {
+      const _f = active(B[teamKey]);
+      const pipRoll = teamKey === 'red' ? rR : bR;
+      if (_f.id === 418 && !_f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[teamKey]) {
+        B.pipToastedUsed[teamKey] = true;
+        const oppName = teamKey === 'red' ? 'blue' : 'red';
+        B.pipDieRemoval[oppName] = (B.pipDieRemoval[oppName] || 0) + 1;
+        B[teamKey].resources.fire += 2;
+      }
+    });
+    // Chester (426) — Well Read: Win: 1 Healing Seed on singles, 2 on doubles+
+    if (wF.id === 426 && !wF.ko) {
+      const chesterSeeds = ['doubles','triples','quads','penta'].includes(wR.type) ? 2 : 1;
+      wTeam.resources.healingSeed += chesterSeeds;
+    }
+    // Zippa (423) — Glimmer: Win: 1 Lucky Stone per Healing Seed held
+    if (wF.id === 423 && !wF.ko) {
+      const zippaStones = wTeam.resources.healingSeed || 0;
+      if (zippaStones > 0) wTeam.resources.luckyStone += zippaStones;
+    }
+
     // On-KO triggers
     // Granny (310) BEDTIME STORY! — resource based on WINNER's roll type (matches index.html lines 10811–10826)
     // singles → 2 Lucky Stones, doubles → 1 Moonstone, triples+ → 3 Sacred Fires
@@ -1775,6 +1965,18 @@ function smartSimRounds(gameNum) {
       }
       if (lF.id === 404) { lTeam.resources.surge++; if (sandwichWin) wTeam.resources.surge++; }  // Chagrin KO path (matches index.html lines 10690–10691)
       if (lF.id === 23)  { lTeam.resources.ice += 3; if (sandwichWin) wTeam.resources.ice += 3; }  // Powder FINAL GIFT! — KO → +3 Ice Shards + DEPENDABLE! mirror (matches index.html lines 10708–10712)
+      // Garrick (427) — Watchfire: Win + KO → +1 Sacred Fire
+      if (wF.id === 427 && !wF.ko) { wTeam.resources.fire++; }
+      // Nyx & Bessie (415) — Moo! Caw!: sideline KO → 3 Healing Seeds
+      if (hasSideline(wTeam, 415) && !wF.ko) { wTeam.resources.healingSeed += 3; }
+      // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite
+      if (wF.id === 432 && !wF.ko) {
+        wTeam.resources.fire += 1;
+        wTeam.resources.ice += 2;
+        wTeam.resources.luckyStone += 1;
+        wTeam.resources.moonstone += 1;
+        wTeam.resources.healingSeed += 2;
+      }
       // Munch (66) — Scraps: win a KO → +4 HP (overclocks per Rule #9 — no Math.min cap).
       // Filbert (59) on loser's sideline flips +4 heal → -4 damage. Matches index.html lines 10059–10070.
       if (wF.id === 66 && !wF.ko) {
@@ -1784,21 +1986,14 @@ function smartSimRounds(gameNum) {
       // Bo (109) — MIRACLE!: when Bo wins a KO, revive the first KO'd ally on Bo's sideline at 1 HP.
       // Matches index.html Miracle block. Critical for sim accuracy: without this, Bo sims systematically
       // undervalue her legendary ability to refuel the team after a KO.
-      // Vela (432) sideline — Second Breath: revived ghost enters play at 2x maxHp, swapping activeIdx.
-      // Vigil (433) sideline — Kindling: +6 Sacred Fires on resurrection.
+      // v672 fix: removed Vela (432) Second Breath — id 432 is now Valkin the Grand (Grand Spoils, handled above).
+      // Lucas/Vigil (433) sideline — Kindling: +6 Sacred Fires on resurrection.
       if (wF.id === 109 && !wF.ko) {
         const boReviveTarget = wTeam.ghosts.find((g, i) => i !== wTeam.activeIdx && g.ko);
         if (boReviveTarget) {
           boReviveTarget.ko = false;
-          const velaActive = hasSideline(wTeam, 432);
+          boReviveTarget.hp = 1;
           const vigilActive = hasSideline(wTeam, 433);
-          if (velaActive) {
-            boReviveTarget.hp = boReviveTarget.maxHp * 2;
-            const revivedIdx = wTeam.ghosts.indexOf(boReviveTarget);
-            if (revivedIdx !== -1) wTeam.activeIdx = revivedIdx;
-          } else {
-            boReviveTarget.hp = 1;
-          }
           if (vigilActive) {
             wTeam.resources.fire = (wTeam.resources.fire || 0) + 6;
           }
@@ -1902,6 +2097,10 @@ function smartSimRounds(gameNum) {
     if (hasSideline(enemyTeam, 205)) rxns++;             // Shade's Shadow MELTDOWN! (sideline closer)
     if (ef.id === 70 && ef.hp < knight.hp) rxns++;       // Katrina SEEKER! (fires when Katrina HP < knight HP — same condition as pre-roll block line ~224)
     if (ef.id === 315 && (B.harrisonExtraDie[enemyKey] || 0) > 0) rxns++;  // Harrison ASCEND! fires pre-roll when seeds committed → extra dice (matches index.html line 6787 checkKnightEffects call)
+    // v672: Nick & Knack (409) KNICK KNACK! fires pre-roll when opponent has resources to steal
+    if (ef.id === 409 && !ef.ko) { const oppRes = B[teamKey].resources; if (['ice','fire','surge','luckyStone','moonstone','healingSeed'].some(r => (oppRes[r]||0) > 0)) rxns++; }
+    // v672: Chow (414) SECRET INGREDIENT! fires pre-roll when Chow has a Healing Seed
+    if (ef.id === 414 && !ef.ko && (B[enemyKey].resources.healingSeed || 0) >= 1) rxns++;
     if (ef.id === 210 && !hasSideline(B[teamKey], 301)) {
       // Knight reaction ONLY fires in the forced-die-loss branch (opponent has <2 specials → must lose a die).
       // When opponent has ≥2 specials they choose to DISCARD instead — checkKnightEffects NOT called. Matches index.html line 6923.
@@ -1987,6 +2186,18 @@ function smartSimRounds(gameNum) {
       if (hasSideline(enemyTeam, 79) && !ef.ko && _eD.length >= 2) { const _lS = [..._eD].sort((a,b)=>a-b); if (_lS.every((v,i)=>i===0||v===_lS[i-1]+1)) rxns++; }
       // Bilbo (80) LITTLE BUDDY! — fires when winning team has Bilbo on sideline and active ghost won with singles (matches index.html line 9557: !wF.ko guard)
       if (hasSideline(enemyTeam, 80) && !ef.ko && classify(_eD).type === 'singles') rxns++;
+      // v672: new card knight reactions
+      if (ef.id === 416 && !ef.ko && B.committed[enemyKey].surge > 0) rxns++;  // Rook CHARCOAL! win-path
+      if (ef.id === 424 && !ef.ko) rxns++;  // Bigsby OMEN! win-path
+      if (ef.id === 417 && !ef.ko && B.luckyStoneSpentThisTurn && B.luckyStoneSpentThisTurn[enemyKey] > 0) rxns++; // Twyla LUCKY DANCE!
+      if (ef.id === 426 && !ef.ko) rxns++;  // Chester WELL READ! win-path
+      if (ef.id === 423 && !ef.ko && (B[enemyKey].resources.healingSeed || 0) > 0) rxns++; // Zippa GLIMMER!
+      if (ef.id === 428 && !ef.ko) rxns++;  // Jasper FLAME DIVE! win-path
+      if (ef.id === 430 && !ef.ko) rxns++;  // Gordok RIVER TERROR! win-path
+      if (ef.id === 431 && !ef.ko) rxns++;  // Wise Al SQUALL! win-path
+      if (ef.id === 432 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Valkin GRAND SPOILS! on KO
+      if (hasSideline(enemyTeam, 415) && !ef.ko && active(B[teamKey]).ko) rxns++;  // Nyx & Bessie MOO! CAW!
+      if (ef.id === 427 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Garrick WATCHFIRE! KO fire
     }
     // Lose-path named abilities (only if the enemy team lost this round)
     if (loserWasEnemy) {
@@ -2027,6 +2238,10 @@ function smartSimRounds(gameNum) {
     if (ef.id === 207 && _eD.includes(4)) rxns++;         // Hank TREMOR! fires only when Hank rolls a 4
     if (ef.id === 327 && hasEvenDoubles(_eD)) rxns++;     // Natalia MATERIALIZATION! fires only on even doubles
     if (ef.id === 308 && classify(_kD).type === 'doubles') rxns++;  // Kaplan POLLINATE! fires only when Kaplan's OPPONENT (=knight team) rolled doubles
+    // v672: Sable (413) SMOLDERING SOUL! fires when all dice odd (active or sideline)
+    if ((ef.id === 413 && !ef.ko) || hasSideline(enemyTeam, 413)) { if (_eD.length > 0 && _eD.every(d => d % 2 === 1)) rxns++; }
+    // v672: Pip (418) TOASTED! fires on triples+ (once per game)
+    if (ef.id === 418 && !ef.ko && isTripleOrBetter(classify(_eD).type) && B.pipToastedUsed && !B.pipToastedUsed[enemyKey]) rxns++;
     if (ef.id === 305 && winnerWasEnemy && classify(_eD).type === 'doubles') rxns++;  // Selene HEART OF THE HILLS! fires only on doubles win (~16.7% of rounds) — matches index.html doSeleneChoice line 4205 checkKnightEffects call
     if (ef.id === 311 && winnerWasEnemy && classify(_eD).type === 'doubles') rxns++;  // Pudge BELLY FLOP! fires on doubles win (~41.7% of wins) — matches index.html line 9102 collectKC call
     // Roger TEMPEST! fires on 4+ dice win with 2 distinct pairs — matches index.html lines 10546–10551
@@ -2071,6 +2286,8 @@ function smartSimRounds(gameNum) {
   B.pressureUsed = { red: false, blue: false };
   B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false;
   B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false;
+  // Reset Lucky Stone tracking for Twyla (417) Lucky Dance (matches index.html line 11486)
+  if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
   // NOTE: B.darkWingUsedThisGame is intentionally NOT reset here — once per game, matches index.html darkWingUsedThisGame.
   // Toby (97) — Pure Heart: carry scheduled KO forward if declaration was active, then reset declaration.
   // Mirrors index.html lines 8971–8976 (tie path) + 11010–11015 (win/loss path): both run after the round resolves.
