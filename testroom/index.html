@@ -2139,7 +2139,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v676';
+const TESTROOM_VERSION = 'v678';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3588,7 +3588,7 @@ function triggerEntry(team, skipEntryEffects) {
   if (B.burn && B.burn[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const burnCount = B.burn[entryTeamName][activeIdx] || 0;
-    if (burnCount > 0 && !f.ko) {
+    if (burnCount > 0 && !f.ko && f.id !== 416) {
       const burnPre = f.hp;
       f.hp = Math.max(0, f.hp - burnCount);
       if (f.hp <= 0) { f.ko = true; f.killedBy = -2; } // burn kill
@@ -3596,6 +3596,12 @@ function triggerEntry(team, skipEntryEffects) {
       burnEntryFired = true;
       showAbilityCallout('BURN!', 'var(--accent)', `${f.name} takes ${burnCount} burn damage on entry! (${burnPre} → ${f.hp} HP)${f.ko ? ' KO!' : ''}`, entryTeamName);
       log(`<span class="log-dmg">${f.name}</span> — Burn! <span class="log-dmg">${burnCount} damage on entry!</span> (${burnPre} → ${f.hp} HP)${f.ko ? ' <span class="log-ko">KO!</span>' : ''}`);
+    } else if (burnCount > 0 && f.id === 416) {
+      // Rook (416) — Immune to Burn: consume burn but take no damage
+      delete B.burn[entryTeamName][activeIdx];
+      burnEntryFired = true;
+      showAbilityCallout('BURN IMMUNE!', 'var(--rare)', `${f.name} — Immune to Burn! No damage taken.`, entryTeamName);
+      log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Burn!</span> No damage taken.`);
     }
   }
 
@@ -3960,13 +3966,24 @@ function cycleCommit(team, type) {
   if (!isPreRollActive(team)) return;
   const t = B[team];
   const c = B.committed[team];
+  const f = active(t);
   const total = t.resources[type] + c[type];
   if (total <= 0) return;
-  c[type]++;
-  t.resources[type]--;
-  if (c[type] > total) {
-    t.resources[type] = total;
-    c[type] = 0;
+  // Sylvia (313) — Free Ice Shards: commit without consuming the resource pool
+  if (type === 'ice' && f && f.id === 313) {
+    if (c.ice < total) {
+      c.ice++;
+      // Don't decrement t.resources.ice — ice is free for Sylvia
+    } else {
+      c.ice = 0; // cycle back to zero (uncommit)
+    }
+  } else {
+    c[type]++;
+    t.resources[type]--;
+    if (c[type] > total) {
+      t.resources[type] = total;
+      c[type] = 0;
+    }
   }
   // Narrate what just happened
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
@@ -3987,7 +4004,11 @@ function refundCommitted() {
   ['red', 'blue'].forEach(team => {
     const t = B[team];
     const c = B.committed[team];
-    t.resources.ice += c.ice;
+    const f = active(t);
+    // Sylvia (313) — ice was never consumed, so don't refund it
+    if (!(f && f.id === 313)) {
+      t.resources.ice += c.ice;
+    }
     t.resources.fire += c.fire;
     t.resources.surge += c.surge;
     t.resources.healingSeed += c.auntSusan + c.auntSusanHeal + c.harrison;
@@ -4005,12 +4026,14 @@ function spendHealingSeed(team) {
   playSfx('sfxSpecial', 0.4);
   log(`<span class="log-heal">${f.name}</span> used a Healing Seed! Healed to ${f.hp} HP.`);
 
-  // Young Cap (429) — Energize: when active uses a Healing Seed, +1 die this roll
+  // Young Cap (429) — Energize: when active uses a Healing Seed, +1 die this roll + 1 Ice Shard + 1 Surge
   if (f.id === 429 && !f.ko) {
     if (!f.youngCapDieBonus) f.youngCapDieBonus = 0;
     f.youngCapDieBonus++;
-    showAbilityCallout('ENERGIZE!', 'var(--uncommon)', `${f.name} — Healing Seed used! +1 die this roll!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Energize! Healing Seed → +1 die this roll.`);
+    t.resources.ice++;
+    t.resources.surge++;
+    showAbilityCallout('ENERGIZE!', 'var(--uncommon)', `${f.name} — Healing Seed used! +1 die, +1 Ice Shard, +1 Surge!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Energize! Healing Seed → +1 die this roll, <span class="log-ice">+1 Ice Shard</span>, <span class="log-ms">+1 Surge</span>.`);
   }
 
   // Boopies (419) — Boopie Magic: sideline — when active spends Healing Seed, gain 1 Lucky Stone
@@ -4493,7 +4516,7 @@ function showSylviaModal(loseTeamName, resumeCallback) {
   const titleEl = document.getElementById('sylviaTitle');
   if (titleEl) titleEl.textContent = `${lF ? lF.name : 'Sylvia'} — Porpoise!`;
   const subEl = document.getElementById('sylviaSub');
-  if (subEl) subEl.innerHTML = `Roll a <b>6</b> to dodge all damage!`;
+  if (subEl) subEl.innerHTML = `Roll <b>evens</b> (2, 4, or 6) to dodge all damage!`;
   const dieEl = document.getElementById('sylviaDie');
   if (dieEl) {
     dieEl.textContent = '?';
@@ -4502,7 +4525,7 @@ function showSylviaModal(loseTeamName, resumeCallback) {
   const btn = document.getElementById('sylviaRollBtn');
   if (btn) { btn.disabled = false; btn.textContent = '🌊 Roll the Die!'; }
 
-  narrate(`<b class="${loseTeamName}-text">${lF ? lF.name : 'Sylvia'}</b>&nbsp;rolls for <b class="gold">PORPOISE!</b>&nbsp;A 6 dodges all damage!`);
+  narrate(`<b class="${loseTeamName}-text">${lF ? lF.name : 'Sylvia'}</b>&nbsp;rolls for <b class="gold">PORPOISE!</b>&nbsp;Evens (2, 4, 6) dodges all damage!`);
   document.getElementById('sylviaOverlay').classList.add('active');
 }
 
@@ -4528,7 +4551,7 @@ function doSylviaRoll() {
       clearInterval(shuffle);
       dieEl.textContent = String(finalValue);
       dieEl.style.transform = 'rotate(0deg)';
-      if (finalValue === 6) {
+      if (finalValue % 2 === 0) { // evens dodge
         dieEl.style.background = 'linear-gradient(135deg,#fde68a,#f59e0b)';
         dieEl.style.borderColor = '#f59e0b';
         dieEl.style.color = '#78350f';
@@ -4543,7 +4566,7 @@ function doSylviaRoll() {
 }
 
 function finishSylviaRoll(value) {
-  const dodged = (value === 6);
+  const dodged = (value % 2 === 0); // evens (2, 4, 6) dodge
   B.sylviaPendingResult = { value, dodged };
   const resume = B.sylviaResume;
   B.sylviaResume = null;
@@ -9552,9 +9575,9 @@ function _resolveRoundImpl() {
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
         const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
-        queueAbility('NAP!', 'var(--common)', `${f.name} — Healing Seed while napping!`, () => {
-          team.resources.healingSeed++;
-          log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">1 Healing Seed</span>.`);
+        queueAbility('NAP!', 'var(--common)', `${f.name} — 2 Healing Seeds while napping!`, () => {
+          team.resources.healingSeed += 2;
+          log(`<span class="log-ability">${f.name}</span> — Nap! Gained <span class="log-ms">2 Healing Seeds</span>.`);
           renderBattle();
         }, tNameMax);
         // Knight reactions must be queued WHILE abilityQueueMode===true (not inside onShow
@@ -9562,7 +9585,7 @@ function _resolveRoundImpl() {
         // directly, stomping the NAP! callout still on screen).
         checkKnightEffects(tNameMax, f.name);
         if (sandwichMirrorsMax) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeamMax.resources.healingSeed + 1} total)`, () => { oppTeamMax.resources.healingSeed++; renderBattle(); }, tNameMax === 'red' ? 'blue' : 'red');
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +2 Healing Seeds! (${oppTeamMax.resources.healingSeed + 2} total)`, () => { oppTeamMax.resources.healingSeed += 2; renderBattle(); }, tNameMax === 'red' ? 'blue' : 'red');
         }
       }
     });
@@ -10117,14 +10140,14 @@ function _resolveRoundImpl() {
     } else {
       // Defensive fallback — should never hit in normal flow
       rolledValue = Math.floor(Math.random()*6)+1;
-      sylviaDodged = (rolledValue === 6);
+      sylviaDodged = (rolledValue % 2 === 0); // evens dodge
     }
     sylviaDodgeRolls = [rolledValue];
     if (sylviaDodged) {
       dmg = 0;
       log(`<span class="log-ability">${lF.name}</span> — Porpoise! Rolled [${rolledValue}] — <span class="log-ms">ALL DAMAGE NEGATED!</span>`);
     } else {
-      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${rolledValue}] (needed a 6).`);
+      log(`<span class="log-ability">${lF.name}</span> — Porpoise dodge: [${rolledValue}] (needed evens).`);
     }
     collectKC(loseTeamName, lF.name);
   }
@@ -10589,8 +10612,10 @@ function _resolveRoundImpl() {
       // v674: Gordok gains +1 die next roll when he steals
       if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
       B.gordokDieBonus[winTeamName] = 1;
+      // v677: Gordok also gains +1 Moonstone on steal
+      winTeam.resources.moonstone++;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — River Terror! Stole ${gordokStolenList.join(', ')} instead of dealing damage! <span class="log-ice">+1 die next roll!</span>`);
+      log(`<span class="log-ability">${wF.name}</span> — River Terror! Stole ${gordokStolenList.join(', ')} instead of dealing damage! <span class="log-ice">+1 die next roll!</span> <span class="log-ms">+1 Moonstone!</span>`);
     }
   }
 
@@ -10906,6 +10931,7 @@ function _resolveRoundImpl() {
   if (wF.id === 81 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Spockles Valley Magic
   if (wF.id === 58 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Ashley Burning Soul
   if (wF.id === 206 && !wF.ko) { collectKC(winTeamName, wF.name); }  // Zain Ice Blade — win grants +1 Ice Shard
+  if (wF.id === 301 && !wF.ko) { collectKC(winTeamName, wF.name); }  // Dylan Stained Glass — win grants +1 Burn
   // Farmer Jeff (314) — Harvest: active OR sideline fires on any 6 rolled, win OR lose (v636 buff).
   const hasFJWin = (wF.id === 314 && !wF.ko) || hasSideline(winTeam, 314);
   if (hasFJWin) {
@@ -11229,7 +11255,7 @@ function _resolveRoundImpl() {
   // Sylvia dodge callouts (queued here — abilityQueueMode=true — not in the game-state section)
   if (lF.id === 313 && !lF.ko && sylviaDodgeRolls.length > 0) {
     if (sylviaDodged) queueAbility('PORPOISE!', 'var(--rare)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — DODGED!`, null, loseTeamName);
-    else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — no 6!`, null, loseTeamName);
+    else queueAbility('PORPOISE — MISS', 'var(--border)', `${lF.name} rolls [${sylviaDodgeRolls.join(', ')}] — odd! No dodge.`, null, loseTeamName);
   }
   // Sylvia knight reactions already collected via collectKC at game-state section — do NOT double-fire here
 
@@ -11401,6 +11427,12 @@ function _resolveRoundImpl() {
   if (wF.id === 206 && !wF.ko) { queueAbility('ICE SHARD!', 'var(--ghost-rare)', `${wF.name} — Win! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 206, 'ice', 1); renderBattle(); }, winTeamName); }
   // Zain ICE SHARD knight reactions already collected via collectKC at game-state section (line ~10082) — do NOT double-fire here
   if (wF.id === 206 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Ice Shard! +1 Ice Shard! (${loseTeam.resources.ice + 1} total)`, () => { loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
+  // Dylan (301) — Stained Glass: Win → gain 1 Burn
+  if (wF.id === 301 && !wF.ko) {
+    if (!winTeam.resources.burn) winTeam.resources.burn = 0;
+    queueAbility('STAINED GLASS!', 'var(--common)', `${wF.name} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Stained Glass! Gain <span class="log-dmg">1 Burn</span>!`);
+  }
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
     const _dieCounts = {};
@@ -11597,7 +11629,7 @@ function _resolveRoundImpl() {
 
   // Gordok (430) — River Terror: callout for steal (logic applied pre-damage)
   if (gordokStole) {
-    queueAbility('RIVER TERROR!', 'var(--rare)', `${wF.name} — stole resources instead of dealing damage!`, null, winTeamName);
+    queueAbility('RIVER TERROR!', 'var(--rare)', `${wF.name} — stole resources instead of dealing damage! +1 Moonstone!`, null, winTeamName);
   }
 
   // Wise Al (431) — Squall: callout for ice gain (logic applied pre-damage)
@@ -11648,13 +11680,14 @@ function _resolveRoundImpl() {
       bt.hp = 1;
       log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span>`);
       if (lucasActive) {
-        // Lucas (433) — Kindling: revived ghost enters play, Bo to sideline, +1 die next roll
+        // Lucas (433) — Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die next roll
+        bt.hp += 3; // 1 + 3 = 4 HP total
         const revivedIdx = winTeam.ghosts.indexOf(bt);
         if (revivedIdx !== -1) winTeam.activeIdx = revivedIdx; // swap revived ghost to active
         if (!B.lucasKindlingBonus) B.lucasKindlingBonus = { red: 0, blue: 0 };
         B.lucasKindlingBonus[winTeamName] = 1; // +1 die next roll
-        log(`<span class="log-ability">Lucas</span> — Kindling! <span class="log-heal">${bt.name} charges into play! +1 die next roll!</span>`);
-        queueAbility('KINDLING!', 'var(--rare)', `Lucas — ${bt.name} charges into play! +1 die next roll!`, null, winTeamName);
+        log(`<span class="log-ability">Lucas</span> — Kindling! <span class="log-heal">${bt.name} charges into play at ${bt.hp} HP! +1 die next roll!</span>`);
+        queueAbility('KINDLING!', 'var(--rare)', `Lucas — ${bt.name} charges into play at ${bt.hp} HP! +3 HP, +1 die next roll!`, null, winTeamName);
       }
       renderBattle();
     }, winTeamName);
@@ -11823,9 +11856,9 @@ function _resolveRoundImpl() {
       const isWinSide = team === winTeam;
       const sandwichMirrors = isWinSide ? sandwichForLose : sandwichForWin;
       const oppTeam         = isWinSide ? loseTeam : winTeam;
-      queueAbility('NAP!', 'var(--common)', `${f.name} — round ends, Healing Seed collected!`, () => { team.resources.healingSeed++; renderBattle(); }, team === B.red ? 'red' : 'blue');
+      queueAbility('NAP!', 'var(--common)', `${f.name} — round ends, 2 Healing Seeds collected!`, () => { team.resources.healingSeed += 2; renderBattle(); }, team === B.red ? 'red' : 'blue');
       // Maximo knight reactions already collected via collectKC at game-state section (line ~10155) — do NOT double-fire here
-      if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +1 Healing Seed! (${oppTeam.resources.healingSeed + 1} total)`, () => { oppTeam.resources.healingSeed++; renderBattle(); }, isWinSide ? loseTeamName : winTeamName);
+      if (sandwichMirrors) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Nap! +2 Healing Seeds! (${oppTeam.resources.healingSeed + 2} total)`, () => { oppTeam.resources.healingSeed += 2; renderBattle(); }, isWinSide ? loseTeamName : winTeamName);
     }
   });
 

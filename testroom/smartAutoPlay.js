@@ -186,9 +186,12 @@ function smartTriggerEntry(team) {
   // Castle Guide (420) — Burn: check if the entering ghost has burn stacked on it
   if (B.burn && B.burn[tName]) {
     const burnCount = B.burn[tName][team.activeIdx] || 0;
-    if (burnCount > 0 && !f.ko) {
+    if (burnCount > 0 && !f.ko && f.id !== 416) {
       f.hp = Math.max(0, f.hp - burnCount);
       if (f.hp <= 0) { f.ko = true; f.killedBy = -2; }
+      delete B.burn[tName][team.activeIdx];
+    } else if (burnCount > 0 && f.id === 416) {
+      // Rook (416) — Immune to Burn: consume burn but take no damage
       delete B.burn[tName][team.activeIdx];
     }
   }
@@ -562,6 +565,8 @@ function smartSimRounds(gameNum) {
         const stolen = available[Math.floor(Math.random() * available.length)];
         oppTeam.resources[stolen]--;
         team.resources[stolen] = (team.resources[stolen] || 0) + 1;
+        // Nick & Knack gains +3 HP on steal (overclocks past maxHp per game rules)
+        f.hp += 3;
       }
     }
   });
@@ -584,6 +589,22 @@ function smartSimRounds(gameNum) {
     if (f.id === 414 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
       B[teamKey].resources.healingSeed--;
       B.chowExtraDie[teamKey] = 2;
+    }
+  });
+
+  // Young Cap (429) — Energize: AI auto-heals with seeds when active (+1 HP, +1 die, +1 Ice Shard, +1 Surge per seed used)
+  // Matches index.html useHealingSeed() → Energize block. AI uses 1 seed per round (same as manual play).
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f.id === 429 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
+      B[teamKey].resources.healingSeed--;
+      f.hp = Math.min(f.maxHp, f.hp + 1);
+      if (!f.youngCapDieBonus) f.youngCapDieBonus = 0;
+      f.youngCapDieBonus++;
+      B[teamKey].resources.ice++;
+      B[teamKey].resources.surge++;
+      // Boopies (419) sideline mirror
+      if (hasSideline(B[teamKey], 419)) B[teamKey].resources.luckyStone++;
     }
   });
 
@@ -623,10 +644,10 @@ function smartSimRounds(gameNum) {
       r.surge -= surgeToSpend;
     }
 
-    // Ice Shards: commit all
+    // Ice Shards: commit all (Sylvia 313 — free ice: commit but don't consume)
     if (r.ice > 0) {
       B.committed[team].ice = r.ice;
-      r.ice = 0;
+      if (f.id !== 313) r.ice = 0; // Sylvia keeps her ice
     }
 
     // Sacred Fire: commit all
@@ -885,6 +906,15 @@ function smartSimRounds(gameNum) {
   // Gordok (430) — River Terror: +1 die next roll after stealing (consumed after use)
   if (B.gordokDieBonus && B.gordokDieBonus.red > 0) { redCount += B.gordokDieBonus.red; B.gordokDieBonus.red = 0; }
   if (B.gordokDieBonus && B.gordokDieBonus.blue > 0) { blueCount += B.gordokDieBonus.blue; B.gordokDieBonus.blue = 0; }
+
+  // Young Cap (429) — Energize: +1 die per Healing Seed spent this pre-roll (consumed after use)
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    if (f && f.id === 429 && !f.ko && f.youngCapDieBonus > 0) {
+      if (teamKey === 'red') redCount += f.youngCapDieBonus; else blueCount += f.youngCapDieBonus;
+      f.youngCapDieBonus = 0;
+    }
+  });
 
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) redCount += 1;
@@ -1150,14 +1180,14 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Natalia (327) — even doubles = +1 moonstone (+ Sandwiches DEPENDABLE! mirror — index.html line 7427)
+  // Natalia (327) — even doubles = +2 moonstones (+ Sandwiches DEPENDABLE! mirror — index.html line 7427)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey]; const f = active(t);
     const dice = teamKey === 'red' ? redDice : blueDice;
     if (f.id === 327 && !f.ko && hasEvenDoubles(dice)) {
-      t.resources.moonstone++;
+      t.resources.moonstone += 2;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.moonstone++; // DEPENDABLE! mirror
+      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.moonstone += 2; // DEPENDABLE! mirror
     }
   });
 
@@ -1642,6 +1672,8 @@ function smartSimRounds(gameNum) {
         // v674: Gordok gains +1 die next roll when he steals
         if (!B.gordokDieBonus) B.gordokDieBonus = { red: 0, blue: 0 };
         B.gordokDieBonus[winTeamName] = 1;
+        // v677: Gordok also gains +1 Moonstone on steal
+        wTeam.resources.moonstone++;
       }
     }
     // Wise Al (431) — Squall: Win: gain 4 Ice Shards instead of dealing damage (auto when ice < 6)
@@ -1667,7 +1699,7 @@ function smartSimRounds(gameNum) {
     // abilityDesc: "When you lose a roll: roll 1 die. If you roll a 6, negate all damage."
     // doSylviaRoll() in index.html uses Math.floor(Math.random()*6)+1 — exactly 1 die.
     if (lF.id === 313 && !lF.ko) {
-      if (Math.floor(Math.random()*6)+1 === 6) dmg = 0;
+      if ((Math.floor(Math.random()*6)+1) % 2 === 0) dmg = 0; // evens (2, 4, 6) dodge
     }
     // Patrick (10) — Stone Form: losing to a singles roll → negate ALL incoming damage and deal 3 counter-damage to the winner.
     // In index.html lines 9680–9684: `if (lF.id===10 && !lF.ko && wR.type==='singles' && dmg>0) { dmg=0; collectKC(...); }`
@@ -1858,6 +1890,8 @@ function smartSimRounds(gameNum) {
     if (wF.id === 108 && !wF.ko) { B.pendingLucyDmg[lTeamName] = 1; if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
     if (wF.id === 206 && !wF.ko) { wTeam.resources.ice++;             if (sandwichLose) lTeam.resources.ice++;   }           // Zain: ICE SHARD! +1 Ice on win — matches index.html line 10541
     if (wF.id === 58  && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Ashley: BURNING SOUL! +1 Sacred Fire on win — matches index.html line 10557
+    // Dylan (301) — Stained Glass: Win → gain 1 Burn
+    if (wF.id === 301 && !wF.ko) { if (!wTeam.resources.burn) wTeam.resources.burn = 0; wTeam.resources.burn += 1; }
     // Selene (305) — Heart of the Hills: doubles win → choose 1 Healing Seed OR 2 Lucky Stones.
     // AI heuristic: pick 2 Lucky Stones (2 post-roll rerolls > 1 seed) unless Selene is at <½ HP,
     // in which case prefer a Healing Seed for future recovery value.
@@ -1871,8 +1905,9 @@ function smartSimRounds(gameNum) {
       const _rc = {}; winDice.forEach(d => _rc[d] = (_rc[d]||0)+1);
       if (Object.values(_rc).filter(c => c >= 2).length >= 2) { wTeam.resources.fire += 3; if (sandwichLose) lTeam.resources.fire += 3; }
     }
-    // Farmer Jeff (314) sideline: sixes = seeds (+ DEPENDABLE! mirror)
-    if (hasSideline(wTeam, 314)) {
+    // Farmer Jeff (314) active OR sideline: sixes = seeds (+ DEPENDABLE! mirror)
+    const hasFJWin = (wF.id === 314 && !wF.ko) || hasSideline(wTeam, 314);
+    if (hasFJWin) {
       const sixes = winDice.filter(d => d === 6).length;
       if (sixes > 0) {
         wTeam.resources.healingSeed += sixes;
@@ -1963,9 +1998,10 @@ function smartSimRounds(gameNum) {
       const ones = loseDice.filter(d => d === 1).length;
       if (ones > 0) { lTeam.resources.ice += ones * 2; if (sandwichWin) wTeam.resources.ice += ones * 2; }
     }
-    // Farmer Jeff (314) lose-team sideline: sixes in loseDice = seeds (v636 buff: fires on ANY 6, win OR lose).
+    // Farmer Jeff (314) lose-team active OR sideline: sixes in loseDice = seeds (v636 buff: fires on ANY 6, win OR lose).
     // Matches index.html lines 10193–10195 (game-state collectKC) and 10759–10764 (cinematic queueAbility + sandwichForWin mirror).
-    if (hasSideline(lTeam, 314)) {
+    const hasFJLose = (lF.id === 314 && !lF.ko) || hasSideline(lTeam, 314);
+    if (hasFJLose) {
       const sixesLose = loseDice.filter(d => d === 6).length;
       if (sixesLose > 0) { lTeam.resources.healingSeed += sixesLose; if (sandwichWin) wTeam.resources.healingSeed += sixesLose; }
     }
@@ -2092,7 +2128,8 @@ function smartSimRounds(gameNum) {
           boReviveTarget.hp = 1;
           const lucasActive = hasSideline(wTeam, 433);
           if (lucasActive) {
-            // Lucas Kindling: revived ghost enters play, Bo to sideline, +1 die
+            // Lucas Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die
+            boReviveTarget.hp += 3; // 1 + 3 = 4 HP total
             const revivedIdx = wTeam.ghosts.indexOf(boReviveTarget);
             if (revivedIdx !== -1) wTeam.activeIdx = revivedIdx;
             if (!B.lucasKindlingBonus) B.lucasKindlingBonus = { red: 0, blue: 0 };
@@ -2157,13 +2194,13 @@ function smartSimRounds(gameNum) {
     }
   }
 
-  // End-of-round: Maximo (302) +1 seed + Sandwiches (33) DEPENDABLE! mirror
+  // End-of-round: Maximo (302) +2 seeds + Sandwiches (33) DEPENDABLE! mirror
   ['red','blue'].forEach(teamKey => {
     const f = active(B[teamKey]);
     if (f.id === 302 && !f.ko) {
-      B[teamKey].resources.healingSeed++;
+      B[teamKey].resources.healingSeed += 2;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.healingSeed++;
+      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.healingSeed += 2;
     }
   });
 
@@ -2213,8 +2250,8 @@ function smartSimRounds(gameNum) {
 
     // Win-path named abilities (only if the enemy team won this round)
     if (winnerWasEnemy) {
-      if ([209,307,342,336,309,345,81,206].includes(ef.id) && !ef.ko) rxns++; // Dart PLUNDER!, Artemis STREAM!, Calvin OVERCLOCK!, Humar SACRED FLAME!, AuntSusan HARVEST DANCE!, RedHunter RUMBLE!, Spockles VALLEY MAGIC!, Zain ICE SHARD! — all require !wF.ko in index.html (lines 10190-10197, 9447)
-      if (hasSideline(enemyTeam, 314) && _eD.filter(d => d === 6).length > 0) rxns++;  // Farmer Jeff HARVEST! (sideline win-path: only fires when ≥1 six in enemy's winning dice — matches index.html line 10201 sixes>0 guard)
+      if ([209,307,342,336,309,345,81,206,301].includes(ef.id) && !ef.ko) rxns++; // Dart PLUNDER!, Artemis STREAM!, Calvin OVERCLOCK!, Humar SACRED FLAME!, AuntSusan HARVEST DANCE!, RedHunter RUMBLE!, Spockles VALLEY MAGIC!, Zain ICE SHARD!, Dylan STAINED GLASS! — all require !wF.ko in index.html
+      if (((ef.id === 314 && !ef.ko) || hasSideline(enemyTeam, 314)) && _eD.filter(d => d === 6).length > 0) rxns++;  // Farmer Jeff HARVEST! (active OR sideline win-path: only fires when ≥1 six in enemy's winning dice)
       if (ef.id === 48 && !ef.ko)  rxns++;                 // Opa REST! — active ghost wins → +1 HP; !ef.ko matches index.html line 10701: !wF.ko guard before checkKnightEffects
       if (hasSideline(enemyTeam, 11) && !ef.ko)  rxns++;  // Villager HOSPITALITY! fires only when active ghost is alive (matches index.html line 10703: !wF.ko guard)
       // Jeffery (14) CHUCKLE! intentionally NOT counted here.
@@ -2316,9 +2353,9 @@ function smartSimRounds(gameNum) {
       if (ef.id === 72 && !ef.ko && (teamKey === 'red' ? rR : bR).damage > 2) rxns++;
       // Prince Balatron (113) PARTY TIME! — fires when Balatron loses and survives; counter die always fires. Matches index.html line 9927 collectKC call.
       if (ef.id === 113 && !ef.ko && !active(B[teamKey]).ko) rxns++;
-      // Farmer Jeff (314) HARVEST! lose-team: fires when Jeff is on sideline and enemy team LOST but rolled sixes.
+      // Farmer Jeff (314) HARVEST! lose-team: fires when Jeff is active OR on sideline and enemy team LOST but rolled sixes.
       // v636 buff added this lose-team path; index.html line 10203-10205 collectKC(loseTeamName). Queued in v639.
-      if (hasSideline(enemyTeam, 314) && _eD.filter(d => d === 6).length > 0) rxns++;
+      if (((ef.id === 314 && !ef.ko) || hasSideline(enemyTeam, 314)) && _eD.filter(d => d === 6).length > 0) rxns++;
     }
     // KO-path named abilities (fire on ANY KO of the enemy's active ghost — not restricted to loserWasEnemy)
     if (hasSideline(enemyTeam, 310) && ef.ko) rxns++;   // Granny BEDTIME STORY! fires whenever enemy's active ghost is KO'd (lF.ko or wF.ko self-KO — matches index.html collectKC calls at lines 10122, 10136)
