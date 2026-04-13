@@ -1691,6 +1691,9 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 
       <!-- Roll buttons are now inside each team column -->
 
+      <div style="text-align:center;">
+        <button id="skipSpecialsBtn" onclick="doSkipSpecials()" style="display:none;background:transparent;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.35);font-size:11px;padding:3px 14px;border-radius:6px;cursor:pointer;margin-bottom:4px;transition:opacity 0.2s;" onmouseenter="this.style.color='rgba(255,255,255,0.7)';this.style.borderColor='rgba(255,255,255,0.35)'" onmouseleave="this.style.color='rgba(255,255,255,0.35)';this.style.borderColor='rgba(255,255,255,0.15)'">Skip</button>
+      </div>
       <div class="narrator-box">
         <div class="narrator-inner" id="narrator">Pick your teams and battle!</div>
       </div>
@@ -9199,6 +9202,26 @@ function doPostRollAndResolve(redDice, blueDice) {
   });
 }
 
+// ============================================================
+// SKIP SPECIALS BUTTON — lets players skip the countdown window
+// ============================================================
+function showSkipBtn(callback) {
+  B.skipSpecialsCallback = callback;
+  const btn = document.getElementById('skipSpecialsBtn');
+  if (btn) btn.style.display = '';
+}
+function hideSkipBtn() {
+  B.skipSpecialsCallback = null;
+  const btn = document.getElementById('skipSpecialsBtn');
+  if (btn) btn.style.display = 'none';
+}
+function doSkipSpecials() {
+  if (!B || !B.skipSpecialsCallback) return;
+  const cb = B.skipSpecialsCallback;
+  hideSkipBtn();
+  cb();
+}
+
 // Moonstone — timed window like Lucky Stone (3s countdown, click die to change)
 let msCountdownTimer = null;
 
@@ -9206,6 +9229,7 @@ function showMoonstoneChoice(team, dice) {
   renderDice(B.redDice, B.blueDice);
   renderBattle();
   B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-resource' };
+  showSkipBtn(() => skipMoonstone());
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b>&nbsp;Click it to use!`);
@@ -9225,6 +9249,7 @@ function showMoonstoneChoice(team, dice) {
     msEl.style.cursor = 'pointer';
     msEl.onclick = () => {
       // Player clicked Moonstone — clear the countdown and start fresh for die picking
+      hideSkipBtn();
       clearInterval(msCountdownTimer);
       clearMsCountdown(msEl);
       msEl.classList.remove('rerollable');
@@ -9288,6 +9313,7 @@ function clearMsCountdown(el) {
 
 function pickMsDie(idx) {
   if (!B || !B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-die') return;
+  hideSkipBtn();
   clearInterval(msCountdownTimer);
   msCountdownTimer = null; // prevent any queued interval callbacks from firing
   const team = B.pendingMoonstone.team;
@@ -9420,10 +9446,15 @@ function pickMsValue(val) {
 
 function skipMoonstone() {
   if (!B.pendingMoonstone) return;
+  hideSkipBtn();
   const team = B.pendingMoonstone.team;
   clearInterval(msCountdownTimer);
   document.getElementById('msPicker').classList.remove('active');
   clearDiceClickable(team);
+  // Also clear the resource tile highlight + countdown badge
+  const resEl = document.getElementById(team + '-resources');
+  const msEl = resEl && resEl.querySelector('.res-tile.moonstone');
+  if (msEl) { msEl.classList.remove('rerollable'); msEl.onclick = null; msEl.style.cursor = ''; clearMsCountdown(msEl); }
   log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
   B.pendingMoonstone = null;
 
@@ -9553,6 +9584,7 @@ function startSimultaneousMoonstoneWindows() {
 // ============================================================
 function startSameTeamSpecialsWindow(team, finalCallback) {
   B.phase = 'specials-unified-' + team;
+  showSkipBtn(() => closeWindow());
   const tLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="${team}-text">${tLabel}</b> has a <b style="color:var(--moonstone)">Moonstone</b> and a <b class="gold">Lucky Stone!</b> Click either to use!`);
 
@@ -9586,6 +9618,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
   const closeWindow = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(sharedTimer); sharedTimer = null;
     clearAllBadges();
     const ms = getMsTile(); const ls = getLsTile();
@@ -9905,6 +9938,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
   const closeBoth = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(lsSharedTimer); lsSharedTimer = null;
     // MS tile cleanup
     if (msTile) {
@@ -9924,6 +9958,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
     clearLsCountdown();
     clearDiceClickable(lsTeam);
   };
+  showSkipBtn(() => closeBoth());
 
   // Shared countdown badges on both tiles
   const updateBadges = (r) => {
@@ -10104,6 +10139,7 @@ function startSimultaneousLuckyStoneWindows() {
   const closeShared = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(lsSharedTimer); lsSharedTimer = null;
     clearLsCountdown();
     ['red', 'blue'].forEach(t => {
@@ -10115,6 +10151,7 @@ function startSimultaneousLuckyStoneWindows() {
     document.querySelectorAll('.ls-shared-cd').forEach(el => el.remove());
     resolveRound();
   };
+  showSkipBtn(() => closeShared());
 
   const checkBothDone = () => { if (state.redDone && state.blueDone) closeShared(); };
 
@@ -10247,6 +10284,21 @@ function startLuckyStoneWindow(team, callback) {
   B.phase = 'luckystone-' + team;
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  let _lsSkipped = false;
+  const skipLs = () => {
+    if (_lsSkipped) return;
+    _lsSkipped = true;
+    hideSkipBtn();
+    clearInterval(lsCountdownTimer);
+    clearLsCountdown();
+    clearDiceClickable(team);
+    const resEl = document.getElementById(team + '-resources');
+    const lsEl = resEl && resEl.querySelector('.res-tile.luckyStone');
+    if (lsEl) { lsEl.classList.remove('rerollable'); lsEl.onclick = null; lsEl.style.cursor = ''; }
+    log(`<span style="color:var(--text2)">${team.toUpperCase()} skipped Lucky Stone.</span>`);
+    callback();
+  };
+  showSkipBtn(skipLs);
 
   narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b>&nbsp;Click it to use!`);
 
@@ -14684,6 +14736,8 @@ function clearAllOverlays() {
 
 function resetBattle() {
   stopMusicHard();
+  const skipBtn = document.getElementById('skipSpecialsBtn');
+  if (skipBtn) skipBtn.style.display = 'none';
   B = null; S.battle = null;
   S.redPicks = []; S.bluePicks = [];
   abilityQueue = [];
