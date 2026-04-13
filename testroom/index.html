@@ -12106,14 +12106,22 @@ function _resolveRoundImpl() {
   }
 
   // Jasper (428) — Flame Dive: Win: interactive bonus die reveal (Balatron-style)
-  // HP mutations deferred to showJasperModal → finishJasperRoll.
+  // HP visual deferred to showJasperModal → finishJasperRoll.
+  // KO flag set synchronously so downstream checks (Balatron Party Time, Cameron, etc.)
+  // see the correct alive/dead state immediately.
   let jasperTriggered = false;
   let jasperBonusDie = 0;
   if (wF.id === 428 && !wF.ko) {
     jasperBonusDie = Math.floor(Math.random() * 6) + 1;
     jasperTriggered = true;
     collectKC(winTeamName, wF.name);
-    // Stash for modal — HP mutations deferred to finishJasperRoll
+    // Synchronous KO check — Flame Dive bonus damage to loser
+    const jasperLFHpAfter = Math.max(0, lF.hp - jasperBonusDie);
+    if (jasperLFHpAfter <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
+    // Synchronous self-damage check — Jasper takes 1 recoil
+    const jasperSelfHpAfter = Math.max(0, wF.hp - 1);
+    if (jasperSelfHpAfter <= 0) { wF.ko = true; wF.killedBy = -1; }
+    // Stash for modal — HP visual mutations deferred to finishJasperRoll
     B.jasperPending = {
       bonusDie: jasperBonusDie,
       wFName: wF.name,
