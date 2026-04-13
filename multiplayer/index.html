@@ -1771,8 +1771,11 @@ button, .card-cell, .ghost-card, .team-slot, .pvp-sideline-ghost, .ko-option, .b
         <div class="user-elo" id="user-elo">Elo: 1000</div>
       </div>
     </div>
-    <div class="games-remaining">
-      <span class="count" id="games-count">5</span><span>/5 games</span>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="games-remaining">
+        <span class="count" id="games-count">5</span><span>/5 games</span>
+      </div>
+      <button onclick="restartFreshAccount()" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);padding:4px 10px;border-radius:6px;font-size:0.7rem;cursor:pointer;letter-spacing:0.5px;" title="Reset account to experience first-login flow again">RESTART</button>
     </div>
   </div>
 
@@ -2194,6 +2197,19 @@ async function loadUserProfile() {
 
   // Check for pending PvP challenge link
   if (typeof checkPendingChallenge === 'function') await checkPendingChallenge();
+
+  // ============================================================
+  // RESTART (dev/testing — wipe profile and reload)
+  // ============================================================
+  window.restartFreshAccount = async function() {
+    if (!currentUser) return;
+    if (!confirm('Reset your account? You\'ll lose all cards, stats, and badges.')) return;
+    const ref = db.ref(`mp/users/${currentUser.uid}`);
+    const lbRef = db.ref(`mp/leaderboard/${currentUser.uid}`);
+    await ref.remove();
+    await lbRef.remove();
+    location.reload();
+  };
 
   // Listen for profile changes
   ref.on('value', snap => {
