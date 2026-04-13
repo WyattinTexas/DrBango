@@ -1624,7 +1624,13 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         </div>
         <div class="pick-grid" id="blue-picks"></div>
       </div>
-      <button class="start-btn" id="startBtn" disabled onclick="startBattle()">Select 3 per team</button>
+      <div style="display:flex; align-items:center; gap:16px; justify-content:center; margin-top:12px;">
+        <button class="start-btn" id="startBtn" disabled onclick="startBattle()">Select 3 per team</button>
+        <label id="handLimitToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#9ca3af;user-select:none;" title="Limit specials + items to 3 per team. Must discard when over.">
+          <input type="checkbox" id="handLimitCheckbox" style="accent-color:#f59e0b;cursor:pointer;">
+          <span>Hand Limit (3)</span>
+        </label>
+      </div>
     </div>
 
     <div id="battle-view" style="display:none;">
@@ -2236,6 +2242,16 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Hand Limit — discard down to 3 specials -->
+<div class="selene-overlay" id="handLimitOverlay">
+  <div class="selene-modal" style="max-width:420px;">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#b45309,#f59e0b);">✋ HAND LIMIT</div>
+    <h3 id="handLimitTitle">Discard to 3</h3>
+    <p class="selene-sub" id="handLimitSub">You have too many specials. Tap one to destroy it.</p>
+    <div id="handLimitItems" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0;"></div>
+  </div>
+</div>
+
 <!-- Game Over -->
 <div class="game-over" id="gameOver">
   <div class="go-box">
@@ -2253,7 +2269,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v700';
+const TESTROOM_VERSION = 'v701';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 const firebaseConfig = {
@@ -3126,6 +3142,10 @@ function autoPlayNext() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
+    // === HAND LIMIT ===
+    handLimitMode: !!(document.getElementById('handLimitCheckbox')?.checked),
+    HAND_LIMIT: 3,
+    handLimitPending: null,
     // === DUEL PHASE ===
     // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
     duelPhaseMode: true,
@@ -3733,6 +3753,10 @@ function startBattle() {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
+    // === HAND LIMIT ===
+    handLimitMode: !!(document.getElementById('handLimitCheckbox')?.checked),
+    HAND_LIMIT: 3,
+    handLimitPending: null,
     // === DUEL PHASE ===
     // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
     duelPhaseMode: true,
@@ -7540,17 +7564,20 @@ function renderDuelUI() {
 // and either enters the Duel Phase or falls back to simultaneous ready.
 function startNextRound() {
   if (!B) return;
-  const priority = computeDuelPriority();
-  if (priority) {
-    enterDuelPhase(priority);
-  } else {
-    B.phase = 'ready';
-    B.duelActiveTeam = null;
-    B.duelPriority = null;
-    resetRollButtons();
-    renderBattle();
-    renderDuelUI();
-  }
+  // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
+  checkHandLimits(() => {
+    const priority = computeDuelPriority();
+    if (priority) {
+      enterDuelPhase(priority);
+    } else {
+      B.phase = 'ready';
+      B.duelActiveTeam = null;
+      B.duelPriority = null;
+      resetRollButtons();
+      renderBattle();
+      renderDuelUI();
+    }
+  });
 }
 
 function resetRollButtons() {
@@ -7572,6 +7599,87 @@ function disableRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) r.disabled = true;
   if (b) b.disabled = true;
+}
+
+// ============================================================
+// HAND LIMIT MODE — cap specials at B.HAND_LIMIT (default 3)
+// ============================================================
+const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly'];
+const HAND_RESOURCE_LABELS = {
+  moonstone: { emoji:'🌙', name:'Moonstone' },
+  ice:       { emoji:'❄️', name:'Ice Shard' },
+  fire:      { emoji:'🔥', name:'Sacred Fire' },
+  surge:     { emoji:'⚡', name:'Surge' },
+  healingSeed:{ emoji:'🌱', name:'Healing Seed' },
+  luckyStone:{ emoji:'🍀', name:'Lucky Stone' },
+  firefly:   { emoji:'✨', name:'Firefly' },
+};
+
+function getHandSize(team) {
+  let total = 0;
+  for (const k of HAND_RESOURCE_KEYS) total += (team.resources[k] || 0);
+  return total;
+}
+
+// Check both teams after a round resolves. If over limit, show discard modal then call callback.
+function checkHandLimits(callback) {
+  if (!B || !B.handLimitMode) { callback(); return; }
+  // Check red first, then blue, then proceed
+  checkTeamHandLimit('red', () => {
+    checkTeamHandLimit('blue', callback);
+  });
+}
+
+function checkTeamHandLimit(teamName, callback) {
+  const team = B[teamName];
+  if (getHandSize(team) <= B.HAND_LIMIT) { callback(); return; }
+  // Show discard modal
+  B.handLimitPending = { team: teamName, callback };
+  renderHandLimitModal(teamName);
+  document.getElementById('handLimitOverlay').classList.add('active');
+}
+
+function renderHandLimitModal(teamName) {
+  const team = B[teamName];
+  const handSize = getHandSize(team);
+  const over = handSize - B.HAND_LIMIT;
+  const label = teamName === 'red' ? 'Red' : 'Blue';
+  document.getElementById('handLimitTitle').textContent = `${label} Team — Discard to ${B.HAND_LIMIT}`;
+  document.getElementById('handLimitSub').textContent = `${handSize} specials (${over} over limit). Tap one to destroy it.`;
+  const container = document.getElementById('handLimitItems');
+  container.innerHTML = '';
+  for (const k of HAND_RESOURCE_KEYS) {
+    const count = team.resources[k] || 0;
+    if (count <= 0) continue;
+    const info = HAND_RESOURCE_LABELS[k];
+    for (let i = 0; i < count; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'selene-opt';
+      btn.style.cssText = 'background:linear-gradient(135deg,#374151,#1f2937);min-width:100px;margin:0;padding:8px 14px;font-size:14px;';
+      btn.textContent = `${info.emoji} ${info.name}`;
+      btn.onclick = () => doHandLimitDiscard(teamName, k);
+      container.appendChild(btn);
+    }
+  }
+}
+
+function doHandLimitDiscard(teamName, resourceKey) {
+  const team = B[teamName];
+  if ((team.resources[resourceKey] || 0) <= 0) return;
+  team.resources[resourceKey]--;
+  const info = HAND_RESOURCE_LABELS[resourceKey];
+  log(`<span class="log-ability">Hand Limit</span> — ${teamName === 'red' ? 'Red' : 'Blue'} discards ${info.emoji} ${info.name}! (${getHandSize(team)}/${B.HAND_LIMIT})`);
+  renderBattle();
+  // Still over? Re-render the modal
+  if (getHandSize(team) > B.HAND_LIMIT) {
+    renderHandLimitModal(teamName);
+    return;
+  }
+  // Done — close modal and proceed
+  document.getElementById('handLimitOverlay').classList.remove('active');
+  const pending = B.handLimitPending;
+  B.handLimitPending = null;
+  if (pending?.callback) pending.callback();
 }
 
 // Pre-roll setup — called once when the first player clicks Roll
