@@ -2581,7 +2581,7 @@ const GHOSTS = [
   {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Bounty", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
   {id:437, name:"Rascals", rarity:"common", maxHp:3, art:"art/originals/Rascals.png", ability:"Stampede", abilityDesc:"Entry: gain 3 Burn.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Four tiny colorful imp fiends — purple, red, orange, blue — racing through a gorgeous ornate castle hallway. Pure chaos energy. A pack card. The common troublemakers of the Dark Castle."},
   {id:445, name:"Mike", rarity:"uncommon", maxHp:5, art:"art/originals/WaterSpirit.png", ability:"Torrent", abilityDesc:"Win: deal +1 damage. While in play, your sideline ghosts are immune to Burn.", category:"Defense/Negation", set:"Rolling Hills", tags:["Final 50"], designNote:"Blue water spirit leaping joyfully in front of a waterfall. Frost Valley energy."},
-  {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"Sideline & In Play: when you place Burn on an enemy ghost, remove 1 enemy die next roll. Win: gain 1 Burn.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes. Passive Burn-placement → -1 enemy die. Win → +1 Burn fuels the cycle."},
+  {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"When you place Burn on an enemy ghost, remove 1 enemy die next roll. Win: gain 1 Burn.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes. In play only. Burn-placement → -1 enemy die. Win → +1 Burn."},
   {id:447, name:"Professor Hawking", rarity:"rare", maxHp:2, art:"art/originals/ProfessorHawking.png", ability:"Wisdom", abilityDesc:"While in play: gain +2 dice if you are holding a Moonstone.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Pixel art ghost owl reading a golden book on a tree branch at sunset. Wise, scholarly, charming."},
   {id:448, name:"Harvey", rarity:"uncommon", maxHp:7, art:"art/originals/TreeMonster.png", ability:"Harvest Moon", abilityDesc:"Win: gain +1 Moonstone for each 5 you rolled.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Massive dark tree creature with a wide glowing grin and moonlight orb. Menacing but charming. Tank energy."},
   {id:444, name:"Goobs", rarity:"common", maxHp:4, art:"art/originals/GoobParty.png", ability:"Dance Party", abilityDesc:"Sideline & In Play: on a tie, both players gain 1 Magic Firefly. +5 HP to your current Ghost in Play.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A field full of tiny green blobs dancing under a moonlit sky. The happiest, dumbest card in the game. Ties become resource explosions for both sides. 2HP because the Goobs die if you look at them wrong. Pure party energy."},
@@ -5429,16 +5429,13 @@ function doBurnPlace(team, ghostIndex) {
   log(`<span class="log-ability">BURN!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalBurn} total)`);
   showAbilityCallout('BURN!', 'var(--rare)', `${targetGhost.name} has been marked! ${totalBurn} Burn on entry!`, team);
 
-  // Mable Stadango (446) — Hex: when you place Burn, enemy loses 1 die next roll
+  // Mable Stadango (446) — Hex: when you place Burn, enemy loses 1 die next roll (in play only)
   const mableActive = active(B[team]);
-  const mableOnTeam = (mableActive && mableActive.id === 446 && !mableActive.ko) || hasSideline(B[team], 446);
-  if (mableOnTeam) {
+  if (mableActive && mableActive.id === 446 && !mableActive.ko) {
     if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
     B.hexDieRemoval[enemyTeamName] = (B.hexDieRemoval[enemyTeamName] || 0) + 1;
-    const mableGhost = (mableActive && mableActive.id === 446) ? mableActive : getSidelineGhost(B[team], 446);
-    const mableLabel = (mableActive && mableActive.id === 446) ? mableGhost.name : `${mableGhost ? mableGhost.name : 'Mable Stadango'} (sideline)`;
-    log(`<span class="log-ability">${mableLabel}</span> — Hex! Burn placed → enemy -1 die next roll!`);
-    showAbilityCallout('HEX!', 'var(--uncommon)', `${mableLabel} — Burn placed! Enemy -1 die next roll!`, team);
+    log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
+    showAbilityCallout('HEX!', 'var(--uncommon)', `${mableActive.name} — Burn placed! Enemy -1 die next roll!`, team);
   }
 
   renderBattle();
@@ -13346,19 +13343,7 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Hex! Win → +1 Burn!`);
     checkKnightEffects(winTeamName, wF.name);
   }
-  // Also trigger from sideline on team's win
-  if (wF.id !== 446 && hasSideline(winTeam, 446)) {
-    const mableSG = getSidelineGhost(winTeam, 446);
-    const mableSLabel = mableSG ? mableSG.name : 'Mable Stadango';
-    queueAbility('HEX!', 'var(--uncommon)', `${mableSLabel} (sideline) — Win! +1 Burn!`, () => {
-      if (!winTeam.resources.burn) winTeam.resources.burn = 0;
-      winTeam.resources.burn += 1;
-      popSidelineCard(winTeam, 446);
-      renderBattle();
-    }, winTeamName);
-    log(`<span class="log-ability">${mableSLabel}</span> (sideline) — Hex! Win → +1 Burn!`);
-    checkKnightEffects(winTeamName, mableSLabel, mableSG);
-  }
+  // Mable Stadango (446) — Hex: in play only, no sideline win trigger
 
   // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
   if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
