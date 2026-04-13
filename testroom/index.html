@@ -1617,8 +1617,12 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         </label>
         <label id="handLimitToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Limit specials + items per team. Must discard when over.">
           <input type="checkbox" id="handLimitCheckbox" checked style="accent-color:#f59e0b;cursor:pointer;" onchange="document.getElementById('handLimitSlider').style.opacity=this.checked?'1':'0.35';localStorage.setItem('tr_handLimit',this.checked?'1':'0')">
-          <span id="handLimitLabel">Hand Limit (3)</span>
-          <input type="range" id="handLimitSlider" min="3" max="5" value="3" style="width:50px;accent-color:#f59e0b;cursor:pointer;" oninput="document.getElementById('handLimitLabel').textContent='Hand Limit ('+this.value+')';localStorage.setItem('tr_handLimitVal',this.value)">
+          <span id="handLimitLabel">Hand Limit (4)</span>
+          <input type="range" id="handLimitSlider" min="3" max="7" value="4" style="width:50px;accent-color:#f59e0b;cursor:pointer;" oninput="document.getElementById('handLimitLabel').textContent='Hand Limit ('+this.value+')';localStorage.setItem('tr_handLimitVal',this.value)">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;" title="Seconds to use Lucky Stone / Moonstone after rolling">
+          <span id="specialsTimerLabel">Timer: 5s</span>
+          <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
         </label>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
@@ -2303,10 +2307,13 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   if (hlv !== null) { const r = document.getElementById('handLimitSlider'); r.value = hlv; }
   const sb = localStorage.getItem('tr_skipBtn');
   if (sb !== null) { document.getElementById('skipBtnCheckbox').checked = sb === '1'; }
+  const st = localStorage.getItem('tr_specialsTimer');
+  if (st !== null) { document.getElementById('specialsTimerSlider').value = st; }
   // Sync visual state
   const cb = document.getElementById('handLimitCheckbox');
   document.getElementById('handLimitSlider').style.opacity = cb.checked ? '1' : '0.35';
   document.getElementById('handLimitLabel').textContent = 'Hand Limit (' + document.getElementById('handLimitSlider').value + ')';
+  document.getElementById('specialsTimerLabel').textContent = 'Timer: ' + document.getElementById('specialsTimerSlider').value + 's';
   const speedLabels = ['1x','10x','25x','100x'];
   document.getElementById('speedLabel').textContent = 'Speed: ' + speedLabels[parseInt(document.getElementById('speedSlider').value) || 0];
 })();
@@ -2314,7 +2321,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v709';
+const TESTROOM_VERSION = 'v710';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -2326,6 +2333,7 @@ const SPEED_LABELS = ['1x', '10x', '25x', '100x'];
 function getSpeedDivisor() { return SPEED_DIVISORS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
 function spd(ms) { return Math.max(1, Math.round(ms / getSpeedDivisor())); }
 function updateSpeedLabel() { document.getElementById('speedLabel').textContent = 'Speed: ' + SPEED_LABELS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
+function getSpecialsTimerSecs() { return parseInt(document.getElementById('specialsTimerSlider')?.value) || 5; }
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -9381,7 +9389,7 @@ function showMoonstoneChoice(team, dice) {
         d.onclick = () => pickMsDie(i);
       });
       // Fresh 5s countdown for picking which die
-      let pickRemaining = 5;
+      let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(diceEl, pickRemaining);
       msCountdownTimer = setInterval(() => {
         pickRemaining--;
@@ -9406,8 +9414,8 @@ function showMoonstoneChoice(team, dice) {
     });
   }
 
-  // Start 5s countdown — auto-skip if not used
-  let remaining = 5;
+  // Start countdown — auto-skip if not used
+  let remaining = getSpecialsTimerSecs();
   showLsCountdown(msEl, remaining);
 
   clearInterval(msCountdownTimer);
@@ -9639,7 +9647,7 @@ function startSimultaneousMoonstoneWindows() {
     });
   };
 
-  let remaining = 5;
+  let remaining = getSpecialsTimerSecs();
   updateBadges(remaining);
   clearInterval(lsSharedTimer); lsSharedTimer = null;
   lsSharedTimer = setInterval(() => {
@@ -9841,7 +9849,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
               log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
               if (checkStillAvailable()) {
                 refreshLsTile();
-                startTimer(3);
+                startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
               }
             } else {
               showLsCountdown(el, valRem);
@@ -9866,7 +9874,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
           if (checkStillAvailable()) {
             refreshLsTile();
-            startTimer(3);
+            startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
           }
         } else {
           showLsCountdown(diceEl, pickRem);
@@ -9912,13 +9920,13 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
               const msR = getMsTile();
               if (msR) { msR.classList.add('rerollable'); msR.style.cursor = 'pointer'; msR.onclick = msTileClick; }
             }
-            startTimer(3);
+            startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
           }
         });
       };
     });
 
-    let pickRem = 3;
+    let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
     showLsCountdown(diceEl, pickRem);
     clearInterval(lsCountdownTimer); lsCountdownTimer = null;
     lsCountdownTimer = setInterval(() => {
@@ -9935,7 +9943,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
             const msR2 = getMsTile();
             if (msR2) { msR2.classList.add('rerollable'); msR2.style.cursor = 'pointer'; msR2.onclick = msTileClick; }
           }
-          startTimer(3);
+          startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
         }
       } else {
         showLsCountdown(diceEl, pickRem);
@@ -9958,13 +9966,13 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
     renderBattle();
     if (checkStillAvailable()) {
       refreshLsTile();
-      startTimer(3);
+      startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
     }
   };
   document.addEventListener('unifiedMsDone', onMsDone);
 
   // Start the initial shared timer
-  startTimer(5);
+  startTimer(getSpecialsTimerSecs());
 }
 
 // Moonstone value picker callback for the unified specials window
@@ -10102,7 +10110,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
     }
   };
 
-  let remaining = 5;
+  let remaining = getSpecialsTimerSecs();
   updateBadges(remaining);
   clearInterval(lsSharedTimer); lsSharedTimer = null;
   lsSharedTimer = setInterval(() => {
@@ -10151,7 +10159,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
-      let pickRemaining = 5;
+      let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(msDiceEl, pickRemaining);
       clearInterval(msCountdownTimer);
       msCountdownTimer = setInterval(() => {
@@ -10200,7 +10208,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(lsTeam, i, lsDice, afterLs);
       });
-      let pickRemaining = 3;
+      let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(lsDiceEl, pickRemaining);
       clearInterval(lsCountdownTimer); lsCountdownTimer = null;
       lsCountdownTimer = setInterval(() => {
@@ -10357,12 +10365,12 @@ function startSimultaneousLuckyStoneWindows() {
               // stillAvail is already correctly set to savedAvail-1 (line above),
               // representing the remaining authorized uses. Do NOT decrement again here —
               // the next click will capture the correct savedAvail from B.lsAvailable[team].
-              setTimeout(() => { if (state.closed) return; activateTile(team); restartSharedCountdown(5); }, 600);
+              setTimeout(() => { if (state.closed) return; activateTile(team); restartSharedCountdown(getSpecialsTimerSecs()); }, 600);
             } else {
               if (team === 'red') state.redDone = true; else state.blueDone = true;
               if (!state.closed) {
                 const otherDone = team === 'red' ? state.blueDone : state.redDone;
-                if (!otherDone) setTimeout(() => restartSharedCountdown(5), 600);
+                if (!otherDone) setTimeout(() => restartSharedCountdown(getSpecialsTimerSecs()), 600);
                 else checkBothDone();
               }
             }
@@ -10371,7 +10379,7 @@ function startSimultaneousLuckyStoneWindows() {
       });
 
       // 3s die-pick sub-countdown (safe: serialized by pickingTeam)
-      let pickRem = 3;
+      let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(diceEl, pickRem);
       lsCountdownTimer = setInterval(() => {
         pickRem--;
@@ -10383,7 +10391,7 @@ function startSimultaneousLuckyStoneWindows() {
           if (team === 'red') state.redDone = true; else state.blueDone = true;
           if (!state.closed) {
             const otherDone = team === 'red' ? state.blueDone : state.redDone;
-            if (!otherDone) setTimeout(() => restartSharedCountdown(3), 100);
+            if (!otherDone) setTimeout(() => restartSharedCountdown(Math.max(3, getSpecialsTimerSecs() - 2)), 100);
             else checkBothDone();
           }
         } else { showLsCountdown(diceEl, pickRem); }
@@ -10395,7 +10403,7 @@ function startSimultaneousLuckyStoneWindows() {
   activateTile('red');
   activateTile('blue');
   checkBothDone(); // in case neither team had a tile element
-  restartSharedCountdown(5);
+  restartSharedCountdown(getSpecialsTimerSecs());
 }
 
 function startLuckyStoneWindow(team, callback) {
@@ -10442,7 +10450,7 @@ function startLuckyStoneWindow(team, callback) {
         d.onclick = () => doLuckyReroll(team, i, dice, callback);
       });
       // Fresh 3s countdown on the dice row — mirrors Moonstone's pick-die phase
-      let pickRemaining = 3;
+      let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(diceEl, pickRemaining);
       lsCountdownTimer = setInterval(() => {
         pickRemaining--;
@@ -10465,8 +10473,8 @@ function startLuckyStoneWindow(team, callback) {
     });
   }
 
-  // Start countdown (3, 2, 1) — auto-skip if not used
-  let remaining = 3;
+  // Start countdown — auto-skip if not used
+  let remaining = getSpecialsTimerSecs();
   showLsCountdown(countdownTarget, remaining);
 
   lsCountdownTimer = setInterval(() => {
@@ -10589,7 +10597,7 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
           d.onclick = () => doLuckyReroll(team, i, liveDice, callback);
         });
         // Brief 3s countdown for the next die pick
-        let pickRem = 3;
+        let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
         showLsCountdown(diceElInner, pickRem);
         lsCountdownTimer = setInterval(() => {
           pickRem--;
@@ -14501,7 +14509,7 @@ function renderCardSlot(ghost, isFighter) {
     ${artHtml}
     <div class="ability-banner">${g.ability}</div>
     <div class="card-info">
-      <div class="ci-desc">${g.abilityDesc}</div>
+      <div class="ci-desc" title="${g.abilityDesc}">${g.abilityDesc}</div>
     </div>
     ${statusHtml ? `<div class="fighter-status">${statusHtml}</div>` : ''}`;
 }
