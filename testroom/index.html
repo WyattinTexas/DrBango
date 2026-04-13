@@ -14613,7 +14613,8 @@ document.addEventListener('keydown', e => {
 
 (function checkMultiplayerParams() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('mode') !== 'mp') return;
+  const mode = params.get('mode');
+  if (mode !== 'mp' && mode !== 'daily') return;
 
   const redParam = params.get('red');
   if (!redParam) return;
@@ -14626,8 +14627,18 @@ document.addEventListener('keydown', e => {
   // Set red team from URL params (player's team)
   S.redPicks = redIds;
 
-  // Pick a curated blue team that doesn't overlap with red
-  S.bluePicks = getCuratedTeam(redIds);
+  // For daily mode, use blue team from URL; for mp mode, pick curated team
+  const blueParam = params.get('blue');
+  if (blueParam) {
+    const blueIds = blueParam.split(',').map(Number).filter(id => ghostData(id));
+    if (blueIds.length === 3) {
+      S.bluePicks = blueIds;
+    } else {
+      S.bluePicks = getCuratedTeam(redIds);
+    }
+  } else {
+    S.bluePicks = getCuratedTeam(redIds);
+  }
 
   // Auto-start after a brief delay (let DOM settle)
   setTimeout(() => {
