@@ -2314,7 +2314,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v706';
+const TESTROOM_VERSION = 'v707';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -2573,7 +2573,7 @@ const GHOSTS = [
   {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Bounty", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
   {id:437, name:"Rascals", rarity:"common", maxHp:3, art:"art/originals/Rascals.png", ability:"Stampede", abilityDesc:"Entry: gain 3 Burn.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Four tiny colorful imp fiends — purple, red, orange, blue — racing through a gorgeous ornate castle hallway. Pure chaos energy. A pack card. The common troublemakers of the Dark Castle."},
   {id:445, name:"Mike", rarity:"uncommon", maxHp:5, art:"art/originals/WaterSpirit.png", ability:"Torrent", abilityDesc:"Win: deal +1 damage. While in play, your sideline ghosts are immune to Burn.", category:"Defense/Negation", set:"Rolling Hills", tags:["Final 50"], designNote:"Blue water spirit leaping joyfully in front of a waterfall. Frost Valley energy."},
-  {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"Before rolling: you may spend 1 Burn to remove 1 enemy die this roll and gain 1 Sacred Fire.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes in a purple bioluminescent forest. Mystical, magical, powerful presence."},
+  {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"Sideline & In Play: when you place Burn on an enemy ghost, gain 1 Sacred Fire and remove 1 enemy die this roll.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes. Passive Burn-placement reward — each Burn placed gives +1 Sacred Fire + -1 enemy die."},
   {id:447, name:"Professor Hawking", rarity:"rare", maxHp:2, art:"art/originals/ProfessorHawking.png", ability:"Wisdom", abilityDesc:"While in play: gain +2 dice if you are holding a Moonstone.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Pixel art ghost owl reading a golden book on a tree branch at sunset. Wise, scholarly, charming."},
   {id:448, name:"Harvey", rarity:"uncommon", maxHp:7, art:"art/originals/TreeMonster.png", ability:"Harvest Moon", abilityDesc:"Win: gain +1 Moonstone for each 5 you rolled.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Massive dark tree creature with a wide glowing grin and moonlight orb. Menacing but charming. Tank energy."},
   {id:444, name:"Goobs", rarity:"common", maxHp:4, art:"art/originals/GoobParty.png", ability:"Dance Party", abilityDesc:"Sideline & In Play: on a tie, both players gain 1 Magic Firefly. +5 HP to your current Ghost in Play.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A field full of tiny green blobs dancing under a moonlit sky. The happiest, dumbest card in the game. Ties become resource explosions for both sides. 2HP because the Goobs die if you look at them wrong. Pure party energy."},
@@ -5418,6 +5418,19 @@ function doBurnPlace(team, ghostIndex) {
   const totalBurn = B.burn[enemyTeamName][ghostIndex];
   log(`<span class="log-ability">BURN!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalBurn} total)`);
   showAbilityCallout('BURN!', 'var(--rare)', `${targetGhost.name} has been marked! ${totalBurn} Burn on entry!`, team);
+
+  // Mable Stadango (446) — Hex: when you place Burn, gain 1 Sacred Fire + remove 1 enemy die
+  const mableActive = active(B[team]);
+  const mableOnTeam = (mableActive && mableActive.id === 446 && !mableActive.ko) || hasSideline(B[team], 446);
+  if (mableOnTeam) {
+    t.resources.fire = (t.resources.fire || 0) + 1;
+    if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
+    B.hexDieRemoval[enemyTeamName] = (B.hexDieRemoval[enemyTeamName] || 0) + 1;
+    const mableGhost = (mableActive && mableActive.id === 446) ? mableActive : getSidelineGhost(B[team], 446);
+    const mableLabel = (mableActive && mableActive.id === 446) ? mableGhost.name : `${mableGhost ? mableGhost.name : 'Mable Stadango'} (sideline)`;
+    log(`<span class="log-ability">${mableLabel}</span> — Hex! Burn placed → <span class="log-ms">+1 Sacred Fire</span> + enemy -1 die!`);
+    showAbilityCallout('HEX!', 'var(--uncommon)', `${mableLabel} — Burn placed! +1 Sacred Fire + enemy -1 die!`, team);
+  }
 
   renderBattle();
 
