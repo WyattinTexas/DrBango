@@ -1768,7 +1768,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
       <button class="ssf-btn active" data-set="dc" onclick="toggleStandingsSet('Dark Castle', this)">Dark Castle</button>
       <button class="ssf-btn active" data-set="fv" onclick="toggleStandingsSet('Frost Valley', this)">Frost Valley</button>
     </div>
-    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')">PCT</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th><th class="stat-col st-sortable" title="KOs per Game" onclick="sortStandings('kopg')">KO/G</th><th class="stat-col st-sortable" title="Match MVPs" onclick="sortStandings('mvp')">MVP</th></tr></thead><tbody id="standingsBody"></tbody></table>
+    <table class="standings-table" id="standingsTable"><thead><tr><th style="width:32px" class="st-sortable" onclick="sortStandings('#')">#</th><th style="width:50px"></th><th class="st-sortable" onclick="sortStandings('name')">Spiritkin</th><th class="stat-col st-sortable" onclick="sortStandings('w')">W</th><th class="stat-col st-sortable" onclick="sortStandings('l')">L</th><th class="stat-col st-sortable" onclick="sortStandings('gp')">GP</th><th class="stat-col st-sortable" onclick="sortStandings('pct')" title="Wilson Score Rating">WSR</th><th class="stat-col st-sortable" onclick="sortStandings('gb')">GB</th><th class="stat-col st-sortable" title="KOs Scored" onclick="sortStandings('kills')">KO</th><th class="stat-col st-sortable" title="Times Defeated" onclick="sortStandings('kos')">KO'D</th><th class="stat-col st-sortable" title="KOs per Game" onclick="sortStandings('kopg')">KO/G</th><th class="stat-col st-sortable" title="Match MVPs" onclick="sortStandings('mvp')">MVP</th></tr></thead><tbody id="standingsBody"></tbody></table>
   </div>
 </div>
 
@@ -2253,7 +2253,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v698';
+const TESTROOM_VERSION = 'v699';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 const firebaseConfig = {
@@ -2959,7 +2959,14 @@ function renderStandingsTable() {
     .map(g => {
     const s = standings[g.id] || { wins:0, losses:0, kos:0, kills:0, mvp:0 };
     const total = s.wins + s.losses;
-    const pct = total > 0 ? (s.wins / total) : 0;
+    // Wilson Score lower bound (z=1.96 for 95% confidence)
+    const z = 1.96;
+    let pct;
+    if (total === 0) { pct = 0; }
+    else {
+      const p = s.wins / total;
+      pct = (p + z*z/(2*total) - z * Math.sqrt((p*(1-p) + z*z/(4*total)) / total)) / (1 + z*z/total);
+    }
     const kopg = total > 0 ? ((s.kills || 0) / total) : 0;
     return { ...g, w: s.wins, l: s.losses, kos: s.kos || 0, kills: s.kills || 0, mvp: s.mvp || 0, total, pct, kopg };
   });
