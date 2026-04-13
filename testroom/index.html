@@ -2504,7 +2504,7 @@ const GHOSTS = [
   {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"Before rolling: you may spend 1 Burn to remove 1 enemy die this roll and gain 1 Sacred Fire.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes in a purple bioluminescent forest. Mystical, magical, powerful presence."},
   {id:447, name:"Professor Hawking", rarity:"rare", maxHp:2, art:"art/originals/ProfessorHawking.png", ability:"Wisdom", abilityDesc:"While in play: gain +2 dice if you are holding a Moonstone.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Pixel art ghost owl reading a golden book on a tree branch at sunset. Wise, scholarly, charming."},
   {id:448, name:"Harvey", rarity:"uncommon", maxHp:7, art:"art/originals/TreeMonster.png", ability:"Harvest Moon", abilityDesc:"Win: gain +1 Moonstone for each 5 you rolled.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Massive dark tree creature with a wide glowing grin and moonlight orb. Menacing but charming. Tank energy."},
-  {id:444, name:"Goob Party", rarity:"common", maxHp:4, art:"art/originals/GoobParty.png", ability:"Dance Break", abilityDesc:"Sideline & In Play: on a tie, both players gain 2 Magic Fireflies.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A field full of tiny green blobs dancing under a moonlit sky. The happiest, dumbest card in the game. Ties become resource explosions for both sides. 2HP because the Goobs die if you look at them wrong. Pure party energy."},
+  {id:444, name:"Goobs", rarity:"common", maxHp:4, art:"art/originals/GoobParty.png", ability:"Dance Party", abilityDesc:"Sideline & In Play: on a tie, both players gain 2 Magic Fireflies. +5 HP to your current Ghost in Play.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A field full of tiny green blobs dancing under a moonlit sky. The happiest, dumbest card in the game. Ties become resource explosions for both sides. 2HP because the Goobs die if you look at them wrong. Pure party energy."},
   {id:443, name:"Captain James", rarity:"rare", maxHp:6, art:"art/originals/DCKnight.png", ability:"Final Strike", abilityDesc:"Roll: if you roll triples or higher, gain 2 Sacred Fires.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Tall flame-headed Spiritkin knight in white-gold armor with golden scarf, holding blue magic. The hero of Dark Castle. Likable, heroic, aspirational."},
   {id:442, name:"Castle Gardener", rarity:"common", maxHp:2, art:"art/originals/Gardener.png", ability:"Cultivate", abilityDesc:"Before rolling: you may discard Healing Seeds to gain 1 Sacred Fire each.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A tiny innocent spirit with a watering can tending glowing crystal flowers in a secret castle garden. Converts Healing Seeds into Sacred Fire — the garden fuels the flames. 2HP glass cannon resource converter."},
   {id:440, name:"Gom Gom Gom", rarity:"common", maxHp:5, art:"art/originals/DCFlameball.png", ability:"Chaos", abilityDesc:"Win with doubles: gain 1 Sacred Fire.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Angry blue flame ball fiend in a castle corridor. Jagged teeth, menacing glow. Classic Dark Castle common."},
@@ -3632,7 +3632,7 @@ const CURATED_TEAMS = [
   [8, 205, 410],   // Buttons 1HP triple-6 dream + Shade's Shadow <4HP poke + Mirror Matt reflects doubles
   // #42 Mirror Theft — Mirror Matt reflects doubles, Nick & Knack steals specials, Outlaw removes dice on doubles
   [410, 409, 43],
-  // #43 Tie Party — Jimmy ties for 5 stones + firefly, Goob Party ties for 2 fireflies each, Ancient One +3HP on ties from sideline
+  // #43 Tie Party — Jimmy ties for 5 stones + firefly, Goobs ties for 2 fireflies each, Ancient One +3HP on ties from sideline
   [352, 444, 22],
   // #44 Tommy Salami Chain-6s — Tommy 6s chain extra dice, Rascals entry 3 Burn for fuel, Lars entry resources
   [30, 437, 420],
@@ -10621,8 +10621,8 @@ function _resolveRoundImpl() {
       }
     });
 
-    // Goob Party (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 of every resource
-    // Check BOTH teams; fire once even if both teams have Goob Party
+    // Goobs (444) — Dance Break: Sideline & In Play: on a tie, both players gain 1 of every resource
+    // Check BOTH teams; fire once even if both teams have Goobs
     {
       let goobFired = false;
       [B.red, B.blue].forEach(team => {
@@ -10634,13 +10634,16 @@ function _resolveRoundImpl() {
         if (hasGoobActive || hasGoobSideline) {
           goobFired = true;
           const goobGhost = hasGoobActive ? f : team.ghosts.find(g => g.id === 444);
-          const goobName = goobGhost ? goobGhost.name : 'Goob Party';
-          queueAbility('DANCE BREAK!', 'var(--uncommon)', `${goobName} — Tie! Both players gain 2 Magic Fireflies!`, () => {
+          const goobName = goobGhost ? goobGhost.name : 'Goobs';
+          const goobTeam = B[tNameGoob];
+          const goobActiveGhost = active(goobTeam);
+          queueAbility('DANCE PARTY!', 'var(--uncommon)', `${goobName} — Tie! Both players gain 2 Magic Fireflies! ${goobActiveGhost.name} +5 HP!`, () => {
             [B.red, B.blue].forEach(t => {
               if (!t.resources.firefly) t.resources.firefly = 0;
               t.resources.firefly += 2;
             });
-            log(`<span class="log-ability">${goobName}</span> — Dance Break! Both teams gain <span class="log-ms">+2 Magic Fireflies!</span>`);
+            goobActiveGhost.hp += 5;
+            log(`<span class="log-ability">${goobName}</span> — Dance Party! Both teams gain <span class="log-ms">+2 Magic Fireflies!</span> <span class="log-heal">${goobActiveGhost.name} +5 HP!</span>`);
             renderBattle();
           }, tNameGoob);
           checkKnightEffects(tNameGoob, goobName);
