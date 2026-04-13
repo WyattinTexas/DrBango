@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>BOO! Spirit Battles — Multiplayer</title>
+<title>BOO! Spirit Battles — Arena</title>
+<meta property="og:title" content="BOO! Spirit Battles — Arena">
+<meta property="og:description" content="Collect spirits, build your team, and battle in the arena. Open packs, earn badges, and climb the leaderboard.">
+<meta property="og:image" content="https://drbango.com/testroom/art/timber.jpg">
+<meta property="og:type" content="website">
+<meta name="description" content="BOO! Spirit Battles multiplayer arena — collect, battle, climb.">
+<link rel="icon" href="../testroom/art/timber.jpg" type="image/jpeg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -643,7 +649,7 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
-/* ===== COMING SOON MODAL ===== */
+/* ===== RESULT MODAL ===== */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -1361,24 +1367,167 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
   text-shadow: 0 0 40px rgba(240, 197, 96, 0.5);
 }
 
+/* ===== LOADING SPINNER ===== */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 20px;
+}
+.spinner {
+  width: 48px; height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.loading-screen p { color: var(--text-dim); font-size: 0.9rem; }
+
+/* ===== OFFLINE BANNER ===== */
+.offline-banner {
+  display: none;
+  text-align: center;
+  padding: 12px;
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  color: var(--accent2);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+.offline-banner.active { display: block; }
+
+/* ===== NEED MORE CARDS BANNER ===== */
+.need-cards-banner {
+  display: none;
+  text-align: center;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--gold-deep);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  color: var(--text-warm);
+  font-size: 0.95rem;
+}
+.need-cards-banner.active { display: block; }
+
+/* ===== VIEW TRANSITIONS ===== */
+.content { transition: opacity 0.3s ease; }
+.content.fading { opacity: 0; }
+
+/* ===== CARD HOVER EFFECTS ===== */
+.card-cell:hover {
+  transform: translateY(-4px) scale(1.04);
+  box-shadow: 0 4px 16px rgba(212, 160, 64, 0.2);
+  z-index: 2;
+}
+
+/* ===== BATTLE BUTTON GLOW ===== */
+#battle-btn:not(:disabled) {
+  animation: battle-glow 2s ease-in-out infinite;
+}
+@keyframes battle-glow {
+  0%, 100% { box-shadow: 0 4px 20px rgba(212, 160, 64, 0.3); }
+  50% { box-shadow: 0 4px 30px rgba(212, 160, 64, 0.6), 0 0 50px rgba(212, 160, 64, 0.15); }
+}
+
+/* ===== ELO CHANGE ANIMATION ===== */
+.elo-fly {
+  position: fixed;
+  z-index: 3000;
+  font-size: 1.6rem;
+  font-weight: 900;
+  pointer-events: none;
+  animation: elo-fly-up 1.5s ease-out forwards;
+}
+.elo-fly.positive { color: var(--uncommon); }
+.elo-fly.negative { color: var(--accent); }
+@keyframes elo-fly-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-60px); }
+}
+
+/* ===== LEADERBOARD CURRENT USER HIGHLIGHT ===== */
+.leaderboard-table tr.current-user td {
+  color: var(--gold-bright);
+  font-weight: 700;
+  background: rgba(212, 160, 64, 0.06);
+}
+.leaderboard-table tr.current-user {
+  border: 1px solid var(--gold-deep);
+}
+.leaderboard-self-row {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(212, 160, 64, 0.06);
+  border: 1px solid var(--gold-deep);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--gold-bright);
+  font-weight: 600;
+  display: none;
+}
+.leaderboard-self-row.active { display: block; }
+
+/* ===== BADGES SECTION ===== */
+.badge-item .badge-desc {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  display: block;
+  margin-top: 2px;
+}
+.badge-item.earned .badge-desc { color: var(--text2); }
+
+/* All interactive elements: min 44px touch target */
+button, .card-cell, .team-slot, .pvp-sideline-ghost, .ko-option, .badge-item {
+  min-height: 44px;
+}
+
 /* Mobile */
 @media (max-width: 600px) {
   .pack-card { width: 80px; height: 112px; }
-  .collection-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
-  .team-slot { width: 80px; height: 112px; }
-  #battle-btn { font-size: 1.3rem; padding: 14px 36px; }
-  #challenge-btn { font-size: 1rem; padding: 10px 24px; }
+  .pack-cards { flex-direction: column; align-items: center; gap: 10px; }
+  .collection-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .team-strip { overflow-x: auto; justify-content: flex-start; padding: 0 12px; scroll-snap-type: x mandatory; }
+  .team-slot { width: 80px; height: 112px; flex-shrink: 0; scroll-snap-align: start; }
+  #battle-btn { font-size: 1.3rem; padding: 14px 36px; min-height: 52px; }
+  #challenge-btn { font-size: 1rem; padding: 10px 24px; min-height: 48px; }
   .pvp-ghost-art { width: 50px; height: 50px; }
   .pvp-die { width: 36px; height: 36px; font-size: 1.1rem; }
-  .pvp-roll-btn { font-size: 1.1rem; padding: 12px 36px; }
+  .pvp-roll-btn { font-size: 1.1rem; padding: 12px 36px; min-height: 52px; }
+  .pvp-arena { padding: 10px; gap: 10px; }
+  .badges-grid { gap: 8px; }
+  .badge-item { padding: 6px 10px; font-size: 0.8rem; }
+  .splash-card { width: 48px; height: 68px; }
+  .splash-vs { font-size: 1.8rem; }
+  .top-bar { padding: 10px 12px; }
+  .content { padding: 12px; }
+}
+/* Tablet */
+@media (min-width: 601px) and (max-width: 900px) {
+  .collection-grid { grid-template-columns: repeat(3, 1fr); }
+}
+/* Desktop */
+@media (min-width: 901px) {
+  .collection-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
 }
 </style>
 </head>
 <body>
 <div class="atmosphere"></div>
 
+<!-- ===== LOADING SCREEN ===== -->
+<div class="loading-screen" id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading arena...</p>
+</div>
+
 <!-- ===== AUTH SCREEN ===== -->
-<div id="auth-screen">
+<div id="auth-screen" style="display:none;">
   <h1>BOO! Spirit Battles</h1>
   <p class="subtitle">Multiplayer Arena</p>
   <button id="google-signin-btn">
@@ -1404,6 +1553,12 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
   </div>
 
   <div class="content">
+    <!-- Offline Banner -->
+    <div class="offline-banner" id="offline-banner">Unable to connect. Check your internet connection.</div>
+
+    <!-- Need More Cards Banner -->
+    <div class="need-cards-banner" id="need-cards-banner">Need 3 cards to battle. Open more packs!</div>
+
     <!-- Pack Section -->
     <div class="pack-section">
       <button id="open-pack-btn" disabled>
@@ -1445,8 +1600,9 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
     <!-- No Games State -->
     <div class="no-games-overlay" id="no-games">
       <h3>No Games Remaining</h3>
-      <p style="color:var(--text2)">Come back tomorrow for more battles</p>
+      <p style="color:var(--text2)">Come back tomorrow for more battles!</p>
       <div class="countdown" id="countdown-timer">--:--:--</div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:8px;">Check the leaderboard and badges below while you wait.</p>
     </div>
 
     <!-- Leaderboard -->
@@ -1461,6 +1617,7 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
           </thead>
           <tbody id="leaderboard-rows"></tbody>
         </table>
+        <div class="leaderboard-self-row" id="leaderboard-self-row"></div>
       </div>
     </div>
 
@@ -1622,18 +1779,40 @@ const db = firebase.database();
 // ============================================================
 let currentUser = null;
 let userProfile = null;
-let team = [null, null, null]; // ghost IDs
-let pendingPack = null; // cards to add
+let team = [null, null, null];
+let pendingPack = null;
 let flippedCount = 0;
 let serverTimeOffset = 0;
+let isOffline = false;
 
 const MAX_GAMES = 10;
 const PACK_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const ALL_SETS = ['Set 1', 'Frost Valley', 'Dark Castle', 'Volcanic Activity', 'Rolling Hills'];
 
 const BADGE_DEFS = [
-  { id: 'first_blood', name: 'First Blood', icon: '\u{1F3C6}', desc: 'Win your first game', check: (p) => (p.stats?.wins || 0) >= 1 },
-  { id: 'pack_rat', name: 'Pack Rat', icon: '\u{1F4E6}', desc: 'Open 5 packs', check: (p) => (p.packsOpened || 0) >= 5 },
-  { id: 'collector', name: 'Collector', icon: '\u{1F0CF}', desc: 'Own 50 cards', check: (p) => (p.collection?.length || 0) >= 50 },
+  { id: 'first_blood', name: 'First Blood', icon: '\u{1F3C6}', desc: 'Win your first game',
+    check: (p) => (p.stats?.wins || 0) >= 1 },
+  { id: 'winning_streak', name: 'Winning Streak', icon: '\u{1F525}', desc: 'Win 3 games in a row',
+    check: (p) => (p.currentStreak || 0) >= 3 },
+  { id: 'underdog', name: 'Underdog', icon: '\u{1F415}', desc: 'Win with all commons',
+    check: (p) => !!p.underdogWin },
+  { id: 'pack_rat', name: 'Pack Rat', icon: '\u{1F4E6}', desc: 'Open 5 packs',
+    check: (p) => (p.packsOpened || 0) >= 5 },
+  { id: 'legendary_pull', name: 'Legendary Pull', icon: '\u{2B50}', desc: 'Pull a legendary from a pack',
+    check: (p) => !!p.legendaryPulled },
+  { id: 'collector', name: 'Collector', icon: '\u{1F0CF}', desc: 'Own 50+ unique cards',
+    check: (p) => (p.collection ? [...new Set(p.collection)].length : 0) >= 50 },
+  { id: 'full_house', name: 'Full House', icon: '\u{1F3E0}', desc: 'Own cards from all 5 sets',
+    check: (p) => {
+      if (!p.collection) return false;
+      const ownedSets = new Set();
+      p.collection.forEach(id => {
+        const g = getGhost(id);
+        if (g && g.set) ownedSets.add(g.set);
+      });
+      return ALL_SETS.every(s => ownedSets.has(s));
+    }
+  },
 ];
 
 // ============================================================
@@ -1645,28 +1824,37 @@ db.ref('.info/serverTimeOffset').on('value', snap => {
 function serverNow() { return Date.now() + serverTimeOffset; }
 
 // ============================================================
+// CONNECTIVITY
+// ============================================================
+db.ref('.info/connected').on('value', snap => {
+  isOffline = !snap.val();
+  const banner = document.getElementById('offline-banner');
+  if (banner) {
+    banner.classList.toggle('active', isOffline);
+  }
+});
+
+// ============================================================
 // AUTH
 // ============================================================
 document.getElementById('google-signin-btn').addEventListener('click', () => {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(err => {
-    console.error('Auth error:', err);
     showToast('Sign-in failed. Try again.');
   });
 });
 
 auth.onAuthStateChanged(async (user) => {
+  document.getElementById('loading-screen').style.display = 'none';
   if (user) {
     currentUser = user;
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
 
-    // Set UI
     document.getElementById('user-name').textContent = user.displayName || 'Player';
     document.getElementById('user-avatar').src = user.photoURL || '';
     if (!user.photoURL) document.getElementById('user-avatar').style.display = 'none';
 
-    // Load or create profile
     await loadUserProfile();
   } else {
     currentUser = null;
@@ -1747,10 +1935,13 @@ async function loadUserProfile() {
     }
   });
 
-  // Listen for leaderboard changes
+  // Listen for leaderboard changes (real-time)
   db.ref('mp/leaderboard').orderByChild('elo').limitToLast(20).on('value', snap => {
     renderLeaderboard(snap.val());
   });
+
+  // Cleanup stale games older than 1 hour
+  cleanupStaleGames();
 }
 
 // ============================================================
@@ -1917,18 +2108,21 @@ async function addPackToCollection() {
 
   const newIds = pendingPack.map(g => g.id);
   const updatedCollection = [...(userProfile.collection || []), ...newIds];
+  const hasLegendary = pendingPack.some(g => g.rarity === 'legendary');
 
-  await db.ref(`mp/users/${currentUser.uid}`).update({
+  const updates = {
     collection: updatedCollection,
     lastPackOpened: firebase.database.ServerValue.TIMESTAMP,
     packsOpened: (userProfile.packsOpened || 0) + 1
-  });
+  };
+  if (hasLegendary) updates.legendaryPulled = true;
+
+  await db.ref(`mp/users/${currentUser.uid}`).update(updates);
 
   pendingPack = null;
   document.getElementById('pack-overlay').classList.remove('active');
   showToast('Cards added to collection!');
 
-  // Check badges
   checkBadges();
 }
 
@@ -2028,7 +2222,22 @@ function renderTeamStrip() {
 function updateBattleButton() {
   const btn = document.getElementById('battle-btn');
   const filledSlots = team.filter(id => id !== null).length;
-  btn.disabled = filledSlots < 3 || getGamesRemaining() <= 0;
+  const remaining = getGamesRemaining();
+  const uniqueCards = userProfile.collection ? [...new Set(userProfile.collection)] : [];
+
+  if (uniqueCards.length < 3) {
+    btn.disabled = true;
+    btn.textContent = 'Need 3 cards';
+  } else if (remaining <= 0) {
+    btn.disabled = true;
+    btn.textContent = 'No games remaining';
+  } else if (filledSlots < 3) {
+    btn.disabled = true;
+    btn.textContent = 'BATTLE';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'BATTLE';
+  }
 }
 
 // ============================================================
@@ -2091,12 +2300,20 @@ function toggleLeaderboard() {
 
 function renderLeaderboard(data) {
   const tbody = document.getElementById('leaderboard-rows');
-  if (!data) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:20px">No players yet</td></tr>'; return; }
+  const selfRow = document.getElementById('leaderboard-self-row');
+  if (!data) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:20px">No players yet</td></tr>';
+    selfRow.classList.remove('active');
+    return;
+  }
 
   const entries = Object.entries(data).map(([uid, d]) => ({ uid, ...d }));
   entries.sort((a, b) => (b.elo || 1000) - (a.elo || 1000));
 
-  tbody.innerHTML = entries.slice(0, 20).map((entry, i) => {
+  const top20 = entries.slice(0, 20);
+  const currentInTop20 = currentUser && top20.some(e => e.uid === currentUser.uid);
+
+  tbody.innerHTML = top20.map((entry, i) => {
     const isCurrent = currentUser && entry.uid === currentUser.uid;
     return `
       <tr class="${isCurrent ? 'current-user' : ''}">
@@ -2107,6 +2324,26 @@ function renderLeaderboard(data) {
       </tr>
     `;
   }).join('');
+
+  // Show self rank if not in top 20
+  if (currentUser && !currentInTop20) {
+    // Need to fetch full leaderboard for rank
+    db.ref('mp/leaderboard').orderByChild('elo').once('value', fullSnap => {
+      const all = [];
+      fullSnap.forEach(child => { all.push({ uid: child.key, ...child.val() }); });
+      all.sort((a, b) => (b.elo || 1000) - (a.elo || 1000));
+      const myIdx = all.findIndex(e => e.uid === currentUser.uid);
+      if (myIdx >= 0) {
+        const me = all[myIdx];
+        selfRow.textContent = `You: #${myIdx + 1} \u2014 ${me.elo || 1000} Elo (${me.wins || 0}W-${me.losses || 0}L)`;
+        selfRow.classList.add('active');
+      } else {
+        selfRow.classList.remove('active');
+      }
+    });
+  } else {
+    selfRow.classList.remove('active');
+  }
 }
 
 // ============================================================
@@ -2119,9 +2356,9 @@ function renderBadges() {
   grid.innerHTML = BADGE_DEFS.map(badge => {
     const isEarned = earned.includes(badge.id);
     return `
-      <div class="badge-item ${isEarned ? 'earned' : 'locked'}" title="${badge.desc}">
-        <span class="badge-icon">${badge.icon}</span>
-        <span>${badge.name}</span>
+      <div class="badge-item ${isEarned ? 'earned' : 'locked'}" title="${isEarned ? badge.desc : '???'}">
+        <span class="badge-icon">${isEarned ? badge.icon : '\u{2753}'}</span>
+        <span>${isEarned ? badge.name : '???'}<span class="badge-desc">${isEarned ? badge.desc : 'Keep playing to unlock'}</span></span>
       </div>
     `;
   }).join('');
@@ -2168,16 +2405,32 @@ function clickBattle() {
 // ============================================================
 function updateCountdown() {
   const remaining = getGamesRemaining();
+  const noGames = document.getElementById('no-games');
+  const battleBtn = document.getElementById('battle-btn');
+  const challengeBtn = document.getElementById('challenge-btn');
+
   if (remaining <= 0) {
-    document.getElementById('no-games').classList.add('active');
+    noGames.classList.add('active');
+    battleBtn.disabled = true;
+    battleBtn.textContent = 'No games remaining';
+    challengeBtn.disabled = true;
+
+    // Auto-expand leaderboard when out of games
+    const lbBody = document.getElementById('leaderboard-body');
+    if (lbBody.style.display === 'none') {
+      lbBody.style.display = 'block';
+      document.getElementById('lb-toggle').classList.add('open');
+    }
+
     const ms = getMidnightCountdown();
     const h = Math.floor(ms / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
     const s = Math.floor((ms % 60000) / 1000);
     document.getElementById('countdown-timer').textContent =
-      `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      `Next games in: ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
   } else {
-    document.getElementById('no-games').classList.remove('active');
+    noGames.classList.remove('active');
+    battleBtn.textContent = 'BATTLE';
   }
 }
 
@@ -2216,6 +2469,11 @@ function updateUI() {
 
   document.getElementById('user-elo').textContent = `Elo: ${userProfile.stats?.elo || 1000}`;
   document.getElementById('games-count').textContent = getGamesRemaining();
+
+  // Check if user has < 3 unique cards
+  const uniqueCards = userProfile.collection ? [...new Set(userProfile.collection)] : [];
+  const needCardsBanner = document.getElementById('need-cards-banner');
+  needCardsBanner.classList.toggle('active', uniqueCards.length < 3);
 
   updatePackTimer();
   renderCollection();
@@ -2278,6 +2536,20 @@ async function processBattleResult() {
 
     await ref.child('stats/wins').transaction(v => (v || 0) + 1);
     await ref.child('stats/elo').set(newElo);
+
+    // Track winning streak
+    const newStreak = (userProfile.currentStreak || 0) + 1;
+    await ref.child('currentStreak').set(newStreak);
+
+    // Check underdog (all commons team)
+    const savedTeam = userProfile.currentTeam || team.filter(id => id !== null);
+    const allCommons = savedTeam.every(id => {
+      const g = getGhost(id);
+      return g && g.rarity === 'common';
+    });
+    if (allCommons) {
+      await ref.child('underdogWin').set(true);
+    }
   } else if (result === 'loss') {
     const expected = 1 / (1 + Math.pow(10, (AI_ELO - currentElo) / 400));
     newElo = Math.round(currentElo + K * (0 - expected));
@@ -2287,8 +2559,8 @@ async function processBattleResult() {
 
     await ref.child('stats/losses').transaction(v => (v || 0) + 1);
     await ref.child('stats/elo').set(newElo);
+    await ref.child('currentStreak').set(0);
   } else {
-    // Draw — no elo change
     titleText = 'Draw!';
     bodyText = 'An even match. No Elo change.';
   }
@@ -2330,6 +2602,9 @@ async function processBattleResult() {
   else box.style.borderColor = 'var(--border)';
 
   document.getElementById('result-modal').classList.add('active');
+
+  // Elo fly animation
+  if (eloChange !== 0) showEloFly(eloChange);
 }
 
 function closeResultModal() {
@@ -2417,9 +2692,13 @@ async function checkPendingChallenge() {
     return;
   }
 
-  // Already accepted?
+  // Already accepted or finished?
+  if (game.status === 'finished' || game.status === 'expired') {
+    showToast('This challenge has expired.');
+    return;
+  }
   if (game.status !== 'waiting') {
-    showToast('Challenge already accepted or expired.');
+    showToast('Challenge already accepted.');
     return;
   }
 
@@ -3196,6 +3475,24 @@ function handlePvPGameOver(game) {
 
   overlay.classList.add('active');
 
+  // Elo fly animation
+  if (eloChange !== 0) showEloFly(eloChange);
+
+  // Track streaks
+  if (currentUser) {
+    const myRef = db.ref(`mp/users/${currentUser.uid}`);
+    if (iWon) {
+      myRef.child('currentStreak').transaction(v => (v || 0) + 1);
+      // Check underdog
+      const myTeamIds = mySide === 'red' ? game.creatorTeam : game.opponentTeam;
+      if (myTeamIds && myTeamIds.every(id => { const g = getGhost(id); return g && g.rarity === 'common'; })) {
+        myRef.child('underdogWin').set(true);
+      }
+    } else {
+      myRef.child('currentStreak').set(0);
+    }
+  }
+
   // Check badges
   checkBadges();
 }
@@ -3278,6 +3575,45 @@ function updateChallengeButton() {
   const filledSlots = team.filter(id => id !== null).length;
   btn.disabled = filledSlots < 3 || getGamesRemaining() <= 0;
 }
+
+// ============================================================
+// ELO FLY ANIMATION
+// ============================================================
+function showEloFly(change) {
+  const eloEl = document.getElementById('user-elo');
+  const rect = eloEl.getBoundingClientRect();
+  const fly = document.createElement('div');
+  fly.className = `elo-fly ${change > 0 ? 'positive' : 'negative'}`;
+  fly.textContent = change > 0 ? `+${change}` : `${change}`;
+  fly.style.left = rect.left + rect.width / 2 + 'px';
+  fly.style.top = rect.top + 'px';
+  document.body.appendChild(fly);
+  setTimeout(() => fly.remove(), 1500);
+}
+
+// ============================================================
+// STALE GAME CLEANUP
+// ============================================================
+async function cleanupStaleGames() {
+  const oneHourAgo = serverNow() - 3600000;
+  const snap = await db.ref('mp/games')
+    .orderByChild('created')
+    .endAt(oneHourAgo)
+    .limitToFirst(20)
+    .once('value');
+
+  snap.forEach(child => {
+    const game = child.val();
+    if (game.status === 'waiting' || game.status === 'active') {
+      db.ref(`mp/games/${child.key}`).update({ status: 'expired' });
+    }
+  });
+}
+
+// ============================================================
+// HANDLE EXPIRED CHALLENGE
+// ============================================================
+// (Already handled in checkPendingChallenge — status !== 'waiting' shows 'expired' toast)
 
 
 </script>
