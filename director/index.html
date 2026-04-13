@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Director — Boo! Spirit Battles Game Design Audit</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --surface3: #222233;
+  --border: #2a2a3a;
+  --text: #e8e8f0;
+  --text2: #8888a0;
+  --text3: #555566;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --yellow: #eab308;
+  --green: #22c55e;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --score-S: #7c3aed;
+  --score-A: #2563eb;
+  --score-B: #059669;
+  --score-C: #d97706;
+  --score-D: #ea580c;
+  --score-F: #dc2626;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'SF Mono','Fira Code','JetBrains Mono',monospace; background:var(--bg); color:var(--text); min-height:100vh; }
+.app { max-width:1800px; margin:0 auto; padding:20px; }
+
+.header { display:flex; align-items:baseline; gap:16px; padding:16px 0; border-bottom:1px solid var(--border); margin-bottom:20px; flex-wrap:wrap; }
+.header h1 { font-size:18px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.header h1 span { color:var(--red); }
+.header .tag { font-size:11px; padding:3px 8px; border-radius:3px; background:var(--red); color:white; font-weight:700; }
+.header .stats { margin-left:auto; font-size:12px; color:var(--text2); display:flex; gap:16px; flex-wrap:wrap; }
+.header .stats .val { color:var(--text); font-weight:700; }
+
+/* Rules Reference */
+.rules-bar { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 16px; margin-bottom:20px; font-size:11px; color:var(--text2); line-height:1.8; }
+.rules-bar strong { color:var(--text); }
+.rules-bar .sep { color:var(--border); margin:0 8px; }
+
+/* Summary */
+.summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:20px; }
+.summary-card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px; }
+.summary-card .label { font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+.summary-card .score { font-size:28px; font-weight:700; }
+.summary-card .bar { height:4px; background:var(--surface3); border-radius:2px; margin-top:8px; overflow:hidden; }
+.summary-card .bar .fill { height:100%; border-radius:2px; }
+.summary-card .detail { font-size:10px; color:var(--text3); margin-top:6px; }
+
+/* Verdict Boxes */
+.verdict-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px; }
+@media(max-width:1000px){.verdict-grid{grid-template-columns:1fr;}}
+.verdict-box { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px; }
+.verdict-box h3 { font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.verdict-box h3 .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.verdict-box .list { max-height:220px; overflow-y:auto; }
+.verdict-box .item { font-size:11px; padding:5px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.verdict-box .item:last-child { border:none; }
+.verdict-box .item .name { color:var(--text); white-space:nowrap; }
+.verdict-box .item .why { color:var(--text3); font-size:10px; text-align:right; }
+
+/* Controls */
+.controls { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
+.controls input, .controls select {
+  background:var(--surface); border:1px solid var(--border); color:var(--text);
+  padding:6px 10px; border-radius:4px; font-size:11px; font-family:inherit; outline:none;
+}
+.controls input:focus, .controls select:focus { border-color:var(--blue); }
+.controls input { flex:1; min-width:180px; }
+.controls select { min-width:110px; }
+.controls button {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:6px 12px;
+  border-radius:4px; font-size:11px; font-family:inherit; cursor:pointer;
+}
+.controls button:hover { background:var(--surface3); }
+
+/* Table */
+.grid-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:11px; }
+th { background:var(--surface2); padding:8px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); white-space:nowrap; border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
+th:hover { color:var(--blue); }
+td { padding:6px 10px; border-bottom:1px solid rgba(42,42,58,0.5); vertical-align:top; }
+tr:hover td { background:rgba(59,130,246,0.04); }
+tr.row-S td { border-left:2px solid var(--score-S); }
+tr.row-A td { border-left:2px solid var(--score-A); }
+tr.row-F td, tr.row-D td { background:rgba(239,68,68,0.03); }
+
+.grade-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:12px; font-weight:700; min-width:28px; text-align:center; }
+.grade-S { background:rgba(124,58,237,0.2); color:var(--score-S); }
+.grade-A { background:rgba(37,99,235,0.2); color:var(--score-A); }
+.grade-B { background:rgba(5,150,105,0.2); color:var(--score-B); }
+.grade-C { background:rgba(217,119,6,0.2); color:var(--score-C); }
+.grade-D { background:rgba(234,88,12,0.2); color:var(--score-D); }
+.grade-F { background:rgba(220,38,38,0.2); color:var(--score-F); }
+
+.rarity { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:600; text-transform:uppercase; }
+.r-common { background:#374151; color:#9ca3af; }
+.r-uncommon { background:#064e3b; color:#34d399; }
+.r-rare { background:#1e3a5f; color:#60a5fa; }
+.r-ghost-rare { background:#3b1f6e; color:#a78bfa; }
+.r-legendary { background:#713f12; color:#fbbf24; }
+
+.cat-tag { font-size:10px; color:var(--text2); }
+.ability-text { max-width:300px; font-size:10px; color:var(--text2); line-height:1.4; }
+.issue-tag { display:inline-block; padding:1px 5px; border-radius:2px; font-size:9px; font-weight:600; margin:1px; white-space:nowrap; }
+.issue-critical { background:rgba(239,68,68,0.2); color:var(--red); }
+.issue-warning { background:rgba(245,158,11,0.2); color:var(--orange); }
+.issue-note { background:rgba(59,130,246,0.15); color:var(--blue); }
+.issue-good { background:rgba(34,197,94,0.15); color:var(--green); }
+.notes-text { max-width:260px; font-size:10px; color:var(--cyan); line-height:1.4; }
+.score-cell { text-align:center; font-weight:700; font-size:12px; }
+
+/* Detail Panel */
+.detail-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100; }
+.detail-overlay.open { display:block; }
+.detail-panel { position:fixed; top:0; right:0; bottom:0; width:500px; max-width:90vw; background:var(--surface); border-left:1px solid var(--border); z-index:101; overflow-y:auto; padding:24px; transform:translateX(100%); transition:transform 0.2s; }
+.detail-panel.open { transform:translateX(0); }
+.detail-panel .close { position:absolute; top:12px; right:12px; background:none; border:none; color:var(--text2); font-size:20px; cursor:pointer; font-family:inherit; }
+.detail-panel h2 { font-size:18px; margin-bottom:4px; }
+.detail-panel .meta { font-size:11px; color:var(--text2); margin-bottom:16px; }
+.detail-panel .score-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px; }
+.detail-panel .sg-item { background:var(--surface2); padding:10px; border-radius:4px; }
+.detail-panel .sg-item .sg-label { font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
+.detail-panel .sg-item .sg-val { font-size:22px; font-weight:700; margin-top:4px; }
+.detail-panel .sg-item .sg-why { font-size:10px; color:var(--text3); margin-top:4px; line-height:1.4; }
+.detail-panel .section { margin-bottom:16px; }
+.detail-panel .section h4 { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); margin-bottom:8px; }
+.detail-panel .section p { font-size:12px; line-height:1.6; }
+.detail-panel .il-item { padding:8px; background:var(--surface2); border-radius:4px; margin-bottom:6px; font-size:11px; line-height:1.5; }
+.detail-panel .synergy { color:var(--purple); }
+.detail-panel .team-ideas { color:var(--cyan); font-size:11px; line-height:1.6; }
+
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><span>DIRECTOR</span> — Game Design Audit v2</h1>
+    <span class="tag">BOO! SPIRIT BATTLES</span>
+    <div class="stats">
+      <span>Cards: <span class="val" id="totalCount">0</span></span>
+      <span>Avg Grade: <span class="val" id="avgGrade">-</span></span>
+      <span>Issues: <span class="val" style="color:var(--red)" id="issueCount">0</span></span>
+    </div>
+  </div>
+
+  <div class="rules-bar">
+    <strong>RULES ENGINE:</strong> Singles=1dmg <span class="sep">|</span> Doubles=2dmg <span class="sep">|</span> Triples=3dmg <span class="sep">|</span> Only winner deals damage <span class="sep">|</span> Ties=re-roll <span class="sep">|</span> Ice Shard: +1dmg (before roll, lost either way) <span class="sep">|</span> Sacred Fire: +3dmg (before roll, lost either way) <span class="sep">|</span> Teams: 1 active + 2 reserves <span class="sep">|</span> Max 1 legendary per team <span class="sep">|</span> All rarities balanced (legendaries slightly above) <span class="sep">|</span> <strong style="color:var(--orange)">BEFORE-ROLL WINDOW:</strong> abilities + resources spent here — countered by Masked Hero &amp; Piper
+  </div>
+
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <div class="verdict-grid">
+    <div class="verdict-box">
+      <h3><span class="dot" style="background:var(--red)"></span>Needs Work</h3>
+      <div class="list" id="needsWorkList"></div>
+    </div>
+    <div class="verdict-box">
+      <h3><span class="dot" style="background:var(--orange)"></span>Unclear / Ambiguous</h3>
+      <div class="list" id="unclearList"></div>
+    </div>
+    <div class="verdict-box">
+      <h3><span class="dot" style="background:var(--green)"></span>Gold Standard</h3>
+      <div class="list" id="goldList"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search name, ability, issues..." oninput="renderTable()">
+    <select id="filterRarity" onchange="renderTable()">
+      <option value="">All Rarities</option>
+      <option value="common">Common</option>
+      <option value="uncommon">Uncommon</option>
+      <option value="rare">Rare</option>
+      <option value="ghost-rare">Ghost-Rare</option>
+      <option value="legendary">Legendary</option>
+    </select>
+    <select id="filterCat" onchange="renderTable()">
+      <option value="">All Categories</option>
+      <option value="Damage Multiplier">Damage Multiplier</option>
+      <option value="Dice Modifier">Dice Modifier</option>
+      <option value="Defense/Negation">Defense/Negation</option>
+      <option value="HP Recovery">HP Recovery</option>
+      <option value="Debuff">Debuff</option>
+      <option value="Prediction/Reaction">Prediction/Reaction</option>
+      <option value="Resource Generation">Resource Generation</option>
+      <option value="Destruction/Instant Kill">Destruction/Instant Kill</option>
+    </select>
+    <select id="filterGrade" onchange="renderTable()">
+      <option value="">All Grades</option>
+      <option value="S">S — Exceptional</option>
+      <option value="A">A — Strong</option>
+      <option value="B">B — Solid</option>
+      <option value="C">C — Needs Polish</option>
+      <option value="D">D — Weak</option>
+      <option value="F">F — Redesign</option>
+    </select>
+    <select id="filterSet" onchange="renderTable()">
+      <option value="">All Sets</option>
+      <option value="Set 1">Set 1</option>
+      <option value="Dark Castle">Dark Castle</option>
+      <option value="Frost Valley">Frost Valley</option>
+    </select>
+    <button onclick="cycleSortField()">Sort: <span id="sortLabel">Grade ↓</span></button>
+  </div>
+
+  <div class="grid-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="doSort('id')">#</th>
+        <th onclick="doSort('name')">Name</th>
+        <th onclick="doSort('rarity')">Rarity</th>
+        <th onclick="doSort('maxHp')">HP</th>
+        <th onclick="doSort('category')">Category</th>
+        <th>Ability</th>
+        <th onclick="doSort('total')" title="Overall Grade">GRADE</th>
+        <th onclick="doSort('clarity')">CLR</th>
+        <th onclick="doSort('identity')">IDN</th>
+        <th onclick="doSort('balance')">BAL</th>
+        <th onclick="doSort('teamplay')">TMP</th>
+        <th onclick="doSort('excitement')">EXC</th>
+        <th>Flags</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="close" onclick="closeDetail()">×</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+// =====================================================================
+// GAME RULES CONSTANTS
+// =====================================================================
+// Base damage: Singles=1, Doubles=2, Triples=3
+// Only winner deals damage. Ties = re-roll.
+// Ice Shard: +1 dmg, spent before rolling, lost win or lose
+// Sacred Fire: +3 dmg, spent before rolling, lost win or lose
+// Teams: 1 active + 2 reserves (sideline). Face-up for abilities.
+// Both players roll 3 dice simultaneously.
+// Singles vs Singles: highest die wins. Doubles tie: higher unpaired die.
+
+const BASE_DMG = { singles: 1, doubles: 2, triples: 3 };
+// Probability of roll types with 3 dice:
+// Singles: 120/216 = 55.6%
+// Doubles: 90/216 = 41.7%
+// Triples: 6/216 = 2.8%
+
+// =====================================================================
+// ALL 114 LIVE CARDS
+// =====================================================================
+const CARDS = [
+  { id:1, name:'Kodako', rarity:'common', maxHp:6, ability:'Swift', abilityDesc:'Roll 1-2-3: negate damage and deal 4 to enemy.', category:'Defense/Negation', set:'Set 1' },
+  { id:2, name:'Nikon', rarity:'common', maxHp:6, ability:'Ambush', abilityDesc:'Win first roll: deal triple damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:3, name:'Ancient Librarian', rarity:'common', maxHp:6, ability:'Knowledge', abilityDesc:'For each 2 rolled by both players, add +1 damage if you deal damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:4, name:'Wanderer', rarity:'common', maxHp:8, ability:'Curiousity', abilityDesc:'If any enemy sideline cards are hidden, choose one to flip upon entering battle.', category:'Prediction/Reaction', set:'Set 1' },
+  { id:5, name:'Puff', rarity:'common', maxHp:6, ability:'Cute', abilityDesc:'Enemy doubles and triples do -1 damage.', category:'Defense/Negation', set:'Set 1' },
+  { id:6, name:'Fang Outside', rarity:'common', maxHp:2, ability:'Skillful Coward', abilityDesc:'When Fang wins a roll, you may switch with a ghost on your sideline after damage.', category:'Prediction/Reaction', set:'Set 1' },
+  { id:7, name:'Fang Undercover', rarity:'common', maxHp:2, ability:'Skilled Coward', abilityDesc:'When taking damage, you may switch this ghost with any of your sideline ghosts and negate damage.', category:'Defense/Negation', set:'Set 1' },
+  { id:8, name:'Buttons', rarity:'common', maxHp:1, ability:'Perfect Plan', abilityDesc:"If Buttons rolls triple 6's, deal +15 damage.", category:'Damage Multiplier', set:'Set 1' },
+  { id:9, name:'Little Boo', rarity:'common', maxHp:2, ability:'Mercy', abilityDesc:'Enemy rolled triples count as a 1,2,3 roll instead.', category:'Defense/Negation', set:'Set 1' },
+  { id:10, name:'Patrick', rarity:'common', maxHp:3, ability:'Stone Form', abilityDesc:"Don't roll. If opponent rolls singles: negate damage, deal 3.", category:'Defense/Negation', set:'Set 1' },
+  { id:11, name:'Villager', rarity:'common', maxHp:4, ability:'Hospitality', abilityDesc:'When on the sideline, the ghost in battle gains +1 health every winning roll.', category:'HP Recovery', set:'Set 1' },
+  { id:12, name:'Dupy', rarity:'common', maxHp:4, ability:'Frolic', abilityDesc:"Rolling a tie instant K.O's the opposing ghost.", category:'Destruction/Instant Kill', set:'Set 1' },
+  { id:13, name:'Shoo', rarity:'common', maxHp:4, ability:'Alpine Air', abilityDesc:'If on the sideline, the ghost in play gains +2 health when their health is less than 4. Only Once Per Ghost.', category:'HP Recovery', set:'Set 1' },
+  { id:14, name:'Jeffery', rarity:'common', maxHp:5, ability:'Chuckle', abilityDesc:'If on sideline and your ghost wins a battle, ghost in play gains 3 HP.', category:'HP Recovery', set:'Set 1' },
+  { id:15, name:'Winston', rarity:'common', maxHp:5, ability:'Scheme', abilityDesc:"If Winston rolls doubles, you may swap your opponent's ghost with a ghost on their sideline after damage.", category:'Prediction/Reaction', set:'Set 1' },
+  { id:16, name:'Chip', rarity:'common', maxHp:4, ability:'Acrobatic Dive', abilityDesc:'Your even rolled doubles add +3 damage if you deal damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:17, name:'Boo Brothers', rarity:'common', maxHp:5, ability:'Teamwork', abilityDesc:'Before rolling, may remove 1 die to gain 1 HP.', category:'HP Recovery', set:'Set 1' },
+  { id:18, name:'Charlie', rarity:'common', maxHp:4, ability:'Rush', abilityDesc:"Double 2's hit for 7.", category:'Damage Multiplier', set:'Set 1' },
+  { id:19, name:'Scallywags', rarity:'common', maxHp:5, ability:'Frenzy', abilityDesc:'If your rolled dice are all under 4 each, gain +1 dice next turn.', category:'Dice Modifier', set:'Dark Castle' },
+  { id:20, name:'Floop', rarity:'common', maxHp:4, ability:'Muck', abilityDesc:'Enemy loses a dice for the following turn if they roll doubles.', category:'Debuff', set:'Dark Castle' },
+  { id:21, name:'Needle', rarity:'common', maxHp:7, ability:'Big Bro', abilityDesc:'While on the sideline, if Buttons is in play, you may roll +1 dice.', category:'Dice Modifier', set:'Dark Castle' },
+  { id:22, name:'Ancient One', rarity:'common', maxHp:7, ability:'Friend to All', abilityDesc:'While on the sideline, give your ghost in play +3 health upon ties.', category:'HP Recovery', set:'Dark Castle' },
+  { id:23, name:'Powder', rarity:'common', maxHp:5, ability:'Final Gift', abilityDesc:'When defeated, gain 3 Ice Shards for your next ghost.', category:'Resource Generation', set:'Frost Valley' },
+  { id:24, name:'Simon', rarity:'common', maxHp:6, ability:'Brew Time', abilityDesc:'When you take damage from a before-the-roll effect, gain 1 Sacred Fire.', category:'Resource Generation', set:'Frost Valley' },
+  { id:25, name:'Cameron', rarity:'common', maxHp:6, ability:'Force of Nature', abilityDesc:'If your damage gets negated, destroy the enemy.', category:'Destruction/Instant Kill', set:'Frost Valley' },
+  { id:26, name:'Logey', rarity:'common', maxHp:6, ability:'Heinous', abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:'Debuff', set:'Frost Valley' },
+  { id:27, name:'Fredrick', rarity:'common', maxHp:5, ability:'Careful', abilityDesc:'Opponent may only roll up to 3 dice.', category:'Debuff', set:'Frost Valley' },
+  { id:28, name:'Dream Cat', rarity:'common', maxHp:4, ability:'Jinx', abilityDesc:'Both roll doubles: gain +1 die next turn.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:29, name:'Sad Sal', rarity:'common', maxHp:5, ability:'Tough Job', abilityDesc:'Lose a roll: gain 1 Ice Shard.', category:'Resource Generation', set:'Frost Valley' },
+  { id:30, name:'Tommy Salami', rarity:'common', maxHp:6, ability:'Regulator', abilityDesc:"Enemy 5's and 6's reroll low. +1 damage per rerolled die if you win.", category:'Debuff', set:'Frost Valley' },
+  { id:31, name:'Gus', rarity:'common', maxHp:7, ability:'Gale Force', abilityDesc:'If you win a roll, you may force your opponent to choose a different ghost from their sideline instead of dealing damage.', category:'Prediction/Reaction', set:'Frost Valley' },
+  { id:32, name:'Lou', rarity:'common', maxHp:7, ability:'Bros', abilityDesc:'While on the sideline, Grawr gains +1 Damage and +1 Health on Winning Rolls.', category:'Damage Multiplier', set:'Frost Valley' },
+  { id:33, name:'Sandwiches', rarity:'common', maxHp:6, ability:'Dependable', abilityDesc:'While on the sideline, if your opponent gains a Special, you gain it as well.', category:'Resource Generation', set:'Frost Valley' },
+  { id:34, name:'Grawr', rarity:'uncommon', maxHp:7, ability:'Menace', abilityDesc:'When Grawr enters the battle, Grawr deals 1 damage to the opponent.', category:'Damage Multiplier', set:'Set 1' },
+  { id:35, name:'Larry', rarity:'uncommon', maxHp:6, ability:'Flying Kick', abilityDesc:'Triples deal 3X damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:36, name:'Bill & Bob', rarity:'uncommon', maxHp:6, ability:'Bait n Switch', abilityDesc:'While below 4 health, deal 2X damage on winning rolls.', category:'Damage Multiplier', set:'Set 1' },
+  { id:37, name:'Dealer', rarity:'uncommon', maxHp:5, ability:'House Rules', abilityDesc:'Your rolls in numeric order protect Dealer from taking any damage.', category:'Defense/Negation', set:'Set 1' },
+  { id:38, name:'Alucard', rarity:'uncommon', maxHp:4, ability:'Colony Call', abilityDesc:'Doubles deal +2 damage for each ghost on your sideline. Once Per Game.', category:'Damage Multiplier', set:'Set 1' },
+  { id:39, name:'Castle Guards', rarity:'uncommon', maxHp:7, ability:'Flamethrower', abilityDesc:"Any 3's you roll multiplies Castle Guard's damage by 2 each.", category:'Damage Multiplier', set:'Set 1' },
+  { id:40, name:'Team Zippy', rarity:'uncommon', maxHp:7, ability:'Teamwork', abilityDesc:'Any single damage you inflict deals +2 damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:41, name:'Guard Thomas', rarity:'uncommon', maxHp:6, ability:'Stoic', abilityDesc:'Below 6 HP: immune to singles damage.', category:'Defense/Negation', set:'Set 1' },
+  { id:42, name:'Doc', rarity:'uncommon', maxHp:2, ability:'Savage', abilityDesc:'+5 damage when you roll doubles.', category:'Damage Multiplier', set:'Set 1' },
+  { id:43, name:'Outlaw', rarity:'uncommon', maxHp:5, ability:'Thief', abilityDesc:'Roll doubles: remove 1 opponent die next turn.', category:'Debuff', set:'Set 1' },
+  { id:44, name:'Bubble Boys', rarity:'uncommon', maxHp:9, ability:'Pop', abilityDesc:'If the enemy rolls triples, Bubble Boys are defeated.', category:'Defense/Negation', set:'Set 1' },
+  { id:45, name:'Cornelius', rarity:'uncommon', maxHp:2, ability:'Antidote', abilityDesc:'While on the sideline, negate all enemy sideline effects.', category:'Defense/Negation', set:'Set 1' },
+  { id:46, name:'Cave Dweller', rarity:'uncommon', maxHp:7, ability:'Lurk', abilityDesc:'Deal 3X damage on first roll win.', category:'Damage Multiplier', set:'Set 1' },
+  { id:47, name:'Hermit', rarity:'uncommon', maxHp:3, ability:'Solitude', abilityDesc:'Upon entry, Hermit gains +2 health for each ghost defeated on both teams.', category:'HP Recovery', set:'Set 1' },
+  { id:48, name:'Opa', rarity:'uncommon', maxHp:5, ability:'Rest', abilityDesc:'If Opa wins the roll or ties, gain +1 health.', category:'HP Recovery', set:'Set 1' },
+  { id:49, name:'Greg', rarity:'uncommon', maxHp:5, ability:'Chase', abilityDesc:"If Greg has more health than the opposing ghost, Greg's rolls do x2 damage.", category:'Damage Multiplier', set:'Set 1' },
+  { id:50, name:'Jackson', rarity:'uncommon', maxHp:3, ability:'Regrow', abilityDesc:"After your roll, you may remove 1 of Jackson's health to reroll 1 of the dice.", category:'Dice Modifier', set:'Set 1' },
+  { id:51, name:'Nicholas', rarity:'uncommon', maxHp:1, ability:'Sneak Attack', abilityDesc:'While on the sideline, deal 2 damage to the enemy ghost when they enter play.', category:'Damage Multiplier', set:'Dark Castle' },
+  { id:52, name:'Hugo', rarity:'uncommon', maxHp:5, ability:'Wreckage', abilityDesc:'Your opponent loses 1 die their next roll when Hugo takes roll damage.', category:'Debuff', set:'Dark Castle' },
+  { id:53, name:'Bogey', rarity:'uncommon', maxHp:5, ability:'Bogus', abilityDesc:'Reflect all incoming damage. Once per game.', category:'Defense/Negation', set:'Frost Valley' },
+  { id:54, name:'Roger', rarity:'uncommon', maxHp:6, ability:'Tempest', abilityDesc:'Roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires.', category:'Resource Generation', set:'Frost Valley' },
+  { id:55, name:'Masked Hero', rarity:'uncommon', maxHp:5, ability:'Underdog', abilityDesc:'When enemy uses a before-rolling effect: deal 3 damage.', category:'Prediction/Reaction', set:'Frost Valley' },
+  { id:56, name:'Chad', rarity:'uncommon', maxHp:6, ability:'Sploop!', abilityDesc:'On entry, gain 2 Ice Shards.', category:'Resource Generation', set:'Frost Valley' },
+  { id:57, name:'Marcus', rarity:'uncommon', maxHp:7, ability:'Glacial Pounding', abilityDesc:'Take 3+ damage: gain 4 extra dice next roll.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:58, name:'Ashley', rarity:'uncommon', maxHp:3, ability:'Burning Soul', abilityDesc:'Win a roll: gain 1 Sacred Fire.', category:'Resource Generation', set:'Frost Valley' },
+  { id:59, name:'Mr Filbert', rarity:'uncommon', maxHp:6, ability:'Mask Merchant', abilityDesc:'While on the sideline, any healing instead deals damage to the intended ghost.', category:'Debuff', set:'Frost Valley' },
+  { id:60, name:'Dallas', rarity:'uncommon', maxHp:4, ability:'Quick Draw', abilityDesc:'When coming off the sideline, steal 1 of your opponents die for the first 2 rolls.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:61, name:'Suspicious Jeff', rarity:'uncommon', maxHp:4, ability:'Snicker', abilityDesc:'While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.', category:'Debuff', set:'Frost Valley' },
+  { id:62, name:'Raditz', rarity:'rare', maxHp:6, ability:'Hunt', abilityDesc:'When Raditz enters the battle, you may switch the opposing ghost with a different ghost from their sideline.', category:'Prediction/Reaction', set:'Set 1' },
+  { id:63, name:'Doug', rarity:'rare', maxHp:3, ability:'Caution', abilityDesc:'Before rolling, Doug may switch with a sideline ghost once per game. Then, gain +1 dice your next roll.', category:'Dice Modifier', set:'Set 1' },
+  { id:64, name:'Sparky', rarity:'rare', maxHp:4, ability:'Tinder', abilityDesc:"Your rolled 1's add +3 damage each if you deal damage.", category:'Damage Multiplier', set:'Set 1' },
+  { id:65, name:'Wim', rarity:'rare', maxHp:6, ability:'Slash', abilityDesc:'+5 damage when all dice are odd.', category:'Damage Multiplier', set:'Set 1' },
+  { id:66, name:'Munch', rarity:'rare', maxHp:6, ability:'Scraps', abilityDesc:'Upon defeating a ghost, gain 4 health.', category:'HP Recovery', set:'Set 1' },
+  { id:67, name:'Snorton', rarity:'rare', maxHp:8, ability:'Fissure', abilityDesc:"+5 damage if you roll at least two 6's and deal damage.", category:'Damage Multiplier', set:'Set 1' },
+  { id:68, name:'Kairan', rarity:'rare', maxHp:3, ability:"Let's Dance", abilityDesc:'Roll doubles: +1 die next roll.', category:'Dice Modifier', set:'Set 1' },
+  { id:69, name:'Sonya', rarity:'rare', maxHp:3, ability:'Mesmerize', abilityDesc:'You may change one of your dice results to a 2 each roll.', category:'Dice Modifier', set:'Set 1' },
+  { id:70, name:'Katrina', rarity:'rare', maxHp:5, ability:'Seeker', abilityDesc:'Before rolling, if you have less HP than the enemy, gain 1 HP.', category:'HP Recovery', set:'Set 1' },
+  { id:71, name:'Admiral', rarity:'rare', maxHp:3, ability:'Comrades', abilityDesc:'While on the sideline, +2 damage to your even doubles rolls.', category:'Damage Multiplier', set:'Set 1' },
+  { id:72, name:'Sky', rarity:'rare', maxHp:4, ability:'Elusive', abilityDesc:'If incoming damage is greater than 2, the damage is negated.', category:'Defense/Negation', set:'Set 1' },
+  { id:73, name:'Stone Cold', rarity:'rare', maxHp:7, ability:'One-two-one!', abilityDesc:"Roll double 1's: deal 3X damage.", category:'Damage Multiplier', set:'Set 1' },
+  { id:74, name:'Dark Jeff', rarity:'rare', maxHp:3, ability:'Cackle', abilityDesc:'While on the sideline, +1 damage to all your rolls.', category:'Damage Multiplier', set:'Set 1' },
+  { id:75, name:'Flora', rarity:'rare', maxHp:4, ability:'Restore', abilityDesc:'Roll doubles: +2 HP after damage is applied.', category:'HP Recovery', set:'Set 1' },
+  { id:76, name:'Dark Wing', rarity:'rare', maxHp:2, ability:'Precision', abilityDesc:"Dark Wing may reroll dice if he doesn't roll doubles.", category:'Dice Modifier', set:'Set 1' },
+  { id:77, name:'City Cyboo', rarity:'rare', maxHp:1, ability:'Barrier', abilityDesc:'Takes no damage from Enemy Doubles.', category:'Defense/Negation', set:'Set 1' },
+  { id:78, name:'Haywire', rarity:'rare', maxHp:7, ability:'Wild Chords', abilityDesc:'Upon rolling triples, gain +1 dice for the rest of the game. Once Per Game.', category:'Dice Modifier', set:'Dark Castle' },
+  { id:79, name:'Laura', rarity:'rare', maxHp:4, ability:'Catchy Tune', abilityDesc:'While on the sideline, your rolls in numeric order gain +3 roll damage.', category:'Damage Multiplier', set:'Dark Castle' },
+  { id:80, name:'Bilbo', rarity:'rare', maxHp:2, ability:'Little Buddy', abilityDesc:'While on the sideline, your ghost in play gains +2 damage if you roll singles.', category:'Damage Multiplier', set:'Dark Castle' },
+  { id:81, name:'Spockles', rarity:'rare', maxHp:6, ability:'Valley Magic', abilityDesc:'Win a roll: gain 2 Ice Shards.', category:'Resource Generation', set:'Frost Valley' },
+  { id:82, name:'Antoinette', rarity:'rare', maxHp:6, ability:'Grace', abilityDesc:'Roll as many dice as your opponent.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:83, name:'Troubling Haters', rarity:'rare', maxHp:4, ability:'Growing Mob', abilityDesc:'Deal 4+ damage in a turn: gain +2 HP.', category:'HP Recovery', set:'Frost Valley' },
+  { id:84, name:'Wandering Sue', rarity:'rare', maxHp:4, ability:'Hidden Weakness', abilityDesc:'If enemy has 12+ HP, destroy them before rolling.', category:'Destruction/Instant Kill', set:'Frost Valley' },
+  { id:85, name:'Eloise', rarity:'rare', maxHp:5, ability:'Change of Heart', abilityDesc:'Spend 1 Ice Shard to swap HP with enemy before rolling.', category:'Prediction/Reaction', set:'Frost Valley' },
+  { id:86, name:'Pelter', rarity:'rare', maxHp:5, ability:'Snowball', abilityDesc:'Doubles gain +2 damage.', category:'Damage Multiplier', set:'Frost Valley' },
+  { id:87, name:'Zach', rarity:'rare', maxHp:7, ability:'Craftsman', abilityDesc:'While on the sideline, Guard Thomas gains +3 damage on Doubles.', category:'Damage Multiplier', set:'Frost Valley' },
+  { id:88, name:'Pale Nimbus', rarity:'rare', maxHp:4, ability:'Hidden Storm', abilityDesc:'While on the Sideline, add +2 Damage if your total roll result adds to less than 7.', category:'Damage Multiplier', set:'Frost Valley' },
+  { id:89, name:'Mallow', rarity:'rare', maxHp:2, ability:'Dozy Cozy', abilityDesc:'While on the sideline, before rolling you may spend 2 Sacred Fire to give your Ghost in Play 3 Health and gain 2 Burn.', category:'HP Recovery', set:'Frost Valley' },
+  { id:90, name:'Jeanie', rarity:'rare', maxHp:4, ability:'Hidden Treasure', abilityDesc:'While on the sideline, you may force the opponent to reroll all their dice. Once Per Game.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:91, name:'Calvin & Anna', rarity:'rare', maxHp:6, ability:'Toboggan', abilityDesc:'When you defeat a Ghost, you may switch Calvin & Anna with a ghost from your sideline after the opponent chooses their next ghost.', category:'Prediction/Reaction', set:'Frost Valley' },
+  { id:92, name:'Gary', rarity:'rare', maxHp:6, ability:'Lucky Novice', abilityDesc:'While on the sideline, gain +1 Ice Shards for each 1 you roll.', category:'Resource Generation', set:'Frost Valley' },
+  { id:93, name:'Bandit Pete', rarity:'rare', maxHp:5, ability:'Bandit', abilityDesc:'While on the Sideline, if either player rolls only 2 dice, your ghost in play gains +3 Damage.', category:'Damage Multiplier', set:'Frost Valley' },
+  { id:94, name:'Jenkins', rarity:'ghost-rare', maxHp:5, ability:'Greeting', abilityDesc:'When Jenkins enters the battle, roll 4 dice to inflict damage once.', category:'Damage Multiplier', set:'Set 1' },
+  { id:95, name:'Tabitha', rarity:'ghost-rare', maxHp:1, ability:'Rally', abilityDesc:'While on the sideline, +2 damage to your doubles rolls.', category:'Damage Multiplier', set:'Set 1' },
+  { id:96, name:'Hector', rarity:'ghost-rare', maxHp:6, ability:'Protector', abilityDesc:'Singles beat doubles. +1 damage on singles.', category:'Defense/Negation', set:'Dark Castle' },
+  { id:97, name:'Toby', rarity:'ghost-rare', maxHp:7, ability:'Pure Heart', abilityDesc:'Before rolling you may declare the final roll. Toby is defeated next turn before rolling. Winning this roll defeats the enemy ghost.', category:'Destruction/Instant Kill', set:'Dark Castle' },
+  { id:98, name:'Redd', rarity:'ghost-rare', maxHp:7, ability:'Notorious', abilityDesc:'When Redd enters the battle, gain +2 dice this roll.', category:'Dice Modifier', set:'Dark Castle' },
+  { id:99, name:'Guardian Fairy', rarity:'ghost-rare', maxHp:3, ability:'Wish', abilityDesc:'While on the sideline, you may switch the Guardian Fairy into play and receive the incoming damage.', category:'Defense/Negation', set:'Set 1' },
+  { id:100, name:'Cyboo', rarity:'ghost-rare', maxHp:3, ability:'Spark', abilityDesc:'While on the sideline, your ghost in play gains +1 dice if they have less than 3 health.', category:'Dice Modifier', set:'Set 1' },
+  { id:101, name:'Splinter', rarity:'ghost-rare', maxHp:6, ability:'Toxic Fumes', abilityDesc:'After winning a roll, deal 1 damage before every roll until defeated.', category:'Debuff', set:'Set 1' },
+  { id:103, name:'Night Master', rarity:'ghost-rare', maxHp:5, ability:'Bullseye', abilityDesc:'If you roll doubles and win the roll, immediately destroy a ghost on the enemy sideline that has less than 4 HP.', category:'Destruction/Instant Kill', set:'Frost Valley' },
+  { id:104, name:'Skylar', rarity:'ghost-rare', maxHp:7, ability:'Winter Barrage', abilityDesc:'Ice Shards deal +2 damage instead of +1.', category:'Resource Generation', set:'Frost Valley' },
+  { id:105, name:'Tyler', rarity:'ghost-rare', maxHp:6, ability:'Heating Up', abilityDesc:'Before rolling, spend 2 HP to gain +1 die. Sacred Fires deal x2.', category:'Dice Modifier', set:'Frost Valley' },
+  { id:106, name:'King Jay', rarity:'ghost-rare', maxHp:7, ability:'Reflection', abilityDesc:'Lose roll & dice total = 7: reflect all damage.', category:'Defense/Negation', set:'Frost Valley' },
+  { id:107, name:'Piper', rarity:'ghost-rare', maxHp:6, ability:'Slick Coat', abilityDesc:'Negate enemy before-rolling effects. -1 enemy die next roll.', category:'Debuff', set:'Frost Valley' },
+  { id:108, name:'Lucy', rarity:'legendary', maxHp:8, ability:'Blue Fire', abilityDesc:'Win a roll: +1 bonus damage.', category:'Damage Multiplier', set:'Dark Castle' },
+  { id:109, name:'Bo', rarity:'legendary', maxHp:5, ability:'Miracle', abilityDesc:'Upon defeating a Ghost, return one of your defeated Ghosts to your sideline.', category:'HP Recovery', set:'Set 1' },
+  { id:110, name:'The Mountain King', rarity:'legendary', maxHp:9, ability:'Beast Mode', abilityDesc:'Doubles deal 2X damage.', category:'Damage Multiplier', set:'Set 1' },
+  { id:111, name:'Shade', rarity:'legendary', maxHp:5, ability:'Haunt', abilityDesc:'After first roll, opponent takes 1 damage before each roll.', category:'Debuff', set:'Set 1' },
+  { id:112, name:'Doom', rarity:'legendary', maxHp:7, ability:'Fiendship', abilityDesc:'+2 bonus damage!', category:'Damage Multiplier', set:'Set 1' },
+  { id:113, name:'Prince Balatron', rarity:'legendary', maxHp:6, ability:'Party Time', abilityDesc:'Lose a roll & survive: roll 1 counter die for damage.', category:'Prediction/Reaction', set:'Frost Valley' },
+  { id:114, name:'Romy', rarity:'legendary', maxHp:8, ability:'Valley Guardian', abilityDesc:'Predict a die number. If any die matches: +3 damage.', category:'Prediction/Reaction', set:'Frost Valley' },
+];
+
+// =====================================================================
+// SCORING ENGINE v2 — Built on actual game rules
+// =====================================================================
+// Dimensions:
+// CLARITY (1-10): Can both players resolve this without arguing?
+// IDENTITY (1-10): Does this card have a unique mechanical personality?
+// BALANCE (1-10): HP + ability coherent? Functional? No degenerate combos?
+// TEAMPLAY (1-10): Does it create interesting team-building decisions?
+// EXCITEMENT (1-10): Does it create moments players talk about after?
+
+function analyzeCard(card) {
+  const desc = card.abilityDesc.toLowerCase();
+  const issues = [];
+  const notes = [];
+  const strengths = [];
+  let clarity = 7, identity = 6, balance = 7, teamplay = 5, excitement = 5;
+
+  // ================================================================
+  // CLARITY — Can both players resolve without arguing?
+  // ================================================================
+  const words = desc.split(/\s+/).length;
+  if (words <= 10) { clarity += 1; strengths.push('Clean, short text'); }
+  if (words > 25) { clarity -= 1; issues.push({type:'warning',text:'Wordy ('+words+' words)'}); }
+  if (words > 35) { clarity -= 1; notes.push('Consider trimming text for card print'); }
+
+  // Timing keywords — broad check for any trigger/condition language
+  const hasTiming = /before rolling|after|when|upon|while|on entry|if |roll|deal |win|lose|predict|take|defeat|gain|spend/.test(desc);
+  if (!hasTiming && card.category !== 'Damage Multiplier' && card.category !== 'Defense/Negation') {
+    clarity -= 1; issues.push({type:'note',text:'Missing timing keyword'});
+  }
+
+  // Ambiguous phrasing
+  if (card.name === 'Cameron') {
+    // "Negated" is a defined game term — triggers when a card explicitly negates damage.
+    // Examples: Sky (dmg >2), Patrick (singles), Fang Undercover (on switch), Dealer (numeric order),
+    // Kodako (1-2-3 roll), Little Boo (triples→singles conversion counts?).
+    // Cameron is a meta-counter to all negation cards. Excellent design.
+    clarity += 1;
+    identity += 2;
+    strengths.push('Anti-negation tech — punishes Sky, Patrick, Fang Undercover, Dealer, Kodako');
+    notes.push('Creates a real risk for running negation-heavy teams');
+  }
+  if (card.name === 'Castle Guards') {
+    clarity -= 2; issues.push({type:'critical',text:'"Multiplies by 2 each" — multiplicative or additive? Two 3s = x4 or +4?'});
+    notes.push('Clarify: "For each 3 rolled, double your damage" or "+2 per 3 rolled"');
+  }
+  if (card.name === 'Splinter') {
+    clarity -= 1; issues.push({type:'warning',text:'Does the DOT stack on multiple wins? Whose defeat ends it?'});
+    notes.push('Clarify: "deal 1 damage before each roll (does not stack)" or similar');
+  }
+  if (card.name === 'Toby') {
+    clarity -= 1; issues.push({type:'warning',text:'"Declare the final roll" — declare what exactly?'});
+    notes.push('Incredible card concept — just needs tighter wording');
+  }
+  if (card.name === 'Sonya') {
+    issues.push({type:'note',text:'Changing a die to 2 seems weak — but it enables doubles matching'});
+    strengths.push('Subtle skill card for forcing doubles');
+  }
+  if (card.name === 'Fredrick') {
+    clarity -= 1; issues.push({type:'warning',text:'Base is already 3 dice — only matters if enemy has bonus dice'});
+    notes.push('Text reads as if it does nothing. Add: "enemies with bonus dice roll only 3"');
+  }
+  if (card.name === 'Mr Filbert') {
+    clarity -= 1; issues.push({type:'warning',text:'"Any healing" — whose? Both players? Just enemy?'});
+  }
+  if (card.name === 'Masked Hero') {
+    // "Before-rolling effect" = the before-roll timing window: abilities that trigger before rolling,
+    // plus spending Ice Shards and Sacred Fires. This is actually well-defined in the game's rules.
+    strengths.push('Punishes the entire before-roll window — including resource spending');
+    notes.push('Players should clarify: does spending Ice Shards/Sacred Fires count as a before-rolling effect?');
+  }
+  if (desc.includes('if you deal damage') && desc.includes('+') && desc.includes('damage')) {
+    // "add damage if you deal damage" is slightly circular but players understand it
+  }
+
+  scores_clarity = Math.max(1, Math.min(10, clarity));
+
+  // ================================================================
+  // IDENTITY — Unique mechanical personality?
+  // ================================================================
+
+  // Sideline damage buffs — how many overlap?
+  const isSidelineDmg = desc.includes('sideline') && (desc.includes('+') || desc.includes('damage') || desc.includes('gain'));
+  const sidelineDmgCards = ['Dark Jeff','Tabitha','Admiral','Bilbo','Laura','Pale Nimbus','Bandit Pete'];
+  if (sidelineDmgCards.includes(card.name)) {
+    // These all share "passive sideline damage buff" space, but in a 1-3 dmg system each condition matters
+    const hasUniqueCondition = card.name === 'Laura' || card.name === 'Pale Nimbus' || card.name === 'Bandit Pete';
+    if (!hasUniqueCondition) {
+      identity -= 1;
+      issues.push({type:'note',text:'Sideline damage buff — shared design space with '+sidelineDmgCards.filter(n=>n!==card.name).join(', ')});
+    } else {
+      strengths.push('Unique trigger condition differentiates from other sideline buffs');
+    }
+  }
+
+  // Named synergy partners — GREAT for identity
+  const namedPartners = {
+    'Lou': 'Grawr', 'Grawr': 'Lou', 'Needle': 'Buttons', 'Buttons': 'Needle',
+    'Zach': 'Guard Thomas', 'Guard Thomas': 'Zach',
+    'Fang Outside': 'Fang Undercover', 'Fang Undercover': 'Fang Outside'
+  };
+  if (namedPartners[card.name]) {
+    identity += 2; teamplay += 2;
+    strengths.push('Named synergy with ' + namedPartners[card.name] + ' — creates deckbuilding identity');
+  }
+
+  // High-concept unique mechanics
+  const uniqueMechanics = {
+    'Patrick': 'No-roll strategy — completely unique approach',
+    'Dupy': 'Tie = instant KO — turns dead rolls into threat',
+    'Gus': 'Win but choose disruption over damage — unique strategic choice',
+    'Boo Brothers': 'Sacrifice dice for HP — elegant risk/reward every turn',
+    'Jackson': 'Sacrifice HP to reroll — life as currency',
+    'Hermit': 'Scales with total defeats — timing puzzle',
+    'Bo': 'Resurrect defeated ghosts — legendary feeling ability',
+    'Eloise': 'HP swap — dramatic reversal potential',
+    'Romy': 'Prediction mechanic — skill expression',
+    'Prince Balatron': 'Counter-attack on loss — comeback king',
+    'Hector': 'Singles beat doubles — inverts the entire hierarchy',
+    'Toby': 'Sacrifice self for guaranteed kill attempt — peak drama',
+    'Simon': 'Turn damage taken into resources — elegant pain-to-power',
+    'Sad Sal': 'Turn losses into resources — losing has value',
+    'Antoinette': 'Mirror opponent dice count — elegant equalizer',
+    'Bogey': 'Damage reflect bomb — timing is everything',
+    'Night Master': 'Snipe sideline ghosts — unique targeting',
+    'King Jay': 'Specific dice total reflects damage — math puzzle',
+    'Mr Filbert': 'Anti-healing — warps opponent strategy from sideline',
+    'Cornelius': 'Anti-sideline — meta counter card',
+    'Masked Hero': 'Punishes before-roll window — counters Ice Shards, Sacred Fires, and abilities',
+    'Piper': 'Negates before-roll effects + dice removal — shuts down resource-heavy play',
+    'Mallow': 'Convert Sacred Fires to healing from sideline — resource flexibility',
+    'Dallas': 'Dice theft on entry — aggressive tempo swing',
+    'Tyler': 'HP-to-dice conversion + Sacred Fire synergy — multiple costs/rewards',
+    'Wanderer': 'Intel gathering — reveals hidden reserves',
+    'Calvin & Anna': 'Counter-pick after defeating a ghost — information advantage',
+    'Raditz': 'Force opponent into bad matchup on entry',
+    'Cyboo': 'Desperation dice boost — rewards being low HP',
+    'Guardian Fairy': 'Bodyguard from sideline — absorbs a killing blow',
+    'Ashley': 'Sacred Fire engine — generates resources by winning',
+    'Spockles': 'Ice Shard engine — generates resources by winning',
+  };
+  if (uniqueMechanics[card.name]) {
+    identity += 2;
+    strengths.push(uniqueMechanics[card.name]);
+  }
+
+  // Very generic abilities get dinged
+  if (desc === '+2 bonus damage!') {
+    // In context: this is +2 in a 1-3 system, which is HUGE. But the text has no personality.
+    identity -= 1;
+    issues.push({type:'note',text:'Mechanically strong (+2 in a 1-3 system) but text has no story/flavor'});
+    notes.push('Consider adding a trigger or condition for more interesting play patterns');
+  }
+
+  scores_identity = Math.max(1, Math.min(10, identity));
+
+  // ================================================================
+  // BALANCE — All rarities are balanced EXCEPT legendaries (slightly better)
+  // ================================================================
+  // IMPORTANT: Common, Uncommon, Rare, Ghost-Rare are ALL equally viable.
+  // Rarity = collectibility, NOT power. A common can be a top-tier card.
+  // Only legendaries are designed to be slightly above the curve.
+  // Limit: 1 legendary per team of 3.
+
+  // We evaluate balance on internal consistency: does the HP + ability
+  // combination make sense? Is the card functional? Are there degenerate combos?
+  const isLegendary = card.rarity === 'legendary';
+
+  // ================================================================
+  // BEFORE-THE-ROLL TIMING WINDOW
+  // ================================================================
+  // "Before rolling" is a critical timing trigger in the game.
+  // Ice Shards and Sacred Fires are also spent before rolling.
+  // Masked Hero punishes before-roll effects (3 damage).
+  // Piper negates enemy before-roll effects.
+  // Cards with before-roll effects carry inherent risk vs these counters.
+  const hasBeforeRoll = desc.includes('before rolling') || desc.includes('predict');
+  const isBeforeRollCounter = card.name === 'Masked Hero' || card.name === 'Piper';
+
+  if (hasBeforeRoll) {
+    strengths.push('Before-roll trigger — powerful but vulnerable to Masked Hero / Piper');
+    teamplay += 1; // Creates matchup consideration
+  }
+  if (isBeforeRollCounter) {
+    identity += 1;
+    teamplay += 1;
+    strengths.push('Counters the before-roll timing window (Ice Shards, Sacred Fires, abilities)');
+  }
+
+  // Also track cards whose abilities interact with spending resources
+  // (since spending resources = before the roll = Masked Hero risk)
+  if (desc.includes('ice shard') || desc.includes('sacred fire')) {
+    if (!hasBeforeRoll && !isBeforeRollCounter) {
+      notes.push('Resource-related — interacts with before-roll timing window');
+    }
+  }
+
+  // Specific balance flags
+  if (card.name === 'Sky') {
+    // "Greater than 2" means 3+ is negated. Singles=1 (through), Doubles=2 (through), Triples=3 (negated).
+    // BUT any +damage buff pushing damage above 2 also gets negated.
+    // Countered by chip damage, weak to sustained singles.
+    balance += 1;
+    strengths.push('Anti-burst design — lets singles/doubles through, negates triples + buffed damage');
+    notes.push('Countered by chip damage strategies. Buffed singles that exceed 2 are also negated.');
+  }
+  if (card.name === 'Buttons') {
+    // 1 HP, triple 6s = 0.46% chance. But Needle gives +1 die from sideline.
+    // With 4 dice: P(triple 6) still very low. BUT the dream of +15 is the whole point.
+    // This is a meme card / Timmy card. That's a valid design role.
+    identity += 1; excitement += 3;
+    strengths.push('Meme card — the dream of triple 6s is the entire appeal');
+    issues.push({type:'note',text:'Near-zero trigger rate — exists for the story, not the win rate'});
+  }
+  if (card.name === 'Ancient Librarian') {
+    // Both players rolling 2s — each die has 1/6 chance of being a 2.
+    // With 6 dice total (3 each), expected 2s = 1. So +1 damage sometimes.
+    // Actually not terrible — it triggers more often than you'd think.
+    balance += 0;
+    notes.push('Triggers on ~1 expected 2 across 6 dice — modest but consistent');
+  }
+  // Legendary-specific: should feel slightly above the curve
+  if (isLegendary) {
+    // 1 per team limit means legendaries should justify the slot
+    if (card.name === 'Doom') {
+      strengths.push('+2 in a 1-3 system = 67-200% damage boost. Simple but dominant.');
+    }
+    if (card.name === 'Lucy') {
+      strengths.push('8 HP tank with +1 on every win. Grinds opponents down.');
+    }
+    if (card.name === 'Bo') {
+      excitement += 1;
+      strengths.push('Resurrection is the most legendary-feeling ability in the game');
+    }
+  }
+
+  // Before-roll cards: flag the Masked Hero vulnerability
+  if (hasBeforeRoll && card.name !== 'Masked Hero' && card.name !== 'Piper') {
+    issues.push({type:'note',text:'Before-roll ability — vulnerable to Masked Hero (3 dmg) and Piper (negation)'});
+  }
+
+  if (card.name === 'Wandering Sue') {
+    // 12+ HP is extremely rare. No base ghost has that much.
+    // Would need massive healing buffs. Almost never triggers.
+    balance -= 1;
+    issues.push({type:'warning',text:'12+ HP threshold almost never reached — ability rarely fires'});
+    notes.push('Consider lowering threshold or changing to "more than X HP"');
+  }
+  if (card.name === 'Dream Cat') {
+    // Both rolling doubles: ~41.7% * 41.7% = ~17.4%. Not that rare!
+    // And the reward (+1 die) is solid. This is actually decent.
+    strengths.push('17% trigger rate is reasonable for +1 die reward');
+  }
+  if (card.name === 'Jeffery') {
+    // "Wins a battle" = defeats an enemy ghost, NOT just winning a roll.
+    // So this only triggers when you KO an enemy — much rarer than every winning roll.
+    // 3 HP refill after a KO is strong but appropriately gated.
+    strengths.push('3 HP heal on ghost KO — rewards finishing blows, not just winning rolls');
+    notes.push('"Wins a battle" = defeats an enemy ghost (not a single roll win)');
+  }
+  if (card.name === 'Roger') {
+    // 2 pairs of doubles requires 4+ dice. Getting 4 dice is rare.
+    // Then needing two pairs is very specific. But 3 Sacred Fires = +9 potential damage.
+    issues.push({type:'warning',text:'Very hard to trigger — needs 4+ dice AND specific pattern'});
+    notes.push('Sacred Fire payoff is huge (+9 dmg) but setup is nearly impossible without dice gainers');
+  }
+
+  // HP sanity — rarity doesn't matter, but HP must make sense with the ability
+  if (card.maxHp === 1 && !desc.includes('sideline')) {
+    // 1 HP in play = dies to ANY hit. Must have a reason.
+    if (card.name === 'Buttons') {
+      // Meme card — 1 HP IS the design (glass cannon dream)
+    } else if (card.name === 'City Cyboo') {
+      // Immune to doubles — so only dies to singles/triples. Niche but valid.
+      strengths.push('1 HP + doubles immunity = only dies to singles or triples');
+    } else {
+      balance -= 1; issues.push({type:'warning',text:'1 HP with no sideline role — one hit kill'});
+    }
+  }
+  // High HP cards are strong regardless of rarity — that's fine
+  if (card.maxHp >= 8) {
+    strengths.push('High HP (' + card.maxHp + ') — takes many winning rolls to bring down');
+  }
+  // Legendary should feel worth the 1-per-team slot
+  if (isLegendary && card.maxHp <= 4) {
+    balance -= 1;
+    issues.push({type:'warning',text:'Low HP for a legendary — hard to justify the 1-per-team slot'});
+  }
+
+  scores_balance = Math.max(1, Math.min(10, balance));
+
+  // ================================================================
+  // TEAMPLAY — Interesting team-building decisions?
+  // ================================================================
+  // With only 3 ghosts (1 active + 2 reserves), every slot matters enormously.
+  // Good teamplay score = this card creates interesting draft/team choices.
+
+  if (desc.includes('sideline')) {
+    teamplay += 1; // Sideline effects inherently create team decisions
+    strengths.push('Sideline role gives team-building purpose');
+  }
+  if (namedPartners[card.name]) {
+    // Already handled above
+  }
+  // Cards that combo with categories
+  if (card.name === 'Cornelius') {
+    teamplay += 2; strengths.push('Meta-counter — shuts down sideline-heavy teams');
+  }
+  if (card.name === 'Mr Filbert') {
+    teamplay += 2; strengths.push('Anti-healing tech — punishes healer teams from sideline');
+  }
+  if (card.name === 'Sandwiches') {
+    teamplay += 1; strengths.push('Resource mirroring — interesting in resource-heavy matchups');
+  }
+  // Cards that interact with opponent team structure
+  if (desc.includes('sideline ghost') || desc.includes('opponent\'s ghost') || desc.includes('their sideline')) {
+    teamplay += 1;
+  }
+  // Cards that are pure solo — no team interaction
+  if (!desc.includes('sideline') && !desc.includes('ghost') && !desc.includes('entry') && !desc.includes('defeated') && !namedPartners[card.name]) {
+    // Pure solo card — not inherently bad
+  }
+  // Resource generators create team synergy
+  if (card.category === 'Resource Generation') {
+    teamplay += 1; strengths.push('Resource generation enables combos with resource-spending cards');
+  }
+
+  scores_teamplay = Math.max(1, Math.min(10, teamplay));
+
+  // ================================================================
+  // EXCITEMENT — Moments players talk about?
+  // ================================================================
+
+  // High risk / high reward
+  if (card.maxHp <= 2 && (desc.includes('damage') || desc.includes('destroy') || desc.includes('+5') || desc.includes('+15'))) {
+    excitement += 2; strengths.push('Glass cannon — high drama every roll');
+  }
+  // Jackpot moments
+  if (desc.includes('triple 6') || desc.includes('3x damage') || desc.includes('triple damage')) excitement += 2;
+  if (desc.includes('instant k.o') || desc.includes('destroy')) excitement += 1;
+  // Prediction / skill expression
+  if (desc.includes('predict') || desc.includes('declare') || desc.includes('choose')) excitement += 1;
+  // Dramatic reversals
+  if (desc.includes('swap hp') || desc.includes('reflect') || desc.includes('counter')) excitement += 2;
+  if (desc.includes('below') || desc.includes('less than') || desc.includes('when defeated')) excitement += 1;
+  // Comeback mechanics
+  if (desc.includes('lose a roll') || desc.includes('take damage') || desc.includes('takes damage')) excitement += 1;
+  // Sacrifice mechanics
+  if (desc.includes('remove 1') && (desc.includes('health') || desc.includes('hp') || desc.includes('die'))) excitement += 2;
+  // Opponent interaction
+  if (desc.includes('swap') || desc.includes('switch') || desc.includes('steal') || desc.includes('force')) excitement += 1;
+  // Emotional cards
+  if (card.name === 'Toby') excitement += 3; // Self-sacrifice for guaranteed kill
+  if (card.name === 'Bo') excitement += 2; // Resurrection
+  if (card.name === 'Dupy') excitement += 2; // Tie = death
+  if (card.name === 'Bogey') excitement += 2; // Reflect bomb
+
+  scores_excitement = Math.max(1, Math.min(10, excitement));
+
+  // ================================================================
+  // TOTAL & GRADE
+  // ================================================================
+  const total = scores_clarity + scores_identity + scores_balance + scores_teamplay + scores_excitement;
+  let grade;
+  if (total >= 42) grade = 'S';
+  else if (total >= 36) grade = 'A';
+  else if (total >= 30) grade = 'B';
+  else if (total >= 24) grade = 'C';
+  else if (total >= 18) grade = 'D';
+  else grade = 'F';
+
+  return {
+    ...card,
+    scores: { clarity: scores_clarity, identity: scores_identity, balance: scores_balance, teamplay: scores_teamplay, excitement: scores_excitement },
+    total, grade, issues, notes, strengths
+  };
+}
+
+// =====================================================================
+// SCORE ALL CARDS
+// =====================================================================
+const scored = CARDS.map(c => analyzeCard(c));
+
+// =====================================================================
+// STATE & SORTING
+// =====================================================================
+let sortField = 'total';
+let sortDir = -1;
+
+function doSort(field) {
+  if (sortField === field) sortDir *= -1;
+  else { sortField = field; sortDir = field === 'name' ? 1 : -1; }
+  document.getElementById('sortLabel').textContent = field + (sortDir > 0 ? ' ↑' : ' ↓');
+  renderTable();
+}
+function cycleSortField() {
+  const fields = ['total','clarity','identity','balance','teamplay','excitement','name','maxHp','rarity','id'];
+  const idx = fields.indexOf(sortField);
+  sortField = fields[(idx+1)%fields.length];
+  sortDir = sortField === 'name' ? 1 : -1;
+  document.getElementById('sortLabel').textContent = sortField + (sortDir > 0 ? ' ↑' : ' ↓');
+  renderTable();
+}
+
+const RARITY_ORD = { common:0, uncommon:1, rare:2, 'ghost-rare':3, legendary:4 };
+
+function getFiltered() {
+  let list = [...scored];
+  const search = (document.getElementById('search')?.value || '').toLowerCase();
+  const rarity = document.getElementById('filterRarity')?.value || '';
+  const cat = document.getElementById('filterCat')?.value || '';
+  const grade = document.getElementById('filterGrade')?.value || '';
+  const set = document.getElementById('filterSet')?.value || '';
+
+  if (search) list = list.filter(c =>
+    c.name.toLowerCase().includes(search) || c.ability.toLowerCase().includes(search) ||
+    c.abilityDesc.toLowerCase().includes(search) || c.issues.some(i=>i.text.toLowerCase().includes(search)) ||
+    c.strengths.some(s=>s.toLowerCase().includes(search))
+  );
+  if (rarity) list = list.filter(c => c.rarity === rarity);
+  if (cat) list = list.filter(c => c.category === cat);
+  if (grade) list = list.filter(c => c.grade === grade);
+  if (set) list = list.filter(c => c.set === set);
+
+  list.sort((a,b) => {
+    let va, vb;
+    if (sortField === 'name') { va=a.name; vb=b.name; }
+    else if (sortField === 'rarity') { va=RARITY_ORD[a.rarity]; vb=RARITY_ORD[b.rarity]; }
+    else if (sortField === 'category') { va=a.category; vb=b.category; }
+    else if (sortField === 'id') { va=a.id||0; vb=b.id||0; }
+    else if (sortField === 'maxHp') { va=a.maxHp; vb=b.maxHp; }
+    else if (sortField === 'total') { va=a.total; vb=b.total; }
+    else { va=a.scores[sortField]||0; vb=b.scores[sortField]||0; }
+    if (typeof va === 'string') return sortDir * va.localeCompare(vb);
+    return sortDir * (va - vb);
+  });
+  return list;
+}
+
+function gradeColor(g) {
+  return { S:'var(--score-S)', A:'var(--score-A)', B:'var(--score-B)', C:'var(--score-C)', D:'var(--score-D)', F:'var(--score-F)' }[g] || 'var(--text)';
+}
+function scoreColor(v) {
+  if (v >= 9) return 'var(--score-S)';
+  if (v >= 7) return 'var(--score-A)';
+  if (v >= 5) return 'var(--score-B)';
+  if (v >= 3) return 'var(--score-C)';
+  return 'var(--score-F)';
+}
+
+// =====================================================================
+// RENDER
+// =====================================================================
+function renderSummary() {
+  const dims = ['clarity','identity','balance','teamplay','excitement'];
+  const labels = ['Clarity','Identity','Balance','Teamplay','Excitement'];
+  const grid = document.getElementById('summaryGrid');
+  grid.innerHTML = dims.map((d,i) => {
+    const avg = (scored.reduce((s,c) => s + c.scores[d], 0) / scored.length).toFixed(1);
+    const pct = (avg/10*100).toFixed(0);
+    const color = scoreColor(parseFloat(avg));
+    const weakest = [...scored].sort((a,b)=>a.scores[d]-b.scores[d]).slice(0,3).map(c=>c.name).join(', ');
+    const strongest = [...scored].sort((a,b)=>b.scores[d]-a.scores[d]).slice(0,3).map(c=>c.name).join(', ');
+    return `<div class="summary-card">
+      <div class="label">${labels[i]}</div>
+      <div class="score" style="color:${color}">${avg}</div>
+      <div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="detail">Best: ${strongest}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderVerdicts() {
+  const sorted = [...scored].sort((a,b) => a.total - b.total);
+  const needsWork = sorted.filter(c => c.issues.some(i => i.type === 'critical') || c.grade === 'D' || c.grade === 'F').slice(0, 15);
+  const unclear = scored.filter(c => c.issues.some(i => i.text.toLowerCase().includes('ambig') || i.text.toLowerCase().includes('unclear') || i.text.toLowerCase().includes('what count') || i.text.toLowerCase().includes('confus') || i.text.toLowerCase().includes('missing timing'))).slice(0, 15);
+  const gold = sorted.slice(-15).reverse();
+
+  document.getElementById('needsWorkList').innerHTML = needsWork.map(c =>
+    `<div class="item"><span class="name">${c.name} <span class="grade-badge grade-${c.grade}">${c.grade}</span></span><span class="why">${c.issues.find(i=>i.type==='critical')?.text || c.issues[0]?.text || ''}</span></div>`
+  ).join('') || '<div class="item"><span class="name" style="color:var(--green)">No critical issues found</span></div>';
+
+  document.getElementById('unclearList').innerHTML = unclear.map(c =>
+    `<div class="item"><span class="name">${c.name}</span><span class="why">${c.issues.find(i=>i.text.toLowerCase().includes('ambig')||i.text.toLowerCase().includes('what count')||i.text.includes('timing')||i.text.includes('confus'))?.text || c.issues[0]?.text || ''}</span></div>`
+  ).join('') || '<div class="item"><span class="name" style="color:var(--green)">All cards have clear text</span></div>';
+
+  document.getElementById('goldList').innerHTML = gold.map(c =>
+    `<div class="item"><span class="name">${c.name} <span class="grade-badge grade-${c.grade}">${c.grade}</span></span><span class="why">${c.strengths[0]||''}</span></div>`
+  ).join('');
+}
+
+function renderTable() {
+  const list = getFiltered();
+  document.getElementById('tableBody').innerHTML = list.map(c => {
+    const dims = ['clarity','identity','balance','teamplay','excitement'];
+    return `<tr class="row-${c.grade}" onclick="openDetail('${c.name.replace(/'/g,"\\'")}')">
+      <td style="color:var(--text3)">${c.id||'—'}</td>
+      <td><strong>${c.name}</strong></td>
+      <td><span class="rarity r-${c.rarity}">${c.rarity}</span></td>
+      <td>${c.maxHp}</td>
+      <td><span class="cat-tag">${c.category}</span></td>
+      <td><div><strong>${c.ability}</strong></div><div class="ability-text">${c.abilityDesc}</div></td>
+      <td><span class="grade-badge grade-${c.grade}">${c.grade}</span> <span style="color:var(--text3);font-size:10px">${c.total}</span></td>
+      ${dims.map(d => `<td class="score-cell" style="color:${scoreColor(c.scores[d])}">${c.scores[d]}</td>`).join('')}
+      <td>${c.issues.slice(0,2).map(i=>`<span class="issue-tag issue-${i.type}">${i.text.length>45?i.text.slice(0,42)+'...':i.text}</span>`).join('')}${c.strengths.length?'<span class="issue-tag issue-good">'+c.strengths[0].slice(0,40)+'</span>':''}</td>
+      <td class="notes-text">${c.notes[0]||''}</td>
+    </tr>`;
+  }).join('');
+
+  // Stats
+  document.getElementById('totalCount').textContent = scored.length;
+  const avgTotal = (scored.reduce((s,c)=>s+c.total,0)/scored.length).toFixed(1);
+  const grades = { S:0,A:0,B:0,C:0,D:0,F:0 };
+  scored.forEach(c => grades[c.grade]++);
+  document.getElementById('avgGrade').textContent = avgTotal + '/50';
+  document.getElementById('issueCount').textContent = scored.filter(c=>c.issues.some(i=>i.type==='critical')).length;
+}
+
+function openDetail(name) {
+  const c = scored.find(x => x.name === name);
+  if (!c) return;
+  const dims = ['clarity','identity','balance','teamplay','excitement'];
+  const labels = ['Clarity','Identity','Balance','Teamplay','Excitement'];
+  const dimDesc = {
+    clarity:'Can both players resolve this without arguments?',
+    identity:'Does this card have a unique mechanical personality?',
+    balance:'HP + ability make sense together? Card is functional and fair?',
+    teamplay:'Creates interesting team-building decisions?',
+    excitement:'Creates moments players talk about after the game?'
+  };
+
+  document.getElementById('detailContent').innerHTML = `
+    <h2>${c.name}</h2>
+    <div class="meta">
+      <span class="rarity r-${c.rarity}">${c.rarity}</span>
+      HP: ${c.maxHp} | ${c.category} | ${c.set}
+    </div>
+    <div class="section">
+      <h4>${c.ability}</h4>
+      <p>${c.abilityDesc}</p>
+    </div>
+    <div style="font-size:36px;font-weight:700;color:${gradeColor(c.grade)};margin:12px 0">
+      <span class="grade-badge grade-${c.grade}" style="font-size:28px;padding:6px 16px">${c.grade}</span>
+      <span style="font-size:16px;color:var(--text2);margin-left:8px">${c.total}/50</span>
+    </div>
+    <div class="score-grid">
+      ${dims.map((d,i)=>`<div class="sg-item">
+        <div class="sg-label">${labels[i]}</div>
+        <div class="sg-val" style="color:${scoreColor(c.scores[d])}">${c.scores[d]}</div>
+        <div class="sg-why">${dimDesc[d]}</div>
+      </div>`).join('')}
+    </div>
+    ${c.strengths.length?`<div class="section">
+      <h4>Strengths</h4>
+      ${c.strengths.map(s=>`<div class="il-item" style="color:var(--green)">${s}</div>`).join('')}
+    </div>`:''}
+    ${c.issues.length?`<div class="section">
+      <h4>Issues (${c.issues.length})</h4>
+      ${c.issues.map(i=>`<div class="il-item"><span class="issue-tag issue-${i.type}">${i.type}</span> ${i.text}</div>`).join('')}
+    </div>`:''}
+    ${c.notes.length?`<div class="section">
+      <h4>Director Notes</h4>
+      ${c.notes.map(n=>`<div class="il-item" style="color:var(--cyan)">${n}</div>`).join('')}
+    </div>`:''}
+  `;
+
+  document.getElementById('detailOverlay').classList.add('open');
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+// INIT
+renderSummary();
+renderVerdicts();
+renderTable();
+</script>
+</body>
+</html>

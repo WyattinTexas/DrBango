@@ -2175,8 +2175,8 @@ function doMallowChoice(choice) {
   const { team, btn } = mp;
   const f = active(B[team]);
   B.mallowDecided[team] = true;
-  if (choice === 'yes' && f && !f.ko && B[team].resources && B[team].resources.fire >= 1) {
-    B[team].resources.fire -= 1;
+  if (choice === 'yes' && f && !f.ko && B[team].resources && B[team].resources.fire >= 2) {
+    B[team].resources.fire -= 2;
     const hpBefore = f.hp;
     const mallowSideG = getSidelineGhost(B[team], 89);
     const mallowName = mallowSideG ? mallowSideG.name : 'Mallow';
@@ -2192,9 +2192,17 @@ function doMallowChoice(choice) {
     } else {
       f.hp += 3;
       const overMallow = f.hp > f.maxHp;
+      // Grant 2 Burn
+      const enemyTeam = team === 'red' ? 'blue' : 'red';
+      if (!B.burn[enemyTeam]) B.burn[enemyTeam] = {};
+      const enemySideline = B[enemyTeam].ghosts.filter((g, i) => i !== B[enemyTeam].activeIdx && !g.ko);
+      if (enemySideline.length > 0) {
+        const burnTarget = enemySideline[0];
+        B.burn[enemyTeam][burnTarget.id] = (B.burn[enemyTeam][burnTarget.id] || 0) + 2;
+      }
       showAbilityCallout('DOZY COZY!', 'var(--rare)',
-        `${mallowName} — spent 1 🔥 Sacred Fire! ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''})!`, team);
-      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 1 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}).`);
+        `${mallowName} — spent 2 🔥! ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}) + 2 Burn!`, team);
+      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 2 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}). +2 Burn!`);
     }
     renderBattle();
     if (f.ko) {
@@ -3457,7 +3465,7 @@ function rollReady(team) {
     // Mallow (89) — Dozy Cozy: spend 1 Sacred Fire for +3 HP to active ghost (sideline)
     // Offered once per round when Mallow is on the sideline and team has ≥1 Sacred Fire.
     if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
-        B[team].resources && B[team].resources.fire >= 1) {
+        B[team].resources && B[team].resources.fire >= 2) {
       btn.classList.add('locked');
       btn.disabled = true;
       B.mallowPending = { team, btn };
@@ -3716,7 +3724,7 @@ function hasAnyDecision(team) {
       r && r.ice >= 1 && oppF && !oppF.ko) return true;
   // Mallow (89) — Dozy Cozy (sideline)
   if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
-      r && r.fire >= 1) return true;
+      r && r.fire >= 2) return true;
   // Gus (31) — Gale Force
   if (f.id === 31 && B.galeForceDecided && !B.galeForceDecided[team]) {
     const gOpp = B[oppTeamName];
@@ -3894,7 +3902,7 @@ function openDuelPhasePrimers(team) {
 
   // — MALLOW (89) — Dozy Cozy: spend 1 Sacred Fire for +3 HP (sideline)
   if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
-      B[team].resources && B[team].resources.fire >= 1) {
+      B[team].resources && B[team].resources.fire >= 2) {
     disableDone();
     B.mallowPending = { team, btn: doneBtn };
     const mallowHpAfter = f.hp + 3;
