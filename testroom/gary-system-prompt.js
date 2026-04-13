@@ -156,7 +156,8 @@ TONE EXAMPLES
       const rarity = g.rarity || '?';
       const set = g.set || '?';
       const ability = g.ability ? ' | ' + g.ability : '';
-      lines.push(`${id} | ${g.name} | ${hp} | ${rarity} | ${set}${ability}`);
+      const desc = g.abilityDesc ? ' — ' + g.abilityDesc : '';
+      lines.push(`${id} | ${g.name} | ${hp} | ${rarity} | ${set}${ability}${desc}`);
     }
     return lines.join('\n');
   }
@@ -297,18 +298,14 @@ DESIGN KNOWLEDGE YOU INHERITED FROM GARY
       ? `\n\nRECENT BATTLE CONTEXT FOR ${username}:\n${recentBattle}`
       : '';
 
-    // Roster-level queries get the full compact index injected, so Gary
-    // can answer filter/aggregate questions ("all 5 HP cards", "every
-    // healer", "how many Rolling Hills rares") without guessing.
-    // Also triggers when the user name-dropped 3+ cards in one message —
-    // at that point they're clearly comparing across the roster.
+    // Always inject the full roster so Gary knows every card's name, HP,
+    // ability, and what it does. Cost: ~8K tokens at Sonnet pricing = ~$0.02/call.
+    // Without this, Gary hallucinates stats on any question that doesn't
+    // name-drop specific cards or trigger roster intent keywords.
     const namedCards = findReferencedCards(userMessage);
-    const wantsRoster = detectRosterIntent(userMessage) || namedCards.length >= 3;
-    const rosterBlock = wantsRoster
-      ? '\n\nFULL ROSTER INDEX (use this to answer filter/list/aggregate questions — format: id | name | HP | rarity | set | ability):\n' +
-        buildRosterIndex() +
-        '\n\nWhen the user asks a filter/list/count question, consult this index before answering. Do not invent cards that are not in the list. If your answer is a list, keep it tight — group or summarize rather than reciting every line.'
-      : '';
+    const rosterBlock = '\n\nFULL ROSTER INDEX (every card in the game — format: id | name | HP | rarity | set | ability — description):\n' +
+      buildRosterIndex() +
+      '\n\nYou know every card in the game. Consult this index before answering ANY card question. Do not invent cards that are not in the list. If your answer is a list, keep it tight — group or summarize rather than reciting every line.';
 
     // ----- CHARACTER MODE -----
     if (character) {
