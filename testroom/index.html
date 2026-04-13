@@ -1607,7 +1607,11 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <button class="set-filter-btn" data-set="Dark Castle" onclick="filterPicks('Dark Castle')">Dark Castle</button>
         <button class="set-filter-btn" data-set="Volcanic Activity" onclick="filterPicks('Volcanic Activity')">Volcanic Activity</button>
         <button class="set-filter-btn" data-set="Rolling Hills" onclick="filterPicks('Rolling Hills')">Rolling Hills</button>
-        <label id="handLimitToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Limit specials + items per team. Must discard when over.">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Battle animation speed">
+          <span id="speedLabel">Speed: 1x</span>
+          <input type="range" id="speedSlider" min="0" max="3" value="0" style="width:56px;accent-color:#22d3ee;cursor:pointer;" oninput="updateSpeedLabel()">
+        </label>
+        <label id="handLimitToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Limit specials + items per team. Must discard when over.">
           <input type="checkbox" id="handLimitCheckbox" style="accent-color:#f59e0b;cursor:pointer;" onchange="document.getElementById('handLimitSlider').style.opacity=this.checked?'1':'0.35'">
           <span id="handLimitLabel">Hand Limit (3)</span>
           <input type="range" id="handLimitSlider" min="3" max="5" value="3" style="width:50px;accent-color:#f59e0b;cursor:pointer;opacity:0.35;" oninput="document.getElementById('handLimitLabel').textContent='Hand Limit ('+this.value+')'">
@@ -2268,8 +2272,18 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v701';
+const TESTROOM_VERSION = 'v702';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
+
+// ============================================================
+// BATTLE SPEED — multiplier for all animation/delay timings
+// 0=1x (normal), 1=10x, 2=25x, 3=100x
+// ============================================================
+const SPEED_DIVISORS = [1, 10, 25, 100];
+const SPEED_LABELS = ['1x', '10x', '25x', '100x'];
+function getSpeedDivisor() { return SPEED_DIVISORS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
+function spd(ms) { return Math.max(1, Math.round(ms / getSpeedDivisor())); }
+function updateSpeedLabel() { document.getElementById('speedLabel').textContent = 'Speed: ' + SPEED_LABELS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -3858,11 +3872,11 @@ function startBattle() {
       const secondTeam = (_priority === 'blue') ? B.red  : B.blue;
       const firstEntryCount = triggerEntry(firstTeam);
       renderBattle();
-      const firstEntryDelay = firstEntryCount > 0 ? firstEntryCount * 1500 : 300;
+      const firstEntryDelay = firstEntryCount > 0 ? firstEntryCount * spd(1500) : spd(300);
       setTimeout(() => {
         const secondEntryCount = triggerEntry(secondTeam);
         renderBattle();
-        const secondEntryDelay = secondEntryCount > 0 ? secondEntryCount * 1500 : 300;
+        const secondEntryDelay = secondEntryCount > 0 ? secondEntryCount * spd(1500) : spd(300);
         setTimeout(() => {
           // All entry effects done — check for KOs, then enable rolling
           if (handleKOs()) return;
@@ -3871,7 +3885,7 @@ function startBattle() {
           narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
         }, secondEntryDelay);
       }, firstEntryDelay);
-    }, 2200);
+    }, spd(2200));
   } else {
     // No splash — fire entries in Duel Phase priority order, then enable
     const _priority2 = computeDuelPriority();
@@ -4125,7 +4139,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Fire all entry callouts sequentially — each 1500ms after the previous
   // c[3] = team string for card-glow spotlight; undefined = narrator-only fallback
   entryCallouts.forEach((c, i) => {
-    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
   });
   return entryCallouts.length;
 }
@@ -4243,7 +4257,7 @@ function popSidelineCard(teamObj, ghostId) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.classList.add('sideline-pop');
-  setTimeout(() => el.classList.remove('sideline-pop'), 1300);
+  setTimeout(() => el.classList.remove('sideline-pop'), spd(1300));
 }
 
 // Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
@@ -4689,7 +4703,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
     setTimeout(() => {
       if (!handleKOs()) { startNextRound(); }
     }, afterEntry);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -5133,10 +5147,10 @@ function doTylerChoice(choice) {
     log(`<span class="log-ability">${f.name}</span> — Heating Up! Spent 2 HP for +1 die (${prevHp} → ${f.hp} HP).`);
     renderBattle();
     // Short pause so the callout is visible before the dice roll
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
     narrate(`<b class="${team}-text">Tyler</b> holds HP — rolling without the trade.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5162,7 +5176,7 @@ function doGuardianFairyReactive(choice) {
     queueAbility('WISH!', 'var(--ghost-rare)', `${gfName} — leaps in to absorb ${dmg} damage for ${lF.name}!${gfGhost.ko ? ' GF falls!' : ' ' + gfGhost.hp + ' HP left'}`, null, loseTeamName);
     log(`<span class="log-ability">${gfName}</span> — Wish! Absorbed ${dmg} damage for ${lF.name}! ${gfGhost.ko ? '<span class="log-ko">GF falls!</span>' : gfGhost.hp + ' HP left'}`);
     renderBattle();
-    if (resume) setTimeout(resume, 1500);
+    if (resume) setTimeout(resume, spd(1500));
   } else {
     // Damage applies to the original ghost
     lF.hp = Math.max(0, lF.hp - dmg);
@@ -5194,14 +5208,14 @@ function doChowChoice(choice) {
     renderBattle();
     // If more seeds available, allow another use (re-offer after callout clears)
     if (B[team].resources.healingSeed >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     } else {
       B.chowDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     B.chowDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5226,14 +5240,14 @@ function doCultivateChoice(choice) {
     renderBattle();
     // If more seeds available, re-offer (repeatable)
     if (B[team].resources.healingSeed >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     } else {
       B.cultivateDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     B.cultivateDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5297,9 +5311,9 @@ function doNickKnackSteal(team, resKey) {
       `${f.name} — stole 1 ${resLabel} from the opponent! +3 HP! (${f.hp} HP)`, team);
     log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span> from opponent! <span class="log-heal">+3 HP</span> (${f.hp} HP)!`);
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5536,11 +5550,11 @@ function doEloiseChoice(choice) {
     showAbilityCallout('CHANGE OF HEART!', 'var(--rare)', `${f.name} — HP swap! (${myOldHp} → ${f.hp}) vs enemy (${oppOldHp} → ${oppF.hp})`, team);
     log(`<span class="log-ability">${f.name}</span> — Change of Heart! Spent 1 Ice Shard. Swapped HP: ${myOldHp} → ${f.hp}, enemy ${oppOldHp} → ${oppF.hp}.`);
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
     B.eloiseUsedThisRound[team] = true; // mark used so we don't re-offer on re-render
     narrate(`<b class="${team}-text">Eloise</b> holds — no swap this round.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5579,13 +5593,13 @@ function doMallowChoice(choice) {
     renderBattle();
     if (f.ko) {
       // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
-      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, spd(1500));
     } else {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     log(`<span class="log-ability">Mallow</span> — holds the fire.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5632,13 +5646,13 @@ function doBooChoice(choice) {
     renderBattle();
     if (f.ko) {
       // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
-      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, spd(1500));
     } else {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     narrate(`<b class="${team}-text">Boo Brothers</b> hold — keeping all dice.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5657,10 +5671,10 @@ function doGusChoice(choice) {
     B.galeForcePending[team] = true;
     showAbilityCallout('GALE FORCE!', 'var(--common)', `${gusG.name} — Gale Force primed! Win = force enemy swap!`, team);
     log(`<span class="log-ability">${gusG.name}</span> — Gale Force primed! Win this roll → force enemy ghost swap.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
     narrate(`<b class="${team}-text">Gus</b> holds — dealing damage if he wins.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -5679,7 +5693,7 @@ function doRaditzHuntChoice(choice) {
     narrate(`<b class="${team}-text">Raditz</b> — Hunt not used. Rolling as normal.`);
     // Unlock opponent's button so they can roll independently
     if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
 
@@ -5692,7 +5706,7 @@ function doRaditzHuntChoice(choice) {
     // No valid swap targets (shouldn't happen, but guard it)
     narrate(`<b class="${team}-text">Raditz</b> — Hunt! No sideline ghosts to swap in.`);
     if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
 
@@ -5765,7 +5779,7 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
     }, afterEntry);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -5782,7 +5796,7 @@ function doDougCautionChoice(choice) {
     // Mark as used so we don't re-offer (once-per-game skip counts as use)
     if (B.dougCautionUsed) B.dougCautionUsed[team] = true;
     narrate(`<b class="${team}-text">Doug</b> — Caution not used. Rolling as normal.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
   // YES — show ghost picker (already rendered in the overlay)
@@ -5833,7 +5847,7 @@ function doDougCautionSwap(targetIdx) {
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
     }, afterEntry);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -5979,7 +5993,7 @@ function doJeanieChoice(choice) {
   log(`<span class="log-ability">Jeanie</span> — Hidden Treasure! ${teamLabel} forces ${oppLabel} to reroll: [${oldDice.join(', ')}] → [${newDice.join(', ')}].`);
 
   // Pause for callout splash then continue
-  setTimeout(() => { continuation(); }, 1500);
+  setTimeout(() => { continuation(); }, spd(1500));
 }
 
 // ============================================================
@@ -6330,7 +6344,7 @@ function doTobogganChoice(idx) {
     setTimeout(() => {
       continuation();
     }, entryDelay);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -6404,7 +6418,7 @@ function doFangOutsideChoice(idx) {
     setTimeout(() => {
       continuation();
     }, entryDelay);
-  }, 1500);
+  }, spd(1500));
 }
 
 // Fang Undercover (7) — Skilled Coward: arm choice handler
@@ -6476,7 +6490,7 @@ function doFangUndercoverSwapChoice(idx) {
     setTimeout(() => {
       continuation();
     }, entryDelay);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -6550,7 +6564,7 @@ function doWinstonSchemeChoice(idx) {
     setTimeout(() => {
       continuation();
     }, entryDelay);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -6609,7 +6623,7 @@ function doGaleForcePickerChoice(idx) {
     const entryCount = triggerEntry(loseTeam, false);
     const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
     setTimeout(continuation, entryDelay);
-  }, 1500);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -6645,9 +6659,9 @@ function rollReady(team) {
     // If pre-roll callouts were queued (via setTimeout), wait for all of them to fully play
     // before dice roll — last callout starts at (N-1)*1500 and lasts ~1400ms, so N*1500 is exact
     if (calloutCount > 0) {
-      preRollDelay = calloutCount * 1500;
+      preRollDelay = calloutCount * spd(1500);
       // Store the absolute end-time so the second team's click can also wait for callouts to finish
-      B.preRollCalloutEndTime = Date.now() + calloutCount * 1500;
+      B.preRollCalloutEndTime = Date.now() + calloutCount * spd(1500);
     }
 
     // Timber choice modal — pause rolling until opponent picks
@@ -7055,9 +7069,9 @@ function doTeamRoll(team, btn) {
       const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
-      }, eitherTripled ? 1800 : 1400);
+      }, spd(eitherTripled ? 1800 : 1400));
     }
-  }, 700);
+  }, spd(700));
 }
 
 // ============================================================
@@ -7453,7 +7467,7 @@ function _runDuelTeamTurn(team) {
     const name = f ? f.name : team;
     setTimeout(() => {
       narrate(`<b class="${team}-text">${name}</b> has nothing to commit — rolling!`);
-      setTimeout(() => { duelPhaseReady(team); }, 350);
+      setTimeout(() => { duelPhaseReady(team); }, spd(350));
     }, 250);
   }
   // else: team has resources to commit — leave Ready enabled, wait for manual click
@@ -8145,7 +8159,7 @@ function doPreRollSetup() {
     // doKoSwap, etc.) — handleKOs() will transition to 'ko-swap' when it fires.
     B.phase = 'ko-pause';
     preRollCallouts.forEach((c, i) => {
-      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
     setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
@@ -8856,7 +8870,7 @@ function doPreRollSetup() {
   if (latePreRollKO && preRollCallouts.length > 0) {
     B.phase = 'ko-pause';
     preRollCallouts.forEach((c, i) => {
-      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
     setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
@@ -8880,7 +8894,7 @@ function doPreRollSetup() {
 
   // Drain pre-roll callouts sequentially — each plays for 1.4s before the next fires
   preRollCallouts.forEach((c, i) => {
-    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
   });
 
   renderBattle();
@@ -11055,7 +11069,7 @@ function _resolveRoundImpl() {
       }
       narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
-      setTimeout(() => { startNextRound(); }, 350);
+      setTimeout(() => { startNextRound(); }, spd(350));
     });
     return;
   }
@@ -13514,9 +13528,9 @@ function _resolveRoundImpl() {
               // same breathing-room pattern as the no-KO path (v110/v114 fix).
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { startNextRound(); }, 350);
+              setTimeout(() => { startNextRound(); }, spd(350));
             }
-          }, 1800);
+          }, spd(1800));
         } else {
           B.phase = 'ko-pause';
           renderBattle();
@@ -13526,9 +13540,9 @@ function _resolveRoundImpl() {
               // gives the player a beat to read "Round N — X vs Y" before the game unblocks.
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { startNextRound(); }, 350);
+              setTimeout(() => { startNextRound(); }, spd(350));
             }
-          }, 750);
+          }, spd(750));
         }
       };
 
@@ -13691,7 +13705,7 @@ function openKoSwap() {
     B.koSwapQueue = null;
     renderBattle();
     narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
-    setTimeout(() => { startNextRound(); }, 350);
+    setTimeout(() => { startNextRound(); }, spd(350));
     return;
   }
   const team = B.koSwapQueue[0];
@@ -14025,7 +14039,7 @@ function showTriplesEffect(side, rollType) {
 
   // Screen shake
   document.body.classList.add('screen-shake');
-  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+  setTimeout(() => document.body.classList.remove('screen-shake'), spd(500));
 
   // Banner pop
   banner.className = 'triples-banner ' + side + '-triples';
@@ -14034,8 +14048,8 @@ function showTriplesEffect(side, rollType) {
     setTimeout(() => {
       banner.classList.remove('show');
       banner.classList.add('fade');
-      setTimeout(() => { banner.className = 'triples-banner'; }, 500);
-    }, 1200);
+      setTimeout(() => { banner.className = 'triples-banner'; }, spd(500));
+    }, spd(1200));
   });
 }
 
@@ -14090,7 +14104,7 @@ function drainAbilityQueue(callback) {
           try { log(`<span class="log-dmg">ERROR in post-drain callback:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {}
           try { B.phase = 'ready'; resetRollButtons(); renderBattle(); } catch (_) {}
         }
-      }, 1500);
+      }, spd(1500));
       return;
     }
     const a = abilityQueue[i++];
@@ -14100,7 +14114,7 @@ function drainAbilityQueue(callback) {
     if (a.onShow) {
       try { a.onShow(); } catch (e) { console.error('[ability onShow CRASH]', a.name, e); try { log(`<span class="log-dmg">ERROR in ${a.name} onShow:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {} }
     }
-    setTimeout(next, 1300);
+    setTimeout(next, spd(1300));
   }
   next();
 }
@@ -14117,7 +14131,7 @@ function showAbilityCallout(name, color, desc, team) {
   el.className = 'ability-splash ' + theme;
   el.classList.add('active');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
+  el._timer = setTimeout(() => { el.classList.remove('active'); }, spd(1400));
 
   // Play the ability SFX — audio cue is good, keep it
   playSfx('sfxSpecial', 0.85);
@@ -14142,7 +14156,7 @@ function showAbilityCallout(name, color, desc, team) {
           'ability-fire-purple', 'ability-fire-green', 'ability-fire-gold',
           'ability-fire-red', 'ability-fire-default'
         );
-      }, 1200);
+      }, spd(1200));
     }
   }
 
@@ -14153,7 +14167,7 @@ function showAbilityCallout(name, color, desc, team) {
     narrator.classList.add('ability-active');
     narrator.innerHTML = '<b style="color:' + (color || 'var(--moonstone)') + '">' + name + '</b>' +
       (desc ? ' <span style="opacity:0.72;font-size:12px;font-weight:500">\u2014 ' + desc + '</span>' : '');
-    narrator._abilityTimer = setTimeout(() => { narrator.classList.remove('ability-active'); }, 1300);
+    narrator._abilityTimer = setTimeout(() => { narrator.classList.remove('ability-active'); }, spd(1300));
   }
 
   // Small hype-pop callout strip — unobtrusive, keep it
@@ -14166,7 +14180,7 @@ function showAbilityCallout(name, color, desc, team) {
     void small.offsetWidth;
     small.classList.add('hype-pop');
     clearTimeout(small._timer);
-    small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
+    small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, spd(2200));
   }
 }
 
@@ -14542,10 +14556,10 @@ function revealDice(team, values) {
         d.classList.remove('rolling');
         d.textContent = v;
       }
-    }, i * 300);
+    }, i * spd(300));
   });
   // Immediately highlight the hand type after all dice reveal
-  const revealDone = values.length * 300 + 50;
+  const revealDone = values.length * spd(300) + 50;
   setTimeout(() => highlightRollPreview(team, values), revealDone);
 }
 
