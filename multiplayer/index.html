@@ -802,12 +802,13 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
   <button id="add-to-collection-btn" onclick="addPackToCollection()">Add to Collection</button>
 </div>
 
-<!-- ===== COMING SOON MODAL ===== -->
-<div class="modal-overlay" id="coming-soon-modal">
-  <div class="modal-box">
-    <h3>Coming Soon</h3>
-    <p>Real-time battles are on the way. Build your team and get ready.</p>
-    <button class="modal-close-btn" onclick="document.getElementById('coming-soon-modal').classList.remove('active')">Got it</button>
+<!-- ===== BATTLE RESULT MODAL ===== -->
+<div class="modal-overlay" id="result-modal">
+  <div class="modal-box" id="result-modal-box">
+    <h3 id="result-title">Victory!</h3>
+    <p id="result-body">You won the battle!</p>
+    <div id="result-elo-change" style="font-size:1.4rem;font-weight:800;margin:8px 0;"></div>
+    <button class="modal-close-btn" onclick="closeResultModal()">Continue</button>
   </div>
 </div>
 
@@ -929,6 +930,16 @@ async function loadUserProfile() {
   if (!userProfile.badges) userProfile.badges = [];
   if (!userProfile.stats) userProfile.stats = { wins: 0, losses: 0, elo: 1000 };
 
+  // Restore saved team from Firebase (persists across page navigation)
+  if (userProfile.currentTeam && Array.isArray(userProfile.currentTeam)) {
+    const collection = userProfile.collection || [];
+    userProfile.currentTeam.forEach((id, i) => {
+      if (i < 3 && collection.includes(id)) {
+        team[i] = id;
+      }
+    });
+  }
+
   // Update leaderboard entry
   await db.ref(`mp/leaderboard/${currentUser.uid}`).set({
     displayName: userProfile.displayName,
@@ -938,6 +949,9 @@ async function loadUserProfile() {
   });
 
   updateUI();
+
+  // Process any pending battle result (from testroom redirect)
+  await processBattleResult();
 
   // Listen for profile changes
   ref.on('value', snap => {
@@ -1352,10 +1366,18 @@ async function checkBadges() {
 }
 
 // ============================================================
-// BATTLE BUTTON (Coming Soon)
+// BATTLE BUTTON — redirect to testroom
 // ============================================================
 function clickBattle() {
-  document.getElementById('coming-soon-modal').classList.add('active');
+  const filledTeam = team.filter(id => id !== null);
+  if (filledTeam.length < 3) return;
+  if (getGamesRemaining() <= 0) return;
+
+  // Save team to Firebase before leaving (so we can restore on return)
+  db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
+
+  // Redirect to testroom with team IDs
+  window.location.href = '../testroom/?red=' + filledTeam.join(',') + '&mode=mp';
 }
 
 // ============================================================
@@ -1429,6 +1451,109 @@ function showToast(msg) {
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2500);
 }
+
+// ============================================================
+// BATTLE RESULT HANDLING
+// ============================================================
+let pendingResult = null;
+
+function checkBattleResult() {
+  const params = new URLSearchParams(window.location.search);
+  const result = params.get('result');
+  if (!result) return;
+
+  // Clean URL so refresh doesn't re-process
+  window.history.replaceState({}, '', window.location.pathname);
+
+  // Store result to process after profile loads
+  pendingResult = result;
+}
+
+// Called once profile is loaded
+async function processBattleResult() {
+  if (!pendingResult || !userProfile || !currentUser) return;
+  const result = pendingResult;
+  pendingResult = null;
+
+  const ref = db.ref(`mp/users/${currentUser.uid}`);
+  const currentElo = userProfile.stats?.elo || 1000;
+  const AI_ELO = 1200;
+  const K = 32;
+
+  let newElo = currentElo;
+  let eloChange = 0;
+  let titleText = '';
+  let bodyText = '';
+
+  if (result === 'win') {
+    const expected = 1 / (1 + Math.pow(10, (AI_ELO - currentElo) / 400));
+    newElo = Math.round(currentElo + K * (1 - expected));
+    eloChange = newElo - currentElo;
+    titleText = 'Victory!';
+    bodyText = 'Your spirits conquered the arena.';
+
+    await ref.child('stats/wins').transaction(v => (v || 0) + 1);
+    await ref.child('stats/elo').set(newElo);
+  } else if (result === 'loss') {
+    const expected = 1 / (1 + Math.pow(10, (AI_ELO - currentElo) / 400));
+    newElo = Math.round(currentElo + K * (0 - expected));
+    eloChange = newElo - currentElo;
+    titleText = 'Defeat';
+    bodyText = 'The enemy spirits were too strong this time.';
+
+    await ref.child('stats/losses').transaction(v => (v || 0) + 1);
+    await ref.child('stats/elo').set(newElo);
+  } else {
+    // Draw — no elo change
+    titleText = 'Draw!';
+    bodyText = 'An even match. No Elo change.';
+  }
+
+  // Increment games played today
+  await ref.child('gamesPlayedToday').transaction(v => (v || 0) + 1);
+
+  // Update leaderboard
+  const snap = await ref.once('value');
+  const profile = snap.val();
+  await db.ref(`mp/leaderboard/${currentUser.uid}`).set({
+    displayName: profile.displayName,
+    wins: profile.stats?.wins || 0,
+    losses: profile.stats?.losses || 0,
+    elo: newElo
+  });
+
+  // Check badges
+  checkBadges();
+
+  // Show result modal
+  document.getElementById('result-title').textContent = titleText;
+  document.getElementById('result-body').textContent = bodyText;
+  const eloEl = document.getElementById('result-elo-change');
+  if (eloChange > 0) {
+    eloEl.textContent = `+${eloChange} Elo`;
+    eloEl.style.color = 'var(--uncommon)';
+  } else if (eloChange < 0) {
+    eloEl.textContent = `${eloChange} Elo`;
+    eloEl.style.color = 'var(--accent)';
+  } else {
+    eloEl.textContent = '';
+  }
+
+  // Style the modal box border based on result
+  const box = document.getElementById('result-modal-box');
+  if (result === 'win') box.style.borderColor = 'var(--gold)';
+  else if (result === 'loss') box.style.borderColor = 'var(--accent)';
+  else box.style.borderColor = 'var(--border)';
+
+  document.getElementById('result-modal').classList.add('active');
+}
+
+function closeResultModal() {
+  document.getElementById('result-modal').classList.remove('active');
+}
+
+// Check for result params immediately
+checkBattleResult();
 
 // ============================================================
 // PACK BUTTON CLICK
