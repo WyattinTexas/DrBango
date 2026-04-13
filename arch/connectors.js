@@ -42,7 +42,7 @@ const ALL_GHOSTS = [
   { name:"Nikon", file:"nikon.jpg", rarity:"common", maxHp:6, ability:"Ambush", abilityDesc:"Win first roll: deal triple damage." },
   { name:"Kodako", file:"kodako.jpg", rarity:"common", maxHp:6, ability:"Swift", abilityDesc:"Roll 1-2-3: negate damage and deal 4 to enemy." },
   { name:"Powder", file:"powder.jpg", rarity:"common", maxHp:5, ability:"Final Gift", abilityDesc:"When defeated, gain 3 Ice Shards for your next ghost." },
-  { name:"Simon", file:"simon.jpg", rarity:"common", maxHp:6, ability:"Brew Time", abilityDesc:"When you take damage, gain 1 Sacred Fire." },
+  { name:"Simon", file:"simon.jpg", rarity:"common", maxHp:6, ability:"Brew Time", abilityDesc:"When you take damage from a before-the-roll effect, gain 1 Sacred Fire." },
   { name:"Cameron", file:"cameron.jpg", rarity:"common", maxHp:6, ability:"Force of Nature", abilityDesc:"If your damage gets negated, destroy the enemy." },
   { name:"Logey", file:"logey.jpg", rarity:"common", maxHp:6, ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll." },
   { name:"Fredrick", file:"fredrick.jpg", rarity:"common", maxHp:5, ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice." },

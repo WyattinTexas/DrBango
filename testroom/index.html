@@ -2253,7 +2253,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v699';
+const TESTROOM_VERSION = 'v700';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 const firebaseConfig = {
@@ -2648,7 +2648,7 @@ const GHOSTS = [
   // FROST VALLEY
   // ============================================================
   {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Final Gift", abilityDesc:"When defeated, gain 3 Ice Shards for your next ghost.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Death-triggered resource gen."},
-  {id:24, name:"Simon", rarity:"common", maxHp:7, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"When you take damage from any source, gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Damage-to-resource conversion."},
+  {id:24, name:"Simon", rarity:"common", maxHp:7, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"When you take damage from a before-the-roll effect, gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll damage-to-resource conversion. Only triggers on before-the-roll chip damage (Swarm, Haunt, Toxic Fumes, Blue Fire, Meteor, etc.), NOT on normal dice roll damage."},
   {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Force of Nature", abilityDesc:"If your damage gets negated, destroy the enemy.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley. Anti-negation nuke."},
   {id:26, name:"Logey", rarity:"common", maxHp:6, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Dice cap."},
@@ -2675,7 +2675,7 @@ const GHOSTS = [
   {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball", abilityDesc:"Doubles gain +2 damage.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Doubles damage booster."},
   {id:87, name:"Zach", rarity:"rare", maxHp:7, art:"art/originals/zach.jpg", ability:"Craftsman", abilityDesc:"While on the sideline, Guard Thomas gains +3 damage on Doubles.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Guard Thomas synergy."},
   {id:88, name:"Pale Nimbus", rarity:"rare", maxHp:4, art:"art/originals/pale_nimbus.jpg", ability:"Hidden Storm", abilityDesc:"While on the sideline, add +2 Damage if your total roll result adds to less than 7.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Low-roll sideline booster."},
-  {id:89, name:"Mallow", rarity:"rare", maxHp:5, art:"art/originals/mallow.jpg", ability:"Dozy Cozy", abilityDesc:"While on the sideline, before rolling you may remove a Sacred Fire to give your Ghost in Play 3 Health.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Sacred Fire healing."},
+  {id:89, name:"Mallow", rarity:"rare", maxHp:2, art:"art/originals/mallow.jpg", ability:"Dozy Cozy", abilityDesc:"While on the sideline, before rolling you may remove a Sacred Fire to give your Ghost in Play 3 Health.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Sacred Fire healing. 2 HP — healing is the most dangerous mechanic (stalls games), so Mallow pays with extreme fragility."},
   {id:90, name:"Jeanie", rarity:"rare", maxHp:4, art:"art/originals/jeanie.jpg", ability:"Hidden Treasure", abilityDesc:"While on the sideline, you may force the opponent to reroll all their dice. Once Per Game.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. One-shot reroll."},
   {id:91, name:"Calvin & Anna", rarity:"rare", maxHp:6, art:"art/originals/calvin_anna.jpg", ability:"Toboggan", abilityDesc:"When you defeat a Ghost, you may switch Calvin & Anna with a ghost from your sideline.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Kill-swap."},
   {id:92, name:"Gary", rarity:"rare", maxHp:6, art:"art/originals/gary.jpg", ability:"Lucky Novice", abilityDesc:"Sideline & In Play, gain +2 Ice Shards for each 1 you roll.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. The real Gary. v598 buff: fires whether Gary is in play or on the sideline. v599 buff: +2 Ice Shards per 1 rolled (was +1). Balance comp: Zain Ice Blade + Skylar Winter Barrage lines just got a serious fuel injection."},
@@ -12164,14 +12164,10 @@ function _resolveRoundImpl() {
     }
   }
 
-  // Simon (24) — Brew Time: when Simon takes any real damage (even if KO'd), gain +1 Sacred Fire
-  // No KO guard — fires even on death, matching the boobattles reference (resource carries to next ghost)
+  // Simon (24) — Brew Time: REMOVED from post-roll damage. Only triggers on before-the-roll effects
+  // (Swarm, Haunt, Toxic Fumes, Blue Fire/Meteor, Princess Shade Bounty, Shade's Shadow).
+  // Pre-roll triggers live in doPreRollSetup(). No post-roll Sacred Fire generation.
   let simonBrewTriggered = false;
-  if (lF.id === 24 && dmg > 0) {
-    simonBrewTriggered = true;
-    collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Brew Time! Took ${dmg} damage → +1 Sacred Fire!`);
-  }
 
   // Sad Sal (29) — Tough Job: losing ANY roll grants +1 Ice Shard (no dmg guard — triggers even on 0 damage)
   // Boobattles ref: "loser.ability === 'Tough Job' → iceShards += 1" — loss condition only, no HP threshold.
@@ -12889,13 +12885,8 @@ function _resolveRoundImpl() {
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sxL} Healing Seed${sxL>1?'s':''}! (${winTeam.resources.healingSeed + sxL} total)`, () => { winTeam.resources.healingSeed += sxL; creditGhost(winTeamName, 33, 'seed', sxL); renderBattle(); }, winTeamName);
   }
 
-  // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
-  if (simonBrewTriggered) {
-    const simonFireTotal = loseTeam.resources.fire + 1;
-    queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
-    // Simon knight reactions already collected via collectKC at game-state section (line ~10000) — do NOT double-fire here
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; creditGhost(winTeamName, 33, 'fire', 1); renderBattle(); }, winTeamName);
-  }
+  // Simon (24) — Brew Time: post-roll trigger REMOVED. Only fires on pre-roll chip damage now.
+  // simonBrewTriggered is always false — kept for code structure compatibility.
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {

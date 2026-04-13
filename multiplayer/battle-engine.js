@@ -8807,14 +8807,8 @@ function _resolveRoundImpl() {
     }
   }
 
-  // Simon (24) — Brew Time: when Simon takes any real damage (even if KO'd), gain +1 Sacred Fire
-  // No KO guard — fires even on death, matching the boobattles reference (resource carries to next ghost)
+  // Simon (24) — Brew Time: REMOVED from post-roll damage. Only triggers on before-the-roll effects.
   let simonBrewTriggered = false;
-  if (lF.id === 24 && dmg > 0) {
-    simonBrewTriggered = true;
-    collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Brew Time! Took ${dmg} damage → +1 Sacred Fire!`);
-  }
 
   // Sad Sal (29) — Tough Job: losing ANY roll grants +1 Ice Shard (no dmg guard — triggers even on 0 damage)
   // Boobattles ref: "loser.ability === 'Tough Job' → iceShards += 1" — loss condition only, no HP threshold.
@@ -9532,13 +9526,7 @@ function _resolveRoundImpl() {
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest! +${sxL} Healing Seed${sxL>1?'s':''}! (${winTeam.resources.healingSeed + sxL} total)`, () => { winTeam.resources.healingSeed += sxL; creditGhost(winTeamName, 33, 'seed', sxL); renderBattle(); }, winTeamName);
   }
 
-  // Simon (24) — Brew Time: took damage → +1 Sacred Fire (onShow deferred so fire tile updates WITH the splash)
-  if (simonBrewTriggered) {
-    const simonFireTotal = loseTeam.resources.fire + 1;
-    queueAbility('BREW TIME!', 'var(--common)', `${lF.name} — Took ${dmg} damage! +1 Sacred Fire! (${simonFireTotal} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
-    // Simon knight reactions already collected via collectKC at game-state section (line ~10000) — do NOT double-fire here
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Brew Time! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; creditGhost(winTeamName, 33, 'fire', 1); renderBattle(); }, winTeamName);
-  }
+  // Simon (24) — Brew Time: post-roll trigger REMOVED. Only fires on pre-roll chip damage now.
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {

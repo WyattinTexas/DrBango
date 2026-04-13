@@ -287,11 +287,8 @@ function afterLossTriggers(loser, roll, damage, isPlayer) {
       effects.push({ ability: 'Restore', desc: 'Doubles rolled! +2 HP!' });
     }
   }
-  // Simon Brew Time: gain 1 Sacred Fire when taking damage
-  if (loser.ability === 'Brew Time' && damage > 0) {
-    if (isPlayer) sacredFires += 1; else enemySacredFires += 1;
-    effects.push({ ability: 'Brew Time', desc: 'Took damage! +1 Sacred Fire!' });
-  }
+  // Simon Brew Time: REMOVED from post-roll. Only triggers on before-the-roll effects now.
+  // Pre-roll triggers (Swarm, Haunt, Toxic Fumes, etc.) handle Sacred Fire generation.
 
   if (isPlayer && damage > 0) tookDamageLastRound = true;
 
