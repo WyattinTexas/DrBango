@@ -1304,22 +1304,21 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Jackson (50) — Regrow: after rolling (and Dark Wing reroll + Tommy mutation), may spend 1 HP to reroll
-  // the lowest die once per round. Requires HP >= 2 (spending to 0 is forbidden by index.html guard f.hp < 2).
-  // AI heuristic: always spend — rerolling the lowest die is almost always EV-positive.
-  // Matches index.html checkJacksonRegrow (line 4888) + doJacksonChoice + pickJacksonDie (lines 4921–4956).
+  // Jackson (50) — Regrow: after rolling (and Dark Wing reroll + Tommy mutation), may spend HP to reroll
+  // the lowest die. Can repeat as long as HP >= 2. AI heuristic: always spend — rerolling lowest is EV-positive.
   B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false;
   B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false;
   ['red','blue'].forEach(tKey => {
     const jF = active(B[tKey]);
-    if (jF.id !== 50 || jF.ko || jF.hp < 2 || B.jacksonUsedThisRound[tKey]) return;
+    if (jF.id !== 50 || jF.ko) return;
     const jDice = tKey === 'red' ? redDice : blueDice;
-    // Reroll the lowest die (index 0 after sort) — AI always picks lowest for maximum improvement.
-    const newVal = weightedRoll(tKey, 1)[0];
-    jDice[0] = newVal; // jDice is already sorted ascending; index 0 is the minimum
-    jDice.sort((a, b) => a - b);
-    jF.hp -= 1;
-    B.jacksonUsedThisRound[tKey] = true;
+    // Keep rerolling lowest die as long as HP allows
+    while (jF.hp >= 2) {
+      const newVal = weightedRoll(tKey, 1)[0];
+      jDice[0] = newVal;
+      jDice.sort((a, b) => a - b);
+      jF.hp -= 1;
+    }
   });
 
   // Snapshot Moonstones + Lucky Stones BEFORE post-roll triggers grant new ones.

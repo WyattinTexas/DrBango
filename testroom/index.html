@@ -2321,7 +2321,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v715';
+const TESTROOM_VERSION = 'v716';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -4579,7 +4579,7 @@ function carpenterTransform(team) {
   // Leave behind Carpenter's Hammer
   if (!B.carpenterHammer) B.carpenterHammer = { red: false, blue: false };
   B.carpenterHammer[team] = true;
-  queueAbility('EVOLUTION!', 'var(--rare)', `Carpenter transforms into the Welder! Carpenter's Hammer forged! (+2 singles, permanent)`, null, team);
+  queueAbility('TRANSFORMATION!', 'var(--rare)', `Carpenter transforms into the Welder! Carpenter's Hammer forged! (+2 singles, permanent)`, null, team);
   log(`<span class="log-ability">Carpenter</span> — Evolution! <span class="log-ms">WELDER rises!</span> Carpenter's Hammer left behind!`);
   renderBattle();
 }
@@ -4606,7 +4606,7 @@ function welderTransform(team) {
   // Leave behind Welder's Torch
   if (!B.welderTorch) B.welderTorch = { red: false, blue: false };
   B.welderTorch[team] = true;
-  queueAbility('EVOLUTION!', 'var(--rare)', `Welder transforms into the Foreman! Welder's Torch forged! (burns +1, wins give Burn, permanent)`, null, team);
+  queueAbility('TRANSFORMATION!', 'var(--rare)', `Welder transforms into the Foreman! Welder's Torch forged! (burns +1, wins give Burn, permanent)`, null, team);
   log(`<span class="log-ability">Welder</span> — Evolution! <span class="log-ms">FOREMAN rises!</span> Welder's Torch left behind!`);
   renderBattle();
 }
@@ -6068,7 +6068,7 @@ function doDougCautionSwap(targetIdx) {
 // ============================================================
 function checkJacksonRegrow(team, dice, continuation) {
   const f = active(B[team]);
-  if (!f || f.id !== 50 || f.ko || f.hp < 2 || B.jacksonUsedThisRound[team]) {
+  if (!f || f.id !== 50 || f.ko || f.hp < 2) {
     continuation();
     return;
   }
@@ -6112,8 +6112,6 @@ function pickJacksonDie(idx) {
   // Spend 1 HP
   const prevHp = f.hp;
   f.hp -= 1;
-  B.jacksonUsedThisRound[team] = true;
-
   // Mutate the preRoll dice array IN-PLACE so postRollDone's closure sees the change.
   // (Same pattern as Sonya v284 / Jeanie v285 / Dark Wing v285)
   // Creating a new array via [...B.redDice] does NOT work: postRollDone() closes over
@@ -6134,8 +6132,10 @@ function pickJacksonDie(idx) {
   showAbilityCallout('REGROW!', 'var(--uncommon)', `${f.name} — die rerolled: ${oldVal} → ${newVal}! (${prevHp} → ${f.hp} HP)`, team);
   log(`<span class="log-ability">${f.name}</span> — Regrow! Spent 1 HP, rerolled die: ${oldVal} → ${newVal} (${prevHp} → ${f.hp} HP). New dice: [${preRollDice.join(', ')}]`);
 
-  // Short pause for callout, then continue to moonstone/lucky stones
-  setTimeout(() => { continuation(); }, 1200);
+  // Short pause for callout, then re-prompt if Jackson can go again
+  setTimeout(() => {
+    checkJacksonRegrow(team, [...preRollDice], continuation);
+  }, 1200);
 }
 
 // ============================================================
@@ -9388,10 +9388,10 @@ function doPostRollAndResolve(redDice, blueDice) {
     const afterDarkWing = () => {
       const jRed  = active(B.red);
       const jBlue = active(B.blue);
-      if (jRed  && jRed.id  === 50 && !jRed.ko  && jRed.hp  >= 2 && B.jacksonUsedThisRound && !B.jacksonUsedThisRound.red) {
+      if (jRed  && jRed.id  === 50 && !jRed.ko  && jRed.hp  >= 2) {
         checkJacksonRegrow('red',  [...B.redDice],  afterJackson); return;
       }
-      if (jBlue && jBlue.id === 50 && !jBlue.ko && jBlue.hp >= 2 && B.jacksonUsedThisRound && !B.jacksonUsedThisRound.blue) {
+      if (jBlue && jBlue.id === 50 && !jBlue.ko && jBlue.hp >= 2) {
         checkJacksonRegrow('blue', [...B.blueDice], afterJackson); return;
       }
       afterJackson();
@@ -9624,7 +9624,7 @@ function pickMsValue(val) {
     g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
     g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
     g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
-    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
     renderBattle();
   }
@@ -10110,7 +10110,7 @@ function pickMsValueUnified(val) {
     g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
     g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
     g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
-    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
     renderBattle();
   }
@@ -14825,8 +14825,8 @@ function renderBattle() {
     if (B.haywireBonus && B.haywireBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireBonus[team]} Die (Wild Chords)</div>`;
     if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
     if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">🍞 -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
-    if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Carpenter's Hammer — Singles hit +2 harder</div>`;
-    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Torch — Wins give +1 Burn</div>`;
+    if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Hammer: Singles hit +2 harder</div>`;
+    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Torch: Wins give +1 Burn</div>`;
     if (permHtml) {
       const permRow = document.createElement('div');
       permRow.className = 'permanent-effects-row';
