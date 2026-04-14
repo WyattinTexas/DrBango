@@ -2321,7 +2321,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v711';
+const TESTROOM_VERSION = 'v712';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -8343,8 +8343,8 @@ function doPreRollSetup() {
   // Castle Gardener (442) — Cultivate: reset per round
   B.cultivateDecided = { red: false, blue: false };
 
-  // Forest Spirit (446) — Hex: reset per round
-  B.hexDieRemoval = { red: 0, blue: 0 };
+  // Forest Spirit (446) — Hex: NOT reset here — set by doBurnPlace, consumed at lines 8676-8687
+  if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
 
   // Aunt Susan (309)
   B.auntSusanBonus = { red: false, blue: false };
@@ -13121,8 +13121,8 @@ function _resolveRoundImpl() {
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
     const dylanName = (wF.id === 301) ? wF.name : (getSidelineGhost(winTeam, 301) || {}).name || 'Dylan';
     const dylanLabel = (wF.id === 301) ? '' : ' (sideline)';
-    queueAbility('STAINED GLASS!', 'var(--common)', `${dylanName}${dylanLabel} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
-    log(`<span class="log-ability">${dylanName}${dylanLabel}</span> — Stained Glass! Gain <span class="log-dmg">1 Burn</span>!`);
+    queueAbility('STRAW GUARDIAN!', 'var(--common)', `${dylanName}${dylanLabel} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${dylanName}${dylanLabel}</span> — Straw Guardian! Gain <span class="log-dmg">1 Burn</span>!`);
   }
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
@@ -14741,10 +14741,7 @@ function renderBattle() {
         const cnt = B.committed[team].harrison;
         html += `<button class="ability-btn ${cnt>0?'committed':'pressure'}" onclick="toggleHarrison('${team}')" oncontextmenu="event.preventDefault();uncommitHarrison('${team}')" style="${cnt>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${cnt>0?' (+'+cnt+' dice)':''}</button>`;
       }
-      // Mable Stadango (446) — Hex: spend Burn for die removal + Sacred Fire
-      if (f.id === 446 && !f.ko && (B[team].resources.burn || 0) >= 1) {
-        html += `<button class="ability-btn pressure" onclick="useHex('${team}')">🌿 Hex (${B[team].resources.burn} Burn)</button>`;
-      }
+      // Mable Stadango (446) — Hex: now passive (triggers in doBurnPlace), no button needed
       // Finn (204) — Flame Blade: forge button (2 Healing Seeds + 1 Sacred Fire) OR swing toggle if forged
       if (B[team].ghosts.some(g => g.id === 204 && !g.ko)) {
         if (!B.flameBlade || !B.flameBlade[team]) {
