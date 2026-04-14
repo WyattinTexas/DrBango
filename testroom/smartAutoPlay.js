@@ -1369,7 +1369,7 @@ function smartSimRounds(gameNum) {
 
   // Gom Gom Gom (440) — Chaos: MOVED to win-path only in v685 (was post-roll both teams)
 
-  // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
+  // Champ (438) — Thrill (B): +1 Surge on any doubles+ (either team)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey]; const f = active(t);
     if (f.id === 438 && !f.ko) {
@@ -1705,7 +1705,7 @@ function smartSimRounds(gameNum) {
     const _romyPred = B.romyPrediction ? B.romyPrediction[winTeamName] : null;
     if (wF.id === 114 && !wF.ko && _romyPred != null && _romyPred !== -1 && winDice.includes(_romyPred)) { dmg += 3; }
 
-    // Champ (438) — Overpower (A): immune to damage from Specials (committed resources)
+    // Champ (438) — Thrill (A): immune to damage from Specials (committed resources)
     const champImmuneToSpecials = lF.id === 438 && !lF.ko;
     // Ice Shards (+1 each; Skylar (104) WINTER BARRAGE! doubles to +2 each when Skylar wins)
     // Matches index.html lines 9059–9071: `const perShard = skylarActive ? 2 : 1;`
@@ -1727,13 +1727,13 @@ function smartSimRounds(gameNum) {
     if (fireCommitted > 0 && wTeam.ghosts.some(g => g.id === 406 && !g.ko)) {
       wTeam.resources.fire += fireCommitted;
     }
-    // Aunt Susan damage bonus (+2 per seed) — blocked by Champ Overpower
+    // Aunt Susan damage bonus (+2 per seed) — blocked by Champ Thrill
     if (B.auntSusanBonus[winTeamName] > 0 && !champImmuneToSpecials) dmg += B.auntSusanBonus[winTeamName] * 2;
     // Haywire (78) — Wild Chords permanent +2 damage on any winning roll after the trigger
     if (wF.id === 78 && !wF.ko && (B.haywireDamageBonus[winTeamName] || 0) > 0) {
       dmg += B.haywireDamageBonus[winTeamName];
     }
-    // Rook (416) — Charcoal: Win: +1 dmg per Surge committed — blocked by Champ Overpower
+    // Rook (416) — Charcoal: Win: +1 dmg per Surge committed — blocked by Champ Thrill
     if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0 && !champImmuneToSpecials) {
       dmg += B.committed[winTeamName].surge;
     }

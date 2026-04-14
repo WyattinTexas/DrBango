@@ -5540,7 +5540,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
+  // Champ (438) — Thrill (B): +1 Surge on any doubles+ (either team)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameChamp = team === B.red ? 'red' : 'blue';
@@ -5551,9 +5551,9 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (eitherDoubles) {
         const _champTeam = team;
         const _champName = f.name;
-        queueAbility('OVERPOWER!', 'var(--uncommon)', `${f.name} — Doubles detected! +1 Surge!`, () => {
+        queueAbility('THRILL!', 'var(--uncommon)', `${f.name} — Doubles detected! +1 Surge!`, () => {
           _champTeam.resources.surge++;
-          log(`<span class="log-ability">${_champName}</span> — Overpower! Doubles → gained <span class="log-ms">1 Surge</span>!`);
+          log(`<span class="log-ability">${_champName}</span> — Thrill! Doubles → gained <span class="log-ms">1 Surge</span>!`);
           renderBattle();
         }, tNameChamp);
         checkKnightEffects(tNameChamp, f.name);
@@ -7652,10 +7652,10 @@ function _resolveRoundImpl() {
     abilityQueue = savedQ; abilityQueueMode = savedM;
   };
 
-  // Champ (438) — Overpower (A): immune to damage from Specials (committed resources)
+  // Champ (438) — Thrill (A): immune to damage from Specials (committed resources)
   const champImmuneToSpecials = lF.id === 438 && !lF.ko;
   if (champImmuneToSpecials && (B.committed[winTeamName].ice > 0 || B.committed[winTeamName].fire > 0 || B.committed[winTeamName].surge > 0)) {
-    log(`<span class="log-ability">${lF.name}</span> — Overpower! Immune to all committed resource damage!`);
+    log(`<span class="log-ability">${lF.name}</span> — Thrill! Immune to all committed resource damage!`);
   }
 
   // Committed Ice Shards: +1 per shard (Skylar Winter Barrage: +2 each)
@@ -7695,14 +7695,14 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Charcoal! Immune to Sacred Fire damage!`);
   }
 
-  // Aunt Susan (309) — +2 damage per seed committed (also blocked by Champ Overpower)
+  // Aunt Susan (309) — +2 damage per seed committed (also blocked by Champ Thrill)
   if (B.auntSusanBonus[winTeamName] > 0 && !champImmuneToSpecials) {
     const susanDmg = B.auntSusanBonus[winTeamName] * 2;
     dmg += susanDmg;
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
   }
 
-  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round (also blocked by Champ Overpower)
+  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round (also blocked by Champ Thrill)
   if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0 && !champImmuneToSpecials) {
     const rookSurgeDmg = B.committed[winTeamName].surge;
     dmg += rookSurgeDmg;

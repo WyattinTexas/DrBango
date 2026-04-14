@@ -628,7 +628,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 /* Persistent permanent effect badges */
 .permanent-buff { display:inline-block; padding:2px 8px; margin:2px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(34,197,94,0.15); color:#22c55a; border:1px solid rgba(34,197,94,0.3); }
 .permanent-debuff { display:inline-block; padding:2px 8px; margin:2px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
-.permanent-effects-row { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; justify-content:center; }
+.permanent-effects-row { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:4px; }
 
 /* Arena Mid — Dice + Info */
 .arena-mid { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }
@@ -2590,7 +2590,7 @@ const GHOSTS = [
   {id:440, name:"Gom Gom Gom", rarity:"common", maxHp:5, art:"art/originals/DCFlameball.png", ability:"Chaos", abilityDesc:"Win with doubles: gain 1 Sacred Fire.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Angry blue flame ball fiend in a castle corridor. Jagged teeth, menacing glow. Classic Dark Castle common."},
   {id:441, name:"Wendy", rarity:"rare", maxHp:4, art:"art/originals/DCMoonDragon.png", ability:"Moonbeam", abilityDesc:"Win with doubles or better: gain 1 Magic Firefly.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Cute pale lavender dragon floating by a full moon over castle spires. Gentle, beautiful, moonlit. Dark Castle rare."},
   {id:439, name:"Lucy's Shadow", rarity:"rare", maxHp:4, art:"art/originals/LucysShadow.png", ability:"Mentor", abilityDesc:"Sideline: while Lucy is in play, Lucy gains +1 extra Sacred Fire on wins and her Sacred Fires deal double damage.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A dark contemplative dragon-spirit sitting in a castle archway, devoted to Lucy's blue fire. Doubles Lucy's Sacred Fire output from the bench. The loyal shadow that amplifies the queen."},
-  {id:438, name:"Champ", rarity:"uncommon", maxHp:6, art:"art/originals/Champ.png", ability:"Overpower", abilityDesc:"Immune to damage from Specials. Gains +1 Surge when you or the enemy rolls doubles or higher.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A hulking blue-grey flame beast with orange fire mane standing in a grand cathedral hall. Fierce fanged grin, powerful stance. The mid-tier brawler of Dark Castle. Watercolor meets Pokemon Gengar energy."},
+  {id:438, name:"Champ", rarity:"ghost rare", maxHp:5, art:"art/originals/Champ.png", ability:"Thrill", abilityDesc:"Immune to damage from Specials. Gains +1 Surge when you or the enemy rolls doubles or higher.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A hulking blue-grey flame beast with orange fire mane standing in a grand cathedral hall. Fierce fanged grin, powerful stance. The mid-tier brawler of Dark Castle. Watercolor meets Pokemon Gengar energy."},
   // === CARPENTER / WELDER / FOREMAN — Blue-Collar Evolution Chain ===
   {id:449, name:"Carpenter", rarity:"uncommon", maxHp:4, art:"art/originals/Carpenter.png", ability:"Apprentice", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
   {id:450, name:"Welder", rarity:"uncommon", maxHp:5, art:"art/originals/Welder.png", ability:"Arc", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
@@ -9244,7 +9244,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Champ (438) — Overpower (B): +1 Surge on any doubles+ (either team)
+  // Champ (438) — Thrill (B): +1 Surge on any doubles+ (either team)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameChamp = team === B.red ? 'red' : 'blue';
@@ -9255,9 +9255,9 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (eitherDoubles) {
         const _champTeam = team;
         const _champName = f.name;
-        queueAbility('OVERPOWER!', 'var(--uncommon)', `${f.name} — Doubles detected! +1 Surge!`, () => {
+        queueAbility('THRILL!', 'var(--ghost-rare)', `${f.name} — Doubles detected! +1 Surge!`, () => {
           _champTeam.resources.surge++;
-          log(`<span class="log-ability">${_champName}</span> — Overpower! Doubles → gained <span class="log-ms">1 Surge</span>!`);
+          log(`<span class="log-ability">${_champName}</span> — Thrill! Doubles → gained <span class="log-ms">1 Surge</span>!`);
           renderBattle();
         }, tNameChamp);
         checkKnightEffects(tNameChamp, f.name);
@@ -11439,10 +11439,10 @@ function _resolveRoundImpl() {
     abilityQueue = savedQ; abilityQueueMode = savedM;
   };
 
-  // Champ (438) — Overpower (A): immune to damage from Specials (committed resources)
+  // Champ (438) — Thrill (A): immune to damage from Specials (committed resources)
   const champImmuneToSpecials = lF.id === 438 && !lF.ko;
   if (champImmuneToSpecials && (B.committed[winTeamName].ice > 0 || B.committed[winTeamName].fire > 0 || B.committed[winTeamName].surge > 0)) {
-    log(`<span class="log-ability">${lF.name}</span> — Overpower! Immune to all committed resource damage!`);
+    log(`<span class="log-ability">${lF.name}</span> — Thrill! Immune to all committed resource damage!`);
   }
 
   // Committed Ice Shards: +1 per shard (Skylar Winter Barrage: +2 each)
@@ -11482,14 +11482,14 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Charcoal! Immune to Sacred Fire damage!`);
   }
 
-  // Aunt Susan (309) — +2 damage per seed committed (also blocked by Champ Overpower)
+  // Aunt Susan (309) — +2 damage per seed committed (also blocked by Champ Thrill)
   if (B.auntSusanBonus[winTeamName] > 0 && !champImmuneToSpecials) {
     const susanDmg = B.auntSusanBonus[winTeamName] * 2;
     dmg += susanDmg;
     log(`<span class="log-ability">${wF.name}</span> — Harvest Dance! <span class="log-dmg">+${susanDmg} bonus damage!</span>`);
   }
 
-  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round (also blocked by Champ Overpower)
+  // Rook (416) — Charcoal: Win: +1 dmg per Surge committed this round (also blocked by Champ Thrill)
   if (wF.id === 416 && !wF.ko && B.committed[winTeamName].surge > 0 && !champImmuneToSpecials) {
     const rookSurgeDmg = B.committed[winTeamName].surge;
     dmg += rookSurgeDmg;
@@ -14826,8 +14826,7 @@ function renderBattle() {
     if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
     if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">🍞 -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
     if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Carpenter's Hammer — Singles hit +2 harder</div>`;
-    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Welder's Torch — Burns sear +1, wins ignite</div>`;
-    if (B.foremanDieBonus && B.foremanDieBonus[team] > 0) permHtml += `<div class="permanent-buff">📋 +${B.foremanDieBonus[team]} Die Next Roll (Blueprint)</div>`;
+    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Torch — Wins give +1 Burn</div>`;
     if (permHtml) {
       const permRow = document.createElement('div');
       permRow.className = 'permanent-effects-row';
