@@ -2321,7 +2321,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v713';
+const TESTROOM_VERSION = 'v714';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -2592,9 +2592,9 @@ const GHOSTS = [
   {id:439, name:"Lucy's Shadow", rarity:"rare", maxHp:4, art:"art/originals/LucysShadow.png", ability:"Mentor", abilityDesc:"Sideline: while Lucy is in play, Lucy gains +1 extra Sacred Fire on wins and her Sacred Fires deal double damage.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A dark contemplative dragon-spirit sitting in a castle archway, devoted to Lucy's blue fire. Doubles Lucy's Sacred Fire output from the bench. The loyal shadow that amplifies the queen."},
   {id:438, name:"Champ", rarity:"uncommon", maxHp:6, art:"art/originals/Champ.png", ability:"Overpower", abilityDesc:"Immune to damage from Specials. Gains +1 Surge when you or the enemy rolls doubles or higher.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A hulking blue-grey flame beast with orange fire mane standing in a grand cathedral hall. Fierce fanged grin, powerful stance. The mid-tier brawler of Dark Castle. Watercolor meets Pokemon Gengar energy."},
   // === CARPENTER / WELDER / FOREMAN — Blue-Collar Evolution Chain ===
-  {id:449, name:"Carpenter", rarity:"uncommon", maxHp:6, art:"art/originals/Carpenter.png", ability:"Apprentice", abilityDesc:"+2 damage on singles. Before rolling: trade 1 die for 1 Surge. When you commit a Surge, Carpenter transforms into the Welder and leaves behind Carpenter's Hammer (+2 singles, permanent).", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
-  {id:450, name:"Welder", rarity:"uncommon", maxHp:5, art:"art/originals/Welder.png", ability:"Arc", abilityDesc:"Burns deal +1 extra damage on entry. Wins give 1 Burn. When any die shows a 4, Welder transforms into the Foreman and leaves behind Welder's Torch (burns +1, wins give Burn, permanent).", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
-  {id:451, name:"Foreman", rarity:"rare", maxHp:6, art:"art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"When Foreman wins a roll: +1 die next turn.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"End of the blue-collar chain. By this point you have Carpenter's Hammer (+2 singles) and Welder's Torch (burns +1, wins give burn) both active. Foreman snowballs dice on wins. The boss. Art: Spiritkin leaning over blueprints, detective-show 'I've had it up to here' energy."},
+  {id:449, name:"Carpenter", rarity:"uncommon", maxHp:4, art:"art/originals/Carpenter.png", ability:"Apprentice", abilityDesc:"Win: +2 damage on singles. Upon using Surge, transform into Welder and gain the Carpenter's Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
+  {id:450, name:"Welder", rarity:"uncommon", maxHp:5, art:"art/originals/Welder.png", ability:"Arc", abilityDesc:"Burns deal +1 damage. Win: gain 1 Burn. Roll a 4: transform into Foreman and gain the Welder's Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
+  {id:451, name:"Foreman", rarity:"rare", maxHp:5, art:"art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"Win: +1 die next roll.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"End of the blue-collar chain. By this point you have Carpenter's Hammer (+2 singles) and Welder's Torch (burns +1, wins give burn) both active. Foreman snowballs dice on wins. The boss. Art: Spiritkin leaning over blueprints, detective-show 'I've had it up to here' energy."},
   // === SKYLAR SEED — PLAGUE/DECAY MECHANIC (2026-04-11) — GALLERY ONLY, NO BATTLE LOGIC ===
   // First ghost to target the opposing sideline. Working name, working numbers — pending 20-ghost name review.
   // === VOLCANIC ACTIVITY — Designed Cards ===
@@ -4557,21 +4557,6 @@ function useFinnFlameBlade(team) {
   renderBattle();
 }
 
-// Carpenter (449) — Trade Die for Surge: give up 1 die this roll, gain 1 Surge
-function useCarpenterTrade(team) {
-  if (!isPreRollActive(team)) return;
-  const t = B[team];
-  const f = active(t);
-  if (f.id !== 449 || f.ko) return;
-  if (!B.carpenterDiceTrade) B.carpenterDiceTrade = { red: 0, blue: 0 };
-  B.carpenterDiceTrade[team]++;
-  t.resources.surge++;
-  log(`<span class="log-ability">${f.name}</span> — Apprentice! Traded 1 die for <span class="log-ms">1 Surge</span>!`);
-  showAbilityCallout('APPRENTICE!', 'var(--uncommon)', `${f.name} — Traded a die for Surge!`, team);
-  playSfx('sfxSpecial', 0.3);
-  renderBattle();
-}
-
 // Carpenter (449) → Welder (450) transform: called when Surge is committed while Carpenter is active
 function carpenterTransform(team) {
   const t = B[team];
@@ -4588,7 +4573,7 @@ function carpenterTransform(team) {
   // Transform into Welder
   const welderData = ghostData(450);
   g.id = 450; g.name = welderData.name; g.maxHp = welderData.maxHp;
-  g.hp = Math.min(g.hp, g.maxHp); // keep current HP, cap at new max
+  // HP carries over — don't cap down on evolution
   g.ability = welderData.ability; g.abilityDesc = welderData.abilityDesc;
   g.art = welderData.art; g.rarity = welderData.rarity;
   // Leave behind Carpenter's Hammer
@@ -4615,7 +4600,7 @@ function welderTransform(team) {
   // Transform into Foreman
   const foremanData = ghostData(451);
   g.id = 451; g.name = foremanData.name; g.maxHp = foremanData.maxHp;
-  g.hp = Math.min(g.hp, g.maxHp);
+  // HP carries over — don't cap down on evolution
   g.ability = foremanData.ability; g.abilityDesc = foremanData.abilityDesc;
   g.art = foremanData.art; g.rarity = foremanData.rarity;
   // Leave behind Welder's Torch
@@ -8694,18 +8679,6 @@ function doPreRollSetup() {
     preRollCallouts.push(['RIVER TERROR!', 'var(--rare)', `Gordok — stolen resources! +${B.gordokDieBonus.blue} bonus die!`, 'blue']);
     log(`<span class="log-ability">Gordok</span> — River Terror! +${B.gordokDieBonus.blue} bonus die this roll.`);
     B.gordokDieBonus.blue = 0;
-  }
-
-  // Carpenter (449) — die trade: reduce dice count by traded amount
-  if (B.carpenterDiceTrade && B.carpenterDiceTrade.red > 0) {
-    redCount = Math.max(1, redCount - B.carpenterDiceTrade.red);
-    log(`<span class="log-ability">Carpenter</span> — Traded ${B.carpenterDiceTrade.red} die for Surge. -${B.carpenterDiceTrade.red} dice.`);
-    B.carpenterDiceTrade.red = 0;
-  }
-  if (B.carpenterDiceTrade && B.carpenterDiceTrade.blue > 0) {
-    blueCount = Math.max(1, blueCount - B.carpenterDiceTrade.blue);
-    log(`<span class="log-ability">Carpenter</span> — Traded ${B.carpenterDiceTrade.blue} die for Surge. -${B.carpenterDiceTrade.blue} dice.`);
-    B.carpenterDiceTrade.blue = 0;
   }
 
   // Foreman (451) — Blueprint: +1 die from previous win (consumed after use)
@@ -14822,19 +14795,7 @@ function renderBattle() {
       const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
       rh += `<div class="res-tile fire ${isReady?'clickable':''}" ${burnClick} title="Burn: ${r.burn} available — click to place on an enemy sideline ghost (deals damage on entry)"><span class="res-main">🔥</span><span class="res-count">${r.burn}</span><span class="res-label">BURN</span></div>`;
     }
-    // Castle Guide (420) — Burn: show total burn already placed on enemy sideline ghosts
-    if (B.burn) {
-      const enemyTeam = team === 'red' ? 'blue' : 'red';
-      const burnObj = B.burn[enemyTeam] || {};
-      const totalBurn = Object.values(burnObj).reduce((s, v) => s + v, 0);
-      if (totalBurn > 0) {
-        const burnDetails = Object.entries(burnObj).map(([idx, cnt]) => {
-          const g = B[enemyTeam].ghosts[parseInt(idx)];
-          return g ? `${g.name}: ${cnt}` : '';
-        }).filter(Boolean).join(', ');
-        rh += `<div class="res-tile fire" title="Burn placed on enemy: ${burnDetails}"><span class="res-main">💥</span><span class="res-count">${totalBurn}</span><span class="res-label">PLACED</span></div>`;
-      }
-    }
+    // Burn placed indicator removed — burn disappears when spent, no need to track visually
     // Happy Crystal (208) — sacrifice tile
     if (isReady && f.id === 208 && !f.ko) {
       rh += `<div class="res-tile moonstone clickable" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone"><span class="res-main">💀</span><span class="res-label">Sac</span></div>`;
@@ -14864,8 +14825,8 @@ function renderBattle() {
     if (B.haywireBonus && B.haywireBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireBonus[team]} Die (Wild Chords)</div>`;
     if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
     if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">🍞 -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
-    if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 +2 Singles Dmg (Carpenter's Hammer)</div>`;
-    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">🔥 Burns +1, Wins → Burn (Welder's Torch)</div>`;
+    if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Carpenter's Hammer — Singles hit +2 harder</div>`;
+    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Welder's Torch — Burns sear +1, wins ignite</div>`;
     if (B.foremanDieBonus && B.foremanDieBonus[team] > 0) permHtml += `<div class="permanent-buff">📋 +${B.foremanDieBonus[team]} Die Next Roll (Blueprint)</div>`;
     if (permHtml) {
       const permRow = document.createElement('div');
@@ -14941,11 +14902,7 @@ function renderBattle() {
         const ibSwung = (B.iceBladeSwing && B.iceBladeSwing[team]) || (B.committed[team].zainBlade > 0);
         html += `<button class="ability-btn ${ibSwung?'committed':'pressure'}" onclick="toggleIceBlade('${team}')" title="${ibSwung?'Sheathing — click to stop swinging':'Swing the Ice Blade — +1 die to your roll AND +2 damage if you win'}" style="border-color:#67e8f9;color:${ibSwung?'#fff':'#67e8f9'};${ibSwung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${ibSwung?'Ice Blade SWINGING (+1 die, +2 dmg on win)':'Swing Ice Blade'}</button>`;
       }
-      // Carpenter (449) — Trade Die for Surge button
-      if (f.id === 449 && !f.ko) {
-        const traded = (B.carpenterDiceTrade && B.carpenterDiceTrade[team]) || 0;
-        html += `<button class="ability-btn pressure" onclick="useCarpenterTrade('${team}')" title="Trade 1 die for 1 Surge" style="border-color:#a855f7;color:#a855f7;">🔨 Trade Die → Surge${traded > 0 ? ' ('+traded+' traded)' : ''}</button>`;
-      }
+      // Carpenter (449) — no button needed; transforms when Surge is committed via cycleCommit
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
         html += `<div class="blackout-picker">
