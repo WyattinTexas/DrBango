@@ -2113,6 +2113,25 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Jenkins (94) — Greeting: entry roll 4 dice interactive modal -->
+<div class="selene-overlay" id="jenkinsOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#065f46,#10b981);">👋 GREETING!</div>
+    <h3 id="jenkinsTitle">Jenkins — Greeting!</h3>
+    <p class="selene-sub" id="jenkinsSub">Jenkins enters the fight — roll 4 dice for entry damage!</p>
+    <div id="jenkinsDiceWrap" style="display:flex;justify-content:center;align-items:center;gap:10px;margin:18px 0;">
+      <div class="jenkins-die" id="jenkinsDie0" style="width:68px;height:68px;border-radius:12px;background:linear-gradient(135deg,#a7f3d0,#34d399);color:#064e3b;font-size:2.4rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(16,185,129,.45),inset 0 2px 0 rgba(255,255,255,.5);border:3px solid #10b981;">?</div>
+      <div class="jenkins-die" id="jenkinsDie1" style="width:68px;height:68px;border-radius:12px;background:linear-gradient(135deg,#a7f3d0,#34d399);color:#064e3b;font-size:2.4rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(16,185,129,.45),inset 0 2px 0 rgba(255,255,255,.5);border:3px solid #10b981;">?</div>
+      <div class="jenkins-die" id="jenkinsDie2" style="width:68px;height:68px;border-radius:12px;background:linear-gradient(135deg,#a7f3d0,#34d399);color:#064e3b;font-size:2.4rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(16,185,129,.45),inset 0 2px 0 rgba(255,255,255,.5);border:3px solid #10b981;">?</div>
+      <div class="jenkins-die" id="jenkinsDie3" style="width:68px;height:68px;border-radius:12px;background:linear-gradient(135deg,#a7f3d0,#34d399);color:#064e3b;font-size:2.4rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(16,185,129,.45),inset 0 2px 0 rgba(255,255,255,.5);border:3px solid #10b981;">?</div>
+    </div>
+    <div id="jenkinsResult" style="display:none;text-align:center;margin:8px 0;font-size:15px;font-weight:700;color:var(--text1);"></div>
+    <div class="selene-options">
+      <button class="selene-opt" id="jenkinsRollBtn" onclick="doJenkinsRoll()" style="background:linear-gradient(135deg,#065f46,#10b981);">👋 Roll the Greeting Dice!</button>
+    </div>
+  </div>
+</div>
+
 <!-- Jackson (50) — Regrow: post-roll spend 1 HP to reroll 1 die -->
 <div class="selene-overlay" id="jacksonOverlay">
   <div class="selene-modal">
@@ -2321,7 +2340,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v716';
+const TESTROOM_VERSION = 'v717';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 
 // ============================================================
@@ -3937,32 +3956,34 @@ function startBattle() {
       const secondTeam = (_priority === 'blue') ? B.red  : B.blue;
       const firstEntryCount = triggerEntry(firstTeam);
       renderBattle();
-      const firstEntryDelay = firstEntryCount > 0 ? firstEntryCount * spd(1500) : spd(300);
-      setTimeout(() => {
+      afterEntryWithJenkins(firstEntryCount, () => {
         const secondEntryCount = triggerEntry(secondTeam);
         renderBattle();
-        const secondEntryDelay = secondEntryCount > 0 ? secondEntryCount * spd(1500) : spd(300);
-        setTimeout(() => {
+        afterEntryWithJenkins(secondEntryCount, () => {
           // All entry effects done — check for KOs, then enable rolling
           if (handleKOs()) return;
           // Duel Phase v1: check for priority before unlocking rolls
           startNextRound();
           narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
-        }, secondEntryDelay);
-      }, firstEntryDelay);
+        });
+      });
     }, spd(2200));
   } else {
     // No splash — fire entries in Duel Phase priority order, then enable
     const _priority2 = computeDuelPriority();
     const firstTeam2  = (_priority2 === 'blue') ? B.blue : B.red;
     const secondTeam2 = (_priority2 === 'blue') ? B.red  : B.blue;
-    triggerEntry(firstTeam2);
-    triggerEntry(secondTeam2);
-    renderBattle();
-    if (handleKOs()) return;
-    narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
-    if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
-    if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+    const ec1 = triggerEntry(firstTeam2);
+    afterEntryWithJenkins(ec1, () => {
+      const ec2 = triggerEntry(secondTeam2);
+      afterEntryWithJenkins(ec2, () => {
+        renderBattle();
+        if (handleKOs()) return;
+        narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+        if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
+        if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+      });
+    });
   }
 }
 
@@ -4069,24 +4090,24 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Jenkins (94) — Greeting: on entry, roll 4 dice and deal damage by roll TYPE (not sum).
-  // Boo's dice combat uses singles=1, doubles=2, triples=3, quads=4, penta=5 — Jenkins is no
-  // exception. The advantage of 4 dice is better odds of hitting doubles/triples/quads, not a
-  // bigger damage number. Previously this summed the dice face values (bug: 4×6=24 possible).
+  // Deferred to interactive modal — dice are pre-computed here, damage applied after player rolls.
   if (f.id === 94) {
     const ef = active(enemy);
     if (!ef.ko) {
       const jenkinsDice = rollDice(4);
       const jenkinsRoll = classify(jenkinsDice);
-      const jenkinsDmg = jenkinsRoll.damage; // 1/2/3/4/5 by roll type
-      ef.hp = Math.max(0, ef.hp - jenkinsDmg);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
-      const enemyName = enemy === B.red ? 'red' : 'blue';
-      const rollLabel = describeRoll(jenkinsRoll);
-      entryCallouts.push(['GREETING!', 'var(--ghost-rare)',
-        `${f.name} — rolled [${jenkinsDice.join(', ')}] — ${rollLabel} → ${jenkinsDmg} entry damage to ${ef.name}!`, entryTeamName]);
-      log(`<span class="log-ability">${f.name}</span> — Greeting! Rolled [${jenkinsDice.join(', ')}] — ${rollLabel} → <span class="log-dmg">${jenkinsDmg} entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
-      playDamageSfx(jenkinsDmg);
-      hitDamage(enemyName);
+      const jenkinsDmg = jenkinsRoll.damage;
+      const enemyTeamName = enemy === B.red ? 'red' : 'blue';
+      B.jenkinsPending = {
+        team: entryTeamName,
+        enemyTeam: enemyTeamName,
+        dice: jenkinsDice,
+        roll: jenkinsRoll,
+        damage: jenkinsDmg,
+        enemyName: ef.name,
+        jenkinsName: f.name
+      };
+      // No callout here — the modal handles the reveal
       collectKnightReactions();
     }
   }
@@ -4827,12 +4848,9 @@ function doPressureSwap(attackerTeam, targetIdx) {
   // fires (triggerEntry's first setTimeout is at i=0 → ~0ms, which stomped PRESSURE! instantly).
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(enemy, false);
-    // Wait for all entry callouts to clear, then restore roll buttons.
-    // If handleKOs() returns true (entry caused a KO), openKoSwap manages its own restoration.
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (!handleKOs()) { startNextRound(); }
-    }, afterEntry);
+    });
   }, spd(1500));
 }
 
@@ -5734,6 +5752,113 @@ function finishSkyElusive() {
 }
 
 // ============================================================
+// JENKINS (94) — Greeting: interactive 4-dice entry roll modal
+// ============================================================
+function showJenkinsModal(resumeCallback) {
+  const jp = B.jenkinsPending;
+  if (!jp) { if (resumeCallback) resumeCallback(); return; }
+  B.jenkinsResume = resumeCallback;
+  document.getElementById('jenkinsTitle').textContent = `${jp.jenkinsName} — Greeting!`;
+  document.getElementById('jenkinsSub').innerHTML = `${jp.jenkinsName} enters the fight — roll 4 dice for entry damage to <b>${jp.enemyName}</b>!`;
+  document.getElementById('jenkinsResult').style.display = 'none';
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('jenkinsDie' + i);
+    if (d) { d.textContent = '?'; d.style.transform = 'rotate(0deg)'; d.style.background = 'linear-gradient(135deg,#a7f3d0,#34d399)'; d.style.borderColor = '#10b981'; d.style.color = '#064e3b'; }
+  }
+  const btn = document.getElementById('jenkinsRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '👋 Roll the Greeting Dice!'; }
+  narrate(`<b class="${jp.team}-text">${jp.jenkinsName}</b> — <b class="gold">GREETING!</b>`);
+  document.getElementById('jenkinsOverlay').classList.add('active');
+}
+
+function doJenkinsRoll() {
+  const btn = document.getElementById('jenkinsRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const jp = B.jenkinsPending;
+  if (!jp) { finishJenkinsRoll(); return; }
+
+  // Shuffle animation across all 4 dice, landing on pre-computed values
+  let ticks = 0;
+  const totalTicks = 12;
+  const tickMs = 65;
+  const shuffle = setInterval(() => {
+    ticks++;
+    for (let i = 0; i < 4; i++) {
+      const d = document.getElementById('jenkinsDie' + i);
+      if (d) {
+        d.textContent = String(Math.floor(Math.random() * 6) + 1);
+        d.style.transform = `rotate(${ticks * 30}deg)`;
+      }
+    }
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      // Land on final values
+      for (let i = 0; i < 4; i++) {
+        const d = document.getElementById('jenkinsDie' + i);
+        if (d) {
+          d.textContent = String(jp.dice[i]);
+          d.style.transform = 'rotate(0deg)';
+        }
+      }
+      // Color dice based on damage result
+      const dmg = jp.damage;
+      let bg, border, color;
+      if (dmg >= 4) { bg = 'linear-gradient(135deg,#fde68a,#f59e0b)'; border = '#f59e0b'; color = '#78350f'; }
+      else if (dmg >= 2) { bg = 'linear-gradient(135deg,#fbbf24,#d97706)'; border = '#b45309'; color = '#78350f'; }
+      else { bg = 'linear-gradient(135deg,#a7f3d0,#34d399)'; border = '#10b981'; color = '#064e3b'; }
+      for (let i = 0; i < 4; i++) {
+        const d = document.getElementById('jenkinsDie' + i);
+        if (d) { d.style.background = bg; d.style.borderColor = border; d.style.color = color; }
+      }
+      // Show result label
+      const rollLabel = describeRoll(jp.roll);
+      const resultEl = document.getElementById('jenkinsResult');
+      if (resultEl) {
+        resultEl.innerHTML = `<span style="color:var(--ghost-rare);">${rollLabel}</span> → <span style="color:var(--accent);">${dmg} damage</span> to ${jp.enemyName}!`;
+        resultEl.style.display = 'block';
+      }
+      setTimeout(() => finishJenkinsRoll(), 1200);
+    }
+  }, tickMs);
+}
+
+function finishJenkinsRoll() {
+  const jp = B.jenkinsPending;
+  const resume = B.jenkinsResume;
+  B.jenkinsPending = null;
+  B.jenkinsResume = null;
+  document.getElementById('jenkinsOverlay').classList.remove('active');
+  if (jp) {
+    // Apply the deferred damage now
+    const enemyTeam = B[jp.enemyTeam];
+    const ef = enemyTeam ? active(enemyTeam) : null;
+    if (ef && ef.name === jp.enemyName && !ef.ko) {
+      ef.hp = Math.max(0, ef.hp - jp.damage);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 94; }
+    }
+    const rollLabel = describeRoll(jp.roll);
+    log(`<span class="log-ability">${jp.jenkinsName}</span> — Greeting! Rolled [${jp.dice.join(', ')}] — ${rollLabel} → <span class="log-dmg">${jp.damage} entry damage to ${jp.enemyName}!</span> ${ef && ef.ko ? '<span class="log-ko">KO!</span>' : (ef ? ef.hp + ' HP left' : '')}`);
+    playDamageSfx(jp.damage);
+    hitDamage(jp.enemyTeam);
+    renderBattle();
+  }
+  if (resume) setTimeout(resume, 300);
+}
+
+// Helper: after entry callouts finish, check for Jenkins modal before continuing
+function afterEntryWithJenkins(entryCalloutCount, continuation) {
+  const delay = entryCalloutCount > 0 ? entryCalloutCount * spd(1500) : 300;
+  setTimeout(() => {
+    if (B.jenkinsPending) {
+      showJenkinsModal(continuation);
+    } else {
+      continuation();
+    }
+  }, delay);
+}
+
+// ============================================================
 // ELOISE (85) — Change of Heart: swap HP with enemy for 1 Ice Shard
 // ============================================================
 function doEloiseChoice(choice) {
@@ -5981,8 +6106,7 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
 
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(enemy, false);
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (handleKOs()) return; // entry effect caused a KO — KO flow takes over
       renderBattle();
       // Unlock opponent's button — they can now roll independently
@@ -5991,7 +6115,7 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
       btn.disabled = false;
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
-    }, afterEntry);
+    });
   }, spd(1500));
 }
 
@@ -6044,8 +6168,7 @@ function doDougCautionSwap(targetIdx) {
 
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(myTeam, false);
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (handleKOs()) return;
       // Apply +1 die bonus to the incoming ghost's roll.
       // During Duel Phase, B.preRoll doesn't exist yet (it's built later in
@@ -6059,7 +6182,7 @@ function doDougCautionSwap(targetIdx) {
       btn.disabled = false;
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
-    }, afterEntry);
+    });
   }, spd(1500));
 }
 
@@ -6553,10 +6676,7 @@ function doTobogganChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(winTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
+    afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
 }
 
@@ -6627,10 +6747,7 @@ function doFangOutsideChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(winTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
+    afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
 }
 
@@ -6699,10 +6816,7 @@ function doFangUndercoverSwapChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(fuTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
+    afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
 }
 
@@ -6773,10 +6887,7 @@ function doWinstonSchemeChoice(idx) {
   // Fire entry effects for the newly-active enemy ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(loseTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
+    afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
 }
 
@@ -6834,8 +6945,7 @@ function doGaleForcePickerChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(loseTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(continuation, entryDelay);
+    afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
 }
 
@@ -13981,8 +14091,7 @@ function _resolveRoundImpl() {
             renderBattle();
             log(`<span class="log-ability">Gus</span> — Gale Force! ${gfAlive[0].name} was the only option — enters automatically!`);
             const entryCount = triggerEntry(loseTeam, false);
-            const delay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-            setTimeout(afterFangUndercover, delay);
+            afterEntryWithJenkins(entryCount, afterFangUndercover);
             return;
           }
         }
@@ -14155,30 +14264,26 @@ function doKoSwap(team, idx) {
   // Remove this team from the queue
   B.koSwapQueue.shift();
 
-  // Check if entry effects caused new KOs (e.g. Nerina's Leviathan)
-  const redAllDown = B.red.ghosts.every(g => g.ko);
-  const blueAllDown = B.blue.ghosts.every(g => g.ko);
-  if (redAllDown && blueAllDown) { showGameOver('draw'); return; }
-  if (redAllDown) { showGameOver('blue'); return; }
-  if (blueAllDown) { showGameOver('red'); return; }
+  // After entry callouts + Jenkins modal resolve, check for KOs and continue
+  afterEntryWithJenkins(entryCalloutCount > 0 ? entryCalloutCount : 0, () => {
+    // Check if entry effects caused new KOs (e.g. Nerina's Leviathan, Jenkins Greeting)
+    const redAllDown = B.red.ghosts.every(g => g.ko);
+    const blueAllDown = B.blue.ghosts.every(g => g.ko);
+    if (redAllDown && blueAllDown) { showGameOver('draw'); return; }
+    if (redAllDown) { showGameOver('blue'); return; }
+    if (blueAllDown) { showGameOver('red'); return; }
 
-  // Check if entry damage KO'd someone new — add to queue
-  ['red','blue'].forEach(tm => {
-    const tt = B[tm];
-    if (active(tt).ko && !B.koSwapQueue.includes(tm)) {
-      const alive = tt.ghosts.filter((g,i) => i !== tt.activeIdx && !g.ko);
-      if (alive.length > 0) B.koSwapQueue.push(tm);
-    }
+    // Check if entry damage KO'd someone new — add to queue
+    ['red','blue'].forEach(tm => {
+      const tt = B[tm];
+      if (active(tt).ko && !B.koSwapQueue.includes(tm)) {
+        const alive = tt.ghosts.filter((g,i) => i !== tt.activeIdx && !g.ko);
+        if (alive.length > 0) B.koSwapQueue.push(tm);
+      }
+    });
+
+    openKoSwap();
   });
-
-  // Wait for all entry callouts to finish before showing the next KO swap picker.
-  // entryCalloutCount accounts for both the entry ability AND any Knight reactions
-  // (each 1500ms apart), so 2 callouts = 3000ms.
-  // Minimum 800ms even with 0 callouts — gives the player time to read
-  // "[Ghost] enters the arena!" before the next KO picker or roll buttons appear.
-  // Matches the 800ms auto-pick delay in openKoSwap for symmetric breathing room.
-  const splashDelay = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 800;
-  setTimeout(openKoSwap, splashDelay);
 }
 
 function showGameOver(winner) {
@@ -14328,10 +14433,16 @@ function doSwap(team, idx) {
   if (skipEntry) {
     log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
   }
-  triggerEntry(t, skipEntry);
+  const entryCount = triggerEntry(t, skipEntry);
 
   document.getElementById('swapOverlay').classList.remove('active');
-  if (!handleKOs()) renderBattle();
+  if (B.jenkinsPending) {
+    afterEntryWithJenkins(entryCount, () => {
+      if (!handleKOs()) renderBattle();
+    });
+  } else {
+    if (!handleKOs()) renderBattle();
+  }
 }
 
 // ============================================================
@@ -15036,6 +15147,7 @@ function clearAllOverlays() {
   document.getElementById('hexOverlay').classList.remove('active');
   document.getElementById('nickKnackOverlay').classList.remove('active');
   document.getElementById('jasperOverlay').classList.remove('active');
+  document.getElementById('jenkinsOverlay').classList.remove('active');
   document.getElementById('balatronOverlay').classList.remove('active');
   document.getElementById('tommyOverlay').classList.remove('active');
   document.getElementById('sylviaOverlay').classList.remove('active');
