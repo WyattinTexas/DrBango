@@ -3,70 +3,13 @@
 // Battle system, card data, game state, movement, encounters
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════ CARD DATABASE — loaded from cards_data.js (ALL_CARDS, 233 cards) ═══════
-// Fallback if cards_data.js hasn't loaded yet
+// ═══════ CARD DATABASE — loaded from cards_data.js (ALL_CARDS, 187 verified Spiritkin) ═══════
 if (typeof ALL_CARDS === 'undefined') var ALL_CARDS = [];
 const CARDS = ALL_CARDS.length ? ALL_CARDS : [
-  // Minimal fallback
-  {id:316, name:"Penny",     rarity:"common",   maxHp:4, ability:"Forager",       desc:"Win: gain 1 Healing Seed.",                   set:"Rolling Hills"},
-  {id:320, name:"Bramble",   rarity:"common",   maxHp:3, ability:"Thorn Wall",    desc:"Entry: opponent takes 1 damage next round.",   set:"Rolling Hills"},
-  {id:328, name:"Drizzle",   rarity:"common",   maxHp:4, ability:"Rain Dance",    desc:"Both players reroll all 1s.",                  set:"Rolling Hills"},
-  {id:340, name:"Cluck",     rarity:"common",   maxHp:5, ability:"Peck",          desc:"Win with singles: deal +2 damage.",            set:"Rolling Hills"},
-  {id:358, name:"Tadpole",   rarity:"common",   maxHp:5, ability:"Splash",        desc:"Entry: gain 1 Surge.",                        set:"Rolling Hills"},
-  {id:324, name:"Biscuit",   rarity:"common",   maxHp:5, ability:"Warm Up",       desc:"Sideline: active ghost heals +1 HP on wins.", set:"Rolling Hills"},
-  {id:311, name:"Pudge",     rarity:"common",   maxHp:7, ability:"Belly Flop",    desc:"Doubles: deal +2 damage. Then take 1 damage.", set:"Rolling Hills"},
-  {id:308, name:"Kaplan",    rarity:"uncommon", maxHp:5, ability:"Pollinate",      desc:"When opponent rolls doubles: gain 1 Healing Seed.", set:"Rolling Hills"},
-  {id:318, name:"Magnolia",  rarity:"uncommon", maxHp:5, ability:"Bloom",          desc:"Spend 1 Healing Seed: +2 damage this round.", set:"Rolling Hills"},
-  {id:342, name:"Calvin",    rarity:"uncommon", maxHp:5, ability:"Overclock",      desc:"Win: heal +1 HP (can exceed max). +1 Healing Seed.", set:"Rolling Hills"},
-  {id:334, name:"Fiddle",    rarity:"uncommon", maxHp:6, ability:"Hoedown",        desc:"Win: you may swap active ghost safely.",       set:"Rolling Hills"},
-  {id:309, name:"Aunt Susan",rarity:"rare",     maxHp:4, ability:"Harvest Dance",  desc:"Spend 1 Healing Seed: +2 dmg OR +2 HP. Win: +1 seed.", set:"Rolling Hills"},
-  {id:338, name:"Thistle",   rarity:"rare",     maxHp:7, ability:"Barbed",         desc:"When you take damage: attacker takes 1 back.", set:"Rolling Hills"},
-  {id:346, name:"Harvest Moon",rarity:"rare",   maxHp:6, ability:"Reaping",        desc:"Defeat a ghost: gain 1 of every resource.",   set:"Rolling Hills"},
-  {id:332, name:"Grandmother Willow",rarity:"ghost-rare",maxHp:7, ability:"Deep Roots", desc:"Cannot be KO'd by singles damage.", set:"Rolling Hills"},
-  {id:305, name:"Selene",    rarity:"legendary",maxHp:6, ability:"Heart of Hills", desc:"Doubles: choose 2 Healing Seeds OR 3 Lucky Stones.", set:"Rolling Hills"},
-  {id:210, name:"Timber",    rarity:"legendary",maxHp:7, ability:"Howl",           desc:"Before roll: opponent discards 2 specials OR removes 1 die.", set:"Rolling Hills"},
-
-  // ── FROST VALLEY ──
-  {id:23,  name:"Powder",    rarity:"common",   maxHp:5, ability:"Final Gift",     desc:"When defeated: gain 3 Ice Shards.",           set:"Frost Valley"},
-  {id:25,  name:"Cameron",   rarity:"common",   maxHp:6, ability:"Force of Nature",desc:"If your damage is negated, destroy the enemy.",set:"Frost Valley"},
-  {id:29,  name:"Sad Sal",   rarity:"common",   maxHp:5, ability:"Tough Job",      desc:"Lose a roll: gain 1 Ice Shard.",              set:"Frost Valley"},
-  {id:31,  name:"Gus",       rarity:"common",   maxHp:7, ability:"Gale Force",     desc:"Win: may force opponent to swap instead of damage.", set:"Frost Valley"},
-  {id:30,  name:"Tommy Salami",rarity:"common", maxHp:6, ability:"Regulator",      desc:"Roll a 6: gain +1 die and roll it. Chains.",  set:"Frost Valley"},
-  {id:56,  name:"Chad",      rarity:"uncommon", maxHp:6, ability:"Sploop!",        desc:"Entry: gain 2 Ice Shards.",                   set:"Frost Valley"},
-  {id:53,  name:"Bogey",     rarity:"uncommon", maxHp:5, ability:"Bogus",          desc:"Reflect damage back once per game.",           set:"Frost Valley"},
-  {id:57,  name:"Marcus",    rarity:"uncommon", maxHp:7, ability:"Glacial Pounding",desc:"Take 3+ damage: gain 4 extra dice next roll.",set:"Frost Valley"},
-  {id:86,  name:"Pelter",    rarity:"rare",     maxHp:5, ability:"Snowball",       desc:"Doubles gain +2 damage.",                     set:"Frost Valley"},
-  {id:81,  name:"Spockles",  rarity:"rare",     maxHp:6, ability:"Valley Magic",   desc:"Win: gain 2 Ice Shards.",                     set:"Frost Valley"},
-  {id:75,  name:"Flora",     rarity:"rare",     maxHp:4, ability:"Restore",        desc:"Roll doubles: +2 HP after damage.",           set:"Frost Valley"},
-  {id:92,  name:"Gary",      rarity:"rare",     maxHp:6, ability:"Lucky Novice",   desc:"Gain +2 Ice Shards for each 1 you roll.",     set:"Frost Valley"},
-  {id:106, name:"King Jay",  rarity:"ghost-rare",maxHp:7, ability:"Reflection",    desc:"Lose & dice total 7: reflect all damage.",    set:"Frost Valley"},
-  {id:104, name:"Skylar",    rarity:"ghost-rare",maxHp:7, ability:"Winter Barrage",desc:"Ice Shards deal +2 damage instead of +1.",    set:"Frost Valley"},
-  {id:113, name:"Prince Balatron",rarity:"legendary",maxHp:6, ability:"Party Time",desc:"Lose & survive: roll 1 counter die for damage.", set:"Frost Valley"},
-
-  // ── VOLCANIC ISLES ──
-  {id:209, name:"Dart",      rarity:"common",   maxHp:3, ability:"Plunder",        desc:"Win: gain 2 Surge.",                          set:"Volcanic Activity"},
-  {id:329, name:"Clink",     rarity:"common",   maxHp:3, ability:"Prospect",       desc:"Win OR lose: gain 1 Surge.",                  set:"Volcanic Activity"},
-  {id:317, name:"Scorch",    rarity:"common",   maxHp:3, ability:"Singe",          desc:"Win: opponent loses 1 max HP permanently.",   set:"Volcanic Activity"},
-  {id:304, name:"Ember Force",rarity:"uncommon",maxHp:3, ability:"Swarm",          desc:"Before rolling: deal 1 damage to enemy.",     set:"Volcanic Activity"},
-  {id:321, name:"Forge Fire",rarity:"uncommon", maxHp:5, ability:"Temper",         desc:"Spend 1 Surge: next win deals double damage.",set:"Volcanic Activity"},
-  {id:343, name:"Boris",     rarity:"uncommon", maxHp:6, ability:"Fortify",        desc:"Spend 1 Surge: gain 2 HP (can exceed max).",  set:"Volcanic Activity"},
-  {id:325, name:"Magma Heart",rarity:"rare",    maxHp:7, ability:"Core Melt",      desc:"Below 3 HP: damage ignores all reduction.",   set:"Volcanic Activity"},
-  {id:367, name:"Dragonclaw",rarity:"rare",     maxHp:7, ability:"Rake",           desc:"Win with 3 different numbers: +3 damage.",    set:"Volcanic Activity"},
-  {id:327, name:"Natalia",   rarity:"ghost-rare",maxHp:6, ability:"Materialization",desc:"Even doubles (2s,4s,6s): gain 2 Moonstones.",set:"Volcanic Activity"},
-  {id:345, name:"Red Hunter",rarity:"ghost-rare",maxHp:6, ability:"Rumble",        desc:"Win: if opponent has specials, deal +3 damage.", set:"Volcanic Activity"},
-  {id:306, name:"Nerina",    rarity:"legendary",maxHp:9, ability:"Leviathan",      desc:"Entry: deal 3 damage to enemy.",              set:"Volcanic Activity"},
-
-  // ── DARK CASTLE ──
-  {id:19,  name:"Scallywags",rarity:"common",   maxHp:5, ability:"Frenzy",         desc:"All dice under 4: gain +1 die next turn.",    set:"Dark Castle"},
-  {id:22,  name:"Ancient One",rarity:"common",  maxHp:7, ability:"Friend to All",  desc:"Sideline: +3 HP to active ghost on ties.",    set:"Dark Castle"},
-  {id:5,   name:"Puff",      rarity:"common",   maxHp:6, ability:"Cute",           desc:"Enemy doubles and triples do -1 damage.",     set:"Dark Castle"},
-  {id:52,  name:"Hugo",      rarity:"uncommon", maxHp:5, ability:"Wreckage",       desc:"Take damage: opponent loses 1 die next roll.",set:"Dark Castle"},
-  {id:96,  name:"Hector",    rarity:"ghost-rare",maxHp:6, ability:"Protector",     desc:"Singles beat doubles. +1 damage on singles.", set:"Dark Castle"},
-  {id:98,  name:"Redd",      rarity:"ghost-rare",maxHp:7, ability:"Notorious",     desc:"Entry: gain +2 dice this roll.",              set:"Dark Castle"},
-  {id:108, name:"Lucy",      rarity:"legendary",maxHp:8, ability:"Blue Fire",      desc:"Win: gain 1 Sacred Fire.",                   set:"Dark Castle"},
-  {id:112, name:"Doom",      rarity:"legendary",maxHp:7, ability:"Fiendship",      desc:"+2 bonus damage on all wins.",               set:"Dark Castle"},
-  {id:110, name:"Mountain King",rarity:"legendary",maxHp:9, ability:"Beast Mode",  desc:"Doubles deal 2X damage.",                    set:"Dark Castle"},
-  {id:432, name:"Valkin the Grand",rarity:"legendary",maxHp:8, ability:"Grand Spoils",desc:"KO a ghost: gain 1 of every resource type.", set:"Dark Castle"}
+  // Minimal fallback (starters only)
+  {id:28, name:"Dream Cat", rarity:"common", maxHp:4, ability:"Jinx", desc:"Both roll doubles: gain +2 dice next turn.", set:"Frost Valley"},
+  {id:16, name:"Chip", rarity:"common", maxHp:4, ability:"Acrobatic Dive", desc:"Your even rolled doubles add +3 damage if you deal damage.", set:"Set 1"},
+  {id:20, name:"Floop", rarity:"common", maxHp:5, ability:"Muck", desc:"Enemy loses a dice for the following turn if they roll doubles.", set:"Dark Castle"}
 ];
 
 function getCard(id) { return CARDS.find(c => c.id === id); }
