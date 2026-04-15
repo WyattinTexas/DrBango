@@ -1999,7 +1999,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </div>
     <div style="text-align:center;">
       <div style="font-family:'Creepster',cursive;font-size:1.5rem;color:var(--text);letter-spacing:2px;line-height:1;">BOO Battle Network</div>
-      <div style="font-size:0.6rem;color:var(--text-dim);letter-spacing:1px;">v0.01</div>
+      <div style="font-size:0.6rem;color:var(--text-dim);letter-spacing:1px;" id="bbn-version"></div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
       <div class="games-remaining">
@@ -2275,6 +2275,12 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
+const BBN_VERSION = 'v0.02';
+document.addEventListener('DOMContentLoaded', () => {
+  const vEl = document.getElementById('bbn-version');
+  if (vEl) vEl.textContent = BBN_VERSION;
+});
+
 // ============================================================
 // FIREBASE INIT
 // ============================================================
@@ -3128,7 +3134,8 @@ function updateCountdown() {
     noGames.classList.add('active');
     battleBtn.disabled = true;
     battleBtn.textContent = 'No games remaining';
-    challengeBtn.disabled = true;
+    // Challenge a Friend is always available — not gated by daily energy
+    challengeBtn.disabled = team.filter(id => id !== null).length < 3;
 
     // Leaderboard is always visible in sidebar now (no expand needed)
 
@@ -3619,10 +3626,7 @@ async function checkPendingChallenge() {
 async function createChallenge() {
   const filledTeam = team.filter(id => id !== null);
   if (filledTeam.length < 3) return;
-  if (getGamesRemaining() <= 0) {
-    showToast('No games remaining today!');
-    return;
-  }
+  // Challenge a Friend is not gated by daily energy — always available
 
   // Save team to Firebase
   await db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
