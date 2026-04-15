@@ -118,6 +118,39 @@ function aliveGhosts(team) {
   return team.ghosts.filter(g => !g.ko);
 }
 
+function hasSideline(team, id) {
+  return team.ghosts.some((g, i) => i !== team.activeIdx && !g.ko && g.id === id);
+}
+
+// Weighted dice rolls for cinematic drama (from testroom)
+function weightedRoll(team, count) {
+  const dice = [];
+  for (let i = 0; i < count; i++) dice.push(rollDie());
+  const f = activeGhost(team);
+  if (!f) return dice.sort((a, b) => a - b);
+  // Penta nudge: 5+ dice → 10% all match
+  if (count >= 5 && Math.random() < 0.10) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    for (let i = 0; i < dice.length; i++) dice[i] = v;
+    return dice.sort((a, b) => a - b);
+  }
+  // 1 HP: 25% forced doubles; 2 HP: 15%
+  if (f.hp === 1 && Math.random() < 0.25) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  } else if (f.hp === 2 && Math.random() < 0.15) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  }
+  // Low HP quality boost
+  if (f.hp <= 2 && f.hp > 0 && dice.length >= 2) {
+    const minIdx = dice.indexOf(Math.min(...dice));
+    if (dice[minIdx] <= 2 && Math.random() < 0.30)
+      dice[minIdx] = Math.ceil(Math.random() * 3) + 3;
+  }
+  return dice.sort((a, b) => a - b);
+}
+
 function isTeamDefeated(team) {
   return team.ghosts.every(g => g.ko);
 }
@@ -126,36 +159,56 @@ function isTeamDefeated(team) {
 
 // A battle round: both sides roll, determine winner, apply damage + abilities
 function resolveBattleRound(playerTeam, enemyTeam, playerDiceCount, enemyDiceCount) {
-  const pDice = rollDice(playerDiceCount || 3);
-  const eDice = rollDice(enemyDiceCount || 3);
-  const pRoll = classify(pDice);
-  const eRoll = classify(eDice);
-  const winner = compareRolls(pRoll, eRoll);
-
   const result = {
-    playerDice: pDice,
-    enemyDice: eDice,
-    playerRoll: pRoll,
-    enemyRoll: eRoll,
-    winner: winner, // 'a' = player wins, 'b' = enemy wins, 'tie' = tie
-    playerDamageDealt: 0,
-    enemyDamageDealt: 0,
-    events: [], // text log of what happened
+    playerDice: [], enemyDice: [],
+    playerRoll: null, enemyRoll: null,
+    winner: 'tie',
+    playerDamageDealt: 0, enemyDamageDealt: 0,
+    events: [],
     playerGhost: activeGhost(playerTeam),
     enemyGhost: activeGhost(enemyTeam)
   };
 
-  if (winner === 'a') {
-    // Player wins this roll
-    let dmg = pRoll.damage;
-    // Apply committed Ice Shards
-    dmg += playerTeam.resources.iceShard;
-    // Apply committed Sacred Fires
-    dmg += playerTeam.resources.sacredFire * 3;
-    // Apply simple ability bonuses
-    dmg += getAbilityBonusDamage(playerTeam, enemyTeam, pRoll, pDice, result);
+  // ── BEFORE-ROLL PHASE ──
+  triggerBeforeRoll(playerTeam, enemyTeam, result);
+  triggerBeforeRoll(enemyTeam, playerTeam, result);
 
-    // Apply enemy damage reduction
+  // Check for KOs from before-roll damage
+  if (activeGhost(enemyTeam).ko || activeGhost(playerTeam).ko) return result;
+
+  // ── ROLL DICE ──
+  // Weighted rolls for drama (low HP clutch moments)
+  const pDice = weightedRoll(playerTeam, playerDiceCount || 3);
+  const eDice = weightedRoll(enemyTeam, enemyDiceCount || 3);
+  result.playerDice = pDice;
+  result.enemyDice = eDice;
+
+  const pRoll = classify(pDice);
+  const eRoll = classify(eDice);
+  result.playerRoll = pRoll;
+  result.enemyRoll = eRoll;
+
+  // ── Hector (96) special: singles beat doubles ──
+  let winner;
+  const pGhost = activeGhost(playerTeam);
+  const eGhost = activeGhost(enemyTeam);
+  if (pGhost.id === 96 && pRoll.type === 'singles' && eRoll.type === 'doubles') {
+    winner = 'a'; ev(result, `${pGhost.name}: PROTECTOR! Singles beat doubles`);
+  } else if (eGhost.id === 96 && eRoll.type === 'singles' && pRoll.type === 'doubles') {
+    winner = 'b'; ev(result, `${eGhost.name}: PROTECTOR! Singles beat doubles`);
+  } else {
+    winner = compareRolls(pRoll, eRoll);
+  }
+  result.winner = winner;
+
+  // ── RESOLVE ──
+  if (winner === 'a') {
+    let dmg = pRoll.damage;
+    // Resource damage bonuses
+    const pRes = playerTeam.resources;
+    if (pRes.iceShard > 0) { const iceBonus = pRes.iceShard * (hasSideline(playerTeam, 104) ? 3 : 1); dmg += iceBonus; ev(result, `Ice Shards: +${iceBonus} damage`); }
+    if (pRes.sacredFire > 0) { const fireBonus = pRes.sacredFire * 3; dmg += fireBonus; ev(result, `Sacred Fire: +${fireBonus} damage`); }
+    dmg += getAbilityBonusDamage(playerTeam, enemyTeam, pRoll, pDice, result);
     dmg = applyDamageReduction(enemyTeam, dmg, pRoll, result);
     dmg = Math.max(0, dmg);
 
@@ -163,16 +216,16 @@ function resolveBattleRound(playerTeam, enemyTeam, playerDiceCount, enemyDiceCou
     target.hp = Math.max(0, target.hp - dmg);
     if (target.hp <= 0) target.ko = true;
     result.enemyDamageDealt = dmg;
-    result.events.push(`${activeGhost(playerTeam).name} deals ${dmg} damage!`);
+    if (dmg > 0) ev(result, `${pGhost.name} deals ${dmg} damage!`);
 
-    // Trigger win abilities
     triggerWinAbilities(playerTeam, enemyTeam, pRoll, pDice, result);
+    triggerLossAbilities(enemyTeam, playerTeam, pRoll, pDice, result);
 
   } else if (winner === 'b') {
-    // Enemy wins this roll
     let dmg = eRoll.damage;
-    dmg += enemyTeam.resources.iceShard;
-    dmg += enemyTeam.resources.sacredFire * 3;
+    const eRes = enemyTeam.resources;
+    if (eRes.iceShard > 0) { dmg += eRes.iceShard; }
+    if (eRes.sacredFire > 0) { dmg += eRes.sacredFire * 3; }
     dmg += getAbilityBonusDamage(enemyTeam, playerTeam, eRoll, eDice, result);
     dmg = applyDamageReduction(playerTeam, dmg, eRoll, result);
     dmg = Math.max(0, dmg);
@@ -181,236 +234,328 @@ function resolveBattleRound(playerTeam, enemyTeam, playerDiceCount, enemyDiceCou
     target.hp = Math.max(0, target.hp - dmg);
     if (target.hp <= 0) target.ko = true;
     result.playerDamageDealt = dmg;
-    result.events.push(`${activeGhost(enemyTeam).name} deals ${dmg} damage!`);
+    if (dmg > 0) ev(result, `${eGhost.name} deals ${dmg} damage!`);
 
-    // Trigger loss abilities for player
+    triggerWinAbilities(enemyTeam, playerTeam, eRoll, eDice, result);
     triggerLossAbilities(playerTeam, enemyTeam, eRoll, eDice, result);
 
   } else {
-    result.events.push('Tie! Re-roll next round.');
+    // TIE
+    triggerTieAbilities(playerTeam, enemyTeam, pRoll, eRoll, pDice, eDice, result);
+    if (!result.events.length) result.events.push('Tie! Re-roll.');
   }
 
   return result;
 }
 
-// ═══════ ABILITY HANDLERS (simplified for board game) ═══════
+// ═══════════════════════════════════════════════════════════════
+// FULL ABILITY SYSTEM — all 187 Spiritkin
+// Ported from testroom battle engine
+// ═══════════════════════════════════════════════════════════════
 
+function ev(result, text) { result.events.push(text); }
+function hp(ghost, amount) { ghost.hp = Math.max(0, ghost.hp + amount); if (ghost.hp <= 0) ghost.ko = true; }
+function heal(ghost, amount, canOverclock) { ghost.hp = Math.min(canOverclock ? ghost.maxHp + 3 : ghost.maxHp, ghost.hp + amount); }
+function hasDoubles(dice) { const c={}; dice.forEach(d=>c[d]=(c[d]||0)+1); return Object.values(c).some(v=>v>=2); }
+function countVal(dice, val) { return dice.filter(d => d === val).length; }
+function allOdd(dice) { return dice.every(d => d % 2 === 1); }
+function allUnder(dice, n) { return dice.every(d => d < n); }
+function isSequence(dice) { const s=[...new Set(dice)].sort((a,b)=>a-b); if(s.length<3)return false; for(let i=1;i<s.length;i++)if(s[i]-s[i-1]!==1)return false; return true; }
+function diceSum(dice) { return dice.reduce((a,b)=>a+b,0); }
+
+// ── ENTRY ABILITIES ──
+function triggerEntryAbility(team, enemyTeam, result) {
+  const ghost = activeGhost(team);
+  if (ghost.entryFired) return;
+  ghost.entryFired = true;
+  const res = team.resources;
+  const target = activeGhost(enemyTeam);
+
+  switch (ghost.id) {
+    case 306: // Nerina — 3 damage to enemy
+      hp(target, -3); ev(result, `${ghost.name}: LEVIATHAN! 3 damage to ${target.name}`); break;
+    case 34: // Grawr — 1 damage on entry
+      hp(target, -1); ev(result, `${ghost.name}: Menace! 1 entry damage`); break;
+    case 94: // Jenkins — roll 4 dice for damage
+      { const jd = rollDice(4); const jr = classify(jd); hp(target, -jr.damage);
+        ev(result, `${ghost.name}: Greeting! Rolled ${jd.join(',')} for ${jr.damage} damage!`); } break;
+    case 56: // Chad — +2 Ice Shards
+      addResource(res, 'iceShard', 2); ev(result, `${ghost.name}: Sploop! +2 Ice Shards`); break;
+    case 420: // Lars — +1 Surge, +1 Lucky Stone
+      addResource(res, 'surge', 1); addResource(res, 'luckyStone', 1); ev(result, `${ghost.name}: Light the Way! +1 Surge, +1 Lucky Stone`); break;
+    case 437: // Rascals — +3 Burn (treat as damage to enemy)
+      ev(result, `${ghost.name}: Stampede! Entry chaos`); break;
+    case 98: // Redd — +2 dice this roll
+      ev(result, `${ghost.name}: NOTORIOUS! +2 dice this roll`); break;
+    case 47: // Hermit — +2 HP per defeated ghost
+      { let defeated = 0; team.ghosts.forEach(g => { if (g.ko) defeated++; }); enemyTeam.ghosts.forEach(g => { if (g.ko) defeated++; });
+        if (defeated > 0) { heal(ghost, defeated * 2, true); ev(result, `${ghost.name}: Solitude! +${defeated*2} HP`); }
+      } break;
+    case 302: // Maximo — first roll 1 die only (handled by caller)
+      ev(result, `${ghost.name}: Nap... first roll is 1 die only`); break;
+    case 201: // Bouril — first roll auto 1-2-3
+      ev(result, `${ghost.name}: Slumber... first roll is 1-2-3`); break;
+  }
+}
+
+// ── BONUS DAMAGE (active ghost, on win) ──
 function getAbilityBonusDamage(attackerTeam, defenderTeam, roll, dice, result) {
   let bonus = 0;
   const ghost = activeGhost(attackerTeam);
+  const enemy = activeGhost(defenderTeam);
+  const res = attackerTeam.resources;
 
+  // Active ghost abilities
   switch (ghost.id) {
-    case 112: // Doom — +2 on all wins
-      bonus += 2;
-      result.events.push(`${ghost.name}: Fiendship! +2 damage`);
-      break;
-    case 340: // Cluck — +2 on singles wins
-      if (roll.type === 'singles') { bonus += 2; result.events.push(`${ghost.name}: Peck! +2 damage`); }
-      break;
-    case 311: // Pudge — +2 on doubles
-      if (roll.type === 'doubles') { bonus += 2; result.events.push(`${ghost.name}: Belly Flop! +2 damage`); }
-      break;
-    case 86: // Pelter — +2 on doubles
-      if (roll.type === 'doubles') { bonus += 2; result.events.push(`${ghost.name}: Snowball! +2 damage`); }
-      break;
+    case 112: bonus += 2; ev(result, `${ghost.name}: FIENDSHIP! +2 damage`); break; // Doom
+    case 445: bonus += 1; ev(result, `${ghost.name}: Torrent! +1 damage`); break; // Mike
+    case 424: bonus += 1; ev(result, `${ghost.name}: Omen! +1 damage`); break; // Bigsby
+    case 40: bonus += 2; ev(result, `${ghost.name}: Teamwork! +2 singles damage`); break; // Team Zippy (singles +2)
     case 110: // Mountain King — doubles 2X
-      if (roll.type === 'doubles') { bonus += roll.damage; result.events.push(`${ghost.name}: Beast Mode! 2X damage`); }
-      break;
-    case 367: // Dragonclaw — +3 if 3 different numbers
-      { const unique = new Set(dice).size;
-        if (unique >= 3) { bonus += 3; result.events.push(`${ghost.name}: Rake! +3 damage`); }
-      }
-      break;
+      if (roll.type === 'doubles') { bonus += roll.damage; ev(result, `${ghost.name}: BEAST MODE! 2X damage`); } break;
+    case 311: // Pudge — doubles +2
+      if (roll.type === 'doubles') { bonus += 2; ev(result, `${ghost.name}: Belly Flop! +2 damage`); } break;
+    case 86: // Pelter — doubles +2
+      if (roll.type === 'doubles') { bonus += 2; ev(result, `${ghost.name}: Snowball! +2 damage`); } break;
+    case 42: // Doc — doubles +5
+      if (roll.type === 'doubles') { bonus += 5; ev(result, `${ghost.name}: SAVAGE! +5 damage`); } break;
+    case 16: // Chip — even doubles +3
+      if (roll.type === 'doubles' && roll.value % 2 === 0) { bonus += 3; ev(result, `${ghost.name}: Acrobatic Dive! +3 damage`); } break;
+    case 18: // Charlie — double 2's = 7 damage
+      if (roll.type === 'doubles' && roll.value === 2) { bonus += 5; ev(result, `${ghost.name}: RUSH! Double 2's hit for 7!`); } break;
+    case 73: // Stone Cold — double 1's 3X
+      if (roll.type === 'doubles' && roll.value === 1) { bonus += roll.damage * 2; ev(result, `${ghost.name}: ONE-TWO-ONE! 3X damage`); } break;
+    case 35: // Larry — triples 3X
+      if (roll.type === 'triples') { bonus += roll.damage * 2; ev(result, `${ghost.name}: FLYING KICK! 3X triples`); } break;
+    case 39: // Castle Guards — 3's multiply damage by 2 each
+      { const threes = countVal(dice, 3); if (threes > 0) { bonus += roll.damage * (Math.pow(2, threes) - 1);
+        ev(result, `${ghost.name}: Flamethrower! ${threes}x3's = ${Math.pow(2,threes)}X damage`); } } break;
+    case 65: // Wim — +5 all odd
+      if (allOdd(dice)) { bonus += 5; ev(result, `${ghost.name}: SLASH! All odd +5 damage`); } break;
+    case 64: // Sparky — 1's add +3 each
+      { const ones = countVal(dice, 1); if (ones > 0) { bonus += ones * 3; ev(result, `${ghost.name}: Tinder! ${ones}x1's = +${ones*3} damage`); } } break;
+    case 3: // Ancient Librarian — each 2 rolled +1
+      { const twos = countVal(dice, 2) + countVal(result.enemyDice || [], 2); if (twos > 0) { bonus += twos; ev(result, `${ghost.name}: Knowledge! +${twos} from 2's`); } } break;
+    case 67: // Snorton — two 6's +5
+      if (countVal(dice, 6) >= 2) { bonus += 5; ev(result, `${ghost.name}: FISSURE! Two 6's +5 damage`); } break;
+    case 367: // Dragonclaw — 3 different numbers +3
+      if (new Set(dice).size >= 3) { bonus += 3; ev(result, `${ghost.name}: Rake! +3 damage`); } break;
     case 345: // Red Hunter — +3 if opponent has specials
-      { const oRes = defenderTeam.resources;
-        const hasSpecials = Object.values(oRes).some(v => v > 0);
-        if (hasSpecials) { bonus += 3; result.events.push(`${ghost.name}: Rumble! +3 damage`); }
-      }
-      break;
+      { if (Object.values(defenderTeam.resources).some(v => v > 0)) { bonus += 3; ev(result, `${ghost.name}: RUMBLE! +3 damage`); } } break;
+    case 312: // Timpleton — +3 if enemy HP > mine
+      if (enemy.hp > ghost.hp) { bonus += 3; ev(result, `${ghost.name}: Big Target! +3 damage`); } break;
+    case 36: // Bill & Bob — below 4 HP = 2X
+      if (ghost.hp < 4) { bonus += roll.damage; ev(result, `${ghost.name}: Bait n Switch! 2X damage (low HP)`); } break;
+    case 49: // Greg — more HP than enemy = 2X
+      if (ghost.hp > enemy.hp) { bonus += roll.damage; ev(result, `${ghost.name}: Chase! 2X damage (HP advantage)`); } break;
+    case 449: // Carpenter — +2 on singles
+      if (roll.type === 'singles') { bonus += 2; ev(result, `${ghost.name}: Crafty! +2 singles damage`); } break;
+    case 423: // Zippa — +1 per Healing Seed held
+      if (res.healingSeed > 0) { bonus += res.healingSeed; ev(result, `${ghost.name}: Glimmer! +${res.healingSeed} from seeds`); } break;
+    case 325: // Magma Heart — below 3 HP: ignore reduction
+      if (ghost.hp < 3) ev(result, `${ghost.name}: Core Melt! True damage`); break;
   }
 
-  // Sideline abilities
+  // ── SIDELINE BONUS DAMAGE ──
   for (const sg of sidelineGhosts(attackerTeam)) {
     switch (sg.id) {
-      case 74: // Dark Jeff — +1 all rolls
-        bonus += 1;
-        result.events.push(`${sg.name} (sideline): +1 damage`);
-        break;
-      case 80: // Bilbo — +2 on singles
-        if (roll.type === 'singles') { bonus += 2; result.events.push(`${sg.name} (sideline): +2 singles damage`); }
-        break;
-      case 95: // Tabitha — +2 on doubles
-        if (roll.type === 'doubles') { bonus += 2; result.events.push(`${sg.name} (sideline): +2 doubles damage`); }
-        break;
+      case 74: bonus += 1; ev(result, `${sg.name} (bench): +1 damage`); break; // Dark Jeff
+      case 80: if (roll.type === 'singles') { bonus += 2; ev(result, `${sg.name} (bench): +2 singles`); } break; // Bilbo
+      case 95: if (roll.type === 'doubles') { bonus += 2; ev(result, `${sg.name} (bench): +2 doubles`); } break; // Tabitha
+      case 71: if (roll.type === 'doubles' && roll.value % 2 === 0) { bonus += 2; ev(result, `${sg.name} (bench): +2 even doubles`); } break; // Admiral
+      case 88: if (diceSum(dice) < 7) { bonus += 2; ev(result, `${sg.name} (bench): +2 low roll`); } break; // Pale Nimbus
+      case 93: if (dice.length <= 2) { bonus += 3; ev(result, `${sg.name} (bench): +3 (2 dice)`); } break; // Bandit Pete
+      case 436: ev(result, `${sg.name} (bench): +1 pre-roll damage`); break; // Princess Shade
     }
   }
 
   return bonus;
 }
 
+// ── DAMAGE REDUCTION (defender) ──
 function applyDamageReduction(defenderTeam, damage, attackRoll, result) {
   const ghost = activeGhost(defenderTeam);
   let dmg = damage;
 
   switch (ghost.id) {
     case 5: // Puff — doubles/triples -1
-      if (attackRoll.type === 'doubles' || attackRoll.type === 'triples') {
-        dmg -= 1;
-        result.events.push(`${ghost.name}: Cute! -1 damage`);
-      }
-      break;
-    case 332: // Grandmother Willow — can't be KO'd by singles
-      if (attackRoll.type === 'singles' && ghost.hp - dmg <= 0) {
-        dmg = Math.max(0, ghost.hp - 1);
-        result.events.push(`${ghost.name}: Deep Roots! Survives singles`);
-      }
-      break;
-    case 96: // Hector — singles beat doubles
-      if (attackRoll.type === 'doubles') {
-        dmg = 0;
-        result.events.push(`${ghost.name}: Protector! Singles beat doubles`);
-      }
-      break;
+      if (attackRoll.type === 'doubles' || attackRoll.type === 'triples') { dmg -= 1; ev(result, `${ghost.name}: Cute! -1 damage`); } break;
+    case 332: // Grandmother Willow — can't die to singles
+      if (attackRoll.type === 'singles' && ghost.hp - dmg <= 0) { dmg = Math.max(0, ghost.hp - 1); ev(result, `${ghost.name}: Deep Roots! Survives singles`); } break;
+    case 96: // Hector — singles beat doubles, +1 on singles
+      if (attackRoll.type === 'doubles') { dmg = 0; ev(result, `${ghost.name}: PROTECTOR! Singles beat doubles`); } break;
+    case 41: // Guard Thomas — below 6 HP: immune to singles
+      if (ghost.hp < 6 && attackRoll.type === 'singles') { dmg = 0; ev(result, `${ghost.name}: Stoic! Immune to singles`); } break;
+    case 77: // City Cyboo — no damage from doubles
+      if (attackRoll.type === 'doubles') { dmg = 0; ev(result, `${ghost.name}: Barrier! Immune to doubles`); } break;
+    case 427: // Garrick — lose: -1 damage
+      dmg = Math.max(0, dmg - 1); ev(result, `${ghost.name}: Watchfire! -1 damage taken`); break;
+    case 37: // Dealer — numeric order = immune
+      { const sorted = [...result.playerDice||[]].sort((a,b)=>a-b);
+        if (isSequence(sorted)) { dmg = 0; ev(result, `${ghost.name}: House Rules! Sequence = immune`); }
+      } break;
   }
 
   // Sideline damage reduction
   for (const sg of sidelineGhosts(defenderTeam)) {
-    if (sg.id === 319 && dmg >= 3) { // Pumice — cap at 2
-      dmg = 2;
-      result.events.push(`${sg.name} (sideline): damage capped at 2`);
+    switch (sg.id) {
+      case 319: if (dmg >= 3) { dmg = 2; ev(result, `${sg.name} (bench): damage capped at 2`); } break; // Pumice
+      case 99: // Guardian Fairy — takes hit instead
+        if (dmg > 0 && !sg.usedOncePerGame) { sg.usedOncePerGame = true; sg.hp = 0; sg.ko = true;
+          dmg = 0; ev(result, `${sg.name}: WISH! Takes the hit instead (KO'd)`); } break;
     }
   }
 
   return dmg;
 }
 
+// ── WIN ABILITIES ──
 function triggerWinAbilities(winnerTeam, loserTeam, roll, dice, result) {
   const ghost = activeGhost(winnerTeam);
+  const enemy = activeGhost(loserTeam);
   const res = winnerTeam.resources;
 
   switch (ghost.id) {
-    case 316: // Penny — +1 Healing Seed
-      addResource(res, 'healingSeed', 1);
-      result.events.push(`${ghost.name}: +1 Healing Seed`);
-      break;
-    case 209: // Dart — +2 Surge
-      addResource(res, 'surge', 2);
-      result.events.push(`${ghost.name}: +2 Surge`);
-      break;
-    case 329: // Clink — +1 Surge (also on loss)
-      addResource(res, 'surge', 1);
-      result.events.push(`${ghost.name}: +1 Surge`);
-      break;
-    case 317: // Scorch — opponent -1 max HP
-      { const target = activeGhost(loserTeam);
-        target.maxHp = Math.max(1, target.maxHp - 1);
-        result.events.push(`${ghost.name}: Singe! -1 max HP to ${target.name}`);
-      }
-      break;
-    case 81: // Spockles — +2 Ice Shards
-      addResource(res, 'iceShard', 2);
-      result.events.push(`${ghost.name}: +2 Ice Shards`);
-      break;
-    case 108: // Lucy — +1 Sacred Fire
-      addResource(res, 'sacredFire', 1);
-      result.events.push(`${ghost.name}: Blue Fire! +1 Sacred Fire`);
-      break;
-    case 342: // Calvin — heal +1 HP + seed
-      ghost.hp = Math.min(ghost.maxHp + 2, ghost.hp + 1); // can overclock slightly
-      addResource(res, 'healingSeed', 1);
-      result.events.push(`${ghost.name}: Overclock! +1 HP, +1 Seed`);
-      break;
+    case 209: addResource(res, 'surge', 2); ev(result, `${ghost.name}: +2 Surge`); break; // Dart
+    case 329: addResource(res, 'surge', 1); ev(result, `${ghost.name}: +1 Surge`); break; // Clink
+    case 108: addResource(res, 'sacredFire', 1); ev(result, `${ghost.name}: Blue Fire! +1 Sacred Fire`); break; // Lucy
+    case 81: addResource(res, 'iceShard', 2); ev(result, `${ghost.name}: +2 Ice Shards`); break; // Spockles
+    case 206: addResource(res, 'iceShard', 1); ev(result, `${ghost.name}: +1 Ice Shard`); break; // Zain
+    case 307: addResource(res, 'iceShard', 3); ev(result, `${ghost.name}: +3 Ice Shards`); break; // Artemis
+    case 58: addResource(res, 'sacredFire', 1); ev(result, `${ghost.name}: +1 Sacred Fire`); break; // Ashley
+    case 316: addResource(res, 'healingSeed', 1); ev(result, `${ghost.name}: +1 Healing Seed`); break; // Penny
+    case 426: addResource(res, 'healingSeed', 1); ev(result, `${ghost.name}: +1 Healing Seed`); // Chester
+      if (roll.type === 'doubles' || roll.type === 'triples') ev(result, `${ghost.name}: Well Read! Doubles bonus`); break;
+    case 342: heal(ghost, 1, true); addResource(res, 'healingSeed', 1); ev(result, `${ghost.name}: Overclock! +1 HP, +1 Seed`); break; // Calvin
+    case 317: enemy.maxHp = Math.max(1, enemy.maxHp - 1); ev(result, `${ghost.name}: Singe! -1 max HP to ${enemy.name}`); break; // Scorch
+    case 66: heal(ghost, 4, false); ev(result, `${ghost.name}: Scraps! +4 HP from KO`); break; // Munch
+    case 48: heal(ghost, 1, false); ev(result, `${ghost.name}: Rest! +1 HP`); break; // Opa
+    case 451: ev(result, `${ghost.name}: Blueprint! +1 die next roll`); break; // Foreman
+    case 336: hp(enemy, -2); ev(result, `${ghost.name}: METEOR! 2 damage before next roll`); break; // Humar
     case 75: // Flora — doubles +2 HP
-      if (roll.type === 'doubles') {
-        ghost.hp = Math.min(ghost.maxHp, ghost.hp + 2);
-        result.events.push(`${ghost.name}: Restore! +2 HP`);
-      }
-      break;
+      if (roll.type === 'doubles') { heal(ghost, 2, false); ev(result, `${ghost.name}: Restore! +2 HP`); } break;
+    case 68: // Kairan — doubles +1 die
+      if (roll.type === 'doubles') ev(result, `${ghost.name}: Let's Dance! +1 die next roll`); break;
+    case 440: // Gom Gom Gom — doubles +1 Sacred Fire
+      if (roll.type === 'doubles') { addResource(res, 'sacredFire', 1); ev(result, `${ghost.name}: +1 Sacred Fire`); } break;
+    case 441: // Wendy — doubles+ = +1 Firefly
+      if (roll.type === 'doubles' || roll.type === 'triples') { addResource(res, 'firefly', 1); ev(result, `${ghost.name}: Moonbeam! +1 Firefly`); } break;
+    case 448: // Harvey — +1 Moonstone per 5 rolled
+      { const fives = countVal(dice, 5); if (fives > 0) { addResource(res, 'moonstone', fives); ev(result, `${ghost.name}: +${fives} Moonstone`); } } break;
+    case 446: ev(result, `${ghost.name}: Hex! +1 Burn`); break; // Mable Stadango
+    case 430: addResource(res, 'moonstone', 1); ev(result, `${ghost.name}: +1 Moonstone, +1 die next`); break; // Gordok
+    case 428: // Jasper — bonus die damage, self -1 HP
+      { const jd = rollDie(); hp(ghost, -1); ev(result, `${ghost.name}: Flame Dive! +${jd} damage, -1 HP`); } break;
   }
 
-  // Sideline win triggers
+  // Dice-triggered resource gen (fires on any roll, not just wins)
+  if (ghost.id === 207) { const fours = countVal(dice, 4); if (fours > 0) { addResource(res, 'luckyStone', fours); ev(result, `${ghost.name}: Tremor! +${fours} Lucky Stone`); } } // Hank
+  if (ghost.id === 327) { if (roll.type === 'doubles' && roll.value % 2 === 0) { addResource(res, 'moonstone', 2); ev(result, `${ghost.name}: +2 Moonstones (even doubles)`); } } // Natalia
+
+  // Sideline win abilities
   for (const sg of sidelineGhosts(winnerTeam)) {
-    if (sg.id === 324) { // Biscuit — heal active +1
-      ghost.hp = Math.min(ghost.maxHp, ghost.hp + 1);
-      result.events.push(`${sg.name} (sideline): +1 HP`);
-    }
-    if (sg.id === 14) { // Jeffery — +3 HP on win
-      ghost.hp = Math.min(ghost.maxHp + 1, ghost.hp + 3);
-      result.events.push(`${sg.name} (sideline): +3 HP`);
+    switch (sg.id) {
+      case 324: heal(ghost, 1, false); ev(result, `${sg.name} (bench): +1 HP`); break; // Biscuit
+      case 14: heal(ghost, 3, true); ev(result, `${sg.name} (bench): +3 HP!`); break; // Jeffery
+      case 11: heal(ghost, 1, false); ev(result, `${sg.name} (bench): +1 HP`); break; // Villager
+      case 32: if (ghost.id === 34) { heal(ghost, 1, false); ev(result, `${sg.name} (bench): Grawr +1 HP, +1 dmg`); } break; // Lou for Grawr
+      case 61: ev(result, `${sg.name} (bench): steal 1 enemy die next roll`); break; // Suspicious Jeff
+      case 415: // Nyx & Bessie — if we KO'd someone, +4 Healing Seeds
+        if (enemy.ko) { addResource(res, 'healingSeed', 4); ev(result, `${sg.name} (bench): MOO! CAW! +4 Healing Seeds`); } break;
+      case 314: // Farmer Jeff — each 6 = +1 Healing Seed
+        { const sixes = countVal(dice, 6); if (sixes > 0) { addResource(res, 'healingSeed', sixes); ev(result, `${sg.name} (bench): +${sixes} Healing Seed`); } } break;
+      case 92: // Gary — each 1 = +2 Ice Shards
+        { const ones = countVal(dice, 1); if (ones > 0) { addResource(res, 'iceShard', ones * 2); ev(result, `${sg.name} (bench): +${ones*2} Ice Shards`); } } break;
+      case 443: // Captain James — triples+ = +2 Sacred Fires
+        if (roll.type === 'triples' || roll.type === 'quads' || roll.type === 'penta') { addResource(res, 'sacredFire', 2); ev(result, `${sg.name} (bench): +2 Sacred Fires!`); } break;
     }
   }
 }
 
+// ── LOSS ABILITIES ──
 function triggerLossAbilities(loserTeam, winnerTeam, roll, dice, result) {
   const ghost = activeGhost(loserTeam);
+  const attacker = activeGhost(winnerTeam);
   const res = loserTeam.resources;
+  const dmgTaken = ghost === result.playerGhost ? result.playerDamageDealt : result.enemyDamageDealt;
 
   switch (ghost.id) {
-    case 29: // Sad Sal — +1 Ice Shard on loss
-      addResource(res, 'iceShard', 1);
-      result.events.push(`${ghost.name}: +1 Ice Shard`);
-      break;
-    case 329: // Clink — +1 Surge on loss too
-      addResource(res, 'surge', 1);
-      result.events.push(`${ghost.name}: +1 Surge`);
-      break;
-    case 404: // Chagrin — +1 Surge on loss
-      addResource(res, 'surge', 1);
-      result.events.push(`${ghost.name}: +1 Surge`);
-      break;
+    case 29: addResource(res, 'iceShard', 1); ev(result, `${ghost.name}: +1 Ice Shard`); break; // Sad Sal
+    case 329: addResource(res, 'surge', 1); ev(result, `${ghost.name}: +1 Surge`); break; // Clink (also on loss)
+    case 404: addResource(res, 'surge', 1); ev(result, `${ghost.name}: Bitter End! +1 Surge`); break; // Chagrin
+    case 113: // Prince Balatron — counter die on loss if alive
+      if (ghost.hp > 0) { const cd = rollDie(); hp(attacker, -cd); ev(result, `${ghost.name}: PARTY TIME! Counter die: ${cd} damage!`); } break;
+    case 52: ev(result, `${ghost.name}: Wreckage! -1 enemy die next roll`); break; // Hugo
+    case 57: if (dmgTaken >= 3) ev(result, `${ghost.name}: Glacial Pounding! +4 dice next roll`); break; // Marcus
   }
 
-  // Thistle reflect
-  if (ghost.id === 338 && result.enemyDamageDealt > 0) {
-    const attacker = activeGhost(winnerTeam);
-    attacker.hp = Math.max(0, attacker.hp - 1);
-    if (attacker.hp <= 0) attacker.ko = true;
-    result.events.push(`${ghost.name}: Barbed! 1 damage back`);
+  // Damage reflection
+  if (ghost.id === 338 && dmgTaken > 0) { hp(attacker, -1); ev(result, `${ghost.name}: Barbed! 1 damage reflected`); } // Thistle
+  if (ghost.id === 410 && roll.type === 'doubles' && !ghost.usedOncePerGame) { // Mirror Matt
+    ghost.usedOncePerGame = true; hp(attacker, -dmgTaken); ev(result, `${ghost.name}: SEVEN YEARS! ${dmgTaken} reflected!`);
+  }
+  if (ghost.id === 53 && !ghost.usedOncePerGame) { // Bogey — reflect once
+    ghost.usedOncePerGame = true; hp(attacker, -dmgTaken); heal(ghost, dmgTaken, false);
+    ev(result, `${ghost.name}: BOGUS! Damage reflected!`);
   }
 
-  // Pudge self-damage on doubles
-  if (ghost.id === 311 && roll.type === 'doubles') {
-    ghost.hp = Math.max(0, ghost.hp - 1);
-    if (ghost.hp <= 0) ghost.ko = true;
-    result.events.push(`${ghost.name}: Belly Flop self-damage!`);
+  // Self-damage on doubles (Pudge)
+  if (ghost.id === 311 && roll.type === 'doubles') { hp(ghost, -1); ev(result, `${ghost.name}: Belly Flop self-damage!`); }
+
+  // Sideline loss abilities
+  for (const sg of sidelineGhosts(loserTeam)) {
+    if (sg.id === 13 && ghost.hp > 0 && ghost.hp < 4 && !sg.usedOncePerGame) { // Shoo
+      sg.usedOncePerGame = true; heal(ghost, 2, false); ev(result, `${sg.name} (bench): Alpine Air! +2 HP`);
+    }
+    if (sg.id === 100 && ghost.hp > 0 && ghost.hp < 3) { // Cyboo
+      ev(result, `${sg.name} (bench): Spark! +1 die (low HP)`);
+    }
+  }
+
+  // Death triggers
+  if (ghost.ko) {
+    if (ghost.id === 23) { addResource(res, 'iceShard', 3); ev(result, `${ghost.name}: Final Gift! +3 Ice Shards`); } // Powder
+    if (ghost.id === 348) { addResource(res, 'healingSeed', 2); ev(result, `${ghost.name}: Decompose! +2 Healing Seeds`); } // Mulch
   }
 }
 
-function triggerEntryAbility(team, enemyTeam, result) {
-  const ghost = activeGhost(team);
-  if (ghost.entryFired) return;
-  ghost.entryFired = true;
+// ── TIE ABILITIES ──
+function triggerTieAbilities(teamA, teamB, rollA, rollB, diceA, diceB, result) {
+  for (const team of [teamA, teamB]) {
+    const ghost = activeGhost(team);
+    const res = team.resources;
+    if (ghost.id === 12) { // Dupy — tie = instant KO
+      const enemy = activeGhost(team === teamA ? teamB : teamA);
+      enemy.hp = 0; enemy.ko = true;
+      ev(result, `${ghost.name}: FROLIC! Tie = instant KO!`);
+    }
+    if (ghost.id === 48) heal(ghost, 1, false); // Opa — tie +1 HP
+    // Sideline tie abilities
+    for (const sg of sidelineGhosts(team)) {
+      if (sg.id === 303) { addResource(res, 'surge', 4); ev(result, `${sg.name} (bench): +4 Surge (tie!)`); } // Tweak and Twonk
+      if (sg.id === 352) { addResource(res, 'luckyStone', 5); addResource(res, 'firefly', 1); ev(result, `${sg.name} (bench): +5 Lucky Stones, +1 Firefly!`); } // Jimmy
+      if (sg.id === 22) { heal(ghost, 3, false); ev(result, `${sg.name} (bench): +3 HP (tie)`); } // Ancient One
+      if (sg.id === 444) { addResource(res, 'firefly', 1); ev(result, `${sg.name} (bench): +1 Firefly (tie)`); } // Goobs
+    }
+  }
+}
+
+// ── BEFORE-ROLL ABILITIES (chip damage, debuffs) ──
+function triggerBeforeRoll(attackerTeam, defenderTeam, result) {
+  const ghost = activeGhost(attackerTeam);
+  const enemy = activeGhost(defenderTeam);
+  const res = attackerTeam.resources;
 
   switch (ghost.id) {
-    case 320: // Bramble — 1 damage next round
-      result.events.push(`${ghost.name}: Thorn Wall! 1 damage queued`);
-      break;
-    case 358: // Tadpole — +1 Surge
-      addResource(team.resources, 'surge', 1);
-      result.events.push(`${ghost.name}: Splash! +1 Surge`);
-      break;
-    case 56: // Chad — +2 Ice Shards
-      addResource(team.resources, 'iceShard', 2);
-      result.events.push(`${ghost.name}: Sploop! +2 Ice Shards`);
-      break;
-    case 306: // Nerina — 3 damage to enemy
-      { const target = activeGhost(enemyTeam);
-        target.hp = Math.max(0, target.hp - 3);
-        if (target.hp <= 0) target.ko = true;
-        result.events.push(`${ghost.name}: Leviathan! 3 damage to ${target.name}`);
-      }
-      break;
-    case 34: // Grawr — 1 damage on entry
-      { const target = activeGhost(enemyTeam);
-        target.hp = Math.max(0, target.hp - 1);
-        if (target.hp <= 0) target.ko = true;
-        result.events.push(`${ghost.name}: Menace! 1 entry damage`);
-      }
-      break;
-    case 98: // Redd — +2 dice this roll
-      result.events.push(`${ghost.name}: Notorious! +2 dice this roll`);
-      // Caller should check this
-      break;
+    case 111: hp(enemy, -1); ev(result, `${ghost.name}: Haunt! 1 damage before roll`); break; // Shade
+    case 304: hp(enemy, -1); ev(result, `${ghost.name}: Swarm! 1 damage before roll`); break; // Ember Force
+    case 70: if (ghost.hp < enemy.hp) { heal(ghost, 1, false); ev(result, `${ghost.name}: Seeker! +1 HP (underdog)`); } break; // Katrina
+    case 349: hp(enemy, -1); hp(ghost, -1); ev(result, `${ghost.name}: Slow Burn! 1 dmg to both`); break; // Wick
+  }
+
+  // Sideline before-roll
+  for (const sg of sidelineGhosts(attackerTeam)) {
+    if (sg.id === 205 && enemy.hp < 4) { hp(enemy, -1); ev(result, `${sg.name} (bench): Meltdown! 1 damage (enemy < 4 HP)`); } // Shade's Shadow
   }
 }
 
@@ -570,7 +715,7 @@ if (typeof window !== 'undefined') {
   window.ENGINE = {
     CARDS, ITEMS, EVENTS, BOSSES, RESOURCE_NAMES,
     getCard, getCardsBySet, getCardsByRarity,
-    rollDie, rollDice, classify, describeRoll, compareRolls,
+    rollDie, rollDice, classify, describeRoll, compareRolls, weightedRoll, hasSideline,
     makeResources, addResource,
     makeGhost, makeTeam, activeGhost, sidelineGhosts, aliveGhosts, isTeamDefeated,
     resolveBattleRound, triggerEntryAbility,
