@@ -4312,8 +4312,8 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _swarmSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip
-        if (!ef.ko && hasSideline(B[tNamePre], 436)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        if (!ef.ko && hasSideline(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
           const psPreHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
@@ -4327,6 +4327,10 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
+        } else if (!ef.ko && hasSideline(B[tNamePre], 436) && hasSideline(B[enemyName], 45)) {
+          const cornGhostPS = getSidelineGhost(B[enemyName], 45);
+          preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS ? cornGhostPS.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
+          log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
         }
       }
     } else if (f.id === 304 && !f.ko && dylanNegates(enemy)) {
@@ -4335,12 +4339,13 @@ function doPreRollSetup() {
     }
   });
 
-  // Shade's Shadow (205) — sideline: deal 1 dmg before each roll IF enemy active < 4 HP (negated by Dylan)
+  // Shade's Shadow (205) — sideline: deal 1 dmg before each roll IF enemy active < 4 HP (negated by Dylan or Cornelius)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const enemy = opp(team);
     const tNameShade = team === B.red ? 'red' : 'blue';
-    if (hasSideline(team, 205) && !dylanNegates(enemy)) {
+    const corneliusBlocksShadow = hasSideline(enemy, 45);
+    if (hasSideline(team, 205) && !dylanNegates(enemy) && !corneliusBlocksShadow) {
       const shadeGhost = getSidelineGhost(team, 205);
       const ef = active(enemy);
       if (!ef.ko && ef.hp < 4) {
@@ -4386,8 +4391,8 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _meltSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip
-        if (!ef.ko && hasSideline(B[tNameShade], 436)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        if (!ef.ko && hasSideline(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
           const psPreHp2 = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
@@ -4402,10 +4407,20 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
+        } else if (!ef.ko && hasSideline(B[tNameShade], 436) && hasSideline(enemy, 45)) {
+          const cornGhostPS2 = getSidelineGhost(enemy, 45);
+          preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS2 ? cornGhostPS2.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
+          log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
         }
       }
     } else if (hasSideline(team, 205) && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade's Shadow</span> — Meltdown blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
+      B.piperBlockedThisRound[tNameShade] = true; // v640: Slick Coat gate
+    } else if (hasSideline(team, 205) && corneliusBlocksShadow) {
+      const cornGhostSS = getSidelineGhost(enemy, 45);
+      const enemyNameSS = enemy === B.red ? 'red' : 'blue';
+      preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostSS ? cornGhostSS.name : 'Cornelius'} blocks Shade's Shadow Meltdown!`, enemyNameSS]);
+      log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! <span class="log-ability">Shade's Shadow</span> Meltdown blocked!`);
       B.piperBlockedThisRound[tNameShade] = true; // v640: Slick Coat gate
     }
   });
@@ -4461,8 +4476,8 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _hauntSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip
-          if (!ef.ko && hasSideline(B[tNameHaunt], 436)) {
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+          if (!ef.ko && hasSideline(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
             const psPreHp3 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
             if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
@@ -4476,6 +4491,11 @@ function doPreRollSetup() {
               preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
+          } else if (!ef.ko && hasSideline(B[tNameHaunt], 436) && hasSideline(enemy, 45)) {
+            const cornGhostPS3 = getSidelineGhost(enemy, 45);
+            const enemyNameHaunt = enemy === B.red ? 'red' : 'blue';
+            preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS3 ? cornGhostPS3.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyNameHaunt]);
+            log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
           }
         }
       }
@@ -4538,8 +4558,8 @@ function doPreRollSetup() {
           preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
           log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
         }
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip
-        if (!f.ko && hasSideline(B[tNameLucyActor], 436)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        if (!f.ko && hasSideline(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
           const psPreHpL = f.hp;
           f.hp = Math.max(0, f.hp - 1);
           if (f.hp <= 0) { f.ko = true; f.killedBy = 436; }
@@ -4554,6 +4574,10 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
+        } else if (!f.ko && hasSideline(B[tNameLucyActor], 436) && hasSideline(B[tNameLucyTarget], 45)) {
+          const cornGhostPSL = getSidelineGhost(B[tNameLucyTarget], 45);
+          preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPSL ? cornGhostPSL.name : 'Cornelius'} blocks Princess Shade's Bounty!`, tNameLucyTarget]);
+          log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
         }
         // Knight reactions on Lucy's side (the actor). Temp queue mode so reactions
         // splice AFTER BLUE FIRE! in preRollCallouts instead of stomping it.
@@ -4622,7 +4646,8 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _splinterSavedKQ;
-          if (!ef.ko && hasSideline(B[tNameSplinter], 436)) {
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+          if (!ef.ko && hasSideline(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
             const psPreHp4 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
             if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
@@ -4636,6 +4661,10 @@ function doPreRollSetup() {
               preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
+          } else if (!ef.ko && hasSideline(B[tNameSplinter], 436) && hasSideline(enemy, 45)) {
+            const cornGhostPS4 = getSidelineGhost(enemy, 45);
+            preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS4 ? cornGhostPS4.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
+            log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
           }
         }
       }
