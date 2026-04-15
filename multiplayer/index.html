@@ -3623,7 +3623,43 @@ async function createChallenge() {
   // Save team to Firebase
   await db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
 
-  // Create game node
+  // --- AUTO-MATCH: check if someone else is already waiting ---
+  const waitingSnap = await db.ref('mp/games').orderByChild('status').equalTo('waiting').limitToFirst(5).once('value');
+  let matched = false;
+  if (waitingSnap.exists()) {
+    waitingSnap.forEach(child => {
+      if (matched) return;
+      const game = child.val();
+      // Skip our own games
+      if (game.creator === currentUser.uid) return;
+      // Found a waiting opponent — auto-join their game
+      matched = true;
+      const gameId = child.key;
+      const myName = currentUser.displayName || 'Player';
+      const myElo = userProfile.stats?.elo || 1000;
+
+      // Update the game to active
+      db.ref(`mp/games/${gameId}`).update({
+        opponent: currentUser.uid,
+        opponentName: myName,
+        opponentElo: myElo,
+        opponentTeam: filledTeam,
+        status: 'active'
+      });
+
+      // Redirect to testroom as blue
+      const url = '../testroom/?livepvp=' + gameId
+        + '&side=blue'
+        + '&red=' + game.creatorTeam.join(',')
+        + '&blue=' + filledTeam.join(',')
+        + '&redName=' + encodeURIComponent(game.creatorName)
+        + '&blueName=' + encodeURIComponent(myName);
+      window.location.href = url;
+    });
+  }
+  if (matched) return;
+
+  // --- No one waiting — create a new game and wait ---
   const gameRef = db.ref('mp/games').push();
   const gameId = gameRef.key;
 
@@ -3655,12 +3691,12 @@ async function createChallenge() {
     return `<div class="preview-card"><img src="${g.art}" alt="${g.name}"></div>`;
   }).join('');
 
-  // Set link
+  // Set link (still available as fallback)
   const link = `${window.location.origin}/multiplayer/?challenge=${gameId}`;
   document.getElementById('challenge-link-input').value = link;
   document.getElementById('challenge-status').textContent = 'Waiting for opponent...';
 
-  // Listen for opponent
+  // Listen for opponent (auto-matched or via link)
   gameListener = gameRef.on('value', snap => {
     const game = snap.val();
     if (!game) return;
