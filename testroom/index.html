@@ -15562,37 +15562,133 @@ function aiTick() {
     setTimeout(() => doRomyPrediction(4), 600);
     return;
   }
+
+  // --- Post-roll: auto-use moonstone / lucky stone for blue ---
+  aiHandlePostRoll();
 }
 
 // AI commits available specials before rolling
 function aiCommitSpecials(team) {
   if (!B || !B[team]) return;
-  const r = B[team].resources;
+  const t = B[team];
+  const r = t.resources;
   if (!r) return;
+  const f = active(t);
+  if (!f || f.ko) return;
 
-  // Commit all ice shards
+  // --- Healing Seeds: use if HP below max (heal before fighting) ---
+  while (r.healingSeed > 0 && f.hp < f.maxHp) {
+    spendHealingSeed(team);
+  }
+
+  // --- Ice Blade: swing it if forged ---
+  if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[team] &&
+      B.iceBladeSwing && !B.iceBladeSwing[team]) {
+    toggleIceBlade(team);
+  }
+
+  // --- Flame Blade: swing it if forged ---
+  if (B.flameBlade && B.flameBlade[team] &&
+      B.flameBladeSwing && !B.flameBladeSwing[team]) {
+    if (typeof toggleFlameBlade === 'function') toggleFlameBlade(team);
+  }
+
+  // --- Zain Ice Blade forge: forge if we have Zain + materials ---
+  if (!B.iceBladeForgedPermanent?.[team]) {
+    const zain = t.ghosts.find(g => g.id === 206 && !g.ko && !g.iceBladeForged);
+    if (zain && r.ice >= 1 && r.moonstone >= 1) {
+      useZainForge(team);
+    }
+  }
+
+  // --- Finn Flame Blade forge ---
+  if (!B.flameBlade?.[team]) {
+    const finn = t.ghosts.find(g => g.id === 204 && !g.ko);
+    if (finn && r.healingSeed >= 2 && r.fire >= 1) {
+      if (typeof useFinnForge === 'function') useFinnForge(team);
+    }
+  }
+
+  // --- Commit all ice shards for bonus damage ---
   if (r.ice > 0 && B.committed) {
     B.committed[team].ice = r.ice;
   }
 
-  // Commit all sacred fire
+  // --- Commit all sacred fire for bonus damage ---
   if (r.fire > 0 && B.committed) {
     B.committed[team].fire = r.fire;
   }
 
-  // Use healing seed if HP is below max
-  const f = active(B[team]);
-  if (f && r.healingSeed > 0 && f.hp < f.maxHp) {
-    // Healing seeds are used via the UI tile clicks — just commit surge if available
+  // --- Commit surge for extra dice ---
+  if (r.surge > 0 && B.committed) {
+    B.committed[team].surge = r.surge;
   }
 
-  // Commit surge for abilities that use it
-  if (r.surge > 0 && B.committed) {
-    // Some ghosts use surge — commit 1 if available
-    B.committed[team].surge = Math.min(r.surge, 1);
+  // --- Aunt Susan: commit seeds for damage if HP is full ---
+  if (r.healingSeed > 0 && f.hp >= f.maxHp && B.committed) {
+    const auntSusan = t.ghosts.find(g => g.id === 308 && !g.ko);
+    if (auntSusan) {
+      B.committed[team].auntSusan = r.healingSeed;
+    }
   }
 
   renderBattle();
+}
+
+// --- POST-ROLL AI: auto-use moonstone and lucky stone for blue ---
+function aiHandlePostRoll() {
+  if (!AI_ACTIVE || !B) return;
+
+  // Auto-use Moonstone when it pops up for blue
+  if (B.pendingMoonstone && B.pendingMoonstone.team === 'blue') {
+    const pm = B.pendingMoonstone;
+
+    if (pm.phase === 'pick-resource') {
+      // Click the moonstone tile to activate it
+      const resEl = document.getElementById('blue-resources');
+      const msEl = resEl && resEl.querySelector('.res-tile.moonstone.rerollable');
+      if (msEl) {
+        setTimeout(() => { if (msEl.onclick) msEl.onclick(); }, 600);
+      } else {
+        // If no clickable moonstone, skip
+        setTimeout(() => skipMoonstone(), 600);
+      }
+      return;
+    }
+
+    if (pm.phase === 'pick-die') {
+      // Pick the lowest die to change
+      const dice = pm.dice || B.blueDice || [];
+      let worstIdx = 0;
+      let worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      setTimeout(() => { if (typeof pickMsDie === 'function') pickMsDie(worstIdx); }, 500);
+      return;
+    }
+
+    if (pm.phase === 'pick-value') {
+      // Change to 6 (best value)
+      setTimeout(() => { if (typeof pickMsValue === 'function') pickMsValue(6); }, 500);
+      return;
+    }
+  }
+
+  // Auto-use Lucky Stone when it appears for blue
+  const blueDiceEl = document.getElementById('blue-dice');
+  if (blueDiceEl) {
+    const rerollable = blueDiceEl.querySelectorAll('.die.rerollable');
+    if (rerollable.length > 0 && B.phase && B.phase.includes && B[`blue`]?.resources?.luckyStone >= 0) {
+      // Find lowest die and click it
+      let lowestEl = null, lowestVal = 7;
+      rerollable.forEach(el => {
+        const val = parseInt(el.textContent);
+        if (!isNaN(val) && val < lowestVal) { lowestVal = val; lowestEl = el; }
+      });
+      if (lowestEl && lowestVal <= 3) {
+        setTimeout(() => { if (lowestEl.onclick) lowestEl.onclick(); }, 600);
+      }
+    }
+  }
 }
 
 // ============================================================
