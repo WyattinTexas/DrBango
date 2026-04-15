@@ -233,6 +233,12 @@ body {
   font-weight: 600;
   flex-shrink: 0;
 }
+.sidebar-lb-badges {
+  display: inline;
+  margin-left: 3px;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
 .sidebar-lb-challenge {
   margin-left: 6px;
   padding: 2px 8px;
@@ -313,6 +319,49 @@ body {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
+}
+/* Sidebar Daily Rival */
+.sidebar-daily {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-daily-header {
+  cursor: pointer;
+  user-select: none;
+}
+.sidebar-daily-header h4 {
+  font-family: 'Creepster', cursive;
+  font-size: 0.85rem;
+  color: var(--text-warm);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-daily-header .arrow {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+.sidebar-daily-header.open .arrow {
+  transform: rotate(90deg);
+}
+.sidebar-daily-body .daily-challenge {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--gold-deep);
+  background: linear-gradient(135deg, var(--surface2), var(--surface3));
+}
+.sidebar-daily-body .daily-cards {
+  gap: 6px;
+}
+.sidebar-daily-body .daily-card {
+  width: 50px;
+}
+.sidebar-daily-body .daily-card img {
+  width: 46px;
+  height: 46px;
 }
 .sidebar-badges h4 {
   font-family: 'Creepster', cursive;
@@ -1916,7 +1965,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </div>
   </div>
 
-  <!-- Sidebar Leaderboard + Badges -->
+  <!-- Sidebar Leaderboard + Badges + Daily Rival -->
   <div class="sidebar-leaderboard" id="sidebar-leaderboard">
     <h3>Leaderboard</h3>
     <div id="sidebar-lb-rows"></div>
@@ -1924,6 +1973,23 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     <div class="sidebar-badges">
       <h4>Badges</h4>
       <div class="sidebar-badges-row" id="sidebar-badges-row"></div>
+    </div>
+    <!-- Daily Rival (sidebar, collapsible) -->
+    <div class="sidebar-daily" id="sidebar-daily" style="display:none;">
+      <div class="sidebar-daily-header" onclick="toggleSidebarDaily()">
+        <h4>Today's Rival <span class="arrow" id="daily-arrow">&#9654;</span></h4>
+      </div>
+      <div class="sidebar-daily-body" id="sidebar-daily-body" style="display:none;">
+        <div class="daily-challenge" id="daily-challenge-section">
+          <div class="daily-team-name" id="daily-team-name" style="font-size:0.85rem;"></div>
+          <div class="daily-difficulty" id="daily-difficulty" style="font-size:0.6rem;"></div>
+          <div class="daily-cards" id="daily-cards"></div>
+          <div class="daily-badge-preview" id="daily-badge-preview" style="margin:6px 0;"></div>
+          <div class="daily-subtitle" id="daily-reward-text" style="font-size:0.7rem;">Beat today's rival for 3 bonus cards!</div>
+          <div class="daily-attempts" id="daily-attempts" style="font-size:0.7rem;"></div>
+          <button id="daily-battle-btn" onclick="clickDailyBattle()" style="font-size:0.75rem;padding:8px 16px;">FIGHT TODAY'S RIVAL</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1940,18 +2006,6 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         <span>Open Pack</span>
       </button>
       <div class="pack-timer" id="pack-timer"></div>
-    </div>
-
-    <!-- Daily Match -->
-    <div class="daily-challenge" id="daily-challenge-section" style="display:none;">
-      <h3>TODAY'S RIVAL</h3>
-      <div class="daily-team-name" id="daily-team-name"></div>
-      <div class="daily-difficulty" id="daily-difficulty"></div>
-      <div class="daily-cards" id="daily-cards"></div>
-      <div class="daily-badge-preview" id="daily-badge-preview" style="margin:8px 0;"></div>
-      <div class="daily-subtitle" id="daily-reward-text">Beat today's rival for 3 bonus cards!</div>
-      <div class="daily-attempts" id="daily-attempts"></div>
-      <button id="daily-battle-btn" onclick="clickDailyBattle()">FIGHT TODAY'S RIVAL</button>
     </div>
 
     <!-- Character Select Grid (top) -->
@@ -2728,6 +2782,21 @@ function updateBattleButton() {
 }
 
 // ============================================================
+// SIDEBAR DAILY RIVAL TOGGLE
+// ============================================================
+function toggleSidebarDaily() {
+  const body = document.getElementById('sidebar-daily-body');
+  const header = document.querySelector('.sidebar-daily-header');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    header.classList.add('open');
+  } else {
+    body.style.display = 'none';
+    header.classList.remove('open');
+  }
+}
+
+// ============================================================
 // COLLECTION
 // ============================================================
 // All cards use full template regardless of set
@@ -2800,7 +2869,10 @@ function toggleLeaderboard() {
   }
 }
 
-function renderLeaderboard(data) {
+// Cache for player badges (loaded once per session)
+let _lbBadgeCache = {};
+
+async function renderLeaderboard(data) {
   const container = document.getElementById('sidebar-lb-rows');
   const selfRow = document.getElementById('sidebar-lb-self');
   if (!data) {
@@ -2815,17 +2887,39 @@ function renderLeaderboard(data) {
   const top15 = entries.slice(0, 15);
   const currentInTop15 = currentUser && top15.some(e => e.uid === currentUser.uid);
 
+  // Load badges for players we haven't cached yet
+  const uncached = top15.filter(e => !_lbBadgeCache[e.uid]);
+  if (uncached.length > 0) {
+    const promises = uncached.map(async e => {
+      try {
+        const snap = await db.ref(`mp/users/${e.uid}/dailyBadges`).once('value');
+        _lbBadgeCache[e.uid] = snap.val() || [];
+      } catch (_) { _lbBadgeCache[e.uid] = []; }
+    });
+    await Promise.all(promises);
+  }
+
   container.innerHTML = top15.map((entry, i) => {
     const isCurrent = currentUser && entry.uid === currentUser.uid;
     const isSelected = selectedTarget && selectedTarget.uid === entry.uid;
     const challengeBtn = !isCurrent
       ? `<button class="sidebar-lb-challenge" onclick="event.stopPropagation();selectTarget('${entry.uid}')">Challenge</button>`
       : '';
+
+    // Build badge icons for this player
+    const playerBadges = _lbBadgeCache[entry.uid] || [];
+    const badgeHtml = playerBadges.length > 0
+      ? `<span class="sidebar-lb-badges">${playerBadges.map(b => {
+          const match = (typeof DAILY_MATCHES !== 'undefined' ? DAILY_MATCHES : []).find(m => m.badge === b);
+          return match ? `<span title="${match.name}">${match.icon}</span>` : '';
+        }).join('')}</span>`
+      : '';
+
     return `
       <div class="sidebar-lb-row ${isCurrent ? 'current-user' : 'challengeable'} ${isSelected ? 'selected-target' : ''}"
            ${!isCurrent ? `onclick="selectTarget('${entry.uid}')"` : ''}>
         <span class="sidebar-lb-rank">${i + 1}</span>
-        <span class="sidebar-lb-name">${entry.displayName || 'Unknown'}</span>
+        <span class="sidebar-lb-name">${entry.displayName || 'Unknown'}${badgeHtml}</span>
         <span class="sidebar-lb-elo">${entry.elo || 1000}</span>
         ${challengeBtn}
       </div>
@@ -4349,6 +4443,9 @@ function renderDailyChallenge() {
   }
 
   section.style.display = 'block';
+  // Show the sidebar daily section
+  const sidebarDaily = document.getElementById('sidebar-daily');
+  if (sidebarDaily) sidebarDaily.style.display = 'block';
 
   document.getElementById('daily-team-name').textContent = daily.name;
   const diffEl = document.getElementById('daily-difficulty');
