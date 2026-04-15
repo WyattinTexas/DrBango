@@ -189,11 +189,12 @@ body {
 .sidebar-lb-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
+  padding: 5px 6px;
   border-radius: 6px;
   font-size: 11px;
   color: var(--text2);
+  cursor: default;
+  transition: all 0.15s;
 }
 .sidebar-lb-row:nth-child(even) {
   background: rgba(255,255,255,0.02);
@@ -204,10 +205,21 @@ body {
   background: rgba(212, 160, 64, 0.08);
   border: 1px solid var(--gold-deep);
 }
+.sidebar-lb-row.challengeable {
+  cursor: pointer;
+}
+.sidebar-lb-row.challengeable:hover {
+  background: rgba(212, 160, 64, 0.1);
+}
+.sidebar-lb-row.selected-target {
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid var(--accent);
+}
 .sidebar-lb-rank {
   width: 20px;
   color: var(--text-dim);
   font-weight: 700;
+  flex-shrink: 0;
 }
 .sidebar-lb-name {
   flex: 1;
@@ -219,6 +231,69 @@ body {
 .sidebar-lb-elo {
   color: var(--gold);
   font-weight: 600;
+  flex-shrink: 0;
+}
+.sidebar-lb-challenge {
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--bg);
+  background: var(--gold);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.sidebar-lb-challenge:hover {
+  background: var(--gold-bright);
+  transform: scale(1.05);
+}
+/* Target preview in roster area */
+.target-preview {
+  text-align: center;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(233, 69, 96, 0.08);
+  border: 1px solid rgba(233, 69, 96, 0.3);
+  border-radius: 12px;
+}
+.target-preview .target-name {
+  font-family: 'Creepster', cursive;
+  font-size: 1.2rem;
+  color: var(--accent2);
+  letter-spacing: 1px;
+}
+.target-preview .target-elo {
+  font-size: 0.8rem;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.target-preview .target-team {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.target-preview .target-ghost {
+  text-align: center;
+  width: 64px;
+}
+.target-preview .target-ghost img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  object-position: center 20%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.target-preview .target-ghost-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 3px;
 }
 .sidebar-lb-self {
   margin-top: 6px;
@@ -1902,7 +1977,15 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
           <span class="slot-label">Slot 3</span>
         </div>
       </div>
-      <button id="battle-btn" disabled onclick="clickBattle()">&#x2694;&#xFE0F; QUEUE UP</button>
+
+      <!-- Target Preview (shows who you're about to fight) -->
+      <div class="target-preview" id="target-preview" style="display:none;">
+        <div class="target-name" id="target-name"></div>
+        <div class="target-elo" id="target-elo"></div>
+        <div class="target-team" id="target-team"></div>
+      </div>
+
+      <button id="battle-btn" disabled onclick="clickBattle()">Select an opponent from the leaderboard</button>
       <button id="challenge-btn" disabled onclick="createChallenge()">CHALLENGE A FRIEND</button>
       <div class="challenge-warning">The winner takes one of the loser's cards!</div>
     </div>
@@ -2114,6 +2197,7 @@ const db = firebase.database();
 let currentUser = null;
 let userProfile = null;
 let team = [null, null, null];
+let selectedTarget = null; // { uid, name, elo, team: [id,id,id] }
 let pendingPack = null;
 let flippedCount = 0;
 let serverTimeOffset = 0;
@@ -2633,10 +2717,13 @@ function updateBattleButton() {
     btn.textContent = 'No games remaining';
   } else if (filledSlots < 3) {
     btn.disabled = true;
-    btn.textContent = '\u2694\uFE0F QUEUE UP';
+    btn.textContent = 'Pick 3 spirits first';
+  } else if (!selectedTarget) {
+    btn.disabled = true;
+    btn.textContent = 'Select an opponent from the leaderboard';
   } else {
     btn.disabled = false;
-    btn.textContent = '\u2694\uFE0F QUEUE UP';
+    btn.textContent = `\u2694\uFE0F CHALLENGE ${selectedTarget.name.toUpperCase()}`;
   }
 }
 
@@ -2730,11 +2817,17 @@ function renderLeaderboard(data) {
 
   container.innerHTML = top15.map((entry, i) => {
     const isCurrent = currentUser && entry.uid === currentUser.uid;
+    const isSelected = selectedTarget && selectedTarget.uid === entry.uid;
+    const challengeBtn = !isCurrent
+      ? `<button class="sidebar-lb-challenge" onclick="event.stopPropagation();selectTarget('${entry.uid}')">Challenge</button>`
+      : '';
     return `
-      <div class="sidebar-lb-row ${isCurrent ? 'current-user' : ''}">
+      <div class="sidebar-lb-row ${isCurrent ? 'current-user' : 'challengeable'} ${isSelected ? 'selected-target' : ''}"
+           ${!isCurrent ? `onclick="selectTarget('${entry.uid}')"` : ''}>
         <span class="sidebar-lb-rank">${i + 1}</span>
         <span class="sidebar-lb-name">${entry.displayName || 'Unknown'}</span>
         <span class="sidebar-lb-elo">${entry.elo || 1000}</span>
+        ${challengeBtn}
       </div>
     `;
   }).join('');
@@ -2756,6 +2849,56 @@ function renderLeaderboard(data) {
     });
   } else {
     selfRow.classList.remove('active');
+  }
+}
+
+// Select a target from the leaderboard to challenge
+async function selectTarget(uid) {
+  try {
+    const snap = await db.ref(`mp/users/${uid}`).once('value');
+    const userData = snap.val();
+    if (!userData || !userData.currentTeam || userData.currentTeam.length < 3) {
+      showToast('This player has no team set up yet');
+      return;
+    }
+
+    const validTeam = userData.currentTeam.filter(id => getGhost(id));
+    if (validTeam.length < 3) {
+      showToast('This player\'s team has invalid cards');
+      return;
+    }
+
+    selectedTarget = {
+      uid,
+      name: userData.displayName || 'Unknown',
+      elo: userData.stats?.elo || 1000,
+      team: validTeam.slice(0, 3)
+    };
+
+    // Show target preview
+    const preview = document.getElementById('target-preview');
+    document.getElementById('target-name').textContent = `VS ${selectedTarget.name}`;
+    document.getElementById('target-elo').textContent = `${selectedTarget.elo} Elo`;
+
+    // Show opponent's team (art + name only — no abilities)
+    document.getElementById('target-team').innerHTML = selectedTarget.team.map(id => {
+      const ghost = getGhost(id);
+      return `<div class="target-ghost">
+        <img src="${ghost.art}" alt="${ghost.name}" onerror="this.style.background='var(--surface3)'">
+        <div class="target-ghost-name">${ghost.name}</div>
+      </div>`;
+    }).join('');
+
+    preview.style.display = 'block';
+    updateBattleButton();
+
+    // Re-render leaderboard to show selected state
+    const lbSnap = await db.ref('mp/leaderboard').once('value');
+    renderLeaderboard(lbSnap.val());
+
+  } catch (err) {
+    console.error('Error selecting target:', err);
+    showToast('Error loading opponent data');
   }
 }
 
@@ -2810,76 +2953,29 @@ async function clickBattle() {
   const filledTeam = team.filter(id => id !== null);
   if (filledTeam.length < 3) return;
   if (getGamesRemaining() <= 0) return;
+  if (!selectedTarget) return;
 
   const btn = document.getElementById('battle-btn');
   btn.disabled = true;
-  btn.textContent = 'Finding opponent...';
+  btn.textContent = 'Loading battle...';
 
   // Save our team
   await db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
 
-  // Find an opponent via async matchmaking
-  const opponent = await findAsyncOpponent();
+  // Store opponent info in sessionStorage so we can update their record on return
+  sessionStorage.setItem('mp_opponent', JSON.stringify({
+    uid: selectedTarget.uid,
+    name: selectedTarget.name,
+    elo: selectedTarget.elo,
+    team: selectedTarget.team
+  }));
 
-  if (opponent) {
-    // Store opponent info in sessionStorage so we can update their record on return
-    sessionStorage.setItem('mp_opponent', JSON.stringify({
-      uid: opponent.uid,
-      name: opponent.name,
-      elo: opponent.elo,
-      team: opponent.team
-    }));
-
-    // Redirect to testroom with both teams
-    window.location.href = '../testroom/?red=' + filledTeam.join(',')
-      + '&blue=' + opponent.team.join(',')
-      + '&mode=mp'
-      + '&oppName=' + encodeURIComponent(opponent.name)
-      + '&oppElo=' + opponent.elo;
-  } else {
-    // No opponents available — fall back to AI
-    sessionStorage.removeItem('mp_opponent');
-    window.location.href = '../testroom/?red=' + filledTeam.join(',') + '&mode=mp';
-  }
-}
-
-// Find the closest-Elo opponent who has a saved team (not yourself)
-async function findAsyncOpponent() {
-  try {
-    const snap = await db.ref('mp/users').once('value');
-    const allUsers = snap.val();
-    if (!allUsers) return null;
-
-    const myUid = currentUser.uid;
-    const myElo = userProfile.stats?.elo || 1000;
-
-    // Build candidate list: must have a 3-card team, must not be yourself
-    const candidates = [];
-    for (const [uid, data] of Object.entries(allUsers)) {
-      if (uid === myUid) continue;
-      if (!data.currentTeam || !Array.isArray(data.currentTeam) || data.currentTeam.length < 3) continue;
-      // Verify all cards are valid ghosts
-      const validTeam = data.currentTeam.filter(id => getGhost(id));
-      if (validTeam.length < 3) continue;
-
-      candidates.push({
-        uid,
-        name: data.displayName || 'Unknown',
-        elo: data.stats?.elo || 1000,
-        team: validTeam.slice(0, 3)
-      });
-    }
-
-    if (candidates.length === 0) return null;
-
-    // Sort by closest Elo, then pick randomly from top 3 closest
-    candidates.sort((a, b) => Math.abs(a.elo - myElo) - Math.abs(b.elo - myElo));
-    const pool = candidates.slice(0, Math.min(3, candidates.length));
-    return pool[Math.floor(Math.random() * pool.length)];
-  } catch (err) {
-    console.error('Matchmaking error:', err);
-    return null;
-  }
+  // Redirect to testroom with both teams
+  window.location.href = '../testroom/?red=' + filledTeam.join(',')
+    + '&blue=' + selectedTarget.team.join(',')
+    + '&mode=mp'
+    + '&oppName=' + encodeURIComponent(selectedTarget.name)
+    + '&oppElo=' + selectedTarget.elo;
 }
 
 // ============================================================
