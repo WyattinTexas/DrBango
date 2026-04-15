@@ -4,13 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════ CARD DATABASE — loaded from cards_data.js (ALL_CARDS, 187 verified Spiritkin) ═══════
-if (typeof ALL_CARDS === 'undefined') var ALL_CARDS = [];
-const CARDS = ALL_CARDS.length ? ALL_CARDS : [
-  // Minimal fallback (starters only)
-  {id:28, name:"Dream Cat", rarity:"common", maxHp:4, ability:"Jinx", desc:"Both roll doubles: gain +2 dice next turn.", set:"Frost Valley"},
-  {id:16, name:"Chip", rarity:"common", maxHp:4, ability:"Acrobatic Dive", desc:"Your even rolled doubles add +3 damage if you deal damage.", set:"Set 1"},
-  {id:20, name:"Floop", rarity:"common", maxHp:5, ability:"Muck", desc:"Enemy loses a dice for the following turn if they roll doubles.", set:"Dark Castle"}
-];
+const CARDS = ALL_CARDS;
 
 function getCard(id) { return CARDS.find(c => c.id === id); }
 function getCardsBySet(set) { return CARDS.filter(c => c.set === set); }
