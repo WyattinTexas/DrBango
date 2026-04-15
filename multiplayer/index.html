@@ -3137,6 +3137,16 @@ async function processBattleResult() {
     if (allCommons) {
       await ref.child('underdogWin').set(true);
     }
+
+    // Grant 3 bonus cards for arena win
+    const bonusCards = generateDailyPack();
+    const bonusIds = bonusCards.map(g => g.id);
+    const updatedCollection = [...(userProfile.collection || []), ...bonusIds];
+    await ref.child('collection').set(updatedCollection);
+    userProfile.collection = updatedCollection;
+
+    const cardNames = bonusCards.map(g => g.name).join(', ');
+    bodyText += `\n+3 cards: ${cardNames}`;
   } else if (result === 'loss') {
     const expected = 1 / (1 + Math.pow(10, (opponentElo - currentElo) / 400));
     newElo = Math.round(currentElo + K * (0 - expected));
