@@ -67,43 +67,105 @@ canvas{position:absolute;top:0;left:0}
 #modal-actions button:hover{background:rgba(255,255,255,.15);border-color:rgba(255,240,200,.4)}
 #modal-actions button.primary{border-color:#90e070;color:#90e070}
 
-#battle-screen{position:fixed;inset:0;z-index:250;background:rgba(6,3,1,.98);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-  font-family:'Cinzel',serif;color:#f0e8d8}
-.b-fighter{display:flex;align-items:center;gap:16px;padding:12px 20px;border-radius:10px;min-width:420px}
-.b-fighter.enemy{background:rgba(224,50,50,.06);border:1px solid rgba(224,50,50,.15);flex-direction:row-reverse}
-.b-fighter.player{background:rgba(80,192,64,.06);border:1px solid rgba(80,192,64,.15)}
-.b-portrait{width:80px;height:80px;border-radius:10px;object-fit:cover;border:2px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.05);flex-shrink:0}
-.b-info{flex:1;min-width:0}
-.b-name{font-size:18px;font-weight:800;margin-bottom:2px}
-.b-ability-name{font:600 11px 'Cinzel',serif;color:#f0d860;margin-bottom:2px}
-.b-ability-desc{font:11px 'Crimson Text',serif;opacity:.55;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.b-hp-outer{width:100%;height:10px;background:rgba(255,255,255,.1);border-radius:5px;overflow:hidden}
-.b-hp-inner{height:100%;border-radius:5px;transition:width .4s}
-.b-hp-inner.green{background:#50c040}.b-hp-inner.red{background:#e05050}
-.b-hp-text{font:9px 'Press Start 2P',monospace;opacity:.6;margin-top:2px}
-.b-resources{font:8px 'Press Start 2P',monospace;margin-top:4px;opacity:.7;display:flex;gap:6px;flex-wrap:wrap}
-#b-vs{font-size:24px;font-weight:900;color:#e05050;text-shadow:0 0 16px rgba(224,80,80,.3);margin:4px 0}
-#b-dice-area{display:flex;gap:20px;align-items:center;justify-content:center;min-height:56px}
-.dice-group{display:flex;gap:5px}
-.die{width:40px;height:40px;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);
-  border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font:700 20px 'Press Start 2P',monospace;transition:all .3s}
-.die.win{border-color:#50c040;color:#50c040;background:rgba(80,192,64,.1);box-shadow:0 0 8px rgba(80,192,64,.2)}
-.die.lose{border-color:#e05050;color:#e05050;background:rgba(224,80,80,.1)}
+/* ═══ BATTLE SCREEN ═══ */
+#battle-screen{position:fixed;inset:0;z-index:250;background:linear-gradient(180deg,rgba(6,3,1,.98),rgba(15,8,4,.98));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  font-family:'Cinzel',serif;color:#f0e8d8;overflow-y:auto;padding:12px}
+#b-enemy,#b-player{width:100%;max-width:480px}
+.battle-side{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px}
+.enemy-side{border-color:rgba(233,69,96,.3)}.player-side{border-color:rgba(46,204,113,.3)}
+.side-label{font:700 10px 'Press Start 2P',monospace;letter-spacing:2px;color:#e94560;margin-bottom:8px}
+
+/* Card components */
+.card-normal{display:flex;gap:12px;align-items:center}
+.card-portrait{width:72px;height:72px;border-radius:10px;object-fit:cover;border:2px solid rgba(255,255,255,.15);flex-shrink:0;background:rgba(255,255,255,.05)}
+.card-portrait-placeholder{width:72px;height:72px;border-radius:10px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:rgba(255,255,255,.2);flex-shrink:0}
+.card-battle-info{flex:1;min-width:0}
+.card-name{font-size:16px;font-weight:800;margin-bottom:2px}
+.card-ability-name{font-size:11px;font-weight:700;color:#f0d860;margin-bottom:2px}
+.card-ability-desc{font:11px 'Crimson Text',serif;color:rgba(255,255,255,.5);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hp-bar-outer{width:100%;height:14px;background:rgba(255,255,255,.08);border-radius:7px;overflow:hidden;position:relative}
+.hp-bar-inner{height:100%;border-radius:7px;transition:width .5s ease}
+.hp-bar-inner.healthy{background:linear-gradient(90deg,#2ecc71,#27ae60)}
+.hp-bar-inner.warning{background:linear-gradient(90deg,#f39c12,#e67e22)}
+.hp-bar-inner.critical{background:linear-gradient(90deg,#e94560,#c0392b)}
+.hp-bar-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 9px 'Press Start 2P',monospace;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.card-normal.ko{opacity:.3;filter:grayscale(1)}
+
+/* Sideline / mini cards */
+.sideline-row{display:flex;gap:6px;margin-top:8px}
+.card-mini{width:48px;height:56px;border-radius:8px;overflow:hidden;border:2px solid rgba(255,255,255,.12);position:relative;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.05)}
+.card-mini:hover{border-color:#d4a040;transform:scale(1.08)}
+.card-mini.ko{opacity:.25;filter:grayscale(1);cursor:default}
+.card-mini img{width:100%;height:40px;object-fit:cover;display:block}
+.card-mini-placeholder{width:100%;height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:rgba(255,255,255,.15)}
+.mini-hp-bar{position:absolute;bottom:12px;left:0;right:0;height:3px;background:rgba(0,0,0,.4)}
+.mini-hp-fill{height:100%}
+.mini-hp-fill.healthy{background:#2ecc71}.mini-hp-fill.warning{background:#f39c12}.mini-hp-fill.critical{background:#e94560}
+.mini-name{font:600 7px 'Cinzel',serif;text-align:center;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.7)}
+
+.battle-resources{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.res-badge{font:9px 'Press Start 2P',monospace;background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;color:#f0d860}
+
+/* Large cards (roster panels) */
+.card-large{width:200px;border:2px solid rgba(255,255,255,.15);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);cursor:pointer;transition:all .2s;position:relative;flex-shrink:0}
+.card-large:hover{transform:scale(1.03);box-shadow:0 0 16px rgba(212,160,64,.2)}
+.card-large.active-card{border-color:#2ecc71;box-shadow:0 0 12px rgba(46,204,113,.2)}
+.card-large.ko{opacity:.3;filter:grayscale(1)}
+.card-large.swap-selected{border-color:#f0d860;box-shadow:0 0 16px rgba(240,216,96,.4);animation:pulse-border .8s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(240,216,96,.3)}50%{box-shadow:0 0 0 6px rgba(240,216,96,.15)}}
+.card-rarity-bar{height:3px;width:100%}
+.card-slot-num{position:absolute;top:6px;left:8px;font:900 18px 'Cinzel',serif;color:#d4a040;text-shadow:0 2px 6px rgba(0,0,0,.7);z-index:2}
+.card-art{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:rgba(255,255,255,.05)}
+.card-art-placeholder{width:100%;aspect-ratio:1;background:rgba(255,255,255,.05)}
+.card-info{padding:10px 12px}
+.card-hp{font:700 13px 'Cinzel',serif;color:#4ade80;margin-bottom:4px}
+.card-hp .heart{color:#ef4444}
+.card-rarity{font:700 9px 'Press Start 2P',monospace;letter-spacing:1px;margin-bottom:6px}
+
+/* Party screen */
+.party-header{text-align:center;margin-bottom:16px}
+.party-header h2{font:900 22px 'Cinzel',serif;letter-spacing:3px}
+.party-subtitle{font:12px 'Crimson Text',serif;color:rgba(255,255,255,.5);margin-top:4px}
+.party-roster{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.party-done-btn{background:rgba(46,204,113,.15);border:2px solid #2ecc71;border-radius:8px;color:#2ecc71;font:700 14px 'Cinzel',serif;padding:10px 32px;cursor:pointer;margin-top:16px}
+.party-actions{text-align:center}
+
+/* Recruit screen */
+.recruit-roster{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.recruit-option{cursor:pointer;position:relative;transition:all .2s}
+.recruit-option:hover{transform:scale(1.1)}
+.recruit-replace-label{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);font:700 8px 'Press Start 2P',monospace;color:#e94560;background:rgba(0,0,0,.8);padding:2px 6px;border-radius:4px;white-space:nowrap}
+
+/* KO overlay */
+#ko-overlay{position:absolute;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:10}
+.ko-overlay-content{text-align:center;max-width:600px}
+.ko-overlay-content h3{font:800 18px 'Cinzel',serif}
+.ko-picker-grid{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.ko-option{cursor:pointer;transition:transform .2s}
+.ko-option:hover{transform:scale(1.05)}
+
+/* Dice & results */
+#b-vs{font-size:22px;font-weight:900;color:#e94560;text-shadow:0 0 16px rgba(233,69,96,.3);margin:2px 0}
+#b-dice-area{display:flex;gap:16px;align-items:center;justify-content:center;min-height:50px}
+.dice-group{display:flex;gap:4px}
+.die{width:38px;height:38px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 18px 'Press Start 2P',monospace;transition:all .3s}
+.die.win{border-color:#2ecc71;color:#2ecc71;background:rgba(46,204,113,.08);box-shadow:0 0 8px rgba(46,204,113,.2)}
+.die.lose{border-color:#e94560;color:#e94560;background:rgba(233,69,96,.08)}
 .die.rolling{animation:diceRoll .4s ease-out}
 @keyframes diceRoll{0%{transform:rotateZ(0) scale(.5);opacity:0}60%{transform:rotateZ(360deg) scale(1.1)}100%{transform:rotateZ(360deg) scale(1);opacity:1}}
-#b-result{font:700 16px 'Cinzel',serif;min-height:24px;text-align:center}
-#b-callout{font:700 14px 'Cinzel',serif;color:#f0d860;min-height:20px;text-align:center;transition:opacity .3s}
-#b-log{font:12px 'Crimson Text',serif;opacity:.7;max-height:80px;overflow-y:auto;text-align:center;padding:0 20px;line-height:1.5;width:100%;max-width:500px}
-#b-actions{display:flex;gap:8px;margin-top:4px}
-#b-actions button{
-  background:rgba(255,255,255,.08);border:2px solid rgba(255,240,200,.2);border-radius:8px;
-  color:#f0e8d8;font:700 14px 'Cinzel',serif;padding:10px 24px;cursor:pointer;transition:all .15s}
-#b-actions button:hover{background:rgba(255,255,255,.15)}
-#b-actions button.attack{border-color:#e05050;color:#e05050}
-#b-actions button.resource{border-color:#f0d860;color:#f0d860;font-size:11px;padding:8px 14px}
+#b-result{font:700 14px 'Cinzel',serif;min-height:20px;text-align:center}
+#b-callout{font:700 13px 'Cinzel',serif;color:#f0d860;min-height:18px;text-align:center;transition:opacity .3s}
+#b-log{font:12px 'Crimson Text',serif;opacity:.6;max-height:70px;overflow-y:auto;text-align:center;padding:0 16px;line-height:1.4;width:100%;max-width:480px}
+#b-actions{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;justify-content:center}
+#b-actions button{background:rgba(255,255,255,.06);border:2px solid rgba(255,240,200,.15);border-radius:8px;color:#f0e8d8;font:700 13px 'Cinzel',serif;padding:8px 20px;cursor:pointer;transition:all .15s}
+#b-actions button:hover{background:rgba(255,255,255,.12)}
+#b-actions button.attack{border-color:#e94560;color:#e94560}
+#b-actions button.resource{border-color:#f0d860;color:#f0d860;font-size:10px;padding:6px 12px}
+
+/* Starter screen cards */
+.starter-card-wrap{cursor:pointer;transition:all .2s}
+.starter-card-wrap:hover{transform:translateY(-6px)}
 
 #starter-screen{position:fixed;inset:0;z-index:300;background:rgba(6,3,1,.98);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;color:#f0e8d8}
@@ -132,6 +194,7 @@ canvas{position:absolute;top:0;left:0}
   <div id="hud-coins"><span id="coin-count">3</span> Coins</div>
   <div id="hud-seals"></div>
   <div id="hud-turn">Turn <span id="turn-num">1</span></div>
+  <button onclick="showPartyScreen()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#f0e8d8;font:9px 'Press Start 2P',monospace;padding:4px 10px;cursor:pointer">PARTY</button>
 </div>
 
 <div id="action-bar" style="display:none">
@@ -167,6 +230,7 @@ canvas{position:absolute;top:0;left:0}
 <script src="cards_data.js"></script>
 <script src="art_map.js"></script>
 <script src="engine.js"></script>
+<script src="battle-ui.js"></script>
 <script>
 // ═══════════════════════════════════════
 // TOP-DOWN PIXEL ART OVERWORLD
@@ -886,24 +950,18 @@ let reachable = null; // Current reachable nodes for movement
 
 // ── STARTER SELECTION ──
 function showStarterScreen() {
-  const starters = [
-    ENGINE.getCard(28),  // Dream Cat
-    ENGINE.getCard(16),  // Chip
-    ENGINE.getCard(20),  // Floop
-  ];
+  if (typeof renderStarterScreen === 'function') {
+    renderStarterScreen();
+    return;
+  }
+  // Fallback
+  const starters = [ENGINE.getCard(28), ENGINE.getCard(16), ENGINE.getCard(20)];
   const el = document.getElementById('starter-choices');
   el.innerHTML = '';
   for (const card of starters) {
     const div = document.createElement('div');
     div.className = 'starter-card';
-    const artPath = typeof ART_MAP!=='undefined'&&ART_MAP[card.id] ? '../testroom/'+ART_MAP[card.id] : '';
-    div.innerHTML = `
-      ${artPath ? `<img src="${artPath}" style="width:80px;height:80px;border-radius:8px;object-fit:cover;margin-bottom:8px" onerror="this.style.display='none'">` : ''}
-      <div class="s-name">${card.name}</div>
-      <div class="s-hp">${card.maxHp} HP</div>
-      <div class="s-ability">${card.ability}</div>
-      <div class="s-desc">${card.desc}</div>
-    `;
+    div.innerHTML = `<div class="s-name">${card.name}</div><div class="s-hp">${card.maxHp} HP</div>`;
     div.onclick = () => startGame(card.id);
     el.appendChild(div);
   }
@@ -1056,7 +1114,6 @@ function endTurn() {
 
 // ── ENCOUNTERS (BATTLES) ──
 function startEncounter(node) {
-  // Get or generate encounter card for this node
   let cardId = G.revealedEncounters[node.id];
   if (!cardId) {
     const card = ENGINE.getEncounterCard(node.r);
@@ -1065,36 +1122,41 @@ function startEncounter(node) {
   }
 
   const card = ENGINE.getCard(cardId);
+
+  // Show encounter preview (FIGHT or FLEE)
+  if (typeof showEncounterPreview === 'function') {
+    showEncounterPreview(card,
+      () => { // FIGHT
+        hideModal();
+        document.getElementById('modal').style.maxWidth = '500px';
+        doEncounterBattle(card, cardId, node);
+      },
+      () => { // FLEE
+        hideModal();
+        document.getElementById('modal').style.maxWidth = '500px';
+        endTurn();
+      }
+    );
+  } else {
+    doEncounterBattle(card, cardId, node);
+  }
+}
+
+function doEncounterBattle(card, cardId, node) {
   const enemyTeam = ENGINE.makeTeam([cardId]);
 
   showBattle(G.party, enemyTeam, false, () => {
-    // On win: offer to recruit
-    if (!ENGINE.isTeamDefeated(enemyTeam)) {
-      endTurn();
-      return;
-    }
-    // Victory!
+    if (!ENGINE.isTeamDefeated(enemyTeam)) { endTurn(); return; }
     G.coins += 3;
-    showModal(
-      `${card.name} Defeated!`,
-      `<p>+3 Spirit Coins!</p><p><b>${card.name}</b> wants to join your team!</p>
-       <p>${card.ability}: ${card.desc}</p>
-       <p>${card.maxHp} HP | ${card.rarity}</p>`,
-      [
-        { text: 'RECRUIT', primary: true, action: () => {
-          if (G.party.ghosts.length < 5) {
-            G.party.ghosts.push(ENGINE.makeGhost(cardId));
-          } else {
-            // Would need swap UI — for now just replace last bench
-            G.party.ghosts[4] = ENGINE.makeGhost(cardId);
-          }
-          hideModal();
-          updateHUD();
-          endTurn();
-        }},
-        { text: 'Pass', action: () => { hideModal(); endTurn(); }}
-      ]
-    );
+
+    // Use new recruit screen with full party management
+    if (typeof showRecruitScreen === 'function') {
+      showRecruitScreen(card, () => { updateHUD(); endTurn(); });
+    } else {
+      // Fallback
+      if (G.party.ghosts.length < 5) G.party.ghosts.push(ENGINE.makeGhost(cardId));
+      updateHUD(); endTurn();
+    }
   });
 }
 
@@ -1135,40 +1197,12 @@ function showRollActions() {
   setBattleActions(actions);
 }
 
-function getArtPath(ghostId) {
-  const path = typeof ART_MAP !== 'undefined' ? ART_MAP[ghostId] : null;
-  return path ? '../testroom/' + path : '';
-}
-
-function renderFighter(el, ghost, team, isEnemy) {
-  const art = getArtPath(ghost.id);
-  const hpPct = Math.max(0, ghost.hp / ghost.maxHp * 100);
-  const res = team.resources;
-  const icons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥'};
-  let resHtml = '';
-  for (const [key, icon] of Object.entries(icons)) {
-    if (res[key] > 0) resHtml += `<span>${icon}${res[key]}</span>`;
-  }
-
-  el.innerHTML = `
-    ${art ? `<img class="b-portrait" src="${art}" onerror="this.style.display='none'" alt="${ghost.name}">` : '<div class="b-portrait"></div>'}
-    <div class="b-info">
-      <div class="b-name" style="color:${isEnemy?'#e05050':'#90e070'}">${ghost.name}</div>
-      <div class="b-ability-name">${ghost.ability}</div>
-      <div class="b-ability-desc">${ghost.abilityDesc}</div>
-      <div class="b-hp-outer"><div class="b-hp-inner ${isEnemy?'red':'green'}" style="width:${hpPct}%"></div></div>
-      <div class="b-hp-text">${ghost.hp} / ${ghost.maxHp} HP</div>
-      ${resHtml ? `<div class="b-resources">${resHtml}</div>` : ''}
-    </div>
-  `;
-}
+// Old renderFighter removed — now uses battle-ui.js renderBattleScreen()
 
 function updateBattleUI() {
-  const bs = battleState;
-  const pGhost = ENGINE.activeGhost(bs.playerTeam);
-  const eGhost = ENGINE.activeGhost(bs.enemyTeam);
-  renderFighter(document.getElementById('b-player'), pGhost, bs.playerTeam, false);
-  renderFighter(document.getElementById('b-enemy'), eGhost, bs.enemyTeam, true);
+  if (typeof renderBattleScreen === 'function') {
+    renderBattleScreen(battleState);
+  }
 }
 
 function showCallout(text, color) {
@@ -1274,17 +1308,17 @@ function doBattleRound() {
 }
 
 function showSwapModal(team, callback) {
-  const alive = team.ghosts.filter((g, i) => i !== team.activeIdx && !g.ko);
-  setBattleActions(alive.map(g => ({
-    text: `SEND IN ${g.name.toUpperCase()} (${g.hp}HP)`,
-    action: () => {
-      team.activeIdx = team.ghosts.indexOf(g);
-      const entryResult = { events: [] };
-      ENGINE.triggerEntryAbility(team, battleState.enemyTeam, entryResult);
-      for (const e of entryResult.events) logBattle(e);
+  if (typeof showKoSwapPicker === 'function') {
+    showKoSwapPicker(team, battleState.enemyTeam, () => {
+      updateBattleUI();
       callback();
-    }
-  })));
+    });
+  } else {
+    // Fallback: auto-pick first alive
+    const alive = team.ghosts.findIndex((g, i) => i !== team.activeIdx && !g.ko);
+    if (alive >= 0) team.activeIdx = alive;
+    callback();
+  }
 }
 
 function endBattle() {
