@@ -14330,6 +14330,11 @@ function _resolveRoundImpl() {
 }
 
 function handleKOs() {
+  // Mark any ghost with hp <= 0 as KO (safety net for edge cases)
+  ['red','blue'].forEach(team => {
+    B[team].ghosts.forEach(g => { if (g.hp <= 0 && !g.ko) g.ko = true; });
+  });
+
   // Check for game-over first
   const redAllDown = B.red.ghosts.every(g => g.ko);
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
@@ -14339,14 +14344,20 @@ function handleKOs() {
 
   // Check if any active ghost is KO'd and needs a replacement pick
   const teamsNeedingSwap = [];
-  ['red','blue'].forEach(team => {
+  for (const team of ['red','blue']) {
     const t = B[team];
     const f = active(t);
     if (f.ko) {
       const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
-      if (alive.length > 0) teamsNeedingSwap.push(team);
+      if (alive.length > 0) {
+        teamsNeedingSwap.push(team);
+      } else {
+        // Active is KO'd and no sideline — this team is fully eliminated
+        const winner = team === 'red' ? 'blue' : 'red';
+        showGameOver(winner); renderBattle(); return true;
+      }
     }
-  });
+  }
 
   if (teamsNeedingSwap.length > 0) {
     // Queue the KO swap picks — caller must NOT resume to 'ready'
