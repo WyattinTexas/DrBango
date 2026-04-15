@@ -15414,6 +15414,16 @@ document.addEventListener('keydown', e => {
 
   MP_MODE = true;
 
+  // Force standard settings for all MP/daily games
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 0; // 1x speed
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true; // hand limit ON
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4; // limit of 4
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 5; // 5 second timer
+
   // Set red team from URL params (player's team)
   S.redPicks = redIds;
 
@@ -15721,6 +15731,16 @@ function aiHandlePostRoll() {
   PVP_GAME_ID = gameId;
   PVP_GAME_REF = db.ref(`mp/livegames/${gameId}`);
 
+  // Force standard settings
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 0;
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true;
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4;
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 5;
+
   // Set teams
   S.redPicks = redIds;
   S.bluePicks = blueIds;
@@ -15816,9 +15836,84 @@ function setupLivePvP() {
     if (B && B.phase === 'ready') doSwap(oppSide, data.idx);
   });
 
+  // --- DISCONNECT DETECTION ---
+  // If opponent disconnects, they forfeit
+  PVP_GAME_REF.child(`connected/${oppSide}`).on('value', snap => {
+    const connected = snap.val();
+    // Only trigger forfeit if game is in progress (not during initial load)
+    if (connected === false && B && B.phase !== 'over' && B.round > 1) {
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) {
+        banner.textContent = 'Opponent disconnected — you win!';
+        banner.style.display = 'block';
+        banner.style.color = 'var(--uncommon)';
+      }
+      // Trigger game over — we win
+      setTimeout(() => {
+        if (B && B.phase !== 'over') showGameOver(mySide);
+      }, 1500);
+    }
+  });
+
+  // --- AFK TIMEOUT (15 seconds) ---
+  let pvpAfkTimer = null;
+  let pvpAfkWarned = false;
+
+  function resetPvPAfk() {
+    clearTimeout(pvpAfkTimer);
+    pvpAfkWarned = false;
+    const warn = document.getElementById('pvp-afk-warning');
+    if (warn) warn.style.display = 'none';
+
+    pvpAfkTimer = setTimeout(() => {
+      if (!B || B.phase === 'over' || !LIVE_PVP) return;
+      // Check if it's our turn to roll
+      const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+      if (!myBtn || myBtn.disabled || myBtn.classList.contains('locked')) return;
+      if (B.phase !== 'ready' && B.phase !== 'rolling') return;
+
+      // Show warning
+      pvpAfkWarned = true;
+      let warn = document.getElementById('pvp-afk-warning');
+      if (!warn) {
+        warn = document.createElement('div');
+        warn.id = 'pvp-afk-warning';
+        warn.style.cssText = 'text-align:center;padding:10px;font-weight:800;font-size:1rem;color:var(--accent);display:none;';
+        document.querySelector('.battle-arena')?.prepend(warn);
+      }
+      warn.textContent = 'Roll now or forfeit in 10 seconds!';
+      warn.style.display = 'block';
+
+      // Auto-forfeit after 10 more seconds
+      setTimeout(() => {
+        if (!pvpAfkWarned || !B || B.phase === 'over') return;
+        const myBtn2 = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+        if (myBtn2 && !myBtn2.disabled && !myBtn2.classList.contains('locked') &&
+            (B.phase === 'ready' || B.phase === 'rolling')) {
+          // Still hasn't rolled — forfeit
+          warn.textContent = 'Time expired — you forfeit!';
+          PVP_GAME_REF.child(`connected/${mySide}`).set(false);
+          setTimeout(() => {
+            if (B && B.phase !== 'over') {
+              const loseSide = mySide;
+              const winSide = mySide === 'red' ? 'blue' : 'red';
+              showGameOver(winSide);
+            }
+          }, 1000);
+        }
+      }, 10000);
+    }, 15000);
+  }
+
+  // Reset AFK timer on any click
+  document.addEventListener('click', resetPvPAfk);
+  // Start initial timer
+  resetPvPAfk();
+
   // Cleanup
   window.addEventListener('beforeunload', () => {
     if (PVP_GAME_REF) PVP_GAME_REF.child(`connected/${mySide}`).set(false);
+    clearTimeout(pvpAfkTimer);
   });
 }
 
