@@ -3,9 +3,11 @@
 // Battle system, card data, game state, movement, encounters
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════ CARD DATABASE (curated ~50 cards for board game) ═══════
-const CARDS = [
-  // ── ROLLING HILLS ──
+// ═══════ CARD DATABASE — loaded from cards_data.js (ALL_CARDS, 233 cards) ═══════
+// Fallback if cards_data.js hasn't loaded yet
+if (typeof ALL_CARDS === 'undefined') var ALL_CARDS = [];
+const CARDS = ALL_CARDS.length ? ALL_CARDS : [
+  // Minimal fallback
   {id:316, name:"Penny",     rarity:"common",   maxHp:4, ability:"Forager",       desc:"Win: gain 1 Healing Seed.",                   set:"Rolling Hills"},
   {id:320, name:"Bramble",   rarity:"common",   maxHp:3, ability:"Thorn Wall",    desc:"Entry: opponent takes 1 damage next round.",   set:"Rolling Hills"},
   {id:328, name:"Drizzle",   rarity:"common",   maxHp:4, ability:"Rain Dance",    desc:"Both players reroll all 1s.",                  set:"Rolling Hills"},
@@ -480,22 +482,25 @@ function triggerEntryAbility(team, enemyTeam, result) {
 // Get a random card appropriate for the region
 function getEncounterCard(region) {
   let pool;
+  // Set 1 cards appear everywhere, regional cards appear in their region
+  const general = CARDS.filter(c => c.set === 'Set 1' && c.rarity !== 'legendary');
   switch (region) {
     case 'rolling_hills':
-      pool = CARDS.filter(c => c.set === 'Rolling Hills' && c.rarity !== 'legendary');
+      pool = CARDS.filter(c => (c.set === 'Rolling Hills') && c.rarity !== 'legendary').concat(general);
       break;
     case 'frost_valley':
-      pool = CARDS.filter(c => c.set === 'Frost Valley' && c.rarity !== 'legendary');
+      pool = CARDS.filter(c => (c.set === 'Frost Valley') && c.rarity !== 'legendary').concat(general);
       break;
     case 'volcanic_isles':
-      pool = CARDS.filter(c => c.set === 'Volcanic Activity' && c.rarity !== 'legendary');
+      pool = CARDS.filter(c => (c.set === 'Volcanic Activity') && c.rarity !== 'legendary').concat(general);
       break;
     case 'dark_castle':
-      pool = CARDS.filter(c => c.set === 'Dark Castle' && c.rarity !== 'legendary');
+      pool = CARDS.filter(c => (c.set === 'Dark Castle') && c.rarity !== 'legendary').concat(general);
       break;
     default:
       pool = CARDS.filter(c => c.rarity !== 'legendary');
   }
+  if (!pool.length) pool = CARDS.filter(c => c.rarity !== 'legendary');
 
   // Weighted by rarity
   const weights = { common: 50, uncommon: 30, rare: 15, 'ghost-rare': 5 };
