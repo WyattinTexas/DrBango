@@ -2342,6 +2342,11 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 const TESTROOM_VERSION = 'v717';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
+let LIVE_PVP = false; // true when in real-time PvP mode
+let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
+let PVP_GAME_ID = null;
+let PVP_GAME_REF = null;
+let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -7040,6 +7045,8 @@ function doGaleForcePickerChoice(idx) {
 // ============================================================
 function rollReady(team) {
   if (!B) return;
+  // Live PvP: block rolling opponent's side (unless it's a forced dice injection)
+  if (LIVE_PVP && team !== PVP_SIDE && !B._pvpForcedDice) return;
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
   if (B.phase !== 'ready' && B.phase !== 'rolling') return;
@@ -14498,7 +14505,17 @@ function showGameOver(winner) {
 
   // MULTIPLAYER MODE: replace buttons with "Return to Arena" redirect
   if (MP_MODE) {
-    const result = winner === 'red' ? 'win' : (winner === 'blue' ? 'loss' : 'draw');
+    // In live PvP, result is relative to YOUR side
+    const result = LIVE_PVP
+      ? (winner === PVP_SIDE ? 'win' : (winner === 'draw' ? 'draw' : 'loss'))
+      : (winner === 'red' ? 'win' : (winner === 'blue' ? 'loss' : 'draw'));
+
+    // Clean up live PvP game
+    if (LIVE_PVP && PVP_GAME_REF) {
+      PVP_GAME_REF.child('status').set('finished');
+      PVP_GAME_REF.child('winner').set(winner);
+    }
+
     const goButtons = el.querySelector('.go-buttons');
     if (goButtons) {
       goButtons.innerHTML = `
@@ -15391,6 +15408,261 @@ document.addEventListener('keydown', e => {
     startBattle();
   }, 300);
 })();
+
+// ============================================================
+// LIVE PVP MODE — real-time 1v1 via Firebase
+// ============================================================
+// URL: ?livepvp=GAMEID&side=red|blue&red=IDS&blue=IDS
+// Each player controls ONLY their roll button + their decisions.
+// Dice sync via Firebase. State syncs after each resolution.
+(function checkLivePvPParams() {
+  const params = new URLSearchParams(window.location.search);
+  const gameId = params.get('livepvp');
+  if (!gameId) return;
+
+  const side = params.get('side');
+  if (side !== 'red' && side !== 'blue') return;
+
+  const redParam = params.get('red');
+  const blueParam = params.get('blue');
+  if (!redParam || !blueParam) return;
+
+  const redIds = redParam.split(',').map(Number).filter(id => ghostData(id));
+  const blueIds = blueParam.split(',').map(Number).filter(id => ghostData(id));
+  if (redIds.length !== 3 || blueIds.length !== 3) return;
+
+  LIVE_PVP = true;
+  MP_MODE = true;
+  PVP_SIDE = side;
+  PVP_GAME_ID = gameId;
+  PVP_GAME_REF = db.ref(`mp/livegames/${gameId}`);
+
+  const oppSide = side === 'red' ? 'blue' : 'red';
+
+  // Set teams
+  S.redPicks = redIds;
+  S.bluePicks = blueIds;
+
+  // Show player labels
+  const redName = params.get('redName') || 'Red';
+  const blueName = params.get('blueName') || 'Blue';
+  const redTitle = document.querySelector('.roster-title.red');
+  const blueTitle = document.querySelector('.roster-title.blue');
+  if (redTitle) redTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(redName)}${side === 'red' ? ' (You)' : ''}`;
+  if (blueTitle) blueTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(blueName)}${side === 'blue' ? ' (You)' : ''}`;
+
+  // Hide gallery, settings, opponent's roll button — straight to battle
+  document.getElementById('gallery').style.display = 'none';
+  document.getElementById('teamRosters').style.display = 'none';
+  document.querySelector('.random-pick-row').style.display = 'none';
+  document.querySelector('.controls').style.display = 'none';
+
+  // Show a "Waiting for opponent..." banner
+  const waitBanner = document.createElement('div');
+  waitBanner.id = 'pvp-wait-banner';
+  waitBanner.style.cssText = 'text-align:center;padding:16px;font-family:Creepster,cursive;font-size:1.4rem;color:var(--gold-bright);letter-spacing:2px;display:none;';
+  waitBanner.textContent = "Waiting for opponent's roll...";
+  document.querySelector('.battle-arena')?.prepend(waitBanner);
+
+  // Start battle
+  setTimeout(() => {
+    renderPicks();
+    startBattle();
+
+    // After battle starts, set up PvP controls
+    setupLivePvP(side, oppSide);
+  }, 400);
+})();
+
+function setupLivePvP(mySide, oppSide) {
+  if (!LIVE_PVP || !PVP_GAME_REF) return;
+
+  const myBtnId = mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+  const oppBtnId = oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+  const oppBtn = document.getElementById(oppBtnId);
+
+  // Hide opponent's roll button — they roll from their own client
+  if (oppBtn) {
+    oppBtn.style.display = 'none';
+  }
+
+  // Signal that we're connected
+  PVP_GAME_REF.child(`connected/${mySide}`).set(true);
+  PVP_GAME_REF.child(`connected/${mySide}`).onDisconnect().set(false);
+
+  // Initialize round tracking
+  PVP_GAME_REF.child('currentRound').set(B ? B.round : 1);
+
+  // Override rollReady to sync dice via Firebase
+  const origDoTeamRoll = window.doTeamRoll;
+
+  // Intercept: when MY side rolls, write dice to Firebase after generation
+  // When OPPONENT's side needs to roll, wait for their dice from Firebase
+  window._pvpOrigDoTeamRoll = origDoTeamRoll;
+
+  // Listen for opponent's roll
+  PVP_GAME_REF.child(`rolls`).on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+    if (!B || B.phase === 'over') return;
+
+    // Opponent rolled — inject their dice into the engine
+    const round = data.round;
+    if (round !== B.round) return; // stale roll
+
+    // Show the wait banner as hidden
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner) banner.style.display = 'none';
+
+    // Simulate opponent's roll button click with predetermined dice
+    B._pvpForcedDice = data.dice;
+    rollReady(oppSide);
+
+    // Clean up
+    snap.ref.remove();
+  });
+
+  // Listen for opponent's KO swap choice
+  PVP_GAME_REF.child('koSwap').on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+
+    // Opponent chose their KO replacement
+    if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
+      doKoSwap(oppSide, data.idx);
+    }
+    snap.ref.remove();
+  });
+
+  // Listen for opponent's voluntary swap choice
+  PVP_GAME_REF.child('swap').on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+    if (B && B.phase === 'ready') {
+      doSwap(oppSide, data.idx);
+    }
+    snap.ref.remove();
+  });
+
+  // Listen for ability decisions from opponent
+  PVP_GAME_REF.child('decisions').on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+
+    // Route to the appropriate handler
+    if (data.type === 'timber' && B.timberPending) {
+      doTimberChoice(data.choice);
+    } else if (data.type === 'romy' && B.romyPending) {
+      doRomyPrediction(data.value);
+    } else if (data.type === 'toby') {
+      doPureHeartChoice(data.choice);
+    } else if (data.type === 'tyler') {
+      doTylerChoice(data.choice);
+    }
+    snap.ref.remove();
+  });
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    PVP_GAME_REF.child(`connected/${mySide}`).set(false);
+  });
+}
+
+// Override doTeamRoll to inject forced dice in PvP mode
+const _origWeightedRoll = window.weightedRoll;
+const _origWeightedRollFn = weightedRoll;
+// We'll patch weightedRoll to use forced dice when available
+const _pvpPatchedWeightedRoll = function(team, count) {
+  if (LIVE_PVP && B && B._pvpForcedDice) {
+    const forced = B._pvpForcedDice;
+    B._pvpForcedDice = null;
+    return forced;
+  }
+  return _origWeightedRollFn.call(this, team, count);
+};
+// Apply patch
+weightedRoll = _pvpPatchedWeightedRoll;
+
+// Hook into doTeamRoll to broadcast dice after rolling (for our side)
+const _origDoTeamRollFn = doTeamRoll;
+doTeamRoll = function(team, btn) {
+  _origDoTeamRollFn(team, btn);
+
+  // After rolling, if this was OUR side, broadcast the dice
+  if (LIVE_PVP && team === PVP_SIDE && B && B.preRoll && B.preRoll[team] && B.preRoll[team].dice) {
+    PVP_GAME_REF.child('rolls').push({
+      side: team,
+      round: B.round,
+      dice: B.preRoll[team].dice,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+
+    // Show waiting banner if opponent hasn't rolled yet
+    const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+    if (!B.preRoll[oppSide]?.dice) {
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'block';
+    }
+  }
+};
+
+// Hook into doKoSwap to broadcast choice (for our side)
+const _origDoKoSwapFn = doKoSwap;
+doKoSwap = function(team, idx) {
+  // If this is our swap, broadcast it
+  if (LIVE_PVP && team === PVP_SIDE) {
+    PVP_GAME_REF.child('koSwap').push({
+      side: team,
+      idx: idx,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  _origDoKoSwapFn(team, idx);
+};
+
+// Hook into doSwap to broadcast voluntary swaps
+const _origDoSwapFn = doSwap;
+doSwap = function(team, idx) {
+  if (LIVE_PVP && team === PVP_SIDE) {
+    PVP_GAME_REF.child('swap').push({
+      side: team,
+      idx: idx,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  _origDoSwapFn(team, idx);
+};
+
+// Prevent clicking opponent's sideline cards for KO swap / voluntary swap
+const _origRenderBattle = renderBattle;
+renderBattle = function() {
+  _origRenderBattle();
+  if (!LIVE_PVP) return;
+  const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+
+  // Disable opponent's sideline clicks
+  document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
+    if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
+      // Opponent needs to pick — show waiting state
+      el.style.pointerEvents = 'none';
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) {
+        banner.textContent = "Waiting for opponent to choose replacement...";
+        banner.style.display = 'block';
+      }
+    }
+  });
+
+  // Disable opponent's swap button if it exists
+  const oppSwapBtn = document.querySelector(`[onclick*="openSwap('${oppSide}')"]`);
+  if (oppSwapBtn) oppSwapBtn.style.display = 'none';
+
+  // Show our roll button, hide opponent's
+  const myBtnId = PVP_SIDE === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+  const oppBtnId = oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+  const oppBtn = document.getElementById(oppBtnId);
+  if (oppBtn) oppBtn.style.display = 'none';
+};
 
 // ============================================================
 // INIT

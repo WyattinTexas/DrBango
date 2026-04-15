@@ -3463,11 +3463,19 @@ async function createChallenge() {
     const game = snap.val();
     if (!game) return;
     if (game.status === 'active' && game.opponent) {
-      // Opponent joined!
-      document.getElementById('challenge-status').textContent = `${game.opponentName} accepted!`;
+      // Opponent joined! Redirect to testroom for full battle experience
+      document.getElementById('challenge-status').textContent = `${game.opponentName} accepted! Loading battle...`;
+      gameRef.off('value', gameListener);
       overlay.classList.remove('active');
-      // Start the PvP battle
-      startPvPBattle(gameId, game);
+
+      // Redirect to testroom in live PvP mode
+      const url = '../testroom/?livepvp=' + gameId
+        + '&side=red'
+        + '&red=' + game.creatorTeam.join(',')
+        + '&blue=' + game.opponentTeam.join(',')
+        + '&redName=' + encodeURIComponent(game.creatorName)
+        + '&blueName=' + encodeURIComponent(game.opponentName);
+      window.location.href = url;
     }
   });
 }
@@ -3616,13 +3624,14 @@ async function acceptChallenge() {
 
   document.getElementById('accept-overlay').classList.remove('active');
 
-  mySide = 'blue';
-  currentGameId = gameId;
-  currentGameRef = db.ref(`mp/games/${gameId}`);
-
-  // Start the PvP battle
-  const fullSnap = await currentGameRef.once('value');
-  startPvPBattle(gameId, fullSnap.val());
+  // Redirect to testroom in live PvP mode (as blue/opponent)
+  const url = '../testroom/?livepvp=' + gameId
+    + '&side=blue'
+    + '&red=' + game.creatorTeam.join(',')
+    + '&blue=' + filledTeam.join(',')
+    + '&redName=' + encodeURIComponent(game.creatorName)
+    + '&blueName=' + encodeURIComponent(currentUser.displayName || 'Player');
+  window.location.href = url;
 }
 
 function declineChallenge() {
