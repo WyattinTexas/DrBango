@@ -409,29 +409,37 @@ body {
   gap: 6px;
   justify-content: center;
 }
+/* Badge: each shape uses an SVG background for clean outlines that clip-path can't do */
 .daily-badge {
   width: 36px; height: 36px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #111118; border: 2px solid #2a2a35;
-  opacity: 0.25; transition: all 0.3s;
+  background: transparent;
+  border: none;
   position: relative;
+  transition: all 0.3s;
 }
-.daily-badge.earned {
-  opacity: 1;
+/* Inner shape element — handles the actual colored shape */
+.daily-badge .badge-shape {
+  width: 100%; height: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.15);
+  transition: all 0.3s;
+}
+.daily-badge.earned .badge-shape {
+  background: var(--badge-color, #888);
   border-color: var(--badge-color, #888);
-  background: linear-gradient(135deg, rgba(0,0,0,0.6), color-mix(in srgb, var(--badge-color, #888) 30%, #1a1a2e));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--badge-color, #888) 50%, transparent),
-              0 0 20px color-mix(in srgb, var(--badge-color, #888) 20%, transparent);
+  filter: brightness(1.1) saturate(1.2);
+  box-shadow: 0 0 12px var(--badge-color, #888), 0 0 24px rgba(255,255,255,0.1);
 }
-.daily-badge.shape-circle { border-radius: 50%; }
-.daily-badge.shape-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); border: none; outline: 2px solid #333; }
-.daily-badge.shape-hexagon.earned { outline-color: var(--badge-color, #888); }
-.daily-badge.shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border: none; }
-.daily-badge.shape-shield { clip-path: polygon(50% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%, 0% 0%); border: none; }
-.daily-badge.shape-star { border-radius: 4px; }
-.daily-badge.shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border: none; }
-.daily-badge.shape-triangle { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border: none; }
-.daily-badge.shape-octagon { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border: none; }
+/* Shapes */
+.badge-shape.shape-circle { border-radius: 50%; }
+.badge-shape.shape-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); border: none; }
+.badge-shape.shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border: none; }
+.badge-shape.shape-shield { clip-path: polygon(50% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%, 0% 0%); border: none; }
+.badge-shape.shape-star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); border: none; }
+.badge-shape.shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border: none; }
+.badge-shape.shape-triangle { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border: none; }
+.badge-shape.shape-octagon { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border: none; }
 
 /* Section headers */
 .section-header {
@@ -3043,7 +3051,9 @@ function renderBadges() {
   row.innerHTML = DAILY_MATCHES.map(match => {
     const isEarned = earnedDaily.includes(match.badge);
     return `
-      <div class="daily-badge shape-${match.shape} ${isEarned ? 'earned' : ''}" title="${isEarned ? match.name : '???'}" style="${isEarned ? `--badge-color:${match.color}` : ''}"></div>
+      <div class="daily-badge ${isEarned ? 'earned' : ''}" title="${isEarned ? match.name : '???'}" style="${isEarned ? `--badge-color:${match.color}` : ''}">
+        <div class="badge-shape shape-${match.shape}"></div>
+      </div>
     `;
   }).join('');
 }
@@ -4552,10 +4562,10 @@ function renderDailyChallenge() {
   const earnedDaily = userProfile.dailyBadges || [];
   const isEarned = earnedDaily.includes(daily.badge);
   if (isEarned) {
-    badgePreview.innerHTML = `<div class="daily-badge shape-${daily.shape} earned" style="display:inline-flex;width:42px;height:42px;--badge-color:${daily.color}"></div>
+    badgePreview.innerHTML = `<div class="daily-badge earned" style="display:inline-flex;width:42px;height:42px;--badge-color:${daily.color}"><div class="badge-shape shape-${daily.shape}"></div></div>
       <span style="color:${daily.color};font-size:0.8rem;font-weight:700;margin-left:6px;vertical-align:middle;">Badge Earned!</span>`;
   } else {
-    badgePreview.innerHTML = `<div class="daily-badge shape-${daily.shape}" style="display:inline-flex;width:42px;height:42px;"></div>
+    badgePreview.innerHTML = `<div class="daily-badge" style="display:inline-flex;width:42px;height:42px;"><div class="badge-shape shape-${daily.shape}"></div></div>
       <span style="color:var(--text-dim);font-size:0.8rem;font-weight:600;margin-left:6px;vertical-align:middle;">Win to earn this badge</span>`;
   }
 
@@ -4579,7 +4589,7 @@ function renderDailyChallenge() {
     btn.style.display = 'none';
     rewardText.innerHTML = `
       <div style="text-align:center;margin-top:12px;">
-        <div class="daily-badge shape-${daily.shape} earned" style="display:inline-flex;width:64px;height:64px;--badge-color:${daily.color};margin-bottom:8px;"></div>
+        <div class="daily-badge earned" style="display:inline-flex;width:64px;height:64px;--badge-color:${daily.color};margin-bottom:8px;"><div class="badge-shape shape-${daily.shape}"></div></div>
         <div style="font-family:'Creepster',cursive;font-size:1.3rem;color:var(--gold-bright);letter-spacing:2px;">RIVAL DEFEATED</div>
         <div style="font-size:0.8rem;color:var(--text2);margin-top:4px;">Badge earned &bull; 3 bonus cards claimed</div>
       </div>`;
