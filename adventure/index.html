@@ -3,161 +3,1440 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Lantern's Path — Adventure Mode</title>
-<meta name="description" content="A Frodo-style journey mode for BOO: Battle of Origins. Blueprint prototype.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<title>BOO! Spirit Battles — Overworld Adventure</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800;900&family=Press+Start+2P&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#080604;cursor:default}
+canvas{position:absolute;top:0;left:0}
+#bg{z-index:0;image-rendering:pixelated}
+#bg:active{cursor:grabbing}
+#game{z-index:1;pointer-events:none}
+#fx{z-index:2;pointer-events:none}
+
+#tip{
+  position:absolute;pointer-events:none;z-index:100;
+  background:rgba(8,4,2,.96);border:2px solid rgba(255,240,200,.25);border-radius:6px;
+  padding:10px 16px;color:#f4e8c8;font-family:'Cinzel',serif;font-size:14px;line-height:1.4;
+  max-width:260px;opacity:0;transition:opacity .15s;box-shadow:0 6px 24px rgba(0,0,0,.7);
+}
+#tip.on{opacity:1}
+#tip b{font-size:16px;display:block;margin-bottom:4px}
+
+#ctrl{position:absolute;bottom:12px;right:12px;z-index:50}
+#ctrl button{
+  background:rgba(8,4,2,.9);border:1px solid rgba(255,240,200,.15);border-radius:5px;
+  color:#f4e8c8;font:8px 'Press Start 2P',monospace;padding:7px 12px;cursor:pointer;
+}
+
+/* ═══ GAME UI ═══ */
+#hud{position:absolute;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;gap:12px;
+  padding:8px 16px;background:rgba(8,4,2,.85);border-bottom:1px solid rgba(255,240,200,.1);
+  font:13px 'Cinzel',serif;color:#f0e8d8;flex-wrap:wrap}
+#hud-party{display:flex;gap:6px}
+.hud-ghost{padding:4px 10px;border-radius:4px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:12px;cursor:pointer;position:relative}
+.hud-ghost.active{border-color:#90e070;background:rgba(144,224,112,.12)}
+.hud-ghost.ko{opacity:.4;text-decoration:line-through}
+.hud-ghost .hp-bar{position:absolute;bottom:0;left:0;height:2px;background:#50c040;border-radius:0 0 4px 4px}
+#hud-resources{display:flex;gap:8px;margin-left:auto;font:10px 'Press Start 2P',monospace}
+.res-item{display:flex;align-items:center;gap:3px;opacity:.8}
+.res-item span{color:#f0d860}
+#hud-coins{padding:4px 10px;background:rgba(240,216,96,.15);border-radius:4px;font-weight:700;color:#f0d860}
+#hud-seals{display:flex;gap:4px}
+.seal{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.2);opacity:.3}
+.seal.earned{opacity:1;box-shadow:0 0 6px rgba(255,200,100,.4)}
+#hud-turn{font:9px 'Press Start 2P',monospace;opacity:.5}
+
+#action-bar{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:8px}
+#action-bar button{
+  background:rgba(8,4,2,.9);border:2px solid #90e070;border-radius:8px;
+  color:#f0e8d8;font:700 14px 'Cinzel',serif;padding:12px 24px;cursor:pointer;
+  transition:all .15s;text-transform:uppercase;letter-spacing:2px}
+#action-bar button:hover{background:rgba(144,224,112,.15);transform:translateY(-2px)}
+#action-bar button:disabled{opacity:.3;cursor:default;transform:none}
+
+#modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}
+#modal{background:rgba(12,8,4,.97);border:2px solid rgba(255,240,200,.2);border-radius:12px;padding:24px 32px;
+  max-width:500px;width:90%;color:#f0e8d8;font-family:'Cinzel',serif;box-shadow:0 12px 48px rgba(0,0,0,.8)}
+#modal-title{font-size:22px;font-weight:800;margin-bottom:12px;text-align:center}
+#modal-body{font-size:14px;line-height:1.6;margin-bottom:16px;font-family:'Crimson Text',serif}
+#modal-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#modal-actions button{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,240,200,.2);border-radius:6px;
+  color:#f0e8d8;font:600 13px 'Cinzel',serif;padding:8px 20px;cursor:pointer;transition:all .15s}
+#modal-actions button:hover{background:rgba(255,255,255,.15);border-color:rgba(255,240,200,.4)}
+#modal-actions button.primary{border-color:#90e070;color:#90e070}
+
+#battle-screen{position:fixed;inset:0;z-index:250;background:rgba(6,3,1,.98);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  font-family:'Cinzel',serif;color:#f0e8d8}
+#b-enemy,#b-player{text-align:center;min-width:280px}
+.b-name{font-size:20px;font-weight:800;margin-bottom:4px}
+.b-ability{font-size:11px;opacity:.6;margin-bottom:8px;font-family:'Crimson Text',serif}
+.b-hp-outer{width:200px;height:12px;background:rgba(255,255,255,.1);border-radius:6px;margin:0 auto 4px;overflow:hidden}
+.b-hp-inner{height:100%;background:#50c040;border-radius:6px;transition:width .4s}
+.b-hp-text{font:10px 'Press Start 2P',monospace;opacity:.7}
+#b-vs{font-size:28px;font-weight:900;color:#e05050;text-shadow:0 0 20px rgba(224,80,80,.3)}
+#b-dice-area{display:flex;gap:24px;align-items:center;justify-content:center;min-height:60px}
+.dice-group{display:flex;gap:6px}
+.die{width:36px;height:36px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font:700 18px 'Press Start 2P',monospace;transition:all .3s}
+.die.win{border-color:#50c040;color:#50c040;background:rgba(80,192,64,.1)}
+.die.lose{border-color:#e05050;color:#e05050;background:rgba(224,80,80,.1)}
+#b-log{font:12px 'Crimson Text',serif;opacity:.8;max-height:100px;overflow-y:auto;text-align:center;padding:0 20px;line-height:1.6}
+#b-actions{display:flex;gap:8px}
+#b-actions button{
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,240,200,.2);border-radius:8px;
+  color:#f0e8d8;font:700 14px 'Cinzel',serif;padding:10px 24px;cursor:pointer;transition:all .15s}
+#b-actions button:hover{background:rgba(255,255,255,.15)}
+#b-actions button.attack{border-color:#e05050;color:#e05050}
+
+#starter-screen{position:fixed;inset:0;z-index:300;background:rgba(6,3,1,.98);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;color:#f0e8d8}
+#starter-screen h2{font:800 28px 'Cinzel',serif;letter-spacing:3px}
+#starter-choices{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.starter-card{background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);border-radius:10px;
+  padding:16px 20px;width:180px;cursor:pointer;transition:all .2s;text-align:center}
+.starter-card:hover{border-color:#90e070;background:rgba(144,224,112,.08);transform:translateY(-4px)}
+.starter-card .s-name{font:700 16px 'Cinzel',serif;margin-bottom:4px}
+.starter-card .s-hp{font:10px 'Press Start 2P',monospace;color:#50c040;margin-bottom:6px}
+.starter-card .s-ability{font:600 12px 'Cinzel',serif;color:#f0d860;margin-bottom:4px}
+.starter-card .s-desc{font:12px 'Crimson Text',serif;opacity:.7;font-style:italic}
+</style>
 </head>
 <body>
+<canvas id="bg"></canvas>
+<canvas id="game"></canvas>
+<canvas id="fx"></canvas>
+<div id="tip"><b></b><span></span></div>
+<div id="ctrl"><button onclick="resetView()">Reset View</button></div>
 
-<!-- Atmospheric layers -->
-<div class="stars" id="stars"></div>
-<div class="grain"></div>
-<div class="vignette"></div>
+<!-- Game UI Panels -->
+<div id="hud" style="display:none">
+  <div id="hud-party"></div>
+  <div id="hud-resources"></div>
+  <div id="hud-coins"><span id="coin-count">3</span> Coins</div>
+  <div id="hud-seals"></div>
+  <div id="hud-turn">Turn <span id="turn-num">1</span></div>
+</div>
 
-<!-- ============== HUD ============== -->
-<header class="hud">
-  <div class="hud-left">
-    <div class="lantern-mini" id="lanternMini" aria-label="Lantern">
-      <svg viewBox="0 0 42 58" fill="none">
-        <path d="M21 2 L21 6" stroke="#a8d8ff" stroke-width="0.8" opacity="0.6"/>
-        <path d="M14 6 Q21 2 28 6" stroke="#4a8fd8" stroke-width="0.6" fill="none" opacity="0.55"/>
-        <rect x="11" y="7" width="20" height="2" fill="none" stroke="#4a8fd8" stroke-width="0.6" opacity="0.7"/>
-        <rect x="9" y="11" width="24" height="34" fill="none" stroke="#4a8fd8" stroke-width="0.6" opacity="0.5" rx="1"/>
-        <line x1="15" y1="11" x2="15" y2="45" stroke="#4a8fd8" stroke-width="0.4" opacity="0.35"/>
-        <line x1="21" y1="11" x2="21" y2="45" stroke="#4a8fd8" stroke-width="0.4" opacity="0.35"/>
-        <line x1="27" y1="11" x2="27" y2="45" stroke="#4a8fd8" stroke-width="0.4" opacity="0.35"/>
-        <rect x="7" y="45" width="28" height="4" fill="none" stroke="#4a8fd8" stroke-width="0.6" opacity="0.6"/>
-        <rect x="10" y="49" width="22" height="3" fill="none" stroke="#4a8fd8" stroke-width="0.5" opacity="0.45"/>
-      </svg>
-      <div class="flame-wrap mini-flame">
-        <div class="flame-glow"></div>
-        <div class="flame"></div>
-        <div class="flame-core"></div>
-      </div>
-    </div>
-    <div class="flame-gauge">
-      <div class="flame-label">Blue Flame</div>
-      <div class="flame-count"><span id="flameCount">8</span><span class="flame-max">/<span id="flameMax">12</span></span></div>
-    </div>
-  </div>
+<div id="action-bar" style="display:none">
+  <button id="btn-roll" onclick="doRollMovement()">ROLL TO MOVE</button>
+  <button id="btn-action" style="display:none" onclick="doNodeAction()">EXPLORE</button>
+  <button id="btn-end" style="display:none" onclick="endTurn()">END TURN</button>
+</div>
 
-  <div class="hud-center">
-    <div class="region-tag" id="regionTag">— Rolling Hills —</div>
-    <div class="region-mood" id="regionMood">The Deceptive Calm</div>
-  </div>
-
-  <div class="hud-right">
-    <div class="meta-stat"><span class="meta-label">Wills</span><span class="meta-value" id="willsCount">0</span></div>
-    <div class="meta-stat"><span class="meta-label">Shards</span><span class="meta-value" id="shardsCount">0</span></div>
-    <button class="btn-ghost" id="menuBtn" title="Menu">☰</button>
-  </div>
-</header>
-
-<!-- ============== PARTY ROSTER ============== -->
-<aside class="party-roster" id="partyRoster">
-  <div class="party-label">— Lantern Companions —</div>
-  <div class="party-slots" id="partySlots"></div>
-</aside>
-
-<!-- ============== MAIN STAGE ============== -->
-<main class="stage" id="stage">
-
-  <!-- Start screen -->
-  <section class="screen screen-start active" id="screenStart">
-    <div class="start-inner">
-      <div class="eyebrow">A Prototype Blueprint</div>
-      <h1>The Lantern's <em>Path</em></h1>
-      <div class="start-sub">An Adventure Mode for BOO: Battle of Origins</div>
-      <div class="start-lantern">
-        <div class="lantern-hero">
-          <svg viewBox="0 0 120 160" fill="none">
-            <path d="M60 4 L60 14" stroke="#a8d8ff" stroke-width="1.2" opacity="0.7"/>
-            <path d="M40 14 Q60 4 80 14" stroke="#4a8fd8" stroke-width="1" fill="none" opacity="0.6"/>
-            <rect x="32" y="16" width="56" height="5" fill="none" stroke="#4a8fd8" stroke-width="1" opacity="0.8"/>
-            <rect x="28" y="25" width="64" height="100" fill="none" stroke="#4a8fd8" stroke-width="1" opacity="0.55" rx="2"/>
-            <line x1="42" y1="25" x2="42" y2="125" stroke="#4a8fd8" stroke-width="0.7" opacity="0.4"/>
-            <line x1="60" y1="25" x2="60" y2="125" stroke="#4a8fd8" stroke-width="0.7" opacity="0.4"/>
-            <line x1="78" y1="25" x2="78" y2="125" stroke="#4a8fd8" stroke-width="0.7" opacity="0.4"/>
-            <line x1="28" y1="70" x2="92" y2="70" stroke="#4a8fd8" stroke-width="0.5" opacity="0.3"/>
-            <line x1="28" y1="95" x2="92" y2="95" stroke="#4a8fd8" stroke-width="0.5" opacity="0.3"/>
-            <rect x="22" y="125" width="76" height="10" fill="none" stroke="#4a8fd8" stroke-width="1" opacity="0.7"/>
-            <rect x="28" y="135" width="64" height="6" fill="none" stroke="#4a8fd8" stroke-width="0.8" opacity="0.55"/>
-          </svg>
-          <div class="flame-wrap hero-flame">
-            <div class="flame-glow"></div>
-            <div class="flame"></div>
-            <div class="flame-core"></div>
-          </div>
-        </div>
-      </div>
-      <p class="start-blurb">Toby's grandfather has vanished beyond the Overworld. With the lantern in hand and Spark at his heels, he walks toward the distant castle where the Battle of Origins still burns. Every step costs flame. Every encounter is a choice.</p>
-      <div class="start-actions">
-        <button class="btn-primary" id="btnNewRun">Begin the Journey</button>
-        <button class="btn-ghost" id="btnContinue" style="display:none;">Continue Run</button>
-      </div>
-      <div class="start-foot">A blueprint prototype · Wyatt · Claude · Gary · MMXXVI</div>
-    </div>
-  </section>
-
-  <!-- Map screen -->
-  <section class="screen screen-map" id="screenMap">
-    <div class="map-header">
-      <div class="map-act" id="mapAct">— Act I —</div>
-      <div class="map-region" id="mapRegion">Rolling Hills</div>
-      <div class="map-subtitle" id="mapSubtitle">The Deceptive Calm</div>
-    </div>
-    <div class="map-body" id="mapBody"></div>
-    <div class="map-hint">Tap a lit node to travel. Dim nodes are out of reach.</div>
-  </section>
-
-  <!-- Encounter screen (reused for every node type) -->
-  <section class="screen screen-encounter" id="screenEncounter">
-    <div class="encounter-card" id="encounterCard">
-      <!-- Populated dynamically -->
-    </div>
-  </section>
-
-  <!-- End screen -->
-  <section class="screen screen-end" id="screenEnd">
-    <div class="end-inner">
-      <div class="eyebrow" id="endEyebrow">— The Road Ends —</div>
-      <h1 id="endTitle">The lantern has gone dark.</h1>
-      <div class="end-body" id="endBody"></div>
-      <div class="end-stats" id="endStats"></div>
-      <div class="end-actions">
-        <button class="btn-primary" id="btnRestart">Walk Again</button>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<!-- ============== MENU MODAL ============== -->
-<div class="menu-modal" id="menuModal" hidden>
-  <div class="menu-inner">
-    <div class="menu-title">The Lantern</div>
-    <div class="menu-list">
-      <button class="menu-item" id="miReturn">Return to Journey</button>
-      <button class="menu-item" id="miReset">Abandon Run</button>
-      <button class="menu-item" id="miHelp">How to Walk</button>
-    </div>
-    <div class="menu-help" id="menuHelp" hidden>
-      <p><strong>Blue Flame</strong> is your journey clock. Spend it on camps and hazards, earn it back by restoring corrupted Spiritkin.</p>
-      <p><strong>BOO Matches</strong> are dice duels. Pick an active companion and roll to do damage.</p>
-      <p><strong>Restoration</strong> encounters ask you to chip down a corruption meter before it overtakes you.</p>
-      <p><strong>Your companions</strong> live inside the lantern. If one is KO'd, they rest for a few nodes.</p>
-      <p><strong>Valkin waits</strong> at the end of Act IV. The match will be rigged.</p>
-    </div>
+<div id="modal-overlay" style="display:none">
+  <div id="modal">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-actions"></div>
   </div>
 </div>
 
-<!-- ============== TOAST ============== -->
-<div class="toast" id="toast"></div>
+<div id="battle-screen" style="display:none">
+  <div id="b-enemy"></div>
+  <div id="b-vs">VS</div>
+  <div id="b-player"></div>
+  <div id="b-dice-area"></div>
+  <div id="b-log"></div>
+  <div id="b-actions"></div>
+</div>
 
-<script src="cards.js"></script>
-<script src="game.js"></script>
+<div id="starter-screen">
+  <h2>Choose Your First Spiritkin</h2>
+  <div id="starter-choices"></div>
+</div>
+
+<script src="engine.js"></script>
+<script>
+// ═══════════════════════════════════════
+// TOP-DOWN PIXEL ART OVERWORLD
+// Diamond layout: RH bottom → FV left / VI right → DC top
+// ═══════════════════════════════════════
+
+const PX=3,MW=420,MH=280;
+const WW=MW*PX,WH=MH*PX;
+const buf=document.createElement('canvas');
+buf.width=MW;buf.height=MH;
+const a=buf.getContext('2d');
+a.imageSmoothingEnabled=false;
+
+let sd=42;
+function sr(s){sd=s}function rn(){sd=(sd*16807)%2147483647;return(sd-1)/2147483646}
+function ri(a,b){return Math.floor(rn()*(b-a+1))+a}
+function pk(a){return a[ri(0,a.length-1)]}
+function lr(a,b,t){return a+(b-a)*Math.max(0,Math.min(1,t))}
+function px(x,y,c){a.fillStyle=c;a.fillRect(Math.floor(x),Math.floor(y),1,1)}
+function pr(x,y,w,h,c){a.fillStyle=c;a.fillRect(Math.floor(x),Math.floor(y),w,h)}
+
+// ═══════ TOP-DOWN TERRAIN ═══════
+
+function renderArt(){
+  a.fillStyle='#1a4a10';a.fillRect(0,0,MW,MH);
+  drawGrassBase();
+  drawRollingHillsTD();
+  drawFrostValleyTD();
+  drawVolcanicIslesTD();
+  drawDarkCastleTD();
+  drawWaterFeatures();
+  drawMainRoads();
+}
+
+function drawGrassBase(){
+  sr(100);
+  // Smooth blended terrain — green base everywhere, regions tint on top
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
+    const cx=x/MW,cy=y/MH;
+    const v=rn();
+
+    // Start with green grass everywhere
+    let r=45+v*20+Math.sin(x*0.05+y*0.04)*8;
+    let g=95+v*25+Math.sin(x*0.04-y*0.03)*10;
+    let b=28+v*12;
+
+    // Region tints (additive blending, wide coverage)
+    const fvDist=Math.sqrt(Math.pow(cx-0.15,2)+Math.pow(cy-0.35,2));
+    const viDist=Math.sqrt(Math.pow(cx-0.85,2)+Math.pow(cy-0.35,2));
+    const dcDist=Math.sqrt(Math.pow(cx-0.50,2)+Math.pow(cy-0.08,2));
+
+    const fvT=Math.max(0,1-fvDist*2.2); // snow tint
+    const viT=Math.max(0,1-viDist*2.2); // volcanic tint
+    const dcT=Math.max(0,1-dcDist*2.8); // dark tint
+
+    // Apply tints by lerping from green base
+    if(fvT>0){r=lr(r,170+v*15,fvT);g=lr(g,180+v*12,fvT);b=lr(b,195+v*10,fvT)}
+    if(viT>0){r=lr(r,75+v*15,viT);g=lr(g,58+v*10,viT);b=lr(b,48+v*8,viT)}
+    if(dcT>0){r=lr(r,35+v*10,dcT);g=lr(g,28+v*8,dcT);b=lr(b,50+v*12,dcT)}
+
+    px(x,y,`rgb(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)})`);
+  }
+}
+
+function drawRollingHillsTD(){
+  sr(200);
+  // Mario-style rounded hills (smooth bumps from above)
+  for(const[hcx,hcy,hr,c1,c2]of[
+    [80,220,18,'#4aa838','#3a9028'],[160,250,14,'#48a030','#389828'],
+    [300,230,16,'#50b040','#40a030'],[380,215,12,'#4aa838','#3a9028'],
+    [130,195,10,'#48a830','#389820'],[250,260,20,'#50b040','#40a030'],
+    [50,245,11,'#4aa838','#3a9028'],[350,250,13,'#48a830','#389820'],
+    [210,210,8,'#50b040','#40a030']
+  ]){
+    for(let dy=-hr;dy<=hr;dy++)for(let dx=-hr;dx<=hr;dx++){
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<=hr){
+        const shade=1-d/hr;
+        const ppx=Math.floor(hcx+dx),ppy=Math.floor(hcy+dy);
+        if(ppx>=0&&ppx<MW&&ppy>=0&&ppy<MH)
+          px(ppx,ppy,shade>0.5?c1:c2);
+      }
+    }
+  }
+  // Scattered trees
+  for(let i=0;i<50;i++){
+    const tx=ri(25,395),ty=ri(Math.floor(MH*0.56),MH-12);
+    const cx_=tx/MW;if(cx_<0.18||cx_>0.82)continue;
+    const sz=ri(2,3);
+    const c=pk(['#1a5a10','#2a6a1a','#2a7a1a']);
+    for(let dy=-sz;dy<=sz;dy++)for(let dx=-sz;dx<=sz;dx++){
+      if(dx*dx+dy*dy<=sz*sz)px(tx+dx,ty+dy,c);
+    }
+  }
+  // Houses
+  for(const[hx,hy,c]of[[100,205,'#b05040'],[175,195,'#607898'],[260,215,'#709048'],[330,205,'#b06050'],[210,240,'#a04838']]){
+    pr(hx-2,hy-2,5,5,c);pr(hx-1,hy-1,3,3,'#d0c0a0');
+    px(hx,hy,'#4a3020');
+  }
+  // Flower patches
+  for(let i=0;i<35;i++){
+    const fx=ri(50,370),fy=ri(Math.floor(MH*0.58),MH-6);
+    px(fx,fy,pk(['#e04878','#e8b030','#9848c0','#48c068']));
+  }
+}
+
+function drawFrostValleyTD(){
+  sr(300);
+  // Mountains — bigger, more prominent, with snow caps
+  for(const[mx,my,ms]of[[25,30,16],[55,18,20],[90,22,14],[130,28,12],[40,55,10],[110,50,11],[145,40,9],[20,75,8]]){
+    // Mountain body (darker base, lighter top)
+    for(let r=ms;r>0;r-=1){
+      const yt=r/ms;
+      const baseR=140+yt*40,baseG=148+yt*38,baseB=160+yt*35;
+      for(let dx=-r;dx<=r;dx++){
+        const dy=r-Math.abs(dx);
+        const ppx=mx+dx,ppy=my-Math.floor(dy/2);
+        if(ppx>=0&&ppx<MW*0.38&&ppy>=0&&ppy<MH)
+          px(ppx,ppy,`rgb(${Math.floor(baseR)},${Math.floor(baseG)},${Math.floor(baseB)})`);
+      }
+    }
+    // Snow cap (top third)
+    for(let r=Math.floor(ms*0.4);r>0;r-=1){
+      for(let dx=-r;dx<=r;dx++){
+        const dy=r-Math.abs(dx);
+        const ppx=mx+dx,ppy=my-Math.floor(ms*0.3)-Math.floor(dy/2);
+        if(ppx>=0&&ppx<MW*0.38&&ppy>=0&&ppy<MH)
+          px(ppx,ppy,rn()>0.3?'#e8eef4':'#d8e4f0');
+      }
+    }
+  }
+  // Snow-covered pines
+  for(let i=0;i<30;i++){
+    const tx=ri(10,Math.floor(MW*0.35)),ty=ri(20,Math.floor(MH*0.50));
+    const sz=2;
+    for(let dy=-sz;dy<=sz;dy++)for(let dx=-sz;dx<=sz;dx++){
+      if(dx*dx+dy*dy<=sz*sz)px(tx+dx,ty+dy,pk(['#1a3830','#1a4038']));
+    }
+    px(tx,ty-1,'#d8e4f0');px(tx+1,ty,'#c8d8e8');
+  }
+  // Frozen lake
+  const lx=70,ly=100,lw=16,lh=9;
+  for(let dy=-lh;dy<=lh;dy++)for(let dx=-lw;dx<=lw;dx++){
+    if(dx*dx/(lw*lw)+dy*dy/(lh*lh)<=1)px(lx+dx,ly+dy,rn()>0.5?'#88b8d8':'#78a8c8');
+  }
+  // Ice crystals scattered
+  for(let i=0;i<8;i++){
+    const ix=ri(15,Math.floor(MW*0.34)),iy=ri(25,Math.floor(MH*0.48));
+    pr(ix,iy,2,3,'#a0d0e8');px(ix,iy-1,'#c0e4f8');
+  }
+  // Snow patches (white splotches)
+  for(let i=0;i<20;i++){
+    const sx=ri(8,Math.floor(MW*0.36)),sy=ri(15,Math.floor(MH*0.52));
+    const sw=ri(3,6),sh=ri(2,4);
+    for(let dy=0;dy<sh;dy++)for(let dx=0;dx<sw;dx++){
+      if(rn()>0.3)px(sx+dx,sy+dy,rn()>0.5?'#d4dce8':'#c8d4e0');
+    }
+  }
+}
+
+function drawVolcanicIslesTD(){
+  sr(400);
+  // Ocean along right edge
+  for(let y=0;y<Math.floor(MH*0.55);y++){
+    for(let x=Math.floor(MW*0.92);x<MW;x++){
+      const edge=(x-MW*0.92)/(MW*0.08);
+      if(rn()<0.3+edge*0.7)
+        px(x,y,rn()>0.5?'#1860a0':'#2070b0');
+    }
+  }
+  // Volcanic islands/coast
+  for(let y=Math.floor(MH*0.15);y<Math.floor(MH*0.50);y++){
+    const coastX=Math.floor(MW*0.90+Math.sin(y*0.08)*4);
+    for(let x=coastX;x<coastX+3;x++){
+      if(x>=0&&x<MW)px(x,y,rn()>0.5?'#a09068':'#908060');
+    }
+  }
+  // Volcano caldera (prominent)
+  const vx=365,vy=25,vr=18;
+  for(let dy=-vr;dy<=vr;dy++)for(let dx=-vr;dx<=vr;dx++){
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<=vr){
+      const ppx=vx+dx,ppy=vy+dy;
+      if(ppx>=0&&ppx<MW&&ppy>=0&&ppy<MH){
+        if(d<5)px(ppx,ppy,pk(['#e85020','#d84018','#f06828']));
+        else if(d<11)px(ppx,ppy,pk(['#504848','#585050']));
+        else px(ppx,ppy,pk(['#3a3434','#403838']));
+      }
+    }
+  }
+  // Lava rivers flowing toward ocean
+  for(const[sx,sy,ex,ey]of[[365,40,400,90],[360,38,390,120],[355,42,MW-5,70]]){
+    let lx=sx,ly=sy;
+    const steps=80;
+    for(let s=0;s<steps;s++){
+      const t=s/steps;
+      lx=Math.floor(lr(sx,ex,t)+Math.sin(s*0.12)*3);
+      ly=Math.floor(lr(sy,ey,t)+Math.cos(s*0.1)*2);
+      const w=2-t;// thins as it flows
+      for(let dx=-w;dx<=w;dx++){
+        const ppx=lx+Math.floor(dx);
+        if(ppx>=0&&ppx<MW&&ly>=0&&ly<MH)
+          px(ppx,ly,pk(['#d04018','#e05828','#c83810']));
+      }
+    }
+  }
+  // Lava pools
+  for(const[cx,cy,r]of[[330,80,7],[375,65,5],[310,110,6]]){
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy<=r*r){
+        const ppx=cx+dx,ppy=cy+dy;
+        if(ppx>=0&&ppx<MW)px(ppx,ppy,pk(['#d04018','#e06028','#e88038']));
+      }
+    }
+  }
+  // Rock formations
+  for(let i=0;i<15;i++){
+    const rx=ri(Math.floor(MW*0.65),MW-20),ry=ri(15,Math.floor(MH*0.48));
+    const rr=ri(2,4);
+    for(let dy=-rr;dy<=rr;dy++)for(let dx=-rr;dx<=rr;dx++){
+      if(dx*dx+dy*dy<=rr*rr)px(rx+dx,ry+dy,pk(['#484040','#504848','#585050']));
+    }
+  }
+  // Dead trees
+  for(let i=0;i<8;i++){
+    const tx=ri(Math.floor(MW*0.66),MW-20),ty=ri(20,Math.floor(MH*0.48));
+    pxR(tx,ty,1,4,'#3a2820');px(tx-1,ty+1,'#3a2820');px(tx+1,ty,'#3a2820');
+  }
+  // function pxR alias
+  function pxR(x,y,w,h,c){pr(x,y,w,h,c)}
+}
+
+function drawDarkCastleTD(){
+  sr(500);
+  // Main fortress (bigger, more detail)
+  const cx=210,cy=28;
+  // Outer walls
+  pr(cx-16,cy-10,32,22,'#2a2040');
+  pr(cx-14,cy-8,28,18,'#201838');
+  // Battlements along top
+  for(let i=0;i<8;i++)pr(cx-15+i*4,cy-12,2,2,'#302848');
+  // Corner towers (bigger)
+  for(const[tx,ty]of[[cx-15,cy-9],[cx+15,cy-9],[cx-15,cy+9],[cx+15,cy+9]]){
+    for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
+      if(dx*dx+dy*dy<=9)px(tx+dx,ty+dy,'#383050');
+    }
+    px(tx,ty,'#7050b0');// purple flame
+  }
+  // Inner keep
+  pr(cx-6,cy-4,12,8,'#282040');
+  px(cx,cy,'#8060c0');px(cx+1,cy,'#9070d0');
+  // Glowing windows
+  for(const[wx,wy]of[[cx-4,cy-2],[cx+4,cy-2],[cx-4,cy+2],[cx+4,cy+2],[cx,cy-5]]){
+    px(wx,wy,'#a870e0');
+  }
+  // Gate
+  pr(cx-2,cy+8,4,4,'#100818');px(cx-1,cy+7,'#6040a0');px(cx+1,cy+7,'#6040a0');
+
+  // Smaller ruined towers scattered around
+  for(const[rtx,rty]of[[170,40],[250,38],[185,55],[235,52],[160,25],[260,22]]){
+    pr(rtx-2,rty-4,5,8,'#282040');
+    pr(rtx-1,rty-5,3,1,'#302848');
+    px(rtx,rty-3,'#6848a0');// window
+  }
+
+  // Dark crystal formations
+  for(let i=0;i<12;i++){
+    const dx_=ri(Math.floor(MW*0.30),Math.floor(MW*0.70)),dy_=ri(8,Math.floor(MH*0.22));
+    pr(dx_,dy_,2,3,'#503088');px(dx_,dy_-1,'#7858b0');
+  }
+
+  // Stars (more visible)
+  for(let i=0;i<40;i++){
+    const sx=ri(Math.floor(MW*0.28),Math.floor(MW*0.72)),sy=ri(2,Math.floor(MH*0.14));
+    px(sx,sy,rn()>0.6?'#b0b0d0':'#8888a8');
+    if(rn()>0.8)px(sx+1,sy,'#9898b8');
+  }
+
+  // Dark fog patches
+  for(let i=0;i<15;i++){
+    const fx=ri(Math.floor(MW*0.28),Math.floor(MW*0.72)),fy=ri(Math.floor(MH*0.18),Math.floor(MH*0.28));
+    const fw=ri(4,10);
+    for(let dx=0;dx<fw;dx++){
+      if(fx+dx<MW)px(fx+dx,fy,rn()>0.5?'#1a1228':'#141020');
+    }
+  }
+
+  // Twisted dead trees
+  for(let i=0;i<6;i++){
+    const tx=ri(Math.floor(MW*0.30),Math.floor(MW*0.70)),ty=ri(12,Math.floor(MH*0.24));
+    pr(tx,ty,1,5,'#201830');px(tx-1,ty+1,'#281838');px(tx+1,ty,'#281838');
+    px(tx,ty-1,'#503878');
+  }
+}
+
+function drawWaterFeatures(){
+  sr(600);
+  // Gentle river through Rolling Hills
+  let rx=210,ry=MH*0.55;
+  for(let i=0;i<90;i++){
+    const w=3+Math.sin(i*0.08);
+    for(let dx=-w;dx<=w;dx++){
+      const ppx=Math.floor(rx+dx),ppy=Math.floor(ry);
+      if(ppx>=0&&ppx<MW&&ppy>=0&&ppy<MH)px(ppx,ppy,rn()>0.4?'#2070a8':'#3888b8');
+    }
+    rx+=Math.sin(i*0.06)*1.5;ry+=1;
+  }
+  // Small ponds
+  for(const[cx,cy,r]of[[140,185,5],[290,195,4]]){
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy<=r*r)px(cx+dx,cy+dy,'#2878b0');
+    }
+  }
+}
+
+function drawMainRoads(){
+  sr(700);
+  // Subtle dirt roads
+  function road(x1,y1,x2,y2,w,c){
+    const st=Math.max(Math.abs(x2-x1),Math.abs(y2-y1))*2;
+    for(let i=0;i<=st;i++){
+      const t=i/st;
+      const cx=Math.floor(lr(x1,x2,t)+Math.sin(i*0.06)*1.5);
+      const cy=Math.floor(lr(y1,y2,t)+Math.cos(i*0.08)*1);
+      for(let dy=-w;dy<=w;dy++)for(let dx=-w;dx<=w;dx++){
+        if(Math.abs(dx)+Math.abs(dy)<=w){
+          const ppx=cx+dx,ppy=cy+dy;
+          if(ppx>=0&&ppx<MW&&ppy>=0&&ppy<MH)px(ppx,ppy,c);
+        }
+      }
+    }
+  }
+  road(210,240,210,155,2,'#a89060');
+  road(210,155,100,100,2,'#a09068');
+  road(100,100,75,55,2,'#9098a0');
+  road(210,155,320,100,2,'#807068');
+  road(320,100,340,55,2,'#605850');
+  road(75,55,185,35,2,'#706878');
+  road(340,55,235,35,2,'#504858');
+  road(115,90,305,90,2,'#908868');
+}
+
+// ═══════ NODE DATA (reduced, spread out) ═══════
+
+const NT={
+  start:    {col:'#90e070',sz:20,tag:'START',       gc:[180,255,140],ga:.5,sh:'diamond'},
+  encounter:{col:'#e050a0',sz:14,tag:'ENCOUNTER',   gc:[255,100,200],ga:.4},
+  event:    {col:'#e8c840',sz:13,tag:'EVENT',        gc:[255,230,100],ga:.3},
+  camp:     {col:'#e87830',sz:16,tag:'CAMP',          gc:[255,160,60], ga:.5},
+  shop:     {col:'#40b0d0',sz:15,tag:'SHOP',          gc:[100,210,255],ga:.4},
+  shrine:   {col:'#f0d860',sz:16,tag:'SHRINE',        gc:[255,240,150],ga:.5,sh:'star'},
+  boss:     {col:'#e03030',sz:24,tag:'BOSS',          gc:[255,80,80],  ga:.7,sh:'hex'},
+  quest:    {col:'#a08040',sz:13,tag:'QUEST',         gc:[200,170,100],ga:.2},
+  final:    {col:'#b030d0',sz:28,tag:'FINAL BOSS',   gc:[220,100,255],ga:.9,sh:'hex'}
+};
+
+// Diamond layout: RH bottom-center, FV left, VI right, DC top-center
+const nodes=[
+  // ── START (bottom center) ──
+  {id:0, x:.50,y:.90,type:'start',    r:'rolling_hills', name:'Toby\'s Cottage',       desc:'Your journey begins. Choose your first Spiritkin.'},
+
+  // ── ROLLING HILLS (bottom, wide spread) ──
+  {id:1, x:.35,y:.80,type:'encounter',r:'rolling_hills', name:'Sunlit Glade',          desc:'Common spirits gather in this gentle clearing.'},
+  {id:2, x:.65,y:.80,type:'encounter',r:'rolling_hills', name:'Riverbank',             desc:'Water spirits play in the shallows.'},
+  {id:3, x:.25,y:.70,type:'event',    r:'rolling_hills', name:'Flower Field',          desc:'Beautiful but unpredictable.'},
+  {id:4, x:.50,y:.72,type:'camp',     r:'rolling_hills', name:'Hearthfire Camp',       desc:'Rest, heal, train, or gather resources.'},
+  {id:5, x:.75,y:.70,type:'quest',    r:'rolling_hills', name:'Village Board',         desc:'Draw a Quest card.'},
+  {id:6, x:.35,y:.62,type:'shop',     r:'rolling_hills', name:'Bramble\'s Post',       desc:'Draw 4 items. Buy what you can afford.'},
+  {id:7, x:.65,y:.62,type:'encounter',r:'rolling_hills', name:'Ancient Oak',           desc:'Powerful spirits nest in the canopy.'},
+  {id:8, x:.50,y:.56,type:'boss',     r:'rolling_hills', name:'Timber\'s Grove',       desc:'Timber (5 HP) — Timber Howl silences your bench.'},
+
+  // ── FORK POINT ── (Timber beaten → choose FV left or VI right)
+
+  // ── FROST VALLEY (left side) ──
+  {id:9, x:.22,y:.50,type:'encounter',r:'frost_valley',  name:'Frozen Pond',           desc:'Ice spirits glide beneath the surface.'},
+  {id:10,x:.12,y:.42,type:'event',    r:'frost_valley',  name:'Snowdrift Pass',        desc:'A blizzard rolls in.'},
+  {id:11,x:.28,y:.40,type:'camp',     r:'frost_valley',  name:'Icebound Shelter',      desc:'A warm refuge in the cold.'},
+  {id:12,x:.08,y:.32,type:'encounter',r:'frost_valley',  name:'Crystal Cavern',        desc:'Rare spirits shimmer in the dark.'},
+  {id:13,x:.22,y:.30,type:'shop',     r:'frost_valley',  name:'Frostweaver\'s Stall',  desc:'Specialty ice items.'},
+  {id:14,x:.15,y:.22,type:'shrine',   r:'frost_valley',  name:'Crystal Goo\'s Lair',   desc:'Feed: 2 Ice Shards + 1 Moonstone.'},
+  {id:15,x:.28,y:.20,type:'encounter',r:'frost_valley',  name:'Ice Spire Peak',        desc:'Only the bravest climb this high.'},
+  {id:16,x:.20,y:.13,type:'boss',     r:'frost_valley',  name:'King Jay\'s Throne',    desc:'King Jay (7 HP) — Reflection: rolls totaling 7 hurt you.'},
+
+  // ── VOLCANIC ISLES (right side) ──
+  {id:17,x:.78,y:.50,type:'encounter',r:'volcanic_isles',name:'Ashen Shore',           desc:'Embers fill the scorching air.'},
+  {id:18,x:.88,y:.42,type:'event',    r:'volcanic_isles',name:'Eruption Point',        desc:'The ground rumbles beneath you.'},
+  {id:19,x:.72,y:.40,type:'camp',     r:'volcanic_isles',name:'Ember Rest',            desc:'Warmth without the burn.'},
+  {id:20,x:.92,y:.32,type:'encounter',r:'volcanic_isles',name:'Obsidian Fields',       desc:'Dangerous spirits in dark glass.'},
+  {id:21,x:.78,y:.30,type:'shop',     r:'volcanic_isles',name:'Forge Market',          desc:'Weapons forged in fire.'},
+  {id:22,x:.85,y:.22,type:'shrine',   r:'volcanic_isles',name:'Magma Goo\'s Cave',     desc:'Feed: 2 Surges + 1 Sacred Fire.'},
+  {id:23,x:.72,y:.20,type:'encounter',r:'volcanic_isles',name:'Caldera Basin',         desc:'The heart of the volcano.'},
+  {id:24,x:.80,y:.13,type:'boss',     r:'volcanic_isles',name:'Nerina\'s Domain',      desc:'Nerina (7 HP) — Volcanic Fury burns your resources.'},
+
+  // ── CROSS PATH (between FV and VI) ──
+  {id:25,x:.50,y:.35,type:'encounter',r:'rolling_hills', name:'Crossroads',            desc:'A neutral meeting ground between fire and ice.'},
+
+  // ── DARK CASTLE (top center) ──
+  {id:26,x:.35,y:.18,type:'encounter',r:'dark_castle',   name:'Shadow Gate',           desc:'Spirits warp through rifts.'},
+  {id:27,x:.65,y:.18,type:'event',    r:'dark_castle',   name:'Haunted Corridor',      desc:'Echoes of fallen summoners.'},
+  {id:28,x:.42,y:.12,type:'event',    r:'dark_castle',   name:'Cursed Hall',           desc:'The castle fights back.'},
+  {id:29,x:.58,y:.12,type:'encounter',r:'dark_castle',   name:'Dark Sanctum',          desc:'Only legends appear here.'},
+  {id:30,x:.50,y:.08,type:'shrine',   r:'dark_castle',   name:'Ancient Goo\'s Altar',  desc:'Feed: 1 of every resource type.'},
+  {id:31,x:.42,y:.22,type:'quest',    r:'dark_castle',   name:'Faded Manuscript',      desc:'One final quest.'},
+  {id:32,x:.58,y:.22,type:'camp',     r:'dark_castle',   name:'Last Hearth',           desc:'The final rest before the end.'},
+
+  // Boss + Final
+  {id:33,x:.35,y:.06,type:'boss',     r:'dark_castle',   name:'Lucy\'s Inferno',       desc:'Lucy (8 HP) — Blue Fire hurts you even when she loses.'},
+  {id:34,x:.65,y:.06,type:'boss',     r:'dark_castle',   name:'Lucy\'s Inferno',       desc:'Lucy (8 HP) — Blue Fire hurts you even when she loses.'},
+  // Actually let's keep one Lucy and put Valkin after
+  {id:35,x:.50,y:.03,type:'final',    r:'dark_castle',   name:'Valkin\'s Throne',      desc:'Valkin the Grand (12 HP). 3-Spiritkin gauntlet. Become Grand Master.'}
+];
+
+// Fix: remove duplicate Lucy, restructure DC
+nodes.splice(34,1); // remove id:34 duplicate
+// Renumber: id:35 becomes id:34
+nodes[nodes.length-1].id=34;
+
+const edges=[
+  // Start → RH
+  [0,1],[0,2],
+  [1,3],[1,4],[2,4],[2,5],
+  [3,6],[4,6],[4,7],[5,7],
+  [6,8],[7,8],
+
+  // Timber → Fork (FV left, VI right)
+  [8,9],[8,17],
+
+  // Frost Valley
+  [9,10],[9,11],
+  [10,12],[11,13],
+  [12,14],[13,14],[13,15],
+  [14,16],[15,16],
+
+  // Volcanic Isles
+  [17,18],[17,19],
+  [18,20],[19,21],
+  [20,22],[21,22],[21,23],
+  [22,24],[23,24],
+
+  // Cross path between FV and VI
+  [11,25],[19,25],
+  [25,13],[25,21],
+
+  // FV/VI → Dark Castle
+  [16,26],[16,28],
+  [24,27],[24,29],
+
+  // Dark Castle internal
+  [26,28],[26,31],[27,29],[27,32],
+  [28,30],[29,30],
+  [31,33],[32,33],
+  [30,33],
+
+  // Lucy → Valkin
+  [33,34]
+];
+
+const RG={rolling_hills:[168,216,110],frost_valley:[184,224,255],volcanic_isles:[255,138,64],dark_castle:[154,106,212]};
+
+// ═══════ CANVAS ENGINE ═══════
+
+const cvs=[document.getElementById('bg'),document.getElementById('game'),document.getElementById('fx')];
+const[bCtx,gCtx,fCtx]=cvs.map(c=>c.getContext('2d'));
+const tip=document.getElementById('tip');
+
+let W,H,dpr=window.devicePixelRatio||1;
+let camX=0,camY=0,camScale=1;
+let drag=null,dragCam=null;
+let hovNode=null,time=0;
+
+function resize(){
+  W=window.innerWidth;H=window.innerHeight;
+  cvs.forEach(c=>{c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px'});
+  const sx=W/WW,sy=H/WH;
+  camScale=Math.min(sx,sy)*0.98;
+  camX=(W-WW*camScale)/2;camY=(H-WH*camScale)/2;
+}
+
+function w2s(wx,wy){return{x:wx*WW*camScale+camX,y:wy*WH*camScale+camY}}
+function s2w(sx,sy){return{x:(sx-camX)/(WW*camScale),y:(sy-camY)/(WH*camScale)}}
+
+// ═══════ DRAWING ═══════
+
+function drawBg(){
+  const g=bCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+  g.fillStyle='#060404';g.fillRect(0,0,W,H);
+  g.imageSmoothingEnabled=false;
+  g.drawImage(buf,0,0,MW,MH,camX,camY,WW*camScale,WH*camScale);
+}
+
+function drawGame(){
+  const g=gCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+  const t=time*0.002;
+
+  // ── ROADS ──
+  for(const[fi,ti]of edges){
+    const na=nodes.find(n=>n.id===fi),nb=nodes.find(n=>n.id===ti);
+    if(!na||!nb)continue;
+    const p1=w2s(na.x,na.y),p2=w2s(nb.x,nb.y);
+    const rg=RG[na.r]||RG[nb.r];
+
+    // Road shadow
+    g.save();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=10*camScale;g.lineCap='round';
+    const mx=(p1.x+p2.x)/2+Math.sin(fi*1.3)*6*camScale;
+    const my=(p1.y+p2.y)/2+Math.cos(ti*1.7)*6*camScale;
+    g.beginPath();g.moveTo(p1.x,p1.y);g.quadraticCurveTo(mx,my,p2.x,p2.y);g.stroke();
+    // Road body
+    g.strokeStyle=`rgba(${rg[0]},${rg[1]},${rg[2]},.15)`;g.lineWidth=8*camScale;
+    g.beginPath();g.moveTo(p1.x,p1.y);g.quadraticCurveTo(mx,my,p2.x,p2.y);g.stroke();
+    // Center
+    g.strokeStyle=`rgba(${rg[0]},${rg[1]},${rg[2]},.3)`;g.lineWidth=3*camScale;
+    g.beginPath();g.moveTo(p1.x,p1.y);g.quadraticCurveTo(mx,my,p2.x,p2.y);g.stroke();
+    g.restore();
+  }
+
+  // ── NODES ──
+  for(const node of nodes){
+    const nt=NT[node.type];
+    const pos=w2s(node.x,node.y);
+    const isHov=hovNode===node;
+    const isReachable=window._reachableNodes&&window._reachableNodes.has(node.id);
+    const isPlayer=G&&G.currentNode===node.id;
+    const pulse=isReachable?.5+Math.sin(t*3+node.id)*.5:.85+Math.sin(t+node.id*.8)*.15;
+    const isBoss=node.type==='boss'||node.type==='final';
+    const sz=((isHov||isReachable)?nt.sz*1.2:nt.sz)*camScale;
+    const[gr,gg,gb]=nt.gc;
+
+    g.save();
+
+    // Glow
+    const glR=sz*(1.6+nt.ga)*pulse;
+    const gl=g.createRadialGradient(pos.x,pos.y,sz*.2,pos.x,pos.y,glR);
+    gl.addColorStop(0,`rgba(${gr},${gg},${gb},${.18*nt.ga*pulse})`);
+    gl.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gl;g.beginPath();g.arc(pos.x,pos.y,glR,0,Math.PI*2);g.fill();
+
+    // Shape
+    g.beginPath();
+    if(nt.sh==='hex'){for(let i=0;i<6;i++){const aa=Math.PI/3*i-Math.PI/6;g[i?'lineTo':'moveTo'](pos.x+sz*Math.cos(aa),pos.y+sz*Math.sin(aa))}g.closePath()}
+    else if(nt.sh==='diamond'){g.moveTo(pos.x,pos.y-sz);g.lineTo(pos.x+sz*.7,pos.y);g.lineTo(pos.x,pos.y+sz);g.lineTo(pos.x-sz*.7,pos.y);g.closePath()}
+    else if(nt.sh==='star'){for(let i=0;i<12;i++){const aa=Math.PI/6*i-Math.PI/2;const rd=i%2?sz*.5:sz;g[i?'lineTo':'moveTo'](pos.x+rd*Math.cos(aa),pos.y+rd*Math.sin(aa))}g.closePath()}
+    else g.arc(pos.x,pos.y,sz,0,Math.PI*2);
+
+    // Fill
+    const fg=g.createRadialGradient(pos.x,pos.y-sz*.2,0,pos.x,pos.y,sz);
+    fg.addColorStop(0,nt.col);fg.addColorStop(1,`rgba(${gr*.4|0},${gg*.4|0},${gb*.4|0},.9)`);
+    g.fillStyle=fg;g.fill();
+
+    // Border
+    g.strokeStyle=isReachable?'#ffffff':isHov?'#fff':nt.col;
+    g.lineWidth=(isReachable?4:isHov?3:2)*camScale;g.stroke();
+    if(isReachable){g.strokeStyle='rgba(144,224,112,.6)';g.lineWidth=2*camScale;g.stroke()}
+    g.restore();
+
+    // Icon inside
+    g.save();
+    const iconSz=isBoss?sz*.5:sz*.55;
+    g.font=`${iconSz}px serif`;g.textAlign='center';g.textBaseline='middle';
+    g.shadowColor='rgba(0,0,0,.6)';g.shadowBlur=2;
+    if(node.type==='boss')g.fillText('\u2694\uFE0F',pos.x,pos.y);
+    else if(node.type==='final')g.fillText('\uD83D\uDC51',pos.x,pos.y);
+    else if(node.type==='camp'){g.fillText('\uD83D\uDD25',pos.x,pos.y)}
+    else if(node.type==='shop'){g.fillText('\uD83D\uDCB0',pos.x,pos.y)}
+    else if(node.type==='shrine'){g.fillStyle='#fff';g.fillText('\u2726',pos.x,pos.y)}
+    else if(node.type==='encounter'){g.fillStyle='#fff';g.font=`bold ${iconSz}px serif`;g.fillText('!',pos.x,pos.y)}
+    else if(node.type==='quest'){g.fillText('\uD83D\uDCDC',pos.x,pos.y)}
+    else if(node.type==='event'){g.fillStyle='#fff';g.font=`bold ${iconSz*.9}px serif`;g.fillText('?',pos.x,pos.y)}
+    else if(node.type==='start'){g.fillStyle='#fff';g.font=`bold ${iconSz*.8}px 'Cinzel'`;g.fillText('GO',pos.x,pos.y+1)}
+    g.restore();
+
+    // ── LABELS — strong outline, no backing ──
+    const ls=Math.max(.65,camScale);
+
+    // Helper: stroke text for readability (outline effect)
+    function outlineText(text,x,y,font,color,baseline){
+      g.save();
+      g.font=font;g.textAlign='center';g.textBaseline=baseline;
+      // Dark stroke outline (draw text multiple times offset)
+      g.fillStyle='#000';
+      const o=1.5*camScale;
+      for(let dx=-o;dx<=o;dx+=o)for(let dy=-o;dy<=o;dy+=o){
+        if(dx||dy)g.fillText(text,x+dx,y+dy);
+      }
+      // Main text
+      g.fillStyle=color;
+      g.fillText(text,x,y);
+      g.restore();
+    }
+
+    // Type tag (above node)
+    const tagFont=`700 ${Math.max(7,isBoss?9*ls:7.5*ls)}px 'Press Start 2P',monospace`;
+    outlineText(nt.tag,pos.x,pos.y-sz-5*camScale,tagFont,nt.col,'bottom');
+
+    // Name (below node)
+    const nameFont=`800 ${Math.max(9,isBoss?13*ls:10*ls)}px 'Cinzel',serif`;
+    const nameCol=isHov?`rgb(${gr},${gg},${gb})`:'#f0e8d8';
+    outlineText(node.name,pos.x,pos.y+sz+5*camScale,nameFont,nameCol,'top');
+
+    // Boss HP subtitle
+    if(isBoss){
+      const subFont=`700 ${Math.max(7,8*ls)}px 'Cinzel',serif`;
+      const sub=node.type==='final'?'VALKIN THE GRAND \u00B7 12 HP':
+        node.name.includes('Timber')?'5 HP':
+        node.name.includes('Jay')?'7 HP':
+        node.name.includes('Nerina')?'7 HP':'8 HP';
+      outlineText(sub,pos.x,pos.y+sz+18*ls,subFont,`rgba(${gr},${gg},${gb},.9)`,'top');
+    }
+  }
+
+  // Lantern on player position (or node 0 before game starts)
+  const playerNode = G ? nodes.find(n=>n.id===G.currentNode) || nodes[0] : nodes[0];
+  const sp=w2s(playerNode.x,playerNode.y);
+  g.font=`${22*camScale}px serif`;g.textAlign='center';g.textBaseline='middle';
+  g.fillText('\uD83C\uDFEE',sp.x,sp.y-28*camScale);
+  g.save();
+  g.font=`700 ${9*camScale}px 'Press Start 2P',monospace`;
+  g.textAlign='center';g.shadowColor='rgba(0,0,0,1)';g.shadowBlur=4;
+  g.fillStyle='rgba(100,200,255,.8)';
+  g.fillText('YOU',sp.x,sp.y-40*camScale);
+  g.restore();
+}
+
+// Particles
+class Pt{
+  constructor(r){this.r=r;this.reset()}
+  reset(){
+    if(this.r==='vi'){this.x=.62+rn()*.35;this.y=rn()*.55}
+    else{this.x=rn()*.38;this.y=rn()*.55}
+    this.sz=rn()*2+.5;this.sp=rn()*.0003+.0001;this.dr=(rn()-.5)*.0002;
+    this.op=rn()*.4+.2;this.life=1;
+  }
+  update(){
+    if(this.r==='vi'){this.y-=this.sp;this.life-=.002}
+    else{this.y+=this.sp*.6;this.x+=Math.sin(time*.003+this.y*8)*.00008;this.life-=.0015}
+    if(this.life<=0||this.y<0||this.y>1)this.reset();
+  }
+  draw(c){
+    const p=w2s(this.x,this.y),s=this.sz*camScale,al=this.op*this.life;
+    if(this.r==='vi'){c.fillStyle=`rgba(255,${100+rn()*80|0},20,${al})`;c.shadowColor='rgba(255,120,20,.3)';c.shadowBlur=s*3}
+    else{c.fillStyle=`rgba(200,220,255,${al*.5})`;c.shadowColor='rgba(200,220,255,.2)';c.shadowBlur=s*2}
+    c.beginPath();c.arc(p.x,p.y,s,0,Math.PI*2);c.fill();c.shadowBlur=0;
+  }
+}
+const pts=[];for(let i=0;i<35;i++)pts.push(new Pt('vi'));for(let i=0;i<30;i++)pts.push(new Pt('fv'));
+
+function drawFx(){
+  const g=fCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+  for(const p of pts){p.update();p.draw(g)}
+}
+
+// ═══════ INTERACTION ═══════
+
+function getNodeAt(sx,sy){
+  const w=s2w(sx,sy);let c=null,d=Infinity;
+  for(const n of nodes){
+    const dx=(w.x-n.x)*WW,dy=(w.y-n.y)*WH;
+    const dist=Math.sqrt(dx*dx+dy*dy),hr=NT[n.type].sz*2;
+    if(dist<hr&&dist<d){c=n;d=dist}
+  }return c;
+}
+
+cvs[0].style.cursor='grab';
+cvs[0].addEventListener('mousemove',e=>{
+  const r=cvs[0].getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  if(drag){camX=dragCam.x+(mx-drag.x);camY=dragCam.y+(my-drag.y);return}
+  const nd=getNodeAt(mx,my);hovNode=nd;
+  cvs[0].style.cursor=nd?'pointer':'grab';
+  if(nd){
+    tip.querySelector('b').textContent=nd.name;
+    tip.querySelector('b').style.color=NT[nd.type].col;
+    tip.querySelector('span').textContent=nd.desc;
+    tip.classList.add('on');
+    let tx=e.clientX+16,ty=e.clientY-10;
+    if(tx+270>W)tx=e.clientX-280;if(ty+80>H)ty=e.clientY-90;
+    tip.style.left=tx+'px';tip.style.top=ty+'px';
+  }else tip.classList.remove('on');
+});
+cvs[0].addEventListener('mousedown',e=>{const r=cvs[0].getBoundingClientRect();drag={x:e.clientX-r.left,y:e.clientY-r.top};dragCam={x:camX,y:camY}});
+cvs[0].addEventListener('mouseup',()=>drag=null);
+cvs[0].addEventListener('mouseleave',()=>{drag=null;hovNode=null;tip.classList.remove('on')});
+cvs[0].addEventListener('wheel',e=>{
+  e.preventDefault();const r=cvs[0].getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const old=camScale;camScale=Math.max(.4,Math.min(5,camScale*(e.deltaY>0?.92:1.08)));
+  camX=mx-(mx-camX)*(camScale/old);camY=my-(my-camY)*(camScale/old);
+},{passive:false});
+
+function resetView(){
+  const sx=W/WW,sy=H/WH;camScale=Math.min(sx,sy)*.98;
+  camX=(W-WW*camScale)/2;camY=(H-WH*camScale)/2;
+}
+
+// ═══════ LOOP ═══════
+let lck='';
+function loop(ts){
+  time=ts;
+  const ck=`${camX.toFixed(1)},${camY.toFixed(1)},${camScale.toFixed(3)}`;
+  if(ck!==lck){drawBg();lck=ck}
+  drawGame();drawFx();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize',()=>{resize();lck=''});
+resize();renderArt();requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════════════════════
+// GAME LOGIC — ties engine.js to the map
+// ═══════════════════════════════════════════════════════
+
+let G = null; // Game state
+let reachable = null; // Current reachable nodes for movement
+
+// ── STARTER SELECTION ──
+function showStarterScreen() {
+  const starters = [
+    ENGINE.getCard(316), // Penny
+    ENGINE.getCard(324), // Biscuit
+    ENGINE.getCard(340), // Cluck
+    ENGINE.getCard(358), // Tadpole
+    ENGINE.getCard(29),  // Sad Sal
+    ENGINE.getCard(209), // Dart
+  ];
+  const el = document.getElementById('starter-choices');
+  el.innerHTML = '';
+  for (const card of starters) {
+    const div = document.createElement('div');
+    div.className = 'starter-card';
+    div.innerHTML = `
+      <div class="s-name">${card.name}</div>
+      <div class="s-hp">${card.maxHp} HP</div>
+      <div class="s-ability">${card.ability}</div>
+      <div class="s-desc">${card.desc}</div>
+    `;
+    div.onclick = () => startGame(card.id);
+    el.appendChild(div);
+  }
+}
+
+function startGame(cardId) {
+  document.getElementById('starter-screen').style.display = 'none';
+  G = ENGINE.createGameState(cardId);
+  updateHUD();
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('action-bar').style.display = 'flex';
+  showMessage('Welcome to the Overworld!', `You start at Toby's Cottage with ${ENGINE.getCard(cardId).name}. Roll to move!`);
+}
+
+// ── HUD ──
+function updateHUD() {
+  if (!G) return;
+  // Party
+  const partyEl = document.getElementById('hud-party');
+  partyEl.innerHTML = '';
+  for (const ghost of G.party.ghosts) {
+    const div = document.createElement('div');
+    div.className = 'hud-ghost' + (ghost === ENGINE.activeGhost(G.party) ? ' active' : '') + (ghost.ko ? ' ko' : '');
+    div.textContent = `${ghost.name} ${ghost.hp}/${ghost.maxHp}`;
+    const bar = document.createElement('div');
+    bar.className = 'hp-bar';
+    bar.style.width = (ghost.hp / ghost.maxHp * 100) + '%';
+    div.appendChild(bar);
+    partyEl.appendChild(div);
+  }
+
+  // Resources
+  const resEl = document.getElementById('hud-resources');
+  resEl.innerHTML = '';
+  const res = G.party.resources;
+  const icons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥'};
+  for (const [key, icon] of Object.entries(icons)) {
+    if (res[key] > 0) {
+      const div = document.createElement('div');
+      div.className = 'res-item';
+      div.innerHTML = `${icon}<span>${res[key]}</span>`;
+      resEl.appendChild(div);
+    }
+  }
+
+  // Coins
+  document.getElementById('coin-count').textContent = G.coins;
+
+  // Turn
+  document.getElementById('turn-num').textContent = G.turnNumber;
+
+  // Seals
+  const sealsEl = document.getElementById('hud-seals');
+  sealsEl.innerHTML = '';
+  const sealColors = {rolling_hills:'#90e070',frost_valley:'#80c8f0',volcanic_isles:'#e87830',dark_castle:'#9070c0'};
+  for (const [region, color] of Object.entries(sealColors)) {
+    const div = document.createElement('div');
+    div.className = 'seal' + (G.seals.includes(region) ? ' earned' : '');
+    div.style.borderColor = color;
+    if (G.seals.includes(region)) div.style.background = color;
+    sealsEl.appendChild(div);
+  }
+}
+
+// ── MOVEMENT ──
+function doRollMovement() {
+  if (!G || !G.canMove) return;
+  G.turnNumber++;
+  const roll = ENGINE.rollMovement();
+  G.movementRoll = roll;
+  G.movesLeft = roll;
+  G.canMove = false;
+
+  // Calculate reachable nodes
+  reachable = ENGINE.getReachableNodes(G.currentNode, roll, edges, nodes);
+
+  // Highlight reachable nodes on map
+  highlightReachable();
+
+  document.getElementById('btn-roll').style.display = 'none';
+  showMessage('Movement Roll', `You rolled a <b>${roll}</b>! Click a highlighted node to move there.`, true);
+
+  // Enable click-to-move
+  cvs[0].onclick = handleMapClick;
+}
+
+function highlightReachable() {
+  // Store for rendering - nodes that can be reached pulse
+  window._reachableNodes = reachable ? new Set(reachable.keys()) : new Set();
+}
+
+function handleMapClick(e) {
+  if (!reachable) return;
+  const r = cvs[0].getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const node = getNodeAt(mx, my);
+  if (node && reachable.has(node.id)) {
+    moveToNode(node.id);
+  }
+}
+
+function moveToNode(nodeId) {
+  G.currentNode = nodeId;
+  G.visitedNodes.add(nodeId);
+  reachable = null;
+  window._reachableNodes = new Set();
+  cvs[0].onclick = null;
+
+  // Update player position on map (re-render will handle it)
+  updateHUD();
+
+  // Show action button
+  document.getElementById('btn-action').style.display = '';
+  document.getElementById('btn-action').textContent = 'EXPLORE ' + nodes.find(n => n.id === nodeId).name.toUpperCase();
+}
+
+function doNodeAction() {
+  const node = nodes.find(n => n.id === G.currentNode);
+  if (!node) return;
+  document.getElementById('btn-action').style.display = 'none';
+
+  switch (node.type) {
+    case 'start': showMessage(node.name, 'Home sweet home. Nothing to do here.'); endTurn(); break;
+    case 'encounter': startEncounter(node); break;
+    case 'event': doEvent(node); break;
+    case 'camp': showCamp(node); break;
+    case 'shop': showShop(node); break;
+    case 'shrine': showShrine(node); break;
+    case 'quest': showQuest(node); break;
+    case 'boss': startBossBattle(node); break;
+    case 'final': startBossBattle(node); break;
+    default: endTurn();
+  }
+}
+
+function endTurn() {
+  G.canMove = true;
+  G.movesLeft = 0;
+  reachable = null;
+  window._reachableNodes = new Set();
+  document.getElementById('btn-roll').style.display = '';
+  document.getElementById('btn-action').style.display = 'none';
+  document.getElementById('btn-end').style.display = 'none';
+  updateHUD();
+}
+
+// ── ENCOUNTERS (BATTLES) ──
+function startEncounter(node) {
+  // Get or generate encounter card for this node
+  let cardId = G.revealedEncounters[node.id];
+  if (!cardId) {
+    const card = ENGINE.getEncounterCard(node.r);
+    cardId = card.id;
+    G.revealedEncounters[node.id] = cardId;
+  }
+
+  const card = ENGINE.getCard(cardId);
+  const enemyTeam = ENGINE.makeTeam([cardId]);
+
+  showBattle(G.party, enemyTeam, false, () => {
+    // On win: offer to recruit
+    if (!ENGINE.isTeamDefeated(enemyTeam)) {
+      endTurn();
+      return;
+    }
+    // Victory!
+    G.coins += 3;
+    showModal(
+      `${card.name} Defeated!`,
+      `<p>+3 Spirit Coins!</p><p><b>${card.name}</b> wants to join your team!</p>
+       <p>${card.ability}: ${card.desc}</p>
+       <p>${card.maxHp} HP | ${card.rarity}</p>`,
+      [
+        { text: 'RECRUIT', primary: true, action: () => {
+          if (G.party.ghosts.length < 5) {
+            G.party.ghosts.push(ENGINE.makeGhost(cardId));
+          } else {
+            // Would need swap UI — for now just replace last bench
+            G.party.ghosts[4] = ENGINE.makeGhost(cardId);
+          }
+          hideModal();
+          updateHUD();
+          endTurn();
+        }},
+        { text: 'Pass', action: () => { hideModal(); endTurn(); }}
+      ]
+    );
+  });
+}
+
+// ── BATTLE SYSTEM (UI) ──
+let battleState = null;
+
+function showBattle(playerTeam, enemyTeam, isBoss, onComplete) {
+  battleState = { playerTeam, enemyTeam, isBoss, onComplete, round: 0 };
+  const screen = document.getElementById('battle-screen');
+  screen.style.display = 'flex';
+  updateBattleUI();
+  setBattleActions([
+    { text: 'ROLL DICE', cls: 'attack', action: () => doBattleRound() }
+  ]);
+}
+
+function updateBattleUI() {
+  const bs = battleState;
+  const pGhost = ENGINE.activeGhost(bs.playerTeam);
+  const eGhost = ENGINE.activeGhost(bs.enemyTeam);
+
+  document.getElementById('b-player').innerHTML = `
+    <div class="b-name" style="color:#90e070">${pGhost.name}</div>
+    <div class="b-ability">${pGhost.ability}: ${pGhost.abilityDesc}</div>
+    <div class="b-hp-outer"><div class="b-hp-inner" style="width:${pGhost.hp/pGhost.maxHp*100}%"></div></div>
+    <div class="b-hp-text">${pGhost.hp} / ${pGhost.maxHp} HP</div>
+  `;
+  document.getElementById('b-enemy').innerHTML = `
+    <div class="b-name" style="color:#e05050">${eGhost.name}</div>
+    <div class="b-ability">${eGhost.ability}: ${eGhost.abilityDesc}</div>
+    <div class="b-hp-outer"><div class="b-hp-inner" style="width:${eGhost.hp/eGhost.maxHp*100}%;background:#e05050"></div></div>
+    <div class="b-hp-text">${eGhost.hp} / ${eGhost.maxHp} HP</div>
+  `;
+}
+
+function doBattleRound() {
+  const bs = battleState;
+  bs.round++;
+
+  // Fire entry abilities on first round
+  if (bs.round === 1) {
+    const entryResult = { events: [] };
+    ENGINE.triggerEntryAbility(bs.playerTeam, bs.enemyTeam, entryResult);
+    ENGINE.triggerEntryAbility(bs.enemyTeam, bs.playerTeam, entryResult);
+    if (entryResult.events.length) {
+      logBattle(entryResult.events.join(' | '));
+    }
+  }
+
+  const result = ENGINE.resolveBattleRound(bs.playerTeam, bs.enemyTeam, 3, 3);
+
+  // Show dice
+  const diceArea = document.getElementById('b-dice-area');
+  const pWin = result.winner === 'a';
+  const eWin = result.winner === 'b';
+  diceArea.innerHTML = `
+    <div class="dice-group">${result.playerDice.map(d => `<div class="die ${pWin?'win':eWin?'lose':''}">${d}</div>`).join('')}</div>
+    <div style="font:700 16px 'Cinzel';color:${pWin?'#90e070':eWin?'#e05050':'#f0d860'}">${pWin?'WIN!':eWin?'LOSE':result.winner==='tie'?'TIE':''}</div>
+    <div class="dice-group">${result.enemyDice.map(d => `<div class="die ${eWin?'win':pWin?'lose':''}">${d}</div>`).join('')}</div>
+  `;
+
+  // Log events
+  for (const evt of result.events) logBattle(evt);
+
+  updateBattleUI();
+
+  // Check for battle end
+  const pGhost = ENGINE.activeGhost(bs.playerTeam);
+  const eGhost = ENGINE.activeGhost(bs.enemyTeam);
+
+  if (eGhost.ko) {
+    if (ENGINE.isTeamDefeated(bs.enemyTeam)) {
+      logBattle('VICTORY!');
+      setBattleActions([{ text: 'CONTINUE', cls: 'attack', action: () => endBattle() }]);
+      return;
+    }
+    // Enemy has more ghosts — auto-swap to next alive
+    const nextIdx = bs.enemyTeam.ghosts.findIndex((g, i) => i !== bs.enemyTeam.activeIdx && !g.ko);
+    if (nextIdx >= 0) {
+      bs.enemyTeam.activeIdx = nextIdx;
+      logBattle(`${ENGINE.activeGhost(bs.enemyTeam).name} enters the battle!`);
+      updateBattleUI();
+    }
+  }
+
+  if (pGhost.ko) {
+    const aliveCount = ENGINE.aliveGhosts(bs.playerTeam).length;
+    if (aliveCount === 0) {
+      logBattle('DEFEATED... Return to nearest camp.');
+      setBattleActions([{ text: 'CONTINUE', action: () => { endBattle(); handleDefeat(); } }]);
+      return;
+    }
+    // Let player choose swap
+    showSwapModal(bs.playerTeam, () => {
+      updateBattleUI();
+      setBattleActions([{ text: 'ROLL DICE', cls: 'attack', action: () => doBattleRound() }]);
+    });
+    return;
+  }
+
+  if (result.winner === 'tie') {
+    // Auto re-roll on tie
+    setBattleActions([{ text: 'RE-ROLL', cls: 'attack', action: () => doBattleRound() }]);
+    return;
+  }
+
+  setBattleActions([{ text: 'ROLL DICE', cls: 'attack', action: () => doBattleRound() }]);
+}
+
+function showSwapModal(team, callback) {
+  const alive = team.ghosts.filter((g, i) => i !== team.activeIdx && !g.ko);
+  setBattleActions(alive.map(g => ({
+    text: `SEND IN ${g.name.toUpperCase()} (${g.hp}HP)`,
+    action: () => {
+      team.activeIdx = team.ghosts.indexOf(g);
+      const entryResult = { events: [] };
+      ENGINE.triggerEntryAbility(team, battleState.enemyTeam, entryResult);
+      for (const e of entryResult.events) logBattle(e);
+      callback();
+    }
+  })));
+}
+
+function endBattle() {
+  document.getElementById('battle-screen').style.display = 'none';
+  document.getElementById('b-log').innerHTML = '';
+  document.getElementById('b-dice-area').innerHTML = '';
+  const cb = battleState.onComplete;
+  battleState = null;
+  if (cb) cb();
+}
+
+function handleDefeat() {
+  // Revive all ghosts to 1 HP, lose half coins
+  for (const g of G.party.ghosts) { g.ko = false; g.hp = 1; g.entryFired = false; }
+  G.coins = Math.floor(G.coins / 2);
+  updateHUD();
+  endTurn();
+}
+
+function setBattleActions(actions) {
+  const el = document.getElementById('b-actions');
+  el.innerHTML = '';
+  for (const a of actions) {
+    const btn = document.createElement('button');
+    btn.textContent = a.text;
+    if (a.cls) btn.className = a.cls;
+    btn.onclick = a.action;
+    el.appendChild(btn);
+  }
+}
+
+function logBattle(text) {
+  const el = document.getElementById('b-log');
+  el.innerHTML += `<div>${text}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── CAMP ──
+function showCamp(node) {
+  showModal(node.name, '<p>Welcome to camp. Choose an action:</p>', [
+    { text: 'HEAL ALL (+full HP)', primary: true, action: () => {
+      for (const g of G.party.ghosts) { g.hp = g.maxHp; g.ko = false; g.entryFired = false; }
+      hideModal(); showMessage('Healed!', 'All Spiritkin restored to full HP.'); updateHUD(); endTurn();
+    }},
+    { text: 'TRAIN (3 coins, +1 max HP to active)', action: () => {
+      if (G.coins >= 3) {
+        G.coins -= 3;
+        const ghost = ENGINE.activeGhost(G.party);
+        ghost.maxHp += 1; ghost.hp += 1;
+        hideModal(); showMessage('Training!', `${ghost.name} gained +1 max HP!`); updateHUD(); endTurn();
+      } else { hideModal(); showMessage('Not enough coins', 'Need 3 coins to train.'); endTurn(); }
+    }},
+    { text: 'REST (+2 resources of choice)', action: () => {
+      // Give 2 random resources
+      const types = ['luckyStone','moonstone','healingSeed','surge','iceShard'];
+      for (let i = 0; i < 2; i++) {
+        const t = types[Math.floor(Math.random() * types.length)];
+        ENGINE.addResource(G.party.resources, t, 1);
+      }
+      hideModal(); showMessage('Rested!', 'Gained 2 random resources.'); updateHUD(); endTurn();
+    }},
+    { text: 'Leave', action: () => { hideModal(); endTurn(); }}
+  ]);
+}
+
+// ── SHOP ──
+function showShop(node) {
+  const items = ENGINE.getShopItems();
+  const actions = items.map(item => ({
+    text: `${item.name} (${item.cost} coins)`,
+    action: () => {
+      if (G.coins >= item.cost) {
+        G.coins -= item.cost;
+        G.items.push({ ...item });
+        hideModal(); showMessage('Purchased!', `Got ${item.name}: ${item.desc}`); updateHUD(); endTurn();
+      } else {
+        hideModal(); showMessage('Not enough coins!', `${item.name} costs ${item.cost} coins.`); endTurn();
+      }
+    }
+  }));
+  actions.push({ text: 'Leave', action: () => { hideModal(); endTurn(); }});
+  showModal(node.name, '<p>Browse the wares:</p>', actions);
+}
+
+// ── EVENTS ──
+function doEvent(node) {
+  const event = ENGINE.drawEvent();
+  switch (event.type) {
+    case 'battle':
+      showMessage(event.name, event.desc);
+      setTimeout(() => startEncounter(node), 1000);
+      break;
+    case 'reward':
+      G.coins += event.reward.coins || 0;
+      showMessage(event.name, `${event.desc} +${event.reward.coins} coins!`);
+      updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    case 'heal':
+      for (const g of G.party.ghosts) g.hp = Math.min(g.maxHp, g.hp + 2);
+      showMessage(event.name, event.desc); updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    case 'resources':
+      const types = ['luckyStone','moonstone','healingSeed','surge','iceShard'];
+      ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
+      ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
+      showMessage(event.name, event.desc); updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    case 'trap':
+      const active = ENGINE.activeGhost(G.party);
+      active.hp = Math.max(0, active.hp - 2);
+      if (active.hp <= 0) active.ko = true;
+      showMessage(event.name, `${active.name} takes 2 damage!`); updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    case 'free_recruit':
+      const freeCard = ENGINE.getEncounterCard(node.r);
+      if (G.party.ghosts.length < 5) {
+        G.party.ghosts.push(ENGINE.makeGhost(freeCard.id));
+        showMessage(event.name, `${freeCard.name} joins your team!`);
+      } else {
+        showMessage(event.name, 'Your party is full!');
+      }
+      updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    default:
+      showMessage(event.name, event.desc); setTimeout(endTurn, 1500);
+  }
+}
+
+// ── SHRINE ──
+function showShrine(node) {
+  showModal(node.name, `<p>${node.desc}</p><p>Shrines offer powerful one-time rewards.</p>`, [
+    { text: 'Claim Reward', primary: true, action: () => {
+      // Give a strong reward
+      ENGINE.addResource(G.party.resources, 'firefly', 2);
+      ENGINE.addResource(G.party.resources, 'moonstone', 2);
+      hideModal(); showMessage('Shrine Blessing!', 'Gained 2 Magic Fireflies and 2 Moonstones!'); updateHUD(); endTurn();
+    }},
+    { text: 'Leave', action: () => { hideModal(); endTurn(); }}
+  ]);
+}
+
+// ── QUEST ──
+function showQuest(node) {
+  showModal(node.name, '<p>A quest appears on the board...</p><p><i>Quest system coming soon! For now, gain 5 coins.</i></p>', [
+    { text: 'Accept', primary: true, action: () => {
+      G.coins += 5;
+      hideModal(); showMessage('Quest Accepted!', '+5 coins as a placeholder reward.'); updateHUD(); endTurn();
+    }}
+  ]);
+}
+
+// ── BOSS BATTLE ──
+function startBossBattle(node) {
+  let bossKey;
+  if (node.name.includes('Timber')) bossKey = 'timber';
+  else if (node.name.includes('Jay')) bossKey = 'kingJay';
+  else if (node.name.includes('Nerina')) bossKey = 'nerina';
+  else if (node.name.includes('Lucy')) bossKey = 'lucy';
+  else bossKey = 'valkin';
+
+  if (G.bossesDefeated.includes(bossKey)) {
+    showMessage('Already Defeated', `You've already beaten ${ENGINE.BOSSES[bossKey].name}!`);
+    endTurn();
+    return;
+  }
+
+  const boss = ENGINE.BOSSES[bossKey];
+  const enemyTeam = ENGINE.makeTeam([boss.cardId]);
+  // Set boss HP
+  enemyTeam.ghosts[0].hp = boss.hp;
+  enemyTeam.ghosts[0].maxHp = boss.hp;
+
+  showBattle(G.party, enemyTeam, true, () => {
+    if (ENGINE.isTeamDefeated(enemyTeam)) {
+      G.bossesDefeated.push(bossKey);
+      G.coins += 5;
+
+      // Grant seal
+      const regionMap = { timber: 'rolling_hills', kingJay: 'frost_valley', nerina: 'volcanic_isles', lucy: 'dark_castle' };
+      if (regionMap[bossKey]) G.seals.push(regionMap[bossKey]);
+
+      // Unlock regions
+      if (bossKey === 'timber') {
+        G.regionsUnlocked.push('frost_valley', 'volcanic_isles');
+      } else if (bossKey === 'kingJay' || bossKey === 'nerina') {
+        if (G.bossesDefeated.includes('kingJay') || G.bossesDefeated.includes('nerina')) {
+          G.regionsUnlocked.push('dark_castle');
+        }
+      }
+
+      showModal(
+        `${boss.name} DEFEATED!`,
+        `<p>+5 Spirit Coins! Region Seal earned!</p>${bossKey === 'valkin' ? '<p style="font-size:24px;text-align:center;color:#f0d860">🏆 YOU ARE THE GRAND MASTER! 🏆</p>' : ''}`,
+        [{ text: 'CONTINUE', primary: true, action: () => { hideModal(); updateHUD(); endTurn(); if(bossKey==='valkin'){G.won=true;G.gameOver=true;} } }]
+      );
+    } else {
+      endTurn();
+    }
+  });
+}
+
+// ── UI HELPERS ──
+function showMessage(title, body, noAutoClose) {
+  showModal(title, body, noAutoClose ? [] : [{ text: 'OK', action: () => hideModal() }]);
+}
+
+function showModal(title, body, actions) {
+  document.getElementById('modal-title').innerHTML = title;
+  document.getElementById('modal-body').innerHTML = body;
+  const actEl = document.getElementById('modal-actions');
+  actEl.innerHTML = '';
+  for (const a of (actions || [])) {
+    const btn = document.createElement('button');
+    btn.textContent = a.text;
+    if (a.primary) btn.className = 'primary';
+    btn.onclick = a.action;
+    actEl.appendChild(btn);
+  }
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function hideModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+// ── OVERRIDE NODE RENDERING for game state ──
+const _origDrawNodes = drawNodesAndLabels;
+// We'll modify the draw loop to highlight player position and reachable nodes
+const _origDrawGame = drawGame;
+
+// Patch: draw player position indicator
+const origLoop = loop;
+
+// ── Override the player position on the map ──
+// Instead of always showing lantern on node 0, show it on current node
+// We patch the drawGame function's lantern drawing
+
+// ── INIT ──
+// Wait for engine.js to load
+setTimeout(() => {
+  if (typeof ENGINE !== 'undefined') {
+    showStarterScreen();
+  } else {
+    console.error('Engine not loaded!');
+  }
+}, 100);
+
+</script>
 </body>
 </html>
