@@ -3623,16 +3623,23 @@ async function createChallenge() {
   // Save team to Firebase
   await db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
 
-  // --- AUTO-MATCH: check if someone else is already waiting ---
+  // --- AUTO-MATCH: check if someone else is already waiting (created within last 5 min) ---
   const waitingSnap = await db.ref('mp/games').orderByChild('status').equalTo('waiting').limitToFirst(5).once('value');
   let matched = false;
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
   if (waitingSnap.exists()) {
     waitingSnap.forEach(child => {
       if (matched) return;
       const game = child.val();
       // Skip our own games
       if (game.creator === currentUser.uid) return;
-      // Found a waiting opponent — auto-join their game
+      // Skip stale games (older than 5 minutes)
+      if (game.created && game.created < fiveMinAgo) {
+        // Clean up stale game
+        db.ref(`mp/games/${child.key}`).update({ status: 'expired' });
+        return;
+      }
+      // Found a fresh waiting opponent — auto-join their game
       matched = true;
       const gameId = child.key;
       const myName = currentUser.displayName || 'Player';
@@ -3658,6 +3665,16 @@ async function createChallenge() {
     });
   }
   if (matched) return;
+
+  // --- Clean up any other stale waiting games we own ---
+  if (waitingSnap.exists()) {
+    waitingSnap.forEach(child => {
+      const game = child.val();
+      if (game.creator === currentUser.uid && game.status === 'waiting') {
+        db.ref(`mp/games/${child.key}`).update({ status: 'expired' });
+      }
+    });
+  }
 
   // --- No one waiting — create a new game and wait ---
   const gameRef = db.ref('mp/games').push();
