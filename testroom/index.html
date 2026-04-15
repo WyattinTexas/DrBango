@@ -15407,8 +15407,155 @@ document.addEventListener('keydown', e => {
     switchTab('battle');
     renderPicks();
     startBattle();
+    // Start blue AI for async/daily modes (not live PvP — that's a real player)
+    if (!LIVE_PVP) startBlueAI();
   }, 300);
 })();
+
+// ============================================================
+// BLUE AI AUTO-PLAY — for MP/daily modes (not live PvP)
+// ============================================================
+// Watches for blue's roll button to become enabled, then auto-plays:
+// - Commits specials before rolling (ice shards, sacred fire, surge)
+// - Auto-rolls after a brief delay (feels natural, not instant)
+// - Auto-picks KO replacement (save best ghost for last)
+// - Auto-handles ability modals on blue's side
+let AI_ACTIVE = false;
+let aiCheckInterval = null;
+
+function startBlueAI() {
+  if (AI_ACTIVE || LIVE_PVP) return;
+  AI_ACTIVE = true;
+
+  // Poll for opportunities to act
+  aiCheckInterval = setInterval(() => {
+    if (!B || B.phase === 'over') { stopBlueAI(); return; }
+    aiTick();
+  }, 600);
+}
+
+function stopBlueAI() {
+  AI_ACTIVE = false;
+  if (aiCheckInterval) { clearInterval(aiCheckInterval); aiCheckInterval = null; }
+}
+
+function aiTick() {
+  if (!B || !AI_ACTIVE) return;
+
+  // --- Auto-roll blue when button is ready ---
+  if (B.phase === 'ready' || B.phase === 'rolling') {
+    const blueBtn = document.getElementById('rollBlueBtn');
+    if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
+      // Commit specials before rolling
+      aiCommitSpecials('blue');
+      // Small delay to feel natural
+      setTimeout(() => {
+        if (B && (B.phase === 'ready' || B.phase === 'rolling')) {
+          rollReady('blue');
+        }
+      }, 400 + Math.random() * 600);
+      return;
+    }
+  }
+
+  // --- Auto-pick KO replacement ---
+  if (B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === 'blue') {
+    const t = B.blue;
+    const alive = t.ghosts.filter((g, i) => i !== t.activeIdx && !g.ko);
+    if (alive.length > 0) {
+      // Save the best ghost for last: pick the WEAKER one now
+      // "Best" = highest rarity, then highest HP
+      const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+      alive.sort((a, b) => {
+        const rd = (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0);
+        if (rd !== 0) return rd;
+        return b.hp - a.hp;
+      });
+      // Pick the WORST (last in sorted = lowest rarity/HP), saving best for last
+      const pick = alive[alive.length - 1];
+      const pickIdx = t.ghosts.indexOf(pick);
+      setTimeout(() => {
+        if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === 'blue') {
+          doKoSwap('blue', pickIdx);
+        }
+      }, 800 + Math.random() * 400);
+      return;
+    }
+  }
+
+  // --- Duel Phase: auto-click Done for blue ---
+  if ((B.phase === 'duel-1' || B.phase === 'duel-2') && B.duelActiveTeam === 'blue') {
+    aiCommitSpecials('blue');
+    const doneBtn = document.getElementById('duelDoneBlueBtn');
+    if (doneBtn && !doneBtn.disabled) {
+      setTimeout(() => {
+        if (doneBtn && !doneBtn.disabled) doneBtn.click();
+      }, 500 + Math.random() * 500);
+      return;
+    }
+  }
+
+  // --- Auto-handle blue ability modals ---
+  // Timber choice: always choose to discard specials (less punishing)
+  if (B.timberPending && B.timberPending.team !== 'blue') {
+    // Timber is opponent's ability affecting blue — auto-pick "discard"
+    const timberOverlay = document.getElementById('timberOverlay');
+    if (timberOverlay && timberOverlay.classList.contains('active')) {
+      setTimeout(() => doTimberChoice('discard'), 600);
+      return;
+    }
+  }
+
+  // Tyler: always opt in if HP > 4 (aggressive AI)
+  if (B.tylerPending && B.tylerPending.team === 'blue') {
+    const f = active(B.blue);
+    setTimeout(() => doTylerChoice(f && f.hp > 4 ? 'yes' : 'no'), 600);
+    return;
+  }
+
+  // Toby Pure Heart: never gamble (conservative AI)
+  if (B.tobyPending && B.tobyPending.team === 'blue') {
+    setTimeout(() => doPureHeartChoice('no'), 600);
+    return;
+  }
+
+  // Romy prediction: pick 4 (most common high-value die)
+  if (B.romyPending && B.romyPending.team === 'blue') {
+    setTimeout(() => doRomyPrediction(4), 600);
+    return;
+  }
+}
+
+// AI commits available specials before rolling
+function aiCommitSpecials(team) {
+  if (!B || !B[team]) return;
+  const r = B[team].resources;
+  if (!r) return;
+
+  // Commit all ice shards
+  if (r.ice > 0 && B.committed) {
+    B.committed[team].ice = r.ice;
+  }
+
+  // Commit all sacred fire
+  if (r.fire > 0 && B.committed) {
+    B.committed[team].fire = r.fire;
+  }
+
+  // Use healing seed if HP is below max
+  const f = active(B[team]);
+  if (f && r.healingSeed > 0 && f.hp < f.maxHp) {
+    // Healing seeds are used via the UI tile clicks — just commit surge if available
+  }
+
+  // Commit surge for abilities that use it
+  if (r.surge > 0 && B.committed) {
+    // Some ghosts use surge — commit 1 if available
+    B.committed[team].surge = Math.min(r.surge, 1);
+  }
+
+  renderBattle();
+}
 
 // ============================================================
 // LIVE PVP MODE — real-time 1v1 via Firebase
