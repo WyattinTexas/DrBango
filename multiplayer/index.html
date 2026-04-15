@@ -3196,6 +3196,50 @@ function showToast(msg) {
 }
 
 // ============================================================
+// REWARD CARD REVEAL — reuses pack overlay for battle rewards
+// ============================================================
+function showRewardCards(cards, title, onClose) {
+  pendingPack = cards;
+  flippedCount = 0;
+
+  const container = document.getElementById('pack-cards');
+  container.innerHTML = '';
+  document.getElementById('add-to-collection-btn').style.display = 'none';
+  document.querySelector('#pack-overlay h2').textContent = title || 'New Spiritkin!';
+
+  cards.forEach((ghost, i) => {
+    const el = document.createElement('div');
+    el.className = `pack-card rarity-${ghost.rarity}`;
+    el.innerHTML = `
+      <div class="pack-card-inner">
+        <div class="pack-card-front">
+          <div class="card-back-art">?</div>
+        </div>
+        <div class="pack-card-back">
+          <img src="${ghost.art}" alt="${ghost.name}" onerror="this.style.background='var(--surface3)'">
+          <span class="card-reveal-rarity" style="background:var(--${ghost.rarity})">${ghost.rarity.replace('-', ' ')}</span>
+          <span class="card-reveal-name">${ghost.name}</span>
+        </div>
+      </div>
+    `;
+    el.addEventListener('click', () => flipCard(el, ghost, i));
+    container.appendChild(el);
+  });
+
+  // Override the add-to-collection button for rewards (already added)
+  const addBtn = document.getElementById('add-to-collection-btn');
+  addBtn.textContent = 'Continue';
+  addBtn.onclick = function() {
+    document.getElementById('pack-overlay').classList.remove('active');
+    addBtn.textContent = 'Add to Collection';
+    addBtn.onclick = function() { addPackToCollection(); };
+    if (onClose) onClose();
+  };
+
+  document.getElementById('pack-overlay').classList.add('active');
+}
+
+// ============================================================
 // BATTLE RESULT HANDLING
 // ============================================================
 let pendingResult = null;
@@ -3271,8 +3315,8 @@ async function processBattleResult() {
     await ref.child('collection').set(updatedCollection);
     userProfile.collection = updatedCollection;
 
-    const cardNames = bonusCards.map(g => g.name).join(', ');
-    bodyText += `\n+3 cards: ${cardNames}`;
+    // Store for reveal after result modal closes
+    window._pendingRewardCards = bonusCards;
   } else if (result === 'loss') {
     const expected = 1 / (1 + Math.pow(10, (opponentElo - currentElo) / 400));
     newElo = Math.round(currentElo + K * (0 - expected));
@@ -3381,6 +3425,20 @@ async function processBattleResult() {
 
 function closeResultModal() {
   document.getElementById('result-modal').classList.remove('active');
+
+  // Show reward card reveal if there are pending rewards
+  if (window._pendingRewardCards && window._pendingRewardCards.length > 0) {
+    const cards = window._pendingRewardCards;
+    window._pendingRewardCards = null;
+    setTimeout(() => {
+      showRewardCards(cards, 'Victory Rewards!', () => {
+        renderCollection();
+        checkDailyCompletionPack();
+      });
+    }, 400);
+    return;
+  }
+
   // Check if player completed all 5 daily games
   checkDailyCompletionPack();
 }
@@ -4717,14 +4775,16 @@ async function processDailyResult() {
       }
     }
 
-    showToast('Today\'s Rival defeated! 3 bonus cards earned!');
-
-    // Update local profile and re-render so daily section shows "defeated"
+    // Update local profile
     userProfile.dailyChallengeWon = true;
     userProfile.dailyChallengeDate = dateKey;
     userProfile.collection = updatedCollection;
-    renderDailyChallenge();
-    renderCollection();
+
+    // Show the reward cards with celebration
+    showRewardCards(bonusCards, 'Rival Defeated!', () => {
+      renderDailyChallenge();
+      renderCollection();
+    });
   }
 }
 
