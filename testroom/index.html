@@ -2347,6 +2347,7 @@ let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
 let PVP_GAME_ID = null;
 let PVP_GAME_REF = null;
 let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
+let MP_DAILY = false; // true when loaded via daily rival mode
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -14518,8 +14519,12 @@ function showGameOver(winner) {
 
     const goButtons = el.querySelector('.go-buttons');
     if (goButtons) {
+      // Daily mode uses dailyResult param; regular MP uses result param
+      const returnUrl = MP_DAILY
+        ? `../multiplayer/?dailyResult=${result}`
+        : `../multiplayer/?result=${result}`;
       goButtons.innerHTML = `
-        <button class="go-btn-rematch" onclick="window.location.href='../multiplayer/?result=${result}'">
+        <button class="go-btn-rematch" onclick="window.location.href='${returnUrl}'">
           Return to Arena
         </button>
       `;
@@ -15338,7 +15343,10 @@ document.addEventListener('keydown', e => {
       // Determine result and redirect
       const winner = B && B.phase === 'over' ? (document.getElementById('goTitle').className.includes('red') ? 'red' : document.getElementById('goTitle').className.includes('blue') ? 'blue' : 'draw') : 'draw';
       const result = winner === 'red' ? 'win' : (winner === 'blue' ? 'loss' : 'draw');
-      window.location.href = '../multiplayer/?result=' + result;
+      const returnUrl = MP_DAILY
+        ? '../multiplayer/?dailyResult=' + result
+        : '../multiplayer/?result=' + result;
+      window.location.href = returnUrl;
     } else {
       rematchBattle();
     }
@@ -15367,6 +15375,7 @@ document.addEventListener('keydown', e => {
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode');
   if (mode !== 'mp' && mode !== 'daily') return;
+  if (mode === 'daily') MP_DAILY = true;
 
   const redParam = params.get('red');
   if (!redParam) return;
