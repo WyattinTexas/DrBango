@@ -7082,18 +7082,23 @@ function doGaleForcePickerChoice(idx) {
 // ============================================================
 function rollReady(team) {
   if (!B) return;
-  // Live PvP: Red runs the engine for both sides.
-  // Blue's click sends a "ready" signal — Red processes both rolls.
-  if (LIVE_PVP && team !== PVP_SIDE) {
-    // Red's engine handles Blue's roll via Firebase listener
-    return;
-  }
-  if (LIVE_PVP && PVP_SIDE === 'blue') {
-    // Blue: send ready signal, don't roll locally
-    PVP_GAME_REF.child('blueReady').set(true);
-    const btn2 = document.getElementById('rollBlueBtn');
-    if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
-    return;
+  // Live PvP routing:
+  // - Blue player clicking Blue Roll → send "ready" signal, don't run engine
+  // - Red player clicking Red Roll → runs normally (Red's engine)
+  // - Red's engine rolling Blue (from Firebase listener) → allowed through
+  if (LIVE_PVP) {
+    if (PVP_SIDE === 'blue' && team === 'blue') {
+      // Blue player: send ready signal, don't roll locally
+      PVP_GAME_REF.child('blueReady').set(true);
+      const btn2 = document.getElementById('rollBlueBtn');
+      if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
+      return;
+    }
+    if (PVP_SIDE === 'blue' && team === 'red') {
+      // Blue client trying to roll Red — block
+      return;
+    }
+    // Red client: allow rolling both sides (Red clicks Red, Firebase triggers Blue)
   }
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
@@ -16050,6 +16055,14 @@ function setupLivePvP() {
   const mySide = PVP_SIDE;
   const oppSide = mySide === 'red' ? 'blue' : 'red';
   const oppBtnId = oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+
+  // Clean up stale data from previous games
+  PVP_GAME_REF.child('blueReady').set(false);
+  PVP_GAME_REF.child('rolls').remove();
+  PVP_GAME_REF.child('roundResult').remove();
+  PVP_GAME_REF.child('koSwap').remove();
+  PVP_GAME_REF.child('swap').remove();
+  PVP_GAME_REF.child('gameOver').remove();
 
   // Hide opponent's roll button
   const oppBtn = document.getElementById(oppBtnId);
