@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v732';
+const TESTROOM_VERSION = 'v733';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2367,6 +2367,7 @@ let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
 let MP_DAILY = false; // true when loaded via daily rival mode
 let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
 let pvpAbilityEvents = []; // v721: capture ability callouts for Blue sync
+let pvpRedClickedRoll = false; // v733: async MP — AI waits for Red to click READY before rolling
 let pvpBlueResolvedLocally = false; // v725: flag to prevent double-resolution on Blue
 let pvpRedReady = false; // v726: Red has committed resources and is waiting for Blue
 
@@ -7173,6 +7174,10 @@ function rollReady(team) {
     }
     // Red's engine rolling Blue (from pvpTryGenerateDice) → allowed through
   }
+  // v733: async MP — when Red clicks READY, signal the AI to roll Blue after a short delay
+  if (MP_MODE && !LIVE_PVP && team === 'red') {
+    pvpRedClickedRoll = true;
+  }
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
   if (B.phase !== 'ready' && B.phase !== 'rolling') return;
@@ -8146,6 +8151,12 @@ function resetRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
   if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
+  // v733: async MP — Red button says "READY" (commit signal), Blue is AI-controlled
+  if (MP_MODE && !LIVE_PVP) {
+    if (r) r.textContent = 'READY';
+    if (b) b.style.display = 'none'; // hide Blue's button — AI rolls it
+    pvpRedClickedRoll = false; // reset each round
+  }
   // Live PvP: hide opponent's button, label ours properly
   if (LIVE_PVP) {
     const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
@@ -15985,14 +15996,17 @@ function aiTick() {
   if (B.phase === 'ready' || B.phase === 'rolling') {
     const blueBtn = document.getElementById('rollBlueBtn');
     if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
+      // v733: wait for Red to click READY before AI rolls Blue
+      if (!pvpRedClickedRoll) return;
       // Commit specials before rolling
       aiCommitSpecials('blue');
-      // v731: longer delay — give Red (human) time to commit specials first
+      // v733: Red already committed — short delay for feel, then roll
+      pvpRedClickedRoll = false;
       setTimeout(() => {
         if (B && (B.phase === 'ready' || B.phase === 'rolling')) {
           rollReady('blue');
         }
-      }, 2500 + Math.random() * 1500);
+      }, 800 + Math.random() * 400);
       return;
     }
   }
