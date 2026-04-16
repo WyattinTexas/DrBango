@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v717';
+const TESTROOM_VERSION = 'v718';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2638,6 +2638,7 @@ const GHOSTS = [
   {id:449, name:"Carpenter", rarity:"uncommon", maxHp:4, art:"art/originals/Carpenter.png", ability:"Crafty", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
   {id:450, name:"Welder", rarity:"rare", maxHp:5, art:"art/originals/Welder.png", ability:"Flux", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
   {id:451, name:"Foreman", rarity:"rare", maxHp:5, art:"art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"Win: +1 die next roll.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"End of the blue-collar chain. By this point you have Carpenter's Hammer (+2 singles) and Welder's Torch (burns +1, wins give burn) both active. Foreman snowballs dice on wins. The boss. Art: Spiritkin leaning over blueprints, detective-show 'I've had it up to here' energy."},
+  {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy. Rewards evolution-heavy decks with Burn resources. Pairs with Carpenter chain, Bigsby→Doom, any future transform cards."},
   // === SKYLAR SEED — PLAGUE/DECAY MECHANIC (2026-04-11) — GALLERY ONLY, NO BATTLE LOGIC ===
   // First ghost to target the opposing sideline. Working name, working numbers — pending 20-ghost name review.
   // === VOLCANIC ACTIVITY — Designed Cards ===
@@ -4698,6 +4699,7 @@ function carpenterTransform(team) {
   B.carpenterHammer[team] = true;
   queueAbility('TRANSFORMATION!', 'var(--rare)', `Carpenter transforms into the Welder! Carpenter's Hammer forged! (+2 singles, permanent)`, null, team);
   log(`<span class="log-ability">Carpenter</span> — Evolution! <span class="log-ms">WELDER rises!</span> Carpenter's Hammer left behind!`);
+  checkRipagooTransform(team);
   renderBattle();
 }
 
@@ -4725,7 +4727,23 @@ function welderTransform(team) {
   B.welderTorch[team] = true;
   queueAbility('TRANSFORMATION!', 'var(--rare)', `Welder transforms into the Foreman! Welder's Torch forged! (burns +1, wins give Burn, permanent)`, null, team);
   log(`<span class="log-ability">Welder</span> — Evolution! <span class="log-ms">FOREMAN rises!</span> Welder's Torch left behind!`);
+  checkRipagooTransform(team);
   renderBattle();
+}
+
+// Ripagoo (452) — Chemical Y: sideline — if a card in play transforms, gain 2 Burn
+function checkRipagooTransform(team) {
+  const t = B[team];
+  if (hasSideline(t, 452)) {
+    if (!t.resources.burn) t.resources.burn = 0;
+    t.resources.burn += 2;
+    const rg = getSidelineGhost(t, 452);
+    const rName = rg ? rg.name : 'Ripagoo';
+    popSidelineCard(t, 452);
+    showAbilityCallout('CHEMICAL Y!', 'var(--uncommon)', `${rName} (sideline) — Transformation detected! +2 Burn!`, team);
+    log(`<span class="log-ability">${rName}</span> — Chemical Y! Transformation → <span class="log-burn">+2 Burn!</span>`);
+    renderBattle();
+  }
 }
 
 function toggleFlameBlade(team) {
@@ -9939,6 +9957,7 @@ function pickMsValue(val) {
     g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
     queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    checkRipagooTransform(team);
     renderBattle();
   }
 
@@ -10425,6 +10444,7 @@ function pickMsValueUnified(val) {
     g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
     queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    checkRipagooTransform(team);
     renderBattle();
   }
 
