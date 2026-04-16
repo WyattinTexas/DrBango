@@ -167,6 +167,34 @@ canvas{position:absolute;top:0;left:0}
 .starter-card-wrap{cursor:pointer;transition:all .2s}
 .starter-card-wrap:hover{transform:translateY(-6px)}
 
+/* ═══ VICTORY SCREEN ═══ */
+#victory-screen{position:fixed;inset:0;z-index:400;background:radial-gradient(ellipse at center,rgba(30,20,10,.95),rgba(6,3,1,.99));
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#f0e8d8;text-align:center;padding:20px}
+#victory-screen.active{display:flex}
+#victory-screen h1{font:900 42px 'Cinzel',serif;color:#f0d860;text-shadow:0 0 40px rgba(240,216,96,.4);letter-spacing:6px;animation:victoryPulse 2s ease-in-out infinite}
+@keyframes victoryPulse{0%,100%{text-shadow:0 0 40px rgba(240,216,96,.4)}50%{text-shadow:0 0 80px rgba(240,216,96,.6),0 0 120px rgba(240,216,96,.2)}}
+#victory-screen .crown{font-size:80px;animation:crownBounce 1s ease-out}
+@keyframes crownBounce{0%{transform:scale(0) rotateZ(-20deg);opacity:0}60%{transform:scale(1.2) rotateZ(5deg)}100%{transform:scale(1) rotateZ(0);opacity:1}}
+.victory-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;text-align:left;margin:16px 0}
+.victory-stat{font:12px 'Crimson Text',serif}.victory-stat b{color:#f0d860;font-family:'Cinzel',serif}
+.victory-party{display:flex;gap:8px;justify-content:center;margin:12px 0}
+#victory-screen button{background:rgba(240,216,96,.15);border:2px solid #f0d860;border-radius:8px;color:#f0d860;font:700 16px 'Cinzel',serif;padding:12px 32px;cursor:pointer;margin-top:12px}
+
+/* ═══ BOSS INTRO ═══ */
+#boss-intro{position:fixed;inset:0;z-index:350;background:rgba(6,3,1,.97);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#f0e8d8}
+#boss-intro.active{display:flex}
+.boss-intro-art{width:160px;height:160px;border-radius:16px;object-fit:cover;border:3px solid #e94560;box-shadow:0 0 40px rgba(233,69,96,.3);animation:bossAppear .8s ease-out}
+@keyframes bossAppear{0%{transform:scale(0.3);opacity:0;filter:blur(10px)}100%{transform:scale(1);opacity:1;filter:blur(0)}}
+.boss-intro-name{font:900 36px 'Cinzel',serif;color:#e94560;text-shadow:0 0 30px rgba(233,69,96,.4);letter-spacing:4px}
+.boss-intro-hp{font:700 14px 'Press Start 2P',monospace;color:#e05050}
+.boss-intro-ability{font:700 16px 'Cinzel',serif;color:#f0d860}
+.boss-intro-desc{font:14px 'Crimson Text',serif;color:rgba(255,255,255,.6);max-width:400px;font-style:italic}
+#boss-intro button{background:rgba(233,69,96,.15);border:2px solid #e94560;border-radius:8px;color:#e94560;font:700 18px 'Cinzel',serif;padding:14px 40px;cursor:pointer;margin-top:8px;letter-spacing:3px}
+
+/* ═══ BATTLE TRANSITION ═══ */
+#battle-flash{position:fixed;inset:0;z-index:240;background:#fff;opacity:0;pointer-events:none;transition:opacity .15s}
+#battle-flash.flash{opacity:.6;transition:none}
+
 #starter-screen{position:fixed;inset:0;z-index:300;background:rgba(6,3,1,.98);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;color:#f0e8d8}
 #starter-screen h2{font:800 28px 'Cinzel',serif;letter-spacing:3px}
@@ -220,6 +248,26 @@ canvas{position:absolute;top:0;left:0}
   <div id="b-callout"></div>
   <div id="b-log"></div>
   <div id="b-actions"></div>
+</div>
+
+<div id="battle-flash"></div>
+
+<div id="boss-intro">
+  <img class="boss-intro-art" id="boss-intro-art" src="">
+  <div class="boss-intro-name" id="boss-intro-name"></div>
+  <div class="boss-intro-hp" id="boss-intro-hp"></div>
+  <div class="boss-intro-ability" id="boss-intro-ability"></div>
+  <div class="boss-intro-desc" id="boss-intro-desc"></div>
+  <button id="boss-intro-btn" onclick="dismissBossIntro()">FIGHT</button>
+</div>
+
+<div id="victory-screen">
+  <div class="crown">👑</div>
+  <h1>GRAND MASTER</h1>
+  <p style="font:16px 'Cinzel',serif;color:rgba(255,255,255,.7)">You have defeated Valkin the Grand and claimed the Overworld.</p>
+  <div class="victory-stats" id="victory-stats"></div>
+  <div class="victory-party" id="victory-party"></div>
+  <button onclick="deleteSave();location.reload()">NEW ADVENTURE</button>
 </div>
 
 <div id="starter-screen">
@@ -756,6 +804,7 @@ function drawGame(){
     const reachDist=isReachable?window._reachableNodes.get(node.id):0;
     const isPlayer=G&&G.currentNode===node.id;
     const isLocked=G&&!isRegionUnlocked(node.r);
+    const isCleared=isEncounterCleared(node.id);
     const pulse=isReachable?.5+Math.sin(t*3+node.id)*.5:.85+Math.sin(t+node.id*.8)*.15;
     const isBoss=node.type==='boss'||node.type==='final';
     const sz=((isHov||isReachable)?nt.sz*1.2:nt.sz)*camScale*(isLocked?0.8:1);
@@ -809,6 +858,11 @@ function drawGame(){
     else if(node.type==='quest'){g.fillText('\uD83D\uDCDC',pos.x,pos.y)}
     else if(node.type==='event'){g.fillStyle='#fff';g.font=`bold ${iconSz*.9}px serif`;g.fillText('?',pos.x,pos.y)}
     else if(node.type==='start'){g.fillStyle='#fff';g.font=`bold ${iconSz*.8}px 'Cinzel'`;g.fillText('GO',pos.x,pos.y+1)}
+    // Cleared checkmark
+    if(isCleared&&!isLocked){
+      g.fillStyle='#2ecc71';g.font=`bold ${sz*.8}px serif`;
+      g.fillText('✓',pos.x+sz*.6,pos.y-sz*.4);
+    }
     g.restore();
 
     // ── LABELS — strong outline, no backing ──
@@ -1162,7 +1216,8 @@ function saveGame() {
     bossesDefeated: G.bossesDefeated,
     regionsUnlocked: G.regionsUnlocked,
     gameOver: G.gameOver,
-    won: G.won
+    won: G.won,
+    clearedNodes: G._clearedNodes ? [...G._clearedNodes] : []
   };
   localStorage.setItem('boo_adventure_save', JSON.stringify(saveData));
 }
@@ -1189,6 +1244,7 @@ function loadGame() {
     state.regionsUnlocked = data.regionsUnlocked || ['rolling_hills'];
     state.gameOver = data.gameOver || false;
     state.won = data.won || false;
+    state._clearedNodes = new Set(data.clearedNodes || []);
     return state;
   } catch (e) {
     console.error('Failed to load save:', e);
@@ -1236,6 +1292,7 @@ function doEncounterBattle(card, cardId, node) {
   showBattle(G.party, enemyTeam, false, () => {
     if (!ENGINE.isTeamDefeated(enemyTeam)) { endTurn(); return; }
     G.coins += 3;
+    markEncounterCleared(node.id);
 
     // Use new recruit screen with full party management
     if (typeof showRecruitScreen === 'function') {
@@ -1252,6 +1309,7 @@ function doEncounterBattle(card, cardId, node) {
 let battleState = null;
 
 function showBattle(playerTeam, enemyTeam, isBoss, onComplete) {
+  battleFlash();
   battleState = { playerTeam, enemyTeam, isBoss, onComplete, round: 0 };
   const screen = document.getElementById('battle-screen');
   screen.style.display = 'flex';
@@ -1281,6 +1339,30 @@ function showRollActions() {
     res.surge--;battleState.extraDice=(battleState.extraDice||0)+1;
     showCallout('+1 die from Surge!','#f0d860');showRollActions();
   }});
+  // Item usage
+  if (G && G.items) {
+    const smoke = G.items.findIndex(i => i.id === 'smoke_bomb');
+    if (smoke >= 0 && !battleState.isBoss) {
+      actions.push({text:'💨 Smoke Bomb (flee)',cls:'resource',action:()=>{
+        G.items.splice(smoke, 1); endBattle(); endTurn();
+      }});
+    }
+    const crystal = G.items.findIndex(i => i.id === 'power_crystal');
+    if (crystal >= 0) {
+      actions.push({text:'💎 Power Crystal (+2 dmg)',cls:'resource',action:()=>{
+        G.items.splice(crystal, 1); battleState.powerCrystal = true;
+        showCallout('Power Crystal! +2 damage this battle','#f0d860'); showRollActions();
+      }});
+    }
+    const horn = G.items.findIndex(i => i.id === 'battle_horn');
+    if (horn >= 0 && !battleState.usedHorn) {
+      actions.push({text:'📯 Battle Horn (reroll)',cls:'resource',action:()=>{
+        battleState.usedHorn = true; G.items.splice(horn, 1);
+        showCallout('Battle Horn! Rerolling...','#f0d860');
+        doBattleRound(); // Just roll again
+      }});
+    }
+  }
   actions.push({ text: 'ROLL DICE', cls: 'attack', action: () => doBattleRound() });
   setBattleActions(actions);
 }
@@ -1316,8 +1398,28 @@ function doBattleRound() {
   }
 
   const extraDice = bs.extraDice || 0;
-  bs.extraDice = 0; // reset after use
+  bs.extraDice = 0;
   const result = ENGINE.resolveBattleRound(bs.playerTeam, bs.enemyTeam, 3 + extraDice, 3);
+  // Power Crystal bonus
+  if (bs.powerCrystal && result.winner === 'a' && result.enemyDamageDealt > 0) {
+    const target = ENGINE.activeGhost(bs.enemyTeam);
+    target.hp = Math.max(0, target.hp - 2);
+    if (target.hp <= 0) target.ko = true;
+    result.enemyDamageDealt += 2;
+    result.events.push('💎 Power Crystal: +2 damage!');
+  }
+
+  // Sound effects
+  playSFX('dice');
+  if (result.winner !== 'tie') {
+    const dmg = result.winner === 'a' ? result.enemyDamageDealt : result.playerDamageDealt;
+    setTimeout(() => {
+      if (dmg >= 3) playSFX('dmg3');
+      else if (dmg >= 2) playSFX('dmg2');
+      else if (dmg >= 1) playSFX('dmg1');
+      if (result.playerRoll.type === 'triples' || result.enemyRoll.type === 'triples') playSFX('triples');
+    }, 400);
+  }
 
   // Animated dice reveal
   const diceArea = document.getElementById('b-dice-area');
@@ -1577,12 +1679,14 @@ function startBossBattle(node) {
   }
 
   const boss = ENGINE.BOSSES[bossKey];
-  const enemyTeam = ENGINE.makeTeam([boss.cardId]);
-  // Set boss HP
-  enemyTeam.ghosts[0].hp = boss.hp;
-  enemyTeam.ghosts[0].maxHp = boss.hp;
 
-  showBattle(G.party, enemyTeam, true, () => {
+  // Show boss intro splash first
+  showBossIntro(bossKey, () => {
+    const enemyTeam = ENGINE.makeTeam([boss.cardId]);
+    enemyTeam.ghosts[0].hp = boss.hp;
+    enemyTeam.ghosts[0].maxHp = boss.hp;
+
+    showBattle(G.party, enemyTeam, true, () => {
     if (ENGINE.isTeamDefeated(enemyTeam)) {
       G.bossesDefeated.push(bossKey);
       G.coins += 5;
@@ -1600,15 +1704,22 @@ function startBossBattle(node) {
         }
       }
 
-      showModal(
-        `${boss.name} DEFEATED!`,
-        `<p>+5 Spirit Coins! Region Seal earned!</p>${bossKey === 'valkin' ? '<p style="font-size:24px;text-align:center;color:#f0d860">🏆 YOU ARE THE GRAND MASTER! 🏆</p>' : ''}`,
-        [{ text: 'CONTINUE', primary: true, action: () => { hideModal(); updateHUD(); endTurn(); if(bossKey==='valkin'){G.won=true;G.gameOver=true;} } }]
-      );
+      if (bossKey === 'valkin') {
+        G.won = true; G.gameOver = true;
+        playSFX('win');
+        setTimeout(() => showVictoryScreen(), 500);
+      } else {
+        showModal(
+          `${boss.name} DEFEATED!`,
+          `<p>+5 Spirit Coins! Region Seal earned!</p>`,
+          [{ text: 'CONTINUE', primary: true, action: () => { hideModal(); updateHUD(); endTurn(); } }]
+        );
+      }
     } else {
       endTurn();
     }
-  });
+    }); // end showBattle
+  }); // end showBossIntro
 }
 
 // ── UI HELPERS ──
@@ -1634,6 +1745,95 @@ function showModal(title, body, actions) {
 function hideModal() {
   document.getElementById('modal-overlay').style.display = 'none';
 }
+
+// ═══════════════════════════════════════════
+// GREAT FEATURES
+// ═══════════════════════════════════════════
+
+// ── VICTORY SCREEN ──
+function showVictoryScreen() {
+  const el = document.getElementById('victory-screen');
+  el.classList.add('active');
+  // Stats
+  const stats = document.getElementById('victory-stats');
+  stats.innerHTML = `
+    <div class="victory-stat"><b>Turns:</b> ${G.turnNumber}</div>
+    <div class="victory-stat"><b>Party Size:</b> ${G.party.ghosts.length}</div>
+    <div class="victory-stat"><b>Bosses Defeated:</b> ${G.bossesDefeated.length}</div>
+    <div class="victory-stat"><b>Seals Earned:</b> ${G.seals.length}/4</div>
+    <div class="victory-stat"><b>Coins:</b> ${G.coins}</div>
+    <div class="victory-stat"><b>Nodes Visited:</b> ${G.visitedNodes.size}</div>
+  `;
+  // Show final party
+  const partyEl = document.getElementById('victory-party');
+  partyEl.innerHTML = G.party.ghosts.map(g => renderCard(g, {size:'mini'})).join('');
+}
+
+// ── BATTLE TRANSITION ──
+function battleFlash() {
+  const fl = document.getElementById('battle-flash');
+  fl.classList.add('flash');
+  setTimeout(() => fl.classList.remove('flash'), 150);
+}
+
+// ── SOUND EFFECTS ──
+const SFX = {};
+function loadSounds() {
+  const sounds = {
+    dice: '../boo/DiceRoll.mp3',
+    dmg1: '../boo/1Damage.mp3',
+    dmg2: '../boo/2Damage.mp3',
+    dmg3: '../boo/3Damage.mp3',
+    triples: '../boo/triples.mp3',
+    special: '../boo/Special.mp3',
+    shatter: '../boo/Shatter.mp3',
+    win: '../boo/winningwhistle.mp3'
+  };
+  for (const [key, path] of Object.entries(sounds)) {
+    SFX[key] = new Audio(path);
+    SFX[key].volume = 0.4;
+  }
+}
+function playSFX(name) {
+  if (SFX[name]) { SFX[name].currentTime = 0; SFX[name].play().catch(() => {}); }
+}
+
+// ── BOSS INTRO ──
+let _bossIntroCallback = null;
+function showBossIntro(bossKey, callback) {
+  const boss = ENGINE.BOSSES[bossKey];
+  const card = ENGINE.getCard(boss.cardId);
+  const art = typeof ART_MAP !== 'undefined' && ART_MAP[boss.cardId] ? '../testroom/' + ART_MAP[boss.cardId] : '';
+
+  document.getElementById('boss-intro-art').src = art;
+  document.getElementById('boss-intro-name').textContent = boss.name;
+  document.getElementById('boss-intro-hp').textContent = boss.hp + ' HP';
+  document.getElementById('boss-intro-ability').textContent = card ? card.ability : '';
+  document.getElementById('boss-intro-desc').textContent = card ? card.desc : '';
+  document.getElementById('boss-intro').classList.add('active');
+  _bossIntroCallback = callback;
+  playSFX('special');
+}
+function dismissBossIntro() {
+  document.getElementById('boss-intro').classList.remove('active');
+  if (_bossIntroCallback) { _bossIntroCallback(); _bossIntroCallback = null; }
+}
+
+// ── MAP COMPLETION MARKERS ──
+// Track cleared encounters in game state
+function markEncounterCleared(nodeId) {
+  if (!G._clearedNodes) G._clearedNodes = new Set();
+  G._clearedNodes.add(nodeId);
+}
+function isEncounterCleared(nodeId) {
+  return G && G._clearedNodes && G._clearedNodes.has(nodeId);
+}
+
+// Load sounds on first interaction
+document.addEventListener('click', function initSounds() {
+  loadSounds();
+  document.removeEventListener('click', initSounds);
+}, { once: true });
 
 // Player position + reachable nodes are handled inline via G state checks in drawGame
 
