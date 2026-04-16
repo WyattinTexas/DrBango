@@ -4004,7 +4004,7 @@ function startBattle() {
   document.getElementById('team-select').style.display = 'none';
   document.getElementById('battle-view').style.display = 'block';
   document.querySelector('.app').classList.add('battle-active');
-  startMusic();
+  if (!MP_MODE) startMusic(); // No music in multiplayer
   log('<span class="log-round">Battle begins!</span>');
   renderBattle();
 
@@ -7082,8 +7082,19 @@ function doGaleForcePickerChoice(idx) {
 // ============================================================
 function rollReady(team) {
   if (!B) return;
-  // Live PvP: you can only roll YOUR side. Opponent's dice arrive via Firebase.
-  if (LIVE_PVP && team !== PVP_SIDE) return;
+  // Live PvP: Red runs the engine for both sides.
+  // Blue's click sends a "ready" signal — Red processes both rolls.
+  if (LIVE_PVP && team !== PVP_SIDE) {
+    // Red's engine handles Blue's roll via Firebase listener
+    return;
+  }
+  if (LIVE_PVP && PVP_SIDE === 'blue') {
+    // Blue: send ready signal, don't roll locally
+    PVP_GAME_REF.child('blueReady').set(true);
+    const btn2 = document.getElementById('rollBlueBtn');
+    if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
+    return;
+  }
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
   if (B.phase !== 'ready' && B.phase !== 'rolling') return;
@@ -8031,21 +8042,21 @@ function renderDuelUI() {
 function startNextRound() {
   if (!B) return;
 
-  // Live PvP state sync: Red is authoritative — writes state after each round.
-  // Blue reads it and overwrites local state to prevent drift.
+  // Live PvP state sync: Red is authoritative — broadcasts full state after each round.
   if (LIVE_PVP && PVP_GAME_REF && B.phase !== 'over') {
     if (PVP_SIDE === 'red') {
-      // Red: write authoritative state
+      // Red: broadcast round result to Blue
       const stateSnap = pvpSerializeState();
       PVP_GAME_REF.child('stateSync').set(stateSnap);
-    } else {
-      // Blue: read Red's state and apply it
-      PVP_GAME_REF.child('stateSync').once('value', snap => {
-        const state = snap.val();
-        if (state) pvpApplyState(state);
-        renderBattle();
+      PVP_GAME_REF.child('roundResult').push({
+        state: stateSnap,
+        redDice: B.redDice || null,
+        blueDice: B.blueDice || null,
+        gameOver: null,
+        ts: Date.now()
       });
     }
+    // Blue doesn't need to do anything — roundResult listener handles it
   }
 
   // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
@@ -14630,6 +14641,13 @@ function showGameOver(winner) {
     const stateSnap = pvpSerializeState();
     PVP_GAME_REF.child('stateSync').set(stateSnap);
     PVP_GAME_REF.child('gameOver').set({ winner, ts: Date.now() });
+    PVP_GAME_REF.child('roundResult').push({
+      state: stateSnap,
+      redDice: B.redDice || null,
+      blueDice: B.blueDice || null,
+      gameOver: winner,
+      ts: Date.now()
+    });
   }
   fadeOutMusic();
   // Victory fanfare (delayed to let music fade a bit)
@@ -16041,23 +16059,54 @@ function setupLivePvP() {
   PVP_GAME_REF.child(`connected/${mySide}`).set(true);
   PVP_GAME_REF.child(`connected/${mySide}`).onDisconnect().set(false);
 
-  // --- DICE SYNC ---
-  // Listen for opponent's dice. Instead of calling rollReady (which has 15+
-  // ability modal checks that block on the wrong client), we inject dice
-  // DIRECTLY into the engine state and trigger resolution.
-  PVP_GAME_REF.child('rolls').on('child_added', snap => {
-    const data = snap.val();
-    if (!data || data.side !== oppSide) return;
-    if (!B || B.phase === 'over') return;
-    snap.ref.remove();
+  // --- DICE SYNC (Red-authoritative) ---
+  // Red generates ALL dice. Blue sends "ready" signal.
+  // When both are ready, Red rolls both sides and broadcasts results.
+  if (mySide === 'blue') {
+    // BLUE: listen for Red's authoritative round result
+    PVP_GAME_REF.child('roundResult').on('child_added', snap => {
+      const data = snap.val();
+      if (!data || !B || B.phase === 'over') return;
+      snap.ref.remove();
 
-    // Hide wait banner
-    const banner = document.getElementById('pvp-wait-banner');
-    if (banner) banner.style.display = 'none';
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
 
-    // Inject opponent's dice directly into engine state
-    pvpInjectOpponentDice(oppSide, data.dice);
-  });
+      // Apply the full state from Red (authoritative)
+      pvpApplyState(data.state);
+      renderBattle();
+
+      // Show dice animations for both sides
+      if (data.redDice) {
+        B.redDice = data.redDice;
+        B.blueDice = data.blueDice;
+        renderDice(data.redDice, data.blueDice);
+      }
+
+      // If game over
+      if (data.gameOver) {
+        setTimeout(() => {
+          if (B && B.phase !== 'over') showGameOver(data.gameOver);
+        }, 800);
+      }
+    });
+  } else {
+    // RED: listen for Blue's "ready" signal, then roll both sides
+    PVP_GAME_REF.child('blueReady').on('value', snap => {
+      const ready = snap.val();
+      if (!ready || !B || B.phase === 'over') return;
+      if (B.phase !== 'rolling' && B.phase !== 'ready') return;
+
+      // Blue is ready — clear the signal
+      PVP_GAME_REF.child('blueReady').set(false);
+
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
+
+      // Roll Blue's dice on Red's engine
+      rollReady('blue');
+    });
+  }
 
   // --- KO SWAP SYNC ---
   PVP_GAME_REF.child('koSwap').on('child_added', snap => {
@@ -16114,6 +16163,7 @@ function setupLivePvP() {
     }
 
     const elapsed = Math.floor((Date.now() - pvpTurnStart) / 1000);
+    const remaining = Math.max(0, 25 - elapsed);
 
     // Determine whose turn it is
     const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
@@ -16123,34 +16173,34 @@ function setupLivePvP() {
     if (B.phase === 'ko-swap') {
       const whoSwaps = B.koSwapQueue && B.koSwapQueue[0];
       if (whoSwaps === mySide) {
-        timerEl.textContent = `Your pick — ${elapsed}s`;
-        timerEl.style.color = elapsed >= 15 ? 'var(--accent)' : 'var(--gold-bright)';
+        timerEl.textContent = `Your pick — ${remaining}s`;
+        timerEl.style.color = remaining <= 10 ? 'var(--accent)' : 'var(--gold-bright)';
       } else {
-        timerEl.textContent = `Opponent picking — ${elapsed}s`;
+        timerEl.textContent = `Opponent picking...`;
         timerEl.style.color = 'var(--text2)';
       }
     } else if (myTurnToRoll) {
-      if (elapsed >= 20) {
-        timerEl.textContent = `ROLL NOW! — ${elapsed}s`;
+      if (remaining <= 5) {
+        timerEl.textContent = `ROLL NOW! ${remaining}s`;
         timerEl.style.color = 'var(--accent)';
         timerEl.style.fontSize = '1.4rem';
         timerEl.style.background = 'rgba(233,69,96,0.2)';
-        timerEl.style.animation = 'none'; timerEl.offsetHeight; timerEl.style.animation = 'pvpTimerPulse 0.5s ease-in-out infinite';
-      } else if (elapsed >= 15) {
-        timerEl.textContent = `Your roll — ${elapsed}s`;
+        timerEl.style.animation = 'pvpTimerPulse 0.5s ease-in-out infinite';
+      } else if (remaining <= 10) {
+        timerEl.textContent = `Your roll — ${remaining}s`;
         timerEl.style.color = 'var(--accent)';
         timerEl.style.fontSize = '1.2rem';
         timerEl.style.background = 'rgba(233,69,96,0.1)';
         timerEl.style.animation = '';
       } else {
-        timerEl.textContent = `Your roll — ${elapsed}s`;
+        timerEl.textContent = `Your roll — ${remaining}s`;
         timerEl.style.color = 'var(--gold-bright)';
         timerEl.style.fontSize = '1.1rem';
         timerEl.style.background = 'rgba(0,0,0,0.4)';
         timerEl.style.animation = '';
       }
     } else if (B.phase === 'ready' || B.phase === 'rolling') {
-      timerEl.textContent = `Waiting for opponent — ${elapsed}s`;
+      timerEl.textContent = `Waiting for opponent...`;
       timerEl.style.color = 'var(--text2)';
       timerEl.style.fontSize = '1.1rem';
       timerEl.style.background = 'rgba(0,0,0,0.4)';
