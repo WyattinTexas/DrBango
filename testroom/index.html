@@ -14843,7 +14843,16 @@ function startMusic() {
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.2;
-  music.play().catch(() => {});
+  music.play().catch(() => {
+    // Autoplay blocked — retry on first user click
+    const retryMusic = () => {
+      music.play().catch(() => {});
+      document.removeEventListener('click', retryMusic);
+      document.removeEventListener('touchstart', retryMusic);
+    };
+    document.addEventListener('click', retryMusic, { once: true });
+    document.addEventListener('touchstart', retryMusic, { once: true });
+  });
 }
 
 function fadeOutMusic() {
@@ -15969,16 +15978,17 @@ function aiHandlePostRoll() {
   waitBanner.id = 'pvp-wait-banner';
   waitBanner.style.cssText = 'text-align:center;padding:12px;font-family:Creepster,cursive;font-size:1.2rem;color:var(--gold-bright);letter-spacing:2px;display:none;';
   waitBanner.textContent = "Waiting for opponent's roll...";
-  document.querySelector('.battle-arena')?.prepend(waitBanner);
+  const bv = document.getElementById('battle-view');
+  if (bv) bv.prepend(waitBanner);
 
   // Add turn timer display — prominent, above the dice
   const timerBar = document.createElement('div');
   timerBar.id = 'pvp-turn-timer';
   timerBar.style.cssText = 'text-align:center;padding:8px 16px;font-family:Creepster,cursive;font-size:1.1rem;font-weight:700;color:var(--text2);letter-spacing:2px;background:rgba(0,0,0,0.4);border-radius:8px;margin:4px auto;max-width:400px;';
   timerBar.textContent = '';
-  // Insert above the dice/arena area
-  const arenaEl = document.getElementById('arena') || document.querySelector('.battle-arena');
-  if (arenaEl) arenaEl.parentNode.insertBefore(timerBar, arenaEl);
+  // Insert at top of battle view
+  const battleView = document.getElementById('battle-view');
+  if (battleView) battleView.prepend(timerBar);
 
   // Start battle immediately
   setTimeout(() => {
@@ -16462,12 +16472,25 @@ renderBattle = function() {
     oppResources.style.opacity = '0.7';
   }
 
-  // Block clicking opponent's sideline for voluntary swaps
+  // Block ALL opponent-side sideline interactions
   document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
-    if (!(B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === PVP_SIDE)) {
-      el.style.pointerEvents = 'none';
-    }
+    el.style.pointerEvents = 'none';
   });
+
+  // During KO swap: only allow clicking YOUR OWN sideline when it's YOUR swap turn
+  if (B && B.phase === 'ko-swap' && B.koSwapQueue) {
+    const whoSwaps = B.koSwapQueue[0];
+    // Block YOUR sideline if it's NOT your turn to swap
+    if (whoSwaps !== PVP_SIDE) {
+      document.querySelectorAll(`#${PVP_SIDE}-sl-left, #${PVP_SIDE}-sl-right`).forEach(el => {
+        el.style.pointerEvents = 'none';
+      });
+    }
+    // Block opponent's sideline always (they pick on their own client)
+    document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
+      el.style.pointerEvents = 'none';
+    });
+  }
 
   // If opponent needs to KO swap, show waiting
   if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
