@@ -2358,7 +2358,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v734';
+const TESTROOM_VERSION = 'v735';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -4503,6 +4503,9 @@ function pvpBroadcastCommitted(team) {
     committed: { ...B.committed[team] },
     resources: { ...t.resources },
     activeHp: f ? f.hp : 0,
+    // v735: include burn state so opponent's engine knows about burn placement
+    burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : null,
+    burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : null,
     ts: Date.now()
   });
 }
@@ -5685,6 +5688,8 @@ function doBurnPlace(team, ghostIndex) {
   }
 
   renderBattle();
+  // v735: broadcast burn state so opponent's engine knows about it
+  pvpBroadcastCommitted(team);
 
   // If still have burn to place, re-open picker after a brief delay
   if (t.resources.burn > 0) {
@@ -16641,6 +16646,13 @@ function setupLivePvP() {
       const oppActive = active(B[data.side]);
       if (oppActive) oppActive.hp = data.activeHp;
     }
+    // v735: sync burn state — critical for entry damage on KO swaps
+    if (data.burn) {
+      B.burn = data.burn;
+      if (!B.burn.red) B.burn.red = {};
+      if (!B.burn.blue) B.burn.blue = {};
+    }
+    if (data.burnSource) B.burnSource = data.burnSource;
     renderBattle();
     playSfx('sfxSpecial', 0.15); // subtle audio cue that opponent is doing something
   });
