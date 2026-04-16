@@ -14859,20 +14859,27 @@ function playDamageSfx(dmg) {
   else playSfx('sfx1Damage');
 }
 
+let _musicStarted = false;
 function startMusic() {
+  if (_musicStarted) return;
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.2;
-  music.play().catch(() => {
-    // Autoplay blocked — retry on first user click
-    const retryMusic = () => {
-      music.play().catch(() => {});
-      document.removeEventListener('click', retryMusic);
-      document.removeEventListener('touchstart', retryMusic);
-    };
-    document.addEventListener('click', retryMusic, { once: true });
-    document.addEventListener('touchstart', retryMusic, { once: true });
-  });
+  const p = music.play();
+  if (p) {
+    p.then(() => { _musicStarted = true; }).catch(() => {
+      // Autoplay blocked — retry once on first click
+      const retry = () => {
+        if (_musicStarted) return;
+        _musicStarted = true;
+        music.volume = 0.2;
+        music.play().catch(() => {});
+      };
+      document.addEventListener('click', retry, { once: true });
+    });
+  } else {
+    _musicStarted = true;
+  }
 }
 
 function fadeOutMusic() {
