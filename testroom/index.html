@@ -8085,6 +8085,14 @@ function resetRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
   if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
+  // Live PvP: hide opponent's button, label ours properly
+  if (LIVE_PVP) {
+    const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+    const oppBtn = document.getElementById(oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    if (oppBtn) oppBtn.style.display = 'none';
+    const myBtn = document.getElementById(PVP_SIDE === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    if (myBtn) myBtn.textContent = 'ROLL';
+  }
   // Clear dice display between rounds — no leftover numbers from last roll
   ['red', 'blue'].forEach(t => {
     const el = document.getElementById(t + '-dice');
@@ -16044,6 +16052,8 @@ function aiHandlePostRoll() {
   setTimeout(() => {
     renderPicks();
     startBattle();
+    // Disable duel phase in live PvP — requires both players on same engine
+    if (B) B.duelPhaseMode = false;
     setupLivePvP();
   }, 400);
 })();
@@ -16104,21 +16114,34 @@ function setupLivePvP() {
       }
     });
   } else {
-    // RED: listen for Blue's "ready" signal, then roll both sides
+    // RED: listen for Blue's "ready" signal
+    PVP_OPPONENT_READY = false;
     PVP_GAME_REF.child('blueReady').on('value', snap => {
       const ready = snap.val();
       if (!ready || !B || B.phase === 'over') return;
-      if (B.phase !== 'rolling' && B.phase !== 'ready') return;
-
-      // Blue is ready — clear the signal
+      PVP_OPPONENT_READY = true;
       PVP_GAME_REF.child('blueReady').set(false);
 
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
 
-      // Roll Blue's dice on Red's engine
-      rollReady('blue');
+      // Try to roll Blue now — if Red is in a state that allows it
+      pvpTryRollBlue();
     });
+
+    // Poll: if Blue was ready but Red wasn't in the right phase, retry
+    setInterval(() => {
+      if (PVP_OPPONENT_READY && B && B.phase !== 'over') pvpTryRollBlue();
+    }, 500);
+  }
+
+  function pvpTryRollBlue() {
+    if (!PVP_OPPONENT_READY || !B) return;
+    // Only roll Blue when engine is ready for it
+    if (B.phase === 'ready' || B.phase === 'rolling') {
+      PVP_OPPONENT_READY = false;
+      rollReady('blue');
+    }
   }
 
   // --- KO SWAP SYNC ---
