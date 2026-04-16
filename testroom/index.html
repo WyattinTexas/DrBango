@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v730';
+const TESTROOM_VERSION = 'v731';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -10058,6 +10058,18 @@ function pickMsValue(val) {
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
+  // v731: broadcast Moonstone choice to Red's engine so it resolves with correct dice
+  if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF && team === 'blue') {
+    PVP_GAME_REF.child('specialsChoice').push({
+      type: 'moonstone',
+      side: 'blue',
+      dieIndex: ms.dieIndex,
+      chosenValue: val,
+      dice: ms.dice.slice(),
+      ts: Date.now()
+    });
+  }
+
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used,
   // Bigsby MUST be sacrificed and replaced with Doom (id 112). Mandatory transformation.
   if (f.id === 424 && !f.ko) {
@@ -10551,6 +10563,18 @@ function pickMsValueUnified(val) {
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
+  // v731: broadcast Moonstone choice to Red's engine
+  if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF && team === 'blue') {
+    PVP_GAME_REF.child('specialsChoice').push({
+      type: 'moonstone',
+      side: 'blue',
+      dieIndex: ms.dieIndex,
+      chosenValue: val,
+      dice: ms.dice.slice(),
+      ts: Date.now()
+    });
+  }
+
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used
   if (f.id === 424 && !f.ko) {
     const g = f;
@@ -10814,6 +10838,68 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
 }
 
 // ============================================================
+// v731: PvP SPECIALS SYNC — Blue broadcasts "done", Red waits
+// ============================================================
+// Blue calls this after all specials (MS + LS) are finished,
+// right before resolveRound(). Red listens for the signal.
+function pvpBroadcastSpecialsDone() {
+  if (!LIVE_PVP || PVP_SIDE !== 'blue' || !PVP_GAME_REF || !B) return;
+  PVP_GAME_REF.child('specialsDone').set({
+    blueDice: (B.pendingResolve ? B.pendingResolve.blueDice : B.blueDice || []).slice(),
+    ts: Date.now()
+  });
+}
+
+// Red calls this instead of resolveRound() after its own specials.
+// If Blue had any specials available this round, Red waits for Blue's
+// "specialsDone" signal (with final dice). Otherwise resolves immediately.
+let _pvpSpecialsDoneRef = null; // listener handle for cleanup
+function pvpWaitForBlueSpecials() {
+  if (!LIVE_PVP || PVP_SIDE !== 'red' || !PVP_GAME_REF || !B) { resolveRound(); return; }
+
+  // Check if Blue had any specials this round
+  const blueMsAvail = B.msAvailable ? B.msAvailable.blue : 0;
+  const blueLsAvail = B.lsAvailable ? B.lsAvailable.blue : 0;
+  const blueHadMS = blueMsAvail > 0 && B.blue.resources.moonstone > 0;
+  const blueHadLS = blueLsAvail > 0 && B.blue.resources.luckyStone > 0;
+
+  if (!blueHadMS && !blueHadLS) { resolveRound(); return; }
+
+  // Wait for Blue's specialsDone signal (with timeout safety)
+  log(`<span style="color:var(--text2)">Waiting for Blue's specials...</span>`);
+  let resolved = false;
+  const finish = (blueDice) => {
+    if (resolved) return;
+    resolved = true;
+    if (_pvpSpecialsDoneRef) { PVP_GAME_REF.child('specialsDone').off('value', _pvpSpecialsDoneRef); _pvpSpecialsDoneRef = null; }
+    clearTimeout(safetyTimeout);
+    PVP_GAME_REF.child('specialsDone').set(null);
+    PVP_GAME_REF.child('specialsChoice').remove();
+    // Apply Blue's final dice
+    if (blueDice && blueDice.length && B.pendingResolve) {
+      B.pendingResolve.blueDice = blueDice;
+      B.blueDice = blueDice;
+      renderDice(B.pendingResolve.redDice, blueDice);
+    }
+    resolveRound();
+  };
+
+  _pvpSpecialsDoneRef = PVP_GAME_REF.child('specialsDone').on('value', snap => {
+    const data = snap.val();
+    if (!data || !data.blueDice) return;
+    finish(data.blueDice);
+  });
+
+  // Safety timeout — if Blue disconnects or something breaks, don't deadlock
+  const safetyTimeout = setTimeout(() => {
+    if (!resolved) {
+      log(`<span style="color:var(--text2)">Blue specials timed out — resolving with current dice.</span>`);
+      finish(null);
+    }
+  }, 15000);
+}
+
+// ============================================================
 // LUCKY STONE — countdown + clickable dice reroll
 // ============================================================
 let lsCountdownTimer = null;
@@ -10831,18 +10917,19 @@ function checkLuckyStones() {
   // v728: PvP Blue local resolution — show Blue's own LS picker, skip Red's
   if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
     if (blueHasLS) {
-      startLuckyStoneWindow('blue', () => resolveRound());
+      startLuckyStoneWindow('blue', () => { pvpBroadcastSpecialsDone(); resolveRound(); });
     } else {
-      resolveRound(); // Red has LS but we can't make Red's choice — skip
+      pvpBroadcastSpecialsDone(); // v731: tell Red we're done with specials
+      resolveRound();
     }
     return;
   }
   // v728: PvP Red — show Red's own LS picker, skip Blue's
   if (LIVE_PVP && PVP_SIDE === 'red') {
     if (redHasLS) {
-      startLuckyStoneWindow('red', () => resolveRound());
+      startLuckyStoneWindow('red', () => pvpWaitForBlueSpecials());
     } else {
-      resolveRound(); // Blue has LS but Red can't make Blue's choice — skip
+      pvpWaitForBlueSpecials(); // v731: wait for Blue's LS/MS choices before resolving
     }
     return;
   }
@@ -11175,6 +11262,18 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
     else B.pendingResolve.blueDice = dice;
     B.redDice = B.pendingResolve.redDice;
     B.blueDice = B.pendingResolve.blueDice;
+
+    // v731: broadcast Lucky Stone reroll to Red's engine so it resolves with correct dice
+    if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF) {
+      PVP_GAME_REF.child('specialsChoice').push({
+        type: 'luckyStone',
+        side: 'blue',
+        dieIndex: dieIndex,
+        newValue: newVal,
+        dice: dice.slice(), // full sorted dice array for easy application
+        ts: Date.now()
+      });
+    }
 
     // Re-render dice directly (revealDice needs IDs from showRolling which aren't present here)
     targetDie.classList.remove('rolling');
@@ -16251,6 +16350,8 @@ function setupLivePvP() {
   PVP_GAME_REF.child('koSwapRequest').remove();
   PVP_GAME_REF.child('swap').remove();
   PVP_GAME_REF.child('gameOver').remove();
+  PVP_GAME_REF.child('specialsChoice').remove(); // v731
+  PVP_GAME_REF.child('specialsDone').set(null);   // v731
 
   // Hide opponent's roll button
   const oppBtn = document.getElementById(oppBtnId);
@@ -17032,12 +17133,12 @@ if (LIVE_PVP) {
     }
     // Sylvia — auto-roll (don't skip)
     const sylviaOverlay = document.getElementById('sylviaOverlay');
-    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaPending && shouldAutoResolve(B.sylviaPending.team)) {
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaResume && B.sylviaTeamName && shouldAutoResolve(B.sylviaTeamName)) {
       setTimeout(() => { if (typeof doSylviaRoll === 'function') doSylviaRoll(); }, 300);
     }
     // Balatron — auto-roll
     const balatronOverlay = document.getElementById('balatronOverlay');
-    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && shouldAutoResolve(B.balatronPending.team)) {
+    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && shouldAutoResolve(B.balatronPending.loseTeamName)) {
       setTimeout(() => { if (typeof doBalatronRoll === 'function') doBalatronRoll(); }, 300);
     }
     // DarkWing — auto-yes (reroll)
@@ -17057,7 +17158,7 @@ if (LIVE_PVP) {
     // Nick Knack — auto-pick first option
     const nickOverlay = document.getElementById('nickKnackOverlay');
     if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && shouldAutoResolve(B.nickKnackPending.team)) {
-      setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal('moonstone'); }, 300);
+      setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal(B.nickKnackPending.team, 'moonstone'); }, 300);
     }
     // Burn picker — auto-pick first enemy sideline
     const burnOverlay = document.getElementById('burnOverlay');
