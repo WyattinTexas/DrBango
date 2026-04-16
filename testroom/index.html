@@ -724,6 +724,10 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   0%,100% { box-shadow:0 0 12px rgba(251,191,36,0.5), 0 0 24px rgba(251,191,36,0.2); transform:scale(1.15); }
   50% { box-shadow:0 0 24px rgba(251,191,36,0.9), 0 0 48px rgba(251,191,36,0.4); transform:scale(1.25); }
 }
+@keyframes pvpTimerPulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.7; transform:scale(1.05); }
+}
 .reroll-countdown {
   position:absolute; top:-20px; left:50%; transform:translateX(-50%);
   font-size:14px; font-weight:900; color:#fbbf24;
@@ -15806,12 +15810,14 @@ function aiHandlePostRoll() {
   waitBanner.textContent = "Waiting for opponent's roll...";
   document.querySelector('.battle-arena')?.prepend(waitBanner);
 
-  // Add turn timer display
+  // Add turn timer display — prominent, above the dice
   const timerBar = document.createElement('div');
   timerBar.id = 'pvp-turn-timer';
-  timerBar.style.cssText = 'text-align:center;padding:6px;font-size:0.85rem;font-weight:700;color:var(--text2);letter-spacing:1px;';
+  timerBar.style.cssText = 'text-align:center;padding:8px 16px;font-family:Creepster,cursive;font-size:1.1rem;font-weight:700;color:var(--text2);letter-spacing:2px;background:rgba(0,0,0,0.4);border-radius:8px;margin:4px auto;max-width:400px;';
   timerBar.textContent = '';
-  document.querySelector('.battle-arena')?.prepend(timerBar);
+  // Insert above the dice/arena area
+  const arenaEl = document.getElementById('arena') || document.querySelector('.battle-arena');
+  if (arenaEl) arenaEl.parentNode.insertBefore(timerBar, arenaEl);
 
   // Start battle immediately
   setTimeout(() => {
@@ -15926,11 +15932,31 @@ function setupLivePvP() {
         timerEl.style.color = 'var(--text2)';
       }
     } else if (myTurnToRoll) {
-      timerEl.textContent = `Your roll — ${elapsed}s`;
-      timerEl.style.color = elapsed >= 15 ? 'var(--accent)' : 'var(--gold-bright)';
+      if (elapsed >= 20) {
+        timerEl.textContent = `ROLL NOW! — ${elapsed}s`;
+        timerEl.style.color = 'var(--accent)';
+        timerEl.style.fontSize = '1.4rem';
+        timerEl.style.background = 'rgba(233,69,96,0.2)';
+        timerEl.style.animation = 'none'; timerEl.offsetHeight; timerEl.style.animation = 'pvpTimerPulse 0.5s ease-in-out infinite';
+      } else if (elapsed >= 15) {
+        timerEl.textContent = `Your roll — ${elapsed}s`;
+        timerEl.style.color = 'var(--accent)';
+        timerEl.style.fontSize = '1.2rem';
+        timerEl.style.background = 'rgba(233,69,96,0.1)';
+        timerEl.style.animation = '';
+      } else {
+        timerEl.textContent = `Your roll — ${elapsed}s`;
+        timerEl.style.color = 'var(--gold-bright)';
+        timerEl.style.fontSize = '1.1rem';
+        timerEl.style.background = 'rgba(0,0,0,0.4)';
+        timerEl.style.animation = '';
+      }
     } else if (B.phase === 'ready' || B.phase === 'rolling') {
       timerEl.textContent = `Waiting for opponent — ${elapsed}s`;
       timerEl.style.color = 'var(--text2)';
+      timerEl.style.fontSize = '1.1rem';
+      timerEl.style.background = 'rgba(0,0,0,0.4)';
+      timerEl.style.animation = '';
     } else {
       timerEl.textContent = '';
     }
@@ -16088,6 +16114,106 @@ doSwap = function(team, idx) {
   }
   _origDoSwapFn(team, idx);
 };
+
+// ---- PVP: Auto-resolve opponent ability modals ----
+// In live PvP, ability choice modals should only appear for YOUR side.
+// When the engine shows a modal for the opponent, auto-resolve it with
+// a reasonable default so both clients stay in sync.
+if (LIVE_PVP) {
+  const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+
+  // Poll for opponent modals and auto-resolve them
+  setInterval(() => {
+    if (!B || B.phase === 'over') return;
+
+    // Wise Al — auto-pick damage (aggressive)
+    if (B.wiseAlPending && B.wiseAlPending.winTeamName === oppSide) {
+      setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 300);
+    }
+    // Gordok — auto-pick damage
+    if (B.gordokPending && B.gordokPending.winTeamName === oppSide) {
+      setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 300);
+    }
+    // Selene — auto-pick heal
+    if (B.selenePending && B.selenePending.team === oppSide) {
+      const overlay = document.getElementById('seleneOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doSeleneChoice === 'function') doSeleneChoice('heal'); }, 300);
+      }
+    }
+    // Pressure — auto-skip
+    if (B.pressurePending && B.pressurePending.team === oppSide) {
+      const overlay = document.getElementById('pressureOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doPressureChoice === 'function') doPressureChoice('no'); }, 300);
+      }
+    }
+    // Sylvia — auto-roll (don't skip)
+    const sylviaOverlay = document.getElementById('sylviaOverlay');
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaPending && B.sylviaPending.team === oppSide) {
+      setTimeout(() => { if (typeof doSylviaRoll === 'function') doSylviaRoll(); }, 300);
+    }
+    // Balatron — auto-roll
+    const balatronOverlay = document.getElementById('balatronOverlay');
+    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && B.balatronPending.team === oppSide) {
+      setTimeout(() => { if (typeof doBalatronRoll === 'function') doBalatronRoll(); }, 300);
+    }
+    // DarkWing — auto-yes (reroll)
+    if (B.darkWingPending && B.darkWingPending.team === oppSide) {
+      const overlay = document.getElementById('darkWingOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doDarkWingChoice === 'function') doDarkWingChoice('yes'); }, 300);
+      }
+    }
+    // Jeanie — auto-yes (force reroll)
+    if (B.jeaniePending && B.jeaniePending.team === oppSide) {
+      const overlay = document.getElementById('jeanieOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doJeanieChoice === 'function') doJeanieChoice('yes'); }, 300);
+      }
+    }
+    // Nick Knack — auto-pick first option
+    const nickOverlay = document.getElementById('nickKnackOverlay');
+    if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && B.nickKnackPending.team === oppSide) {
+      setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal('moonstone'); }, 300);
+    }
+    // Burn picker — auto-pick first enemy sideline
+    const burnOverlay = document.getElementById('burnOverlay');
+    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerPending && B.burnPickerPending.team === oppSide) {
+      const enemyTeam = B[PVP_SIDE];
+      const target = enemyTeam.ghosts.find((g, i) => i !== enemyTeam.activeIdx && !g.ko);
+      if (target) {
+        const idx = enemyTeam.ghosts.indexOf(target);
+        setTimeout(() => { if (typeof doBurnPick === 'function') doBurnPick(idx); }, 300);
+      }
+    }
+    // Firefly picker — auto-pick moonstone
+    const fireflyOverlay = document.getElementById('fireflyOverlay');
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPending && B.fireflyPending.team === oppSide) {
+      setTimeout(() => { if (typeof doFireflyChoice === 'function') doFireflyChoice('moonstone'); }, 300);
+    }
+    // Tommy — auto-yes
+    const tommyOverlay = document.getElementById('tommyOverlay');
+    if (tommyOverlay && tommyOverlay.classList.contains('active') && B.tommyPending && B.tommyPending.team === oppSide) {
+      setTimeout(() => { if (typeof doTommyChoice === 'function') doTommyChoice('yes'); }, 300);
+    }
+    // Jackson — auto-yes
+    const jacksonOverlay = document.getElementById('jacksonOverlay');
+    if (jacksonOverlay && jacksonOverlay.classList.contains('active') && B.jacksonPending && B.jacksonPending.team === oppSide) {
+      setTimeout(() => { if (typeof doJacksonChoice === 'function') doJacksonChoice('yes'); }, 300);
+    }
+    // Sonya — auto-yes
+    const sonyaOverlay = document.getElementById('sonyaOverlay');
+    if (sonyaOverlay && sonyaOverlay.classList.contains('active') && B.sonyaPending && B.sonyaPending.team === oppSide) {
+      setTimeout(() => { if (typeof doSonyaChoice === 'function') doSonyaChoice('yes'); }, 300);
+    }
+    // Toboggan — auto-yes
+    const tobogganOverlay = document.getElementById('tobogganOverlay');
+    if (tobogganOverlay && tobogganOverlay.classList.contains('active') && B.tobogganPending && B.tobogganPending.team === oppSide) {
+      setTimeout(() => { if (typeof doTobogganChoice === 'function') doTobogganChoice('yes'); }, 300);
+    }
+  }, 500);
+}
 
 // Hook renderBattle — hide opponent's controls after each render
 const _origRenderBattle = renderBattle;
