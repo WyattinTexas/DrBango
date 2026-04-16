@@ -9043,9 +9043,20 @@ function doPreRollSetup() {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameW = team === B.red ? 'red' : 'blue';
+    const enemyName = tNameW === 'red' ? 'blue' : 'red';
+    const enemy = B[enemyName];
     const hasWillowActive = f.id === 435 && !f.ko;
     const hasWillowSideline = hasSideline(team, 435);
-    if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tNameW]) {
+
+    // Cornelius (45) on enemy sideline negates Willow's sideline effect (not active)
+    if (hasWillowSideline && !hasWillowActive && hasSideline(enemy, 45)) {
+      if (B.willowLostLast[tNameW]) {
+        const cornG = getSidelineGhost(enemy, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornG ? cornG.name : 'Cornelius'} blocks Willow's Joy of Painting!`, enemyName]);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Willow Joy of Painting blocked!`);
+      }
+      // Skip — Cornelius negates
+    } else if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tNameW]) {
       if (tNameW === 'red') redCount++; else blueCount++;
       const wName = hasWillowActive ? f.name : (getSidelineGhost(team, 435) || {}).name || 'Willow';
       const wLabel = hasWillowActive ? '' : ' (sideline)';
