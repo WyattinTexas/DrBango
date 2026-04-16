@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v723';
+const TESTROOM_VERSION = 'v724';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16115,12 +16115,10 @@ function setupLivePvP() {
   if (mySide === 'blue') {
     // v723: Blue listens for dice rolls and animates them locally
     // This gives Blue the full dice experience: shake, reveal, triples, SFX
-    let pvpBlueDiceReceived = { red: false, blue: false };
     PVP_GAME_REF.child('rolls').on('child_added', snap => {
       const data = snap.val();
       if (!data || !B || B.phase === 'over') return;
       snap.ref.remove();
-      pvpBlueDiceReceived[data.side] = true;
       pvpAnimateDice(data.side, data.dice);
       if (typeof resetPvPAfk === 'function') resetPvPAfk();
     });
@@ -16138,14 +16136,13 @@ function setupLivePvP() {
       const abilities = data.abilityEvents || [];
       const hasAbilities = abilities.length > 0;
 
-      // v723: Dice are now animated live from the `rolls` listener.
-      // Only render dice here as fallback if they weren't received via rolls.
-      if (data.redDice && data.blueDice && !pvpBlueDiceReceived.red && !pvpBlueDiceReceived.blue) {
-        if (B) { B.redDice = data.redDice; B.blueDice = data.blueDice; }
-        renderDice(data.redDice, data.blueDice);
+      // v724: Dice are animated live from the `rolls` listener.
+      // Re-render with highlighting if we have dice (preserves hand-type glow).
+      if (B.redDice && B.blueDice) {
+        renderDice(B.redDice, B.blueDice);
+        highlightRollPreview('red', B.redDice);
+        highlightRollPreview('blue', B.blueDice);
       }
-      // Reset for next round
-      pvpBlueDiceReceived = { red: false, blue: false };
 
       // v722: Show ability callouts FAST — Blue is already behind Red, don't add more delay.
       // Fire the last/main ability callout for visual impact, apply state immediately.
@@ -16175,12 +16172,17 @@ function setupLivePvP() {
 
       // Only reset Blue's roll button on round-end events
       if (data.event === 'roundEnd' || !data.event) {
+        // v724: set phase to 'ready' so resources are clickable + pre-roll works
+        B.phase = 'ready';
+        B.preRoll = null; // clear stale dice state for next round
         B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
         const myBtn = document.getElementById('rollBlueBtn');
-        if (myBtn && B && B.phase !== 'over') {
+        if (myBtn && B.phase !== 'over') {
           myBtn.disabled = false;
           myBtn.textContent = 'ROLL';
         }
+        // Re-render so resource tiles show as clickable
+        renderBattle();
         // v722: reset AFK timer fresh when it's Blue's turn to roll
         if (typeof resetPvPAfk === 'function') resetPvPAfk();
       }
@@ -16661,12 +16663,14 @@ function pvpSerializeState() {
     red: {
       activeIdx: B.red.activeIdx,
       ghosts: B.red.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
-      resources: { ...B.red.resources }
+      resources: { ...B.red.resources },
+      committed: B.committed.red ? { ...B.committed.red } : null
     },
     blue: {
       activeIdx: B.blue.activeIdx,
       ghosts: B.blue.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
-      resources: { ...B.blue.resources }
+      resources: { ...B.blue.resources },
+      committed: B.committed.blue ? { ...B.committed.blue } : null
     },
     willowLostLast: B.willowLostLast ? { ...B.willowLostLast } : { red: false, blue: false },
     iceBladeForgedPermanent: B.iceBladeForgedPermanent ? { ...B.iceBladeForgedPermanent } : { red: false, blue: false },
@@ -16697,6 +16701,10 @@ function pvpApplyState(state) {
     // Sync resources
     if (state[side].resources) {
       Object.assign(B[side].resources, state[side].resources);
+    }
+    // v724: sync committed resources so Blue sees Red's specials (and vice versa)
+    if (state[side].committed) {
+      B.committed[side] = { ...state[side].committed };
     }
   });
 
