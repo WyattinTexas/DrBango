@@ -1685,6 +1685,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <!-- Center — Dice + Round -->
         <div class="arena-center">
           <div class="turn-indicator" id="turnIndicator">Round 1</div>
+          <button id="muteToggle" onclick="toggleMute()" title="Toggle music" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;opacity:0.6;z-index:10;padding:4px;" aria-label="Toggle music">&#x1F50A;</button>
           <div class="arena-mid">
             <div class="dice-stack">
               <div class="dice-row dice-red" id="red-dice"></div>
@@ -2357,7 +2358,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v733';
+const TESTROOM_VERSION = 'v734';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -15143,6 +15144,7 @@ function playDamageSfx(dmg) {
 let _musicStarted = false;
 function startMusic() {
   if (_musicStarted) return;
+  if (_muted) { _musicStarted = true; return; } // v734: respect mute toggle
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.2;
@@ -15171,6 +15173,33 @@ function fadeOutMusic() {
     else { clearInterval(music._fadeInt); music.pause(); music.volume = 0.2; }
   }, 60);
 }
+
+// v734: mute toggle — persists via localStorage
+let _muted = localStorage.getItem('tr_muted') === '1';
+function toggleMute() {
+  _muted = !_muted;
+  localStorage.setItem('tr_muted', _muted ? '1' : '0');
+  const music = document.getElementById('bgMusic');
+  const btn = document.getElementById('muteToggle');
+  if (_muted) {
+    music.pause();
+    btn.textContent = '\u{1F507}'; // muted speaker
+    btn.title = 'Music off — click to unmute';
+  } else {
+    music.volume = 0.2;
+    music.play().catch(() => {});
+    btn.textContent = '\u{1F50A}'; // speaker with sound
+    btn.title = 'Music on — click to mute';
+  }
+}
+// Apply saved mute state on load
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('muteToggle');
+  if (btn && _muted) {
+    btn.textContent = '\u{1F507}';
+    btn.title = 'Music off — click to unmute';
+  }
+});
 
 function stopMusicHard() {
   const music = document.getElementById('bgMusic');
