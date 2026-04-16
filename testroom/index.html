@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v728';
+const TESTROOM_VERSION = 'v729';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -4491,6 +4491,20 @@ function triggerBorisHook(team) {
 // ========================================
 // RESOURCE SPENDING
 // ========================================
+// v729: broadcast resource/committed changes live so opponent sees pre-roll decisions
+function pvpBroadcastCommitted(team) {
+  if (!LIVE_PVP || !PVP_GAME_REF || !B || team !== PVP_SIDE) return;
+  const t = B[team];
+  const f = active(t);
+  PVP_GAME_REF.child('committedUpdate').set({
+    side: team,
+    committed: { ...B.committed[team] },
+    resources: { ...t.resources },
+    activeHp: f ? f.hp : 0,
+    ts: Date.now()
+  });
+}
+
 function cycleCommit(team, type) {
   if (!isPreRollActive(team)) return;
   const t = B[team];
@@ -4532,6 +4546,7 @@ function cycleCommit(team, type) {
     carpenterTransform(team);
   }
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function refundCommitted() {
@@ -4580,6 +4595,7 @@ function spendHealingSeed(team) {
   }
 
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function sacrificeHappyCrystal(team) {
@@ -4606,6 +4622,7 @@ function toggleAuntSusan(team) {
     t.resources.healingSeed--;
   }
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function uncommitAuntSusan(team) {
@@ -4617,6 +4634,7 @@ function uncommitAuntSusan(team) {
     t.resources.healingSeed++;
   }
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function toggleAuntSusanHeal(team) {
@@ -16234,6 +16252,7 @@ function setupLivePvP() {
   // Clean up stale data from previous games
   PVP_GAME_REF.child('blueReady').set(false);
   PVP_GAME_REF.child('redReady').set(false);
+  PVP_GAME_REF.child('committedUpdate').set(null);
   PVP_GAME_REF.child('rolls').remove();
   PVP_GAME_REF.child('roundResult').remove();
   PVP_GAME_REF.child('koSwap').remove();
@@ -16273,7 +16292,16 @@ function setupLivePvP() {
     // BLUE: listen for Red's authoritative round result
     // v725: when pvpBlueResolvedLocally is true, Blue already ran combat locally.
     // roundResult becomes a silent state correction — no effects, no callouts.
+    let pvpBluePendingResults = []; // v729: queue results while Blue is in interactive state
+
     function pvpBlueProcessEvent(data) {
+      // v729: if Blue is in ko-swap or another interactive phase, queue the result
+      // and apply it after the interaction completes. Don't stomp the picker.
+      if (B && (B.phase === 'ko-swap') && pvpBlueResolvedLocally) {
+        pvpBluePendingResults.push(data);
+        return;
+      }
+
       // v722: reset AFK timer — Blue is actively watching, not idle
       if (typeof resetPvPAfk === 'function') resetPvPAfk();
 
@@ -16303,6 +16331,10 @@ function setupLivePvP() {
           }
           renderBattle();
           if (typeof resetPvPAfk === 'function') resetPvPAfk();
+          // v729: drain any results queued while Blue was in interactive phase
+          while (pvpBluePendingResults.length > 0) {
+            pvpBlueProcessEvent(pvpBluePendingResults.shift());
+          }
         }
 
         // If game over from Red's authority
@@ -16459,6 +16491,22 @@ function setupLivePvP() {
       overlay.style.display = 'flex';
     });
   }
+
+  // --- v729: LIVE RESOURCE COMMIT SYNC ---
+  // See opponent commit Ice Shards, Fire, Surge in real-time (the theater of the game)
+  PVP_GAME_REF.child('committedUpdate').on('value', snap => {
+    const data = snap.val();
+    if (!data || data.side === mySide || !B) return;
+    // Apply opponent's committed resources + updated resource pool + active HP
+    if (data.committed) B.committed[data.side] = { ...data.committed };
+    if (data.resources) Object.assign(B[data.side].resources, data.resources);
+    if (data.activeHp != null) {
+      const oppActive = active(B[data.side]);
+      if (oppActive) oppActive.hp = data.activeHp;
+    }
+    renderBattle();
+    playSfx('sfxSpecial', 0.15); // subtle audio cue that opponent is doing something
+  });
 
   // --- VOLUNTARY SWAP SYNC ---
   PVP_GAME_REF.child('swap').on('child_added', snap => {
