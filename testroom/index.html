@@ -15783,6 +15783,13 @@ function aiHandlePostRoll() {
   waitBanner.textContent = "Waiting for opponent's roll...";
   document.querySelector('.battle-arena')?.prepend(waitBanner);
 
+  // Add turn timer display
+  const timerBar = document.createElement('div');
+  timerBar.id = 'pvp-turn-timer';
+  timerBar.style.cssText = 'text-align:center;padding:6px;font-size:0.85rem;font-weight:700;color:var(--text2);letter-spacing:1px;';
+  timerBar.textContent = '';
+  document.querySelector('.battle-arena')?.prepend(timerBar);
+
   // Start battle immediately
   setTimeout(() => {
     renderPicks();
@@ -15866,24 +15873,62 @@ function setupLivePvP() {
     }
   });
 
-  // --- AFK TIMEOUT (15 seconds) ---
+  // --- TURN TIMER + AFK TIMEOUT ---
   let pvpAfkTimer = null;
   let pvpAfkWarned = false;
+  let pvpTurnStart = Date.now();
+  let pvpTimerInterval = null;
+
+  function updateTurnTimer() {
+    const timerEl = document.getElementById('pvp-turn-timer');
+    if (!timerEl || !B || B.phase === 'over') {
+      if (timerEl) timerEl.textContent = '';
+      return;
+    }
+
+    const elapsed = Math.floor((Date.now() - pvpTurnStart) / 1000);
+
+    // Determine whose turn it is
+    const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    const myTurnToRoll = myBtn && !myBtn.disabled && !myBtn.classList.contains('locked') &&
+                         (B.phase === 'ready' || B.phase === 'rolling');
+
+    if (B.phase === 'ko-swap') {
+      const whoSwaps = B.koSwapQueue && B.koSwapQueue[0];
+      if (whoSwaps === mySide) {
+        timerEl.textContent = `Your pick — ${elapsed}s`;
+        timerEl.style.color = elapsed >= 15 ? 'var(--accent)' : 'var(--gold-bright)';
+      } else {
+        timerEl.textContent = `Opponent picking — ${elapsed}s`;
+        timerEl.style.color = 'var(--text2)';
+      }
+    } else if (myTurnToRoll) {
+      timerEl.textContent = `Your roll — ${elapsed}s`;
+      timerEl.style.color = elapsed >= 15 ? 'var(--accent)' : 'var(--gold-bright)';
+    } else if (B.phase === 'ready' || B.phase === 'rolling') {
+      timerEl.textContent = `Waiting for opponent — ${elapsed}s`;
+      timerEl.style.color = 'var(--text2)';
+    } else {
+      timerEl.textContent = '';
+    }
+  }
+
+  // Start the visible timer
+  pvpTimerInterval = setInterval(updateTurnTimer, 1000);
 
   function resetPvPAfk() {
     clearTimeout(pvpAfkTimer);
     pvpAfkWarned = false;
+    pvpTurnStart = Date.now();
     const warn = document.getElementById('pvp-afk-warning');
     if (warn) warn.style.display = 'none';
 
     pvpAfkTimer = setTimeout(() => {
       if (!B || B.phase === 'over' || !LIVE_PVP) return;
-      // Check if it's our turn to roll
       const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
       if (!myBtn || myBtn.disabled || myBtn.classList.contains('locked')) return;
       if (B.phase !== 'ready' && B.phase !== 'rolling') return;
 
-      // Show warning
       pvpAfkWarned = true;
       let warn = document.getElementById('pvp-afk-warning');
       if (!warn) {
@@ -15895,18 +15940,15 @@ function setupLivePvP() {
       warn.textContent = 'Roll now or forfeit in 10 seconds!';
       warn.style.display = 'block';
 
-      // Auto-forfeit after 10 more seconds
       setTimeout(() => {
         if (!pvpAfkWarned || !B || B.phase === 'over') return;
         const myBtn2 = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
         if (myBtn2 && !myBtn2.disabled && !myBtn2.classList.contains('locked') &&
             (B.phase === 'ready' || B.phase === 'rolling')) {
-          // Still hasn't rolled — forfeit
           warn.textContent = 'Time expired — you forfeit!';
           PVP_GAME_REF.child(`connected/${mySide}`).set(false);
           setTimeout(() => {
             if (B && B.phase !== 'over') {
-              const loseSide = mySide;
               const winSide = mySide === 'red' ? 'blue' : 'red';
               showGameOver(winSide);
             }
@@ -15925,6 +15967,7 @@ function setupLivePvP() {
   window.addEventListener('beforeunload', () => {
     if (PVP_GAME_REF) PVP_GAME_REF.child(`connected/${mySide}`).set(false);
     clearTimeout(pvpAfkTimer);
+    clearInterval(pvpTimerInterval);
   });
 }
 
@@ -16035,12 +16078,22 @@ renderBattle = function() {
   const oppBtn = document.getElementById(oppBtnId);
   if (oppBtn) oppBtn.style.display = 'none';
 
+  // Block clicking opponent's specials/resources
+  const oppResources = document.getElementById(`${oppSide}-resources`);
+  if (oppResources) {
+    oppResources.style.pointerEvents = 'none';
+    oppResources.style.opacity = '0.7';
+  }
+
+  // Block clicking opponent's sideline for voluntary swaps
+  document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
+    if (!(B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === PVP_SIDE)) {
+      el.style.pointerEvents = 'none';
+    }
+  });
+
   // If opponent needs to KO swap, show waiting
   if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
-    // Disable opponent's sideline clicks on our client
-    document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
-      el.style.pointerEvents = 'none';
-    });
     const banner = document.getElementById('pvp-wait-banner');
     if (banner) {
       banner.textContent = "Waiting for opponent to choose replacement...";
