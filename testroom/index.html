@@ -14496,13 +14496,11 @@ function _resolveRoundImpl() {
           renderBattle();
           setTimeout(() => {
             if (!handleKOs()) {
-              // Narrate the new matchup first, then enable roll buttons 350ms later —
-              // same breathing-room pattern as the no-KO path (v110/v114 fix).
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
               setTimeout(() => { startNextRound(); }, spd(350));
             }
-          }, spd(1800));
+          }, spd(900)); // v729: was 1800ms — tightened so swap picker appears faster
         } else {
           B.phase = 'ko-pause';
           renderBattle();
@@ -14709,12 +14707,10 @@ function openKoSwap() {
     const autoIdx = t.ghosts.indexOf(alive[0]);
     const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
     narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
-    setTimeout(() => doKoSwap(team, autoIdx), 800);
+    setTimeout(() => doKoSwap(team, autoIdx), 400); // v729: was 800ms
     return;
   }
-  // (Red's engine already handles Blue's KO swaps via the koSwapRequest listener below)
 
-  // Live PvP: if it's Blue's turn to swap and we're Red's engine, notify Blue
   if (LIVE_PVP && PVP_SIDE === 'red' && team === 'blue') {
     pvpBroadcastState({ event: 'koSwapNeeded', swapTeam: 'blue' });
     const aliveIdxes = alive.map(g => t.ghosts.indexOf(g));
@@ -14735,18 +14731,14 @@ function openKoSwap() {
   if (alive.length === 1) {
     const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
     narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
-    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(alive[0])), 800);
+    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(alive[0])), 400); // v729: was 800ms
     return;
   }
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> — who answers the call?`);
-  // Delay renderBattle() so the narrator text appears (drainNarrate fires at t+150ms)
-  // and is readable before the gold-pulsing picker cards become interactive.
-  // Without this delay, sideline cards go clickable at t=0 — before the player
-  // even sees the "who answers the call?" prompt. 300ms gives the text time to
-  // fade in and register before the picker lights up.
-  setTimeout(() => renderBattle(), 300); // sideline cards with ko-swap-pick class become clickable
+  // Brief delay so narrator text appears before picker lights up
+  setTimeout(() => renderBattle(), 150); // v729: was 300ms — tightened for snappier feel
 }
 
 function doKoSwap(team, idx) {
