@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v718';
+const TESTROOM_VERSION = 'v719';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2611,7 +2611,7 @@ const GHOSTS = [
   {id:419, name:"Boopies", rarity:"common", maxHp:3, art:"art/originals/Hedgeling.png", ability:"Boopie Magic", abilityDesc:"Sideline: whenever your active ghost spends a Healing Seed, gain 1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A tiny sprite that lives inside the hedgerows between fields — you can only see it if you know to look. Passive synergy that rewards Healing Seed builds: every seed spent also generates luck. Combos with Chester, Gourdling, Beewick, and The Overcast naturally. Art direction: a 6-inch figure peering through a gap in a thorny green hedgerow, mossy green skin, bright curious eyes, small acorn cap, nearly invisible against the hedge."},
   {id:420, name:"Lars", rarity:"common", maxHp:4, art:"art/originals/Gourdling.png", ability:"Light the Way", abilityDesc:"Entry: gain 1 Surge, 1 Lucky Stone, and 1 Burn.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A pumpkin-spirit — round, orange, genuinely delighted by autumn. Entry 2 Healing Seeds is a resource burst that fuels The Overcast, Magnolia, Beewick, and Chester combos. Feels like opening a harvest basket. Pairs naturally with any Healing Seed payoff card. Art direction: a round gently glowing jack-o-lantern creature with an authentically HAPPY carved expression (not spooky — joyful), autumn leaves orbiting it, warm amber light from within."},
   {id:423, name:"Zippa", rarity:"uncommon", maxHp:5, art:"art/originals/Beewick.png", ability:"Glimmer", abilityDesc:"Gain +1 damage for each Healing Seed you hold.", category:"Damage Multiplier", set:"Rolling Hills", tags:["Final 50"], designNote:"Beekeeper spirit. Reworked: passive +1 damage per Healing Seed held. Rewards stacking seeds. Hard synergy with Chester and Gourdling."},
-  {id:424, name:"Bigsby", rarity:"uncommon", maxHp:5, art:"art/originals/Digby.png", ability:"Omen", abilityDesc:"Win: deal +1 damage. If you use a Moonstone, transform into Doom.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A mole farmer who has dug through enough hills to know exactly where the shiny things are. Moonstone on entry is clean uncommon-level power — fuels any Moonstone strategy, bridges RH into the Fluxling/Obsidian Eel VA cross-play, and rewards deckbuilders who value die control. Art direction: a stout mole in a dirt-stained work vest, holding a discovered moonstone triumphantly, still has mud on his snout, enormously pleased with himself."},
+  {id:424, name:"Bigsby", rarity:"rare", maxHp:5, art:"art/originals/Digby.png", ability:"Omen", abilityDesc:"Win: deal +1 damage. If you use a Moonstone, transform into Doom.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A mole farmer who has dug through enough hills to know exactly where the shiny things are. Moonstone on entry is clean uncommon-level power — fuels any Moonstone strategy, bridges RH into the Fluxling/Obsidian Eel VA cross-play, and rewards deckbuilders who value die control. Art direction: a stout mole in a dirt-stained work vest, holding a discovered moonstone triumphantly, still has mud on his snout, enormously pleased with himself."},
   {id:426, name:"Chester", rarity:"uncommon", maxHp:5, art:"art/originals/Chester.png", ability:"Well Read", abilityDesc:"Win: gain 1 Healing Seed. Win with doubles or better: also gain 2 Burn.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Cheese-cellar dweller. Reworked: always gets 1 Healing Seed on win. Doubles+ also grants 2 Burn (was 1 Burn instead of seed)."},
   {id:427, name:"Garrick", rarity:"uncommon", maxHp:5, art:"art/originals/Brock.png", ability:"Watchfire", abilityDesc:"Lose: take -1 damage. Gains 1 Sacred Fire if he defeats a Spiritkin.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"The rolling hills' unofficial guardian — a badger, specifically. 'Brock' is the old English name for badger. The sett is the stable center of any field. Win or lose, Brock cushions every exchange: hits harder when ahead, takes less when behind. Reliable two-way modifier on a 6HP body. Works as a fighter or a bench presence that makes your active ghost feel safer. Art direction: a dignified badger in a dark well-worn coat, standing on a hillside at dusk, protective expression, white stripe catching the last light."},
   {id:428, name:"Jasper", rarity:"rare", maxHp:5, art:"art/originals/Pickwick.png", ability:"Flame Dive", abilityDesc:"Win: roll 1 bonus die. Deal its value as additional damage. Jasper takes 1 damage.", category:"Damage Multiplier", set:"Rolling Hills", tags:["Final 50"], designNote:"The ghost of a joyful wanderer who never stopped moving in life and hasn't stopped in death either. Entry resource burst — one of each immediately usable resource (no Sacred Fire keeps it balanced). 6HP means he can fight, not just be hit-and-swap. RH's merchant hero. Wyatt flag: Pickwick + The Shepherd resurrection loop could refuel resources repeatedly — worth testing. Art direction: a round happy wanderer in a well-worn travelling coat, bulging pack slung over one shoulder, big grin, glowing footsteps trailing behind him on a rolling hill path."},
@@ -7088,8 +7088,15 @@ function rollReady(team) {
   // - Red's engine rolling Blue (from Firebase listener) → allowed through
   if (LIVE_PVP) {
     if (PVP_SIDE === 'blue' && team === 'blue') {
-      // Blue player: send ready signal, don't roll locally
-      PVP_GAME_REF.child('blueReady').set(true);
+      // Blue player: send committed resources + ready signal to Red's engine
+      const blueActive = active(B.blue);
+      PVP_GAME_REF.child('blueReady').set({
+        ready: true,
+        committed: B.committed.blue,
+        resources: B.blue.resources,
+        activeHp: blueActive ? blueActive.hp : 0,
+        ts: Date.now()
+      });
       const btn2 = document.getElementById('rollBlueBtn');
       if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
       return;
@@ -16097,13 +16104,24 @@ function setupLivePvP() {
 
       // Apply the full state from Red (authoritative)
       pvpApplyState(data.state);
-      renderBattle();
 
       // Show dice animations for both sides
-      if (data.redDice) {
+      if (data.redDice && data.blueDice) {
         B.redDice = data.redDice;
         B.blueDice = data.blueDice;
         renderDice(data.redDice, data.blueDice);
+      }
+
+      renderBattle();
+
+      // Reset Blue's committed resources for next round
+      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+
+      // Re-enable Blue's roll button for next round
+      const myBtn = document.getElementById('rollBlueBtn');
+      if (myBtn && B.phase !== 'over') {
+        myBtn.disabled = false;
+        myBtn.textContent = 'ROLL';
       }
 
       // If game over
@@ -16114,12 +16132,14 @@ function setupLivePvP() {
       }
     });
   } else {
-    // RED: listen for Blue's "ready" signal
+    // RED: listen for Blue's "ready" signal (now an object with committed resources)
     PVP_OPPONENT_READY = false;
+    let PVP_BLUE_READY_DATA = null;
     PVP_GAME_REF.child('blueReady').on('value', snap => {
-      const ready = snap.val();
-      if (!ready || !B || B.phase === 'over') return;
+      const data = snap.val();
+      if (!data || !data.ready || !B || B.phase === 'over') return;
       PVP_OPPONENT_READY = true;
+      PVP_BLUE_READY_DATA = data;
       PVP_GAME_REF.child('blueReady').set(false);
 
       const banner = document.getElementById('pvp-wait-banner');
@@ -16139,6 +16159,16 @@ function setupLivePvP() {
     if (!PVP_OPPONENT_READY || !B) return;
     // Only roll Blue when engine is ready for it
     if (B.phase === 'ready' || B.phase === 'rolling') {
+      // Apply Blue's committed resources & state from their client
+      if (PVP_BLUE_READY_DATA) {
+        if (PVP_BLUE_READY_DATA.committed) B.committed.blue = PVP_BLUE_READY_DATA.committed;
+        if (PVP_BLUE_READY_DATA.resources) B.blue.resources = PVP_BLUE_READY_DATA.resources;
+        if (PVP_BLUE_READY_DATA.activeHp != null) {
+          const blueActive = active(B.blue);
+          if (blueActive) blueActive.hp = PVP_BLUE_READY_DATA.activeHp;
+        }
+        PVP_BLUE_READY_DATA = null;
+      }
       PVP_OPPONENT_READY = false;
       rollReady('blue');
     }
@@ -16419,6 +16449,7 @@ function pvpSerializeState() {
     flameBlade: B.flameBlade ? { ...B.flameBlade } : { red: false, blue: false },
     duelLastLoser: B.duelLastLoser || null,
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
+    log: B.log.slice(0, 20),
     ts: Date.now()
   };
 }
@@ -16451,6 +16482,7 @@ function pvpApplyState(state) {
   if (state.flameBlade) B.flameBlade = state.flameBlade;
   if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
   if (state.burn) B.burn = state.burn;
+  if (state.log) B.log = state.log;
 }
 
 // Also sync game over: if Red declares game over, Blue should see it
