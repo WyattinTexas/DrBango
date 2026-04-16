@@ -2361,6 +2361,7 @@ let PVP_GAME_ID = null;
 let PVP_GAME_REF = null;
 let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
 let MP_DAILY = false; // true when loaded via daily rival mode
+let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -14512,7 +14513,11 @@ function showGameOver(winner) {
   const title = document.getElementById('goTitle');
   const rounds = B.round - 1;
   if (winner === 'draw') { title.textContent = 'DRAW!'; title.className = ''; }
-  else { title.textContent = `TEAM ${winner.toUpperCase()} WINS!`; title.className = `${winner}-win`; }
+  else {
+    const winnerName = MP_MODE ? MP_PLAYER_NAMES[winner] : `Team ${winner.charAt(0).toUpperCase() + winner.slice(1)}`;
+    title.textContent = `${winnerName} WINS!`;
+    title.className = `${winner}-win`;
+  }
 
   // Round count
   document.getElementById('goRounds').textContent = `${rounds} round${rounds !== 1 ? 's' : ''} played`;
@@ -14548,8 +14553,9 @@ function showGameOver(winner) {
       </div>`;
     }).join('');
 
+    const displayLabel = MP_MODE ? MP_PLAYER_NAMES[teamColor] : `Team ${teamLabel}`;
     return `<div class="go-team-col">
-      <h3 class="${teamColor}-label">Team ${teamLabel}</h3>
+      <h3 class="${teamColor}-label">${displayLabel}</h3>
       ${rows}
     </div>`;
   }
@@ -15467,10 +15473,12 @@ document.addEventListener('keydown', e => {
   // Show opponent name/elo if provided (async PvP)
   const oppName = params.get('oppName');
   const oppElo = params.get('oppElo');
+  MP_PLAYER_NAMES.red = 'You';
   if (oppName) {
+    MP_PLAYER_NAMES.blue = decodeURIComponent(oppName);
     const blueTitle = document.querySelector('.roster-title.blue');
     if (blueTitle) {
-      blueTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(oppName)} <span style="font-size:0.7em;color:var(--text2)">(${oppElo || '?'} Elo)</span>`;
+      blueTitle.innerHTML = `<span class="roster-dot"></span> ${MP_PLAYER_NAMES.blue} <span style="font-size:0.7em;color:var(--text2)">(${oppElo || '?'} Elo)</span>`;
     }
   }
 
@@ -15772,6 +15780,8 @@ function aiHandlePostRoll() {
   // Show player labels
   const redName = params.get('redName') || 'Red';
   const blueName = params.get('blueName') || 'Blue';
+  MP_PLAYER_NAMES.red = decodeURIComponent(redName);
+  MP_PLAYER_NAMES.blue = decodeURIComponent(blueName);
   const redTitle = document.querySelector('.roster-title.red');
   const blueTitle = document.querySelector('.roster-title.blue');
   if (redTitle) redTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(redName)}${side === 'red' ? ' (You)' : ''}`;
