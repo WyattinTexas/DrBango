@@ -755,9 +755,10 @@ function drawGame(){
     const isReachable=window._reachableNodes&&window._reachableNodes.has&&window._reachableNodes.has(node.id);
     const reachDist=isReachable?window._reachableNodes.get(node.id):0;
     const isPlayer=G&&G.currentNode===node.id;
+    const isLocked=G&&!isRegionUnlocked(node.r);
     const pulse=isReachable?.5+Math.sin(t*3+node.id)*.5:.85+Math.sin(t+node.id*.8)*.15;
     const isBoss=node.type==='boss'||node.type==='final';
-    const sz=((isHov||isReachable)?nt.sz*1.2:nt.sz)*camScale;
+    const sz=((isHov||isReachable)?nt.sz*1.2:nt.sz)*camScale*(isLocked?0.8:1);
     const[gr,gg,gb]=nt.gc;
 
     g.save();
@@ -797,7 +798,9 @@ function drawGame(){
     const iconSz=isBoss?sz*.5:sz*.55;
     g.font=`${iconSz}px serif`;g.textAlign='center';g.textBaseline='middle';
     g.shadowColor='rgba(0,0,0,.6)';g.shadowBlur=2;
-    if(node.type==='boss')g.fillText('\u2694\uFE0F',pos.x,pos.y);
+    if(isLocked){
+      g.globalAlpha=0.35;g.fillStyle='#888';g.font=`${iconSz*1.2}px serif`;g.fillText('\uD83D\uDD12',pos.x,pos.y);
+    } else if(node.type==='boss')g.fillText('\u2694\uFE0F',pos.x,pos.y);
     else if(node.type==='final')g.fillText('\uD83D\uDC51',pos.x,pos.y);
     else if(node.type==='camp'){g.fillText('\uD83D\uDD25',pos.x,pos.y)}
     else if(node.type==='shop'){g.fillText('\uD83D\uDCB0',pos.x,pos.y)}
@@ -1054,8 +1057,25 @@ function doRollMovement() {
 }
 
 function highlightReachable() {
-  // Store for rendering - nodes that can be reached pulse
-  window._reachableNodes = reachable || new Map();
+  // Filter out locked regions from reachable nodes
+  const filtered = new Map();
+  if (reachable) {
+    for (const [id, dist] of reachable) {
+      const node = nodes.find(n => n.id === id);
+      if (node && isRegionUnlocked(node.r)) {
+        filtered.set(id, dist);
+      }
+    }
+  }
+  window._reachableNodes = filtered;
+}
+
+function isRegionUnlocked(region) {
+  if (!G) return true;
+  if (region === 'rolling_hills') return true; // Always open
+  if (region === 'frost_valley' || region === 'volcanic_isles') return G.bossesDefeated.includes('timber');
+  if (region === 'dark_castle') return G.bossesDefeated.includes('kingJay') || G.bossesDefeated.includes('nerina');
+  return true;
 }
 
 function handleMapClick(e) {
@@ -1064,6 +1084,10 @@ function handleMapClick(e) {
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const node = getNodeAt(mx, my);
   if (node && reachable.has(node.id)) {
+    if (!isRegionUnlocked(node.r)) {
+      showMessage('Region Locked', `Defeat ${node.r === 'dark_castle' ? 'King Jay or Nerina' : 'Timber'} to unlock this area.`);
+      return;
+    }
     moveToNode(node.id);
   }
 }
@@ -1111,6 +1135,69 @@ function endTurn() {
   document.getElementById('btn-action').style.display = 'none';
   document.getElementById('btn-end').style.display = 'none';
   updateHUD();
+  saveGame();
+}
+
+// ── SAVE / LOAD ──
+function saveGame() {
+  if (!G) return;
+  const saveData = {
+    party: {
+      ghosts: G.party.ghosts.map(g => ({
+        id: g.id, name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko,
+        ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity, set: g.set,
+        usedOncePerGame: g.usedOncePerGame, entryFired: g.entryFired
+      })),
+      activeIdx: G.party.activeIdx,
+      resources: { ...G.party.resources }
+    },
+    coins: G.coins,
+    items: G.items,
+    quests: G.quests,
+    seals: G.seals,
+    currentNode: G.currentNode,
+    visitedNodes: [...G.visitedNodes],
+    revealedEncounters: G.revealedEncounters,
+    turnNumber: G.turnNumber,
+    bossesDefeated: G.bossesDefeated,
+    regionsUnlocked: G.regionsUnlocked,
+    gameOver: G.gameOver,
+    won: G.won
+  };
+  localStorage.setItem('boo_adventure_save', JSON.stringify(saveData));
+}
+
+function loadGame() {
+  const raw = localStorage.getItem('boo_adventure_save');
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    // Reconstruct game state
+    const state = ENGINE.createGameState(data.party.ghosts[0].id);
+    state.party.ghosts = data.party.ghosts;
+    state.party.activeIdx = data.party.activeIdx;
+    state.party.resources = data.party.resources;
+    state.coins = data.coins;
+    state.items = data.items || [];
+    state.quests = data.quests || [];
+    state.seals = data.seals || [];
+    state.currentNode = data.currentNode;
+    state.visitedNodes = new Set(data.visitedNodes || []);
+    state.revealedEncounters = data.revealedEncounters || {};
+    state.turnNumber = data.turnNumber || 0;
+    state.bossesDefeated = data.bossesDefeated || [];
+    state.regionsUnlocked = data.regionsUnlocked || ['rolling_hills'];
+    state.gameOver = data.gameOver || false;
+    state.won = data.won || false;
+    return state;
+  } catch (e) {
+    console.error('Failed to load save:', e);
+    return null;
+  }
+}
+
+function deleteSave() {
+  localStorage.removeItem('boo_adventure_save');
 }
 
 // ── ENCOUNTERS (BATTLES) ──
@@ -1551,12 +1638,20 @@ function hideModal() {
 // Player position + reachable nodes are handled inline via G state checks in drawGame
 
 // ── INIT ──
-// Wait for engine.js to load
 setTimeout(() => {
-  if (typeof ENGINE !== 'undefined') {
-    showStarterScreen();
+  if (typeof ENGINE === 'undefined') { console.error('Engine not loaded!'); return; }
+
+  // Try to load saved game
+  const saved = loadGame();
+  if (saved) {
+    G = saved;
+    document.getElementById('starter-screen').style.display = 'none';
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('action-bar').style.display = 'flex';
+    updateHUD();
+    showMessage('Welcome Back!', `Loaded save — Turn ${G.turnNumber}, ${G.party.ghosts.length} ghosts.`);
   } else {
-    console.error('Engine not loaded!');
+    showStarterScreen();
   }
 }, 100);
 

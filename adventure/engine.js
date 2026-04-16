@@ -206,8 +206,8 @@ function resolveBattleRound(playerTeam, enemyTeam, playerDiceCount, enemyDiceCou
     let dmg = pRoll.damage;
     // Resource damage bonuses
     const pRes = playerTeam.resources;
-    if (pRes.iceShard > 0) { const iceBonus = pRes.iceShard * (hasSideline(playerTeam, 104) ? 3 : 1); dmg += iceBonus; ev(result, `Ice Shards: +${iceBonus} damage`); }
-    if (pRes.sacredFire > 0) { const fireBonus = pRes.sacredFire * 3; dmg += fireBonus; ev(result, `Sacred Fire: +${fireBonus} damage`); }
+    if (pRes.iceShard > 0) { const iceBonus = pRes.iceShard * (hasSideline(playerTeam, 104) ? 3 : 1); dmg += iceBonus; ev(result, `Ice Shards: +${iceBonus} damage`); pRes.iceShard = 0; }
+    if (pRes.sacredFire > 0) { const fireBonus = pRes.sacredFire * 3; dmg += fireBonus; ev(result, `Sacred Fire: +${fireBonus} damage`); pRes.sacredFire = 0; }
     dmg += getAbilityBonusDamage(playerTeam, enemyTeam, pRoll, pDice, result);
     dmg = applyDamageReduction(enemyTeam, dmg, pRoll, result);
     dmg = Math.max(0, dmg);
@@ -224,8 +224,8 @@ function resolveBattleRound(playerTeam, enemyTeam, playerDiceCount, enemyDiceCou
   } else if (winner === 'b') {
     let dmg = eRoll.damage;
     const eRes = enemyTeam.resources;
-    if (eRes.iceShard > 0) { dmg += eRes.iceShard; }
-    if (eRes.sacredFire > 0) { dmg += eRes.sacredFire * 3; }
+    if (eRes.iceShard > 0) { dmg += eRes.iceShard; eRes.iceShard = 0; }
+    if (eRes.sacredFire > 0) { dmg += eRes.sacredFire * 3; eRes.sacredFire = 0; }
     dmg += getAbilityBonusDamage(enemyTeam, playerTeam, eRoll, eDice, result);
     dmg = applyDamageReduction(playerTeam, dmg, eRoll, result);
     dmg = Math.max(0, dmg);
