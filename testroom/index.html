@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v725';
+const TESTROOM_VERSION = 'v726';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -14971,12 +14971,13 @@ function stopMusicHard() {
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
-// v722: skip bgMusic if it's already playing — the old code paused it immediately
-// after play(), which killed music in multiplayer (first click = during battle)
+// v726: skip bgMusic entirely — startMusic() has its own retry-on-click handler.
+// unlockAudio's play().then(pause) pattern races with startMusic's retry and kills music.
 (function unlockAudio() {
   const unlock = () => {
     document.querySelectorAll('audio').forEach(a => {
-      if (!a.paused) return; // already playing (e.g. bgMusic) — don't touch it
+      if (a.id === 'bgMusic') return; // handled by startMusic's own retry
+      if (!a.paused) return;
       a.play().then(() => a.pause()).catch(() => {});
     });
     document.removeEventListener('click', unlock);
@@ -16100,7 +16101,8 @@ function aiHandlePostRoll() {
   setTimeout(() => {
     renderPicks();
     startBattle();
-    // Disable duel phase in live PvP — requires both players on same engine
+    // Duel Phase disabled in live PvP — the Firebase ready-check already ensures
+    // both players commit resources before resolution (Blue rolls when ready).
     if (B) B.duelPhaseMode = false;
     setupLivePvP();
   }, 400);
@@ -16162,6 +16164,10 @@ function setupLivePvP() {
 
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
+
+      // v726: dismiss stale PvP KO swap overlay if present
+      const koOverlay = document.getElementById('pvp-ko-swap-overlay');
+      if (koOverlay) koOverlay.style.display = 'none';
 
       if (pvpBlueResolvedLocally) {
         // v725: Blue already saw the full combat experience locally.
@@ -16295,21 +16301,32 @@ function setupLivePvP() {
   });
 
   // --- KO SWAP REQUEST (Blue receives from Red when Blue needs to pick) ---
+  // v726: Blue now runs engine locally and auto-resolves KO swaps during resolution.
+  // This Firebase listener is only needed as a FALLBACK when local resolution didn't handle it.
   if (mySide === 'blue') {
     PVP_GAME_REF.child('koSwapRequest').on('value', snap => {
       const data = snap.val();
       if (!data || data.side !== 'blue' || !B) return;
       PVP_GAME_REF.child('koSwapRequest').set(null);
 
+      // v726: if Blue already resolved locally, skip — local engine handled the swap
+      if (pvpBlueResolvedLocally) {
+        // Still need to tell Red which ghost Blue picked (Red's engine is waiting)
+        const aliveIdxes = data.aliveIdxes || [];
+        if (aliveIdxes.length > 0) {
+          // Send the first alive ghost (matches local auto-resolve)
+          PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: aliveIdxes[0], timestamp: firebase.database.ServerValue.TIMESTAMP });
+        }
+        return;
+      }
+
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
 
-      // Show a swap picker modal for Blue
       const aliveIdxes = data.aliveIdxes || [];
       const aliveNames = data.aliveNames || [];
       const fallenName = data.fallenName || 'Your ghost';
 
-      // If only one option, auto-pick
       if (aliveIdxes.length === 1) {
         narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">${aliveNames[0]}</b> steps up!`);
         PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: aliveIdxes[0], timestamp: firebase.database.ServerValue.TIMESTAMP });
@@ -16318,7 +16335,6 @@ function setupLivePvP() {
 
       narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">Blue</b> — who answers the call?`);
 
-      // Build a simple picker overlay
       let overlay = document.getElementById('pvp-ko-swap-overlay');
       if (!overlay) {
         overlay = document.createElement('div');
