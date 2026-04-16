@@ -255,6 +255,23 @@ body {
 .lb-badge-mini.shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
 .lb-badge-mini.shape-triangle { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
 .lb-badge-mini.shape-octagon { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+.sidebar-lb-portrait {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  margin-right: 5px;
+}
+.sidebar-lb-row.current-user .sidebar-lb-portrait { border-color: var(--gold-deep); }
+.sidebar-lb-archetype {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-left: 3px;
+  flex-shrink: 0;
+}
 .sidebar-lb-challenge {
   margin-left: 6px;
   padding: 2px 8px;
@@ -2275,7 +2292,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.20';
+const BBN_VERSION = 'v0.21';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -2439,7 +2456,8 @@ async function loadUserProfile() {
     displayName: userProfile.displayName,
     wins: userProfile.stats.wins,
     losses: userProfile.stats.losses,
-    elo: userProfile.stats.elo
+    elo: userProfile.stats.elo,
+    team: userProfile.currentTeam || null
   });
 
   updateUI();
@@ -2906,6 +2924,23 @@ function renderCollection() {
 // ============================================================
 // LEADERBOARD
 // ============================================================
+
+// v0.21: derive one-word team archetype from ghost categories
+function getTeamArchetype(teamIds) {
+  if (!teamIds || teamIds.length < 3) return '';
+  const cats = teamIds.map(id => getGhost(id)?.category || '').filter(Boolean);
+  const catStr = cats.join(' ');
+  if (catStr.includes('Destruction') || catStr.includes('Instant Kill')) return 'Lethal';
+  if (catStr.includes('Damage Multiplier') && catStr.includes('Resource')) return 'Engine';
+  if (catStr.includes('Damage Multiplier')) return 'Aggro';
+  if (catStr.includes('HP Recovery') || catStr.includes('Defense')) return 'Control';
+  if (catStr.includes('Resource')) return 'Builder';
+  if (catStr.includes('Debuff')) return 'Disrupt';
+  if (catStr.includes('Dice Modifier')) return 'Trickster';
+  if (catStr.includes('Prediction')) return 'Tactical';
+  return 'Balanced';
+}
+
 function toggleLeaderboard() {
   const body = document.getElementById('leaderboard-body');
   const toggle = document.getElementById('lb-toggle');
@@ -2964,11 +2999,22 @@ async function renderLeaderboard(data) {
         }).join('')}</span>`
       : '';
 
+    // v0.21: lead ghost portrait + team archetype
+    const teamIds = entry.team || [];
+    const leadGhost = teamIds.length > 0 ? getGhost(teamIds[0]) : null;
+    const portraitHtml = leadGhost
+      ? `<img class="sidebar-lb-portrait" src="${leadGhost.art}" alt="${leadGhost.name}" onerror="this.style.display='none'">`
+      : '';
+    const archetype = getTeamArchetype(teamIds);
+    const archetypeHtml = archetype ? `<span class="sidebar-lb-archetype">${archetype}</span>` : '';
+
     return `
       <div class="sidebar-lb-row ${isCurrent ? 'current-user' : 'challengeable'} ${isSelected ? 'selected-target' : ''}"
            ${!isCurrent ? `onclick="selectTarget('${entry.uid}')"` : ''}>
         <span class="sidebar-lb-rank">${i + 1}</span>
+        ${portraitHtml}
         <span class="sidebar-lb-name">${entry.displayName || 'Unknown'}${badgeHtml}</span>
+        ${archetypeHtml}
         <span class="sidebar-lb-elo">${entry.elo || 1000}</span>
         ${challengeBtn}
       </div>
@@ -3403,7 +3449,8 @@ async function processBattleResult() {
     displayName: profile.displayName,
     wins: profile.stats?.wins || 0,
     losses: profile.stats?.losses || 0,
-    elo: newElo
+    elo: newElo,
+    team: profile.currentTeam || null
   });
 
   // Check badges
@@ -4402,13 +4449,15 @@ async function finishPvPBattle(battle, winnerSide, loserSide, myDice, oppDice, m
     displayName: cp.displayName,
     wins: cp.stats?.wins || 0,
     losses: cp.stats?.losses || 0,
-    elo: newCreatorElo
+    elo: newCreatorElo,
+    team: cp.currentTeam || null
   });
   await db.ref(`mp/leaderboard/${pvpState.opponent}`).set({
     displayName: op.displayName,
     wins: op.stats?.wins || 0,
     losses: op.stats?.losses || 0,
-    elo: newOpponentElo
+    elo: newOpponentElo,
+    team: op.currentTeam || null
   });
 }
 

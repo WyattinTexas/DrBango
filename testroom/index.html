@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v722';
+const TESTROOM_VERSION = 'v723';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -7100,6 +7100,11 @@ function rollReady(team) {
       });
       const btn2 = document.getElementById('rollBlueBtn');
       if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
+      // v723: show local rolling animation so Blue feels responsive
+      const blueDiceCount = B.preRoll ? B.preRoll.blue.count : (ghostData(blueActive.id)?.dice ?? 3);
+      showRolling('blue', blueDiceCount);
+      playSfx('sfxDiceRoll');
+      narrate(`<b class="blue-text">${blueActive.name}</b> rolls...`);
       return;
     }
     if (PVP_SIDE === 'blue' && team === 'red') {
@@ -16108,8 +16113,19 @@ function setupLivePvP() {
   // Red generates ALL dice. Blue sends "ready" signal.
   // When both are ready, Red rolls both sides and broadcasts results.
   if (mySide === 'blue') {
+    // v723: Blue listens for dice rolls and animates them locally
+    // This gives Blue the full dice experience: shake, reveal, triples, SFX
+    let pvpBlueDiceReceived = { red: false, blue: false };
+    PVP_GAME_REF.child('rolls').on('child_added', snap => {
+      const data = snap.val();
+      if (!data || !B || B.phase === 'over') return;
+      snap.ref.remove();
+      pvpBlueDiceReceived[data.side] = true;
+      pvpAnimateDice(data.side, data.dice);
+      if (typeof resetPvPAfk === 'function') resetPvPAfk();
+    });
+
     // BLUE: listen for Red's authoritative round result
-    // v721: Blue now replays ability callouts with full visual effects before applying state
     let pvpBlueLastLogLen = 0;
     function pvpBlueProcessEvent(data) {
       // v722: reset AFK timer — Blue is actively watching, not idle
@@ -16122,11 +16138,14 @@ function setupLivePvP() {
       const abilities = data.abilityEvents || [];
       const hasAbilities = abilities.length > 0;
 
-      // Show dice FIRST (before abilities, so Blue sees the roll)
-      if (data.redDice && data.blueDice) {
+      // v723: Dice are now animated live from the `rolls` listener.
+      // Only render dice here as fallback if they weren't received via rolls.
+      if (data.redDice && data.blueDice && !pvpBlueDiceReceived.red && !pvpBlueDiceReceived.blue) {
         if (B) { B.redDice = data.redDice; B.blueDice = data.blueDice; }
         renderDice(data.redDice, data.blueDice);
       }
+      // Reset for next round
+      pvpBlueDiceReceived = { red: false, blue: false };
 
       // v722: Show ability callouts FAST — Blue is already behind Red, don't add more delay.
       // Fire the last/main ability callout for visual impact, apply state immediately.
@@ -16478,6 +16497,44 @@ function setupLivePvP() {
   }
 }
 
+// v723: Animate dice on Blue's screen without running resolution.
+// Blue sees the full dice show (shake → reveal → triples) but combat
+// resolution still comes from Red's roundResult broadcast.
+function pvpAnimateDice(side, dice) {
+  if (!B) return;
+  // Create minimal preRoll structure if needed (don't run doPreRollSetup — that triggers abilities)
+  if (!B.preRoll) {
+    B.preRoll = {
+      red: { count: ghostData(active(B.red).id)?.dice ?? 3, dice: null },
+      blue: { count: ghostData(active(B.blue).id)?.dice ?? 3, dice: null }
+    };
+    B.phase = 'rolling';
+    renderBattle();
+  }
+  // Store dice in engine state
+  B.preRoll[side].dice = dice;
+  if (side === 'red') B.redDice = dice;
+  else B.blueDice = dice;
+
+  const f = active(B[side]);
+  const cls = side === 'red' ? 'red-text' : 'blue-text';
+  const diceCount = dice.length;
+
+  // Full dice animation: shake → SFX → reveal → triples
+  showRolling(side, diceCount);
+  if (diceCount > 0) playSfx('sfxDiceRoll');
+  narrate(`<b class="${cls}">${f.name}</b> rolls...`);
+
+  setTimeout(() => {
+    revealDice(side, dice);
+    const roll = classify(dice);
+    const tl = typeLabel(roll.type);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    if (isTripleOrBetter(roll.type)) showTriplesEffect(side, roll.type);
+    // NO resolution here — Blue waits for roundResult from Red
+  }, spd(700));
+}
+
 // Inject opponent's dice directly into the engine — bypasses rollReady entirely.
 // This avoids all pre-roll ability modals (Timber, Romy, Tyler, etc.) firing
 // on the wrong client. Those modals only fire when YOU click YOUR roll button.
@@ -16532,7 +16589,8 @@ const _origDoTeamRollFn = doTeamRoll;
 doTeamRoll = function(team, btn) {
   _origDoTeamRollFn(team, btn);
 
-  if (LIVE_PVP && team === PVP_SIDE && B && B.preRoll && B.preRoll[team]?.dice) {
+  // v723: Red broadcasts ALL dice (both sides) so Blue can animate them
+  if (LIVE_PVP && PVP_SIDE === 'red' && B && B.preRoll && B.preRoll[team]?.dice) {
     PVP_GAME_REF.child('rolls').push({
       side: team,
       round: B.round,
