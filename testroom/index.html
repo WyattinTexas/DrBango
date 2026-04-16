@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v729';
+const TESTROOM_VERSION = 'v730';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16287,9 +16287,10 @@ function setupLivePvP() {
     let pvpBluePendingResults = []; // v729: queue results while Blue is in interactive state
 
     function pvpBlueProcessEvent(data) {
-      // v729: if Blue is in ko-swap or another interactive phase, queue the result
-      // and apply it after the interaction completes. Don't stomp the picker.
-      if (B && (B.phase === 'ko-swap') && pvpBlueResolvedLocally) {
+      // v730: queue roundResult while Blue is in any KO-related phase or mid-resolution.
+      // Red's broadcasts (damageResolved, koSwap) arrive while Blue's local engine is
+      // still processing — don't stomp the interactive KO picker or ability flow.
+      if (B && (B.phase === 'ko-swap' || B.phase === 'ko-pause') && pvpBlueResolvedLocally) {
         pvpBluePendingResults.push(data);
         return;
       }
@@ -17197,13 +17198,17 @@ renderBattle = function() {
     });
   }
 
-  // If opponent needs to KO swap, show waiting
+  // v730: manage wait banner during KO swaps
   if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
     const banner = document.getElementById('pvp-wait-banner');
     if (banner) {
       banner.textContent = "Waiting for opponent to choose replacement...";
       banner.style.display = 'block';
     }
+  } else if (B && LIVE_PVP) {
+    // Dismiss banner when it's our turn or not in ko-swap
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner && B.phase !== 'rolling') banner.style.display = 'none';
   }
 };
 
