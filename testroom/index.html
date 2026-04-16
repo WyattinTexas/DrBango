@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v724';
+const TESTROOM_VERSION = 'v725';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2367,6 +2367,7 @@ let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
 let MP_DAILY = false; // true when loaded via daily rival mode
 let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
 let pvpAbilityEvents = []; // v721: capture ability callouts for Blue sync
+let pvpBlueResolvedLocally = false; // v725: flag to prevent double-resolution on Blue
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -7089,8 +7090,16 @@ function rollReady(team) {
   // - Red's engine rolling Blue (from Firebase listener) → allowed through
   if (LIVE_PVP) {
     if (PVP_SIDE === 'blue' && team === 'blue') {
+      // v725: Blue runs pre-roll setup locally so pre-roll modals fire (Timber, Romy, Tyler, etc.)
+      if (B.phase === 'ready') {
+        doPreRollSetup();
+        if (B.phase !== 'ready') return; // pre-roll interrupted
+        B.phase = 'rolling';
+        renderBattle();
+      }
       // Blue player: send committed resources + ready signal to Red's engine
       const blueActive = active(B.blue);
+      pvpBlueResolvedLocally = false; // v725: reset for this round
       PVP_GAME_REF.child('blueReady').set({
         ready: true,
         committed: B.committed.blue,
@@ -10725,6 +10734,10 @@ let lsCountdownTimer = null;
 let lsSharedTimer = null; // separate timer for the simultaneous Lucky Stone window
 
 function checkLuckyStones() {
+  // v725: Blue's local PvP resolution skips Lucky Stone window entirely.
+  // Red's authoritative state will have the real dice + LS results.
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) { resolveRound(); return; }
+
   // Only offer Lucky Stones that existed BEFORE this round (not gained this turn)
   const redAvail = B.lsAvailable ? B.lsAvailable.red : 0;
   const blueAvail = B.lsAvailable ? B.lsAvailable.blue : 0;
@@ -14589,6 +14602,16 @@ function openKoSwap() {
   const fallen = active(t);
   const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
 
+  // v725: Blue's local engine auto-picks first alive ghost for ALL KO swaps during local resolution.
+  // Red's roundResult will correct the actual state. This prevents Blue's engine from deadlocking on a picker.
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+    const autoIdx = t.ghosts.indexOf(alive[0]);
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+    narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
+    setTimeout(() => doKoSwap(team, autoIdx), 800);
+    return;
+  }
+
   // Live PvP: if it's Blue's turn to swap and we're Red's engine, notify Blue
   if (LIVE_PVP && PVP_SIDE === 'red' && team === 'blue') {
     pvpBroadcastState({ event: 'koSwapNeeded', swapTeam: 'blue' });
@@ -16113,18 +16136,26 @@ function setupLivePvP() {
   // Red generates ALL dice. Blue sends "ready" signal.
   // When both are ready, Red rolls both sides and broadcasts results.
   if (mySide === 'blue') {
-    // v723: Blue listens for dice rolls and animates them locally
-    // This gives Blue the full dice experience: shake, reveal, triples, SFX
+    // v725: Blue listens for dice rolls, animates them, AND runs local combat resolution.
+    // pvpInjectOpponentDice handles Red's dice; for Blue's own dice we inject + animate directly.
+    // When both dice arrive, pvpInjectOpponentDice triggers doPostRollAndResolve locally.
     PVP_GAME_REF.child('rolls').on('child_added', snap => {
       const data = snap.val();
       if (!data || !B || B.phase === 'over') return;
       snap.ref.remove();
-      pvpAnimateDice(data.side, data.dice);
       if (typeof resetPvPAfk === 'function') resetPvPAfk();
+      if (data.side === 'red') {
+        // Red's dice — inject as opponent dice (triggers resolution if Blue's dice already present)
+        pvpInjectOpponentDice('red', data.dice);
+      } else {
+        // Blue's own dice — inject into engine state + animate, then check for resolution
+        pvpInjectOwnDice('blue', data.dice);
+      }
     });
 
     // BLUE: listen for Red's authoritative round result
-    let pvpBlueLastLogLen = 0;
+    // v725: when pvpBlueResolvedLocally is true, Blue already ran combat locally.
+    // roundResult becomes a silent state correction — no effects, no callouts.
     function pvpBlueProcessEvent(data) {
       // v722: reset AFK timer — Blue is actively watching, not idle
       if (typeof resetPvPAfk === 'function') resetPvPAfk();
@@ -16132,68 +16163,72 @@ function setupLivePvP() {
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
 
-      const oldLogLen = pvpBlueLastLogLen;
+      if (pvpBlueResolvedLocally) {
+        // v725: Blue already saw the full combat experience locally.
+        // Just apply Red's authoritative state as a silent correction.
+        pvpApplyState(data.state);
+        renderBattle();
+
+        // Reset for next round on roundEnd
+        if (data.event === 'roundEnd' || !data.event) {
+          B.phase = 'ready';
+          B.preRoll = null;
+          B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+          pvpBlueResolvedLocally = false;
+          const myBtn = document.getElementById('rollBlueBtn');
+          if (myBtn && B.phase !== 'over') {
+            myBtn.disabled = false;
+            myBtn.textContent = 'ROLL';
+          }
+          renderBattle();
+          if (typeof resetPvPAfk === 'function') resetPvPAfk();
+        }
+
+        // If game over from Red's authority
+        if (data.gameOver) {
+          setTimeout(() => {
+            if (B && B.phase !== 'over') showGameOver(data.gameOver);
+          }, 800);
+        }
+        return;
+      }
+
+      // Fallback: Blue hasn't resolved locally (shouldn't happen in v725, but safe)
       const abilities = data.abilityEvents || [];
       const hasAbilities = abilities.length > 0;
 
       // v724: Dice are animated live from the `rolls` listener.
-      // Re-render with highlighting if we have dice (preserves hand-type glow).
       if (B.redDice && B.blueDice) {
         renderDice(B.redDice, B.blueDice);
         highlightRollPreview('red', B.redDice);
         highlightRollPreview('blue', B.blueDice);
       }
 
-      // v722: Show ability callouts FAST — Blue is already behind Red, don't add more delay.
-      // Fire the last/main ability callout for visual impact, apply state immediately.
       if (hasAbilities) {
-        // Show the most recent ability (the important one) with full SFX + glow
         const last = abilities[abilities.length - 1];
         showAbilityCallout(last.name, last.color, last.desc, last.team);
       }
-      // Apply state right away — no artificial delays
-      pvpBlueFinalize(data, oldLogLen);
-    }
-
-    function pvpBlueFinalize(data, oldLogLen) {
-      // Apply the full state from Red (authoritative)
       pvpApplyState(data.state);
       renderBattle();
 
-      // Show new log entries as narration
-      if (B && B.log && B.log.length > oldLogLen) {
-        const newCount = B.log.length - oldLogLen;
-        const newEntries = B.log.slice(0, newCount);
-        newEntries.reverse().forEach((entry, i) => {
-          setTimeout(() => narrate(entry), i * 800);
-        });
-      }
-      pvpBlueLastLogLen = B && B.log ? B.log.length : 0;
-
-      // Only reset Blue's roll button on round-end events
       if (data.event === 'roundEnd' || !data.event) {
-        // v724: set phase to 'ready' so resources are clickable + pre-roll works
         B.phase = 'ready';
-        B.preRoll = null; // clear stale dice state for next round
+        B.preRoll = null;
         B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
         const myBtn = document.getElementById('rollBlueBtn');
         if (myBtn && B.phase !== 'over') {
           myBtn.disabled = false;
           myBtn.textContent = 'ROLL';
         }
-        // Re-render so resource tiles show as clickable
         renderBattle();
-        // v722: reset AFK timer fresh when it's Blue's turn to roll
         if (typeof resetPvPAfk === 'function') resetPvPAfk();
       }
 
-      // If game over
       if (data.gameOver) {
         setTimeout(() => {
           if (B && B.phase !== 'over') showGameOver(data.gameOver);
         }, 800);
       }
-
     }
 
     PVP_GAME_REF.child('roundResult').on('child_added', snap => {
@@ -16575,6 +16610,8 @@ function pvpInjectOpponentDice(oppSide, dice) {
     // Check if both sides have rolled — resolve
     if (B.preRoll && B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
       B.preRoll.resolved = true;
+      // v725: mark Blue as resolving locally so roundResult becomes a silent correction
+      if (LIVE_PVP && PVP_SIDE === 'blue') pvpBlueResolvedLocally = true;
       const otherRoll = classify(B.preRoll[PVP_SIDE]?.dice || []);
       const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
       setTimeout(() => {
@@ -16582,6 +16619,49 @@ function pvpInjectOpponentDice(oppSide, dice) {
       }, spd(eitherTripled ? 1800 : 1400));
     }
   }, spd(700));
+}
+
+// v725: Inject Blue's own dice (received from Red's broadcast) into the engine.
+// Similar to pvpInjectOpponentDice but for Blue's own side.
+function pvpInjectOwnDice(side, dice) {
+  if (!B) return;
+  // Ensure preRoll exists (should already from doPreRollSetup in rollReady)
+  if (!B.preRoll) {
+    B.preRoll = {
+      red: { count: ghostData(active(B.red).id)?.dice ?? 3, dice: null },
+      blue: { count: ghostData(active(B.blue).id)?.dice ?? 3, dice: null }
+    };
+    if (B.phase === 'ready') B.phase = 'rolling';
+    renderBattle();
+  }
+
+  // Store authoritative dice from Red (overrides any local placeholder)
+  B.preRoll[side].dice = dice;
+  if (side === 'red') B.redDice = dice;
+  else B.blueDice = dice;
+
+  // Reveal Blue's own dice (rolling animation already started in rollReady)
+  const f = active(B[side]);
+  const cls = side === 'red' ? 'red-text' : 'blue-text';
+
+  setTimeout(() => {
+    revealDice(side, dice);
+    const roll = classify(dice);
+    const tl = typeLabel(roll.type);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    if (isTripleOrBetter(roll.type)) showTriplesEffect(side, roll.type);
+
+    // Check if both sides have rolled — resolve
+    if (B.preRoll && B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
+      B.preRoll.resolved = true;
+      pvpBlueResolvedLocally = true;
+      const otherRoll = classify(B.preRoll[side === 'red' ? 'blue' : 'red']?.dice || []);
+      const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
+      setTimeout(() => {
+        doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
+      }, spd(eitherTripled ? 1800 : 1400));
+    }
+  }, spd(400)); // shorter delay since rolling animation already started
 }
 
 // ---- HOOKS: broadcast our actions to Firebase ----
@@ -16730,58 +16810,74 @@ if (LIVE_PVP && PVP_GAME_REF) {
   });
 }
 
-// ---- PVP: Auto-resolve opponent ability modals ----
-// In live PvP, ability choice modals should only appear for YOUR side.
-// When the engine shows a modal for the opponent, auto-resolve it with
-// a reasonable default so both clients stay in sync.
+// ---- PVP: Auto-resolve ability modals ----
+// Red's engine: auto-resolve opponent (Blue) modals only.
+// Blue's engine (v725): auto-resolve ALL modals (both sides) during local resolution,
+// since Red's roundResult is authoritative and will correct any divergence.
 if (LIVE_PVP) {
   const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+  // v725: Blue auto-resolves all modals; Red only auto-resolves opponent's
+  const shouldAutoResolve = (modalTeam) => {
+    if (PVP_SIDE === 'blue' && pvpBlueResolvedLocally) return true; // Blue resolving locally: auto-all
+    return modalTeam === oppSide; // Red: only auto opponent
+  };
 
-  // Poll for opponent modals and auto-resolve them
+  // Poll for modals and auto-resolve them
   setInterval(() => {
     if (!B || B.phase === 'over') return;
 
     // Wise Al — auto-pick damage (aggressive)
-    if (B.wiseAlPending && B.wiseAlPending.winTeamName === oppSide) {
+    if (B.wiseAlPending && shouldAutoResolve(B.wiseAlPending.winTeamName)) {
       setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 300);
     }
     // Gordok — auto-pick damage
-    if (B.gordokPending && B.gordokPending.winTeamName === oppSide) {
+    if (B.gordokPending && shouldAutoResolve(B.gordokPending.winTeamName)) {
       setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 300);
     }
     // Selene — auto-pick heal
-    if (B.selenePending && B.selenePending.team === oppSide) {
+    if (B.selenePending && shouldAutoResolve(B.selenePending.tName)) {
       const overlay = document.getElementById('seleneOverlay');
       if (overlay && overlay.classList.contains('active')) {
         setTimeout(() => { if (typeof doSeleneChoice === 'function') doSeleneChoice('heal'); }, 300);
       }
     }
-    // Pressure — auto-skip
-    if (B.pressurePending && B.pressurePending.team === oppSide) {
-      const overlay = document.getElementById('pressureOverlay');
-      if (overlay && overlay.classList.contains('active')) {
-        setTimeout(() => { if (typeof doPressureChoice === 'function') doPressureChoice('no'); }, 300);
+    // Pressure / Raditz Hunt — auto-pick first available when overlay is active
+    const pressureOvl = document.getElementById('pressureOverlay');
+    if (pressureOvl && pressureOvl.classList.contains('active') && (PVP_SIDE === 'blue' && pvpBlueResolvedLocally)) {
+      const firstOpt = pressureOvl.querySelector('.pressure-opt');
+      if (firstOpt) {
+        setTimeout(() => { firstOpt.click(); }, 300);
+      }
+    }
+    // Hand Limit — auto-discard first available resource
+    const handLimitOvl = document.getElementById('handLimitOverlay');
+    if (handLimitOvl && handLimitOvl.classList.contains('active') && B.handLimitPending && (PVP_SIDE === 'blue' && pvpBlueResolvedLocally)) {
+      const hlTeam = B.handLimitPending.team;
+      const hlRes = B[hlTeam]?.resources;
+      if (hlRes) {
+        const hlKey = Object.keys(hlRes).find(k => (hlRes[k] || 0) > 0);
+        if (hlKey) setTimeout(() => { if (typeof doHandLimitDiscard === 'function') doHandLimitDiscard(hlTeam, hlKey); }, 300);
       }
     }
     // Sylvia — auto-roll (don't skip)
     const sylviaOverlay = document.getElementById('sylviaOverlay');
-    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaPending && B.sylviaPending.team === oppSide) {
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaPending && shouldAutoResolve(B.sylviaPending.team)) {
       setTimeout(() => { if (typeof doSylviaRoll === 'function') doSylviaRoll(); }, 300);
     }
     // Balatron — auto-roll
     const balatronOverlay = document.getElementById('balatronOverlay');
-    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && B.balatronPending.team === oppSide) {
+    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && shouldAutoResolve(B.balatronPending.team)) {
       setTimeout(() => { if (typeof doBalatronRoll === 'function') doBalatronRoll(); }, 300);
     }
     // DarkWing — auto-yes (reroll)
-    if (B.darkWingPending && B.darkWingPending.team === oppSide) {
+    if (B.darkWingPending && shouldAutoResolve(B.darkWingPending.team)) {
       const overlay = document.getElementById('darkWingOverlay');
       if (overlay && overlay.classList.contains('active')) {
         setTimeout(() => { if (typeof doDarkWingChoice === 'function') doDarkWingChoice('yes'); }, 300);
       }
     }
     // Jeanie — auto-yes (force reroll)
-    if (B.jeaniePending && B.jeaniePending.team === oppSide) {
+    if (B.jeaniePending && shouldAutoResolve(B.jeaniePending.team)) {
       const overlay = document.getElementById('jeanieOverlay');
       if (overlay && overlay.classList.contains('active')) {
         setTimeout(() => { if (typeof doJeanieChoice === 'function') doJeanieChoice('yes'); }, 300);
@@ -16789,43 +16885,105 @@ if (LIVE_PVP) {
     }
     // Nick Knack — auto-pick first option
     const nickOverlay = document.getElementById('nickKnackOverlay');
-    if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && B.nickKnackPending.team === oppSide) {
+    if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && shouldAutoResolve(B.nickKnackPending.team)) {
       setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal('moonstone'); }, 300);
     }
     // Burn picker — auto-pick first enemy sideline
     const burnOverlay = document.getElementById('burnOverlay');
-    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerPending && B.burnPickerPending.team === oppSide) {
-      const enemyTeam = B[PVP_SIDE];
-      const target = enemyTeam.ghosts.find((g, i) => i !== enemyTeam.activeIdx && !g.ko);
+    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerPending && shouldAutoResolve(B.burnPickerPending.team)) {
+      const autoPickTeam = B.burnPickerPending.team === 'red' ? B.blue : B.red;
+      const target = autoPickTeam.ghosts.find((g, i) => i !== autoPickTeam.activeIdx && !g.ko);
       if (target) {
-        const idx = enemyTeam.ghosts.indexOf(target);
+        const idx = autoPickTeam.ghosts.indexOf(target);
         setTimeout(() => { if (typeof doBurnPick === 'function') doBurnPick(idx); }, 300);
       }
     }
     // Firefly picker — auto-pick moonstone
     const fireflyOverlay = document.getElementById('fireflyOverlay');
-    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPending && B.fireflyPending.team === oppSide) {
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPending && shouldAutoResolve(B.fireflyPending.team)) {
       setTimeout(() => { if (typeof doFireflyChoice === 'function') doFireflyChoice('moonstone'); }, 300);
     }
-    // Tommy — auto-yes
+    // Tommy — auto-yes / auto-roll chain
     const tommyOverlay = document.getElementById('tommyOverlay');
-    if (tommyOverlay && tommyOverlay.classList.contains('active') && B.tommyPending && B.tommyPending.team === oppSide) {
-      setTimeout(() => { if (typeof doTommyChoice === 'function') doTommyChoice('yes'); }, 300);
+    if (tommyOverlay && tommyOverlay.classList.contains('active')) {
+      if (B.tommyPending && shouldAutoResolve(B.tommyPending.team)) {
+        setTimeout(() => { if (typeof doTommyChoice === 'function') doTommyChoice('yes'); }, 300);
+      } else if (B.tommyChainPending && shouldAutoResolve(B.tommyChainPending.team)) {
+        setTimeout(() => { if (typeof doTommyRoll === 'function') doTommyRoll(); }, 300);
+      }
     }
     // Jackson — auto-yes
     const jacksonOverlay = document.getElementById('jacksonOverlay');
-    if (jacksonOverlay && jacksonOverlay.classList.contains('active') && B.jacksonPending && B.jacksonPending.team === oppSide) {
+    if (jacksonOverlay && jacksonOverlay.classList.contains('active') && B.jacksonPending && shouldAutoResolve(B.jacksonPending.team)) {
       setTimeout(() => { if (typeof doJacksonChoice === 'function') doJacksonChoice('yes'); }, 300);
     }
     // Sonya — auto-yes
     const sonyaOverlay = document.getElementById('sonyaOverlay');
-    if (sonyaOverlay && sonyaOverlay.classList.contains('active') && B.sonyaPending && B.sonyaPending.team === oppSide) {
+    if (sonyaOverlay && sonyaOverlay.classList.contains('active') && B.sonyaPending && shouldAutoResolve(B.sonyaPending.team)) {
       setTimeout(() => { if (typeof doSonyaChoice === 'function') doSonyaChoice('yes'); }, 300);
     }
-    // Toboggan — auto-yes
+    // Toboggan — auto-pick first ghost
     const tobogganOverlay = document.getElementById('tobogganOverlay');
-    if (tobogganOverlay && tobogganOverlay.classList.contains('active') && B.tobogganPending && B.tobogganPending.team === oppSide) {
-      setTimeout(() => { if (typeof doTobogganChoice === 'function') doTobogganChoice('yes'); }, 300);
+    if (tobogganOverlay && tobogganOverlay.classList.contains('active') && B.tobogganPending && shouldAutoResolve(B.tobogganPending.winTeamName)) {
+      const tobTeam = B[B.tobogganPending.winTeamName];
+      const tobAlive = tobTeam.ghosts.filter((g,i) => i !== tobTeam.activeIdx && !g.ko);
+      const tobIdx = tobAlive.length > 0 ? tobTeam.ghosts.indexOf(tobAlive[0]) : -1;
+      setTimeout(() => { if (typeof doTobogganChoice === 'function') doTobogganChoice(tobIdx); }, 300);
+    }
+    // Fang Outside — auto-skip (don't swap)
+    const fangOutsideOverlay = document.getElementById('fangOutsideOverlay');
+    if (fangOutsideOverlay && fangOutsideOverlay.classList.contains('active') && B.fangOutsidePending && shouldAutoResolve(B.fangOutsidePending.winTeamName)) {
+      setTimeout(() => { if (typeof doFangOutsideChoice === 'function') doFangOutsideChoice(-1); }, 300);
+    }
+    // Winston Scheme — auto-pick first target
+    const winstonOverlay = document.getElementById('winstonSchemeOverlay');
+    if (winstonOverlay && winstonOverlay.classList.contains('active') && B.winstonSchemePending && shouldAutoResolve(B.winstonSchemePending.winTeamName)) {
+      const wsTeam = B[B.winstonSchemePending.loseTeamName];
+      const wsAlive = wsTeam.ghosts.filter((g,i) => i !== wsTeam.activeIdx && !g.ko);
+      const wsIdx = wsAlive.length > 0 ? wsTeam.ghosts.indexOf(wsAlive[0]) : -1;
+      setTimeout(() => { if (typeof doWinstonSchemeChoice === 'function') doWinstonSchemeChoice(wsIdx); }, 300);
+    }
+    // Gus Gale Force picker — auto-pick first available
+    const gfPickerOverlay = document.getElementById('galeForcePickerOverlay');
+    if (gfPickerOverlay && gfPickerOverlay.classList.contains('active') && B.galeForcePicker && shouldAutoResolve(B.galeForcePicker.winTeamName)) {
+      const gfLoseTeam = B[B.galeForcePicker.loseTeamName];
+      const gfAlive = gfLoseTeam?.ghosts?.filter((g,i) => i !== gfLoseTeam.activeIdx && !g.ko);
+      if (gfAlive && gfAlive.length > 0) {
+        const gfIdx = gfLoseTeam.ghosts.indexOf(gfAlive[0]);
+        setTimeout(() => { if (typeof doGaleForcePickerChoice === 'function') doGaleForcePickerChoice(gfIdx); }, 300);
+      }
+    }
+    // Guardian Fairy — auto-decline (let damage apply normally)
+    const gfReactiveOverlay = document.getElementById('guardianFairyOverlay');
+    if (gfReactiveOverlay && gfReactiveOverlay.classList.contains('active') && B.guardianFairyReactivePending && shouldAutoResolve(B.guardianFairyReactivePending.loseTeamName)) {
+      setTimeout(() => { if (typeof doGuardianFairyReactive === 'function') doGuardianFairyReactive('no'); }, 300);
+    }
+    // Jenkins — auto-roll greeting dice
+    const jenkinsOverlay = document.getElementById('jenkinsOverlay');
+    if (jenkinsOverlay && jenkinsOverlay.classList.contains('active') && B.jenkinsPending && shouldAutoResolve(B.jenkinsPending.team)) {
+      setTimeout(() => { if (typeof doJenkinsRoll === 'function') doJenkinsRoll(); }, 300);
+    }
+    // Jasper — auto-roll flame dive
+    const jasperOverlay = document.getElementById('jasperOverlay');
+    if (jasperOverlay && jasperOverlay.classList.contains('active') && B.jasperPending && shouldAutoResolve(B.jasperPending.winTeamName)) {
+      setTimeout(() => { if (typeof doJasperRoll === 'function') doJasperRoll(); }, 300);
+    }
+    // Sky Elusive — auto-roll counter die
+    const skyElOverlay = document.getElementById('skyElusiveOverlay');
+    if (skyElOverlay && skyElOverlay.classList.contains('active') && B.skyElusivePending && shouldAutoResolve(B.skyElusivePending.winTeamName)) {
+      setTimeout(() => { if (typeof doSkyElusiveRoll === 'function') doSkyElusiveRoll(); }, 300);
+    }
+    // Fang Undercover swap — auto-pick first available sideline ghost
+    const fuSwapOverlay = document.getElementById('fangUndercoverSwapOverlay');
+    if (fuSwapOverlay && fuSwapOverlay.classList.contains('active') && B.fangUndercoverSwapData) {
+      const fuLoseTeam = B[B.fangUndercoverSwapData.loseTeamName];
+      if (fuLoseTeam && shouldAutoResolve(B.fangUndercoverSwapData.loseTeamName)) {
+        const fuAlive = fuLoseTeam.ghosts.filter((g,i) => i !== fuLoseTeam.activeIdx && !g.ko);
+        if (fuAlive.length > 0) {
+          const fuIdx = fuLoseTeam.ghosts.indexOf(fuAlive[0]);
+          setTimeout(() => { if (typeof doFangUndercoverSwapChoice === 'function') doFangUndercoverSwapChoice(fuIdx); }, 300);
+        }
+      }
     }
   }, 500);
 }
