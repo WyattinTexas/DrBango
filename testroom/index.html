@@ -7089,6 +7089,7 @@ function rollReady(team) {
   if (LIVE_PVP) {
     if (PVP_SIDE === 'blue' && team === 'blue') {
       // Blue player: send committed resources + ready signal to Red's engine
+      console.log('[PVP BLUE] Sending ready signal to Firebase');
       const blueActive = active(B.blue);
       PVP_GAME_REF.child('blueReady').set({
         ready: true,
@@ -16137,6 +16138,7 @@ function setupLivePvP() {
     let PVP_BLUE_READY_DATA = null;
     PVP_GAME_REF.child('blueReady').on('value', snap => {
       const data = snap.val();
+      console.log('[PVP] blueReady listener fired:', data, 'phase:', B?.phase);
       if (!data || !data.ready || !B || B.phase === 'over') return;
       PVP_OPPONENT_READY = true;
       PVP_BLUE_READY_DATA = data;
@@ -16157,6 +16159,7 @@ function setupLivePvP() {
 
   function pvpTryRollBlue() {
     if (!PVP_OPPONENT_READY || !B) return;
+    console.log('[PVP] pvpTryRollBlue: phase=' + B.phase + ', preRoll=' + !!B.preRoll);
     // Only roll Blue when engine is ready for it
     if (B.phase === 'ready' || B.phase === 'rolling') {
       // Apply Blue's committed resources & state from their client
@@ -16170,6 +16173,7 @@ function setupLivePvP() {
         PVP_BLUE_READY_DATA = null;
       }
       PVP_OPPONENT_READY = false;
+      console.log('[PVP RED] Rolling blue now, phase:', B.phase);
       rollReady('blue');
     }
   }
