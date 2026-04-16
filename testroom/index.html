@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v719';
+const TESTROOM_VERSION = 'v720';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -7089,7 +7089,6 @@ function rollReady(team) {
   if (LIVE_PVP) {
     if (PVP_SIDE === 'blue' && team === 'blue') {
       // Blue player: send committed resources + ready signal to Red's engine
-      console.log('[PVP BLUE] Sending ready signal to Firebase');
       const blueActive = active(B.blue);
       PVP_GAME_REF.child('blueReady').set({
         ready: true,
@@ -8056,21 +8055,7 @@ function startNextRound() {
   if (!B) return;
 
   // Live PvP state sync: Red is authoritative — broadcasts full state after each round.
-  if (LIVE_PVP && PVP_GAME_REF && B.phase !== 'over') {
-    if (PVP_SIDE === 'red') {
-      // Red: broadcast round result to Blue
-      const stateSnap = pvpSerializeState();
-      PVP_GAME_REF.child('stateSync').set(stateSnap);
-      PVP_GAME_REF.child('roundResult').push({
-        state: stateSnap,
-        redDice: B.redDice || null,
-        blueDice: B.blueDice || null,
-        gameOver: null,
-        ts: Date.now()
-      });
-    }
-    // Blue doesn't need to do anything — roundResult listener handles it
-  }
+  if (B.phase !== 'over') pvpBroadcastState({ event: 'roundEnd' });
 
   // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
   checkHandLimits(() => {
@@ -14384,6 +14369,8 @@ function _resolveRoundImpl() {
         : [];
 
       const proceedToKoHandling = () => {
+        // Live PvP: broadcast state after damage so Blue sees HP changes in near-real-time
+        pvpBroadcastState({ event: 'damageResolved' });
         if (lF.ko) {
           B.phase = 'ko-pause';
           renderBattle();
@@ -14595,6 +14582,23 @@ function openKoSwap() {
   const t = B[team];
   const fallen = active(t);
   const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
+
+  // Live PvP: if it's Blue's turn to swap and we're Red's engine, notify Blue
+  if (LIVE_PVP && PVP_SIDE === 'red' && team === 'blue') {
+    pvpBroadcastState({ event: 'koSwapNeeded', swapTeam: 'blue' });
+    const aliveIdxes = alive.map(g => t.ghosts.indexOf(g));
+    PVP_GAME_REF.child('koSwapRequest').set({
+      side: 'blue',
+      fallenName: fallen.name,
+      aliveIdxes: aliveIdxes,
+      aliveNames: alive.map(g => g.name),
+      ts: Date.now()
+    });
+    // Red waits for Blue's koSwap response via existing listener
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner) { banner.textContent = "Waiting for opponent's swap pick..."; banner.style.display = 'block'; }
+    return;
+  }
 
   // If only one option, auto-pick (no real choice)
   if (alive.length === 1) {
@@ -16080,6 +16084,7 @@ function setupLivePvP() {
   PVP_GAME_REF.child('rolls').remove();
   PVP_GAME_REF.child('roundResult').remove();
   PVP_GAME_REF.child('koSwap').remove();
+  PVP_GAME_REF.child('koSwapRequest').remove();
   PVP_GAME_REF.child('swap').remove();
   PVP_GAME_REF.child('gameOver').remove();
 
@@ -16096,6 +16101,7 @@ function setupLivePvP() {
   // When both are ready, Red rolls both sides and broadcasts results.
   if (mySide === 'blue') {
     // BLUE: listen for Red's authoritative round result
+    let pvpBlueLastLogLen = 0;
     PVP_GAME_REF.child('roundResult').on('child_added', snap => {
       const data = snap.val();
       if (!data || !B || B.phase === 'over') return;
@@ -16103,6 +16109,9 @@ function setupLivePvP() {
 
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
+
+      // Track log length before applying state for narration diff
+      const oldLogLen = pvpBlueLastLogLen;
 
       // Apply the full state from Red (authoritative)
       pvpApplyState(data.state);
@@ -16116,14 +16125,27 @@ function setupLivePvP() {
 
       renderBattle();
 
-      // Reset Blue's committed resources for next round
-      B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+      // Show new log entries as narration so Blue sees play-by-play
+      if (B.log && B.log.length > oldLogLen) {
+        const newCount = B.log.length - oldLogLen;
+        const newEntries = B.log.slice(0, newCount);
+        newEntries.reverse().forEach((entry, i) => {
+          setTimeout(() => narrate(entry), i * 800);
+        });
+      }
+      pvpBlueLastLogLen = B.log ? B.log.length : 0;
 
-      // Re-enable Blue's roll button for next round
-      const myBtn = document.getElementById('rollBlueBtn');
-      if (myBtn && B.phase !== 'over') {
-        myBtn.disabled = false;
-        myBtn.textContent = 'ROLL';
+      // Only reset Blue's roll button on round-end events (not mid-round updates)
+      if (data.event === 'roundEnd' || !data.event) {
+        // Reset Blue's committed resources for next round
+        B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+
+        // Re-enable Blue's roll button for next round
+        const myBtn = document.getElementById('rollBlueBtn');
+        if (myBtn && B.phase !== 'over') {
+          myBtn.disabled = false;
+          myBtn.textContent = 'ROLL';
+        }
       }
 
       // If game over
@@ -16139,7 +16161,6 @@ function setupLivePvP() {
     PVP_BLUE_READY_DATA = null;
     PVP_GAME_REF.child('blueReady').on('value', snap => {
       const data = snap.val();
-      console.log('[PVP] blueReady listener fired:', data, 'phase:', B?.phase);
       if (!data || !data.ready || !B || B.phase === 'over') return;
       PVP_OPPONENT_READY = true;
       PVP_BLUE_READY_DATA = data;
@@ -16160,7 +16181,6 @@ function setupLivePvP() {
 
   function pvpTryRollBlue() {
     if (!PVP_OPPONENT_READY || !B) return;
-    console.log('[PVP] pvpTryRollBlue: phase=' + B.phase + ', preRoll=' + !!B.preRoll);
     // Only roll Blue when engine is ready for it
     if (B.phase === 'ready' || B.phase === 'rolling') {
       // Apply Blue's committed resources & state from their client
@@ -16174,7 +16194,6 @@ function setupLivePvP() {
         PVP_BLUE_READY_DATA = null;
       }
       PVP_OPPONENT_READY = false;
-      console.log('[PVP RED] Rolling blue now, phase:', B.phase);
       rollReady('blue');
     }
   }
@@ -16192,6 +16211,56 @@ function setupLivePvP() {
       doKoSwap(oppSide, data.idx);
     }
   });
+
+  // --- KO SWAP REQUEST (Blue receives from Red when Blue needs to pick) ---
+  if (mySide === 'blue') {
+    PVP_GAME_REF.child('koSwapRequest').on('value', snap => {
+      const data = snap.val();
+      if (!data || data.side !== 'blue' || !B) return;
+      PVP_GAME_REF.child('koSwapRequest').set(null);
+
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
+
+      // Show a swap picker modal for Blue
+      const aliveIdxes = data.aliveIdxes || [];
+      const aliveNames = data.aliveNames || [];
+      const fallenName = data.fallenName || 'Your ghost';
+
+      // If only one option, auto-pick
+      if (aliveIdxes.length === 1) {
+        narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">${aliveNames[0]}</b> steps up!`);
+        PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: aliveIdxes[0], timestamp: firebase.database.ServerValue.TIMESTAMP });
+        return;
+      }
+
+      narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">Blue</b> — who answers the call?`);
+
+      // Build a simple picker overlay
+      let overlay = document.getElementById('pvp-ko-swap-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pvp-ko-swap-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+        document.body.appendChild(overlay);
+      }
+      overlay.innerHTML = '<div style="font-family:Creepster,cursive;font-size:1.6rem;color:var(--gold-bright);letter-spacing:2px;margin-bottom:8px;">Choose your next ghost!</div>';
+      aliveIdxes.forEach((idx, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = aliveNames[i];
+        btn.style.cssText = 'font-family:Creepster,cursive;font-size:1.3rem;padding:14px 32px;border-radius:10px;border:2px solid var(--gold-bright);background:rgba(30,30,50,0.95);color:var(--text);cursor:pointer;min-width:200px;transition:transform 0.15s;';
+        btn.onmouseenter = () => { btn.style.transform = 'scale(1.08)'; };
+        btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+        btn.onclick = () => {
+          overlay.style.display = 'none';
+          PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: idx, timestamp: firebase.database.ServerValue.TIMESTAMP });
+          narrate(`<b class="blue-text">${aliveNames[i]}</b> answers the call!`);
+        };
+        overlay.appendChild(btn);
+      });
+      overlay.style.display = 'flex';
+    });
+  }
 
   // --- VOLUNTARY SWAP SYNC ---
   PVP_GAME_REF.child('swap').on('child_added', snap => {
@@ -16420,6 +16489,8 @@ doKoSwap = function(team, idx) {
     });
   }
   _origDoKoSwapFn(team, idx);
+  // Broadcast state after KO swap so Blue sees the new active ghost immediately
+  pvpBroadcastState({ event: 'koSwap', swapTeam: team, swapIdx: idx });
 };
 
 // Hook doSwap — broadcast voluntary swaps
@@ -16435,10 +16506,26 @@ doSwap = function(team, idx) {
 };
 
 // ---- PVP STATE SYNC: Red is authoritative ----
+function pvpBroadcastState(extras) {
+  if (!LIVE_PVP || PVP_SIDE !== 'red' || !PVP_GAME_REF || !B) return;
+  const state = pvpSerializeState();
+  PVP_GAME_REF.child('stateSync').set(state);
+  PVP_GAME_REF.child('roundResult').push({
+    state: state,
+    redDice: B.redDice || null,
+    blueDice: B.blueDice || null,
+    gameOver: null,
+    ...extras,
+    ts: Date.now()
+  });
+}
+
 function pvpSerializeState() {
   if (!B) return null;
   return {
     round: B.round,
+    phase: B.phase || null,
+    koSwapQueue: B.koSwapQueue ? B.koSwapQueue.slice() : null,
     red: {
       activeIdx: B.red.activeIdx,
       ghosts: B.red.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
