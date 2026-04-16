@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v727';
+const TESTROOM_VERSION = 'v728';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -4934,6 +4934,7 @@ function usePressure(team) {
   }).join('');
   // Lock out Roll buttons while the opponent picks — phase resets to 'ready' in doPressureSwap
   B.phase = 'pressure';
+  B.pressurePickerTeam = enemyTeamName; // v728: track which team picks (for PvP auto-resolve)
   document.getElementById('pressureOverlay').classList.add('active');
 }
 
@@ -6208,6 +6209,7 @@ function doRaditzHuntChoice(choice) {
     </div>`;
   }).join('');
   // B.phase stays 'rolling'; both buttons are still locked — pressureOverlay blocks input
+  B.pressurePickerTeam = enemyTeamName; // v728: track which team picks (for PvP auto-resolve)
   document.getElementById('pressureOverlay').classList.add('active');
 }
 
@@ -9653,6 +9655,39 @@ function doPostRollAndResolve(redDice, blueDice) {
     const _redHasMS  = redMsAvail > 0 && B.red.resources.moonstone > 0;
     const _blueHasMS = blueMsAvail > 0 && B.blue.resources.moonstone > 0;
 
+    // v728: PvP — each side only shows their OWN specials windows.
+    // Opponent's specials are skipped (can't make their choices).
+    if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+      // Blue's local resolution: show Blue's specials only
+      if (_blueHasMS && _blueHasLS) {
+        startSameTeamSpecialsWindow('blue', () => checkLuckyStones());
+        return;
+      }
+      if (_blueHasMS) {
+        B.phase = 'moonstone-blue';
+        showMoonstoneChoice('blue', blueDice);
+        return;
+      }
+      // No Blue moonstone — fall through to Lucky Stone check
+      checkLuckyStones();
+      return;
+    }
+    if (LIVE_PVP && PVP_SIDE === 'red') {
+      // Red's engine: show Red's specials only
+      if (_redHasMS && _redHasLS) {
+        startSameTeamSpecialsWindow('red', () => checkLuckyStones());
+        return;
+      }
+      if (_redHasMS) {
+        B.phase = 'moonstone-red';
+        showMoonstoneChoice('red', redDice);
+        return;
+      }
+      // No Red moonstone — fall through to Lucky Stone check
+      checkLuckyStones();
+      return;
+    }
+
     if (_redHasMS && _blueHasLS && !_blueHasMS && !_redHasLS) {
       startCrossTypeSpecialsWindow('red', 'blue');
       return;
@@ -10767,10 +10802,6 @@ let lsCountdownTimer = null;
 let lsSharedTimer = null; // separate timer for the simultaneous Lucky Stone window
 
 function checkLuckyStones() {
-  // v725: Blue's local PvP resolution skips Lucky Stone window entirely.
-  // Red's authoritative state will have the real dice + LS results.
-  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) { resolveRound(); return; }
-
   // Only offer Lucky Stones that existed BEFORE this round (not gained this turn)
   const redAvail = B.lsAvailable ? B.lsAvailable.red : 0;
   const blueAvail = B.lsAvailable ? B.lsAvailable.blue : 0;
@@ -10778,6 +10809,25 @@ function checkLuckyStones() {
   const blueHasLS = blueAvail > 0 && B.blue.resources.luckyStone > 0;
 
   if (!redHasLS && !blueHasLS) { resolveRound(); return; }
+
+  // v728: PvP Blue local resolution — show Blue's own LS picker, skip Red's
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+    if (blueHasLS) {
+      startLuckyStoneWindow('blue', () => resolveRound());
+    } else {
+      resolveRound(); // Red has LS but we can't make Red's choice — skip
+    }
+    return;
+  }
+  // v728: PvP Red — show Red's own LS picker, skip Blue's
+  if (LIVE_PVP && PVP_SIDE === 'red') {
+    if (redHasLS) {
+      startLuckyStoneWindow('red', () => resolveRound());
+    } else {
+      resolveRound(); // Blue has LS but Red can't make Blue's choice — skip
+    }
+    return;
+  }
 
   // Both teams have Lucky Stones — show simultaneously (saves up to 3s vs sequential)
   if (redHasLS && blueHasLS) {
@@ -14635,15 +14685,16 @@ function openKoSwap() {
   const fallen = active(t);
   const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
 
-  // v725: Blue's local engine auto-picks first alive ghost for ALL KO swaps during local resolution.
-  // Red's roundResult will correct the actual state. This prevents Blue's engine from deadlocking on a picker.
-  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+  // v728: Blue's local engine auto-picks only for RED's KO swaps (can't make Red's choice).
+  // Blue's OWN KO swaps show the real picker so the player can choose.
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally && team !== 'blue') {
     const autoIdx = t.ghosts.indexOf(alive[0]);
     const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
     narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
     setTimeout(() => doKoSwap(team, autoIdx), 800);
     return;
   }
+  // (Red's engine already handles Blue's KO swaps via the koSwapRequest listener below)
 
   // Live PvP: if it's Blue's turn to swap and we're Red's engine, notify Blue
   if (LIVE_PVP && PVP_SIDE === 'red' && team === 'blue') {
@@ -14681,6 +14732,11 @@ function openKoSwap() {
 }
 
 function doKoSwap(team, idx) {
+  // v728: if Blue picks a KO swap during local resolution, broadcast to Red immediately
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally && team === 'blue') {
+    PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: idx, timestamp: firebase.database.ServerValue.TIMESTAMP });
+    B._blueKoSwapPick = idx; // stash so koSwapRequest listener can use it
+  }
   const t = B[team];
   const fallen = active(t);
   // doKoSwap fires only when a ghost is KO'd by damage — entry effects always fire.
@@ -16230,9 +16286,9 @@ function setupLivePvP() {
 
       if (pvpBlueResolvedLocally) {
         // v725: Blue already saw the full combat experience locally.
-        // Just apply Red's authoritative state as a silent correction.
-        pvpApplyState(data.state);
-        renderBattle();
+        // v728: Only re-render if Red's authoritative state actually differs from local state.
+        const stateChanged = pvpApplyState(data.state);
+        if (stateChanged) renderBattle();
 
         // Reset for next round on roundEnd
         if (data.event === 'roundEnd' || !data.event) {
@@ -16351,14 +16407,16 @@ function setupLivePvP() {
       if (!data || data.side !== 'blue' || !B) return;
       PVP_GAME_REF.child('koSwapRequest').set(null);
 
-      // v726: if Blue already resolved locally, skip — local engine handled the swap
+      // v728: if Blue already resolved locally, the local engine showed the real picker.
+      // Blue's doKoSwap already broadcast the choice — just skip the redundant picker.
       if (pvpBlueResolvedLocally) {
-        // Still need to tell Red which ghost Blue picked (Red's engine is waiting)
-        const aliveIdxes = data.aliveIdxes || [];
-        if (aliveIdxes.length > 0) {
-          // Send the first alive ghost (matches local auto-resolve)
-          PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: aliveIdxes[0], timestamp: firebase.database.ServerValue.TIMESTAMP });
+        // If Blue already picked (doKoSwap broadcast), skip. If not yet picked, the local
+        // picker is still active and doKoSwap will broadcast when Blue chooses.
+        if (B._blueKoSwapPick != null) {
+          // Already broadcast — nothing to do
+          B._blueKoSwapPick = null;
         }
+        // Either way, don't show a second picker — local engine is handling it
         return;
       }
 
@@ -16824,21 +16882,31 @@ function pvpApplyState(state) {
   if (!B || !state) return;
   B.round = state.round;
 
-  // Sync ghosts: HP, KO, activeIdx
+  // v728: track whether anything actually changed, to avoid unnecessary re-renders
+  let changed = false;
+
+  // Sync ghosts: HP, KO, activeIdx — only update if values actually differ
   ['red', 'blue'].forEach(side => {
     if (!state[side]) return;
-    B[side].activeIdx = state[side].activeIdx;
+    if (B[side].activeIdx !== state[side].activeIdx) {
+      B[side].activeIdx = state[side].activeIdx;
+      changed = true;
+    }
     state[side].ghosts.forEach((sg, i) => {
-      if (B[side].ghosts[i]) {
-        B[side].ghosts[i].hp = sg.hp;
-        B[side].ghosts[i].maxHp = sg.maxHp;
-        B[side].ghosts[i].ko = sg.ko;
-        if (sg.killedBy) B[side].ghosts[i].killedBy = sg.killedBy;
-      }
+      const g = B[side].ghosts[i];
+      if (!g) return;
+      if (g.hp !== sg.hp) { g.hp = sg.hp; changed = true; }
+      if (g.maxHp !== sg.maxHp) { g.maxHp = sg.maxHp; changed = true; }
+      if (g.ko !== sg.ko) { g.ko = sg.ko; changed = true; }
+      if (sg.killedBy) g.killedBy = sg.killedBy;
     });
-    // Sync resources
+    // Sync resources — only update keys that differ
     if (state[side].resources) {
-      Object.assign(B[side].resources, state[side].resources);
+      const sr = state[side].resources;
+      const br = B[side].resources;
+      for (const k in sr) {
+        if (br[k] !== sr[k]) { br[k] = sr[k]; changed = true; }
+      }
     }
     // v724: sync committed resources so Blue sees Red's specials (and vice versa)
     if (state[side].committed) {
@@ -16853,6 +16921,8 @@ function pvpApplyState(state) {
   if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
   if (state.burn) B.burn = state.burn;
   if (state.log) B.log = state.log;
+
+  return changed; // v728: caller can skip renderBattle() if nothing changed
 }
 
 // Also sync game over: if Red declares game over, Blue should see it
@@ -16869,15 +16939,15 @@ if (LIVE_PVP && PVP_GAME_REF) {
 }
 
 // ---- PVP: Auto-resolve ability modals ----
-// Red's engine: auto-resolve opponent (Blue) modals only.
-// Blue's engine (v725): auto-resolve ALL modals (both sides) during local resolution,
-// since Red's roundResult is authoritative and will correct any divergence.
+// v728: Both sides auto-resolve ONLY the opponent's modals.
+// Blue's own interactive abilities (Lucky Stone, Moonstone, KO swap, etc.) now show real pickers.
+// Red's roundResult silently corrects any divergence afterward.
 if (LIVE_PVP) {
   const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
-  // v725: Blue auto-resolves all modals; Red only auto-resolves opponent's
+  const mySide = PVP_SIDE;
+  // v728: auto-resolve opponent's modals only — never auto-resolve your own team's choices
   const shouldAutoResolve = (modalTeam) => {
-    if (PVP_SIDE === 'blue' && pvpBlueResolvedLocally) return true; // Blue resolving locally: auto-all
-    return modalTeam === oppSide; // Red: only auto opponent
+    return modalTeam === oppSide;
   };
 
   // Poll for modals and auto-resolve them
@@ -16900,16 +16970,18 @@ if (LIVE_PVP) {
       }
     }
     // Pressure / Raditz Hunt — auto-pick first available when overlay is active
+    // v728: only auto-pick if the picker is for the OPPONENT's team
     const pressureOvl = document.getElementById('pressureOverlay');
-    if (pressureOvl && pressureOvl.classList.contains('active') && (PVP_SIDE === 'blue' && pvpBlueResolvedLocally)) {
+    if (pressureOvl && pressureOvl.classList.contains('active') && B.pressurePickerTeam && shouldAutoResolve(B.pressurePickerTeam)) {
       const firstOpt = pressureOvl.querySelector('.pressure-opt');
       if (firstOpt) {
         setTimeout(() => { firstOpt.click(); }, 300);
       }
     }
     // Hand Limit — auto-discard first available resource
+    // v728: only auto-discard for the opponent's team
     const handLimitOvl = document.getElementById('handLimitOverlay');
-    if (handLimitOvl && handLimitOvl.classList.contains('active') && B.handLimitPending && (PVP_SIDE === 'blue' && pvpBlueResolvedLocally)) {
+    if (handLimitOvl && handLimitOvl.classList.contains('active') && B.handLimitPending && shouldAutoResolve(B.handLimitPending.team)) {
       const hlTeam = B.handLimitPending.team;
       const hlRes = B[hlTeam]?.resources;
       if (hlRes) {
