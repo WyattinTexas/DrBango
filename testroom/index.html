@@ -8012,6 +8012,24 @@ function renderDuelUI() {
 // and either enters the Duel Phase or falls back to simultaneous ready.
 function startNextRound() {
   if (!B) return;
+
+  // Live PvP state sync: Red is authoritative — writes state after each round.
+  // Blue reads it and overwrites local state to prevent drift.
+  if (LIVE_PVP && PVP_GAME_REF && B.phase !== 'over') {
+    if (PVP_SIDE === 'red') {
+      // Red: write authoritative state
+      const stateSnap = pvpSerializeState();
+      PVP_GAME_REF.child('stateSync').set(stateSnap);
+    } else {
+      // Blue: read Red's state and apply it
+      PVP_GAME_REF.child('stateSync').once('value', snap => {
+        const state = snap.val();
+        if (state) pvpApplyState(state);
+        renderBattle();
+      });
+    }
+  }
+
   // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
   checkHandLimits(() => {
     const priority = computeDuelPriority();
@@ -14587,6 +14605,12 @@ function doKoSwap(team, idx) {
 
 function showGameOver(winner) {
   B.phase = 'over';
+  // Live PvP: broadcast game over so both clients show it
+  if (LIVE_PVP && PVP_GAME_REF && PVP_SIDE === 'red') {
+    const stateSnap = pvpSerializeState();
+    PVP_GAME_REF.child('stateSync').set(stateSnap);
+    PVP_GAME_REF.child('gameOver').set({ winner, ts: Date.now() });
+  }
   fadeOutMusic();
   // Victory fanfare (delayed to let music fade a bit)
   setTimeout(() => playSfx('sfxVictory', 0.6), 600);
@@ -16251,6 +16275,73 @@ doSwap = function(team, idx) {
   }
   _origDoSwapFn(team, idx);
 };
+
+// ---- PVP STATE SYNC: Red is authoritative ----
+function pvpSerializeState() {
+  if (!B) return null;
+  return {
+    round: B.round,
+    red: {
+      activeIdx: B.red.activeIdx,
+      ghosts: B.red.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
+      resources: { ...B.red.resources }
+    },
+    blue: {
+      activeIdx: B.blue.activeIdx,
+      ghosts: B.blue.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
+      resources: { ...B.blue.resources }
+    },
+    willowLostLast: B.willowLostLast ? { ...B.willowLostLast } : { red: false, blue: false },
+    iceBladeForgedPermanent: B.iceBladeForgedPermanent ? { ...B.iceBladeForgedPermanent } : { red: false, blue: false },
+    flameBlade: B.flameBlade ? { ...B.flameBlade } : { red: false, blue: false },
+    duelLastLoser: B.duelLastLoser || null,
+    burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
+    ts: Date.now()
+  };
+}
+
+function pvpApplyState(state) {
+  if (!B || !state) return;
+  B.round = state.round;
+
+  // Sync ghosts: HP, KO, activeIdx
+  ['red', 'blue'].forEach(side => {
+    if (!state[side]) return;
+    B[side].activeIdx = state[side].activeIdx;
+    state[side].ghosts.forEach((sg, i) => {
+      if (B[side].ghosts[i]) {
+        B[side].ghosts[i].hp = sg.hp;
+        B[side].ghosts[i].maxHp = sg.maxHp;
+        B[side].ghosts[i].ko = sg.ko;
+        if (sg.killedBy) B[side].ghosts[i].killedBy = sg.killedBy;
+      }
+    });
+    // Sync resources
+    if (state[side].resources) {
+      Object.assign(B[side].resources, state[side].resources);
+    }
+  });
+
+  // Sync battle flags
+  if (state.willowLostLast) B.willowLostLast = state.willowLostLast;
+  if (state.iceBladeForgedPermanent) B.iceBladeForgedPermanent = state.iceBladeForgedPermanent;
+  if (state.flameBlade) B.flameBlade = state.flameBlade;
+  if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
+  if (state.burn) B.burn = state.burn;
+}
+
+// Also sync game over: if Red declares game over, Blue should see it
+if (LIVE_PVP && PVP_GAME_REF) {
+  PVP_GAME_REF.child('gameOver').on('value', snap => {
+    const data = snap.val();
+    if (data && data.winner && B && B.phase !== 'over') {
+      // Red declared game over — show it on Blue's client too
+      setTimeout(() => {
+        if (B && B.phase !== 'over') showGameOver(data.winner);
+      }, 500);
+    }
+  });
+}
 
 // ---- PVP: Auto-resolve opponent ability modals ----
 // In live PvP, ability choice modals should only appear for YOUR side.
