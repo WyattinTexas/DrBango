@@ -14943,9 +14943,12 @@ function stopMusicHard() {
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
+// v722: skip bgMusic if it's already playing — the old code paused it immediately
+// after play(), which killed music in multiplayer (first click = during battle)
 (function unlockAudio() {
   const unlock = () => {
     document.querySelectorAll('audio').forEach(a => {
+      if (!a.paused) return; // already playing (e.g. bgMusic) — don't touch it
       a.play().then(() => a.pause()).catch(() => {});
     });
     document.removeEventListener('click', unlock);
@@ -16108,9 +16111,6 @@ function setupLivePvP() {
     // BLUE: listen for Red's authoritative round result
     // v721: Blue now replays ability callouts with full visual effects before applying state
     let pvpBlueLastLogLen = 0;
-    let pvpBlueEventQueue = []; // queue incoming events if abilities are still playing
-    let pvpBlueProcessing = false;
-
     function pvpBlueProcessEvent(data) {
       // v722: reset AFK timer — Blue is actively watching, not idle
       if (typeof resetPvPAfk === 'function') resetPvPAfk();
@@ -16128,25 +16128,15 @@ function setupLivePvP() {
         renderDice(data.redDice, data.blueDice);
       }
 
-      // v721: Replay ability callouts with card glow + SFX, THEN apply state
+      // v722: Show ability callouts FAST — Blue is already behind Red, don't add more delay.
+      // Fire the last/main ability callout for visual impact, apply state immediately.
       if (hasAbilities) {
-        let idx = 0;
-        function playNextAbility() {
-          if (idx >= abilities.length) {
-            // All abilities shown — now apply final state
-            pvpBlueFinalize(data, oldLogLen);
-            return;
-          }
-          const a = abilities[idx++];
-          showAbilityCallout(a.name, a.color, a.desc, a.team);
-          setTimeout(playNextAbility, spd(1300));
-        }
-        // Small delay after dice so the roll lands visually first
-        setTimeout(playNextAbility, spd(600));
-      } else {
-        // No abilities — apply state immediately
-        pvpBlueFinalize(data, oldLogLen);
+        // Show the most recent ability (the important one) with full SFX + glow
+        const last = abilities[abilities.length - 1];
+        showAbilityCallout(last.name, last.color, last.desc, last.team);
       }
+      // Apply state right away — no artificial delays
+      pvpBlueFinalize(data, oldLogLen);
     }
 
     function pvpBlueFinalize(data, oldLogLen) {
@@ -16183,25 +16173,12 @@ function setupLivePvP() {
         }, 800);
       }
 
-      // Process next queued event if any
-      pvpBlueProcessing = false;
-      if (pvpBlueEventQueue.length > 0) {
-        pvpBlueProcessing = true;
-        pvpBlueProcessEvent(pvpBlueEventQueue.shift());
-      }
     }
 
     PVP_GAME_REF.child('roundResult').on('child_added', snap => {
       const data = snap.val();
       if (!data || !B || B.phase === 'over') return;
       snap.ref.remove();
-
-      // Queue events if we're still replaying abilities from a previous broadcast
-      if (pvpBlueProcessing) {
-        pvpBlueEventQueue.push(data);
-        return;
-      }
-      pvpBlueProcessing = true;
       pvpBlueProcessEvent(data);
     });
   } else {
@@ -16455,6 +16432,50 @@ function setupLivePvP() {
     clearTimeout(pvpAfkTimer);
     clearInterval(pvpTimerInterval);
   });
+
+  // --- v722: CHOICE MODAL SPECTATING ---
+  // When Red opens a choice modal (Wise Al, Gordok, Selene, etc.), broadcast it
+  // so Blue sees what's happening instead of staring at a blank screen.
+  if (mySide === 'red') {
+    // Watch all selene-overlay elements for .active class
+    const overlays = document.querySelectorAll('.selene-overlay');
+    overlays.forEach(ol => {
+      const obs = new MutationObserver(() => {
+        if (ol.classList.contains('active')) {
+          // Extract the ability name from the overlay's banner or h3
+          const banner = ol.querySelector('.selene-banner');
+          const h3 = ol.querySelector('h3');
+          const abilityText = banner ? banner.textContent.trim() : (h3 ? h3.textContent.trim() : 'Making a choice...');
+          PVP_GAME_REF.child('choiceModal').set({ text: abilityText, ts: Date.now() });
+        } else {
+          PVP_GAME_REF.child('choiceModal').set(null);
+        }
+      });
+      obs.observe(ol, { attributes: true, attributeFilter: ['class'] });
+    });
+  } else {
+    // Blue: show spectator banner when Red has a choice modal open
+    PVP_GAME_REF.child('choiceModal').on('value', snap => {
+      const data = snap.val();
+      let spectBanner = document.getElementById('pvp-choice-spectate');
+      if (!spectBanner) {
+        spectBanner = document.createElement('div');
+        spectBanner.id = 'pvp-choice-spectate';
+        spectBanner.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+          'background:rgba(0,0,0,0.85);border:2px solid var(--gold-bright);border-radius:14px;padding:20px 32px;' +
+          'font-family:Creepster,cursive;font-size:1.3rem;color:var(--gold-bright);text-align:center;letter-spacing:2px;' +
+          'display:none;pointer-events:none;animation:pvpTimerPulse 1.5s ease-in-out infinite;';
+        document.body.appendChild(spectBanner);
+      }
+      if (data && data.text) {
+        spectBanner.textContent = '⚔️ ' + data.text;
+        spectBanner.style.display = 'block';
+        if (typeof resetPvPAfk === 'function') resetPvPAfk();
+      } else {
+        spectBanner.style.display = 'none';
+      }
+    });
+  }
 }
 
 // Inject opponent's dice directly into the engine — bypasses rollReady entirely.
