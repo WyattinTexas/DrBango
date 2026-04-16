@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v720';
+const TESTROOM_VERSION = 'v721';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2366,6 +2366,7 @@ let PVP_GAME_REF = null;
 let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
 let MP_DAILY = false; // true when loaded via daily rival mode
 let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
+let pvpAbilityEvents = []; // v721: capture ability callouts for Blue sync
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -4004,7 +4005,7 @@ function startBattle() {
   document.getElementById('team-select').style.display = 'none';
   document.getElementById('battle-view').style.display = 'block';
   document.querySelector('.app').classList.add('battle-active');
-  if (!MP_MODE) startMusic(); // No music in multiplayer
+  startMusic(); // v721: music plays in multiplayer too
   log('<span class="log-round">Battle begins!</span>');
   renderBattle();
 
@@ -15062,6 +15063,10 @@ function drainAbilityQueue(callback) {
 // #abilitySplash DOM element kept (display:none) so .active toggling still works
 // for any external code that reads it (3 callsites) — safe no-op.
 function showAbilityCallout(name, color, desc, team) {
+  // v721: capture ability events for PvP Blue sync (hooked here to catch ALL callouts)
+  if (LIVE_PVP && PVP_SIDE === 'red') {
+    pvpAbilityEvents.push({ name: name || '', color: color || '', desc: desc || '', team: team || '' });
+  }
   // Maintain splash .active compatibility (visual no-op — CSS sets display:none)
   const el = document.getElementById('abilitySplash');
   const theme = SPLASH_THEMES[color] || '';
@@ -16101,48 +16106,66 @@ function setupLivePvP() {
   // When both are ready, Red rolls both sides and broadcasts results.
   if (mySide === 'blue') {
     // BLUE: listen for Red's authoritative round result
+    // v721: Blue now replays ability callouts with full visual effects before applying state
     let pvpBlueLastLogLen = 0;
-    PVP_GAME_REF.child('roundResult').on('child_added', snap => {
-      const data = snap.val();
-      if (!data || !B || B.phase === 'over') return;
-      snap.ref.remove();
+    let pvpBlueEventQueue = []; // queue incoming events if abilities are still playing
+    let pvpBlueProcessing = false;
 
+    function pvpBlueProcessEvent(data) {
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
 
-      // Track log length before applying state for narration diff
       const oldLogLen = pvpBlueLastLogLen;
+      const abilities = data.abilityEvents || [];
+      const hasAbilities = abilities.length > 0;
 
-      // Apply the full state from Red (authoritative)
-      pvpApplyState(data.state);
-
-      // Show dice animations for both sides
+      // Show dice FIRST (before abilities, so Blue sees the roll)
       if (data.redDice && data.blueDice) {
-        B.redDice = data.redDice;
-        B.blueDice = data.blueDice;
+        if (B) { B.redDice = data.redDice; B.blueDice = data.blueDice; }
         renderDice(data.redDice, data.blueDice);
       }
 
+      // v721: Replay ability callouts with card glow + SFX, THEN apply state
+      if (hasAbilities) {
+        let idx = 0;
+        function playNextAbility() {
+          if (idx >= abilities.length) {
+            // All abilities shown — now apply final state
+            pvpBlueFinalize(data, oldLogLen);
+            return;
+          }
+          const a = abilities[idx++];
+          showAbilityCallout(a.name, a.color, a.desc, a.team);
+          setTimeout(playNextAbility, spd(1300));
+        }
+        // Small delay after dice so the roll lands visually first
+        setTimeout(playNextAbility, spd(600));
+      } else {
+        // No abilities — apply state immediately
+        pvpBlueFinalize(data, oldLogLen);
+      }
+    }
+
+    function pvpBlueFinalize(data, oldLogLen) {
+      // Apply the full state from Red (authoritative)
+      pvpApplyState(data.state);
       renderBattle();
 
-      // Show new log entries as narration so Blue sees play-by-play
-      if (B.log && B.log.length > oldLogLen) {
+      // Show new log entries as narration
+      if (B && B.log && B.log.length > oldLogLen) {
         const newCount = B.log.length - oldLogLen;
         const newEntries = B.log.slice(0, newCount);
         newEntries.reverse().forEach((entry, i) => {
           setTimeout(() => narrate(entry), i * 800);
         });
       }
-      pvpBlueLastLogLen = B.log ? B.log.length : 0;
+      pvpBlueLastLogLen = B && B.log ? B.log.length : 0;
 
-      // Only reset Blue's roll button on round-end events (not mid-round updates)
+      // Only reset Blue's roll button on round-end events
       if (data.event === 'roundEnd' || !data.event) {
-        // Reset Blue's committed resources for next round
         B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
-
-        // Re-enable Blue's roll button for next round
         const myBtn = document.getElementById('rollBlueBtn');
-        if (myBtn && B.phase !== 'over') {
+        if (myBtn && B && B.phase !== 'over') {
           myBtn.disabled = false;
           myBtn.textContent = 'ROLL';
         }
@@ -16154,6 +16177,27 @@ function setupLivePvP() {
           if (B && B.phase !== 'over') showGameOver(data.gameOver);
         }, 800);
       }
+
+      // Process next queued event if any
+      pvpBlueProcessing = false;
+      if (pvpBlueEventQueue.length > 0) {
+        pvpBlueProcessing = true;
+        pvpBlueProcessEvent(pvpBlueEventQueue.shift());
+      }
+    }
+
+    PVP_GAME_REF.child('roundResult').on('child_added', snap => {
+      const data = snap.val();
+      if (!data || !B || B.phase === 'over') return;
+      snap.ref.remove();
+
+      // Queue events if we're still replaying abilities from a previous broadcast
+      if (pvpBlueProcessing) {
+        pvpBlueEventQueue.push(data);
+        return;
+      }
+      pvpBlueProcessing = true;
+      pvpBlueProcessEvent(data);
     });
   } else {
     // RED: listen for Blue's "ready" signal (now an object with committed resources)
@@ -16510,10 +16554,14 @@ function pvpBroadcastState(extras) {
   if (!LIVE_PVP || PVP_SIDE !== 'red' || !PVP_GAME_REF || !B) return;
   const state = pvpSerializeState();
   PVP_GAME_REF.child('stateSync').set(state);
+  // v721: include ability events so Blue can replay callouts
+  const abilityEvts = pvpAbilityEvents.length > 0 ? pvpAbilityEvents.slice() : null;
+  pvpAbilityEvents = [];
   PVP_GAME_REF.child('roundResult').push({
     state: state,
     redDice: B.redDice || null,
     blueDice: B.blueDice || null,
+    abilityEvents: abilityEvts,
     gameOver: null,
     ...extras,
     ts: Date.now()
