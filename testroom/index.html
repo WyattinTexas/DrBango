@@ -9701,6 +9701,38 @@ function doSkipSpecials() {
 let msCountdownTimer = null;
 
 function showMoonstoneChoice(team, dice) {
+  // Blue AI: auto-use moonstone (pick lowest die → change to 6)
+  if (AI_ACTIVE && team === 'blue') {
+    B.pendingMoonstone = { team, dice: [...dice], dieIndex: null, phase: 'pick-resource' };
+    // Find lowest die
+    let worstIdx = 0, worstVal = 7;
+    dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+    // Auto-use: change lowest die to 6
+    B.pendingMoonstone.dieIndex = worstIdx;
+    const newDice = [...dice];
+    newDice[worstIdx] = 6;
+    newDice.sort((a, b) => a - b);
+    B[team === 'red' ? 'redDice' : 'blueDice'] = newDice;
+    B.pendingMoonstone.dice = newDice;
+    B[team].resources.moonstone--;
+    log(`<span class="log-ms">${team.toUpperCase()} uses Moonstone!</span> Changed die ${worstVal} → 6!`);
+    narrate(`<b class="${team}-text">Blue</b> uses <b style="color:var(--moonstone)">Moonstone!</b> ${worstVal} → 6!`);
+    B.pendingMoonstone = null;
+    renderDice(B.redDice, B.blueDice);
+    renderBattle();
+    // Continue to resolve
+    setTimeout(() => {
+      if (B.pendingResolve) {
+        const pr = B.pendingResolve;
+        B.pendingResolve = null;
+        doResolve(pr.redDice || B.redDice, pr.blueDice || B.blueDice, pr.redRoll, pr.blueRoll);
+      } else {
+        checkLuckyStonePhase();
+      }
+    }, spd(800));
+    return;
+  }
+
   renderDice(B.redDice, B.blueDice);
   renderBattle();
   B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-resource' };
@@ -10394,6 +10426,55 @@ function pickMsValueUnified(val) {
 // If LS player acts first → MS player gets a fresh 5s after LS resolves.
 // ============================================================
 function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
+  // Blue AI: if blue has either moonstone or lucky stone in cross-type window,
+  // auto-use it so the player doesn't see blue's interactive prompts
+  if (AI_ACTIVE && (msTeam === 'blue' || lsTeam === 'blue')) {
+    // Auto-use blue's moonstone
+    if (msTeam === 'blue' && B.blue.resources.moonstone > 0) {
+      const dice = B.pendingResolve.blueDice || B.blueDice;
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      dice[worstIdx] = 6;
+      dice.sort((a, b) => a - b);
+      B.blue.resources.moonstone--;
+      B.blueDice = dice;
+      log(`<span class="log-ms">BLUE uses Moonstone!</span> Changed ${worstVal} → 6!`);
+      renderDice(B.redDice, B.blueDice);
+    }
+    // Auto-use blue's lucky stone
+    if (lsTeam === 'blue' && B.blue.resources.luckyStone > 0) {
+      const dice = B.pendingResolve.blueDice || B.blueDice;
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        dice[worstIdx] = Math.floor(Math.random() * 6) + 1;
+        dice.sort((a, b) => a - b);
+        B.blue.resources.luckyStone--;
+        B.blueDice = dice;
+        log(`<span class="log-ms">BLUE uses Lucky Stone!</span> Rerolled ${worstVal}!`);
+        renderDice(B.redDice, B.blueDice);
+      }
+    }
+    // If the other team (red/player) still has their special, show only their window
+    if (msTeam === 'red' && B.red.resources.moonstone > 0) {
+      showMoonstoneChoice('red', B.pendingResolve.redDice || B.redDice);
+      return;
+    }
+    if (lsTeam === 'red' && B.red.resources.luckyStone > 0) {
+      startLuckyStoneWindow('red', () => {
+        const pr = B.pendingResolve;
+        if (pr) { B.pendingResolve = null; doResolve(pr.redDice, pr.blueDice, pr.redRoll, pr.blueRoll); }
+      });
+      return;
+    }
+    // Both auto-resolved — proceed to resolve
+    setTimeout(() => {
+      const pr = B.pendingResolve;
+      if (pr) { B.pendingResolve = null; doResolve(pr.redDice, pr.blueDice, pr.redRoll, pr.blueRoll); }
+    }, spd(800));
+    return;
+  }
+
   B.phase = 'specials-shared';
   const tLabel = t => t.charAt(0).toUpperCase() + t.slice(1);
   narrate(`<b class="${msTeam}-text">${tLabel(msTeam)}</b> has a <b style="color:var(--moonstone)">Moonstone</b> and <b class="${lsTeam}-text">${tLabel(lsTeam)}</b> has a <b class="gold">Lucky Stone!</b> Click yours to use it!`);
@@ -10756,6 +10837,31 @@ function startSimultaneousLuckyStoneWindows() {
 }
 
 function startLuckyStoneWindow(team, callback) {
+  // Blue AI: auto-use lucky stone (reroll lowest die)
+  if (AI_ACTIVE && team === 'blue') {
+    B.phase = 'luckystone-' + team;
+    const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+    if (dice && B[team].resources.luckyStone > 0) {
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        B[team].resources.luckyStone--;
+        B.luckyStoneSpentThisTurn[team]++;
+        const newVal = Math.floor(Math.random() * 6) + 1;
+        dice[worstIdx] = newVal;
+        dice.sort((a, b) => a - b);
+        log(`<span class="log-ms">${team.toUpperCase()} uses Lucky Stone!</span> Rerolled ${worstVal} → ${newVal}!`);
+        narrate(`<b class="${team}-text">Blue</b> uses <b class="gold">Lucky Stone!</b> ${worstVal} → ${newVal}!`);
+        renderDice(B.redDice, B.blueDice);
+        renderBattle();
+      } else {
+        log(`<span style="color:var(--text2)">${team.toUpperCase()} holds Lucky Stone (${worstVal} is good enough).</span>`);
+      }
+    }
+    setTimeout(() => callback(), spd(800));
+    return;
+  }
+
   B.phase = 'luckystone-' + team;
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
