@@ -2357,7 +2357,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v726';
+const TESTROOM_VERSION = 'v727';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2368,6 +2368,7 @@ let MP_DAILY = false; // true when loaded via daily rival mode
 let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
 let pvpAbilityEvents = []; // v721: capture ability callouts for Blue sync
 let pvpBlueResolvedLocally = false; // v725: flag to prevent double-resolution on Blue
+let pvpRedReady = false; // v726: Red has committed resources and is waiting for Blue
 
 // ============================================================
 // BATTLE SPEED — multiplier for all animation/delay timings
@@ -7120,7 +7121,37 @@ function rollReady(team) {
       // Blue client trying to roll Red — block
       return;
     }
-    // Red client: allow rolling both sides (Red clicks Red, Firebase triggers Blue)
+    // v726: Red waits for Blue to be ready before generating dice.
+    // This ensures Blue has time to commit resources (Ice Shards, Fire, etc.)
+    if (PVP_SIDE === 'red' && team === 'red') {
+      // Run pre-roll setup (abilities, modals) but DON'T generate dice yet
+      if (B.phase === 'ready') {
+        const cc = doPreRollSetup();
+        if (B.phase !== 'ready') return;
+        B.phase = 'rolling';
+        renderBattle();
+        // Send Red's ready signal with committed resources
+        const preDelay = cc > 0 ? cc * spd(1500) : 0;
+        setTimeout(() => {
+          const redActive = active(B.red);
+          PVP_GAME_REF.child('redReady').set({
+            ready: true,
+            committed: B.committed.red,
+            resources: B.red.resources,
+            activeHp: redActive ? redActive.hp : 0,
+            ts: Date.now()
+          });
+          pvpRedReady = true;
+          const btn = document.getElementById('rollRedBtn');
+          if (btn) { btn.disabled = true; btn.textContent = 'Waiting...'; }
+          narrate(`<b class="red-text">${redActive.name}</b> is ready...`);
+          // If Blue is already ready, generate dice now
+          pvpTryGenerateDice();
+        }, preDelay);
+      }
+      return; // Don't fall through to normal engine
+    }
+    // Red's engine rolling Blue (from pvpTryGenerateDice) → allowed through
   }
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
@@ -8071,6 +8102,8 @@ function startNextRound() {
 
   // Live PvP state sync: Red is authoritative — broadcasts full state after each round.
   if (B.phase !== 'over') pvpBroadcastState({ event: 'roundEnd' });
+  // v726: reset ready flags for next round
+  if (LIVE_PVP) { pvpRedReady = false; PVP_OPPONENT_READY = false; }
 
   // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
   checkHandLimits(() => {
@@ -16110,6 +16143,31 @@ function aiHandlePostRoll() {
 
 // ---- LIVE PVP SETUP ----
 let PVP_BLUE_READY_DATA = null;
+// v726: generate BOTH dice sets only when both players are ready.
+// Top-level so rollReady can call it from Red's roll handler.
+function pvpTryGenerateDice() {
+  if (!PVP_OPPONENT_READY || !pvpRedReady || !B) return;
+  if (B.phase !== 'rolling') return;
+
+  // Apply Blue's committed resources
+  if (PVP_BLUE_READY_DATA) {
+    if (PVP_BLUE_READY_DATA.committed) B.committed.blue = PVP_BLUE_READY_DATA.committed;
+    if (PVP_BLUE_READY_DATA.resources) B.blue.resources = PVP_BLUE_READY_DATA.resources;
+    if (PVP_BLUE_READY_DATA.activeHp != null) {
+      const blueActive = active(B.blue);
+      if (blueActive) blueActive.hp = PVP_BLUE_READY_DATA.activeHp;
+    }
+    PVP_BLUE_READY_DATA = null;
+  }
+  PVP_OPPONENT_READY = false;
+  pvpRedReady = false;
+
+  // Now generate Red's dice, then Blue's dice — standard engine flow
+  doTeamRoll('red', document.getElementById('rollRedBtn'));
+  // Small delay so Red's dice broadcast first, then Blue's
+  setTimeout(() => { rollReady('blue'); }, 50);
+}
+
 function setupLivePvP() {
   if (!LIVE_PVP || !PVP_GAME_REF) return;
 
@@ -16119,6 +16177,7 @@ function setupLivePvP() {
 
   // Clean up stale data from previous games
   PVP_GAME_REF.child('blueReady').set(false);
+  PVP_GAME_REF.child('redReady').set(false);
   PVP_GAME_REF.child('rolls').remove();
   PVP_GAME_REF.child('roundResult').remove();
   PVP_GAME_REF.child('koSwap').remove();
@@ -16244,9 +16303,12 @@ function setupLivePvP() {
       pvpBlueProcessEvent(data);
     });
   } else {
-    // RED: listen for Blue's "ready" signal (now an object with committed resources)
+    // v726: RED waits for BOTH ready signals before generating dice.
+    // This gives Blue time to commit resources (Ice Shards, Fire, etc.)
     PVP_OPPONENT_READY = false;
     PVP_BLUE_READY_DATA = null;
+    pvpRedReady = false;
+
     PVP_GAME_REF.child('blueReady').on('value', snap => {
       const data = snap.val();
       if (!data || !data.ready || !B || B.phase === 'over') return;
@@ -16257,33 +16319,13 @@ function setupLivePvP() {
       const banner = document.getElementById('pvp-wait-banner');
       if (banner) banner.style.display = 'none';
 
-      // Try to roll Blue now — if Red is in a state that allows it
-      pvpTryRollBlue();
+      pvpTryGenerateDice();
     });
 
-    // Poll: if Blue was ready but Red wasn't in the right phase, retry
+    // Poll: if both ready but phase wasn't right, retry
     setInterval(() => {
-      if (PVP_OPPONENT_READY && B && B.phase !== 'over') pvpTryRollBlue();
+      if (PVP_OPPONENT_READY && pvpRedReady && B && B.phase !== 'over') pvpTryGenerateDice();
     }, 500);
-  }
-
-  function pvpTryRollBlue() {
-    if (!PVP_OPPONENT_READY || !B) return;
-    // Only roll Blue when engine is ready for it
-    if (B.phase === 'ready' || B.phase === 'rolling') {
-      // Apply Blue's committed resources & state from their client
-      if (PVP_BLUE_READY_DATA) {
-        if (PVP_BLUE_READY_DATA.committed) B.committed.blue = PVP_BLUE_READY_DATA.committed;
-        if (PVP_BLUE_READY_DATA.resources) B.blue.resources = PVP_BLUE_READY_DATA.resources;
-        if (PVP_BLUE_READY_DATA.activeHp != null) {
-          const blueActive = active(B.blue);
-          if (blueActive) blueActive.hp = PVP_BLUE_READY_DATA.activeHp;
-        }
-        PVP_BLUE_READY_DATA = null;
-      }
-      PVP_OPPONENT_READY = false;
-      rollReady('blue');
-    }
   }
 
   // --- KO SWAP SYNC ---
