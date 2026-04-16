@@ -15682,26 +15682,30 @@ function aiCommitSpecials(team) {
     }
   }
 
-  // --- Commit all ice shards for bonus damage ---
-  if (r.ice > 0 && B.committed) {
-    B.committed[team].ice = r.ice;
+  // --- Commit resources using cycleCommit (properly moves from pool to committed) ---
+  // Commit all ice shards
+  while (r.ice > 0 && B.committed) {
+    cycleCommit(team, 'ice');
   }
 
-  // --- Commit all sacred fire for bonus damage ---
-  if (r.fire > 0 && B.committed) {
-    B.committed[team].fire = r.fire;
+  // Commit all sacred fire
+  while (r.fire > 0 && B.committed) {
+    cycleCommit(team, 'fire');
   }
 
-  // --- Commit surge for extra dice ---
-  if (r.surge > 0 && B.committed) {
-    B.committed[team].surge = r.surge;
+  // Commit all surge for extra dice
+  while (r.surge > 0 && B.committed) {
+    cycleCommit(team, 'surge');
   }
 
   // --- Aunt Susan: commit seeds for damage if HP is full ---
   if (r.healingSeed > 0 && f.hp >= f.maxHp && B.committed) {
     const auntSusan = t.ghosts.find(g => g.id === 308 && !g.ko);
     if (auntSusan) {
-      B.committed[team].auntSusan = r.healingSeed;
+      while (r.healingSeed > 0) {
+        if (typeof toggleAuntSusan === 'function') toggleAuntSusan(team);
+        else break;
+      }
     }
   }
 
