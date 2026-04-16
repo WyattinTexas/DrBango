@@ -561,8 +561,24 @@ function triggerBeforeRoll(attackerTeam, defenderTeam, result) {
 
 // ═══════ ENCOUNTER GENERATION ═══════
 
-// Get a random card appropriate for the region
-function getEncounterCard(region) {
+// Get a card from a location's fixed pool
+function getEncounterForLocation(locationName) {
+  if (typeof ENCOUNTER_POOLS !== 'undefined' && ENCOUNTER_POOLS[locationName]) {
+    const pool = ENCOUNTER_POOLS[locationName].ghosts;
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    const card = getCard(id);
+    if (card) return card;
+  }
+  return null; // Fallback to region-based
+}
+
+// Get a random card appropriate for the region (fallback)
+function getEncounterCard(region, locationName) {
+  // Try fixed pool first
+  if (locationName) {
+    const fixed = getEncounterForLocation(locationName);
+    if (fixed) return fixed;
+  }
   let pool;
   // Set 1 cards appear everywhere, regional cards appear in their region
   const general = CARDS.filter(c => c.set === 'Set 1' && c.rarity !== 'legendary');
@@ -719,7 +735,7 @@ if (typeof window !== 'undefined') {
     makeResources, addResource,
     makeGhost, makeTeam, activeGhost, sidelineGhosts, aliveGhosts, isTeamDefeated,
     resolveBattleRound, triggerEntryAbility,
-    getEncounterCard, drawEvent, getShopItems,
+    getEncounterCard, getEncounterForLocation, drawEvent, getShopItems,
     createGameState, rollMovement, getConnectedNodes, getReachableNodes
   };
 }
