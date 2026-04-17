@@ -2832,8 +2832,9 @@ const GHOSTS = [
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
-  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any die shows a 2: swap your lowest die with your opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
-  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."}
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any die shows a 2: swap your lowest die with your opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
+  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
+  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline: if you hold 3+ different specials, your active ghost gains +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."}
 ];
 
 // ============================================================
@@ -9085,6 +9086,31 @@ function doPreRollSetup() {
     }
   });
 
+  // Explorer Jeff (455) — Treasure Hunter: sideline, if holding 3+ different specials, +1 die
+  // Negated by Cornelius (45) — Antidote
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    const enemyTeamObj = team === B.red ? B.blue : B.red;
+    if (!f.ko && hasSideline(team, 455)) {
+      const res = B[tName].resources;
+      const types = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly'].filter(r => (res[r] || 0) > 0).length;
+      if (types >= 3) {
+        if (hasSideline(enemyTeamObj, 45)) {
+          const cornGhost = getSidelineGhost(enemyTeamObj, 45);
+          preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Explorer Jeff's Treasure Hunter!`, tName === 'red' ? 'blue' : 'red']);
+          log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`);
+        } else {
+          if (tName === 'red') redCount += 1;
+          else blueCount += 1;
+          const ejGhost = getSidelineGhost(team, 455);
+          preRollCallouts.push(['TREASURE HUNTER!', 'var(--uncommon)', `${ejGhost ? ejGhost.name : 'Explorer Jeff'} (sideline) — ${types} specials held! +1 die!`, tName]);
+          log(`<span class="log-ability">Explorer Jeff</span> (sideline) — Treasure Hunter! ${types} different specials → +1 die!`);
+        }
+      }
+    }
+  });
+
   // Shoo (13) — Alpine Air: while on the sideline, the active ghost gains +2 HP when HP < 4. Once per ghost.
   // Negated by Cornelius (45) — Antidote: if the enemy team has Cornelius on sideline, Alpine Air is blocked (once-per-ghost use NOT consumed).
   [B.red, B.blue].forEach(team => {
@@ -12737,6 +12763,24 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Admiral'); log(`<span class="log-ability">Cornelius</span> — Antidote! Admiral Comrades blocked.`); }
   }
 
+  // Explorer Jeff (455) — Treasure Hunter: sideline +1 damage if 3+ different specials held
+  let explorerJeffTriggered = false;
+  let explorerJeffBaseDmg = 0;
+  if (hasSideline(winTeam, 455) && !wF.ko) {
+    const ejRes = B[winTeamName].resources;
+    const ejTypes = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly'].filter(r => (ejRes[r] || 0) > 0).length;
+    if (ejTypes >= 3) {
+      if (!corneliusBlocksRally) {
+        explorerJeffBaseDmg = dmg;
+        dmg += 1;
+        explorerJeffTriggered = true;
+        const ejGhost = getSidelineGhost(winTeam, 455);
+        collectKC(winTeamName, 'Explorer Jeff', ejGhost);
+        log(`<span class="log-ability">Explorer Jeff</span> (sideline) — Treasure Hunter! ${ejTypes} specials → +1 damage!`);
+      } else { corneliusSidelineBlockedList.push('Explorer Jeff'); log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`); }
+    }
+  }
+
   // Dark Jeff (74) — Cackle: while on the sideline, all your rolls deal +1 damage.
   // Passive sideline damage booster — applies to any win when Dark Jeff is benched.
   let darkJeffTriggered = false;
@@ -13760,6 +13804,9 @@ function _resolveRoundImpl() {
   }
   if (darkJeffTriggered) {
     queueAbility('CACKLE!', 'var(--rare)', `Dark Jeff (sideline) — ${darkJeffBaseDmg} + 1 = ${dmg} damage!`, null, winTeamName);
+  }
+  if (explorerJeffTriggered) {
+    queueAbility('TREASURE HUNTER!', 'var(--uncommon)', `Explorer Jeff (sideline) — ${explorerJeffBaseDmg} + 1 = ${dmg} damage!`, null, winTeamName);
   }
   if (admiralTriggered) {
     queueAbility('COMRADES!', 'var(--rare)', `Admiral (sideline) — Even doubles! ${admiralBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
