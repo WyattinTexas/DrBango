@@ -2045,6 +2045,19 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Miyoshi (454) — Bonzai!: lose 3 HP for +5 dice -->
+<div class="selene-overlay" id="bonzaiOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#991b1b,#dc2626);">⚡ BONZAI!</div>
+    <h3>Miyoshi — Bonzai!</h3>
+    <p class="selene-sub" id="bonzaiSub">Lose 3 HP to gain +5 dice this roll?</p>
+    <div class="selene-options">
+      <button class="selene-opt" onclick="doBonzaiChoice('yes')" style="background:linear-gradient(135deg,#991b1b,#dc2626);">⚡ BONZAI! — sacrifice 3 HP for +5 dice!</button>
+      <button class="selene-opt" onclick="doBonzaiChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — hold back</button>
+    </div>
+  </div>
+</div>
+
 <!-- Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire -->
 <div class="selene-overlay" id="cultivateOverlay">
   <div class="selene-modal">
@@ -2818,7 +2831,9 @@ const GHOSTS = [
   {id:106, name:"King Jay", rarity:"ghost-rare", maxHp:7, art:"art/originals/king_jay.jpg", ability:"Reflection", abilityDesc:"Lose roll & dice total = 7: reflect all damage.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Lucky 7 reflector."},
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
-  {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."}
+  {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, ability:"Slipstream", abilityDesc:"For each 2 you roll, steal 1 die result from your opponent.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers on 2s: for each die showing 2, steal one of the opponent's dice and add it to your total. Playful, optimistic, the smartest creature in the water."},
+  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 3 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."}
 ];
 
 // ============================================================
@@ -3294,6 +3309,7 @@ function autoPlayNext() {
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
+    bonzaiDecided: { red: false, blue: false },
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -3966,6 +3982,7 @@ function startBattle() {
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
+    bonzaiDecided: { red: false, blue: false },
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -5512,6 +5529,35 @@ function doChowChoice(choice) {
     }
   } else {
     B.chowDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+  }
+}
+
+// ============================================================
+// MIYOSHI (433) — Bonzai!: sacrifice 3 HP for +5 dice
+// ============================================================
+function doBonzaiChoice(choice) {
+  const bp = B.bonzaiPending;
+  if (!bp) return;
+  B.bonzaiPending = null;
+  document.getElementById('bonzaiOverlay').classList.remove('active');
+  const { team, btn } = bp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 454 && !f.ko && f.hp > 3) {
+    const preHp = f.hp;
+    f.hp -= 3;
+    if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+    B.bonzaiExtraDie[team] = (B.bonzaiExtraDie[team] || 0) + 5;
+    showAbilityCallout('BONZAI!', 'var(--rare)',
+      `${f.name} — sacrificed 3 HP for +5 dice! (${preHp} → ${f.hp} HP)`, team);
+    log(`<span class="log-ability">${f.name}</span> — BONZAI! Sacrificed 3 HP → +5 dice! (${preHp} → ${f.hp} HP)`);
+    playDamageSfx(3);
+    hitDamage(team);
+    renderBattle();
+    B.bonzaiDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
+  } else {
+    B.bonzaiDecided[team] = true;
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
@@ -7331,6 +7377,26 @@ function rollReady(team) {
       }
     }
 
+    // Miyoshi (454) — Bonzai!: lose 3 HP for +5 dice (interactive button)
+    {
+      const bonzaiG = active(B[team]);
+      if (bonzaiG && bonzaiG.id === 454 && !bonzaiG.ko &&
+          B.bonzaiDecided && !B.bonzaiDecided[team] &&
+          bonzaiG.hp > 3) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.bonzaiPending = { team, btn };
+        const bonzaiDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          document.getElementById('bonzaiSub').innerHTML =
+            `Declare BONZAI! — Lose 3 HP for +5 dice this roll?<br>` +
+            `(Current HP: ${bonzaiG.hp} → ${bonzaiG.hp - 3} HP after)`;
+          document.getElementById('bonzaiOverlay').classList.add('active');
+        }, bonzaiDelay);
+        return;
+      }
+    }
+
     // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
     {
       const cultG = active(B[team]);
@@ -7789,6 +7855,17 @@ function openDuelPhasePrimers(team) {
       `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
       `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
     document.getElementById('chowOverlay').classList.add('active');
+    return true;
+  }
+
+  // — MIYOSHI (433) — Bonzai!: lose 3 HP for +5 dice (Duel Phase)
+  if (f.id === 454 && !f.ko && B.bonzaiDecided && !B.bonzaiDecided[team] && f.hp > 3) {
+    disableDone();
+    B.bonzaiPending = { team, btn: doneBtn };
+    document.getElementById('bonzaiSub').innerHTML =
+      `Declare BONZAI! — Lose 3 HP for +5 dice this roll?<br>` +
+      `(Current HP: ${f.hp} → ${f.hp - 3} HP after)`;
+    document.getElementById('bonzaiOverlay').classList.add('active');
     return true;
   }
 
@@ -8806,6 +8883,10 @@ function doPreRollSetup() {
   if (!B.chowExtraDie) B.chowExtraDie = { red: 0, blue: 0 };
   B.chowDecided = { red: false, blue: false };
 
+  // Miyoshi (454) — Bonzai!: sacrifice HP for dice
+  if (!B.bonzaiExtraDie) B.bonzaiExtraDie = { red: 0, blue: 0 };
+  B.bonzaiDecided = { red: false, blue: false };
+
   // Castle Gardener (442) — Cultivate: reset per round
   B.cultivateDecided = { red: false, blue: false };
 
@@ -9054,6 +9135,10 @@ function doPreRollSetup() {
   // Chow (414) — Secret Ingredient: +2 dice from discarded seed, then consume
   if (B.chowExtraDie && B.chowExtraDie.red > 0) { redCount += B.chowExtraDie.red; B.chowExtraDie.red = 0; }
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
+
+  // Miyoshi (454) — Bonzai!: +5 dice from HP sacrifice
+  if (B.bonzaiExtraDie && B.bonzaiExtraDie.red > 0) { redCount += B.bonzaiExtraDie.red; B.bonzaiExtraDie.red = 0; }
+  if (B.bonzaiExtraDie && B.bonzaiExtraDie.blue > 0) { blueCount += B.bonzaiExtraDie.blue; B.bonzaiExtraDie.blue = 0; }
 
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
@@ -12354,6 +12439,20 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Snowball! Doubles win → +2 damage!`);
   }
 
+  // Kaylee (453) — Slipstream: for each 2 rolled, steal 1 opponent die result → add to damage
+  let slipstreamBonus = 0;
+  if (wF.id === 453 && !wF.ko) {
+    const twos = winDice.filter(d => d === 2).length;
+    if (twos > 0 && loseDice && loseDice.length > 0) {
+      const sortedLDice = [...loseDice].sort((a, b) => b - a);
+      const stolen = sortedLDice.slice(0, twos);
+      slipstreamBonus = stolen.reduce((a, b) => a + b, 0);
+      dmg += slipstreamBonus;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Slipstream! Rolled ${twos}x 2s → <span class="log-dmg">+${slipstreamBonus} bonus damage</span> stolen from opponent's dice [${stolen.join(', ')}]!`);
+    }
+  }
+
   // Doc (42) — Savage: doubles win → +5 bonus damage
   let docTriggered = false;
   let docBaseDmg = 0;
@@ -13579,6 +13678,10 @@ function _resolveRoundImpl() {
   }
   if (pelterTriggered) {
     queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
+  }
+  if (slipstreamBonus > 0) {
+    const slipTwos = winDice.filter(d => d === 2).length;
+    queueAbility('SLIPSTREAM!', 'var(--rare)', `${wF.name} — Rolled ${slipTwos}x 2s → stole +${slipstreamBonus} damage from opponent's dice!`, null, winTeamName);
   }
   if (docTriggered) {
     queueAbility('SAVAGE!', 'var(--uncommon)', `${wF.name} — Doubles! ${docBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
