@@ -5632,6 +5632,26 @@ function doSlipstreamChoice(choice) {
   }
 }
 
+// Bonzai pre-roll BUTTON handler (clicked before Roll)
+function useBonzaiButton(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 454 || f.ko || f.hp <= 4) return;
+  if (B.bonzaiDecided[team]) return;
+  const preHp = f.hp;
+  f.hp -= 4;
+  if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+  B.bonzaiDecided[team] = true;
+  // Store the dice bonus for consumption during roll setup
+  if (!B.bonzaiBtnDice) B.bonzaiBtnDice = { red: 0, blue: 0 };
+  B.bonzaiBtnDice[team] = 5;
+  showAbilityCallout('BONZAI!', 'var(--rare)',
+    `${f.name} — sacrificed 4 HP for +5 dice! (${preHp} → ${f.hp} HP)`, team);
+  log(`<span class="log-ability">${f.name}</span> — BONZAI! Sacrificed 4 HP → +5 dice! (${preHp} → ${f.hp} HP)`);
+  playDamageSfx(3);
+  hitDamage(team);
+  renderBattle();
+}
+
 function doBonzaiChoice(choice) {
   const bp = B.bonzaiPending;
   if (!bp) return;
@@ -7476,28 +7496,7 @@ function rollReady(team) {
       }
     }
 
-    // Miyoshi (454) — Bonzai!: lose 3 HP for +5 dice (interactive button)
-    {
-      const bonzaiG = active(B[team]);
-      if (bonzaiG && bonzaiG.id === 454 && !bonzaiG.ko &&
-          B.bonzaiDecided && !B.bonzaiDecided[team] &&
-          bonzaiG.hp > 4) {
-        btn.classList.add('locked');
-        btn.disabled = true;
-        B.bonzaiPending = { team, btn };
-        // Clear previous dice so player can't see results before deciding
-        document.getElementById('red-dice').innerHTML = '';
-        document.getElementById('blue-dice').innerHTML = '';
-        const bonzaiDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-        setTimeout(() => {
-          document.getElementById('bonzaiSub').innerHTML =
-            `Declare BONZAI! — Lose 4 HP for +5 dice this roll?<br>` +
-            `(Current HP: ${bonzaiG.hp} → ${bonzaiG.hp - 4} HP after)`;
-          document.getElementById('bonzaiOverlay').classList.add('active');
-        }, bonzaiDelay);
-        return;
-      }
-    }
+    // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
     // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
     {
@@ -7623,27 +7622,7 @@ function rollReady(team) {
     calloutCount = Math.max(0, Math.ceil((B.preRollCalloutEndTime - Date.now()) / 1500));
   }
 
-  // Miyoshi (454) — Bonzai!: second-team click path (phase is already 'rolling')
-  {
-    const bonzaiG2 = active(B[team]);
-    if (bonzaiG2 && bonzaiG2.id === 454 && !bonzaiG2.ko &&
-        B.bonzaiDecided && !B.bonzaiDecided[team] &&
-        bonzaiG2.hp > 4) {
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.bonzaiPending = { team, btn };
-      document.getElementById('red-dice').innerHTML = '';
-      document.getElementById('blue-dice').innerHTML = '';
-      const bonzaiDelay2 = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        document.getElementById('bonzaiSub').innerHTML =
-          `Declare BONZAI! — Lose 4 HP for +5 dice this roll?<br>` +
-          `(Current HP: ${bonzaiG2.hp} → ${bonzaiG2.hp - 4} HP after)`;
-        document.getElementById('bonzaiOverlay').classList.add('active');
-      }, bonzaiDelay2);
-      return;
-    }
-  }
+  // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
   // Gus (31) — Gale Force: opt-in to force enemy ghost swap on win instead of dealing damage.
   // Offered each round when Gus is active and the opponent has ≥1 alive sideline ghost.
@@ -7982,19 +7961,7 @@ function openDuelPhasePrimers(team) {
     return true;
   }
 
-  // — Miyoshi (454) — Bonzai!: lose 3 HP for +5 dice (Duel Phase)
-  if (f.id === 454 && !f.ko && B.bonzaiDecided && !B.bonzaiDecided[team] && f.hp > 4) {
-    disableDone();
-    B.bonzaiPending = { team, btn: doneBtn };
-    // Clear previous dice so player can't see results before deciding
-    document.getElementById('red-dice').innerHTML = '';
-    document.getElementById('blue-dice').innerHTML = '';
-    document.getElementById('bonzaiSub').innerHTML =
-      `Declare BONZAI! — Lose 4 HP for +5 dice this roll?<br>` +
-      `(Current HP: ${f.hp} → ${f.hp - 4} HP after)`;
-    document.getElementById('bonzaiOverlay').classList.add('active');
-    return true;
-  }
+  // — Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
   // — CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (Duel Phase)
   if (f.id === 442 && !f.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
@@ -9013,6 +8980,7 @@ function doPreRollSetup() {
   // Miyoshi (454) — Bonzai!: sacrifice HP for dice
   if (!B.bonzaiExtraDie) B.bonzaiExtraDie = { red: 0, blue: 0 };
   B.bonzaiDecided = { red: false, blue: false };
+  B.bonzaiBtnDice = { red: 0, blue: 0 };
 
   // Castle Gardener (442) — Cultivate: reset per round
   B.cultivateDecided = { red: false, blue: false };
@@ -9288,7 +9256,9 @@ function doPreRollSetup() {
   if (B.chowExtraDie && B.chowExtraDie.red > 0) { redCount += B.chowExtraDie.red; B.chowExtraDie.red = 0; }
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
 
-  // Miyoshi (454) — Bonzai!: dice now added directly to B.preRoll[team].count in doBonzaiChoice
+  // Miyoshi (454) — Bonzai!: +5 dice from pre-roll button click
+  if (B.bonzaiBtnDice && B.bonzaiBtnDice.red > 0) { redCount += B.bonzaiBtnDice.red; B.bonzaiBtnDice.red = 0; }
+  if (B.bonzaiBtnDice && B.bonzaiBtnDice.blue > 0) { blueCount += B.bonzaiBtnDice.blue; B.bonzaiBtnDice.blue = 0; }
 
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
@@ -16023,6 +15993,10 @@ function renderBattle() {
             `<button class="blackout-num ${B.blackoutNum && B.blackoutNum[team] === n ? 'active' : ''}" onclick="setBlackout('${team}', ${n})">${n}</button>`
           ).join('')}
         </div>`;
+      }
+      // Miyoshi (454) — Bonzai!: pre-roll button to sacrifice HP for dice
+      if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
+        html += `<button class="ability-btn pressure" onclick="useBonzaiButton('${team}')" style="border-color:#dc2626;color:#dc2626;font-weight:bold;">⚡ BONZAI! (−4 HP, +5 dice)</button>`;
       }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
     }
