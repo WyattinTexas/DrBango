@@ -2832,7 +2832,7 @@ const GHOSTS = [
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
-  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"For each 2 you roll, steal 1 die result from your opponent.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers on 2s: for each die showing 2, steal one of the opponent's dice and add it to your total. Playful, optimistic, the smartest creature in the water."},
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If you roll a 2: swap it with the opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."}
 ];
 
@@ -11633,32 +11633,27 @@ function _resolveRoundImpl() {
 
   B.redDice = redDice; B.blueDice = blueDice;
 
-  // Kaylee (453) — Slipstream: for each 2 rolled, steal opponent's highest die → add to your dice
-  // Fires BEFORE winner determination so stolen dice change the outcome
+  // Kaylee (453) — Slipstream: if you rolled a 2, swap it with opponent's highest die
+  // Fires BEFORE winner determination so the swap changes the outcome
   ['red', 'blue'].forEach(_slipTeam => {
     const _slipF = active(B[_slipTeam]);
-    const _slipOpp = _slipTeam === 'red' ? 'blue' : 'red';
     if (_slipF && _slipF.id === 453 && !_slipF.ko) {
       const myDice = _slipTeam === 'red' ? redDice : blueDice;
       const oppDice = _slipTeam === 'red' ? blueDice : redDice;
-      const twos = myDice.filter(d => d === 2).length;
-      if (twos > 0 && oppDice.length > 0) {
-        // Sort opponent dice descending, steal the highest ones
-        const oppSorted = [...oppDice].sort((a, b) => b - a);
-        const toSteal = Math.min(twos, oppDice.length);
-        const stolen = oppSorted.slice(0, toSteal);
-        // Remove stolen dice from opponent (remove highest first)
-        for (let i = 0; i < toSteal; i++) {
-          const idx = oppDice.indexOf(stolen[i]);
-          if (idx !== -1) oppDice.splice(idx, 1);
-        }
-        // Add stolen dice to Kaylee's roll
-        stolen.forEach(d => myDice.push(d));
+      const twoIdx = myDice.indexOf(2);
+      if (twoIdx !== -1 && oppDice.length > 0) {
+        // Find opponent's highest die
+        const oppMax = Math.max(...oppDice);
+        const oppMaxIdx = oppDice.indexOf(oppMax);
+        // Swap: Kaylee's 2 goes to opponent, opponent's highest goes to Kaylee
+        myDice[twoIdx] = oppMax;
+        oppDice[oppMaxIdx] = 2;
         myDice.sort((a, b) => a - b);
-        B.slipstreamStolen = { team: _slipTeam, values: stolen, count: twos };
+        oppDice.sort((a, b) => a - b);
+        B.slipstreamStolen = { team: _slipTeam, gave: 2, took: oppMax };
         if (!sylviaResuming) {
-          blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Rolled ${twos}x 2s → stole [${stolen.join(', ')}] from opponent!`, team: _slipTeam });
-          log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! Rolled ${twos}x 2s → <span class="log-dmg">stole [${stolen.join(', ')}] from opponent's dice!</span>`);
+          blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Swapped a 2 for opponent's ${oppMax}!`, team: _slipTeam });
+          log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! <span class="log-dmg">Swapped a 2 → took opponent's ${oppMax}!</span>`);
         }
       }
     }
