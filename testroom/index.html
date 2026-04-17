@@ -2832,7 +2832,7 @@ const GHOSTS = [
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
-  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If you roll a 2: swap it with the opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:5, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any die shows a 2: swap your lowest die with your opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."}
 ];
 
@@ -11633,27 +11633,32 @@ function _resolveRoundImpl() {
 
   B.redDice = redDice; B.blueDice = blueDice;
 
-  // Kaylee (453) — Slipstream: if you rolled a 2, swap it with opponent's highest die
+  // Kaylee (453) — Slipstream: if any die shows a 2, swap your lowest die with opponent's highest
+  // The 2 is the activation key, but you swap your WORST for their BEST
   // Fires BEFORE winner determination so the swap changes the outcome
   ['red', 'blue'].forEach(_slipTeam => {
     const _slipF = active(B[_slipTeam]);
     if (_slipF && _slipF.id === 453 && !_slipF.ko) {
       const myDice = _slipTeam === 'red' ? redDice : blueDice;
       const oppDice = _slipTeam === 'red' ? blueDice : redDice;
-      const twoIdx = myDice.indexOf(2);
-      if (twoIdx !== -1 && oppDice.length > 0) {
-        // Find opponent's highest die
+      const hasTwo = myDice.includes(2);
+      if (hasTwo && oppDice.length > 0) {
+        // Swap your lowest die with opponent's highest die
+        const myMin = Math.min(...myDice);
+        const myMinIdx = myDice.indexOf(myMin);
         const oppMax = Math.max(...oppDice);
         const oppMaxIdx = oppDice.indexOf(oppMax);
-        // Swap: Kaylee's 2 goes to opponent, opponent's highest goes to Kaylee
-        myDice[twoIdx] = oppMax;
-        oppDice[oppMaxIdx] = 2;
-        myDice.sort((a, b) => a - b);
-        oppDice.sort((a, b) => a - b);
-        B.slipstreamStolen = { team: _slipTeam, gave: 2, took: oppMax };
-        if (!sylviaResuming) {
-          blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Swapped a 2 for opponent's ${oppMax}!`, team: _slipTeam });
-          log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! <span class="log-dmg">Swapped a 2 → took opponent's ${oppMax}!</span>`);
+        // Only swap if it's actually beneficial (opponent's highest > your lowest)
+        if (oppMax > myMin) {
+          myDice[myMinIdx] = oppMax;
+          oppDice[oppMaxIdx] = myMin;
+          myDice.sort((a, b) => a - b);
+          oppDice.sort((a, b) => a - b);
+          B.slipstreamStolen = { team: _slipTeam, gave: myMin, took: oppMax };
+          if (!sylviaResuming) {
+            blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Rolled a 2! Swapped ${myMin} for opponent's ${oppMax}!`, team: _slipTeam });
+            log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! Rolled a 2 → <span class="log-dmg">swapped ${myMin} for opponent's ${oppMax}!</span>`);
+          }
         }
       }
     }
