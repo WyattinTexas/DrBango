@@ -3407,9 +3407,10 @@ function autoSimRounds(gameNum) {
   // Classify and determine winner
   const rR = classify(redDice), bR = classify(blueDice);
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
+  function _gr(t) { return typeRank[t] !== undefined ? typeRank[t] : (t.endsWith('-of-a-kind') ? parseInt(t) : 0); }
   let winner = null;
-  if (typeRank[rR.type] > typeRank[bR.type]) winner = 'red';
-  else if (typeRank[bR.type] > typeRank[rR.type]) winner = 'blue';
+  if (_gr(rR.type) > _gr(bR.type)) winner = 'red';
+  else if (_gr(bR.type) > _gr(rR.type)) winner = 'blue';
   else if (rR.value > bR.value) winner = 'red';
   else if (bR.value > rR.value) winner = 'blue';
   // Tiebreaker on remaining dice
@@ -4427,6 +4428,7 @@ function classify(dice) {
   const mx = Math.max(...Object.values(c));
   const vals = Object.entries(c).filter(([,v])=>v===mx).map(([k])=>+k);
   const mv = Math.max(...vals);
+  if (mx>=6) return {type:mx+'-of-a-kind',value:mv,damage:mx};
   if (mx>=5) return {type:'penta',value:mv,damage:5};
   if (mx>=4) return {type:'quads',value:mv,damage:4};
   if (mx>=3) return {type:'triples',value:mv,damage:3};
@@ -4435,6 +4437,7 @@ function classify(dice) {
 }
 
 function describeRoll(r) {
+  if (r.type.endsWith('-of-a-kind')) return `${r.damage} ${r.value}'s!!!`;
   if (r.type==='penta') return `five ${r.value}'s!`;
   if (r.type==='quads') return `four ${r.value}'s!`;
   if (r.type==='triples') return `three ${r.value}'s`;
@@ -4442,9 +4445,10 @@ function describeRoll(r) {
   return `${r.value} high`;
 }
 
-function isTripleOrBetter(type) { return ['triples','quads','penta'].includes(type); }
+function isTripleOrBetter(type) { return ['triples','quads','penta'].includes(type) || type.endsWith('-of-a-kind'); }
 
 function typeLabel(type) {
+  if (type.endsWith('-of-a-kind')) return type.toUpperCase() + '!!!';
   if (type==='penta') return 'PENTA!!';
   if (type==='quads') return 'QUADS!';
   if (type==='triples') return 'TRIPLES!';
@@ -9193,9 +9197,7 @@ function doPreRollSetup() {
   if (B.chowExtraDie && B.chowExtraDie.red > 0) { redCount += B.chowExtraDie.red; B.chowExtraDie.red = 0; }
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
 
-  // Miyoshi (454) — Bonzai!: +5 dice from HP sacrifice
-  if (B.bonzaiExtraDie && B.bonzaiExtraDie.red > 0) { redCount += B.bonzaiExtraDie.red; B.bonzaiExtraDie.red = 0; }
-  if (B.bonzaiExtraDie && B.bonzaiExtraDie.blue > 0) { blueCount += B.bonzaiExtraDie.blue; B.bonzaiExtraDie.blue = 0; }
+  // Miyoshi (454) — Bonzai!: dice now added directly to B.preRoll[team].count in doBonzaiChoice
 
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
@@ -11737,6 +11739,11 @@ function _resolveRoundImpl() {
   // Rule: compare best hand type first. If same type AND same value,
   // compare remaining dice highest-to-lowest. Missing dice = 0.
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
+  function getRank(type) {
+    if (typeRank[type] !== undefined) return typeRank[type];
+    if (type.endsWith('-of-a-kind')) return parseInt(type); // 6-of-a-kind → 6, 7 → 7, etc.
+    return 0;
+  }
   let winner = null;
   let tiebreaker = null; // {value: N} — the remaining die that broke the tie
 
@@ -11744,8 +11751,8 @@ function _resolveRoundImpl() {
   // Singles promote to effective rank 2.5 — still lose to triples, quads, penta, etc.
   const _rAct = active(B.red), _bAct = active(B.blue);
   const hectorActive = (_rAct.id === 96 && !_rAct.ko) || (_bAct.id === 96 && !_bAct.ko);
-  const rEffRank = (hectorActive && rR.type === 'singles' && bR.type === 'doubles') ? 2.5 : typeRank[rR.type];
-  const bEffRank = (hectorActive && bR.type === 'singles' && rR.type === 'doubles') ? 2.5 : typeRank[bR.type];
+  const rEffRank = (hectorActive && rR.type === 'singles' && bR.type === 'doubles') ? 2.5 : getRank(rR.type);
+  const bEffRank = (hectorActive && bR.type === 'singles' && rR.type === 'doubles') ? 2.5 : getRank(bR.type);
 
   if (rEffRank > bEffRank) winner = 'red';
   else if (bEffRank > rEffRank) winner = 'blue';
