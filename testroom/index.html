@@ -2045,6 +2045,22 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Kaylee (453) — Slipstream: choose dice to swap -->
+<div class="selene-overlay" id="slipstreamOverlay">
+  <div class="selene-modal" style="max-width:500px;">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#0e7490,#22d3ee);">🌊 SLIPSTREAM!</div>
+    <h3>Kaylee — Slipstream!</h3>
+    <p class="selene-sub">You rolled a 2! Pick one of YOUR dice, then one of your OPPONENT's dice to swap.</p>
+    <p style="text-align:center;margin:8px 0;color:var(--text2);font-size:13px;" id="slipstreamStep">Step 1: Pick YOUR die to give away</p>
+    <div id="slipstreamMyDice" style="display:flex;gap:8px;justify-content:center;margin:8px 0;"></div>
+    <p style="text-align:center;color:var(--text2);font-size:13px;">Opponent's dice:</p>
+    <div id="slipstreamOppDice" style="display:flex;gap:8px;justify-content:center;margin:8px 0;"></div>
+    <div class="selene-options">
+      <button class="selene-opt" id="slipstreamSkipBtn" onclick="doSlipstreamChoice('skip')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Skip — don't swap</button>
+    </div>
+  </div>
+</div>
+
 <!-- Miyoshi (454) — Bonzai!: lose 3 HP for +5 dice -->
 <div class="selene-overlay" id="bonzaiOverlay">
   <div class="selene-modal">
@@ -2832,7 +2848,7 @@ const GHOSTS = [
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
-  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any die shows a 2: swap your lowest die with your opponent's highest die.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any die shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline: if you hold 3+ different specials, your active ghost gains +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."}
 ];
@@ -5541,6 +5557,81 @@ function doChowChoice(choice) {
 // ============================================================
 // MIYOSHI (433) — Bonzai!: sacrifice 4 HP for +5 dice
 // ============================================================
+// ============================================================
+// KAYLEE (453) — Slipstream: interactive dice swap
+// ============================================================
+function showSlipstreamPicker(team, myDice, oppDice, callback) {
+  B.slipstreamState = { team, myDice, oppDice, callback, myIdx: null, oppIdx: null, step: 1 };
+  const myContainer = document.getElementById('slipstreamMyDice');
+  const oppContainer = document.getElementById('slipstreamOppDice');
+  const stepLabel = document.getElementById('slipstreamStep');
+  stepLabel.textContent = "Step 1: Pick YOUR die to give away";
+
+  // Render my dice as clickable buttons
+  myContainer.innerHTML = myDice.map((d, i) =>
+    `<button class="die" style="cursor:pointer;font-size:22px;min-width:44px;padding:8px 12px;" onclick="slipstreamPickMy(${i})" id="slipMy${i}">${d}</button>`
+  ).join('');
+
+  // Render opponent dice (not clickable yet)
+  oppContainer.innerHTML = oppDice.map((d, i) =>
+    `<button class="die" style="cursor:default;opacity:0.5;font-size:22px;min-width:44px;padding:8px 12px;" id="slipOpp${i}">${d}</button>`
+  ).join('');
+
+  document.getElementById('slipstreamOverlay').classList.add('active');
+}
+
+function slipstreamPickMy(idx) {
+  const s = B.slipstreamState;
+  if (!s || s.step !== 1) return;
+  s.myIdx = idx;
+  s.step = 2;
+  // Highlight selected die
+  for (let i = 0; i < s.myDice.length; i++) {
+    const el = document.getElementById('slipMy' + i);
+    if (el) el.style.opacity = i === idx ? '1' : '0.3';
+  }
+  // Enable opponent dice clicking
+  document.getElementById('slipstreamStep').textContent = "Step 2: Pick OPPONENT's die to take";
+  for (let i = 0; i < s.oppDice.length; i++) {
+    const el = document.getElementById('slipOpp' + i);
+    if (el) { el.style.cursor = 'pointer'; el.style.opacity = '1'; el.onclick = () => slipstreamPickOpp(i); }
+  }
+}
+
+function slipstreamPickOpp(idx) {
+  const s = B.slipstreamState;
+  if (!s || s.step !== 2) return;
+  s.oppIdx = idx;
+  document.getElementById('slipstreamOverlay').classList.remove('active');
+
+  // Perform the swap
+  const gave = s.myDice[s.myIdx];
+  const took = s.oppDice[s.oppIdx];
+  s.myDice[s.myIdx] = took;
+  s.oppDice[s.oppIdx] = gave;
+  s.myDice.sort((a, b) => a - b);
+  s.oppDice.sort((a, b) => a - b);
+
+  const _slipF = active(B[s.team]);
+  B.slipstreamStolen = { team: s.team, gave, took };
+  showAbilityCallout('SLIPSTREAM!', 'var(--rare)', `${_slipF.name} — Swapped ${gave} for opponent's ${took}!`, s.team);
+  log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! <span class="log-dmg">Swapped ${gave} for opponent's ${took}!</span>`);
+  renderDice(B.redDice, B.blueDice);
+
+  B.slipstreamState = null;
+  // Resume resolution after a brief delay for the callout
+  setTimeout(() => s.callback(), spd(1500));
+}
+
+function doSlipstreamChoice(choice) {
+  if (choice === 'skip') {
+    document.getElementById('slipstreamOverlay').classList.remove('active');
+    const s = B.slipstreamState;
+    B.slipstreamState = null;
+    if (s && s.callback) s.callback();
+  }
+}
+
 function doBonzaiChoice(choice) {
   const bp = B.bonzaiPending;
   if (!bp) return;
@@ -11683,39 +11774,36 @@ function _resolveRoundImpl() {
 
   B.redDice = redDice; B.blueDice = blueDice;
 
-  // Kaylee (453) — Slipstream: if any die shows a 2, swap your lowest die with opponent's highest
-  // The 2 is the activation key, but you swap your WORST for their BEST
+  // Kaylee (453) — Slipstream: if any die shows a 2, player chooses which dice to swap
+  // Interactive modal pauses resolution — player picks one of their dice and one of opponent's
   // Fires BEFORE winner determination so the swap changes the outcome
-  ['red', 'blue'].forEach(_slipTeam => {
-    const _slipF = active(B[_slipTeam]);
-    if (_slipF && _slipF.id === 453 && !_slipF.ko) {
-      const myDice = _slipTeam === 'red' ? redDice : blueDice;
-      const oppDice = _slipTeam === 'red' ? blueDice : redDice;
-      const hasTwo = myDice.includes(2);
-      if (hasTwo && oppDice.length > 0) {
-        // Swap your lowest die with opponent's highest die
-        const myMin = Math.min(...myDice);
-        const myMinIdx = myDice.indexOf(myMin);
-        const oppMax = Math.max(...oppDice);
-        const oppMaxIdx = oppDice.indexOf(oppMax);
-        // Only swap if it's actually beneficial (opponent's highest > your lowest)
-        if (oppMax > myMin) {
-          myDice[myMinIdx] = oppMax;
-          oppDice[oppMaxIdx] = myMin;
-          myDice.sort((a, b) => a - b);
-          oppDice.sort((a, b) => a - b);
-          B.slipstreamStolen = { team: _slipTeam, gave: myMin, took: oppMax };
-          if (!sylviaResuming) {
-            blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Rolled a 2! Swapped ${myMin} for opponent's ${oppMax}!`, team: _slipTeam });
-            log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! Rolled a 2 → <span class="log-dmg">swapped ${myMin} for opponent's ${oppMax}!</span>`);
-          }
-        }
+  let slipstreamTeam = null;
+  if (!sylviaResuming) {
+    for (const _slipTeam of ['red', 'blue']) {
+      const _slipF = active(B[_slipTeam]);
+      if (_slipF && _slipF.id === 453 && !_slipF.ko) {
+        const myDice = _slipTeam === 'red' ? redDice : blueDice;
+        if (myDice.includes(2)) { slipstreamTeam = _slipTeam; break; }
       }
     }
-  });
+  }
+  if (slipstreamTeam) {
+    const myDice = slipstreamTeam === 'red' ? redDice : blueDice;
+    const oppDice = slipstreamTeam === 'red' ? blueDice : redDice;
+    // Sync dice display so player can see what they rolled
+    renderDice(B.redDice, B.blueDice);
+    // Show interactive picker — resolution resumes in callback
+    B.slipstreamResuming = true;
+    showSlipstreamPicker(slipstreamTeam, myDice, oppDice, () => {
+      // Resume resolution from the top — slipstreamResuming flag skips re-entry into slipstream
+      B.sylviaResuming = true; // reuse this flag to skip header log + blackout re-fire
+      _resolveRoundImpl();
+    });
+    return; // Pause resolution until player picks
+  }
+  B.slipstreamResuming = false;
 
   // Sync visual dice display after Blackout/Slipstream may have modified dice arrays.
-  // Without this, modified dice stay stale on screen and highlightWinnerDice indexes wrong.
   renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
