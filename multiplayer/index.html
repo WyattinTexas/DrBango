@@ -2509,7 +2509,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.38';
+const BBN_VERSION = 'v0.39';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5227,35 +5227,153 @@ async function checkDailyCompletionPack() {
 }
 
 // ============================================================
-// SPECIAL PACK — one-time gift for existing players
+// SPECIAL PACK V2 — per-player custom packs + generic random
 // ============================================================
-const SPECIAL_PACK_IDS = [74, 206, 210, 94, 97, 306]; // Dark Jeff, Zain, Timber, Jenkins, Toby, Nerina
+
+// Per-player custom packs keyed by displayName match
+const CUSTOM_PACKS = [
+  {
+    match: (name) => name.toLowerCase().includes('ej') && name.toLowerCase().includes('brieva'),
+    ids: [424, 109], // Bigsby (uncommon) + Bo (legendary)
+    label: 'EJ\'s Pack'
+  },
+  {
+    match: (name) => name.toLowerCase().includes('julian') && name.toLowerCase().includes('barba'),
+    ids: [450, 113], // Welder (rare) + Prince Balatron (legendary)
+    label: 'Julian\'s Pack'
+  },
+  {
+    match: (name) => name.toLowerCase().includes('skylar'),
+    ids: [450, 452, 210], // Welder (rare), Ripagoo (uncommon) + Timber (legendary)
+    label: 'Skylar\'s Pack'
+  }
+];
+
+function buildRandomPack() {
+  const rarityOrder = ['uncommon', 'rare', 'rare', 'rare', 'ghost-rare', 'legendary'];
+  const pack = [];
+  for (const rarity of rarityOrder) {
+    const pool = getGhostsByRarity(rarity);
+    if (pool.length === 0) continue;
+    // Pick a random card not already in this pack
+    let pick;
+    let attempts = 0;
+    do {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+      attempts++;
+    } while (pack.some(g => g.id === pick.id) && attempts < 50);
+    pack.push(pick);
+  }
+  return pack;
+}
+
+function getCustomPackForUser(displayName) {
+  if (!displayName) return null;
+  for (const cp of CUSTOM_PACKS) {
+    if (cp.match(displayName)) return cp;
+  }
+  return null;
+}
 
 async function checkSpecialPack() {
   if (!currentUser || !userProfile) return;
-  if (userProfile.receivedSpecialPack) return;
+  if (userProfile.receivedSpecialPackV2) return;
   // Only for existing players who already have some cards
   if (!userProfile.collection || userProfile.collection.length === 0) return;
 
-  // Grant the special pack cards
-  const newCards = SPECIAL_PACK_IDS.filter(id => getGhost(id)); // safety check
-  const updatedCollection = [...(userProfile.collection || []), ...newCards];
+  const displayName = userProfile.displayName || currentUser.displayName || '';
+  const customPack = getCustomPackForUser(displayName);
+
+  let packCards; // array of ghost objects, ordered least-rare to most-rare
+  let packTitle;
+
+  if (customPack) {
+    // Custom per-player pack
+    packCards = customPack.ids.map(id => getGhost(id)).filter(Boolean);
+    packTitle = customPack.label + ' — Special Delivery!';
+  } else {
+    // Generic random pack: 1 uncommon, 3 rare, 1 ghost-rare, 1 legendary
+    packCards = buildRandomPack();
+    packTitle = 'Welcome Back! Special Pack!';
+  }
+
+  if (packCards.length === 0) return;
+
+  // Sort by rarity: uncommon -> rare -> ghost-rare -> legendary (left to right)
+  const raritySort = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+  packCards.sort((a, b) => (raritySort[a.rarity] || 0) - (raritySort[b.rarity] || 0));
+
+  // Add card IDs to collection
+  const newCardIds = packCards.map(g => g.id);
+  const updatedCollection = [...(userProfile.collection || []), ...newCardIds];
 
   await db.ref(`mp/users/${currentUser.uid}`).update({
     collection: updatedCollection,
-    receivedSpecialPack: true
+    receivedSpecialPackV2: true
   });
 
   userProfile.collection = updatedCollection;
-  userProfile.receivedSpecialPack = true;
+  userProfile.receivedSpecialPackV2 = true;
 
-  // Show the cards with the reward reveal
-  const cards = newCards.map(id => getGhost(id));
-  showRewardCards(cards, 'Welcome Back! Special Pack!', () => {
+  // Show the cards with cinematic staggered reveal
+  showRewardCardsStaggered(packCards, packTitle, () => {
     updateUI();
   });
 
-  showToast('Welcome back! You received a Special Pack!');
+  showToast(customPack ? `${customPack.label} delivered!` : 'Welcome back! You received a Special Pack!');
+}
+
+// Cinematic left-to-right staggered reveal
+function showRewardCardsStaggered(cards, title, onClose) {
+  pendingPack = cards;
+  flippedCount = 0;
+
+  const container = document.getElementById('pack-cards');
+  container.innerHTML = '';
+  document.getElementById('add-to-collection-btn').style.display = 'none';
+  document.querySelector('#pack-overlay h2').textContent = title || 'New Spiritkin!';
+
+  cards.forEach((ghost, i) => {
+    const el = document.createElement('div');
+    el.className = `pack-card rarity-${ghost.rarity}`;
+    el.innerHTML = `
+      <div class="pack-card-inner">
+        <div class="pack-card-front">
+          <div class="card-back-art">?</div>
+        </div>
+        <div class="pack-card-back">
+          <img src="${ghost.art}" alt="${ghost.name}" onerror="this.style.background='var(--surface3)'">
+          <span class="card-reveal-rarity" style="background:var(--${ghost.rarity})">${ghost.rarity.replace('-', ' ')}</span>
+          <span class="card-reveal-name">${ghost.name}</span>
+        </div>
+      </div>
+    `;
+    // Disable manual click — auto-flip handles it
+    container.appendChild(el);
+  });
+
+  document.getElementById('pack-overlay').classList.add('active');
+
+  // Auto-flip each card left to right with staggered delay
+  const cardEls = container.querySelectorAll('.pack-card');
+  const staggerDelay = 350; // ms between each card flip
+  const initialDelay = 600; // wait before first flip
+
+  cardEls.forEach((el, i) => {
+    setTimeout(() => {
+      flipCard(el, cards[i], i);
+    }, initialDelay + i * staggerDelay);
+  });
+
+  // Override the add-to-collection button for rewards (already added)
+  const addBtn = document.getElementById('add-to-collection-btn');
+  addBtn.textContent = 'Continue';
+  addBtn.onclick = function() {
+    document.getElementById('pack-overlay').classList.remove('active');
+    addBtn.textContent = 'Add to Collection';
+    addBtn.onclick = function() { addPackToCollection(); };
+    if (onClose) onClose();
+  };
 }
 
 // ============================================================
