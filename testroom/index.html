@@ -15419,24 +15419,35 @@ function playDamageSfx(dmg) {
   else playSfx('sfx1Damage');
 }
 
+// ============================================================
+// MUSIC SYSTEM — v740 rewrite (fixes stale listeners, fade reset, mute state)
+// ============================================================
 let _musicStarted = false;
+let _musicRetryHandler = null; // track the single retry listener so we can remove it
+
 function startMusic() {
   if (_musicStarted) return;
-  if (_muted) { _musicStarted = true; return; } // v734: respect mute toggle
+  if (_muted) { _musicStarted = true; return; }
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.2;
+  // Remove any stale retry handler from a previous battle cycle
+  if (_musicRetryHandler) {
+    document.removeEventListener('click', _musicRetryHandler);
+    _musicRetryHandler = null;
+  }
   const p = music.play();
   if (p) {
     p.then(() => { _musicStarted = true; }).catch(() => {
-      // Autoplay blocked — retry once on first click
-      const retry = () => {
+      // Autoplay blocked — attach a single retry on next click
+      _musicRetryHandler = () => {
         if (_musicStarted) return;
         _musicStarted = true;
+        _musicRetryHandler = null;
         music.volume = 0.2;
         music.play().catch(() => {});
       };
-      document.addEventListener('click', retry, { once: true });
+      document.addEventListener('click', _musicRetryHandler, { once: true });
     });
   } else {
     _musicStarted = true;
@@ -15448,7 +15459,12 @@ function fadeOutMusic() {
   clearInterval(music._fadeInt);
   music._fadeInt = setInterval(() => {
     if (music.volume > 0.03) { music.volume -= 0.03; }
-    else { clearInterval(music._fadeInt); music.pause(); music.volume = 0.2; }
+    else {
+      clearInterval(music._fadeInt);
+      music.pause();
+      music.volume = 0.2;
+      _musicStarted = false; // reset so music can restart on next battle
+    }
   }, 60);
 }
 
@@ -15461,12 +15477,30 @@ function toggleMute() {
   const btn = document.getElementById('muteToggle');
   if (_muted) {
     music.pause();
-    btn.textContent = '\u{1F507}'; // muted speaker
+    // Don't reset _musicStarted — muting is temporary, not a stop
+    btn.textContent = '\u{1F507}';
     btn.title = 'Music off — click to unmute';
   } else {
     music.volume = 0.2;
-    music.play().catch(() => {});
-    btn.textContent = '\u{1F50A}'; // speaker with sound
+    _musicStarted = false; // allow startMusic path to re-engage
+    const p = music.play();
+    if (p) {
+      p.then(() => { _musicStarted = true; }).catch(() => {
+        // Autoplay blocked on unmute — retry on next click
+        if (_musicRetryHandler) document.removeEventListener('click', _musicRetryHandler);
+        _musicRetryHandler = () => {
+          if (_musicStarted) return;
+          _musicStarted = true;
+          _musicRetryHandler = null;
+          music.volume = 0.2;
+          music.play().catch(() => {});
+        };
+        document.addEventListener('click', _musicRetryHandler, { once: true });
+      });
+    } else {
+      _musicStarted = true;
+    }
+    btn.textContent = '\u{1F50A}';
     btn.title = 'Music on — click to mute';
   }
 }
@@ -15484,7 +15518,13 @@ function stopMusicHard() {
   clearInterval(music._fadeInt);
   music.pause();
   music.currentTime = 0;
+  music.volume = 0.2;
   _musicStarted = false;
+  // Clean up any pending retry handler
+  if (_musicRetryHandler) {
+    document.removeEventListener('click', _musicRetryHandler);
+    _musicRetryHandler = null;
+  }
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
