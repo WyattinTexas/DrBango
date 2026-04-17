@@ -2509,7 +2509,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.39';
+const BBN_VERSION = 'v0.40';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -3115,10 +3115,11 @@ function renderCollection() {
   const uniqueIds = [...new Set(collection)];
   const ghosts = uniqueIds.map(id => getGhost(id)).filter(Boolean);
 
+  // v0.40: sort by rarity first (common → legendary), then by set within each tier
   ghosts.sort((a, b) => {
-    const setDiff = (setOrder[a.set] || 99) - (setOrder[b.set] || 99);
-    if (setDiff !== 0) return setDiff;
-    return (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
+    const rarDiff = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
+    if (rarDiff !== 0) return rarDiff;
+    return (setOrder[a.set] || 99) - (setOrder[b.set] || 99);
   });
 
   // Total active ghosts count
@@ -3310,6 +3311,9 @@ async function selectTarget(uid) {
 
     preview.style.display = 'block';
     updateBattleButton();
+
+    // v0.40: scroll the preview into view so the player sees it
+    preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Re-render leaderboard to show selected state
     const lbSnap = await db.ref('mp/leaderboard').once('value');
