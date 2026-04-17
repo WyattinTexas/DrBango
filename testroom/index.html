@@ -7528,6 +7528,28 @@ function rollReady(team) {
     calloutCount = Math.max(0, Math.ceil((B.preRollCalloutEndTime - Date.now()) / 1500));
   }
 
+  // Miyoshi (454) — Bonzai!: second-team click path (phase is already 'rolling')
+  {
+    const bonzaiG2 = active(B[team]);
+    if (bonzaiG2 && bonzaiG2.id === 454 && !bonzaiG2.ko &&
+        B.bonzaiDecided && !B.bonzaiDecided[team] &&
+        bonzaiG2.hp > 4) {
+      btn.classList.add('locked');
+      btn.disabled = true;
+      B.bonzaiPending = { team, btn };
+      document.getElementById('red-dice').innerHTML = '';
+      document.getElementById('blue-dice').innerHTML = '';
+      const bonzaiDelay2 = (calloutCount > 0) ? calloutCount * 1500 : 0;
+      setTimeout(() => {
+        document.getElementById('bonzaiSub').innerHTML =
+          `Declare BONZAI! — Lose 4 HP for +5 dice this roll?<br>` +
+          `(Current HP: ${bonzaiG2.hp} → ${bonzaiG2.hp - 4} HP after)`;
+        document.getElementById('bonzaiOverlay').classList.add('active');
+      }, bonzaiDelay2);
+      return;
+    }
+  }
+
   // Gus (31) — Gale Force: opt-in to force enemy ghost swap on win instead of dealing damage.
   // Offered each round when Gus is active and the opponent has ≥1 alive sideline ghost.
   // B.galeForceDecided prevents re-offering after the player has already chosen this round.
