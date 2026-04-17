@@ -11629,9 +11629,40 @@ function _resolveRoundImpl() {
   }
 
   B.redDice = redDice; B.blueDice = blueDice;
-  // Sync visual dice display after Blackout may have removed dice from either array.
-  // Without this, the blacked-out die stays visible on screen even though it no longer
-  // counts in the calculation, and highlightWinnerDice indexes into stale DOM elements.
+
+  // Kaylee (453) — Slipstream: for each 2 rolled, steal opponent's highest die → add to your dice
+  // Fires BEFORE winner determination so stolen dice change the outcome
+  ['red', 'blue'].forEach(_slipTeam => {
+    const _slipF = active(B[_slipTeam]);
+    const _slipOpp = _slipTeam === 'red' ? 'blue' : 'red';
+    if (_slipF && _slipF.id === 453 && !_slipF.ko) {
+      const myDice = _slipTeam === 'red' ? redDice : blueDice;
+      const oppDice = _slipTeam === 'red' ? blueDice : redDice;
+      const twos = myDice.filter(d => d === 2).length;
+      if (twos > 0 && oppDice.length > 0) {
+        // Sort opponent dice descending, steal the highest ones
+        const oppSorted = [...oppDice].sort((a, b) => b - a);
+        const toSteal = Math.min(twos, oppDice.length);
+        const stolen = oppSorted.slice(0, toSteal);
+        // Remove stolen dice from opponent (remove highest first)
+        for (let i = 0; i < toSteal; i++) {
+          const idx = oppDice.indexOf(stolen[i]);
+          if (idx !== -1) oppDice.splice(idx, 1);
+        }
+        // Add stolen dice to Kaylee's roll
+        stolen.forEach(d => myDice.push(d));
+        myDice.sort((a, b) => a - b);
+        B.slipstreamStolen = { team: _slipTeam, values: stolen, count: twos };
+        if (!sylviaResuming) {
+          blackoutCallouts.push({ name: 'SLIPSTREAM!', color: 'var(--rare)', desc: `${_slipF.name} — Rolled ${twos}x 2s → stole [${stolen.join(', ')}] from opponent!`, team: _slipTeam });
+          log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! Rolled ${twos}x 2s → <span class="log-dmg">stole [${stolen.join(', ')}] from opponent's dice!</span>`);
+        }
+      }
+    }
+  });
+
+  // Sync visual dice display after Blackout/Slipstream may have modified dice arrays.
+  // Without this, modified dice stay stale on screen and highlightWinnerDice indexes wrong.
   renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
@@ -12445,19 +12476,8 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Snowball! Doubles win → +2 damage!`);
   }
 
-  // Kaylee (453) — Slipstream: for each 2 rolled, steal 1 opponent die result → add to damage
-  let slipstreamBonus = 0;
-  if (wF.id === 453 && !wF.ko) {
-    const twos = winDice.filter(d => d === 2).length;
-    if (twos > 0 && loseDice && loseDice.length > 0) {
-      const sortedLDice = [...loseDice].sort((a, b) => b - a);
-      const stolen = sortedLDice.slice(0, twos);
-      slipstreamBonus = stolen.reduce((a, b) => a + b, 0);
-      dmg += slipstreamBonus;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Slipstream! Rolled ${twos}x 2s → <span class="log-dmg">+${slipstreamBonus} bonus damage</span> stolen from opponent's dice [${stolen.join(', ')}]!`);
-    }
-  }
+  // Kaylee (453) — Slipstream: dice stealing handled pre-winner in _resolveRoundImpl
+  const slipstreamBonus = 0; // kept for callout compatibility
 
   // Doc (42) — Savage: doubles win → +5 bonus damage
   let docTriggered = false;
@@ -13685,10 +13705,7 @@ function _resolveRoundImpl() {
   if (pelterTriggered) {
     queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
-  if (slipstreamBonus > 0) {
-    const slipTwos = winDice.filter(d => d === 2).length;
-    queueAbility('SLIPSTREAM!', 'var(--rare)', `${wF.name} — Rolled ${slipTwos}x 2s → stole +${slipstreamBonus} damage from opponent's dice!`, null, winTeamName);
-  }
+  // Kaylee (453) — Slipstream callout now handled in pre-winner section via blackoutCallouts queue
   if (docTriggered) {
     queueAbility('SAVAGE!', 'var(--uncommon)', `${wF.name} — Doubles! ${docBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
