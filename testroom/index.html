@@ -3327,6 +3327,7 @@ function autoPlayNext() {
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
     bonzaiDecided: { red: false, blue: false },
+    battleStarted: false,
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -4004,6 +4005,7 @@ function startBattle() {
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
     bonzaiDecided: { red: false, blue: false },
+    battleStarted: false,
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -4084,6 +4086,7 @@ function startBattle() {
         renderBattle();
         afterEntryWithJenkins(secondEntryCount, () => {
           // All entry effects done — check for KOs, then enable rolling
+          B.battleStarted = true; // Nicholas Sneak Attack can now fire on swaps
           if (handleKOs()) return;
           // Duel Phase v1: check for priority before unlocking rolls
           startNextRound();
@@ -4101,6 +4104,7 @@ function startBattle() {
       const ec2 = triggerEntry(secondTeam2);
       afterEntryWithJenkins(ec2, () => {
         renderBattle();
+        B.battleStarted = true; // Nicholas Sneak Attack can now fire on swaps
         if (handleKOs()) return;
         narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
         if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
@@ -4343,8 +4347,9 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Nicholas (51) — Sneak Attack: while on the sideline, deal 2 damage to the entering ghost
-  // Does NOT fire at battle start (round 1) — sideline hasn't "flipped" yet. Only fires on mid-battle swaps.
-  if (hasSideline(enemy, 51) && !f.ko && B.round > 1) {
+  // Does NOT fire at initial battle setup — only fires on mid-battle swaps (KO, Pressure, Gus, etc.)
+  // B.battleStarted is set to true after the initial entry sequence completes.
+  if (hasSideline(enemy, 51) && !f.ko && B.battleStarted) {
     const nicholasGhost = getSidelineGhost(enemy, 51);
     f.hp = Math.max(0, f.hp - 2);
     if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
