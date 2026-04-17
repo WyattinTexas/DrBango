@@ -2358,7 +2358,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v735';
+const TESTROOM_VERSION = 'v736';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16790,8 +16790,13 @@ function setupLivePvP() {
     }, 30000); // v722: 30s before warning (was 15s)
   }
 
-  // Reset AFK timer on any click
-  document.addEventListener('click', resetPvPAfk);
+  // v736: only reset AFK timer on clicks during roll phases, not during ko-swap.
+  // During ko-swap the timer was resetting on every click (including swap card clicks),
+  // making the countdown jump back to 45s and preventing players from swapping.
+  document.addEventListener('click', () => {
+    if (B && (B.phase === 'ko-swap' || B.phase === 'ko-pause')) return; // don't reset during swaps
+    resetPvPAfk();
+  });
   // Start initial timer
   resetPvPAfk();
 
@@ -17085,9 +17090,13 @@ function pvpApplyState(state) {
   // Sync ghosts: HP, KO, activeIdx — only update if values actually differ
   ['red', 'blue'].forEach(side => {
     if (!state[side]) return;
+    // v736: skip activeIdx update during Blue's local resolution — prevents
+    // "old ghost" flash where Red's state correction briefly shows the wrong fighter
     if (B[side].activeIdx !== state[side].activeIdx) {
-      B[side].activeIdx = state[side].activeIdx;
-      changed = true;
+      if (!(pvpBlueResolvedLocally && (B.phase === 'ko-swap' || B.phase === 'ko-pause'))) {
+        B[side].activeIdx = state[side].activeIdx;
+        changed = true;
+      }
     }
     state[side].ghosts.forEach((sg, i) => {
       const g = B[side].ghosts[i];
