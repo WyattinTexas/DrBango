@@ -348,7 +348,7 @@ const GHOSTS = [
   // ============================================================
   // DARK CASTLE
   // ============================================================
-  {id:19, name:"Scallywags", rarity:"common", maxHp:5, art:"../testroom/art/originals/Scallywags.png", ability:"Frenzy", abilityDesc:"If your rolled dice are all under 4 each, gain +1 dice next turn.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Low-roll reward."},
+  {id:19, name:"Scallywags", rarity:"common", maxHp:5, art:"../testroom/art/originals/Scallywags.png", ability:"Frenzy", abilityDesc:"If your rolled dice are all under 4 each, gain +1 die next turn + 1 Surge.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Low-roll reward."},
   {id:20, name:"Floop", rarity:"common", maxHp:4, art:"../testroom/art/originals/Floop.png", ability:"Muck", abilityDesc:"Enemy loses a dice for the following turn if they roll doubles.", category:"Debuff", set:"Dark Castle", designNote:"Dark Castle. Anti-doubles punisher."},
   {id:21, name:"Needle", rarity:"common", maxHp:7, art:"../testroom/art/originals/Needle_dc.png", ability:"Big Bro", abilityDesc:"While on the sideline, if Buttons is in play, you may roll +1 dice.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Buttons synergy."},
   {id:22, name:"Ancient One", rarity:"common", maxHp:7, art:"../testroom/art/originals/ancient_one.jpg", ability:"Friend to All", abilityDesc:"While on the sideline, give your ghost in play +3 health upon ties.", category:"HP Recovery", set:"Dark Castle", designNote:"Dark Castle. Tie healer."},

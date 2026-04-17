@@ -2762,7 +2762,7 @@ const GHOSTS = [
   // ============================================================
   // DARK CASTLE
   // ============================================================
-  {id:19, name:"Scallywags", rarity:"common", maxHp:5, art:"art/originals/Scallywags.png", ability:"Frenzy", abilityDesc:"If your rolled dice are all under 4 each, gain +1 dice next turn.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Low-roll reward."},
+  {id:19, name:"Scallywags", rarity:"common", maxHp:5, art:"art/originals/Scallywags.png", ability:"Frenzy", abilityDesc:"If your rolled dice are all under 4 each, gain +1 die next turn + 1 Surge.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Low-roll reward."},
   {id:20, name:"Floop", rarity:"common", maxHp:5, art:"art/originals/Floop.png", ability:"Muck", abilityDesc:"Enemy loses a dice for the following turn if they roll doubles.", category:"Debuff", set:"Dark Castle", designNote:"Dark Castle. Anti-doubles punisher. 5 HP (was 4)."},
   {id:21, name:"Needle", rarity:"common", maxHp:7, art:"art/originals/Needle_dc.png", ability:"Big Bro", abilityDesc:"While on the sideline, if Buttons is in play, you may roll +1 dice.", category:"Dice Modifier", set:"Dark Castle", designNote:"Dark Castle. Buttons synergy."},
   {id:22, name:"Ancient One", rarity:"common", maxHp:7, art:"art/originals/ancient_one.jpg", ability:"Friend to All", abilityDesc:"While on the sideline, give your ghost in play +3 health upon ties.", category:"HP Recovery", set:"Dark Castle", designNote:"Dark Castle. Tie healer."},
@@ -11781,8 +11781,9 @@ function _resolveRoundImpl() {
       const scDice = team === B.red ? redDice : blueDice;
       if (f.id === 19 && !f.ko && scDice && scDice.length > 0 && scDice.every(d => d < 4)) {
         B.scallywagsFrenzyBonus[tNameSC] = (B.scallywagsFrenzyBonus[tNameSC] || 0) + 1;
-        queueAbility('FRENZY!', 'var(--common)', `${f.name} — All dice under 4 on a tie! +1 die next roll!`, null, tNameSC);
-        log(`<span class="log-ability">${f.name}</span> — Frenzy! Tie: all dice under 4 → +1 die next round.`);
+        team.resources.surge = (team.resources.surge || 0) + 1;
+        queueAbility('FRENZY!', 'var(--common)', `${f.name} — All dice under 4 on a tie! +1 die next roll + 1 Surge!`, null, tNameSC);
+        log(`<span class="log-ability">${f.name}</span> — Frenzy! Tie: all dice under 4 → +1 die next round + <span class="log-ms">+1 Surge</span>.`);
         checkKnightEffects(tNameSC, f.name);
       }
     });
@@ -14385,9 +14386,11 @@ function _resolveRoundImpl() {
     if (f.id !== 19) return;
     if (!dice || dice.length === 0 || !dice.every(d => d < 4)) return;
     B.scallywagsFrenzyBonus[myTName] = (B.scallywagsFrenzyBonus[myTName] || 0) + 1;
+    const _scTeam = B[myTName];
+    _scTeam.resources.surge = (_scTeam.resources.surge || 0) + 1;
     const ctx = f === wF ? 'Win' : (f.ko ? 'Down' : 'Loss');
-    queueAbility('FRENZY!', 'var(--common)', `${f.name} — ${ctx}! All dice under 4! +1 die next roll!`, null, myTName);
-    log(`<span class="log-ability">${f.name}</span> — Frenzy! ${ctx}: all dice under 4 → +1 die next round.`);
+    queueAbility('FRENZY!', 'var(--common)', `${f.name} — ${ctx}! All dice under 4! +1 die next roll + 1 Surge!`, null, myTName);
+    log(`<span class="log-ability">${f.name}</span> — Frenzy! ${ctx}: all dice under 4 → +1 die next round + <span class="log-ms">+1 Surge</span>.`);
     checkKnightEffects(myTName, f.name);
   });
 
