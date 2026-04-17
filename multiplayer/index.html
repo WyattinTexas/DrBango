@@ -702,6 +702,11 @@ body {
 .ghost-card.rarity-ghost-rare::before { background: var(--ghost-rare); }
 .ghost-card.rarity-legendary::before { background: var(--legendary); }
 .ghost-card:hover { transform: scale(1.08); border-color: var(--gold); box-shadow: 0 0 16px rgba(212,160,64,0.3); z-index: 2; }
+.dupe-badge { position:absolute; top:2px; right:2px; font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:6px; z-index:3; line-height:1.2; }
+.dupe-badge.dupe-silver { background:linear-gradient(135deg,#c0c0c0,#e8e8e8,#a8a8a8); color:#222; text-shadow:0 0 2px rgba(255,255,255,0.5); }
+.dupe-badge.dupe-gold { background:linear-gradient(135deg,#d4a030,#ffe066,#b8860b); color:#222; text-shadow:0 0 3px rgba(255,215,0,0.6); }
+.dupe-badge.dupe-diamond { background:linear-gradient(135deg,#88e0ef,#e0f7ff,#44c3d2,#a0f0ff); color:#114; text-shadow:0 0 4px rgba(136,224,239,0.8); animation:diamond-shimmer 2s ease-in-out infinite; }
+@keyframes diamond-shimmer { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.3)} }
 .ghost-card {
   width: 72px;
   flex-shrink: 0;
@@ -3132,8 +3137,11 @@ function renderCollection() {
   ghosts.forEach(ghost => {
     const inTeam = team.includes(ghost.id);
 
+    const dupeCount = counts[ghost.id] || 1;
+    const dupeTier = dupeCount >= 4 ? 'dupe-diamond' : dupeCount === 3 ? 'dupe-gold' : dupeCount === 2 ? 'dupe-silver' : '';
     let cardHTML = `
         <div class="ghost-card rarity-${ghost.rarity} ${inTeam ? 'in-team' : ''}" data-id="${ghost.id}">
+          ${dupeCount > 1 ? `<div class="dupe-badge ${dupeTier}">×${dupeCount}</div>` : ''}
           ${ghost.art ? `<img class="portrait-img" src="${ghost.art}" alt="${ghost.name}" loading="lazy" onerror="this.style.background='var(--surface3)'">` : '<div class="portrait-img" style="background:var(--surface3)"></div>'}
           <div class="portrait-name">${ghost.name}</div>
         </div>
@@ -5703,12 +5711,6 @@ async function acceptTrade(tradeId) {
     showToast('You no longer own that card!');
     await db.ref(`mp/trades/${tradeId}`).update({ status: 'declined' });
     closeTradeModal();
-    return;
-  }
-
-  const teamSet = new Set(team.filter(id => id !== null));
-  if (teamSet.has(trade.requesting)) {
-    showToast('That card is on your active team! Remove it first.');
     return;
   }
 
