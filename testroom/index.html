@@ -2387,7 +2387,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v742';
+const TESTROOM_VERSION = 'v743';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2850,7 +2850,7 @@ const GHOSTS = [
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
   {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
-  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline: if you hold 3+ different specials, your active ghost gains +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."}
+  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline & In Play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."}
 ];
 
 // ============================================================
@@ -9184,26 +9184,29 @@ function doPreRollSetup() {
     }
   });
 
-  // Explorer Jeff (455) — Treasure Hunter: sideline, if holding 3+ different specials, +1 die
-  // Negated by Cornelius (45) — Antidote
+  // Explorer Jeff (455) — Treasure Hunter: sideline & in play, if holding 3+ different specials, +1 die
+  // Negated by Cornelius (45) — Antidote (only when on sideline)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
     const enemyTeamObj = team === B.red ? B.blue : B.red;
-    if (!f.ko && hasSideline(team, 455)) {
+    const ejOnSideline = hasSideline(team, 455);
+    const ejActive = f.id === 455 && !f.ko;
+    if (!f.ko && (ejOnSideline || ejActive)) {
       const res = B[tName].resources;
       const types = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'].filter(r => (res[r] || 0) > 0).length;
       if (types >= 3) {
-        if (hasSideline(enemyTeamObj, 45)) {
+        // Cornelius only blocks sideline abilities, not in-play
+        if (ejOnSideline && hasSideline(enemyTeamObj, 45)) {
           const cornGhost = getSidelineGhost(enemyTeamObj, 45);
           preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Explorer Jeff's Treasure Hunter!`, tName === 'red' ? 'blue' : 'red']);
           log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`);
         } else {
           if (tName === 'red') redCount += 1;
           else blueCount += 1;
-          const ejGhost = getSidelineGhost(team, 455);
-          preRollCallouts.push(['TREASURE HUNTER!', 'var(--uncommon)', `${ejGhost ? ejGhost.name : 'Explorer Jeff'} (sideline) — ${types} specials held! +1 die!`, tName]);
-          log(`<span class="log-ability">Explorer Jeff</span> (sideline) — Treasure Hunter! ${types} different specials → +1 die!`);
+          const loc = ejActive ? 'in play' : 'sideline';
+          preRollCallouts.push(['TREASURE HUNTER!', 'var(--uncommon)', `Explorer Jeff (${loc}) — ${types} specials held! +1 die!`, tName]);
+          log(`<span class="log-ability">Explorer Jeff</span> (${loc}) — Treasure Hunter! ${types} different specials → +1 die!`);
         }
       }
     }
@@ -12863,21 +12866,27 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Admiral'); log(`<span class="log-ability">Cornelius</span> — Antidote! Admiral Comrades blocked.`); }
   }
 
-  // Explorer Jeff (455) — Treasure Hunter: sideline +1 damage if 3+ different specials held
+  // Explorer Jeff (455) — Treasure Hunter: sideline & in play, +1 damage if 3+ different specials held
   let explorerJeffTriggered = false;
   let explorerJeffBaseDmg = 0;
-  if (hasSideline(winTeam, 455) && !wF.ko) {
+  const ejOnSidelineDmg = hasSideline(winTeam, 455);
+  const ejActiveDmg = wF.id === 455 && !wF.ko;
+  if ((ejOnSidelineDmg || ejActiveDmg) && !wF.ko) {
     const ejRes = B[winTeamName].resources;
     const ejTypes = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'].filter(r => (ejRes[r] || 0) > 0).length;
     if (ejTypes >= 3) {
-      if (!corneliusBlocksRally) {
+      // Cornelius only blocks sideline, not in-play
+      if (ejOnSidelineDmg && !ejActiveDmg && corneliusBlocksRally) {
+        corneliusSidelineBlockedList.push('Explorer Jeff'); log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`);
+      } else {
         explorerJeffBaseDmg = dmg;
         dmg += 1;
         explorerJeffTriggered = true;
-        const ejGhost = getSidelineGhost(winTeam, 455);
-        collectKC(winTeamName, 'Explorer Jeff', ejGhost);
-        log(`<span class="log-ability">Explorer Jeff</span> (sideline) — Treasure Hunter! ${ejTypes} specials → +1 damage!`);
-      } else { corneliusSidelineBlockedList.push('Explorer Jeff'); log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`); }
+        const loc = ejActiveDmg ? 'in play' : 'sideline';
+        if (ejOnSidelineDmg && !ejActiveDmg) { const ejGhost = getSidelineGhost(winTeam, 455); collectKC(winTeamName, 'Explorer Jeff', ejGhost); }
+        else { collectKC(winTeamName, wF.name); }
+        log(`<span class="log-ability">Explorer Jeff</span> (${loc}) — Treasure Hunter! ${ejTypes} specials → +1 damage!`);
+      }
     }
   }
 
