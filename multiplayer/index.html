@@ -2540,7 +2540,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.43';
+const BBN_VERSION = 'v0.44';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5146,8 +5146,14 @@ async function processDailyResult() {
     // Mark as won
     await ref.update({ dailyChallengeWon: true, dailyChallengeDate: dateKey });
 
-    // Grant 3 bonus cards (same weights as daily pack)
+    // Grant 3 bonus cards — first card is guaranteed from the rival's team
     const bonusCards = generateDailyPack();
+    const rivalTeam = daily.team || [];
+    if (rivalTeam.length > 0) {
+      const rivalId = rivalTeam[Math.floor(Math.random() * rivalTeam.length)];
+      const rivalGhost = getGhost(rivalId);
+      if (rivalGhost) bonusCards[0] = rivalGhost;
+    }
     const newIds = bonusCards.map(g => g.id);
     const updatedCollection = [...(userProfile.collection || []), ...newIds];
     await ref.child('collection').set(updatedCollection);
