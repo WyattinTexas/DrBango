@@ -2540,7 +2540,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.44';
+const BBN_VERSION = 'v0.45';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5166,6 +5166,8 @@ async function processDailyResult() {
         dailyBadges.push(daily.badge);
         await ref.child('dailyBadges').set(dailyBadges);
         showToast(`Badge earned: ${daily.name}`);
+        // Invalidate leaderboard badge cache so new badge shows immediately
+        if (currentUser) delete _lbBadgeCache[currentUser.uid];
       }
     }
 
@@ -5178,6 +5180,8 @@ async function processDailyResult() {
     showRewardCards(bonusCards, 'Rival Defeated!', () => {
       renderDailyChallenge();
       renderCollection();
+      // Re-render leaderboard so new badge appears
+      db.ref('mp/leaderboard').once('value', snap => renderLeaderboard(snap.val()));
     });
   }
 }
