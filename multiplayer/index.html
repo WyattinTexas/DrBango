@@ -963,6 +963,29 @@ body {
   font-size: 1.8rem;
   color: var(--gold-bright);
 }
+.pack-overlay h2.promo-title {
+  font-size: 2.2rem;
+  background: linear-gradient(135deg, #f0c560, #fff6a0, #f0c560, #d4a030);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: promoShimmer 3s ease-in-out infinite;
+  text-shadow: none;
+  letter-spacing: 2px;
+}
+.pack-overlay .promo-subtitle {
+  font-family: 'Creepster', cursive;
+  font-size: 1rem;
+  color: #d4a030;
+  margin-top: -20px;
+  letter-spacing: 3px;
+  opacity: 0.85;
+}
+@keyframes promoShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
 .pack-cards {
   display: flex;
   gap: 16px;
@@ -2358,6 +2381,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <!-- ===== PACK OPENING OVERLAY ===== -->
 <div class="pack-overlay" id="pack-overlay">
   <h2>New Pack!</h2>
+  <div class="promo-subtitle" id="pack-subtitle" style="display:none;"></div>
   <div class="pack-cards" id="pack-cards"></div>
   <button id="add-to-collection-btn" onclick="addPackToCollection()">Add to Collection</button>
 </div>
@@ -2700,6 +2724,9 @@ async function loadUserProfile() {
 
   // One-time special pack for existing players
   await checkSpecialPack();
+
+  // Beta promotional pack for specific testers
+  await checkBetaPromoPack();
 
   // Check for incoming trades
   await checkIncomingTrades();
@@ -5388,6 +5415,122 @@ function showRewardCardsStaggered(cards, title, onClose) {
     addBtn.onclick = function() { addPackToCollection(); };
     if (onClose) onClose();
   };
+}
+
+// ============================================================
+// BETA PROMO PACK
+// ============================================================
+
+const BETA_PROMO_RECIPIENTS = [
+  {
+    match: (name) => name.toLowerCase().includes('skylar'),
+    mustInclude: [454, 455], // Miyoshi, Explorer Jeff
+    label: 'Skylar'
+  },
+  {
+    match: (name) => name.toLowerCase().includes('ej'),
+    mustInclude: [453], // Kaylee
+    label: 'EJ'
+  },
+  {
+    match: (name) => name.toLowerCase().includes('julian'),
+    mustInclude: [455], // Explorer Jeff
+    label: 'Julian'
+  },
+  {
+    match: (name) => name.toLowerCase().includes('emily'),
+    mustInclude: [454], // Miyoshi
+    label: 'Emily'
+  },
+  {
+    match: (name) => {
+      const lower = name.toLowerCase();
+      return lower.includes('josh') || lower.includes('bonvino');
+    },
+    mustInclude: [454, 110], // Miyoshi, Mountain King (legendary exception for Josh)
+    label: 'Josh'
+  }
+];
+
+async function checkBetaPromoPack() {
+  if (!currentUser || !userProfile) return;
+  if (userProfile.betaPromoReceived) return;
+
+  const displayName = userProfile.displayName || currentUser.displayName || '';
+  if (!displayName) return;
+
+  // Find matching recipient
+  const recipient = BETA_PROMO_RECIPIENTS.find(r => r.match(displayName));
+  if (!recipient) return;
+
+  const collection = new Set(userProfile.collection || []);
+  const PACK_SIZE = 5;
+
+  // Start with must-include cards (skip any already in collection)
+  const packIds = [];
+  for (const id of recipient.mustInclude) {
+    if (!collection.has(id) && getGhost(id)) {
+      packIds.push(id);
+    }
+  }
+
+  // Fill remaining slots with random rares and ghost-rares not in collection and not already in pack
+  const fillCount = PACK_SIZE - packIds.length;
+  if (fillCount > 0) {
+    const eligibleRarities = ['rare', 'ghost-rare'];
+    const pool = getActiveGhosts().filter(g =>
+      eligibleRarities.includes(g.rarity) &&
+      !collection.has(g.id) &&
+      !packIds.includes(g.id)
+    );
+
+    // Shuffle pool
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    for (let i = 0; i < Math.min(fillCount, pool.length); i++) {
+      packIds.push(pool[i].id);
+    }
+  }
+
+  if (packIds.length === 0) return;
+
+  // Build ghost objects and sort by rarity (least rare to most rare, left to right)
+  const raritySort = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+  const packCards = packIds.map(id => getGhost(id)).filter(Boolean);
+  packCards.sort((a, b) => (raritySort[a.rarity] || 0) - (raritySort[b.rarity] || 0));
+
+  // Add to collection and save flag
+  const newCardIds = packCards.map(g => g.id);
+  const updatedCollection = [...(userProfile.collection || []), ...newCardIds];
+
+  await db.ref(`mp/users/${currentUser.uid}`).update({
+    collection: updatedCollection,
+    betaPromoReceived: true
+  });
+
+  userProfile.collection = updatedCollection;
+  userProfile.betaPromoReceived = true;
+
+  // Show the pack with promo styling
+  showRewardCardsStaggered(packCards, 'SPIRITKIN BETA PROMOTIONAL PACK', () => {
+    // Remove promo styling when closed
+    const h2 = document.querySelector('#pack-overlay h2');
+    h2.classList.remove('promo-title');
+    document.getElementById('pack-subtitle').style.display = 'none';
+    updateUI();
+  });
+
+  // Apply promo styling after overlay is shown
+  const h2 = document.querySelector('#pack-overlay h2');
+  h2.classList.add('promo-title');
+  const subtitle = document.getElementById('pack-subtitle');
+  subtitle.textContent = packCards.length + ' Exclusive Cards';
+  subtitle.style.display = '';
+
+  showToast(`${recipient.label} — your Beta Promotional Pack has arrived!`);
 }
 
 // ============================================================

@@ -408,7 +408,12 @@ const GHOSTS = [
   // === VOLCANIC ACTIVITY — EVOLUTION CHAIN ===
   {id:449, name:"Carpenter", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/Carpenter.png", ability:"Crafty", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry."},
   {id:450, name:"Welder", rarity:"rare", maxHp:5, art:"../testroom/art/originals/Welder.png", ability:"Flux", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist."},
-  {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy."}
+  {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy."},
+
+  // === BETA PROMO CARDS ===
+  {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Aquatic spirit. Slipstream swaps your 2 for opponent's best die."},
+  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Water-and-fire spirit. Sacrifice HP for massive dice surge."},
+  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"../testroom/art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline & In Play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. Rewards resource diversity from the bench."}
 ];
 
 
