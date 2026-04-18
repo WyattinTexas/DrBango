@@ -11332,8 +11332,36 @@ function startSimultaneousLuckyStoneWindows() {
   // Activate both tiles simultaneously
   activateTile('red');
   activateTile('blue');
-  checkBothDone(); // in case neither team had a tile element
-  restartSharedCountdown(getSpecialsTimerSecs());
+
+  // AI blue: auto-use Lucky Stone (reroll lowest die) instead of waiting for DOM click
+  if (AI_ACTIVE && !state.blueDone) {
+    const dice = B.pendingResolve ? B.pendingResolve.blueDice : null;
+    if (dice && B.blue.resources.luckyStone > 0) {
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        B.blue.resources.luckyStone--;
+        B.luckyStoneSpentThisTurn.blue++;
+        const newVal = Math.floor(Math.random() * 6) + 1;
+        dice[worstIdx] = newVal;
+        dice.sort((a, b) => a - b);
+        log(`<span class="log-ms">BLUE uses Lucky Stone!</span> Rerolled ${worstVal} → ${newVal}!`);
+        narrate(`<b class="blue-text">Blue</b> uses <b class="gold">Lucky Stone!</b> ${worstVal} → ${newVal}!`);
+        renderDice(B.redDice, B.blueDice);
+        renderBattle();
+      } else {
+        log(`<span style="color:var(--text2)">BLUE holds Lucky Stone (${worstVal} is good enough).</span>`);
+      }
+    }
+    // Mark blue as done — clear its tile
+    state.blueDone = true;
+    const blueResEl = document.getElementById('blue-resources');
+    const blueLsEl = blueResEl && blueResEl.querySelector('.res-tile.luckyStone');
+    if (blueLsEl) { blueLsEl.classList.remove('rerollable'); blueLsEl.onclick = null; blueLsEl.style.cursor = ''; }
+  }
+
+  checkBothDone(); // in case neither team had a tile element (or AI already resolved blue)
+  if (!state.closed) restartSharedCountdown(getSpecialsTimerSecs());
 }
 
 function startLuckyStoneWindow(team, callback) {
@@ -16466,6 +16494,161 @@ function aiTick() {
     return;
   }
 
+  // Selene (305): prefer Lucky Stones (3 LS is more impactful than 2 seeds)
+  if (B.selenePending && B.selenePending.tName === 'blue') {
+    const seleneOverlay = document.getElementById('seleneOverlay');
+    if (seleneOverlay && seleneOverlay.classList.contains('active')) {
+      setTimeout(() => doSeleneChoice('stone'), 600);
+      return;
+    }
+  }
+
+  // Wise Al: always pick damage (aggressive AI)
+  if (B.wiseAlPending && B.wiseAlPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 600);
+    return;
+  }
+
+  // Gordok: always pick damage (aggressive AI)
+  if (B.gordokPending && B.gordokPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 600);
+    return;
+  }
+
+  // Jackson (50): opt in if HP > 5 (aggressive but safe)
+  if (B.jacksonPending && B.jacksonPending.team === 'blue') {
+    const jacksonOverlay = document.getElementById('jacksonOverlay');
+    if (jacksonOverlay && jacksonOverlay.classList.contains('active')) {
+      const jf = active(B.blue);
+      setTimeout(() => doJacksonChoice(jf && jf.hp > 5 ? 'yes' : 'no'), 600);
+      return;
+    }
+  }
+
+  // Sonya (69): always use Mesmerize (change die to 2 — weakens opponent)
+  if (B.sonyaPending && B.sonyaPending.team === 'blue') {
+    const sonyaOverlay = document.getElementById('sonyaOverlay');
+    if (sonyaOverlay && sonyaOverlay.classList.contains('active')) {
+      setTimeout(() => doSonyaChoice('yes'), 600);
+      return;
+    }
+  }
+
+  // Jeanie (90): always use Hidden Treasure (force opponent reroll)
+  if (B.jeaniePending && B.jeaniePending.team === 'blue') {
+    const jeanieOverlay = document.getElementById('jeanieOverlay');
+    if (jeanieOverlay && jeanieOverlay.classList.contains('active')) {
+      setTimeout(() => doJeanieChoice('yes'), 600);
+      return;
+    }
+  }
+
+  // Dark Wing: always opt in
+  if (B.darkWingPending && B.darkWingPending.team === 'blue') {
+    setTimeout(() => { if (typeof doDarkWingChoice === 'function') doDarkWingChoice('yes'); }, 600);
+    return;
+  }
+
+  // Tommy chain: auto-roll the bonus die
+  if (B.tommyChainPending && B.tommyChainPending.team === 'blue') {
+    const tommyOverlay = document.getElementById('tommyOverlay');
+    if (tommyOverlay && tommyOverlay.classList.contains('active')) {
+      const tommyBtn = document.getElementById('tommyRollBtn');
+      if (tommyBtn && !tommyBtn.disabled) {
+        setTimeout(() => doTommyRoll(), 600);
+      }
+      return;
+    }
+  }
+
+  // Balatron (113): auto-roll the counter die
+  if (B.balatronPending && B.balatronPending.loseTeamName === 'blue') {
+    const balatronOverlay = document.getElementById('balatronOverlay');
+    if (balatronOverlay && balatronOverlay.classList.contains('active')) {
+      const balatronBtn = document.getElementById('balatronRollBtn');
+      if (balatronBtn && !balatronBtn.disabled) {
+        setTimeout(() => doBalatronRoll(), 600);
+      }
+      return;
+    }
+  }
+
+  // Sylvia (313): auto-roll ice shard die when modal appears
+  if (B.sylviaResume && B.sylviaTeamName === 'blue') {
+    const sylviaOverlay = document.getElementById('sylviaOverlay');
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active')) {
+      const sylviaBtn = document.getElementById('sylviaRollBtn');
+      if (sylviaBtn && !sylviaBtn.disabled) {
+        setTimeout(() => { if (sylviaBtn.onclick) sylviaBtn.onclick(); else sylviaBtn.click(); }, 600);
+      }
+      return;
+    }
+  }
+
+  // Pressure picker: blue is forced to swap — pick which of blue's own ghosts enters
+  // pressurePickerTeam = 'blue' means red attacked, blue chooses which of their own sideline ghosts comes in
+  if (B.pressurePickerTeam === 'blue') {
+    const pressureOverlay = document.getElementById('pressureOverlay');
+    if (pressureOverlay && pressureOverlay.classList.contains('active')) {
+      const blueTeam = B.blue;
+      const sidelineAlive = blueTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== blueTeam.activeIdx && !x.ghost.ko);
+      if (sidelineAlive.length > 0) {
+        // Save the best ghost: pick the weaker one now (same logic as KO swap)
+        const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+        sidelineAlive.sort((a, b) => {
+          const rd = (rarityRank[b.ghost.rarity] || 0) - (rarityRank[a.ghost.rarity] || 0);
+          if (rd !== 0) return rd;
+          return b.ghost.hp - a.ghost.hp;
+        });
+        const pick = sidelineAlive[sidelineAlive.length - 1]; // weakest
+        setTimeout(() => doPressureSwap('red', pick.index), 600);
+      }
+      return;
+    }
+  }
+
+  // Burn picker overlay: auto-pick best target (lowest HP sideline ghost)
+  if (B.burnPickerTeam === 'blue') {
+    const burnOverlay = document.getElementById('burnOverlay');
+    if (burnOverlay && burnOverlay.classList.contains('active')) {
+      const enemyTeam = B.red;
+      const sidelineTargets = enemyTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+      if (sidelineTargets.length > 0) {
+        sidelineTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => doBurnPlace('blue', sidelineTargets[0].index), 500);
+      } else {
+        setTimeout(() => closeBurnPicker(), 400);
+      }
+      return;
+    }
+  }
+
+  // Firefly picker overlay: convert to moonstone (best default)
+  if (B.fireflyPickerTeam === 'blue') {
+    const fireflyOverlay = document.getElementById('fireflyOverlay');
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active')) {
+      setTimeout(() => doFireflyConvert('blue', 'moonstone'), 500);
+      return;
+    }
+  }
+
+  // Nick Knack picker: steal most valuable resource from opponent
+  if (B.nickKnackPending && B.nickKnackPending.team === 'blue') {
+    const nickOverlay = document.getElementById('nickKnackOverlay');
+    if (nickOverlay && nickOverlay.classList.contains('active')) {
+      const oppRes = B.red.resources;
+      // Priority: moonstone > luckyStone > surge > fire > ice > healingSeed
+      const stealOrder = ['moonstone', 'luckyStone', 'surge', 'fire', 'ice', 'healingSeed'];
+      const stealKey = stealOrder.find(k => (oppRes[k] || 0) > 0) || 'skip';
+      setTimeout(() => doNickKnackSteal('blue', stealKey), 500);
+      return;
+    }
+  }
+
   // --- Post-roll: auto-use moonstone / lucky stone for blue ---
   aiHandlePostRoll();
 }
@@ -16479,9 +16662,27 @@ function aiCommitSpecials(team) {
   const f = active(t);
   if (!f || f.ko) return;
 
+  // --- Magic Fireflies: convert to most useful resource FIRST (before other commits) ---
+  while ((r.firefly || 0) > 0) {
+    // Priority: moonstone > luckyStone > surge > ice > fire > healingSeed
+    // Moonstone = guaranteed die change to 6, Lucky Stone = reroll safety net
+    let bestRes = 'moonstone';
+    if ((r.moonstone || 0) >= 2) bestRes = 'luckyStone';
+    if ((r.luckyStone || 0) >= 2 && (r.moonstone || 0) >= 1) bestRes = 'surge';
+    if ((r.surge || 0) >= 2) bestRes = 'ice';
+    // If HP is low, prefer healing seed
+    if (f.hp < f.maxHp * 0.5 && (r.healingSeed || 0) < 2) bestRes = 'healingSeed';
+    doFireflyConvert(team, bestRes);
+  }
+
   // --- Healing Seeds: use if HP below max (heal before fighting) ---
   while (r.healingSeed > 0 && f.hp < f.maxHp) {
     spendHealingSeed(team);
+  }
+
+  // --- Bonzai (Miyoshi 454): sacrifice 4 HP for +5 dice if HP > 6 ---
+  if (f.id === 454 && !f.ko && f.hp > 6 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
+    useBonzaiButton(team);
   }
 
   // --- Ice Blade: swing it if forged ---
@@ -16512,6 +16713,14 @@ function aiCommitSpecials(team) {
     }
   }
 
+  // --- Harrison (315) Ascend: commit healing seeds for extra dice ---
+  if (f.id === 315 && !f.ko && r.healingSeed > 0 && B.committed) {
+    // Commit all available seeds (each = +1 die)
+    while (r.healingSeed > 0) {
+      toggleHarrison(team);
+    }
+  }
+
   // --- Commit resources using cycleCommit (properly moves from pool to committed) ---
   // Commit all ice shards
   while (r.ice > 0 && B.committed) {
@@ -16528,7 +16737,7 @@ function aiCommitSpecials(team) {
     cycleCommit(team, 'surge');
   }
 
-  // --- Aunt Susan: commit seeds for damage if HP is full ---
+  // --- Aunt Susan (308): commit seeds for damage if HP is full ---
   if (r.healingSeed > 0 && f.hp >= f.maxHp && B.committed) {
     const auntSusan = t.ghosts.find(g => g.id === 308 && !g.ko);
     if (auntSusan) {
@@ -16536,6 +16745,59 @@ function aiCommitSpecials(team) {
         if (typeof toggleAuntSusan === 'function') toggleAuntSusan(team);
         else break;
       }
+    }
+  }
+
+  // --- Aunt Susan Heal (308): commit seeds for healing if HP is low and Aunt Susan active ---
+  if (r.healingSeed > 0 && f.id === 308 && f.hp < f.maxHp && B.committed) {
+    while (r.healingSeed > 0) {
+      if (typeof toggleAuntSusanHeal === 'function') toggleAuntSusanHeal(team);
+      else break;
+    }
+  }
+
+  // --- Burn: place all burn on enemy sideline ghosts ---
+  if ((r.burn || 0) > 0) {
+    const enemyTeamName = team === 'red' ? 'blue' : 'red';
+    const enemyTeam = B[enemyTeamName];
+    // Find non-KO'd sideline ghosts on enemy team
+    const sidelineTargets = enemyTeam.ghosts
+      .map((g, i) => ({ ghost: g, index: i }))
+      .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+    if (sidelineTargets.length > 0) {
+      while ((r.burn || 0) > 0 && sidelineTargets.length > 0) {
+        // Spread burn across targets, prioritizing ghosts with lower HP
+        sidelineTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        const target = sidelineTargets[0];
+        // Call doBurnPlace directly (bypasses the overlay picker)
+        r.burn--;
+        if (!B.burn) B.burn = { red: {}, blue: {} };
+        if (!B.burn[enemyTeamName]) B.burn[enemyTeamName] = {};
+        B.burn[enemyTeamName][target.index] = (B.burn[enemyTeamName][target.index] || 0) + 1;
+        // Track burn source for KO credit
+        const burnPlacer = active(B[team]);
+        const burnPlacerId = burnPlacer ? (burnPlacer.originalId || burnPlacer.id) : 0;
+        if (!B.burnSource) B.burnSource = { red: {}, blue: {} };
+        if (!B.burnSource[enemyTeamName]) B.burnSource[enemyTeamName] = {};
+        if (!B.burnSource[enemyTeamName][target.index]) B.burnSource[enemyTeamName][target.index] = {};
+        B.burnSource[enemyTeamName][target.index][burnPlacerId] = (B.burnSource[enemyTeamName][target.index][burnPlacerId] || 0) + 1;
+        const totalBurn = B.burn[enemyTeamName][target.index];
+        log(`<span class="log-ability">BURN!</span> AI placed on <span class="log-dmg">${target.ghost.name}</span>! (${totalBurn} total)`);
+        // Mable (446) Hex: burn placement = enemy -1 die
+        const mableActive = active(B[team]);
+        if (mableActive && mableActive.id === 446 && !mableActive.ko) {
+          if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
+          B.hexDieRemoval[enemyTeamName] = (B.hexDieRemoval[enemyTeamName] || 0) + 1;
+          log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
+        }
+      }
+    }
+  }
+
+  // --- Hex (Mable 446): spend burn for -1 enemy die + sacred fire ---
+  if (f.id === 446 && !f.ko && (r.burn || 0) > 0) {
+    while ((r.burn || 0) > 0) {
+      useHex(team);
     }
   }
 
