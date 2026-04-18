@@ -2387,7 +2387,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v744';
+const TESTROOM_VERSION = 'v747';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3738,8 +3738,8 @@ const CURATED_TEAMS = [
   [108, 437, 446],
   // #3  Ice Blade Forge — Zain forges Ice Blade from wins, Sylvia free Ice Shards, Finn forges Flame Blade from seeds+fire
   [206, 313, 431],
-  // #4  Resurrection Engine — Bo revives on KO + 3 Fireflies, Lucas buffs revived ghost +3HP/+1die, Granny gains resources on ally KO
-  [109, 433, 310],
+  // #4  Resurrection Engine — Miyoshi Bonzai sacrifices HP for +5 dice, Bo revives on KO + 3 Fireflies, Lucas buffs revived ghost +3HP/+1die
+  [454, 109, 433],
   // #5  Dice Destroyer — Pip triples remove opponent dice permanently, Haywire triples gain permanent die, Willow +1 die after losses
   [418, 78, 435],
   // #6  Resource Avalanche — Chester wins for seeds/fireflies, Twyla spends Lucky Stones for +dice/+seeds, Zippa converts seeds to stones
@@ -11701,6 +11701,12 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
   }
 }
 
+// Bridge for callers that pass dice/roll explicitly after nulling B.pendingResolve
+function doResolve(redDice, blueDice, redRoll, blueRoll) {
+  B.pendingResolve = { redDice, blueDice, redRoll, blueRoll };
+  resolveRound();
+}
+
 // v386: Safe wrapper — catches any thrown error in the damage/cinematic pipeline
 // and recovers the game to a rollable state. Without this, a ReferenceError or
 // TypeError anywhere inside the 2000-line resolveRound body silently kills the
@@ -16484,7 +16490,7 @@ function aiTick() {
 
   // Toby Pure Heart: never gamble (conservative AI)
   if (B.tobyPending && B.tobyPending.team === 'blue') {
-    setTimeout(() => doPureHeartChoice('no'), 600);
+    setTimeout(() => doTobyPureHeart(false), 600);
     return;
   }
 
@@ -16680,8 +16686,8 @@ function aiCommitSpecials(team) {
     spendHealingSeed(team);
   }
 
-  // --- Bonzai (Miyoshi 454): sacrifice 4 HP for +5 dice if HP > 6 ---
-  if (f.id === 454 && !f.ko && f.hp > 6 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
+  // --- Bonzai (Miyoshi 454): sacrifice 4 HP for +5 dice — use whenever survivable ---
+  if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
     useBonzaiButton(team);
   }
 
@@ -16709,7 +16715,7 @@ function aiCommitSpecials(team) {
   if (!B.flameBlade?.[team]) {
     const finn = t.ghosts.find(g => g.id === 204 && !g.ko);
     if (finn && r.healingSeed >= 2 && r.fire >= 1) {
-      if (typeof useFinnForge === 'function') useFinnForge(team);
+      if (typeof useFinnFlameBlade === 'function') useFinnFlameBlade(team);
     }
   }
 
@@ -16846,7 +16852,7 @@ function aiHandlePostRoll() {
   const blueDiceEl = document.getElementById('blue-dice');
   if (blueDiceEl) {
     const rerollable = blueDiceEl.querySelectorAll('.die.rerollable');
-    if (rerollable.length > 0 && B.phase && B.phase.includes && B[`blue`]?.resources?.luckyStone >= 0) {
+    if (rerollable.length > 0 && B.phase && B.phase.includes('luckystone') && B.blue?.resources?.luckyStone > 0) {
       // Find lowest die and click it
       let lowestEl = null, lowestVal = 7;
       rerollable.forEach(el => {
