@@ -220,7 +220,7 @@ const CURATED_TEAMS = [
   [108, 406, 439],
   // #14 Toby All-In — Toby declares final roll for KO, Guardian Fairy takes hits from sideline, Hector singles beat doubles
   [97, 99, 96],
-  // #15 Frost Blade Master — Skylar Ice Shards deal +2, Wise Al wins for 4 Ice Shards, Spockles wins for 2 Ice Shards
+  // #15 Frost Blade Master — Skylar Ice Shards deal +2, Pal Al wins for 4 Ice Shards, Spockles wins for 2 Ice Shards
   [104, 431, 81],
 
   // ===================== MID TIER (25 teams) =====================
@@ -1376,7 +1376,7 @@ function doSeleneChoice(choice) {
   drainAbilityQueue(() => { if (cont) cont(); });
 }
 
-// Wise Al (431) — Squall: show choice modal
+// Pal Al (431) — Squall: show choice modal
 function showWiseAlModal(resumeCallback) {
   const wp = B.wiseAlPending;
   if (!wp) { resumeCallback(); return; }
@@ -8612,7 +8612,7 @@ function _resolveRoundImpl() {
     }
   }
 
-  // Wise Al (431) — Squall: Win: you MAY gain 4 Ice Shards instead of dealing damage (player choice)
+  // Pal Al (431) — Squall: Win: you MAY gain 4 Ice Shards instead of dealing damage (player choice)
   let wiseAlSqualled = false;
   if (wF.id === 431 && !wF.ko && dmg > 0) {
     if (autoPlayRunning) {
@@ -9674,7 +9674,7 @@ function _resolveRoundImpl() {
     queueAbility('RIVER TERROR!', 'var(--rare)', `${wF.name} — stole resources instead of dealing damage! +1 Moonstone!`, null, winTeamName);
   }
 
-  // Wise Al (431) — Squall: callout for ice gain (logic applied pre-damage) — only for autoPlay (human uses modal)
+  // Pal Al (431) — Squall: callout for ice gain (logic applied pre-damage) — only for autoPlay (human uses modal)
   if (wiseAlSqualled && !B.wiseAlPending) {
     queueAbility('SQUALL!', 'var(--rare)', `${wF.name} — +4 Ice Shards instead of dealing damage!`, null, winTeamName);
   }
@@ -10185,7 +10185,7 @@ function _resolveRoundImpl() {
         }
       };
 
-      // Wise Al / Gordok choice modals: fire before Guardian Fairy (winner decides first)
+      // Pal Al / Gordok choice modals: fire before Guardian Fairy (winner decides first)
       const afterWiseAlGordok = () => {
         if (B.guardianFairyReactivePending) {
           const gfp = B.guardianFairyReactivePending;

@@ -189,13 +189,27 @@ function smartTriggerEntry(team) {
     if (burnCount > 0 && !f.ko && mikeProtects) {
       // Mike's Torrent: sideline immune to Burn — consume burn, deal 0
       delete B.burn[tName][team.activeIdx];
+      if (B.burnSource && B.burnSource[tName]) delete B.burnSource[tName][team.activeIdx];
     } else if (burnCount > 0 && !f.ko && f.id !== 416) {
       f.hp = Math.max(0, f.hp - burnCount);
-      if (f.hp <= 0) { f.ko = true; f.killedBy = -2; }
+      if (f.hp <= 0) {
+        f.ko = true;
+        let topBurner = -2;
+        const sources = B.burnSource && B.burnSource[tName] && B.burnSource[tName][team.activeIdx];
+        if (sources) {
+          let maxCount = 0;
+          for (const [sid, cnt] of Object.entries(sources)) {
+            if (cnt > maxCount) { maxCount = cnt; topBurner = parseInt(sid); }
+          }
+        }
+        f.killedBy = topBurner;
+      }
       delete B.burn[tName][team.activeIdx];
+      if (B.burnSource && B.burnSource[tName]) delete B.burnSource[tName][team.activeIdx];
     } else if (burnCount > 0 && f.id === 416) {
       // Rook (416) — Immune to Burn: consume burn but take no damage
       delete B.burn[tName][team.activeIdx];
+      if (B.burnSource && B.burnSource[tName]) delete B.burnSource[tName][team.activeIdx];
     }
   }
 
@@ -823,6 +837,12 @@ function smartSimRounds(gameNum) {
         if (!B.burn) B.burn = { red: {}, blue: {} };
         if (!B.burn[oppKey]) B.burn[oppKey] = {};
         B.burn[oppKey][target.index] = (B.burn[oppKey][target.index] || 0) + r.burn;
+        // Track burn source for KO credit
+        const burnPlacerId = f.originalId || f.id;
+        if (!B.burnSource) B.burnSource = { red: {}, blue: {} };
+        if (!B.burnSource[oppKey]) B.burnSource[oppKey] = {};
+        if (!B.burnSource[oppKey][target.index]) B.burnSource[oppKey][target.index] = {};
+        B.burnSource[oppKey][target.index][burnPlacerId] = (B.burnSource[oppKey][target.index][burnPlacerId] || 0) + r.burn;
         r.burn = 0;
       }
     }
@@ -863,7 +883,7 @@ function smartSimRounds(gameNum) {
       B.flameBlade[teamKey] = true;
     }
   });
-  // Flame Blade: AI always swings when forged (maximises die count and enables +5 Burn on win)
+  // Flame Blade: AI always swings when forged (maximises die count and enables +3 Burn on win)
   ['red','blue'].forEach(teamKey => {
     if (B.flameBlade && B.flameBlade[teamKey]) {
       if (!B.flameBladeSwing) B.flameBladeSwing = { red: false, blue: false };
@@ -1749,10 +1769,10 @@ function smartSimRounds(gameNum) {
     }
     // Zain (206) — Ice Blade: permanent +2 damage on ALL wins once forged AND swinging (team-wide)
     if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName] && (B.committed[winTeamName].zainBlade > 0 || (B.iceBladeSwing && B.iceBladeSwing[winTeamName]))) dmg += 2;
-    // Flame Blade: +5 Burn on win when swinging
+    // Flame Blade: +3 Burn on win when swinging
     if (B.flameBlade && B.flameBlade[winTeamName] && B.flameBladeSwing && B.flameBladeSwing[winTeamName]) {
       if (!wTeam.resources.burn) wTeam.resources.burn = 0;
-      wTeam.resources.burn += 5;
+      wTeam.resources.burn += 3;
     }
     // Red Hunter (345) — enemy has resources (pool + committed ice/fire/surge): +3 damage
     // Matches index.html lines 9372–9385: checks both eRes AND B.committed[loseTeamName].
@@ -1885,7 +1905,7 @@ function smartSimRounds(gameNum) {
     if (wF.id === 430 && !wF.ko && dmg > 0) {
       const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
       const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (lTeam.resources[r] || 0), 0);
-      if (gordokTotalRes >= 2) {
+      if (gordokTotalRes > 0) {
         let gordokStolen = 0;
         for (let i = 0; i < 2 && gordokStolen < 2; i++) {
           const avail = gordokResTypes.filter(r => (lTeam.resources[r] || 0) > 0);
@@ -1904,7 +1924,7 @@ function smartSimRounds(gameNum) {
         wTeam.resources.moonstone++;
       }
     }
-    // Wise Al (431) — Squall: Win: gain 4 Ice Shards instead of dealing damage (auto when ice < 6)
+    // Pal Al (431) — Squall: Win: gain 4 Ice Shards instead of dealing damage (auto when ice < 6)
     let wiseAlSqualled = false;
     if (wF.id === 431 && !wF.ko && dmg > 0) {
       if ((wTeam.resources.ice || 0) < 6) {
@@ -2590,7 +2610,7 @@ function smartSimRounds(gameNum) {
       if (ef.id === 423 && !ef.ko && (B[enemyKey].resources.healingSeed || 0) > 0) rxns++; // Zippa GLIMMER!
       if (ef.id === 428 && !ef.ko) rxns++;  // Jasper FLAME DIVE! win-path
       if (ef.id === 430 && !ef.ko) rxns++;  // Gordok RIVER TERROR! win-path
-      if (ef.id === 431 && !ef.ko) rxns++;  // Wise Al SQUALL! win-path
+      if (ef.id === 431 && !ef.ko) rxns++;  // Pal Al SQUALL! win-path
       if (ef.id === 432 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Valkin GRAND SPOILS! on KO
       if (hasSideline(enemyTeam, 415) && !ef.ko && active(B[teamKey]).ko) rxns++;  // Nyx & Bessie MOO! CAW!
       if (ef.id === 427 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Garrick WATCHFIRE! KO fire

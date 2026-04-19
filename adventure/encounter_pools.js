@@ -47,7 +47,7 @@ const ENCOUNTER_POOLS = {
   },
   'Bramble Thicket': {
     desc: 'Rare spirits hide in the thorns.',
-    ghosts: [429,446,430,314,431,40,39,44], // Young Cap, Mable, Gordok, Farmer Jeff, Wise Al, Team Zippy, Castle Guards, Bubble Boys
+    ghosts: [429,446,430,314,431,40,39,44], // Young Cap, Mable, Gordok, Farmer Jeff, Pal Al, Team Zippy, Castle Guards, Bubble Boys
     terrain: 'dense thorny bushes, hidden clearings, berry patches'
   },
 
