@@ -206,6 +206,39 @@ canvas{position:absolute;top:0;left:0}
 .starter-card .s-hp{font:10px 'Press Start 2P',monospace;color:#50c040;margin-bottom:6px}
 .starter-card .s-ability{font:600 12px 'Cinzel',serif;color:#f0d860;margin-bottom:4px}
 .starter-card .s-desc{font:12px 'Crimson Text',serif;opacity:.7;font-style:italic}
+
+/* ═══ REGION DISCOVERY SPLASH ═══ */
+#region-splash{position:fixed;inset:0;z-index:500;pointer-events:none;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;opacity:0;transition:opacity .8s ease}
+#region-splash.active{opacity:1}
+#region-splash.fade-out{opacity:0;transition:opacity 1.2s ease}
+.splash-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.7) 100%)}
+.splash-region-name{font:900 52px 'Cinzel',serif;letter-spacing:8px;text-transform:uppercase;
+  text-shadow:0 0 60px var(--splash-glow),0 4px 20px rgba(0,0,0,.8);color:var(--splash-color);
+  animation:splashName 3s ease-out forwards;z-index:1}
+.splash-subtitle{font:16px 'Crimson Text',serif;color:rgba(255,255,255,.6);font-style:italic;
+  margin-top:8px;letter-spacing:3px;animation:splashSub 3s ease-out forwards;z-index:1}
+.splash-line{width:200px;height:2px;background:linear-gradient(90deg,transparent,var(--splash-color),transparent);
+  margin-top:12px;animation:splashLine 2.5s ease-out forwards;z-index:1}
+@keyframes splashName{0%{transform:scale(.8) translateY(20px);opacity:0}15%{transform:scale(1);opacity:1}75%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes splashSub{0%{opacity:0;transform:translateY(10px)}20%{opacity:.6}75%{opacity:.6}100%{opacity:0}}
+@keyframes splashLine{0%{width:0;opacity:0}20%{width:200px;opacity:.5}75%{opacity:.5}100%{opacity:0}}
+
+/* ═══ LEVEL UP DING ═══ */
+#levelup-overlay{position:fixed;inset:0;z-index:450;pointer-events:none;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;opacity:0}
+#levelup-overlay.active{animation:levelupFlash 2.5s ease-out forwards}
+.levelup-text{font:900 38px 'Cinzel',serif;color:#f0d860;text-shadow:0 0 40px rgba(240,216,96,.6),0 0 80px rgba(240,216,96,.3);letter-spacing:6px}
+.levelup-detail{font:14px 'Crimson Text',serif;color:rgba(255,255,255,.7);margin-top:6px}
+.levelup-ring{position:absolute;width:200px;height:200px;border:3px solid rgba(240,216,96,.4);border-radius:50%;
+  animation:levelupRing 1.5s ease-out forwards}
+@keyframes levelupFlash{0%{opacity:0}8%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes levelupRing{0%{transform:scale(.3);opacity:.8}100%{transform:scale(3);opacity:0}}
+
+/* ═══ XP BAR ═══ */
+.hud-ghost .xp-bar{position:absolute;bottom:3px;left:0;height:2px;background:#d4a040;border-radius:0 0 4px 4px;transition:width .3s}
+.hud-ghost .level-badge{position:absolute;top:-4px;right:-4px;background:#d4a040;color:#080604;font:700 7px 'Press Start 2P',monospace;
+  width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1}
 </style>
 </head>
 <body>
@@ -273,6 +306,19 @@ canvas{position:absolute;top:0;left:0}
 <div id="starter-screen">
   <h2>Choose Your First Spiritkin</h2>
   <div id="starter-choices"></div>
+</div>
+
+<div id="region-splash">
+  <div class="splash-vignette"></div>
+  <div class="splash-region-name" id="splash-name"></div>
+  <div class="splash-subtitle" id="splash-sub"></div>
+  <div class="splash-line" id="splash-line"></div>
+</div>
+
+<div id="levelup-overlay">
+  <div class="levelup-ring"></div>
+  <div class="levelup-text">LEVEL UP</div>
+  <div class="levelup-detail" id="levelup-detail"></div>
 </div>
 
 <script src="cards_data.js"></script>
@@ -917,32 +963,126 @@ function drawGame(){
   g.restore();
 }
 
-// Particles
+// ═══════ ENHANCED AMBIENT WORLD ═══════
+
+// Region-aware particles: snow, embers, fireflies, dark energy
 class Pt{
   constructor(r){this.r=r;this.reset()}
   reset(){
-    if(this.r==='vi'){this.x=.62+rn()*.35;this.y=rn()*.55}
-    else{this.x=rn()*.38;this.y=rn()*.55}
-    this.sz=rn()*2+.5;this.sp=rn()*.0003+.0001;this.dr=(rn()-.5)*.0002;
-    this.op=rn()*.4+.2;this.life=1;
+    if(this.r==='vi'){this.x=.62+rn()*.35;this.y=rn()*.55;this.sz=rn()*2.5+.5;this.sp=rn()*.0004+.0001;this.op=rn()*.5+.2}
+    else if(this.r==='fv'){this.x=rn()*.38;this.y=-.02;this.sz=rn()*1.8+.5;this.sp=rn()*.0002+.0001;this.op=rn()*.4+.15;this.drift=rn()*.0003-.00015}
+    else if(this.r==='rh'){this.x=.25+rn()*.50;this.y=.55+rn()*.42;this.sz=rn()*1.5+.5;this.sp=rn()*.00008+.00002;this.op=0;this.maxOp=rn()*.35+.1;this.phase=rn()*Math.PI*2}
+    else if(this.r==='dc'){this.x=.28+rn()*.44;this.y=rn()*.25;this.sz=rn()*2+.8;this.sp=rn()*.0002+.00005;this.op=rn()*.25+.05;this.drift=rn()*.0002-.0001}
+    this.life=1;
   }
   update(){
-    if(this.r==='vi'){this.y-=this.sp;this.life-=.002}
-    else{this.y+=this.sp*.6;this.x+=Math.sin(time*.003+this.y*8)*.00008;this.life-=.0015}
-    if(this.life<=0||this.y<0||this.y>1)this.reset();
+    if(this.r==='vi'){this.y-=this.sp;this.x+=Math.sin(time*.002+this.x*10)*.00015;this.life-=.0015}
+    else if(this.r==='fv'){this.y+=this.sp;this.x+=this.drift+Math.sin(time*.001+this.y*5)*.0001;this.life-=.001}
+    else if(this.r==='rh'){this.y-=this.sp;this.x+=Math.sin(time*.0008+this.phase)*.0001;this.op=this.maxOp*(.5+.5*Math.sin(time*.003+this.phase));this.life-=.0008}
+    else if(this.r==='dc'){this.y-=this.sp*.5;this.x+=this.drift+Math.sin(time*.002+this.y*12)*.00012;this.life-=.001}
+    if(this.life<=0||this.y<-.05||this.y>1.05)this.reset();
   }
   draw(c){
     const p=w2s(this.x,this.y),s=this.sz*camScale,al=this.op*this.life;
-    if(this.r==='vi'){c.fillStyle=`rgba(255,${100+rn()*80|0},20,${al})`;c.shadowColor='rgba(255,120,20,.3)';c.shadowBlur=s*3}
-    else{c.fillStyle=`rgba(200,220,255,${al*.5})`;c.shadowColor='rgba(200,220,255,.2)';c.shadowBlur=s*2}
-    c.beginPath();c.arc(p.x,p.y,s,0,Math.PI*2);c.fill();c.shadowBlur=0;
+    if(al<.01)return;
+    c.save();
+    if(this.r==='vi'){c.fillStyle=`rgba(255,${100+rn()*80|0},20,${al})`;c.shadowColor='rgba(255,120,20,.4)';c.shadowBlur=s*4}
+    else if(this.r==='fv'){c.fillStyle=`rgba(220,235,255,${al*.6})`;c.shadowColor='rgba(200,220,255,.15)';c.shadowBlur=s*2}
+    else if(this.r==='rh'){c.fillStyle=`rgba(255,${220+rn()*35|0},${80+rn()*60|0},${al})`;c.shadowColor=`rgba(255,230,100,${al*.6})`;c.shadowBlur=s*5}
+    else if(this.r==='dc'){c.fillStyle=`rgba(${140+rn()*40|0},80,${200+rn()*55|0},${al})`;c.shadowColor='rgba(160,80,220,.3)';c.shadowBlur=s*4}
+    c.beginPath();c.arc(p.x,p.y,s,0,Math.PI*2);c.fill();
+    c.restore();
   }
 }
-const pts=[];for(let i=0;i<35;i++)pts.push(new Pt('vi'));for(let i=0;i<30;i++)pts.push(new Pt('fv'));
+
+// Roaming spirit wisps — larger ethereal creatures that drift between nodes
+class Wisp{
+  constructor(region){
+    this.region=region;this.reset();
+  }
+  reset(){
+    const bounds={rh:[.25,.55,.75,.95],fv:[.05,.15,.38,.55],vi:[.62,.10,.95,.55],dc:[.28,.02,.72,.28]};
+    const b=bounds[this.region]||bounds.rh;
+    this.x=b[0]+rn()*(b[2]-b[0]);this.y=b[1]+rn()*(b[3]-b[1]);
+    this.tx=b[0]+rn()*(b[2]-b[0]);this.ty=b[1]+rn()*(b[3]-b[1]);
+    this.sz=rn()*3+2;this.op=rn()*.15+.05;this.moveTimer=0;this.moveInterval=3000+rn()*5000;
+    this.trail=[];this.bounds=b;
+  }
+  update(){
+    this.moveTimer+=16;
+    if(this.moveTimer>this.moveInterval){
+      this.moveTimer=0;this.moveInterval=3000+rn()*5000;
+      this.tx=this.bounds[0]+rn()*(this.bounds[2]-this.bounds[0]);
+      this.ty=this.bounds[1]+rn()*(this.bounds[3]-this.bounds[1]);
+    }
+    this.x+=(this.tx-this.x)*.003;this.y+=(this.ty-this.y)*.003;
+    this.x+=Math.sin(time*.001+this.y*3)*.0002;
+    this.trail.push({x:this.x,y:this.y,a:this.op});
+    if(this.trail.length>12)this.trail.shift();
+  }
+  draw(c){
+    const cols={rh:'180,255,140',fv:'160,200,255',vi:'255,160,80',dc:'180,120,255'};
+    const col=cols[this.region]||cols.rh;
+    // Trail
+    for(let i=0;i<this.trail.length;i++){
+      const t=this.trail[i],p=w2s(t.x,t.y);
+      const a=t.a*(i/this.trail.length)*.4;
+      const s=this.sz*camScale*(i/this.trail.length)*.6;
+      c.save();c.fillStyle=`rgba(${col},${a})`;c.beginPath();c.arc(p.x,p.y,s,0,Math.PI*2);c.fill();c.restore();
+    }
+    // Body
+    const p=w2s(this.x,this.y),s=this.sz*camScale;
+    const pulse=.7+.3*Math.sin(time*.004+this.x*10);
+    c.save();
+    c.fillStyle=`rgba(${col},${this.op*pulse})`;
+    c.shadowColor=`rgba(${col},.3)`;c.shadowBlur=s*6;
+    c.beginPath();c.arc(p.x,p.y,s,0,Math.PI*2);c.fill();
+    // Inner bright core
+    c.fillStyle=`rgba(255,255,255,${this.op*pulse*.5})`;
+    c.beginPath();c.arc(p.x,p.y,s*.3,0,Math.PI*2);c.fill();
+    c.restore();
+  }
+}
+
+// Day/night cycle
+let dayNightPhase=0;
+
+const pts=[];
+for(let i=0;i<30;i++)pts.push(new Pt('vi'));
+for(let i=0;i<25;i++)pts.push(new Pt('fv'));
+for(let i=0;i<20;i++)pts.push(new Pt('rh'));
+for(let i=0;i<15;i++)pts.push(new Pt('dc'));
+
+const wisps=[];
+for(const r of['rh','rh','rh','fv','fv','vi','vi','dc','dc','dc'])wisps.push(new Wisp(r));
 
 function drawFx(){
   const g=fCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+
+  // Day/night cycle — slow 4-minute cycle
+  dayNightPhase=(time*.00004)%1;
+  const nightIntensity=Math.max(0,Math.sin(dayNightPhase*Math.PI*2-.3))*.25;
+  if(nightIntensity>.01){
+    g.fillStyle=`rgba(10,15,40,${nightIntensity})`;
+    g.fillRect(0,0,W,H);
+    // Stars during night
+    if(nightIntensity>.1){
+      const starSeed=42;
+      for(let i=0;i<60;i++){
+        const sx=(Math.sin(i*127.1+starSeed)*.5+.5)*W;
+        const sy=(Math.cos(i*311.7+starSeed)*.3+.05)*H;
+        const twinkle=.3+.7*Math.sin(time*.003+i*1.7);
+        const sa=nightIntensity*twinkle*2;
+        g.fillStyle=`rgba(255,255,240,${Math.min(sa,.6)})`;
+        g.beginPath();g.arc(sx,sy,1*dpr,0,Math.PI*2);g.fill();
+      }
+    }
+  }
+
+  // Particles
   for(const p of pts){p.update();p.draw(g)}
+  // Roaming wisps
+  for(const w of wisps){w.update();w.draw(g)}
 }
 
 // ═══════ INTERACTION ═══════
@@ -1043,11 +1183,24 @@ function updateHUD() {
   for (const ghost of G.party.ghosts) {
     const div = document.createElement('div');
     div.className = 'hud-ghost' + (ghost === ENGINE.activeGhost(G.party) ? ' active' : '') + (ghost.ko ? ' ko' : '');
+    const lvl = ghost.level || 1;
     div.textContent = `${ghost.name} ${ghost.hp}/${ghost.maxHp}`;
     const bar = document.createElement('div');
     bar.className = 'hp-bar';
     bar.style.width = (ghost.hp / ghost.maxHp * 100) + '%';
     div.appendChild(bar);
+    // XP progress bar
+    const xpBar = document.createElement('div');
+    xpBar.className = 'xp-bar';
+    xpBar.style.width = ((ghost.xp || 0) / XP_TO_LEVEL * 100) + '%';
+    div.appendChild(xpBar);
+    // Level badge
+    if (lvl > 1) {
+      const badge = document.createElement('div');
+      badge.className = 'level-badge';
+      badge.textContent = lvl;
+      div.appendChild(badge);
+    }
     partyEl.appendChild(div);
   }
 
@@ -1153,6 +1306,9 @@ function moveToNode(nodeId) {
   window._reachableNodes = new Map();
   cvs[0].onclick = null;
 
+  // Region discovery check
+  checkRegionDiscovery(nodeId);
+
   // Update player position on map (re-render will handle it)
   updateHUD();
 
@@ -1200,7 +1356,8 @@ function saveGame() {
       ghosts: G.party.ghosts.map(g => ({
         id: g.id, name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko,
         ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity, set: g.set,
-        usedOncePerGame: g.usedOncePerGame, entryFired: g.entryFired
+        usedOncePerGame: g.usedOncePerGame, entryFired: g.entryFired,
+        xp: g.xp || 0, level: g.level || 1
       })),
       activeIdx: G.party.activeIdx,
       resources: { ...G.party.resources }
@@ -1217,7 +1374,8 @@ function saveGame() {
     regionsUnlocked: G.regionsUnlocked,
     gameOver: G.gameOver,
     won: G.won,
-    clearedNodes: G._clearedNodes ? [...G._clearedNodes] : []
+    clearedNodes: G._clearedNodes ? [...G._clearedNodes] : [],
+    discoveredRegions: G.discoveredRegions ? [...G.discoveredRegions] : ['rolling_hills']
   };
   localStorage.setItem('boo_adventure_save', JSON.stringify(saveData));
 }
@@ -1229,7 +1387,7 @@ function loadGame() {
     const data = JSON.parse(raw);
     // Reconstruct game state
     const state = ENGINE.createGameState(data.party.ghosts[0].id);
-    state.party.ghosts = data.party.ghosts;
+    state.party.ghosts = data.party.ghosts.map(g => ({ ...g, xp: g.xp || 0, level: g.level || 1 }));
     state.party.activeIdx = data.party.activeIdx;
     state.party.resources = data.party.resources;
     state.coins = data.coins;
@@ -1245,6 +1403,7 @@ function loadGame() {
     state.gameOver = data.gameOver || false;
     state.won = data.won || false;
     state._clearedNodes = new Set(data.clearedNodes || []);
+    state.discoveredRegions = new Set(data.discoveredRegions || ['rolling_hills']);
     return state;
   } catch (e) {
     console.error('Failed to load save:', e);
@@ -1292,6 +1451,7 @@ function doEncounterBattle(card, cardId, node) {
   showBattle(G.party, enemyTeam, false, () => {
     if (!ENGINE.isTeamDefeated(enemyTeam)) { endTurn(); return; }
     G.coins += 3;
+    awardXP(ENGINE.activeGhost(G.party));
     markEncounterCleared(node.id);
 
     // Use new recruit screen with full party management
@@ -1690,6 +1850,7 @@ function startBossBattle(node) {
     if (ENGINE.isTeamDefeated(enemyTeam)) {
       G.bossesDefeated.push(bossKey);
       G.coins += 5;
+      awardXP(ENGINE.activeGhost(G.party));
 
       // Grant seal
       const regionMap = { timber: 'rolling_hills', kingJay: 'frost_valley', nerina: 'volcanic_isles', lucy: 'dark_castle' };
@@ -1836,6 +1997,90 @@ document.addEventListener('click', function initSounds() {
 }, { once: true });
 
 // Player position + reachable nodes are handled inline via G state checks in drawGame
+
+// ═══════════════════════════════════════
+// XP / LEVELING SYSTEM
+// ═══════════════════════════════════════
+const XP_PER_WIN = 1;
+const XP_TO_LEVEL = 3; // 3 wins to level up
+
+function awardXP(ghost) {
+  if (!ghost || ghost.ko) return;
+  ghost.xp = (ghost.xp || 0) + XP_PER_WIN;
+  ghost.level = ghost.level || 1;
+  if (ghost.xp >= XP_TO_LEVEL) {
+    ghost.xp -= XP_TO_LEVEL;
+    ghost.level++;
+    ghost.maxHp += 1;
+    ghost.hp = Math.min(ghost.hp + 1, ghost.maxHp);
+    showLevelUp(ghost);
+  }
+}
+
+function showLevelUp(ghost) {
+  const el = document.getElementById('levelup-overlay');
+  document.getElementById('levelup-detail').textContent =
+    `${ghost.name} reached Level ${ghost.level}! +1 Max HP (${ghost.maxHp} HP)`;
+  el.classList.remove('active');
+  void el.offsetWidth; // force reflow
+  el.classList.add('active');
+  playSFX('special');
+  setTimeout(() => el.classList.remove('active'), 2600);
+}
+
+// ═══════════════════════════════════════
+// REGION DISCOVERY SPLASH
+// ═══════════════════════════════════════
+const REGION_INFO = {
+  rolling_hills: { name: 'Rolling Hills', sub: 'Where all journeys begin', color: '#90e070', glow: 'rgba(144,224,112,.4)' },
+  frost_valley:  { name: 'Frost Valley',  sub: 'The cold bites deep',     color: '#80c8f0', glow: 'rgba(128,200,240,.4)' },
+  volcanic_isles:{ name: 'Volcanic Isles', sub: 'Fire consumes the weak', color: '#e87830', glow: 'rgba(232,120,48,.4)'  },
+  dark_castle:   { name: 'Dark Castle',    sub: 'Only legends survive',   color: '#9070c0', glow: 'rgba(144,112,192,.4)' }
+};
+
+function checkRegionDiscovery(nodeId) {
+  if (!G) return;
+  if (!G.discoveredRegions) G.discoveredRegions = new Set(['rolling_hills']);
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const region = node.r;
+  if (G.discoveredRegions.has(region)) return;
+  G.discoveredRegions.add(region);
+  showRegionSplash(region);
+}
+
+function showRegionSplash(region) {
+  const info = REGION_INFO[region];
+  if (!info) return;
+  const el = document.getElementById('region-splash');
+  const nameEl = document.getElementById('splash-name');
+  const subEl = document.getElementById('splash-sub');
+  const lineEl = document.getElementById('splash-line');
+
+  el.style.setProperty('--splash-color', info.color);
+  el.style.setProperty('--splash-glow', info.glow);
+  nameEl.textContent = info.name;
+  subEl.textContent = info.sub;
+
+  // Reset animations
+  el.classList.remove('active', 'fade-out');
+  nameEl.style.animation = 'none';
+  subEl.style.animation = 'none';
+  lineEl.style.animation = 'none';
+  void el.offsetWidth;
+  nameEl.style.animation = '';
+  subEl.style.animation = '';
+  lineEl.style.animation = '';
+
+  el.classList.add('active');
+  playSFX('special');
+
+  setTimeout(() => {
+    el.classList.remove('active');
+    el.classList.add('fade-out');
+    setTimeout(() => el.classList.remove('fade-out'), 1200);
+  }, 3200);
+}
 
 // ── INIT ──
 setTimeout(() => {
