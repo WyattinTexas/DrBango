@@ -273,9 +273,7 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <div id="action-bar" style="display:none">
-  <button id="btn-roll" onclick="doRollMovement()">ROLL TO MOVE</button>
   <button id="btn-action" style="display:none" onclick="doNodeAction()">EXPLORE</button>
-  <button id="btn-end" style="display:none" onclick="endTurn()">END TURN</button>
 </div>
 
 <div id="modal-overlay" style="display:none">
@@ -920,12 +918,7 @@ function drawGame(){
     // Border
     g.strokeStyle=isReachable?'#ffffff':isHov?'#fff':nt.col;
     g.lineWidth=(isReachable?4:isHov?3:2)*camScale;g.stroke();
-    if(isReachable){g.strokeStyle='rgba(144,224,112,.6)';g.lineWidth=2*camScale;g.stroke();
-      // Distance badge
-      g.fillStyle='#90e070';g.font=`700 ${10*camScale}px 'Press Start 2P',monospace`;
-      g.textAlign='center';g.textBaseline='middle';
-      g.fillText(reachDist,pos.x+sz+8*camScale,pos.y-sz-4*camScale);
-    }
+    if(isReachable){g.strokeStyle='rgba(144,224,112,.6)';g.lineWidth=2*camScale;g.stroke()}
     g.restore();
 
     // Icon inside
@@ -1251,7 +1244,6 @@ resize();renderArt();requestAnimationFrame(loop);
 // ═══════════════════════════════════════════════════════
 
 let G = null; // Game state
-let reachable = null; // Current reachable nodes for movement
 
 // ── STARTER SELECTION ──
 function showStarterScreen() {
@@ -1282,7 +1274,8 @@ function startGame(cardId) {
   updateHUD();
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('action-bar').style.display = 'flex';
-  showMessage(`Welcome, ${summonerData.name}`, `Your journey begins at Toby's Cottage with ${ENGINE.getCard(cardId).name}. Roll to move!`);
+  showMessage(`Welcome, ${summonerData.name}`, `Your journey begins at Toby's Cottage with ${ENGINE.getCard(cardId).name}. Click a nearby node to travel.`);
+  setTimeout(() => enableTravel(), 100);
 }
 
 // ── HUD ──
@@ -1349,44 +1342,23 @@ function updateHUD() {
   }
 }
 
-// ── MOVEMENT ──
-function doRollMovement() {
-  if (!G || !G.canMove) return;
-  G.turnNumber++;
-  const roll = ENGINE.rollMovement();
-  G.movementRoll = roll;
-  G.movesLeft = roll;
-  G.canMove = false;
-
-  // Calculate reachable nodes
-  reachable = ENGINE.getReachableNodes(G.currentNode, roll, edges, nodes);
-
-  // Highlight reachable nodes on map
-  highlightReachable();
-
-  document.getElementById('btn-roll').style.display = 'none';
-
-  // Brief flash of roll result, then auto-dismiss so map is clickable
-  showMessage('Movement Roll', `You rolled a <b>${roll}</b>! Click a highlighted node to move there.`);
-  setTimeout(() => {
-    hideModal();
-    // Enable click-to-move AFTER modal is gone
-    cvs[0].onclick = handleMapClick;
-  }, 1200);
-}
-
-function highlightReachable() {
-  // Filter out locked regions from reachable nodes
+// ── MOVEMENT (direct travel) ──
+function enableTravel() {
+  if (!G) return;
+  // Show adjacent connected nodes as reachable
+  const adjacent = new Map();
+  for (const [a, b] of edges) {
+    if (a === G.currentNode) adjacent.set(b, 1);
+    if (b === G.currentNode) adjacent.set(a, 1);
+  }
+  // Filter locked regions
   const filtered = new Map();
-  if (reachable) {
-    for (const [id, dist] of reachable) {
-      const node = nodes.find(n => n.id === id);
-      if (node && isRegionUnlocked(node.r)) {
-        filtered.set(id, dist);
-      }
-    }
+  for (const [id, dist] of adjacent) {
+    const node = nodes.find(n => n.id === id);
+    if (node && isRegionUnlocked(node.r)) filtered.set(id, dist);
   }
   window._reachableNodes = filtered;
+  cvs[0].onclick = handleMapClick;
 }
 
 function isRegionUnlocked(region) {
@@ -1398,15 +1370,10 @@ function isRegionUnlocked(region) {
 }
 
 function handleMapClick(e) {
-  if (!reachable) return;
   const r = cvs[0].getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const node = getNodeAt(mx, my);
-  if (node && reachable.has(node.id)) {
-    if (!isRegionUnlocked(node.r)) {
-      showMessage('Region Locked', `Defeat ${node.r === 'dark_castle' ? 'King Jay or Nerina' : 'Timber'} to unlock this area.`);
-      return;
-    }
+  if (node && window._reachableNodes && window._reachableNodes.has(node.id)) {
     moveToNode(node.id);
   }
 }
@@ -1414,7 +1381,7 @@ function handleMapClick(e) {
 function moveToNode(nodeId) {
   G.currentNode = nodeId;
   G.visitedNodes.add(nodeId);
-  reachable = null;
+  G.turnNumber++;
   window._reachableNodes = new Map();
   cvs[0].onclick = null;
 
@@ -1428,8 +1395,9 @@ function moveToNode(nodeId) {
   updateHUD();
 
   // Show action button
+  const node = nodes.find(n => n.id === nodeId);
   document.getElementById('btn-action').style.display = '';
-  document.getElementById('btn-action').textContent = 'EXPLORE ' + nodes.find(n => n.id === nodeId).name.toUpperCase();
+  document.getElementById('btn-action').textContent = 'EXPLORE ' + node.name.toUpperCase();
 }
 
 function doNodeAction() {
@@ -1452,15 +1420,12 @@ function doNodeAction() {
 }
 
 function endTurn() {
-  G.canMove = true;
-  G.movesLeft = 0;
-  reachable = null;
   window._reachableNodes = new Map();
-  document.getElementById('btn-roll').style.display = '';
   document.getElementById('btn-action').style.display = 'none';
-  document.getElementById('btn-end').style.display = 'none';
   updateHUD();
   saveGame();
+  // Re-enable travel to adjacent nodes
+  enableTravel();
 }
 
 // ── SAVE / LOAD ──
@@ -2276,7 +2241,7 @@ setTimeout(() => {
     updateSummonerHUD();
     updateHUD();
     // Pan camera to player position on load
-    setTimeout(() => panToNode(G.currentNode), 200);
+    setTimeout(() => { panToNode(G.currentNode); enableTravel(); }, 200);
     showMessage(`Welcome back, ${summonerData.name}!`, `Turn ${G.turnNumber} — ${G.party.ghosts.length} Spiritkin in your party.`);
   } else {
     initSummonerSetup();
