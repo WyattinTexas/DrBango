@@ -2414,7 +2414,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v759';
+const TESTROOM_VERSION = 'v761';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2880,7 +2880,8 @@ const GHOSTS = [
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
   {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
-  {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."}
+  {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
+  {id:459, name:"Eli", rarity:"uncommon", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."}
 ];
 
 // ============================================================
@@ -9754,6 +9755,24 @@ function doPreRollSetup() {
           preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp}${seekerOver ? ' · overclocked!' : ''})`, team === B.red ? 'red' : 'blue']);
           log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp}${seekerOver ? ' overclocked!' : ''})`);
         }
+      }
+    }
+  });
+
+  // Eli (459) — Steady: before rolling, gain +1 Lucky Stone
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 459 && !f.ko) {
+      const tName = team === B.red ? 'red' : 'blue';
+      team.resources.luckyStone = (team.resources.luckyStone || 0) + 1;
+      preRollCallouts.push(['STEADY!', 'var(--uncommon)', `${f.name} — +1 Lucky Stone! (${team.resources.luckyStone} total)`, tName]);
+      log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
+      collectKC(tName, f.name);
+      // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
+      if (hasSideline(opp(team), 33)) {
+        const _sandOpp = opp(team);
+        _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
+        preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
       }
     }
   });
