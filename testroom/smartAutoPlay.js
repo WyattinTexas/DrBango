@@ -1384,12 +1384,12 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Maisie (458) — Lucky: all 1s count as 6s (mutate dice FIRST)
+  // Maisie (458) — Lucky: all 1s count as 5s (mutate dice FIRST)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey]; const f = active(t);
     if (f.id === 458 && !f.ko) {
       const dice = teamKey === 'red' ? redDice : blueDice;
-      for (let i = 0; i < dice.length; i++) { if (dice[i] === 1) dice[i] = 6; }
+      for (let i = 0; i < dice.length; i++) { if (dice[i] === 1) dice[i] = 5; }
       dice.sort((a, b) => a - b);
     }
   });
