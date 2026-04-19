@@ -2414,7 +2414,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v756';
+const TESTROOM_VERSION = 'v757';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2879,7 +2879,8 @@ const GHOSTS = [
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
-  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."}
+  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
+  {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 6s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 6. Low HP balances the power."}
 ];
 
 // ============================================================
@@ -9979,6 +9980,24 @@ function doPostRollAndResolve(redDice, blueDice) {
   abilityQueueMode = true;
 
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
+
+  // Maisie (458) — Lucky: all 1s count as 6s (mutate dice FIRST, before any other post-roll reads them)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 458 && !f.ko) {
+      const dice = tName === 'red' ? redDice : blueDice;
+      let converted = 0;
+      for (let i = 0; i < dice.length; i++) {
+        if (dice[i] === 1) { dice[i] = 6; converted++; }
+      }
+      dice.sort((a, b) => a - b);
+      if (converted > 0) {
+        queueAbility('LUCKY!', 'var(--ghost-rare)', `${f.name} — ${converted} one${converted > 1 ? 's' : ''} became 6${converted > 1 ? 's' : ''}! 🍀`, () => { renderDice(redDice, blueDice); renderBattle(); }, tName);
+        log(`<span class="log-ability">${f.name}</span> — Lucky! ${converted} one${converted > 1 ? 's' : ''} → 6${converted > 1 ? 's' : ''}! 🍀`);
+      }
+    }
+  });
 
   // Sophia (457) — Mask of Day: gain 1 Burn for each 1 you roll
   ['red', 'blue'].forEach(tName => {
