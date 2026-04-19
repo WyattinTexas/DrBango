@@ -241,6 +241,9 @@ function smartPickSwap(team) {
   let best = alive[0], bestScore = -999;
   for (const c of alive) {
     let score = c.g.hp; // base: HP
+    // Lou (32) must stay on sideline to buff Grawr (34) — penalize bringing Lou in while Grawr is alive
+    const grawrAlive = t.ghosts.some(g => g.id === 34 && !g.ko);
+    if (c.g.id === 32 && grawrAlive) score -= 50;
     // Bonus for entry damage dealers
     if (c.g.id === 306) score += 5; // Nerina: 3 entry damage
     if (c.g.id === 312) score += 3; // Timpleton: +3 damage on win when enemy HP > mine
