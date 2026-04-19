@@ -408,6 +408,7 @@ const GHOSTS = [
   // === VOLCANIC ACTIVITY — EVOLUTION CHAIN ===
   {id:449, name:"Carpenter", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/Carpenter.png", ability:"Crafty", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry."},
   {id:450, name:"Welder", rarity:"rare", maxHp:5, art:"../testroom/art/originals/Welder.png", ability:"Flux", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist."},
+  {id:451, name:"Foreman", rarity:"rare", maxHp:5, art:"../testroom/art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"Win: +1 die next roll.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"End of the blue-collar chain. Foreman snowballs dice on wins."},
   {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy."},
 
   // === BETA PROMO CARDS ===
