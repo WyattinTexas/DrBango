@@ -239,6 +239,19 @@ canvas{position:absolute;top:0;left:0}
 .hud-ghost .xp-bar{position:absolute;bottom:3px;left:0;height:2px;background:#d4a040;border-radius:0 0 4px 4px;transition:width .3s}
 .hud-ghost .level-badge{position:absolute;top:-4px;right:-4px;background:#d4a040;color:#080604;font:700 7px 'Press Start 2P',monospace;
   width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1}
+
+/* ═══ SUMMONER PORTRAITS ═══ */
+.portrait-option{width:64px;height:64px;border-radius:50%;border:3px solid rgba(255,255,255,.15);
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;
+  font-size:32px;background:rgba(255,255,255,.05)}
+.portrait-option:hover{border-color:rgba(255,240,200,.4);transform:scale(1.1)}
+.portrait-option.selected{border-color:#90e070;background:rgba(144,224,112,.12);box-shadow:0 0 20px rgba(144,224,112,.3)}
+
+/* ═══ SUMMONER HUD ═══ */
+#hud-summoner{display:flex;align-items:center;gap:8px;padding-right:12px;border-right:1px solid rgba(255,255,255,.1);margin-right:4px}
+.summoner-avatar{width:28px;height:28px;border-radius:50%;border:2px solid #90e070;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(144,224,112,.1)}
+.summoner-name{font:700 13px 'Cinzel',serif;color:#f0e8d8}
+.summoner-level{font:8px 'Press Start 2P',monospace;color:#d4a040}
 </style>
 </head>
 <body>
@@ -246,10 +259,11 @@ canvas{position:absolute;top:0;left:0}
 <canvas id="game"></canvas>
 <canvas id="fx"></canvas>
 <div id="tip"><b></b><span></span></div>
-<div id="ctrl"><button onclick="resetView()">Reset View</button></div>
+<div id="ctrl"><button onclick="toggleWorldView()">World Map</button></div>
 
 <!-- Game UI Panels -->
 <div id="hud" style="display:none">
+  <div id="hud-summoner"></div>
   <div id="hud-party"></div>
   <div id="hud-resources"></div>
   <div id="hud-coins"><span id="coin-count">3</span> Coins</div>
@@ -304,8 +318,27 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <div id="starter-screen">
-  <h2>Choose Your First Spiritkin</h2>
-  <div id="starter-choices"></div>
+  <!-- Phase 1: Name your summoner -->
+  <div id="summoner-setup" style="text-align:center">
+    <h2 style="font:900 28px 'Cinzel',serif;letter-spacing:3px;color:#f0e8d8;margin-bottom:6px">Name Your Summoner</h2>
+    <p style="font:14px 'Crimson Text',serif;color:rgba(255,255,255,.5);margin-bottom:20px;font-style:italic">Every legend begins with a name.</p>
+    <div id="summoner-portraits" style="display:flex;gap:12px;justify-content:center;margin-bottom:20px"></div>
+    <input type="text" id="summoner-name-input" placeholder="Enter your name..." maxlength="16"
+      style="background:rgba(255,255,255,.08);border:2px solid rgba(255,240,200,.2);border-radius:8px;
+      color:#f0e8d8;font:700 18px 'Cinzel',serif;padding:12px 24px;text-align:center;outline:none;
+      width:280px;letter-spacing:2px;transition:border-color .2s"
+      onfocus="this.style.borderColor='#90e070'" onblur="this.style.borderColor='rgba(255,240,200,.2)'">
+    <br>
+    <button id="summoner-confirm" onclick="confirmSummoner()" style="background:rgba(144,224,112,.12);border:2px solid #90e070;border-radius:8px;
+      color:#90e070;font:700 16px 'Cinzel',serif;padding:12px 32px;cursor:pointer;margin-top:16px;letter-spacing:3px;
+      transition:all .15s" onmouseover="this.style.background='rgba(144,224,112,.25)'" onmouseout="this.style.background='rgba(144,224,112,.12)'">BEGIN</button>
+  </div>
+  <!-- Phase 2: Choose first spiritkin (shown after naming) -->
+  <div id="spiritkin-select" style="display:none;text-align:center">
+    <h2 style="font:900 22px 'Cinzel',serif;letter-spacing:3px;color:#f0e8d8">Choose Your First Spiritkin</h2>
+    <p id="summoner-greeting" style="font:14px 'Crimson Text',serif;color:rgba(255,255,255,.5);margin:6px 0 16px;font-style:italic"></p>
+    <div id="starter-choices"></div>
+  </div>
   <div style="position:absolute;bottom:12px;right:16px;font:9px 'Press Start 2P',monospace;color:rgba(255,255,255,.25)">v2.0</div>
 </div>
 
@@ -797,12 +830,18 @@ let camX=0,camY=0,camScale=1;
 let drag=null,dragCam=null;
 let hovNode=null,time=0;
 
+let camInitialized=false;
 function resize(){
   W=window.innerWidth;H=window.innerHeight;
   cvs.forEach(c=>{c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px'});
-  const sx=W/WW,sy=H/WH;
-  camScale=Math.min(sx,sy)*0.98;
-  camX=(W-WW*camScale)/2;camY=(H-WH*camScale)/2;
+  if(!camInitialized){
+    // Start zoomed in on player — world feels BIG
+    camScale=Math.min(W/WW,H/WH)*2.8;
+    const startNode=nodes[0];
+    camX=W/2-startNode.x*WW*camScale;
+    camY=H/2-startNode.y*WH*camScale;
+    camInitialized=true;
+  }
 }
 
 function w2s(wx,wy){return{x:wx*WW*camScale+camX,y:wy*WH*camScale+camY}}
@@ -951,16 +990,34 @@ function drawGame(){
     }
   }
 
-  // Lantern on player position (or node 0 before game starts)
+  // Player character on map
   const playerNode = G ? nodes.find(n=>n.id===G.currentNode) || nodes[0] : nodes[0];
   const sp=w2s(playerNode.x,playerNode.y);
-  g.font=`${22*camScale}px serif`;g.textAlign='center';g.textBaseline='middle';
-  g.fillText('\uD83C\uDFEE',sp.x,sp.y-28*camScale);
+  // Glowing ring under player
+  const pPulse=.6+.4*Math.sin(t*2);
   g.save();
-  g.font=`700 ${9*camScale}px 'Press Start 2P',monospace`;
-  g.textAlign='center';g.shadowColor='rgba(0,0,0,1)';g.shadowBlur=4;
-  g.fillStyle='rgba(100,200,255,.8)';
-  g.fillText('YOU',sp.x,sp.y-40*camScale);
+  g.strokeStyle=`rgba(144,224,112,${.3*pPulse})`;g.lineWidth=3*camScale;
+  g.beginPath();g.arc(sp.x,sp.y-24*camScale,16*camScale,0,Math.PI*2);g.stroke();
+  g.shadowColor='rgba(144,224,112,.4)';g.shadowBlur=12*camScale;
+  g.stroke();
+  g.restore();
+  // Portrait circle
+  g.save();
+  g.fillStyle='rgba(8,4,2,.85)';g.strokeStyle='#90e070';g.lineWidth=2.5*camScale;
+  g.beginPath();g.arc(sp.x,sp.y-24*camScale,14*camScale,0,Math.PI*2);g.fill();g.stroke();
+  g.font=`${16*camScale}px serif`;g.textAlign='center';g.textBaseline='middle';
+  g.fillText(summonerData.portrait,sp.x,sp.y-24*camScale);
+  g.restore();
+  // Name tag
+  g.save();
+  g.font=`700 ${Math.max(8,9*camScale)}px 'Press Start 2P',monospace`;
+  g.textAlign='center';g.textBaseline='top';
+  // Outline
+  g.fillStyle='#000';
+  const nameY=sp.y-44*camScale;
+  for(let dx=-1.5;dx<=1.5;dx+=1.5)for(let dy=-1.5;dy<=1.5;dy+=1.5){if(dx||dy)g.fillText(summonerData.name,sp.x+dx,nameY+dy)}
+  g.fillStyle='#90e070';
+  g.fillText(summonerData.name,sp.x,nameY);
   g.restore();
 }
 
@@ -1127,6 +1184,55 @@ function resetView(){
   camX=(W-WW*camScale)/2;camY=(H-WH*camScale)/2;
 }
 
+function panToNode(nodeId, zoom){
+  const node=nodes.find(n=>n.id===nodeId);
+  if(!node)return;
+  const targetScale=zoom||(Math.min(W/WW,H/WH)*2.8);
+  const targetX=W/2-node.x*WW*targetScale;
+  const targetY=H/2-node.y*WH*targetScale;
+  // Smooth pan animation
+  const startX=camX,startY=camY,startS=camScale;
+  const dur=600;let t0=null;
+  function step(ts){
+    if(!t0)t0=ts;
+    const p=Math.min(1,(ts-t0)/dur);
+    const ease=p<.5?2*p*p:(1-Math.pow(-2*p+2,2)/2); // easeInOutQuad
+    camX=startX+(targetX-startX)*ease;
+    camY=startY+(targetY-startY)*ease;
+    camScale=startS+(targetScale-startS)*ease;
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+let _isWorldView=false;
+function toggleWorldView(){
+  if(_isWorldView){
+    const nodeId=G?G.currentNode:0;
+    panToNode(nodeId);
+    _isWorldView=false;
+    document.querySelector('#ctrl button:first-child').textContent='World Map';
+  }else{
+    const targetScale=Math.min(W/WW,H/WH)*.98;
+    const targetX=(W-WW*targetScale)/2;
+    const targetY=(H-WH*targetScale)/2;
+    const startX=camX,startY=camY,startS=camScale;
+    const dur=600;let t0=null;
+    function step(ts){
+      if(!t0)t0=ts;
+      const p=Math.min(1,(ts-t0)/dur);
+      const ease=p<.5?2*p*p:(1-Math.pow(-2*p+2,2)/2);
+      camX=startX+(targetX-startX)*ease;
+      camY=startY+(targetY-startY)*ease;
+      camScale=startS+(targetScale-startS)*ease;
+      if(p<1)requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+    _isWorldView=true;
+    document.querySelector('#ctrl button:first-child').textContent='Back to You';
+  }
+}
+
 // ═══════ LOOP ═══════
 let lck='';
 function loop(ts){
@@ -1169,15 +1275,20 @@ function showStarterScreen() {
 function startGame(cardId) {
   document.getElementById('starter-screen').style.display = 'none';
   G = ENGINE.createGameState(cardId);
+  G.discoveredRegions = new Set(['rolling_hills']);
+  G.summonerName = summonerData.name;
+  G.summonerPortrait = summonerData.portrait;
+  updateSummonerHUD();
   updateHUD();
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('action-bar').style.display = 'flex';
-  showMessage('Welcome to the Overworld!', `You start at Toby's Cottage with ${ENGINE.getCard(cardId).name}. Roll to move!`);
+  showMessage(`Welcome, ${summonerData.name}`, `Your journey begins at Toby's Cottage with ${ENGINE.getCard(cardId).name}. Roll to move!`);
 }
 
 // ── HUD ──
 function updateHUD() {
   if (!G) return;
+  updateSummonerLevel();
   // Party
   const partyEl = document.getElementById('hud-party');
   partyEl.innerHTML = '';
@@ -1310,6 +1421,9 @@ function moveToNode(nodeId) {
   // Region discovery check
   checkRegionDiscovery(nodeId);
 
+  // Camera follows player
+  panToNode(nodeId);
+
   // Update player position on map (re-render will handle it)
   updateHUD();
 
@@ -1376,7 +1490,9 @@ function saveGame() {
     gameOver: G.gameOver,
     won: G.won,
     clearedNodes: G._clearedNodes ? [...G._clearedNodes] : [],
-    discoveredRegions: G.discoveredRegions ? [...G.discoveredRegions] : ['rolling_hills']
+    discoveredRegions: G.discoveredRegions ? [...G.discoveredRegions] : ['rolling_hills'],
+    summonerName: G.summonerName || summonerData.name,
+    summonerPortrait: G.summonerPortrait || summonerData.portrait
   };
   localStorage.setItem('boo_adventure_save', JSON.stringify(saveData));
 }
@@ -1405,6 +1521,8 @@ function loadGame() {
     state.won = data.won || false;
     state._clearedNodes = new Set(data.clearedNodes || []);
     state.discoveredRegions = new Set(data.discoveredRegions || ['rolling_hills']);
+    state.summonerName = data.summonerName || 'Summoner';
+    state.summonerPortrait = data.summonerPortrait || '🧙';
     return state;
   } catch (e) {
     console.error('Failed to load save:', e);
@@ -2083,6 +2201,65 @@ function showRegionSplash(region) {
   }, 3200);
 }
 
+// ═══════════════════════════════════════
+// SUMMONER IDENTITY SYSTEM
+// ═══════════════════════════════════════
+const PORTRAITS = ['🧙','⚔️','🏹','🔮','🛡️','🌟','👁️','🐉'];
+let summonerData = { name: 'Summoner', portrait: '🧙', level: 1 };
+
+function initSummonerSetup() {
+  const container = document.getElementById('summoner-portraits');
+  container.innerHTML = '';
+  PORTRAITS.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'portrait-option' + (i === 0 ? ' selected' : '');
+    div.textContent = p;
+    div.onclick = () => {
+      container.querySelectorAll('.portrait-option').forEach(el => el.classList.remove('selected'));
+      div.classList.add('selected');
+      summonerData.portrait = p;
+    };
+    container.appendChild(div);
+  });
+  // Auto-focus name input
+  setTimeout(() => document.getElementById('summoner-name-input').focus(), 300);
+  // Enter key to confirm
+  document.getElementById('summoner-name-input').onkeydown = (e) => {
+    if (e.key === 'Enter') confirmSummoner();
+  };
+}
+
+function confirmSummoner() {
+  const name = document.getElementById('summoner-name-input').value.trim();
+  if (!name) { document.getElementById('summoner-name-input').style.borderColor = '#e94560'; return; }
+  summonerData.name = name;
+  // Transition to spiritkin selection
+  document.getElementById('summoner-setup').style.display = 'none';
+  document.getElementById('spiritkin-select').style.display = '';
+  document.getElementById('summoner-greeting').textContent = `${name}, choose the spirit that will walk beside you.`;
+  showStarterScreen();
+}
+
+function updateSummonerHUD() {
+  const el = document.getElementById('hud-summoner');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="summoner-avatar">${summonerData.portrait}</div>
+    <div>
+      <div class="summoner-name">${summonerData.name}</div>
+      <div class="summoner-level">Lv ${summonerData.level}</div>
+    </div>
+  `;
+}
+
+function updateSummonerLevel() {
+  if (!G) return;
+  // Summoner level = total ghost levels earned across party
+  const totalLevels = G.party.ghosts.reduce((sum, g) => sum + ((g.level || 1) - 1), 0);
+  summonerData.level = 1 + totalLevels;
+  updateSummonerHUD();
+}
+
 // ── INIT ──
 setTimeout(() => {
   if (typeof ENGINE === 'undefined') { console.error('Engine not loaded!'); return; }
@@ -2091,13 +2268,18 @@ setTimeout(() => {
   const saved = loadGame();
   if (saved) {
     G = saved;
+    summonerData.name = G.summonerName || 'Summoner';
+    summonerData.portrait = G.summonerPortrait || '🧙';
     document.getElementById('starter-screen').style.display = 'none';
     document.getElementById('hud').style.display = 'flex';
     document.getElementById('action-bar').style.display = 'flex';
+    updateSummonerHUD();
     updateHUD();
-    showMessage('Welcome Back!', `Loaded save — Turn ${G.turnNumber}, ${G.party.ghosts.length} ghosts.`);
+    // Pan camera to player position on load
+    setTimeout(() => panToNode(G.currentNode), 200);
+    showMessage(`Welcome back, ${summonerData.name}!`, `Turn ${G.turnNumber} — ${G.party.ghosts.length} Spiritkin in your party.`);
   } else {
-    showStarterScreen();
+    initSummonerSetup();
   }
 }, 100);
 
