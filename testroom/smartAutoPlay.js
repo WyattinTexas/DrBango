@@ -412,6 +412,7 @@ function smartSimRounds(gameNum) {
       ef.hp = Math.max(0, ef.hp - 1);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
       if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
+    }
   });
 
   // Splinter (101) — Toxic Fumes: once activated (first win), deal 1 chip damage to enemy before every roll.
@@ -890,6 +891,12 @@ function smartSimRounds(gameNum) {
       B.flameBladeSwing[teamKey] = true;
     }
   });
+  // Sophia (457) — Mask: AI always keeps mask active when owned
+  ['red','blue'].forEach(teamKey => {
+    if (B.sophiaMask && B.sophiaMask[teamKey]) {
+      B.sophiaMaskActive[teamKey] = true;
+    }
+  });
 
   // ===== COMPUTE DICE COUNTS =====
   let redCount = 3, blueCount = 3;
@@ -1256,6 +1263,18 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Sophia (457) — Mask of Night: roll the same number of dice as the enemy ghost
+  ['red','blue'].forEach(tName => {
+    if (B.sophiaMask && B.sophiaMask[tName] === 'night' && B.sophiaMaskActive && B.sophiaMaskActive[tName]) {
+      const myCount = tName === 'red' ? redCount : blueCount;
+      const oppCount = tName === 'red' ? blueCount : redCount;
+      if (myCount !== oppCount) {
+        if (tName === 'red') redCount = oppCount;
+        else blueCount = oppCount;
+      }
+    }
+  });
+
   // Fredrick (27) — CAREFUL!: when Fredrick is active, cap opponent dice at 3 (applied LAST — overrides all bonuses).
   // Matches index.html lines 7305–7319: applied after all doPreRollSetup bonuses so surge/retribution/frenzy can't exceed 3.
   // No Dylan check — index.html does not guard Fredrick's cap against Dylan (301).
@@ -1358,6 +1377,19 @@ function smartSimRounds(gameNum) {
         t.resources.luckyStone += fours;
         const oppKey = teamKey === 'red' ? 'blue' : 'red';
         if (hasSideline(B[oppKey], 33)) B[oppKey].resources.luckyStone += fours; // DEPENDABLE! mirror
+      }
+    }
+  });
+
+  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 you roll (post-roll, both teams)
+  ['red','blue'].forEach(teamKey => {
+    if (B.sophiaMask && B.sophiaMask[teamKey] === 'day' && B.sophiaMaskActive && B.sophiaMaskActive[teamKey]) {
+      const dice = teamKey === 'red' ? redDice : blueDice;
+      const ones = dice.filter(d => d === 1).length;
+      if (ones > 0) {
+        const t = B[teamKey];
+        if (!t.resources.burn) t.resources.burn = 0;
+        t.resources.burn += ones;
       }
     }
   });
@@ -1774,6 +1806,10 @@ function smartSimRounds(gameNum) {
       if (!wTeam.resources.burn) wTeam.resources.burn = 0;
       wTeam.resources.burn += 3;
     }
+    // Sophia (457) — Mask of Night: +1 damage on win when active
+    if (B.sophiaMask && B.sophiaMask[winTeamName] === 'night' && B.sophiaMaskActive && B.sophiaMaskActive[winTeamName]) {
+      dmg += 1;
+    }
     // Red Hunter (345) — enemy has resources (pool + committed ice/fire/surge): +3 damage
     // Matches index.html lines 9372–9385: checks both eRes AND B.committed[loseTeamName].
     // In the sim, ice/fire/surge are moved to committed BEFORE this block runs — checking
@@ -1932,6 +1968,19 @@ function smartSimRounds(gameNum) {
         dmg = 0;
         wiseAlSqualled = true;
       }
+    }
+    // Sophia (457) — Masquerade: Win: gain Mask of Day or Mask of Night instead of dealing damage (once per game)
+    // AI strategy: pick Mask of Night if enemy has high dice potential, otherwise Mask of Day for burn farming
+    let sophiaMasqueraded = false;
+    if (wF.id === 457 && !wF.ko && dmg > 0 && B.sophiaMask && !B.sophiaMask[winTeamName]) {
+      // Check enemy dice potential — if opponent likely has 5+ dice, Night is better
+      const enemyF = active(lTeam);
+      const enemyHasBoosts = (lTeam.resources.surge || 0) > 0 || (B.foremanDieBonus && B.foremanDieBonus[lTeamName] > 0);
+      const pickNight = enemyHasBoosts || Math.random() < 0.6; // lean toward Night but not always
+      B.sophiaMask[winTeamName] = pickNight ? 'night' : 'day';
+      B.sophiaMaskActive[winTeamName] = true;
+      dmg = 0;
+      sophiaMasqueraded = true;
     }
     // Cameron (25) — Force of Nature: if Cameron wins but the loser's defensive ability negates damage → instantly destroy the loser.
     // We capture dmg BEFORE any negation so we can detect "started > 0, ended at 0 after defense".
@@ -2611,6 +2660,7 @@ function smartSimRounds(gameNum) {
       if (ef.id === 428 && !ef.ko) rxns++;  // Jasper FLAME DIVE! win-path
       if (ef.id === 430 && !ef.ko) rxns++;  // Gordok RIVER TERROR! win-path
       if (ef.id === 431 && !ef.ko) rxns++;  // Pal Al SQUALL! win-path
+      if (ef.id === 457 && !ef.ko && !(B.sophiaMask && B.sophiaMask[enemyKey])) rxns++;  // Sophia MASQUERADE! win-path (only if mask not yet claimed)
       if (ef.id === 432 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Valkin GRAND SPOILS! on KO
       if (hasSideline(enemyTeam, 415) && !ef.ko && active(B[teamKey]).ko) rxns++;  // Nyx & Bessie MOO! CAW!
       if (ef.id === 427 && !ef.ko && active(B[teamKey]).ko) rxns++;  // Garrick WATCHFIRE! KO fire
