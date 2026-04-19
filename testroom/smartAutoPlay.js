@@ -1571,18 +1571,18 @@ function smartSimRounds(gameNum) {
         if (hasSideline(B[oppKey], 33)) B[oppKey].resources.surge += 4; // DEPENDABLE! mirror
       }
     });
-    // Jimmy (352) Sideline & In Play: tie → +5 Lucky Stones + 1 Magic Firefly
-    // Sandwiches (33) DEPENDABLE! mirror: opponent also gains +5 Lucky Stones + 1 Magic Firefly if Sandwiches on their sideline
+    // Jimmy (352) Sideline & In Play: tie → +3 Lucky Stones + 1 Magic Firefly
+    // Sandwiches (33) DEPENDABLE! mirror: opponent also gains +3 Lucky Stones + 1 Magic Firefly if Sandwiches on their sideline
     ['red','blue'].forEach(teamKey => {
       const f = active(B[teamKey]);
       const hasJimmyActive = f.id === 352 && !f.ko;
       const hasJimmySideline = hasSideline(B[teamKey], 352);
       if (hasJimmyActive || hasJimmySideline) {
-        B[teamKey].resources.luckyStone += 5;
+        B[teamKey].resources.luckyStone += 3;
         B[teamKey].resources.firefly = (B[teamKey].resources.firefly || 0) + 1;
         const oppKey = teamKey === 'red' ? 'blue' : 'red';
         if (hasSideline(B[oppKey], 33)) {
-          B[oppKey].resources.luckyStone += 5;
+          B[oppKey].resources.luckyStone += 3;
           B[oppKey].resources.firefly = (B[oppKey].resources.firefly || 0) + 1;
         }
       }
@@ -2701,7 +2701,7 @@ function smartSimRounds(gameNum) {
     // KO-path named abilities (fire on ANY KO of the enemy's active ghost — not restricted to loserWasEnemy)
     if (hasSideline(enemyTeam, 310) && ef.ko) rxns++;   // Granny BEDTIME STORY! fires whenever enemy's active ghost is KO'd (lF.ko or wF.ko self-KO — matches index.html collectKC calls at lines 10122, 10136)
     // Tie-path named abilities (only on ties)
-    if (!winner && ((ef.id === 352 && !ef.ko) || hasSideline(enemyTeam, 352))) rxns++;  // Jimmy CHIRP! Sideline & In Play: tie → +5 Lucky Stones + 1 Magic Firefly
+    if (!winner && ((ef.id === 352 && !ef.ko) || hasSideline(enemyTeam, 352))) rxns++;  // Jimmy CHIRP! Sideline & In Play: tie → +3 Lucky Stones + 1 Magic Firefly
     if (!winner && hasSideline(enemyTeam, 303)) rxns++;  // Tweak and Twonk ROARING CROWD! sideline: tie → +4 Surge (no active-ghost ko guard in index.html line 8765 — sideline ability, no ef.ko needed)
     if (!winner && hasSideline(enemyTeam, 22) && !ef.ko) rxns++;  // Ancient One FRIEND TO ALL! sideline tie healer; !ef.ko matches index.html line 8939: `|| f.ko) return` guard on active ghost
     if (!winner && ef.id === 48 && !ef.ko) rxns++;        // Opa REST! tie-path: active tie → +1 HP; !ef.ko matches index.html line 8916: !f.ko guard (win-path guard was fixed in v646 — this is the separate tie-path entry)

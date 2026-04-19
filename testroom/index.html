@@ -2414,7 +2414,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v758';
+const TESTROOM_VERSION = 'v759';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2647,7 +2647,7 @@ const GHOSTS = [
   {id:346, name:"Harvest Moon", art:"art/harvest_moon.webp", rarity:"rare", maxHp:6, ability:"Reaping", abilityDesc:"Defeat a ghost: gain 1 of every resource (Healing Seed, Surge, Surge).", category:"Resource Generation", set:"Rolling Hills", designNote:"The harvest payoff."},
   {id:348, name:"Mulch", art:"art/mulch.webp", rarity:"common", maxHp:3, ability:"Decompose", abilityDesc:"When defeated: your team gains 2 Healing Seeds.", category:"Resource Generation", set:"Rolling Hills", designNote:"Death trigger resource gen."},
   {id:350, name:"Silo", art:"art/silo.webp", rarity:"uncommon", maxHp:6, ability:"Stockpile", abilityDesc:"Sideline: at end of each round, store 1 copy of any resource your team gained.", category:"Resource Generation", set:"Rolling Hills", designNote:"Resource doubler from sideline."},
-  {id:352, name:"Jimmy", art:"art/cricket.webp", rarity:"common", maxHp:2, ability:"Chirp", abilityDesc:"Sideline & In Play: on a tie, gain 5 Lucky Stones and 1 Magic Firefly.", category:"Resource Generation", set:"Rolling Hills", designNote:"Mutual benefit on ties. Fires from sideline AND in play. Nerfed 7→5 Lucky Stones, added 1 Magic Firefly."},
+  {id:352, name:"Jimmy", art:"art/cricket.webp", rarity:"common", maxHp:2, ability:"Chirp", abilityDesc:"Sideline & In Play: on a tie, gain 3 Lucky Stones and 1 Magic Firefly.", category:"Resource Generation", set:"Rolling Hills", designNote:"Mutual benefit on ties. Fires from sideline AND in play. Nerfed 7→5 Lucky Stones, added 1 Magic Firefly."},
   {id:354, name:"Patches", art:"art/patches.webp", rarity:"uncommon", maxHp:5, ability:"Quilt", abilityDesc:"Spend 2 Healing Seeds: negate all damage this round.", category:"Defense/Negation", set:"Rolling Hills", designNote:"Resource-powered shield."},
   {id:356, name:"Riverbed", art:"art/riverbed.webp", rarity:"rare", maxHp:7, ability:"Current", abilityDesc:"Sideline: if opponent rolls doubles, force them to reroll one die.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Anti-doubles from sideline."},
   {id:358, name:"Tadpole", art:"art/tadpole.webp", rarity:"common", maxHp:5, ability:"Splash", abilityDesc:"Entry: gain 1 Surge.", category:"Resource Generation", set:"Rolling Hills", designNote:"Simple entry resource gen."},
@@ -12225,7 +12225,7 @@ function _resolveRoundImpl() {
       }
     });
 
-    // Jimmy (352) — Sideline & In Play: tie → gain 5 Lucky Stones + 1 Magic Firefly
+    // Jimmy (352) — Sideline & In Play: tie → gain 3 Lucky Stones + 1 Magic Firefly
     [B.red, B.blue].forEach(team => {
       const f = active(team);
       const tNameJim = team === B.red ? 'red' : 'blue';
@@ -12234,18 +12234,18 @@ function _resolveRoundImpl() {
       if (hasJimmyActive || hasJimmySideline) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
         const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
-        const lsTotal = team.resources.luckyStone + 5;
+        const lsTotal = team.resources.luckyStone + 3;
         const ffTotal = (team.resources.firefly || 0) + 1;
         const jimmyGhost = hasJimmyActive ? f : team.ghosts.find(g => g.id === 352);
-        queueAbility('CHIRP!', 'var(--common)', `${jimmyGhost.name} — Tie! +5 Lucky Stones + 1 Magic Firefly! (${lsTotal} LS, ${ffTotal} FF)`, () => {
-          team.resources.luckyStone += 5;
+        queueAbility('CHIRP!', 'var(--common)', `${jimmyGhost.name} — Tie! +3 Lucky Stones + 1 Magic Firefly! (${lsTotal} LS, ${ffTotal} FF)`, () => {
+          team.resources.luckyStone += 3;
           team.resources.firefly = (team.resources.firefly || 0) + 1;
-          log(`<span class="log-ability">${jimmyGhost.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span> + <span class="log-ms">1 Magic Firefly</span>!`);
+          log(`<span class="log-ability">${jimmyGhost.name}</span> — Chirp! Tie → gained <span class="log-ms">3 Lucky Stones</span> + <span class="log-ms">1 Magic Firefly</span>!`);
           renderBattle();
         }, tNameJim);
         checkKnightEffects(tNameJim, jimmyGhost.name);
         if (sandwichMirrorsJim) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +5 Lucky Stones + 1 Magic Firefly!`, () => { oppTeamJim.resources.luckyStone += 5; oppTeamJim.resources.firefly = (oppTeamJim.resources.firefly || 0) + 1; renderBattle(); }, tNameJim === 'red' ? 'blue' : 'red');
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +3 Lucky Stones + 1 Magic Firefly!`, () => { oppTeamJim.resources.luckyStone += 3; oppTeamJim.resources.firefly = (oppTeamJim.resources.firefly || 0) + 1; renderBattle(); }, tNameJim === 'red' ? 'blue' : 'red');
         }
       }
     });
