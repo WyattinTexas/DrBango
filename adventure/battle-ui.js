@@ -346,61 +346,20 @@ function renderBattleScreen(bs) {
       ">ROUND ${bs.round}</div>`
     : '';
 
-  // ── ENEMY SIDE ──
+  // ── ENEMY SIDE — clean, no box borders ──
   document.getElementById('b-enemy').innerHTML = `
-    <div class="battle-side enemy-side" style="
-      background:linear-gradient(180deg,rgba(233,69,96,.04),rgba(255,255,255,.02));
-      border:1px solid rgba(233,69,96,.2);
-      border-radius:16px;
-      padding:16px 20px;
-      position:relative;
-      box-shadow:inset 0 0 40px rgba(233,69,96,.03);
-    ">
-      <div class="side-label" style="
-        font:700 10px 'Press Start 2P',monospace;
-        letter-spacing:3px;
-        color:#e94560;
-        margin-bottom:10px;
-        display:flex;align-items:center;gap:8px;
-      ">
-        <span style="display:inline-block;width:20px;height:2px;background:#e94560;opacity:.4"></span>
-        ${bs.isBoss ? '💀 BOSS' : 'ENEMY'}
-        <span style="display:inline-block;width:20px;height:2px;background:#e94560;opacity:.4"></span>
-      </div>
+    <div class="battle-side">
+      ${roundBadge}
       ${renderCard(eGhost, { size: 'normal', active: true, team: 'enemy' })}
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${renderResources(bs.enemyTeam.resources)}</div>
-      ${eSideline.length ? `
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          ${eSideline.map(g => renderCard(g, { size: 'mini', team: 'enemy' })).join('')}
-        </div>` : ''}
     </div>
   `;
 
-  // ── PLAYER SIDE ──
+  // ── PLAYER SIDE — clean, no box borders ──
   document.getElementById('b-player').innerHTML = `
-    <div class="battle-side player-side" style="
-      background:linear-gradient(0deg,rgba(46,204,113,.04),rgba(255,255,255,.02));
-      border:1px solid rgba(46,204,113,.2);
-      border-radius:16px;
-      padding:16px 20px;
-      position:relative;
-      box-shadow:inset 0 0 40px rgba(46,204,113,.03);
-    ">
-      <div class="side-label" style="
-        font:700 10px 'Press Start 2P',monospace;
-        letter-spacing:3px;
-        color:#2ecc71;
-        margin-bottom:10px;
-        display:flex;align-items:center;gap:8px;
-      ">
-        <span style="display:inline-block;width:20px;height:2px;background:#2ecc71;opacity:.4"></span>
-        ${summonerData && summonerData.name ? summonerData.name.toUpperCase() : 'YOUR TEAM'}
-        <span style="display:inline-block;width:20px;height:2px;background:#2ecc71;opacity:.4"></span>
-      </div>
+    <div class="battle-side">
       ${renderCard(pGhost, { size: 'normal', active: true, team: 'player' })}
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${renderResources(bs.playerTeam.resources)}</div>
-      ${pSideline.length ? `
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      ${pSideline.length > 0 ? `
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center">
           ${pSideline.map(g => renderCard(g, { size: 'mini', team: 'player' })).join('')}
         </div>` : ''}
     </div>
