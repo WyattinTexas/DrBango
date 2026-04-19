@@ -38,12 +38,14 @@ function renderCard(ghost, options = {}) {
   const clickable = options.onClick;
 
   if (size === 'mini') {
-    // Sideline thumbnail (44x44)
-    return `<div class="card-mini ${isKo?'ko':''}" ${clickable?`onclick="${clickable}"`:''} title="${ghost.name} ${ghost.hp}/${ghost.maxHp} HP\n${ghost.ability}: ${ghost.abilityDesc}">
+    return `<div class="card-mini ${isKo?'ko':''}" ${clickable?`onclick="${clickable}"`:''}>
       ${art?`<img src="${art}" onerror="this.style.display='none'">`:
         `<div class="card-mini-placeholder">${ghost.name[0]}</div>`}
-      <div class="mini-hp-bar"><div class="mini-hp-fill ${hpClass(ghost.hp,ghost.maxHp)}" style="width:${Math.max(0,ghost.hp/ghost.maxHp*100)}%"></div></div>
-      <div class="mini-name">${ghost.name}</div>
+      <div class="mini-info">
+        <div class="mini-name">${ghost.name}</div>
+        <div class="mini-ability">${ghost.ability || ''}</div>
+        <div class="mini-hp" style="color:${hpClass(ghost.hp,ghost.maxHp)==='critical'?'#e94560':hpClass(ghost.hp,ghost.maxHp)==='warning'?'#f39c12':'#50c040'}">${ghost.hp}/${ghost.maxHp} HP</div>
+      </div>
     </div>`;
   }
 
