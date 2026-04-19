@@ -5286,24 +5286,27 @@ async function checkDailyCompletionPack() {
 const CUSTOM_PACKS = [
   {
     match: (name) => name.toLowerCase().includes('ej') && name.toLowerCase().includes('brieva'),
-    ids: [424, 336, 111], // Bigsby + Humar (legendary) + Shade (legendary)
+    ids: [456, 424, 336, 111], // Ryder + Bigsby + Humar (legendary) + Shade (legendary)
     label: 'EJ\'s Pack'
   },
   {
     match: (name) => name.toLowerCase().includes('julian') && name.toLowerCase().includes('barba'),
-    ids: [450, 113], // Welder (rare) + Prince Balatron (legendary)
+    ids: [456, 450, 113], // Ryder + Welder (rare) + Prince Balatron (legendary)
     label: 'Julian\'s Pack'
   },
   {
     match: (name) => name.toLowerCase().includes('skylar'),
-    ids: [450, 452, 210], // Welder (rare), Ripagoo (uncommon) + Timber (legendary)
+    ids: [456, 450, 452, 210], // Ryder + Welder (rare), Ripagoo (uncommon) + Timber (legendary)
     label: 'Skylar\'s Pack'
   }
 ];
 
 function buildRandomPack() {
-  const rarityOrder = ['uncommon', 'rare', 'rare', 'rare', 'ghost-rare', 'legendary'];
+  const rarityOrder = ['uncommon', 'rare', 'rare', 'ghost-rare', 'legendary'];
   const pack = [];
+  // Guaranteed Ryder (456) in every pack
+  const ryder = getGhost(456);
+  if (ryder) pack.push(ryder);
   for (const rarity of rarityOrder) {
     const pool = getGhostsByRarity(rarity);
     if (pool.length === 0) continue;
@@ -5329,7 +5332,7 @@ function getCustomPackForUser(displayName) {
 
 async function checkSpecialPack() {
   if (!currentUser || !userProfile) return;
-  if (userProfile.receivedSpecialPackV2) return;
+  if (userProfile.receivedSpecialPackV3) return;
   // Only for existing players who already have some cards
   if (!userProfile.collection || userProfile.collection.length === 0) return;
 
@@ -5361,11 +5364,11 @@ async function checkSpecialPack() {
 
   await db.ref(`mp/users/${currentUser.uid}`).update({
     collection: updatedCollection,
-    receivedSpecialPackV2: true
+    receivedSpecialPackV3: true
   });
 
   userProfile.collection = updatedCollection;
-  userProfile.receivedSpecialPackV2 = true;
+  userProfile.receivedSpecialPackV3 = true;
 
   // Show the cards with cinematic staggered reveal
   showRewardCardsStaggered(packCards, packTitle, () => {
