@@ -1,0 +1,2500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spirit War</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SPIRIT WAR — Strategy Board Game
+   ============================================================ */
+:root {
+  --bg: #0a0612;
+  --bg-warm: #14101e;
+  --surface: #14101c;
+  --surface2: #1c1828;
+  --surface3: #25202e;
+  --border: #2a2230;
+  --text: #f4ecd8;
+  --text2: #a09686;
+  --text-dim: #6a6056;
+  --gold: #d4a040;
+  --gold-bright: #f0c560;
+  --accent: #e94560;
+  --red: #e94560;
+  --blue: #4B9CD3;
+  --red-deep: #4a0e1a;
+  --blue-deep: #0a3050;
+  --common: #8b95a5;
+  --uncommon: #2ecc71;
+  --rare: #3498db;
+  --ghost-rare: #9b59b6;
+  --legendary: #f39c12;
+  --hp-green: #27ae60;
+  --hp-yellow: #f1c40f;
+  --hp-red: #e74c3c;
+  --fire-color: #ff6348;
+  --ice-color: #7ee8fa;
+  --surge-color: #f0c560;
+  --seed-color: #2ecc71;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ---- ATMOSPHERE ---- */
+.atmosphere {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(212,160,64,0.08), transparent 60%),
+    radial-gradient(ellipse 50% 60% at 18% 50%, rgba(233,69,96,0.08), transparent 60%),
+    radial-gradient(ellipse 50% 60% at 82% 50%, rgba(76,201,240,0.08), transparent 60%),
+    linear-gradient(180deg, #0e0820 0%, #14101e 35%, #0a0612 100%);
+}
+
+/* ---- TYPOGRAPHY ---- */
+h1, h2, h3 { font-family: 'Cinzel', serif; }
+.title {
+  text-align: center; padding: 24px 0 8px;
+  font-size: 2.4rem; font-weight: 900;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold), #8a6b20);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: none; letter-spacing: 2px;
+}
+.subtitle { text-align:center; color:var(--text2); font-size:0.9rem; margin-bottom:16px; }
+
+/* ---- BUTTONS ---- */
+.btn {
+  font-family: 'Cinzel', serif; font-weight: 700;
+  padding: 10px 24px; border: 2px solid var(--gold);
+  background: linear-gradient(135deg, rgba(212,160,64,0.15), rgba(212,160,64,0.05));
+  color: var(--gold-bright); border-radius: 8px; cursor: pointer;
+  transition: all 0.2s; font-size: 0.95rem; letter-spacing: 1px;
+}
+.btn:hover { background: linear-gradient(135deg, rgba(212,160,64,0.3), rgba(212,160,64,0.1)); transform: translateY(-1px); }
+.btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+.btn.red { border-color: var(--red); color: var(--red); }
+.btn.blue { border-color: var(--blue); color: var(--blue); }
+.btn.confirm {
+  background: linear-gradient(135deg, rgba(46,204,113,0.3), rgba(46,204,113,0.1));
+  border-color: #2ecc71; color: #2ecc71;
+}
+
+/* ============================================================
+   PHASE: DRAFT
+   ============================================================ */
+#draft-phase { display:none; max-width:1200px; margin:0 auto; padding:0 16px 32px; }
+.draft-header { text-align:center; margin-bottom:16px; }
+.draft-header h2 { font-size:1.4rem; color:var(--gold); }
+.draft-info { color:var(--text2); font-size:0.85rem; margin-top:4px; }
+
+.draft-pool {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px; margin-bottom: 24px;
+}
+.draft-card {
+  position: relative; border: 2px solid var(--border); border-radius: 8px;
+  background: var(--surface2); overflow: hidden; cursor: pointer;
+  transition: all 0.2s; aspect-ratio: 3/4;
+}
+.draft-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+.draft-card.picked-red { border-color: var(--red); opacity: 0.5; pointer-events: none; }
+.draft-card.picked-blue { border-color: var(--blue); opacity: 0.5; pointer-events: none; }
+.draft-card.selected { border-color: var(--gold-bright); box-shadow: 0 0 12px rgba(212,160,64,0.4); }
+.draft-card img { width:100%; height:70%; object-fit:cover; }
+.draft-card .card-name {
+  padding: 4px 6px; font-size: 0.7rem; font-weight: 700;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.draft-card .card-hp {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,0.7); color: var(--hp-green);
+  font-size: 0.65rem; font-weight: 800; padding: 2px 5px; border-radius: 4px;
+}
+.draft-card .card-rarity {
+  position: absolute; top: 4px; left: 4px;
+  width: 8px; height: 8px; border-radius: 50%;
+}
+
+.draft-bench {
+  display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;
+}
+.bench-section { min-width: 280px; flex: 1; max-width: 500px; }
+.bench-section h3 {
+  font-size: 1rem; margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 2px solid;
+}
+.bench-section.red h3 { color: var(--red); border-color: var(--red); }
+.bench-section.blue h3 { color: var(--blue); border-color: var(--blue); }
+.bench-slots { display: flex; gap: 6px; flex-wrap: wrap; min-height: 50px; }
+.bench-slot {
+  width: 56px; height: 56px; border: 2px dashed var(--border);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; color: var(--text-dim); position: relative; overflow: hidden;
+}
+.bench-slot.filled { border-style: solid; }
+.bench-slot.filled.red { border-color: var(--red); }
+.bench-slot.filled.blue { border-color: var(--blue); }
+.bench-slot img { width:100%; height:100%; object-fit:cover; border-radius:6px; }
+.bench-slot .remove-btn {
+  position: absolute; top: -2px; right: -2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(0,0,0,0.8); color: var(--accent);
+  font-size: 0.6rem; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Card detail tooltip */
+.card-tooltip {
+  display: none; position: fixed; z-index: 100;
+  background: var(--surface); border: 2px solid var(--gold);
+  border-radius: 12px; padding: 16px; width: 280px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.card-tooltip.active { display: block; }
+.card-tooltip .tt-name { font-family:'Cinzel',serif; font-size:1.1rem; font-weight:700; color:var(--gold-bright); }
+.card-tooltip .tt-stats { color:var(--text2); font-size:0.8rem; margin:4px 0; }
+.card-tooltip .tt-ability { font-weight:700; color:var(--text); margin-top:6px; }
+.card-tooltip .tt-desc { color:var(--text2); font-size:0.8rem; margin-top:2px; }
+
+/* ============================================================
+   PHASE: MAP (Order + Reveal + Battle)
+   ============================================================ */
+#map-phase { display:none; }
+.map-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr 200px;
+  gap: 0; min-height: 100vh;
+}
+
+/* Side panels */
+.side-panel {
+  padding: 12px; background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto; max-height: 100vh;
+}
+.side-panel.right { border-right: none; border-left: 1px solid var(--border); }
+.side-panel h3 {
+  font-size: 0.85rem; margin-bottom: 8px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.panel-ghost {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px; margin-bottom: 4px; border-radius: 6px;
+  cursor: pointer; transition: background 0.15s;
+  font-size: 0.75rem;
+}
+.panel-ghost:hover { background: var(--surface3); }
+.panel-ghost.deployed { opacity: 0.5; }
+.panel-ghost.ko { opacity: 0.3; text-decoration: line-through; }
+.panel-ghost.selected { background: rgba(212,160,64,0.15); border: 1px solid var(--gold); }
+.panel-ghost img { width:32px; height:32px; border-radius:6px; object-fit:cover; }
+.panel-ghost .pg-name { font-weight:600; }
+.panel-ghost .pg-hp { color:var(--hp-green); font-size:0.7rem; }
+.panel-ghost .pg-hp.hurt { color: var(--hp-yellow); }
+.panel-ghost .pg-hp.critical { color: var(--hp-red); }
+
+/* Hex map */
+.hex-container {
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; overflow: auto;
+}
+.hex-map { position: relative; }
+
+.hex-tile {
+  position: absolute; width: 90px; height: 104px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: var(--surface2); cursor: pointer;
+  transition: all 0.3s; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+}
+.hex-tile::before {
+  content: ''; position: absolute; inset: 2px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: var(--surface); z-index: -1;
+}
+.hex-tile:hover { transform: scale(1.08); z-index: 10; }
+.hex-tile.red-controlled { background: linear-gradient(135deg, var(--red), #8b1a2e); }
+.hex-tile.blue-controlled { background: linear-gradient(135deg, var(--blue), #1a5a8b); }
+.hex-tile.contested { background: linear-gradient(135deg, var(--red), var(--blue)); animation: contested-pulse 2s infinite; }
+.hex-tile.selected-hex { box-shadow: 0 0 20px rgba(212,160,64,0.6); transform: scale(1.1); z-index: 10; }
+.hex-tile.captured-flash { animation: capture-flash 1s ease-out; }
+.hex-tile.valid-target { box-shadow: 0 0 12px rgba(46,204,113,0.5); }
+
+@keyframes contested-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+@keyframes capture-flash {
+  0% { filter: brightness(2.5); transform: scale(1.15); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+.hex-tile .hex-name {
+  font-family: 'Cinzel', serif; font-size: 0.6rem; font-weight: 700;
+  color: var(--text); margin-top: 8px; line-height: 1.1;
+}
+.hex-tile .hex-resource {
+  font-size: 0.55rem; color: var(--text2); margin-top: 2px;
+}
+.hex-tile .hex-icon { font-size: 1.2rem; margin-top: 4px; }
+.hex-tile .hex-garrison {
+  position: absolute; bottom: 8px;
+  display: flex; gap: 2px;
+}
+.hex-tile .garrison-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.garrison-dot.red { background: var(--red); }
+.garrison-dot.blue { background: var(--blue); }
+
+/* Order marker */
+.order-marker {
+  position: absolute; top: 6px; right: 6px;
+  width: 14px; height: 14px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5rem; font-weight: 900; color: #fff;
+  z-index: 5;
+}
+.order-marker.attack { background: var(--accent); }
+.order-marker.defend { background: var(--blue); }
+.order-marker.recruit { background: var(--uncommon); }
+
+/* ---- HUD ---- */
+.hud {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, var(--surface), var(--surface2));
+  border-top: 2px solid var(--gold);
+  padding: 12px 20px; display: flex; align-items: center;
+  justify-content: space-between; z-index: 50;
+}
+.hud-left, .hud-right { display:flex; align-items:center; gap:12px; }
+.hud-center { text-align:center; }
+.hud .turn-label {
+  font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700;
+  color: var(--gold-bright);
+}
+.hud .phase-label { color: var(--text2); font-size: 0.8rem; }
+.resource-bar { display:flex; gap:10px; font-size:0.8rem; }
+.resource-bar .res {
+  display:flex; align-items:center; gap:3px;
+  padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.05);
+}
+.deploy-counter {
+  font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 700;
+  color: var(--gold); margin-top: 2px;
+}
+
+/* ============================================================
+   BATTLE OVERLAY
+   ============================================================ */
+#battle-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.92);
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#battle-overlay.active { display: flex; }
+
+.battle-arena {
+  width: 720px; max-width: 95vw;
+  background: var(--surface); border: 2px solid var(--gold);
+  border-radius: 16px; padding: 24px; position: relative;
+  overflow: hidden;
+}
+.battle-arena .territory-name {
+  text-align: center; font-family: 'Cinzel', serif;
+  font-size: 1.3rem; color: var(--gold); margin-bottom: 16px;
+  text-shadow: 0 0 20px rgba(212,160,64,0.3);
+}
+.fighters {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px;
+}
+.fighter {
+  width: 220px; text-align: center;
+}
+.fighter img {
+  width: 110px; height: 110px; border-radius: 12px;
+  object-fit: cover; border: 3px solid var(--border);
+  transition: all 0.3s;
+}
+.fighter.red-fighter img { border-color: var(--red); }
+.fighter.blue-fighter img { border-color: var(--blue); }
+.fighter .f-name { font-family:'Cinzel',serif; font-weight:700; font-size:1rem; margin-top:6px; }
+.fighter .f-ability { color:var(--text2); font-size:0.7rem; margin-top:2px; min-height: 2em; }
+.fighter .hp-bar {
+  width: 85%; margin: 6px auto 0; height: 10px;
+  background: var(--surface3); border-radius: 5px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.fighter .hp-fill { height:100%; border-radius:4px; transition: width 0.4s; }
+.fighter .hp-text { font-size:0.75rem; color:var(--text2); margin-top:3px; font-weight:600; }
+.fighter.damage-flash img { animation: dmg-flash 0.4s ease-out; }
+@keyframes dmg-flash {
+  0%, 100% { filter: brightness(1); }
+  30% { filter: brightness(0.3) sepia(1) hue-rotate(-30deg) saturate(5); }
+}
+
+.vs-badge {
+  font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 900;
+  color: var(--gold); text-shadow: 0 0 20px rgba(212,160,64,0.5);
+}
+
+/* Resource commit area */
+.resource-commit-area {
+  display: flex; justify-content: center; gap: 12px; margin-bottom: 12px;
+  padding: 8px; background: rgba(255,255,255,0.03); border-radius: 8px;
+  border: 1px solid var(--border); min-height: 42px; align-items: center;
+}
+.res-commit-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  border: 2px solid var(--border); background: var(--surface2);
+  color: var(--text); font-size: 0.8rem; font-weight: 600;
+  transition: all 0.2s;
+}
+.res-commit-btn:hover { border-color: var(--gold); background: rgba(212,160,64,0.1); }
+.res-commit-btn.committed { border-color: var(--gold-bright); background: rgba(212,160,64,0.2); box-shadow: 0 0 8px rgba(212,160,64,0.3); }
+.res-commit-btn .res-count { color: var(--text2); font-size: 0.7rem; }
+.res-commit-label { color: var(--text-dim); font-size: 0.75rem; font-style: italic; }
+
+.dice-area {
+  display: flex; justify-content: space-between; gap: 20px; margin-bottom: 16px;
+}
+.dice-group { flex:1; text-align:center; }
+.dice-group .dice-label { font-size:0.75rem; color:var(--text2); margin-bottom:4px; }
+.dice-display {
+  display: flex; gap: 6px; justify-content: center; min-height: 40px;
+  align-items: center;
+}
+.die {
+  width: 38px; height: 38px; background: var(--surface3);
+  border: 2px solid var(--border); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; font-weight: 900; color: var(--text);
+  transition: all 0.3s;
+}
+.die.rolling { animation: die-spin 0.1s infinite; }
+@keyframes die-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(0.85); }
+  50% { transform: rotate(180deg) scale(0.75); }
+  75% { transform: rotate(270deg) scale(0.85); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.die.red-die { border-color: var(--red); color: var(--red); }
+.die.blue-die { border-color: var(--blue); color: var(--blue); }
+.die.match-die { box-shadow: 0 0 10px currentColor; transform: scale(1.1); }
+
+.roll-label {
+  font-size: 0.8rem; color: var(--text2); margin-top: 4px;
+  font-weight: 600; min-height: 1.2em;
+}
+.roll-label.singles { color: var(--text2); }
+.roll-label.doubles { color: var(--uncommon); }
+.roll-label.triples { color: var(--rare); font-weight: 800; }
+.roll-label.quads { color: var(--legendary); font-weight: 900; text-shadow: 0 0 8px var(--legendary); }
+.roll-label.penta { color: var(--gold-bright); font-weight: 900; text-shadow: 0 0 12px var(--gold-bright); animation: penta-glow 0.5s infinite; }
+@keyframes penta-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.battle-log {
+  max-height: 140px; overflow-y: auto; padding: 10px;
+  background: var(--surface2); border-radius: 8px;
+  font-size: 0.8rem; color: var(--text2);
+  border: 1px solid var(--border);
+}
+.battle-log p { margin-bottom: 3px; line-height: 1.4; }
+.battle-log .log-dmg { color: var(--accent); font-weight: 600; }
+.battle-log .log-heal { color: var(--hp-green); font-weight: 600; }
+.battle-log .log-res { color: var(--gold); }
+.battle-log .log-ability { color: var(--ghost-rare); font-weight: 600; }
+.battle-log .log-ko { color: var(--accent); font-weight: 900; font-size: 0.9rem; }
+.battle-log .log-entry { color: var(--ice-color); font-weight: 600; }
+.battle-log .log-round { color: var(--gold); font-family: 'Cinzel', serif; font-weight: 700; margin-top: 6px; }
+
+.battle-result {
+  text-align: center; margin-top: 12px;
+  font-family: 'Cinzel', serif; font-size: 1.4rem; font-weight: 700;
+}
+.battle-controls { text-align:center; margin-top:12px; display:flex; gap:10px; justify-content:center; }
+
+/* KO overlay effect */
+.ko-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.7); z-index: 10; animation: ko-fade-in 0.5s;
+  flex-direction: column;
+}
+@keyframes ko-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.ko-text {
+  font-family: 'Cinzel', serif; font-size: 3rem; font-weight: 900;
+  color: var(--accent); text-shadow: 0 0 40px rgba(233,69,96,0.8);
+  animation: ko-slam 0.5s ease-out;
+}
+@keyframes ko-slam {
+  0% { transform: scale(3); opacity: 0; }
+  60% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.ko-name {
+  font-family: 'Cinzel', serif; font-size: 1rem; color: var(--text2);
+  margin-top: 8px;
+}
+
+/* Screen shake for big hits */
+.screen-shake { animation: shake 0.4s ease-out; }
+@keyframes shake {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-4px, 2px); }
+  20% { transform: translate(4px, -2px); }
+  30% { transform: translate(-3px, 3px); }
+  40% { transform: translate(3px, -1px); }
+  50% { transform: translate(-2px, 1px); }
+  60% { transform: translate(2px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+}
+.big-shake { animation: big-shake 0.6s ease-out; }
+@keyframes big-shake {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-8px, 4px); }
+  20% { transform: translate(8px, -4px); }
+  30% { transform: translate(-6px, 6px); }
+  40% { transform: translate(6px, -3px); }
+  50% { transform: translate(-4px, 2px); }
+}
+
+/* Gold flash for quads+ */
+.gold-flash::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle, rgba(240,197,96,0.3), transparent 70%);
+  animation: gold-pulse 0.8s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes gold-pulse {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   TURN SUMMARY OVERLAY
+   ============================================================ */
+#turn-summary {
+  display: none; position: fixed; inset: 0; z-index: 180;
+  background: rgba(0,0,0,0.85);
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#turn-summary.active { display: flex; }
+.summary-content {
+  background: var(--surface); border: 2px solid var(--gold);
+  border-radius: 16px; padding: 32px; width: 500px; max-width: 90vw;
+  text-align: center;
+}
+.summary-content h2 {
+  font-size: 1.5rem; color: var(--gold); margin-bottom: 16px;
+}
+.summary-list { text-align: left; margin: 12px 0; }
+.summary-list p { margin: 4px 0; font-size: 0.85rem; color: var(--text2); }
+.summary-list .s-gain { color: var(--hp-green); }
+.summary-list .s-loss { color: var(--accent); }
+.summary-list .s-territory { color: var(--gold); font-weight: 600; }
+
+/* ============================================================
+   VICTORY SCREEN
+   ============================================================ */
+#victory-screen {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.95);
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#victory-screen.active { display: flex; }
+.victory-content {
+  text-align: center; max-width: 600px;
+}
+.victory-content h1 {
+  font-size: 3rem; margin-bottom: 12px;
+}
+.victory-content .victory-sub { color: var(--text2); font-size: 1.1rem; margin-bottom: 24px; }
+.victory-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin: 20px 0; text-align: left;
+}
+.victory-stat {
+  background: var(--surface2); border-radius: 8px; padding: 12px;
+  border: 1px solid var(--border);
+}
+.victory-stat .stat-label { color: var(--text2); font-size: 0.8rem; }
+.victory-stat .stat-value { font-family: 'Cinzel', serif; font-size: 1.5rem; font-weight: 700; color: var(--gold); }
+.victory-score {
+  font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 900;
+  color: var(--gold-bright); margin: 16px 0;
+  text-shadow: 0 0 20px rgba(212,160,64,0.5);
+}
+
+/* ============================================================
+   START SCREEN
+   ============================================================ */
+#start-screen {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; text-align: center;
+  padding: 20px;
+}
+.start-logo {
+  font-family: 'Cinzel', serif; font-size: 4rem; font-weight: 900;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold), #8a6b20);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 8px; letter-spacing: 4px;
+}
+.start-tagline { color: var(--text2); font-size: 1.1rem; margin-bottom: 32px; }
+.start-options { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 800px) {
+  .map-layout { grid-template-columns: 1fr; }
+  .side-panel { display: none; }
+  .hex-tile { width: 70px; height: 81px; }
+  .hex-tile .hex-name { font-size: 0.5rem; }
+  .battle-arena { padding: 16px; }
+  .fighter img { width: 70px; height: 70px; }
+}
+</style>
+</head>
+<body>
+<div class="atmosphere"></div>
+
+<!-- ============================================================
+     START SCREEN
+     ============================================================ -->
+<div id="start-screen">
+  <div class="start-logo">Spirit War</div>
+  <div class="start-tagline">Command your Spiritkin. Conquer the map. Win the war.</div>
+  <div class="start-options">
+    <button class="btn" onclick="startGame()">New Game</button>
+  </div>
+  <div style="margin-top:24px; color:var(--text-dim); font-size:0.8rem; max-width:500px;">
+    Draft 8 Spiritkin, deploy them across territories, and battle for control.<br>
+    Permadeath is real — KO'd ghosts are gone forever.<br>
+    First to hold 10 territories wins the war.
+  </div>
+</div>
+
+<!-- ============================================================
+     DRAFT PHASE
+     ============================================================ -->
+<div id="draft-phase">
+  <h1 class="title">Spirit War</h1>
+  <div class="draft-header">
+    <h2 id="draft-turn-label">Red Team — Pick a Spiritkin</h2>
+    <div class="draft-info" id="draft-info">Snake draft: Red picks 1, Blue picks 2, Red picks 2... (8 each)</div>
+  </div>
+  <div class="draft-bench">
+    <div class="bench-section red">
+      <h3>Red Warband <span id="red-count">0/8</span></h3>
+      <div class="bench-slots" id="red-bench"></div>
+    </div>
+    <div class="bench-section blue">
+      <h3>Blue Warband <span id="blue-count">0/8</span></h3>
+      <div class="bench-slots" id="blue-bench"></div>
+    </div>
+  </div>
+  <div style="text-align:center; margin-bottom:16px;">
+    <button class="btn" id="auto-draft-btn" onclick="autoDraft()">Auto-Draft</button>
+  </div>
+  <div class="draft-pool" id="draft-pool"></div>
+</div>
+
+<!-- ============================================================
+     MAP PHASE
+     ============================================================ -->
+<div id="map-phase">
+  <div class="map-layout">
+    <!-- Red warband panel -->
+    <div class="side-panel" id="red-panel">
+      <h3 style="color:var(--red)">Red Warband</h3>
+      <div id="red-warband-list"></div>
+      <div style="margin-top:12px;">
+        <h3 style="color:var(--gold)">Resources</h3>
+        <div id="red-resources" class="resource-bar" style="flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
+    <!-- Hex map -->
+    <div class="hex-container">
+      <div class="hex-map" id="hex-map"></div>
+    </div>
+
+    <!-- Blue warband panel -->
+    <div class="side-panel right" id="blue-panel">
+      <h3 style="color:var(--blue)">Blue Warband</h3>
+      <div id="blue-warband-list"></div>
+      <div style="margin-top:12px;">
+        <h3 style="color:var(--gold)">Resources</h3>
+        <div id="blue-resources" class="resource-bar" style="flex-wrap:wrap;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-left">
+      <div>
+        <span style="color:var(--red); font-weight:700;">Red: <span id="hud-red-territories">3</span></span>
+        <div id="hud-red-res" class="resource-bar" style="font-size:0.7rem; margin-top:2px;"></div>
+      </div>
+    </div>
+    <div class="hud-center">
+      <div class="turn-label" id="hud-turn">Turn 1</div>
+      <div class="phase-label" id="hud-phase">Order Phase — Red, deploy your Spiritkin</div>
+      <div class="deploy-counter" id="hud-deploy-counter"></div>
+    </div>
+    <div class="hud-right">
+      <div>
+        <span style="color:var(--blue); font-weight:700;">Blue: <span id="hud-blue-territories">3</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     BATTLE OVERLAY
+     ============================================================ -->
+<div id="battle-overlay">
+  <div class="battle-arena" id="battle-arena">
+    <div class="territory-name" id="battle-territory-name">The Ember Fields</div>
+    <div class="fighters">
+      <div class="fighter red-fighter" id="red-fighter">
+        <img id="battle-red-img" src="" alt="Red fighter">
+        <div class="f-name" id="battle-red-name">--</div>
+        <div class="f-ability" id="battle-red-ability"></div>
+        <div class="hp-bar"><div class="hp-fill" id="battle-red-hp-fill" style="width:100%;background:var(--hp-green);"></div></div>
+        <div class="hp-text" id="battle-red-hp-text">7/7</div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="fighter blue-fighter" id="blue-fighter">
+        <img id="battle-blue-img" src="" alt="Blue fighter">
+        <div class="f-name" id="battle-blue-name">--</div>
+        <div class="f-ability" id="battle-blue-ability"></div>
+        <div class="hp-bar"><div class="hp-fill" id="battle-blue-hp-fill" style="width:100%;background:var(--hp-green);"></div></div>
+        <div class="hp-text" id="battle-blue-hp-text">7/7</div>
+      </div>
+    </div>
+    <div class="resource-commit-area" id="resource-commit-area">
+      <span class="res-commit-label">No resources to commit</span>
+    </div>
+    <div class="dice-area">
+      <div class="dice-group">
+        <div class="dice-label" style="color:var(--red)">Red</div>
+        <div class="dice-display" id="battle-red-dice"></div>
+        <div class="roll-label" id="battle-red-roll-label"></div>
+      </div>
+      <div class="dice-group">
+        <div class="dice-label" style="color:var(--blue)">Blue</div>
+        <div class="dice-display" id="battle-blue-dice"></div>
+        <div class="roll-label" id="battle-blue-roll-label"></div>
+      </div>
+    </div>
+    <div class="battle-log" id="battle-log"></div>
+    <div class="battle-result" id="battle-result"></div>
+    <div class="battle-controls" id="battle-controls">
+      <button class="btn" id="battle-roll-btn" onclick="battleRoll()">Roll Dice</button>
+      <button class="btn" id="battle-skip-btn" onclick="battleAutoFinish()" style="font-size:0.8rem; padding:8px 16px;">Auto-Finish</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TURN SUMMARY
+     ============================================================ -->
+<div id="turn-summary">
+  <div class="summary-content">
+    <h2 id="summary-title">Turn 1 Summary</h2>
+    <div class="summary-list" id="summary-list"></div>
+    <button class="btn confirm" onclick="closeSummary()" style="margin-top:16px;">Next Turn</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     VICTORY SCREEN
+     ============================================================ -->
+<div id="victory-screen">
+  <div class="victory-content">
+    <h1 id="victory-title" style="color:var(--gold-bright)">Victory!</h1>
+    <div class="victory-sub" id="victory-sub">Red conquers the Spirit Realm!</div>
+    <div class="victory-stats" id="victory-stats"></div>
+    <div class="victory-score" id="victory-score"></div>
+    <button class="btn" onclick="location.reload()" style="margin-top:16px;">Play Again</button>
+  </div>
+</div>
+
+<!-- Card tooltip -->
+<div class="card-tooltip" id="card-tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-stats" id="tt-stats"></div>
+  <div class="tt-ability" id="tt-ability"></div>
+  <div class="tt-desc" id="tt-desc"></div>
+</div>
+
+<script>
+// ============================================================
+// GHOST DATA — imported from testroom
+// ============================================================
+const GHOSTS = [
+  {id:201, name:"Bouril", rarity:"uncommon", maxHp:10, art:"../testroom/art/old_hank.jpg", ability:"Slumber", abilityDesc:"Entry: your first roll is automatically 1-2-3.", set:"Volcanic Activity"},
+  {id:202, name:"Death Howl", rarity:"rare", maxHp:6, art:"../testroom/art/bubbles.png", ability:"Pressure", abilityDesc:"Before rolling: force opponent to swap their active ghost.", set:"Volcanic Activity"},
+  {id:203, name:"Benjamin", rarity:"rare", maxHp:4, art:"../testroom/art/benny.jpg", ability:"Magic Touch", abilityDesc:"Use Moonstone without discarding it.", set:"Volcanic Activity"},
+  {id:204, name:"Finn", rarity:"rare", maxHp:6, art:"../testroom/art/finn.png", ability:"Forge", abilityDesc:"Discard 2 Seeds + 1 Fire to forge the Flame Blade.", set:"Rolling Hills"},
+  {id:205, name:"Shade's Shadow", rarity:"rare", maxHp:1, art:"../testroom/art/kaboom.png", ability:"Meltdown", abilityDesc:"Sideline: deal 1 dmg if enemy < 4 HP.", set:"Volcanic Activity"},
+  {id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/echo.png", ability:"Ice Blade", abilityDesc:"Win: gain 1 Ice Shard. Forge the Ice Blade.", set:"Volcanic Activity"},
+  {id:207, name:"Hank", rarity:"common", maxHp:7, art:"../testroom/art/stomper.png", ability:"Tremor", abilityDesc:"Each 4 you roll: gain 1 Lucky Stone.", set:"Volcanic Activity"},
+  {id:208, name:"Happy Crystal", rarity:"common", maxHp:2, art:"../testroom/art/clover.jpg", ability:"Spark Strike", abilityDesc:"Sacrifice to gain 1 Moonstone.", set:"Volcanic Activity"},
+  {id:209, name:"Dart", rarity:"common", maxHp:3, art:"../testroom/art/swipers.png", ability:"Plunder", abilityDesc:"Win: gain 2 Surge.", set:"Volcanic Activity"},
+  {id:210, name:"Timber", rarity:"legendary", maxHp:7, art:"../testroom/art/timber.jpg", ability:"Howl", abilityDesc:"Before rolling: opponent discards 2 specials or -1 die.", set:"Rolling Hills"},
+  {id:301, name:"Dylan", rarity:"common", maxHp:3, art:"../testroom/art/haystack_hank.jpg", ability:"Straw Guardian", abilityDesc:"Negates enemy before-roll effects. Win: +1 Burn.", set:"Rolling Hills"},
+  {id:302, name:"Maximo", rarity:"common", maxHp:4, art:"../testroom/art/toadstool.jpg", ability:"Nap", abilityDesc:"Entry: 1 die first roll. Each round: +1 Seed + 1 Stone.", set:"Rolling Hills"},
+  {id:303, name:"Tweak and Twonk", rarity:"common", maxHp:6, art:"../testroom/art/nugget.jpg", ability:"Roaring Crowd", abilityDesc:"Sideline: ties give +4 Surge.", set:"Rolling Hills"},
+  {id:304, name:"The Ember Force", rarity:"uncommon", maxHp:3, art:"../testroom/art/the_flickers.jpg", ability:"Swarm", abilityDesc:"Before rolling: deal 1 damage to enemy.", set:"Volcanic Activity"},
+  {id:305, name:"Selene", rarity:"legendary", maxHp:6, art:"../testroom/art/luna.jpg", ability:"Heart of the Hills", abilityDesc:"Roll doubles: choose 2 Seeds or 3 Lucky Stones.", set:"Rolling Hills"},
+  {id:306, name:"Nerina", rarity:"legendary", maxHp:9, art:"../testroom/art/the_deep.jpg", ability:"Leviathan", abilityDesc:"Entry: deal 3 damage to enemy.", set:"Volcanic Activity"},
+  {id:307, name:"Artemis", rarity:"rare", maxHp:3, art:"../testroom/art/dewdrop.webp", ability:"Daughter of the Stream", abilityDesc:"Win: gain 3 Ice Shards.", set:"Rolling Hills"},
+  {id:308, name:"Kaplan", rarity:"uncommon", maxHp:5, art:"../testroom/art/honeybun.jpg", ability:"Pollinate", abilityDesc:"When opponent rolls doubles: gain 1 Seed.", set:"Rolling Hills"},
+  {id:309, name:"Aunt Susan", rarity:"rare", maxHp:4, art:"../testroom/art/rustler.jpg", ability:"Harvest Dance", abilityDesc:"Discard 1 Seed: +2 dmg or +2 HP. Win: +1 Seed.", set:"Rolling Hills"},
+  {id:310, name:"Granny", rarity:"uncommon", maxHp:3, art:"../testroom/art/granny.jpg", ability:"Bedtime Story", abilityDesc:"Sideline: ally KO grants resources by kill type.", set:"Rolling Hills"},
+  {id:311, name:"Pudge", rarity:"common", maxHp:7, art:"../testroom/art/pudge.webp", ability:"Belly Flop", abilityDesc:"Doubles: +2 dmg, take 1 self-damage.", set:"Rolling Hills"},
+  {id:312, name:"Timpleton", rarity:"rare", maxHp:4, art:"../testroom/art/lurk.jpg", ability:"Big Target", abilityDesc:"Win: +3 dmg if enemy HP > yours.", set:"Rolling Hills"},
+  {id:313, name:"Sylvia", rarity:"rare", maxHp:4, art:"../testroom/art/ripple.jpg", ability:"Porpoise", abilityDesc:"Free Ice Shards. Lose: 30% dodge.", set:"Volcanic Activity"},
+  {id:314, name:"Farmer Jeff", rarity:"ghost-rare", maxHp:5, art:"../testroom/art/farmer_jeff.jpg", ability:"Harvest", abilityDesc:"Gain 1 Seed for each 6 rolled.", set:"Rolling Hills"},
+  {id:315, name:"Harrison", rarity:"rare", maxHp:7, art:"../testroom/art/moonreach.jpg", ability:"Ascend", abilityDesc:"Discard Seeds: +1 die per seed.", set:"Rolling Hills"},
+  {id:316, name:"Penny", rarity:"common", maxHp:4, art:"../testroom/art/penny.webp", ability:"Forager", abilityDesc:"Win: gain 1 Healing Seed.", set:"Rolling Hills"},
+  {id:320, name:"Bramble", rarity:"common", maxHp:3, art:"../testroom/art/bramble.webp", ability:"Thorn Wall", abilityDesc:"Entry: opponent takes 1 dmg next round.", set:"Rolling Hills"},
+  {id:322, name:"Old Mill", rarity:"rare", maxHp:6, art:"../testroom/art/old_mill.webp", ability:"Grindstone", abilityDesc:"Spend 2 Surge: gain 1 Moonstone.", set:"Rolling Hills"},
+  {id:324, name:"Biscuit", rarity:"common", maxHp:5, art:"../testroom/art/biscuit.webp", ability:"Warm Up", abilityDesc:"Sideline: +1 HP on wins (can't exceed max).", set:"Rolling Hills"},
+  {id:326, name:"Barnaby", rarity:"uncommon", maxHp:5, art:"../testroom/art/barnaby.webp", ability:"Stubborn", abilityDesc:"Immune to forced switches.", set:"Rolling Hills"},
+  {id:328, name:"Drizzle", rarity:"common", maxHp:4, art:"../testroom/art/drizzle.webp", ability:"Rain Dance", abilityDesc:"Both players reroll all 1s.", set:"Rolling Hills"},
+  {id:332, name:"Grandmother Willow", rarity:"ghost-rare", maxHp:7, art:"../testroom/art/grandmother_willow.webp", ability:"Deep Roots", abilityDesc:"Can't be KO'd by singles damage.", set:"Rolling Hills"},
+  {id:334, name:"Fiddle", rarity:"uncommon", maxHp:6, art:"../testroom/art/fiddle.webp", ability:"Hoedown", abilityDesc:"Win: safe swap without trigger effects.", set:"Rolling Hills"},
+  {id:336, name:"Humar", rarity:"legendary", maxHp:5, art:"../testroom/art/humar.jpg", ability:"Meteor", abilityDesc:"Win: enemy takes 2 dmg before next roll + 1 Burn.", set:"Volcanic Activity"},
+  {id:338, name:"Thistle", rarity:"rare", maxHp:7, art:"../testroom/art/thistle.webp", ability:"Barbed", abilityDesc:"When hit: attacker takes 1 dmg back.", set:"Rolling Hills"},
+  {id:340, name:"Cluck", rarity:"common", maxHp:5, art:"../testroom/art/cluck.webp", ability:"Peck", abilityDesc:"Win with singles: +2 damage.", set:"Rolling Hills"},
+  {id:346, name:"Harvest Moon", rarity:"rare", maxHp:6, art:"../testroom/art/harvest_moon.webp", ability:"Reaping", abilityDesc:"Defeat a ghost: gain 1 of every resource.", set:"Rolling Hills"},
+  {id:348, name:"Mulch", rarity:"common", maxHp:3, art:"../testroom/art/mulch.webp", ability:"Decompose", abilityDesc:"When defeated: team gains 2 Seeds.", set:"Rolling Hills"},
+  {id:352, name:"Jimmy", rarity:"common", maxHp:2, art:"../testroom/art/cricket.webp", ability:"Chirp", abilityDesc:"On tie: gain 5 Lucky Stones + 1 Firefly.", set:"Rolling Hills"},
+  {id:354, name:"Patches", rarity:"uncommon", maxHp:5, art:"../testroom/art/patches.webp", ability:"Quilt", abilityDesc:"Spend 2 Seeds: negate all damage.", set:"Rolling Hills"},
+  {id:356, name:"Riverbed", rarity:"rare", maxHp:7, art:"../testroom/art/riverbed.webp", ability:"Current", abilityDesc:"Sideline: force opponent to reroll one die on doubles.", set:"Rolling Hills"},
+  {id:358, name:"Tadpole", rarity:"common", maxHp:5, art:"../testroom/art/tadpole.webp", ability:"Splash", abilityDesc:"Entry: gain 1 Surge.", set:"Rolling Hills"},
+  {id:360, name:"The Shepherd", rarity:"legendary", maxHp:8, art:"../testroom/art/the_shepherd.webp", ability:"Flock", abilityDesc:"Defeated ghosts return with 1 HP. Once per game.", set:"Rolling Hills"},
+  {id:362, name:"Bumble", rarity:"uncommon", maxHp:6, art:"../testroom/art/bumble.webp", ability:"Pollinate", abilityDesc:"Win: gain 2 Seeds (opponent gets 1).", set:"Rolling Hills"},
+  {id:366, name:"Mother Nature", rarity:"legendary", maxHp:8, art:"../testroom/art/mother_nature.webp", ability:"Seasons", abilityDesc:"Cycles: Spring +1HP, Summer +1dmg, Autumn +1 resource, Winter -1 enemy die.", set:"Rolling Hills"},
+  {id:368, name:"Scarecrow King", rarity:"rare", maxHp:4, art:"../testroom/art/scarecrow_king.webp", ability:"Command", abilityDesc:"Sideline: all other sideline abilities trigger twice.", set:"Rolling Hills"},
+  // Frost Valley originals
+  {id:1, name:"Kodako", rarity:"rare", maxHp:5, art:"../testroom/art/originals/kodako.jpg", ability:"Cold Stare", abilityDesc:"Roll 1-2-3: negate damage & deal 4.", set:"Frost Valley"},
+  {id:3, name:"Ancient Librarian", rarity:"rare", maxHp:5, art:"../testroom/art/originals/ancient_librarian.jpg", ability:"Tome", abilityDesc:"+1 dmg per 2 rolled.", set:"Frost Valley"},
+  {id:5, name:"Puff", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/puff.jpg", ability:"Nimbus Cloud", abilityDesc:"Enemy doubles/triples reduced by 1.", set:"Frost Valley"},
+  {id:7, name:"Fang Undercover", rarity:"rare", maxHp:4, art:"../testroom/art/originals/fang_undercover.jpg", ability:"Skilled Coward", abilityDesc:"Swap to sideline before rolling.", set:"Frost Valley"},
+  {id:9, name:"Little Boo", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/little_boo.jpg", ability:"Nightmare", abilityDesc:"Enemy triples become 1-2-3.", set:"Frost Valley"},
+  {id:11, name:"Villager", rarity:"common", maxHp:5, art:"../testroom/art/originals/villager.jpg", ability:"Encourage", abilityDesc:"Sideline: +1 HP on active ghost wins.", set:"Frost Valley"},
+  {id:13, name:"Donut", rarity:"common", maxHp:3, art:"../testroom/art/originals/donut.jpg", ability:"Sugar Rush", abilityDesc:"Roll doubles: gain 2 Surge.", set:"Frost Valley"},
+  {id:15, name:"Winston", rarity:"rare", maxHp:5, art:"../testroom/art/originals/winston.jpg", ability:"Noble Scheme", abilityDesc:"Roll doubles: force enemy swap.", set:"Frost Valley"},
+  {id:17, name:"Boo Brothers", rarity:"uncommon", maxHp:7, art:"../testroom/art/originals/boo_brothers.jpg", ability:"Teamwork", abilityDesc:"Trade 1 die for +1 HP.", set:"Frost Valley"},
+  {id:19, name:"Caldera", rarity:"rare", maxHp:5, art:"../testroom/art/originals/caldera.jpg", ability:"Eruption", abilityDesc:"Consecutive wins: +1 dmg each.", set:"Frost Valley"},
+  {id:21, name:"Hugo", rarity:"uncommon", maxHp:6, art:"../testroom/art/originals/hugo.jpg", ability:"Wreckage", abilityDesc:"Take 3+ dmg: gain +2 dice next roll.", set:"Frost Valley"},
+  {id:23, name:"Toby", rarity:"legendary", maxHp:4, art:"../testroom/art/originals/toby.jpg", ability:"Pure Heart", abilityDesc:"Declare all-in: win = +5 dmg, lose = instant KO.", set:"Frost Valley"},
+  {id:25, name:"Patrick", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/patrick.jpg", ability:"Stone Wall", abilityDesc:"Enemy singles: deal 3 + negate their dmg.", set:"Frost Valley"},
+  {id:27, name:"Stomper", rarity:"uncommon", maxHp:6, art:"../testroom/art/originals/stomper.jpg", ability:"Quake", abilityDesc:"When swapped in: deal 1 dmg to enemy.", set:"Frost Valley"},
+  {id:29, name:"Sad Sal", rarity:"common", maxHp:4, art:"../testroom/art/originals/sad_sal.jpg", ability:"Tears", abilityDesc:"Lose: gain 1 Ice Shard.", set:"Frost Valley"},
+  {id:31, name:"Gus", rarity:"rare", maxHp:7, art:"../testroom/art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"Win: force enemy swap (no damage).", set:"Frost Valley"},
+  {id:37, name:"Dealer", rarity:"rare", maxHp:3, art:"../testroom/art/originals/dealer.jpg", ability:"House Rules", abilityDesc:"Numeric order: negate all damage.", set:"Frost Valley"},
+  {id:43, name:"Dream Cat", rarity:"rare", maxHp:5, art:"../testroom/art/originals/dream_cat.jpg", ability:"Lucid", abilityDesc:"Mutual doubles: +2 dice next roll.", set:"Frost Valley"},
+  {id:45, name:"Cornelius", rarity:"rare", maxHp:4, art:"../testroom/art/originals/cornelius.jpg", ability:"Antidote", abilityDesc:"Shut down all enemy sideline effects.", set:"Frost Valley"},
+  {id:51, name:"Nicholas", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/nicholas.jpg", ability:"Sneak Attack", abilityDesc:"Sideline: deal 2 dmg to every entering enemy.", set:"Frost Valley"},
+  {id:57, name:"Marcus", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/marcus.jpg", ability:"Glacial Surge", abilityDesc:"Take 3+ dmg: gain +4 dice next roll.", set:"Frost Valley"},
+  {id:62, name:"Raditz", rarity:"rare", maxHp:5, art:"../testroom/art/originals/raditz.jpg", ability:"Hunt", abilityDesc:"Entry: force enemy active to sideline.", set:"Frost Valley"},
+  {id:64, name:"Sparky", rarity:"uncommon", maxHp:3, art:"../testroom/art/originals/sparky.jpg", ability:"Static", abilityDesc:"+3 dmg per 1 rolled.", set:"Frost Valley"},
+  {id:66, name:"Munch", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/munch.jpg", ability:"Devour", abilityDesc:"KO an enemy: gain +4 HP.", set:"Frost Valley"},
+  {id:69, name:"Sonya", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/sonya.jpg", ability:"Icy Touch", abilityDesc:"Before rolling: force one enemy die to 2.", set:"Frost Valley"},
+  {id:80, name:"Bilbo", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/bilbo.jpg", ability:"Crafty", abilityDesc:"Sideline: +2 singles damage.", set:"Frost Valley"},
+  {id:82, name:"Antoinette", rarity:"rare", maxHp:6, art:"../testroom/art/originals/antoinette.jpg", ability:"Grace", abilityDesc:"Roll as many dice as opponent.", set:"Frost Valley"},
+  {id:85, name:"Eloise", rarity:"rare", maxHp:5, art:"../testroom/art/originals/eloise.jpg", ability:"Change of Heart", abilityDesc:"Spend 1 Ice: swap HP with enemy.", set:"Frost Valley"},
+  {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"../testroom/art/originals/pelter.jpg", ability:"Snowball", abilityDesc:"Doubles: +2 dmg.", set:"Frost Valley"},
+  {id:92, name:"Gary", rarity:"rare", maxHp:6, art:"../testroom/art/originals/gary.jpg", ability:"Lucky Novice", abilityDesc:"+2 Ice Shards per 1 rolled.", set:"Frost Valley"},
+  {id:97, name:"Toby", rarity:"legendary", maxHp:4, art:"../testroom/art/originals/toby.jpg", ability:"Pure Heart", abilityDesc:"All-in gamble: win = +5 dmg, lose = KO.", set:"Frost Valley"},
+  {id:103, name:"Night Master", rarity:"ghost-rare", maxHp:5, art:"../testroom/art/originals/night_master.jpg", ability:"Bullseye", abilityDesc:"Doubles + win: destroy a <4HP sideline enemy.", set:"Frost Valley"},
+  {id:104, name:"Skylar", rarity:"ghost-rare", maxHp:7, art:"../testroom/art/originals/skylar.jpg", ability:"Winter Barrage", abilityDesc:"Ice Shards deal +2 instead of +1.", set:"Frost Valley"},
+  {id:105, name:"Tyler", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/tyler.jpg", ability:"Heating Up", abilityDesc:"Spend 2 HP for +1 die. Sacred Fires deal x2.", set:"Frost Valley"},
+  {id:106, name:"King Jay", rarity:"ghost-rare", maxHp:7, art:"../testroom/art/originals/king_jay.jpg", ability:"Reflection", abilityDesc:"Lose + dice total = 7: reflect all damage.", set:"Frost Valley"},
+  {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-roll effects. -1 enemy die.", set:"Frost Valley"},
+  {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"../testroom/art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose & survive: roll 1 counter die.", set:"Frost Valley"},
+  {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"../testroom/art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die: if match, +3 dmg.", set:"Frost Valley"},
+];
+
+// Remove duplicates (Toby id:23 and id:97 are the same)
+const GHOST_POOL = GHOSTS.filter((g, i, arr) => arr.findIndex(x => x.id === g.id) === i);
+
+function ghostById(id) { return GHOST_POOL.find(g => g.id === id); }
+
+// ============================================================
+// ABILITY SYSTEM — Simplified categories for Spirit War
+// ============================================================
+function parseAbilities(ghost) {
+  const desc = (ghost.abilityDesc || '').toLowerCase();
+  const id = ghost.id;
+  const ab = { entry: null, winBonus: null, loseEffect: null, passive: null, resourceGen: null };
+
+  // ENTRY EFFECTS: "entry: deal X damage"
+  if (id === 306) ab.entry = { type: 'damage', amount: 3 }; // Nerina
+  else if (id === 320) ab.entry = { type: 'damage', amount: 1 }; // Bramble
+  else if (id === 27) ab.entry = { type: 'damage', amount: 1 }; // Stomper
+  else if (id === 304) ab.entry = { type: 'damage', amount: 1 }; // Ember Force
+  else if (id === 358) ab.entry = { type: 'resource', resource: 'surge', amount: 1 }; // Tadpole
+  else if (id === 51) ab.entry = { type: 'damage', amount: 2 }; // Nicholas (sneak attack)
+
+  // WIN BONUSES
+  if (id === 340) ab.winBonus = { type: 'singles', bonus: 2 }; // Cluck: singles +2
+  else if (id === 311) ab.winBonus = { type: 'doubles', bonus: 2, selfDmg: 1 }; // Pudge: doubles +2, self 1
+  else if (id === 86) ab.winBonus = { type: 'doubles', bonus: 2 }; // Pelter: doubles +2
+  else if (id === 312) ab.winBonus = { type: 'hpCheck', bonus: 3 }; // Timpleton: +3 if enemy HP > yours
+  else if (id === 336) ab.winBonus = { type: 'any', bonus: 2 }; // Humar: win +2 extra
+  else if (id === 25) ab.winBonus = { type: 'enemySingles', bonus: 3, negate: true }; // Patrick
+  else if (id === 19) ab.winBonus = { type: 'streak', bonus: 1 }; // Caldera: consecutive wins
+  else if (id === 64) ab.winBonus = { type: 'per1', bonus: 3 }; // Sparky: +3 per 1 rolled
+  else if (id === 3) ab.winBonus = { type: 'per2', bonus: 1 }; // Ancient Librarian: +1 per 2
+
+  // LOSE EFFECTS
+  if (id === 313) ab.loseEffect = { type: 'dodge', chance: 0.30 }; // Sylvia: 30% dodge
+  else if (id === 113) ab.loseEffect = { type: 'counter' }; // Balatron: counter die
+  else if (id === 106) ab.loseEffect = { type: 'reflect', condition: 'dice7' }; // King Jay
+
+  // PASSIVE DEFENSE
+  if (id === 332) ab.passive = { type: 'singlesImmune' }; // Grandmother Willow
+  else if (id === 338) ab.passive = { type: 'thorns', amount: 1 }; // Thistle
+  else if (id === 5) ab.passive = { type: 'reduceHighRolls', amount: 1 }; // Puff
+
+  // RESOURCE GENERATION on win
+  if (id === 209) ab.resourceGen = { trigger: 'win', resource: 'surge', amount: 2 }; // Dart
+  else if (id === 307) ab.resourceGen = { trigger: 'win', resource: 'ice', amount: 3 }; // Artemis
+  else if (id === 316) ab.resourceGen = { trigger: 'win', resource: 'healingSeed', amount: 1 }; // Penny
+  else if (id === 206) ab.resourceGen = { trigger: 'win', resource: 'ice', amount: 1 }; // Zain
+  else if (id === 362) ab.resourceGen = { trigger: 'win', resource: 'healingSeed', amount: 2 }; // Bumble
+  else if (id === 29) ab.resourceGen = { trigger: 'lose', resource: 'ice', amount: 1 }; // Sad Sal
+  else if (id === 346) ab.resourceGen = { trigger: 'ko', resource: 'all', amount: 1 }; // Harvest Moon
+  else if (id === 348) ab.resourceGen = { trigger: 'death', resource: 'healingSeed', amount: 2 }; // Mulch
+
+  return ab;
+}
+
+// ============================================================
+// MAP DATA — 19 hex territories
+// ============================================================
+const REGIONS = {
+  'frost': { name: 'Frost Valley', color: '#7ee8fa', resource: 'ice' },
+  'volcanic': { name: 'Volcanic Activity', color: '#ff6348', resource: 'fire' },
+  'hills': { name: 'Rolling Hills', color: '#2ecc71', resource: 'healingSeed' },
+  'castle': { name: 'Dark Castle', color: '#9b59b6', resource: 'moonstone' },
+  'neutral': { name: 'Neutral', color: '#a09686', resource: 'surge' },
+};
+
+// Hex grid layout
+const HEX_W = 95;
+const HEX_H = 110;
+
+const TERRITORIES = [
+  { id:'t0', name:"Glacier Peak", region:'frost', row:0, col:1, startOwner:null, resource:'ice' },
+  { id:'t1', name:"Frozen Lake", region:'frost', row:0, col:2, startOwner:null, resource:'ice' },
+  { id:'t2', name:"Blizzard Pass", region:'frost', row:0, col:3, startOwner:null, resource:'surge' },
+  { id:'t3', name:"Crystal Caves", region:'frost', row:1, col:0.5, startOwner:'red', resource:'ice' },
+  { id:'t4', name:"Whispering Woods", region:'neutral', row:1, col:1.5, startOwner:null, resource:'surge' },
+  { id:'t5', name:"Moonstone Shrine", region:'castle', row:1, col:2.5, startOwner:null, resource:'moonstone' },
+  { id:'t6', name:"Shadow Gate", region:'castle', row:1, col:3.5, startOwner:'blue', resource:'moonstone' },
+  { id:'t7', name:"Red Stronghold", region:'volcanic', row:2, col:0, startOwner:'red', resource:'fire', isStronghold:'red' },
+  { id:'t8', name:"Ember Fields", region:'volcanic', row:2, col:1, startOwner:'red', resource:'fire' },
+  { id:'t9', name:"The Crossroads", region:'neutral', row:2, col:2, startOwner:null, resource:'surge' },
+  { id:'t10', name:"Twilight Marsh", region:'hills', row:2, col:3, startOwner:'blue', resource:'healingSeed' },
+  { id:'t11', name:"Blue Fortress", region:'hills', row:2, col:4, startOwner:'blue', resource:'healingSeed', isStronghold:'blue' },
+  { id:'t12', name:"Lava Flow", region:'volcanic', row:3, col:0.5, startOwner:null, resource:'fire' },
+  { id:'t13', name:"Spirit Bridge", region:'neutral', row:3, col:1.5, startOwner:null, resource:'surge' },
+  { id:'t14', name:"Harvest Vale", region:'hills', row:3, col:2.5, startOwner:null, resource:'healingSeed' },
+  { id:'t15', name:"Ancient Grove", region:'hills', row:3, col:3.5, startOwner:null, resource:'healingSeed' },
+  { id:'t16', name:"Volcano Heart", region:'volcanic', row:4, col:1, startOwner:null, resource:'fire' },
+  { id:'t17', name:"Wildflower Field", region:'neutral', row:4, col:2, startOwner:null, resource:'surge' },
+  { id:'t18', name:"Shepherd's Rest", region:'hills', row:4, col:3, startOwner:null, resource:'healingSeed' },
+];
+
+const ADJACENCY = {
+  t0: ['t1','t3','t4'],
+  t1: ['t0','t2','t4','t5'],
+  t2: ['t1','t5','t6'],
+  t3: ['t0','t4','t7','t8'],
+  t4: ['t0','t1','t3','t5','t8','t9'],
+  t5: ['t1','t2','t4','t6','t9','t10'],
+  t6: ['t2','t5','t10','t11'],
+  t7: ['t3','t8','t12'],
+  t8: ['t3','t4','t7','t9','t12','t13'],
+  t9: ['t4','t5','t8','t10','t13','t14'],
+  t10: ['t5','t6','t9','t11','t14','t15'],
+  t11: ['t6','t10','t15'],
+  t12: ['t7','t8','t13','t16'],
+  t13: ['t8','t9','t12','t14','t16','t17'],
+  t14: ['t9','t10','t13','t15','t17','t18'],
+  t15: ['t10','t11','t14','t18'],
+  t16: ['t12','t13','t17'],
+  t17: ['t13','t14','t16','t18'],
+  t18: ['t14','t15','t17'],
+};
+
+const RES_ICON = {
+  ice: '❄️', fire: '🔥', healingSeed: '🌱', moonstone: '🌙',
+  surge: '⚡', luckyStone: '🍀', firefly: '✨'
+};
+const RES_NAME = {
+  ice: 'Ice Shards', fire: 'Sacred Fire', healingSeed: 'Seeds',
+  moonstone: 'Moonstone', surge: 'Surge', luckyStone: 'Lucky Stones', firefly: 'Fireflies'
+};
+
+// ============================================================
+// GAME STATE
+// ============================================================
+const MAX_DEPLOYS = 3;
+
+let G = {
+  phase: 'start',
+  turn: 1,
+  currentDrafter: 'red',
+  draftRound: 0,
+  redWarband: [],
+  blueWarband: [],
+  redPicked: [],
+  bluePicked: [],
+  territories: {},
+  orders: { red: {}, blue: {} },
+  redResources: { ice:0, fire:0, healingSeed:0, moonstone:0, surge:2, luckyStone:0, firefly:0 },
+  blueResources: { ice:0, fire:0, healingSeed:0, moonstone:0, surge:2, luckyStone:0, firefly:0 },
+  orderPhaseTeam: 'red',
+  selectedGhost: null,
+  selectedTerritory: null,
+  pendingBattles: [],
+  battleQueue: [],
+  winTarget: 10,
+  deployCount: 0, // how many deployed this turn
+  // Stats tracking
+  stats: {
+    red: { battlesWon: 0, ghostsLost: 0, totalDamage: 0 },
+    blue: { battlesWon: 0, ghostsLost: 0, totalDamage: 0 },
+  },
+  turnSummary: [], // events this turn
+  territoryChanges: [], // which territories changed hands this turn
+};
+
+// ============================================================
+// DICE ENGINE (from testroom)
+// ============================================================
+function rollDice(n) {
+  const d = [];
+  for (let i = 0; i < n; i++) d.push(Math.floor(Math.random()*6)+1);
+  return d.sort((a,b) => a-b);
+}
+
+function classify(dice) {
+  if (!dice || !dice.length) return { type:'none', value:0, damage:0 };
+  if (dice.length === 1) return { type:'singles', value:dice[0], damage:1 };
+  const c = {};
+  dice.forEach(d => c[d] = (c[d]||0)+1);
+  const mx = Math.max(...Object.values(c));
+  const vals = Object.entries(c).filter(([,v]) => v === mx).map(([k]) => +k);
+  const mv = Math.max(...vals);
+  if (mx >= 6) return { type: mx+'-of-a-kind', value: mv, damage: mx };
+  if (mx >= 5) return { type:'penta', value:mv, damage:5 };
+  if (mx >= 4) return { type:'quads', value:mv, damage:4 };
+  if (mx >= 3) return { type:'triples', value:mv, damage:3 };
+  if (mx >= 2) return { type:'doubles', value:mv, damage:2 };
+  return { type:'singles', value: Math.max(...dice), damage:1 };
+}
+
+function describeRoll(r) {
+  if (r.type.endsWith('-of-a-kind')) return `${r.damage} of a kind!`;
+  if (r.type === 'penta') return `PENTA!`;
+  if (r.type === 'quads') return `QUADS!`;
+  if (r.type === 'triples') return `Triples`;
+  if (r.type === 'doubles') return `Doubles (${r.value}s)`;
+  return `${r.value} high`;
+}
+
+function rollTypeClass(r) {
+  if (r.type === 'penta' || r.type.endsWith('-of-a-kind')) return 'penta';
+  if (r.type === 'quads') return 'quads';
+  if (r.type === 'triples') return 'triples';
+  if (r.type === 'doubles') return 'doubles';
+  return 'singles';
+}
+
+function weightedRoll(hp, count) {
+  const dice = [];
+  for (let i = 0; i < count; i++) dice.push(Math.floor(Math.random()*6)+1);
+  if (count >= 5 && Math.random() < 0.10) {
+    const v = Math.ceil(Math.random()*4)+2;
+    for (let i = 0; i < dice.length; i++) dice[i] = v;
+    return dice.sort((a,b) => a-b);
+  }
+  if (hp === 1 && Math.random() < 0.25) {
+    const v = Math.ceil(Math.random()*4)+2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  } else if (hp === 2 && Math.random() < 0.15) {
+    const v = Math.ceil(Math.random()*4)+2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  }
+  if (hp <= 2 && hp > 0 && dice.length >= 2) {
+    const minIdx = dice.indexOf(Math.min(...dice));
+    if (dice[minIdx] <= 2 && Math.random() < 0.30) {
+      dice[minIdx] = Math.ceil(Math.random()*3)+3;
+    }
+  }
+  return dice.sort((a,b) => a-b);
+}
+
+// ============================================================
+// START GAME
+// ============================================================
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  G.phase = 'draft';
+  initDraft();
+}
+
+// ============================================================
+// DRAFT PHASE
+// ============================================================
+function initDraft() {
+  document.getElementById('draft-phase').style.display = 'block';
+  const shuffled = [...GHOST_POOL].sort(() => Math.random() - 0.5);
+  G.draftPool = shuffled.slice(0, 24);
+  G.draftRound = 0;
+  G.currentDrafter = 'red';
+  renderDraft();
+}
+
+function renderDraft() {
+  const pool = document.getElementById('draft-pool');
+  pool.innerHTML = '';
+  G.draftPool.forEach(g => {
+    const picked = G.redPicked.includes(g.id) ? 'picked-red' :
+                   G.bluePicked.includes(g.id) ? 'picked-blue' : '';
+    const rarityColor = `var(--${g.rarity === 'ghost-rare' ? 'ghost-rare' : g.rarity})`;
+    pool.innerHTML += `
+      <div class="draft-card ${picked}" onclick="draftPick(${g.id})"
+           onmouseenter="showTooltip(event,${g.id})" onmouseleave="hideTooltip()">
+        <div class="card-rarity" style="background:${rarityColor}"></div>
+        <div class="card-hp">${g.maxHp} HP</div>
+        <img src="${g.art}" alt="${g.name}" onerror="this.style.display='none'">
+        <div class="card-name">${g.name}</div>
+      </div>`;
+  });
+
+  ['red','blue'].forEach(team => {
+    const picks = team === 'red' ? G.redPicked : G.bluePicked;
+    const bench = document.getElementById(`${team}-bench`);
+    bench.innerHTML = '';
+    for (let i = 0; i < 8; i++) {
+      if (i < picks.length) {
+        const g = ghostById(picks[i]);
+        bench.innerHTML += `
+          <div class="bench-slot filled ${team}">
+            <img src="${g.art}" alt="${g.name}" onerror="this.style.display='none'">
+          </div>`;
+      } else {
+        bench.innerHTML += `<div class="bench-slot">${i+1}</div>`;
+      }
+    }
+    document.getElementById(`${team}-count`).textContent = `${picks.length}/8`;
+  });
+
+  const label = document.getElementById('draft-turn-label');
+  if (G.redPicked.length >= 8 && G.bluePicked.length >= 8) {
+    label.textContent = 'Draft Complete!';
+    label.style.color = 'var(--gold)';
+    if (!G._mapStarting) {
+      G._mapStarting = true;
+      setTimeout(startMapPhase, 800);
+    }
+    return;
+  }
+  const color = G.currentDrafter === 'red' ? 'var(--red)' : 'var(--blue)';
+  const name = G.currentDrafter === 'red' ? 'Red' : 'Blue';
+  label.innerHTML = `<span style="color:${color}">${name} Team</span> -- Pick a Spiritkin`;
+}
+
+function draftPick(id) {
+  if (G.redPicked.includes(id) || G.bluePicked.includes(id)) return;
+  const team = G.currentDrafter;
+  const picks = team === 'red' ? G.redPicked : G.bluePicked;
+  if (picks.length >= 8) return;
+
+  picks.push(id);
+  G.draftRound++;
+
+  if (G.draftRound === 1) {
+    G.currentDrafter = 'blue';
+  } else if (G.draftRound <= 15) {
+    const totalRed = G.redPicked.length;
+    const totalBlue = G.bluePicked.length;
+    if (totalRed <= totalBlue) G.currentDrafter = 'red';
+    else G.currentDrafter = 'blue';
+  }
+
+  if (G.redPicked.length >= 8 && G.bluePicked.length < 8) G.currentDrafter = 'blue';
+  if (G.bluePicked.length >= 8 && G.redPicked.length < 8) G.currentDrafter = 'red';
+
+  renderDraft();
+}
+
+function autoDraft() {
+  while (G.redPicked.length < 8 || G.bluePicked.length < 8) {
+    const available = G.draftPool.filter(g => !G.redPicked.includes(g.id) && !G.bluePicked.includes(g.id));
+    if (!available.length) break;
+    const pick = available[Math.floor(Math.random() * available.length)];
+    const team = G.currentDrafter;
+    const picks = team === 'red' ? G.redPicked : G.bluePicked;
+    if (picks.length >= 8) break;
+    picks.push(pick.id);
+    G.draftRound++;
+    if (G.draftRound === 1) { G.currentDrafter = 'blue'; }
+    else {
+      if (G.redPicked.length <= G.bluePicked.length) G.currentDrafter = 'red';
+      else G.currentDrafter = 'blue';
+    }
+    if (G.redPicked.length >= 8 && G.bluePicked.length < 8) G.currentDrafter = 'blue';
+    if (G.bluePicked.length >= 8 && G.redPicked.length < 8) G.currentDrafter = 'red';
+  }
+  renderDraft();
+}
+
+// ============================================================
+// MAP PHASE
+// ============================================================
+function startMapPhase() {
+  document.getElementById('draft-phase').style.display = 'none';
+  document.getElementById('map-phase').style.display = 'block';
+  G.phase = 'orders';
+
+  G.redWarband = G.redPicked.map(id => {
+    const g = ghostById(id);
+    return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, art:g.art, rarity:g.rarity, ability:g.ability, abilityDesc:g.abilityDesc, deployed:null, consecutiveWins:0 };
+  });
+  G.blueWarband = G.bluePicked.map(id => {
+    const g = ghostById(id);
+    return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, art:g.art, rarity:g.rarity, ability:g.ability, abilityDesc:g.abilityDesc, deployed:null, consecutiveWins:0 };
+  });
+
+  TERRITORIES.forEach(t => {
+    G.territories[t.id] = { owner: t.startOwner, garrison: [] };
+  });
+
+  G.orderPhaseTeam = 'red';
+  G.selectedGhost = null;
+  G.selectedTerritory = null;
+  G.orders = { red: {}, blue: {} };
+  G.deployCount = 0;
+
+  renderMap();
+  renderPanels();
+  updateHud();
+}
+
+function hexToPixel(row, col) {
+  const x = col * (HEX_W * 0.82) + 40;
+  const y = row * (HEX_H * 0.78) + 20;
+  return { x, y };
+}
+
+function getValidDeployTargets(team) {
+  const valid = new Set();
+  Object.entries(G.territories).forEach(([tid, state]) => {
+    if (state.owner === team) {
+      valid.add(tid);
+      ADJACENCY[tid].forEach(adj => valid.add(adj));
+    }
+  });
+  return valid;
+}
+
+function renderMap() {
+  const map = document.getElementById('hex-map');
+  map.innerHTML = '';
+
+  let maxX = 0, maxY = 0;
+  TERRITORIES.forEach(t => {
+    const pos = hexToPixel(t.row, t.col);
+    if (pos.x + HEX_W > maxX) maxX = pos.x + HEX_W;
+    if (pos.y + HEX_H > maxY) maxY = pos.y + HEX_H;
+  });
+  map.style.width = maxX + 40 + 'px';
+  map.style.height = maxY + 40 + 'px';
+
+  // Calculate valid deploy targets for highlighting
+  const validTargets = G.phase === 'orders' && G.selectedGhost ? getValidDeployTargets(G.orderPhaseTeam) : new Set();
+
+  TERRITORIES.forEach(t => {
+    const pos = hexToPixel(t.row, t.col);
+    const state = G.territories[t.id];
+    const region = REGIONS[t.region];
+
+    let ownerClass = '';
+    if (state.owner === 'red') ownerClass = 'red-controlled';
+    else if (state.owner === 'blue') ownerClass = 'blue-controlled';
+
+    const selected = G.selectedTerritory === t.id ? 'selected-hex' : '';
+    const validTarget = validTargets.has(t.id) ? 'valid-target' : '';
+    const captured = G.territoryChanges.includes(t.id) ? 'captured-flash' : '';
+
+    // Order markers
+    let orderMarker = '';
+    if (G.phase === 'orders') {
+      const team = G.orderPhaseTeam;
+      const orders = G.orders[team];
+      const ordersHere = Object.entries(orders).filter(([gId, o]) => o.target === t.id);
+      if (ordersHere.length > 0) {
+        orderMarker = `<div class="order-marker attack">${ordersHere.length}</div>`;
+      }
+    }
+
+    // Garrison dots
+    let garrisonHtml = '';
+    if (state.garrison.length > 0) {
+      garrisonHtml = '<div class="hex-garrison">';
+      state.garrison.forEach(gId => {
+        const wg = getWarbandGhost(gId);
+        const dotTeam = G.redWarband.find(w => w.id === gId) ? 'red' : 'blue';
+        garrisonHtml += `<div class="garrison-dot ${dotTeam}" title="${wg?.name || '?'}"></div>`;
+      });
+      garrisonHtml += '</div>';
+    }
+
+    const icon = t.isStronghold ? '🏰' : (RES_ICON[t.resource] || '');
+
+    map.innerHTML += `
+      <div class="hex-tile ${ownerClass} ${selected} ${validTarget} ${captured}" id="hex-${t.id}"
+           style="left:${pos.x}px; top:${pos.y}px;"
+           onclick="clickTerritory('${t.id}')">
+        ${orderMarker}
+        <div class="hex-icon">${icon}</div>
+        <div class="hex-name">${t.name}</div>
+        <div class="hex-resource">${RES_ICON[t.resource] || ''} ${region.name.split(' ')[0]}</div>
+        ${garrisonHtml}
+      </div>`;
+  });
+
+  // Clear captured flash after animation
+  if (G.territoryChanges.length) {
+    setTimeout(() => { G.territoryChanges = []; }, 1200);
+  }
+}
+
+function renderPanels() {
+  ['red', 'blue'].forEach(team => {
+    const warband = team === 'red' ? G.redWarband : G.blueWarband;
+    const list = document.getElementById(`${team}-warband-list`);
+    list.innerHTML = '';
+    warband.forEach(w => {
+      const koClass = w.ko ? 'ko' : '';
+      const deployedClass = w.deployed ? 'deployed' : '';
+      const selectedClass = G.selectedGhost === w.id ? 'selected' : '';
+      const hpClass = w.hp <= w.maxHp * 0.3 ? 'critical' : w.hp <= w.maxHp * 0.6 ? 'hurt' : '';
+      const deployLabel = w.deployed ? ` @ ${getTerritoryName(w.deployed)}` : '';
+      const koLabel = w.ko ? '<span style="color:var(--accent);font-size:0.6rem;"> FALLEN</span>' : '';
+      list.innerHTML += `
+        <div class="panel-ghost ${koClass} ${deployedClass} ${selectedClass}"
+             onclick="clickGhost('${team}', ${w.id})">
+          <img src="${w.art}" alt="${w.name}" onerror="this.style.display='none'">
+          <div>
+            <div class="pg-name">${w.name}${koLabel}</div>
+            <div class="pg-hp ${hpClass}">${w.ko ? 'Permadeath' : w.hp + '/' + w.maxHp + ' HP'}${deployLabel}</div>
+          </div>
+        </div>`;
+    });
+
+    const res = team === 'red' ? G.redResources : G.blueResources;
+    const resDiv = document.getElementById(`${team}-resources`);
+    resDiv.innerHTML = '';
+    Object.entries(res).forEach(([key, val]) => {
+      if (val > 0) {
+        resDiv.innerHTML += `<div class="res">${RES_ICON[key] || key} <strong>${val}</strong></div>`;
+      }
+    });
+  });
+}
+
+function updateHud() {
+  document.getElementById('hud-turn').textContent = `Turn ${G.turn}`;
+
+  const redCount = Object.values(G.territories).filter(t => t.owner === 'red').length;
+  const blueCount = Object.values(G.territories).filter(t => t.owner === 'blue').length;
+  document.getElementById('hud-red-territories').textContent = redCount;
+  document.getElementById('hud-blue-territories').textContent = blueCount;
+
+  // HUD resource bar for red
+  const hudRes = document.getElementById('hud-red-res');
+  if (hudRes) {
+    const res = G.redResources;
+    hudRes.innerHTML = '';
+    ['ice','fire','surge','healingSeed'].forEach(key => {
+      if (res[key] > 0) hudRes.innerHTML += `<div class="res">${RES_ICON[key]}${res[key]}</div>`;
+    });
+  }
+
+  let phaseText = '';
+  if (G.phase === 'orders') {
+    const teamName = G.orderPhaseTeam === 'red' ? 'Red' : 'Blue';
+    phaseText = `Order Phase -- ${teamName}, select a ghost then click a territory`;
+  } else if (G.phase === 'reveal') {
+    phaseText = 'Reveal Phase -- Orders revealed!';
+  } else if (G.phase === 'battle') {
+    phaseText = 'Battle Phase -- Contested territories fight!';
+  } else if (G.phase === 'harvest') {
+    phaseText = 'Harvest Phase -- Collecting resources...';
+  }
+  document.getElementById('hud-phase').textContent = phaseText;
+
+  // Deploy counter
+  const dc = document.getElementById('hud-deploy-counter');
+  if (G.phase === 'orders' && G.orderPhaseTeam === 'red') {
+    const remaining = MAX_DEPLOYS - G.deployCount;
+    dc.textContent = `${remaining} deployment${remaining !== 1 ? 's' : ''} remaining`;
+    dc.style.color = remaining === 0 ? 'var(--accent)' : 'var(--gold)';
+  } else {
+    dc.textContent = '';
+  }
+
+  renderOrderControls();
+}
+
+function getTerritoryName(id) {
+  const t = TERRITORIES.find(t => t.id === id);
+  return t ? t.name : id;
+}
+
+function getWarbandGhost(ghostId) {
+  return G.redWarband.find(w => w.id === ghostId) || G.blueWarband.find(w => w.id === ghostId);
+}
+
+function getGhostTeam(ghostId) {
+  if (G.redWarband.find(w => w.id === ghostId)) return 'red';
+  if (G.blueWarband.find(w => w.id === ghostId)) return 'blue';
+  return null;
+}
+
+// ============================================================
+// ORDER PHASE — Select ghost, then click territory to deploy
+// ============================================================
+function clickGhost(team, ghostId) {
+  if (G.phase !== 'orders') return;
+  if (team !== G.orderPhaseTeam) return;
+
+  const warband = team === 'red' ? G.redWarband : G.blueWarband;
+  const ghost = warband.find(w => w.id === ghostId);
+  if (!ghost || ghost.ko) return;
+
+  if (G.selectedGhost === ghostId) {
+    G.selectedGhost = null;
+    // If already deployed, un-deploy
+    if (ghost.deployed) {
+      const tid = ghost.deployed;
+      G.territories[tid].garrison = G.territories[tid].garrison.filter(g => g !== ghostId);
+      delete G.orders[team][ghostId];
+      ghost.deployed = null;
+      G.deployCount--;
+    }
+  } else {
+    // Can only select if not at deploy limit (unless already deployed = repositioning)
+    if (!ghost.deployed && G.deployCount >= MAX_DEPLOYS) {
+      // Can't select new ghost, at limit
+      return;
+    }
+    G.selectedGhost = ghostId;
+  }
+  renderMap();
+  renderPanels();
+  updateHud();
+}
+
+function clickTerritory(tid) {
+  if (G.phase !== 'orders') return;
+  if (G.selectedGhost === null) {
+    G.selectedTerritory = G.selectedTerritory === tid ? null : tid;
+    renderMap();
+    return;
+  }
+
+  const team = G.orderPhaseTeam;
+  const warband = team === 'red' ? G.redWarband : G.blueWarband;
+  const ghost = warband.find(w => w.id === G.selectedGhost);
+  if (!ghost || ghost.ko) return;
+
+  // Check adjacency
+  const state = G.territories[tid];
+  const canDeploy = state.owner === team ||
+    ADJACENCY[tid].some(adj => G.territories[adj].owner === team);
+
+  if (!canDeploy) {
+    flashHex(tid, '#e74c3c');
+    return;
+  }
+
+  // Check deploy limit (if not already deployed = new deployment)
+  const isReposition = ghost.deployed !== null;
+
+  // If already deployed elsewhere, remove from old position
+  if (ghost.deployed) {
+    const oldTid = ghost.deployed;
+    G.territories[oldTid].garrison = G.territories[oldTid].garrison.filter(g => g !== ghost.id);
+    delete G.orders[team][ghost.id];
+  }
+
+  // Deploy
+  ghost.deployed = tid;
+  if (!G.territories[tid].garrison.includes(ghost.id)) {
+    G.territories[tid].garrison.push(ghost.id);
+  }
+  G.orders[team][ghost.id] = { target: tid, action: 'attack' };
+  if (!isReposition) G.deployCount++;
+  G.selectedGhost = null;
+
+  renderMap();
+  renderPanels();
+  updateHud();
+}
+
+function flashHex(tid, color) {
+  const el = document.getElementById('hex-' + tid);
+  if (!el) return;
+  el.style.boxShadow = `0 0 20px ${color}`;
+  setTimeout(() => el.style.boxShadow = '', 500);
+}
+
+function endOrderPhase() {
+  if (G.orderPhaseTeam === 'red') {
+    G.orderPhaseTeam = 'blue';
+    G.selectedGhost = null;
+    G.selectedTerritory = null;
+    G.deployCount = 0;
+    updateHud();
+    renderMap();
+    renderPanels();
+    setTimeout(aiDeployBlue, 600);
+  } else {
+    G.phase = 'reveal';
+    updateHud();
+    setTimeout(resolveOrders, 800);
+  }
+}
+
+// ============================================================
+// SMARTER AI for Blue
+// ============================================================
+function aiDeployBlue() {
+  const available = G.blueWarband.filter(w => !w.ko && !w.deployed);
+  if (available.length === 0) { endOrderPhase(); return; }
+
+  // Sort available by HP (strongest first)
+  available.sort((a, b) => b.hp - a.hp);
+
+  const deployCount = Math.min(MAX_DEPLOYS, available.length);
+  let deployed = 0;
+
+  // Score each territory for attack value
+  const ownTerritories = Object.entries(G.territories).filter(([id, s]) => s.owner === 'blue');
+  const validTargets = getValidDeployTargets('blue');
+
+  const scoredTargets = [];
+  validTargets.forEach(tid => {
+    const state = G.territories[tid];
+    let score = 0;
+
+    // Prioritize: attack red-owned adjacent to blue
+    if (state.owner === 'red') {
+      score += 10;
+      // Bonus for territories adjacent to more blue territory
+      const adjBlue = ADJACENCY[tid].filter(a => G.territories[a].owner === 'blue').length;
+      score += adjBlue * 2;
+      // Stronghold capture = huge priority
+      const t = TERRITORIES.find(t => t.id === tid);
+      if (t && t.isStronghold === 'red') score += 20;
+    }
+    // Neutral territories worth taking
+    else if (state.owner === null) {
+      score += 5;
+      // Prefer resource territories
+      const t = TERRITORIES.find(t => t.id === tid);
+      if (t && t.resource === 'fire') score += 2;
+      if (t && t.resource === 'ice') score += 2;
+    }
+    // Defend territories that red is attacking (has red ghosts)
+    else if (state.owner === 'blue') {
+      const hasRedGhosts = state.garrison.some(gId => G.redWarband.find(w => w.id === gId));
+      if (hasRedGhosts) score += 8;
+      // Defend stronghold
+      const t = TERRITORIES.find(t => t.id === tid);
+      if (t && t.isStronghold === 'blue') score += 12;
+      // Defend if adjacent to red
+      const adjRed = ADJACENCY[tid].filter(a => G.territories[a].owner === 'red').length;
+      if (adjRed > 0) score += 3;
+    }
+
+    if (score > 0) scoredTargets.push({ tid, score });
+  });
+
+  // Sort by score descending
+  scoredTargets.sort((a, b) => b.score - a.score);
+
+  // Deploy strongest ghosts to highest-priority targets
+  for (let i = 0; i < deployCount && i < scoredTargets.length; i++) {
+    const ghost = available[i];
+    const tid = scoredTargets[i].tid;
+    ghost.deployed = tid;
+    if (!G.territories[tid].garrison.includes(ghost.id)) {
+      G.territories[tid].garrison.push(ghost.id);
+    }
+    G.orders.blue[ghost.id] = { target: tid, action: 'attack' };
+    deployed++;
+  }
+
+  // If no scored targets, defend random owned territory
+  for (let i = deployed; i < deployCount; i++) {
+    if (i >= available.length) break;
+    const ghost = available[i];
+    if (ownTerritories.length > 0) {
+      const tid = ownTerritories[Math.floor(Math.random() * ownTerritories.length)][0];
+      ghost.deployed = tid;
+      if (!G.territories[tid].garrison.includes(ghost.id)) {
+        G.territories[tid].garrison.push(ghost.id);
+      }
+      G.orders.blue[ghost.id] = { target: tid, action: 'defend' };
+    }
+  }
+
+  endOrderPhase();
+}
+
+// ============================================================
+// RESOLVE ORDERS — find contested territories, trigger battles
+// ============================================================
+function resolveOrders() {
+  G.pendingBattles = [];
+  G.turnSummary = [];
+  G.territoryChanges = [];
+
+  TERRITORIES.forEach(t => {
+    const state = G.territories[t.id];
+    const redHere = state.garrison.filter(gId => G.redWarband.find(w => w.id === gId));
+    const blueHere = state.garrison.filter(gId => G.blueWarband.find(w => w.id === gId));
+
+    if (redHere.length > 0 && blueHere.length > 0) {
+      G.pendingBattles.push({
+        territoryId: t.id,
+        redGhosts: [...redHere],
+        blueGhosts: [...blueHere],
+      });
+    } else if (redHere.length > 0 && state.owner !== 'red') {
+      const oldOwner = state.owner;
+      state.owner = 'red';
+      G.territoryChanges.push(t.id);
+      G.turnSummary.push({ type: 'capture', team: 'red', territory: t.name, from: oldOwner });
+    } else if (blueHere.length > 0 && state.owner !== 'blue') {
+      const oldOwner = state.owner;
+      state.owner = 'blue';
+      G.territoryChanges.push(t.id);
+      G.turnSummary.push({ type: 'capture', team: 'blue', territory: t.name, from: oldOwner });
+    }
+  });
+
+  renderMap();
+
+  if (G.pendingBattles.length > 0) {
+    G.phase = 'battle';
+    updateHud();
+    setTimeout(() => startNextBattle(), 600);
+  } else {
+    harvestPhase();
+  }
+}
+
+// ============================================================
+// BATTLE SYSTEM — with abilities + resources
+// ============================================================
+let currentBattle = null;
+let committedResources = { ice: 0, fire: 0, surge: 0 };
+
+function startNextBattle() {
+  if (G.pendingBattles.length === 0) {
+    closeBattle();
+    harvestPhase();
+    return;
+  }
+
+  const battle = G.pendingBattles.shift();
+  const t = TERRITORIES.find(t => t.id === battle.territoryId);
+
+  const redGhost = getWarbandGhost(battle.redGhosts[0]);
+  const blueGhost = getWarbandGhost(battle.blueGhosts[0]);
+
+  currentBattle = {
+    territoryId: battle.territoryId,
+    territoryName: t.name,
+    red: { ...redGhost, startHp: redGhost.hp, abilities: parseAbilities(ghostById(redGhost.id)) },
+    blue: { ...blueGhost, startHp: blueGhost.hp, abilities: parseAbilities(ghostById(blueGhost.id)) },
+    log: [],
+    round: 0,
+    finished: false,
+    winner: null,
+    entryDone: false,
+  };
+
+  committedResources = { ice: 0, fire: 0, surge: 0 };
+
+  const overlay = document.getElementById('battle-overlay');
+  overlay.classList.add('active');
+
+  document.getElementById('battle-territory-name').textContent = `Battle for ${t.name}!`;
+  updateBattleUI();
+  renderResourceCommitArea();
+  document.getElementById('battle-result').textContent = '';
+  document.getElementById('battle-roll-btn').style.display = '';
+  document.getElementById('battle-skip-btn').style.display = '';
+
+  // Dramatic opening
+  const log = document.getElementById('battle-log');
+  log.innerHTML = `<p style="font-family:Cinzel,serif; color:var(--gold); font-size:0.9rem; text-align:center;">
+    The battle for <strong>${t.name}</strong> begins!</p>`;
+
+  // Process entry effects
+  setTimeout(() => processEntryEffects(), 400);
+}
+
+function processEntryEffects() {
+  if (!currentBattle || currentBattle.entryDone) return;
+  currentBattle.entryDone = true;
+
+  const r = currentBattle.red;
+  const b = currentBattle.blue;
+
+  // Red entry
+  if (r.abilities.entry) {
+    if (r.abilities.entry.type === 'damage') {
+      const dmg = r.abilities.entry.amount;
+      b.hp = Math.max(0, b.hp - dmg);
+      addBattleLog(`<span class="log-entry">${r.name}'s ${r.ability}: deals ${dmg} entry damage to ${b.name}!</span>`);
+      flashFighter('blue');
+    } else if (r.abilities.entry.type === 'resource') {
+      const res = r.abilities.entry.resource;
+      const amt = r.abilities.entry.amount;
+      G.redResources[res] = (G.redResources[res] || 0) + amt;
+      addBattleLog(`<span class="log-res">${r.name}'s ${r.ability}: gains ${amt} ${RES_ICON[res]}!</span>`);
+    }
+  }
+
+  // Blue entry
+  if (b.abilities.entry) {
+    if (b.abilities.entry.type === 'damage') {
+      const dmg = b.abilities.entry.amount;
+      r.hp = Math.max(0, r.hp - dmg);
+      addBattleLog(`<span class="log-entry">${b.name}'s ${b.ability}: deals ${dmg} entry damage to ${r.name}!</span>`);
+      flashFighter('red');
+    } else if (b.abilities.entry.type === 'resource') {
+      const res = b.abilities.entry.resource;
+      const amt = b.abilities.entry.amount;
+      G.blueResources[res] = (G.blueResources[res] || 0) + amt;
+      addBattleLog(`<span class="log-res">${b.name}'s ${b.ability}: gains ${amt} ${RES_ICON[res]}!</span>`);
+    }
+  }
+
+  updateBattleUI();
+
+  // Check for immediate KO from entry effects
+  if (r.hp <= 0 || b.hp <= 0) {
+    setTimeout(() => finishBattle(), 600);
+  }
+}
+
+function flashFighter(side) {
+  const el = document.getElementById(side + '-fighter');
+  if (el) {
+    el.classList.add('damage-flash');
+    setTimeout(() => el.classList.remove('damage-flash'), 500);
+  }
+}
+
+function renderResourceCommitArea() {
+  const area = document.getElementById('resource-commit-area');
+  if (!currentBattle || currentBattle.finished) {
+    area.innerHTML = '';
+    return;
+  }
+
+  const res = G.redResources;
+  const hasIce = res.ice > 0;
+  const hasFire = res.fire > 0;
+  const hasSurge = res.surge > 0;
+
+  if (!hasIce && !hasFire && !hasSurge) {
+    area.innerHTML = '<span class="res-commit-label">No resources to commit</span>';
+    return;
+  }
+
+  let html = '<span class="res-commit-label">Commit: </span>';
+  if (hasIce) {
+    const c = committedResources.ice;
+    html += `<button class="res-commit-btn ${c > 0 ? 'committed' : ''}" onclick="toggleCommitResource('ice')">
+      ❄️ Ice (+1 dmg) <span class="res-count">${c}/${res.ice}</span></button>`;
+  }
+  if (hasFire) {
+    const c = committedResources.fire;
+    html += `<button class="res-commit-btn ${c > 0 ? 'committed' : ''}" onclick="toggleCommitResource('fire')">
+      🔥 Fire (+3 dmg) <span class="res-count">${c}/${res.fire}</span></button>`;
+  }
+  if (hasSurge) {
+    const c = committedResources.surge;
+    html += `<button class="res-commit-btn ${c > 0 ? 'committed' : ''}" onclick="toggleCommitResource('surge')">
+      ⚡ Surge (+1 die) <span class="res-count">${c}/${res.surge}</span></button>`;
+  }
+  area.innerHTML = html;
+}
+
+function toggleCommitResource(type) {
+  const available = G.redResources[type] || 0;
+  if (committedResources[type] < available) {
+    committedResources[type]++;
+  } else {
+    committedResources[type] = 0;
+  }
+  renderResourceCommitArea();
+}
+
+// AI resource commitment
+function aiCommitResources() {
+  const res = G.blueResources;
+  const committed = { ice: 0, fire: 0, surge: 0 };
+  if (!currentBattle) return committed;
+
+  const b = currentBattle.blue;
+  const r = currentBattle.red;
+
+  // Commit resources when HP is low or opponent is close to dying
+  const urgency = (b.hp <= 3 || r.hp <= 3) ? 0.7 : 0.3;
+
+  // Commit surge (extra dice) if available and roll is worth it
+  if (res.surge > 0 && Math.random() < urgency) {
+    committed.surge = Math.min(res.surge, 2);
+  }
+  // Commit fire if available
+  if (res.fire > 0 && Math.random() < urgency * 0.8) {
+    committed.fire = Math.min(res.fire, 1);
+  }
+  // Commit ice
+  if (res.ice > 0 && Math.random() < urgency * 0.6) {
+    committed.ice = Math.min(res.ice, 2);
+  }
+
+  return committed;
+}
+
+function updateBattleUI() {
+  if (!currentBattle) return;
+  const r = currentBattle.red;
+  const b = currentBattle.blue;
+
+  document.getElementById('battle-red-img').src = r.art;
+  document.getElementById('battle-red-name').textContent = r.name;
+  document.getElementById('battle-red-ability').textContent = `${r.ability}: ${r.abilityDesc}`;
+  document.getElementById('battle-red-hp-text').textContent = `${Math.max(0, r.hp)}/${r.maxHp}`;
+  const rPct = Math.max(0, (r.hp / r.maxHp) * 100);
+  const rFill = document.getElementById('battle-red-hp-fill');
+  rFill.style.width = rPct + '%';
+  rFill.style.background = rPct > 50 ? 'var(--hp-green)' : rPct > 25 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+
+  document.getElementById('battle-blue-img').src = b.art;
+  document.getElementById('battle-blue-name').textContent = b.name;
+  document.getElementById('battle-blue-ability').textContent = `${b.ability}: ${b.abilityDesc}`;
+  document.getElementById('battle-blue-hp-text').textContent = `${Math.max(0, b.hp)}/${b.maxHp}`;
+  const bPct = Math.max(0, (b.hp / b.maxHp) * 100);
+  const bFill = document.getElementById('battle-blue-hp-fill');
+  bFill.style.width = bPct + '%';
+  bFill.style.background = bPct > 50 ? 'var(--hp-green)' : bPct > 25 ? 'var(--hp-yellow)' : 'var(--hp-red)';
+}
+
+function battleRoll() {
+  if (!currentBattle || currentBattle.finished) return;
+  const btn = document.getElementById('battle-roll-btn');
+  btn.disabled = true;
+
+  currentBattle.round++;
+  const r = currentBattle.red;
+  const b = currentBattle.blue;
+
+  addBattleLog(`<span class="log-round">-- Round ${currentBattle.round} --</span>`);
+
+  // Calculate dice counts
+  let redDiceCount = 3 + committedResources.surge;
+  let blueDiceCount = 3;
+
+  // AI commits resources
+  const aiRes = aiCommitResources();
+  blueDiceCount += aiRes.surge;
+
+  // Apply committed resources
+  let redBonusDmg = committedResources.ice + (committedResources.fire * 3);
+  let blueBonusDmg = aiRes.ice + (aiRes.fire * 3);
+
+  // Deduct resources
+  if (committedResources.ice > 0) {
+    G.redResources.ice -= committedResources.ice;
+    addBattleLog(`<span class="log-res">Red commits ${committedResources.ice} ❄️ Ice (+${committedResources.ice} dmg)</span>`);
+  }
+  if (committedResources.fire > 0) {
+    G.redResources.fire -= committedResources.fire;
+    addBattleLog(`<span class="log-res">Red commits ${committedResources.fire} 🔥 Fire (+${committedResources.fire * 3} dmg)</span>`);
+  }
+  if (committedResources.surge > 0) {
+    G.redResources.surge -= committedResources.surge;
+    addBattleLog(`<span class="log-res">Red commits ${committedResources.surge} ⚡ Surge (+${committedResources.surge} dice)</span>`);
+  }
+  // AI resource deductions
+  if (aiRes.ice > 0) { G.blueResources.ice -= aiRes.ice; addBattleLog(`<span class="log-res">Blue commits ${aiRes.ice} ❄️</span>`); }
+  if (aiRes.fire > 0) { G.blueResources.fire -= aiRes.fire; addBattleLog(`<span class="log-res">Blue commits ${aiRes.fire} 🔥</span>`); }
+  if (aiRes.surge > 0) { G.blueResources.surge -= aiRes.surge; addBattleLog(`<span class="log-res">Blue commits ${aiRes.surge} ⚡</span>`); }
+
+  // Reset committed resources for next round
+  committedResources = { ice: 0, fire: 0, surge: 0 };
+  renderResourceCommitArea();
+
+  // Roll dice
+  const redDice = weightedRoll(r.hp, redDiceCount);
+  const blueDice = weightedRoll(b.hp, blueDiceCount);
+
+  // Apply Puff's passive (reduce enemy doubles/triples by 1)
+  let redRoll = classify(redDice);
+  let blueRoll = classify(blueDice);
+
+  if (r.abilities.passive?.type === 'reduceHighRolls' && (blueRoll.type === 'doubles' || blueRoll.type === 'triples')) {
+    blueRoll.damage = Math.max(1, blueRoll.damage - 1);
+    addBattleLog(`<span class="log-ability">${r.name}'s ${r.ability}: reduces ${b.name}'s roll!</span>`);
+  }
+  if (b.abilities.passive?.type === 'reduceHighRolls' && (redRoll.type === 'doubles' || redRoll.type === 'triples')) {
+    redRoll.damage = Math.max(1, redRoll.damage - 1);
+    addBattleLog(`<span class="log-ability">${b.name}'s ${b.ability}: reduces ${r.name}'s roll!</span>`);
+  }
+
+  // Show rolling animation
+  showBattleDice('red', redDice, true);
+  showBattleDice('blue', blueDice, true);
+
+  setTimeout(() => {
+    showBattleDice('red', redDice, false);
+    showBattleDice('blue', blueDice, false);
+
+    const redLabel = document.getElementById('battle-red-roll-label');
+    const blueLabel = document.getElementById('battle-blue-roll-label');
+    redLabel.textContent = describeRoll(redRoll);
+    redLabel.className = 'roll-label ' + rollTypeClass(redRoll);
+    blueLabel.textContent = describeRoll(blueRoll);
+    blueLabel.className = 'roll-label ' + rollTypeClass(blueRoll);
+
+    // Screen shake for big rolls
+    const maxType = Math.max(redRoll.damage, blueRoll.damage);
+    if (maxType >= 4) {
+      const arena = document.getElementById('battle-arena');
+      arena.classList.add(maxType >= 5 ? 'big-shake' : 'screen-shake');
+      if (maxType >= 4) arena.classList.add('gold-flash');
+      setTimeout(() => { arena.classList.remove('screen-shake', 'big-shake', 'gold-flash'); }, 700);
+    }
+
+    // Determine winner
+    let redWins = false, blueWins = false, tie = false;
+    if (redRoll.damage > blueRoll.damage || (redRoll.damage === blueRoll.damage && redRoll.value > blueRoll.value)) {
+      redWins = true;
+    } else if (blueRoll.damage > redRoll.damage || (blueRoll.damage === redRoll.damage && blueRoll.value > redRoll.value)) {
+      blueWins = true;
+    } else {
+      tie = true;
+    }
+
+    if (tie) {
+      addBattleLog(`Tie! No damage dealt.`);
+    }
+
+    if (redWins) {
+      let dmg = redRoll.damage + redBonusDmg;
+
+      // Win bonuses
+      if (r.abilities.winBonus) {
+        const wb = r.abilities.winBonus;
+        if (wb.type === 'singles' && redRoll.type === 'singles') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${wb.bonus} singles bonus!</span>`); }
+        if (wb.type === 'doubles' && redRoll.type === 'doubles') {
+          dmg += wb.bonus;
+          addBattleLog(`<span class="log-ability">${r.ability}: +${wb.bonus} doubles bonus!</span>`);
+          if (wb.selfDmg) { r.hp = Math.max(1, r.hp - wb.selfDmg); addBattleLog(`<span class="log-dmg">${r.name} takes ${wb.selfDmg} self-damage!</span>`); }
+        }
+        if (wb.type === 'hpCheck' && b.hp > r.hp) { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${wb.bonus} (enemy HP > yours)!</span>`); }
+        if (wb.type === 'any') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${wb.bonus} bonus damage!</span>`); }
+        if (wb.type === 'enemySingles' && blueRoll.type === 'singles') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${wb.bonus} vs enemy singles! Enemy damage negated!</span>`); }
+        if (wb.type === 'streak') { r.consecutiveWins = (r.consecutiveWins || 0) + 1; if (r.consecutiveWins > 1) { dmg += r.consecutiveWins - 1; addBattleLog(`<span class="log-ability">${r.ability}: +${r.consecutiveWins-1} streak bonus!</span>`); } }
+        if (wb.type === 'per1') { const ones = redDice.filter(d => d === 1).length; if (ones > 0) { dmg += ones * wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${ones * wb.bonus} from ${ones}x 1s!</span>`); } }
+        if (wb.type === 'per2') { const twos = redDice.filter(d => d === 2).length; if (twos > 0) { dmg += twos * wb.bonus; addBattleLog(`<span class="log-ability">${r.ability}: +${twos * wb.bonus} from ${twos}x 2s!</span>`); } }
+      }
+
+      // Lose effects for blue
+      let dodged = false;
+      if (b.abilities.loseEffect) {
+        const le = b.abilities.loseEffect;
+        if (le.type === 'dodge' && Math.random() < le.chance) {
+          dodged = true;
+          addBattleLog(`<span class="log-ability">${b.name}'s ${b.ability}: DODGED the attack!</span>`);
+        }
+        if (le.type === 'reflect' && le.condition === 'dice7') {
+          const total = blueDice.reduce((a,c) => a+c, 0);
+          if (total === 7) {
+            dodged = true;
+            r.hp = Math.max(0, r.hp - dmg);
+            addBattleLog(`<span class="log-ability">${b.name}'s ${b.ability}: REFLECTED ${dmg} damage back!</span>`);
+            flashFighter('red');
+          }
+        }
+      }
+
+      if (!dodged) {
+        // Grandmother Willow: can't be KO'd by singles
+        if (b.abilities.passive?.type === 'singlesImmune' && redRoll.type === 'singles') {
+          if (b.hp - dmg <= 0) {
+            dmg = b.hp - 1; // Survive with 1 HP
+            addBattleLog(`<span class="log-ability">${b.name}'s Deep Roots: survives singles!</span>`);
+          }
+        }
+
+        // Patrick: negate enemy singles damage
+        if (r.abilities.winBonus?.type === 'enemySingles' && blueRoll.type === 'singles') {
+          // already handled in bonus, just skip blue damage
+        }
+
+        b.hp = Math.max(0, b.hp - dmg);
+        addBattleLog(`<span class="log-dmg">${r.name} deals ${dmg} to ${b.name}!</span>`);
+        flashFighter('blue');
+        G.stats.red.totalDamage += dmg;
+
+        // Thorns
+        if (b.abilities.passive?.type === 'thorns') {
+          const thornDmg = b.abilities.passive.amount;
+          r.hp = Math.max(0, r.hp - thornDmg);
+          addBattleLog(`<span class="log-ability">${b.name}'s Barbed: ${r.name} takes ${thornDmg} thorn damage!</span>`);
+          flashFighter('red');
+        }
+      }
+
+      // Resource gen on win
+      if (r.abilities.resourceGen?.trigger === 'win') {
+        const rg = r.abilities.resourceGen;
+        G.redResources[rg.resource] = (G.redResources[rg.resource] || 0) + rg.amount;
+        addBattleLog(`<span class="log-res">${r.name} gains ${rg.amount} ${RES_ICON[rg.resource]}!</span>`);
+      }
+
+      b.consecutiveWins = 0;
+    }
+
+    if (blueWins) {
+      let dmg = blueRoll.damage + blueBonusDmg;
+
+      // Win bonuses for blue
+      if (b.abilities.winBonus) {
+        const wb = b.abilities.winBonus;
+        if (wb.type === 'singles' && blueRoll.type === 'singles') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${b.ability}: +${wb.bonus} singles bonus!</span>`); }
+        if (wb.type === 'doubles' && blueRoll.type === 'doubles') {
+          dmg += wb.bonus;
+          addBattleLog(`<span class="log-ability">${b.ability}: +${wb.bonus} doubles bonus!</span>`);
+          if (wb.selfDmg) { b.hp = Math.max(1, b.hp - wb.selfDmg); }
+        }
+        if (wb.type === 'hpCheck' && r.hp > b.hp) { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${b.ability}: +${wb.bonus} (enemy HP > yours)!</span>`); }
+        if (wb.type === 'any') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${b.ability}: +${wb.bonus} bonus!</span>`); }
+        if (wb.type === 'enemySingles' && redRoll.type === 'singles') { dmg += wb.bonus; addBattleLog(`<span class="log-ability">${b.ability}: +${wb.bonus} vs enemy singles!</span>`); }
+        if (wb.type === 'streak') { b.consecutiveWins = (b.consecutiveWins || 0) + 1; if (b.consecutiveWins > 1) { dmg += b.consecutiveWins - 1; } }
+        if (wb.type === 'per1') { const ones = blueDice.filter(d => d === 1).length; if (ones > 0) dmg += ones * wb.bonus; }
+        if (wb.type === 'per2') { const twos = blueDice.filter(d => d === 2).length; if (twos > 0) dmg += twos * wb.bonus; }
+      }
+
+      // Lose effects for red
+      let dodged = false;
+      if (r.abilities.loseEffect) {
+        const le = r.abilities.loseEffect;
+        if (le.type === 'dodge' && Math.random() < le.chance) {
+          dodged = true;
+          addBattleLog(`<span class="log-ability">${r.name}'s ${r.ability}: DODGED!</span>`);
+        }
+        if (le.type === 'counter') {
+          // Balatron counter die
+          if (r.hp - dmg > 0) {
+            const counterDie = Math.floor(Math.random() * 6) + 1;
+            addBattleLog(`<span class="log-ability">${r.name}'s ${r.ability}: counter die = ${counterDie}!</span>`);
+            b.hp = Math.max(0, b.hp - counterDie);
+          }
+        }
+        if (le.type === 'reflect' && le.condition === 'dice7') {
+          const total = redDice.reduce((a,c) => a+c, 0);
+          if (total === 7) {
+            dodged = true;
+            b.hp = Math.max(0, b.hp - dmg);
+            addBattleLog(`<span class="log-ability">${r.name}'s ${r.ability}: REFLECTED ${dmg}!</span>`);
+            flashFighter('blue');
+          }
+        }
+      }
+
+      if (!dodged) {
+        // Grandmother Willow
+        if (r.abilities.passive?.type === 'singlesImmune' && blueRoll.type === 'singles') {
+          if (r.hp - dmg <= 0) { dmg = r.hp - 1; addBattleLog(`<span class="log-ability">${r.name}'s Deep Roots: survives singles!</span>`); }
+        }
+
+        r.hp = Math.max(0, r.hp - dmg);
+        addBattleLog(`<span class="log-dmg">${b.name} deals ${dmg} to ${r.name}!</span>`);
+        flashFighter('red');
+        G.stats.blue.totalDamage += dmg;
+
+        // Thorns
+        if (r.abilities.passive?.type === 'thorns') {
+          const thornDmg = r.abilities.passive.amount;
+          b.hp = Math.max(0, b.hp - thornDmg);
+          addBattleLog(`<span class="log-ability">${r.name}'s Barbed: ${b.name} takes ${thornDmg}!</span>`);
+          flashFighter('blue');
+        }
+      }
+
+      // Resource gen on lose for red
+      if (r.abilities.resourceGen?.trigger === 'lose') {
+        const rg = r.abilities.resourceGen;
+        G.redResources[rg.resource] = (G.redResources[rg.resource] || 0) + rg.amount;
+        addBattleLog(`<span class="log-res">${r.name} gains ${rg.amount} ${RES_ICON[rg.resource]}!</span>`);
+      }
+      // Blue resource gen on win
+      if (b.abilities.resourceGen?.trigger === 'win') {
+        const rg = b.abilities.resourceGen;
+        G.blueResources[rg.resource] = (G.blueResources[rg.resource] || 0) + rg.amount;
+        addBattleLog(`<span class="log-res">${b.name} gains ${rg.amount} ${RES_ICON[rg.resource]}!</span>`);
+      }
+
+      r.consecutiveWins = 0;
+    }
+
+    updateBattleUI();
+    renderResourceCommitArea();
+
+    // Check for KO
+    if (r.hp <= 0 || b.hp <= 0) {
+      setTimeout(() => finishBattle(), 600);
+    } else {
+      btn.disabled = false;
+    }
+  }, 800);
+}
+
+function showBattleDice(team, dice, rolling) {
+  const container = document.getElementById(`battle-${team}-dice`);
+  const cls = team === 'red' ? 'red-die' : 'blue-die';
+  if (rolling) {
+    container.innerHTML = dice.map(() => {
+      const rv = Math.floor(Math.random()*6)+1;
+      return `<div class="die ${cls} rolling">${rv}</div>`;
+    }).join('');
+  } else {
+    // Highlight matching dice
+    const counts = {};
+    dice.forEach(d => counts[d] = (counts[d]||0)+1);
+    container.innerHTML = dice.map(d => {
+      const matchClass = counts[d] >= 2 ? 'match-die' : '';
+      return `<div class="die ${cls} ${matchClass}">${d}</div>`;
+    }).join('');
+  }
+}
+
+function addBattleLog(html) {
+  const log = document.getElementById('battle-log');
+  log.innerHTML += `<p>${html}</p>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+function battleAutoFinish() {
+  if (!currentBattle || currentBattle.finished) return;
+  const autoRoll = () => {
+    if (currentBattle.finished) return;
+    battleRoll();
+    if (!currentBattle.finished) {
+      setTimeout(autoRoll, 1100);
+    }
+  };
+  document.getElementById('battle-skip-btn').style.display = 'none';
+  document.getElementById('resource-commit-area').innerHTML = '<span class="res-commit-label">Auto-finishing...</span>';
+  autoRoll();
+}
+
+function finishBattle() {
+  currentBattle.finished = true;
+  const r = currentBattle.red;
+  const b = currentBattle.blue;
+
+  document.getElementById('battle-roll-btn').style.display = 'none';
+  document.getElementById('battle-skip-btn').style.display = 'none';
+  document.getElementById('resource-commit-area').innerHTML = '';
+
+  let winner, loser, winTeam, loseTeam;
+  if (r.hp <= 0 && b.hp <= 0) {
+    const tState = G.territories[currentBattle.territoryId];
+    winTeam = tState.owner || 'blue';
+    loseTeam = winTeam === 'red' ? 'blue' : 'red';
+    winner = winTeam === 'red' ? r : b;
+    loser = winTeam === 'red' ? b : r;
+  } else if (r.hp <= 0) {
+    winTeam = 'blue'; loseTeam = 'red'; winner = b; loser = r;
+  } else {
+    winTeam = 'red'; loseTeam = 'blue'; winner = r; loser = b;
+  }
+
+  G.stats[winTeam].battlesWon++;
+  G.stats[loseTeam].ghostsLost++;
+
+  // PERMADEATH — the loser is gone forever
+  const loserWar = loseTeam === 'red' ? G.redWarband : G.blueWarband;
+  const loserGhost = loserWar.find(w => w.id === loser.id);
+
+  // Resource gen on KO/death
+  if (winner.abilities.resourceGen?.trigger === 'ko') {
+    const rg = winner.abilities.resourceGen;
+    const winRes = winTeam === 'red' ? G.redResources : G.blueResources;
+    if (rg.resource === 'all') {
+      ['ice','fire','healingSeed','surge'].forEach(r => winRes[r] = (winRes[r]||0) + rg.amount);
+      addBattleLog(`<span class="log-res">${winner.name}'s ${winner.ability}: gains 1 of every resource!</span>`);
+    }
+  }
+  if (loser.abilities.resourceGen?.trigger === 'death') {
+    const rg = loser.abilities.resourceGen;
+    const teamRes = loseTeam === 'red' ? G.redResources : G.blueResources;
+    teamRes[rg.resource] = (teamRes[rg.resource] || 0) + rg.amount;
+    addBattleLog(`<span class="log-res">${loser.name}'s ${loser.ability}: team gains ${rg.amount} ${RES_ICON[rg.resource]}!</span>`);
+  }
+
+  // Show KO overlay
+  const arena = document.getElementById('battle-arena');
+  const koOverlay = document.createElement('div');
+  koOverlay.className = 'ko-overlay';
+  koOverlay.innerHTML = `<div class="ko-text">K.O.</div><div class="ko-name">${loser.name} has fallen forever.</div>`;
+  arena.appendChild(koOverlay);
+
+  // Screen shake on KO
+  arena.classList.add('big-shake');
+  setTimeout(() => arena.classList.remove('big-shake'), 700);
+
+  const winColor = winTeam === 'red' ? 'var(--red)' : 'var(--blue)';
+  document.getElementById('battle-result').innerHTML =
+    `<span style="color:${winColor}">${winner.name} claims ${currentBattle.territoryName}!</span>`;
+
+  // Apply results to game state
+  const rWar = G.redWarband.find(w => w.id === r.id);
+  const bWar = G.blueWarband.find(w => w.id === b.id);
+  if (rWar) { rWar.hp = r.hp; if (r.hp <= 0) { rWar.ko = true; rWar.deployed = null; } }
+  if (bWar) { bWar.hp = b.hp; if (b.hp <= 0) { bWar.ko = true; bWar.deployed = null; } }
+
+  // Update winner HP in warband
+  const winWar = winTeam === 'red' ? rWar : bWar;
+  if (winWar) winWar.hp = winner.hp;
+
+  // Territory changes owner to winner
+  const oldOwner = G.territories[currentBattle.territoryId].owner;
+  G.territories[currentBattle.territoryId].owner = winTeam;
+  if (oldOwner !== winTeam) {
+    G.territoryChanges.push(currentBattle.territoryId);
+  }
+
+  // Remove KO'd ghosts from garrison
+  const gar = G.territories[currentBattle.territoryId].garrison;
+  G.territories[currentBattle.territoryId].garrison = gar.filter(gId => {
+    const w = getWarbandGhost(gId);
+    return w && !w.ko;
+  });
+
+  G.turnSummary.push({
+    type: 'battle', territory: currentBattle.territoryName,
+    winner: winner.name, winTeam, loser: loser.name, loseTeam,
+    rounds: currentBattle.round,
+  });
+
+  // Continue button
+  setTimeout(() => {
+    const controls = document.getElementById('battle-controls');
+    controls.innerHTML = `<button class="btn confirm" onclick="afterBattle()">Continue</button>`;
+  }, 800);
+}
+
+function afterBattle() {
+  // Remove KO overlay
+  const koOverlay = document.querySelector('.ko-overlay');
+  if (koOverlay) koOverlay.remove();
+
+  closeBattle();
+  if (G.pendingBattles.length > 0) {
+    setTimeout(() => startNextBattle(), 400);
+  } else {
+    checkVictory() || harvestPhase();
+  }
+}
+
+function closeBattle() {
+  document.getElementById('battle-overlay').classList.remove('active');
+  document.getElementById('battle-controls').innerHTML = `
+    <button class="btn" id="battle-roll-btn" onclick="battleRoll()">Roll Dice</button>
+    <button class="btn" id="battle-skip-btn" onclick="battleAutoFinish()" style="font-size:0.8rem; padding:8px 16px;">Auto-Finish</button>`;
+  document.getElementById('battle-red-dice').innerHTML = '';
+  document.getElementById('battle-blue-dice').innerHTML = '';
+  document.getElementById('battle-red-roll-label').textContent = '';
+  document.getElementById('battle-blue-roll-label').textContent = '';
+  document.getElementById('battle-red-roll-label').className = 'roll-label';
+  document.getElementById('battle-blue-roll-label').className = 'roll-label';
+  currentBattle = null;
+  renderMap();
+  renderPanels();
+  updateHud();
+}
+
+// ============================================================
+// HARVEST PHASE
+// ============================================================
+function harvestPhase() {
+  G.phase = 'harvest';
+  updateHud();
+
+  const harvestLog = [];
+
+  ['red','blue'].forEach(team => {
+    const res = team === 'red' ? G.redResources : G.blueResources;
+    const gains = {};
+    Object.entries(G.territories).forEach(([tid, state]) => {
+      if (state.owner === team) {
+        const t = TERRITORIES.find(t => t.id === tid);
+        if (t && t.resource && res[t.resource] !== undefined) {
+          res[t.resource]++;
+          gains[t.resource] = (gains[t.resource] || 0) + 1;
+        }
+      }
+    });
+    Object.entries(gains).forEach(([res, amt]) => {
+      harvestLog.push({ team, resource: res, amount: amt });
+    });
+  });
+
+  // Heal garrisoned ghosts +1 HP between turns
+  [...G.redWarband, ...G.blueWarband].forEach(w => {
+    if (!w.ko && w.deployed && w.hp < w.maxHp) {
+      w.hp = Math.min(w.maxHp, w.hp + 1);
+    }
+  });
+
+  renderPanels();
+
+  // Build turn summary
+  G.turnSummary.push(...harvestLog.map(h => ({
+    type: 'harvest', team: h.team, resource: h.resource, amount: h.amount
+  })));
+
+  if (!checkVictory()) {
+    showTurnSummary();
+  }
+}
+
+function showTurnSummary() {
+  const el = document.getElementById('turn-summary');
+  document.getElementById('summary-title').textContent = `Turn ${G.turn} Complete`;
+
+  const list = document.getElementById('summary-list');
+  let html = '';
+
+  // Territory changes
+  const captures = G.turnSummary.filter(s => s.type === 'capture');
+  const battles = G.turnSummary.filter(s => s.type === 'battle');
+  const harvests = G.turnSummary.filter(s => s.type === 'harvest');
+
+  if (captures.length) {
+    captures.forEach(c => {
+      const color = c.team === 'red' ? 'var(--red)' : 'var(--blue)';
+      html += `<p class="s-territory"><span style="color:${color}">${c.team === 'red' ? 'Red' : 'Blue'}</span> captured <strong>${c.territory}</strong></p>`;
+    });
+  }
+
+  if (battles.length) {
+    battles.forEach(b => {
+      const color = b.winTeam === 'red' ? 'var(--red)' : 'var(--blue)';
+      html += `<p><span style="color:${color}">${b.winner}</span> defeated <span class="s-loss">${b.loser}</span> at <strong>${b.territory}</strong> (${b.rounds} rounds)</p>`;
+    });
+  }
+
+  if (harvests.length) {
+    html += `<p style="margin-top:8px; color:var(--gold); font-weight:600;">Resources Harvested:</p>`;
+    ['red', 'blue'].forEach(team => {
+      const teamHarvests = harvests.filter(h => h.team === team);
+      if (teamHarvests.length) {
+        const color = team === 'red' ? 'var(--red)' : 'var(--blue)';
+        const items = teamHarvests.map(h => `${RES_ICON[h.resource]} ${h.amount}`).join(' ');
+        html += `<p class="s-gain"><span style="color:${color}">${team === 'red' ? 'Red' : 'Blue'}</span>: ${items}</p>`;
+      }
+    });
+  }
+
+  // Warband status
+  const redAlive = G.redWarband.filter(w => !w.ko).length;
+  const blueAlive = G.blueWarband.filter(w => !w.ko).length;
+  html += `<p style="margin-top:8px; color:var(--text-dim);">Warband: Red ${redAlive}/8, Blue ${blueAlive}/8</p>`;
+
+  if (!html) html = '<p>A quiet turn. No battles fought.</p>';
+  list.innerHTML = html;
+
+  el.classList.add('active');
+}
+
+function closeSummary() {
+  document.getElementById('turn-summary').classList.remove('active');
+  nextTurn();
+}
+
+function checkVictory() {
+  const redCount = Object.values(G.territories).filter(t => t.owner === 'red').length;
+  const blueCount = Object.values(G.territories).filter(t => t.owner === 'blue').length;
+
+  const redStronghold = G.territories['t7'];
+  const blueStronghold = G.territories['t11'];
+
+  if (redCount >= G.winTarget || (blueStronghold && blueStronghold.owner === 'red')) {
+    showVictory('red');
+    return true;
+  }
+  if (blueCount >= G.winTarget || (redStronghold && redStronghold.owner === 'blue')) {
+    showVictory('blue');
+    return true;
+  }
+
+  const redAlive = G.redWarband.filter(w => !w.ko).length;
+  const blueAlive = G.blueWarband.filter(w => !w.ko).length;
+  if (redAlive === 0) { showVictory('blue'); return true; }
+  if (blueAlive === 0) { showVictory('red'); return true; }
+
+  return false;
+}
+
+function showVictory(team) {
+  G.phase = 'victory';
+  const screen = document.getElementById('victory-screen');
+  screen.classList.add('active');
+
+  const title = document.getElementById('victory-title');
+  const sub = document.getElementById('victory-sub');
+  const color = team === 'red' ? 'var(--red)' : 'var(--blue)';
+  const name = team === 'red' ? 'Red' : 'Blue';
+  title.style.color = color;
+  title.textContent = `${name} Wins!`;
+  sub.textContent = `${name} has conquered the Spirit Realm in ${G.turn} turns!`;
+
+  // Stats
+  const stats = G.stats[team];
+  const warband = team === 'red' ? G.redWarband : G.blueWarband;
+  const surviving = warband.filter(w => !w.ko);
+  const territories = Object.values(G.territories).filter(t => t.owner === team).length;
+
+  const statsHtml = `
+    <div class="victory-stat"><div class="stat-label">Territories Held</div><div class="stat-value">${territories}</div></div>
+    <div class="victory-stat"><div class="stat-label">Battles Won</div><div class="stat-value">${stats.battlesWon}</div></div>
+    <div class="victory-stat"><div class="stat-label">Ghosts Surviving</div><div class="stat-value">${surviving.length}/${warband.length}</div></div>
+    <div class="victory-stat"><div class="stat-label">Total Damage</div><div class="stat-value">${stats.totalDamage}</div></div>
+  `;
+  document.getElementById('victory-stats').innerHTML = statsHtml;
+
+  // Campaign score
+  const efficiencyBonus = Math.max(0, 20 - G.turn) * 10;
+  const ghostBonus = surviving.length * 25;
+  const territoryBonus = territories * 15;
+  const battleBonus = stats.battlesWon * 20;
+  const totalScore = efficiencyBonus + ghostBonus + territoryBonus + battleBonus;
+  document.getElementById('victory-score').textContent = `Campaign Score: ${totalScore}`;
+}
+
+function nextTurn() {
+  G.turn++;
+  G.phase = 'orders';
+  G.orderPhaseTeam = 'red';
+  G.selectedGhost = null;
+  G.selectedTerritory = null;
+  G.deployCount = 0;
+
+  // Un-deploy all ghosts for fresh orders (ghosts stay alive, permadeath is real)
+  [...G.redWarband, ...G.blueWarband].forEach(w => {
+    w.deployed = null;
+    w.consecutiveWins = 0;
+  });
+  Object.values(G.territories).forEach(s => {
+    s.garrison = [];
+  });
+  G.orders = { red: {}, blue: {} };
+  G.turnSummary = [];
+
+  renderMap();
+  renderPanels();
+  updateHud();
+}
+
+// ============================================================
+// TOOLTIP
+// ============================================================
+function showTooltip(e, ghostId) {
+  const g = ghostById(ghostId);
+  if (!g) return;
+  const tt = document.getElementById('card-tooltip');
+  document.getElementById('tt-name').textContent = g.name;
+  const rarityLabel = g.rarity === 'ghost-rare' ? 'Ghost Rare' : g.rarity.charAt(0).toUpperCase() + g.rarity.slice(1);
+  document.getElementById('tt-stats').textContent = `${rarityLabel} | ${g.maxHp} HP | ${g.set}`;
+  document.getElementById('tt-ability').textContent = g.ability;
+  document.getElementById('tt-desc').textContent = g.abilityDesc;
+  tt.classList.add('active');
+  tt.style.left = Math.min(e.clientX + 10, window.innerWidth - 300) + 'px';
+  tt.style.top = Math.min(e.clientY - 10, window.innerHeight - 200) + 'px';
+}
+function hideTooltip() {
+  document.getElementById('card-tooltip').classList.remove('active');
+}
+
+// ============================================================
+// ORDER CONTROLS
+// ============================================================
+function renderOrderControls() {
+  if (G.phase !== 'orders') {
+    const btn = document.getElementById('end-orders-btn');
+    if (btn) btn.remove();
+    return;
+  }
+  const hud = document.querySelector('.hud');
+  let btn = document.getElementById('end-orders-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'end-orders-btn';
+    btn.className = 'btn confirm';
+    btn.onclick = endOrderPhase;
+    hud.querySelector('.hud-right').appendChild(btn);
+  }
+  const team = G.orderPhaseTeam;
+  const warband = team === 'red' ? G.redWarband : G.blueWarband;
+  const deployed = warband.filter(w => w.deployed).length;
+  btn.textContent = `End Orders (${deployed} deployed)`;
+}
+
+</script>
+</body>
+</html>
