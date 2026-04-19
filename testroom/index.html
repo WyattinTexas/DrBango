@@ -2400,7 +2400,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v750';
+const TESTROOM_VERSION = 'v751';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3905,6 +3905,8 @@ const CURATED_TEAMS = [
   [423, 315, 415],
   // #75 Carpenter's Workshop — Dart fights first generating Surge, Carpenter enters and uses Surge to evolve up the chain, Bilbo adds +2 singles from sideline
   [209, 449, 80],
+  // #76 Dark Pressure — Ryder Toll forces opponent choice (1 dmg or Sacred Fire), Tyler doubles Sacred Fire damage, Princess Shade +1 on all pre-roll chip damage
+  [456, 105, 436],
 ];
 
 // --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
@@ -5309,6 +5311,30 @@ function doRiderChoice(choice) {
       if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 456; }
       subtitle = `${oppLabel}'s ${oppGhost.name} takes 1 damage! (${oppGhost.hp}/${oppGhost.maxHp} HP)`;
       log(`<span class="log-ability">${oppLabel}</span> chose to take 1 damage from Ryder's Toll! ${oppGhost.name} → ${oppGhost.hp}/${oppGhost.maxHp} HP.`);
+      // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
+      if (oppGhost.id === 24 && !oppGhost.ko) {
+        tp.team.resources.fire = (tp.team.resources.fire || 0) + 1;
+        queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Toll damage → +1 Sacred Fire!`, tp.oppTeamName);
+        log(`<span class="log-ability">Simon</span> — Brew Time! Took Toll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+      }
+      // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius 45)
+      if (!oppGhost.ko && hasSideline(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
+        oppGhost.hp = Math.max(0, oppGhost.hp - 1);
+        if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 436; }
+        queueAbility('BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${oppGhost.name}!`, tp.riderTeam);
+        log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
+        popSidelineCard(B[tp.riderTeam], 436);
+        // Simon takes Bounty damage too
+        if (oppGhost.id === 24 && !oppGhost.ko) {
+          tp.team.resources.fire = (tp.team.resources.fire || 0) + 1;
+          queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Bounty damage → +1 Sacred Fire!`, tp.oppTeamName);
+          log(`<span class="log-ability">Simon</span> — Brew Time! Took Bounty damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+        }
+      } else if (!oppGhost.ko && hasSideline(B[tp.riderTeam], 436) && hasSideline(tp.team, 45)) {
+        const cornGhost = getSidelineGhost(tp.team, 45);
+        queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Princess Shade's Bounty!`, tp.oppTeamName);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
+      }
     }
   } else {
     // Give Ryder +1 Sacred Fire

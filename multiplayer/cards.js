@@ -413,7 +413,8 @@ const GHOSTS = [
   // === BETA PROMO CARDS ===
   {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Aquatic spirit. Slipstream swaps your 2 for opponent's best die."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"../testroom/art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Water-and-fire spirit. Sacrifice HP for massive dice surge."},
-  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"../testroom/art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline & In Play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. Rewards resource diversity from the bench."}
+  {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:2, art:"../testroom/art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"Sideline & In Play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. Rewards resource diversity from the bench."},
+  {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"../testroom/art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo. Psychological warfare — opponent faces a lose-lose every round."}
 ];
 
 
