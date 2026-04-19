@@ -503,6 +503,22 @@ function showEncounterPreview(card, onFight, onFlee) {
   const rg = rarityGlow(card.rarity);
   const art = artPath(card.id);
 
+  // Power comparison
+  let powerLabel = '';
+  let powerColor = '#f0d860';
+  if (typeof G !== 'undefined' && G && G.party) {
+    const playerGhost = ENGINE.activeGhost(G.party);
+    if (playerGhost) {
+      const pHp = playerGhost.hp;
+      const eHp = ghost.hp;
+      if (eHp > pHp + 2) { powerLabel = '⚠️ DANGEROUS'; powerColor = '#e94560'; }
+      else if (eHp < pHp - 2) { powerLabel = 'Easy prey'; powerColor = '#2ecc71'; }
+      else { powerLabel = 'Evenly matched'; powerColor = '#f0d860'; }
+    }
+  }
+
+  const abilityDesc = card.desc || ghost.abilityDesc || '';
+
   const modalBody = `
     <div style="text-align:center;animation:encounterSlideIn .4s ease-out">
       <style>
@@ -532,6 +548,26 @@ function showEncounterPreview(card, onFight, onFlee) {
         font:700 11px 'Press Start 2P',monospace;
         color:${rc};letter-spacing:1px;
       ">${RARITY_LABELS[card.rarity] || 'COMMON'}</div>
+
+      ${powerLabel ? `<div style="
+        margin-top:10px;
+        font:700 10px 'Press Start 2P',monospace;
+        color:${powerColor};letter-spacing:1px;
+      ">${powerLabel}</div>` : ''}
+
+      ${card.ability ? `<div style="
+        margin-top:8px;
+        font:700 13px 'Cinzel',serif;
+        color:#f0d860;
+      ">${card.ability}</div>` : ''}
+      ${abilityDesc ? `<div style="
+        margin-top:4px;
+        font:12px/1.4 'Crimson Text',serif;
+        color:rgba(255,255,255,.55);
+        font-style:italic;
+        max-width:280px;
+        margin-left:auto;margin-right:auto;
+      ">${abilityDesc}</div>` : ''}
     </div>
   `;
 
