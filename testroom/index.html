@@ -1846,10 +1846,10 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
-<!-- Sophia (457) — Artisan choice modal -->
+<!-- Sophia (457) — Masquerade choice modal -->
 <div class="selene-overlay" id="sophiaOverlay">
   <div class="selene-modal">
-    <div class="selene-banner" style="background:linear-gradient(135deg,#2a1a3a,#6b3aaa);">🎭 ARTISAN!</div>
+    <div class="selene-banner" style="background:linear-gradient(135deg,#2a1a3a,#6b3aaa);">🎭 MASQUERADE!</div>
     <h3>Sophia wins! Choose a mask:</h3>
     <p class="selene-sub" id="sophiaSub">Deal damage or gain a mask?</p>
     <div class="selene-options">
@@ -2879,7 +2879,7 @@ const GHOSTS = [
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
-  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Artisan", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."}
+  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."}
 ];
 
 // ============================================================
@@ -3395,7 +3395,7 @@ function autoPlayNext() {
     welderTorch: { red: false, blue: false },
     foremanDieBonus: { red: 0, blue: 0 },
     carpenterDiceTrade: { red: 0, blue: 0 },
-    // Sophia (457) — Artisan: Mask of Day / Mask of Night
+    // Sophia (457) — Masquerade: Mask of Day / Mask of Night
     sophiaMask: { red: null, blue: null },
     sophiaMaskActive: { red: false, blue: false },
   };
@@ -5179,7 +5179,7 @@ function doWiseAlChoice(choice) {
   drainAbilityQueue(() => { if (wp.resume) wp.resume(); });
 }
 
-// Sophia (457) — Artisan: show choice modal
+// Sophia (457) — Masquerade: show choice modal
 function showSophiaModal(resumeCallback) {
   const sp = B.sophiaPending;
   if (!sp) { resumeCallback(); return; }
@@ -5199,9 +5199,9 @@ function doSophiaChoice(choice) {
     B.sophiaMaskActive[sp.winTeamName] = true;
     const maskName = choice === 'day' ? '☀️ Mask of Day' : '🌙 Mask of Night';
     const maskDesc = choice === 'day' ? 'Gain 1 Burn for each 1 you roll' : 'Roll the same number of dice as the enemy ghost, +1 damage';
-    collectKC(sp.winTeamName, sp.wF.name);
-    log(`<span class="log-ability">${sp.wF.name}</span> — Artisan! Gained <b>${maskName}</b> instead of dealing damage! (${maskDesc})`);
-    queueAbility('ARTISAN!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
+    checkKnightEffects(sp.winTeamName, sp.wF.name);
+    log(`<span class="log-ability">${sp.wF.name}</span> — Masquerade! Gained <b>${maskName}</b> instead of dealing damage! (${maskDesc})`);
+    queueAbility('MASQUERADE!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
   } else {
     // Deal the stashed damage
     sp.lF.hp = Math.max(0, sp.lF.hp - sp.dmg);
@@ -13644,22 +13644,22 @@ function _resolveRoundImpl() {
     }
   }
 
-  // Sophia (457) — Artisan: Win: you MAY gain Mask of Day or Mask of Night instead of dealing damage (once per game)
-  let sophiaArtisaned = false;
+  // Sophia (457) — Masquerade: Win: you MAY gain Mask of Day or Mask of Night instead of dealing damage (once per game)
+  let sophiaMasqueraded = false;
   if (wF.id === 457 && !wF.ko && dmg > 0 && !B.sophiaMask[winTeamName]) {
     if (autoPlayRunning) {
       // AI auto-picks: take Mask of Night (anti-dice is stronger for AI)
       B.sophiaMask[winTeamName] = 'night';
       B.sophiaMaskActive[winTeamName] = true;
       dmg = 0;
-      sophiaArtisaned = true;
+      sophiaMasqueraded = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Artisan! Gained <b>🌙 Mask of Night</b> instead of dealing damage! (Roll the same number of dice as the enemy ghost, +1 damage)`);
+      log(`<span class="log-ability">${wF.name}</span> — Masquerade! Gained <b>🌙 Mask of Night</b> instead of dealing damage! (Roll the same number of dice as the enemy ghost, +1 damage)`);
     } else {
       // Human player: defer to modal choice
       B.sophiaPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
       dmg = 0;
-      sophiaArtisaned = true;
+      sophiaMasqueraded = true;
     }
   }
 
