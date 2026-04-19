@@ -2400,7 +2400,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v751';
+const TESTROOM_VERSION = 'v752';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16570,7 +16570,14 @@ function aiTick() {
       // Save the best ghost for last: pick the WEAKER one now
       // "Best" = highest rarity, then highest HP
       const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+      // Bo (109) + Lucas (433) combo: keep Lucas on sideline for Kindling triggers
+      const boOnTeam = t.ghosts.some(g => g.id === 109 && !g.ko);
       alive.sort((a, b) => {
+        if (boOnTeam) {
+          const aIsLucas = a.id === 433 ? 1 : 0;
+          const bIsLucas = b.id === 433 ? 1 : 0;
+          if (aIsLucas !== bIsLucas) return aIsLucas - bIsLucas;
+        }
         const rd = (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0);
         if (rd !== 0) return rd;
         return b.hp - a.hp;
@@ -16626,11 +16633,13 @@ function aiTick() {
     }
   }
 
-  // Ryder Toll: AI takes 1 damage (less punishing than stacking Sacred Fire)
+  // Ryder Toll: AI takes 1 damage unless it would KO them (HP <= 1), then give Sacred Fire
   if (B.riderPending && B.riderPending.oppTeamName === 'blue') {
     const riderOverlay = document.getElementById('riderOverlay');
     if (riderOverlay && riderOverlay.classList.contains('active')) {
-      setTimeout(() => doRiderChoice('damage'), 600);
+      const aiActive = active(B.blue);
+      const choice = (aiActive && aiActive.hp <= 1) ? 'sacredfire' : 'damage';
+      setTimeout(() => doRiderChoice(choice), 600);
       return;
     }
   }
@@ -16642,9 +16651,12 @@ function aiTick() {
     return;
   }
 
-  // Toby Pure Heart: never gamble (conservative AI)
+  // Toby Pure Heart: declare when AI is losing (fewer remaining ghosts) or Toby is last ghost
   if (B.tobyPending && B.tobyPending.team === 'blue') {
-    setTimeout(() => doTobyPureHeart(false), 600);
+    const blueAlive = S.blue.filter(g => g.hp > 0).length;
+    const redAlive = S.red.filter(g => g.hp > 0).length;
+    const shouldDeclare = blueAlive < redAlive || blueAlive === 1;
+    setTimeout(() => doTobyPureHeart(shouldDeclare), 600);
     return;
   }
 
@@ -16757,7 +16769,14 @@ function aiTick() {
       if (sidelineAlive.length > 0) {
         // Save the best ghost: pick the weaker one now (same logic as KO swap)
         const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+        // Bo (109) + Lucas (433) combo: keep Lucas on sideline for Kindling triggers
+        const boOnTeamP = blueTeam.ghosts.some(g => g.id === 109 && !g.ko);
         sidelineAlive.sort((a, b) => {
+          if (boOnTeamP) {
+            const aIsLucas = a.ghost.id === 433 ? 1 : 0;
+            const bIsLucas = b.ghost.id === 433 ? 1 : 0;
+            if (aIsLucas !== bIsLucas) return aIsLucas - bIsLucas;
+          }
           const rd = (rarityRank[b.ghost.rarity] || 0) - (rarityRank[a.ghost.rarity] || 0);
           if (rd !== 0) return rd;
           return b.ghost.hp - a.ghost.hp;
