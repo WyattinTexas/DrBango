@@ -152,10 +152,42 @@ canvas{position:absolute;top:0;left:0}
 .die{width:38px;height:38px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 18px 'Press Start 2P',monospace;transition:all .3s}
 .die.win{border-color:#2ecc71;color:#2ecc71;background:rgba(46,204,113,.08);box-shadow:0 0 8px rgba(46,204,113,.2)}
 .die.lose{border-color:#e94560;color:#e94560;background:rgba(233,69,96,.08)}
-.die.rolling{animation:diceRoll .4s ease-out}
-@keyframes diceRoll{0%{transform:rotateZ(0) scale(.5);opacity:0}60%{transform:rotateZ(360deg) scale(1.1)}100%{transform:rotateZ(360deg) scale(1);opacity:1}}
+.die.triples-glow{box-shadow:0 0 20px rgba(251,191,36,.7);border-color:#fbbf24;transform:scale(1.2)}
+.die.rolling{animation:diceShake .12s infinite}
+.die.hidden{opacity:0;transform:scale(.5)}
+.die.revealed{animation:diceReveal .3s ease-out forwards}
+@keyframes diceShake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg) scale(1.08)}75%{transform:rotate(8deg) scale(1.08)}}
+@keyframes diceReveal{0%{transform:scale(.5) rotate(-10deg);opacity:0}60%{transform:scale(1.15) rotate(3deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
 #b-result{font:700 14px 'Cinzel',serif;min-height:20px;text-align:center}
 #b-callout{font:700 13px 'Cinzel',serif;color:#f0d860;min-height:18px;text-align:center;transition:opacity .3s}
+
+/* ═══ BATTLE JUICE ═══ */
+.screen-shake{animation:screenShake .5s ease-out}
+@keyframes screenShake{0%,100%{transform:translateX(0)}10%{transform:translateX(-8px)}30%{transform:translateX(8px)}50%{transform:translateX(-4px)}70%{transform:translateX(4px)}90%{transform:translateX(-2px)}}
+.battle-side.hit{animation:hitShake .5s ease-out}
+@keyframes hitShake{0%{transform:translate(0) scale(1)}10%{transform:translate(-8px,4px) scale(.97)}25%{transform:translate(6px,-5px) scale(1.02)}40%{transform:translate(-5px,3px)}55%{transform:translate(3px,-2px)}70%{transform:translate(-2px,1px)}100%{transform:translate(0) scale(1)}}
+.battle-side.ability-fire{animation:abilityGlow 1.2s ease-out forwards}
+@keyframes abilityGlow{0%{filter:brightness(1)}30%{filter:brightness(1.15) drop-shadow(0 0 18px rgba(240,216,96,.8))}100%{filter:brightness(1) drop-shadow(0 0 0 transparent)}}
+.hp-bar-inner.critical{animation:hpPulse .8s ease-in-out infinite}
+@keyframes hpPulse{0%,100%{opacity:1}50%{opacity:.65}}
+
+/* Triples banner */
+#triples-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.3);z-index:800;
+  font:900 4rem 'Cinzel',serif;opacity:0;pointer-events:none;letter-spacing:6px}
+#triples-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1);transition:opacity .2s,transform .4s cubic-bezier(.34,1.56,.64,1)}
+#triples-banner.fade{opacity:0;transform:translate(-50%,-50%) scale(1.3);transition:opacity .4s,transform .4s ease-in}
+#triples-banner.player{color:#2ecc71;text-shadow:0 0 40px rgba(46,204,113,.8),0 0 80px rgba(46,204,113,.4),0 4px 8px rgba(0,0,0,.6)}
+#triples-banner.enemy{color:#e94560;text-shadow:0 0 40px rgba(233,69,96,.8),0 0 80px rgba(233,69,96,.4),0 4px 8px rgba(0,0,0,.6)}
+#triples-flash{position:fixed;inset:0;z-index:799;pointer-events:none;opacity:0}
+#triples-flash.player-flash{background:radial-gradient(ellipse at center,rgba(46,204,113,.3),transparent 70%)}
+#triples-flash.enemy-flash{background:radial-gradient(ellipse at center,rgba(233,69,96,.3),transparent 70%)}
+
+/* Floating damage numbers */
+.float-damage{position:fixed;z-index:810;font:900 28px 'Press Start 2P',monospace;pointer-events:none;
+  animation:floatUp 1.2s ease-out forwards}
+.float-damage.player-dmg{color:#e94560;text-shadow:0 2px 8px rgba(233,69,96,.6)}
+.float-damage.enemy-dmg{color:#2ecc71;text-shadow:0 2px 8px rgba(46,204,113,.6)}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1.2)}30%{transform:translateY(-30px) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(.8)}}
 #b-log{font:12px 'Crimson Text',serif;opacity:.6;max-height:70px;overflow-y:auto;text-align:center;padding:0 16px;line-height:1.4;width:100%;max-width:480px}
 #b-actions{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;justify-content:center}
 #b-actions button{background:rgba(255,255,255,.06);border:2px solid rgba(255,240,200,.15);border-radius:8px;color:#f0e8d8;font:700 13px 'Cinzel',serif;padding:8px 20px;cursor:pointer;transition:all .15s}
@@ -296,6 +328,8 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <div id="battle-flash"></div>
+<div id="triples-banner"></div>
+<div id="triples-flash"></div>
 
 <div id="boss-intro">
   <img class="boss-intro-art" id="boss-intro-art" src="">
@@ -1630,6 +1664,7 @@ function showCallout(text, color) {
 function doBattleRound() {
   const bs = battleState;
   bs.round++;
+  setBattleActions([]); // Disable actions during animation
 
   // Fire entry abilities on first round
   if (bs.round === 1) {
@@ -1638,6 +1673,13 @@ function doBattleRound() {
     ENGINE.triggerEntryAbility(bs.enemyTeam, bs.playerTeam, entryResult);
     if (entryResult.events.length) {
       logBattle(entryResult.events.join(' | '));
+      // Show entry callouts with proper timing
+      entryResult.events.forEach((evt, i) => {
+        setTimeout(() => {
+          showCallout(evt, '#f0d860');
+          fireAbilityGlow('player');
+        }, i * 1500);
+      });
     }
   }
 
@@ -1653,92 +1695,201 @@ function doBattleRound() {
     result.events.push('💎 Power Crystal: +2 damage!');
   }
 
-  // Sound effects
-  playSFX('dice');
-  if (result.winner !== 'tie') {
-    const dmg = result.winner === 'a' ? result.enemyDamageDealt : result.playerDamageDealt;
-    setTimeout(() => {
-      if (dmg >= 3) playSFX('dmg3');
-      else if (dmg >= 2) playSFX('dmg2');
-      else if (dmg >= 1) playSFX('dmg1');
-      if (result.playerRoll.type === 'triples' || result.enemyRoll.type === 'triples') playSFX('triples');
-    }, 400);
-  }
-
-  // Animated dice reveal
-  const diceArea = document.getElementById('b-dice-area');
   const pWin = result.winner === 'a';
   const eWin = result.winner === 'b';
+  const diceArea = document.getElementById('b-dice-area');
+  const resultEl = document.getElementById('b-result');
+  resultEl.textContent = '';
+
+  // Phase 1: Show rolling dice (all hidden, then rolling)
+  playSFX('dice');
+  const pCount = result.playerDice.length;
+  const eCount = result.enemyDice.length;
   diceArea.innerHTML = `
-    <div class="dice-group">${result.playerDice.map(d => `<div class="die rolling ${pWin?'win':eWin?'lose':''}">${d}</div>`).join('')}</div>
-    <div class="dice-group">${result.enemyDice.map(d => `<div class="die rolling ${eWin?'win':pWin?'lose':''}">${d}</div>`).join('')}</div>
+    <div class="dice-group" id="p-dice">${result.playerDice.map((d,i) => `<div class="die rolling" id="pd-${i}">?</div>`).join('')}</div>
+    <div style="font:900 16px 'Cinzel',serif;color:rgba(255,255,255,.3)">VS</div>
+    <div class="dice-group" id="e-dice">${result.enemyDice.map((d,i) => `<div class="die rolling" id="ed-${i}">?</div>`).join('')}</div>
   `;
 
-  // Result text
-  const resultEl = document.getElementById('b-result');
-  const pRoll = ENGINE.describeRoll(result.playerRoll);
-  const eRoll = ENGINE.describeRoll(result.enemyRoll);
-  if (pWin) {
-    resultEl.innerHTML = `<span style="color:#90e070">${pRoll} — WIN!</span> vs <span style="opacity:.5">${eRoll}</span>`;
-    if (result.enemyDamageDealt > 0) showCallout(`${result.enemyDamageDealt} DAMAGE!`, '#e05050');
-  } else if (eWin) {
-    resultEl.innerHTML = `<span style="opacity:.5">${pRoll}</span> vs <span style="color:#e05050">${eRoll} — LOSE</span>`;
-    if (result.playerDamageDealt > 0) showCallout(`${result.playerDamageDealt} DAMAGE!`, '#e05050');
-  } else {
-    resultEl.innerHTML = `<span style="color:#f0d860">TIE — ${pRoll}</span>`;
+  // Phase 2: Staggered dice reveal (300ms per die)
+  const revealDelay = 600; // Wait before first reveal
+  const stagger = 300;
+  const allDice = Math.max(pCount, eCount);
+
+  for (let i = 0; i < allDice; i++) {
+    setTimeout(() => {
+      // Reveal player die
+      const pd = document.getElementById(`pd-${i}`);
+      if (pd) { pd.classList.remove('rolling'); pd.classList.add('revealed'); pd.textContent = result.playerDice[i]; }
+      // Reveal enemy die
+      const ed = document.getElementById(`ed-${i}`);
+      if (ed) { ed.classList.remove('rolling'); ed.classList.add('revealed'); ed.textContent = result.enemyDice[i]; }
+    }, revealDelay + i * stagger);
   }
 
-  // Show ability events as callouts
-  for (let i = 0; i < result.events.length; i++) {
-    setTimeout(() => showCallout(result.events[i], '#f0d860'), 600 + i * 800);
-  }
+  // Phase 3: After all dice revealed — highlight, show result
+  const allRevealed = revealDelay + allDice * stagger + 200;
 
-  // Log events
-  for (const evt of result.events) logBattle(evt);
-
-  updateBattleUI();
-
-  // Check for battle end
-  const pGhost = ENGINE.activeGhost(bs.playerTeam);
-  const eGhost = ENGINE.activeGhost(bs.enemyTeam);
-
-  if (eGhost.ko) {
-    if (ENGINE.isTeamDefeated(bs.enemyTeam)) {
-      logBattle('VICTORY!');
-      setBattleActions([{ text: 'CONTINUE', cls: 'attack', action: () => endBattle() }]);
-      return;
+  setTimeout(() => {
+    // Highlight winning/losing dice
+    for (let i = 0; i < pCount; i++) {
+      const pd = document.getElementById(`pd-${i}`);
+      if (pd) pd.classList.add(pWin ? 'win' : eWin ? 'lose' : '');
     }
-    // Enemy has more ghosts — auto-swap to next alive
-    const nextIdx = bs.enemyTeam.ghosts.findIndex((g, i) => i !== bs.enemyTeam.activeIdx && !g.ko);
-    if (nextIdx >= 0) {
-      bs.enemyTeam.activeIdx = nextIdx;
-      logBattle(`${ENGINE.activeGhost(bs.enemyTeam).name} enters the battle!`);
-      updateBattleUI();
+    for (let i = 0; i < eCount; i++) {
+      const ed = document.getElementById(`ed-${i}`);
+      if (ed) ed.classList.add(eWin ? 'win' : pWin ? 'lose' : '');
     }
-  }
 
-  if (pGhost.ko) {
-    const aliveCount = ENGINE.aliveGhosts(bs.playerTeam).length;
-    if (aliveCount === 0) {
-      logBattle('DEFEATED... Return to nearest camp.');
-      setBattleActions([{ text: 'CONTINUE', action: () => { endBattle(); handleDefeat(); } }]);
-      return;
+    // Check for triples/quads/penta
+    const pIsSpecial = ['triples','quads','penta'].includes(result.playerRoll.type);
+    const eIsSpecial = ['triples','quads','penta'].includes(result.enemyRoll.type);
+
+    if (pIsSpecial || eIsSpecial) {
+      showTriplesEffect(pIsSpecial ? 'player' : 'enemy', pIsSpecial ? result.playerRoll.type : result.enemyRoll.type);
+      // Glow matching dice
+      const side = pIsSpecial ? 'pd' : 'ed';
+      const count = pIsSpecial ? pCount : eCount;
+      for (let i = 0; i < count; i++) {
+        const d = document.getElementById(`${side}-${i}`);
+        if (d) d.classList.add('triples-glow');
+      }
     }
-    // Let player choose swap
-    showSwapModal(bs.playerTeam, () => {
-      updateBattleUI();
-      showRollActions();
+  }, allRevealed);
+
+  // Phase 4: Result text + damage (after a beat of suspense)
+  const resultDelay = allRevealed + ((['triples','quads','penta'].includes(result.playerRoll.type) || ['triples','quads','penta'].includes(result.enemyRoll.type)) ? 1200 : 400);
+
+  setTimeout(() => {
+    const pRoll = ENGINE.describeRoll(result.playerRoll);
+    const eRoll = ENGINE.describeRoll(result.enemyRoll);
+
+    if (pWin) {
+      resultEl.innerHTML = `<span style="color:#90e070">${pRoll} — WIN!</span> vs <span style="opacity:.5">${eRoll}</span>`;
+      if (result.enemyDamageDealt > 0) {
+        // Screen shake + hit effect on enemy
+        document.body.classList.add('screen-shake');
+        setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+        const eSide = document.getElementById('b-enemy');
+        eSide.classList.add('hit');
+        setTimeout(() => eSide.classList.remove('hit'), 500);
+        // Floating damage number
+        showFloatingDamage(result.enemyDamageDealt, 'enemy-dmg');
+        // Damage SFX
+        if (result.enemyDamageDealt >= 3) playSFX('dmg3');
+        else if (result.enemyDamageDealt >= 2) playSFX('dmg2');
+        else playSFX('dmg1');
+      }
+    } else if (eWin) {
+      resultEl.innerHTML = `<span style="opacity:.5">${pRoll}</span> vs <span style="color:#e05050">${eRoll} — LOSE</span>`;
+      if (result.playerDamageDealt > 0) {
+        document.body.classList.add('screen-shake');
+        setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+        const pSide = document.getElementById('b-player');
+        pSide.classList.add('hit');
+        setTimeout(() => pSide.classList.remove('hit'), 500);
+        showFloatingDamage(result.playerDamageDealt, 'player-dmg');
+        if (result.playerDamageDealt >= 3) playSFX('dmg3');
+        else if (result.playerDamageDealt >= 2) playSFX('dmg2');
+        else playSFX('dmg1');
+      }
+    } else {
+      resultEl.innerHTML = `<span style="color:#f0d860">TIE — ${pRoll}</span>`;
+    }
+
+    updateBattleUI();
+
+    // Phase 5: Ability callouts (1300ms spacing)
+    const abilityStart = 600;
+    result.events.forEach((evt, i) => {
+      setTimeout(() => {
+        showCallout(evt, '#f0d860');
+        logBattle(evt);
+        fireAbilityGlow(pWin ? 'player' : 'enemy');
+      }, abilityStart + i * 1300);
     });
-    return;
-  }
 
-  if (result.winner === 'tie') {
-    // Auto re-roll on tie
-    setBattleActions([{ text: 'RE-ROLL', cls: 'attack', action: () => doBattleRound() }]);
-    return;
-  }
+    // Phase 6: Post-round resolution (after abilities)
+    const resolveDelay = abilityStart + result.events.length * 1300 + 500;
 
-  showRollActions();
+    setTimeout(() => {
+      const pGhost = ENGINE.activeGhost(bs.playerTeam);
+      const eGhost = ENGINE.activeGhost(bs.enemyTeam);
+
+      if (eGhost.ko) {
+        if (ENGINE.isTeamDefeated(bs.enemyTeam)) {
+          logBattle('VICTORY!');
+          playSFX('win');
+          setBattleActions([{ text: 'CONTINUE', cls: 'attack', action: () => endBattle() }]);
+          return;
+        }
+        const nextIdx = bs.enemyTeam.ghosts.findIndex((g, i) => i !== bs.enemyTeam.activeIdx && !g.ko);
+        if (nextIdx >= 0) {
+          bs.enemyTeam.activeIdx = nextIdx;
+          logBattle(`${ENGINE.activeGhost(bs.enemyTeam).name} enters the battle!`);
+          updateBattleUI();
+        }
+      }
+
+      if (pGhost.ko) {
+        const aliveCount = ENGINE.aliveGhosts(bs.playerTeam).length;
+        if (aliveCount === 0) {
+          logBattle('DEFEATED...');
+          setBattleActions([{ text: 'CONTINUE', action: () => { endBattle(); handleDefeat(); } }]);
+          return;
+        }
+        showSwapModal(bs.playerTeam, () => { updateBattleUI(); showRollActions(); });
+        return;
+      }
+
+      if (result.winner === 'tie') {
+        setBattleActions([{ text: 'RE-ROLL', cls: 'attack', action: () => doBattleRound() }]);
+        return;
+      }
+
+      showRollActions();
+    }, resolveDelay);
+  }, resultDelay);
+}
+
+// ── BATTLE JUICE HELPERS ──
+function showTriplesEffect(side, rollType) {
+  const banner = document.getElementById('triples-banner');
+  const flash = document.getElementById('triples-flash');
+  const label = { penta: 'PENTA!!', quads: 'QUADS!', triples: 'TRIPLES!' }[rollType] || 'TRIPLES!';
+  banner.textContent = label;
+  banner.className = 'triples-banner ' + side;
+  flash.className = 'triples-flash ' + side + '-flash';
+  flash.style.transition = 'none';
+  flash.style.opacity = '0.6';
+  requestAnimationFrame(() => { flash.style.transition = 'opacity 0.8s ease-out'; flash.style.opacity = '0'; });
+  playSFX('triples');
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+  requestAnimationFrame(() => {
+    banner.classList.add('show');
+    setTimeout(() => { banner.classList.remove('show'); banner.classList.add('fade');
+      setTimeout(() => banner.className = '', 500);
+    }, 1200);
+  });
+}
+
+function showFloatingDamage(amount, cls) {
+  const el = document.createElement('div');
+  el.className = 'float-damage ' + cls;
+  el.textContent = '-' + amount;
+  el.style.left = '50%';
+  el.style.top = cls === 'player-dmg' ? '60%' : '30%';
+  el.style.transform = 'translateX(-50%)';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1300);
+}
+
+function fireAbilityGlow(side) {
+  const el = document.getElementById(side === 'player' ? 'b-player' : 'b-enemy');
+  if (!el) return;
+  el.classList.add('ability-fire');
+  setTimeout(() => el.classList.remove('ability-fire'), 1200);
 }
 
 function showSwapModal(team, callback) {
