@@ -421,13 +421,14 @@ canvas{position:absolute;top:0;left:0}
 <script src="battle-ui.js"></script>
 <script src="atmosphere.js"></script>
 <script src="narration.js"></script>
+<script src="vfx.js"></script>
 <script>
 // ═══════════════════════════════════════
 // TOP-DOWN PIXEL ART OVERWORLD
 // Diamond layout: RH bottom → FV left / VI right → DC top
 // ═══════════════════════════════════════
 
-const PX=3,MW=420,MH=280;
+const PX=2,MW=840,MH=560;
 const WW=MW*PX,WH=MH*PX;
 const buf=document.createElement('canvas');
 buf.width=MW;buf.height=MH;
@@ -1180,32 +1181,14 @@ const wisps=[];
 for(const r of['rh','rh','rh','fv','fv','vi','vi','dc','dc','dc'])wisps.push(new Wisp(r));
 
 function drawFx(){
-  const g=fCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
-
-  // Day/night cycle — slow 4-minute cycle
-  dayNightPhase=(time*.00004)%1;
-  const nightIntensity=Math.max(0,Math.sin(dayNightPhase*Math.PI*2-.3))*.25;
-  if(nightIntensity>.01){
-    g.fillStyle=`rgba(10,15,40,${nightIntensity})`;
-    g.fillRect(0,0,W,H);
-    // Stars during night
-    if(nightIntensity>.1){
-      const starSeed=42;
-      for(let i=0;i<60;i++){
-        const sx=(Math.sin(i*127.1+starSeed)*.5+.5)*W;
-        const sy=(Math.cos(i*311.7+starSeed)*.3+.05)*H;
-        const twinkle=.3+.7*Math.sin(time*.003+i*1.7);
-        const sa=nightIntensity*twinkle*2;
-        g.fillStyle=`rgba(255,255,240,${Math.min(sa,.6)})`;
-        g.beginPath();g.arc(sx,sy,1*dpr,0,Math.PI*2);g.fill();
-      }
-    }
+  // Use new WorldVFX system if available, otherwise fallback
+  if(typeof WorldVFX!=='undefined'){
+    WorldVFX.draw(fCtx,time);
+  }else{
+    const g=fCtx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+    for(const p of pts){p.update();p.draw(g)}
+    for(const w of wisps){w.update();w.draw(g)}
   }
-
-  // Particles
-  for(const p of pts){p.update();p.draw(g)}
-  // Roaming wisps
-  for(const w of wisps){w.update();w.draw(g)}
 }
 
 // ═══════ INTERACTION ═══════
@@ -2421,6 +2404,8 @@ function checkRegionDiscovery(nodeId) {
   if (G.discoveredRegions.has(region)) return;
   G.discoveredRegions.add(region);
   showRegionSplash(region);
+  // VFX region burst
+  if (typeof WorldVFX !== 'undefined') WorldVFX.regionBurst(region);
 }
 
 function showRegionSplash(region) {
@@ -2538,6 +2523,16 @@ setTimeout(() => {
   }
 }, 100);
 
+</script>
+<script src="terrain.js"></script>
+<script>
+// Re-render terrain with enhanced version if terrain.js loaded
+if(typeof window._terrainReady!=='undefined'){
+  buf.width=MW;buf.height=MH;
+  a.imageSmoothingEnabled=false;
+  renderArt();
+  lck='';
+}
 </script>
 </body>
 </html>
