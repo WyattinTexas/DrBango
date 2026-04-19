@@ -1846,6 +1846,20 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Sophia (457) — Artisan choice modal -->
+<div class="selene-overlay" id="sophiaOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#2a1a3a,#6b3aaa);">🎭 ARTISAN!</div>
+    <h3>Sophia wins! Choose a mask:</h3>
+    <p class="selene-sub" id="sophiaSub">Deal damage or gain a mask?</p>
+    <div class="selene-options">
+      <button class="selene-opt" id="sophiaDmgBtn" onclick="doSophiaChoice('damage')">⚔️ Deal Damage</button>
+      <button class="selene-opt" onclick="doSophiaChoice('day')" style="background:linear-gradient(135deg,#b8860b,#ffd700);">☀️ Mask of Day</button>
+      <button class="selene-opt" onclick="doSophiaChoice('night')" style="background:linear-gradient(135deg,#1a1a3a,#4a4a8a);">🌙 Mask of Night</button>
+    </div>
+  </div>
+</div>
+
 <!-- Gordok (430) — River Terror choice modal -->
 <div class="selene-overlay" id="gordokOverlay">
   <div class="selene-modal">
@@ -2864,7 +2878,8 @@ const GHOSTS = [
   {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
-  {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."}
+  {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
+  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Artisan", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."}
 ];
 
 // ============================================================
@@ -3380,6 +3395,9 @@ function autoPlayNext() {
     welderTorch: { red: false, blue: false },
     foremanDieBonus: { red: 0, blue: 0 },
     carpenterDiceTrade: { red: 0, blue: 0 },
+    // Sophia (457) — Artisan: Mask of Day / Mask of Night
+    sophiaMask: { red: null, blue: null },
+    sophiaMaskActive: { red: false, blue: false },
   };
   S.battle = B;
 
@@ -4059,6 +4077,8 @@ function startBattle() {
     welderTorch: { red: false, blue: false },
     foremanDieBonus: { red: 0, blue: 0 },
     carpenterDiceTrade: { red: 0, blue: 0 },
+    sophiaMask: { red: null, blue: null },
+    sophiaMaskActive: { red: false, blue: false },
   };
   S.battle = B;
   initMatchStats();
@@ -5157,6 +5177,46 @@ function doWiseAlChoice(choice) {
     renderBattle();
   }
   drainAbilityQueue(() => { if (wp.resume) wp.resume(); });
+}
+
+// Sophia (457) — Artisan: show choice modal
+function showSophiaModal(resumeCallback) {
+  const sp = B.sophiaPending;
+  if (!sp) { resumeCallback(); return; }
+  sp.resume = resumeCallback;
+  document.getElementById('sophiaSub').textContent = `Deal ${sp.dmg} damage or gain a mask (once per game)?`;
+  document.getElementById('sophiaDmgBtn').textContent = `⚔️ Deal ${sp.dmg} Damage`;
+  document.getElementById('sophiaOverlay').classList.add('active');
+}
+
+function doSophiaChoice(choice) {
+  const sp = B.sophiaPending;
+  if (!sp) return;
+  B.sophiaPending = null;
+  document.getElementById('sophiaOverlay').classList.remove('active');
+  if (choice === 'day' || choice === 'night') {
+    B.sophiaMask[sp.winTeamName] = choice;
+    B.sophiaMaskActive[sp.winTeamName] = true;
+    const maskName = choice === 'day' ? '☀️ Mask of Day' : '🌙 Mask of Night';
+    const maskDesc = choice === 'day' ? 'Gain 1 Burn for each 1 you roll' : 'Roll the same number of dice as the enemy ghost, +1 damage';
+    collectKC(sp.winTeamName, sp.wF.name);
+    log(`<span class="log-ability">${sp.wF.name}</span> — Artisan! Gained <b>${maskName}</b> instead of dealing damage! (${maskDesc})`);
+    queueAbility('ARTISAN!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
+  } else {
+    // Deal the stashed damage
+    sp.lF.hp = Math.max(0, sp.lF.hp - sp.dmg);
+    if (sp.lF.hp <= 0) { sp.lF.ko = true; sp.lF.killedBy = (sp.wF.originalId || sp.wF.id); }
+    log(`<span class="log-dmg">${sp.wF.name} deals ${sp.dmg} to ${sp.lF.name}!</span> ${sp.lF.ko?'<span class="log-ko">KO!</span>':sp.lF.hp+' HP left'}`);
+    renderBattle();
+  }
+  drainAbilityQueue(() => { if (sp.resume) sp.resume(); });
+}
+
+function toggleSophiaMask(team) {
+  if (!isPreRollActive(team)) return;
+  if (!B.sophiaMask[team]) return;
+  B.sophiaMaskActive[team] = !B.sophiaMaskActive[team];
+  renderBattle();
 }
 
 // Gordok (430) — River Terror: show choice modal
@@ -9820,6 +9880,21 @@ function doPreRollSetup() {
     }
   });
 
+  // Sophia (457) — Mask of Night: roll the same number of dice as the enemy ghost
+  ['red', 'blue'].forEach(tName => {
+    if (B.sophiaMask[tName] === 'night' && B.sophiaMaskActive[tName]) {
+      const myCount = tName === 'red' ? redCount : blueCount;
+      const oppCount = tName === 'red' ? blueCount : redCount;
+      if (myCount !== oppCount) {
+        if (tName === 'red') redCount = oppCount;
+        else blueCount = oppCount;
+        const f = active(B[tName]);
+        preRollCallouts.push(['MASK OF NIGHT!', 'var(--rare)', `🌙 Mask of Night — ${f.name} mirrors the enemy! Rolling ${oppCount} dice!`, tName]);
+        log(`<span class="log-ability">Mask of Night</span> — ${f.name} rolls ${oppCount} dice (matching opponent)!`);
+      }
+    }
+  });
+
   // Fredrick (27) — Careful: when Fredrick is active, opponent may only roll up to 3 dice (applied last so it overrides all bonuses)
   [B.red, B.blue].forEach(team => {
     const fredF = active(team);
@@ -9904,6 +9979,26 @@ function doPostRollAndResolve(redDice, blueDice) {
   abilityQueueMode = true;
 
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
+
+  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 you roll
+  ['red', 'blue'].forEach(tName => {
+    if (B.sophiaMask[tName] === 'day' && B.sophiaMaskActive[tName]) {
+      const team = tName === 'red' ? B.red : B.blue;
+      const dice = tName === 'red' ? redDice : blueDice;
+      const ones = countVal(dice, 1);
+      if (ones > 0) {
+        const _modOnes = ones;
+        const _modTeam = team;
+        const _modTName = tName;
+        const f = active(team);
+        queueAbility('MASK OF DAY!', 'var(--rare)', `☀️ Mask of Day — ${f.name} rolled ${ones} one${ones>1?'s':''}! +${ones} Burn!`, () => {
+          _modTeam.resources.burn = (_modTeam.resources.burn || 0) + _modOnes;
+          log(`<span class="log-ability">Mask of Day</span> — Rolled ${_modOnes} one${_modOnes>1?'s':''}! <span class="log-dmg">+${_modOnes} Burn!</span>`);
+          renderBattle();
+        }, _modTName);
+      }
+    }
+  });
 
   // Hank (207) — each 4 rolled: gain 1 Lucky Stone (Tremor)
   [B.red, B.blue].forEach(team => {
@@ -12432,6 +12527,7 @@ function _resolveRoundImpl() {
     B.selenePending = null; // discard any doubles-triggered Selene reward from this tie round — it must not ghost into the next round's post-roll flow
     B.wiseAlPending = null;
     B.gordokPending = null;
+    B.sophiaPending = null;
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -12941,6 +13037,14 @@ function _resolveRoundImpl() {
   if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[winTeamName] && (B.committed[winTeamName].zainBlade > 0 || (B.iceBladeSwing && B.iceBladeSwing[winTeamName]))) {
     dmg += 2;
     zainIceBladeTriggered = true;
+  }
+
+  // Sophia (457) — Mask of Night: +1 damage on win when active
+  let maskOfNightDmgTriggered = false;
+  if (B.sophiaMask && B.sophiaMask[winTeamName] === 'night' && B.sophiaMaskActive[winTeamName]) {
+    dmg += 1;
+    maskOfNightDmgTriggered = true;
+    log(`<span class="log-ability">Mask of Night</span> — 🌙 +1 damage!`);
   }
 
   // Flame Blade: +3 Burn on win when swinging
@@ -13537,6 +13641,25 @@ function _resolveRoundImpl() {
       B.wiseAlPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
       dmg = 0; // defer damage — modal handler will apply
       wiseAlSqualled = true; // flag so "0 damage" log doesn't fire
+    }
+  }
+
+  // Sophia (457) — Artisan: Win: you MAY gain Mask of Day or Mask of Night instead of dealing damage (once per game)
+  let sophiaArtisaned = false;
+  if (wF.id === 457 && !wF.ko && dmg > 0 && !B.sophiaMask[winTeamName]) {
+    if (autoPlayRunning) {
+      // AI auto-picks: take Mask of Night (anti-dice is stronger for AI)
+      B.sophiaMask[winTeamName] = 'night';
+      B.sophiaMaskActive[winTeamName] = true;
+      dmg = 0;
+      sophiaArtisaned = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Artisan! Gained <b>🌙 Mask of Night</b> instead of dealing damage! (Roll the same number of dice as the enemy ghost, +1 damage)`);
+    } else {
+      // Human player: defer to modal choice
+      B.sophiaPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
+      dmg = 0;
+      sophiaArtisaned = true;
     }
   }
 
@@ -15212,10 +15335,18 @@ function _resolveRoundImpl() {
         }
       };
 
-      if (B.gordokPending) {
-        showGordokModal(afterGordokChoice);
+      const afterSophiaChoice = () => {
+        if (B.gordokPending) {
+          showGordokModal(afterGordokChoice);
+        } else {
+          afterGordokChoice();
+        }
+      };
+
+      if (B.sophiaPending) {
+        showSophiaModal(afterSophiaChoice);
       } else {
-        afterGordokChoice();
+        afterSophiaChoice();
       }
     });
   }, dmgDelay);
@@ -16226,6 +16357,17 @@ function renderBattle() {
         const ibSwung = (B.iceBladeSwing && B.iceBladeSwing[team]) || (B.committed[team].zainBlade > 0);
         html += `<button class="ability-btn ${ibSwung?'committed':'pressure'}" onclick="toggleIceBlade('${team}')" title="${ibSwung?'Sheathing — click to stop swinging':'Swing the Ice Blade — +1 die to your roll AND +2 damage if you win'}" style="border-color:#67e8f9;color:${ibSwung?'#fff':'#67e8f9'};${ibSwung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${ibSwung?'Ice Blade SWINGING (+1 die, +2 dmg on win)':'Swing Ice Blade'}</button>`;
       }
+      // Sophia (457) — Mask toggle (shown for any active ghost on the team, if mask is owned)
+      if (B.sophiaMask && B.sophiaMask[team]) {
+        const maskType = B.sophiaMask[team];
+        const maskOn = B.sophiaMaskActive[team];
+        const maskIcon = maskType === 'day' ? '☀️' : '🌙';
+        const maskName = maskType === 'day' ? 'Mask of Day' : 'Mask of Night';
+        const maskEffect = maskType === 'day' ? 'Gain 1 Burn per 1 rolled' : 'Mirror enemy dice count, +1 dmg';
+        const maskColor = maskType === 'day' ? '#ffd700' : '#6b7aff';
+        const maskBg = maskType === 'day' ? 'background:linear-gradient(135deg,#b8860b,#ffd700);' : 'background:linear-gradient(135deg,#2a2a5a,#6b7aff);';
+        html += `<button class="ability-btn ${maskOn?'committed':'pressure'}" onclick="toggleSophiaMask('${team}')" title="${maskOn?'Remove mask':'Wear mask — '+maskEffect}" style="border-color:${maskColor};color:${maskOn?'#fff':maskColor};${maskOn?maskBg:''}">${maskIcon} ${maskOn?maskName+' ON ('+maskEffect+')':'Wear '+maskName}</button>`;
+      }
       // Carpenter (449) — no button needed; transforms when Surge is committed via cycleCommit
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
@@ -16678,6 +16820,12 @@ function aiTick() {
   // Pal Al: always pick damage (aggressive AI)
   if (B.wiseAlPending && B.wiseAlPending.winTeamName === 'blue') {
     setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 600);
+    return;
+  }
+
+  // Sophia: AI picks Mask of Night
+  if (B.sophiaPending && B.sophiaPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.sophiaPending) doSophiaChoice('night'); }, 600);
     return;
   }
 
@@ -17857,6 +18005,8 @@ function pvpSerializeState() {
     willowLostLast: B.willowLostLast ? { ...B.willowLostLast } : { red: false, blue: false },
     iceBladeForgedPermanent: B.iceBladeForgedPermanent ? { ...B.iceBladeForgedPermanent } : { red: false, blue: false },
     flameBlade: B.flameBlade ? { ...B.flameBlade } : { red: false, blue: false },
+    sophiaMask: B.sophiaMask ? { ...B.sophiaMask } : { red: null, blue: null },
+    sophiaMaskActive: B.sophiaMaskActive ? { ...B.sophiaMaskActive } : { red: false, blue: false },
     duelLastLoser: B.duelLastLoser || null,
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
     log: B.log.slice(0, 20),
@@ -17908,6 +18058,8 @@ function pvpApplyState(state) {
   if (state.willowLostLast) B.willowLostLast = state.willowLostLast;
   if (state.iceBladeForgedPermanent) B.iceBladeForgedPermanent = state.iceBladeForgedPermanent;
   if (state.flameBlade) B.flameBlade = state.flameBlade;
+  if (state.sophiaMask) B.sophiaMask = state.sophiaMask;
+  if (state.sophiaMaskActive) B.sophiaMaskActive = state.sophiaMaskActive;
   if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
   if (state.burn) B.burn = state.burn;
   if (state.log) B.log = state.log;
@@ -17951,6 +18103,10 @@ if (LIVE_PVP) {
     // Gordok — auto-pick damage
     if (B.gordokPending && shouldAutoResolve(B.gordokPending.winTeamName)) {
       setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 300);
+    }
+    // Sophia — auto-pick Mask of Night (AI prefers dice mirroring)
+    if (B.sophiaPending && shouldAutoResolve(B.sophiaPending.winTeamName)) {
+      setTimeout(() => { if (B.sophiaPending) doSophiaChoice('night'); }, 300);
     }
     // Selene — auto-pick heal
     if (B.selenePending && shouldAutoResolve(B.selenePending.tName)) {
