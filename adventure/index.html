@@ -286,6 +286,24 @@ canvas{position:absolute;top:0;left:0}
 .summoner-avatar{width:28px;height:28px;border-radius:50%;border:2px solid #90e070;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(144,224,112,.1)}
 .summoner-name{font:700 13px 'Cinzel',serif;color:#f0e8d8}
 .summoner-level{font:8px 'Press Start 2P',monospace;color:#d4a040}
+
+/* ═══ TRAVEL NARRATION BAR ═══ */
+#narration-bar{position:fixed;bottom:0;left:0;right:0;z-index:150;pointer-events:none;
+  padding:16px 32px;background:linear-gradient(transparent,rgba(6,3,1,.9) 40%);
+  opacity:0;transition:opacity .6s ease;display:flex;align-items:flex-end;justify-content:center}
+#narration-bar.active{opacity:1}
+#narration-text{font:italic 15px/1.5 'Crimson Text',serif;color:rgba(240,232,216,.75);
+  max-width:600px;text-align:center;letter-spacing:.5px}
+
+/* ═══ NPC DIALOGUE BOX ═══ */
+#npc-dialogue{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:160;
+  background:rgba(8,4,2,.95);border:2px solid rgba(255,240,200,.15);border-radius:12px;
+  padding:16px 24px;max-width:480px;width:90%;opacity:0;transition:opacity .4s;pointer-events:none}
+#npc-dialogue.active{opacity:1;pointer-events:auto}
+#npc-speaker{font:700 14px 'Cinzel',serif;color:#f0d860;margin-bottom:4px}
+#npc-text{font:14px/1.5 'Crimson Text',serif;color:rgba(240,232,216,.8)}
+#npc-dialogue .npc-dismiss{position:absolute;top:8px;right:12px;background:none;border:none;
+  color:rgba(255,255,255,.3);font-size:16px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -376,6 +394,13 @@ canvas{position:absolute;top:0;left:0}
   <div style="position:absolute;bottom:12px;right:16px;font:9px 'Press Start 2P',monospace;color:rgba(255,255,255,.25)">v2.0</div>
 </div>
 
+<div id="narration-bar"><div id="narration-text"></div></div>
+<div id="npc-dialogue">
+  <button class="npc-dismiss" onclick="dismissNPC()">×</button>
+  <div id="npc-speaker"></div>
+  <div id="npc-text"></div>
+</div>
+
 <div id="region-splash">
   <div class="splash-vignette"></div>
   <div class="splash-region-name" id="splash-name"></div>
@@ -394,6 +419,8 @@ canvas{position:absolute;top:0;left:0}
 <script src="encounter_pools.js"></script>
 <script src="engine.js"></script>
 <script src="battle-ui.js"></script>
+<script src="atmosphere.js"></script>
+<script src="narration.js"></script>
 <script>
 // ═══════════════════════════════════════
 // TOP-DOWN PIXEL ART OVERWORLD
@@ -1019,9 +1046,18 @@ function drawGame(){
     }
   }
 
-  // Player character on map
-  const playerNode = G ? nodes.find(n=>n.id===G.currentNode) || nodes[0] : nodes[0];
-  const sp=w2s(playerNode.x,playerNode.y);
+  // Player character on map (with walking interpolation)
+  let playerWX, playerWY;
+  if (_isWalking && _walkingFrom && _walkingTo) {
+    const ease = _walkProgress < .5 ? 2 * _walkProgress * _walkProgress : 1 - Math.pow(-2 * _walkProgress + 2, 2) / 2;
+    playerWX = _walkingFrom.x + (_walkingTo.x - _walkingFrom.x) * ease;
+    playerWY = _walkingFrom.y + (_walkingTo.y - _walkingFrom.y) * ease;
+  } else {
+    const playerNode = G ? nodes.find(n=>n.id===G.currentNode) || nodes[0] : nodes[0];
+    playerWX = playerNode.x;
+    playerWY = playerNode.y;
+  }
+  const sp=w2s(playerWX,playerWY);
   // Glowing ring under player
   const pPulse=.6+.4*Math.sin(t*2);
   g.save();
@@ -1414,24 +1450,90 @@ function handleMapClick(e) {
   }
 }
 
+// Walking animation state
+let _walkingFrom = null, _walkingTo = null, _walkProgress = 0, _isWalking = false;
+
 function moveToNode(nodeId) {
-  G.currentNode = nodeId;
-  G.visitedNodes.add(nodeId);
-  G.turnNumber++;
+  const fromId = G.currentNode;
+  const fromNode = nodes.find(n => n.id === fromId);
+  const toNode = nodes.find(n => n.id === nodeId);
   window._reachableNodes = new Map();
   cvs[0].onclick = null;
 
-  // Region discovery check
-  checkRegionDiscovery(nodeId);
+  // Start walking animation
+  _walkingFrom = fromNode;
+  _walkingTo = toNode;
+  _walkProgress = 0;
+  _isWalking = true;
 
-  // Camera follows player
-  panToNode(nodeId);
+  // Show travel narration during walk
+  if (typeof Narration !== 'undefined') {
+    const text = Narration.getTravelText(fromNode.r, toNode.r, fromNode.name, toNode.name);
+    showNarration(text);
+    // Set ambient sound for destination region
+    if (typeof Atmosphere !== 'undefined') Atmosphere.setRegion(toNode.r);
+  }
 
-  // Update player position on map
-  updateHUD();
+  // Animate the walk over ~1.5 seconds
+  const walkDur = 1500;
+  const startTime = performance.now();
 
-  // Auto-explore after camera settles
-  setTimeout(() => doNodeAction(), 700);
+  function walkStep(ts) {
+    const elapsed = ts - startTime;
+    _walkProgress = Math.min(1, elapsed / walkDur);
+    // Ease in-out
+    const ease = _walkProgress < .5 ? 2 * _walkProgress * _walkProgress : 1 - Math.pow(-2 * _walkProgress + 2, 2) / 2;
+
+    // Interpolate camera to follow walker
+    const wx = fromNode.x + (toNode.x - fromNode.x) * ease;
+    const wy = fromNode.y + (toNode.y - fromNode.y) * ease;
+    const targetScale = Math.min(W / WW, H / WH) * 2.8;
+    camX = W / 2 - wx * WW * targetScale;
+    camY = H / 2 - wy * WH * targetScale;
+    camScale = targetScale;
+
+    if (_walkProgress < 1) {
+      requestAnimationFrame(walkStep);
+    } else {
+      // Walk complete — arrive
+      _isWalking = false;
+      G.currentNode = nodeId;
+      G.visitedNodes.add(nodeId);
+      G.turnNumber++;
+
+      // Region discovery check
+      checkRegionDiscovery(nodeId);
+
+      // Hide narration
+      setTimeout(() => hideNarration(), 800);
+
+      updateHUD();
+
+      // Auto-explore after brief arrival moment
+      setTimeout(() => doNodeAction(), 600);
+    }
+  }
+  requestAnimationFrame(walkStep);
+}
+
+function showNarration(text) {
+  const bar = document.getElementById('narration-bar');
+  document.getElementById('narration-text').textContent = text;
+  bar.classList.add('active');
+}
+function hideNarration() {
+  document.getElementById('narration-bar').classList.remove('active');
+}
+
+function showNPCDialogue(speaker, text, duration) {
+  const el = document.getElementById('npc-dialogue');
+  document.getElementById('npc-speaker').textContent = speaker;
+  document.getElementById('npc-text').textContent = text;
+  el.classList.add('active');
+  if (duration) setTimeout(() => dismissNPC(), duration);
+}
+function dismissNPC() {
+  document.getElementById('npc-dialogue').classList.remove('active');
 }
 
 function doNodeAction() {
@@ -1440,7 +1542,12 @@ function doNodeAction() {
   document.getElementById('btn-action').style.display = 'none';
 
   switch (node.type) {
-    case 'start': showMessage(node.name, 'Home sweet home. Nothing to do here.'); endTurn(); break;
+    case 'start':
+      if (typeof Narration !== 'undefined') {
+        const g = Narration.getNodeGreeting('start', node.name, node.r, summonerData.name, G.turnNumber);
+        if (g) showNPCDialogue(g.speaker, g.text, 4000);
+      }
+      endTurn(); break;
     case 'encounter': startEncounter(node); break;
     case 'event': doEvent(node); break;
     case 'camp': showCamp(node); break;
@@ -1946,10 +2053,20 @@ function logBattle(text) {
 
 // ── CAMP ──
 function showCamp(node) {
-  showModal(node.name, '<p>Welcome to camp. Choose an action:</p>', [
+  // Show NPC greeting first, then options after a beat
+  if (typeof Narration !== 'undefined') {
+    const greeting = Narration.getNodeGreeting('camp', node.name, node.r, summonerData.name, G.visitedNodes.has(node.id) ? 2 : 1);
+    if (greeting) {
+      showNPCDialogue(greeting.speaker, greeting.text);
+      // Also show camp scene
+      const scene = Narration.getCampScene(node.r, summonerData.name, G.party.ghosts.map(g => g.name));
+      if (scene) showNarration(scene);
+    }
+  }
+  showModal(node.name, '', [
     { text: 'HEAL ALL (+full HP)', primary: true, action: () => {
       for (const g of G.party.ghosts) { g.hp = g.maxHp; g.ko = false; g.entryFired = false; }
-      hideModal(); showMessage('Healed!', 'All Spiritkin restored to full HP.'); updateHUD(); endTurn();
+      hideModal(); updateHUD(); endTurn();
     }},
     { text: 'TRAIN (3 coins, +1 max HP to active)', action: () => {
       if (G.coins >= 3) {
@@ -1974,6 +2091,10 @@ function showCamp(node) {
 
 // ── SHOP ──
 function showShop(node) {
+  if (typeof Narration !== 'undefined') {
+    const greeting = Narration.getNodeGreeting('shop', node.name, node.r, summonerData.name, G.visitedNodes.has(node.id) ? 2 : 1);
+    if (greeting) showNPCDialogue(greeting.speaker, greeting.text);
+  }
   const items = ENGINE.getShopItems();
   const actions = items.map(item => ({
     text: `${item.name} (${item.cost} coins)`,
@@ -2037,7 +2158,11 @@ function doEvent(node) {
 
 // ── SHRINE ──
 function showShrine(node) {
-  showModal(node.name, `<p>${node.desc}</p><p>Shrines offer powerful one-time rewards.</p>`, [
+  if (typeof Narration !== 'undefined') {
+    const greeting = Narration.getNodeGreeting('shrine', node.name, node.r, summonerData.name, 1);
+    if (greeting) showNPCDialogue(greeting.speaker, greeting.text, 5000);
+  }
+  showModal(node.name, `<p>${node.desc}</p>`, [
     { text: 'Claim Reward', primary: true, action: () => {
       // Give a strong reward
       ENGINE.addResource(G.party.resources, 'firefly', 2);
@@ -2140,6 +2265,8 @@ function showModal(title, body, actions) {
 
 function hideModal() {
   document.getElementById('modal-overlay').style.display = 'none';
+  dismissNPC();
+  hideNarration();
 }
 
 // ═══════════════════════════════════════════
@@ -2228,6 +2355,18 @@ function isEncounterCleared(nodeId) {
 // Load sounds on first interaction
 document.addEventListener('click', function initSounds() {
   loadSounds();
+  // Init ambient atmosphere
+  if (typeof Atmosphere !== 'undefined') {
+    Atmosphere.init();
+    Atmosphere.setVolume(0.4);
+    // Set region based on current position
+    if (G) {
+      const currentNode = nodes.find(n => n.id === G.currentNode);
+      if (currentNode) Atmosphere.setRegion(currentNode.r);
+    } else {
+      Atmosphere.setRegion('rolling_hills');
+    }
+  }
   document.removeEventListener('click', initSounds);
 }, { once: true });
 
