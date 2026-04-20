@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v773';
+const TESTROOM_VERSION = 'v774';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16827,25 +16827,30 @@ function renderDice(rd, bd) {
   } else {
     if (rd) {
       const rdPh = _dicePhysics['red'];
-      if (rdPh && rdPh.settled && rd.length === rdPh.dice.length) {
-        update3dDice('red', rd);
-        // Also update hidden flat dice so textContent-based lookups still work
+      if (rdPh && rd.length === rdPh.dice.length) {
+        // 3D dice exist with matching count — update them (works during settling too)
+        if (rdPh.settled) update3dDice('red', rd);
         const flatRed = redEl.querySelectorAll('.die');
         rd.forEach((v, i) => { if (flatRed[i]) flatRed[i].textContent = v; });
+      } else if (rdPh && rd.length !== rdPh.dice.length) {
+        // Count mismatch (bonus die) — fall back to flat
+        cancelAnimationFrame(rdPh.raf); rdPh.els.forEach(e => e.remove()); delete _dicePhysics['red'];
+        redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
       } else {
-        // Count mismatch (bonus die) or no 3D dice — fall back to flat
-        if (rdPh) { cancelAnimationFrame(rdPh.raf); rdPh.els.forEach(e => e.remove()); delete _dicePhysics['red']; }
+        // No 3D dice at all
         redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
       }
     }
     if (bd) {
       const bdPh = _dicePhysics['blue'];
-      if (bdPh && bdPh.settled && bd.length === bdPh.dice.length) {
-        update3dDice('blue', bd);
+      if (bdPh && bd.length === bdPh.dice.length) {
+        if (bdPh.settled) update3dDice('blue', bd);
         const flatBlue = blueEl.querySelectorAll('.die');
         bd.forEach((v, i) => { if (flatBlue[i]) flatBlue[i].textContent = v; });
+      } else if (bdPh && bd.length !== bdPh.dice.length) {
+        cancelAnimationFrame(bdPh.raf); bdPh.els.forEach(e => e.remove()); delete _dicePhysics['blue'];
+        blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
       } else {
-        if (bdPh) { cancelAnimationFrame(bdPh.raf); bdPh.els.forEach(e => e.remove()); delete _dicePhysics['blue']; }
         blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
       }
     }
