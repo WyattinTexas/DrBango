@@ -1015,13 +1015,13 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 }
 .face-red .pip3d { background: #4a0e1a; }
 .face-blue .pip3d { background: #0a3050; }
-/* Settling animation */
+/* Settling animation — dice fly from arena back to tray */
 .die-physics.settling .die-cube {
-  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.7s cubic-bezier(0.25, 1.1, 0.5, 1);
 }
 .die-physics.settling {
-  transition: left 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
-              top 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: left 0.7s cubic-bezier(0.25, 1.1, 0.5, 1),
+              top 0.7s cubic-bezier(0.25, 1.1, 0.5, 1);
 }
 /* 3D die shadow on the tray */
 .die-physics::after {
@@ -2550,7 +2550,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v765';
+const TESTROOM_VERSION = 'v766';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16731,7 +16731,7 @@ function renderDice(rd, bd) {
   }
 }
 
-// Show rolling animation — 3D physics dice bouncing in the tray
+// Show rolling animation — 3D physics dice bouncing across the arena
 function showRolling(team, count) {
   const el = document.getElementById(team + '-dice');
   const cls = 'die-' + team;
@@ -16741,15 +16741,16 @@ function showRolling(team, count) {
   ).join('');
   if (count === 0) return;
 
-  const stack = document.querySelector('.dice-stack');
-  const rect = stack.getBoundingClientRect();
-  const W = rect.width;
-  const H = rect.height;
+  // Roll dice across the full arena board
+  const board = document.querySelector('.arena-board');
+  const boardRect = board.getBoundingClientRect();
+  const W = boardRect.width;
+  const H = boardRect.height;
   const dieSize = window.innerWidth <= 600 ? 42 : 56;
   const half = dieSize / 2;
-  const pad = { t:18, b:16, l:22, r:22 };
-  const minX = pad.l, maxX = W - pad.r - dieSize;
-  const minY = pad.t, maxY = H - pad.b - dieSize;
+  const pad = 16; // board padding
+  const minX = pad, maxX = W - pad - dieSize;
+  const minY = pad, maxY = H - pad - dieSize;
 
   // Clean up previous physics for this team
   if (_dicePhysics[team]) {
@@ -16765,20 +16766,21 @@ function showRolling(team, count) {
     die.className = 'die-physics';
     die.style.width = dieSize + 'px';
     die.style.height = dieSize + 'px';
+    die.style.zIndex = '100'; // above cards during rolling
     die.style.setProperty('--dh', half + 'px');
     die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
-    stack.appendChild(die);
+    board.appendChild(die);
     els.push(die);
 
-    // Start from hand position — clustered near one edge, thrown across the tray
+    // Start from team's side — thrown across the arena like a real roll
     const isRed = team === 'red';
-    const handX = isRed ? minX + 5 + i * 4 : maxX - 5 - i * 4;
-    const handY = isRed ? maxY - 10 + (Math.random() - 0.5) * 10 : minY + 10 + (Math.random() - 0.5) * 10;
-    const throwVx = (isRed ? 1 : -1) * (14 + Math.random() * 12);
-    const throwVy = (isRed ? -1 : 1) * (3 + Math.random() * 9);
+    const handX = isRed ? minX + 20 + i * 6 : maxX - 20 - i * 6;
+    const handY = H * 0.55 + (Math.random() - 0.5) * 30;
+    const throwVx = (isRed ? 1 : -1) * (18 + Math.random() * 16);
+    const throwVy = (Math.random() - 0.5) * 14;
     dice.push({
       el: die, cube: die.querySelector('.die-cube'),
-      x: handX + (Math.random() - 0.5) * 8, y: handY,
+      x: handX + (Math.random() - 0.5) * 10, y: handY,
       vx: throwVx,
       vy: throwVy,
       rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
@@ -16789,8 +16791,8 @@ function showRolling(team, count) {
   }
 
   const bounce = 0.55;
-  const friction = 0.975;
-  const rotFric = 0.965;
+  const friction = 0.978;
+  const rotFric = 0.968;
 
   function step() {
     // Dice-to-dice repulsion (prevents stacking)
@@ -16849,25 +16851,31 @@ function revealDice(team, values) {
   // Stop physics loop
   cancelAnimationFrame(physics.raf);
 
+  // Calculate tray position within the arena board
+  const board = document.querySelector('.arena-board');
+  const boardRect = board.getBoundingClientRect();
   const stack = document.querySelector('.dice-stack');
-  const W = stack.getBoundingClientRect().width;
+  const stackRect = stack.getBoundingClientRect();
+  const offsetX = stackRect.left - boardRect.left;
+  const offsetY = stackRect.top - boardRect.top;
+  const stackW = stackRect.width;
   const dieSize = window.innerWidth <= 600 ? 42 : 56;
   const gap = 12;
-  const pad = { t:18, b:16, l:22, r:22 };
+  const trayPad = { t:18, l:22, r:22 };
 
-  // Calculate target positions (matching flex row layout)
+  // Calculate target positions (dice fly from arena into tray)
   values.forEach((v, i) => {
     const d = physics.dice[i];
     if (!d) return;
 
     let tx, ty;
     if (team === 'red') {
-      tx = pad.l + 8 + i * (dieSize + gap);
-      ty = pad.t;
+      tx = offsetX + trayPad.l + 8 + i * (dieSize + gap);
+      ty = offsetY + trayPad.t;
     } else {
       const totalW = values.length * dieSize + (values.length - 1) * gap;
-      tx = W - pad.r - 8 - totalW + i * (dieSize + gap);
-      ty = pad.t + dieSize + 14;
+      tx = offsetX + stackW - trayPad.r - 8 - totalW + i * (dieSize + gap);
+      ty = offsetY + trayPad.t + dieSize + 14;
     }
 
     // Snap rotation to show correct face value
@@ -16888,10 +16896,12 @@ function revealDice(team, values) {
   });
 
   // After settling, mark as settled and highlight (keep 3D dice visible)
-  const swapDelay = values.length * spd(100) + spd(600);
+  const swapDelay = values.length * spd(100) + spd(750);
   setTimeout(() => {
     physics.settled = true;
     physics.values = values;
+    // Lower z-index now that dice are in the tray
+    physics.els.forEach(e => e.style.zIndex = '10');
     // Write values to hidden flat dice so textContent-based lookups work (highlights, etc.)
     values.forEach((v, i) => {
       const d = document.getElementById(team + '-die-' + i);
