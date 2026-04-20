@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v770';
+const TESTROOM_VERSION = 'v771';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16742,6 +16742,52 @@ const FACE_TARGET = {
 function nearestSnap(cur,tgt){const n=Math.round((cur-tgt)/360);return tgt+n*360;}
 let _dicePhysics = {};
 
+/* ═══════ Throw Profiles — choreographed dice paths ═══════ */
+// Each profile generates per-die {vx, vy} based on die index and count.
+// Red throws right+up from bottom-left; Blue throws left+up from bottom-right.
+const THROW_PROFILES = [
+  // THE BLOOM — dice unfurl like petals: steep arc, wide sweep, low curl
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 13 + t * 15, vy: -(25 - t * 20) };
+  },
+  // THE BANK SHOT — all hit the top wall, spread horizontally
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 10 + t * 14, vy: -(20 + t * 4) };
+  },
+  // THE CROSS-TABLE — full send to the far wall
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 24 + t * 6, vy: -(8 + t * 10) };
+  },
+  // THE SPIRAL — widest orbit to tightest drop
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 28 - t * 18, vy: -(10 + t * 12) };
+  },
+  // THE SCATTER — each die at a very different angle
+  (i, n) => {
+    const angles = [0.15, 0.55, 0.85, 0.35, 0.7]; // spread across quadrants
+    const a = angles[i % angles.length];
+    return { vx: 14 + a * 14, vy: -(6 + (1 - a) * 20) };
+  },
+  // THE GENTLE TOSS — short lob, barely leaves the hand
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 7 + t * 5, vy: -(9 + t * 3) };
+  },
+];
+
+function pickThrowProfile(count) {
+  const profile = THROW_PROFILES[Math.floor(Math.random() * THROW_PROFILES.length)];
+  const noise = () => 1 + (Math.random() - 0.5) * 0.25; // ±12.5% variation
+  return Array.from({ length: count }, (_, i) => {
+    const v = profile(i, count);
+    return { vx: v.vx * noise(), vy: v.vy * noise() };
+  });
+}
+
 function update3dDice(team, values) {
   const physics = _dicePhysics[team];
   if (!physics || !physics.dice) return;
@@ -16835,6 +16881,10 @@ function showRolling(team, count) {
 
   const dice = [];
   const els = [];
+  const isRed = team === 'red';
+  const handX = isRed ? minX + 10 : maxX - 10;
+  const handY = maxY - 5;
+  const throwVecs = pickThrowProfile(count);
 
   for (let i = 0; i < count; i++) {
     const die = document.createElement('div');
@@ -16847,20 +16897,13 @@ function showRolling(team, count) {
     board.appendChild(die);
     els.push(die);
 
-    // Craps-style throw — red from bottom-left, blue from bottom-right
-    const isRed = team === 'red';
-    const handX = isRed ? minX + 10 : maxX - 10;
-    const handY = maxY - 5;
-    // Throw up and toward center — like rolling dice across a table
-    const baseVx = (isRed ? 1 : -1) * (16 + Math.random() * 10);
-    const baseVy = -(14 + Math.random() * 10); // strong upward arc
-    const spreadVx = (Math.random() - 0.5) * 5;
-    const spreadVy = (Math.random() - 0.5) * 4;
+    // Beautiful choreographed throw from team's corner
+    const tv = throwVecs[i];
     dice.push({
       el: die, cube: die.querySelector('.die-cube'),
       x: handX + (Math.random() - 0.5) * 6, y: handY + (Math.random() - 0.5) * 6,
-      vx: baseVx + spreadVx,
-      vy: baseVy + spreadVy,
+      vx: (isRed ? 1 : -1) * tv.vx,
+      vy: tv.vy,
       rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
       vrx: (Math.random() - 0.5) * 35,
       vry: (Math.random() - 0.5) * 35,
