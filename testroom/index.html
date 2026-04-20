@@ -1015,13 +1015,17 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 }
 .face-red .pip3d { background: #4a0e1a; }
 .face-blue .pip3d { background: #0a3050; }
-/* Settling animation — dice fly from arena back to tray */
+/* Phase 1: dice land on a face in place (rotation only, no position change) */
+.die-physics.landing .die-cube {
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+/* Phase 2: dice fly from arena back to tray */
 .die-physics.settling .die-cube {
-  transition: transform 0.7s cubic-bezier(0.25, 1.1, 0.5, 1);
+  transition: transform 0.65s cubic-bezier(0.25, 1.1, 0.5, 1);
 }
 .die-physics.settling {
-  transition: left 0.7s cubic-bezier(0.25, 1.1, 0.5, 1),
-              top 0.7s cubic-bezier(0.25, 1.1, 0.5, 1);
+  transition: left 0.65s cubic-bezier(0.25, 1.1, 0.5, 1),
+              top 0.65s cubic-bezier(0.25, 1.1, 0.5, 1);
 }
 /* 3D die shadow on the tray */
 .die-physics::after {
@@ -2550,7 +2554,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v766';
+const TESTROOM_VERSION = 'v767';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16772,17 +16776,19 @@ function showRolling(team, count) {
     board.appendChild(die);
     els.push(die);
 
-    // Start from team's side — thrown across the arena like a real roll
+    // All dice start from the SAME hand point — thrown together as a group
     const isRed = team === 'red';
-    const handX = isRed ? minX + 20 + i * 6 : maxX - 20 - i * 6;
-    const handY = H * 0.55 + (Math.random() - 0.5) * 30;
-    const throwVx = (isRed ? 1 : -1) * (18 + Math.random() * 16);
-    const throwVy = (Math.random() - 0.5) * 14;
+    const handX = isRed ? minX + 15 : maxX - 15;
+    const handY = H * 0.55;
+    // Same base throw direction, slight spread (like dice leaving a hand)
+    const baseVx = (isRed ? 1 : -1) * (20 + Math.random() * 8);
+    const spreadVx = (Math.random() - 0.5) * 6;  // slight horizontal spread
+    const spreadVy = (Math.random() - 0.5) * 10; // slight vertical spread
     dice.push({
       el: die, cube: die.querySelector('.die-cube'),
-      x: handX + (Math.random() - 0.5) * 10, y: handY,
-      vx: throwVx,
-      vy: throwVy,
+      x: handX + (Math.random() - 0.5) * 4, y: handY + (Math.random() - 0.5) * 4,
+      vx: baseVx + spreadVx,
+      vy: spreadVy,
       rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
       vrx: (Math.random() - 0.5) * 35,
       vry: (Math.random() - 0.5) * 35,
@@ -16851,64 +16857,75 @@ function revealDice(team, values) {
   // Stop physics loop
   cancelAnimationFrame(physics.raf);
 
-  // Calculate tray position within the arena board
-  const board = document.querySelector('.arena-board');
-  const boardRect = board.getBoundingClientRect();
-  const stack = document.querySelector('.dice-stack');
-  const stackRect = stack.getBoundingClientRect();
-  const offsetX = stackRect.left - boardRect.left;
-  const offsetY = stackRect.top - boardRect.top;
-  const stackW = stackRect.width;
   const dieSize = window.innerWidth <= 600 ? 42 : 56;
-  const gap = 12;
-  const trayPad = { t:18, l:22, r:22 };
 
-  // Calculate target positions (dice fly from arena into tray)
+  // ── Phase 1: LAND — dice snap to their face value in place (no position change) ──
   values.forEach((v, i) => {
     const d = physics.dice[i];
     if (!d) return;
 
-    let tx, ty;
-    if (team === 'red') {
-      tx = offsetX + trayPad.l + 8 + i * (dieSize + gap);
-      ty = offsetY + trayPad.t;
-    } else {
-      const totalW = values.length * dieSize + (values.length - 1) * gap;
-      tx = offsetX + stackW - trayPad.r - 8 - totalW + i * (dieSize + gap);
-      ty = offsetY + trayPad.t + dieSize + 14;
-    }
-
-    // Snap rotation to show correct face value
     const tgt = FACE_TARGET[v];
     const frx = nearestSnap(d.rx, tgt.rx);
     const fry = nearestSnap(d.ry, tgt.ry);
-    const frz = nearestSnap(d.rz, 0) + (Math.random() - 0.5) * 6; // slight natural tilt
-    // Store final rotation for later updates
+    const frz = nearestSnap(d.rz, 0) + (Math.random() - 0.5) * 6;
     d.rx = frx; d.ry = fry; d.rz = frz;
     d.value = v;
 
+    // Stagger the landing slightly — dice don't all stop at the exact same instant
     setTimeout(() => {
-      d.el.classList.add('settling');
-      d.el.style.left = tx + 'px';
-      d.el.style.top = ty + 'px';
+      d.el.classList.add('landing');
       d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
-    }, i * spd(100));
+    }, i * spd(60));
   });
 
-  // After settling, mark as settled and highlight (keep 3D dice visible)
-  const swapDelay = values.length * spd(100) + spd(750);
+  // ── Phase 2: FLY TO TRAY — after a pause so player sees the values ──
+  const landPause = values.length * spd(60) + spd(550); // landing animation + readable pause
   setTimeout(() => {
-    physics.settled = true;
-    physics.values = values;
-    // Lower z-index now that dice are in the tray
-    physics.els.forEach(e => e.style.zIndex = '10');
-    // Write values to hidden flat dice so textContent-based lookups work (highlights, etc.)
+    const board = document.querySelector('.arena-board');
+    const boardRect = board.getBoundingClientRect();
+    const stack = document.querySelector('.dice-stack');
+    const stackRect = stack.getBoundingClientRect();
+    const offsetX = stackRect.left - boardRect.left;
+    const offsetY = stackRect.top - boardRect.top;
+    const stackW = stackRect.width;
+    const gap = 12;
+    const trayPad = { t:18, l:22, r:22 };
+
     values.forEach((v, i) => {
-      const d = document.getElementById(team + '-die-' + i);
-      if (d) d.textContent = v;
+      const d = physics.dice[i];
+      if (!d) return;
+
+      let tx, ty;
+      if (team === 'red') {
+        tx = offsetX + trayPad.l + 8 + i * (dieSize + gap);
+        ty = offsetY + trayPad.t;
+      } else {
+        const totalW = values.length * dieSize + (values.length - 1) * gap;
+        tx = offsetX + stackW - trayPad.r - 8 - totalW + i * (dieSize + gap);
+        ty = offsetY + trayPad.t + dieSize + 14;
+      }
+
+      setTimeout(() => {
+        d.el.classList.remove('landing');
+        d.el.classList.add('settling');
+        d.el.style.left = tx + 'px';
+        d.el.style.top = ty + 'px';
+      }, i * spd(80));
     });
-    highlightRollPreview(team, values);
-  }, swapDelay);
+
+    // After all dice reach the tray
+    const flyDelay = values.length * spd(80) + spd(700);
+    setTimeout(() => {
+      physics.settled = true;
+      physics.values = values;
+      physics.els.forEach(e => e.style.zIndex = '10');
+      values.forEach((v, i) => {
+        const d = document.getElementById(team + '-die-' + i);
+        if (d) d.textContent = v;
+      });
+      highlightRollPreview(team, values);
+    }, flyDelay);
+  }, landPause);
 }
 
 function highlightRollPreview(team, dice) {
