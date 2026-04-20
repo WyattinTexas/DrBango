@@ -1033,6 +1033,77 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   border-radius: 50%;
   pointer-events: none;
 }
+/* 3D dice highlight effects (applied after settling) */
+.die-physics.highlight-single {
+  transform: scale(1.12);
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-double {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 12px rgba(251,191,36,0.5));
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-double .die-face {
+  border-color: #fbbf24 !important;
+}
+.die-physics.highlight-triple {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 18px rgba(251,191,36,0.7));
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-triple .die-face {
+  border-color: #fbbf24 !important;
+}
+/* Smooth rotation update for rerolls */
+.die-physics.value-update .die-cube {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* 3D dice rerollable glow (mirrors .die.rerollable for flat dice) */
+.die-physics.rerollable-3d {
+  cursor: pointer;
+  animation: rerollPulse3d 0.8s ease-in-out infinite;
+  z-index: 12;
+}
+@keyframes rerollPulse3d {
+  0%,100% { filter: drop-shadow(0 0 8px rgba(251,191,36,0.3)); }
+  50% { filter: drop-shadow(0 0 20px rgba(251,191,36,0.6)); }
+}
+/* 3D die spinning during Lucky Stone reroll */
+.die-physics.rolling-3d .die-cube {
+  animation: spin3d 0.15s linear infinite;
+}
+@keyframes spin3d {
+  from { transform: rotateX(0deg) rotateY(0deg); }
+  to { transform: rotateX(180deg) rotateY(180deg); }
+}
+/* 3D dice win/lose/triples highlights */
+.die-physics.die-win-3d {
+  filter: drop-shadow(0 0 14px rgba(255,200,60,0.8)) drop-shadow(0 0 28px rgba(255,175,35,0.5));
+  transform: scale(1.10);
+  animation: dieWinPulse3d 1.3s ease-in-out infinite;
+  transition: transform 0.3s, filter 0.3s;
+}
+.die-physics.die-win-3d .die-face {
+  border-color: #fff3a0 !important;
+}
+@keyframes dieWinPulse3d {
+  0%,100% { filter: drop-shadow(0 0 14px rgba(255,200,60,0.8)) drop-shadow(0 0 28px rgba(255,175,35,0.5)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,210,80,1)) drop-shadow(0 0 40px rgba(255,185,50,0.7)); }
+}
+.die-physics.die-loser-3d {
+  opacity: 0.45;
+  filter: grayscale(0.4) brightness(0.7);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.die-physics.triples-glow-3d {
+  filter: drop-shadow(0 0 30px rgba(255,200,60,0.9)) drop-shadow(0 0 60px rgba(255,175,35,0.6));
+  transform: scale(1.25);
+  animation: triplesPulse3d 0.6s ease-in-out infinite;
+}
+@keyframes triplesPulse3d {
+  0%,100% { transform: scale(1.25); filter: drop-shadow(0 0 30px rgba(255,200,60,0.9)) drop-shadow(0 0 60px rgba(255,175,35,0.6)); }
+  50% { transform: scale(1.35); filter: drop-shadow(0 0 40px rgba(255,210,80,1)) drop-shadow(0 0 80px rgba(255,185,50,0.8)); }
+}
 
 /* Moonstone picker */
 .moonstone-picker {
@@ -2479,7 +2550,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v763';
+const TESTROOM_VERSION = 'v765';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2944,7 +3015,7 @@ const GHOSTS = [
   {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
   {id:455, name:"Explorer Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
-  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
+  {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 or 2 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
   {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."}
 ];
@@ -5265,7 +5336,7 @@ function doSophiaChoice(choice) {
     B.sophiaMask[sp.winTeamName] = choice;
     B.sophiaMaskActive[sp.winTeamName] = true;
     const maskName = choice === 'day' ? '☀️ Mask of Day' : '🌙 Mask of Night';
-    const maskDesc = choice === 'day' ? 'Gain 1 Burn for each 1 you roll' : 'Roll the same number of dice as the enemy ghost, +1 damage';
+    const maskDesc = choice === 'day' ? 'Gain 1 Burn for each 1 or 2 you roll' : 'Roll the same number of dice as the enemy ghost, +1 damage';
     checkKnightEffects(sp.winTeamName, sp.wF.name);
     log(`<span class="log-ability">${sp.wF.name}</span> — Masquerade! Gained <b>${maskName}</b> instead of dealing damage! (${maskDesc})`);
     queueAbility('MASQUERADE!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
@@ -10083,20 +10154,20 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 you roll
+  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 or 2 you roll
   ['red', 'blue'].forEach(tName => {
     if (B.sophiaMask[tName] === 'day' && B.sophiaMaskActive[tName]) {
       const team = tName === 'red' ? B.red : B.blue;
       const dice = tName === 'red' ? redDice : blueDice;
-      const ones = countVal(dice, 1);
-      if (ones > 0) {
-        const _modOnes = ones;
+      const lowRolls = countVal(dice, 1) + countVal(dice, 2);
+      if (lowRolls > 0) {
+        const _modLow = lowRolls;
         const _modTeam = team;
         const _modTName = tName;
         const f = active(team);
-        queueAbility('MASK OF DAY!', 'var(--rare)', `☀️ Mask of Day — ${f.name} rolled ${ones} one${ones>1?'s':''}! +${ones} Burn!`, () => {
-          _modTeam.resources.burn = (_modTeam.resources.burn || 0) + _modOnes;
-          log(`<span class="log-ability">Mask of Day</span> — Rolled ${_modOnes} one${_modOnes>1?'s':''}! <span class="log-dmg">+${_modOnes} Burn!</span>`);
+        queueAbility('MASK OF DAY!', 'var(--rare)', `☀️ Mask of Day — ${f.name} rolled ${lowRolls} low die${lowRolls>1?'s':''}! +${lowRolls} Burn!`, () => {
+          _modTeam.resources.burn = (_modTeam.resources.burn || 0) + _modLow;
+          log(`<span class="log-ability">Mask of Day</span> — Rolled ${_modLow} low die${_modLow>1?'s':''}! <span class="log-dmg">+${_modLow} Burn!</span>`);
           renderBattle();
         }, _modTName);
       }
@@ -10504,6 +10575,7 @@ function showMoonstoneChoice(team, dice) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
+      sync3dDiceClickable(team);
       // Fresh 5s countdown for picking which die
       let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(diceEl, pickRemaining);
@@ -10528,6 +10600,7 @@ function showMoonstoneChoice(team, dice) {
       d.style.borderColor = 'var(--moonstone)';
       d.onclick = () => pickMsDie(i);
     });
+    sync3dDiceClickable(team);
   }
 
   // Start countdown — auto-skip if not used
@@ -10986,6 +11059,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           }, 1000);
         };
       });
+      sync3dDiceClickable(team);
 
       // Die-pick countdown
       let pickRem = 5;
@@ -11054,6 +11128,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
         });
       };
     });
+    sync3dDiceClickable(team);
 
     let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
     showLsCountdown(diceEl, pickRem);
@@ -11350,6 +11425,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
+      sync3dDiceClickable(msTeam);
       let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(msDiceEl, pickRemaining);
       clearInterval(msCountdownTimer);
@@ -11399,6 +11475,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(lsTeam, i, lsDice, afterLs);
       });
+      sync3dDiceClickable(lsTeam);
       let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(lsDiceEl, pickRemaining);
       clearInterval(lsCountdownTimer); lsCountdownTimer = null;
@@ -11650,6 +11727,7 @@ function startSimultaneousLuckyStoneWindows() {
           });
         };
       });
+      sync3dDiceClickable(team);
 
       // 3s die-pick sub-countdown (safe: serialized by pickingTeam)
       let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
@@ -11775,6 +11853,7 @@ function startLuckyStoneWindow(team, callback) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(team, i, dice, callback);
       });
+      sync3dDiceClickable(team);
       // Fresh 3s countdown on the dice row — mirrors Moonstone's pick-die phase
       let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(diceEl, pickRemaining);
@@ -11797,6 +11876,7 @@ function startLuckyStoneWindow(team, callback) {
       d.classList.add('rerollable');
       d.onclick = () => doLuckyReroll(team, i, dice, callback);
     });
+    sync3dDiceClickable(team);
   }
 
   // Start countdown — auto-skip if not used
@@ -11841,6 +11921,49 @@ function clearDiceClickable(team) {
     d.classList.remove('rerollable');
     d.onclick = null;
   });
+  // Also clear 3D dice rerollable state
+  const physics = _dicePhysics[team];
+  if (physics && physics.settled) {
+    physics.dice.forEach(d => {
+      d.el.classList.remove('rerollable-3d');
+      d.el.onclick = null;
+      d.el.style.cursor = '';
+    });
+  }
+}
+
+// Sync visual highlights from flat dice to 3D dice
+function sync3dDiceHighlights(team) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.settled) return;
+  const flatDice = [...document.getElementById(team + '-dice').querySelectorAll('.die')];
+  const HL_3D = ['die-win-3d', 'die-loser-3d', 'triples-glow-3d', 'highlight-single', 'highlight-double', 'highlight-triple'];
+  physics.dice.forEach((d, i) => {
+    d.el.classList.remove(...HL_3D);
+    const flat = flatDice[i];
+    if (!flat) return;
+    if (flat.classList.contains('die-win') || flat.classList.contains('die-win-doubles') ||
+        flat.classList.contains('die-win-triples') || flat.classList.contains('die-win-mega') ||
+        flat.classList.contains('die-win-secondary')) {
+      d.el.classList.add('die-win-3d');
+    } else if (flat.classList.contains('die-loser')) {
+      d.el.classList.add('die-loser-3d');
+    }
+    if (flat.classList.contains('triples-glow')) {
+      d.el.classList.add('triples-glow-3d');
+    }
+  });
+}
+
+// Proxy click events from 3D dice to flat dice so existing handlers work unchanged
+function sync3dDiceClickable(team) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.settled) return;
+  const flatDice = [...document.getElementById(team + '-dice').querySelectorAll('.die')];
+  physics.dice.forEach((d, i) => {
+    d.el.classList.add('rerollable-3d');
+    d.el.onclick = () => { if (flatDice[i] && flatDice[i].onclick) flatDice[i].onclick(); };
+  });
 }
 
 function doLuckyReroll(team, dieIndex, dice, callback) {
@@ -11857,6 +11980,11 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
   const targetDie = dieDivs[dieIndex];
   targetDie.classList.add('rolling');
   targetDie.textContent = '?';
+  // Also spin the 3D die if present
+  const lrPhysics = _dicePhysics[team];
+  if (lrPhysics && lrPhysics.settled && lrPhysics.dice[dieIndex]) {
+    lrPhysics.dice[dieIndex].el.classList.add('rolling-3d');
+  }
   playSfx('sfxDiceRoll');
 
   setTimeout(() => {
@@ -11886,6 +12014,9 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
 
     // Re-render dice directly (revealDice needs IDs from showRolling which aren't present here)
     targetDie.classList.remove('rolling');
+    if (lrPhysics && lrPhysics.settled && lrPhysics.dice[dieIndex]) {
+      lrPhysics.dice[dieIndex].el.classList.remove('rolling-3d');
+    }
     renderDice(
       team === 'red' ? dice : B.pendingResolve.redDice,
       team === 'blue' ? dice : B.pendingResolve.blueDice
@@ -11934,6 +12065,7 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
           d.classList.add('rerollable');
           d.onclick = () => doLuckyReroll(team, i, liveDice, callback);
         });
+        sync3dDiceClickable(team);
         // Brief 3s countdown for the next die pick
         let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
         showLsCountdown(diceElInner, pickRem);
@@ -12042,6 +12174,9 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
       if (parseInt(d.textContent) === winRoll.value) d.classList.add(hlClass);
     });
   }
+  // Sync highlights to 3D dice
+  sync3dDiceHighlights(winTeam);
+  sync3dDiceHighlights(loseTeam);
 }
 
 // Bridge for callers that pass dice/roll explicitly after nulling B.pendingResolve
@@ -12271,6 +12406,11 @@ function _resolveRoundImpl() {
       if (el) el.querySelectorAll('.die').forEach(d => {
         d.classList.remove('die-win','die-win-doubles','die-win-triples','die-win-mega','die-win-secondary','die-loser');
       });
+      // Also clear 3D dice highlights
+      const ph = _dicePhysics[team];
+      if (ph && ph.settled) {
+        ph.dice.forEach(d => d.el.classList.remove('die-win-3d','die-loser-3d','triples-glow-3d','highlight-single','highlight-double','highlight-triple'));
+      }
     });
 
     // Mark both active ghosts as having rolled (so Ambush/Lurk don't fire next round).
@@ -15984,6 +16124,11 @@ function showTriplesEffect(side, rollType) {
   if (diceEl) {
     diceEl.querySelectorAll('.die').forEach(d => d.classList.add('triples-glow'));
   }
+  // Also glow 3D dice
+  const tripPh = _dicePhysics[side];
+  if (tripPh && tripPh.settled) {
+    tripPh.dice.forEach(d => d.el.classList.add('triples-glow-3d'));
+  }
 
   // Flash
   flash.className = 'triples-flash ' + side + '-flash';
@@ -16466,7 +16611,7 @@ function renderBattle() {
         const maskOn = B.sophiaMaskActive[team];
         const maskIcon = maskType === 'day' ? '☀️' : '🌙';
         const maskName = maskType === 'day' ? 'Mask of Day' : 'Mask of Night';
-        const maskEffect = maskType === 'day' ? 'Gain 1 Burn per 1 rolled' : 'Mirror enemy dice count, +1 dmg';
+        const maskEffect = maskType === 'day' ? 'Gain 1 Burn per 1 or 2 rolled' : 'Mirror enemy dice count, +1 dmg';
         const maskColor = maskType === 'day' ? '#ffd700' : '#6b7aff';
         const maskBg = maskType === 'day' ? 'background:linear-gradient(135deg,#b8860b,#ffd700);' : 'background:linear-gradient(135deg,#2a2a5a,#6b7aff);';
         html += `<button class="ability-btn ${maskOn?'committed':'pressure'}" onclick="toggleSophiaMask('${team}')" title="${maskOn?'Remove mask':'Wear mask — '+maskEffect}" style="border-color:${maskColor};color:${maskOn?'#fff':maskColor};${maskOn?maskBg:''}">${maskIcon} ${maskOn?maskName+' ON ('+maskEffect+')':'Wear '+maskName}</button>`;
@@ -16524,15 +16669,65 @@ const FACE_TARGET = {
 function nearestSnap(cur,tgt){const n=Math.round((cur-tgt)/360);return tgt+n*360;}
 let _dicePhysics = {};
 
+function update3dDice(team, values) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice) return;
+  physics.values = values;
+  values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d || d.value === v) return; // no change
+    d.value = v;
+    // Clear any highlight classes
+    d.el.classList.remove('highlight-single', 'highlight-double', 'highlight-triple');
+    // Smoothly rotate to new face
+    const tgt = FACE_TARGET[v];
+    d.rx = nearestSnap(d.rx, tgt.rx);
+    d.ry = nearestSnap(d.ry, tgt.ry);
+    d.el.classList.add('value-update');
+    d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    setTimeout(() => d.el.classList.remove('value-update'), 450);
+  });
+}
+
 function renderDice(rd, bd) {
   const redEl = document.getElementById('red-dice');
   const blueEl = document.getElementById('blue-dice');
   if (!rd && !bd) {
+    // Reset — also clean up any lingering 3D dice
+    ['red', 'blue'].forEach(t => {
+      if (_dicePhysics[t]) {
+        cancelAnimationFrame(_dicePhysics[t].raf);
+        _dicePhysics[t].els.forEach(e => e.remove());
+        delete _dicePhysics[t];
+      }
+    });
     redEl.innerHTML = [0,0,0].map(()=>`<div class="die die-red">?</div>`).join('');
     blueEl.innerHTML = [0,0,0].map(()=>`<div class="die die-blue">?</div>`).join('');
   } else {
-    if (rd) redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
-    if (bd) blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
+    if (rd) {
+      const rdPh = _dicePhysics['red'];
+      if (rdPh && rdPh.settled && rd.length === rdPh.dice.length) {
+        update3dDice('red', rd);
+        // Also update hidden flat dice so textContent-based lookups still work
+        const flatRed = redEl.querySelectorAll('.die');
+        rd.forEach((v, i) => { if (flatRed[i]) flatRed[i].textContent = v; });
+      } else {
+        // Count mismatch (bonus die) or no 3D dice — fall back to flat
+        if (rdPh) { cancelAnimationFrame(rdPh.raf); rdPh.els.forEach(e => e.remove()); delete _dicePhysics['red']; }
+        redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
+      }
+    }
+    if (bd) {
+      const bdPh = _dicePhysics['blue'];
+      if (bdPh && bdPh.settled && bd.length === bdPh.dice.length) {
+        update3dDice('blue', bd);
+        const flatBlue = blueEl.querySelectorAll('.die');
+        bd.forEach((v, i) => { if (flatBlue[i]) flatBlue[i].textContent = v; });
+      } else {
+        if (bdPh) { cancelAnimationFrame(bdPh.raf); bdPh.els.forEach(e => e.remove()); delete _dicePhysics['blue']; }
+        blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
+      }
+    }
   }
 }
 
@@ -16575,18 +16770,21 @@ function showRolling(team, count) {
     stack.appendChild(die);
     els.push(die);
 
-    // Start from center-top, scatter outward
-    const cx = W / 2 - half + (Math.random() - 0.5) * 30;
-    const cy = minY + (maxY - minY) * 0.3;
+    // Start from hand position — clustered near one edge, thrown across the tray
+    const isRed = team === 'red';
+    const handX = isRed ? minX + 5 + i * 4 : maxX - 5 - i * 4;
+    const handY = isRed ? maxY - 10 + (Math.random() - 0.5) * 10 : minY + 10 + (Math.random() - 0.5) * 10;
+    const throwVx = (isRed ? 1 : -1) * (14 + Math.random() * 12);
+    const throwVy = (isRed ? -1 : 1) * (3 + Math.random() * 9);
     dice.push({
       el: die, cube: die.querySelector('.die-cube'),
-      x: cx, y: cy,
-      vx: (Math.random() - 0.5) * 12,
-      vy: (Math.random() - 0.5) * 8,
+      x: handX + (Math.random() - 0.5) * 8, y: handY,
+      vx: throwVx,
+      vy: throwVy,
       rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
-      vrx: (Math.random() - 0.5) * 28,
-      vry: (Math.random() - 0.5) * 28,
-      vrz: (Math.random() - 0.5) * 16
+      vrx: (Math.random() - 0.5) * 35,
+      vry: (Math.random() - 0.5) * 35,
+      vrz: (Math.random() - 0.5) * 22
     });
   }
 
@@ -16595,6 +16793,20 @@ function showRolling(team, count) {
   const rotFric = 0.965;
 
   function step() {
+    // Dice-to-dice repulsion (prevents stacking)
+    for (let a = 0; a < dice.length; a++) {
+      for (let b = a + 1; b < dice.length; b++) {
+        const da = dice[a], db = dice[b];
+        const dx = da.x - db.x, dy = da.y - db.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < dieSize && dist > 0.1) {
+          const push = (dieSize - dist) * 0.15;
+          const nx = dx / dist, ny = dy / dist;
+          da.vx += nx * push; da.vy += ny * push;
+          db.vx -= nx * push; db.vy -= ny * push;
+        }
+      }
+    }
     dice.forEach(d => {
       d.x += d.vx; d.y += d.vy;
       d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
@@ -16662,7 +16874,10 @@ function revealDice(team, values) {
     const tgt = FACE_TARGET[v];
     const frx = nearestSnap(d.rx, tgt.rx);
     const fry = nearestSnap(d.ry, tgt.ry);
-    const frz = nearestSnap(d.rz, 0);
+    const frz = nearestSnap(d.rz, 0) + (Math.random() - 0.5) * 6; // slight natural tilt
+    // Store final rotation for later updates
+    d.rx = frx; d.ry = fry; d.rz = frz;
+    d.value = v;
 
     setTimeout(() => {
       d.el.classList.add('settling');
@@ -16672,18 +16887,16 @@ function revealDice(team, values) {
     }, i * spd(100));
   });
 
-  // After settling, swap to standard flat dice
+  // After settling, mark as settled and highlight (keep 3D dice visible)
   const swapDelay = values.length * spd(100) + spd(600);
   setTimeout(() => {
-    // Show flat dice in the rows
+    physics.settled = true;
+    physics.values = values;
+    // Write values to hidden flat dice so textContent-based lookups work (highlights, etc.)
     values.forEach((v, i) => {
       const d = document.getElementById(team + '-die-' + i);
-      if (d) { d.textContent = v; d.style.visibility = 'visible'; }
+      if (d) d.textContent = v;
     });
-    // Remove 3D physics dice
-    physics.els.forEach(e => e.remove());
-    delete _dicePhysics[team];
-    // Highlight roll type
     highlightRollPreview(team, values);
   }, swapDelay);
 }
@@ -16691,42 +16904,69 @@ function revealDice(team, values) {
 function highlightRollPreview(team, dice) {
   const roll = classify(dice);
   if (roll.type === 'none') return;
-  const diceEl = document.getElementById(team + '-dice');
-  if (!diceEl) return;
-  const dieDivs = [...diceEl.querySelectorAll('.die')];
 
-  if (roll.type === 'singles') {
-    // Subtle bump on the highest die
-    let done = false;
-    [...dieDivs].reverse().forEach(d => {
-      if (!done && parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.12)';
-        d.style.transition = 'transform 0.3s';
-        done = true;
-      }
-    });
-  } else if (roll.type === 'doubles') {
-    // Glow on the matching pair
-    let count = 0;
-    dieDivs.forEach(d => {
-      if (count < 2 && parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.15)';
-        d.style.boxShadow = '0 0 14px rgba(251,191,36,0.5)';
-        d.style.borderColor = '#fbbf24';
-        d.style.transition = 'all 0.3s';
-        count++;
-      }
-    });
+  const physics = _dicePhysics[team];
+  if (physics && physics.settled) {
+    // Highlight 3D dice
+    const diceObjs = physics.dice;
+    if (roll.type === 'singles') {
+      let done = false;
+      [...diceObjs].reverse().forEach(d => {
+        if (!done && d.value === roll.value) {
+          d.el.classList.add('highlight-single');
+          done = true;
+        }
+      });
+    } else if (roll.type === 'doubles') {
+      let count = 0;
+      diceObjs.forEach(d => {
+        if (count < 2 && d.value === roll.value) {
+          d.el.classList.add('highlight-double');
+          count++;
+        }
+      });
+    } else {
+      diceObjs.forEach(d => {
+        if (d.value === roll.value) {
+          d.el.classList.add('highlight-triple');
+        }
+      });
+    }
   } else {
-    // Triples+ — all matching dice glow
-    dieDivs.forEach(d => {
-      if (parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.2)';
-        d.style.boxShadow = '0 0 20px rgba(251,191,36,0.7)';
-        d.style.borderColor = '#fbbf24';
-        d.style.transition = 'all 0.3s';
-      }
-    });
+    // Fallback: highlight flat dice
+    const diceEl = document.getElementById(team + '-dice');
+    if (!diceEl) return;
+    const dieDivs = [...diceEl.querySelectorAll('.die')];
+    if (roll.type === 'singles') {
+      let done = false;
+      [...dieDivs].reverse().forEach(d => {
+        if (!done && parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.12)';
+          d.style.transition = 'transform 0.3s';
+          done = true;
+        }
+      });
+    } else if (roll.type === 'doubles') {
+      let count = 0;
+      dieDivs.forEach(d => {
+        if (count < 2 && parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.15)';
+          d.style.boxShadow = '0 0 14px rgba(251,191,36,0.5)';
+          d.style.borderColor = '#fbbf24';
+          d.style.transition = 'all 0.3s';
+          count++;
+        }
+      });
+    } else {
+      dieDivs.forEach(d => {
+        if (parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.2)';
+          d.style.boxShadow = '0 0 20px rgba(251,191,36,0.7)';
+          d.style.borderColor = '#fbbf24';
+          d.style.transition = 'all 0.3s';
+        }
+      });
+    }
   }
 }
 
