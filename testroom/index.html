@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v772';
+const TESTROOM_VERSION = 'v773';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16989,25 +16989,24 @@ function revealDice(team, values) {
   const offsetY = stackRect.top - boardRect.top;
   const stackW = stackRect.width;
   const dieSize = window.innerWidth <= 600 ? 42 : 56;
-  const gap = 12;
-  const trayPad = { t:18, l:22, r:22 };
+  const gap = window.innerWidth <= 600 ? 10 : 20;
+  const rowGap = window.innerWidth <= 600 ? 8 : 18;
+
+  // Center dice in the tray with proper spacing
+  const totalDiceW = values.length * dieSize + (values.length - 1) * gap;
+  const trayStartX = offsetX + (stackW - totalDiceW) / 2;
+  const trayMidY = offsetY + stackRect.height / 2;
 
   // Settle: rotation snaps to correct face (0.35s) while position flies to tray (0.7s).
-  // The face locks in during the flight so there's no visible "flip" at rest.
   values.forEach((v, i) => {
     const d = physics.dice[i];
     if (!d) return;
 
-    // Target position in the tray
-    let tx, ty;
-    if (team === 'red') {
-      tx = offsetX + trayPad.l + 8 + i * (dieSize + gap);
-      ty = offsetY + trayPad.t;
-    } else {
-      const totalW = values.length * dieSize + (values.length - 1) * gap;
-      tx = offsetX + stackW - trayPad.r - 8 - totalW + i * (dieSize + gap);
-      ty = offsetY + trayPad.t + dieSize + 14;
-    }
+    // Target position — centered in tray, red on top row, blue on bottom
+    const tx = trayStartX + i * (dieSize + gap);
+    const ty = team === 'red'
+      ? trayMidY - dieSize - rowGap / 2
+      : trayMidY + rowGap / 2;
 
     // Target rotation for the correct face value
     const tgt = FACE_TARGET[v];
