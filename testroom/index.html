@@ -969,6 +969,71 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   75% { transform:rotate(8deg) scale(1.08); }
 }
 
+/* ═══════ 3D Dice Physics Rolling ═══════ */
+.die-physics {
+  position: absolute;
+  z-index: 10;
+  perspective: 350px;
+}
+.die-cube {
+  width: 100%; height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+}
+.die-face {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 11px;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  background: linear-gradient(165deg, #f4ecd8 0%, #e8dcb8 35%, #d8c894 70%, #b8a878 100%);
+  border: 1px solid rgba(120, 80, 30, 0.5);
+  box-shadow: inset 0 -2px 4px rgba(120, 80, 30, 0.25), inset 0 1px 2px rgba(255, 255, 240, 0.5);
+}
+.die-face.face-red {
+  border-color: rgba(233,69,96,0.55);
+  background: linear-gradient(165deg, #fce0d8 0%, #f4b8a8 35%, #d88878 70%, #a05050 100%);
+}
+.die-face.face-blue {
+  border-color: rgba(76,201,240,0.55);
+  background: linear-gradient(165deg, #dcf0fc 0%, #a8d8ee 35%, #78a0c4 70%, #406088 100%);
+}
+/* Cube face transforms */
+.face-front  { transform: translateZ(var(--dh, 28px)); }
+.face-back   { transform: rotateY(180deg) translateZ(var(--dh, 28px)); }
+.face-right  { transform: rotateY(90deg) translateZ(var(--dh, 28px)); }
+.face-left   { transform: rotateY(-90deg) translateZ(var(--dh, 28px)); }
+.face-top    { transform: rotateX(-90deg) translateZ(var(--dh, 28px)); }
+.face-bottom { transform: rotateX(90deg) translateZ(var(--dh, 28px)); }
+/* Pips (dice dots) */
+.pip3d {
+  position: absolute;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #3a1f08;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.3);
+}
+.face-red .pip3d { background: #4a0e1a; }
+.face-blue .pip3d { background: #0a3050; }
+/* Settling animation */
+.die-physics.settling .die-cube {
+  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.die-physics.settling {
+  transition: left 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+              top 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* 3D die shadow on the tray */
+.die-physics::after {
+  content: '';
+  position: absolute;
+  bottom: -6px; left: 8%;
+  width: 84%; height: 10px;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.35), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 /* Moonstone picker */
 .moonstone-picker {
   display:none; background:rgba(0,0,0,0.7); position:fixed; inset:0; z-index:150;
@@ -2414,7 +2479,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v762';
+const TESTROOM_VERSION = 'v763';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16426,6 +16491,39 @@ function renderBattle() {
   });
 }
 
+/* ═══════ 3D Dice Physics Helpers ═══════ */
+const PIP_LAYOUTS = {
+  1: ['c'],
+  2: ['tr','bl'],
+  3: ['tr','c','bl'],
+  4: ['tl','tr','bl','br'],
+  5: ['tl','tr','c','bl','br'],
+  6: ['tl','ml','bl','tr','mr','br']
+};
+const PIP_STYLES = {
+  tl:'top:18%;left:18%', tr:'top:18%;right:18%',
+  ml:'top:50%;left:18%;transform:translateY(-50%)',
+  c:'top:50%;left:50%;transform:translate(-50%,-50%)',
+  mr:'top:50%;right:18%;transform:translateY(-50%)',
+  bl:'bottom:18%;left:18%', br:'bottom:18%;right:18%'
+};
+function pip3dHTML(val) {
+  return (PIP_LAYOUTS[val]||PIP_LAYOUTS[1]).map(p=>`<span class="pip3d" style="${PIP_STYLES[p]}"></span>`).join('');
+}
+function cube3dHTML(team) {
+  const c='face-'+team;
+  // front=1, right=2, top=3, bottom=4, left=5, back=6
+  return [
+    ['front',1],['back',6],['right',2],['left',5],['top',3],['bottom',4]
+  ].map(([f,v])=>`<div class="die-face ${c} face-${f}">${pip3dHTML(v)}</div>`).join('');
+}
+const FACE_TARGET = {
+  1:{rx:0,ry:0}, 2:{rx:0,ry:-90}, 3:{rx:90,ry:0},
+  4:{rx:-90,ry:0}, 5:{rx:0,ry:90}, 6:{rx:0,ry:180}
+};
+function nearestSnap(cur,tgt){const n=Math.round((cur-tgt)/360);return tgt+n*360;}
+let _dicePhysics = {};
+
 function renderDice(rd, bd) {
   const redEl = document.getElementById('red-dice');
   const blueEl = document.getElementById('blue-dice');
@@ -16438,31 +16536,156 @@ function renderDice(rd, bd) {
   }
 }
 
-// Show rolling animation for one side
+// Show rolling animation — 3D physics dice bouncing in the tray
 function showRolling(team, count) {
   const el = document.getElementById(team + '-dice');
   const cls = 'die-' + team;
-  // Give each die an ID so revealDice can target them sequentially
+  // Hidden placeholder dice for layout (keeps tray height stable)
   el.innerHTML = Array(count).fill(0).map((_, i) =>
-    `<div class="die ${cls} rolling" id="${team}-die-${i}">?</div>`
+    `<div class="die ${cls}" id="${team}-die-${i}" style="visibility:hidden">?</div>`
   ).join('');
+  if (count === 0) return;
+
+  const stack = document.querySelector('.dice-stack');
+  const rect = stack.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const half = dieSize / 2;
+  const pad = { t:18, b:16, l:22, r:22 };
+  const minX = pad.l, maxX = W - pad.r - dieSize;
+  const minY = pad.t, maxY = H - pad.b - dieSize;
+
+  // Clean up previous physics for this team
+  if (_dicePhysics[team]) {
+    cancelAnimationFrame(_dicePhysics[team].raf);
+    _dicePhysics[team].els.forEach(e => e.remove());
+  }
+
+  const dice = [];
+  const els = [];
+
+  for (let i = 0; i < count; i++) {
+    const die = document.createElement('div');
+    die.className = 'die-physics';
+    die.style.width = dieSize + 'px';
+    die.style.height = dieSize + 'px';
+    die.style.setProperty('--dh', half + 'px');
+    die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
+    stack.appendChild(die);
+    els.push(die);
+
+    // Start from center-top, scatter outward
+    const cx = W / 2 - half + (Math.random() - 0.5) * 30;
+    const cy = minY + (maxY - minY) * 0.3;
+    dice.push({
+      el: die, cube: die.querySelector('.die-cube'),
+      x: cx, y: cy,
+      vx: (Math.random() - 0.5) * 12,
+      vy: (Math.random() - 0.5) * 8,
+      rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
+      vrx: (Math.random() - 0.5) * 28,
+      vry: (Math.random() - 0.5) * 28,
+      vrz: (Math.random() - 0.5) * 16
+    });
+  }
+
+  const bounce = 0.55;
+  const friction = 0.975;
+  const rotFric = 0.965;
+
+  function step() {
+    dice.forEach(d => {
+      d.x += d.vx; d.y += d.vy;
+      d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
+      // Wall bounces
+      if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx) * bounce; d.vry *= 0.6; }
+      if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx) * bounce; d.vry *= 0.6; }
+      if (d.y < minY) { d.y = minY; d.vy = Math.abs(d.vy) * bounce; d.vrx *= 0.6; }
+      if (d.y > maxY) { d.y = maxY; d.vy = -Math.abs(d.vy) * bounce; d.vrx *= 0.6; }
+      // Friction
+      d.vx *= friction; d.vy *= friction;
+      d.vrx *= rotFric; d.vry *= rotFric; d.vrz *= rotFric;
+      // Render
+      d.el.style.left = d.x + 'px';
+      d.el.style.top = d.y + 'px';
+      d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    });
+    _dicePhysics[team].raf = requestAnimationFrame(step);
+  }
+
+  _dicePhysics[team] = { raf: requestAnimationFrame(step), dice, els };
 }
 
-// Reveal dice values one at a time — 300ms stagger (Feature 7)
+// Reveal dice values — settle 3D dice to final positions, then swap to flat dice
 function revealDice(team, values) {
-  const cls = 'die-' + team;
+  const physics = _dicePhysics[team];
+
+  if (!physics || !physics.dice.length) {
+    // Fallback for 0 dice or missing physics
+    const cls = 'die-' + team;
+    values.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById(team + '-die-' + i);
+        if (d) { d.classList.remove('rolling'); d.textContent = v; d.style.visibility = 'visible'; }
+      }, i * spd(300));
+    });
+    setTimeout(() => highlightRollPreview(team, values), values.length * spd(300) + 50);
+    return;
+  }
+
+  // Stop physics loop
+  cancelAnimationFrame(physics.raf);
+
+  const stack = document.querySelector('.dice-stack');
+  const W = stack.getBoundingClientRect().width;
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const gap = 12;
+  const pad = { t:18, b:16, l:22, r:22 };
+
+  // Calculate target positions (matching flex row layout)
   values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d) return;
+
+    let tx, ty;
+    if (team === 'red') {
+      tx = pad.l + 8 + i * (dieSize + gap);
+      ty = pad.t;
+    } else {
+      const totalW = values.length * dieSize + (values.length - 1) * gap;
+      tx = W - pad.r - 8 - totalW + i * (dieSize + gap);
+      ty = pad.t + dieSize + 14;
+    }
+
+    // Snap rotation to show correct face value
+    const tgt = FACE_TARGET[v];
+    const frx = nearestSnap(d.rx, tgt.rx);
+    const fry = nearestSnap(d.ry, tgt.ry);
+    const frz = nearestSnap(d.rz, 0);
+
     setTimeout(() => {
-      const d = document.getElementById(team + '-die-' + i);
-      if (d) {
-        d.classList.remove('rolling');
-        d.textContent = v;
-      }
-    }, i * spd(300));
+      d.el.classList.add('settling');
+      d.el.style.left = tx + 'px';
+      d.el.style.top = ty + 'px';
+      d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
+    }, i * spd(100));
   });
-  // Immediately highlight the hand type after all dice reveal
-  const revealDone = values.length * spd(300) + 50;
-  setTimeout(() => highlightRollPreview(team, values), revealDone);
+
+  // After settling, swap to standard flat dice
+  const swapDelay = values.length * spd(100) + spd(600);
+  setTimeout(() => {
+    // Show flat dice in the rows
+    values.forEach((v, i) => {
+      const d = document.getElementById(team + '-die-' + i);
+      if (d) { d.textContent = v; d.style.visibility = 'visible'; }
+    });
+    // Remove 3D physics dice
+    physics.els.forEach(e => e.remove());
+    delete _dicePhysics[team];
+    // Highlight roll type
+    highlightRollPreview(team, values);
+  }, swapDelay);
 }
 
 function highlightRollPreview(team, dice) {
