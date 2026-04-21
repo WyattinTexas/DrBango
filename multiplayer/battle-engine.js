@@ -1832,29 +1832,22 @@ function doChowChoice(choice) {
 }
 
 // ============================================================
-// ZORK (463) — Stoke: discard all Burn for +1 die each
+// ZORK (463) — Stoke: discard all Burn for +1 die per Burn (button)
 // ============================================================
-function doZorkChoice(choice) {
-  const zp = B.zorkPending;
-  if (!zp) return;
-  B.zorkPending = null;
-  document.getElementById('zorkOverlay').classList.remove('active');
-  const { team, btn } = zp;
+function useZorkStoke(team) {
   const f = active(B[team]);
-  if (choice === 'yes' && f && f.id === 463 && !f.ko && B[team].resources.burn > 0) {
-    const burnSpent = B[team].resources.burn;
-    B[team].resources.burn = 0;
-    B.zorkExtraDie[team] = (B.zorkExtraDie[team] || 0) + burnSpent;
-    showAbilityCallout('STOKE!', 'var(--common)',
-      `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
-    renderBattle();
-    B.zorkDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
-  } else {
-    B.zorkDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
-  }
+  if (!f || f.id !== 463 || f.ko) return;
+  if (B.zorkDecided[team]) return;
+  if (!B[team].resources.burn || B[team].resources.burn <= 0) return;
+  const burnSpent = B[team].resources.burn;
+  B[team].resources.burn = 0;
+  B.zorkDecided[team] = true;
+  if (!B.zorkExtraDie) B.zorkExtraDie = { red: 0, blue: 0 };
+  B.zorkExtraDie[team] = (B.zorkExtraDie[team] || 0) + burnSpent;
+  showAbilityCallout('STOKE!', 'var(--common)',
+    `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, team);
+  log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+  renderBattle();
 }
 
 // ============================================================
@@ -3424,24 +3417,7 @@ function rollReady(team) {
       }
     }
 
-    // Zork (463) — Stoke: discard all Burn for +1 die each (interactive button)
-    {
-      const zorkG = active(B[team]);
-      if (zorkG && zorkG.id === 463 && !zorkG.ko && B.zorkDecided && !B.zorkDecided[team] &&
-          B[team].resources && B[team].resources.burn >= 1) {
-        btn.classList.add('locked');
-        btn.disabled = true;
-        B.zorkPending = { team, btn };
-        const zorkDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-        setTimeout(() => {
-          document.getElementById('zorkSub').innerHTML =
-            `Discard all 🔥 Burn for +1 die each?<br>` +
-            `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
-          document.getElementById('zorkOverlay').classList.add('active');
-        }, zorkDelay);
-        return;
-      }
-    }
+    // Zork (463) — Stoke: now handled by pre-roll ability button (useZorkStoke)
 
     // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
     {
@@ -3904,17 +3880,7 @@ function openDuelPhasePrimers(team) {
     return true;
   }
 
-  // — ZORK (463) — Stoke: discard all Burn for +1 die each (Duel Phase)
-  if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
-      B[team].resources && B[team].resources.burn >= 1) {
-    disableDone();
-    B.zorkPending = { team, btn: doneBtn };
-    document.getElementById('zorkSub').innerHTML =
-      `Discard all 🔥 Burn for +1 die each?<br>` +
-      `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
-    document.getElementById('zorkOverlay').classList.add('active');
-    return true;
-  }
+  // — ZORK (463) — Stoke: now handled by pre-roll ability button (useZorkStoke)
 
   // — CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (Duel Phase)
   if (f.id === 442 && !f.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
@@ -11175,6 +11141,11 @@ function renderBattle() {
             html += `<button class="ability-btn" disabled title="Need 2 Healing Seeds + 1 Sacred Fire" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔥 Forge Flame Blade (1🌱 + 1🔥)</button>`;
           }
         }
+      }
+      // Zork (463) — Stoke: pre-roll button to discard Burn for dice
+      if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
+          B[team].resources && B[team].resources.burn >= 1) {
+        html += `<button class="ability-btn pressure" onclick="useZorkStoke('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🔥 STOKE! (${B[team].resources.burn} Burn → +${B[team].resources.burn} dice)</button>`;
       }
       // Flame Blade toggle (if forged — shown for any active ghost on the team)
       if (B.flameBlade && B.flameBlade[team]) {
