@@ -25,7 +25,7 @@ const GHOSTS = [
     designNote:"Wolf spirit — Timber's packmate. Forces the opponent to swap their active ghost before rolling. They choose who comes in, but the disruption is brutal. 6 HP keeps him in the fight."
   },
   {
-    id:203, name:"Benjamin", rarity:"uncommon", maxHp:4, art:"../testroom/art/benny.jpg",
+    id:203, name:"Benjamin", rarity:"uncommon", maxHp:3, art:"../testroom/art/benny.jpg",
     ability:"Magic Touch", abilityDesc:"Once per turn: use the Moonstone special without discarding it.",
     category:"Destruction/Instant Kill", set:"Volcanic Activity",
     designNote:"Moonstone economy card. 3 HP is fragile, but his ability to use Moonstones without discarding them makes him incredibly valuable. Protect him and your Moonstones go twice as far."
@@ -421,7 +421,7 @@ const GHOSTS = [
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"../testroom/art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"../testroom/art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
   {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"../testroom/art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
-  {id:462, name:"Ridley", rarity:"uncommon", maxHp:4, art:"../testroom/art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
+  {id:462, name:"Ridley", rarity:"uncommon", maxHp:3, art:"../testroom/art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
   {id:463, name:"Zork", rarity:"common", maxHp:4, art:"../testroom/art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."}
 ];
 
