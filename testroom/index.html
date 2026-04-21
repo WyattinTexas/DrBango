@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v775';
+const TESTROOM_VERSION = 'v776';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3080,7 +3080,8 @@ const GHOSTS = [
   {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 or 2 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
   {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
-  {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."}
+  {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
+  {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."}
 ];
 
 // ============================================================
@@ -10361,6 +10362,26 @@ function doPostRollAndResolve(redDice, blueDice) {
         }, tNameChamp);
         checkKnightEffects(tNameChamp, f.name);
       }
+    }
+  });
+
+  // Ronan (461) — Mixup: if you roll doubles+ → gain +1 Ice Shard & +1 Burn (win or lose)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameRonan = team === B.red ? 'red' : 'blue';
+    const ronanDice = team === B.red ? redDice : blueDice;
+    if (f.id === 461 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(ronanDice).type)) {
+      const _rTeam = team;
+      const _rName = f.name;
+      queueAbility('MIXUP!', 'var(--common)', `${f.name} — Doubles! +1 Ice Shard & +1 Burn!`, () => {
+        if (!_rTeam.resources.ice) _rTeam.resources.ice = 0;
+        _rTeam.resources.ice += 1;
+        if (!_rTeam.resources.burn) _rTeam.resources.burn = 0;
+        _rTeam.resources.burn += 1;
+        log(`<span class="log-ability">${_rName}</span> — Mixup! Doubles → gained <span class="log-ms">1 Ice Shard</span> & <span class="log-dmg">1 Burn</span>!`);
+        renderBattle();
+      }, tNameRonan);
+      checkKnightEffects(tNameRonan, f.name);
     }
   });
 

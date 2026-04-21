@@ -5590,6 +5590,26 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
+  // Ronan (461) — Mixup: if you roll doubles+ → gain +1 Ice Shard & +1 Burn (win or lose)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameRonan = team === B.red ? 'red' : 'blue';
+    const ronanDice = team === B.red ? redDice : blueDice;
+    if (f.id === 461 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(ronanDice).type)) {
+      const _rTeam = team;
+      const _rName = f.name;
+      queueAbility('MIXUP!', 'var(--common)', `${f.name} — Doubles! +1 Ice Shard & +1 Burn!`, () => {
+        if (!_rTeam.resources.ice) _rTeam.resources.ice = 0;
+        _rTeam.resources.ice += 1;
+        if (!_rTeam.resources.burn) _rTeam.resources.burn = 0;
+        _rTeam.resources.burn += 1;
+        log(`<span class="log-ability">${_rName}</span> — Mixup! Doubles → gained <span class="log-ms">1 Ice Shard</span> & <span class="log-dmg">1 Burn</span>!`);
+        renderBattle();
+      }, tNameRonan);
+      checkKnightEffects(tNameRonan, f.name);
+    }
+  });
+
   abilityQueueMode = false;
 
   // Drain post-roll callouts sequentially, THEN check moonstone/KOs

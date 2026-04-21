@@ -1444,6 +1444,18 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Ronan (461) — Mixup: if you roll doubles+ → gain +1 Ice Shard & +1 Burn (win or lose)
+  ['red','blue'].forEach(teamKey => {
+    const t = B[teamKey]; const f = active(t);
+    const ronanDice = teamKey === 'red' ? redDice : blueDice;
+    if (f.id === 461 && !f.ko && ['doubles','triples','quads','penta'].includes(classify(ronanDice).type)) {
+      if (!t.resources.ice) t.resources.ice = 0;
+      t.resources.ice += 1;
+      if (!t.resources.burn) t.resources.burn = 0;
+      t.resources.burn += 1;
+    }
+  });
+
   // ===== AI: MOONSTONE (change a die to improve hand) =====
   // Only use moonstones that existed BEFORE this round (snapshot), not mid-roll gains (Natalia etc.)
   ['red','blue'].forEach(teamKey => {
