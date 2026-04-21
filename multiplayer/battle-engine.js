@@ -1844,9 +1844,9 @@ function useZorkStoke(team) {
   B.zorkDecided[team] = true;
   if (!B.zorkExtraDie) B.zorkExtraDie = { red: 0, blue: 0 };
   B.zorkExtraDie[team] = (B.zorkExtraDie[team] || 0) + burnSpent;
-  showAbilityCallout('STOKE!', 'var(--common)',
+  showAbilityCallout('SMOLDER!', 'var(--common)',
     `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, team);
-  log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+  log(`<span class="log-ability">${f.name}</span> — Smolder! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
   renderBattle();
 }
 
@@ -11145,7 +11145,7 @@ function renderBattle() {
       // Zork (463) — Stoke: pre-roll button to discard Burn for dice
       if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
           B[team].resources && B[team].resources.burn >= 1) {
-        html += `<button class="ability-btn pressure" onclick="useZorkStoke('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🔥 STOKE! (${B[team].resources.burn} Burn → +${B[team].resources.burn} dice)</button>`;
+        html += `<button class="ability-btn pressure" onclick="useZorkStoke('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🔥 SMOLDER! (${B[team].resources.burn} Burn → +${B[team].resources.burn} dice)</button>`;
       }
       // Flame Blade toggle (if forged — shown for any active ghost on the team)
       if (B.flameBlade && B.flameBlade[team]) {
