@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v774';
+const TESTROOM_VERSION = 'v775';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3079,7 +3079,8 @@ const GHOSTS = [
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
   {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 or 2 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
   {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
-  {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."}
+  {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
+  {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."}
 ];
 
 // ============================================================
@@ -14179,6 +14180,27 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Slicer (460) — Parting Gift: Sideline & In Play — win with quads+ → destroy any enemy sideline ghost
+  // Auto-picks highest-HP target (most impactful). No HP restriction unlike Night Master.
+  let slicerTarget = null;
+  const slicerActive = wF.id === 460 && !wF.ko;
+  const slicerSideline = hasSideline(winTeam, 460);
+  if ((slicerActive || slicerSideline) && ['quads','penta'].includes(wR.type)) {
+    const loseActiveIdx = loseTeam.activeIdx;
+    const slicerCandidates = loseTeam.ghosts.filter((g, i) => i !== loseActiveIdx && !g.ko);
+    if (slicerCandidates.length > 0) {
+      const best = slicerCandidates.reduce((a, b) => b.hp > a.hp ? b : a);
+      slicerTarget = { ghost: best, priorHp: best.hp };
+      best.hp = 0;
+      best.ko = true;
+      best.killedBy = 460;
+      const slicerGhost = slicerActive ? wF : getSidelineGhost(winTeam, 460);
+      const slicerLabel = slicerSideline && !slicerActive ? `${slicerGhost.name} (sideline)` : slicerGhost.name;
+      collectKC(winTeamName, slicerLabel);
+      log(`<span class="log-ability">${slicerLabel}</span> — Parting Gift! ${best.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`);
+    }
+  }
+
   // Flora (75) — Restore: rolling doubles (win OR lose) heals +2 HP. Fires after damage is applied.
   // Win case: Flora won with doubles — heal her after lF took damage.
   // Lose case: Flora lost but rolled doubles and survived — heal even in defeat.
@@ -14678,6 +14700,16 @@ function _resolveRoundImpl() {
   // Night Master (103) — Bullseye: sideline snipe callout — onShow updates sideline display
   if (bullseyeTarget) {
     queueAbility('BULLSEYE!', 'var(--ghost-rare)', `${wF.name} — Doubles! ${bullseyeTarget.ghost.name} (${bullseyeTarget.priorHp} HP) sniped from the enemy sideline!`, () => { renderBattle(); }, winTeamName);
+  }
+
+  // Slicer (460) — Parting Gift: sideline snipe callout — onShow updates sideline display
+  if (slicerTarget) {
+    const slicerGhostQ = (wF.id === 460 && !wF.ko) ? wF : getSidelineGhost(winTeam, 460);
+    const slicerLabelQ = (slicerSideline && !slicerActive) ? `${slicerGhostQ ? slicerGhostQ.name : 'Slicer'} (sideline)` : (slicerGhostQ ? slicerGhostQ.name : 'Slicer');
+    queueAbility('PARTING GIFT!', 'var(--uncommon)', `${slicerLabelQ} — Quads! ${slicerTarget.ghost.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`, () => {
+      if (slicerSideline && !slicerActive) popSidelineCard(winTeam, 460);
+      renderBattle();
+    }, winTeamName);
   }
 
   // Bubble Boys (44) — Pop: callout fires after Bullseye, onShow re-renders so KO greys out BB

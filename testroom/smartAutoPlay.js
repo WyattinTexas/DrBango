@@ -1394,15 +1394,15 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 you roll (post-roll, both teams)
+  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 or 2 you roll (post-roll, both teams)
   ['red','blue'].forEach(teamKey => {
     if (B.sophiaMask && B.sophiaMask[teamKey] === 'day' && B.sophiaMaskActive && B.sophiaMaskActive[teamKey]) {
       const dice = teamKey === 'red' ? redDice : blueDice;
-      const ones = dice.filter(d => d === 1).length;
-      if (ones > 0) {
+      const lowRolls = dice.filter(d => d === 1 || d === 2).length;
+      if (lowRolls > 0) {
         const t = B[teamKey];
         if (!t.resources.burn) t.resources.burn = 0;
-        t.resources.burn += ones;
+        t.resources.burn += lowRolls;
       }
     }
   });
@@ -2144,6 +2144,18 @@ function smartSimRounds(gameNum) {
     if (wF.id === 103 && !wF.ko && wR.type === 'doubles') {
       const _nmTarget = lTeam.ghosts.find((g, i) => i !== lTeam.activeIdx && !g.ko && g.hp < 4);
       if (_nmTarget) { _nmTarget.hp = 0; _nmTarget.ko = true; _nmTarget.killedBy = 103; }
+    }
+
+    // Slicer (460) — Parting Gift: Sideline & In Play — win with quads+ → destroy any enemy sideline ghost.
+    // Auto-picks highest-HP target. No HP restriction unlike Night Master.
+    const slicerActive = wF.id === 460 && !wF.ko;
+    const slicerSideline = hasSideline(wTeam, 460);
+    if ((slicerActive || slicerSideline) && ['quads','penta'].includes(wR.type)) {
+      const slicerCandidates = lTeam.ghosts.filter((g, i) => i !== lTeam.activeIdx && !g.ko);
+      if (slicerCandidates.length > 0) {
+        const best = slicerCandidates.reduce((a, b) => b.hp > a.hp ? b : a);
+        best.hp = 0; best.ko = true; best.killedBy = 460;
+      }
     }
 
     // Prince Balatron (113) — Party Time: lose & survive → roll 1 counter die for damage against the winner.

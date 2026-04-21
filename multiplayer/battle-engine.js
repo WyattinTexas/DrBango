@@ -8798,6 +8798,28 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Slicer (460) — Parting Gift: Sideline & In Play — win with quads+ → destroy any enemy sideline ghost
+  // Auto-picks highest-HP target (most impactful). No HP restriction unlike Night Master.
+  let slicerTarget = null;
+  const slicerActive = wF.id === 460 && !wF.ko;
+  const slicerSideline = hasSideline(winTeam, 460);
+  if ((slicerActive || slicerSideline) && ['quads','penta'].includes(wR.type)) {
+    const loseActiveIdx = loseTeam.activeIdx;
+    const slicerCandidates = loseTeam.ghosts.filter((g, i) => i !== loseActiveIdx && !g.ko);
+    if (slicerCandidates.length > 0) {
+      // Pick highest HP target (most valuable to destroy)
+      const best = slicerCandidates.reduce((a, b) => b.hp > a.hp ? b : a);
+      slicerTarget = { ghost: best, priorHp: best.hp };
+      best.hp = 0;
+      best.ko = true;
+      best.killedBy = 460;
+      const slicerGhost = slicerActive ? wF : getSidelineGhost(winTeam, 460);
+      const slicerLabel = slicerSideline && !slicerActive ? `${slicerGhost.name} (sideline)` : slicerGhost.name;
+      collectKC(winTeamName, slicerLabel);
+      log(`<span class="log-ability">${slicerLabel}</span> — Parting Gift! ${best.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`);
+    }
+  }
+
   // Flora (75) — Restore: rolling doubles (win OR lose) heals +2 HP. Fires after damage is applied.
   // Win case: Flora won with doubles — heal her after lF took damage.
   // Lose case: Flora lost but rolled doubles and survived — heal even in defeat.
@@ -9285,6 +9307,13 @@ function _resolveRoundImpl() {
   // Night Master (103) — Bullseye: sideline snipe callout — onShow updates sideline display
   if (bullseyeTarget) {
     queueAbility('BULLSEYE!', 'var(--ghost-rare)', `${wF.name} — Doubles! ${bullseyeTarget.ghost.name} (${bullseyeTarget.priorHp} HP) sniped from the enemy sideline!`, () => { renderBattle(); }, winTeamName);
+  }
+
+  // Slicer (460) — Parting Gift: sideline snipe callout — onShow updates sideline display
+  if (slicerTarget) {
+    const slicerGhostQ = (wF.id === 460 && !wF.ko) ? wF : getSidelineGhost(winTeam, 460);
+    const slicerLabelQ = (slicerSideline && !slicerActive) ? `${slicerGhostQ ? slicerGhostQ.name : 'Slicer'} (sideline)` : (slicerGhostQ ? slicerGhostQ.name : 'Slicer');
+    queueAbility('PARTING GIFT!', 'var(--uncommon)', `${slicerLabelQ} — Quads! ${slicerTarget.ghost.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`, () => { renderBattle(); }, winTeamName);
   }
 
   // Bubble Boys (44) — Pop: callout fires after Bullseye, onShow re-renders so KO greys out BB
