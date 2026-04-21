@@ -872,8 +872,8 @@ function smartSimRounds(gameNum) {
   ['red','blue'].forEach(teamKey => {
     const team = B[teamKey];
     const finnAlive = team.ghosts.some(g => g.id === 204 && !g.ko);
-    if (finnAlive && (!B.flameBlade || !B.flameBlade[teamKey]) && (team.resources.healingSeed || 0) >= 2 && (team.resources.fire || 0) >= 1) {
-      team.resources.healingSeed -= 2;
+    if (finnAlive && (!B.flameBlade || !B.flameBlade[teamKey]) && (team.resources.healingSeed || 0) >= 1 && (team.resources.fire || 0) >= 1) {
+      team.resources.healingSeed -= 1;
       team.resources.fire -= 1;
       if (!B.flameBlade) B.flameBlade = { red: false, blue: false };
       B.flameBlade[teamKey] = true;

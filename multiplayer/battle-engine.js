@@ -1077,13 +1077,13 @@ function useFinnFlameBlade(team) {
   const finnOnTeam = t.ghosts.some(g => g.id === 204 && !g.ko);
   if (!finnOnTeam) return;
   if (B.flameBlade && B.flameBlade[team]) return; // already forged
-  if ((t.resources.healingSeed || 0) < 2 || (t.resources.fire || 0) < 1) return;
-  t.resources.healingSeed -= 2;
+  if ((t.resources.healingSeed || 0) < 1 || (t.resources.fire || 0) < 1) return;
+  t.resources.healingSeed -= 1;
   t.resources.fire -= 1;
   if (!B.flameBlade) B.flameBlade = { red: false, blue: false };
   B.flameBlade[team] = true;
   creditGhost(team, 204, 'ms', 1); // Finn earns MVP credit for forging
-  log(`<span class="log-ability">Finn</span> — Forge! 2 Healing Seeds + 1 Sacred Fire → <span class="log-ms">Flame Blade!</span> (permanent item)`);
+  log(`<span class="log-ability">Finn</span> — Forge! 1 Healing Seed + 1 Sacred Fire → <span class="log-ms">Flame Blade!</span> (permanent item)`);
   showAbilityCallout('FLAME BLADE!', 'var(--rare)', 'Finn forges the Flame Blade!', team);
   playSfx('sfxSpecial', 0.5);
   renderBattle();
@@ -11164,11 +11164,11 @@ function renderBattle() {
       if (B[team].ghosts.some(g => g.id === 204 && !g.ko)) {
         if (!B.flameBlade || !B.flameBlade[team]) {
           const r = B[team].resources;
-          const canForge = (r.healingSeed || 0) >= 2 && (r.fire || 0) >= 1;
+          const canForge = (r.healingSeed || 0) >= 1 && (r.fire || 0) >= 1;
           if (canForge) {
-            html += `<button class="ability-btn pressure" onclick="useFinnFlameBlade('${team}')" title="Finn — forge the Flame Blade (2 Healing Seeds + 1 Sacred Fire)" style="border-color:#fb923c;color:#fb923c;">🔥 Forge Flame Blade (2🌱 + 1🔥)</button>`;
+            html += `<button class="ability-btn pressure" onclick="useFinnFlameBlade('${team}')" title="Finn — forge the Flame Blade (2 Healing Seeds + 1 Sacred Fire)" style="border-color:#fb923c;color:#fb923c;">🔥 Forge Flame Blade (1🌱 + 1🔥)</button>`;
           } else {
-            html += `<button class="ability-btn" disabled title="Need 2 Healing Seeds + 1 Sacred Fire" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔥 Forge Flame Blade (2🌱 + 1🔥)</button>`;
+            html += `<button class="ability-btn" disabled title="Need 2 Healing Seeds + 1 Sacred Fire" style="opacity:0.4;border-color:#fb923c;color:#fb923c;">🔥 Forge Flame Blade (1🌱 + 1🔥)</button>`;
           }
         }
       }
