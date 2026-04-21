@@ -374,6 +374,7 @@ function startBattle() {
   B = {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
+    battleStarted: false,
     pendingMoonstone:null, pendingSteal:null,
     // === DUEL PHASE ===
     // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
@@ -487,6 +488,7 @@ function startBattle() {
         const secondEntryDelay = secondEntryCount > 0 ? secondEntryCount * 1500 : 300;
         setTimeout(() => {
           // All entry effects done — check for KOs, then enable rolling
+          B.battleStarted = true;
           if (handleKOs()) return;
           // Duel Phase v1: check for priority before unlocking rolls
           startNextRound();
@@ -501,6 +503,7 @@ function startBattle() {
     const secondTeam2 = (_priority2 === 'blue') ? B.red  : B.blue;
     triggerEntry(firstTeam2);
     triggerEntry(secondTeam2);
+    B.battleStarted = true;
     renderBattle();
     if (handleKOs()) return;
     narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
@@ -692,7 +695,8 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Dallas (60) — Quick Draw: on entry from sideline, prime die theft for first 2 rolls
-  if (f.id === 60) {
+  // Only fires when coming OFF the sideline — not when Dallas starts as the active ghost
+  if (f.id === 60 && B.battleStarted) {
     f.dallasQuickDraw = 2;
     entryCallouts.push(['QUICK DRAW!', 'var(--uncommon)', `${f.name} — stealing 1 opponent die for the next 2 rolls!`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Quick Draw! Steals 1 opponent die for the first 2 rolls.`);
