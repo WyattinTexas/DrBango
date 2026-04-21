@@ -2612,7 +2612,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v776';
+const TESTROOM_VERSION = 'v777';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3081,7 +3081,9 @@ const GHOSTS = [
   {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
-  {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."}
+  {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
+  {id:462, name:"Ridley", rarity:"uncommon", maxHp:5, art:"art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
+  {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Stoke", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."}
 ];
 
 // ============================================================
@@ -9708,6 +9710,20 @@ function doPreRollSetup() {
     B.foremanDieBonus.blue = 0;
   }
 
+  // Zork (463) — Stoke: before rolling, discard all Burn to gain +1 die per Burn discarded
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 463 && !f.ko && team.resources.burn > 0) {
+      const burnSpent = team.resources.burn;
+      team.resources.burn = 0;
+      if (tName === 'red') redCount += burnSpent; else blueCount += burnSpent;
+      preRollCallouts.push(['STOKE!', 'var(--common)', `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, tName]);
+      log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+      checkKnightEffects(tName, f.name);
+    }
+  });
+
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) {
     redCount += 1;
@@ -13301,6 +13317,22 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Teamwork! Singles win → +2 damage!`);
   }
 
+  // Ridley (462) — Nimble: singles +1 damage, doubles +2 damage.
+  let ridleyTriggered = false;
+  let ridleyBaseDmg = 0;
+  let ridleyBonus = 0;
+  if (wF.id === 462 && !wF.ko) {
+    if (wR.type === 'singles') { ridleyBonus = 1; }
+    else if (['doubles','triples','quads','penta'].includes(wR.type)) { ridleyBonus = 2; }
+    if (ridleyBonus > 0) {
+      ridleyBaseDmg = dmg;
+      dmg += ridleyBonus;
+      ridleyTriggered = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Nimble! ${wR.type === 'singles' ? 'Singles' : 'Doubles'} → +${ridleyBonus} damage!`);
+    }
+  }
+
   // Carpenter (449) — Apprentice: +2 damage on singles (active Carpenter only)
   let carpenterTriggered = false;
   if (wF.id === 449 && !wF.ko && wR.type === 'singles') {
@@ -14540,6 +14572,9 @@ function _resolveRoundImpl() {
   }
   if (teamZippyTriggered) {
     queueAbility('TEAMWORK!', 'var(--uncommon)', `${wF.name} — Singles win! ${teamZippyBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
+  }
+  if (ridleyTriggered) {
+    queueAbility('NIMBLE!', 'var(--uncommon)', `${wF.name} — ${wR.type === 'singles' ? 'Singles' : 'Doubles'}! ${ridleyBaseDmg} + ${ridleyBonus} = ${ridleyBaseDmg + ridleyBonus} damage!`, null, winTeamName);
   }
   if (gregTriggered) {
     queueAbility('CHASE!', 'var(--uncommon)', `${wF.name} — More HP than ${lF.name}! (${wF.hp} vs ${lF.hp}) ${gregBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);

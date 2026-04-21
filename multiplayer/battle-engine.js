@@ -5040,6 +5040,20 @@ function doPreRollSetup() {
     B.gordokDieBonus.blue = 0;
   }
 
+  // Zork (463) — Stoke: before rolling, discard all Burn to gain +1 die per Burn discarded
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 463 && !f.ko && team.resources.burn > 0) {
+      const burnSpent = team.resources.burn;
+      team.resources.burn = 0;
+      if (tName === 'red') redCount += burnSpent; else blueCount += burnSpent;
+      preRollCallouts.push(['STOKE!', 'var(--common)', `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, tName]);
+      log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+      checkKnightEffects(tName, f.name);
+    }
+  });
+
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) {
     redCount += 1;
@@ -8030,6 +8044,22 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Teamwork! Singles win → +2 damage!`);
   }
 
+  // Ridley (462) — Nimble: singles +1 damage, doubles +2 damage.
+  let ridleyTriggered = false;
+  let ridleyBaseDmg = 0;
+  let ridleyBonus = 0;
+  if (wF.id === 462 && !wF.ko) {
+    if (wR.type === 'singles') { ridleyBonus = 1; }
+    else if (['doubles','triples','quads','penta'].includes(wR.type)) { ridleyBonus = 2; }
+    if (ridleyBonus > 0) {
+      ridleyBaseDmg = dmg;
+      dmg += ridleyBonus;
+      ridleyTriggered = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Nimble! ${wR.type === 'singles' ? 'Singles' : 'Doubles'} → +${ridleyBonus} damage!`);
+    }
+  }
+
   // Greg (49) — Chase: if Greg has more HP than the opposing ghost, rolls deal 2X damage.
   // Faithfully ported from GHOSTS abilityDesc: "If Greg has more health than the opposing ghost, Greg's rolls do x2 damage."
   let gregTriggered = false;
@@ -9155,6 +9185,9 @@ function _resolveRoundImpl() {
   }
   if (teamZippyTriggered) {
     queueAbility('TEAMWORK!', 'var(--uncommon)', `${wF.name} — Singles win! ${teamZippyBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
+  }
+  if (ridleyTriggered) {
+    queueAbility('NIMBLE!', 'var(--uncommon)', `${wF.name} — ${wR.type === 'singles' ? 'Singles' : 'Doubles'}! ${ridleyBaseDmg} + ${ridleyBonus} = ${ridleyBaseDmg + ridleyBonus} damage!`, null, winTeamName);
   }
   if (gregTriggered) {
     queueAbility('CHASE!', 'var(--uncommon)', `${wF.name} — More HP than ${lF.name}! (${wF.hp} vs ${lF.hp}) ${gregBaseDmg} × 2 = ${dmg} damage!`, null, winTeamName);

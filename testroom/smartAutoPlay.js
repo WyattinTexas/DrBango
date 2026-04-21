@@ -1077,6 +1077,16 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Zork (463) — Stoke: before rolling, discard all Burn for +1 die per Burn
+  ['red','blue'].forEach(teamKey => {
+    const t = B[teamKey]; const f = active(t);
+    if (f.id === 463 && !f.ko && t.resources.burn > 0) {
+      const burnSpent = t.resources.burn;
+      t.resources.burn = 0;
+      if (teamKey === 'red') redCount += burnSpent; else blueCount += burnSpent;
+    }
+  });
+
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) redCount += 1;
   if (B.flameBladeSwing && B.flameBladeSwing.blue) blueCount += 1;
@@ -1852,6 +1862,11 @@ function smartSimRounds(gameNum) {
     if (wF.id === 96 && !wF.ko && wR.type === 'singles') { dmg += 1; }
     // Team Zippy (40) — Teamwork: singles win → +2 bonus damage. Matches index.html lines 9289–9299.
     if (wF.id === 40 && !wF.ko && wR.type === 'singles') { dmg += 2; }
+    // Ridley (462) — Nimble: singles +1 damage, doubles+ +2 damage.
+    if (wF.id === 462 && !wF.ko) {
+      if (wR.type === 'singles') { dmg += 1; }
+      else if (['doubles','triples','quads','penta'].includes(wR.type)) { dmg += 2; }
+    }
     // Greg (49) — Chase: if Greg has more HP than the opposing ghost, winning rolls deal 2X damage.
     // Matches index.html lines 9305–9311: `if (wF.id===49 && !wF.ko && wF.hp>lF.hp) { dmg*=2; collectKC(...); }`
     if (wF.id === 49 && !wF.ko && wF.hp > lF.hp) { dmg *= 2; }
