@@ -8906,7 +8906,7 @@ function _resolveRoundImpl() {
   let slicerTarget = null;
   const slicerActive = wF.id === 460 && !wF.ko;
   const slicerSideline = hasSideline(winTeam, 460);
-  if ((slicerActive || slicerSideline) && ['quads','penta'].includes(wR.type)) {
+  if ((slicerActive || slicerSideline) && (wR.type === 'quads' || wR.type === 'penta' || wR.type.endsWith('-of-a-kind'))) {
     const loseActiveIdx = loseTeam.activeIdx;
     const slicerCandidates = loseTeam.ghosts.filter((g, i) => i !== loseActiveIdx && !g.ko);
     if (slicerCandidates.length > 0) {

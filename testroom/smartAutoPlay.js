@@ -2178,7 +2178,7 @@ function smartSimRounds(gameNum) {
     // Auto-picks highest-HP target. No HP restriction unlike Night Master.
     const slicerActive = wF.id === 460 && !wF.ko;
     const slicerSideline = hasSideline(wTeam, 460);
-    if ((slicerActive || slicerSideline) && ['quads','penta'].includes(wR.type)) {
+    if ((slicerActive || slicerSideline) && (wR.type === 'quads' || wR.type === 'penta' || wR.type.endsWith('-of-a-kind'))) {
       const slicerCandidates = lTeam.ghosts.filter((g, i) => i !== lTeam.activeIdx && !g.ko);
       if (slicerCandidates.length > 0) {
         const best = slicerCandidates.reduce((a, b) => b.hp > a.hp ? b : a);
