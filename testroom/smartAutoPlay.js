@@ -1077,13 +1077,14 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Zork (463) — Stoke: before rolling, discard all Burn for +1 die per Burn
+  // Zork (463) — Stoke: AI auto-spends all Burn for +1 die each (always beneficial)
   ['red','blue'].forEach(teamKey => {
     const t = B[teamKey]; const f = active(t);
     if (f.id === 463 && !f.ko && t.resources.burn > 0) {
       const burnSpent = t.resources.burn;
       t.resources.burn = 0;
       if (teamKey === 'red') redCount += burnSpent; else blueCount += burnSpent;
+      if (B.zorkDecided) B.zorkDecided[teamKey] = true;
     }
   });
 

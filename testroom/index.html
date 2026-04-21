@@ -2270,6 +2270,19 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
+<!-- Zork (463) — Stoke: discard Burn for +1 die each -->
+<div class="selene-overlay" id="zorkOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#b45309,#f59e0b);">🔥 STOKE</div>
+    <h3>Zork — Stoke!</h3>
+    <p class="selene-sub" id="zorkSub">Discard all Burn for +1 die each?</p>
+    <div class="selene-options">
+      <button class="selene-opt" onclick="doZorkChoice('yes')" style="background:linear-gradient(135deg,#b45309,#f59e0b);">🔥 Yes — burn it all for dice!</button>
+      <button class="selene-opt" onclick="doZorkChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — keep the Burn</button>
+    </div>
+  </div>
+</div>
+
 <!-- Kaylee (453) — Slipstream: choose dice to swap -->
 <div class="selene-overlay" id="slipstreamOverlay">
   <div class="selene-modal" style="max-width:500px;">
@@ -3559,6 +3572,8 @@ function autoPlayNext() {
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
+    zorkDecided: { red: false, blue: false },
+    zorkExtraDie: { red: 0, blue: 0 },
     bonzaiDecided: { red: false, blue: false },
     battleStarted: false,
     cultivateDecided: { red: false, blue: false },
@@ -4242,6 +4257,8 @@ function startBattle() {
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
+    zorkDecided: { red: false, blue: false },
+    zorkExtraDie: { red: 0, blue: 0 },
     bonzaiDecided: { red: false, blue: false },
     battleStarted: false,
     cultivateDecided: { red: false, blue: false },
@@ -5917,6 +5934,32 @@ function doChowChoice(choice) {
     }
   } else {
     B.chowDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+  }
+}
+
+// ============================================================
+// ZORK (463) — Stoke: discard all Burn for +1 die per Burn
+// ============================================================
+function doZorkChoice(choice) {
+  const zp = B.zorkPending;
+  if (!zp) return;
+  B.zorkPending = null;
+  document.getElementById('zorkOverlay').classList.remove('active');
+  const { team, btn } = zp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 463 && !f.ko && B[team].resources.burn > 0) {
+    const burnSpent = B[team].resources.burn;
+    B[team].resources.burn = 0;
+    B.zorkExtraDie[team] = (B.zorkExtraDie[team] || 0) + burnSpent;
+    showAbilityCallout('STOKE!', 'var(--common)',
+      `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+    renderBattle();
+    B.zorkDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
+  } else {
+    B.zorkDecided[team] = true;
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
@@ -7889,6 +7932,25 @@ function rollReady(team) {
       }
     }
 
+    // Zork (463) — Stoke: discard all Burn for +1 die each (interactive button)
+    {
+      const zorkG = active(B[team]);
+      if (zorkG && zorkG.id === 463 && !zorkG.ko && B.zorkDecided && !B.zorkDecided[team] &&
+          B[team].resources && B[team].resources.burn >= 1) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.zorkPending = { team, btn };
+        const zorkDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          document.getElementById('zorkSub').innerHTML =
+            `Discard all 🔥 Burn for +1 die each?<br>` +
+            `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
+          document.getElementById('zorkOverlay').classList.add('active');
+        }, zorkDelay);
+        return;
+      }
+    }
+
     // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
     // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 2 Sacred Fire (interactive button)
@@ -8351,6 +8413,18 @@ function openDuelPhasePrimers(team) {
       `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
       `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
     document.getElementById('chowOverlay').classList.add('active');
+    return true;
+  }
+
+  // — ZORK (463) — Stoke: discard all Burn for +1 die each (Duel Phase)
+  if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
+      B[team].resources && B[team].resources.burn >= 1) {
+    disableDone();
+    B.zorkPending = { team, btn: doneBtn };
+    document.getElementById('zorkSub').innerHTML =
+      `Discard all 🔥 Burn for +1 die each?<br>` +
+      `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
+    document.getElementById('zorkOverlay').classList.add('active');
     return true;
   }
 
@@ -9373,6 +9447,10 @@ function doPreRollSetup() {
   if (!B.chowExtraDie) B.chowExtraDie = { red: 0, blue: 0 };
   B.chowDecided = { red: false, blue: false };
 
+  // Zork (463) — Stoke: reset decided flag, zorkExtraDie persists until consumed
+  if (!B.zorkExtraDie) B.zorkExtraDie = { red: 0, blue: 0 };
+  B.zorkDecided = { red: false, blue: false };
+
   // Miyoshi (454) — Bonzai!: sacrifice HP for dice
   // bonzaiDecided and bonzaiBtnDice are set by the pre-roll button (useBonzaiButton)
   // Do NOT reset here — they persist from button click through to dice consumption
@@ -9710,19 +9788,9 @@ function doPreRollSetup() {
     B.foremanDieBonus.blue = 0;
   }
 
-  // Zork (463) — Stoke: before rolling, discard all Burn to gain +1 die per Burn discarded
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 463 && !f.ko && team.resources.burn > 0) {
-      const burnSpent = team.resources.burn;
-      team.resources.burn = 0;
-      if (tName === 'red') redCount += burnSpent; else blueCount += burnSpent;
-      preRollCallouts.push(['STOKE!', 'var(--common)', `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, tName]);
-      log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
-      checkKnightEffects(tName, f.name);
-    }
-  });
+  // Zork (463) — Stoke: consume committed dice from doZorkChoice
+  if (B.zorkExtraDie && B.zorkExtraDie.red > 0) { redCount += B.zorkExtraDie.red; B.zorkExtraDie.red = 0; }
+  if (B.zorkExtraDie && B.zorkExtraDie.blue > 0) { blueCount += B.zorkExtraDie.blue; B.zorkExtraDie.blue = 0; }
 
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) {

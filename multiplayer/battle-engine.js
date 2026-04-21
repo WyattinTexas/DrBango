@@ -407,6 +407,8 @@ function startBattle() {
     haywireBonus: { red: 0, blue: 0 },
     haywireDamageBonus: { red: 0, blue: 0 },
     chowDecided: { red: false, blue: false },
+    zorkDecided: { red: false, blue: false },
+    zorkExtraDie: { red: 0, blue: 0 },
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -1821,6 +1823,32 @@ function doChowChoice(choice) {
     }
   } else {
     B.chowDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+  }
+}
+
+// ============================================================
+// ZORK (463) — Stoke: discard all Burn for +1 die each
+// ============================================================
+function doZorkChoice(choice) {
+  const zp = B.zorkPending;
+  if (!zp) return;
+  B.zorkPending = null;
+  document.getElementById('zorkOverlay').classList.remove('active');
+  const { team, btn } = zp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 463 && !f.ko && B[team].resources.burn > 0) {
+    const burnSpent = B[team].resources.burn;
+    B[team].resources.burn = 0;
+    B.zorkExtraDie[team] = (B.zorkExtraDie[team] || 0) + burnSpent;
+    showAbilityCallout('STOKE!', 'var(--common)',
+      `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
+    renderBattle();
+    B.zorkDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+  } else {
+    B.zorkDecided[team] = true;
     setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
   }
 }
@@ -3392,6 +3420,25 @@ function rollReady(team) {
       }
     }
 
+    // Zork (463) — Stoke: discard all Burn for +1 die each (interactive button)
+    {
+      const zorkG = active(B[team]);
+      if (zorkG && zorkG.id === 463 && !zorkG.ko && B.zorkDecided && !B.zorkDecided[team] &&
+          B[team].resources && B[team].resources.burn >= 1) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+        B.zorkPending = { team, btn };
+        const zorkDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
+        setTimeout(() => {
+          document.getElementById('zorkSub').innerHTML =
+            `Discard all 🔥 Burn for +1 die each?<br>` +
+            `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
+          document.getElementById('zorkOverlay').classList.add('active');
+        }, zorkDelay);
+        return;
+      }
+    }
+
     // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
     {
       const cultG = active(B[team]);
@@ -3850,6 +3897,18 @@ function openDuelPhasePrimers(team) {
       `Discard 1 🌱 Healing Seed for +2 dice this roll?<br>` +
       `(Seeds: ${B[team].resources.healingSeed} | Current bonus dice: +${B.chowExtraDie[team] || 0})`;
     document.getElementById('chowOverlay').classList.add('active');
+    return true;
+  }
+
+  // — ZORK (463) — Stoke: discard all Burn for +1 die each (Duel Phase)
+  if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
+      B[team].resources && B[team].resources.burn >= 1) {
+    disableDone();
+    B.zorkPending = { team, btn: doneBtn };
+    document.getElementById('zorkSub').innerHTML =
+      `Discard all 🔥 Burn for +1 die each?<br>` +
+      `(Burn: ${B[team].resources.burn} → +${B[team].resources.burn} dice)`;
+    document.getElementById('zorkOverlay').classList.add('active');
     return true;
   }
 
@@ -4762,6 +4821,10 @@ function doPreRollSetup() {
   if (!B.chowExtraDie) B.chowExtraDie = { red: 0, blue: 0 };
   B.chowDecided = { red: false, blue: false };
 
+  // Zork (463) — Stoke: reset decided flag, zorkExtraDie persists until consumed
+  if (!B.zorkExtraDie) B.zorkExtraDie = { red: 0, blue: 0 };
+  B.zorkDecided = { red: false, blue: false };
+
   // Castle Gardener (442) — Cultivate: reset per round
   B.cultivateDecided = { red: false, blue: false };
 
@@ -5040,19 +5103,9 @@ function doPreRollSetup() {
     B.gordokDieBonus.blue = 0;
   }
 
-  // Zork (463) — Stoke: before rolling, discard all Burn to gain +1 die per Burn discarded
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 463 && !f.ko && team.resources.burn > 0) {
-      const burnSpent = team.resources.burn;
-      team.resources.burn = 0;
-      if (tName === 'red') redCount += burnSpent; else blueCount += burnSpent;
-      preRollCallouts.push(['STOKE!', 'var(--common)', `${f.name} — ${burnSpent} Burn → +${burnSpent} dice!`, tName]);
-      log(`<span class="log-ability">${f.name}</span> — Stoke! Discarded ${burnSpent} Burn for +${burnSpent} dice!`);
-      checkKnightEffects(tName, f.name);
-    }
-  });
+  // Zork (463) — Stoke: consume committed dice from doZorkChoice
+  if (B.zorkExtraDie && B.zorkExtraDie.red > 0) { redCount += B.zorkExtraDie.red; B.zorkExtraDie.red = 0; }
+  if (B.zorkExtraDie && B.zorkExtraDie.blue > 0) { blueCount += B.zorkExtraDie.blue; B.zorkExtraDie.blue = 0; }
 
   // Flame Blade item: when swinging, +1 die
   if (B.flameBladeSwing && B.flameBladeSwing.red) {
@@ -11245,7 +11298,7 @@ function clearAllOverlays() {
     'raditzHuntOverlay','dougCautionOverlay','tobogganOverlay','fangOutsideOverlay',
     'fangUndercoverArmOverlay','fangUndercoverSwapOverlay','winstonSchemeOverlay',
     'galeForcePickerOverlay','wiseAlOverlay','gordokOverlay','cultivateOverlay',
-    'chowOverlay','hexOverlay','nickKnackOverlay','jasperOverlay','balatronOverlay',
+    'chowOverlay','zorkOverlay','hexOverlay','nickKnackOverlay','jasperOverlay','balatronOverlay',
     'tommyOverlay','sylviaOverlay','burnOverlay','fireflyOverlay','abilitySplash','vsSplash'
   ];
   overlayIds.forEach(id => {
