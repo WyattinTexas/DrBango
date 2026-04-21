@@ -812,19 +812,11 @@ function smartSimRounds(gameNum) {
       r.healingSeed -= seeds;
     }
 
-    // Aunt Susan (309): spend seeds for damage or heal
+    // Aunt Susan (309): spend seeds for damage (heal removed)
     if (f.id === 309 && !f.ko && r.healingSeed > 0) {
-      if (f.hp <= f.maxHp * 0.4) {
-        // Low HP: invest in healing
-        const seeds = Math.min(r.healingSeed, 2);
-        B.committed[team].auntSusanHeal = seeds;
-        r.healingSeed -= seeds;
-      } else {
-        // Healthy: invest in damage
-        const seeds = Math.min(r.healingSeed, 2);
-        B.committed[team].auntSusan = seeds;
-        r.healingSeed -= seeds;
-      }
+      const seeds = Math.min(r.healingSeed, 2);
+      B.committed[team].auntSusan = seeds;
+      r.healingSeed -= seeds;
     }
 
     // Burn resource: auto-place all burn on highest-HP enemy sideline ghost
@@ -2230,7 +2222,7 @@ function smartSimRounds(gameNum) {
       }
     }
     if (wF.id === 336 && !wF.ko) { wTeam.resources.fire++;            if (sandwichLose) lTeam.resources.fire++;  }           // Humar Sacred Flame
-    if (wF.id === 309 && !wF.ko) { wTeam.resources.healingSeed++;     if (sandwichLose) lTeam.resources.healingSeed++; }     // Aunt Susan: +1 seed on win
+    if (wF.id === 309 && !wF.ko) { wTeam.resources.healingSeed += 2;  if (sandwichLose) lTeam.resources.healingSeed += 2; }   // Aunt Susan: +2 seeds on win
     if (wF.id === 81  && !wF.ko) { wTeam.resources.ice += 2;          if (sandwichLose) lTeam.resources.ice += 2; }          // Spockles: VALLEY MAGIC! +2 Ice on win — matches index.html line 10538
     // Splinter (101) — Toxic Fumes: first win activates poison (chip damage fires pre-roll every subsequent round).
     // Matches index.html lines 9656–9661: `if (wF.id===101 && !wF.ko && !B.splinterActivated[winTeamName]) { B.splinterActivated[winTeamName]=true; }`

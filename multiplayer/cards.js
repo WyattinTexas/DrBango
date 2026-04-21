@@ -123,7 +123,7 @@ const GHOSTS = [
   },
   {
     id:309, name:"Aunt Susan", rarity:"rare", maxHp:4, art:"../testroom/art/rustler.jpg",
-    ability:"Harvest Dance", abilityDesc:"Discard 1 Healing Seed: deal +2 damage OR heal +2 HP. Win: +1 Healing Seed.",
+    ability:"Harvest Dance", abilityDesc:"Discard 1 Healing Seed: deal +2 damage. Win: +2 Healing Seeds.",
     category:"Damage Multiplier", set:"Rolling Hills",
     designNote:"The autumn whirlwind. Builds momentum like Caldera but resets on ANY loss, not just when you deal damage. Higher risk, different rhythm."
   },
@@ -421,7 +421,7 @@ const GHOSTS = [
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"../testroom/art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"../testroom/art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
   {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"../testroom/art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
-  {id:462, name:"Ridley", rarity:"uncommon", maxHp:5, art:"../testroom/art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
+  {id:462, name:"Ridley", rarity:"uncommon", maxHp:4, art:"../testroom/art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
   {id:463, name:"Zork", rarity:"common", maxHp:4, art:"../testroom/art/zork.png", ability:"Stoke", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."}
 ];
 

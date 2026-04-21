@@ -9671,7 +9671,7 @@ function _resolveRoundImpl() {
   if (humarTriggered) { queueAbility('METEOR!', 'var(--legendary)', `${wF.name} — Win! 2 delayed damage + 1 Burn gained!`, () => { renderBattle(); }, winTeamName); }
   // Humar knight reactions already collected via collectKC at game-state section (line ~10078) — do NOT double-fire here
   // Humar Sandwiches mirror removed — Meteor deals delayed damage + burn, not mirrorable resources
-  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }, winTeamName); }
+  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +2 Healing Seeds!`, () => { winTeam.resources.healingSeed += 2; renderBattle(); }, winTeamName); }
   // Aunt Susan knight reactions already collected via collectKC at game-state section (line ~10079) — do NOT double-fire here
   if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); }, loseTeamName);
   // Splinter (101) — Toxic Fumes: first win triggers activation callout

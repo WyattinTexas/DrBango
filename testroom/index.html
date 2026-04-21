@@ -2799,7 +2799,7 @@ const GHOSTS = [
   },
   {
     id:309, name:"Aunt Susan", rarity:"rare", maxHp:4, art:"art/rustler.jpg",
-    ability:"Harvest Dance", abilityDesc:"Discard 1 Healing Seed: deal +2 damage OR heal +2 HP. Win: +1 Healing Seed.",
+    ability:"Harvest Dance", abilityDesc:"Discard 1 Healing Seed: deal +2 damage. Win: +2 Healing Seeds.",
     category:"Damage Multiplier", set:"Rolling Hills",
     designNote:"The autumn whirlwind. Builds momentum like Caldera but resets on ANY loss, not just when you deal damage. Higher risk, different rhythm."
   },
@@ -3095,7 +3095,7 @@ const GHOSTS = [
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
   {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
-  {id:462, name:"Ridley", rarity:"uncommon", maxHp:5, art:"art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
+  {id:462, name:"Ridley", rarity:"uncommon", maxHp:4, art:"art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
   {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Stoke", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."}
 ];
 
@@ -15105,7 +15105,7 @@ function _resolveRoundImpl() {
   if (humarTriggered) { queueAbility('METEOR!', 'var(--legendary)', `${wF.name} — Win! 2 delayed damage + 1 Burn gained!`, () => { renderBattle(); }, winTeamName); }
   // Humar knight reactions already collected via collectKC at game-state section (line ~10078) — do NOT double-fire here
   // Humar Sandwiches mirror removed — Meteor deals delayed damage + burn, not mirrorable resources
-  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }, winTeamName); }
+  if (wF.id === 309 && !wF.ko) { queueAbility('HARVEST DANCE!', 'var(--rare)', `${wF.name} — Win → +2 Healing Seeds!`, () => { winTeam.resources.healingSeed += 2; renderBattle(); }, winTeamName); }
   // Aunt Susan knight reactions already collected via collectKC at game-state section (line ~10079) — do NOT double-fire here
   if (wF.id === 309 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Dance! +1 Healing Seed! (${loseTeam.resources.healingSeed + 1} total)`, () => { loseTeam.resources.healingSeed++; renderBattle(); }, loseTeamName);
   // Splinter (101) — Toxic Fumes: first win triggers activation callout
@@ -16733,10 +16733,9 @@ function renderBattle() {
     if (isReady && f.id === 208 && !f.ko) {
       rh += `<div class="res-tile moonstone clickable" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone"><span class="res-main">💀</span><span class="res-label">Sac</span></div>`;
     }
-    // Aunt Susan (309) — commit healing seeds for damage or heal (click=add, right-click=remove)
-    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0 || c.auntSusanHeal > 0)) {
+    // Aunt Susan (309) — commit healing seeds for damage (click=add, right-click=remove)
+    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0)) {
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusan>0?'committed':''}" onclick="toggleAuntSusan('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusan('${team}')" title="Click: +2 dmg per seed. Right-click: remove"><span class="res-main">🌱</span><span class="res-label">${c.auntSusan>0?'+'+c.auntSusan*2+'dmg':'+2dmg'}</span></div>`;
-      rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal>0?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusanHeal('${team}')" title="Click: +2 HP per seed. Right-click: remove" style="${c.auntSusanHeal>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">${c.auntSusanHeal>0?'+'+c.auntSusanHeal*2+'hp':'+2hp'}</span></div>`;
     }
     // Snapshot current resources for flash detection
     const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0 };
