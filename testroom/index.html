@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v785'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v786'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2638,7 +2638,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v785';
+const TESTROOM_VERSION = 'v786';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3109,7 +3109,8 @@ const GHOSTS = [
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
   {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
   {id:462, name:"Ridley", rarity:"uncommon", maxHp:3, art:"art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
-  {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."}
+  {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."},
+  {id:464, name:"Yawn Eater", rarity:"uncommon", maxHp:7, art:"art/originals/YawnEater.png", ability:"Feast", abilityDesc:"Gain +1 die for each sideline ability on the enemy sideline.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost #200. A smug blobby shadow creature that devours sideline energy. The more passive effects your opponent stacks, the more dice Yawn Eater rolls."}
 ];
 
 // ============================================================
@@ -10142,6 +10143,27 @@ function doPreRollSetup() {
         const _sandOpp = opp(team);
         _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
         preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
+      }
+    }
+  });
+
+  // Yawn Eater (464) — Feast: +1 die for each sideline ability on the enemy sideline
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 464 && !f.ko) {
+      const enemyTeam = opp(team);
+      // Count enemy sideline ghosts that have sideline abilities
+      const sidelineCount = enemyTeam.ghosts.filter((g, i) => {
+        if (i === enemyTeam.activeIdx || g.ko) return false;
+        const gd = ghostData(g.id);
+        return gd && gd.abilityDesc && (gd.abilityDesc.includes('Sideline') || gd.abilityDesc.includes('sideline'));
+      }).length;
+      if (sidelineCount > 0) {
+        if (tName === 'red') redCount += sidelineCount;
+        else blueCount += sidelineCount;
+        preRollCallouts.push(['FEAST!', 'var(--uncommon)', `${f.name} — ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''}! +${sidelineCount} dice!`, tName]);
+        log(`<span class="log-ability">${f.name}</span> — Feast! ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''} → +${sidelineCount} dice!`);
       }
     }
   });

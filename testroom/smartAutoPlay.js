@@ -1302,6 +1302,23 @@ function smartSimRounds(gameNum) {
     }
   });
 
+  // Yawn Eater (464) — Feast: +1 die per enemy sideline ability
+  ['red','blue'].forEach(tName => {
+    const f = active(B[tName]);
+    if (f.id === 464 && !f.ko) {
+      const enemyTeam = B[tName === 'red' ? 'blue' : 'red'];
+      const sidelineCount = enemyTeam.ghosts.filter((g, i) => {
+        if (i === enemyTeam.activeIdx || g.ko) return false;
+        const gd = ghostData(g.id);
+        return gd && gd.abilityDesc && (gd.abilityDesc.includes('Sideline') || gd.abilityDesc.includes('sideline'));
+      }).length;
+      if (sidelineCount > 0) {
+        if (tName === 'red') redCount += sidelineCount;
+        else blueCount += sidelineCount;
+      }
+    }
+  });
+
   // Antoinette (82) — GRACE!: matches opponent's dice count (upward mirror only). +1 damage on doubles.
   // Applied after all other bonuses so surge/retribution/frenzy/etc. are already baked in.
   // Fredrick (27) cap still applies after Grace — matches index.html lines 7184–7199 ordering.

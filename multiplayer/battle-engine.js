@@ -5304,6 +5304,26 @@ function doPreRollSetup() {
     }
   });
 
+  // Yawn Eater (464) — Feast: +1 die for each sideline ability on the enemy sideline
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 464 && !f.ko) {
+      const enemyTeam = opp(team);
+      const sidelineCount = enemyTeam.ghosts.filter((g, i) => {
+        if (i === enemyTeam.activeIdx || g.ko) return false;
+        const gd = ghostData(g.id);
+        return gd && gd.abilityDesc && (gd.abilityDesc.includes('Sideline') || gd.abilityDesc.includes('sideline'));
+      }).length;
+      if (sidelineCount > 0) {
+        if (tName === 'red') redCount += sidelineCount;
+        else blueCount += sidelineCount;
+        preRollCallouts.push(['FEAST!', 'var(--uncommon)', `${f.name} — ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''}! +${sidelineCount} dice!`, tName]);
+        log(`<span class="log-ability">${f.name}</span> — Feast! ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''} → +${sidelineCount} dice!`);
+      }
+    }
+  });
+
   // Antoinette (82) — Grace: roll as many dice as your opponent rolls. +1 damage on doubles.
   // Applied last so all other modifiers (Surge, Piper, Redd, etc.) are already baked into counts
   [B.red, B.blue].forEach(team => {
