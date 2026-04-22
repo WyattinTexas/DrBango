@@ -9,7 +9,7 @@ _Scope: index.html — all cards in GHOSTS array, all pre-roll ability handlers_
 
 | Metric | Count |
 |---|---|
-| Total cards audited | 108 (across Set 1, Dark Castle, Frost Valley, Volcanic Activity, Rolling Hills; IDs 407–431 are gallery-only stubs — zero battle logic, excluded) |
+| Total cards audited | 108 (across Set 1, Dark Castle, Frost Valley, Volcanic Isles, Rolling Hills; IDs 407–431 are gallery-only stubs — zero battle logic, excluded) |
 | Pre-roll-modal primers found | 12 |
 | Covered by v406 openDuelPhasePrimers | 10 |
 | **Missing from v406 (BROKEN — needs fix)** | **2** |
@@ -157,7 +157,7 @@ The following cards have pre-roll effects but they are **automatic** (no player 
 
 ## Staging cards (IDs 407–431) — excluded from audit
 
-Per the GHOSTS array comment at line 2278: _"These 25 cards (12 Volcanic Activity + 13 Rolling Hills) were designed by the cards agent overnight. abilityDesc is written but NO handlers, entry effects, or sideline checks exist for any of these IDs."_ These cards have no battle logic. Spout (415) has a pre-roll-modal ability description ("declare a number 1–6") but zero handler code exists. None of the IDs 407–431 appear in any handler, `hasAnyDecision`, or `openDuelPhasePrimers`. They are excluded from this audit's scope as designed.
+Per the GHOSTS array comment at line 2278: _"These 25 cards (12 Volcanic Isles + 13 Rolling Hills) were designed by the cards agent overnight. abilityDesc is written but NO handlers, entry effects, or sideline checks exist for any of these IDs."_ These cards have no battle logic. Spout (415) has a pre-roll-modal ability description ("declare a number 1–6") but zero handler code exists. None of the IDs 407–431 appear in any handler, `hasAnyDecision`, or `openDuelPhasePrimers`. They are excluded from this audit's scope as designed.
 
 ---
 

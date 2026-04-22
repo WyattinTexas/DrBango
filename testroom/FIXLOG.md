@@ -1,5 +1,355 @@
 # Testroom Coordination Log
 
+## v658 — SIM FIX: Granny (310) BEDTIME STORY! — singles-KO consolation grant is +2 Lucky Stones (not +1) in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` Granny (310) BEDTIME STORY! singles-KO consolation prize was `luckyStone++` (+1), but `index.html` line 10815 grants `luckyStone += 2` (+2). The Sandwiches (33) DEPENDABLE! mirror inside the same block also used `luckyStone++`. Both wrong. The stale comment at the top of the block said "singles → Lucky Stone" (singular), further obscuring the discrepancy.
+
+**Impact:** Every simulation where Granny's team's active ghost was KO'd by a singles roll underdelivered 1 Lucky Stone per KO — exactly half the correct consolation prize. Lucky Stones are high-value resources (post-roll rerolls); teams running Granny against singles-heavy builds (Team Zippy, Guard Thomas, Patrick Stone Form) were systematically undervalued in all auto-play balance data.
+
+**Fix** (`smartAutoPlay.js`, two lines in Granny block + comment):
+```js
+// Before:
+// singles → Lucky Stone, doubles → Moonstone, triples+ → 3 Sacred Fires
+if (wR.type === 'singles') lTeam.resources.luckyStone++;
+...
+if (wR.type === 'singles') wTeam.resources.luckyStone++;   // Sandwiches mirror
+
+// After:
+// singles → 2 Lucky Stones, doubles → 1 Moonstone, triples+ → 3 Sacred Fires
+if (wR.type === 'singles') lTeam.resources.luckyStone += 2;  // matches index.html line 10815
+...
+if (wR.type === 'singles') wTeam.resources.luckyStone += 2;  // matches index.html line 10816
+```
+
+**Note:** A second gap was also identified — the sim has no `if (wF.ko && hasSideline(wTeam, 310))` block for the Pudge Belly Flop self-KO case (index.html lines 10829–10840). This is a separate bug queued for the NEXT cycle.
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** no new variables added; `+= 2` replaces `++` in-place ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim resource-amount fix; only Granny (310) has the BEDTIME STORY! singles path; no card ability implementations or blacklisted functions touched.
+
+**Version bump:** v657 → v658
+
+---
+
+## v654 — SIM FIX: Gary (92) LUCKY NOVICE! — three bugs in smartAutoPlay.js resource grant (active ghost missing, +1→+2 per 1, Cornelius block absent)
+
+**Problem:** `smartAutoPlay.js` had three divergences from `index.html` in Gary's Lucky Novice implementation:
+
+1. **Active Gary not handled** (v598 buff drift): Lines 1623 and 1694 used `hasSideline(wTeam/lTeam, 92)` only — when Gary is the active ghost, he generates zero ice in the sim. `index.html` lines 9608–9611 check `wF.id === 92 && !wF.ko` and `lF.id === 92 && !lF.ko` in addition to sideline.
+
+2. **v599 buff missing** (+2 per 1, was +1): `index.html` line 9614 comment: "v599 BALANCE BUFF: Lucky Novice grants +2 Ice Shards per 1 rolled, not +1." Sim was still granting `+1` per 1 rolled — halving Gary's ice output.
+
+3. **Cornelius block absent for sideline Gary**: Active Gary is intentionally NOT blocked by Cornelius (per index.html comment at line 9606), but sideline Gary IS blocked by `corneliusBlocksRally` / `corneliusOnWinTeam`. Sim had no Cornelius check at all.
+
+4. **rxns++ line 2011** also only counted sideline Gary — fixed to `(ef.id === 92 && !ef.ko) || hasSideline(enemyTeam, 92)`.
+
+**Fix** (`smartAutoPlay.js`, lines 1623–1627, 1694–1698, 2011):
+- Win-path: `garyWinActive = wF.id === 92 && !wF.ko`; `garyWinSide = !garyWinActive && hasSideline(wTeam, 92) && !hasSideline(lTeam, 45)`; grant `ones * 2` ice
+- Lose-path: `garyLoseActive = lF.id === 92 && !lF.ko`; `garyLoseSide = !garyLoseActive && hasSideline(lTeam, 92) && !hasSideline(wTeam, 45)`; grant `ones * 2` ice
+- rxns++: `(ef.id === 92 && !ef.ko) || hasSideline(enemyTeam, 92)`
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `garyWinActive/garyWinSide/garyLoseActive/garyLoseSide` declared and used in same sequential scope; not referenced outside their blocks ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim resource-grant fix; no card ability implementations or blacklisted functions touched.
+
+**Version bump:** v653 → v654
+
+---
+
+## v653 — SIM FIX: Maximo (302) NAP! — missing `!ef.ko` guard on end-of-round rxns++ in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 2014 had:
+```js
+if (ef.id === 302) rxns++;  // Maximo NAP! (every round)
+```
+But `index.html` has `!f.ko` guards at both NAP! trigger sites:
+- Line 10275: `if (f.id === 302 && !f.ko) { collectKC(...) }`
+- Line 11007: `if (f.id === 302 && !f.ko) { ... queueAbility('NAP!', ...) }`
+
+When Maximo is the active ghost and gets KO'd mid-round (e.g. simultaneous KO), the sim was still counting a knight reaction even though the real game suppresses it via `!f.ko`.
+
+**Also verified:** Gary (92) LUCKY NOVICE! at line 2011 uses `hasSideline(enemyTeam, 92)` which already filters KO'd ghosts internally (hasSideline checks `!g.ko`) — AUDITED PASS, no additional guard needed.
+
+**Fix** (`smartAutoPlay.js`, line 2014 — 1 guard addition):
+```js
+// Before:
+if (ef.id === 302) rxns++;
+// After:
+if (ef.id === 302 && !ef.ko) rxns++;
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v652 → v653
+
+---
+
+## v652 — SIM FIX: Jimmy (352) / Ancient One (22) / Opa (48) — missing `!ef.ko` guards on tie-path rxns++ in smartAutoPlay.js
+
+**Problem:** Three tie-path knight-reaction entries in `smartAutoPlay.js` (lines 2006–2009) were missing `!ef.ko` guards that exist in `index.html`:
+- Line 2006 (Jimmy CHIRP!): index.html line 8790 has `if (f.id === 352 && !f.ko)` — `!ef.ko` absent in sim
+- Line 2008 (Ancient One FRIEND TO ALL!): index.html line 8939 has `if (!hasSideline(team, 22) || f.ko) return` — active ghost ko guard on `f.ko` absent in sim
+- Line 2009 (Opa REST! tie-path): index.html line 8916 has `if (f.id === 48 && !f.ko)` — `!ef.ko` absent in sim (the separate WIN-path Opa entry at line 1910 was already fixed in v646)
+
+Note: Tweak and Twonk (303) at line 2007 does NOT need `!ef.ko` — index.html line 8765 checks only `hasSideline(team, 303)` with no active ghost ko guard (it's a sideline resource grant, not dependent on active ghost being alive). AUDITED PASS for line 2007.
+
+**Fix** (`smartAutoPlay.js`, lines 2006/2008/2009 — 3 one-word insertions):
+- Added `&& !ef.ko` to Jimmy CHIRP! (line 2006)
+- Added `&& !ef.ko` to Ancient One FRIEND TO ALL! (line 2008)
+- Added `&& !ef.ko` to Opa REST! tie-path (line 2009)
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v651 → v652
+
+---
+
+## v651 — SIM FIX: Zach (87) / Laura (79) / Bilbo (80) — missing `!ef.ko` guards on win-path rxns++ in smartAutoPlay.js
+
+**Problem:** Three consecutive win-path knight-reaction entries in `smartAutoPlay.js` (lines 1977, 1979, 1981) were missing `!ef.ko` guards that exist in `index.html`:
+- Line 1977 (Zach CRAFTSMAN!): index.html line 9650 has `&& !wF.ko` — absent in sim
+- Line 1979 (Laura CATCHY TUNE!): index.html line 9588 has `&& !wF.ko` — absent in sim
+- Line 1981 (Bilbo LITTLE BUDDY!): index.html line 9557 has `&& !wF.ko` — absent in sim
+
+When Cameron (25) Force of Nature KOs the winning ghost, all three were still counting knight reactions in the sim even though the real game suppresses them via `!wF.ko`.
+
+**Fix** (`smartAutoPlay.js`, lines 1977/1979/1981 — 3 one-word insertions):
+- Added `!ef.ko &&` to Zach, Laura, and Bilbo rxns++ conditions
+- Updated comments to cite the matching index.html line numbers with guard confirmation
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v650 → v651
+
+---
+
+## v650 — SIM FIX: Pale Nimbus (88) HIDDEN STORM! — missing `!ef.ko` guard on win-path rxns++ in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1975 had:
+```js
+if (hasSideline(enemyTeam, 88) && _eD.reduce((s,d)=>s+d,0) < 7) rxns++;
+```
+But `index.html` line 9572 has:
+```js
+if (hasSideline(winTeam, 88) && !wF.ko && winDice && winDice.reduce((s, d) => s + d, 0) < 7) {
+```
+The `!wF.ko` guard was absent — when the active winning ghost is KO'd (e.g. simultaneous Cameron Force of Nature), the sim still counted a HIDDEN STORM! knight reaction even though the real game's `!wF.ko` check suppresses it entirely.
+
+**Also verified:** Hugo (52) WRECKAGE! at line 1988 has no `!ef.ko` guard intentionally — index.html line 10129 comment says "Fires even if Hugo is KO'd — attacking Hugo costs you regardless." AUDITED PASS.
+
+**Fix** (`smartAutoPlay.js`, line 1975 — 1 line change):
+```js
+// Before:
+if (hasSideline(enemyTeam, 88) && _eD.reduce((s,d)=>s+d,0) < 7) rxns++;
+// After:
+if (hasSideline(enemyTeam, 88) && !ef.ko && _eD.reduce((s,d)=>s+d,0) < 7) rxns++;
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v649 → v650
+
+---
+
+## v649 — SIM FIX: Lou (32) BROS! — missing `!ef.ko` guard on win-path rxns++ in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1918 had:
+```js
+if (hasSideline(enemyTeam, 32) && ef.id === 34)  rxns++;
+```
+But `index.html` line 9665 has:
+```js
+if (hasSideline(winTeam, 32) && wF.id === 34 && !wF.ko) {
+```
+The `!ef.ko` guard was absent — when Grawr (34) wins but ends the round KO'd (e.g. simultaneous Cameron Force of Nature), the sim still counted a BROS! knight reaction even though the real game's `!wF.ko` check suppresses it entirely.
+
+**Fix** (`smartAutoPlay.js`, line 1918 — 1 line change):
+```js
+// Before:
+if (hasSideline(enemyTeam, 32) && ef.id === 34)  rxns++;
+// After:
+if (hasSideline(enemyTeam, 32) && ef.id === 34 && !ef.ko)  rxns++;
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Also identified (NEXT):** Fed and Hayden (406) win-path rxns++ at smartAutoPlay.js line 1922 already has `!g.ko` guard — AUDITED PASS. Kodako (1) win-case at line 1924 already has `!ef.ko` guard — AUDITED PASS.
+
+**Version bump:** v648 → v649
+
+---
+
+## v648 — SIM FIX: 8-card win-path rxns++ block — missing `!ef.ko` guard in winnerWasEnemy block of smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1908 had a combined `rxns++` for 8 win-path resource-grant abilities with NO alive check:
+```js
+if ([209,307,342,336,309,345,81,206].includes(ef.id)) rxns++;
+```
+But `index.html` has `!wF.ko` guards on ALL 8 abilities:
+- Line 10190: `if (wF.id === 209 && !wF.ko)` — Dart PLUNDER!
+- Line 10191: `if (wF.id === 307 && !wF.ko)` — Artemis DAUGHTER OF THE STREAM!
+- Line 10192: `if (wF.id === 342 && !wF.ko)` — Calvin OVERCLOCK!
+- Line 10193: `if (wF.id === 336 && !wF.ko)` — Humar SACRED FLAME!
+- Line 10194: `if (wF.id === 309 && !wF.ko)` — Aunt Susan HARVEST DANCE!
+- Line 10195: `if (wF.id === 81 && !wF.ko)` — Spockles VALLEY MAGIC!
+- Line 10197: `if (wF.id === 206 && !wF.ko)` — Zain ICE SHARD!
+- Line 9447:  `if (wF.id === 345 && !wF.ko)` — Red Hunter RUMBLE!
+
+When Cameron (25) Force of Nature triggers (winner dealt 0 damage → instantly KO'd), `ef.ko` becomes `true` for the winning ghost. The sim was still counting knight reactions for these 8 abilities even when Cameron killed them — over-inflating Knight Terror HEAVY AIR / Knight Light RETRIBUTION counts on any FoN round where the winning ghost happened to be one of these 8 IDs.
+
+**Fix** (`smartAutoPlay.js`, line 1908 — 1 line change):
+```js
+// Before:
+if ([209,307,342,336,309,345,81,206].includes(ef.id)) rxns++;
+// After:
+if ([209,307,342,336,309,345,81,206].includes(ef.id) && !ef.ko) rxns++;
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched. Hugo (52) loserWasEnemy `dmg > 0` approximation verified AUDITED PASS (Hugo has no defensive ability that zeros damage, so dmg is always > 0 when he loses).
+
+**Also identified (NEXT):** Lou (32) BROS! win-path `rxns++` at smartAutoPlay.js line 1918 has `if (hasSideline(enemyTeam, 32) && ef.id === 34) rxns++` with no `!ef.ko` guard; index.html line 9665 has `!wF.ko` guard — same class of bug.
+
+**Version bump:** v647 → v648
+
+---
+
+## v647 — SIM FIX: Sylvia (313) PORPOISE! — missing `!ef.ko` guard in loserWasEnemy rxns++ block of smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1985 grouped Sylvia (313) with Simon (24), SadSal (29), and Chagrin (404) in a single combined `rxns++` with no alive check:
+```js
+if ([24,29,313,404].includes(ef.id)) rxns++;
+```
+But `index.html` has `!lF.ko` guards on **both** Sylvia trigger sites:
+- Line 9480: `if (lF.id === 313 && !lF.ko)` — pre-resolve PORPOISE dodge setup
+- Line 10513: `if (lF.id === 313 && !lF.ko && sylviaDodgeRolls.length > 0)` — PORPOISE callout
+
+If Sylvia is KO'd, she cannot roll her dodge die. The sim was still counting a knight reaction for her when she lost and was already dead — over-inflating Knight Terror HEAVY AIR / Knight Light RETRIBUTION counts whenever Sylvia lost while KO'd. Simon, SadSal, and Chagrin intentionally have no ko guard (Simon fires even on death, SadSal fires on any loss, Chagrin fires on both lose-alive and lose-KO'd) so they remain ungrouped.
+
+**Fix** (`smartAutoPlay.js`, line 1985 — 1 line split into 2):
+```js
+// Before:
+if ([24,29,313,404].includes(ef.id)) rxns++;       // Simon BREW TIME!, SadSal TOUGH JOB!, Sylvia PORPOISE!, Chagrin BITTER END!
+// After:
+if ([24,29,404].includes(ef.id)) rxns++;            // Simon BREW TIME!, SadSal TOUGH JOB!, Chagrin BITTER END! (fire even when KO'd)
+if (ef.id === 313 && !ef.ko) rxns++;               // Sylvia PORPOISE! — alive-only; matches index.html lines 9480, 10513: !lF.ko guard
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v646 → v647
+
+---
+
+## v646 — SIM FIX: Opa (48) REST! — missing `!ef.ko` guard on win-path knight-reaction in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1910 had:
+```js
+if (ef.id === 48)  rxns++;
+```
+But the actual index.html trigger at line 10701 is:
+```js
+if (wF.id === 48 && !wF.ko) checkKnightEffects(winTeamName, wF.name);
+```
+The `!ef.ko` guard was absent in the sim — same class of bug as Villager (11) fixed in v645. In rare edge-case rounds where Opa wins but ends the round KO'd (e.g., simultaneous damage), the sim would still count a knight reaction for Opa REST! even though the real game's `!wF.ko` check suppresses `checkKnightEffects` entirely. This over-inflated Knight Terror HEAVY AIR / Knight Light RETRIBUTION counts whenever Opa was the active ghost and won while KO'd.
+
+**Fix** (`smartAutoPlay.js`, 1 line changed):
+```js
+// Before:
+if (ef.id === 48)  rxns++;
+// After:
+if (ef.id === 48 && !ef.ko)  rxns++;  // matches index.html line 10701: !wF.ko guard
+```
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v645 → v646
+
+---
+
+## v645 — SIM FIX: Villager (11) HOSPITALITY! — missing `!ef.ko` guard on win-path knight-reaction in smartAutoPlay.js
+
+**Problem:** `smartAutoPlay.js` line 1911 had:
+```js
+if (hasSideline(enemyTeam, 11))  rxns++;
+```
+But the actual index.html trigger at line 10703 is:
+```js
+if (hasSideline(winTeam, 11) && !wF.ko) {
+```
+The `!wF.ko` guard was absent in the sim. In rare edge-case rounds where the winning active ghost is somehow KO'd (e.g. Bubble Boys POP! wins but self-KOs), the sim would still count a knight reaction for Villager HOSPITALITY! even though the real game's `!wF.ko` check suppresses the heal entirely. This inflated Knight Terror HEAVY AIR / Knight Light RETRIBUTION counts whenever Villager was on the winning team's sideline and their active ghost ended the round KO'd.
+
+**Fix** (`smartAutoPlay.js`, 1 line changed):
+```js
+// Before:
+if (hasSideline(enemyTeam, 11))  rxns++;
+// After:
+if (hasSideline(enemyTeam, 11) && !ef.ko)  rxns++;  // matches index.html line 10703: !wF.ko guard
+```
+
+`ef` in the `winnerWasEnemy` block is the enemy team's active ghost — corresponds exactly to `wF` in index.html's win-path context.
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `ef.ko` already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim rxns++ guard fix. No card ability implementations or blacklisted functions touched.
+
+**Version bump:** v644 → v645
+
+---
+
+## v643 — SIM FIX: Farmer Jeff (314) HARVEST! — lose-team knight-reaction entry missing from smartAutoPlay.js
+
+**Problem:** The v636 buff gave Farmer Jeff the ability to fire HARVEST! on any 6 rolled, win OR lose. `smartAutoPlay.js` line 1909 correctly handles the win-team case in the `winnerWasEnemy` block (`hasSideline(enemyTeam, 314) rxns++`). But the `loserWasEnemy` block (lines 1984–1998) had no Farmer Jeff entry at all. When the enemy team lost but Jeff was on their sideline and they rolled sixes, zero knight reactions were counted — every Knight Terror or Knight Light pairing vs. a Jeff team was systematically undercounted on loss rounds.
+
+This was explicitly queued in the v639 FIXLOG entry: "The `rxns++` knight-reaction block (line 1906) still only counts Jeff in `winnerWasEnemy`. With the v636 buff, Jeff also fires when the enemy LOSES and rolls sixes — so there's a second missing `rxns++` entry in the `loserWasEnemy` block. Queued as NEXT cycle."
+
+**Fix** (`smartAutoPlay.js`, 1 line added inside `loserWasEnemy` block):
+```js
+// Farmer Jeff (314) HARVEST! lose-team: fires when Jeff is on sideline and enemy team LOST but rolled sixes.
+// v636 buff added this lose-team path; index.html line 10203-10205 collectKC(loseTeamName). Queued in v639.
+if (hasSideline(enemyTeam, 314) && _eD.filter(d => d === 6).length > 0) rxns++;
+```
+
+The sixes guard (`_eD.filter(d => d === 6).length > 0`) makes this more accurate than the win-path check (which fires unconditionally for any Jeff-on-sideline enemy win). `_eD` = enemy's actual dice this round, correct in the `loserWasEnemy` context since `_eD` is set unconditionally as `enemyKey === 'red' ? redDice : blueDice`.
+
+**Audit #1 (template literals):** no template literals added ✓
+**Audit #2 (block scope):** `hasSideline`, `enemyTeam`, `_eD` all already in scope — no new variables ✓
+**Audit #3 (family-audit):** FAMILY: none — isolated sim-accuracy fix in a single `rxns++` block. No card ability implementations touched. No blacklisted functions.
+
+**Version bump:** v642 → v643
+
+---
+
+## v642 — Timpleton (312) sim parity fix
+
+**Problem:** `smartAutoPlay.js` still modeled Timpleton as an Entry-strike (deal 3 damage on entry if enemy HP > mine). The v640 playtest fix reworked Timpleton to a win-roll +3 damage modifier in `index.html`, but the sim was never updated — every sim game with Timpleton was using the wrong ability mechanic, skewing balance data.
+
+**Fix (smartAutoPlay.js only, 4 edits):**
+1. Removed the `if (f.id === 312)` entry-damage block from `smartTriggerEntry()` (~line 119).
+2. Added a breadcrumb comment in its place pointing at the new win-path handler.
+3. Updated the `applyEntryKnightRxn()` comment to drop the stale "Timpleton line 3541" reference.
+4. Added win-path block after Red Hunter: `if (wF.id === 312 && !wF.ko && lF && !lF.ko && lF.hp > wF.hp) { dmg += 3; }` — mirrors `index.html` exactly (v640 implementation).
+5. Updated AI scoring comment from "conditional 3 damage" to "+3 damage on win when enemy HP > mine" for clarity.
+
+**AUDIT STATUS:** Timpleton (312) — `AUDITED FIX (v642)` — sim now matches live game. No scope leaks, no template literals, no blacklisted function touches.
+
+---
+
 ## ⚡ WYATT DIRECTIVE (2026-04-11) — Orchestrator FYI: testroom Gary got a roster brain (v641)
 
 **Summary:** Wyatt asked testroom Gary to "list all cards with 5 health" and he punted — couldn't do it. Root cause was in `gary-system-prompt.js → build()`: card data was ONLY injected when the user message contained literal ghost names (via `findReferencedCards`). Roster-wide / filter / aggregate questions got zero card data and Gary had to guess. Shipped in v641.
@@ -4831,11 +5181,11 @@ HOP! (→ team param, already in scope as function arg)
 
 ## v421 — 25 NEW gallery-only cards merged (IDs 407-431)
 
-The cards agent finished its overnight design run. 25 cards staged into the GHOSTS array right after Scarecrow King (368), before the SHELVED_IDS comment block. **12 Volcanic Activity + 13 Rolling Hills, all gallery-only, zero battle logic.**
+The cards agent finished its overnight design run. 25 cards staged into the GHOSTS array right after Scarecrow King (368), before the SHELVED_IDS comment block. **12 Volcanic Isles + 13 Rolling Hills, all gallery-only, zero battle logic.**
 
 Distribution: 8 common / 10 uncommon / 5 rare / 2 ghost-rare.
 
-**Volcanic Activity (407-418):**
+**Volcanic Isles (407-418):**
 - 407 Glorp (common) • 408 Brimstone (common) • 409 Cindergrub (common) • 410 Glass Fang (common)
 - 411 Fumarole (uncommon) • 412 Fluxling (uncommon) • 413 Obsidian Eel (uncommon) • 414 Ember Mole (uncommon) • 415 Spout (uncommon)
 - 416 Pyroclast (rare) • 417 Hesta (rare)
@@ -4868,7 +5218,7 @@ v400 stripped Biscuit (324). The full named-fake list in your system prompt has 
 Read ~/DrBango/testroom/AUDIT_TODO.md "PACING & STORYTELLING" section. Pick ONE concrete UI moment per cycle: KO pacing (1.5s pause before swap picker), narrator beat sequencing, dice highlight on win, ability callout staggering.
 
 **5. NEW: GALLERY-ONLY CARD SET — IDs 407-431 (incoming via cards agent right now).**
-Wyatt is staging 25 NEW cards (12 Volcanic Activity + 13 Rolling Hills) via the cards agent. They will appear in the GHOSTS array with NO battle logic, NO entries in any handlers. Treat IDs 407-431 as **GALLERY-ONLY**. **DO NOT IMPLEMENT BATTLE LOGIC for any of these IDs.** Wyatt designs abilities tomorrow. You may polish their `abilityDesc` text or fix typos, but never add `hasSideline(team, 407..431)`, `f.id === 407..431`, modal handlers, entry effects, or anything else.
+Wyatt is staging 25 NEW cards (12 Volcanic Isles + 13 Rolling Hills) via the cards agent. They will appear in the GHOSTS array with NO battle logic, NO entries in any handlers. Treat IDs 407-431 as **GALLERY-ONLY**. **DO NOT IMPLEMENT BATTLE LOGIC for any of these IDs.** Wyatt designs abilities tomorrow. You may polish their `abilityDesc` text or fix typos, but never add `hasSideline(team, 407..431)`, `f.id === 407..431`, modal handlers, entry effects, or anything else.
 
 **Gallery-only ID list (battle-logic immutable until Wyatt approves):** 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431.
 
@@ -5643,9 +5993,9 @@ Live testroom now carries the "watercolor storybook staged in a Renaissance thea
 - **Pattern confirmed correct**: `collectKC` pushes Knight reactions to `resolveKnightCallouts[]` which is flushed at line ~9594 AFTER all other abilities drain — so HEAVY AIR!/RETRIBUTION! correctly plays last in the sequence, not interleaved.
 - Also bumped TESTROOM_VERSION v375 → v376.
 
-## v375 — BUG FIX: 8 Volcanic Activity set callout colors corrected to proper rarity CSS variables
+## v375 — BUG FIX: 8 Volcanic Isles set callout colors corrected to proper rarity CSS variables
 
-- **Root cause**: All Volcanic Activity set cards initially used `'var(--magma)'` (orange-red) as their ability callout color under the "intentional set theming" rationale. However, Aunt Susan (309) was corrected to `var(--rare)` in v348, Harrison (315) to `var(--rare)` in v352, and Farmer Jeff (314) to `var(--ghost-rare)` in v352 — establishing that rarity color is the rule, not set color. Six VA cards were missed in those sweeps.
+- **Root cause**: All Volcanic Isles set cards initially used `'var(--magma)'` (orange-red) as their ability callout color under the "intentional set theming" rationale. However, Aunt Susan (309) was corrected to `var(--rare)` in v348, Harrison (315) to `var(--rare)` in v352, and Farmer Jeff (314) to `var(--ghost-rare)` in v352 — establishing that rarity color is the rule, not set color. Six VA cards were missed in those sweeps.
 - **8 callout instances corrected across 7 cards**:
   1. **Tyson (365) HOP!** (line ~3375): `var(--magma)` → `var(--common)` — Tyson is `rarity:"common"`
   2. **Death Howl (202) PRESSURE!** (line ~3456): `var(--magma)` → `var(--rare)` — Death Howl is `rarity:"rare"`
@@ -5656,7 +6006,7 @@ Live testroom now carries the "watercolor storybook staged in a Renaissance thea
   7. **Chagrin (404) BITTER END!** (line ~9409, lose-path): `var(--magma)` → `var(--rare)` — Chagrin is `rarity:"rare"`
   8. **Chagrin (404) BITTER END!** (line ~9425, KO-path): `var(--magma)` → `var(--rare)` — same card, KO trigger path
 - **Zero remaining `var(--magma)` callout instances** in active (non-CSS, non-shelved) ability callout code paths. All remaining `var(--magma)` references are CSS styling (header gradient, tab active state, set badge color, status tag, AFK timer, etc.) — not ability callout color arguments.
-- **Visual impact**: All 7 cards now flash their correct rarity-tier color during ability callouts, consistent with every other card in the game. Previously these cards falsely signaled "Volcanic Activity" orange when they should have shown common gray, uncommon green, rare blue, or ghost-rare purple.
+- **Visual impact**: All 7 cards now flash their correct rarity-tier color during ability callouts, consistent with every other card in the game. Previously these cards falsely signaled "Volcanic Isles" orange when they should have shown common gray, uncommon green, rare blue, or ghost-rare purple.
 - Also bumped TESTROOM_VERSION v374 → v375.
 
 ## v374 — BUG FIX: Tweak and Twonk (303) and Jimmy (352) tie-path Knight reactions fire during drain instead of being queued
@@ -5946,10 +6296,10 @@ Live testroom now carries the "watercolor storybook staged in a Renaissance thea
 ## v348 — BUG FIX: Aunt Susan (309) HARVEST DANCE! callout colors — all three wrong
 
 - **Aunt Susan (309) Harvest Dance — callout color BUG FIX**: Same class of mis-coloring as Finn (v315), Zain (v316), Timpleton (v317), Bouril/Hank/Calvin (v325), Granny (v326), Red Hunter (v327). Aunt Susan is `rarity:"rare"` so all her ability callouts should flash `var(--rare)` (blue). Instead:
-  1. **Damage callout** (Phase 7, spend-seed-for-damage path, line ~9182): was `'var(--magma)'` (orange-red, the Volcanic Activity set color) → corrected to `'var(--rare)'`
+  1. **Damage callout** (Phase 7, spend-seed-for-damage path, line ~9182): was `'var(--magma)'` (orange-red, the Volcanic Isles set color) → corrected to `'var(--rare)'`
   2. **Heal callout** (Phase 7, spend-seed-for-heal path, line ~9198): was `'#22c55e'` (hardcoded Tailwind green-500, close to uncommon green but not a CSS variable and wrong rarity) → corrected to `'var(--rare)'`
   3. **Win +1 seed callout** (Phase 7, win-grants-seed path, line ~9700): was `'#22c55e'` (same hardcoded green) → corrected to `'var(--rare)'`
-  - **Impact**: Every time Aunt Susan used a Healing Seed for damage, the callout flashed magma-orange (implying Volcanic Activity card). Every time she healed or earned a seed, the callout flashed near-uncommon green (implying a common/uncommon card). All three wrong colors; all three now flash the correct rare-tier blue.
+  - **Impact**: Every time Aunt Susan used a Healing Seed for damage, the callout flashed magma-orange (implying Volcanic Isles card). Every time she healed or earned a seed, the callout flashed near-uncommon green (implying a common/uncommon card). All three wrong colors; all three now flash the correct rare-tier blue.
   - **MASK MERCHANT! override preserved** at line ~9193: stays `'var(--uncommon)'` (Mr. Filbert's rarity) — correct.
   - **Sandwiches DEPENDABLE! mirror preserved** at line ~9701: stays `'var(--common)'` — correct.
 - Also bumped TESTROOM_VERSION v347 → v348.
@@ -6144,7 +6494,7 @@ Live testroom now carries the "watercolor storybook staged in a Renaissance thea
 
 - **Pudge (311) Belly Flop — AUDITED FIX**: `BELLY FLOP!` callout used `'var(--uncommon)'` (green) but Pudge is `rarity:"common"`. Fixed to `'var(--common)'` (gray). Same class of wrong-rarity-color bug as Finn (v315), Zain+Nerina (v316), Timpleton (v317), Bouril+Hank+Calvin (v323), Granny (v325), Boris (v326). Functional implementation verified PASS: `wF.id===311 && wR.type==='doubles'` → `dmg+=2, pudgeSelfDmg=true`; `collectKC(winTeamName, wF.name)` for Knight reactions; post-damage self-damage `wF.hp = Math.max(0, wF.hp - 1)`; KO-capable; pudgeDelay self-damage hit animation after HP bar drop; correct.
 - **Humar (336) Sacred Flame — AUDITED PASS**: `wF.id===336 && !wF.ko` win trigger; `collectKC(winTeamName, wF.name)` in Phase 5; `queueAbility('SACRED FLAME!', 'var(--legendary)', ...)` deferred onShow grant; Sandwiches mirror with `sandwichForLose` guard; `'var(--legendary)'` callout color correct for legendary rarity. Correct.
-- **Dart (209) Plunder — AUDITED PASS**: `wF.id===209 && !wF.ko` win trigger; `collectKC(winTeamName, wF.name)` in Phase 5; `queueAbility('PLUNDER!', 'var(--magma)', ..., () => { winTeam.resources.surge += 2; })` deferred onShow grant; Sandwiches mirror with `sandwichForLose` guard; `'var(--magma)'` callout color is intentional Volcanic Activity set theming (same as Red Hunter RUMBLE!, Tyson HOP!, Aunt Susan HARVEST DANCE!). Correct.
+- **Dart (209) Plunder — AUDITED PASS**: `wF.id===209 && !wF.ko` win trigger; `collectKC(winTeamName, wF.name)` in Phase 5; `queueAbility('PLUNDER!', 'var(--magma)', ..., () => { winTeam.resources.surge += 2; })` deferred onShow grant; Sandwiches mirror with `sandwichForLose` guard; `'var(--magma)'` callout color is intentional Volcanic Isles set theming (same as Red Hunter RUMBLE!, Tyson HOP!, Aunt Susan HARVEST DANCE!). Correct.
 - **Happy Crystal (208) Spark Strike — AUDITED PASS**: Sacrifice tile renders in resource area when `isReady && f.id===208 && !f.ko`; `sacrificeHappyCrystal(team)` sets `f.hp=0, f.ko=true, f.killedBy=-1`; `t.resources.moonstone++`; `showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)', ...)` — moonstone color is intentional thematic signal for a Moonstone grant (same pattern as Benjamin Magic Touch using moonstone color); `if (!handleKOs()) renderBattle()` fires chain-KO logic. Correct.
 - **Dylan (301) Scarecrow — AUDITED PASS**: Passive sideline effect; implemented via `dylanNegates(enemyTeam)` helper at line 3182: `return hasSideline(enemyTeam, 301) || (enemyActive && enemyActive.id === 107 && !enemyActive.ko)`; consumed at every pre-roll effect site (Death Howl Pressure, Splinter Toxic Fumes, Shade Haunt, Shade's Shadow Meltdown, Tyson Hop, Ember Force entry, Wick Slow Burn, Wandering Sue Hidden Weakness). Piper (107) Slick Coat also routes through this check (v281 fix). Correct.
 - **Tyson (365) Hop — AUDITED PASS**: `useTysonHop(team)` button renders when `f.id===365 && !f.ko && aliveSideline.length>0`; Dylan-negates guard shows BLOCKED! callout; HOP! callout + Knight reactions collected via temp queue mode; `drainAbilityQueue(() => openSwap(team))` fires swap modal after drain; `skipEntry = (oldGhost.id === 365)` in `doKoSwap` flow prevents incoming ghost entry effects per spec "No entry effects trigger"; correct.
@@ -6160,7 +6510,7 @@ Live testroom now carries the "watercolor storybook staged in a Renaissance thea
 ## v325 — AUDITED FIX: Granny (310) BEDTIME STORY! — wrong callout color corrected + batch color audits (Red Hunter, Farmer Jeff)
 
 - **Granny (310) BEDTIME STORY! — AUDITED FIX**: All 6 `BEDTIME STORY!` callout instances used `'#fbbf24'` (hardcoded amber hex — the Lucky Stone/overclock UI color) instead of the correct rarity color. Granny is `rarity:"uncommon"` → fixed to `'var(--uncommon)'` (green). The amber was misleading because Granny's ability grants 3 *different* resources depending on roll type (singles → Lucky Stone, doubles → Sacred Fire, triples → Moonstone) — using the Lucky Stone color for all three cases was a false visual signal, especially for the Sacred Fire and Moonstone paths. Same class of bug as Finn (v315), Zain+Nerina (v316), Timpleton (v317), Bouril+Hank+Calvin (v323).
-- **Red Hunter (345) RUMBLE! — AUDITED PASS**: Callout uses `'var(--magma)'`. Red Hunter is `rarity:"ghost-rare"` but the magma color is intentional set theming — Red Hunter is in the "Volcanic Activity" set, and `getSetColor('Volcanic Activity')` returns `'var(--magma)'`. All other VA set ability callouts use magma consistently (Death Howl PRESSURE!, Dart PLUNDER!, Tyson HOP!, Aunt Susan HARVEST DANCE!). Functional implementation verified PASS: `wF.id===345` trigger; checks all 6 resource types (+ committed) on loseTeam; if any > 0 → `dmg += 3`, `redHunterTriggered = true`, `collectKC`; cinematic RUMBLE! callout queued in Phase 7. Correct.
+- **Red Hunter (345) RUMBLE! — AUDITED PASS**: Callout uses `'var(--magma)'`. Red Hunter is `rarity:"ghost-rare"` but the magma color is intentional set theming — Red Hunter is in the "Volcanic Isles" set, and `getSetColor('Volcanic Isles')` returns `'var(--magma)'`. All other VA set ability callouts use magma consistently (Death Howl PRESSURE!, Dart PLUNDER!, Tyson HOP!, Aunt Susan HARVEST DANCE!). Functional implementation verified PASS: `wF.id===345` trigger; checks all 6 resource types (+ committed) on loseTeam; if any > 0 → `dmg += 3`, `redHunterTriggered = true`, `collectKC`; cinematic RUMBLE! callout queued in Phase 7. Correct.
 - **Farmer Jeff (314) HARVEST! — AUDITED PASS**: Callout uses `'#22c55e'` (green). Jeff is `rarity:"ghost-rare"` but the green is intentional thematic color — HARVEST! generates Healing Seeds, and `#22c55e` is the established Healing Seed theme color used by 7+ ability callouts (ASCEND!, POLLINATE!, NAP!, FORAGER!, HARVEST DANCE!, BLOOM!). Same intentional exception as Harrison ASCEND! (documented in v317: "intentional green for plant/seed theme — not a rarity color"). Functional implementation verified PASS: `hasSideline(winTeam, 314) && countVal(winDice, 6) > 0`; counts 6s in winDice; `winTeam.resources.healingSeed += sx`; `popSidelineCard(winTeam, 314)` bounce animation; `collectKC(winTeamName, 'Farmer Jeff', jeffGhost)` for Knight reactions; Sandwiches mirror present. Correct.
 - Also bumped TESTROOM_VERSION v324 → v325.
 
@@ -6581,7 +6931,7 @@ Add the same Show/Hide set toggle buttons (Base Set, Dark Castle, Frost Valley) 
 
 - Three toggle buttons at the top of the standings modal: "Show Base Set", "Show Dark Castle", "Show Frost Valley"
 - Click to include cards from that set in the standings table. Click again to exclude.
-- The canonical testroom cards (Volcanic Activity, Rolling Hills) are ALWAYS shown — the toggles only control originals.
+- The canonical testroom cards (Volcanic Isles, Rolling Hills) are ALWAYS shown — the toggles only control originals.
 - When a toggle changes, the standings table re-renders with only the included cards, and ALL existing sort logic (W, L, GP, PCT, GB, KO, KO'D, KO/G) works against the filtered pool.
 - GB (Games Behind) and leader detection should recompute against the filtered pool — e.g., if only Dark Castle is showing, the Dark Castle leader gets GB=- and everyone else is relative to that leader.
 - Use the existing `visibleOriginalSets` Set from v276 so the state is shared across gallery/picker/standings, OR give standings its own independent toggle state. Either is fine — pick whichever is cleaner.
@@ -6724,11 +7074,11 @@ HARD RULES — VIOLATION = REVERTED COMMIT:
 3. Never add hasSideline(team, X) checks where X is a shelved ID.
 4. Never add f.id === X or wF.id === X checks where X is a shelved ID.
 5. If you find existing dead code referencing a shelved ID, treat it as a CLEANUP task — remove it, don't extend it.
-6. The 36 canonical cards are the ONLY active cards in Volcanic Activity / Rolling Hills. Anything outside the canonical 36 plus the 113 imported originals is FAKE.
+6. The 36 canonical cards are the ONLY active cards in Volcanic Isles / Rolling Hills. Anything outside the canonical 36 plus the 113 imported originals is FAKE.
 
 Real Rolling Hills (16): Dylan(301), Maximo(302), Tweak and Twonk(303), Selene(305), Artemis(307), Kaplan(308), Aunt Susan(309), Granny(310), Pudge(311), Timpleton(312), Farmer Jeff(314), Harrison(315), Calvin(342), Jimmy(352), Finn(204) [moved from VA in v303], Timber(210).
 
-Real Volcanic Activity (15): Bouril(201), Death Howl(202), Benjamin(203), Shade's Shadow(205), Zain(206), Hank(207), Happy Crystal(208), Dart(209), The Ember Force(304), Nerina(306), Natalia(327), Humar(336), Red Hunter(345), Tyson(365), Fed and Hayden(406).
+Real Volcanic Isles (15): Bouril(201), Death Howl(202), Benjamin(203), Shade's Shadow(205), Zain(206), Hank(207), Happy Crystal(208), Dart(209), The Ember Force(304), Nerina(306), Natalia(327), Humar(336), Red Hunter(345), Tyson(365), Fed and Hayden(406).
 
 Real Dark Castle expansion (5): Knight Terror(401), Knight Light(402), Smudge(403), Chagrin(404), Sylvia(313).
 
@@ -6791,51 +7141,51 @@ ANY OTHER ID (316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 328, 329, 3
 
 - **v277** — Priority audit of 5 original cards (Patrick, Nikon, Buttons, Stone Cold, Mountain King). Patrick (10) Stone Form: forced dice count to 0 in doPreRollSetup (right before Redd block) so Patrick literally doesn't roll — classify returns type:'none' which always loses to any real roll, then the existing Stone Form singles-counter at resolveRound ~8055 fires its 3-damage counter when opponent rolled singles; added STONE FORM! pre-roll callout and "doesn't roll — Stone Form!" narration path in doTeamRoll for 0-dice case (sfx suppressed). Buttons (8) Perfect Plan: broadened trigger to `winDice.filter(d => d === 6).length >= 3` so quads/penta of 6 also deal +15 (previously failed when Buttons had bonus dice). Stone Cold (73) One-two-one!: broadened trigger to `winDice.filter(d => d === 1).length >= 2` so triples/quads of 1 also deal 3X (previously 3+ 1s classified as 'triples' and missed the check). Nikon (2) Ambush and Mountain King (110) Beast Mode audited and confirmed correct — no code changes.
 
-- **v275** — Implemented Patches (354) — Quilt: pre-roll `#patchesQuiltOverlay` modal (earthy brown 🪡 theme) fires each round when Patches is active with ≥2 Healing Seeds and hasn't decided yet; YES spends 2 Seeds and arms `B.patchesQuiltArmed[team]` with a `QUILT!` primer callout in `#c97c3a`; when Patches loses a roll while armed, all incoming damage is fully negated (shield consumed), `QUILT!` queued in `#c97c3a` in the cinematic section after `GEM ARMOR!`; Cameron Force of Nature check updated so full-negation triggers instant-destroy; `patchesQuiltActive` added to the 0-damage log exclusion; `patchesQuiltDecided`/`patchesQuiltArmed` cleared in both tie-path and win-path round resets so shields never carry forward; `patchesQuiltOverlay` added to `clearAllOverlays()`. A 5 HP Rolling Hills uncommon that uses Healing Seeds as a defensive shield — mirrors Pyrope Gem Armor's Surge-for-negate pattern but costs 2 Seeds instead of 1 Surge, creating a direct economy choice between the Rolling Hills seed-economy defense (Patches) and the Volcanic Activity surge-economy defense (Pyrope). Countered by Cameron (Force of Nature triggers on the negate), Magma Heart Core Melt (bypasses all passive reductions when <3 HP), and Wick Slow Burn (pre-roll chip damage can't be negated by Quilt — only the roll damage is covered).
+- **v275** — Implemented Patches (354) — Quilt: pre-roll `#patchesQuiltOverlay` modal (earthy brown 🪡 theme) fires each round when Patches is active with ≥2 Healing Seeds and hasn't decided yet; YES spends 2 Seeds and arms `B.patchesQuiltArmed[team]` with a `QUILT!` primer callout in `#c97c3a`; when Patches loses a roll while armed, all incoming damage is fully negated (shield consumed), `QUILT!` queued in `#c97c3a` in the cinematic section after `GEM ARMOR!`; Cameron Force of Nature check updated so full-negation triggers instant-destroy; `patchesQuiltActive` added to the 0-damage log exclusion; `patchesQuiltDecided`/`patchesQuiltArmed` cleared in both tie-path and win-path round resets so shields never carry forward; `patchesQuiltOverlay` added to `clearAllOverlays()`. A 5 HP Rolling Hills uncommon that uses Healing Seeds as a defensive shield — mirrors Pyrope Gem Armor's Surge-for-negate pattern but costs 2 Seeds instead of 1 Surge, creating a direct economy choice between the Rolling Hills seed-economy defense (Patches) and the Volcanic Isles surge-economy defense (Pyrope). Countered by Cameron (Force of Nature triggers on the negate), Magma Heart Core Melt (bypasses all passive reductions when <3 HP), and Wick Slow Burn (pre-roll chip damage can't be negated by Quilt — only the roll damage is covered).
 
-- **v274** — Implemented Old Mill (322) — Grindstone: pre-roll `#oldMillOverlay` modal (amber/mill theme ⚙️) fires each round when Old Mill is active with ≥2 Surge and hasn't decided yet; YES spends 2 Surge and grants 1 Moonstone immediately before rolling with `GRINDSTONE!` in `var(--rare)`; NO keeps Surge; `oldMillDecided` per-round flag prevents re-offering; cleared in both tie-path and win-path round resets; `clearAllOverlays` updated; state added to both `startBattle` blocks. The cross-economy bridge card — converts Surge surplus (from Clink, Tadpole, Igneous, Fuego, Ashley) into Moonstone advantage (die-changing power), completing the full Volcanic Activity/Rolling Hills resource-conversion ecosystem.
+- **v274** — Implemented Old Mill (322) — Grindstone: pre-roll `#oldMillOverlay` modal (amber/mill theme ⚙️) fires each round when Old Mill is active with ≥2 Surge and hasn't decided yet; YES spends 2 Surge and grants 1 Moonstone immediately before rolling with `GRINDSTONE!` in `var(--rare)`; NO keeps Surge; `oldMillDecided` per-round flag prevents re-offering; cleared in both tie-path and win-path round resets; `clearAllOverlays` updated; state added to both `startBattle` blocks. The cross-economy bridge card — converts Surge surplus (from Clink, Tadpole, Igneous, Fuego, Ashley) into Moonstone advantage (die-changing power), completing the full Volcanic Isles/Rolling Hills resource-conversion ecosystem.
 
 - **v273** — Implemented Wisp (344) — Guide Light: sideline passive — opponent cannot gain resources this round. In Phase 5 setup (after `sandwichForWin`), computed `wispBlocksWin = hasSideline(loseTeam, 344)` and `wispBlocksLose = hasSideline(winTeam, 344)` with per-round `wispGuideWin/wispGuideLose` once-per-block flags and `wispAnnWin/wispAnnLose` arrow functions that queue a `GUIDE LIGHT!` callout in `var(--common)` the first time a grant is blocked (subsequent denials that round are silent). All 20 resource-grant callout sites patched: win-team grants (Plunder, Daughter of the Stream, Valley Magic, Tempest, Burning Soul, Gary Lucky Novice win, Reaping, Sacred Flame, Harvest Dance, Forager, Prospect win, Crystallize win, Fiesta, Harvest) guarded with `wispBlocksWin` → `wispAnnWin()`; lose-team grants (Brew Time, Tough Job, Gary Lucky Novice lose, Bitter End no-KO, Prospect lose, Crystallize lose, Bedtime Story loseTeam all 3 roll types, Bitter End on-KO, Final Gift, Decompose) guarded with `wispBlocksLose` → `wispAnnLose()`; Granny winner self-KO case (winTeam grants) guarded with `wispBlocksWin`; all `sandwichForLose` mirrors on lose-path grants received `&& !wispBlocksLose`; all `sandwichForWin` mirrors on win-path grants received `&& !wispBlocksWin`. A 4 HP Rolling Hills common — pure resource-denial sideline passive that shuts down entire opponent economies for a round; pairs devastatingly with aggressive openers and counters every resource-engine card (Gary, Aunt Susan, Penny, Fuego, Harvest Moon, Clink, Igneous, Simon, Sad Sal, Powder, Mulch).
 
 - **v272** — Implemented Drizzle (328) — Rain Dance: when Drizzle is the active ghost on either team, all 1s from BOTH teams are automatically rerolled (free, no modal, no cost) in the post-roll chain before Dark Wing fires. Uses `B.preRoll.red/blue.dice` in-place mutation via the Dark Wing splice pattern so the `doPostRollAndResolve` closure captures the updated values and `resolveRound` receives the corrected dice. Chain order: `checkDrizzleRainDance` → `afterDrizzle` (contains DW check) → `afterDarkWing` (contains Jackson) → `afterJackson` → Sonya → Jeanie → postRollDone. `RAIN DANCE!` callout in `#22c55e` (green) shows both teams' updated dice; if no 1s were rolled, fires a "skies are clear!" no-op callout so the player knows the effect checked. The `checkDrizzleRainDance` function added near the Dark Wing handler at line ~4231; the `afterDrizzle` wrapper replaces the old direct DW check in the drain callback. A 4 HP Rolling Hills common that reshapes both teams' dice simultaneously — helps low-die-count builds (removes their 1s) while also helping the opponent (neutral), creating a uniquely symmetric chaos card. Pairs with Sparky (64) Tinder (more 1s = more damage) as an interesting counter-synergy: Drizzle removes the 1s that Sparky wants, so these two card identities directly conflict.
 
-- **v271** — Implemented Slag Heap (339) — Residue: when Slag Heap is KO'd, a `RESIDUE!` callout fires in ghost-common orange with an onShow that sets `B.slagHeapResidueRounds[winTeamName] = 2`; at the start of each subsequent round `doPreRollSetup` decrements the counter (2→1→0) and sets `B.slagHeapResidueActive[tName] = true` with a pre-roll `RESIDUE!` announcement ("X rounds remaining"); `resolveRound`'s Phase 5 entry computes `slagResidueBlocksWin = B.slagHeapResidueActive[winTeamName]` and uses it to block all win-team heals with an inline `RESIDUE!` callout in place of the heal: Opa Rest (win+tie paths), Villager Hospitality, Jeffery Chuckle, Biscuit Warm Up, Calvin Overclock, Flora Restore win case, Growing Mob, Munch Scraps, and Ancient One Friend to All tie path — 10 heal sources fully covered; Residue takes priority over Cornelius Antidote (Residue blocks first, Cornelius only matters when Residue is inactive); Mr Filbert Mask Merchant skipped when Residue is active (heal never reaches the curse branch). A 3 HP Volcanic Activity common designed as an attrition death-curse — combines devastatingly with aggressive kill-chain strategies and counters Villager+Jeffery+Biscuit healing sideboards; pairs with Harvest Moon (both die-to-resource engines) and Mr Filbert (Residue blocks heals, Filbert flips remaining heals to damage — zero recovery for the opponent either way).
+- **v271** — Implemented Slag Heap (339) — Residue: when Slag Heap is KO'd, a `RESIDUE!` callout fires in ghost-common orange with an onShow that sets `B.slagHeapResidueRounds[winTeamName] = 2`; at the start of each subsequent round `doPreRollSetup` decrements the counter (2→1→0) and sets `B.slagHeapResidueActive[tName] = true` with a pre-roll `RESIDUE!` announcement ("X rounds remaining"); `resolveRound`'s Phase 5 entry computes `slagResidueBlocksWin = B.slagHeapResidueActive[winTeamName]` and uses it to block all win-team heals with an inline `RESIDUE!` callout in place of the heal: Opa Rest (win+tie paths), Villager Hospitality, Jeffery Chuckle, Biscuit Warm Up, Calvin Overclock, Flora Restore win case, Growing Mob, Munch Scraps, and Ancient One Friend to All tie path — 10 heal sources fully covered; Residue takes priority over Cornelius Antidote (Residue blocks first, Cornelius only matters when Residue is inactive); Mr Filbert Mask Merchant skipped when Residue is active (heal never reaches the curse branch). A 3 HP Volcanic Isles common designed as an attrition death-curse — combines devastatingly with aggressive kill-chain strategies and counters Villager+Jeffery+Biscuit healing sideboards; pairs with Harvest Moon (both die-to-resource engines) and Mr Filbert (Residue blocks heals, Filbert flips remaining heals to damage — zero recovery for the opponent either way).
 
-- **v270** — Implemented Ash Phoenix (361) — Rebirth: when KO'd, primes `B.ashPhoenixRebirth[loseTeamName] = true` in the on-KO game-state section (`lF.id === 361 && lF.ko && !B.ashPhoenixUsed[loseTeamName]`); `B.ashPhoenixUsed[loseTeamName] = true` marks the once-per-game flag immediately; `REBIRTH!` primer queued in `var(--rare)` in the cinematic section after DECOMPOSE! and before MIRACLE! (announces "returns next round with 2 HP!"); next round's `doPreRollSetup` checks `B.ashPhoenixRebirth[tName]`, finds the KO'd ghost with id===361, sets `ko=false/hp=2`, pushes `REBIRTH!` via `preRollCallouts.unshift` so the resurrection fires FIRST before any chip damage callouts — the sideline updates via `renderBattle()` at the end of `doPreRollSetup` so Ash Phoenix appears alive before the roll buttons unlock. Two-callout design: the first announces the incoming resurrection (current round), the second confirms it (next round) — a complete two-beat arc that gives both teams time to strategize around it. State initialized in both `startBattle` blocks. A 4 HP Volcanic Activity rare self-resurrection engine — dies once per game then comes back to the bench at 2 HP, either re-entering as a fresh threat or being swapped in during a KO rotation.
+- **v270** — Implemented Ash Phoenix (361) — Rebirth: when KO'd, primes `B.ashPhoenixRebirth[loseTeamName] = true` in the on-KO game-state section (`lF.id === 361 && lF.ko && !B.ashPhoenixUsed[loseTeamName]`); `B.ashPhoenixUsed[loseTeamName] = true` marks the once-per-game flag immediately; `REBIRTH!` primer queued in `var(--rare)` in the cinematic section after DECOMPOSE! and before MIRACLE! (announces "returns next round with 2 HP!"); next round's `doPreRollSetup` checks `B.ashPhoenixRebirth[tName]`, finds the KO'd ghost with id===361, sets `ko=false/hp=2`, pushes `REBIRTH!` via `preRollCallouts.unshift` so the resurrection fires FIRST before any chip damage callouts — the sideline updates via `renderBattle()` at the end of `doPreRollSetup` so Ash Phoenix appears alive before the roll buttons unlock. Two-callout design: the first announces the incoming resurrection (current round), the second confirms it (next round) — a complete two-beat arc that gives both teams time to strategize around it. State initialized in both `startBattle` blocks. A 4 HP Volcanic Isles rare self-resurrection engine — dies once per game then comes back to the bench at 2 HP, either re-entering as a fresh threat or being swapped in during a KO rotation.
 
-- **v269** — Implemented Puff Ball (355) — Burst: when hit by doubles, Puff Ball explodes for 2 damage to the attacker then self-KOs. `puffBallBurst` flag set in the game-state counter-damage section (after Thistle Barbed, before Bubble Boys Pop) — `lF.id === 355 && wR.type === 'doubles'` fires regardless of whether Puff Ball survived the normal hit; wF takes 2 damage (KO-capable, killedBy = lF.id), Puff Ball self-destructs (hp=0, ko=true, killedBy=355); Knight reactions collected via `collectKC(loseTeamName, lF.name)`; `BURST!` queued in `var(--common)` in the cinematic section after `BARBED!` with a `renderBattle()` onShow so the sideline greying fires with the callout. A 3 HP Volcanic Activity common kamikaze — it has 41.7% chance of exploding on any given doubles hit (doubles appear ~16% of rolls with 3 dice), making it a deterrent that punishes doubles-heavy strategies like Pelter Snowball (+2 on doubles), Doc Savage (+5 on doubles), and City Cyboo (immune to doubles but Puff Ball explodes on the roll type not the damage). Pairs with Thistle Barbed for a doubled recoil-damage wall (Thistle takes 1 back, Puff Ball takes 2 back and self-destructs). Hard-countered by singles/triples-only builds and Bubble Boys Pop (who also fires on triples — BB and Puff Ball are the set's two reactive suicide cards).
+- **v269** — Implemented Puff Ball (355) — Burst: when hit by doubles, Puff Ball explodes for 2 damage to the attacker then self-KOs. `puffBallBurst` flag set in the game-state counter-damage section (after Thistle Barbed, before Bubble Boys Pop) — `lF.id === 355 && wR.type === 'doubles'` fires regardless of whether Puff Ball survived the normal hit; wF takes 2 damage (KO-capable, killedBy = lF.id), Puff Ball self-destructs (hp=0, ko=true, killedBy=355); Knight reactions collected via `collectKC(loseTeamName, lF.name)`; `BURST!` queued in `var(--common)` in the cinematic section after `BARBED!` with a `renderBattle()` onShow so the sideline greying fires with the callout. A 3 HP Volcanic Isles common kamikaze — it has 41.7% chance of exploding on any given doubles hit (doubles appear ~16% of rolls with 3 dice), making it a deterrent that punishes doubles-heavy strategies like Pelter Snowball (+2 on doubles), Doc Savage (+5 on doubles), and City Cyboo (immune to doubles but Puff Ball explodes on the roll type not the damage). Pairs with Thistle Barbed for a doubled recoil-damage wall (Thistle takes 1 back, Puff Ball takes 2 back and self-destructs). Hard-countered by singles/triples-only builds and Bubble Boys Pop (who also fires on triples — BB and Puff Ball are the set's two reactive suicide cards).
 
 - **v268** — Implemented Wick (349) — Slow Burn: pre-roll chip deals 1 to enemy + 1 self-cost each round in `doPreRollSetup`, Dylan-negatable, Masked Hero reacts, self-KO prevented.
 
 - **v267** — Implemented Harvest Moon (346) — Reaping: defeat a ghost → gain 1 Healing Seed + 1 Sacred Fire + 1 Surge (treating abilityDesc "Healing Seed, Surge, Surge" as a typo for the 3 distinct resources). `harvestMoonTriggered` flag set when `wF.id === 346 && !wF.ko && lF.ko` in the on-KO game-state section (after Mulch Decompose); `REAPING!` queued in `var(--rare)` in the cinematic section (after SCRAPS!) with a single deferred `onShow` that increments all three resource counters simultaneously + Sandwiches DEPENDABLE! mirror. A 6 HP Rolling Hills rare designed as a snowballing resource engine — each KO fuels every economy strategy simultaneously (Forge Fire, Anvil, Magnolia Bloom from the single Surge/Fire/Seed grants), making it the most generalist payoff card in the set. Pairs with any aggressive kill-chain strategy (Mountain King, Doom, Alucard Colony Call) to translate ghost kills into immediate resource pressure. Note: `sandwichForLose` (loseTeam has Sandwiches) is the correct mirror direction since Harvest Moon gains on the winTeam.
 
-- **v266** — Implemented Magma Heart (325) — Core Melt: when below 3 HP, all damage bypasses passive damage reduction effects. `const magmaCoreMelt = wF.id === 325 && !wF.ko && wF.hp < 3 && dmg > 0` computed before the defensive chain; `&& !magmaCoreMelt` added to 8 defensive checks (Guard Thomas Stoic, Dealer House Rules, Sky Elusive, Pumice Float, City Cyboo Barrier, Pyrope Gem Armor, Puff Cute, Grandmother Willow Deep Roots); counter-attacks (Bogey Bogus, Kodako Swift Lose, Patrick Stone Form, King Jay Reflection, Guardian Fairy, Fang Undercover) are intentionally NOT bypassed — those are active responses not passive reductions. `CORE MELT!` queued in `var(--rare)` in the cinematic section before Guard Thomas callout, showing HP and "true damage punches through." Cameron Force of Nature correctly does NOT fire when Core Melt bypasses a defense (the bypassed flags stay false, so the Cameron check's OR condition never triggers). A 7 HP Volcanic Activity rare designed as a berserker close — full HP it's a normal attacker, but below 3 HP it becomes truly unstoppable, punishing slow-kill strategies that let Magma Heart accumulate damage. Pairs devastatingly with Thistle Barbed (each Thistle recoil brings Magma Heart closer to Core Melt threshold) and Wick Slow Burn (self-damage races to trigger Core Melt). Hard-countered by Bogey Bogus (active reflection bypasses Core Melt — the one defense that works) and Patrick Stone Form (counter-attack still fires on singles). No Scorch Singe interaction (Singe reduces max HP, but Core Melt triggers on current HP not max).
+- **v266** — Implemented Magma Heart (325) — Core Melt: when below 3 HP, all damage bypasses passive damage reduction effects. `const magmaCoreMelt = wF.id === 325 && !wF.ko && wF.hp < 3 && dmg > 0` computed before the defensive chain; `&& !magmaCoreMelt` added to 8 defensive checks (Guard Thomas Stoic, Dealer House Rules, Sky Elusive, Pumice Float, City Cyboo Barrier, Pyrope Gem Armor, Puff Cute, Grandmother Willow Deep Roots); counter-attacks (Bogey Bogus, Kodako Swift Lose, Patrick Stone Form, King Jay Reflection, Guardian Fairy, Fang Undercover) are intentionally NOT bypassed — those are active responses not passive reductions. `CORE MELT!` queued in `var(--rare)` in the cinematic section before Guard Thomas callout, showing HP and "true damage punches through." Cameron Force of Nature correctly does NOT fire when Core Melt bypasses a defense (the bypassed flags stay false, so the Cameron check's OR condition never triggers). A 7 HP Volcanic Isles rare designed as a berserker close — full HP it's a normal attacker, but below 3 HP it becomes truly unstoppable, punishing slow-kill strategies that let Magma Heart accumulate damage. Pairs devastatingly with Thistle Barbed (each Thistle recoil brings Magma Heart closer to Core Melt threshold) and Wick Slow Burn (self-damage races to trigger Core Melt). Hard-countered by Bogey Bogus (active reflection bypasses Core Melt — the one defense that works) and Patrick Stone Form (counter-attack still fires on singles). No Scorch Singe interaction (Singe reduces max HP, but Core Melt triggers on current HP not max).
 
 - **v265** — Implemented Grandmother Willow (332) — Deep Roots: cannot be KO'd by singles damage. `lF.id === 332 && wR.type === 'singles' && dmg >= lF.hp` check in the defensive chain (after Puff Cute, before King Jay Reflection) clamps `dmg = Math.max(0, lF.hp - 1)` so singles can chip but never finish her; `DEEP ROOTS!` queued in `var(--ghost-rare)` in the cinematic section after `CUTE!` and before `MERCY!` showing the cap math and surviving HP; `grandmotherWillowDeepRoots` added to the 0-damage log exclusion (for edge case where she has 1 HP and eats a singles hit). Cameron Force of Nature intentionally does NOT trigger (partial reduction ≠ full negate). A 7 HP Rolling Hills ghost-rare designed as the ultimate singles-immune tank — pairs devastatingly with Guard Thomas Stoic (he nullifies singles at <6 HP, GW survives all singles at full HP — together they're nearly impervious to singles-based builds like Team Zippy, Cluck, Bilbo, and Anvil), and with Pumice Float (sideline caps 3+ damage to 2, so GW + Pumice can only be hit for 1-2 per round from any source). Hard-countered by doubles/triples-heavy builds and multi-hit engines. Note: Grandmother Willow CAN take singles damage (chip), she just can't be KO'd by it — a key design distinction that keeps the mechanic fair.
 
 - **v264** — Implemented Magnolia (318) — Bloom: pre-roll `#magnoliaBloomOverlay` modal (green 🌸 theme) fires each round when Magnolia is active with ≥1 Healing Seed and hasn't decided yet; YES spends 1 Healing Seed and sets `B.magnoliaBloomCharged[team] = true` with a `BLOOM!` primer callout in `#22c55e` (green); when Magnolia wins the roll, `dmg += 2` fires in the game-state damage section (after Anvil Heavy Strike, before Greg Chase) with the charge consumed; `BLOOM!` queued in `#22c55e` in the cinematic section showing "base + 2 = final" math; `B.magnoliaBloomDecided` per-round flag prevents re-offering within the same round; both `magnoliaBloomCharged` and `magnoliaBloomDecided` cleared in both tie-path and win-path round resets; `magnoliaBloomOverlay` added to `clearAllOverlays()`; both `startBattle` state blocks initialized. Magnolia is a 5 HP Rolling Hills uncommon that uses Healing Seeds as offensive fuel — the counterpart to Forge Fire Temper (Surge → ×2) and Anvil Heavy Strike (Surge → singles+2), creating a complete resource-to-damage ecosystem where every special type can be converted to a damage boost. Pairs with Healing Seed generators (Aunt Susan Harvest Dance, Farmer Jeff, Penny Forager, Mulch Decompose) for sustained Bloom pressure. Charge is lost if Magnolia loses the roll, adding risk to the spend — player must read the matchup before committing.
 
-- **v262** — Implemented Anvil (357) — Heavy Strike: pre-roll `#anvilHeavyOverlay` modal (charcoal/iron theme 🔨) fires each round when Anvil is active with ≥1 Surge and hasn't decided yet; YES spends 1 Surge and sets `B.anvilCharged[team] = true` with a `HEAVY STRIKE!` primer callout; when Anvil wins with singles that round, `dmg += 2` fires in the game-state damage section (after Forge Fire Temper, before Greg Chase) boosting singles base from 1 → 3; charge consumed on use or cleared at both round-reset paths so it never carries forward; `HEAVY STRIKE!` queued in `var(--uncommon)` in the cinematic section after `TEMPER!` showing "1 → 3 + 2 = final" math; `anvilCharged`/`anvilDecided` initialized in both `startBattle` state blocks, `anvilHeavyOverlay` added to `clearAllOverlays()`. Anvil is a 6 HP Volcanic Activity uncommon that completes the Surge-economy combat trio alongside Forge Fire (offensive ×2 doubles swing) and Pyrope (defensive negate shield) — Anvil is the surgical precision tool that turns the near-useless singles result into a 3-damage baseline, making it the only card that makes singles competitive against doubles/triples builds. Pairs with Clink (always generates Surge win/lose), Tadpole (entry Surge), Igneous (no-damage-round Surge), and Fuego (triples jackpot Surge) for sustained Heavy Strike availability. Hard-countered by Hector (96) Protector (singles already rank above doubles for Hector so Anvil's boost is less impactful) and Guard Thomas (41) Stoic (singles deal 0 when GT has <6 HP — Anvil's charge is wasted against a Stoic GT). Note: Anvil's +2 stacks on top of committed ice/fire resources, Team Zippy/Cluck/Bilbo singles bonuses, and all other modifiers — a fully Surge-armed Anvil singles hit with 3 Ice Shards would deal 1 + 2 (Heavy Strike) + 3 (ice) = 6 damage from what would normally be a 1+3=4 hit.
+- **v262** — Implemented Anvil (357) — Heavy Strike: pre-roll `#anvilHeavyOverlay` modal (charcoal/iron theme 🔨) fires each round when Anvil is active with ≥1 Surge and hasn't decided yet; YES spends 1 Surge and sets `B.anvilCharged[team] = true` with a `HEAVY STRIKE!` primer callout; when Anvil wins with singles that round, `dmg += 2` fires in the game-state damage section (after Forge Fire Temper, before Greg Chase) boosting singles base from 1 → 3; charge consumed on use or cleared at both round-reset paths so it never carries forward; `HEAVY STRIKE!` queued in `var(--uncommon)` in the cinematic section after `TEMPER!` showing "1 → 3 + 2 = final" math; `anvilCharged`/`anvilDecided` initialized in both `startBattle` state blocks, `anvilHeavyOverlay` added to `clearAllOverlays()`. Anvil is a 6 HP Volcanic Isles uncommon that completes the Surge-economy combat trio alongside Forge Fire (offensive ×2 doubles swing) and Pyrope (defensive negate shield) — Anvil is the surgical precision tool that turns the near-useless singles result into a 3-damage baseline, making it the only card that makes singles competitive against doubles/triples builds. Pairs with Clink (always generates Surge win/lose), Tadpole (entry Surge), Igneous (no-damage-round Surge), and Fuego (triples jackpot Surge) for sustained Heavy Strike availability. Hard-countered by Hector (96) Protector (singles already rank above doubles for Hector so Anvil's boost is less impactful) and Guard Thomas (41) Stoic (singles deal 0 when GT has <6 HP — Anvil's charge is wasted against a Stoic GT). Note: Anvil's +2 stacks on top of committed ice/fire resources, Team Zippy/Cluck/Bilbo singles bonuses, and all other modifiers — a fully Surge-armed Anvil singles hit with 3 Ice Shards would deal 1 + 2 (Heavy Strike) + 3 (ice) = 6 damage from what would normally be a 1+3=4 hit.
 
-- **v260** — Implemented Forge Fire (321) — Temper: pre-roll `#forgeFireOverlay` modal (orange flame theme) fires each round when Forge Fire is active, has ≥1 Surge, and Temper isn't already charged; YES spends 1 Surge and sets `B.forgeFireCharged[team] = true` with a `TEMPER!` primer callout; when Forge Fire wins the next roll, `dmg *= 2` fires in the game-state damage section (after Dragonclaw, before Greg Chase) with the charge consumed via `B.forgeFireCharged[team] = false`; `TEMPER!` queued in `var(--uncommon)` in the cinematic section showing the "base × 2 = final" math; `B.forgeFireDecided` per-round flag prevents re-offering within the same round if the player says NO; charge persists across rounds until consumed; `forgeFireDecided` cleared in both tie-path and win-path round resets; `forgeFireOverlay` added to `clearAllOverlays()`; both `startBattle` state blocks initialized with `forgeFireCharged`/`forgeFireDecided`. Forge Fire is a 5 HP Volcanic Activity uncommon with a Surge-as-offensive-fuel identity: spend Surge to arm a 2× damage swing, then win to cash it. Pairs with Clink (329) Prospect (always generates Surge win/loss), Tadpole (358) Splash (entry Surge), Snoozer (330) Nap Time (tie Surge), and Igneous (331) Crystallize (no-damage-round Surge) for a sustained Surge-economy engine. Hard-countered by Piper (107) Slick Coat (pre-roll die drain leaves you Surgeless after a few rounds), Patrick (10) Stone Form (singles counters negate the hit even when Tempered), and King Jay (106) Reflection (Tempered hits reflect back at double the normal damage on a 7-sum).
+- **v260** — Implemented Forge Fire (321) — Temper: pre-roll `#forgeFireOverlay` modal (orange flame theme) fires each round when Forge Fire is active, has ≥1 Surge, and Temper isn't already charged; YES spends 1 Surge and sets `B.forgeFireCharged[team] = true` with a `TEMPER!` primer callout; when Forge Fire wins the next roll, `dmg *= 2` fires in the game-state damage section (after Dragonclaw, before Greg Chase) with the charge consumed via `B.forgeFireCharged[team] = false`; `TEMPER!` queued in `var(--uncommon)` in the cinematic section showing the "base × 2 = final" math; `B.forgeFireDecided` per-round flag prevents re-offering within the same round if the player says NO; charge persists across rounds until consumed; `forgeFireDecided` cleared in both tie-path and win-path round resets; `forgeFireOverlay` added to `clearAllOverlays()`; both `startBattle` state blocks initialized with `forgeFireCharged`/`forgeFireDecided`. Forge Fire is a 5 HP Volcanic Isles uncommon with a Surge-as-offensive-fuel identity: spend Surge to arm a 2× damage swing, then win to cash it. Pairs with Clink (329) Prospect (always generates Surge win/loss), Tadpole (358) Splash (entry Surge), Snoozer (330) Nap Time (tie Surge), and Igneous (331) Crystallize (no-damage-round Surge) for a sustained Surge-economy engine. Hard-countered by Piper (107) Slick Coat (pre-roll die drain leaves you Surgeless after a few rounds), Patrick (10) Stone Form (singles counters negate the hit even when Tempered), and King Jay (106) Reflection (Tempered hits reflect back at double the normal damage on a 7-sum).
 
 - **v259** — Implemented Barnaby (326) — Stubborn: immune to all opponent-forced switches. Three insertion points: (1) `doWinstonSchemeChoice` — if the opponent's active ghost is Barnaby, `STUBBORN!` fires in `var(--uncommon)` via `showAbilityCallout` and `continuation()` is called without executing the swap; (2) game-state section of `resolveRound` — `lF.id === 326` check prevents Gus's Gale Force from zeroing damage and setting `galeForceSwap = true`, leaving normal computed damage intact; `galeForceBlockedByBarnaby` flag carries to the cinematic section where a `STUBBORN!` callout is queued to explain why Gale Force failed; (3) `doRaditzHuntChoice` — `huntTargetActive.id === 326` guard fires `STUBBORN!` via `showAbilityCallout` and returns early (restoring both roll buttons) without executing the Hunt swap. Barnaby is a 5 HP Rolling Hills uncommon whose entire design identity is anti-forced-swap: he exists as a hard counter to Winston Scheme, Gus Gale Force, and Raditz Hunt — the three cards that can disrupt an opponent's active-ghost choice. Playing Barnaby denies the opponent any rotation leverage while he's in play; combined with defensive passives (Guard Thomas Stoic, City Cyboo Barrier, Pumice Float), he enables a lockdown lineup that's extremely difficult to dislodge.
 
-- **v258** — Implemented Igneous (331) — Crystallize: each round Igneous doesn't take damage → gain 1 Surge. Three insertion points: win path (`wF.id === 331 && !wF.ko` — won so no damage taken), lose path (`lF.id === 331 && !lF.ko && dmg === 0` — lost but damage was fully negated by King Jay/Guard Thomas/Bogey/Sky Elusive/etc.), and tie path (`active(team).id === 331` forEach — no damage dealt in a tie). Full Sandwiches DEPENDABLE! mirrors on both win and lose paths. Igneous is a 5 HP Volcanic Activity uncommon with a defensive identity: it rewards playing safely (winning or getting attacked by damage-negation counters) and pairs naturally with Guard Thomas Stoic (singles=0 damage → Crystallize fires), City Cyboo Barrier (doubles=0 damage → Crystallize fires), King Jay Reflection (damage reflected = 0 received → Crystallize fires), and Bogey Bogus (armed reflect = 0 damage → Crystallize fires). An Igneous + Guard Thomas + City Cyboo defensive trio can generate 1 Surge per round reliably: Thomas negates singles, Cyboo negates doubles, and Igneous banks Surge whenever either fires — building toward Boris Fortify, Forge Fire Temper, or Old Mill Grindstone payoffs without ever taking damage.
+- **v258** — Implemented Igneous (331) — Crystallize: each round Igneous doesn't take damage → gain 1 Surge. Three insertion points: win path (`wF.id === 331 && !wF.ko` — won so no damage taken), lose path (`lF.id === 331 && !lF.ko && dmg === 0` — lost but damage was fully negated by King Jay/Guard Thomas/Bogey/Sky Elusive/etc.), and tie path (`active(team).id === 331` forEach — no damage dealt in a tie). Full Sandwiches DEPENDABLE! mirrors on both win and lose paths. Igneous is a 5 HP Volcanic Isles uncommon with a defensive identity: it rewards playing safely (winning or getting attacked by damage-negation counters) and pairs naturally with Guard Thomas Stoic (singles=0 damage → Crystallize fires), City Cyboo Barrier (doubles=0 damage → Crystallize fires), King Jay Reflection (damage reflected = 0 received → Crystallize fires), and Bogey Bogus (armed reflect = 0 damage → Crystallize fires). An Igneous + Guard Thomas + City Cyboo defensive trio can generate 1 Surge per round reliably: Thomas negates singles, Cyboo negates doubles, and Igneous banks Surge whenever either fires — building toward Boris Fortify, Forge Fire Temper, or Old Mill Grindstone payoffs without ever taking damage.
 
 - **v257** — Implemented Fuego (337) — Fiesta: win with triples → gain 1 of every resource (+1 Sacred Fire, +1 Ice Shard, +1 Healing Seed, +1 Surge) in a single `FIESTA!` callout in `var(--uncommon)`; Sandwiches DEPENDABLE! mirror covers all four grants in one deferred `onShow` callback. The jackpot card — triples odds (~1/36 with 2 dice, higher with more) are low but the 4-resource payout is massive, especially for Surge-dependent strategies.
 
-- **v256** — Implemented Pumice (319) — Float: while on the sideline, cap incoming damage at 2 when it would be 3 or more. `hasSideline(loseTeam, 319) && dmg >= 3` check in the defensive game-state section after Sky Elusive, before City Cyboo Barrier; `pumiceFloat`/`pumiceFloatOriginalDmg` flags; `FLOAT!` queued in `var(--common)` in the cinematic section after `ELUSIVE!` and before `BARRIER!`, showing the before→after math. Unlike Sky Elusive (full negate for the active ghost) or City Cyboo Barrier (doubles full negate), Float is a SIDELINE passive partial reduction — damage is capped at 2, not zeroed, so Cameron Force of Nature does NOT trigger. Pumice is a 4 HP Volcanic Activity common designed as a burst-stopper: counters high-damage builds like Doc Savage (+5 → capped at 2), Jenkins Greeting (4-dice entry nuke → capped at 2), Snorton Fissure (+5 → capped at 2), and Doom Fiendship (+2 on top of base). Pairs naturally with City Cyboo Barrier (doubles=0, other=≤2 → your ghost effectively takes max 2 from anything) and Guard Thomas Stoic (singles=0 with Pumice, Pumice caps everything else at 2 → near-invincibility vs non-doubles non-singles), and with Cornelius Antidote (blocking opponent's sideline damage boosts while Pumice limits the raw ceiling). Hard-countered by Cameron Force of Nature (who bypasses Float entirely — he kills on negation, not on reduction) and by low-damage consistency strategies that deal exactly 1-2 per round (Pumice's cap never bites).
+- **v256** — Implemented Pumice (319) — Float: while on the sideline, cap incoming damage at 2 when it would be 3 or more. `hasSideline(loseTeam, 319) && dmg >= 3` check in the defensive game-state section after Sky Elusive, before City Cyboo Barrier; `pumiceFloat`/`pumiceFloatOriginalDmg` flags; `FLOAT!` queued in `var(--common)` in the cinematic section after `ELUSIVE!` and before `BARRIER!`, showing the before→after math. Unlike Sky Elusive (full negate for the active ghost) or City Cyboo Barrier (doubles full negate), Float is a SIDELINE passive partial reduction — damage is capped at 2, not zeroed, so Cameron Force of Nature does NOT trigger. Pumice is a 4 HP Volcanic Isles common designed as a burst-stopper: counters high-damage builds like Doc Savage (+5 → capped at 2), Jenkins Greeting (4-dice entry nuke → capped at 2), Snorton Fissure (+5 → capped at 2), and Doom Fiendship (+2 on top of base). Pairs naturally with City Cyboo Barrier (doubles=0, other=≤2 → your ghost effectively takes max 2 from anything) and Guard Thomas Stoic (singles=0 with Pumice, Pumice caps everything else at 2 → near-invincibility vs non-doubles non-singles), and with Cornelius Antidote (blocking opponent's sideline damage boosts while Pumice limits the raw ceiling). Hard-countered by Cameron Force of Nature (who bypasses Float entirely — he kills on negation, not on reduction) and by low-damage consistency strategies that deal exactly 1-2 per round (Pumice's cap never bites).
 
-- **v255** — Implemented Scorch (317) — Singe: win → opponent's active ghost permanently loses 1 max HP (min 1). `lF.maxHp = Math.max(1, lF.maxHp - 1)` + `lF.hp = Math.min(lF.hp, lF.maxHp)` applied immediately in the on-win callouts section; `SINGE!` queued in `var(--common)` showing the before→after max HP math, with a deferred `renderBattle()` onShow so the HP bar reflects the new maximum as the callout fires. Scorch is a 3 HP Volcanic Activity common whose design identity is attrition warfare — every win permanently shrinks the enemy's ceiling, making Healing Seed strategies, Calvin Overclock overclocking, and Boris Fortify tankiness progressively less effective. Stacks with Doom Fiendship (+2 damage) for a "chip + shrink" combo that snowballs over long engagements. Cannot trigger on KO'd enemies (guarded by `!wF.ko`). No Sandwiches mirror (max HP reduction is a debuff, not a resource grant).
+- **v255** — Implemented Scorch (317) — Singe: win → opponent's active ghost permanently loses 1 max HP (min 1). `lF.maxHp = Math.max(1, lF.maxHp - 1)` + `lF.hp = Math.min(lF.hp, lF.maxHp)` applied immediately in the on-win callouts section; `SINGE!` queued in `var(--common)` showing the before→after max HP math, with a deferred `renderBattle()` onShow so the HP bar reflects the new maximum as the callout fires. Scorch is a 3 HP Volcanic Isles common whose design identity is attrition warfare — every win permanently shrinks the enemy's ceiling, making Healing Seed strategies, Calvin Overclock overclocking, and Boris Fortify tankiness progressively less effective. Stacks with Doom Fiendship (+2 damage) for a "chip + shrink" combo that snowballs over long engagements. Cannot trigger on KO'd enemies (guarded by `!wF.ko`). No Sandwiches mirror (max HP reduction is a debuff, not a resource grant).
 
 - **v254** — Bug fix: `clearAllOverlays()` was missing 4 overlay IDs — `tylerOverlay` (Tyler 105 HP-trade modal), `eloiseOverlay` (Eloise 85 Change of Heart HP-swap modal), `booOverlay` (Boo Brothers 17 Teamwork modal), and `bogeyOverlay` (Bogey 53 Bogus reflect modal). All 4 were activatable via `.classList.add('active')` but never cleaned up on game reset/rematch, meaning if any of these modals were open when the player hit "New Battle" or the AFK timer fired, the modal would remain visible on the team select screen and permanently block the UI. Added all 4 to the `clearAllOverlays()` function in the correct position (after `guardianFairyOverlay`, before `gusOverlay`).
 
 - **v253** — Implemented Biscuit (324) — Warm Up AND Thistle (338) — Barbed. Biscuit: sideline passive +1 HP on wins (capped at maxHp, no overclock), exact clone of Villager (11) Hospitality pattern with full Cornelius Antidote and Mr Filbert Mask Merchant curse support; fires only when the HP increase is actually possible (`biscuitNewHp > wF.hp` guard avoids firing at max HP). Thistle: passive permanent thorns — `lF.id === 338 && dmg > 0` check fires even on the KO hit ("Always"), deals 1 recoil to wF (KO-capable, `killedBy = lF.id`), game-state update inserted after Balatron's Party Time counter in the counter-damage sequence; `BARBED!` queued in `var(--rare)` in the cinematic section after MERCY! and before WRECKAGE!, showing the recoil amount and wF's remaining HP. The "Always" design was intentional — an attacker that KOs Thistle still eats the barb, making Thistle dangerous to rush down. Pairs well with healing supports (Villager, Jeffery, Biscuit) that keep it alive through recoil-heavy exchanges.
 
-- **v251** — Implemented Dragonclaw (367) — Rake: win with 3+ different die values → +3 damage. `dragonclawTriggered`/`dragonclawBaseDmg` in the game-state damage section after Cluck (340) Peck, checking `wF.id === 367 && !wF.ko && new Set(winDice).size >= 3`; `RAKE!` queued in `var(--rare)` in the cinematic section after `PECK!` showing the dice array and "base + 3 = final" math. At 3 standard dice all-different has a ~55% trigger rate (6 faces, 3 dice, all unique = 6×5×4 / 6³ ≈ 55.6%). With 4+ dice (Redd Notorious, Kairan Let's Dance snowball, Haywire Wild Chords) the trigger rate climbs higher but still requires 3 unique values — protecting against pure triple/double setups from shorting the trigger. A 7 HP Volcanic Activity rare that rewards dice diversity over mono-value stacking strategies.
+- **v251** — Implemented Dragonclaw (367) — Rake: win with 3+ different die values → +3 damage. `dragonclawTriggered`/`dragonclawBaseDmg` in the game-state damage section after Cluck (340) Peck, checking `wF.id === 367 && !wF.ko && new Set(winDice).size >= 3`; `RAKE!` queued in `var(--rare)` in the cinematic section after `PECK!` showing the dice array and "base + 3 = final" math. At 3 standard dice all-different has a ~55% trigger rate (6 faces, 3 dice, all unique = 6×5×4 / 6³ ≈ 55.6%). With 4+ dice (Redd Notorious, Kairan Let's Dance snowball, Haywire Wild Chords) the trigger rate climbs higher but still requires 3 unique values — protecting against pure triple/double setups from shorting the trigger. A 7 HP Volcanic Isles rare that rewards dice diversity over mono-value stacking strategies.
 
-- **v250** — Implemented Char (323) — Afterburn: win a round → deal 1 damage at the start of the NEXT round. `B.charAfterburnPending[winTeamName] = true` set in the win-path on-win callouts section with an `AFTERBURN!` primer callout in `var(--common)` announcing the deferred damage. Next round's `doPreRollSetup` (inserted after Splinter Toxic Fumes, before Toby Pure Heart) consumes the flag, applies 1 damage to the enemy active ghost, and fires `AFTERBURN!` as a pre-roll callout with full Dylan negation support, KO-safe path, Knight reactions via temp queue splicing, and Masked Hero (55) Underdog counter-damage. The flag self-clears when consumed so each win arms exactly one Afterburn. A 4 HP Volcanic Activity common with a "lingering burn" identity — chain wins with Afterburn keep pressure on indefinitely, but the 1-round delay means smart opponents can swap in a ghost to eat the chip before their key ghost enters. `charAfterburnPending` initialized in both `startBattle` state blocks.
+- **v250** — Implemented Char (323) — Afterburn: win a round → deal 1 damage at the start of the NEXT round. `B.charAfterburnPending[winTeamName] = true` set in the win-path on-win callouts section with an `AFTERBURN!` primer callout in `var(--common)` announcing the deferred damage. Next round's `doPreRollSetup` (inserted after Splinter Toxic Fumes, before Toby Pure Heart) consumes the flag, applies 1 damage to the enemy active ghost, and fires `AFTERBURN!` as a pre-roll callout with full Dylan negation support, KO-safe path, Knight reactions via temp queue splicing, and Masked Hero (55) Underdog counter-damage. The flag self-clears when consumed so each win arms exactly one Afterburn. A 4 HP Volcanic Isles common with a "lingering burn" identity — chain wins with Afterburn keep pressure on indefinitely, but the 1-round delay means smart opponents can swap in a ghost to eat the chip before their key ghost enters. `charAfterburnPending` initialized in both `startBattle` state blocks.
 
 - **v249** — Implemented Snoozer (330) — Nap Time AND Mulch (348) — Decompose. Snoozer: sideline passive in the tie-path ability queue (after Ancient One Friend to All, before Maximo NAP!) — `hasSideline(team, 330)` check grants +1 Surge via deferred `onShow` callback with `NAP TIME!` callout in `var(--common)` and Sandwiches DEPENDABLE! mirror; only fires on actual tie rounds (no damage dealt), which is its design intent. Mulch: death trigger — `mulchDecomposeTriggered` flag set in on-KO game-state section (parallel to Powder Final Gift), cinematic callout `DECOMPOSE!` in `var(--common)` queued after Powder's FINAL GIFT! with deferred `onShow` granting +2 Healing Seeds to loseTeam plus Sandwiches mirror; Mulch's 3 HP means it's viable as a sacrifice-farmer in Healing Seed strategies paired with Ko-loop builds. Together these complete two more Rolling Hills common resource-generation engines.
 
@@ -6843,7 +7193,7 @@ ANY OTHER ID (316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 328, 329, 3
 
 - **v247** — Implemented Cluck (340) — Peck: win with singles → deal +2 damage. `cluckTriggered`/`cluckBaseDmg` in the game-state damage section after Team Zippy (40), `PECK!` queued in `var(--common)` after `TEAMWORK!` in the cinematic section showing "base + 2 = final" math. First Rolling Hills common with a singles-damage identity — pairs naturally with Bilbo (80) Little Buddy (sideline +2 on singles) and Team Zippy (40) for triple-stacking singles bonuses.
 
-- **v246** — Implemented Clink (329) — Prospect: win OR lose → gain 1 Surge. Win case inserted after Penny's Forager in the on-win callouts section (`wF.id === 329 && !wF.ko`, deferred `onShow` surge++), lose case inserted after Chagrin's Bitter End in the on-lose section (`lF.id === 329 && !lF.ko`, same deferred pattern). Both paths include Sandwiches DEPENDABLE! mirrors. Clink's design identity: 3 HP Volcanic Activity common that generates Surge every round regardless of win/loss — a reliable baseline resource farmer that ensures your team always has at least 1 Surge banked. Pairs naturally with Surge-spending synergies (Boris Fortify, Forge Fire Temper, Anvil Heavy Strike, Pyrope Gem Armor), and pairs especially well with Chagrin (404) who also generates Surge on loss — together they create a team that actively welcomes losing rounds as Surge-farming opportunities. Soft-countered by aggressive KO strategies that eliminate Clink before it can farm multiple rounds.
+- **v246** — Implemented Clink (329) — Prospect: win OR lose → gain 1 Surge. Win case inserted after Penny's Forager in the on-win callouts section (`wF.id === 329 && !wF.ko`, deferred `onShow` surge++), lose case inserted after Chagrin's Bitter End in the on-lose section (`lF.id === 329 && !lF.ko`, same deferred pattern). Both paths include Sandwiches DEPENDABLE! mirrors. Clink's design identity: 3 HP Volcanic Isles common that generates Surge every round regardless of win/loss — a reliable baseline resource farmer that ensures your team always has at least 1 Surge banked. Pairs naturally with Surge-spending synergies (Boris Fortify, Forge Fire Temper, Anvil Heavy Strike, Pyrope Gem Armor), and pairs especially well with Chagrin (404) who also generates Surge on loss — together they create a team that actively welcomes losing rounds as Surge-farming opportunities. Soft-countered by aggressive KO strategies that eliminate Clink before it can farm multiple rounds.
 
 - **v245** — Implemented Penny (316) — Forager: win a roll → gain 1 Healing Seed. Two lines after Aunt Susan's Harvest Dance block in the on-win callouts section: `wF.id === 316 && !wF.ko` queues `FORAGER!` in `#22c55e` (green, same as all Healing Seed grants) with a deferred `onShow` `healingSeed++` so the tile updates exactly as the splash fires, plus a `DEPENDABLE!` Sandwiches mirror. First Rolling Hills card to have battle logic. Healing Seeds are already fully supported as a resource type in the game (commit-to-heal system), so Penny integrates seamlessly. Players can now build Penny into Healing Seed–heavy strategies (Magnolia Bloom, Patches Quilt, Old Mill Grindstone combos).
 
@@ -7424,3 +7774,35 @@ This inflated Knight Terror's apparent strength against Jeffery-paired teams, bi
 **FAMILY audit:** wins-a-battle-defeat-gate family (Jeffery 14, Suspicious Jeff 61, Calvin & Anna 91). This cycle fixes the knight-reaction overcount for Jeffery. Suspicious Jeff has no rxns++ entry (correct — Snicker die theft doesn't call checkKnightEffects). Calvin & Anna's Toboggan also has no rxns++ entry (correct). Family fully resolved.
 
 **Version bump:** `TESTROOM_VERSION` v634 → v635
+
+---
+
+## Fix: Farmer Jeff (314) HARVEST! — win-path knight-reaction missing sixes guard (v644, 2026-04-11)
+
+**File:** `smartAutoPlay.js`
+
+**Problem:** In the knight-reaction estimation block (`winnerWasEnemy` section), line 1909 had:
+```js
+if (hasSideline(enemyTeam, 314)) rxns++;  // Farmer Jeff HARVEST! (sideline)
+```
+This fired on **every** enemy win where the enemy had Farmer Jeff on the sideline — regardless of whether any 6s were rolled. But `index.html` line 10201 shows:
+```js
+if (hasSideline(winTeam, 314)) {
+  const sixes = countVal(winDice, 6);
+  if (sixes > 0) { collectKC(winTeamName, 'Farmer Jeff', jeffGhost); }
+}
+```
+The `collectKC` (which triggers knight reactions) is gated behind `sixes > 0`. Without a 6, no reaction fires in real gameplay.
+
+The lose-path counterpart (line 2000, added in Cycle #2) already had the correct guard:
+```js
+if (hasSideline(enemyTeam, 314) && _eD.filter(d => d === 6).length > 0) rxns++;
+```
+
+**Impact:** Every sim round where the enemy team won + had Farmer Jeff on the sideline but rolled no 6s, the sim incorrectly counted a phantom knight reaction:
+- Knight Terror: 2 extra HP damage (phantom Heavy Air)
+- Knight Light: +1 die next roll (phantom Retribution)
+
+**Fix:** Added `&& _eD.filter(d => d === 6).length > 0` guard to match the lose-path pattern and index.html's `sixes > 0` gate.
+
+**Version bump:** `TESTROOM_VERSION` v643 → v644
