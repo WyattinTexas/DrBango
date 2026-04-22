@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v786'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v787'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2638,7 +2638,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v786';
+const TESTROOM_VERSION = 'v787';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -14579,12 +14579,19 @@ function _resolveRoundImpl() {
   const hasDylanWin = (wF.id === 301 && !wF.ko) || hasSideline(winTeam, 301);
   if (hasDylanWin) { collectKC(winTeamName, wF.id === 301 ? wF.name : 'Dylan'); }
   // Farmer Jeff (314) — Harvest: active OR sideline fires on any 6 rolled, win OR lose (v636 buff).
-  const hasFJWin = (wF.id === 314 && !wF.ko) || hasSideline(winTeam, 314);
+  // Cornelius (45) Antidote blocks Farmer Jeff's sideline effect (not active).
+  const fjWinIsActive = wF.id === 314 && !wF.ko;
+  const fjWinIsSideline = hasSideline(winTeam, 314);
+  const corneliusBlocksFJWin = fjWinIsSideline && !fjWinIsActive && hasSideline(loseTeam, 45);
+  const hasFJWin = (fjWinIsActive || fjWinIsSideline) && !corneliusBlocksFJWin;
   if (hasFJWin) {
     const sixes = countVal(winDice, 6);
     if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314) || wF; collectKC(winTeamName, 'Farmer Jeff', jeffGhost); }
   }
-  const hasFJLose = (lF.id === 314 && !lF.ko) || hasSideline(loseTeam, 314);
+  const fjLoseIsActive = lF.id === 314 && !lF.ko;
+  const fjLoseIsSideline = hasSideline(loseTeam, 314);
+  const corneliusBlocksFJLose = fjLoseIsSideline && !fjLoseIsActive && hasSideline(winTeam, 45);
+  const hasFJLose = (fjLoseIsActive || fjLoseIsSideline) && !corneliusBlocksFJLose;
   if (hasFJLose) {
     const sixesLose = countVal(loseDice, 6);
     if (sixesLose > 0) { const jeffGhostLose = getSidelineGhost(loseTeam, 314) || lF; collectKC(loseTeamName, 'Farmer Jeff', jeffGhostLose); }
@@ -15236,6 +15243,17 @@ function _resolveRoundImpl() {
     queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`, null, winTeamName);
   }
   // Farmer Jeff (314) — Harvest: active OR sideline fires on any 6 rolled, win OR lose (v636 buff).
+  // Cornelius (45) Antidote — show block callout if Jeff's sideline Harvest was negated
+  if (corneliusBlocksFJWin && countVal(winDice, 6) > 0) {
+    const cornGhostFJW = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostFJW ? cornGhostFJW.name : 'Cornelius'} blocks Farmer Jeff's Harvest!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Farmer Jeff Harvest blocked!`);
+  }
+  if (corneliusBlocksFJLose && countVal(loseDice, 6) > 0) {
+    const cornGhostFJL = getSidelineGhost(winTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostFJL ? cornGhostFJL.name : 'Cornelius'} blocks Farmer Jeff's Harvest!`, null, winTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Farmer Jeff Harvest blocked!`);
+  }
   if (hasFJWin && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
     const fjIsActive = wF.id === 314 && !wF.ko;
