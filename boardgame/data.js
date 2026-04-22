@@ -32,7 +32,7 @@ const ALL_GHOSTS = [
   { name:"Kodako", file:"kodako.jpg", rarity:"common", maxHp:6, ability:"Swift", abilityDesc:"Roll 1-2-3: negate damage, deal 4." },
   { name:"Powder", file:"powder.jpg", rarity:"common", maxHp:5, ability:"Final Gift", abilityDesc:"When defeated, gain 3 Ice Shards." },
   { name:"Simon", file:"simon.jpg", rarity:"common", maxHp:6, ability:"Brew Time", abilityDesc:"Take damage: gain 1 Sacred Fire." },
-  { name:"Cameron", file:"cameron.jpg", rarity:"common", maxHp:6, ability:"Force of Nature", abilityDesc:"Damage negated: destroy the enemy." },
+  { name:"Cameron", file:"cameron.jpg", rarity:"common", maxHp:6, ability:"Unstoppable Force", abilityDesc:"Opponent uses special: +1 die. Damage can't be negated." },
   { name:"Dream Cat", file:"dream_cat.jpg", rarity:"common", maxHp:4, ability:"Jinx", abilityDesc:"Both roll doubles: +1 die next turn." },
   { name:"Sad Sal", file:"sad_sal.jpg", rarity:"common", maxHp:5, ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard." },
   { name:"Tommy Salami", file:"tommy_salami.jpg", rarity:"common", maxHp:6, ability:"Regulator", abilityDesc:"Enemy 5's and 6's reroll low." },

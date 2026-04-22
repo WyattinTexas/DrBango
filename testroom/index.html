@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v783'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v784'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2189,18 +2189,20 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   </div>
 </div>
 
-<!-- Guardian Fairy — Wish reactive swap modal -->
-<div class="selene-overlay" id="guardianFairyOverlay">
-  <div class="selene-modal">
-    <div class="selene-banner" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);">🧚 WISH</div>
-    <h3>Guardian Fairy — Wish!</h3>
-    <p class="selene-sub" id="guardianFairySub">Guardian Fairy can take this hit! Switch her in?</p>
-    <div class="selene-options">
-      <button class="selene-opt" onclick="doGuardianFairyReactive('yes')" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);">🧚 Yes — Guardian Fairy takes it!</button>
-      <button class="selene-opt" onclick="doGuardianFairyReactive('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ No — take the damage</button>
-    </div>
-  </div>
+<!-- Guardian Fairy — Wish timed button (replaces old full-screen modal) -->
+<div id="gfWishBtn" style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:9999;
+  background:linear-gradient(135deg,#5b21b6,#7c3aed); color:#fff; border:2px solid #a78bfa; border-radius:14px;
+  padding:12px 28px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 0 30px rgba(139,92,246,0.5);
+  text-align:center; min-width:200px; user-select:none; animation:gfPulse 1s ease-in-out infinite;">
+  <div style="font-size:11px;opacity:0.8;margin-bottom:2px;" id="gfWishSub">Guardian Fairy can take this hit!</div>
+  <span>🧚 WISH!</span>
+  <div id="gfWishCountdown" style="position:absolute;top:-10px;right:-10px;background:#ef4444;color:#fff;
+    border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;box-shadow:0 0 8px rgba(239,68,68,0.6);"></div>
 </div>
+<style>
+@keyframes gfPulse { 0%,100% { box-shadow:0 0 30px rgba(139,92,246,0.5); } 50% { box-shadow:0 0 50px rgba(139,92,246,0.8); } }
+</style>
 
 <!-- Eloise (85) — Change of Heart: spend 1 Ice Shard to swap HP with enemy before rolling -->
 <div class="selene-overlay" id="eloiseOverlay">
@@ -2634,7 +2636,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v783';
+const TESTROOM_VERSION = 'v784';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -5971,11 +5973,14 @@ function doTylerChoice(choice) {
 // ============================================================
 // GUARDIAN FAIRY (99) — Wish: reactive damage swap handler
 // ============================================================
+let gfWishTimer = null;
 function doGuardianFairyReactive(choice) {
   const gfp = B.guardianFairyReactivePending;
   if (!gfp) return;
   B.guardianFairyReactivePending = null;
-  document.getElementById('guardianFairyOverlay').classList.remove('active');
+  // Clear timer and hide button
+  if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+  document.getElementById('gfWishBtn').style.display = 'none';
   const { loseTeamName, gfGhost, dmg, lF, resume } = gfp;
   const loseTeam = B[loseTeamName];
   if (choice === 'yes') {
@@ -5999,6 +6004,33 @@ function doGuardianFairyReactive(choice) {
     renderBattle();
     if (resume) setTimeout(resume, 200);
   }
+}
+
+// Show GF Wish as a timed button with countdown — auto-declines on expiry
+function showGfWishButton() {
+  const gfp = B.guardianFairyReactivePending;
+  if (!gfp) return;
+  const gfG = gfp.gfGhost;
+  const gfName = gfG.name || 'Guardian Fairy';
+  const btn = document.getElementById('gfWishBtn');
+  const cdEl = document.getElementById('gfWishCountdown');
+  const subEl = document.getElementById('gfWishSub');
+  subEl.innerHTML = `${gfName} absorbs ${gfp.dmg} dmg for ${gfp.lF.name}!`;
+  btn.style.display = 'block';
+  btn.onclick = () => doGuardianFairyReactive('yes');
+  const secs = getSpecialsTimerSecs();
+  let remaining = secs;
+  cdEl.textContent = remaining;
+  narrate(`<b class="${gfp.loseTeamName}-text">🧚 ${gfName}</b> can take this hit! Click to activate!`);
+  if (gfWishTimer) clearInterval(gfWishTimer);
+  gfWishTimer = setInterval(() => {
+    remaining--;
+    cdEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(gfWishTimer); gfWishTimer = null;
+      doGuardianFairyReactive('no'); // auto-decline
+    }
+  }, 1000);
 }
 
 // ============================================================
@@ -9990,6 +10022,8 @@ function doPreRollSetup() {
       const wLabel = hasWillowActive ? '' : ' (sideline)';
       preRollCallouts.push(['JOY OF PAINTING!', 'var(--ghost-rare)', `${wName}${wLabel} — Lost last roll! +1 die!`, tNameW]);
       log(`<span class="log-ability">${wName}${wLabel}</span> — Joy of Painting! Lost last roll → +1 die!`);
+      // Knight Terror (401) / Knight Light (402) react to this ability
+      checkKnightEffects(tNameW, wName);
     }
   });
 
@@ -15887,12 +15921,8 @@ function _resolveRoundImpl() {
         if (B.guardianFairyReactivePending) {
           const gfp = B.guardianFairyReactivePending;
           gfp.resume = afterGfReactive;
-          const gfG = gfp.gfGhost;
-          const gfName = gfG.name || 'Guardian Fairy';
-          document.getElementById('guardianFairySub').innerHTML =
-            `<b>${gfName}</b> (${gfG.hp} HP) can take this ${gfp.dmg} damage hit for <b>${gfp.lF.name}</b>!<br>` +
-            `<i>Guardian Fairy swaps in and absorbs the damage. ${gfp.lF.name} goes to sideline at current HP.</i>`;
-          document.getElementById('guardianFairyOverlay').classList.add('active');
+          // v783: timed button instead of full-screen modal
+          showGfWishButton();
         } else {
           afterGfReactive();
         }
@@ -17420,7 +17450,8 @@ function clearAllOverlays() {
   document.getElementById('timberOverlay').classList.remove('active');
   document.getElementById('romyOverlay').classList.remove('active');
   document.getElementById('tobyOverlay').classList.remove('active');
-  document.getElementById('guardianFairyOverlay').classList.remove('active');
+  document.getElementById('gfWishBtn').style.display = 'none';
+  if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
   document.getElementById('tylerOverlay').classList.remove('active');
   document.getElementById('eloiseOverlay').classList.remove('active');
   document.getElementById('booOverlay').classList.remove('active');

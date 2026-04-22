@@ -1208,6 +1208,13 @@ function smartSimRounds(gameNum) {
     const hasWillowSideline = hasSideline(B[tName], 435);
     if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tName]) {
       if (tName === 'red') redCount++; else blueCount++;
+      // Knight Terror (401) / Knight Light (402) react to Joy of Painting
+      const oppK = tName === 'red' ? 'blue' : 'red';
+      const knight = active(B[oppK]);
+      if (knight && !knight.ko) {
+        if (knight.id === 401) { _wf.hp = Math.max(0, _wf.hp - 2); if (_wf.hp <= 0) { _wf.ko = true; _wf.killedBy = 401; } }
+        else if (knight.id === 402) { B.retributionDice[oppK] = (B.retributionDice[oppK] || 0) + 1; }
+      }
     }
   });
   // Haywire (78) — WILD CHORDS!: permanent +1 die bonus added every round once triggered (never consumed/cleared).

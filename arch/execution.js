@@ -1068,11 +1068,13 @@ function resolveRound(pRoll, eRoll) {
         const blockerDesc = enemy.ability === 'Stoic' ? 'Immune to singles below 6 HP!' : 'Damage negated!';
         showAbilitySplash(blockerName, blockerDesc, 1600, () => {
           narrate(`<b class="them">${enemy.name} blocked the attack!</b>`);
-          // Cameron: if damage gets negated, destroy enemy
-          if (pick.ability === 'Force of Nature') {
+          // Cameron: Unstoppable Force — damage cannot be negated, force damage through
+          if (pick.ability === 'Unstoppable Force') {
             setTimeout(() => {
-              showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
-                enemyHp = 0; updateHpDisplay(); setTimeout(enemyDefeated, 600);
+              showAbilitySplash('Unstoppable Force', 'Damage cannot be negated!', 1600, () => {
+                enemyHp -= damage; updateHpDisplay();
+                if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); }
+                else { setTimeout(nextRound, 1400); }
               }, 'playerCard');
             }, 600);
           } else {
@@ -1187,10 +1189,12 @@ function resolveRound(pRoll, eRoll) {
         const blockerDesc = pick.ability === 'Stoic' ? 'Immune to singles below 6 HP!' : 'Damage negated!';
         showAbilitySplash(blockerName, blockerDesc, 1600, () => {
           narrate(`<b class="gold">${pick.name} blocked the attack!</b>`);
-          // Cameron enemy: if their damage negated, destroy player
-          if (enemy.ability === 'Force of Nature') {
-            playerHp = 0; updateHpDisplay();
-            setTimeout(() => { narrate(`<b class="them">Force of Nature! ${pick.name} destroyed!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+          // Cameron enemy: Unstoppable Force — damage cannot be negated, force damage through
+          if (enemy.ability === 'Unstoppable Force') {
+            playerHp -= damage; updateHpDisplay();
+            if (playerHp <= 0) {
+              setTimeout(() => { narrate(`<b class="them">Unstoppable Force! ${pick.name} takes the hit!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
+            } else { setTimeout(nextRound, 1400); }
           } else {
             setTimeout(nextRound, 1400);
           }

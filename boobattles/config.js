@@ -47,7 +47,7 @@ const ABILITY_THEMES = {
   'Swift': 'lucky-strike',
   'Final Gift': 'valley-guardian',
   'Brew Time': 'fury',
-  'Force of Nature': 'beast-mode',
+  'Unstoppable Force': 'beast-mode',
   'Heinous': 'heinous',
   'Careful': 'iron-will',
   'Jinx': 'double-down',

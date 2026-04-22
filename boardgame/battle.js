@@ -758,13 +758,14 @@ function resolvePlayerWin(pRoll, eRoll, wasFirstRoll) {
       setTimeout(nextRound, 1200);
     } else if (blocked) {
       log(`Attack blocked! No damage dealt`, 'block');
-      // Cameron: Force of Nature — if damage negated, destroy
-      if (pick.ability === 'Force of Nature') {
-        showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
-          log(`Force of Nature! ${enemy.name} destroyed!`, 'ability');
-          enemyHp = 0;
+      // Cameron: Unstoppable Force — damage cannot be negated, force damage through
+      if (pick.ability === 'Unstoppable Force') {
+        showAbilitySplash('Unstoppable Force', 'Damage cannot be negated!', 1600, () => {
+          log(`Unstoppable Force! Damage goes through!`, 'ability');
+          enemyHp -= damage;
           updateHpDisplay();
-          setTimeout(enemyDefeated, 600);
+          if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); }
+          else { setTimeout(nextRound, 1000); }
         });
       } else {
         setTimeout(nextRound, 1000);
@@ -889,19 +890,20 @@ function resolveEnemyWin(pRoll, eRoll, wasFirstRoll) {
       else setTimeout(nextRound, 1200);
     } else if (blocked) {
       log(`Attack blocked!`, 'block');
-      // Cameron (enemy): Force of Nature
-      if (enemy.ability === 'Force of Nature') {
-        log(`${enemy.name} — Force of Nature! Damage negated — you're destroyed!`, 'enemy-ability');
-        playerHp = 0;
-        updateHpDisplay();
-        setTimeout(playerDefeated, 800);
+      // Cameron (enemy): Unstoppable Force — damage cannot be negated
+      if (enemy.ability === 'Unstoppable Force') {
+        log(`${enemy.name} — Unstoppable Force! Damage goes through!`, 'enemy-ability');
+        playerHp -= damage; updateHpDisplay();
+        if (playerHp <= 0) { setTimeout(playerDefeated, 800); }
+        else { setTimeout(nextRound, 1200); }
       } else {
-        // Cameron (player): our damage was negated — destroy enemy
-        if (pick.ability === 'Force of Nature' && !reflected) {
-          showAbilitySplash('Force of Nature', 'Damage negated — enemy destroyed!', 1600, () => {
-            log(`Force of Nature! ${enemy.name} destroyed!`, 'ability');
-            enemyHp = 0; updateHpDisplay();
-            setTimeout(enemyDefeated, 600);
+        // Cameron (player): damage cannot be negated — force damage through
+        if (pick.ability === 'Unstoppable Force' && !reflected) {
+          showAbilitySplash('Unstoppable Force', 'Damage cannot be negated!', 1600, () => {
+            log(`Unstoppable Force! Damage goes through!`, 'ability');
+            enemyHp -= damage; updateHpDisplay();
+            if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); }
+            else { setTimeout(nextRound, 1000); }
           });
         } else {
           setTimeout(nextRound, 1000);
