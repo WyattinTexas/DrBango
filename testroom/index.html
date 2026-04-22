@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v777'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v778'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2634,7 +2634,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v777';
+const TESTROOM_VERSION = 'v778';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -16963,7 +16963,8 @@ function pickThrowProfile(count) {
   const noise = () => 1 + (Math.random() - 0.5) * 0.25; // ±12.5% variation
   return Array.from({ length: count }, (_, i) => {
     const v = profile(i, count);
-    return { vx: v.vx * noise(), vy: v.vy * noise() };
+    // 15% velocity boost for more energetic throws
+    return { vx: v.vx * noise() * 1.15, vy: v.vy * noise() * 1.15 };
   });
 }
 
@@ -17089,15 +17090,29 @@ function showRolling(team, count) {
       vx: (isRed ? 1 : -1) * tv.vx,
       vy: tv.vy,
       rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
-      vrx: (Math.random() - 0.5) * 35,
-      vry: (Math.random() - 0.5) * 35,
-      vrz: (Math.random() - 0.5) * 22
+      vrx: (Math.random() - 0.5) * 55,   // cranked tumble
+      vry: (Math.random() - 0.5) * 55,
+      vrz: (Math.random() - 0.5) * 40,
+      bounceCount: 0  // tracks wall hits for decaying bounce coefficient
     });
   }
 
-  const bounce = 0.55;
-  const friction = 0.978;
-  const rotFric = 0.968;
+  // Per-die decaying bounce: starts at 0.65, each hit multiplies by 0.8, floor at 0.3
+  function getBounceCoeff(d) {
+    return Math.max(0.3, 0.65 * Math.pow(0.8, d.bounceCount));
+  }
+  // Speed-dependent surface friction — fast dice slide, slow dice stick
+  function getSurfaceFriction(speed) {
+    if (speed > 8) return 0.982;   // fast: ice-smooth
+    if (speed > 3) return 0.965;   // medium: felt drag
+    return 0.935;                   // slow: table grip, dice stop decisively
+  }
+  // Speed-dependent rotation friction
+  function getRotFriction(speed) {
+    if (speed > 8) return 0.972;
+    if (speed > 3) return 0.950;
+    return 0.920;                   // slow: rotation dies fast
+  }
 
   function step() {
     // Dice-to-dice repulsion (prevents stacking)
@@ -17117,16 +17132,38 @@ function showRolling(team, count) {
     dice.forEach(d => {
       d.x += d.vx; d.y += d.vy;
       d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
-      // Wall bounces
-      if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx) * bounce; d.vry *= 0.6; }
-      if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx) * bounce; d.vry *= 0.6; }
-      if (d.y < minY) { d.y = minY; d.vy = Math.abs(d.vy) * bounce; d.vrx *= 0.6; }
-      if (d.y > maxY) { d.y = maxY; d.vy = -Math.abs(d.vy) * bounce; d.vrx *= 0.6; }
-      // Friction
-      d.vx *= friction; d.vy *= friction;
-      d.vrx *= rotFric; d.vry *= rotFric; d.vrz *= rotFric;
-      // Rotation homing — as dice slow down, settle onto nearest face (like gravity)
       const speed = Math.abs(d.vx) + Math.abs(d.vy);
+
+      // Wall bounces — decaying coefficient + rotation spike on impact
+      const bc = getBounceCoeff(d);
+      if (d.x < minX) {
+        d.x = minX; d.vx = Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3; // wall clatter — spin spikes on impact
+        d.bounceCount++;
+      }
+      if (d.x > maxX) {
+        d.x = maxX; d.vx = -Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y < minY) {
+        d.y = minY; d.vy = Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y > maxY) {
+        d.y = maxY; d.vy = -Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+
+      // Speed-dependent surface friction
+      const fric = getSurfaceFriction(speed);
+      const rFric = getRotFriction(speed);
+      d.vx *= fric; d.vy *= fric;
+      d.vrx *= rFric; d.vry *= rFric; d.vrz *= rFric;
+
+      // Rotation homing — as dice slow down, settle onto nearest face (like gravity)
       if (speed < 6) {
         const strength = 0.08 * (1 - speed / 6);
         d.rx += (Math.round(d.rx / 90) * 90 - d.rx) * strength;
