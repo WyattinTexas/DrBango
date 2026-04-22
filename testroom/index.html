@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v787'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v788'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -375,7 +375,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   flex:1; display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center;
   min-width:0;
 }
-.team-battle-row { display:flex; gap:24px; align-items:center; justify-content:center; }
+.team-battle-row { display:flex; gap:12px; align-items:center; justify-content:center; }
 .sideline-stack { display:flex; flex-direction:column; gap:6px; }
 
 /* Center column */
@@ -1686,10 +1686,17 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   .vs-inner { gap:20px; }
   .triples-banner { font-size:3rem; letter-spacing:3px; }
 }
+/* Laptop: sideline cards overlap center when viewport < 1300px */
+@media (min-width:1121px) and (max-width:1300px) {
+  .fighter-slot { width:200px; }
+  .sideline-slot { width:120px; }
+  .team-battle-row { gap:8px; }
+}
 /* Tablet: 3-column horizontal layout but cards too wide to fit team columns */
 @media (min-width:901px) and (max-width:1120px) {
   .fighter-slot { width:180px; }
   .sideline-slot { width:100px; }
+  .team-battle-row { gap:6px; }
   .fighter-slot .card-name-banner { font-size:13px; padding:6px 8px; }
 }
 /* Mobile portrait: compact everything for ~375px */
@@ -1729,6 +1736,21 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   header h1 { font-size:20px; }
   header .sub { font-size:11px; }
   /* ability-splash-name / desc removed (v407) — element is now display:none */
+}
+/* Lite Mode — kill infinite animations for low-end devices */
+body.lite-mode *, body.lite-mode *::before, body.lite-mode *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.1s !important;
+}
+body.lite-mode .mote { display: none !important; }
+body.lite-mode .die.rolling { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  body *, body *::before, body *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+  }
+  .mote { display: none !important; }
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -1840,6 +1862,10 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Show a Skip button during Moonstone/Lucky Stone windows">
           <input type="checkbox" id="skipBtnCheckbox" style="accent-color:#22d3ee;cursor:pointer;" onchange="localStorage.setItem('tr_skipBtn',this.checked?'1':'0')">
           <span>Skip Btn</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Reduce animations for better performance on slower devices">
+          <input type="checkbox" id="liteModeCheckbox" style="accent-color:#22d3ee;cursor:pointer;" onchange="toggleLiteMode(this.checked)">
+          <span>Lite Mode</span>
         </label>
         <label id="handLimitToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Limit specials + items per team. Must discard when over.">
           <input type="checkbox" id="handLimitCheckbox" checked style="accent-color:#f59e0b;cursor:pointer;" onchange="document.getElementById('handLimitSlider').style.opacity=this.checked?'1':'0.35';localStorage.setItem('tr_handLimit',this.checked?'1':'0')">
@@ -2626,6 +2652,8 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   if (sb !== null) { document.getElementById('skipBtnCheckbox').checked = sb === '1'; }
   const st = localStorage.getItem('tr_specialsTimer');
   if (st !== null) { document.getElementById('specialsTimerSlider').value = st; }
+  const lm = localStorage.getItem('tr_liteMode');
+  if (lm === '1') { document.getElementById('liteModeCheckbox').checked = true; document.body.classList.add('lite-mode'); }
   // Sync visual state
   const cb = document.getElementById('handLimitCheckbox');
   document.getElementById('handLimitSlider').style.opacity = cb.checked ? '1' : '0.35';
@@ -2638,7 +2666,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v787';
+const TESTROOM_VERSION = 'v788';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2662,6 +2690,12 @@ function getSpeedDivisor() { return SPEED_DIVISORS[parseInt(document.getElementB
 function spd(ms) { return Math.max(1, Math.round(ms / getSpeedDivisor())); }
 function updateSpeedLabel() { document.getElementById('speedLabel').textContent = 'Speed: ' + SPEED_LABELS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
 function getSpecialsTimerSecs() { return parseInt(document.getElementById('specialsTimerSlider')?.value) || 5; }
+
+// Lite Mode — reduce animations for better performance on slower devices
+function toggleLiteMode(on) {
+  document.body.classList.toggle('lite-mode', on);
+  localStorage.setItem('tr_liteMode', on ? '1' : '0');
+}
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
@@ -13202,7 +13236,9 @@ function _resolveRoundImpl() {
     const tylerWins = wF.id === 105 && !wF.ko;
     const perFire = tylerWins ? 6 : 3;
     // Lucy's Shadow (439) — Mentor: doubles Sacred Fire damage when Lucy (108) is active winner
-    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439)) ? 2 : 1;
+    // Cornelius (45) Antidote blocks Lucy's Shadow sideline effect
+    const corneliusBlocksLucyShadowDmg = hasSideline(loseTeam, 45);
+    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowDmg) ? 2 : 1;
     const fireDmg = B.committed[winTeamName].fire * perFire * lucyShadowBoost;
     dmg += fireDmg;
     if (tylerWins) {
@@ -13370,9 +13406,14 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Blue Fire! Gain <span class="log-ms">1 Sacred Fire</span>!`);
     // Lucy's Shadow (439) — Mentor: +1 extra Sacred Fire when Lucy wins
-    if (hasSideline(winTeam, 439)) {
+    // Cornelius (45) Antidote blocks Lucy's Shadow sideline effect
+    const corneliusBlocksLucyShadowFire = hasSideline(loseTeam, 45);
+    if (hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowFire) {
       lucyShadowExtraFire = true;
       log(`<span class="log-ability">Lucy's Shadow</span> — Mentor! +1 extra Sacred Fire!`);
+    } else if (hasSideline(winTeam, 439) && corneliusBlocksLucyShadowFire) {
+      const cornGhostLS = getSidelineGhost(loseTeam, 45);
+      log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Lucy's Shadow Mentor blocked!`);
     }
   }
 
@@ -14629,7 +14670,9 @@ function _resolveRoundImpl() {
   // On-KO triggers (game state) — resource grants deferred to BEDTIME STORY!/BITTER END! onShow
   let powderFinalGiftTriggered = false;
   if (lF.ko) {
-    if (hasSideline(loseTeam, 310)) {
+    // Cornelius (45) Antidote blocks Granny's sideline Bedtime Story
+    const corneliusBlocksGrannyLose = hasSideline(winTeam, 45);
+    if (hasSideline(loseTeam, 310) && !corneliusBlocksGrannyLose) {
       const grannyGhost = getSidelineGhost(loseTeam, 310);
       collectKC(loseTeamName, 'Granny', grannyGhost);
     }
@@ -14643,7 +14686,8 @@ function _resolveRoundImpl() {
   }
 
   // Granny Bedtime Story fires for the WINNER's team too when the winner self-KOs (Pudge Belly Flop)
-  if (wF.ko && hasSideline(winTeam, 310)) {
+  const corneliusBlocksGrannyWin = hasSideline(loseTeam, 45);
+  if (wF.ko && hasSideline(winTeam, 310) && !corneliusBlocksGrannyWin) {
     const grannyGhost = getSidelineGhost(winTeam, 310);
     collectKC(winTeamName, 'Granny', grannyGhost);
   }
@@ -15300,7 +15344,7 @@ function _resolveRoundImpl() {
   if (lF.id === 404 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }, winTeamName);
   // On-KO callouts — onShow applies the Granny resource grant with the splash
   if (lF.ko) {
-    if (hasSideline(loseTeam, 310)) {
+    if (hasSideline(loseTeam, 310) && !corneliusBlocksGrannyLose) {
       if (wR.type === 'singles') {
         queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 3 Lucky Stones!`, () => { loseTeam.resources.luckyStone += 3; creditGhost(loseTeamName, 310, 'ls', 3); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Lucky Stones! (${winTeam.resources.luckyStone + 3} total)`, () => { winTeam.resources.luckyStone += 3; renderBattle(); }, winTeamName);
@@ -15311,12 +15355,16 @@ function _resolveRoundImpl() {
         queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → 3 Sacred Fires!`, () => { loseTeam.resources.fire += 3; creditGhost(loseTeamName, 310, 'fire', 3); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Sacred Fires! (${winTeam.resources.fire + 3} total)`, () => { winTeam.resources.fire += 3; renderBattle(); }, winTeamName);
       }
+    } else if (hasSideline(loseTeam, 310) && corneliusBlocksGrannyLose) {
+      const cornGhostGrL = getSidelineGhost(winTeam, 45);
+      queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostGrL ? cornGhostGrL.name : 'Cornelius'} blocks Granny's Bedtime Story!`, null, winTeamName);
+      log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Granny Bedtime Story blocked!`);
     }
     if (lF.id === 404) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }, loseTeamName); }
     if (lF.id === 404 && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End (KO)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }, winTeamName);
   }
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
-  if (wF.ko && hasSideline(winTeam, 310)) {
+  if (wF.ko && hasSideline(winTeam, 310) && !corneliusBlocksGrannyWin) {
     if (wR.type === 'singles') {
       queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 3 Lucky Stones!`, () => { winTeam.resources.luckyStone += 3; creditGhost(winTeamName, 310, 'ls', 3); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Lucky Stones! (${loseTeam.resources.luckyStone + 3} total)`, () => { loseTeam.resources.luckyStone += 3; renderBattle(); }, loseTeamName);
@@ -15327,6 +15375,10 @@ function _resolveRoundImpl() {
       queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → 3 Sacred Fires!`, () => { winTeam.resources.fire += 3; creditGhost(winTeamName, 310, 'fire', 3); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Sacred Fires! (${loseTeam.resources.fire + 3} total)`, () => { loseTeam.resources.fire += 3; renderBattle(); }, loseTeamName);
     }
+  } else if (wF.ko && hasSideline(winTeam, 310) && corneliusBlocksGrannyWin) {
+    const cornGhostGrW = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostGrW ? cornGhostGrW.name : 'Cornelius'} blocks Granny's Bedtime Story!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Granny Bedtime Story blocked!`);
   }
 
   // Powder (23) — Final Gift: KO'd → loseTeam gains 3 Ice Shards (onShow deferred for visual sync)
@@ -15417,12 +15469,18 @@ function _resolveRoundImpl() {
   }
 
   // Nyx & Bessie (415) — Moo! Caw!: sideline KO → 3 Healing Seeds
-  if (hasSideline(winTeam, 415) && !wF.ko && lF.ko) {
+  // Cornelius (45) Antidote blocks Nyx & Bessie's sideline effect
+  const corneliusBlocksNyx = hasSideline(loseTeam, 45);
+  if (hasSideline(winTeam, 415) && !wF.ko && lF.ko && !corneliusBlocksNyx) {
     const nyxG = getSidelineGhost(winTeam, 415);
     const nyxName = nyxG ? nyxG.name : 'Nyx & Bessie';
     queueAbility('MOO! CAW!', 'var(--uncommon)', `${nyxName} (sideline) — KO! +4 Healing Seeds!`, () => { winTeam.resources.healingSeed += 4; renderBattle(); }, winTeamName);
     log(`<span class="log-ability">${nyxName}</span> — Moo! Caw! KO → <span class="log-heal">+4 Healing Seeds!</span>`);
     checkKnightEffects(winTeamName, wF.name);
+  } else if (hasSideline(winTeam, 415) && !wF.ko && lF.ko && corneliusBlocksNyx) {
+    const cornGhostNyx = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostNyx ? cornGhostNyx.name : 'Cornelius'} blocks Nyx & Bessie's Moo! Caw!!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Nyx & Bessie Moo! Caw! blocked!`);
   }
 
   // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite
