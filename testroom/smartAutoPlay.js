@@ -727,6 +727,12 @@ function smartSimRounds(gameNum) {
     if (f.id === 414 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
       B[teamKey].resources.healingSeed--;
       B.chowExtraDie[teamKey] = 2;
+      // Cameron (25) — opponent used a special (Healing Seed)
+      const oppK = teamKey === 'red' ? 'blue' : 'red';
+      if (B[oppK].ghosts.some(g => g.id === 25 && !g.ko)) {
+        if (!B.cameronBonusDice) B.cameronBonusDice = {red:0,blue:0};
+        B.cameronBonusDice[oppK]++;
+      }
     }
   });
 
@@ -752,6 +758,12 @@ function smartSimRounds(gameNum) {
       if (!f.youngCapDieBonus) f.youngCapDieBonus = 0;
       f.youngCapDieBonus++;
       B[teamKey].resources.ice++;
+      // Cameron (25) — opponent used a special (Healing Seed via Young Cap)
+      const oppK = teamKey === 'red' ? 'blue' : 'red';
+      if (B[oppK].ghosts.some(g => g.id === 25 && !g.ko)) {
+        if (!B.cameronBonusDice) B.cameronBonusDice = {red:0,blue:0};
+        B.cameronBonusDice[oppK]++;
+      }
       B[teamKey].resources.surge++;
       // Boopies (419) sideline mirror
       if (hasSideline(B[teamKey], 419)) B[teamKey].resources.luckyStone++;

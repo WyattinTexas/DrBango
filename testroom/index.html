@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v779'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v780'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2634,7 +2634,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v779';
+const TESTROOM_VERSION = 'v780';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -4097,7 +4097,7 @@ const CURATED_TEAMS = [
   [6, 7, 63],
   // #49 Chaos Reroll — Jackson removes HP to reroll dice, Sonya changes die to 2, Dealer numeric order negates damage
   [50, 69, 37],
-  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron negated damage destroys enemy, Masked Hero punishes before-roll effects
+  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron gains dice from enemy specials + damage can't be negated, Masked Hero punishes before-roll effects
   [4, 25, 55],
 
   // ===================== NEW WAVE (25 teams) =====================
@@ -12635,7 +12635,9 @@ function _resolveRoundImpl() {
   if (winner !== null && !sylviaResuming && !B.sylviaPendingResult) {
     const loserTeamName = winner === 'red' ? 'blue' : 'red';
     const loserF = active(B[loserTeamName]);
-    if (loserF && loserF.id === 313 && !loserF.ko) {
+    // Cameron (25) — Unstoppable Force: skip Sylvia's dodge modal when Cameron is the winner
+    const winnerF = active(B[winner]);
+    if (loserF && loserF.id === 313 && !loserF.ko && !(winnerF && winnerF.id === 25 && !winnerF.ko)) {
       showSylviaModal(loserTeamName, () => {
         B.sylviaResuming = true;
         resolveRound();
@@ -13598,7 +13600,7 @@ function _resolveRoundImpl() {
   // (where abilityQueueMode=true) to prevent them firing synchronously and being stomped.
   let sylviaDodged = false;
   let sylviaDodgeRolls = []; // store for callout (array form for back-compat with callout)
-  if (lF.id === 313 && !lF.ko) {
+  if (lF.id === 313 && !lF.ko && !cameronUnnegatable) {
     let rolledValue;
     if (B.sylviaPendingResult && typeof B.sylviaPendingResult.value === 'number') {
       rolledValue = B.sylviaPendingResult.value;
