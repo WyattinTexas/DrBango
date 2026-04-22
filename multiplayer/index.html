@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.56'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.57'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2725,7 +2725,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.56';
+const BBN_VERSION = 'v0.57';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -3526,17 +3526,19 @@ async function selectTarget(uid) {
       name: userData.displayName || 'Unknown',
       elo: userData.stats?.elo || 1000,
       team: validTeam.slice(0, 3),
-      championCount: userData.championCount || 0
+      championCount: userData.championCount || 0,
+      badgeCount: (userData.dailyBadges || []).length
     };
 
     // Show target preview
     const preview = document.getElementById('target-preview');
     document.getElementById('target-name').textContent = `VS ${selectedTarget.name}`;
     const champCount = selectedTarget.championCount;
-    const champBadgeStr = champCount > 0
-      ? `  ${selectedTarget.elo} Elo  ·  👑 ${champCount}x Daily Champion`
-      : `  ${selectedTarget.elo} Elo`;
-    document.getElementById('target-elo').innerHTML = champBadgeStr;
+    const badgeCount = selectedTarget.badgeCount;
+    let statParts = [`${selectedTarget.elo} Elo`];
+    if (champCount > 0) statParts.push(`👑 ${champCount}x Champion`);
+    if (badgeCount > 0) statParts.push(`🛡️ ${badgeCount} Badge${badgeCount !== 1 ? 's' : ''}`);
+    document.getElementById('target-elo').innerHTML = '  ' + statParts.join('  ·  ');
 
     // Show opponent's team (art + name only — no abilities)
     document.getElementById('target-team').innerHTML = selectedTarget.team.map(id => {
@@ -5588,6 +5590,9 @@ async function processChampionResult(result) {
   if (!currentChampion || currentChampion.date !== dateKey) return;
 
   if (result === 'win') {
+    // Save type before claimChampion overwrites currentChampion
+    const wasRival = currentChampion && currentChampion.type === 'rival';
+
     // Player beat the champion — they become the new champion!
     const filledTeam = userProfile.currentTeam || team.filter(id => id !== null);
     await claimChampion(
@@ -5597,6 +5602,43 @@ async function processChampionResult(result) {
       filledTeam
     );
     showToast('👑 You are the new Champion of the Day!');
+
+    // If the champion WAS the rival, also grant daily badge + mark daily as won
+    // (so you don't have to beat the rival twice — once as champion, once as daily)
+    if (wasRival) {
+      const daily = getDailyTeam();
+      const ref = db.ref(`mp/users/${currentUser.uid}`);
+      await ref.update({ dailyChallengeWon: true, dailyChallengeDate: dateKey });
+      if (daily.badge) {
+        const dailyBadges = userProfile.dailyBadges || [];
+        if (!dailyBadges.includes(daily.badge)) {
+          dailyBadges.push(daily.badge);
+          await ref.child('dailyBadges').set(dailyBadges);
+          userProfile.dailyBadges = dailyBadges;
+          showToast(`Badge earned: ${daily.name}`);
+          if (currentUser) delete _lbBadgeCache[currentUser.uid];
+        }
+      }
+      // Grant bonus cards (same as daily win)
+      const bonusCards = generateDailyPack();
+      const rivalTeam = daily.team || [];
+      if (rivalTeam.length > 0) {
+        const rivalId = rivalTeam[Math.floor(Math.random() * rivalTeam.length)];
+        const rivalGhost = getGhost(rivalId);
+        if (rivalGhost) bonusCards[0] = rivalGhost;
+      }
+      const newIds = bonusCards.map(g => g.id);
+      const updatedCollection = [...(userProfile.collection || []), ...newIds];
+      await ref.child('collection').set(updatedCollection);
+      userProfile.dailyChallengeWon = true;
+      userProfile.dailyChallengeDate = dateKey;
+      userProfile.collection = updatedCollection;
+      showRewardCards(bonusCards, 'Champion & Rival Defeated!', () => {
+        renderDailyChallenge();
+        renderCollection();
+        db.ref('mp/leaderboard').once('value', snap => renderLeaderboard(snap.val()));
+      });
+    }
   } else {
     // Champion defended
     if (currentChampion.type === 'player') {
