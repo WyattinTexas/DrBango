@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v795'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v796'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1677,9 +1677,12 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   .team-column { width:100%; }
   .arena-center { min-width:auto; width:100%; }
   .ghost-grid { grid-template-columns:1fr; }
-  .team-battle-row { flex-wrap:nowrap; justify-content:center; }
+  /* Stack fighter + sidelines vertically on mobile */
+  .team-battle-row { flex-direction:column; align-items:center; gap:8px; }
+  .sideline-stack { flex-direction:row; gap:8px; }
+  .fighter-slot { width:200px; margin-left:0; margin-right:0; }
+  .sideline-slot { width:90px; }
   .die { width:44px; height:44px; font-size:20px; }
-  .fighter-slot { margin-left:10px; margin-right:10px; }
   .narrator-inner { font-size:12px; padding:8px 12px; min-height:30px; }
   .log-wrap { max-height:120px !important; }
   /* ability-splash-name / desc removed (v407) — element is now display:none */
@@ -1707,11 +1710,10 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 }
 /* Mobile portrait: compact everything for ~375px */
 @media (max-width:440px) {
-  .app { padding:10px; }
-  .arena-board { padding:8px; gap:6px; scroll-snap-type:y proximity; max-height:100dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  .team-column, .arena-center { scroll-snap-align:start; }
-  .fighter-slot { width:150px; margin-left:6px; margin-right:6px; }
-  .sideline-slot { width:80px; }
+  .app { padding:6px; }
+  .arena-board { padding:6px; gap:4px; }
+  .fighter-slot { width:55vw; max-width:200px; margin:0; }
+  .sideline-slot { width:22vw; max-width:90px; }
   .sideline-slot .card-img, .sideline-slot .card-img-placeholder { aspect-ratio:1; }
   .sideline-slot .ability-banner { font-size:8px; padding:2px 4px; }
   .sideline-slot .card-name-banner { font-size:10px; padding:4px 5px; }
@@ -1745,14 +1747,28 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   header .sub { font-size:11px; }
   /* ability-splash-name / desc removed (v407) — element is now display:none */
 }
-/* Landscape: restore horizontal layout */
+/* Landscape mobile: side-by-side teams, compact cards, scrollable */
 @media (max-height:500px) and (orientation:landscape) {
-  .arena-board { flex-direction:row !important; max-height:100dvh; overflow-y:auto; align-items:flex-start; }
-  .team-column { width:auto; flex:1; }
-  .arena-center { min-width:160px; }
-  .fighter-slot { width:120px; margin:4px; }
-  .sideline-slot { width:70px; }
-  .die { width:40px; height:40px; font-size:18px; }
+  .arena-board { flex-direction:row !important; max-height:100dvh; overflow-y:auto; align-items:stretch; padding:6px; gap:6px; }
+  .team-column { width:auto; flex:1; min-width:0; gap:4px; }
+  /* Revert to horizontal row in landscape — enough width for fighter + sidelines */
+  .team-battle-row { flex-direction:row; gap:4px; }
+  .sideline-stack { flex-direction:column; gap:4px; }
+  .arena-center { min-width:80px; max-width:120px; gap:4px; }
+  .fighter-slot { width:100px; margin:0; }
+  .sideline-slot { width:56px; }
+  .die { width:36px; height:36px; font-size:16px; }
+  .dice-row { gap:2px; }
+  .team-roll { padding:6px 10px; font-size:11px; }
+  .ability-btn { padding:3px 6px; font-size:10px; }
+  .hp-bar-wrap { max-width:160px; }
+  .res-tile { width:30px; height:36px; }
+  .res-tile .res-main { font-size:13px; }
+  .res-tile .res-main img { width:16px; height:16px; }
+  .res-tile .res-count { font-size:9px; }
+  .res-tile .res-label { font-size:6px; }
+  .narrator-inner { font-size:10px; padding:4px 8px; min-height:20px; }
+  .turn-indicator { font-size:12px !important; }
 }
 /* Lite Mode — kill infinite animations for low-end devices */
 body.lite-mode *, body.lite-mode *::before, body.lite-mode *::after {
@@ -2705,7 +2721,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v795';
+const TESTROOM_VERSION = 'v796';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
