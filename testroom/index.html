@@ -6214,34 +6214,27 @@ function doBonzaiChoice(choice) {
 }
 
 // ============================================================
-// CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire
+// CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 2 Sacred Fire (pre-roll button)
 // ============================================================
-function doCultivateChoice(choice) {
-  const cp = B.cultivatePending;
-  if (!cp) return;
-  B.cultivatePending = null;
-  document.getElementById('cultivateOverlay').classList.remove('active');
-  const { team, btn } = cp;
+function useCultivate(team) {
   const f = active(B[team]);
-  if (choice === 'yes' && f && f.id === 442 && !f.ko && B[team].resources.healingSeed >= 1) {
-    B[team].resources.healingSeed--;
-    B[team].resources.fire = (B[team].resources.fire || 0) + 2;
-    // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
-    if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
-    showAbilityCallout('CULTIVATE!', 'var(--uncommon)',
-      `${f.name} — discarded 1 Healing Seed → +2 Sacred Fire!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Cultivate! Discarded 1 Healing Seed → +2 Sacred Fire!`);
-    renderBattle();
-    // If more seeds available, re-offer (repeatable)
-    if (B[team].resources.healingSeed >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
-    } else {
-      B.cultivateDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
-    }
-  } else {
-    B.cultivateDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+  if (!f || f.id !== 442 || f.ko) return;
+  if (!B[team].resources || B[team].resources.healingSeed < 1) return;
+  B[team].resources.healingSeed--;
+  B[team].resources.fire = (B[team].resources.fire || 0) + 2;
+  // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
+  if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
+  showAbilityCallout('CULTIVATE!', 'var(--uncommon)',
+    `${f.name} — discarded 1 Healing Seed → +2 Sacred Fire!`, team);
+  log(`<span class="log-ability">${f.name}</span> — Cultivate! Discarded 1 Healing Seed → +2 Sacred Fire!`);
+  renderBattle();
+}
+// Legacy wrapper for old overlay (no longer used)
+function doCultivateChoice(choice) {
+  document.getElementById('cultivateOverlay').classList.remove('active');
+  if (choice === 'yes') {
+    const cp = B.cultivatePending;
+    if (cp) { B.cultivatePending = null; useCultivate(cp.team); }
   }
 }
 
@@ -8061,24 +8054,7 @@ function rollReady(team) {
 
     // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
-    // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 2 Sacred Fire (interactive button)
-    {
-      const cultG = active(B[team]);
-      if (cultG && cultG.id === 442 && !cultG.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
-          B[team].resources && B[team].resources.healingSeed >= 1) {
-        btn.classList.add('locked');
-        btn.disabled = true;
-        B.cultivatePending = { team, btn };
-        const cultDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-        setTimeout(() => {
-          document.getElementById('cultivateSub').innerHTML =
-            `Discard 1 🌱 Healing Seed for 2 🔥 Sacred Fire?<br>` +
-            `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
-          document.getElementById('cultivateOverlay').classList.add('active');
-        }, cultDelay);
-        return;
-      }
-    }
+    // Castle Gardener (442) — Cultivate: now handled by pre-roll ability button (useCultivate)
 
     // Forest Spirit (446) — Hex: now handled by pre-roll button (useHex)
 
@@ -8528,17 +8504,7 @@ function openDuelPhasePrimers(team) {
 
   // — Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
-  // — CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (Duel Phase)
-  if (f.id === 442 && !f.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
-      B[team].resources && B[team].resources.healingSeed >= 1) {
-    disableDone();
-    B.cultivatePending = { team, btn: doneBtn };
-    document.getElementById('cultivateSub').innerHTML =
-      `Discard 1 🌱 Healing Seed for 1 🔥 Sacred Fire?<br>` +
-      `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
-    document.getElementById('cultivateOverlay').classList.add('active');
-    return true;
-  }
+  // — CASTLE GARDENER (442) — Cultivate: now handled by pre-roll ability button (useCultivate)
 
   // — FOREST SPIRIT (446) — Hex: now handled by pre-roll button (useHex)
 
@@ -16993,6 +16959,10 @@ function renderBattle() {
       // Miyoshi (454) — Bonzai!: pre-roll button to sacrifice HP for dice
       if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
         html += `<button class="ability-btn pressure" onclick="useBonzaiButton('${team}')" style="border-color:#dc2626;color:#dc2626;font-weight:bold;">⚡ BONZAI! (−4 HP, +5 dice)</button>`;
+      }
+      // Castle Gardener (442) — Cultivate: pre-roll button to trade seeds for fire
+      if (f.id === 442 && !f.ko && B[team].resources && B[team].resources.healingSeed >= 1) {
+        html += `<button class="ability-btn pressure" onclick="useCultivate('${team}')" style="border-color:#40916c;color:#40916c;font-weight:bold;">🌱 CULTIVATE! (1 Seed → 2 Sacred Fire)</button>`;
       }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
     }

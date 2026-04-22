@@ -742,7 +742,7 @@ function smartSimRounds(gameNum) {
     if (f.id === 442 && !f.ko && B[teamKey].resources.healingSeed >= 1) {
       const seeds = B[teamKey].resources.healingSeed;
       B[teamKey].resources.healingSeed = 0;
-      B[teamKey].resources.fire = (B[teamKey].resources.fire || 0) + seeds;
+      B[teamKey].resources.fire = (B[teamKey].resources.fire || 0) + (seeds * 2);
       // Boopies (419) sideline mirror
       if (hasSideline(B[teamKey], 419)) B[teamKey].resources.luckyStone = (B[teamKey].resources.luckyStone || 0) + seeds;
     }
