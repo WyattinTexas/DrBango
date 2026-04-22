@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.60'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.61'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2725,7 +2725,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.60';
+const BBN_VERSION = 'v0.61';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6176,15 +6176,22 @@ async function viewCollection(uid, name) {
     targetUid: uid,
     targetName: name || 'Player',
     targetCollection: [],
+    targetChampionCount: 0,
+    targetBadgeCount: 0,
     requesting: null,
     offering: null,
     step: 'pick-theirs'
   };
 
-  // Fetch their collection
-  const snap = await db.ref(`mp/users/${uid}/collection`).once('value');
-  const coll = snap.val() || [];
-  tradeState.targetCollection = coll;
+  // Fetch their collection, champion count, and badges in parallel
+  const [collSnap, champSnap, badgeSnap] = await Promise.all([
+    db.ref(`mp/users/${uid}/collection`).once('value'),
+    db.ref(`mp/users/${uid}/championCount`).once('value'),
+    db.ref(`mp/users/${uid}/dailyBadges`).once('value')
+  ]);
+  tradeState.targetCollection = collSnap.val() || [];
+  tradeState.targetChampionCount = champSnap.val() || 0;
+  tradeState.targetBadgeCount = (badgeSnap.val() || []).length;
 
   renderTradeModal();
   document.getElementById('trade-modal').classList.add('active');
@@ -6201,8 +6208,11 @@ function renderTradeModal() {
     const rarityOrder = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
     ghosts.sort((a, b) => (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0));
 
+    const champStat = tradeState.targetChampionCount > 0 ? `<span style="margin-right:12px;">👑 ${tradeState.targetChampionCount}x Champion</span>` : '';
+    const badgeStat = `<span>🛡️ ${tradeState.targetBadgeCount} Badge${tradeState.targetBadgeCount !== 1 ? 's' : ''}</span>`;
     modal.innerHTML = `
       <h3>${tradeState.targetName}'s Collection</h3>
+      <div style="color:var(--text2);font-size:0.85rem;margin-bottom:8px;">${champStat}${badgeStat}</div>
       <p style="color:var(--text2);font-size:0.85rem;margin-bottom:12px;">Pick a card you want:</p>
       <div class="trade-grid">
         ${ghosts.map(g => `
