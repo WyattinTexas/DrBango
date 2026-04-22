@@ -5397,16 +5397,17 @@ function doPreRollSetup() {
   });
 
   // Marcus (57) — Glacial Pounding: consume bonus dice from last round's big hit (applied last so it can't be stolen by Outlaw)
+  // Bonus goes to the PLAYER — whoever is active gets the dice, even if Marcus died from the hit
   [B.red, B.blue].forEach(team => {
     const tName = team === B.red ? 'red' : 'blue';
     if (B.marcusGlacialBonus && B.marcusGlacialBonus[tName] > 0) {
-      const marF = active(team);
-      if (marF && marF.id === 57 && !marF.ko) {
+      const curF = active(team);
+      if (curF && !curF.ko) {
         const bonus = B.marcusGlacialBonus[tName];
         if (tName === 'red') redCount += bonus;
         else blueCount += bonus;
-        preRollCallouts.push(['GLACIAL POUNDING!', 'var(--uncommon)', `${marF.name} — Took a big hit! +${bonus} bonus dice this roll!`, tName]);
-        log(`<span class="log-ability">${marF.name}</span> — Glacial Pounding! +${bonus} bonus dice from last round's big hit!`);
+        preRollCallouts.push(['GLACIAL POUNDING!', 'var(--uncommon)', `Marcus's revenge! ${curF.name} gets +${bonus} bonus dice!`, tName]);
+        log(`<span class="log-ability">Marcus</span> — Glacial Pounding! ${curF.name} gets +${bonus} bonus dice from last round's big hit!`);
       }
       B.marcusGlacialBonus[tName] = 0;
     }
@@ -8961,10 +8962,11 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Wreckage! Took ${dmg} damage → ${wF.name} loses 1 die next roll!`);
   }
 
-  // Marcus (57) — Glacial Pounding: if Marcus (loser) took 3+ real damage and survived, he gains +4 bonus dice next roll
+  // Marcus (57) — Glacial Pounding: if Marcus (loser) took 3+ real damage, the PLAYER gains +4 bonus dice next roll
+  // Fires even if Marcus dies from the hit — the bonus carries to whoever comes in next
   // Must fire AFTER all defensive mods (Stoic, Bogus, King Jay, GF) so dmg reflects what actually landed on lF
   let marcusGlacialTriggered = false;
-  if (lF.id === 57 && !lF.ko && dmg >= 3) {
+  if (lF.id === 57 && dmg >= 3) {
     B.marcusGlacialBonus[loseTeamName] = (B.marcusGlacialBonus[loseTeamName] || 0) + 4;
     marcusGlacialTriggered = true;
     collectKC(loseTeamName, lF.name);
@@ -9517,9 +9519,9 @@ function _resolveRoundImpl() {
   }
   // Hugo knight reactions already collected via collectKC at game-state section (line ~10019) — do NOT double-fire here
 
-  // Marcus (57) — Glacial Pounding: taking 3+ damage charges up +4 bonus dice for next roll
+  // Marcus (57) — Glacial Pounding: taking 3+ damage charges up +4 bonus dice for the PLAYER's next roll
   if (marcusGlacialTriggered) {
-    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! Charging up... +4 bonus dice next roll!`, null, loseTeamName);
+    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! +4 bonus dice next roll${lF.ko ? ' for the next fighter!' : '!'}`, null, loseTeamName);
   }
   // Marcus knight reactions already collected via collectKC at game-state section (line ~10029) — do NOT double-fire here
 

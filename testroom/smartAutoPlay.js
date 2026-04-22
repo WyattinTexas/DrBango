@@ -46,6 +46,7 @@ function smartPlayNext() {
     pendingMoonstone:null, pendingSteal:null,
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
+    cameronBonusDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     blackoutNum: {},
     harrisonExtraDie: { red: 0, blue: 0 },
@@ -853,6 +854,20 @@ function smartSimRounds(gameNum) {
     if (f.id === 403 && !f.ko) {
       B.blackoutNum[team] = smartBlackoutPick();
     }
+
+    // Cameron (25) — Unstoppable Force: count how many specials this team committed/spent
+    // Each committed special triggers +1 die for Cameron on the opponent's team.
+    const camSpecialsUsed = (B.committed[team].surge || 0) + (B.committed[team].ice || 0) +
+                            (B.committed[team].fire || 0) + (B.committed[team].auntSusan || 0) +
+                            (B.committed[team].harrison || 0);
+    if (camSpecialsUsed > 0) {
+      const oppKey = team === 'red' ? 'blue' : 'red';
+      const oppTeam = B[oppKey];
+      if (oppTeam.ghosts.some(g => g.id === 25 && !g.ko)) {
+        if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
+        B.cameronBonusDice[oppKey] += camSpecialsUsed;
+      }
+    }
   });
 
   // Handle Happy Crystal KOs
@@ -1188,8 +1203,8 @@ function smartSimRounds(gameNum) {
   if ((B.haywireBonus.red || 0) > 0) redCount += B.haywireBonus.red;
   if ((B.haywireBonus.blue || 0) > 0) blueCount += B.haywireBonus.blue;
 
-  // Marcus (57) — GLACIAL POUNDING!: +4 bonus dice next roll after taking 3+ damage (matches index.html lines 7267–7276)
-  // B.marcusGlacialBonus[tName] is set when Marcus (loser) takes 3+ damage and survives.
+  // Marcus (57) — GLACIAL POUNDING!: +4 bonus dice next roll after taking 3+ damage
+  // Bonus goes to the PLAYER — whoever is active gets the dice, even if Marcus died from the hit.
   ['red','blue'].forEach(tName => {
     if ((B.marcusGlacialBonus[tName] || 0) > 0) {
       if (tName === 'red') redCount += B.marcusGlacialBonus[tName];
@@ -1224,6 +1239,20 @@ function smartSimRounds(gameNum) {
       B.retributionDice[tName] = 0;
     }
   });
+
+  // Cameron (25) — Unstoppable Force: bonus dice from opponent special usage
+  if (B.cameronBonusDice) {
+    ['red','blue'].forEach(tName => {
+      if (B.cameronBonusDice[tName] > 0) {
+        const camTeam = B[tName];
+        if (camTeam.ghosts.some(g => g.id === 25 && !g.ko)) {
+          if (tName === 'red') redCount += B.cameronBonusDice[tName];
+          else blueCount += B.cameronBonusDice[tName];
+        }
+        B.cameronBonusDice[tName] = 0;
+      }
+    });
+  }
 
   // Boris (343) — FORTIFY!: when Surge is committed, Boris gains +2 HP (overclocks — no cap per Rule #9)
   // Fires for the whole team's committed Surge (Boris can be active or sideline — matches index.html line 7094+)
@@ -2015,28 +2044,20 @@ function smartSimRounds(gameNum) {
       dmg = 0;
       sophiaMasqueraded = true;
     }
-    // Cameron (25) — Force of Nature: if Cameron wins but the loser's defensive ability negates damage → instantly destroy the loser.
-    // We capture dmg BEFORE any negation so we can detect "started > 0, ended at 0 after defense".
-    // Matches index.html lines 9887–9896: cameronForceOfNature fires when skyBlocked|stoneFormFired|kodakoNegated|
-    // dealerBlocked|cityCybooBarrier|bogeyReflected|fangUndercoverFired|sylviaEvaded. Guardian Fairy absorption
-    // is NOT a negation (damage landed on GF) so we only fire when dmg is zeroed by a true negation.
-    // King Jay (106) REFLECTION! is also NOT a Cameron trigger (not in index.html's flag list) — guarded below.
-    const preCamDmg = dmg;
+    // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+    // When Cameron wins, all negation abilities are bypassed — damage goes through.
+    const cameronUnnegatable = (wF.id === 25 && !wF.ko);
     let kingJayReflected = false;
     let kingJayReflectDmg = 0;
 
     // Sylvia (313) — dodge check: roll 1 die, 6 = negate all damage (~16.7%)
     // abilityDesc: "When you lose a roll: roll 1 die. If you roll a 6, negate all damage."
     // doSylviaRoll() in index.html uses Math.floor(Math.random()*6)+1 — exactly 1 die.
-    if (lF.id === 313 && !lF.ko) {
+    if (lF.id === 313 && !lF.ko && !cameronUnnegatable) {
       if ((Math.floor(Math.random()*6)+1) >= 5) dmg = 0; // 5 or 6 dodge
     }
     // Patrick (10) — Stone Form: losing to a singles roll → negate ALL incoming damage and deal 3 counter-damage to the winner.
-    // In index.html lines 9680–9684: `if (lF.id===10 && !lF.ko && wR.type==='singles' && dmg>0) { dmg=0; collectKC(...); }`
-    // Counter-damage applied at lines 9846–9849: `stoneFormHpAfter = Math.max(0, wF.hp - 3); wF.ko = stoneFormHpAfter<=0`.
-    // Singles is the most common roll type (~50%+ of all outcomes) — without this, Patrick is a 3 HP ghost
-    // that dies to the first singles win. With it, Patrick punishes singles-heavy opponents every time.
-    if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0) {
+    if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) {
       dmg = 0;
       wF.hp = Math.max(0, wF.hp - 3);
       if (wF.hp <= 0) { wF.ko = true; wF.killedBy = lF.id; }
@@ -2044,31 +2065,31 @@ function smartSimRounds(gameNum) {
     // Kodako (1) — Swift LOSE case: rolling 1-2-3 (all three values present in loseDice) while losing → negate all incoming damage, deal 4 counter-damage back to winner.
     // Matches index.html lines 9666–9673: `if (lF.id===1 && !lF.ko && loseDice && [1,2,3].every(v=>loseDice.includes(v)) && dmg>0) { dmg=0; ... deal 4 back to wF }`
     // loseDice is winner==='red' ? blueDice : redDice — computed inline since `loseDice` const isn't defined until the on-lose resource gains block below.
-    if (lF.id === 1 && !lF.ko && dmg > 0 && [1,2,3].every(v => (winner === 'red' ? blueDice : redDice).includes(v))) {
+    if (lF.id === 1 && !lF.ko && dmg > 0 && !cameronUnnegatable && [1,2,3].every(v => (winner === 'red' ? blueDice : redDice).includes(v))) {
       dmg = 0;
       wF.hp = Math.max(0, wF.hp - 4);
       if (wF.hp <= 0) { wF.ko = true; wF.killedBy = lF.id; }
     }
     // Sky (72) — Elusive: if incoming damage > 2, negate entirely (pure big-hit shield; 1-2 dmg passes through).
     // Matches index.html lines 9705–9711: `if (lF.id===72 && !lF.ko && dmg>2) { dmg=0; collectKC(...); }`
-    if (lF.id === 72 && !lF.ko && dmg > 2) { dmg = 0; }
+    if (lF.id === 72 && !lF.ko && dmg > 2 && !cameronUnnegatable) { dmg = 0; }
     // Dealer (37) — House Rules: loser's dice in strict consecutive ascending order → negate all incoming damage.
     // e.g. [1,2,3], [2,3,4], [3,4,5], [4,5-6] — any length run that is perfectly sequential (≥2 dice).
     // Matches index.html lines 9690–9699: sort loseDice, check every(v,i) i===0||v===prev+1, then dmg=0.
-    if (lF.id === 37 && !lF.ko && dmg > 0) {
+    if (lF.id === 37 && !lF.ko && dmg > 0 && !cameronUnnegatable) {
       const _dD = (winner === 'red' ? blueDice : redDice).slice().sort((a, b) => a - b);
       if (_dD.length >= 2 && _dD.every((v, i) => i === 0 || v === _dD[i - 1] + 1)) { dmg = 0; }
     }
     // City Cyboo (77) — Barrier: takes no damage from enemy doubles.
     // 1 HP defender immune to the most common win type. Matches index.html lines 9713–9723.
-    if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0) { dmg = 0; }
+    if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0 && !cameronUnnegatable) { dmg = 0; }
     // Guard Thomas (41) — Stoic: immune to singles when below 6 HP (his max). Matches index.html lines 9642–9649.
-    if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0) { dmg = 0; }
+    if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) { dmg = 0; }
     // Bogey (53) — Bogus: reactive reflect — AI always reflects when offered. If Bogey is the loser,
     // dmg > 0, and once-per-game bogeyUsed is false → reflect the full dmg back to the winner (dmg = 0).
     // Matches index.html lines 9675–9697: bogeyReflectResuming two-pass; sim skips the modal, always chooses 'yes'.
     // Counter-damage applied immediately (wF.hp deferred to onShow in real game, but sim applies synchronously).
-    if (lF.id === 53 && !lF.ko && !B.bogeyUsed[lTeamName] && dmg > 0) {
+    if (lF.id === 53 && !lF.ko && !B.bogeyUsed[lTeamName] && dmg > 0 && !cameronUnnegatable) {
       const bogeyReflDmg = dmg;
       dmg = 0;
       B.bogeyUsed[lTeamName] = true;
@@ -2078,7 +2099,7 @@ function smartSimRounds(gameNum) {
     // Fang Undercover (7) — Skilled Coward: armed + incoming damage > 0 → negate all damage, swap Fang to sideline.
     // Fires after Bogey (same order as index.html lines 9812–9822).
     // In the real game the swap is a post-drain modal (fangUndercoverSwapPending); sim swaps synchronously.
-    if (lF.id === 7 && !lF.ko && B.fangUndercoverArmed[lTeamName] && dmg > 0) {
+    if (lF.id === 7 && !lF.ko && B.fangUndercoverArmed[lTeamName] && dmg > 0 && !cameronUnnegatable) {
       dmg = 0;
       B.fangUndercoverArmed[lTeamName] = false;
       // Fang retreats — pick best available sideline ghost as replacement
@@ -2094,11 +2115,7 @@ function smartSimRounds(gameNum) {
     B.fangUndercoverArmed[winTeamName] = false;
 
     // King Jay (106) — REFLECTION!: lose the roll & loser's dice total = 7 → reflect ALL damage back to the winner (dmg → 0).
-    // Fires after all other negation checks — matches index.html line 9799 ordering (after fang, before Cameron).
-    // King Jay REFLECTION is NOT a Cameron Force of Nature trigger — index.html's Cameron flag list excludes it;
-    // see `&& !kingJayReflected` guard on the Cameron check below.
-    // Matches index.html lines 9799–9805 (detection) and 9875–9879 (winner HP drop + KO).
-    if (lF.id === 106 && !lF.ko && dmg > 0) {
+    if (lF.id === 106 && !lF.ko && dmg > 0 && !cameronUnnegatable) {
       const _kjDice = winner === 'red' ? blueDice : redDice;
       if (_kjDice && _kjDice.length > 0 && _kjDice.reduce((a, b) => a + b, 0) === 7) {
         kingJayReflectDmg = dmg;
@@ -2109,17 +2126,8 @@ function smartSimRounds(gameNum) {
       }
     }
 
-    // Cameron (25) — Force of Nature: Cameron wins, damage was non-zero before negation checks but is now 0 → instant KO.
-    // Guards: wF must be Cameron (25), alive, not yet KO'd; lF must be alive (not already KO'd by counter-damage above).
-    // preCamDmg > 0 means Cameron's roll actually would have dealt damage; dmg === 0 means a defensive ability zeroed it.
-    // This does NOT fire when Bogey reflected (Bogey already applied its own KO logic) — but Bogey's reflect sets dmg=0
-    // and the refect damage fires synchronously above, so if wF survived we still correctly instant-KO lF here.
-    // Matches index.html lines 9887–9896 + 10541–10543.
-    if (wF.id === 25 && !wF.ko && !lF.ko && preCamDmg > 0 && dmg === 0 && !kingJayReflected) {
-      lF.hp = 0;
-      lF.ko = true;
-      lF.killedBy = wF.id;
-    }
+    // Cameron (25) — Unstoppable Force: negation is already blocked above via cameronUnnegatable flag.
+    // No instant KO needed — damage just goes through normally.
 
     // Guardian Fairy (99) — Wish: reactive — AI auto-activates GF when damage would KO the active ghost
     // and fairy has more HP than the damage
@@ -2355,9 +2363,9 @@ function smartSimRounds(gameNum) {
     // Hugo (52) — WRECKAGE!: when Hugo takes real damage, the attacker loses 1 die next roll.
     // Set on winTeamName so the attacker's dice are reduced at the top of the NEXT round. Matches index.html line 10017.
     if (lF.id === 52 && dmg > 0) { B.hugoWreckage[winTeamName] = (B.hugoWreckage[winTeamName] || 0) + 1; }
-    // Marcus (57) — GLACIAL POUNDING!: if Marcus takes 3+ real damage and survives, he gains +4 bonus dice next roll.
-    // Set on loseTeamName so Marcus's team rolls extra dice next round. Matches index.html line 10027.
-    if (lF.id === 57 && !lF.ko && dmg >= 3) { B.marcusGlacialBonus[loseTeamName] = (B.marcusGlacialBonus[loseTeamName] || 0) + 4; }
+    // Marcus (57) — GLACIAL POUNDING!: if Marcus takes 3+ real damage, the PLAYER gains +4 bonus dice next roll.
+    // Fires even if Marcus dies — bonus carries to whoever comes in next.
+    if (lF.id === 57 && dmg >= 3) { B.marcusGlacialBonus[loseTeamName] = (B.marcusGlacialBonus[loseTeamName] || 0) + 4; }
     // Floop (20) — MUCK!: win or lose (including KO), if opponent rolled doubles → they lose 1 die next round.
     // wF = winner (if Floop won, loser rolled lR); lF = loser (if Floop lost/died, winner rolled wR).
     // Uses wF/lF captured pre-damage — same as index.html lines 10844–10858. No !f.ko gate (Wyatt spec).
@@ -2716,7 +2724,7 @@ function smartSimRounds(gameNum) {
       if (ef.id === 313 && !ef.ko) rxns++;               // Sylvia PORPOISE! — alive-only; matches index.html lines 9480, 10513: !lF.ko guard on both dodge trigger sites
       if (ef.id === 23 && ef.ko) rxns++;                 // Powder FINAL GIFT! — fires only on KO (matches index.html line 10127 collectKC)
       if (ef.id === 52) rxns++;                          // Hugo WRECKAGE! — fires whenever Hugo loses (dmg > 0 approximated; nearly always true — matches index.html line 10019 collectKC)
-      if (ef.id === 57 && !ef.ko) rxns++;                // Marcus GLACIAL POUNDING! — fires when Marcus survives a loss (dmg ≥ 3 approximated; matches index.html line 10029 collectKC)
+      if (ef.id === 57) rxns++;                           // Marcus GLACIAL POUNDING! — fires even if Marcus dies (bonus goes to player, not Marcus)
       if (ef.id === 10 && !ef.ko && (teamKey === 'red' ? rR : bR).type === 'singles') rxns++; // Patrick STONE FORM! — fires when Patrick loses to singles (matches index.html line 9683 collectKC); teamKey is the WINNER's team, so their roll type is checked
       // Kodako (1) SWIFT! lose case: fires when Kodako loses and rolled 1-2-3 (matches index.html line 9671 collectKC call)
       if (ef.id === 1 && !ef.ko && [1,2,3].every(v => _eD.includes(v))) rxns++;

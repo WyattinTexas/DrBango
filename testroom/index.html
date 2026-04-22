@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v778'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v779'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2634,7 +2634,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v778';
+const TESTROOM_VERSION = 'v779';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3057,7 +3057,7 @@ const GHOSTS = [
   // ============================================================
   {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Final Gift", abilityDesc:"When defeated, gain 3 Ice Shards for your next ghost.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Death-triggered resource gen."},
   {id:24, name:"Simon", rarity:"common", maxHp:7, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"When you take damage from a before-the-roll effect, gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll damage-to-resource conversion. Only triggers on before-the-roll chip damage (Swarm, Haunt, Toxic Fumes, Blue Fire, Meteor, etc.), NOT on normal dice roll damage."},
-  {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Force of Nature", abilityDesc:"If your damage gets negated, destroy the enemy.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley. Anti-negation nuke."},
+  {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Cameron gains +1 die immediately.\nCameron's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation — Guard Thomas, Bogey, Patrick, Pyrope, etc."},
   {id:26, name:"Logey", rarity:"common", maxHp:6, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Dice cap."},
   {id:28, name:"Dream Cat", rarity:"common", maxHp:4, art:"art/originals/dream_cat.jpg", ability:"Jinx", abilityDesc:"Both roll doubles: gain +2 dice next turn.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Mutual doubles reward. Buffed: +2 dice (was +1)."},
@@ -3070,7 +3070,7 @@ const GHOSTS = [
   {id:54, name:"Roger", rarity:"uncommon", maxHp:6, art:"art/originals/roger.jpg", ability:"Tempest", abilityDesc:"Roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Double-pair jackpot."},
   {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage before the effect happens. If this KOs the enemy, their effect is cancelled.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Anti-pre-roll punisher."},
   {id:56, name:"Chad", rarity:"common", maxHp:6, art:"art/originals/chad.jpg", ability:"Sploop!", abilityDesc:"On entry, gain 2 Ice Shards.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Entry resource gen."},
-  {id:57, name:"Marcus", rarity:"uncommon", maxHp:7, art:"art/originals/marcus.jpg", ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: gain 4 extra dice next roll.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Big hit = big retaliation."},
+  {id:57, name:"Marcus", rarity:"uncommon", maxHp:7, art:"art/originals/marcus.jpg", ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: YOU gain 4 extra dice on the next roll.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Big hit = big retaliation. Bonus goes to player (next active ghost), not just Marcus."},
   {id:58, name:"Ashley", rarity:"uncommon", maxHp:3, art:"art/originals/ashley.jpg", ability:"Burning Soul", abilityDesc:"Win a roll: gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Win-triggered Sacred Fire."},
   {id:59, name:"Mr Filbert", rarity:"common", maxHp:6, art:"art/originals/mr_filbert.jpg", ability:"Mask Merchant", abilityDesc:"While on the sideline, any healing instead deals damage to the intended ghost.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Anti-healing."},
   {id:60, name:"Dallas", rarity:"uncommon", maxHp:4, art:"art/originals/dallas.jpg", ability:"Quick Draw", abilityDesc:"When coming off the sideline, steal 1 of your opponents die for the first 2 rolls.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Entry die theft."},
@@ -3557,6 +3557,7 @@ function autoPlayNext() {
     duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
+    cameronBonusDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     romyPrediction: { red: null, blue: null },
     pureHeartDeclared: { red: null, blue: null },
@@ -4285,6 +4286,7 @@ function startBattle() {
     duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
+    cameronBonusDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     romyPrediction: { red: null, blue: null },
     pureHeartDeclared: { red: null, blue: null },
@@ -4846,6 +4848,22 @@ function triggerBorisHook(team) {
   });
 }
 
+// Cameron (25) — Unstoppable Force: opponent uses a special → Cameron's team gains +1 die
+// Called with the team that USED the special — Cameron must be on the OPPOSING team.
+function triggerCameronSpecialWatch(usingTeam) {
+  if (!B) return;
+  const oppTeamName = usingTeam === 'red' ? 'blue' : 'red';
+  const oppTeam = B[oppTeamName];
+  if (!oppTeam) return;
+  const cameronAlive = oppTeam.ghosts.some(g => g.id === 25 && !g.ko);
+  if (!cameronAlive) return;
+  if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
+  B.cameronBonusDice[oppTeamName]++;
+  const camGhost = oppTeam.ghosts.find(g => g.id === 25 && !g.ko);
+  const loc = oppTeam.ghosts[oppTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
+  log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
+}
+
 // ========================================
 // RESOURCE SPENDING
 // ========================================
@@ -4906,6 +4924,8 @@ function cycleCommit(team, type) {
   if (type === 'surge' && c[type] > 0 && f && f.id === 449 && !f.ko) {
     carpenterTransform(team);
   }
+  // Cameron (25) — Unstoppable Force: opponent committed a special → Cameron gains +1 die
+  if (c[type] > 0) triggerCameronSpecialWatch(team);
   renderBattle();
   pvpBroadcastCommitted(team);
 }
@@ -4954,6 +4974,9 @@ function spendHealingSeed(team) {
     showAbilityCallout('BOOPIE MAGIC!', 'var(--common)', `${boopiesName} (sideline) — Healing Seed spent! +1 Lucky Stone!`, team);
     log(`<span class="log-ability">${boopiesName}</span> — Boopie Magic! Healing Seed spent → <span class="log-ms">+1 Lucky Stone!</span>`);
   }
+
+  // Cameron (25) — Unstoppable Force: opponent used a special
+  triggerCameronSpecialWatch(team);
 
   renderBattle();
   pvpBroadcastCommitted(team);
@@ -9532,6 +9555,25 @@ function doPreRollSetup() {
     B.retributionDice = { red: 0, blue: 0 };
   }
 
+  // Cameron (25) — Unstoppable Force: bonus dice from opponent special usage
+  if (B.cameronBonusDice) {
+    ['red', 'blue'].forEach(tName => {
+      if (B.cameronBonusDice[tName] > 0) {
+        const camTeam = B[tName];
+        const camAlive = camTeam.ghosts.some(g => g.id === 25 && !g.ko);
+        if (camAlive) {
+          if (tName === 'red') redCount += B.cameronBonusDice.red;
+          else blueCount += B.cameronBonusDice.blue;
+          const camG = camTeam.ghosts.find(g => g.id === 25 && !g.ko);
+          const loc = camTeam.ghosts[camTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
+          preRollCallouts.push(['UNSTOPPABLE FORCE!', 'var(--common)', `${camG.name} (${loc}) — Opponent used specials! +${B.cameronBonusDice[tName]} bonus dice!`, tName]);
+          log(`<span class="log-ability">${camG.name}</span> — Unstoppable Force! <span class="log-ms">+${B.cameronBonusDice[tName]} bonus dice</span> from opponent specials!`);
+        }
+        B.cameronBonusDice[tName] = 0;
+      }
+    });
+  }
+
   // Bouril (201) — first roll override
   let hankOverride = { red: false, blue: false };
   [B.red, B.blue].forEach(team => {
@@ -10173,16 +10215,17 @@ function doPreRollSetup() {
   });
 
   // Marcus (57) — Glacial Pounding: consume bonus dice from last round's big hit (applied last so it can't be stolen by Outlaw)
+  // Bonus goes to the PLAYER — whoever is active gets the dice, even if Marcus died from the hit
   [B.red, B.blue].forEach(team => {
     const tName = team === B.red ? 'red' : 'blue';
     if (B.marcusGlacialBonus && B.marcusGlacialBonus[tName] > 0) {
-      const marF = active(team);
-      if (marF && marF.id === 57 && !marF.ko) {
+      const curF = active(team);
+      if (curF && !curF.ko) {
         const bonus = B.marcusGlacialBonus[tName];
         if (tName === 'red') redCount += bonus;
         else blueCount += bonus;
-        preRollCallouts.push(['GLACIAL POUNDING!', 'var(--uncommon)', `${marF.name} — Took a big hit! +${bonus} bonus dice this roll!`, tName]);
-        log(`<span class="log-ability">${marF.name}</span> — Glacial Pounding! +${bonus} bonus dice from last round's big hit!`);
+        preRollCallouts.push(['GLACIAL POUNDING!', 'var(--uncommon)', `Marcus's revenge! ${curF.name} gets +${bonus} bonus dice!`, tName]);
+        log(`<span class="log-ability">Marcus</span> — Glacial Pounding! ${curF.name} gets +${bonus} bonus dice from last round's big hit!`);
       }
       B.marcusGlacialBonus[tName] = 0;
     }
@@ -10708,6 +10751,7 @@ function showMoonstoneChoice(team, dice) {
     B[team === 'red' ? 'redDice' : 'blueDice'] = newDice;
     B.pendingMoonstone.dice = newDice;
     B[team].resources.moonstone--;
+    triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force
     log(`<span class="log-ms">${team.toUpperCase()} uses Moonstone!</span> Changed die ${worstVal} → 6!`);
     narrate(`<b class="${team}-text">Blue</b> uses <b style="color:var(--moonstone)">Moonstone!</b> ${worstVal} → 6!`);
     B.pendingMoonstone = null;
@@ -10883,6 +10927,7 @@ function pickMsValue(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force (moonstone used via picker)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -11391,6 +11436,7 @@ function pickMsValueUnified(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force (moonstone used via unified picker)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -11460,6 +11506,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
       dice[worstIdx] = 6;
       dice.sort((a, b) => a - b);
       B.blue.resources.moonstone--;
+      triggerCameronSpecialWatch('blue'); // Cameron (25) — Unstoppable Force (AI moonstone)
       B.blueDice = dice;
       log(`<span class="log-ms">BLUE uses Moonstone!</span> Changed ${worstVal} → 6!`);
       renderDice(B.redDice, B.blueDice);
@@ -12192,6 +12239,9 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
     dice[dieIndex] = newVal;
     dice.sort((a, b) => a - b);
     t.resources.luckyStone--;
+
+    // Cameron (25) — Unstoppable Force: opponent used a special (Lucky Stone)
+    triggerCameronSpecialWatch(team);
 
     if (team === 'red') B.pendingResolve.redDice = dice;
     else B.pendingResolve.blueDice = dice;
@@ -13834,10 +13884,14 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Swift! 1-2-3 combo → exactly 4 damage!`);
   }
 
+  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+  // When Cameron wins, ALL defensive negation abilities are bypassed — damage goes through.
+  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
+
   // Guard Thomas (41) — Stoic: while Guard Thomas has less than 6 HP, singles rolls deal 0 damage to him.
   // Defensive immunity — no stat change needed, just zero out dmg and flag it.
   let guardThomasStoic = false;
-  if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0) {
+  if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) {
     guardThomasStoic = true;
     dmg = 0;
     log(`<span class="log-ability">${lF.name}</span> — Stoic! Below 6 HP — immune to singles! ${wF.name}'s singles roll blocked!`);
@@ -13852,7 +13906,7 @@ function _resolveRoundImpl() {
   let bogeyHpAfter = 0;
   const bogeyReflectResuming = !!B.bogeyReflectResuming;
   B.bogeyReflectResuming = false;
-  if (lF.id === 53 && !lF.ko && B.bogeyUsed && !B.bogeyUsed[loseTeamName] && dmg > 0) {
+  if (lF.id === 53 && !lF.ko && B.bogeyUsed && !B.bogeyUsed[loseTeamName] && dmg > 0 && !cameronUnnegatable) {
     if (!bogeyReflectResuming && !B.bogeyReflectChoice) {
       // First pass — pause resolveRound, open modal with live damage preview
       B.bogeyReflectPending = { loseTeamName, dmg };
@@ -13880,7 +13934,7 @@ function _resolveRoundImpl() {
 
   // Kodako (1) — Swift LOSE case: rolling 1-2-3 while losing → negate all incoming damage, deal 4 back to winner
   let kodakoSwiftLose = false;
-  if (lF.id === 1 && !lF.ko && loseDice && [1,2,3].every(v => loseDice.includes(v)) && dmg > 0) {
+  if (lF.id === 1 && !lF.ko && loseDice && [1,2,3].every(v => loseDice.includes(v)) && dmg > 0 && !cameronUnnegatable) {
     dmg = 0; // Kodako takes nothing — Swift counters the hit
     kodakoSwiftLose = true;
     collectKC(loseTeamName, lF.name);
@@ -13892,7 +13946,7 @@ function _resolveRoundImpl() {
   let patrickStoneForm = false;
   const patrickStoneDmg = 3;
   let stoneFormHpAfter = 0;
-  if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0) {
+  if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) {
     dmg = 0; // Patrick takes nothing — Stone Form counters singles
     patrickStoneForm = true;
     collectKC(loseTeamName, lF.name);
@@ -13902,7 +13956,7 @@ function _resolveRoundImpl() {
   // Dealer (37) — House Rules: Dealer's losing dice in strict consecutive ascending order → negate all incoming damage.
   // e.g. [1,2,3], [2,3,4], [3,4,5], [4,5,6] — any length run that is perfectly sequential.
   let dealerHouseRules = false;
-  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2) {
+  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2 && !cameronUnnegatable) {
     const _sortedDealerDice = [...loseDice].sort((a, b) => a - b);
     const _isSequential = _sortedDealerDice.every((v, i) => i === 0 || v === _sortedDealerDice[i - 1] + 1);
     if (_isSequential) {
@@ -13917,7 +13971,7 @@ function _resolveRoundImpl() {
   // Counter die is pre-computed; KO flag set synchronously; HP mutation deferred to modal.
   let skyElusive = false;
   let skyElusiveBlockedDmg = 0;
-  if (lF.id === 72 && !lF.ko && dmg > 2) {
+  if (lF.id === 72 && !lF.ko && dmg > 2 && !cameronUnnegatable) {
     skyElusiveBlockedDmg = dmg;
     dmg = 0;
     skyElusive = true;
@@ -13938,7 +13992,7 @@ function _resolveRoundImpl() {
   // A 1 HP doubles-immune defender — the win roll type must be 'doubles' for Barrier to trigger.
   let cityCybooBarrier = false;
   let cityCybooBlockedDmg = 0;
-  if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0) {
+  if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0 && !cameronUnnegatable) {
     cityCybooBlockedDmg = dmg;
     dmg = 0;
     cityCybooBarrier = true;
@@ -13947,7 +14001,7 @@ function _resolveRoundImpl() {
   }
 
   // Puff (5) — Cute: enemy doubles and triples deal -1 damage (minimum 0).
-  // Partial reduction, NOT full negation — Cameron Force of Nature does NOT trigger from Cute alone.
+  // Partial reduction, NOT full negation — Cute is not a negation (Cameron Unstoppable Force doesn't interact with it).
   let puffCute = false;
   let puffCuteOriginalDmg = 0;
   if (lF.id === 5 && !lF.ko && (wR.type === 'doubles' || wR.type === 'triples') && dmg > 0) {
@@ -13963,7 +14017,7 @@ function _resolveRoundImpl() {
   let kingJayReflected = false;
   let kingJayReflectDmg = 0;
   let kingJayHpAfter = 0;
-  if (lF.id === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7) {
+  if (lF.id === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7 && !cameronUnnegatable) {
     kingJayReflectDmg = dmg;
     dmg = 0; // loser takes nothing — all damage goes back
     kingJayReflected = true;
@@ -13999,7 +14053,7 @@ function _resolveRoundImpl() {
   // Fang Undercover (7) — Skilled Coward: armed → negate all incoming damage, trigger post-round swap
   // Fires after Guardian Fairy (GF takes priority if both are in play; Fang Undercover fires only if GF didn't absorb)
   let fangUndercoverActivated = false;
-  if (!kingJayReflected && !guardianFairyAbsorbed &&
+  if (!kingJayReflected && !guardianFairyAbsorbed && !cameronUnnegatable &&
       lF.id === 7 && !lF.ko && B.fangUndercoverArmed && B.fangUndercoverArmed[loseTeamName] && dmg > 0) {
     B.fangUndercoverArmed[loseTeamName] = false; // consume the arm
     fangUndercoverActivated = true;
@@ -14223,18 +14277,13 @@ function _resolveRoundImpl() {
     log(`<span class="log-dmg">${lF.name} — Stone Form counter! ${patrickStoneDmg} damage to ${wF.name}!</span> ${wF.ko?'<span class="log-ko">KO!</span>':stoneFormHpAfter+' HP left'}`);
   }
 
-  // Cameron (25) — Force of Nature: Cameron wins a roll but the loser's defensive ability negates the damage → destroy the loser.
-  // Fires after all counter-damage (Patrick, Kodako, King Jay, Bogey) so wF.ko is accurate.
-  // Guardian Fairy absorption is NOT a negation — Cameron's damage DID land (on GF), so it does NOT trigger Force of Nature.
-  let cameronForceOfNature = false;
-  if (wF.id === 25 && !wF.ko && !lF.ko && !guardianFairyAbsorbed &&
-      (guardThomasStoic || patrickStoneForm || kodakoSwiftLose || bogeyReflected || kingJayReflected || dealerHouseRules || skyElusive || cityCybooBarrier || fangUndercoverActivated)) {
-    lF.hp = 0;
-    lF.ko = true;
-    lF.killedBy = 25;
-    cameronForceOfNature = true;
+  // Cameron (25) — Unstoppable Force: damage cannot be negated (cameronUnnegatable flag set above,
+  // all negation checks already guarded). Log a callout if Cameron wins and dealt damage.
+  let cameronUnstoppableLogged = false;
+  if (cameronUnnegatable && !wF.ko && dmg > 0) {
+    cameronUnstoppableLogged = true;
     collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Force of Nature! Damage negated — ${lF.name} instantly destroyed!`);
+    log(`<span class="log-ability">${wF.name}</span> — Unstoppable Force! Damage cannot be negated!`);
   }
 
   // Pudge self-damage (game state — HP mutation deferred to BELLY FLOP! onShow)
@@ -14411,10 +14460,11 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Wreckage! Took ${dmg} damage → ${wF.name} loses 1 die next roll!`);
   }
 
-  // Marcus (57) — Glacial Pounding: if Marcus (loser) took 3+ real damage and survived, he gains +4 bonus dice next roll
+  // Marcus (57) — Glacial Pounding: if Marcus (loser) took 3+ real damage, the PLAYER gains +4 bonus dice next roll
+  // Fires even if Marcus dies from the hit — the bonus carries to whoever comes in next
   // Must fire AFTER all defensive mods (Stoic, Bogus, King Jay, GF) so dmg reflects what actually landed on lF
   let marcusGlacialTriggered = false;
-  if (lF.id === 57 && !lF.ko && dmg >= 3) {
+  if (lF.id === 57 && dmg >= 3) {
     B.marcusGlacialBonus[loseTeamName] = (B.marcusGlacialBonus[loseTeamName] || 0) + 4;
     marcusGlacialTriggered = true;
     collectKC(loseTeamName, lF.name);
@@ -14960,11 +15010,11 @@ function _resolveRoundImpl() {
   }
   // Fang Undercover knight reactions already collected via collectKC at game-state section (line ~9784) — do NOT double-fire here
 
-  // Cameron (25) — Force of Nature: damage negated → loser instantly destroyed (queued after defense callouts)
-  if (cameronForceOfNature) {
-    queueAbility('FORCE OF NATURE!', 'var(--common)', `${wF.name} — Damage negated... ${lF.name} is instantly DESTROYED!`, () => { renderBattle(); }, loseTeamName);
+  // Cameron (25) — Unstoppable Force: damage pierced negation callout (queued after defense callouts)
+  if (cameronUnstoppableLogged) {
+    queueAbility('UNSTOPPABLE!', 'var(--common)', `${wF.name} — Damage cannot be negated! ${dmg} damage goes through!`, null, winTeamName);
   }
-  // Cameron knight reactions already collected via collectKC at game-state section (line ~9862) — do NOT double-fire here
+  // Cameron knight reactions already collected via collectKC at game-state section — do NOT double-fire here
 
   // Gus (31) — Gale Force: win + primed → zero damage, opponent CHOOSES which sideline ghost to swap in.
   // Fires after all defense callouts. The actual swap is deferred to a picker modal that opens after
@@ -14980,9 +15030,9 @@ function _resolveRoundImpl() {
   }
   // Hugo knight reactions already collected via collectKC at game-state section (line ~10019) — do NOT double-fire here
 
-  // Marcus (57) — Glacial Pounding: taking 3+ damage charges up +4 bonus dice for next roll
+  // Marcus (57) — Glacial Pounding: taking 3+ damage charges up +4 bonus dice for the PLAYER's next roll
   if (marcusGlacialTriggered) {
-    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! Charging up... +4 bonus dice next roll!`, null, loseTeamName);
+    queueAbility('GLACIAL POUNDING!', 'var(--uncommon)', `${lF.name} — Took ${dmg} damage! +4 bonus dice next roll${lF.ko ? ' for the next fighter!' : '!'}`, null, loseTeamName);
   }
   // Marcus knight reactions already collected via collectKC at game-state section (line ~10029) — do NOT double-fire here
 
