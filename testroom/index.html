@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v780'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v783'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2634,7 +2634,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v780';
+const TESTROOM_VERSION = 'v783';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -3076,7 +3076,7 @@ const GHOSTS = [
   {id:60, name:"Dallas", rarity:"uncommon", maxHp:4, art:"art/originals/dallas.jpg", ability:"Quick Draw", abilityDesc:"When coming off the sideline, steal 1 of your opponents die for the first 2 rolls.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Entry die theft."},
   {id:61, name:"Suspicious Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/suspicious_jeff.jpg", ability:"Snicker", abilityDesc:"While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Sideline die theft."},
   {id:81, name:"Spockles", rarity:"rare", maxHp:6, art:"art/originals/spockles.jpg", ability:"Valley Magic", abilityDesc:"Win a roll: gain 2 Ice Shards.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Ice Shard farmer."},
-  {id:82, name:"Antoinette", rarity:"uncommon", maxHp:6, art:"art/originals/antoinette.jpg", ability:"Grace", abilityDesc:"Roll as many dice as your opponent.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Dice mirroring."},
+  {id:82, name:"Antoinette", rarity:"uncommon", maxHp:6, art:"art/originals/antoinette.jpg", ability:"Grace", abilityDesc:"Roll as many dice as your opponent rolls. +1 Damage on doubles.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Dice mirroring."},
   {id:83, name:"Troubling Haters", rarity:"uncommon", maxHp:4, art:"art/originals/troubling_haters.jpg", ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Big damage = HP growth."},
   {id:84, name:"Wandering Sue", rarity:"uncommon", maxHp:4, art:"art/originals/wandering_sue.jpg", ability:"Hidden Weakness", abilityDesc:"If enemy has 12+ HP, destroy them before rolling.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley. Anti-overclock assassin."},
   {id:85, name:"Eloise", rarity:"rare", maxHp:5, art:"art/originals/eloise.jpg", ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. HP swap for Ice Shard."},
@@ -4850,18 +4850,37 @@ function triggerBorisHook(team) {
 
 // Cameron (25) — Unstoppable Force: opponent uses a special → Cameron's team gains +1 die
 // Called with the team that USED the special — Cameron must be on the OPPOSING team.
-function triggerCameronSpecialWatch(usingTeam) {
+// immediate=true: post-roll context (Lucky Stone, Moonstone) — roll an extra die and add it NOW.
+// immediate=false (default): pre-roll context — store for Phase 2 dice computation next roll.
+function triggerCameronSpecialWatch(usingTeam, immediate) {
   if (!B) return;
   const oppTeamName = usingTeam === 'red' ? 'blue' : 'red';
   const oppTeam = B[oppTeamName];
   if (!oppTeam) return;
   const cameronAlive = oppTeam.ghosts.some(g => g.id === 25 && !g.ko);
   if (!cameronAlive) return;
-  if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
-  B.cameronBonusDice[oppTeamName]++;
   const camGhost = oppTeam.ghosts.find(g => g.id === 25 && !g.ko);
   const loc = oppTeam.ghosts[oppTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
-  log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
+
+  if (immediate && B.pendingResolve) {
+    // Post-roll: immediately roll 1 extra die and splice it into Cameron's team dice
+    const extraDie = Math.floor(Math.random() * 6) + 1;
+    const diceKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
+    const prKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
+    const dice = B.pendingResolve[prKey] || B[diceKey] || [];
+    dice.push(extraDie);
+    dice.sort((a, b) => a - b);
+    B.pendingResolve[prKey] = dice;
+    B[diceKey] = dice;
+    renderDice(B.redDice, B.blueDice);
+    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die rolled immediately! [${extraDie}]</span>`);
+    showAbilityCallout('UNSTOPPABLE FORCE!', 'var(--common)', `${camGhost.name} — +1 die! Rolled a ${extraDie}!`, oppTeamName);
+  } else {
+    // Pre-roll: store for next roll's Phase 2 dice computation
+    if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
+    B.cameronBonusDice[oppTeamName]++;
+    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
+  }
 }
 
 // ========================================
@@ -6330,6 +6349,9 @@ function doBurnPlace(team, ghostIndex) {
     log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
     showAbilityCallout('HEX!', 'var(--uncommon)', `${mableActive.name} — Burn placed! Enemy -1 die next roll!`, team);
   }
+
+  // Cameron (25) — Unstoppable Force: opponent used a special (Burn)
+  triggerCameronSpecialWatch(team);
 
   renderBattle();
   // v735: broadcast burn state so opponent's engine knows about it
@@ -10122,7 +10144,7 @@ function doPreRollSetup() {
     }
   });
 
-  // Antoinette (82) — Grace: roll as many dice as your opponent (mirrors opponent's count upward, min base 3)
+  // Antoinette (82) — Grace: roll as many dice as your opponent rolls. +1 damage on doubles.
   // Applied last so all other modifiers (Surge, Piper, Redd, etc.) are already baked into counts
   [B.red, B.blue].forEach(team => {
     const f = active(team);
@@ -10751,7 +10773,7 @@ function showMoonstoneChoice(team, dice) {
     B[team === 'red' ? 'redDice' : 'blueDice'] = newDice;
     B.pendingMoonstone.dice = newDice;
     B[team].resources.moonstone--;
-    triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force
+    triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
     log(`<span class="log-ms">${team.toUpperCase()} uses Moonstone!</span> Changed die ${worstVal} → 6!`);
     narrate(`<b class="${team}-text">Blue</b> uses <b style="color:var(--moonstone)">Moonstone!</b> ${worstVal} → 6!`);
     B.pendingMoonstone = null;
@@ -10927,7 +10949,7 @@ function pickMsValue(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
-  triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force (moonstone used via picker)
+  triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -11436,7 +11458,7 @@ function pickMsValueUnified(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
-  triggerCameronSpecialWatch(team); // Cameron (25) — Unstoppable Force (moonstone used via unified picker)
+  triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -11506,7 +11528,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
       dice[worstIdx] = 6;
       dice.sort((a, b) => a - b);
       B.blue.resources.moonstone--;
-      triggerCameronSpecialWatch('blue'); // Cameron (25) — Unstoppable Force (AI moonstone)
+      triggerCameronSpecialWatch('blue', true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
       B.blueDice = dice;
       log(`<span class="log-ms">BLUE uses Moonstone!</span> Changed ${worstVal} → 6!`);
       renderDice(B.redDice, B.blueDice);
@@ -12240,8 +12262,8 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
     dice.sort((a, b) => a - b);
     t.resources.luckyStone--;
 
-    // Cameron (25) — Unstoppable Force: opponent used a special (Lucky Stone)
-    triggerCameronSpecialWatch(team);
+    // Cameron (25) — Unstoppable Force: opponent used a special (Lucky Stone — immediate die)
+    triggerCameronSpecialWatch(team, true);
 
     if (team === 'red') B.pendingResolve.redDice = dice;
     else B.pendingResolve.blueDice = dice;
@@ -13085,6 +13107,12 @@ function _resolveRoundImpl() {
 
   let dmg = wR.damage;
 
+  // Antoinette (82) — Grace: +1 damage on doubles
+  if (wF.id === 82 && !wF.ko && wR.type === 'doubles') {
+    dmg += 1;
+    log(`<span class="log-ability">${wF.name}</span> — Grace! Doubles → +1 damage!`);
+  }
+
   // Boo Brothers (17) — Teamwork damage bonus: +1 if they used the ability this round
   let booTeamworkDmgTriggered = false;
   if (wF.id === 17 && !wF.ko && B.booTeamworkDmgBonus && B.booTeamworkDmgBonus[winTeamName] > 0) {
@@ -13592,6 +13620,10 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
   }
 
+  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+  // Defined early so it guards Sylvia, Guard Thomas, Bogey, Kodako, Patrick, Dealer, Sky, City Cyboo, King Jay, Fang.
+  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
+
   // Sylvia (313) — loser dodge check: roll 1 die, if it's a 6 negate all damage.
   // v331: the die is rolled by the PLAYER via the Sylvia modal (showSylviaModal) before
   // resolveRound's second pass reaches this block. B.sylviaPendingResult = { value, dodged }
@@ -13885,10 +13917,6 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Swift! 1-2-3 combo → exactly 4 damage!`);
   }
-
-  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
-  // When Cameron wins, ALL defensive negation abilities are bypassed — damage goes through.
-  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
 
   // Guard Thomas (41) — Stoic: while Guard Thomas has less than 6 HP, singles rolls deal 0 damage to him.
   // Defensive immunity — no stat change needed, just zero out dmg and flag it.

@@ -1295,7 +1295,7 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Antoinette (82) — GRACE!: if Antoinette is active, she matches the opponent's dice count (upward mirror only).
+  // Antoinette (82) — GRACE!: matches opponent's dice count (upward mirror only). +1 damage on doubles.
   // Applied after all other bonuses so surge/retribution/frenzy/etc. are already baked in.
   // Fredrick (27) cap still applies after Grace — matches index.html lines 7184–7199 ordering.
   ['red','blue'].forEach(tName => {

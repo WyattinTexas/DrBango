@@ -5304,7 +5304,7 @@ function doPreRollSetup() {
     }
   });
 
-  // Antoinette (82) — Grace: roll as many dice as your opponent (mirrors opponent's count upward, min base 3)
+  // Antoinette (82) — Grace: roll as many dice as your opponent rolls. +1 damage on doubles.
   // Applied last so all other modifiers (Surge, Piper, Redd, etc.) are already baked into counts
   [B.red, B.blue].forEach(team => {
     const f = active(team);
@@ -7285,7 +7285,8 @@ function _resolveRoundImpl() {
   if (winner !== null && !sylviaResuming && !B.sylviaPendingResult) {
     const loserTeamName = winner === 'red' ? 'blue' : 'red';
     const loserF = active(B[loserTeamName]);
-    if (loserF && loserF.id === 313 && !loserF.ko) {
+    const _cameronWinner = active(B[winner]);
+    if (loserF && loserF.id === 313 && !loserF.ko && !(_cameronWinner && _cameronWinner.id === 25 && !_cameronWinner.ko)) {
       showSylviaModal(loserTeamName, () => {
         B.sylviaResuming = true;
         resolveRound();
@@ -7725,6 +7726,12 @@ function _resolveRoundImpl() {
   const loseDice = winner==='red' ? blueDice : redDice;
 
   let dmg = wR.damage;
+
+  // Antoinette (82) — Grace: +1 damage on doubles
+  if (wF.id === 82 && !wF.ko && wR.type === 'doubles') {
+    dmg += 1;
+    log(`<span class="log-ability">${wF.name}</span> — Grace! Doubles → +1 damage!`);
+  }
 
   // v386: collectKC defined BEFORE any ability block that might call it (was TDZ-declared
   // at line ~8163 but referenced by Skylar Winter Barrage at 8131 and Tyler Heating Up
@@ -8187,7 +8194,7 @@ function _resolveRoundImpl() {
   // (where abilityQueueMode=true) to prevent them firing synchronously and being stomped.
   let sylviaDodged = false;
   let sylviaDodgeRolls = []; // store for callout (array form for back-compat with callout)
-  if (lF.id === 313 && !lF.ko) {
+  if (lF.id === 313 && !lF.ko && !cameronUnnegatable) {
     let rolledValue;
     if (B.sylviaPendingResult && typeof B.sylviaPendingResult.value === 'number') {
       rolledValue = B.sylviaPendingResult.value;
@@ -8449,10 +8456,13 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Swift! 1-2-3 combo → exactly 4 damage!`);
   }
 
+  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
+
   // Guard Thomas (41) — Stoic: while Guard Thomas has less than 6 HP, singles rolls deal 0 damage to him.
   // Defensive immunity — no stat change needed, just zero out dmg and flag it.
   let guardThomasStoic = false;
-  if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0) {
+  if (lF.id === 41 && !lF.ko && lF.hp < 6 && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) {
     guardThomasStoic = true;
     dmg = 0;
     log(`<span class="log-ability">${lF.name}</span> — Stoic! Below 6 HP — immune to singles! ${wF.name}'s singles roll blocked!`);
@@ -8467,7 +8477,7 @@ function _resolveRoundImpl() {
   let bogeyHpAfter = 0;
   const bogeyReflectResuming = !!B.bogeyReflectResuming;
   B.bogeyReflectResuming = false;
-  if (lF.id === 53 && !lF.ko && B.bogeyUsed && !B.bogeyUsed[loseTeamName] && dmg > 0) {
+  if (lF.id === 53 && !lF.ko && B.bogeyUsed && !B.bogeyUsed[loseTeamName] && dmg > 0 && !cameronUnnegatable) {
     if (!bogeyReflectResuming && !B.bogeyReflectChoice) {
       // First pass — pause resolveRound, open modal with live damage preview
       B.bogeyReflectPending = { loseTeamName, dmg };
@@ -8495,7 +8505,7 @@ function _resolveRoundImpl() {
 
   // Kodako (1) — Swift LOSE case: rolling 1-2-3 while losing → negate all incoming damage, deal 4 back to winner
   let kodakoSwiftLose = false;
-  if (lF.id === 1 && !lF.ko && loseDice && [1,2,3].every(v => loseDice.includes(v)) && dmg > 0) {
+  if (lF.id === 1 && !lF.ko && loseDice && [1,2,3].every(v => loseDice.includes(v)) && dmg > 0 && !cameronUnnegatable) {
     dmg = 0; // Kodako takes nothing — Swift counters the hit
     kodakoSwiftLose = true;
     collectKC(loseTeamName, lF.name);
@@ -8507,7 +8517,7 @@ function _resolveRoundImpl() {
   let patrickStoneForm = false;
   const patrickStoneDmg = 3;
   let stoneFormHpAfter = 0;
-  if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0) {
+  if (lF.id === 10 && !lF.ko && wR.type === 'singles' && dmg > 0 && !cameronUnnegatable) {
     dmg = 0; // Patrick takes nothing — Stone Form counters singles
     patrickStoneForm = true;
     collectKC(loseTeamName, lF.name);
@@ -8517,7 +8527,7 @@ function _resolveRoundImpl() {
   // Dealer (37) — House Rules: Dealer's losing dice in strict consecutive ascending order → negate all incoming damage.
   // e.g. [1,2,3], [2,3,4], [3,4,5], [4,5,6] — any length run that is perfectly sequential.
   let dealerHouseRules = false;
-  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2) {
+  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2 && !cameronUnnegatable) {
     const _sortedDealerDice = [...loseDice].sort((a, b) => a - b);
     const _isSequential = _sortedDealerDice.every((v, i) => i === 0 || v === _sortedDealerDice[i - 1] + 1);
     if (_isSequential) {
@@ -8532,7 +8542,7 @@ function _resolveRoundImpl() {
   // A pure big-damage shield — lets through 1-2 damage, blocks 3+.
   let skyElusive = false;
   let skyElusiveBlockedDmg = 0;
-  if (lF.id === 72 && !lF.ko && dmg > 2) {
+  if (lF.id === 72 && !lF.ko && dmg > 2 && !cameronUnnegatable) {
     skyElusiveBlockedDmg = dmg;
     dmg = 0;
     skyElusive = true;
@@ -8544,7 +8554,7 @@ function _resolveRoundImpl() {
   // A 1 HP doubles-immune defender — the win roll type must be 'doubles' for Barrier to trigger.
   let cityCybooBarrier = false;
   let cityCybooBlockedDmg = 0;
-  if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0) {
+  if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0 && !cameronUnnegatable) {
     cityCybooBlockedDmg = dmg;
     dmg = 0;
     cityCybooBarrier = true;
@@ -8553,7 +8563,7 @@ function _resolveRoundImpl() {
   }
 
   // Puff (5) — Cute: enemy doubles and triples deal -1 damage (minimum 0).
-  // Partial reduction, NOT full negation — Cameron Force of Nature does NOT trigger from Cute alone.
+  // Partial reduction, NOT full negation — Cute is not blocked by Cameron's Unstoppable Force (it reduces, not negates).
   let puffCute = false;
   let puffCuteOriginalDmg = 0;
   if (lF.id === 5 && !lF.ko && (wR.type === 'doubles' || wR.type === 'triples') && dmg > 0) {
@@ -8569,7 +8579,7 @@ function _resolveRoundImpl() {
   let kingJayReflected = false;
   let kingJayReflectDmg = 0;
   let kingJayHpAfter = 0;
-  if (lF.id === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7) {
+  if (lF.id === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7 && !cameronUnnegatable) {
     kingJayReflectDmg = dmg;
     dmg = 0; // loser takes nothing — all damage goes back
     kingJayReflected = true;
@@ -8606,7 +8616,7 @@ function _resolveRoundImpl() {
   // Fires after Guardian Fairy (GF takes priority if both are in play; Fang Undercover fires only if GF didn't absorb)
   let fangUndercoverActivated = false;
   if (!kingJayReflected && !guardianFairyAbsorbed &&
-      lF.id === 7 && !lF.ko && B.fangUndercoverArmed && B.fangUndercoverArmed[loseTeamName] && dmg > 0) {
+      lF.id === 7 && !lF.ko && B.fangUndercoverArmed && B.fangUndercoverArmed[loseTeamName] && dmg > 0 && !cameronUnnegatable) {
     B.fangUndercoverArmed[loseTeamName] = false; // consume the arm
     fangUndercoverActivated = true;
     B.fangUndercoverSwapPending = loseTeamName; // signal drain callback to show ghost-picker
@@ -8740,7 +8750,7 @@ function _resolveRoundImpl() {
 
   // King Jay reflected damage — applies to the winner
   // wF.hp deferred to onShow so HP bar updates when REFLECTION! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Force of Nature check immediately below sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
   if (kingJayReflected && kingJayReflectDmg > 0) {
     kingJayHpAfter = Math.max(0, wF.hp - kingJayReflectDmg);
     if (kingJayHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
@@ -8749,7 +8759,7 @@ function _resolveRoundImpl() {
 
   // Bogey reflected damage — applies to the winner (lF takes 0; wF eats the full hit)
   // wF.hp deferred to onShow so HP bar updates when BOGUS! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously so Cameron (25) Force of Nature check immediately below sees the correct KO state.
+  // wF.ko is set synchronously so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
   if (bogeyReflected && bogeyReflectDmg > 0) {
     bogeyHpAfter = Math.max(0, wF.hp - bogeyReflectDmg);
     if (bogeyHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
@@ -8758,7 +8768,7 @@ function _resolveRoundImpl() {
 
   // Kodako (1) — Swift lose counter: 4 damage dealt back to the winner
   // wF.hp deferred to onShow so HP bar updates when SWIFT! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Force of Nature check immediately below sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
   let swiftLoseHpAfter = 0;
   if (kodakoSwiftLose) {
     swiftLoseHpAfter = Math.max(0, wF.hp - 4);
@@ -8768,25 +8778,19 @@ function _resolveRoundImpl() {
 
   // Patrick (10) — Stone Form counter: 3 damage dealt back to the winner for throwing a singles roll
   // wF.hp deferred to onShow so HP bar updates when STONE FORM! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Force of Nature check at line ~8814 sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check at line ~8814 sees the correct KO state.
   if (patrickStoneForm) {
     stoneFormHpAfter = Math.max(0, wF.hp - patrickStoneDmg);
     if (stoneFormHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
     log(`<span class="log-dmg">${lF.name} — Stone Form counter! ${patrickStoneDmg} damage to ${wF.name}!</span> ${wF.ko?'<span class="log-ko">KO!</span>':stoneFormHpAfter+' HP left'}`);
   }
 
-  // Cameron (25) — Force of Nature: Cameron wins a roll but the loser's defensive ability negates the damage → destroy the loser.
-  // Fires after all counter-damage (Patrick, Kodako, King Jay, Bogey) so wF.ko is accurate.
-  // Guardian Fairy absorption is NOT a negation — Cameron's damage DID land (on GF), so it does NOT trigger Force of Nature.
-  let cameronForceOfNature = false;
-  if (wF.id === 25 && !wF.ko && !lF.ko && !guardianFairyAbsorbed &&
-      (guardThomasStoic || patrickStoneForm || kodakoSwiftLose || bogeyReflected || kingJayReflected || dealerHouseRules || skyElusive || cityCybooBarrier || fangUndercoverActivated)) {
-    lF.hp = 0;
-    lF.ko = true;
-    lF.killedBy = 25;
-    cameronForceOfNature = true;
+  // Cameron (25) — Unstoppable Force: damage cannot be negated (cameronUnnegatable flag set above)
+  let cameronUnstoppableLogged = false;
+  if (cameronUnnegatable && !wF.ko && dmg > 0) {
+    cameronUnstoppableLogged = true;
     collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Force of Nature! Damage negated — ${lF.name} instantly destroyed!`);
+    log(`<span class="log-ability">${wF.name}</span> — Unstoppable Force! Damage cannot be negated!`);
   }
 
   // Pudge self-damage (game state — HP mutation deferred to BELLY FLOP! onShow)
@@ -9499,9 +9503,8 @@ function _resolveRoundImpl() {
   }
   // Fang Undercover knight reactions already collected via collectKC at game-state section (line ~9784) — do NOT double-fire here
 
-  // Cameron (25) — Force of Nature: damage negated → loser instantly destroyed (queued after defense callouts)
-  if (cameronForceOfNature) {
-    queueAbility('FORCE OF NATURE!', 'var(--common)', `${wF.name} — Damage negated... ${lF.name} is instantly DESTROYED!`, () => { renderBattle(); }, loseTeamName);
+  if (cameronUnstoppableLogged) {
+    queueAbility('UNSTOPPABLE!', 'var(--common)', `${wF.name} — Damage cannot be negated! ${dmg} damage goes through!`, null, winTeamName);
   }
   // Cameron knight reactions already collected via collectKC at game-state section (line ~9862) — do NOT double-fire here
 
