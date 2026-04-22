@@ -355,7 +355,7 @@ function smartSimRounds(gameNum) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = f.id; }
         if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        if (!ef.ko && hasSideline(team, 436)) {
+        if (!ef.ko && hasAlive(team, 436)) {
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
           if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
@@ -382,7 +382,7 @@ function smartSimRounds(gameNum) {
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
         if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-        if (!ef.ko && hasSideline(team, 436)) {
+        if (!ef.ko && hasAlive(team, 436)) {
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
           if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
@@ -412,7 +412,7 @@ function smartSimRounds(gameNum) {
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
     if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    if (!ef.ko && hasSideline(team, 436)) {
+    if (!ef.ko && hasAlive(team, 436)) {
       ef.hp = Math.max(0, ef.hp - 1);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
       if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
@@ -438,7 +438,7 @@ function smartSimRounds(gameNum) {
     ef.hp = Math.max(0, ef.hp - 1);
     if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
     if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
-    if (!ef.ko && hasSideline(team, 436)) {
+    if (!ef.ko && hasAlive(team, 436)) {
       ef.hp = Math.max(0, ef.hp - 1);
       if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
       if (ef.id === 24 && !ef.ko) { B[enemyKey].resources.fire++; }
@@ -472,7 +472,7 @@ function smartSimRounds(gameNum) {
     if (tf.hp <= 0) { tf.ko = true; tf.killedBy = pendingDmg >= 2 ? 336 : 108; }
     if (tf.id === 24 && !tf.ko) { B[teamKey].resources.fire++; }
     // Princess Shade (436) — Royal Decree: attacker (enemy) has Princess Shade on sideline
-    if (!tf.ko && hasSideline(enemy, 436)) {
+    if (!tf.ko && hasAlive(enemy, 436)) {
       tf.hp = Math.max(0, tf.hp - 1);
       if (tf.hp <= 0) { tf.ko = true; tf.killedBy = 436; }
       if (tf.id === 24 && !tf.ko) { B[teamKey].resources.fire++; }
@@ -1360,16 +1360,24 @@ function smartSimRounds(gameNum) {
 
   // ===== ROLL DICE =====
   let redDice, blueDice;
+  // Laura (79) — Catchy Tune: inject locked die, roll one fewer
+  const ctLockedRed = (B.catchyTuneUnlocked.red && B.catchyTuneLockedDie.red !== null && redCount > 0) ? B.catchyTuneLockedDie.red : null;
+  const ctLockedBlue = (B.catchyTuneUnlocked.blue && B.catchyTuneLockedDie.blue !== null && blueCount > 0) ? B.catchyTuneLockedDie.blue : null;
+  const redRollCount = ctLockedRed !== null ? Math.max(0, redCount - 1) : redCount;
+  const blueRollCount = ctLockedBlue !== null ? Math.max(0, blueCount - 1) : blueCount;
+
   // Bouril override
   if (active(B.red).id === 201 && active(B.red).hankFirstRoll) {
     redDice = [1,2,3]; active(B.red).hankFirstRoll = false;
   } else {
-    redDice = weightedRoll('red', redCount).sort((a,b)=>a-b);
+    redDice = weightedRoll('red', redRollCount).sort((a,b)=>a-b);
+    if (ctLockedRed !== null) { redDice.push(ctLockedRed); redDice.sort((a,b)=>a-b); }
   }
   if (active(B.blue).id === 201 && active(B.blue).hankFirstRoll) {
     blueDice = [1,2,3]; active(B.blue).hankFirstRoll = false;
   } else {
-    blueDice = weightedRoll('blue', blueCount).sort((a,b)=>a-b);
+    blueDice = weightedRoll('blue', blueRollCount).sort((a,b)=>a-b);
+    if (ctLockedBlue !== null) { blueDice.push(ctLockedBlue); blueDice.sort((a,b)=>a-b); }
   }
 
   // Dark Wing (76) — Precision: if rolled singles (no matching dice), reroll all dice once.
@@ -1884,7 +1892,7 @@ function smartSimRounds(gameNum) {
     // Bigsby (424) — Omen: Win: +1 damage
     if (wF.id === 424 && !wF.ko) { dmg += 1; }
     // Mike (445) — Torrent: Win: +1 damage
-    if (wF.id === 445 && !wF.ko) { dmg += 1; }
+    if (wF.id === 445 && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0) { dmg += 2; }
     // Twyla (417) — Lucky Dance: v674 rework — moved to dice count section (Lucky Stones give dice + Healing Seeds, not damage + HP)
     // Pudge (311) — doubles: +2 damage, 1 self-damage
     if (wF.id === 311 && wR.type === 'doubles') {
@@ -2005,12 +2013,21 @@ function smartSimRounds(gameNum) {
     // Zach (87) — Craftsman: while on sideline, Guard Thomas (41) active doubles win → +3 damage.
     // Cornelius (45) on enemy sideline blocks it. Matches index.html lines 9566–9578.
     if (hasSideline(wTeam, 87) && wF.id === 41 && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 3; }
-    // Laura (79) — Catchy Tune: while on sideline, winning dice in strict consecutive ascending order → +3 damage.
-    // Any length ≥2 run qualifies (1-2-3, 2-3-4, 3-4-5, 4-5-6, etc.). Cornelius (45) on enemy sideline blocks it.
-    // Matches index.html lines 9515–9531: hasSideline(winTeam,79) + sorted-ascending every-check + corneliusBlocksRally + dmg+=3.
-    if (hasSideline(wTeam, 79) && !wF.ko && winDice && winDice.length >= 2 && !hasSideline(lTeam, 45)) {
-      const _lSorted = [...winDice].sort((a, b) => a - b);
-      if (_lSorted.every((v, i) => i === 0 || v === _lSorted[i - 1] + 1)) { dmg += 3; }
+    // Laura (79) — Catchy Tune: Sideline & In Play: straight unlocks permanent die-lock.
+    // AI auto-locks highest die. Check both winner and loser for straight activation.
+    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && winDice && isStraight(winDice) && !hasSideline(lTeam, 45)) {
+      B.catchyTuneUnlocked[winner] = true;
+    }
+    const loser = winner === 'red' ? 'blue' : 'red';
+    if (!B.catchyTuneUnlocked[loser] && hasAlive(lTeam, 79) && loseDice && isStraight(loseDice) && !hasSideline(wTeam, 45)) {
+      B.catchyTuneUnlocked[loser] = true;
+    }
+    // AI locks highest die for next roll
+    if (B.catchyTuneUnlocked[winner] && winDice && winDice.length > 0) {
+      B.catchyTuneLockedDie[winner] = Math.max(...winDice);
+    }
+    if (B.catchyTuneUnlocked[loser] && loseDice && loseDice.length > 0) {
+      B.catchyTuneLockedDie[loser] = Math.max(...loseDice);
     }
     // Bilbo (80) — Little Buddy: while on sideline, +2 damage to active ghost's singles wins.
     // Cornelius (45) on losing team sideline blocks it. Matches index.html lines 9484–9496.
@@ -2113,8 +2130,18 @@ function smartSimRounds(gameNum) {
     // e.g. [1,2,3], [2,3,4], [3,4,5], [4,5-6] — any length run that is perfectly sequential (≥2 dice).
     // Matches index.html lines 9690–9699: sort loseDice, check every(v,i) i===0||v===prev+1, then dmg=0.
     if (lF.id === 37 && !lF.ko && dmg > 0 && !cameronUnnegatable) {
-      const _dD = (winner === 'red' ? blueDice : redDice).slice().sort((a, b) => a - b);
-      if (_dD.length >= 2 && _dD.every((v, i) => i === 0 || v === _dD[i - 1] + 1)) { dmg = 0; }
+      const _dD = (winner === 'red' ? blueDice : redDice).slice();
+      if (isStraight(_dD)) { dmg = 0; }
+    }
+    // Dealer (37) — House Rules WIN: straight → +3 damage.
+    if (wF.id === 37 && !wF.ko && dmg > 0) {
+      const _dW = (winner === 'red' ? redDice : blueDice).slice();
+      if (isStraight(_dW)) { dmg += 3; }
+    }
+    // Wanderer (4) — Curiosity: straight → +2 damage.
+    if (wF.id === 4 && !wF.ko && dmg > 0) {
+      const _wD = (winner === 'red' ? redDice : blueDice).slice();
+      if (isStraight(_wD)) { dmg += 2; }
     }
     // City Cyboo (77) — Barrier: takes no damage from enemy doubles.
     // 1 HP defender immune to the most common win type. Matches index.html lines 9713–9723.
@@ -2598,7 +2625,7 @@ function smartSimRounds(gameNum) {
     // (lowest HP) sideline ghost. Matches index.html lines 11041–11084: winstonSchemeSideline built from
     // loseTeam sideline, doWinstonSchemeChoice sets loseTeam.activeIdx. AI always swaps when sideline
     // exists — bringing in the opponent's weakest ghost is optimal play for Winston.
-    if (wF.id === 15 && !wF.ko && wR.type === 'doubles') {
+    if (wF.id === 15 && !wF.ko) {
       const winstonTargets = lTeam.ghosts
         .map((g, i) => ({ g, i }))
         .filter(x => x.i !== lTeam.activeIdx && !x.g.ko);
@@ -2803,9 +2830,9 @@ function smartSimRounds(gameNum) {
     if (ef.id === 54 && winnerWasEnemy && _eD.length >= 4) { const _dc = {}; _eD.forEach(d => _dc[d] = (_dc[d]||0)+1); if (Object.values(_dc).filter(c => c >= 2).length >= 2) rxns++; }
     // Dealer (37) HOUSE RULES! — fires when Dealer loses and his dice are in strict consecutive ascending order.
     // Uses _eD (enemy = loser's dice) for the sequential check. Matches index.html line 9696 collectKC call.
-    if (loserWasEnemy && ef.id === 37 && !ef.ko && _eD.length >= 2) {
-      const _sD = _eD.slice().sort((a, b) => a - b);
-      if (_sD.every((v, i) => i === 0 || v === _sD[i - 1] + 1)) rxns++;
+    if (ef.id === 37 && !ef.ko && _eD.length >= 2) {
+      if (loserWasEnemy && isStraight(_eD)) rxns++; // Dealer lose: negate
+      if (winnerWasEnemy && isStraight(_eD)) rxns++; // Dealer win: +3 damage
     }
     // City Cyboo (77) BARRIER! — fires when winner (knight's team, _kD) rolled doubles and City Cyboo lost.
     // Matches index.html line 9721 collectKC(loseTeamName, lF.name).

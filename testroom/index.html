@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v789'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v793'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1853,7 +1853,7 @@ body.lite-mode .die.rolling { animation: none !important; }
         <button class="set-filter-btn" data-set="Set 1" onclick="filterPicks('Set 1')">Set 1</button>
         <button class="set-filter-btn" data-set="Frost Valley" onclick="filterPicks('Frost Valley')">Frost Valley</button>
         <button class="set-filter-btn" data-set="Dark Castle" onclick="filterPicks('Dark Castle')">Dark Castle</button>
-        <button class="set-filter-btn" data-set="Volcanic Activity" onclick="filterPicks('Volcanic Activity')">Volcanic Activity</button>
+        <button class="set-filter-btn" data-set="Volcanic Isles" onclick="filterPicks('Volcanic Isles')">Volcanic Isles</button>
         <button class="set-filter-btn" data-set="Rolling Hills" onclick="filterPicks('Rolling Hills')">Rolling Hills</button>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Battle animation speed">
           <span id="speedLabel">Speed: 1x</span>
@@ -2035,7 +2035,7 @@ body.lite-mode .die.rolling { animation: none !important; }
     </div>
     <div class="standings-set-filters">
       <span class="ssf-label">Sets:</span>
-      <button class="ssf-btn active" data-set="va" onclick="toggleStandingsSet('Volcanic Activity', this)">Volcanic Activity</button>
+      <button class="ssf-btn active" data-set="va" onclick="toggleStandingsSet('Volcanic Isles', this)">Volcanic Isles</button>
       <button class="ssf-btn active" data-set="rh" onclick="toggleStandingsSet('Rolling Hills', this)">Rolling Hills</button>
       <button class="ssf-btn active" data-set="s1" onclick="toggleStandingsSet('Set 1', this)">Base Set</button>
       <button class="ssf-btn active" data-set="dc" onclick="toggleStandingsSet('Dark Castle', this)">Dark Castle</button>
@@ -2591,16 +2591,36 @@ body.lite-mode .die.rolling { animation: none !important; }
   </div>
 </div>
 
-<!-- Winston (15) — Scheme: post-doubles-win force-swap opponent's active ghost -->
+<!-- Winston (15) — Scheme: post-win force-swap opponent's active ghost + gain 2 dice -->
 <div class="pressure-overlay" id="winstonSchemeOverlay">
   <div class="pressure-modal">
     <div id="winstonSchemeBanner" class="pm-who-banner red">♟️ SCHEME!</div>
     <h3>Winston — Scheme!</h3>
-    <div class="pm-sub">Winston rolled doubles! Choose an enemy Ghost to swap in — or skip.</div>
+    <div class="pm-sub">Winston won! Choose an enemy Ghost to swap in — or skip. +2 dice next roll either way!</div>
     <div id="winstonSchemeOptions"></div>
     <div style="margin-top:10px;">
       <button onclick="doWinstonSchemeChoice(-1)" style="background:linear-gradient(135deg,#374151,#1f2937);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:14px;">✖ Skip — keep current Ghost</button>
     </div>
+  </div>
+</div>
+
+<!-- Laura (79) — Catchy Tune: die picker after each roll when unlocked -->
+<div class="pressure-overlay" id="catchyTuneOverlay">
+  <div class="pressure-modal">
+    <div id="catchyTuneBanner" class="pm-who-banner red">🎵 CATCHY TUNE!</div>
+    <h3>Laura — Catchy Tune!</h3>
+    <div class="pm-sub">Choose a die to lock for next roll:</div>
+    <div id="catchyTuneDiceOptions" style="display:flex;gap:12px;justify-content:center;margin:16px 0;"></div>
+  </div>
+</div>
+
+<!-- Tyson (365) — Hop: choose enemy sideline ghost to disable -->
+<div class="pressure-overlay" id="tysonHopOverlay">
+  <div class="pressure-modal">
+    <div id="tysonHopBanner" class="pm-who-banner red">🔥 HOP!</div>
+    <h3>Tyson — Hop!</h3>
+    <div class="pm-sub">Choose an enemy sideline ghost to disable:</div>
+    <div id="tysonHopOptions"></div>
   </div>
 </div>
 
@@ -2666,7 +2686,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v789';
+const TESTROOM_VERSION = 'v793';
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
@@ -2719,7 +2739,7 @@ try {
 }
 
 // ============================================================
-// GHOST DATA — Volcanic Activity (Redesigned)
+// GHOST DATA — Volcanic Isles (Redesigned)
 // ============================================================
 const SHELVED_IDS = new Set([
   // 204 Finn — active (Forge implemented)
@@ -2738,55 +2758,55 @@ const GHOSTS = [
   {
     id:201, name:"Bouril", rarity:"common", maxHp:10, art:"art/old_hank.jpg",
     ability:"Slumber", abilityDesc:"Entry: your first roll is automatically 1-2-3.",
-    category:"Defense/Negation", set:"Volcanic Activity",
+    category:"Defense/Negation", set:"Volcanic Isles",
     designNote:"9 HP tank that starts slow — your first roll is a guaranteed 1-2-3. After that, he's a big body that has to earn his keep."
   },
   {
-    id:202, name:"Death Howl", rarity:"rare", maxHp:6, art:"art/bubbles.png",
-    ability:"Pressure", abilityDesc:"Before rolling: you may force your opponent to swap their active ghost with one from their sideline. Opponent chooses who comes in.",
-    category:"Prediction/Reaction", set:"Volcanic Activity",
+    id:202, name:"Dark Fang", rarity:"rare", maxHp:5, art:"art/originals/DarkFang.png",
+    ability:"Pressure", abilityDesc:"While active: enemy ghost cannot heal or gain HP. Win: deal +1 damage for each KO'd ghost this game (both teams).",
+    category:"Damage Multiplier", set:"Rolling Hills",
     designNote:"Wolf spirit — Timber's packmate. Forces the opponent to swap their active ghost before rolling. They choose who comes in, but the disruption is brutal. 6 HP keeps him in the fight."
   },
   {
     id:203, name:"Benjamin", rarity:"uncommon", maxHp:3, art:"art/benny.jpg",
     ability:"Magic Touch", abilityDesc:"Once per turn: use the Moonstone special without discarding it.",
-    category:"Destruction/Instant Kill", set:"Volcanic Activity",
+    category:"Destruction/Instant Kill", set:"Volcanic Isles",
     designNote:"Moonstone economy card. 3 HP is fragile, but his ability to use Moonstones without discarding them makes him incredibly valuable. Protect him and your Moonstones go twice as far."
   },
   {
     id:204, name:"Finn", rarity:"rare", maxHp:6, art:"art/finn.png",
     ability:"Forge", abilityDesc:"Sideline & In Play: discard 1 Healing Seed and 1 Sacred Fire to forge the Flame Blade.",
     category:"Resource Generation", set:"Rolling Hills",
-    designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Activity's Moonstone plays. Deckbuilding archetype creator. (Originally named Smithy.)"
+    designNote:"Resource conversion is completely empty design space. The cross-set bridge — Frost Valley's economy feeds Volcanic Isles's Moonstone plays. Deckbuilding archetype creator. (Originally named Smithy.)"
   },
   {
     id:205, name:"Shade's Shadow", rarity:"rare", maxHp:1, art:"art/kaboom.png",
     ability:"Meltdown", abilityDesc:"Sideline: before each roll, if the enemy active ghost has less than 4 HP, deal 1 damage.",
-    category:"Damage Multiplier", set:"Volcanic Activity",
+    category:"Damage Multiplier", set:"Volcanic Isles",
     designNote:"Shade's literal shadow. 1 HP means he dies instantly in battle, but from the sideline he finishes off weakened ghosts. Only triggers when enemy is below 4 HP — a closer, not a chipper."
   },
   {
     id:206, name:"Zain", rarity:"ghost-rare", maxHp:6, art:"art/echo.png",
     ability:"Ice Blade", abilityDesc:"Win a roll: gain 1 Ice Shard. Sideline & In Play: discard 1 Ice Shard and 1 Moonstone to forge the Ice Blade.",
-    category:"Resource Generation", set:"Volcanic Activity",
-    designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Activity (the other is the whale, Nerina)."
+    category:"Resource Generation", set:"Volcanic Isles",
+    designNote:"Zora-style aquatic being. Smart, cultured, mortal — his people have been in the spirit world a long time, seen Doom, Mountain King, the old threats. Considering: Surge generation, free resource usage, or ice shard passive. One of two water spirits snuck into Volcanic Isles (the other is the whale, Nerina)."
   },
   {
     id:207, name:"Hank", rarity:"common", maxHp:7, art:"art/stomper.png",
     ability:"Tremor", abilityDesc:"Each 4 you roll: gain 1 Lucky Stone.",
-    category:"Debuff", set:"Volcanic Activity",
+    category:"Debuff", set:"Volcanic Isles",
     designNote:"Big volcanic Donkey Kong energy. 7 HP brawler who collects Lucky Stones on 4s. Lucky Stones let you reroll a die after any roll — his own mini-economy."
   },
   {
     id:208, name:"Happy Crystal", rarity:"common", maxHp:2, art:"art/clover.jpg",
     ability:"Spark Strike", abilityDesc:"Before rolling: you may sacrifice Happy Crystal to gain 1 Moonstone.",
-    category:"Resource Generation", set:"Volcanic Activity",
+    category:"Resource Generation", set:"Volcanic Isles",
     designNote:"Sacrifice play. 2 HP crystal that you pop for a Moonstone before the opponent can KO it. Timing is everything — use it too early and you waste a slot, too late and it dies for nothing."
   },
   {
     id:209, name:"Dart", rarity:"common", maxHp:3, art:"art/swipers.png",
     ability:"Plunder", abilityDesc:"Win: gain 2 Surge.",
-    category:"Debuff", set:"Volcanic Activity",
+    category:"Debuff", set:"Volcanic Isles",
     designNote:"Aggressive volcanic ember. Wins generate 2 Surge — one of the fastest Surge farmers in the game. 5 HP keeps him in the mix."
   },
   {
@@ -2800,7 +2820,7 @@ const GHOSTS = [
     id:301, name:"Dylan", rarity:"common", maxHp:3, art:"art/haystack_hank.jpg",
     ability:"Sun Song", abilityDesc:"Sideline & In Play: enemy before-roll effects don't activate. On winning rolls, gain 1 Burn.",
     category:"Prediction/Reaction", set:"Rolling Hills",
-    designNote:"Sideline utility. Shuts down enemy before-roll effects like Death Howl's forced swap or Benjamin's free Moonstone. 3 HP scarecrow standing guard."
+    designNote:"Sideline utility. Shuts down enemy before-roll effects like Dark Fang's forced swap or Benjamin's free Moonstone. 3 HP scarecrow standing guard."
   },
   {
     id:302, name:"Maximo", rarity:"common", maxHp:4, art:"art/toadstool.jpg",
@@ -2817,7 +2837,7 @@ const GHOSTS = [
   {
     id:304, name:"The Ember Force", rarity:"uncommon", maxHp:3, art:"art/the_flickers.jpg",
     ability:"Swarm", abilityDesc:"Before rolling: deal 1 damage to the enemy active ghost.",
-    category:"Dice Modifier", set:"Volcanic Activity",
+    category:"Dice Modifier", set:"Volcanic Isles",
     designNote:"Little ember preschool. 3 HP but deals 1 guaranteed damage before every roll. Fragile chip damage that adds up fast."
   },
   {
@@ -2829,7 +2849,7 @@ const GHOSTS = [
   {
     id:306, name:"Nerina", rarity:"legendary", maxHp:9, art:"art/the_deep.jpg",
     ability:"Leviathan", abilityDesc:"Entry: deal 3 damage to the enemy active ghost.",
-    category:"Destruction/Instant Kill", set:"Volcanic Activity",
+    category:"Destruction/Instant Kill", set:"Volcanic Isles",
     designNote:"The legendary ocean titan. Crashes in with 3 entry damage — enough to KO fragile ghosts on arrival. 9 HP means she sticks around after the impact."
   },
   {
@@ -2845,7 +2865,7 @@ const GHOSTS = [
     designNote:"Honey floop and Selene's pollinator. When the opponent rolls doubles (~42%), you gain a Healing Seed. Passive, reliable generation at 4 HP."
   },
   {
-    id:309, name:"Aunt Susan", rarity:"rare", maxHp:4, art:"art/rustler.jpg",
+    id:309, name:"Aunt Susan", rarity:"uncommon", maxHp:4, art:"art/rustler.jpg",
     ability:"Harvest Dance", abilityDesc:"Discard 1 Healing Seed: deal +2 damage. Win: +2 Healing Seeds.",
     category:"Damage Multiplier", set:"Rolling Hills",
     designNote:"The autumn whirlwind. Builds momentum like Caldera but resets on ANY loss, not just when you deal damage. Higher risk, different rhythm."
@@ -2871,7 +2891,7 @@ const GHOSTS = [
   {
     id:313, name:"Sylvia", rarity:"rare", maxHp:4, art:"art/ripple.jpg",
     ability:"Porpoise", abilityDesc:"Ice Shards cost nothing to commit. When you lose a roll: roll 1 die. If you roll a 5 or 6, negate all damage.",
-    category:"Defense/Negation", set:"Volcanic Activity",
+    category:"Defense/Negation", set:"Volcanic Isles",
     designNote:"The porpoising dodger. RNG defense that creates incredible drama — will the dodge happen? 30% is enough to matter without being broken."
   },
   {
@@ -2897,7 +2917,7 @@ const GHOSTS = [
   {id:330, name:"Snoozer", art:"art/snoozer.webp", rarity:"common", maxHp:3, ability:"Nap Time", abilityDesc:"Sideline: if no damage is dealt in a round, gain 1 Surge.", category:"Resource Generation", set:"Rolling Hills", designNote:"Rewards peaceful rounds."},
   {id:332, name:"Grandmother Willow", art:"art/grandmother_willow.webp", rarity:"ghost-rare", maxHp:7, ability:"Deep Roots", abilityDesc:"Cannot be KO'd by singles damage. Must be defeated by doubles or triples.", category:"Defense/Negation", set:"Rolling Hills", designNote:"Ultimate tank vs weak hits."},
   {id:334, name:"Fiddle", art:"art/fiddle.webp", rarity:"uncommon", maxHp:6, ability:"Hoedown", abilityDesc:"Win: you may swap your active ghost without triggering Stomper/Crag effects.", category:"Prediction/Reaction", set:"Rolling Hills", designNote:"Safe swap enabler. Counters Stomper."},
-  {id:336, name:"Humar", art:"art/humar.jpg", rarity:"legendary", maxHp:5, ability:"Meteor", abilityDesc:"Win: opponent takes 2 damage before their next roll. Gain 1 Burn.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"The blue flame legend. REWORKED 2026-04-12: swapped from Sacred Fire gen to Lucy's old delayed-damage + Burn mechanic, buffed from 1 to 2 damage. Renamed from Sacred Flame to Meteor. HP reduced 8→5 to balance the offensive power."},
+  {id:336, name:"Humar", art:"art/humar.jpg", rarity:"legendary", maxHp:5, ability:"Meteor", abilityDesc:"Win: opponent takes 2 damage before their next roll. Gain 1 Burn.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"The blue flame legend. REWORKED 2026-04-12: swapped from Sacred Fire gen to Lucy's old delayed-damage + Burn mechanic, buffed from 1 to 2 damage. Renamed from Sacred Flame to Meteor. HP reduced 8→5 to balance the offensive power."},
   {id:338, name:"Thistle", art:"art/thistle.webp", rarity:"rare", maxHp:7, ability:"Barbed", abilityDesc:"When you take damage: the attacker takes 1 damage back. Always.", category:"Defense/Negation", set:"Rolling Hills", designNote:"Passive permanent thorns."},
   {id:340, name:"Cluck", art:"art/cluck.webp", rarity:"common", maxHp:5, ability:"Peck", abilityDesc:"Win with singles: deal +2 damage.", category:"Damage Multiplier", set:"Rolling Hills", designNote:"Simple singles booster."},
   {id:342, name:"Calvin", art:"art/mossy.webp", rarity:"uncommon", maxHp:5, ability:"Overclock", abilityDesc:"Win: heal +1 HP (can exceed max HP). Gain +1 Healing Seed.", category:"HP Recovery", set:"Rolling Hills", designNote:"Overclocking healer. HP grows beyond max on wins. Snowballs if unchecked."},
@@ -2915,18 +2935,18 @@ const GHOSTS = [
   {id:366, name:"Mother Nature", art:"art/mother_nature.webp", rarity:"legendary", maxHp:8, ability:"Seasons", abilityDesc:"Each round cycles: Spring (+1 HP), Summer (+1 dmg), Autumn (+1 resource), Winter (opponent -1 die).", category:"Prediction/Reaction", set:"Rolling Hills", designNote:"The legendary. Predictable but unstoppable cycle."},
   {id:368, name:"Scarecrow King", art:"art/scarecrow_king.webp", rarity:"rare", maxHp:4, ability:"Command", abilityDesc:"Sideline: all your other sideline ghosts' abilities trigger twice.", category:"Prediction/Reaction", set:"Rolling Hills", designNote:"Sideline amplifier. Low HP if forced to fight."},
   // === WYATT APRIL 11 2026 STAGING (IDs 407-431) — GALLERY ONLY, NO BATTLE LOGIC ===
-  // These 25 cards (12 Volcanic Activity + 13 Rolling Hills) were designed by the cards
+  // These 25 cards (12 Volcanic Isles + 13 Rolling Hills) were designed by the cards
   // agent overnight. abilityDesc is written but NO handlers, entry effects, or sideline
   // checks exist for any of these IDs. Wyatt designs battle logic next session.
   // Refiner: DO NOT IMPLEMENT abilities for IDs 407-431 until Wyatt explicitly approves.
   {id:409, name:"Nick & Knack", rarity:"common", maxHp:4, art:"art/originals/Cindergrub.png", ability:"Knick Knack", abilityDesc:"Before rolling: you may steal 1 special from the other player. If you do, gain 1 HP and 2 Burn.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Twin glowing green tunnel-worms. Pre-roll steal → +1 HP + 2 Burn (was +3 HP)."},
   {id:410, name:"Mirror Matt", rarity:"common", maxHp:1, art:"art/originals/MirrorMatt.png", ability:"Seven Years", abilityDesc:"If the opponent wins with doubles, the damage is reflected to the attacker instead.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A being made of obsidian volcanic glass — impossibly beautiful, impossibly sharp. Big burst damage but punishes itself on every win. At 3HP the self-damage is genuinely consequential. Wyatt flag: combined with other VA self-damage sources (Wick, Glass Fang loops) this could snowball; worth watching. Art direction: a translucent jet-black glass creature with razor edges catching lava-light like a prism, ethereal and beautiful, backlit in deep orange."},
-  {id:413, name:"Sable", rarity:"uncommon", maxHp:6, art:"art/originals/ObsidianEel.png", ability:"Furnace", abilityDesc:"Sideline & In Play: Rolling all odd numbers, gain 1 Sacred Fire.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"A long sinuous being made of polished black volcanic glass that swims through lava streams — beautiful and alien. Doubles → Moonstone (~44% trigger on wins) creates the first real Moonstone generation engine in VA. Synergizes with Fluxling: nudge dice into doubles, Eel refills the Moonstone you spent nudging. Art direction: a sleek eel of polished obsidian glass, semi-transparent, cool blue-white glow pulsing along its spine, slow and hypnotic."},
-  {id:414, name:"Chow", rarity:"uncommon", maxHp:5, art:"art/originals/Chow.png", ability:"Secret Ingredient", abilityDesc:"Before rolling: spend 1 Healing Seed to gain +2 dice this roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"THE cozy card of Volcanic Activity. A stubby little mole who has lived underground in the lava tubes for so long it radiates warmth and contentment. Modest entry Healing Seed — not flashy, just warm and helpful. Bridges VA into cross-set Healing Seed strategies. The card that makes players go 'aww' before dropping it. Art direction: a plump mole with velvety ashen-grey fur, tiny pink claws, eyes glowing like embers, wears a small dirt-stained waistcoat, peering up from a tunnel mouth."},
+  {id:413, name:"Sable", rarity:"uncommon", maxHp:6, art:"art/originals/ObsidianEel.png", ability:"Furnace", abilityDesc:"Sideline & In Play: Rolling all odd numbers, gain 1 Sacred Fire.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"A long sinuous being made of polished black volcanic glass that swims through lava streams — beautiful and alien. Doubles → Moonstone (~44% trigger on wins) creates the first real Moonstone generation engine in VA. Synergizes with Fluxling: nudge dice into doubles, Eel refills the Moonstone you spent nudging. Art direction: a sleek eel of polished obsidian glass, semi-transparent, cool blue-white glow pulsing along its spine, slow and hypnotic."},
+  {id:414, name:"Chow", rarity:"uncommon", maxHp:5, art:"art/originals/Chow.png", ability:"Secret Ingredient", abilityDesc:"Before rolling: spend 1 Healing Seed to gain +2 dice this roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"THE cozy card of Volcanic Isles. A stubby little mole who has lived underground in the lava tubes for so long it radiates warmth and contentment. Modest entry Healing Seed — not flashy, just warm and helpful. Bridges VA into cross-set Healing Seed strategies. The card that makes players go 'aww' before dropping it. Art direction: a plump mole with velvety ashen-grey fur, tiny pink claws, eyes glowing like embers, wears a small dirt-stained waistcoat, peering up from a tunnel mouth."},
   {id:415, name:"Nyx & Bessie", rarity:"common", maxHp:6, art:"art/originals/NyxAndBessie.png", ability:"Moo! Caw!", abilityDesc:"While on the sideline, gain 4 Healing Seeds if you defeat a Ghost.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Cow + crow duo. Wyatt's Photoshop original 2026-04-11. A white-faced cow with antlers and a perched crow — farmstead spirits of the Rolling Hills. Sideline payoff: KO an enemy ghost and Nyx & Bessie drop 3 Healing Seeds into your lap. Big burst but requires a kill — parallels Bo's Miracle as a KO-triggered payoff at common rarity. 6HP is generous for a common but justified since sideline-only ability means HP is rarely tested."},
-  {id:416, name:"Rook", rarity:"uncommon", maxHp:6, art:"art/originals/Pyroclast.png", ability:"Charcoal", abilityDesc:"Immune to Sacred Fire and Burn damage. Win: deal +1 damage per Surge committed this turn.", category:"Damage Multiplier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Born from eruption itself — a jagged lava fragment given explosive, furious life. REWORKED 2026-04-11: Surge-conversion payoff + full Sacred Fire immunity. Every Surge committed before rolling becomes +1 damage on a winning roll; incoming enemy Sacred Fire damage does nothing to him. Hard counter to Tyler/Humar/Pyroclast-style Sacred Fire damage stackers on the opposing side. Lore: he's made of the thing, the fire doesn't burn him. Art: manic cartoon lava-rock creature with wild eyes, mid-eruption on a volcanic ridge, toothy grin."},
+  {id:416, name:"Rook", rarity:"uncommon", maxHp:6, art:"art/originals/Pyroclast.png", ability:"Charcoal", abilityDesc:"Immune to Sacred Fire and Burn damage. Win: deal +1 damage per Surge committed this turn.", category:"Damage Multiplier", set:"Volcanic Isles", tags:["Final 50"], designNote:"Born from eruption itself — a jagged lava fragment given explosive, furious life. REWORKED 2026-04-11: Surge-conversion payoff + full Sacred Fire immunity. Every Surge committed before rolling becomes +1 damage on a winning roll; incoming enemy Sacred Fire damage does nothing to him. Hard counter to Tyler/Humar/Pyroclast-style Sacred Fire damage stackers on the opposing side. Lore: he's made of the thing, the fire doesn't burn him. Art: manic cartoon lava-rock creature with wild eyes, mid-eruption on a volcanic ridge, toothy grin."},
   {id:417, name:"Twyla", rarity:"rare", maxHp:6, art:"art/originals/Hesta.png", ability:"Lucky Dance", abilityDesc:"Each Lucky Stone you spend this turn adds +1 die to your roll and gains +1 Healing Seed.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Moonlight dancer twirling above a reflecting pool. Lucky Stones used for rerolls during the turn gain a second payoff IF Twyla wins: each stone spent adds +1 damage to the hit AND +1 HP healed. Spend 3 Lucky Stones on rerolls, win the roll, deal +3 bonus damage and heal 3 HP. The dance rewards commitment — the more stones you burn chasing the win, the bigger the payoff when you get it. Pairs with Hedgeling (Healing Seed → Lucky Stone pipeline) and any Lucky Stone generator. Art: blue moonlight spirit dancer under crescent moon."},
-  {id:418, name:"Pip", rarity:"ghost-rare", maxHp:7, art:"art/originals/Pip.png", ability:"Toasted", abilityDesc:"Upon rolling triples or better: permanently remove 1 die from your opponent for the rest of the game. Pip also gains 2 Sacred Fires. Once per game.", category:"Damage Multiplier", set:"Volcanic Activity", tags:["Final 50"], designNote:"THE one. A tiny ember dragon who passed away mid-giggle while doing a delighted spin-jump near a hot geyser. The ghost still does the spin. Cannot stop. Genuinely does not understand death and has no plans to start. The +1 on all wins is the reliable floor; the triples payoff (+3 damage + 2HP from sheer joy) is the unforgettable jackpot at 2.8% — rare but legendary when it lands. NOT Dragonclaw. Dragonclaw rakes. Pip giggles. Mandatory holo foil. Midjourney art direction: tiny translucent ember dragon ghost mid-loop-de-loop, wings spread in delight, open-mouthed giggle with tiny smoke puffs from nostrils, surrounded by floating warm sparks, Spiritkin ghost transparency, warm orange-gold backlight, pure JOY."},
+  {id:418, name:"Pip", rarity:"ghost-rare", maxHp:7, art:"art/originals/Pip.png", ability:"Toasted", abilityDesc:"Upon rolling triples or better: permanently remove 1 die from your opponent for the rest of the game. Pip also gains 2 Sacred Fires. Once per game.", category:"Damage Multiplier", set:"Volcanic Isles", tags:["Final 50"], designNote:"THE one. A tiny ember dragon who passed away mid-giggle while doing a delighted spin-jump near a hot geyser. The ghost still does the spin. Cannot stop. Genuinely does not understand death and has no plans to start. The +1 on all wins is the reliable floor; the triples payoff (+3 damage + 2HP from sheer joy) is the unforgettable jackpot at 2.8% — rare but legendary when it lands. NOT Dragonclaw. Dragonclaw rakes. Pip giggles. Mandatory holo foil. Midjourney art direction: tiny translucent ember dragon ghost mid-loop-de-loop, wings spread in delight, open-mouthed giggle with tiny smoke puffs from nostrils, surrounded by floating warm sparks, Spiritkin ghost transparency, warm orange-gold backlight, pure JOY."},
   {id:419, name:"Boopies", rarity:"common", maxHp:3, art:"art/originals/Hedgeling.png", ability:"Boopie Magic", abilityDesc:"Sideline: whenever your active ghost spends a Healing Seed, gain 1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A tiny sprite that lives inside the hedgerows between fields — you can only see it if you know to look. Passive synergy that rewards Healing Seed builds: every seed spent also generates luck. Combos with Chester, Gourdling, Beewick, and The Overcast naturally. Art direction: a 6-inch figure peering through a gap in a thorny green hedgerow, mossy green skin, bright curious eyes, small acorn cap, nearly invisible against the hedge."},
   {id:420, name:"Lars", rarity:"common", maxHp:4, art:"art/originals/Gourdling.png", ability:"Light the Way", abilityDesc:"Entry: gain 1 Surge, 1 Lucky Stone, and 1 Burn.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A pumpkin-spirit — round, orange, genuinely delighted by autumn. Entry 2 Healing Seeds is a resource burst that fuels The Overcast, Magnolia, Beewick, and Chester combos. Feels like opening a harvest basket. Pairs naturally with any Healing Seed payoff card. Art direction: a round gently glowing jack-o-lantern creature with an authentically HAPPY carved expression (not spooky — joyful), autumn leaves orbiting it, warm amber light from within."},
   {id:423, name:"Zippa", rarity:"uncommon", maxHp:5, art:"art/originals/Beewick.png", ability:"Glimmer", abilityDesc:"Gain +1 damage for each Healing Seed you hold.", category:"Damage Multiplier", set:"Rolling Hills", tags:["Final 50"], designNote:"Beekeeper spirit. Reworked: passive +1 damage per Healing Seed held. Rewards stacking seeds. Hard synergy with Chester and Gourdling."},
@@ -2938,11 +2958,11 @@ const GHOSTS = [
   {id:430, name:"Gordok", rarity:"uncommon", maxHp:8, art:"art/originals/Millicent.png", ability:"River Terror", abilityDesc:"Win: you may take 2 specials from your opponent instead of dealing damage. Gain +1 die next roll and +1 Moonstone.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"The cunning folk of the Rolling Hills — hedge-witch, wise-woman, someone you bring a pie to before you bring a problem. Moonstone-powered full information + theft: see everything they have, take the worst thing for them to lose. Spending Moonstone (rare resource) for information and theft is elegant. Active, decisive, satisfying for the person playing it. Art direction: a sharp-eyed older woman-shaped figure in a patchwork cloak, standing at a fork in the hill paths, wisps of blue-grey smoke curling from her hands, deeply knowing expression — she already knows what you're going to say."},
   {id:431, name:"Pal Al", rarity:"ghost-rare", maxHp:3, art:"art/originals/TheOvercast.png", ability:"Squall", abilityDesc:"Win: you may gain 1 Magic Firefly instead of dealing damage.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
   {id:432, name:"Valkin the Grand", rarity:"legendary", maxHp:8, art:"art/originals/ValkinTheGrand.png", ability:"Grand Spoils", abilityDesc:"When you KO an enemy ghost: gain 1 Sacred Fire, 2 Ice Shards, 1 Lucky Stone, 1 Moonstone, 2 Healing Seeds.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"THE ANTAGONIST LEGENDARY. Valkin the Grand is the main villain of the BOO: Battle of Origins lore — the tyrant who trapped Toby's grandfather and seeks to control the BOO itself. Grand Spoils embodies his greed: every KO pays him the full resource suite. 6 HP is modest-legendary so the snowball has to be earned. Art: Gemini-generated regal spirit monarch on a blue-flame throne. NOTE: this slot previously held Vela (Second Breath resurrection mechanic) — resolver code at lines ~10776 and smartAutoPlay ~1759 still references id 432 for Vela's resurrection trigger. Needs cleanup: either reassign Vela to a new ID or remove the resurrection hook from id 432."},
-  {id:433, name:"Lucas", rarity:"uncommon", maxHp:5, art:"art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: When a ghost is revived, it charges into play with +3 HP and +1 die next roll. The reviver steps to the sideline.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
+  {id:433, name:"Lucas", rarity:"uncommon", maxHp:5, art:"art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: When a ghost is revived, it charges into play with +3 HP and +1 die next roll. The reviver steps to the sideline.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
   {id:435, name:"Willow", rarity:"ghost-rare", maxHp:4, art:"art/originals/Willow.png", ability:"Joy of Painting", abilityDesc:"Sideline & In Play: gain +1 die if you lost the last roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"A ghost painter at her easel by a moonlit window. Paints through the night, finds joy in every loss. The comeback mechanic — every defeat fuels the next roll. Bob Ross energy meets Dark Castle. 4HP ghost-rare, fragile but inspiring."},
-  {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Bounty", abilityDesc:"Sideline: when the enemy ghost takes damage before the roll, deal +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
+  {id:436, name:"Princess Shade", rarity:"rare", maxHp:4, art:"art/originals/PrincessShade.png", ability:"Bounty", abilityDesc:"While in play & on sideline: when the enemy ghost takes damage before the roll, deal +1 additional damage.", category:"Damage Multiplier", set:"Dark Castle", tags:["Final 50"], designNote:"A dark elegant apparition ascending a grand staircase in a golden-lit castle atrium. Long flowing shadow-form dissolving at the edges. Regal, haunting, beautiful. The princess of the Dark Castle."},
   {id:437, name:"Rascals", rarity:"common", maxHp:3, art:"art/originals/Rascals.png", ability:"Stampede", abilityDesc:"Entry: gain 3 Burn.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Four tiny colorful imp fiends — purple, red, orange, blue — racing through a gorgeous ornate castle hallway. Pure chaos energy. A pack card. The common troublemakers of the Dark Castle."},
-  {id:445, name:"Michael", rarity:"uncommon", maxHp:5, art:"art/originals/WaterSpirit.png", ability:"Torrent", abilityDesc:"Win: deal +1 damage. While in play, your sideline ghosts are immune to Burn.", category:"Defense/Negation", set:"Rolling Hills", tags:["Final 50"], designNote:"Blue water spirit leaping joyfully in front of a waterfall. Frost Valley energy."},
+  {id:445, name:"Michael", rarity:"uncommon", maxHp:5, art:"art/originals/WaterSpirit.png", ability:"Torrent", abilityDesc:"Even doubles: deal +2 damage. While in play, your sideline ghosts are immune to Burn.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"Blue water spirit leaping joyfully in front of a waterfall. Frost Valley energy."},
   {id:446, name:"Mable Stadango", rarity:"rare", maxHp:5, art:"art/originals/ForestSpirit.png", ability:"Hex", abilityDesc:"When you place Burn on an enemy ghost, remove 1 enemy die next roll. Win: gain 1 Burn.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"Hooded spirit with glowing green eyes. In play only. Burn-placement → -1 enemy die. Win → +1 Burn."},
   {id:447, name:"Professor Hawking", rarity:"rare", maxHp:2, art:"art/originals/ProfessorHawking.png", ability:"Wisdom", abilityDesc:"While in play: gain +2 dice if you are holding a Moonstone.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Pixel art ghost owl reading a golden book on a tree branch at sunset. Wise, scholarly, charming."},
   {id:448, name:"Harvey", rarity:"ghost-rare", maxHp:6, art:"art/originals/TreeMonster.png", ability:"Harvest Moon", abilityDesc:"Win: if you rolled any fives, gain 1 Moonstone. (Max 1 Moonstone)", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Massive dark tree creature with a wide glowing grin and moonlight orb. Menacing but charming. Tank energy."},
@@ -2954,59 +2974,59 @@ const GHOSTS = [
   {id:439, name:"Lucy's Shadow", rarity:"rare", maxHp:4, art:"art/originals/LucysShadow.png", ability:"Mentor", abilityDesc:"Sideline: while Lucy is in play, Lucy gains +1 extra Sacred Fire on wins and her Sacred Fires deal double damage.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"A dark contemplative dragon-spirit sitting in a castle archway, devoted to Lucy's blue fire. Doubles Lucy's Sacred Fire output from the bench. The loyal shadow that amplifies the queen."},
   {id:438, name:"Champ", rarity:"ghost rare", maxHp:5, art:"art/originals/Champ.png", ability:"Thrill", abilityDesc:"Immune to damage from Specials. Gains +1 Surge when you or the enemy rolls doubles or higher.", category:"Defense/Negation", set:"Dark Castle", tags:["Final 50"], designNote:"A hulking blue-grey flame beast with orange fire mane standing in a grand cathedral hall. Fierce fanged grin, powerful stance. The mid-tier brawler of Dark Castle. Watercolor meets Pokemon Gengar energy."},
   // === CARPENTER / WELDER / FOREMAN — Blue-Collar Evolution Chain ===
-  {id:449, name:"Carpenter", rarity:"common", maxHp:4, art:"art/originals/Carpenter.png", ability:"Crafty", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
-  {id:450, name:"Welder", rarity:"rare", maxHp:5, art:"art/originals/Welder.png", ability:"Flux", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
-  {id:451, name:"Foreman", rarity:"rare", maxHp:5, art:"art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"Win: +1 die next roll.", category:"Evolution", set:"Volcanic Activity", tags:["Final 50"], designNote:"End of the blue-collar chain. By this point you have Carpenter's Hammer (+2 singles) and Welder's Torch (burns +1, wins give burn) both active. Foreman snowballs dice on wins. The boss. Art: Spiritkin leaning over blueprints, detective-show 'I've had it up to here' energy."},
-  {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy. Rewards evolution-heavy decks with Burn resources. Pairs with Carpenter chain, Bigsby→Doom, any future transform cards."},
+  {id:449, name:"Carpenter", rarity:"common", maxHp:4, art:"art/originals/Carpenter.png", ability:"Crafty", abilityDesc:"Win: +2 damage on singles. If you use a Surge, transform into Welder. Gain the Hammer.", category:"Evolution", set:"Volcanic Isles", tags:["Final 50"], designNote:"Blue-collar evolution chain entry. Simple, honest, hits hard on singles. The dad card. Transforms via surge commit, leaving behind a permanent +2 singles powerup (Carpenter's Hammer). Art: Spiritkin working on an old rocking chair in a warm workshop."},
+  {id:450, name:"Welder", rarity:"rare", maxHp:5, art:"art/originals/Welder.png", ability:"Flux", abilityDesc:"Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.", category:"Evolution", set:"Volcanic Isles", tags:["Final 50"], designNote:"Mid-evolution. Burn specialist with welding mask energy. Transforms on rolling a 4 — the skilled tradesman graduating to management. Leaves behind Welder's Torch as permanent item. Art: Spiritkin with welding mask shooting sparks upward like a cowboy."},
+  {id:451, name:"Foreman", rarity:"rare", maxHp:5, art:"art/originals/Foreman.png", ability:"Blueprint", abilityDesc:"Win: +1 die next roll.", category:"Evolution", set:"Volcanic Isles", tags:["Final 50"], designNote:"End of the blue-collar chain. By this point you have Carpenter's Hammer (+2 singles) and Welder's Torch (burns +1, wins give burn) both active. Foreman snowballs dice on wins. The boss. Art: Spiritkin leaning over blueprints, detective-show 'I've had it up to here' energy."},
+  {id:452, name:"Ripagoo", rarity:"uncommon", maxHp:5, art:"art/originals/Ripagoo.png", ability:"Chemical Y", abilityDesc:"Sideline: if a card in play transforms, gain 2 Burn.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"Sideline observer that feeds off transformation energy. Rewards evolution-heavy decks with Burn resources. Pairs with Carpenter chain, Bigsby→Doom, any future transform cards."},
   // === SKYLAR SEED — PLAGUE/DECAY MECHANIC (2026-04-11) — GALLERY ONLY, NO BATTLE LOGIC ===
   // First ghost to target the opposing sideline. Working name, working numbers — pending 20-ghost name review.
   // === VOLCANIC ACTIVITY — Designed Cards ===
-  {id:317, name:"Scorch", art:"art/scorch.webp", rarity:"common", maxHp:3, ability:"Singe", abilityDesc:"Win: opponent's active ghost loses 1 max HP permanently.", category:"Debuff", set:"Volcanic Activity", designNote:"Permanent max HP reduction. Shrinks opponent over time."},
-  {id:319, name:"Pumice", art:"art/pumice.webp", rarity:"common", maxHp:4, ability:"Float", abilityDesc:"Sideline: if your ghost would take 3+ damage, reduce to 2.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Damage cap from sideline."},
-  {id:321, name:"Forge Fire", rarity:"uncommon", maxHp:5, art:"art/forge_fire.webp", ability:"Temper", abilityDesc:"Spend 1 Surge: your next win deals double damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Surge as offensive fuel."},
-  {id:323, name:"Char", rarity:"common", maxHp:4, art:"art/char.webp", ability:"Afterburn", abilityDesc:"Win: deal 1 damage at the start of next round.", category:"Debuff", set:"Volcanic Activity", designNote:"Delayed damage."},
-  {id:325, name:"Magma Heart", rarity:"rare", maxHp:7, art:"art/magma_heart.webp", ability:"Core Melt", abilityDesc:"Below 3 HP: all your damage ignores damage reduction effects.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Eruption trigger — true damage when near death."},
-  {id:327, name:"Natalia", rarity:"ghost-rare", maxHp:6, art:"art/geode.jpg", ability:"Materialization", abilityDesc:"When you roll even doubles (2s, 4s, or 6s): gain 1 Moonstone + 1 Lucky Stone.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Even doubles reward. 2s, 4s, and 6s each trigger a Moonstone — covers weak and strong doubles alike."},
-  {id:329, name:"Clink", rarity:"common", maxHp:3, art:"art/clink.webp", ability:"Prospect", abilityDesc:"Win: gain 1 Surge. Lose: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Always generates something."},
-  {id:331, name:"Igneous", rarity:"uncommon", maxHp:5, art:"art/igneous.webp", ability:"Crystallize", abilityDesc:"Each round you don't take damage: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Activity", designNote:"Rewards defense."},
-  {id:333, name:"Smoke Signal", rarity:"common", maxHp:4, art:"art/smoke_signal.webp", ability:"Warning", abilityDesc:"Sideline: reveal opponent's sideline abilities.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"Information card. Passive recon."},
-  {id:335, name:"Soot Sprite", rarity:"rare", maxHp:6, art:"art/soot_sprite.webp", ability:"Scatter", abilityDesc:"When hit: split into 2 copies with half HP each. Opponent must KO both.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Splitting is completely new."},
-  {id:337, name:"Fuego", rarity:"uncommon", maxHp:5, art:"art/fuego.webp", ability:"Fiesta", abilityDesc:"Win with triples: gain 1 of every resource.", category:"Resource Generation", set:"Volcanic Activity", designNote:"The jackpot card. Rare but massive payoff."},
-  {id:339, name:"Slag Heap", art:"art/slag_heap.webp", rarity:"common", maxHp:3, ability:"Residue", abilityDesc:"When defeated: opponent's active ghost cannot heal for 2 rounds.", category:"Debuff", set:"Volcanic Activity", designNote:"Anti-healing death trigger."},
-  {id:341, name:"Obsidian Throne", rarity:"ghost-rare", maxHp:7, art:"art/obsidian_throne.webp", ability:"Dominion", abilityDesc:"While active: opponent cannot use items (Surge, Surge, Healing Seeds).", category:"Debuff", set:"Volcanic Activity", designNote:"Item lockdown. Opponent hoards but can't spend."},
-  {id:343, name:"Boris", rarity:"common", maxHp:6, art:"art/bastion.webp", ability:"Fortify", abilityDesc:"When you spend a Surge: Boris gains 2 HP (can exceed max HP).", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Surge for tankiness. Overclocks past maxHp like Calvin — all heals overclock except Healing Seeds."},
-  {id:345, name:"Red Hunter", art:"art/tremor.webp", rarity:"ghost-rare", maxHp:6, ability:"Rumble", abilityDesc:"Win a roll: if your opponent has any specials, deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Punishes hoarders. Logic was already correct — only fires on a winning roll. Text now matches behavior."},
-  {id:347, name:"Eruption", rarity:"rare", maxHp:7, art:"art/eruption.webp", ability:"Blow", abilityDesc:"Spend 2 Silver Leaves: deal 4 damage immediately. No roll needed.", category:"Destruction/Instant Kill", set:"Volcanic Activity", designNote:"Direct damage. Guaranteed 4 for 2 Silver Leaves."},
-  {id:349, name:"Wick", rarity:"uncommon", maxHp:5, art:"art/wick.webp", ability:"Slow Burn", abilityDesc:"Each round: deal 1 damage to opponent. But lose 1 HP yourself.", category:"Debuff", set:"Volcanic Activity", designNote:"Mutual destruction timer."},
-  {id:351, name:"Glow Worm", rarity:"common", maxHp:5, art:"art/glow_worm.webp", ability:"Tunnel", abilityDesc:"Spend 1 Surge: switch your active ghost. Free action, no swap triggers.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"Resource-powered free swap."},
-  {id:353, name:"Molten Mirror", rarity:"rare", maxHp:6, art:"art/molten_mirror.webp", ability:"Reflect Pool", abilityDesc:"Opponent's resource-spending abilities also cost 1 additional resource.", category:"Debuff", set:"Volcanic Activity", designNote:"Resource tax. Economy warfare."},
-  {id:355, name:"Puff Ball", rarity:"common", maxHp:3, art:"art/puff_ball.webp", ability:"Burst", abilityDesc:"When hit by doubles: explode for 2 damage to opponent. Then KO yourself.", category:"Destruction/Instant Kill", set:"Volcanic Activity", designNote:"Reactive suicide bomber. 41.7% trigger rate."},
-  {id:357, name:"Anvil", rarity:"uncommon", maxHp:6, art:"art/anvil.webp", ability:"Heavy Strike", abilityDesc:"Spend 1 Surge: singles deal 3 damage instead of 1 this round.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Surge turns weak singles devastating."},
-  {id:359, name:"Volcanic Heart", art:"art/volcanic_heart.webp", rarity:"ghost-rare", maxHp:8, ability:"Pulse", abilityDesc:"Every 3 rounds: deal 2 damage to ALL ghosts on the field (both teams).", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Board-wide pulse. Changes team building."},
-  {id:361, name:"Ash Phoenix", art:"art/ash_phoenix.webp", rarity:"rare", maxHp:4, ability:"Rebirth", abilityDesc:"When defeated: return to battle next round with 2 HP. Once per game.", category:"HP Recovery", set:"Volcanic Activity", designNote:"Self-resurrection."},
-  {id:363, name:"Pyrope", rarity:"uncommon", maxHp:5, art:"art/pyrope.webp", ability:"Gem Armor", abilityDesc:"Spend 1 Surge: negate the next instance of damage.", category:"Defense/Negation", set:"Volcanic Activity", designNote:"Surge as a shield."},
-  {id:365, name:"Tyson", rarity:"common", maxHp:4, art:"art/cinder_bunny.png", ability:"Hop", abilityDesc:"Before rolling: you may switch Tyson with a sideline ghost. No entry effects trigger.", category:"Prediction/Reaction", set:"Volcanic Activity", designNote:"Clean swap, no triggers."},
-  {id:367, name:"Dragonclaw", rarity:"rare", maxHp:7, art:"art/dragonclaw.webp", ability:"Rake", abilityDesc:"Win with 3 different numbers: deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Activity", designNote:"Rewards diverse rolls. ~55% trigger rate."},
+  {id:317, name:"Scorch", art:"art/scorch.webp", rarity:"common", maxHp:3, ability:"Singe", abilityDesc:"Win: opponent's active ghost loses 1 max HP permanently.", category:"Debuff", set:"Volcanic Isles", designNote:"Permanent max HP reduction. Shrinks opponent over time."},
+  {id:319, name:"Pumice", art:"art/pumice.webp", rarity:"common", maxHp:4, ability:"Float", abilityDesc:"Sideline: if your ghost would take 3+ damage, reduce to 2.", category:"Defense/Negation", set:"Volcanic Isles", designNote:"Damage cap from sideline."},
+  {id:321, name:"Forge Fire", rarity:"uncommon", maxHp:5, art:"art/forge_fire.webp", ability:"Temper", abilityDesc:"Spend 1 Surge: your next win deals double damage.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Surge as offensive fuel."},
+  {id:323, name:"Char", rarity:"common", maxHp:4, art:"art/char.webp", ability:"Afterburn", abilityDesc:"Win: deal 1 damage at the start of next round.", category:"Debuff", set:"Volcanic Isles", designNote:"Delayed damage."},
+  {id:325, name:"Magma Heart", rarity:"rare", maxHp:7, art:"art/magma_heart.webp", ability:"Core Melt", abilityDesc:"Below 3 HP: all your damage ignores damage reduction effects.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Eruption trigger — true damage when near death."},
+  {id:327, name:"Natalia", rarity:"ghost-rare", maxHp:6, art:"art/geode.jpg", ability:"Materialization", abilityDesc:"When you roll even doubles (2s, 4s, or 6s): gain 1 Moonstone + 1 Lucky Stone.", category:"Resource Generation", set:"Volcanic Isles", designNote:"Even doubles reward. 2s, 4s, and 6s each trigger a Moonstone — covers weak and strong doubles alike."},
+  {id:329, name:"Clink", rarity:"common", maxHp:3, art:"art/clink.webp", ability:"Prospect", abilityDesc:"Win: gain 1 Surge. Lose: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Isles", designNote:"Always generates something."},
+  {id:331, name:"Igneous", rarity:"uncommon", maxHp:5, art:"art/igneous.webp", ability:"Crystallize", abilityDesc:"Each round you don't take damage: gain 1 Surge.", category:"Resource Generation", set:"Volcanic Isles", designNote:"Rewards defense."},
+  {id:333, name:"Smoke Signal", rarity:"common", maxHp:4, art:"art/smoke_signal.webp", ability:"Warning", abilityDesc:"Sideline: reveal opponent's sideline abilities.", category:"Prediction/Reaction", set:"Volcanic Isles", designNote:"Information card. Passive recon."},
+  {id:335, name:"Soot Sprite", rarity:"rare", maxHp:6, art:"art/soot_sprite.webp", ability:"Scatter", abilityDesc:"When hit: split into 2 copies with half HP each. Opponent must KO both.", category:"Defense/Negation", set:"Volcanic Isles", designNote:"Splitting is completely new."},
+  {id:337, name:"Fuego", rarity:"uncommon", maxHp:5, art:"art/fuego.webp", ability:"Fiesta", abilityDesc:"Win with triples: gain 1 of every resource.", category:"Resource Generation", set:"Volcanic Isles", designNote:"The jackpot card. Rare but massive payoff."},
+  {id:339, name:"Slag Heap", art:"art/slag_heap.webp", rarity:"common", maxHp:3, ability:"Residue", abilityDesc:"When defeated: opponent's active ghost cannot heal for 2 rounds.", category:"Debuff", set:"Volcanic Isles", designNote:"Anti-healing death trigger."},
+  {id:341, name:"Obsidian Throne", rarity:"ghost-rare", maxHp:7, art:"art/obsidian_throne.webp", ability:"Dominion", abilityDesc:"While active: opponent cannot use items (Surge, Surge, Healing Seeds).", category:"Debuff", set:"Volcanic Isles", designNote:"Item lockdown. Opponent hoards but can't spend."},
+  {id:343, name:"Boris", rarity:"common", maxHp:6, art:"art/bastion.webp", ability:"Fortify", abilityDesc:"When you spend a Surge: Boris gains 2 HP (can exceed max HP).", category:"Defense/Negation", set:"Volcanic Isles", designNote:"Surge for tankiness. Overclocks past maxHp like Calvin — all heals overclock except Healing Seeds."},
+  {id:345, name:"Red Hunter", art:"art/tremor.webp", rarity:"ghost-rare", maxHp:6, ability:"Rumble", abilityDesc:"Win a roll: if your opponent has any specials, deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Punishes hoarders. Logic was already correct — only fires on a winning roll. Text now matches behavior."},
+  {id:347, name:"Eruption", rarity:"rare", maxHp:7, art:"art/eruption.webp", ability:"Blow", abilityDesc:"Spend 2 Silver Leaves: deal 4 damage immediately. No roll needed.", category:"Destruction/Instant Kill", set:"Volcanic Isles", designNote:"Direct damage. Guaranteed 4 for 2 Silver Leaves."},
+  {id:349, name:"Wick", rarity:"uncommon", maxHp:5, art:"art/wick.webp", ability:"Slow Burn", abilityDesc:"Each round: deal 1 damage to opponent. But lose 1 HP yourself.", category:"Debuff", set:"Volcanic Isles", designNote:"Mutual destruction timer."},
+  {id:351, name:"Glow Worm", rarity:"common", maxHp:5, art:"art/glow_worm.webp", ability:"Tunnel", abilityDesc:"Spend 1 Surge: switch your active ghost. Free action, no swap triggers.", category:"Prediction/Reaction", set:"Volcanic Isles", designNote:"Resource-powered free swap."},
+  {id:353, name:"Molten Mirror", rarity:"rare", maxHp:6, art:"art/molten_mirror.webp", ability:"Reflect Pool", abilityDesc:"Opponent's resource-spending abilities also cost 1 additional resource.", category:"Debuff", set:"Volcanic Isles", designNote:"Resource tax. Economy warfare."},
+  {id:355, name:"Puff Ball", rarity:"common", maxHp:3, art:"art/puff_ball.webp", ability:"Burst", abilityDesc:"When hit by doubles: explode for 2 damage to opponent. Then KO yourself.", category:"Destruction/Instant Kill", set:"Volcanic Isles", designNote:"Reactive suicide bomber. 41.7% trigger rate."},
+  {id:357, name:"Anvil", rarity:"uncommon", maxHp:6, art:"art/anvil.webp", ability:"Heavy Strike", abilityDesc:"Spend 1 Surge: singles deal 3 damage instead of 1 this round.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Surge turns weak singles devastating."},
+  {id:359, name:"Volcanic Heart", art:"art/volcanic_heart.webp", rarity:"ghost-rare", maxHp:8, ability:"Pulse", abilityDesc:"Every 3 rounds: deal 2 damage to ALL ghosts on the field (both teams).", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Board-wide pulse. Changes team building."},
+  {id:361, name:"Ash Phoenix", art:"art/ash_phoenix.webp", rarity:"rare", maxHp:4, ability:"Rebirth", abilityDesc:"When defeated: return to battle next round with 2 HP. Once per game.", category:"HP Recovery", set:"Volcanic Isles", designNote:"Self-resurrection."},
+  {id:363, name:"Pyrope", rarity:"uncommon", maxHp:5, art:"art/pyrope.webp", ability:"Gem Armor", abilityDesc:"Spend 1 Surge: negate the next instance of damage.", category:"Defense/Negation", set:"Volcanic Isles", designNote:"Surge as a shield."},
+  {id:365, name:"Tyson", rarity:"common", maxHp:4, art:"art/cinder_bunny.png", ability:"Hop", abilityDesc:"Win: choose an enemy sideline ghost. That ghost's sideline ability is disabled until it enters play.", category:"Disruption", set:"Volcanic Isles", designNote:"Targeted sideline disabler. Stacks across wins. Persists after Tyson dies."},
+  {id:367, name:"Dragonclaw", rarity:"rare", maxHp:7, art:"art/dragonclaw.webp", ability:"Rake", abilityDesc:"Win with 3 different numbers: deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Rewards diverse rolls. ~55% trigger rate."},
   // === EJ'S GHOSTS ===
   {id:401, name:"Knight Terror", rarity:"rare", maxHp:7, art:"art/knight_terror.webp",
     ability:"Heavy Air", abilityDesc:"While active: after any opponent ability triggers and resolves, the enemy active ghost loses 2 HP.",
-    category:"Debuff", set:"Volcanic Activity",
+    category:"Debuff", set:"Dark Castle",
     designNote:"EJ's dark knight. Suppression tank — the opponent's whole team bleeds just for playing the game. Abilities still work, but at a cost."},
   {id:402, name:"Knight Light", rarity:"uncommon", maxHp:6, art:"art/knight_light.png",
     ability:"Retribution", abilityDesc:"While active: when an opponent's ability triggers, gain +1 die on your next roll.",
-    category:"Dice Modifier", set:"Volcanic Activity",
+    category:"Dice Modifier", set:"Dark Castle",
     designNote:"EJ's light knight. Opposing pair with Knight Terror — opponent abilities give you extra dice. Punishes ability-heavy teams."},
   {id:403, name:"Smudge", rarity:"rare", maxHp:5, art:"art/smudge.webp",
     ability:"Blackout", abilityDesc:"Before rolling: name a number. If your opponent rolls it, that die doesn't count.",
-    category:"Dice Modifier", set:"Volcanic Activity",
+    category:"Dice Modifier", set:"Volcanic Isles",
     designNote:"EJ's paint-fire spirit. Splatters a number off the dice. ~42% chance to kill at least one die. Prediction meets disruption."},
   {id:404, name:"Chagrin", rarity:"uncommon", maxHp:6, art:"art/chagrin.png",
     ability:"Bitter End", abilityDesc:"Lose: gain 1 Surge.",
-    category:"Resource Generation", set:"Volcanic Activity",
+    category:"Resource Generation", set:"Volcanic Isles",
     designNote:"EJ's spite ghost. Turns frustration into fuel — every loss powers you up. 6 HP tank that's happy to eat hits."},
   {id:406, name:"Fed and Hayden", rarity:"common", maxHp:4, art:"art/fed_and_hayden.png",
     ability:"Eternal Flame", abilityDesc:"Sacred Fires are not discarded when used.",
-    category:"Resource Generation", set:"Volcanic Activity",
+    category:"Resource Generation", set:"Volcanic Isles",
     designNote:"EJ's lava lion duo. Sacred Fire economy card — your flames never go out. Fragile at 4 HP, protect them."},
 
   // ============================================================
@@ -3015,7 +3035,7 @@ const GHOSTS = [
   {id:1, name:"Kodako", rarity:"common", maxHp:6, art:"art/originals/kodako.jpg", ability:"Swift", abilityDesc:"Roll 1-2-3: negate damage and deal 4 to enemy.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sequence combo defender."},
   {id:2, name:"Nikon", rarity:"common", maxHp:6, art:"art/originals/nikon.jpg", ability:"Ambush", abilityDesc:"Win first roll: deal triple damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. First-strike specialist."},
   {id:3, name:"Ancient Librarian", rarity:"common", maxHp:6, art:"art/originals/AncientLibrarian.png", ability:"Knowledge", abilityDesc:"For each 2 rolled by both players, add +1 damage if you deal damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. 2s matter."},
-  {id:4, name:"Wanderer", rarity:"common", maxHp:8, art:"art/originals/Wanderer.png", ability:"Curiosity", abilityDesc:"If any enemy sideline cards are hidden, choose one to flip upon entering battle.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Intel gatherer."},
+  {id:4, name:"Wanderer", rarity:"common", maxHp:8, art:"art/originals/Wanderer.png", ability:"Curiosity", abilityDesc:"Roll a straight (consecutive sequence, no repeats): deal +2 damage.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. Reworked — straight bonus damage."},
   {id:5, name:"Puff", rarity:"common", maxHp:6, art:"art/originals/Puff.png", ability:"Cute", abilityDesc:"Enemy doubles and triples do -1 damage.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Soft tank."},
   {id:6, name:"Fang Outside", rarity:"common", maxHp:2, art:"art/originals/FangOutside.png", ability:"Skillful Coward", abilityDesc:"When Fang wins a roll, you may switch with a ghost on your sideline after damage.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Hit-and-run."},
   {id:7, name:"Fang Undercover", rarity:"common", maxHp:2, art:"art/originals/FangUndercover.png", ability:"Skilled Coward", abilityDesc:"When taking damage, you may switch this ghost with any of your sideline ghosts and negate damage.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Damage dodge."},
@@ -3026,14 +3046,14 @@ const GHOSTS = [
   {id:12, name:"Dupy", rarity:"common", maxHp:4, art:"art/originals/Dupy.png", ability:"Frolic", abilityDesc:"Rolling a tie instant KOs the opposing ghost.", category:"Destruction/Instant Kill", set:"Set 1", designNote:"Original card. Tie = death."},
   {id:13, name:"Shoo", rarity:"common", maxHp:4, art:"art/originals/Shoo.png", ability:"Alpine Air", abilityDesc:"If on the sideline, the ghost in play gains +2 health when their health is less than 4. Only Once Per Ghost.", category:"HP Recovery", set:"Set 1", designNote:"Original card. Emergency heal."},
   {id:14, name:"Jeffery", rarity:"common", maxHp:5, art:"art/originals/Jeffery.png", ability:"Chuckle", abilityDesc:"If on sideline and your ghost wins a battle, ghost in play gains 3 HP.", category:"HP Recovery", set:"Set 1", designNote:"Original card. Win-triggered sideline healer."},
-  {id:15, name:"Winston", rarity:"common", maxHp:5, art:"art/originals/Winston.png", ability:"Scheme", abilityDesc:"If Winston rolls doubles, you may swap your opponent's ghost with a ghost on their sideline after damage.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Forced swap on doubles."},
+  {id:15, name:"Winston", rarity:"common", maxHp:5, art:"art/originals/Winston.png", ability:"Scheme", abilityDesc:"Win: you may swap your opponent's ghost with one from their sideline. Gain +2 dice next roll.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Forced swap on win + bonus dice."},
   {id:16, name:"Chip", rarity:"common", maxHp:4, art:"art/originals/Chip.png", ability:"Acrobatic Dive", abilityDesc:"Your even rolled doubles add +3 damage if you deal damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Even doubles specialist."},
   {id:17, name:"Boo Brothers", rarity:"common", maxHp:5, art:"art/originals/boo_brothers.jpg", ability:"Teamwork", abilityDesc:"Before rolling, may remove 1 die to gain 1 HP. If you do, gain +1 damage this roll.", category:"HP Recovery", set:"Set 1", designNote:"Original card. Die-for-HP trade + damage bonus."},
   {id:18, name:"Charlie", rarity:"common", maxHp:4, art:"art/originals/Charlie.png", ability:"Rush", abilityDesc:"Double 2's hit for 7.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Double 2s nuke."},
   {id:34, name:"Grawr", rarity:"uncommon", maxHp:7, art:"art/originals/Grawr.png", ability:"Menace", abilityDesc:"When Grawr enters the battle, deal 1 damage to the opponent.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Entry damage."},
   {id:35, name:"Larry", rarity:"uncommon", maxHp:6, art:"art/originals/Larry.png", ability:"Flying Kick", abilityDesc:"Triples deal 3X damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Triples monster."},
   {id:36, name:"Bill & Bob", rarity:"uncommon", maxHp:6, art:"art/originals/Bill&Bob.png", ability:"Bait n Switch", abilityDesc:"While below 4 health, deal 2X damage on winning rolls.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Low HP berserker."},
-  {id:37, name:"Dealer", rarity:"uncommon", maxHp:5, art:"art/originals/Dealer.png", ability:"House Rules", abilityDesc:"Your rolls in numeric order protect Dealer from taking any damage.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sequence shield."},
+  {id:37, name:"Dealer", rarity:"uncommon", maxHp:5, art:"art/originals/Dealer.png", ability:"House Rules", abilityDesc:"Roll a straight (consecutive sequence, no repeats): deal +3 damage and negate all incoming damage.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Reworked — straight = offense + defense."},
   {id:38, name:"Alucard", rarity:"uncommon", maxHp:4, art:"art/originals/Alucard.png", ability:"Colony Call", abilityDesc:"Doubles deal +2 damage for each ghost on your sideline. Once Per Game.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Sideline-scaling nuke."},
   {id:39, name:"Castle Guards", rarity:"uncommon", maxHp:7, art:"art/originals/CastleGuards.png", ability:"Flamethrower", abilityDesc:"Any 3's you roll multiplies Castle Guard's damage by 2 each.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. 3s matter."},
   {id:40, name:"Team Zippy", rarity:"uncommon", maxHp:7, art:"art/originals/TeamZippy.png", ability:"Teamwork", abilityDesc:"Any single damage you inflict deals +2 damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Singles booster."},
@@ -3083,7 +3103,7 @@ const GHOSTS = [
   {id:51, name:"Nicholas", rarity:"uncommon", maxHp:1, art:"art/originals/nicholas.jpg", ability:"Sneak Attack", abilityDesc:"While on the sideline, deal 2 damage to the enemy ghost when they enter play.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Entry punisher."},
   {id:52, name:"Hugo", rarity:"uncommon", maxHp:5, art:"art/originals/Hugo.png", ability:"Wreckage", abilityDesc:"Your opponent loses 1 die their next roll when Hugo takes roll damage.", category:"Debuff", set:"Dark Castle", designNote:"Dark Castle. Damage retaliation."},
   {id:78, name:"Haywire", rarity:"rare", maxHp:7, art:"art/originals/Haywire.png", ability:"Wild Chords", abilityDesc:"Upon rolling triples or better: gain 1 permanent die. Haywire gains +2 permanent damage. Once per game.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Dark Castle. Main character — dice growth + personal damage snowball. Two subjects: the die belongs to the player's pool, the +2 damage is Haywire's personal buff."},
-  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Sideline & In Play: win with all dice in numeric order (no repeats) for +3 damage and 2 Magic Fireflies.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Sequence bonus from sideline."},
+  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Roll a straight to unlock Catchy Tune. Catchy Tune: choose one die after each roll to lock for the next roll.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Rolling Hills. Straight unlocks permanent die-lock. Player chooses which die to carry over."},
   {id:80, name:"Bilbo", rarity:"rare", maxHp:2, art:"art/originals/bilbo.jpg", ability:"Little Buddy", abilityDesc:"While on the sideline, your ghost in play gains +2 damage if you roll singles.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Sideline singles booster."},
   {id:96, name:"Hector", rarity:"ghost-rare", maxHp:6, art:"art/originals/hector.jpg", ability:"Protector", abilityDesc:"Singles beat doubles. +1 damage on singles.", category:"Defense/Negation", set:"Dark Castle", designNote:"Dark Castle ghost-rare. Flips the hierarchy."},
   {id:97, name:"Toby", rarity:"ghost-rare", maxHp:7, art:"art/originals/Toby.png", ability:"Pure Heart", abilityDesc:"Before rolling you may declare the final roll. Toby is defeated next turn before rolling. Winning this roll defeats the enemy ghost.", category:"Destruction/Instant Kill", set:"Dark Castle", designNote:"Dark Castle ghost-rare. All-in gamble."},
@@ -3097,16 +3117,16 @@ const GHOSTS = [
   {id:24, name:"Simon", rarity:"common", maxHp:7, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"When you take damage from a before-the-roll effect, gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll damage-to-resource conversion. Only triggers on before-the-roll chip damage (Swarm, Haunt, Toxic Fumes, Blue Fire, Meteor, etc.), NOT on normal dice roll damage."},
   {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Cameron gains +1 die immediately.\nCameron's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation — Guard Thomas, Bogey, Patrick, Pyrope, etc."},
   {id:26, name:"Logey", rarity:"common", maxHp:6, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
-  {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Opponent may only roll up to 3 dice.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Dice cap."},
+  {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Before rolling: deal 2 damage for each extra die the enemy rolled above 3 last round.", category:"Disruption", set:"Frost Valley", designNote:"Frost Valley. Punishes dice stacking — 4 dice = 2 dmg, 5 dice = 4 dmg."},
   {id:28, name:"Dream Cat", rarity:"common", maxHp:4, art:"art/originals/dream_cat.jpg", ability:"Jinx", abilityDesc:"Both roll doubles: gain +2 dice next turn.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Mutual doubles reward. Buffed: +2 dice (was +1)."},
   {id:29, name:"Sad Sal", rarity:"common", maxHp:5, art:"art/originals/sad_sal.jpg", ability:"Tough Job", abilityDesc:"Lose a roll: gain 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Loss-triggered resources."},
   {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6, gain +1 die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Chain-6s bonus dice."},
-  {id:31, name:"Gus", rarity:"common", maxHp:7, art:"art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"If you win a roll, you may force your opponent to choose a different ghost from their sideline instead of dealing damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Win-to-swap instead of damage."},
+  {id:31, name:"Gus", rarity:"common", maxHp:6, art:"art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"Win: you may force your opponent to swap their active ghost. The new ghost takes the damage.", category:"Disruption", set:"Frost Valley", designNote:"Frost Valley. Win → force swap, new ghost eats the damage."},
   {id:32, name:"Lou", rarity:"common", maxHp:7, art:"art/originals/lou.jpg", ability:"Bros", abilityDesc:"While on the sideline, Grawr gains +1 Damage and +1 Health on Winning Rolls.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Grawr synergy."},
   {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"While on the sideline, if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
   {id:53, name:"Bogey", rarity:"uncommon", maxHp:5, art:"art/originals/bogey.jpg", ability:"Bogus", abilityDesc:"When damage would hit Bogey, you may reflect it back at the attacker. Once per game.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley. One-shot reactive reflect."},
   {id:54, name:"Roger", rarity:"uncommon", maxHp:6, art:"art/originals/roger.jpg", ability:"Tempest", abilityDesc:"Roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Double-pair jackpot."},
-  {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"When enemy uses a before-rolling effect: deal 3 damage before the effect happens. If this KOs the enemy, their effect is cancelled.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Anti-pre-roll punisher."},
+  {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"Immune to before-roll damage. Gain +1 Burn for each 3 you roll.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll immunity + Burn generation on 3s."},
   {id:56, name:"Chad", rarity:"common", maxHp:6, art:"art/originals/chad.jpg", ability:"Sploop!", abilityDesc:"On entry, gain 2 Ice Shards.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Entry resource gen."},
   {id:57, name:"Marcus", rarity:"uncommon", maxHp:7, art:"art/originals/marcus.jpg", ability:"Glacial Pounding", abilityDesc:"Take 3+ damage: YOU gain 4 extra dice on the next roll.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Big hit = big retaliation. Bonus goes to player (next active ghost), not just Marcus."},
   {id:58, name:"Ashley", rarity:"uncommon", maxHp:3, art:"art/originals/ashley.jpg", ability:"Burning Soul", abilityDesc:"Win a roll: gain 1 Sacred Fire.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Win-triggered Sacred Fire."},
@@ -3115,8 +3135,8 @@ const GHOSTS = [
   {id:61, name:"Suspicious Jeff", rarity:"uncommon", maxHp:4, art:"art/originals/suspicious_jeff.jpg", ability:"Snicker", abilityDesc:"While on the sideline, if your Ghost wins a battle, steal 1 of the enemy dice next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. Sideline die theft."},
   {id:81, name:"Spockles", rarity:"rare", maxHp:6, art:"art/originals/spockles.jpg", ability:"Valley Magic", abilityDesc:"Win a roll: gain 2 Ice Shards.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Ice Shard farmer."},
   {id:82, name:"Antoinette", rarity:"uncommon", maxHp:6, art:"art/originals/antoinette.jpg", ability:"Grace", abilityDesc:"Roll as many dice as your opponent rolls. +1 Damage on doubles.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Dice mirroring."},
-  {id:83, name:"Troubling Haters", rarity:"uncommon", maxHp:4, art:"art/originals/troubling_haters.jpg", ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Big damage = HP growth."},
-  {id:84, name:"Wandering Sue", rarity:"uncommon", maxHp:4, art:"art/originals/wandering_sue.jpg", ability:"Hidden Weakness", abilityDesc:"If enemy has 12+ HP, destroy them before rolling.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley. Anti-overclock assassin."},
+  {id:83, name:"Troubling Haters", rarity:"uncommon", maxHp:3, art:"art/originals/troubling_haters.jpg", ability:"Growing Mob", abilityDesc:"Deal 4+ damage in a turn: gain +2 HP.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Big damage = HP growth."},
+  {id:84, name:"Wandering Sue", rarity:"uncommon", maxHp:4, art:"art/originals/wandering_sue.jpg", ability:"Hidden Weakness", abilityDesc:"Before rolling: if the enemy has more HP than Sue, gain +1 die.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Underdog dice bonus — almost always active at 4HP."},
   {id:85, name:"Eloise", rarity:"rare", maxHp:5, art:"art/originals/eloise.jpg", ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. HP swap for Ice Shard."},
   {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball", abilityDesc:"Doubles gain +2 damage.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Doubles damage booster."},
   {id:87, name:"Zach", rarity:"rare", maxHp:7, art:"art/originals/zach.jpg", ability:"Craftsman", abilityDesc:"While on the sideline, Guard Thomas gains +3 damage on Doubles and +1 die each turn.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Guard Thomas synergy. Buffed: now also grants +1 die per turn."},
@@ -3128,22 +3148,22 @@ const GHOSTS = [
   {id:93, name:"Bandit Pete", rarity:"uncommon", maxHp:5, art:"art/originals/bandit_pete.jpg", ability:"Bandit", abilityDesc:"While on the Sideline, if either player rolls only 2 dice, your ghost in play gains +3 Damage.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Low-dice sideline booster."},
   {id:103, name:"Night Master", rarity:"ghost-rare", maxHp:5, art:"art/originals/night_master.jpg", ability:"Bullseye", abilityDesc:"If you roll doubles and win the roll, immediately destroy a ghost on the enemy sideline that has less than 4 HP.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Sideline sniper."},
   {id:104, name:"Skylar", rarity:"ghost-rare", maxHp:7, art:"art/originals/skylar.jpg", ability:"Winter Barrage", abilityDesc:"Ice Shards deal +2 damage instead of +1.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Ice Shard amplifier."},
-  {id:105, name:"Tyler", rarity:"ghost-rare", maxHp:6, art:"art/originals/tyler.jpg", ability:"Heating Up", abilityDesc:"Before rolling, spend 2 HP to gain +1 die. Sacred Fires deal x2.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley ghost-rare. HP-for-dice + Sacred Fire doubler."},
+  {id:105, name:"Tyler", rarity:"ghost-rare", maxHp:7, art:"art/originals/tyler.jpg", ability:"Heating Up", abilityDesc:"Before rolling, spend 2 HP to gain +1 die. Sacred Fires deal x2.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley ghost-rare. HP-for-dice + Sacred Fire doubler."},
   {id:106, name:"King Jay", rarity:"ghost-rare", maxHp:7, art:"art/originals/king_jay.jpg", ability:"Reflection", abilityDesc:"Lose roll & dice total = 7: reflect all damage.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Lucky 7 reflector."},
   {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose a roll & survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
   {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
-  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
-  {id:455, name:"Explorer Jeff", rarity:"rare", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
+  {id:454, name:"Miyoshi", rarity:"ghost-rare", maxHp:6, art:"art/originals/Miyoshi.jpeg", ability:"Bonzai!", abilityDesc:"Before rolling: you may declare 'Bonzai!' — lose 4 HP first, then gain +5 dice.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"A ferocious water-and-fire spirit that charges headfirst into everything. Born where volcanic lava meets ocean rapids. The Bonzai ability is the biggest gamble in the game: sacrifice half your HP for a massive dice surge. Players must yell Bonzai at the table to activate."},
+  {id:455, name:"Explorer Jeff", rarity:"rare", maxHp:4, art:"art/originals/ExplorerJeff.png", ability:"Treasure Hunter", abilityDesc:"While on the sideline or in play: if you hold 3+ different specials, gain +1 die and +1 damage.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"The 5th Jeff. A chunky happy ghost explorer in a safari hat stomping down a volcanic jungle trail, backpack overflowing with treasures, walking stick in hand. 2 HP sideline card — from the bench he rewards resource diversity. Hold 3 different specials and your whole offense upgrades. Draft differently — you need Lucky Stones AND Healing Seeds AND Sacred Fire, not just one stack."},
   {id:456, name:"Ryder", rarity:"rare", maxHp:5, art:"art/originals/Ryder.png", ability:"Toll", abilityDesc:"Before rolling: opponent chooses — take 1 damage or give Ryder +1 Sacred Fire.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Cloaked ghost shark duo on a battlefield — the leader calls the shots. Every round is a lose-lose for the opponent: chip away at their own HP or let Sacred Fire stack for a devastating nuke. Psychological warfare card."},
   {id:457, name:"Sophia", rarity:"rare", maxHp:6, art:"art/originals/Sophia.png", ability:"Masquerade", abilityDesc:"On Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night (once per game).", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost of a young girl sitting on castle steps choosing between two masks. Majora's Mask inspired. Mask of Day: gain 1 Burn for each 1 or 2 you roll. Mask of Night: roll the same number of dice as the enemy ghost. Masks are toggleable inventory items like Ice Blade — player can turn them on or off each turn."},
   {id:458, name:"Maisie", rarity:"ghost-rare", maxHp:4, art:"art/originals/Maisie.png", ability:"Lucky", abilityDesc:"All your 1s count as 5s.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit spiritkin dashing by a waterfall. Dead simple — every 1 becomes a 5. Low HP balances the power."},
   {id:459, name:"Eli", rarity:"common", maxHp:4, art:"art/originals/Eli.png", ability:"Steady", abilityDesc:"Before rolling: gain +1 Lucky Stone.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"Shy mossy bush spiritkin hiding behind a tree stump with big dark eyes and antler-like branches. Quietly stockpiles Lucky Stones every round — a slow, steady reroll engine. Low threat but incredible value over time."},
   {id:460, name:"Slicer", rarity:"uncommon", maxHp:6, art:"art/slicer.png", ability:"Parting Gift", abilityDesc:"Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.", category:"Disruption", set:"Dark Castle", tags:["Final 50"], designNote:"Copper flame-headed diplomat sipping tea. Looks refined and harmless — but rolling quads lets him assassinate a benched ghost. Skylar's concept."},
-  {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Activity", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
+  {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"art/ronan.png", ability:"Mixup", abilityDesc:"If you roll doubles, gain +1 Ice Shard & +1 Burn.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
   {id:462, name:"Ridley", rarity:"uncommon", maxHp:3, art:"art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
-  {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Activity", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."},
+  {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain +1 die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."},
   {id:464, name:"Yawn Eater", rarity:"uncommon", maxHp:7, art:"art/originals/YawnEater.png", ability:"Feast", abilityDesc:"Gain +1 die for each sideline ability on the enemy sideline.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost #200. A smug blobby shadow creature that devours sideline energy. The more passive effects your opponent stacks, the more dice Yawn Eater rolls."}
 ];
 
@@ -3384,7 +3404,7 @@ function pickMatchMvp(winnerTeamName) {
   return best;
 }
 
-let standingsVisibleSets = new Set(['Volcanic Activity','Rolling Hills','Set 1','Dark Castle','Frost Valley']); // all on by default
+let standingsVisibleSets = new Set(['Volcanic Isles','Rolling Hills','Set 1','Dark Castle','Frost Valley']); // all on by default
 
 function toggleStandingsSet(setName, btn) {
   if (standingsVisibleSets.has(setName)) {
@@ -3638,6 +3658,12 @@ function autoPlayNext() {
     fangUndercoverArmed: { red: false, blue: false },
     fangUndercoverSwapPending: null,
     winstonSchemePending: null,
+    winstonDiceBonus: { red: 0, blue: 0 },
+    catchyTuneUnlocked: { red: false, blue: false },
+    catchyTuneLockedDie: { red: null, blue: null },
+    catchyTunePending: null,
+    tysonDisabled: { red: [], blue: [] },
+    tysonPickerPending: null,
     galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
@@ -3717,9 +3743,13 @@ function autoSimRounds(gameNum) {
     }
   });
 
-  // Roll dice
-  const redDice = weightedRoll('red', 3).sort((a,b)=>a-b);
-  const blueDice = weightedRoll('blue', 3).sort((a,b)=>a-b);
+  // Roll dice (with Catchy Tune locked die injection)
+  const _ctRedLocked = (B.catchyTuneUnlocked.red && B.catchyTuneLockedDie.red !== null) ? B.catchyTuneLockedDie.red : null;
+  const _ctBlueLocked = (B.catchyTuneUnlocked.blue && B.catchyTuneLockedDie.blue !== null) ? B.catchyTuneLockedDie.blue : null;
+  const redDice = weightedRoll('red', _ctRedLocked !== null ? 2 : 3).sort((a,b)=>a-b);
+  const blueDice = weightedRoll('blue', _ctBlueLocked !== null ? 2 : 3).sort((a,b)=>a-b);
+  if (_ctRedLocked !== null) { redDice.push(_ctRedLocked); redDice.sort((a,b)=>a-b); }
+  if (_ctBlueLocked !== null) { blueDice.push(_ctBlueLocked); blueDice.sort((a,b)=>a-b); }
 
   // Classify and determine winner
   const rR = classify(redDice), bR = classify(blueDice);
@@ -3749,6 +3779,13 @@ function autoSimRounds(gameNum) {
     let dmg = wR.damage;
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die
+    const winDiceAP = winner === 'red' ? redDice : blueDice;
+    const loseDiceAP = winner === 'red' ? blueDice : redDice;
+    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && isStraight(winDiceAP)) B.catchyTuneUnlocked[winner] = true;
+    if (!B.catchyTuneUnlocked[lTeamName] && hasAlive(lTeam, 79) && isStraight(loseDiceAP)) B.catchyTuneUnlocked[lTeamName] = true;
+    if (B.catchyTuneUnlocked[winner] && winDiceAP.length > 0) B.catchyTuneLockedDie[winner] = Math.max(...winDiceAP);
+    if (B.catchyTuneUnlocked[lTeamName] && loseDiceAP.length > 0) B.catchyTuneLockedDie[lTeamName] = Math.max(...loseDiceAP);
   }
 
   B.round++;
@@ -3816,10 +3853,10 @@ function toggleOriginalSet(setName, btn) {
 }
 
 const RARITY_ORDER = {common:0, uncommon:1, rare:2, 'ghost-rare':3, legendary:4};
-const SET_ORDER = ['Set 1','Dark Castle','Frost Valley','Volcanic Activity','Rolling Hills'];
+const SET_ORDER = ['Set 1','Dark Castle','Frost Valley','Volcanic Isles','Rolling Hills'];
 function getSetClass(s) {
   if (s === 'Rolling Hills') return 'set-rolling';
-  if (s === 'Volcanic Activity') return 'set-volcanic';
+  if (s === 'Volcanic Isles') return 'set-volcanic';
   if (s === 'Set 1') return 'set-set1';
   if (s === 'Dark Castle') return 'set-darkcastle';
   if (s === 'Frost Valley') return 'set-frostvalley';
@@ -3827,7 +3864,7 @@ function getSetClass(s) {
 }
 function getSetColor(s) {
   if (s === 'Rolling Hills') return 'var(--uncommon)';
-  if (s === 'Volcanic Activity') return 'var(--magma)';
+  if (s === 'Volcanic Isles') return 'var(--magma)';
   if (s === 'Set 1') return '#c084fc';
   if (s === 'Dark Castle') return '#f87171';
   if (s === 'Frost Valley') return '#67e8f9';
@@ -4103,7 +4140,7 @@ const CURATED_TEAMS = [
   [103, 86, 53],
   // #34 Redd Entrance — Redd entry +2 dice, Hugo enemy loses die on hit, Floop enemy loses die on doubles
   [98, 52, 20],
-  // #35 Volcanic Activity Core — Rook immune to fire + Surge bonus, Sable odd rolls Sacred Fire, The Ember Force 1 pre-roll damage
+  // #35 Volcanic Isles Core — Rook immune to fire + Surge bonus, Sable odd rolls Sacred Fire, The Ember Force 1 pre-roll damage
   [416, 413, 304],
   // #36 HP Swap Gambit — Eloise spends Ice Shard to swap HP, Chad entry 2 Ice Shards, Sad Sal loses → Ice Shard
   [85, 56, 29],
@@ -4171,7 +4208,7 @@ const CURATED_TEAMS = [
   [1, 9, 37],
   // #65 Professor Moonstone — Natalia generates Moonstones on even doubles, Professor Hawking rolls +2 dice while holding Moonstone, Benjamin uses Moonstones for free
   [327, 447, 203],
-  // #66 Death Howl Disruption — Death Howl forces enemy swap pre-roll, Raditz forces enemy swap on entry, Winston forces enemy swap on doubles
+  // #66 Dark Fang Disruption — Dark Fang forces enemy swap pre-roll, Raditz forces enemy swap on entry, Winston forces enemy swap on doubles
   [202, 62, 15],
   // #67 Bo's Proper Setup — Munch fights first (gains 4HP on KO), Granny harvests resources on ally KO from sideline, Bo enters last to resurrect fallen ally
   [66, 310, 109],
@@ -4367,6 +4404,12 @@ function startBattle() {
     fangUndercoverArmed: { red: false, blue: false },
     fangUndercoverSwapPending: null,
     winstonSchemePending: null,
+    winstonDiceBonus: { red: 0, blue: 0 },
+    catchyTuneUnlocked: { red: false, blue: false },
+    catchyTuneLockedDie: { red: null, blue: null },
+    catchyTunePending: null,
+    tysonDisabled: { red: [], blue: [] },
+    tysonPickerPending: null,
     galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
@@ -4467,9 +4510,15 @@ function startBattle() {
 function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
   const enemy = opp(team);
-  if (skipEntryEffects) return 0; // Tyson's Hop: no entry effects
+  if (skipEntryEffects) return 0;
 
   const entryTeamName = team === B.red ? 'red' : 'blue';
+
+  // Tyson (365) — Hop: when a disabled ghost enters play, re-enable its sideline ability
+  if (B.tysonDisabled && B.tysonDisabled[entryTeamName].includes(team.activeIdx)) {
+    B.tysonDisabled[entryTeamName] = B.tysonDisabled[entryTeamName].filter(i => i !== team.activeIdx);
+    log(`<span class="log-ability">${f.name}</span> — enters play! Sideline ability re-enabled.`);
+  }
   narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
   // Castle Guide (420) — Burn: check if the entering ghost has burn on it
@@ -4822,6 +4871,23 @@ function describeRoll(r) {
 
 function isTripleOrBetter(type) { return ['triples','quads','penta'].includes(type) || type.endsWith('-of-a-kind'); }
 
+// Dark Fang (202) — Pressure: returns true if the OPPONENT has Dark Fang active, blocking healing for this team
+function deathHowlBlocksHealing(teamName) {
+  if (!B) return false;
+  const oppTeamName = teamName === 'red' ? 'blue' : 'red';
+  const oppActive = active(B[oppTeamName]);
+  return oppActive && oppActive.id === 202 && !oppActive.ko;
+}
+// Dark Fang — guarded heal: adds HP only if not blocked. Returns true if heal went through.
+function guardedHeal(ghost, amount, teamName) {
+  if (deathHowlBlocksHealing(teamName)) {
+    log(`<span class="log-ability">Dark Fang</span> — Pressure! ${ghost.name}'s healing blocked!`);
+    return false;
+  }
+  ghost.hp += amount;
+  return true;
+}
+
 function typeLabel(type) {
   if (type.endsWith('-of-a-kind')) return type.toUpperCase() + '!!!';
   if (type==='penta') return 'PENTA!!';
@@ -4833,10 +4899,23 @@ function typeLabel(type) {
 
 // Helper: check if a team has a ghost with given id on sideline (alive)
 function hasSideline(team, id) {
-  return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+  const teamName = B && team === B.red ? 'red' : 'blue';
+  const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
+  return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
 }
 function getSidelineGhost(team, id) {
-  return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+  const teamName = B && team === B.red ? 'red' : 'blue';
+  const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
+  return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
+}
+function hasAlive(team, id) {
+  return team.ghosts.some(g => !g.ko && g.id === id);
+}
+function isStraight(dice) {
+  if (!dice || dice.length < 2) return false;
+  const sorted = [...new Set(dice)].sort((a, b) => a - b);
+  if (sorted.length !== dice.length) return false; // no repeats
+  return sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
 }
 
 // Pop a sideline card to foreground when its ability triggers
@@ -5009,6 +5088,13 @@ function spendHealingSeed(team) {
   const t = B[team];
   const f = active(t);
   if (t.resources.healingSeed <= 0 || f.hp >= f.maxHp) return;
+  // Dark Fang (202) — Pressure: enemy ghost cannot heal
+  if (deathHowlBlocksHealing(team)) {
+    t.resources.healingSeed--;
+    log(`<span class="log-ability">Dark Fang</span> — Pressure! ${f.name}'s Healing Seed consumed but healing blocked!`);
+    renderBattle();
+    return;
+  }
   t.resources.healingSeed--;
   f.hp = Math.min(f.maxHp, f.hp + 1);
   playSfx('sfxSpecial', 0.4);
@@ -5352,7 +5438,7 @@ function useTysonHop(team) {
 }
 
 // ============================================================
-// PRESSURE — manual pre-roll ability (Death Howl 202)
+// PRESSURE — manual pre-roll ability (Dark Fang 202)
 // ============================================================
 function usePressure(team) {
   if (!isPreRollActive(team)) return;
@@ -5377,7 +5463,7 @@ function usePressure(team) {
   const whoBanner = document.getElementById('pressureWho');
   whoBanner.className = `pm-who-banner ${enemyTeamName}`;
   whoBanner.textContent = `🎯 ${enemyLabel.toUpperCase()} PICKS`;
-  document.getElementById('pressureTitle').textContent = `Pressure! — Death Howl forces a swap`;
+  document.getElementById('pressureTitle').textContent = `Pressure! — Dark Fang forces a swap`;
   document.getElementById('pressureSub').textContent = `${enemyLabel} team: choose which ghost enters the fight.`;
   document.getElementById('pressureOptions').innerHTML = aliveSideline.map(g => {
     const realIdx = enemy.ghosts.indexOf(g);
@@ -5415,7 +5501,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
   const enemy = opp(t);
   const oldGhost = active(enemy);
   const oldName = oldGhost.name;
-  // Pressure is a forced swap by Death Howl — NOT Tyson's voluntary Hop.
+  // Pressure is a forced swap by Dark Fang — NOT Tyson's voluntary Hop.
   // Entry effects always fire for the incoming ghost regardless of who was forced out.
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
@@ -5732,12 +5818,12 @@ function doRiderChoice(choice) {
         queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Toll damage → +1 Sacred Fire!`, tp.oppTeamName);
         log(`<span class="log-ability">Simon</span> — Brew Time! Took Toll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
       }
-      // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius 45)
-      if (!oppGhost.ko && hasSideline(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
+      // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius 45)
+      if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
         oppGhost.hp = Math.max(0, oppGhost.hp - 1);
         if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 436; }
         queueAbility('BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${oppGhost.name}!`, tp.riderTeam);
-        log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
+        log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
         popSidelineCard(B[tp.riderTeam], 436);
         // Simon takes Bounty damage too
         if (oppGhost.id === 24 && !oppGhost.ko) {
@@ -5745,7 +5831,7 @@ function doRiderChoice(choice) {
           queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Bounty damage → +1 Sacred Fire!`, tp.oppTeamName);
           log(`<span class="log-ability">Simon</span> — Brew Time! Took Bounty damage → <span class="log-ms">+1 Sacred Fire!</span>`);
         }
-      } else if (!oppGhost.ko && hasSideline(B[tp.riderTeam], 436) && hasSideline(tp.team, 45)) {
+      } else if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && hasSideline(tp.team, 45)) {
         const cornGhost = getSidelineGhost(tp.team, 45);
         queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Princess Shade's Bounty!`, tp.oppTeamName);
         log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
@@ -6200,6 +6286,18 @@ function doSlipstreamChoice(choice) {
 }
 
 // Bonzai pre-roll BUTTON handler (clicked before Roll)
+function useTobyButton(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 97 || f.ko) return;
+  if (!B.pureHeartDeclared || B.pureHeartDeclared[team] !== null) return;
+  B.pureHeartDeclared[team] = true;
+  showAbilityCallout('PURE HEART!', 'var(--ghost-rare)',
+    `${f.name} — declares the final roll! Win = instant KO! Toby sacrifices next round.`, team);
+  narrate(`<b class="gold">PURE HEART!</b> Toby declares the final roll — a win ends it all!`);
+  log(`<span class="log-ability">${f.name}</span> — PURE HEART declared! Win this roll = instant KO. Toby sacrifices next round.`);
+  renderBattle();
+}
+
 function useBonzaiButton(team) {
   const f = active(B[team]);
   if (!f || f.id !== 454 || f.ko || f.hp <= 4) return;
@@ -7758,10 +7856,13 @@ function doWinstonSchemeChoice(idx) {
   const winTeamColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseTeamColor = loseTeamName === 'red' ? 'red-text' : 'blue-text';
 
+  // Winston always gains +2 dice next roll on win (whether swap or skip)
+  B.winstonDiceBonus[winTeamName] = (B.winstonDiceBonus[winTeamName] || 0) + 2;
+
   if (idx === -1) {
-    // Skip — keep current opponent ghost
-    narrate(`<b class="${winTeamColor}">Winston</b> — Scheme skipped.`);
-    log(`Winston — Scheme declined.`);
+    // Skip — keep current opponent ghost, still get dice
+    narrate(`<b class="${winTeamColor}">Winston</b> — Scheme skipped. +2 dice next roll!`);
+    log(`Winston — Scheme declined. <span class="log-ms">+2 dice next roll!</span>`);
     continuation();
     return;
   }
@@ -7776,13 +7877,98 @@ function doWinstonSchemeChoice(idx) {
 
   narrate(`<b class="${winTeamColor}">Winston</b> — Scheme! <b class="${loseTeamColor}">${oldName}</b> forced to sideline — <b class="${loseTeamColor}">${newGhost.name}</b> enters!`);
   showAbilityCallout('SCHEME!', 'var(--common)', `${oldName} forced out — ${newGhost.name} enters!`, winTeamName);
-  log(`<span class="log-ability">Winston</span> — Scheme! Forced ${oldName} to sideline, ${newGhost.name} enters.`);
+  log(`<span class="log-ability">Winston</span> — Scheme! Forced ${oldName} to sideline, ${newGhost.name} enters. <span class="log-ms">+2 dice next roll!</span>`);
 
   // Fire entry effects for the newly-active enemy ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(loseTeam, false);
     afterEntryWithJenkins(entryCount, continuation);
   }, spd(1500));
+}
+
+// ============================================================
+// Tyson (365) — Hop: choose enemy sideline ghost to disable
+// ============================================================
+function showTysonHopPicker(winTeamName, loseTeamName, sidelineGhosts, continuation) {
+  const banner = document.getElementById('tysonHopBanner');
+  if (banner) {
+    banner.className = `pm-who-banner ${winTeamName}`;
+    banner.textContent = '🔥 HOP!';
+  }
+  const loseTeam = B[loseTeamName];
+  const disabled = B.tysonDisabled[loseTeamName];
+  const opts = document.getElementById('tysonHopOptions');
+  if (opts) {
+    opts.innerHTML = sidelineGhosts.filter(g => {
+      const idx = loseTeam.ghosts.indexOf(g);
+      return !disabled.includes(idx); // don't show already-disabled ghosts
+    }).map(g => {
+      const gd = ghostData(g.id);
+      const realIdx = loseTeam.ghosts.indexOf(g);
+      return `<div class="pressure-opt" onclick="doTysonHopChoice('${loseTeamName}', ${realIdx})">
+        ${gd.art ? `<img src="${gd.art}" style="width:50px;height:50px;border-radius:6px;object-fit:cover;border:1px solid var(--${gd.rarity});">` : ''}
+        <div>
+          <div style="font-weight:700;">${g.name}</div>
+          <div style="font-size:12px;color:var(--text2);"><span style="color:var(--${gd.rarity});">${gd.ability}: ${gd.abilityDesc ? gd.abilityDesc.substring(0, 60) : ''}...</span></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  B.tysonPickerPending = { winTeamName, loseTeamName, continuation };
+  B.phase = 'ko-pause';
+  document.getElementById('tysonHopOverlay').classList.add('active');
+}
+
+function doTysonHopChoice(loseTeamName, ghostIdx) {
+  const tp = B.tysonPickerPending;
+  if (!tp) return;
+  B.tysonPickerPending = null;
+  document.getElementById('tysonHopOverlay').classList.remove('active');
+
+  const { winTeamName, continuation } = tp;
+  const loseTeam = B[loseTeamName];
+  const targetGhost = loseTeam.ghosts[ghostIdx];
+  const gd = ghostData(targetGhost.id);
+
+  B.tysonDisabled[loseTeamName].push(ghostIdx);
+
+  const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
+  narrate(`<b class="${winColor}">Tyson</b> — Hop! <b>${targetGhost.name}</b>'s sideline ability disabled!`);
+  showAbilityCallout('HOP!', 'var(--common)', `${targetGhost.name}'s ${gd.ability} disabled!`, winTeamName);
+  log(`<span class="log-ability">Tyson</span> — Hop! ${targetGhost.name}'s sideline ability (${gd.ability}) disabled until it enters play.`);
+
+  continuation();
+}
+
+// ============================================================
+// Laura (79) — Catchy Tune: die picker after each roll
+// ============================================================
+function showCatchyTunePicker(teamName, dice, continuation) {
+  const banner = document.getElementById('catchyTuneBanner');
+  if (banner) {
+    banner.className = `pm-who-banner ${teamName}`;
+    banner.textContent = '🎵 CATCHY TUNE!';
+  }
+  const opts = document.getElementById('catchyTuneDiceOptions');
+  opts.innerHTML = dice.map((d, i) =>
+    `<button onclick="doCatchyTuneChoice('${teamName}', ${d}, ${JSON.stringify(dice)}, this)" style="width:60px;height:60px;font-size:28px;font-weight:bold;border-radius:12px;border:2px solid rgba(255,255,255,0.3);background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;cursor:pointer;transition:transform 0.1s;">${d}</button>`
+  ).join('');
+  B.catchyTunePending = { teamName, continuation };
+  B.phase = 'ko-pause';
+  document.getElementById('catchyTuneOverlay').classList.add('active');
+}
+
+function doCatchyTuneChoice(teamName, dieValue, allDice, btnEl) {
+  const ct = B.catchyTunePending;
+  if (!ct) return;
+  B.catchyTunePending = null;
+  document.getElementById('catchyTuneOverlay').classList.remove('active');
+  B.catchyTuneLockedDie[teamName] = dieValue;
+  const teamColor = teamName === 'red' ? 'red-text' : 'blue-text';
+  narrate(`<b class="${teamColor}">Catchy Tune</b> — locked a <b>${dieValue}</b> for next roll!`);
+  log(`<span class="log-ability">Laura</span> — Catchy Tune! Locked die: <span class="log-ms">${dieValue}</span> for next roll.`);
+  showAbilityCallout('LOCKED!', 'var(--rare)', `Die ${dieValue} locked for next roll!`, teamName);
+  ct.continuation();
 }
 
 // ============================================================
@@ -7811,7 +7997,7 @@ function showGaleForcePickerModal(winTeamName, loseTeamName, sidelineGhosts, con
       </div>`;
     }).join('');
   }
-  B.galeForcePicker = { winTeamName, loseTeamName, continuation };
+  B.galeForcePicker = { winTeamName, loseTeamName, continuation, dmg: B._galeForceDmg || 0 };
   B.phase = 'ko-pause';
   document.getElementById('galeForcePickerOverlay').classList.add('active');
 }
@@ -7822,7 +8008,7 @@ function doGaleForcePickerChoice(idx) {
   B.galeForcePicker = null;
   document.getElementById('galeForcePickerOverlay').classList.remove('active');
 
-  const { winTeamName, loseTeamName, continuation } = gfp;
+  const { winTeamName, loseTeamName, continuation, dmg } = gfp;
   const loseTeam = B[loseTeamName];
   const winTeamColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseTeamColor = loseTeamName === 'red' ? 'red-text' : 'blue-text';
@@ -7831,10 +8017,17 @@ function doGaleForcePickerChoice(idx) {
   const newGhost = loseTeam.ghosts[idx];
 
   loseTeam.activeIdx = idx;
+
+  // Apply stashed damage to the NEW ghost
+  if (dmg > 0) {
+    newGhost.hp = Math.max(0, newGhost.hp - dmg);
+    if (newGhost.hp <= 0) { newGhost.hp = 0; newGhost.ko = true; newGhost.killedBy = 31; }
+    playDamageSfx(dmg);
+  }
   renderBattle();
 
-  narrate(`<b class="${winTeamColor}">Gus</b> — Gale Force! <b class="${loseTeamColor}">${newGhost.name}</b> blown in to replace <b class="${loseTeamColor}">${oldName}</b>!`);
-  log(`<span class="log-ability">Gus</span> — Gale Force! ${oldName} forced to bench — ${newGhost.name} enters!`);
+  narrate(`<b class="${winTeamColor}">Gus</b> — Gale Force! <b class="${loseTeamColor}">${newGhost.name}</b> blown in — takes ${dmg} damage!${newGhost.ko ? ' <b>KO!</b>' : ''}`);
+  log(`<span class="log-ability">Gus</span> — Gale Force! ${oldName} forced to bench — ${newGhost.name} enters and takes <span class="log-dmg">${dmg} damage!</span>${newGhost.ko ? ' <span class="log-ko">KO!</span>' : ' ' + newGhost.hp + ' HP left'}`);
 
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
@@ -8029,22 +8222,11 @@ function rollReady(team) {
       return;
     }
 
-    // Toby (97) — Pure Heart: before rolling, may declare the all-in gamble.
-    // Modal only shows when it hasn't been decided yet this round (null = undecided).
-    // Skipped if pureHeartScheduledKO is already pending (doPreRollSetup handles that).
-    const tobyActive = active(B[team]);
-    if (tobyActive && tobyActive.id === 97 && !tobyActive.ko &&
-        B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
-        !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
-      // Lock only Toby's button — opponent can still roll independently
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.tobyPending = { team, btn };
-      const tobyDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        document.getElementById('tobyOverlay').classList.add('active');
-      }, tobyDelay);
-      return;
+    // Toby (97) — Pure Heart: now handled by pre-roll ability button (useTobyButton)
+    // If Toby hasn't declared yet, auto-set to false (skip) so roll proceeds.
+    if (active(B[team])?.id === 97 && !active(B[team]).ko &&
+        B.pureHeartDeclared && B.pureHeartDeclared[team] === null) {
+      B.pureHeartDeclared[team] = false; // default to not declaring if button wasn't pressed
     }
 
     // Tyler (105) — Heating Up: opt-in 2 HP trade for +1 die
@@ -8327,12 +8509,18 @@ function doTeamRoll(team, btn) {
     return;
   }
   // Roll this team's dice (weighted for cinematic clutch moments)
-  const diceCount = B.preRoll[team].count;
+  let diceCount = B.preRoll[team].count;
   const override = B.preRoll[team].override;
-  const dice = override ? [1,2,3] : weightedRoll(team, diceCount);
+  // Laura (79) — Catchy Tune: if unlocked, one die is locked from last roll
+  const lockedDie = (B.catchyTuneUnlocked[team] && B.catchyTuneLockedDie[team] !== null && diceCount > 0) ? B.catchyTuneLockedDie[team] : null;
+  const rollCount = lockedDie !== null ? Math.max(0, diceCount - 1) : diceCount;
+  const dice = override ? [1,2,3] : weightedRoll(team, rollCount);
+  if (lockedDie !== null && !override) dice.push(lockedDie);
+  dice.sort((a,b) => a-b);
   B.preRoll[team].dice = dice;
   if (team === 'red') { B.redDice = dice; } else { B.blueDice = dice; }
 
+  if (lockedDie !== null && !override) log(`<span class="log-ability">Laura</span> — Catchy Tune! Locked die: <span class="log-ms">${lockedDie}</span> carried over.`);
   if (override) log(`<span class="log-ability">Bouril</span> — Slumber! Auto-rolled [1,2,3]!`);
 
   // Animate: show rolling then reveal
@@ -8514,14 +8702,8 @@ function openDuelPhasePrimers(team) {
     }
   }
 
-  // — TOBY (97) — Pure Heart: declare all-in gamble
-  if (f.id === 97 && B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
-      !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
-    disableDone();
-    B.tobyPending = { team, btn: doneBtn };
-    document.getElementById('tobyOverlay').classList.add('active');
-    return true;
-  }
+  // — TOBY (97) — Pure Heart: now handled by pre-roll ability button (useTobyButton)
+  // No modal intercept needed — button is in ability panel
 
   // — CHOW (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice (Duel Phase)
   if (f.id === 414 && !f.ko && B.chowDecided && !B.chowDecided[team] &&
@@ -8867,6 +9049,27 @@ function renderDuelUI() {
 // and either enters the Duel Phase or falls back to simultaneous ready.
 function startNextRound() {
   if (!B) return;
+
+  // Laura (79) — Catchy Tune: if unlocked, show die picker before next round
+  const ctRed = B.catchyTuneUnlocked.red && B.redDice && B.redDice.length > 0;
+  const ctBlue = B.catchyTuneUnlocked.blue && B.blueDice && B.blueDice.length > 0;
+  if (ctRed || ctBlue) {
+    const proceedAfterPickers = () => { _doStartNextRound(); };
+    if (ctRed && ctBlue) {
+      showCatchyTunePicker('red', B.redDice, () => {
+        showCatchyTunePicker('blue', B.blueDice, proceedAfterPickers);
+      });
+    } else if (ctRed) {
+      showCatchyTunePicker('red', B.redDice, proceedAfterPickers);
+    } else {
+      showCatchyTunePicker('blue', B.blueDice, proceedAfterPickers);
+    }
+    return;
+  }
+  _doStartNextRound();
+}
+function _doStartNextRound() {
+  if (!B) return;
   // Reset per-round Bonzai state for the new round
   B.bonzaiDecided = { red: false, blue: false };
   B.bonzaiBtnDice = { red: 0, blue: 0 };
@@ -9096,13 +9299,13 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _swarmSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
-        if (!ef.ko && hasSideline(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
+        if (!ef.ko && hasAlive(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
           const psPreHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNamePre]);
-          log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+          log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
           hitDamage(enemyName);
           popSidelineCard(B[tNamePre], 436);
@@ -9111,7 +9314,7 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
-        } else if (!ef.ko && hasSideline(B[tNamePre], 436) && hasSideline(B[enemyName], 45)) {
+        } else if (!ef.ko && hasAlive(B[tNamePre], 436) && hasSideline(B[enemyName], 45)) {
           const cornGhostPS = getSidelineGhost(B[enemyName], 45);
           preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS ? cornGhostPS.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
           log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
@@ -9175,13 +9378,13 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _meltSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
-        if (!ef.ko && hasSideline(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
+        if (!ef.ko && hasAlive(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
           const psPreHp2 = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
           if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameShade]);
-          log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+          log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
           hitDamage(enemyName);
           popSidelineCard(B[tNameShade], 436);
@@ -9191,7 +9394,7 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
-        } else if (!ef.ko && hasSideline(B[tNameShade], 436) && hasSideline(enemy, 45)) {
+        } else if (!ef.ko && hasAlive(B[tNameShade], 436) && hasSideline(enemy, 45)) {
           const cornGhostPS2 = getSidelineGhost(enemy, 45);
           preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS2 ? cornGhostPS2.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
           log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
@@ -9260,13 +9463,13 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _hauntSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
-          if (!ef.ko && hasSideline(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
+          if (!ef.ko && hasAlive(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
             const psPreHp3 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
             if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameHaunt]);
-            log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+            log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
             hitDamage(enemyName);
             popSidelineCard(B[tNameHaunt], 436);
@@ -9275,7 +9478,7 @@ function doPreRollSetup() {
               preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
-          } else if (!ef.ko && hasSideline(B[tNameHaunt], 436) && hasSideline(enemy, 45)) {
+          } else if (!ef.ko && hasAlive(B[tNameHaunt], 436) && hasSideline(enemy, 45)) {
             const cornGhostPS3 = getSidelineGhost(enemy, 45);
             const enemyNameHaunt = enemy === B.red ? 'red' : 'blue';
             preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS3 ? cornGhostPS3.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyNameHaunt]);
@@ -9342,13 +9545,13 @@ function doPreRollSetup() {
           preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
           log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
         }
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
-        if (!f.ko && hasSideline(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
+        if (!f.ko && hasAlive(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
           const psPreHpL = f.hp;
           f.hp = Math.max(0, f.hp - 1);
           if (f.hp <= 0) { f.ko = true; f.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${f.name}!`, tNameLucyActor]);
-          log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
+          log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
           playDamageSfx(1);
           hitDamage(tNameLucyTarget);
           popSidelineCard(B[tNameLucyActor], 436);
@@ -9358,7 +9561,7 @@ function doPreRollSetup() {
             preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
-        } else if (!f.ko && hasSideline(B[tNameLucyActor], 436) && hasSideline(B[tNameLucyTarget], 45)) {
+        } else if (!f.ko && hasAlive(B[tNameLucyActor], 436) && hasSideline(B[tNameLucyTarget], 45)) {
           const cornGhostPSL = getSidelineGhost(B[tNameLucyTarget], 45);
           preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPSL ? cornGhostPSL.name : 'Cornelius'} blocks Princess Shade's Bounty!`, tNameLucyTarget]);
           log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
@@ -9430,13 +9633,13 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _splinterSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
-          if (!ef.ko && hasSideline(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
+          if (!ef.ko && hasAlive(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
             const psPreHp4 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
             if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
-            log(`<span class="log-ability">Princess Shade</span> (sideline) — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
+            log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
             hitDamage(enemyName);
             popSidelineCard(B[tNameSplinter], 436);
@@ -9445,7 +9648,7 @@ function doPreRollSetup() {
               preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
-          } else if (!ef.ko && hasSideline(B[tNameSplinter], 436) && hasSideline(enemy, 45)) {
+          } else if (!ef.ko && hasAlive(B[tNameSplinter], 436) && hasSideline(enemy, 45)) {
             const cornGhostPS4 = getSidelineGhost(enemy, 45);
             preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostPS4 ? cornGhostPS4.name : 'Cornelius'} blocks Princess Shade's Bounty!`, enemyName]);
             log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
@@ -9952,6 +10155,24 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${active(B.blue).name}</span> — Let's Dance! +${B.letsDanceBonus.blue} bonus die from last doubles!`);
     }
     B.letsDanceBonus.blue = 0;
+  }
+
+  // Winston (15) — Scheme: +2 dice from last round's win
+  if (B.winstonDiceBonus && B.winstonDiceBonus.red > 0) {
+    if (active(B.red).id === 15 && !active(B.red).ko) {
+      redCount += B.winstonDiceBonus.red;
+      preRollCallouts.push(['SCHEME!', 'var(--common)', `Winston — +${B.winstonDiceBonus.red} bonus dice!`, 'red']);
+      log(`<span class="log-ability">Winston</span> — Scheme! +${B.winstonDiceBonus.red} bonus dice from last win!`);
+    }
+    B.winstonDiceBonus.red = 0;
+  }
+  if (B.winstonDiceBonus && B.winstonDiceBonus.blue > 0) {
+    if (active(B.blue).id === 15 && !active(B.blue).ko) {
+      blueCount += B.winstonDiceBonus.blue;
+      preRollCallouts.push(['SCHEME!', 'var(--common)', `Winston — +${B.winstonDiceBonus.blue} bonus dice!`, 'blue']);
+      log(`<span class="log-ability">Winston</span> — Scheme! +${B.winstonDiceBonus.blue} bonus dice from last win!`);
+    }
+    B.winstonDiceBonus.blue = 0;
   }
 
   // Lucas (433) — Kindling: +1 die next roll after Miracle resurrection (consumed after use)
@@ -13303,11 +13524,11 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Omen! <span class="log-dmg">+1 damage!</span>`);
   }
 
-  // Mike (445) — Torrent: Win: +1 damage
-  if (wF.id === 445 && !wF.ko) {
-    dmg += 1;
+  // Michael (445) — Torrent: Even doubles → +2 damage
+  if (wF.id === 445 && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0) {
+    dmg += 2;
     collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Torrent! <span class="log-dmg">+1 damage!</span>`);
+    log(`<span class="log-ability">${wF.name}</span> — Torrent! Even doubles → <span class="log-dmg">+2 damage!</span>`);
   }
 
   // Twyla (417) — Lucky Dance: MOVED to dice count section (v674 rework: Lucky Stones give dice + Healing Seeds, not damage + HP)
@@ -13824,28 +14045,31 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Pale Nimbus'); log(`<span class="log-ability">Cornelius</span> — Antidote! Pale Nimbus Hidden Storm blocked.`); }
   }
 
-  // Laura (79) — Catchy Tune: Sideline & In Play: winning rolls in numeric order gain +3 damage. If triggered, also gain 2 Magic Fireflies.
-  // Sequences like 1-2-3, 2-3-4, 3-4-5, 4-5-6 all qualify (any length ≥2 consecutive run without repeats).
-  let lauraCatchyTriggered = false;
-  let lauraCatchyBaseDmg = 0;
-  const hasLauraActive = wF.id === 79 && !wF.ko;
-  const hasLauraSideline = hasSideline(winTeam, 79);
-  if ((hasLauraActive || hasLauraSideline) && winDice && winDice.length >= 2) {
-    const _lauraSorted = [...winDice].sort((a, b) => a - b);
-    const _lauraSeq = _lauraSorted.every((v, i) => i === 0 || v === _lauraSorted[i - 1] + 1);
-    if (_lauraSeq) {
-      if (!corneliusBlocksRally || hasLauraActive) {
-        lauraCatchyBaseDmg = dmg;
-        dmg += 3;
-        lauraCatchyTriggered = true;
-        // +1 Magic Firefly
-        if (!winTeam.resources.firefly) winTeam.resources.firefly = 0;
-        winTeam.resources.firefly += 2;
-        const lauraName = hasLauraActive ? wF.name : (getSidelineGhost(winTeam, 79) || {}).name || 'Laura';
-        const lauraLabel = hasLauraActive ? '' : ' (sideline)';
-        collectKC(winTeamName, lauraName);
-        log(`<span class="log-ability">${lauraName}${lauraLabel}</span> — Catchy Tune! [${_lauraSorted.join('-')}] in order → +3 damage + 2 Magic Fireflies!`);
-      } else { corneliusSidelineBlockedList.push('Laura'); log(`<span class="log-ability">Cornelius</span> — Antidote! Laura Catchy Tune blocked.`); }
+  // Laura (79) — Catchy Tune: Sideline & In Play: roll a straight to unlock permanently.
+  // Check WINNER's dice for straight activation (both teams checked separately below).
+  let catchyJustUnlockedWin = false, catchyJustUnlockedLose = false;
+  if (!B.catchyTuneUnlocked[winTeamName] && hasAlive(winTeam, 79) && winDice && isStraight(winDice)) {
+    if (!corneliusBlocksRally || wF.id === 79) {
+      B.catchyTuneUnlocked[winTeamName] = true;
+      catchyJustUnlockedWin = true;
+      const lauraG = wF.id === 79 ? wF : (getSidelineGhost(winTeam, 79) || { name: 'Laura' });
+      const lauraLoc = wF.id === 79 ? '' : ' (sideline)';
+      collectKC(winTeamName, lauraG.name);
+      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune unlocked! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      popSidelineCard(winTeam, 79);
+    } else { corneliusSidelineBlockedList.push('Laura'); }
+  }
+  // Check LOSER's dice for straight activation too (Laura is Sideline & In Play — triggers on any roll)
+  if (!B.catchyTuneUnlocked[loseTeamName] && hasAlive(loseTeam, 79) && loseDice && isStraight(loseDice)) {
+    const enemyCornelius = hasSideline(winTeam, 45);
+    if (!enemyCornelius || lF.id === 79) {
+      B.catchyTuneUnlocked[loseTeamName] = true;
+      catchyJustUnlockedLose = true;
+      const lauraGL = lF.id === 79 ? lF : (getSidelineGhost(loseTeam, 79) || { name: 'Laura' });
+      const lauraLocL = lF.id === 79 ? '' : ' (sideline)';
+      collectKC(loseTeamName, lauraGL.name);
+      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune unlocked! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      popSidelineCard(loseTeam, 79);
     }
   }
 
@@ -13932,6 +14156,40 @@ function _resolveRoundImpl() {
     chipTriggered = true;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Acrobatic Dive! Even doubles → +3 damage! (${chipBaseDmg} + 3 = ${dmg})`);
+  }
+
+  // Dealer (37) — House Rules WIN: straight → +3 damage.
+  let dealerWinTriggered = false;
+  if (wF.id === 37 && !wF.ko && dmg > 0 && winDice && isStraight(winDice)) {
+    const dealerWinBase = dmg;
+    dmg += 3;
+    dealerWinTriggered = true;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — House Rules! Straight [${[...winDice].sort((a,b)=>a-b).join(', ')}] → +3 damage! (${dealerWinBase} + 3 = ${dmg})`);
+  }
+
+  // Dark Fang (202) — Pressure: Win: +1 damage per KO'd ghost this game (both teams)
+  let deathHowlTriggered = false;
+  let deathHowlKOs = 0;
+  if (wF.id === 202 && !wF.ko && dmg > 0) {
+    deathHowlKOs = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
+    if (deathHowlKOs > 0) {
+      const dhBaseDmg = dmg;
+      dmg += deathHowlKOs;
+      deathHowlTriggered = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Pressure! ${deathHowlKOs} KO'd ghost${deathHowlKOs > 1 ? 's' : ''} → +${deathHowlKOs} damage! (${dhBaseDmg} + ${deathHowlKOs} = ${dmg})`);
+    }
+  }
+
+  // Wanderer (4) — Curiosity: roll a straight (consecutive, no repeats) → +2 damage.
+  let wandererTriggered = false;
+  if (wF.id === 4 && !wF.ko && dmg > 0 && winDice && isStraight(winDice)) {
+    const wandererBaseDmg = dmg;
+    dmg += 2;
+    wandererTriggered = true;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Curiosity! Straight [${[...winDice].sort((a,b)=>a-b).join(', ')}] → +2 damage! (${wandererBaseDmg} + 2 = ${dmg})`);
   }
 
   // Ancient Librarian (3) — Knowledge: for each 2 rolled by BOTH players combined, add +1 damage (only if winning ghost deals damage).
@@ -14048,18 +14306,13 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Stone Form! Singles roll negated — dealing 3 back to ${wF.name}!`);
   }
 
-  // Dealer (37) — House Rules: Dealer's losing dice in strict consecutive ascending order → negate all incoming damage.
-  // e.g. [1,2,3], [2,3,4], [3,4,5], [4,5,6] — any length run that is perfectly sequential.
+  // Dealer (37) — House Rules LOSE: straight (consecutive, no repeats) → negate all incoming damage.
   let dealerHouseRules = false;
-  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2 && !cameronUnnegatable) {
-    const _sortedDealerDice = [...loseDice].sort((a, b) => a - b);
-    const _isSequential = _sortedDealerDice.every((v, i) => i === 0 || v === _sortedDealerDice[i - 1] + 1);
-    if (_isSequential) {
-      dmg = 0;
-      dealerHouseRules = true;
-      collectKC(loseTeamName, lF.name);
-      log(`<span class="log-ability">${lF.name}</span> — House Rules! Dice [${_sortedDealerDice.join(', ')}] in order — ${wF.name}'s attack negated!`);
-    }
+  if (lF.id === 37 && !lF.ko && dmg > 0 && loseDice && loseDice.length >= 2 && !cameronUnnegatable && isStraight(loseDice)) {
+    dmg = 0;
+    dealerHouseRules = true;
+    collectKC(loseTeamName, lF.name);
+    log(`<span class="log-ability">${lF.name}</span> — House Rules! Straight [${[...loseDice].sort((a,b)=>a-b).join(', ')}] — ${wF.name}'s attack negated!`);
   }
 
   // Sky (72) — Elusive: if incoming damage is greater than 2, negate it and deal counter die damage.
@@ -14159,20 +14412,21 @@ function _resolveRoundImpl() {
   }
   if (B.fangUndercoverArmed) { B.fangUndercoverArmed[loseTeamName] = false; B.fangUndercoverArmed[winTeamName] = false; } // clear any unused arm
 
-  // Gus (31) — Gale Force: won and declared Gale Force → override all damage to 0, force enemy ghost swap.
-  // Fires after Guardian Fairy (GF absorption irrelevant here since Gus is the winner).
+  // Gus (31) — Gale Force: won → force enemy swap, new ghost takes the damage (auto-triggers, no opt-in).
   let galeForceSwap = false;
   let galeForceSLIdx = -1;
-  if (wF.id === 31 && !wF.ko && B.galeForcePending && B.galeForcePending[winTeamName]) {
+  let galeForceDmg = 0;
+  if (wF.id === 31 && !wF.ko && dmg > 0) {
     galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
     if (galeForceSLIdx >= 0) {
-      dmg = 0; // override ALL computed damage — no hit
+      galeForceDmg = dmg;
+      dmg = 0;
       galeForceSwap = true;
       collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeamName} must choose a replacement ghost!`);
+      log(`<span class="log-ability">${wF.name}</span> — Gale Force! ${loseTeamName} must choose a replacement — the new ghost takes ${galeForceDmg} damage!`);
     }
   }
-  if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; } // consumed or unused
+  if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; }
 
   // --- Mirror Matt (410) — Seven Years: doubles ONLY damage reflected to winner ---
   let mirrorMattReflected = false;
@@ -14865,11 +15119,14 @@ function _resolveRoundImpl() {
     const pnSum = winDice ? winDice.reduce((s, d) => s + d, 0) : '?';
     queueAbility('HIDDEN STORM!', 'var(--rare)', `Pale Nimbus (sideline) — Roll sum ${pnSum} < 7! ${paleNimbusBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
-  if (lauraCatchyTriggered) {
-    const _lSeq = winDice ? [...winDice].sort((a, b) => a - b).join('-') : '?';
-    const _lauraIsActive = wF.id === 79;
-    const _lauraLbl = _lauraIsActive ? wF.name : 'Laura (sideline)';
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `${_lauraLbl} — [${_lSeq}] In order! +3 damage + 2 Magic Fireflies!`, () => { renderBattle(); }, winTeamName);
+  // Laura (79) — Catchy Tune unlock callouts (only on first activation)
+  if (catchyJustUnlockedWin) {
+    const _lSeq = [...winDice].sort((a, b) => a - b).join('-');
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, winTeamName);
+  }
+  if (catchyJustUnlockedLose) {
+    const _lSeqL = [...loseDice].sort((a, b) => a - b).join('-');
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, loseTeamName);
   }
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards (active OR sideline, v598)
   if (garyOnesWin > 0) {
@@ -14919,6 +15176,10 @@ function _resolveRoundImpl() {
     queueAbility('KNOWLEDGE!', 'var(--common)', `Ancient Librarian — ${librarianTwos} 2${librarianTwos > 1 ? 's' : ''} rolled by both teams! ${librarianBaseDmg} + ${librarianTwos} = ${dmg} damage!`, null, winTeamName);
   }
   // Ancient Librarian knight reactions already collected via collectKC at game-state section (~line 9604) — do NOT double-fire here
+  if (wandererTriggered) {
+    const _wandererSorted = [...winDice].sort((a, b) => a - b);
+    queueAbility('CURIOSITY!', 'var(--common)', `${wF.name} — Straight [${_wandererSorted.join('-')}]! +2 damage!`, null, winTeamName);
+  }
   if (sparkyTriggered) {
     queueAbility('TINDER!', 'var(--rare)', `${wF.name} — ${sparkyOneCount} rolled 1${sparkyOneCount > 1 ? 's' : ''} × 3 = +${sparkyOneCount * 3} damage! (${sparkyBaseDmg} + ${sparkyOneCount * 3} = ${dmg})`, null, winTeamName);
   }
@@ -15077,12 +15338,19 @@ function _resolveRoundImpl() {
   }
   // Patrick knight reactions already collected via collectKC at game-state section (line ~9683) — do NOT double-fire here
 
-  // Dealer (37) — House Rules: dice in consecutive order → damage negated callout
+  // Dealer (37) — House Rules: straight on loss → damage negated callout
   if (dealerHouseRules) {
     const _dealerSorted = [...loseDice].sort((a, b) => a - b);
-    queueAbility('HOUSE RULES!', 'var(--uncommon)', `${lF.name} — [${_dealerSorted.join('-')}] In order! ${wF.name}'s attack is nullified!`, null, loseTeamName);
+    queueAbility('HOUSE RULES!', 'var(--uncommon)', `${lF.name} — Straight [${_dealerSorted.join('-')}]! ${wF.name}'s attack is nullified!`, null, loseTeamName);
   }
-  // Dealer knight reactions already collected via collectKC at game-state section (line ~9696) — do NOT double-fire here
+  // Dealer (37) — House Rules: straight on win → +3 damage callout
+  if (dealerWinTriggered) {
+    const _dealerWinSorted = [...winDice].sort((a, b) => a - b);
+    queueAbility('HOUSE RULES!', 'var(--uncommon)', `${wF.name} — Straight [${_dealerWinSorted.join('-')}]! +3 damage!`, null, winTeamName);
+  }
+  if (deathHowlTriggered) {
+    queueAbility('PRESSURE!', 'var(--rare)', `${wF.name} — ${deathHowlKOs} KO${deathHowlKOs > 1 ? 's' : ''} on the field! +${deathHowlKOs} damage!`, null, winTeamName);
+  }
 
   // Sky (72) — Elusive: incoming big damage (>2) negated + counter die pending
   if (skyElusive) {
@@ -15230,7 +15498,7 @@ function _resolveRoundImpl() {
     } else {
       const villagerNewHp = wF.hp + 1;
       const vilOver = villagerNewHp > wF.maxHp;
-      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP${vilOver ? ' · overclocked!' : ''})`, () => { wF.hp++; renderBattle(); }, winTeamName);
+      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP${vilOver ? ' · overclocked!' : ''})`, () => { guardedHeal(wF, 1, winTeamName); renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Hospitality! Villager sideline → +1 HP (${villagerNewHp} HP${vilOver ? ' overclocked!' : ''}).`);
     }
   }
@@ -15271,7 +15539,7 @@ function _resolveRoundImpl() {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Overclock cursed! ${wF.name} takes 1 damage! (${wF.hp}→${calFlipped} HP)`, () => { wF.hp = calFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); }, winTeamName);
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Calvin Overclock flipped to damage. ${wF.name} ${wF.hp} → ${calFlipped} HP.`);
     } else {
-      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP + 1 Healing Seed! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' · overclocked!' : ''}`, () => { wF.hp++; winTeam.resources.healingSeed++; renderBattle(); }, winTeamName);
+      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP + 1 Healing Seed! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' · overclocked!' : ''}`, () => { guardedHeal(wF, 1, winTeamName); winTeam.resources.healingSeed++; renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Overclock! +1 HP (${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' overclocked!' : ''}) + <span class="log-heal">+1 Healing Seed!</span>`);
     }
   }
@@ -15859,8 +16127,8 @@ function _resolveRoundImpl() {
         ? winTeam.ghosts.filter((g, i) => i !== winTeam.activeIdx && !g.ko)
         : [];
 
-      // Winston (15) — Scheme: doubles win → offer to force-swap opponent's active ghost
-      const winstonSchemeSideline = (wF.id === 15 && !wF.ko && wR.type === 'doubles')
+      // Winston (15) — Scheme: any win → offer to force-swap opponent's active ghost + gain 2 dice next roll
+      const winstonSchemeSideline = (wF.id === 15 && !wF.ko)
         ? loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko)
         : [];
 
@@ -15896,12 +16164,24 @@ function _resolveRoundImpl() {
       const fuSwapTeam = B.fangUndercoverSwapPending;
       B.fangUndercoverSwapPending = null;
 
-      // Winston (15) — Scheme: fires after Toboggan/FangOutside, before KO handling
+      // Tyson (365) — Hop: win → choose enemy sideline ghost to disable
+      const checkTysonHop = () => {
+        if (wF.id === 365 && !wF.ko) {
+          const tysonTargets = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko && !B.tysonDisabled[loseTeamName].includes(i));
+          if (tysonTargets.length > 0) {
+            showTysonHopPicker(winTeamName, loseTeamName, tysonTargets, proceedToKoHandling);
+            return;
+          }
+        }
+        proceedToKoHandling();
+      };
+
+      // Winston (15) — Scheme: fires after Toboggan/FangOutside, before Tyson
       const checkWinstonScheme = () => {
         if (winstonSchemeSideline.length > 0) {
-          showWinstonSchemeModal(winTeamName, loseTeamName, winstonSchemeSideline, proceedToKoHandling);
+          showWinstonSchemeModal(winTeamName, loseTeamName, winstonSchemeSideline, checkTysonHop);
         } else {
-          proceedToKoHandling();
+          checkTysonHop();
         }
       };
 
@@ -15915,20 +16195,24 @@ function _resolveRoundImpl() {
         }
       };
 
-      // Gus (31) — Gale Force: if triggered, offer the LOSING player a ghost picker before other post-drain logic.
-      // Spec: "force your opponent to CHOOSE a different ghost" — the opponent decides which sideline ghost enters.
-      // If only 1 sideline option, auto-swap (no real choice). If multiple, show picker modal (same as Winston pattern).
+      // Gus (31) — Gale Force: win → force swap, new ghost takes the damage.
       const checkGaleForcePicker = () => {
         if (galeForceSwap && !wF.ko) {
+          B._galeForceDmg = galeForceDmg; // stash for picker
           const gfAlive = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko);
           if (gfAlive.length > 1) {
             showGaleForcePickerModal(winTeamName, loseTeamName, gfAlive, afterFangUndercover);
             return;
           } else if (gfAlive.length === 1) {
-            // Only 1 option — auto-swap, fire entry effects, then continue
-            loseTeam.activeIdx = loseTeam.ghosts.indexOf(gfAlive[0]);
+            // Only 1 option — auto-swap + apply damage
+            const autoTarget = gfAlive[0];
+            loseTeam.activeIdx = loseTeam.ghosts.indexOf(autoTarget);
+            if (galeForceDmg > 0) {
+              autoTarget.hp = Math.max(0, autoTarget.hp - galeForceDmg);
+              if (autoTarget.hp <= 0) { autoTarget.hp = 0; autoTarget.ko = true; autoTarget.killedBy = 31; }
+            }
             renderBattle();
-            log(`<span class="log-ability">Gus</span> — Gale Force! ${gfAlive[0].name} was the only option — enters automatically!`);
+            log(`<span class="log-ability">Gus</span> — Gale Force! ${autoTarget.name} was the only option — enters and takes <span class="log-dmg">${galeForceDmg} damage!</span>${autoTarget.ko ? ' <span class="log-ko">KO!</span>' : ' ' + autoTarget.hp + ' HP left'}`);
             const entryCount = triggerEntry(loseTeam, false);
             afterEntryWithJenkins(entryCount, afterFangUndercover);
             return;
@@ -16974,7 +17258,7 @@ function renderBattle() {
     const enemy = opp(B[team]);
     let html = '';
     if (isPreRollActive(team)) {
-      // Death Howl (202) — Pressure button (once per round)
+      // Dark Fang (202) — Pressure button (once per round)
       if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
         if (enemySideline.length > 0) {
@@ -17057,6 +17341,12 @@ function renderBattle() {
       // Miyoshi (454) — Bonzai!: pre-roll button to sacrifice HP for dice
       if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
         html += `<button class="ability-btn pressure" onclick="useBonzaiButton('${team}')" style="border-color:#dc2626;color:#dc2626;font-weight:bold;">⚡ BONZAI! (−4 HP, +5 dice)</button>`;
+      }
+      // Toby (97) — Pure Heart: pre-roll button to declare all-in
+      if (f.id === 97 && !f.ko &&
+          B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
+          !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
+        html += `<button class="ability-btn pressure" onclick="useTobyButton('${team}')" style="border-color:#7f1d1d;color:#7f1d1d;font-weight:bold;">💀 PURE HEART! (Final Roll)</button>`;
       }
       // Castle Gardener (442) — Cultivate: pre-roll button to trade seeds for fire
       if (f.id === 442 && !f.ko && B[team].resources && B[team].resources.healingSeed >= 1) {
@@ -17539,6 +17829,8 @@ function clearAllOverlays() {
   document.getElementById('fangUndercoverArmOverlay').classList.remove('active');
   document.getElementById('fangUndercoverSwapOverlay').classList.remove('active');
   document.getElementById('winstonSchemeOverlay').classList.remove('active');
+  document.getElementById('catchyTuneOverlay').classList.remove('active');
+  document.getElementById('tysonHopOverlay').classList.remove('active');
   document.getElementById('galeForcePickerOverlay').classList.remove('active');
   document.getElementById('wiseAlOverlay').classList.remove('active');
   document.getElementById('gordokOverlay').classList.remove('active');
@@ -17618,7 +17910,7 @@ document.addEventListener('keydown', e => {
   // Escape closes any open overlay/modal.
   // pressureOverlay is intentionally excluded — the Pressure pick is a FORCED choice
   // for the opponent; allowing Escape to dismiss it would bypass pressureUsed and let
-  // Death Howl spam Pressure every round. The modal only closes via doPressureSwap().
+  // Dark Fang spam Pressure every round. The modal only closes via doPressureSwap().
   if (e.key === 'Escape') {
     // In MP mode, don't allow Escape to close gameOver (must use Return to Arena button)
     const overlays = ['swapOverlay','msPicker','stealOverlay','standingsOverlay'];

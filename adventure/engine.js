@@ -365,7 +365,7 @@ function getAbilityBonusDamage(attackerTeam, defenderTeam, roll, dice, result) {
       case 71: if (roll.type === 'doubles' && roll.value % 2 === 0) { bonus += 2; ev(result, `${sg.name} (bench): +2 even doubles`); } break; // Admiral
       case 88: if (diceSum(dice) < 7) { bonus += 2; ev(result, `${sg.name} (bench): +2 low roll`); } break; // Pale Nimbus
       case 93: if (dice.length <= 2) { bonus += 3; ev(result, `${sg.name} (bench): +3 (2 dice)`); } break; // Bandit Pete
-      case 436: ev(result, `${sg.name} (bench): +1 pre-roll damage`); break; // Princess Shade
+      case 436: ev(result, `${sg.name} (bench): +1 pre-roll damage`); break; // Princess Shade (also triggers when active — see below)
     }
   }
 
@@ -557,6 +557,13 @@ function triggerBeforeRoll(attackerTeam, defenderTeam, result) {
   for (const sg of sidelineGhosts(attackerTeam)) {
     if (sg.id === 205 && enemy.hp < 4) { hp(enemy, -1); ev(result, `${sg.name} (bench): Meltdown! 1 damage (enemy < 4 HP)`); } // Shade's Shadow
   }
+
+  // Princess Shade (436) — Bounty: +1 to any pre-roll chip damage (works from sideline OR active)
+  const preRollDamageDealt = [111, 304, 349].includes(ghost.id) ||
+    sidelineGhosts(attackerTeam).some(sg => sg.id === 205 && enemy.hp < 4);
+  if (preRollDamageDealt && attackerTeam.ghosts.some(g => !g.ko && g.id === 436)) {
+    hp(enemy, -1); ev(result, `Princess Shade: Bounty! +1 additional damage`);
+  }
 }
 
 // ═══════ ENCOUNTER GENERATION ═══════
@@ -590,7 +597,7 @@ function getEncounterCard(region, locationName) {
       pool = CARDS.filter(c => (c.set === 'Frost Valley') && c.rarity !== 'legendary').concat(general);
       break;
     case 'volcanic_isles':
-      pool = CARDS.filter(c => (c.set === 'Volcanic Activity') && c.rarity !== 'legendary').concat(general);
+      pool = CARDS.filter(c => (c.set === 'Volcanic Isles') && c.rarity !== 'legendary').concat(general);
       break;
     case 'dark_castle':
       pool = CARDS.filter(c => (c.set === 'Dark Castle') && c.rarity !== 'legendary').concat(general);

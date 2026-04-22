@@ -42,17 +42,17 @@ const CARDS = [
   {id:113, name:"Prince Balatron",rarity:"legendary",maxHp:6, ability:"Party Time",desc:"Lose & survive: roll 1 counter die for damage.", set:"Frost Valley"},
 
   // ── VOLCANIC ISLES ──
-  {id:209, name:"Dart",      rarity:"common",   maxHp:3, ability:"Plunder",        desc:"Win: gain 2 Surge.",                          set:"Volcanic Activity"},
-  {id:329, name:"Clink",     rarity:"common",   maxHp:3, ability:"Prospect",       desc:"Win OR lose: gain 1 Surge.",                  set:"Volcanic Activity"},
-  {id:317, name:"Scorch",    rarity:"common",   maxHp:3, ability:"Singe",          desc:"Win: opponent loses 1 max HP permanently.",   set:"Volcanic Activity"},
-  {id:304, name:"Ember Force",rarity:"uncommon",maxHp:3, ability:"Swarm",          desc:"Before rolling: deal 1 damage to enemy.",     set:"Volcanic Activity"},
-  {id:321, name:"Forge Fire",rarity:"uncommon", maxHp:5, ability:"Temper",         desc:"Spend 1 Surge: next win deals double damage.",set:"Volcanic Activity"},
-  {id:343, name:"Boris",     rarity:"uncommon", maxHp:6, ability:"Fortify",        desc:"Spend 1 Surge: gain 2 HP (can exceed max).",  set:"Volcanic Activity"},
-  {id:325, name:"Magma Heart",rarity:"rare",    maxHp:7, ability:"Core Melt",      desc:"Below 3 HP: damage ignores all reduction.",   set:"Volcanic Activity"},
-  {id:367, name:"Dragonclaw",rarity:"rare",     maxHp:7, ability:"Rake",           desc:"Win with 3 different numbers: +3 damage.",    set:"Volcanic Activity"},
-  {id:327, name:"Natalia",   rarity:"ghost-rare",maxHp:6, ability:"Materialization",desc:"Even doubles (2s,4s,6s): gain 2 Moonstones.",set:"Volcanic Activity"},
-  {id:345, name:"Red Hunter",rarity:"ghost-rare",maxHp:6, ability:"Rumble",        desc:"Win: if opponent has specials, deal +3 damage.", set:"Volcanic Activity"},
-  {id:306, name:"Nerina",    rarity:"legendary",maxHp:9, ability:"Leviathan",      desc:"Entry: deal 3 damage to enemy.",              set:"Volcanic Activity"},
+  {id:209, name:"Dart",      rarity:"common",   maxHp:3, ability:"Plunder",        desc:"Win: gain 2 Surge.",                          set:"Volcanic Isles"},
+  {id:329, name:"Clink",     rarity:"common",   maxHp:3, ability:"Prospect",       desc:"Win OR lose: gain 1 Surge.",                  set:"Volcanic Isles"},
+  {id:317, name:"Scorch",    rarity:"common",   maxHp:3, ability:"Singe",          desc:"Win: opponent loses 1 max HP permanently.",   set:"Volcanic Isles"},
+  {id:304, name:"Ember Force",rarity:"uncommon",maxHp:3, ability:"Swarm",          desc:"Before rolling: deal 1 damage to enemy.",     set:"Volcanic Isles"},
+  {id:321, name:"Forge Fire",rarity:"uncommon", maxHp:5, ability:"Temper",         desc:"Spend 1 Surge: next win deals double damage.",set:"Volcanic Isles"},
+  {id:343, name:"Boris",     rarity:"uncommon", maxHp:6, ability:"Fortify",        desc:"Spend 1 Surge: gain 2 HP (can exceed max).",  set:"Volcanic Isles"},
+  {id:325, name:"Magma Heart",rarity:"rare",    maxHp:7, ability:"Core Melt",      desc:"Below 3 HP: damage ignores all reduction.",   set:"Volcanic Isles"},
+  {id:367, name:"Dragonclaw",rarity:"rare",     maxHp:7, ability:"Rake",           desc:"Win with 3 different numbers: +3 damage.",    set:"Volcanic Isles"},
+  {id:327, name:"Natalia",   rarity:"ghost-rare",maxHp:6, ability:"Materialization",desc:"Even doubles (2s,4s,6s): gain 2 Moonstones.",set:"Volcanic Isles"},
+  {id:345, name:"Red Hunter",rarity:"ghost-rare",maxHp:6, ability:"Rumble",        desc:"Win: if opponent has specials, deal +3 damage.", set:"Volcanic Isles"},
+  {id:306, name:"Nerina",    rarity:"legendary",maxHp:9, ability:"Leviathan",      desc:"Entry: deal 3 damage to enemy.",              set:"Volcanic Isles"},
 
   // ── DARK CASTLE ──
   {id:19,  name:"Scallywags",rarity:"common",   maxHp:5, ability:"Frenzy",         desc:"All dice under 4: gain +1 die next turn.",    set:"Dark Castle"},
@@ -488,7 +488,7 @@ function getEncounterCard(region) {
       pool = CARDS.filter(c => c.set === 'Frost Valley' && c.rarity !== 'legendary');
       break;
     case 'volcanic_isles':
-      pool = CARDS.filter(c => c.set === 'Volcanic Activity' && c.rarity !== 'legendary');
+      pool = CARDS.filter(c => c.set === 'Volcanic Isles' && c.rarity !== 'legendary');
       break;
     case 'dark_castle':
       pool = CARDS.filter(c => c.set === 'Dark Castle' && c.rarity !== 'legendary');
