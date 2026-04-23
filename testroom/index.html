@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v804'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v805'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1890,6 +1890,15 @@ body.lite-mode .die.rolling { animation: none !important; }
         <button class="set-filter-btn" data-set="Dark Castle" onclick="filterPicks('Dark Castle')">Dark Castle</button>
         <button class="set-filter-btn" data-set="Volcanic Isles" onclick="filterPicks('Volcanic Isles')">Volcanic Isles</button>
         <button class="set-filter-btn" data-set="Rolling Hills" onclick="filterPicks('Rolling Hills')">Rolling Hills</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Moonstone Sickness mode — punishment for using Moonstones">
+          <span style="color:var(--moonstone)">Moonstone Sickness:</span>
+          <select id="moonstoneModeSelect" style="padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;cursor:pointer;" onchange="localStorage.setItem('tr_msMode',this.value)">
+            <option value="A" selected>A: Permanent 2 dmg/turn</option>
+            <option value="B">B: Escalating one-shot</option>
+            <option value="C">C: Flat 3 dmg next roll</option>
+            <option value="D">D: Permanent 1 dmg/turn</option>
+          </select>
+        </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Battle animation speed">
           <span id="speedLabel">Speed: 1x</span>
           <input type="range" id="speedSlider" min="0" max="3" value="0" style="width:56px;accent-color:#22d3ee;cursor:pointer;" oninput="updateSpeedLabel();localStorage.setItem('tr_speed',this.value)">
@@ -1910,15 +1919,6 @@ body.lite-mode .die.rolling { animation: none !important; }
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;" title="Seconds to use Lucky Stone / Moonstone after rolling">
           <span id="specialsTimerLabel">Timer: 5s</span>
           <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;" title="Moonstone punishment mode">
-          <span style="color:var(--moonstone)">MS Mode:</span>
-          <select id="moonstoneModeSelect" style="padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;cursor:pointer;" onchange="localStorage.setItem('tr_msMode',this.value)">
-            <option value="off">Off</option>
-            <option value="A">A: Permanent 2/turn</option>
-            <option value="B">B: Escalating one-shot</option>
-            <option value="C">C: Flat 3 dmg</option>
-          </select>
         </label>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
@@ -2735,7 +2735,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v804';
+const TESTROOM_VERSION = 'v805';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -9336,13 +9336,15 @@ function doPreRollSetup() {
 
   // Moonstone Sickness — pre-roll damage
   {
-    const msMode = document.getElementById('moonstoneModeSelect')?.value || 'off';
-    if (msMode !== 'off') {
+    const msMode = document.getElementById('moonstoneModeSelect')?.value || 'A';
+    {
       ['red', 'blue'].forEach(teamKey => {
         const t = B[teamKey];
         let msDmg = 0;
         if (msMode === 'A' && t.moonstoneSickness > 0) {
           msDmg = t.moonstoneSickness * 2;
+        } else if (msMode === 'D' && t.moonstoneSickness > 0) {
+          msDmg = t.moonstoneSickness * 1;
         } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
           msDmg = t.moonstoneSicknessPending;
           t.moonstoneSicknessPending = 0; // clear after applying
@@ -11213,12 +11215,16 @@ function doSkipSpecials() {
 
 // Moonstone Sickness — balance experiment
 function applyMoonstoneSickness(team) {
-  const mode = document.getElementById('moonstoneModeSelect')?.value || 'off';
-  if (mode === 'off') return;
+  const mode = document.getElementById('moonstoneModeSelect')?.value || 'A';
   const t = B[team];
   if (mode === 'A') {
     t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
     const totalPerTurn = t.moonstoneSickness * 2;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
+  } else if (mode === 'D') {
+    t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
+    const totalPerTurn = t.moonstoneSickness * 1;
     log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
     narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
   } else if (mode === 'B') {
