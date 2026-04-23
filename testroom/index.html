@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v796'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v797'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2721,7 +2721,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v796';
+const TESTROOM_VERSION = 'v797';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -10129,8 +10129,31 @@ function doPreRollSetup() {
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
 
   // Miyoshi (454) — Bonzai!: +5 dice from pre-roll button click
-  if (B.bonzaiBtnDice && B.bonzaiBtnDice.red > 0) { redCount += B.bonzaiBtnDice.red; B.bonzaiBtnDice.red = 0; }
-  if (B.bonzaiBtnDice && B.bonzaiBtnDice.blue > 0) { blueCount += B.bonzaiBtnDice.blue; B.bonzaiBtnDice.blue = 0; }
+  // Dylan (301) / Piper (107) negate Bonzai — refund the 4 HP sacrifice
+  ['red', 'blue'].forEach(tName => {
+    if (B.bonzaiBtnDice && B.bonzaiBtnDice[tName] > 0) {
+      const team = tName === 'red' ? B.red : B.blue;
+      const enemyTeam = tName === 'red' ? B.blue : B.red;
+      const f = active(team);
+      if (dylanNegates(enemyTeam)) {
+        // Negate: refund HP and cancel dice
+        if (f && f.id === 454 && !f.ko) {
+          f.hp += 4;
+        } else if (f && f.id === 454 && f.ko && f.killedBy === -1) {
+          // Bonzai self-KO — revive
+          f.ko = false; f.killedBy = null; f.hp = 4;
+        }
+        const enemyTName = tName === 'red' ? 'blue' : 'red';
+        preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${enemyTName.charAt(0).toUpperCase() + enemyTName.slice(1)} — Scarecrow/Slick Coat negates Bonzai!`, enemyTName]);
+        log(`<span class="log-ability">${enemyTName.charAt(0).toUpperCase() + enemyTName.slice(1)}</span> — Dylan/Piper negates Miyoshi's Bonzai! HP refunded.`);
+        B.piperBlockedThisRound[tName] = true;
+        B.bonzaiBtnDice[tName] = 0;
+      } else {
+        if (tName === 'red') redCount += B.bonzaiBtnDice.red; else blueCount += B.bonzaiBtnDice.blue;
+        B.bonzaiBtnDice[tName] = 0;
+      }
+    }
+  });
 
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
