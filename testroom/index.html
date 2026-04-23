@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v802'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v803'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2306,17 +2306,20 @@ body.lite-mode .die.rolling { animation: none !important; }
   </div>
 </div>
 
-<div class="selene-overlay" id="gusOverlay">
-  <div class="selene-modal">
-    <div class="selene-banner" style="background:linear-gradient(135deg,#0f4c75,#1b6ca8);">💨 GALE FORCE</div>
-    <h3>Gus — Gale Force!</h3>
-    <p class="selene-sub" id="gusSub">If you WIN this roll, force the opponent to swap their active ghost. No damage is dealt.</p>
-    <div class="selene-options">
-      <button class="selene-opt" onclick="doGusChoice('yes')" style="background:linear-gradient(135deg,#0f4c75,#1b6ca8);">💨 Yes — force swap on win!</button>
-      <button class="selene-opt" onclick="doGusChoice('no')" style="background:linear-gradient(135deg,#1f2937,#374151);">✖ No — deal damage</button>
-    </div>
-  </div>
+<!-- Gus (31) — Gale Force timed button (post-win reactive, Guardian Fairy pattern) -->
+<div id="gusGaleBtn" style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:9999;
+  background:linear-gradient(135deg,#0f4c75,#1b6ca8); color:#fff; border:2px solid #60a5fa; border-radius:14px;
+  padding:12px 28px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 0 30px rgba(96,165,250,0.5);
+  text-align:center; min-width:200px; user-select:none; animation:gusPulse 1s ease-in-out infinite;">
+  <div style="font-size:11px;opacity:0.8;margin-bottom:2px;" id="gusGaleSub">Force a swap instead of damage!</div>
+  <span>💨 GALE FORCE!</span>
+  <div id="gusGaleCountdown" style="position:absolute;top:-10px;right:-10px;background:#ef4444;color:#fff;
+    border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;box-shadow:0 0 8px rgba(239,68,68,0.6);"></div>
 </div>
+<style>
+@keyframes gusPulse { 0%,100% { box-shadow:0 0 30px rgba(96,165,250,0.5); } 50% { box-shadow:0 0 50px rgba(96,165,250,0.8); } }
+</style>
 
 <!-- Mallow (89) — Dozy Cozy: spend 1 Sacred Fire to heal active ghost +3 HP (sideline) -->
 <div class="selene-overlay" id="mallowOverlay">
@@ -2721,7 +2724,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v802';
+const TESTROOM_VERSION = 'v803';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3682,8 +3685,7 @@ function autoPlayNext() {
     hugoWreckage: { red: 0, blue: 0 },
     logeyLockout: { red: 0, blue: 0 },
     dreamCatBonus: { red: 0, blue: 0 },
-    galeForcePending: { red: false, blue: false },
-    galeForceDecided: { red: false, blue: false },
+    // galeForcePending/galeForceDecided removed — Gus is now reactive post-win
     alucardUsed: { red: false, blue: false },
     jacksonUsedThisRound: { red: false, blue: false },
     sonyaUsedThisRound: { red: false, blue: false },
@@ -4429,8 +4431,7 @@ function startBattle() {
     hugoWreckage: { red: 0, blue: 0 },
     logeyLockout: { red: 0, blue: 0 },
     dreamCatBonus: { red: 0, blue: 0 },
-    galeForcePending: { red: false, blue: false },
-    galeForceDecided: { red: false, blue: false },
+    // galeForcePending/galeForceDecided removed — Gus is now reactive post-win
     alucardUsed: { red: false, blue: false },
     jacksonUsedThisRound: { red: false, blue: false },
     sonyaUsedThisRound: { red: false, blue: false },
@@ -7042,25 +7043,72 @@ function doBooChoice(choice) {
 }
 
 // ============================================================
-// GUS (31) — Gale Force: opt-in swap-on-win modal handler
+// GUS (31) — Gale Force: reactive post-win timed button (Guardian Fairy pattern)
 // ============================================================
-function doGusChoice(choice) {
-  const gp = B.gusPending;
+let gusGaleTimer = null;
+function doGusGaleReactive(choice) {
+  const gp = B.gusGaleReactivePending;
   if (!gp) return;
-  B.gusPending = null;
-  document.getElementById('gusOverlay').classList.remove('active');
-  const { team, btn } = gp;
-  const gusG = active(B[team]);
-  B.galeForceDecided[team] = true; // don't re-offer this round regardless of choice
-  if (choice === 'yes' && gusG && !gusG.ko) {
-    B.galeForcePending[team] = true;
-    showAbilityCallout('GALE FORCE!', 'var(--common)', `${gusG.name} — Gale Force primed! Win = force enemy swap!`, team);
-    log(`<span class="log-ability">${gusG.name}</span> — Gale Force primed! Win this roll → force enemy ghost swap.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
+  B.gusGaleReactivePending = null;
+  // Clear timer and hide button
+  if (gusGaleTimer) { clearInterval(gusGaleTimer); gusGaleTimer = null; }
+  document.getElementById('gusGaleBtn').style.display = 'none';
+  const { winTeamName, loseTeamName, dmg, wF, lF, resume } = gp;
+  const loseTeam = B[loseTeamName];
+  const winTeam = B[winTeamName];
+  if (choice === 'yes') {
+    // Force swap — new ghost takes the damage via picker
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Gale Force! ${loseTeamName} must choose a replacement — the new ghost takes ${dmg} damage!`);
+    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`, null, winTeamName);
+    // Cancel Guardian Fairy if it was pending (Gus swap takes priority)
+    if (B.guardianFairyReactivePending) {
+      B.guardianFairyReactivePending = null;
+      if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+      document.getElementById('gfWishBtn').style.display = 'none';
+    }
+    // Set up gale force swap state for the picker
+    B._gusGaleAccepted = true;
+    B._gusGaleDmg = dmg;
+    B._gusGaleWinTeam = winTeamName;
+    B._gusGaleLoseTeam = loseTeamName;
+    if (resume) setTimeout(resume, spd(1500));
   } else {
-    narrate(`<b class="${team}-text">Gus</b> holds — dealing damage if he wins.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+    // Player declined — damage applies to the current opponent now
+    B._gusGaleAccepted = false;
+    lF.hp = Math.max(0, lF.hp - dmg);
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+    playDamageSfx(dmg);
+    hitDamage(loseTeamName);
+    renderBattle();
+    if (resume) setTimeout(resume, 200);
   }
+}
+
+// Show Gus Gale Force as a timed button with countdown — auto-declines on expiry
+function showGusGaleButton() {
+  const gp = B.gusGaleReactivePending;
+  if (!gp) return;
+  const btn = document.getElementById('gusGaleBtn');
+  const cdEl = document.getElementById('gusGaleCountdown');
+  const subEl = document.getElementById('gusGaleSub');
+  subEl.innerHTML = `Force ${gp.loseTeamName === 'red' ? 'Red' : 'Blue'} to swap — new ghost takes ${gp.dmg} dmg!`;
+  btn.style.display = 'block';
+  btn.onclick = () => doGusGaleReactive('yes');
+  const secs = getSpecialsTimerSecs();
+  let remaining = secs;
+  cdEl.textContent = remaining;
+  narrate(`<b class="${gp.winTeamName}-text">💨 ${gp.wF.name}</b> can force a swap! Click to activate!`);
+  if (gusGaleTimer) clearInterval(gusGaleTimer);
+  gusGaleTimer = setInterval(() => {
+    remaining--;
+    cdEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(gusGaleTimer); gusGaleTimer = null;
+      doGusGaleReactive('no'); // auto-decline
+    }
+  }, 1000);
 }
 
 // ============================================================
@@ -8436,29 +8484,9 @@ function rollReady(team) {
 
   // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
-  // Gus (31) — Gale Force: opt-in to force enemy ghost swap on win instead of dealing damage.
-  // Offered each round when Gus is active and the opponent has ≥1 alive sideline ghost.
-  // B.galeForceDecided prevents re-offering after the player has already chosen this round.
-  {
-    const gusG = active(B[team]);
-    const gusOppTeamName = team === 'red' ? 'blue' : 'red';
-    const gusOppTeam = B[gusOppTeamName];
-    const gusOppHasSideline = gusOppTeam.ghosts.some((g, i) => i !== gusOppTeam.activeIdx && !g.ko);
-    if (gusG && gusG.id === 31 && !gusG.ko && gusOppHasSideline &&
-        B.galeForceDecided && !B.galeForceDecided[team]) {
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.gusPending = { team, btn };
-      const gusDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        const gusOppActive = active(gusOppTeam);
-        document.getElementById('gusSub').innerHTML =
-          `If you <b>WIN</b> this roll, ${gusOppActive ? '<b>' + gusOppActive.name + '</b>' : 'the opponent'} must swap for a sideline ghost — <i>no damage dealt</i>.`;
-        document.getElementById('gusOverlay').classList.add('active');
-      }, gusDelay);
-      return;
-    }
+  // Gus (31) — Gale Force: now reactive post-win (no pre-roll modal)
 
+  {
     // Raditz (62) — Hunt: one-time forced-swap on first roll after entry
     // Fires when Raditz's team clicks Roll for the first time after Raditz enters play.
     if (B.raditzHuntReady && B.raditzHuntReady[team]) {
@@ -8652,11 +8680,7 @@ function hasAnyDecision(team) {
   // Mallow (89) — Dozy Cozy (sideline) — costs 2 Sacred Fire
   if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
       r && r.fire >= 2) return true;
-  // Gus (31) — Gale Force
-  if (f.id === 31 && B.galeForceDecided && !B.galeForceDecided[team]) {
-    const gOpp = B[oppTeamName];
-    if (gOpp && gOpp.ghosts.some((g, i) => i !== gOpp.activeIdx && !g.ko)) return true;
-  }
+  // Gus (31) — Gale Force: now reactive post-win (no pre-roll check)
   // Raditz (62) — Hunt
   if (B.raditzHuntReady && B.raditzHuntReady[team]) return true;
   // Doug (63) — Caution
@@ -8829,20 +8853,7 @@ function openDuelPhasePrimers(team) {
     return true;
   }
 
-  // — GUS (31) — Gale Force: opt-in force-swap on win
-  if (f.id === 31 && B.galeForceDecided && !B.galeForceDecided[team]) {
-    const gOpp = B[oppTeamName];
-    const gOppHasSideline = gOpp && gOpp.ghosts.some((g, i) => i !== gOpp.activeIdx && !g.ko);
-    if (gOppHasSideline) {
-      disableDone();
-      B.gusPending = { team, btn: doneBtn };
-      const gOppActive = active(gOpp);
-      document.getElementById('gusSub').innerHTML =
-        `If you <b>WIN</b> this roll, ${gOppActive ? '<b>' + gOppActive.name + '</b>' : 'the opponent'} must swap for a sideline ghost — <i>no damage dealt</i>.`;
-      document.getElementById('gusOverlay').classList.add('active');
-      return true;
-    }
-  }
+  // — GUS (31) — Gale Force: now reactive post-win (no pre-roll Done check)
 
   // — RADITZ (62) — Hunt: force opponent's active ghost to the sideline (one-time on entry)
   if (B.raditzHuntReady && B.raditzHuntReady[team]) {
@@ -13418,7 +13429,7 @@ function _resolveRoundImpl() {
     // Duel Phase: tie rounds DON'T clear duelLastLoser — the previous non-tie loser's
     // initiative is sticky, so it carries forward through tie rounds. "Easier to
     // understand: tie round just keeps the last loser as first mover." (Wyatt, v394)
-    if (B.galeForceDecided) { B.galeForceDecided.red = false; B.galeForceDecided.blue = false; }
+    // galeForceDecided reset removed — Gus is now reactive post-win
     if (B.jacksonUsedThisRound) { B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false; }
     if (B.sonyaUsedThisRound) { B.sonyaUsedThisRound.red = false; B.sonyaUsedThisRound.blue = false; }
     // Dark Wing (76) Precision: NO per-round reset — once-per-GAME flag persists across rounds (v595)
@@ -14505,9 +14516,30 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Reflection! Dice total = 7! ${kingJayReflectDmg} damage reflected back to ${wF.name}!`);
   }
 
+  // Gus (31) — Gale Force: reactive post-win timed button.
+  // Defers damage — player decides in drain chain whether to force swap or deal damage.
+  // Detects BEFORE Guardian Fairy so winner gets first choice.
+  let galeForceSwap = false;
+  let galeForceSLIdx = -1;
+  let galeForceDmg = 0;
+  let gusGaleReactiveTriggered = false;
+  if (wF.id === 31 && !wF.ko && dmg > 0) {
+    galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
+    if (galeForceSLIdx >= 0) {
+      gusGaleReactiveTriggered = true;
+      galeForceDmg = dmg; // stash original damage for swap picker or decline
+      dmg = 0; // defer ALL damage — reactive handler will apply or swap
+      // Set up reactive pending (resume set later in drain chain)
+      B.gusGaleReactivePending = {
+        winTeamName, loseTeamName, dmg: galeForceDmg, wF, lF,
+        resume: null // set in drain chain
+      };
+    }
+  }
+
   // Guardian Fairy (99) — Wish: REACTIVE — if losing team has GF on sideline and damage > 0,
   // defer damage application and show a modal letting the player choose to swap GF in.
-  // GF intercepts BEFORE damage is applied to lF.
+  // GF intercepts BEFORE damage is applied to lF. (Gus Gale Force takes priority if both trigger.)
   let guardianFairyAbsorbed = false;
   let guardianFairyAbsorbedDmg = 0;
   let guardianFairyKOd = false;
@@ -14543,22 +14575,6 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Skilled Coward! Dodge activated! Fang will swap to the sideline!`);
   }
   if (B.fangUndercoverArmed) { B.fangUndercoverArmed[loseTeamName] = false; B.fangUndercoverArmed[winTeamName] = false; } // clear any unused arm
-
-  // Gus (31) — Gale Force: won → force enemy swap, new ghost takes the damage (auto-triggers, no opt-in).
-  let galeForceSwap = false;
-  let galeForceSLIdx = -1;
-  let galeForceDmg = 0;
-  if (wF.id === 31 && !wF.ko && dmg > 0) {
-    galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
-    if (galeForceSLIdx >= 0) {
-      galeForceDmg = dmg;
-      dmg = 0;
-      galeForceSwap = true;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Gale Force! ${loseTeamName} must choose a replacement — the new ghost takes ${galeForceDmg} damage!`);
-    }
-  }
-  if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; }
 
   // --- Mirror Matt (410) — Seven Years: doubles ONLY damage reflected to winner ---
   let mirrorMattReflected = false;
@@ -15524,12 +15540,7 @@ function _resolveRoundImpl() {
   }
   // Cameron knight reactions already collected via collectKC at game-state section — do NOT double-fire here
 
-  // Gus (31) — Gale Force: win + primed → zero damage, opponent CHOOSES which sideline ghost to swap in.
-  // Fires after all defense callouts. The actual swap is deferred to a picker modal that opens after
-  // the queue drains (same post-drain pattern as Winston Scheme) — opponent gets to pick, not auto-pick.
-  if (galeForceSwap && !wF.ko) {
-    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`, null, winTeamName);
-  }
+  // Gus (31) — Gale Force: callout now handled in doGusGaleReactive() when player accepts
   // Gus knight reactions already collected via collectKC at game-state section (line ~9798) — do NOT double-fire here
 
   // Hugo (52) — Wreckage: took real damage → attacker loses 1 die next roll
@@ -16175,8 +16186,8 @@ function _resolveRoundImpl() {
         }, BEAT_HP);
       }, BEAT_DAMAGE);
     } else {
-      if (galeForceSwap) {
-        narrate(`<b class="${winColor}">${wF.name}</b> wins! <b class="gold">GALE FORCE!</b> — forcing a swap instead of damage!`);
+      if (gusGaleReactiveTriggered) {
+        narrate(`<b class="${winColor}">${wF.name}</b> wins! <b class="gold">💨 GALE FORCE?</b> — choose to force a swap!`);
       } else {
         narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
       }
@@ -16222,7 +16233,7 @@ function _resolveRoundImpl() {
       if (B.guardianFairyStandby) { B.guardianFairyStandby.red = false; B.guardianFairyStandby.blue = false; }
       if (B.eloiseUsedThisRound) { B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false; }
       // bogeyArmed removed v430 — Bogey reflect is now reactive (no pre-arm state)
-      if (B.galeForceDecided) { B.galeForceDecided.red = false; B.galeForceDecided.blue = false; }
+      // galeForceDecided reset removed — Gus is now reactive post-win
       if (B.jacksonUsedThisRound) { B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false; }
       if (B.sonyaUsedThisRound) { B.sonyaUsedThisRound.red = false; B.sonyaUsedThisRound.blue = false; }
       // Dark Wing (76) Precision: NO per-round reset — once-per-GAME flag persists across rounds (v595)
@@ -16413,15 +16424,42 @@ function _resolveRoundImpl() {
         }
       };
 
-      // Pal Al / Gordok choice modals: fire before Guardian Fairy (winner decides first)
-      const afterWiseAlGordok = () => {
-        if (B.guardianFairyReactivePending) {
-          const gfp = B.guardianFairyReactivePending;
-          gfp.resume = afterGfReactive;
-          // v783: timed button instead of full-screen modal
-          showGfWishButton();
-        } else {
+      // Gus (31) — Gale Force reactive: winner decides before Guardian Fairy (loser's defense)
+      const afterGusGaleChoice = () => {
+        if (B._gusGaleAccepted) {
+          // Player accepted Gale Force — damage zeroed, swap picker needed
+          B._gusGaleAccepted = false;
+          galeForceSwap = true;
+          galeForceDmg = B._gusGaleDmg || galeForceDmg;
+          dmg = 0; // zero damage to current opponent
+          // Skip Guardian Fairy — no damage to absorb
           afterGfReactive();
+        } else {
+          // Player declined (or wasn't offered) — damage flows normally, GF may absorb
+          if (B.guardianFairyReactivePending) {
+            const gfp = B.guardianFairyReactivePending;
+            gfp.resume = afterGfReactive;
+            // v783: timed button instead of full-screen modal
+            showGfWishButton();
+          } else {
+            afterGfReactive();
+          }
+        }
+      };
+
+      // Pal Al / Gordok choice modals: fire before Gus Gale Force (winner decides first)
+      const afterWiseAlGordok = () => {
+        if (B.gusGaleReactivePending) {
+          const gp = B.gusGaleReactivePending;
+          gp.resume = afterGusGaleChoice;
+          // Auto-accept for AI/autoPlay
+          if (autoPlayRunning) {
+            doGusGaleReactive('yes');
+          } else {
+            showGusGaleButton();
+          }
+        } else {
+          afterGusGaleChoice();
         }
       };
 
@@ -17963,7 +18001,8 @@ function clearAllOverlays() {
   document.getElementById('eloiseOverlay').classList.remove('active');
   document.getElementById('booOverlay').classList.remove('active');
   document.getElementById('bogeyOverlay').classList.remove('active');
-  document.getElementById('gusOverlay').classList.remove('active');
+  document.getElementById('gusGaleBtn').style.display = 'none';
+  if (gusGaleTimer) { clearInterval(gusGaleTimer); gusGaleTimer = null; }
   document.getElementById('mallowOverlay').classList.remove('active');
   document.getElementById('jacksonOverlay').classList.remove('active');
   document.getElementById('jeanieOverlay').classList.remove('active');
@@ -19715,6 +19754,11 @@ if (LIVE_PVP) {
         const gfIdx = gfLoseTeam.ghosts.indexOf(gfAlive[0]);
         setTimeout(() => { if (typeof doGaleForcePickerChoice === 'function') doGaleForcePickerChoice(gfIdx); }, 300);
       }
+    }
+    // Gus Gale Force — auto-accept (always force swap for rival AI)
+    const gusGaleBtnEl = document.getElementById('gusGaleBtn');
+    if (gusGaleBtnEl && gusGaleBtnEl.style.display !== 'none' && B.gusGaleReactivePending && shouldAutoResolve(B.gusGaleReactivePending.winTeamName)) {
+      setTimeout(() => { if (typeof doGusGaleReactive === 'function') doGusGaleReactive('yes'); }, 300);
     }
     // Guardian Fairy — auto-decline (let damage apply normally)
     const gfReactiveOverlay = document.getElementById('guardianFairyOverlay');
