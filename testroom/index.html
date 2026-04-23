@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v803'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v804'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1911,6 +1911,15 @@ body.lite-mode .die.rolling { animation: none !important; }
           <span id="specialsTimerLabel">Timer: 5s</span>
           <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
         </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;" title="Moonstone punishment mode">
+          <span style="color:var(--moonstone)">MS Mode:</span>
+          <select id="moonstoneModeSelect" style="padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11px;cursor:pointer;" onchange="localStorage.setItem('tr_msMode',this.value)">
+            <option value="off">Off</option>
+            <option value="A">A: Permanent 2/turn</option>
+            <option value="B">B: Escalating one-shot</option>
+            <option value="C">C: Flat 3 dmg</option>
+          </select>
+        </label>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
 
@@ -2717,6 +2726,8 @@ body.lite-mode .die.rolling { animation: none !important; }
   document.getElementById('handLimitSlider').style.opacity = cb.checked ? '1' : '0.35';
   document.getElementById('handLimitLabel').textContent = 'Hand Limit (' + document.getElementById('handLimitSlider').value + ')';
   document.getElementById('specialsTimerLabel').textContent = 'Timer: ' + document.getElementById('specialsTimerSlider').value + 's';
+  const msMode = localStorage.getItem('tr_msMode');
+  if (msMode) document.getElementById('moonstoneModeSelect').value = msMode;
   const speedLabels = ['1x','10x','25x','100x'];
   document.getElementById('speedLabel').textContent = 'Speed: ' + speedLabels[parseInt(document.getElementById('speedSlider').value) || 0];
 })();
@@ -2724,7 +2735,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v803';
+const TESTROOM_VERSION = 'v804';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -4383,7 +4394,10 @@ function makeTeam(ids) {
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 }
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 },
+    moonstoneSickness: 0,       // Mode A: permanent stacking counter
+    moonstoneSicknessCount: 0,  // Mode B: escalating counter
+    moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
   };
 }
 
@@ -9320,6 +9334,36 @@ function doPreRollSetup() {
   // PHASE 1: PRE-ROLL TRIGGERS
   // ========================================
 
+  // Moonstone Sickness — pre-roll damage
+  {
+    const msMode = document.getElementById('moonstoneModeSelect')?.value || 'off';
+    if (msMode !== 'off') {
+      ['red', 'blue'].forEach(teamKey => {
+        const t = B[teamKey];
+        let msDmg = 0;
+        if (msMode === 'A' && t.moonstoneSickness > 0) {
+          msDmg = t.moonstoneSickness * 2;
+        } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
+          msDmg = t.moonstoneSicknessPending;
+          t.moonstoneSicknessPending = 0; // clear after applying
+        }
+        if (msDmg > 0) {
+          const f = active(t);
+          if (f && !f.ko) {
+            f.hp = Math.max(0, f.hp - msDmg);
+            if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+            log(`<span class="log-dmg">Moonstone Sickness!</span> ${f.name} takes ${msDmg} damage! ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
+            narrate(`<b style="color:var(--moonstone)">Moonstone Sickness!</b> <b class="${teamKey}-text">${f.name}</b> takes ${msDmg} damage!${f.ko ? ' <b>KO!</b>' : ''}`);
+            preRollCallouts.push(['MOONSTONE SICKNESS!', 'var(--moonstone)', `${f.name} takes ${msDmg} damage!`, teamKey]);
+            playDamageSfx(msDmg);
+            hitDamage(teamKey);
+            renderBattle();
+          }
+        }
+      });
+    }
+  }
+
   // v687: Pre-roll chip damage abilities fire ONCE per turn. If they KO a ghost and
   // a replacement swaps in, doPreRollSetup re-runs — but the replacement is NOT hit
   // again. The flag is set before the first ability fires and checked on re-entry.
@@ -11167,6 +11211,28 @@ function doSkipSpecials() {
   cb();
 }
 
+// Moonstone Sickness — balance experiment
+function applyMoonstoneSickness(team) {
+  const mode = document.getElementById('moonstoneModeSelect')?.value || 'off';
+  if (mode === 'off') return;
+  const t = B[team];
+  if (mode === 'A') {
+    t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
+    const totalPerTurn = t.moonstoneSickness * 2;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
+  } else if (mode === 'B') {
+    t.moonstoneSicknessCount = (t.moonstoneSicknessCount || 0) + 1;
+    t.moonstoneSicknessPending = t.moonstoneSicknessCount * 2;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${t.moonstoneSicknessPending} damage before next roll.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${t.moonstoneSicknessPending} damage before next roll!`);
+  } else if (mode === 'C') {
+    t.moonstoneSicknessPending = 3;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take 3 damage before next roll.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> 3 damage before next roll!`);
+  }
+}
+
 // Moonstone — timed window like Lucky Stone (3s countdown, click die to change)
 let msCountdownTimer = null;
 
@@ -11185,6 +11251,7 @@ function showMoonstoneChoice(team, dice) {
     B[team === 'red' ? 'redDice' : 'blueDice'] = newDice;
     B.pendingMoonstone.dice = newDice;
     B[team].resources.moonstone--;
+    applyMoonstoneSickness(team);
     triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
     log(`<span class="log-ms">${team.toUpperCase()} uses Moonstone!</span> Changed die ${worstVal} → 6!`);
     narrate(`<b class="${team}-text">Blue</b> uses <b style="color:var(--moonstone)">Moonstone!</b> ${worstVal} → 6!`);
@@ -11361,6 +11428,7 @@ function pickMsValue(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  applyMoonstoneSickness(team); // Moonstone Sickness — fires on USE (including Magic Touch)
   triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
@@ -11870,6 +11938,7 @@ function pickMsValueUnified(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  applyMoonstoneSickness(team); // Moonstone Sickness — fires on USE (including Magic Touch)
   triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
@@ -11940,6 +12009,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
       dice[worstIdx] = 6;
       dice.sort((a, b) => a - b);
       B.blue.resources.moonstone--;
+      applyMoonstoneSickness('blue'); // Moonstone Sickness
       triggerCameronSpecialWatch('blue', true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
       B.blueDice = dice;
       log(`<span class="log-ms">BLUE uses Moonstone!</span> Changed ${worstVal} → 6!`);
