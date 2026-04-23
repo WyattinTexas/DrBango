@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v807'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v808'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2744,7 +2744,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v807';
+const TESTROOM_VERSION = 'v808';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3747,7 +3747,7 @@ function autoPlayNext() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
-    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
     burnSource: { red: {}, blue: {} }, // tracks which Spiritkin placed burn: { teamName: { ghostIdx: { spiritkinId: count } } }
     lucasKindlingBonus: { red: 0, blue: 0 },
@@ -4496,7 +4496,7 @@ function startBattle() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
-    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
     burnSource: { red: {}, blue: {} },
     lucasKindlingBonus: { red: 0, blue: 0 },
@@ -9343,36 +9343,35 @@ function doPreRollSetup() {
   // PHASE 1: PRE-ROLL TRIGGERS
   // ========================================
 
-  // Moonstone Sickness — pre-roll damage
-  {
+  // Moonstone Sickness — pre-roll damage (once per turn, does NOT hit replacement if KO)
+  if (!B.moonstoneSicknessFiredThisTurn) {
+    B.moonstoneSicknessFiredThisTurn = true;
     const msMode = document.getElementById('moonstoneModeSelect')?.value || 'A';
-    {
-      ['red', 'blue'].forEach(teamKey => {
-        const t = B[teamKey];
-        let msDmg = 0;
-        if (msMode === 'A' && t.moonstoneSickness > 0) {
-          msDmg = t.moonstoneSickness * 2;
-        } else if (msMode === 'D' && t.moonstoneSickness > 0) {
-          msDmg = t.moonstoneSickness * 1;
-        } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
-          msDmg = t.moonstoneSicknessPending;
-          t.moonstoneSicknessPending = 0; // clear after applying
+    ['red', 'blue'].forEach(teamKey => {
+      const t = B[teamKey];
+      let msDmg = 0;
+      if (msMode === 'A' && t.moonstoneSickness > 0) {
+        msDmg = t.moonstoneSickness * 2;
+      } else if (msMode === 'D' && t.moonstoneSickness > 0) {
+        msDmg = t.moonstoneSickness * 1;
+      } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
+        msDmg = t.moonstoneSicknessPending;
+        t.moonstoneSicknessPending = 0; // clear after applying
+      }
+      if (msDmg > 0) {
+        const f = active(t);
+        if (f && !f.ko) {
+          f.hp = Math.max(0, f.hp - msDmg);
+          if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+          log(`<span class="log-dmg">Moonstone Sickness!</span> ${f.name} takes ${msDmg} damage! ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
+          narrate(`<b style="color:var(--moonstone)">Moonstone Sickness!</b> <b class="${teamKey}-text">${f.name}</b> takes ${msDmg} damage!${f.ko ? ' <b>KO!</b>' : ''}`);
+          preRollCallouts.push(['MOONSTONE SICKNESS!', 'var(--moonstone)', `${f.name} takes ${msDmg} damage!`, teamKey]);
+          playDamageSfx(msDmg);
+          hitDamage(teamKey);
+          renderBattle();
         }
-        if (msDmg > 0) {
-          const f = active(t);
-          if (f && !f.ko) {
-            f.hp = Math.max(0, f.hp - msDmg);
-            if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
-            log(`<span class="log-dmg">Moonstone Sickness!</span> ${f.name} takes ${msDmg} damage! ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
-            narrate(`<b style="color:var(--moonstone)">Moonstone Sickness!</b> <b class="${teamKey}-text">${f.name}</b> takes ${msDmg} damage!${f.ko ? ' <b>KO!</b>' : ''}`);
-            preRollCallouts.push(['MOONSTONE SICKNESS!', 'var(--moonstone)', `${f.name} takes ${msDmg} damage!`, teamKey]);
-            playDamageSfx(msDmg);
-            hitDamage(teamKey);
-            renderBattle();
-          }
-        }
-      });
-    }
+      }
+    });
   }
 
   // v687: Pre-roll chip damage abilities fire ONCE per turn. If they KO a ghost and
@@ -13528,7 +13527,7 @@ function _resolveRoundImpl() {
     if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
     if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
-    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; } B.moonstoneSicknessFiredThisTurn = false;
     // Willow (435) — Joy of Painting: tie = nobody lost, clear both flags
     if (B.willowLostLast) { B.willowLostLast.red = false; B.willowLostLast.blue = false; }
     // Reset item swing toggles each round (player must actively choose to swing)
@@ -16333,7 +16332,7 @@ function _resolveRoundImpl() {
       if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
       if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
       if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
-    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; } B.moonstoneSicknessFiredThisTurn = false;
       // Willow (435) — Joy of Painting: winner didn't lose, loser did
       if (B.willowLostLast) { B.willowLostLast[winTeamName] = false; B.willowLostLast[loseTeamName] = true; }
       // Reset item swing toggles each round (player must actively choose to swing)
@@ -17490,6 +17489,18 @@ function renderBattle() {
     // Aunt Susan (309) — commit healing seeds for damage (click=add, right-click=remove)
     if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0)) {
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusan>0?'committed':''}" onclick="toggleAuntSusan('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusan('${team}')" title="Click: +2 dmg per seed. Right-click: remove"><span class="res-main">🌱</span><span class="res-label">${c.auntSusan>0?'+'+c.auntSusan*2+'dmg':'+2dmg'}</span></div>`;
+    }
+    // Moonstone Sickness indicator
+    {
+      const msMode = document.getElementById('moonstoneModeSelect')?.value || 'A';
+      const stacks = t.moonstoneSickness || 0;
+      const pending = t.moonstoneSicknessPending || 0;
+      if ((msMode === 'A' || msMode === 'D') && stacks > 0) {
+        const dmgPerTurn = msMode === 'A' ? stacks * 2 : stacks;
+        rh += `<div class="res-tile" style="border-color:rgba(168,85,247,0.5);box-shadow:0 0 8px rgba(168,85,247,0.3);" title="Moonstone Sickness: ${dmgPerTurn} damage before every roll (${stacks} stack${stacks>1?'s':''})"><span class="res-main" style="font-size:16px;">☠️</span><span class="res-count" style="color:#a855f7;">${dmgPerTurn}</span><span class="res-label" style="color:#a855f7;">SICK×${stacks}</span></div>`;
+      } else if ((msMode === 'B' || msMode === 'C') && pending > 0) {
+        rh += `<div class="res-tile" style="border-color:rgba(168,85,247,0.5);box-shadow:0 0 8px rgba(168,85,247,0.3);" title="Moonstone Sickness: ${pending} damage before next roll"><span class="res-main" style="font-size:16px;">☠️</span><span class="res-count" style="color:#a855f7;">${pending}</span><span class="res-label" style="color:#a855f7;">NEXT</span></div>`;
+      }
     }
     // Snapshot current resources for flash detection
     const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0 };
