@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v806'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v807'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -382,7 +382,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 /* Center column */
 .arena-center {
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
-  min-width:220px; padding:0 4px; flex-shrink:0;
+  min-width:220px; padding:0 4px; flex-shrink:0; position:relative;
 }
 
 /* Card slots */
@@ -1185,7 +1185,12 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   align-items:center; justify-content:center;
 }
 .moonstone-picker.active { display:flex; }
+.moonstone-picker.step2-inline { display:none !important; }
 .ms-modal { background:var(--surface); border:2px solid var(--moonstone); border-radius:14px; padding:28px 36px; text-align:center; box-shadow:0 0 50px var(--moonstone-glow), 0 0 100px rgba(126,232,250,0.15); }
+.ms-inline-picker { display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:160; background:var(--surface); border:2px solid var(--moonstone); border-radius:14px; padding:16px 24px; text-align:center; box-shadow:0 0 50px var(--moonstone-glow), 0 0 100px rgba(126,232,250,0.15); }
+.ms-inline-picker.active { display:block; }
+.ms-inline-picker h4 { color:var(--moonstone); font-size:13px; margin-bottom:10px; }
+.ms-inline-picker .ms-dice-options { display:flex; gap:8px; justify-content:center; }
 .ms-modal h3 { color:var(--moonstone); margin-bottom:4px; font-size:16px; }
 .ms-modal p { color:var(--text2); font-size:13px; margin-bottom:16px; }
 .ms-dice-options { display:flex; gap:8px; justify-content:center; }
@@ -1972,6 +1977,10 @@ body.lite-mode .die.rolling { animation: none !important; }
             </div>
           </div>
           <div class="ability-callout" id="abilityCallout"></div>
+          <div class="ms-inline-picker" id="msInlinePicker">
+            <h4>Pick a value</h4>
+            <div class="ms-dice-options" id="msInlineOptions"></div>
+          </div>
         </div>
 
         <!-- BLUE Team — Right -->
@@ -2735,7 +2744,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v806';
+const TESTROOM_VERSION = 'v807';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -11384,29 +11393,29 @@ function pickMsDie(idx) {
 
   narrate(`Die ${idx+1} selected — pick a new value!`);
 
-  // Show value picker immediately — no delay that can race with skip timers
-  const el = document.getElementById('msPicker');
-  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
-  const step2 = document.getElementById('msStep2');
-  step2.style.display = 'flex';
-  step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
-  el.classList.add('active');
+  // Hide the full-screen overlay, show inline picker in arena center
+  document.getElementById('msPicker').classList.remove('active');
+  const inlinePicker = document.getElementById('msInlinePicker');
+  const inlineOpts = document.getElementById('msInlineOptions');
+  inlineOpts.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+  inlinePicker.classList.add('active');
 
-  // Scroll into view
-  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  // Scroll arena center into view
+  const arenaCenter = inlinePicker.parentElement;
+  if (arenaCenter) arenaCenter.scrollIntoView({ behavior:'smooth', block:'center' });
 
   // Auto-skip after 7s if no value picked
   let remaining = 7;
-  showLsCountdown(el, remaining);
+  showLsCountdown(inlinePicker, remaining);
   msCountdownTimer = setInterval(() => {
     remaining--;
     if (remaining <= 0) {
       clearInterval(msCountdownTimer);
-      el.classList.remove('active');
-      clearMsCountdown(el);
+      inlinePicker.classList.remove('active');
+      clearMsCountdown(inlinePicker);
       skipMoonstone();
     } else {
-      showLsCountdown(el, remaining);
+      showLsCountdown(inlinePicker, remaining);
     }
   }, 1000);
 }
@@ -11422,6 +11431,8 @@ function pickMsValue(val) {
   const el = document.getElementById('msPicker');
   el.classList.remove('active');
   clearMsCountdown(el);
+  document.getElementById('msInlinePicker').classList.remove('active');
+  clearMsCountdown(document.getElementById('msInlinePicker'));
 
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   let magicTouchFired = false;
@@ -11518,6 +11529,7 @@ function skipMoonstone() {
   const team = B.pendingMoonstone.team;
   clearInterval(msCountdownTimer);
   document.getElementById('msPicker').classList.remove('active');
+  document.getElementById('msInlinePicker').classList.remove('active');
   clearDiceClickable(team);
   // Also clear the resource tile highlight + countdown badge
   const resEl = document.getElementById(team + '-resources');
@@ -11768,16 +11780,16 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           B.pendingMoonstone.dieIndex = i;
           B.pendingMoonstone.phase = 'pick-value';
           narrate(`Die ${i+1} selected — pick a new value!`);
-          const el = document.getElementById('msPicker');
-          document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${i+1}:</p>`;
-          const step2 = document.getElementById('msStep2');
-          step2.style.display = 'flex';
-          step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValueUnified(${v})">${v}</div>`).join('');
-          el.classList.add('active');
-          el.scrollIntoView({ behavior:'smooth', block:'center' });
+          document.getElementById('msPicker').classList.remove('active');
+          const inlinePkr = document.getElementById('msInlinePicker');
+          const inlineOps = document.getElementById('msInlineOptions');
+          inlineOps.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValueUnified(${v})">${v}</div>`).join('');
+          inlinePkr.classList.add('active');
+          const arenaC = inlinePkr.parentElement;
+          if (arenaC) arenaC.scrollIntoView({ behavior:'smooth', block:'center' });
 
           let valRem = 7;
-          showLsCountdown(el, valRem);
+          showLsCountdown(inlinePkr, valRem);
           msCountdownTimer = setInterval(() => {
             valRem--;
             if (valRem <= 0) {
@@ -11932,6 +11944,8 @@ function pickMsValueUnified(val) {
   const el = document.getElementById('msPicker');
   el.classList.remove('active');
   clearMsCountdown(el);
+  document.getElementById('msInlinePicker').classList.remove('active');
+  clearMsCountdown(document.getElementById('msInlinePicker'));
 
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   let magicTouchFired = false;
