@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spirit Card Dashboard v2 — Boo! Spirit Battles (200/200)</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface2: #f1f3f5;
+    --surface3: #e9ecef;
+    --border: #dee2e6;
+    --text: #212529;
+    --text2: #6c757d;
+    --accent: #2563eb;
+    --accent2: #1d4ed8;
+    --teal: #0d9488;
+    --glow: rgba(37,99,235,0.1);
+    --common: #6b7280;
+    --uncommon: #059669;
+    --rare: #2563eb;
+    --ghost-rare: #7c3aed;
+    --legendary: #d97706;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .app { max-width: 1600px; margin: 0 auto; padding: 24px; }
+
+  header { padding: 20px 0 16px; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+  header h1 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text2); font-size: 13px; margin-top: 2px; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stat-card .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; color: var(--text); }
+  .stat-card .detail { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .rarity-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 8px; gap: 2px; }
+  .rarity-bar span { border-radius: 2px; }
+
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+
+  input[type="text"], input[type="number"], select, textarea {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
+  .search-input { flex: 1; min-width: 200px; }
+  .filter-select { min-width: 130px; }
+
+  button {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { background: var(--surface2); border-color: #adb5bd; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-danger { color: #dc2626; }
+  .btn-danger:hover { background: #fef2f2; border-color: #dc2626; }
+  .btn-sm { padding: 3px 8px; font-size: 12px; }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: var(--surface2); padding: 9px 12px; text-align: left; font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2);
+    cursor: pointer; user-select: none; white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+  th:hover { color: var(--accent); }
+  th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--surface2); vertical-align: middle; }
+  tr:hover td { background: #f8f9ff; }
+  tr.editing td { background: #eff6ff; }
+
+  .rarity-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .rarity-common { background: #f3f4f6; color: var(--common); }
+  .rarity-uncommon { background: #ecfdf5; color: var(--uncommon); }
+  .rarity-rare { background: #eff6ff; color: var(--rare); }
+  .rarity-ghost-rare { background: #f5f3ff; color: var(--ghost-rare); }
+  .rarity-legendary { background: #fffbeb; color: var(--legendary); }
+
+  .category-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .hp-bar { display: inline-flex; align-items: center; gap: 6px; }
+  .hp-bar .bar { width: 50px; height: 5px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+  .hp-bar .bar .fill { height: 100%; border-radius: 3px; }
+  .ability-desc { max-width: 300px; font-size: 12px; color: var(--text2); line-height: 1.4; }
+
+  td input, td select, td textarea { width: 100%; padding: 4px 8px; font-size: 12px; }
+  td textarea { min-height: 50px; resize: vertical; }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .chart-card h3 { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 600; }
+  canvas { width: 100% !important; }
+
+  .add-form { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .add-form h3 { font-size: 14px; margin-bottom: 12px; color: var(--text); font-weight: 600; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; }
+  .form-group textarea { min-height: 60px; resize: vertical; }
+
+  .io-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+  .io-bar .spacer { flex: 1; }
+
+  .prompt-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  .prompt-section h3 { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600; }
+  .prompt-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; color: var(--text); white-space: pre-wrap; max-height: 200px; overflow-y: auto; padding: 12px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); }
+  .copy-btn { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; }
+  .copy-btn.copied { color: var(--teal); border-color: var(--teal); }
+
+  .collapsible-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; user-select: none; }
+  .collapsible-header:hover { background: var(--surface2); }
+  .collapsible-header h3 { font-size: 14px; color: var(--text); margin: 0; font-weight: 600; }
+  .collapsible-content { display: none; }
+  .collapsible-content.open { display: block; }
+
+  .target-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); font-weight: 500; }
+  .target-indicator .progress-bar { width: 100px; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+  .target-indicator .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.5s; }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--text2); font-size: 14px; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 1000; transform: translateY(100px); opacity: 0; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  #fileInput { display: none; }
+  .card-preview-overlay { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.35); z-index: 900; }
+  .card-preview-overlay.open { display: block; }
+  .card-preview { position: fixed; top: 0; right: -400px; bottom: 0; width: 380px; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -4px 0 24px rgba(0,0,0,0.12); z-index: 1000; transition: right 0.25s ease; overflow-y: auto; padding: 24px; }
+  .card-preview.open { right: 0; }
+  .card-preview .close-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 20px; color: var(--text2); cursor: pointer; padding: 4px 8px; }
+  .card-preview .close-btn:hover { color: var(--text); }
+  .card-preview .card-img { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+  .card-preview .no-img { width: 100%; height: 280px; background: var(--surface2); border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 13px; }
+  .card-preview h2 { font-size: 20px; margin-bottom: 4px; }
+  .card-preview .card-meta { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+  .card-preview .card-ability-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-preview .card-ability-desc { font-size: 14px; color: var(--text2); line-height: 1.5; margin-bottom: 16px; }
+  .card-preview .card-detail { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .card-preview .card-detail strong { color: var(--text); }
+  tr { cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Spirit Card Dashboard v2</h1>
+    <div class="subtitle">All 200 Spiritkin — Final Polish Phase</div>
+  </header>
+
+  <!-- Stats Overview -->
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>HP Distribution by Rarity</h3>
+      <canvas id="hpChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Ability Category Distribution</h3>
+      <canvas id="catChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search spirits by name or ability...">
+    <select class="filter-select" id="rarityFilter">
+      <option value="">All Rarities</option>
+      <option value="common">Common</option>
+      <option value="uncommon">Uncommon</option>
+      <option value="rare">Rare</option>
+      <option value="ghost-rare">Ghost-Rare</option>
+      <option value="legendary">Legendary</option>
+    </select>
+    <select class="filter-select" id="setFilter">
+      <option value="">All Sets</option>
+      <option value="Set 1">Set 1</option>
+      <option value="Dark Castle">Dark Castle</option>
+      <option value="Frost Valley">Frost Valley</option>
+      <option value="Volcanic Isles">Volcanic Isles</option>
+      <option value="Rolling Hills">Rolling Hills</option>
+    </select>
+    <select class="filter-select" id="categoryFilter">
+      <option value="">All Categories</option>
+      <option value="Dice Modifier">Dice Modifier</option>
+      <option value="Damage Multiplier">Damage Multiplier</option>
+      <option value="Defense/Negation">Defense/Negation</option>
+      <option value="Resource Generation">Resource Generation</option>
+      <option value="Prediction/Reaction">Prediction/Reaction</option>
+      <option value="HP Recovery">HP Recovery</option>
+      <option value="Destruction/Instant Kill">Destruction/Instant Kill</option>
+      <option value="Debuff">Debuff</option>
+    </select>
+    <select class="filter-select" id="appearanceFilter">
+      <option value="">All Appearances</option>
+      <option value="Puff">Puff</option>
+      <option value="Shroud">Shroud</option>
+      <option value="Living Mask">Living Mask</option>
+      <option value="Mimic">Mimic</option>
+      <option value="Forlorn">Forlorn</option>
+      <option value="Harbinger">Harbinger</option>
+      <option value="Elemental">Elemental</option>
+      <option value="Origin">Origin</option>
+      <option value="Corrupted">Corrupted</option>
+      <option value="">Unclassified</option>
+    </select>
+    <div style="flex:1"></div>
+    <div class="target-indicator">
+      <span id="targetCount">36 / 200</span>
+      <div class="progress-bar"><div class="fill" id="targetFill" style="width:18%"></div></div>
+    </div>
+  </div>
+
+  <!-- Import/Export -->
+  <div class="io-bar">
+    <button onclick="toggleAddForm()" class="btn-primary" id="addBtn">+ Add Spirit</button>
+    <div class="spacer"></div>
+    <button onclick="document.getElementById('fileInput').click()">Import JSON</button>
+    <button onclick="exportJSON()">Export JSON</button>
+    <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)">
+  </div>
+
+  <!-- Add Form (hidden by default) -->
+  <div class="add-form" id="addForm" style="display:none">
+    <h3>Add New Spirit</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="newName" placeholder="Spirit name">
+      </div>
+      <div class="form-group">
+        <label>Rarity</label>
+        <select id="newRarity">
+          <option value="common">Common</option>
+          <option value="uncommon">Uncommon</option>
+          <option value="rare">Rare</option>
+          <option value="ghost-rare">Ghost-Rare</option>
+          <option value="legendary">Legendary</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Max HP</label>
+        <input type="number" id="newHp" min="1" max="20" value="5">
+      </div>
+      <div class="form-group">
+        <label>Ability Name</label>
+        <input type="text" id="newAbility" placeholder="Ability name">
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="newCategory">
+          <option value="Dice Modifier">Dice Modifier</option>
+          <option value="Damage Multiplier">Damage Multiplier</option>
+          <option value="Defense/Negation">Defense/Negation</option>
+          <option value="Resource Generation">Resource Generation</option>
+          <option value="Prediction/Reaction">Prediction/Reaction</option>
+          <option value="HP Recovery">HP Recovery</option>
+          <option value="Destruction/Instant Kill">Destruction/Instant Kill</option>
+          <option value="Debuff">Debuff</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Set</label>
+        <select id="newSet">
+          <option value="Set 1">Set 1</option>
+          <option value="Dark Castle">Dark Castle</option>
+          <option value="Frost Valley">Frost Valley</option>
+          <option value="Volcanic Isles">Volcanic Isles</option>
+          <option value="Rolling Hills">Rolling Hills</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Appearance</label>
+        <select id="newAppearance">
+          <option value="">Unclassified</option>
+          <option value="Puff">Puff</option>
+          <option value="Shroud">Shroud</option>
+          <option value="Living Mask">Living Mask</option>
+          <option value="Mimic">Mimic</option>
+          <option value="Forlorn">Forlorn</option>
+          <option value="Harbinger">Harbinger</option>
+          <option value="Elemental">Elemental</option>
+          <option value="Origin">Origin</option>
+          <option value="Corrupted">Corrupted</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Ability Description</label>
+      <textarea id="newDesc" placeholder="Describe what the ability does..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-primary" onclick="addSpirit()">Add Spirit</button>
+      <button onclick="toggleAddForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('collectionId')" id="th-collectionId" style="width:60px"># <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('name')" id="th-name">Name <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('set')" id="th-set">Set <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('rarity')" id="th-rarity">Rarity <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('maxHp')" id="th-maxHp">HP <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('ability')" id="th-ability">Ability <span class="sort-arrow">▲</span></th>
+          <th onclick="sortBy('category')" id="th-category">Category <span class="sort-arrow">▲</span></th>
+          <th>Description</th>
+          <th onclick="sortBy('appearance')" id="th-appearance">Appearance <span class="sort-arrow">▲</span></th>
+          <th style="width:100px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Prompt Output -->
+  <div class="prompt-section">
+    <h3>Balance Summary Prompt</h3>
+    <div class="prompt-text" id="promptText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">📋 Copy to Clipboard</button>
+  </div>
+</div>
+
+<div class="card-preview-overlay" id="previewOverlay" onclick="closePreview()"></div>
+<div class="card-preview" id="previewPanel">
+  <button class="close-btn" onclick="closePreview()">&times;</button>
+  <div id="previewContent"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const RARITIES = ['common', 'uncommon', 'rare', 'ghost-rare', 'legendary'];
+const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+const RARITY_COLORS = { common: '#6b7280', uncommon: '#059669', rare: '#2563eb', 'ghost-rare': '#7c3aed', legendary: '#d97706' };
+const SETS = ['Set 1', 'Dark Castle', 'Frost Valley', 'Volcanic Isles', 'Rolling Hills'];
+const SET_ORDER = { 'Set 1': 0, 'Dark Castle': 1, 'Frost Valley': 2, 'Volcanic Isles': 3, 'Rolling Hills': 4 };
+const SET_COLORS = { 'Set 1': '#dc2626', 'Dark Castle': '#7c3aed', 'Frost Valley': '#2563eb', 'Volcanic Isles': '#ea580c', 'Rolling Hills': '#059669' };
+const APPEARANCES = ['Puff', 'Shroud', 'Living Mask', 'Mimic', 'Forlorn', 'Harbinger', 'Elemental', 'Origin', 'Corrupted'];
+const APPEARANCE_COLORS = { 'Puff': '#60a5fa', 'Shroud': '#a78bfa', 'Living Mask': '#f59e0b', 'Mimic': '#34d399', 'Forlorn': '#6b7280', 'Harbinger': '#ef4444', 'Elemental': '#06b6d4', 'Origin': '#d97706', 'Corrupted': '#dc2626' };
+
+const CATEGORIES = ['Dice Modifier', 'Damage Multiplier', 'Defense/Negation', 'Resource Generation', 'Prediction/Reaction', 'HP Recovery', 'Destruction/Instant Kill', 'Debuff'];
+const CAT_COLORS = {
+  'Dice Modifier': '#2563eb', 'Damage Multiplier': '#dc2626', 'Defense/Negation': '#059669',
+  'Resource Generation': '#d97706', 'Prediction/Reaction': '#7c3aed', 'HP Recovery': '#ea580c',
+  'Destruction/Instant Kill': '#be123c', 'Debuff': '#6d28d9'
+};
+
+const TARGET = 200;
+
+let spirits = [
+{ id: 1, name: 'Kodako', rarity: 'common', maxHp: 6, ability: 'Swift', abilityDesc: 'Roll 1-2-3: negate damage and deal 4 to enemy.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 2, name: 'Nikon', rarity: 'common', maxHp: 6, ability: 'Ambush', abilityDesc: 'Win first roll: deal triple damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 3, name: 'Ancient Librarian', rarity: 'common', maxHp: 6, ability: 'Knowledge', abilityDesc: 'For each 2 rolled by both players, add +1 damage if you deal damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Living Mask' },
+  { id: 4, name: 'Wanderer', rarity: 'common', maxHp: 8, ability: 'Curiosity', abilityDesc: 'Roll a straight (consecutive sequence, no repeats): deal +2 damage.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 5, name: 'Puff', rarity: 'common', maxHp: 6, ability: 'Cute', abilityDesc: 'Enemy Doubles and Triples do -1 damage.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Puff' },
+  { id: 6, name: 'Fang Outside', rarity: 'common', maxHp: 2, ability: 'Skillful Coward', abilityDesc: 'Win: you may switch with a Spiritkin on your sideline after damage.', category: 'Prediction/Reaction', set: 'Set 1', appearance: 'Shroud' },
+  { id: 7, name: 'Fang Undercover', rarity: 'common', maxHp: 2, ability: 'Skilled Coward', abilityDesc: 'When taking damage, you may switch Fang Undercover with any sideline Spiritkin and negate damage.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 8, name: 'Buttons', rarity: 'common', maxHp: 1, ability: 'Perfect Plan', abilityDesc: 'If Buttons rolls triple 6\'s, deal +15 damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 9, name: 'Little Boo', rarity: 'common', maxHp: 2, ability: 'Mercy', abilityDesc: 'Enemy Triples count as a 1-2-3 roll instead.', category: 'Defense/Negation', set: 'Set 1', appearance: '' },
+  { id: 10, name: 'Patrick', rarity: 'common', maxHp: 3, ability: 'Stone Form', abilityDesc: 'Don\'t roll. If opponent rolls Singles: negate damage, deal 3.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 11, name: 'Villager', rarity: 'common', maxHp: 4, ability: 'Hospitality', abilityDesc: 'Sideline: your active Spiritkin gains 1 HP on wins.', category: 'HP Recovery', set: 'Set 1', appearance: 'Shroud' },
+  { id: 12, name: 'Dupy', rarity: 'common', maxHp: 4, ability: 'Frolic', abilityDesc: 'Tie: instantly KO the enemy Spiritkin.', category: 'Destruction/Instant Kill', set: 'Set 1', appearance: 'Shroud' },
+  { id: 13, name: 'Shoo', rarity: 'common', maxHp: 4, ability: 'Alpine Air', abilityDesc: 'Sideline: your active Spiritkin gains 2 HP when below 4 HP. Once Per Spiritkin.', category: 'HP Recovery', set: 'Set 1', appearance: 'Shroud' },
+  { id: 14, name: 'Jeffery', rarity: 'common', maxHp: 5, ability: 'Chuckle', abilityDesc: 'Sideline: when your active Spiritkin defeats an enemy, it gains 3 HP.', category: 'HP Recovery', set: 'Set 1', appearance: 'Origin' },
+  { id: 15, name: 'Winston', rarity: 'common', maxHp: 5, ability: 'Scheme', abilityDesc: 'Win: you may swap the enemy active Spiritkin with one from their sideline. Gain +2 dice next roll.', category: 'Prediction/Reaction', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 16, name: 'Chip', rarity: 'common', maxHp: 4, ability: 'Acrobatic Dive', abilityDesc: 'Even Doubles: +3 damage if you deal damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 17, name: 'Boo Brothers', rarity: 'common', maxHp: 5, ability: 'Teamwork', abilityDesc: 'Before rolling: you may remove 1 die to gain 1 HP. If you do, deal +1 damage this roll.', category: 'HP Recovery', set: 'Set 1', appearance: 'Puff' },
+  { id: 18, name: 'Charlie', rarity: 'common', maxHp: 4, ability: 'Rush', abilityDesc: 'Double 2\'s deal 7 damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 34, name: 'Grawr', rarity: 'uncommon', maxHp: 7, ability: 'Menace', abilityDesc: 'Entry: deal 1 damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 35, name: 'Larry', rarity: 'uncommon', maxHp: 6, ability: 'Flying Kick', abilityDesc: 'Triples deal 3X damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 36, name: 'Bill & Bob', rarity: 'uncommon', maxHp: 6, ability: 'Bait n Switch', abilityDesc: 'Below 4 HP: wins deal 2X damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 37, name: 'Dealer', rarity: 'uncommon', maxHp: 5, ability: 'House Rules', abilityDesc: 'Roll a straight: +3 damage and negate all incoming damage.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 38, name: 'Alucard', rarity: 'uncommon', maxHp: 4, ability: 'Colony Call', abilityDesc: 'Doubles deal +2 damage for each Spiritkin on your sideline. Once Per Game.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 39, name: 'Castle Guards', rarity: 'uncommon', maxHp: 7, ability: 'Flamethrower', abilityDesc: 'Each 3 you roll doubles Castle Guards\' damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Puff' },
+  { id: 40, name: 'Team Zippy', rarity: 'uncommon', maxHp: 7, ability: 'Teamwork', abilityDesc: 'Win with Singles: deal +2 damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 41, name: 'Guard Thomas', rarity: 'uncommon', maxHp: 6, ability: 'Stoic', abilityDesc: 'Below 6 HP: immune to Singles damage.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Puff' },
+  { id: 42, name: 'Doc', rarity: 'uncommon', maxHp: 2, ability: 'Savage', abilityDesc: '+5 damage on Doubles.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 43, name: 'Outlaw', rarity: 'uncommon', maxHp: 5, ability: 'Thief', abilityDesc: 'Doubles: remove 1 enemy die next roll.', category: 'Debuff', set: 'Set 1', appearance: 'Living Mask' },
+  { id: 44, name: 'Bubble Boys', rarity: 'uncommon', maxHp: 9, ability: 'Pop', abilityDesc: 'If the enemy rolls Triples, Bubble Boys are defeated.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Puff' },
+  { id: 45, name: 'Cornelius', rarity: 'uncommon', maxHp: 2, ability: 'Antidote', abilityDesc: 'Sideline: negate all enemy sideline effects.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 46, name: 'Cave Dweller', rarity: 'uncommon', maxHp: 7, ability: 'Lurk', abilityDesc: 'Deal 3X damage on first roll win.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 47, name: 'Hermit', rarity: 'uncommon', maxHp: 3, ability: 'Solitude', abilityDesc: 'Entry: gain 2 HP for each Spiritkin defeated on both teams.', category: 'HP Recovery', set: 'Set 1', appearance: 'Shroud' },
+  { id: 48, name: 'Opa', rarity: 'uncommon', maxHp: 5, ability: 'Rest', abilityDesc: 'Win or tie: gain 1 HP.', category: 'HP Recovery', set: 'Set 1', appearance: 'Puff' },
+  { id: 49, name: 'Greg', rarity: 'uncommon', maxHp: 5, ability: 'Chase', abilityDesc: 'While Greg has more HP than the enemy Spiritkin: deal 2X damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 50, name: 'Jackson', rarity: 'uncommon', maxHp: 6, ability: 'Regrow', abilityDesc: 'After your roll, you may spend 1 of Jackson\'s HP to reroll 1 die.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 62, name: 'Raditz', rarity: 'rare', maxHp: 6, ability: 'Hunt', abilityDesc: 'Entry: you may swap the enemy active Spiritkin with one from their sideline.', category: 'Prediction/Reaction', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 63, name: 'Doug', rarity: 'rare', maxHp: 3, ability: 'Caution', abilityDesc: 'Before rolling: Doug may switch with a sideline Spiritkin Once Per Game. Gain 1 extra die next roll.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 64, name: 'Sparky', rarity: 'rare', maxHp: 4, ability: 'Tinder', abilityDesc: 'Your rolled 1\'s add +3 damage each if you deal damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 65, name: 'Wim', rarity: 'rare', maxHp: 6, ability: 'Slash', abilityDesc: '+5 damage when all dice are odd.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 66, name: 'Munch', rarity: 'rare', maxHp: 6, ability: 'Scraps', abilityDesc: 'Defeat a Spiritkin: gain 4 HP.', category: 'HP Recovery', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 67, name: 'Snorton', rarity: 'rare', maxHp: 8, ability: 'Fissure', abilityDesc: '+5 damage if you roll at least two 6\'s and deal damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 68, name: 'Kairan', rarity: 'rare', maxHp: 4, ability: 'Let\'s Dance', abilityDesc: 'Doubles: +1 die next roll.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 69, name: 'Sonya', rarity: 'rare', maxHp: 3, ability: 'Mesmerize', abilityDesc: 'Each roll: you may change 1 die result to a 2.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 70, name: 'Katrina', rarity: 'rare', maxHp: 5, ability: 'Seeker', abilityDesc: 'Before rolling: if you have less HP than the enemy, gain 1 HP.', category: 'HP Recovery', set: 'Set 1', appearance: 'Living Mask' },
+  { id: 71, name: 'Admiral', rarity: 'rare', maxHp: 3, ability: 'Comrades', abilityDesc: 'Sideline: +2 damage on even Doubles.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Puff' },
+  { id: 72, name: 'Sky', rarity: 'rare', maxHp: 4, ability: 'Elusive', abilityDesc: 'If incoming damage is greater than 2: negate it. Sky rolls 1 die and deals its value as damage.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Elemental' },
+  { id: 73, name: 'Stone Cold', rarity: 'rare', maxHp: 7, ability: 'One-two-one!', abilityDesc: 'Roll double 1\'s: deal 3X damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Elemental' },
+  { id: 74, name: 'Dark Jeff', rarity: 'rare', maxHp: 3, ability: 'Cackle', abilityDesc: 'Sideline: +1 damage to all your rolls.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Origin' },
+  { id: 75, name: 'Flora', rarity: 'rare', maxHp: 4, ability: 'Restore', abilityDesc: 'Doubles: gain 2 HP after damage is applied.', category: 'HP Recovery', set: 'Set 1', appearance: 'Shroud' },
+  { id: 76, name: 'Dark Wing', rarity: 'rare', maxHp: 2, ability: 'Precision', abilityDesc: 'Once Per Game: if Dark Wing rolls Singles, reroll all dice.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 77, name: 'City Cyboo', rarity: 'rare', maxHp: 1, ability: 'Barrier', abilityDesc: 'Takes no damage from enemy Doubles.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 94, name: 'Jenkins', rarity: 'ghost-rare', maxHp: 5, ability: 'Greeting', abilityDesc: 'Entry: roll 4 dice and deal damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 95, name: 'Tabitha', rarity: 'ghost-rare', maxHp: 1, ability: 'Rally', abilityDesc: 'Sideline: +2 damage on Doubles.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 99, name: 'Guardian Fairy', rarity: 'ghost-rare', maxHp: 3, ability: 'Wish', abilityDesc: 'Sideline: when your active Spiritkin is about to take damage, Guardian Fairy leaps in and takes the hit instead.', category: 'Defense/Negation', set: 'Set 1', appearance: 'Shroud' },
+  { id: 100, name: 'Cyboo', rarity: 'ghost-rare', maxHp: 3, ability: 'Spark', abilityDesc: 'Sideline: your active Spiritkin gains 1 extra die when below 3 HP.', category: 'Dice Modifier', set: 'Set 1', appearance: 'Shroud' },
+  { id: 101, name: 'Splinter', rarity: 'ghost-rare', maxHp: 4, ability: 'Toxic Fumes', abilityDesc: 'Win: deal 1 damage before each roll.', category: 'Debuff', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 109, name: 'Bo', rarity: 'legendary', maxHp: 5, ability: 'Miracle', abilityDesc: 'Defeat a Spiritkin: return one of your defeated Spiritkin to your sideline. Gain 1 Magic Firefly.', category: 'HP Recovery', set: 'Set 1', appearance: 'Harbinger' },
+  { id: 110, name: 'The Mountain King', rarity: 'legendary', maxHp: 9, ability: 'Beast Mode', abilityDesc: 'Doubles deal 2X damage.', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Origin' },
+  { id: 111, name: 'Shade', rarity: 'legendary', maxHp: 5, ability: 'Haunt', abilityDesc: 'Before each roll, opponent takes 1 damage.', category: 'Debuff', set: 'Set 1', appearance: 'Corrupted' },
+  { id: 112, name: 'Doom', rarity: 'legendary', maxHp: 7, ability: 'Fiendship', abilityDesc: '+2 bonus damage!', category: 'Damage Multiplier', set: 'Set 1', appearance: 'Origin' },
+  { id: 19, name: 'Scallywags', rarity: 'common', maxHp: 5, ability: 'Frenzy', abilityDesc: 'If all your dice are under 4: gain 1 extra die and 1 Surge next roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: 'Shroud' },
+  { id: 20, name: 'Floop', rarity: 'common', maxHp: 5, ability: 'Muck', abilityDesc: 'If the enemy rolls Doubles: they lose 1 die next roll.', category: 'Debuff', set: 'Dark Castle', appearance: 'Corrupted' },
+  { id: 21, name: 'Needle', rarity: 'common', maxHp: 7, ability: 'Big Bro', abilityDesc: 'Sideline: if Buttons is In Play, gain 1 extra die.', category: 'Dice Modifier', set: 'Dark Castle', appearance: 'Puff' },
+  { id: 22, name: 'Ancient One', rarity: 'common', maxHp: 7, ability: 'Friend to All', abilityDesc: 'Sideline: your active Spiritkin gains 3 HP on ties.', category: 'HP Recovery', set: 'Dark Castle', appearance: 'Harbinger' },
+  { id: 51, name: 'Nicholas', rarity: 'uncommon', maxHp: 1, ability: 'Sneak Attack', abilityDesc: 'Sideline: deal 2 damage to the enemy Spiritkin when they enter play.', category: 'Damage Multiplier', set: 'Dark Castle', appearance: 'Elemental' },
+  { id: 52, name: 'Hugo', rarity: 'uncommon', maxHp: 5, ability: 'Wreckage', abilityDesc: 'When Hugo takes damage: the opponent loses 1 die next roll.', category: 'Debuff', set: 'Dark Castle', appearance: 'Corrupted' },
+  { id: 78, name: 'Haywire', rarity: 'rare', maxHp: 7, ability: 'Wild Chords', abilityDesc: 'Triples or better: gain 1 permanent die. Haywire gains +2 permanent damage. Once Per Game.', category: 'Dice Modifier', set: 'Dark Castle', appearance: 'Mimic' },
+  { id: 80, name: 'Bilbo', rarity: 'rare', maxHp: 2, ability: 'Little Buddy', abilityDesc: 'Sideline: your active Spiritkin deals +2 damage on Singles.', category: 'Damage Multiplier', set: 'Dark Castle', appearance: 'Shroud' },
+  { id: 96, name: 'Hector', rarity: 'ghost-rare', maxHp: 6, ability: 'Protector', abilityDesc: 'Singles beat Doubles. +1 damage on Singles.', category: 'Defense/Negation', set: 'Dark Castle', appearance: 'Corrupted' },
+  { id: 97, name: 'Toby', rarity: 'ghost-rare', maxHp: 7, ability: 'Pure Heart', abilityDesc: 'Before rolling: you may declare the final roll. Toby is defeated next roll. Win: defeat the enemy Spiritkin.', category: 'Destruction/Instant Kill', set: 'Dark Castle', appearance: '' },
+  { id: 98, name: 'Redd', rarity: 'ghost-rare', maxHp: 7, ability: 'Notorious', abilityDesc: 'Entry: gain 2 extra dice this roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: 'Corrupted' },
+  { id: 108, name: 'Lucy', rarity: 'legendary', maxHp: 8, ability: 'Blue Fire', abilityDesc: 'Win: gain 1 Sacred Fire.', category: 'Resource Generation', set: 'Dark Castle', appearance: 'Origin' },
+  { id: 401, name: 'Knight Terror', rarity: 'rare', maxHp: 7, ability: 'Heavy Air', abilityDesc: 'While active: after any opponent ability triggers, the enemy active Spiritkin loses 2 HP.', category: 'Debuff', set: 'Dark Castle', appearance: 'Forlorn' },
+  { id: 402, name: 'Knight Light', rarity: 'uncommon', maxHp: 6, ability: 'Retribution', abilityDesc: 'While active: when an opponent\'s ability triggers, gain 1 extra die next roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: 'Forlorn' },
+  { id: 410, name: 'Mirror Matt', rarity: 'common', maxHp: 1, ability: 'Seven Years', abilityDesc: 'If the opponent wins with Doubles: reflect all damage to the attacker.', category: 'Defense/Negation', set: 'Dark Castle', appearance: '' },
+  { id: 414, name: 'Chow', rarity: 'uncommon', maxHp: 5, ability: 'Secret Ingredient', abilityDesc: 'Before rolling: spend 1 Healing Seed to gain 2 extra dice this roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: '' },
+  { id: 420, name: 'Lars', rarity: 'common', maxHp: 4, ability: 'Light the Way', abilityDesc: 'Entry: gain 1 Surge, 1 Lucky Stone, and 1 Burn.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 424, name: 'Bigsby', rarity: 'rare', maxHp: 5, ability: 'Omen', abilityDesc: 'Win: deal +1 damage. If you use a Moonstone, transform into Doom.', category: 'Damage Multiplier', set: 'Dark Castle', appearance: '' },
+  { id: 427, name: 'Garrick', rarity: 'uncommon', maxHp: 5, ability: 'Watchfire', abilityDesc: 'Lose: take -1 damage. Defeat a Spiritkin: gain 1 Sacred Fire.', category: 'Defense/Negation', set: 'Dark Castle', appearance: '' },
+  { id: 432, name: 'Valkin the Grand', rarity: 'legendary', maxHp: 8, ability: 'Grand Spoils', abilityDesc: 'KO an enemy Spiritkin: gain 1 Sacred Fire, 2 Ice Shards, 1 Lucky Stone, 1 Moonstone, 2 Healing Seeds.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 435, name: 'Willow', rarity: 'ghost-rare', maxHp: 4, ability: 'Joy of Painting', abilityDesc: 'Sideline & In Play: gain 1 extra die if you lost the last roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: '' },
+  { id: 436, name: 'Princess Shade', rarity: 'rare', maxHp: 4, ability: 'Bounty', abilityDesc: 'Sideline & In Play: when the enemy Spiritkin takes damage before the roll, deal +1 additional damage.', category: 'Damage Multiplier', set: 'Dark Castle', appearance: '' },
+  { id: 437, name: 'Rascals', rarity: 'common', maxHp: 3, ability: 'Stampede', abilityDesc: 'Entry: gain 3 Burn.', category: 'Disruption', set: 'Dark Castle', appearance: '' },
+  { id: 438, name: 'Champ', rarity: 'ghost rare', maxHp: 5, ability: 'Thrill', abilityDesc: 'Immune to damage from Specials. Gain 1 Surge when you or the enemy rolls Doubles or better.', category: 'Defense/Negation', set: 'Dark Castle', appearance: '' },
+  { id: 439, name: 'Lucy\'s Shadow', rarity: 'rare', maxHp: 4, ability: 'Mentor', abilityDesc: 'Sideline: while Lucy is In Play, Lucy gains 1 extra Sacred Fire on wins and her Sacred Fires deal double damage.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 440, name: 'Gom Gom Gom', rarity: 'common', maxHp: 5, ability: 'Chaos', abilityDesc: 'Win with Doubles: gain 1 Sacred Fire.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 441, name: 'Wendy', rarity: 'rare', maxHp: 3, ability: 'Moonbeam', abilityDesc: 'Win with Doubles or better: gain 1 Magic Firefly.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 442, name: 'Castle Gardener', rarity: 'common', maxHp: 2, ability: 'Cultivate', abilityDesc: 'Before rolling: you may discard Healing Seeds to gain 2 Sacred Fire each.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 443, name: 'Captain James', rarity: 'rare', maxHp: 6, ability: 'Final Strike', abilityDesc: 'Sideline & In Play: Triples or better: gain 2 Sacred Fires.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 448, name: 'Harvey', rarity: 'ghost-rare', maxHp: 6, ability: 'Harvest Moon', abilityDesc: 'Win: deal +1 damage for each 5 you rolled. If you rolled any 5s, gain 1 Moonstone.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 456, name: 'Ryder', rarity: 'rare', maxHp: 5, ability: 'Toll', abilityDesc: 'Before rolling: opponent chooses — take 1 damage or give Ryder 1 Sacred Fire.', category: 'Disruption', set: 'Dark Castle', appearance: '' },
+  { id: 457, name: 'Sophia', rarity: 'rare', maxHp: 6, ability: 'Masquerade', abilityDesc: 'Win: you may deal no damage. If you do, gain Mask of Day or Mask of Night. Once Per Game.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
+  { id: 460, name: 'Slicer', rarity: 'uncommon', maxHp: 6, ability: 'Parting Gift', abilityDesc: 'Sideline & In Play: if you win with Quads or better, destroy an enemy sideline Spiritkin.', category: 'Disruption', set: 'Dark Castle', appearance: '' },
+  { id: 464, name: 'Yawn Eater', rarity: 'uncommon', maxHp: 7, ability: 'Feast', abilityDesc: 'Gain 1 extra die for each sideline ability on the enemy sideline. Odd Doubles deal +1 damage.', category: 'Dice Modifier', set: 'Dark Castle', appearance: '' },
+  { id: 23, name: 'Powder', rarity: 'common', maxHp: 5, ability: 'Final Gift', abilityDesc: 'When defeated: gain 3 Ice Shards for your next Spiritkin.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 24, name: 'Simon', rarity: 'common', maxHp: 7, ability: 'Brew Time', abilityDesc: 'Gain 2 Sacred Fire when taking before-roll damage. Gain 2 Sacred Fire when the enemy rolls Triples or better.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 25, name: 'Cameron', rarity: 'common', maxHp: 6, ability: 'Unstoppable Force', abilityDesc: 'If the opponent uses a special, Cameron gains 1 extra die. Cameron\'s damage cannot be negated.', category: 'Dice Boost/Anti-Negation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 26, name: 'Logey', rarity: 'common', maxHp: 4, ability: 'Heinous', abilityDesc: 'Opponent\'s 5+ dice are unavailable next roll.', category: 'Debuff', set: 'Frost Valley', appearance: 'Corrupted' },
+  { id: 27, name: 'Fredrick', rarity: 'common', maxHp: 5, ability: 'Careful', abilityDesc: 'Before rolling: deal 2 damage for each extra die the enemy rolled above 3 last round.', category: 'Disruption', set: 'Frost Valley', appearance: 'Living Mask' },
+  { id: 28, name: 'Dream Cat', rarity: 'common', maxHp: 4, ability: 'Jinx', abilityDesc: 'Both roll Doubles: gain 2 extra dice next roll.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 29, name: 'Sad Sal', rarity: 'common', maxHp: 5, ability: 'Tough Job', abilityDesc: 'Lose: gain 1 Ice Shard.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 30, name: 'Tommy Salami', rarity: 'common', maxHp: 6, ability: 'Regulator', abilityDesc: 'When you roll a 6: gain 1 extra die and roll it immediately. Repeats as long as you keep rolling 6s.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 31, name: 'Gus', rarity: 'common', maxHp: 6, ability: 'Gale Force', abilityDesc: 'Win: you may force the opponent to swap their active Spiritkin. The new Spiritkin takes the damage.', category: 'Disruption', set: 'Frost Valley', appearance: 'Puff' },
+  { id: 32, name: 'Lou', rarity: 'common', maxHp: 7, ability: 'Bros', abilityDesc: 'Sideline: Grawr gains +1 damage and 1 HP on wins.', category: 'Damage Multiplier', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 33, name: 'Sandwiches', rarity: 'common', maxHp: 6, ability: 'Dependable', abilityDesc: 'Sideline: if your opponent gains a Special, you gain it as well.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 53, name: 'Bogey', rarity: 'uncommon', maxHp: 5, ability: 'Bogus', abilityDesc: 'When damage would hit Bogey, you may reflect it back at the attacker. Once Per Game.', category: 'Defense/Negation', set: 'Frost Valley', appearance: 'Corrupted' },
+  { id: 54, name: 'Roger', rarity: 'uncommon', maxHp: 6, ability: 'Tempest', abilityDesc: 'Roll 2 pairs of Doubles (4+ dice): gain 3 Sacred Fires.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Puff' },
+  { id: 55, name: 'Masked Hero', rarity: 'uncommon', maxHp: 5, ability: 'Underdog', abilityDesc: 'Immune to before-roll damage. Gain 1 Burn for each 3 you roll.', category: 'Defense/Negation', set: 'Frost Valley', appearance: 'Living Mask' },
+  { id: 56, name: 'Chad', rarity: 'common', maxHp: 6, ability: 'Sploop!', abilityDesc: 'Entry: gain 2 Ice Shards.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 57, name: 'Marcus', rarity: 'uncommon', maxHp: 7, ability: 'Glacial Pounding', abilityDesc: 'Take 3+ damage: gain 4 extra dice next roll.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 58, name: 'Ashley', rarity: 'uncommon', maxHp: 3, ability: 'Burning Soul', abilityDesc: 'Win: gain 1 Sacred Fire.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 59, name: 'Mr Filbert', rarity: 'common', maxHp: 6, ability: 'Mask Merchant', abilityDesc: 'Sideline: any healing instead deals damage to the intended Spiritkin.', category: 'Debuff', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 60, name: 'Dallas', rarity: 'uncommon', maxHp: 4, ability: 'Quick Draw', abilityDesc: 'Entry: steal 1 enemy die for the first 2 rolls.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 61, name: 'Suspicious Jeff', rarity: 'uncommon', maxHp: 4, ability: 'Snicker', abilityDesc: 'Sideline: on wins, steal 1 enemy die next roll.', category: 'Debuff', set: 'Frost Valley', appearance: 'Origin' },
+  { id: 81, name: 'Spockles', rarity: 'rare', maxHp: 6, ability: 'Valley Magic', abilityDesc: 'Win: gain 2 Ice Shards.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 82, name: 'Antoinette', rarity: 'uncommon', maxHp: 6, ability: 'Grace', abilityDesc: 'Roll as many dice as your opponent. +1 damage on Doubles.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 83, name: 'Troubling Haters', rarity: 'uncommon', maxHp: 3, ability: 'Growing Mob', abilityDesc: 'Deal 4+ damage: gain 2 HP.', category: 'HP Recovery', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 84, name: 'Wandering Sue', rarity: 'uncommon', maxHp: 4, ability: 'Hidden Weakness', abilityDesc: 'Before rolling: if the enemy has more HP than Sue, gain 1 extra die.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Shroud' },
+  { id: 85, name: 'Eloise', rarity: 'rare', maxHp: 5, ability: 'Change of Heart', abilityDesc: 'Spend 1 Ice Shard to swap HP with enemy before rolling.', category: 'Prediction/Reaction', set: 'Frost Valley', appearance: 'Mimic' },
+  { id: 86, name: 'Pelter', rarity: 'rare', maxHp: 5, ability: 'Snowball', abilityDesc: 'Doubles: deal +2 damage.', category: 'Damage Multiplier', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 87, name: 'Zach', rarity: 'rare', maxHp: 7, ability: 'Craftsman', abilityDesc: 'Sideline: Guard Thomas gains +3 damage on Doubles and +1 die each roll.', category: 'Damage Multiplier', set: 'Frost Valley', appearance: 'Mimic' },
+  { id: 88, name: 'Pale Nimbus', rarity: 'rare', maxHp: 4, ability: 'Hidden Storm', abilityDesc: 'Sideline: +2 damage if your total dice add to less than 7.', category: 'Damage Multiplier', set: 'Frost Valley', appearance: 'Puff' },
+  { id: 89, name: 'Mallow', rarity: 'rare', maxHp: 5, ability: 'Dozy Cozy', abilityDesc: 'Sideline: before rolling, you may spend 2 Sacred Fire to give your active Spiritkin 3 HP and gain 1 Burn.', category: 'HP Recovery', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 90, name: 'Jeanie', rarity: 'rare', maxHp: 4, ability: 'Hidden Treasure', abilityDesc: 'Sideline: you may force the opponent to reroll all dice. Once Per Game.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Puff' },
+  { id: 91, name: 'Calvin & Anna', rarity: 'rare', maxHp: 6, ability: 'Toboggan', abilityDesc: 'Defeat a Spiritkin: you may switch Calvin & Anna with a Spiritkin from your sideline.', category: 'Prediction/Reaction', set: 'Frost Valley', appearance: 'Mimic' },
+  { id: 92, name: 'Gary', rarity: 'rare', maxHp: 6, ability: 'Lucky Novice', abilityDesc: 'Sideline & In Play: gain 2 Ice Shards for each 1 you roll.', category: 'Resource Generation', set: 'Frost Valley', appearance: '' },
+  { id: 93, name: 'Bandit Pete', rarity: 'uncommon', maxHp: 5, ability: 'Bandit', abilityDesc: 'Sideline: if either player rolls only 2 dice, your active Spiritkin gains +3 damage.', category: 'Damage Multiplier', set: 'Frost Valley', appearance: 'Living Mask' },
+  { id: 103, name: 'Night Master', rarity: 'ghost-rare', maxHp: 5, ability: 'Bullseye', abilityDesc: 'Win with Doubles: destroy an enemy sideline Spiritkin with less than 4 HP.', category: 'Destruction/Instant Kill', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 104, name: 'Skylar', rarity: 'ghost-rare', maxHp: 7, ability: 'Winter Barrage', abilityDesc: 'Ice Shards deal +2 damage instead of +1.', category: 'Resource Generation', set: 'Frost Valley', appearance: 'Corrupted' },
+  { id: 105, name: 'Tyler', rarity: 'ghost-rare', maxHp: 7, ability: 'Heating Up', abilityDesc: 'Before rolling: spend 2 HP to gain 1 extra die. Sacred Fires deal 2X damage.', category: 'Dice Modifier', set: 'Frost Valley', appearance: 'Corrupted' },
+  { id: 106, name: 'King Jay', rarity: 'ghost-rare', maxHp: 7, ability: 'Reflection', abilityDesc: 'Lose roll & dice total = 7: reflect all damage.', category: 'Defense/Negation', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 107, name: 'Piper', rarity: 'ghost-rare', maxHp: 6, ability: 'Slick Coat', abilityDesc: 'Negate enemy before-rolling effects. -1 enemy die next roll. Win with Singles: gain 1 Sacred Fire.', category: 'Debuff', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 113, name: 'Prince Balatron', rarity: 'legendary', maxHp: 6, ability: 'Party Time', abilityDesc: 'Lose and survive: roll 1 counter die for damage.', category: 'Prediction/Reaction', set: 'Frost Valley', appearance: 'Elemental' },
+  { id: 114, name: 'Romy', rarity: 'legendary', maxHp: 8, ability: 'Valley Guardian', abilityDesc: 'Predict a die number. If any die matches: +3 damage.', category: 'Prediction/Reaction', set: 'Frost Valley', appearance: 'Origin' },
+  { id: 201, name: 'Bouril', rarity: 'common', maxHp: 10, ability: 'Slumber', abilityDesc: 'Entry: your first roll is automatically 1-2-3.', category: 'Defense/Negation', set: 'Volcanic Isles', appearance: '' },
+  { id: 203, name: 'Benjamin', rarity: 'uncommon', maxHp: 3, ability: 'Magic Touch', abilityDesc: 'Once per roll: use the Moonstone special without discarding it.', category: 'Destruction/Instant Kill', set: 'Volcanic Isles', appearance: '' },
+  { id: 205, name: 'Shade\'s Shadow', rarity: 'rare', maxHp: 1, ability: 'Meltdown', abilityDesc: 'Sideline: before each roll, if the enemy active Spiritkin has less than 4 HP, deal 1 damage.', category: 'Damage Multiplier', set: 'Volcanic Isles', appearance: '' },
+  { id: 206, name: 'Zain', rarity: 'ghost-rare', maxHp: 6, ability: 'Ice Blade', abilityDesc: 'Win: gain 1 Ice Shard. Sideline & In Play: discard 1 Ice Shard and 1 Moonstone to forge the Ice Blade.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 207, name: 'Hank', rarity: 'common', maxHp: 7, ability: 'Tremor', abilityDesc: 'Each 4 you roll: gain 1 Lucky Stone.', category: 'Debuff', set: 'Volcanic Isles', appearance: '' },
+  { id: 208, name: 'Happy Crystal', rarity: 'common', maxHp: 2, ability: 'Spark Strike', abilityDesc: 'Before rolling: you may sacrifice Happy Crystal to gain 1 Moonstone.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 209, name: 'Dart', rarity: 'common', maxHp: 3, ability: 'Plunder', abilityDesc: 'Win: gain 2 Surge.', category: 'Debuff', set: 'Volcanic Isles', appearance: '' },
+  { id: 304, name: 'The Ember Force', rarity: 'uncommon', maxHp: 3, ability: 'Swarm', abilityDesc: 'Before rolling: deal 1 damage to the enemy active Spiritkin.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 306, name: 'Nerina', rarity: 'legendary', maxHp: 9, ability: 'Leviathan', abilityDesc: 'Entry: deal 3 damage to the enemy active Spiritkin.', category: 'Destruction/Instant Kill', set: 'Volcanic Isles', appearance: '' },
+  { id: 313, name: 'Sylvia', rarity: 'rare', maxHp: 4, ability: 'Porpoise', abilityDesc: 'Ice Shards cost nothing to commit. When you lose a roll: roll 1 die. If you roll a 5 or 6, negate all damage.', category: 'Defense/Negation', set: 'Volcanic Isles', appearance: '' },
+  { id: 327, name: 'Natalia', rarity: 'ghost-rare', maxHp: 6, ability: 'Materialization', abilityDesc: 'Even Doubles (2s, 4s, or 6s): gain 1 Moonstone.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 336, name: 'Humar', rarity: 'legendary', maxHp: 5, ability: 'Meteor', abilityDesc: 'Win: opponent takes 2 damage before their next roll. Gain 1 Burn.', category: 'Damage Multiplier', set: 'Volcanic Isles', appearance: '' },
+  { id: 343, name: 'Boris', rarity: 'common', maxHp: 6, ability: 'Fortify', abilityDesc: 'When you spend a Surge: Boris gains 2 HP (can exceed max HP).', category: 'Defense/Negation', set: 'Volcanic Isles', appearance: '' },
+  { id: 345, name: 'Red Hunter', rarity: 'ghost-rare', maxHp: 6, ability: 'Rumble', abilityDesc: 'Win: if your opponent has any specials, deal +3 damage.', category: 'Damage Multiplier', set: 'Volcanic Isles', appearance: '' },
+  { id: 365, name: 'Tyson', rarity: 'common', maxHp: 4, ability: 'Hop', abilityDesc: 'Win: choose an enemy sideline Spiritkin. That Spiritkin\'s sideline ability is disabled until it enters play.', category: 'Disruption', set: 'Volcanic Isles', appearance: '' },
+  { id: 403, name: 'Smudge', rarity: 'rare', maxHp: 5, ability: 'Blackout', abilityDesc: 'Before rolling: name a number. If your opponent rolls it, that die doesn\'t count.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 404, name: 'Chagrin', rarity: 'uncommon', maxHp: 6, ability: 'Bitter End', abilityDesc: 'Lose: gain 1 Surge.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 406, name: 'Fed and Hayden', rarity: 'common', maxHp: 4, ability: 'Eternal Flame', abilityDesc: 'Sacred Fires are not discarded when used.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 413, name: 'Sable', rarity: 'uncommon', maxHp: 6, ability: 'Furnace', abilityDesc: 'Sideline & In Play: roll all odd numbers, gain 1 Sacred Fire.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 416, name: 'Rook', rarity: 'uncommon', maxHp: 6, ability: 'Charcoal', abilityDesc: 'Immune to Sacred Fire and Burn damage. Win: deal +1 damage per Surge committed this roll.', category: 'Damage Multiplier', set: 'Volcanic Isles', appearance: '' },
+  { id: 418, name: 'Pip', rarity: 'ghost-rare', maxHp: 7, ability: 'Toasted', abilityDesc: 'Triples or better: permanently remove 1 die from your opponent. Pip gains 2 Sacred Fires. Once Per Game.', category: 'Damage Multiplier', set: 'Volcanic Isles', appearance: '' },
+  { id: 433, name: 'Lucas', rarity: 'uncommon', maxHp: 5, ability: 'Kindling', abilityDesc: 'Sideline: when a Spiritkin is revived, it charges into play with +3 HP and +1 die next roll. The reviver steps to the sideline.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 445, name: 'Michael', rarity: 'uncommon', maxHp: 5, ability: 'Torrent', abilityDesc: 'Even Doubles: deal +2 damage. While In Play, your sideline Spiritkin are immune to Burn.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 449, name: 'Carpenter', rarity: 'common', maxHp: 4, ability: 'Crafty', abilityDesc: 'Win: +2 damage on Singles. If you use a Surge, transform into Welder. Gain the Hammer.', category: 'Evolution', set: 'Volcanic Isles', appearance: '' },
+  { id: 450, name: 'Welder', rarity: 'rare', maxHp: 5, ability: 'Flux', abilityDesc: 'Win: gain 1 Burn. Roll a 4: transform into Foreman. Gain the Torch.', category: 'Evolution', set: 'Volcanic Isles', appearance: '' },
+  { id: 451, name: 'Foreman', rarity: 'rare', maxHp: 5, ability: 'Blueprint', abilityDesc: 'Win: +1 die next roll.', category: 'Evolution', set: 'Volcanic Isles', appearance: '' },
+  { id: 452, name: 'Ripagoo', rarity: 'uncommon', maxHp: 5, ability: 'Chemical Y', abilityDesc: 'Sideline: if a Spiritkin In Play transforms, gain 2 Burn.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 454, name: 'Miyoshi', rarity: 'ghost-rare', maxHp: 6, ability: 'Bonzai!', abilityDesc: 'Before rolling: you may declare \'Bonzai!\' — lose 4 HP, then gain 5 extra dice.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 455, name: 'Explorer Jeff', rarity: 'rare', maxHp: 4, ability: 'Treasure Hunter', abilityDesc: 'Sideline & In Play: if you hold 3+ different specials, gain 1 extra die and deal +1 damage.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 461, name: 'Ronan', rarity: 'common', maxHp: 5, ability: 'Mixup', abilityDesc: 'Doubles: gain 1 Ice Shard and 1 Burn.', category: 'Resource Generation', set: 'Volcanic Isles', appearance: '' },
+  { id: 463, name: 'Zork', rarity: 'common', maxHp: 4, ability: 'Smolder', abilityDesc: 'Before rolling: discard Burn to gain 1 extra die per Burn discarded.', category: 'Dice Modifier', set: 'Volcanic Isles', appearance: '' },
+  { id: 79, name: 'Laura', rarity: 'rare', maxHp: 4, ability: 'Catchy Tune', abilityDesc: 'Roll a straight to unlock Catchy Tune. Catchy Tune: choose one die after each roll to lock for the next roll.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: 'Mimic' },
+  { id: 202, name: 'Dark Fang', rarity: 'rare', maxHp: 5, ability: 'Pressure', abilityDesc: 'While active: enemy Spiritkin cannot heal or gain HP. Win: deal +1 damage for each KO\'d Spiritkin this game (both teams).', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 204, name: 'Finn', rarity: 'rare', maxHp: 6, ability: 'Forge', abilityDesc: 'Sideline & In Play: discard 1 Healing Seed and 1 Sacred Fire to forge the Flame Blade.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 210, name: 'Timber', rarity: 'legendary', maxHp: 7, ability: 'Howl', abilityDesc: 'While Timber is active, before rolling: opponent must choose — discard 2 specials OR remove 1 die for this roll.', category: 'Debuff', set: 'Rolling Hills', appearance: '' },
+  { id: 301, name: 'Dylan', rarity: 'common', maxHp: 3, ability: 'Sun Song', abilityDesc: 'Sideline & In Play: enemy before-roll effects don\'t activate. Win: gain 1 Burn.', category: 'Prediction/Reaction', set: 'Rolling Hills', appearance: '' },
+  { id: 302, name: 'Maximo', rarity: 'common', maxHp: 4, ability: 'Nap', abilityDesc: 'Entry: roll only 1 die on your first roll. After each round: gain 1 Healing Seed and 1 Lucky Stone.', category: 'Defense/Negation', set: 'Rolling Hills', appearance: '' },
+  { id: 303, name: 'Tweak and Twonk', rarity: 'common', maxHp: 6, ability: 'Roaring Crowd', abilityDesc: 'Sideline: if your active Spiritkin ties, gain 4 Surge.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 305, name: 'Selene', rarity: 'legendary', maxHp: 6, ability: 'Heart of the Hills', abilityDesc: 'Roll Doubles: choose — gain 2 Healing Seeds OR 3 Lucky Stones.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 307, name: 'Artemis', rarity: 'rare', maxHp: 3, ability: 'Daughter of the Stream', abilityDesc: 'Win: gain 3 Ice Shards.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 308, name: 'Kaplan', rarity: 'uncommon', maxHp: 5, ability: 'Pollinate', abilityDesc: 'When opponent rolls Doubles: gain 1 Healing Seed.', category: 'Debuff', set: 'Rolling Hills', appearance: '' },
+  { id: 309, name: 'Aunt Susan', rarity: 'uncommon', maxHp: 4, ability: 'Harvest Dance', abilityDesc: 'Discard 1 Healing Seed: deal +2 damage. Win: gain 2 Healing Seeds.', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 310, name: 'Granny', rarity: 'uncommon', maxHp: 3, ability: 'Bedtime Story', abilityDesc: 'Sideline: when one of your Spiritkin is defeated — by Singles: gain 3 Lucky Stones. By Doubles: gain 1 Moonstone. By Triples or better: gain 3 Sacred Fires.', category: 'HP Recovery', set: 'Rolling Hills', appearance: '' },
+  { id: 311, name: 'Pudge', rarity: 'common', maxHp: 7, ability: 'Belly Flop', abilityDesc: 'Doubles: deal +2 damage. After damage is applied, you take 1 damage.', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 312, name: 'Timpleton', rarity: 'uncommon', maxHp: 4, ability: 'Big Target', abilityDesc: 'Win: deal +3 damage if the enemy Spiritkin\'s HP is higher than Timpleton\'s.', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 314, name: 'Farmer Jeff', rarity: 'ghost-rare', maxHp: 5, ability: 'Harvest', abilityDesc: 'Sideline & In Play: gain 1 Healing Seed for each 6 you roll.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 315, name: 'Harrison', rarity: 'rare', maxHp: 7, ability: 'Ascend', abilityDesc: 'Discard Healing Seeds: roll 1 extra die per seed discarded.', category: 'Defense/Negation', set: 'Rolling Hills', appearance: '' },
+  { id: 342, name: 'Calvin', rarity: 'uncommon', maxHp: 5, ability: 'Overclock', abilityDesc: 'Win: gain 1 HP (can exceed max HP). Gain 1 Healing Seed.', category: 'HP Recovery', set: 'Rolling Hills', appearance: '' },
+  { id: 352, name: 'Jimmy', rarity: 'common', maxHp: 2, ability: 'Chirp', abilityDesc: 'Sideline & In Play: on a tie, gain 3 Lucky Stones and 1 Magic Firefly.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 409, name: 'Nick & Knack', rarity: 'common', maxHp: 4, ability: 'Knick Knack', abilityDesc: 'Before rolling: you may steal 1 special from the other player. If you do, gain 1 HP and 2 Burn.', category: 'Disruption', set: 'Rolling Hills', appearance: '' },
+  { id: 415, name: 'Nyx & Bessie', rarity: 'common', maxHp: 6, ability: 'Moo! Caw!', abilityDesc: 'Sideline: gain 4 Healing Seeds when you defeat a Spiritkin.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 417, name: 'Twyla', rarity: 'rare', maxHp: 6, ability: 'Lucky Dance', abilityDesc: 'Each Lucky Stone you spend adds +1 die and you gain 1 Healing Seed.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: '' },
+  { id: 419, name: 'Boopies', rarity: 'common', maxHp: 3, ability: 'Boopie Magic', abilityDesc: 'Sideline: whenever your active Spiritkin spends a Healing Seed, gain 1 Lucky Stone.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 423, name: 'Zippa', rarity: 'uncommon', maxHp: 5, ability: 'Glimmer', abilityDesc: 'Deal +1 damage for each Healing Seed you hold.', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 426, name: 'Chester', rarity: 'uncommon', maxHp: 5, ability: 'Well Read', abilityDesc: 'Win: gain 1 Healing Seed. Win with Doubles or better: also gain 2 Burn.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 428, name: 'Jasper', rarity: 'rare', maxHp: 5, ability: 'Flame Dive', abilityDesc: 'Win: roll 1 bonus die. Deal its value as additional damage. Jasper takes 1 damage.', category: 'Damage Multiplier', set: 'Rolling Hills', appearance: '' },
+  { id: 429, name: 'Young Cap', rarity: 'uncommon', maxHp: 4, ability: 'Energize', abilityDesc: 'Before rolling: when you use a Healing Seed, also gain 1 extra die, 1 Ice Shard, and 1 Surge this roll.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: '' },
+  { id: 430, name: 'Gordok', rarity: 'uncommon', maxHp: 8, ability: 'River Terror', abilityDesc: 'Win: you may take 2 specials from your opponent instead of dealing damage. Gain 1 extra die next roll and 1 Moonstone.', category: 'Disruption', set: 'Rolling Hills', appearance: '' },
+  { id: 431, name: 'Pal Al', rarity: 'ghost-rare', maxHp: 3, ability: 'Squall', abilityDesc: 'Win: you may gain 1 Magic Firefly instead of dealing damage.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 444, name: 'Goobs', rarity: 'common', maxHp: 4, ability: 'Dance Party', abilityDesc: 'Sideline & In Play: on a tie, both players gain 1 Magic Firefly. Your active Spiritkin gains 5 HP.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 446, name: 'Mable Stadango', rarity: 'rare', maxHp: 5, ability: 'Hex', abilityDesc: 'When you place Burn on an enemy Spiritkin, remove 1 enemy die next roll. Win: gain 1 Burn.', category: 'Disruption', set: 'Rolling Hills', appearance: '' },
+  { id: 447, name: 'Professor Hawking', rarity: 'rare', maxHp: 2, ability: 'Wisdom', abilityDesc: 'While active: gain 2 extra dice if you are holding a Moonstone.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: '' },
+  { id: 453, name: 'Kaylee', rarity: 'ghost-rare', maxHp: 6, ability: 'Slipstream', abilityDesc: 'If any of your dice shows a 2: you may swap one of your dice with one of your opponent\'s dice.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: '' },
+  { id: 458, name: 'Maisie', rarity: 'ghost-rare', maxHp: 4, ability: 'Lucky', abilityDesc: 'All your 1s count as 5s.', category: 'Dice Modifier', set: 'Rolling Hills', appearance: '' },
+  { id: 459, name: 'Eli', rarity: 'common', maxHp: 4, ability: 'Steady', abilityDesc: 'Before rolling: gain 1 Lucky Stone.', category: 'Resource Generation', set: 'Rolling Hills', appearance: '' },
+  { id: 462, name: 'Ridley', rarity: 'uncommon', maxHp: 3, ability: 'Nimble', abilityDesc: 'Singles deal +1 damage. Doubles deal +2 damage.', category: 'Damage Boost', set: 'Rolling Hills', appearance: '' },
+];
+
+let nextIdt sortField = 'collectionId';
+let sortDir = 1;
+let editingId = null;
+
+// ============================================================
+// RENDERING
+// ============================================================
+function updateAll() {
+  renderStats();
+  renderTable();
+  renderCharts();
+  updatePrompt();
+  updateTarget();
+}
+
+function updateTarget() {
+  const count = spirits.length;
+  const pct = Math.min(100, (count / TARGET) * 100);
+  document.getElementById('targetCount').textContent = `${count} / ${TARGET}`;
+  document.getElementById('targetFill').style.width = pct + '%';
+}
+
+function renderStats() {
+  const grid = document.getElementById('statsGrid');
+  const total = spirits.length;
+  const byRarity = {};
+  const avgHpByRarity = {};
+  const byCat = {};
+
+  RARITIES.forEach(r => { byRarity[r] = 0; avgHpByRarity[r] = { sum: 0, count: 0 }; });
+  CATEGORIES.forEach(c => byCat[c] = 0);
+
+  spirits.forEach(s => {
+    byRarity[s.rarity] = (byRarity[s.rarity] || 0) + 1;
+    avgHpByRarity[s.rarity].sum += s.maxHp;
+    avgHpByRarity[s.rarity].count++;
+    byCat[s.category] = (byCat[s.category] || 0) + 1;
+  });
+
+  const avgHpAll = total > 0 ? (spirits.reduce((s, g) => s + g.maxHp, 0) / total).toFixed(1) : '0';
+
+  // Rarity bar segments
+  const rarityBarHtml = RARITIES.map(r => {
+    const pct = total > 0 ? (byRarity[r] / total) * 100 : 0;
+    return `<span style="flex:${pct};background:${RARITY_COLORS[r]}" title="${r}: ${byRarity[r]}"></span>`;
+  }).join('');
+
+  // Rarity detail
+  const rarityDetail = RARITIES.map(r => {
+    const avg = avgHpByRarity[r].count > 0 ? (avgHpByRarity[r].sum / avgHpByRarity[r].count).toFixed(1) : '-';
+    return `<span style="color:${RARITY_COLORS[r]}">${capitalize(r)}: ${byRarity[r]} (avg ${avg} HP)</span>`;
+  }).join(' · ');
+
+  // Top category
+  const topCat = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const topCatStr = topCat.slice(0, 3).map(([c, n]) => `${c}: ${n}`).join(', ');
+
+  // Needed to reach target
+  const needed = Math.max(0, TARGET - total);
+
+  grid.innerHTML = `
+    <div class="stat-card">
+      <div class="label">Total Spirits</div>
+      <div class="value" style="color:var(--teal)">${total}</div>
+      <div class="detail">${needed > 0 ? needed + ' more needed to reach ' + TARGET : 'Target reached!'}</div>
+      <div class="rarity-bar">${rarityBarHtml}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Average HP</div>
+      <div class="value">${avgHpAll}</div>
+      <div class="detail" style="font-size:11px">${rarityDetail}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Top Categories</div>
+      <div class="value" style="font-size:16px;margin-top:8px">${topCatStr}</div>
+      <div class="detail">${CATEGORIES.length} categories total</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">HP Range</div>
+      <div class="value">${total > 0 ? Math.min(...spirits.map(s=>s.maxHp)) + ' – ' + Math.max(...spirits.map(s=>s.maxHp)) : '-'}</div>
+      <div class="detail">Across all rarities</div>
+    </div>
+  `;
+}
+
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const rarityFilter = document.getElementById('rarityFilter').value;
+  const catFilter = document.getElementById('categoryFilter').value;
+  const setFilter = document.getElementById('setFilter').value;
+  const appearanceFilter = document.getElementById('appearanceFilter').value;
+
+  let filtered = spirits.filter(s => {
+    if (search && !s.name.toLowerCase().includes(search) && !s.ability.toLowerCase().includes(search) && !s.abilityDesc.toLowerCase().includes(search) && !(s.appearance && s.appearance.toLowerCase().includes(search))) return false;
+    if (rarityFilter && s.rarity !== rarityFilter) return false;
+    if (catFilter && s.category !== catFilter) return false;
+    if (setFilter && s.set !== setFilter) return false;
+    if (appearanceFilter && s.appearance !== appearanceFilter) return false;
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    let av = a[sortField], bv = b[sortField];
+    if (sortField === 'collectionId') { av = spirits.indexOf(a); bv = spirits.indexOf(b); }
+    if (sortField === 'rarity') { av = RARITY_ORDER[av]; bv = RARITY_ORDER[bv]; }
+    if (sortField === 'maxHp') { av = Number(av); bv = Number(bv); }
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+
+  // Update sort headers
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  const activeTh = document.getElementById('th-' + sortField);
+  if (activeTh) {
+    activeTh.classList.add('sorted');
+    activeTh.querySelector('.sort-arrow').textContent = sortDir === 1 ? '▲' : '▼';
+  }
+
+  const tbody = document.getElementById('tableBody');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No spirits match your filters</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((s, idx) => {
+    if (editingId === s.id) return renderEditRow(s);
+    const hpPct = (s.maxHp / 12) * 100;
+    const hpColor = s.maxHp <= 3 ? '#f87171' : s.maxHp <= 5 ? '#fbbf24' : s.maxHp <= 7 ? '#34d399' : '#60a5fa';
+    const colId = spirits.indexOf(s) + 1;
+    const setColor = SET_COLORS[s.set] || '#8b8b9e';
+    return `
+      <tr onclick="openPreview(${s.id})">
+        <td style="color:var(--text2);font-size:12px;text-align:center">${colId}/200</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td><span class="category-badge" style="background:${setColor}22;color:${setColor}">${esc(s.set || '')}</span></td>
+        <td><span class="rarity-badge rarity-${s.rarity}">${capitalize(s.rarity)}</span></td>
+        <td>
+          <div class="hp-bar">
+            <span>${s.maxHp}</span>
+            <div class="bar"><div class="fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+          </div>
+        </td>
+        <td><strong>${esc(s.ability)}</strong></td>
+        <td><span class="category-badge" style="background:${CAT_COLORS[s.category]}22;color:${CAT_COLORS[s.category]}">${esc(s.category)}</span></td>
+        <td><div class="ability-desc">${esc(s.abilityDesc)}</div></td>
+        <td style="font-size:12px;color:var(--text2)">${esc(s.appearance || 'Unclassified')}</td>
+        <td>
+          <button class="btn-sm" onclick="event.stopPropagation();startEdit(${s.id})">Edit</button>
+          <button class="btn-sm btn-danger" onclick="event.stopPropagation();deleteSpirit(${s.id})">×</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderEditRow(s) {
+  const colId = spirits.indexOf(s) + 1;
+  return `
+    <tr class="editing">
+      <td style="text-align:center;color:var(--text2);font-size:12px">${colId}/200</td>
+      <td><input type="text" id="edit-name" value="${esc(s.name)}"></td>
+      <td>
+        <select id="edit-set">
+          ${SETS.map(st => `<option value="${st}" ${s.set === st ? 'selected' : ''}>${st}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select id="edit-rarity">
+          ${RARITIES.map(r => `<option value="${r}" ${s.rarity === r ? 'selected' : ''}>${capitalize(r)}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" id="edit-hp" value="${s.maxHp}" min="1" max="20" style="width:60px"></td>
+      <td><input type="text" id="edit-ability" value="${esc(s.ability)}"></td>
+      <td>
+        <select id="edit-category">
+          ${CATEGORIES.map(c => `<option value="${c}" ${s.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td><textarea id="edit-desc">${esc(s.abilityDesc)}</textarea></td>
+      <td><select id="edit-appearance">
+          <option value="">Unclassified</option>
+          <option value="Puff" ${s.appearance==='Puff'?'selected':''}>Puff</option>
+          <option value="Shroud" ${s.appearance==='Shroud'?'selected':''}>Shroud</option>
+          <option value="Living Mask" ${s.appearance==='Living Mask'?'selected':''}>Living Mask</option>
+          <option value="Mimic" ${s.appearance==='Mimic'?'selected':''}>Mimic</option>
+          <option value="Forlorn" ${s.appearance==='Forlorn'?'selected':''}>Forlorn</option>
+          <option value="Harbinger" ${s.appearance==='Harbinger'?'selected':''}>Harbinger</option>
+          <option value="Elemental" ${s.appearance==='Elemental'?'selected':''}>Elemental</option>
+          <option value="Origin" ${s.appearance==='Origin'?'selected':''}>Origin</option>
+          <option value="Corrupted" ${s.appearance==='Corrupted'?'selected':''}>Corrupted</option>
+        </select></td>
+      <td>
+        <button class="btn-sm btn-primary" onclick="saveEdit(${s.id})">Save</button>
+        <button class="btn-sm" onclick="cancelEdit()">Cancel</button>
+      </td>
+    </tr>
+  `;
+}
+
+// ============================================================
+// CHARTS (pure canvas, no dependencies)
+// ============================================================
+function renderCharts() {
+  renderHPChart();
+  renderCategoryChart();
+}
+
+function renderHPChart() {
+  const canvas = document.getElementById('hpChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 200;
+  ctx.clearRect(0, 0, W, H);
+
+  // Collect HP distribution per rarity
+  const hpRange = [];
+  for (let hp = 1; hp <= 12; hp++) hpRange.push(hp);
+
+  const data = {};
+  RARITIES.forEach(r => {
+    data[r] = {};
+    hpRange.forEach(hp => data[r][hp] = 0);
+  });
+  spirits.forEach(s => {
+    if (data[s.rarity] && data[s.rarity][s.maxHp] !== undefined) data[s.rarity][s.maxHp]++;
+  });
+
+  const maxCount = Math.max(1, ...Object.values(data).flatMap(d => Object.values(d)));
+  const margin = { top: 10, right: 20, bottom: 30, left: 35 };
+  const plotW = W - margin.left - margin.right;
+  const plotH = H - margin.top - margin.bottom;
+  const barGroupW = plotW / hpRange.length;
+  const barW = barGroupW / (RARITIES.length + 1);
+
+  // Y axis
+  ctx.strokeStyle = '#dee2e6';
+  ctx.lineWidth = 1;
+  ctx.font = '10px system-ui';
+  ctx.fillStyle = '#6c757d';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= maxCount; i++) {
+    const y = margin.top + plotH - (i / maxCount) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, y);
+    ctx.lineTo(W - margin.right, y);
+    ctx.stroke();
+    ctx.fillText(i, margin.left - 5, y + 3);
+  }
+
+  // X axis labels
+  ctx.textAlign = 'center';
+  hpRange.forEach((hp, i) => {
+    const x = margin.left + i * barGroupW + barGroupW / 2;
+    ctx.fillText(hp + ' HP', x, H - 8);
+  });
+
+  // Bars
+  RARITIES.forEach((r, ri) => {
+    ctx.fillStyle = RARITY_COLORS[r];
+    hpRange.forEach((hp, hi) => {
+      const count = data[r][hp];
+      if (count === 0) return;
+      const x = margin.left + hi * barGroupW + ri * barW + 2;
+      const barH = (count / maxCount) * plotH;
+      const y = margin.top + plotH - barH;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(x, y, barW - 1, barH);
+      ctx.globalAlpha = 1;
+    });
+  });
+}
+
+function renderCategoryChart() {
+  const canvas = document.getElementById('catChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 200;
+  ctx.clearRect(0, 0, W, H);
+
+  const counts = {};
+  CATEGORIES.forEach(c => counts[c] = 0);
+  spirits.forEach(s => counts[s.category] = (counts[s.category] || 0) + 1);
+
+  const total = spirits.length || 1;
+  const entries = CATEGORIES.map(c => ({ cat: c, count: counts[c], color: CAT_COLORS[c] })).filter(e => e.count > 0);
+
+  // Draw pie
+  const cx = 90, cy = 95, r = 75;
+  let startAngle = -Math.PI / 2;
+
+  entries.forEach(e => {
+    const slice = (e.count / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + slice);
+    ctx.closePath();
+    ctx.fillStyle = e.color;
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    startAngle += slice;
+  });
+
+  // Center hole (donut)
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // Center text
+  ctx.font = 'bold 18px system-ui';
+  ctx.fillStyle = '#212529';
+  ctx.textAlign = 'center';
+  ctx.fillText(total, cx, cy + 2);
+  ctx.font = '10px system-ui';
+  ctx.fillStyle = '#6c757d';
+  ctx.fillText('spirits', cx, cy + 16);
+
+  // Legend on right side
+  const legendX = 195;
+  let legendY = 16;
+  ctx.textAlign = 'left';
+  ctx.font = '11px system-ui';
+
+  entries.forEach(e => {
+    ctx.fillStyle = e.color;
+    ctx.fillRect(legendX, legendY - 4, 10, 10);
+    ctx.fillStyle = '#212529';
+    ctx.fillText(`${e.cat} (${e.count})`, legendX + 16, legendY + 4);
+    legendY += 20;
+  });
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function sortBy(field) {
+  if (sortField === field) sortDir *= -1;
+  else { sortField = field; sortDir = 1; }
+  renderTable();
+}
+
+function startEdit(id) {
+  editingId = id;
+  renderTable();
+}
+
+function cancelEdit() {
+  editingId = null;
+  renderTable();
+}
+
+function saveEdit(id) {
+  const s = spirits.find(s => s.id === id);
+  if (!s) return;
+  s.name = document.getElementById('edit-name').value.trim() || s.name;
+  s.set = document.getElementById('edit-set').value;
+  s.rarity = document.getElementById('edit-rarity').value;
+  s.maxHp = parseInt(document.getElementById('edit-hp').value) || s.maxHp;
+  s.ability = document.getElementById('edit-ability').value.trim() || s.ability;
+  s.category = document.getElementById('edit-category').value;
+  s.abilityDesc = document.getElementById('edit-desc').value.trim() || s.abilityDesc;
+  s.appearance = document.getElementById('edit-appearance').value;
+  editingId = null;
+  updateAll();
+  showToast('Spirit updated');
+}
+
+function deleteSpirit(id) {
+  if (!confirm('Delete this spirit?')) return;
+  spirits = spirits.filter(s => s.id !== id);
+  updateAll();
+  showToast('Spirit deleted');
+}
+
+function toggleAddForm() {
+  const form = document.getElementById('addForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function addSpirit() {
+  const name = document.getElementById('newName').value.trim();
+  const rarity = document.getElementById('newRarity').value;
+  const maxHp = parseInt(document.getElementById('newHp').value);
+  const ability = document.getElementById('newAbility').value.trim();
+  const category = document.getElementById('newCategory').value;
+  const spiritSet = document.getElementById('newSet').value;
+  const appearance = document.getElementById('newAppearance').value;
+  const desc = document.getElementById('newDesc').value.trim();
+
+  if (!name) { showToast('Name is required'); return; }
+  if (!ability) { showToast('Ability name is required'); return; }
+
+  spirits.push({ id: nextId++, name, rarity, maxHp: maxHp || 5, ability, abilityDesc: desc, category, set: spiritSet, appearance: appearance });
+
+  // Clear form
+  document.getElementById('newName').value = '';
+  document.getElementById('newAbility').value = '';
+  document.getElementById('newDesc').value = '';
+  document.getElementById('newHp').value = '5';
+  document.getElementById('newAppearance').value = '';
+
+  updateAll();
+  showToast(`${name} added!`);
+}
+
+function exportJSON() {
+  const data = JSON.stringify(spirits, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'spirit-cards-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported!');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Expected array');
+      spirits = data.map((s, i) => ({
+        id: s.id || nextId++,
+        name: s.name || 'Unknown',
+        rarity: s.rarity || 'common',
+        maxHp: s.maxHp || 5,
+        ability: s.ability || 'None',
+        abilityDesc: s.abilityDesc || '',
+        category: s.category || 'Dice Modifier'
+      }));
+      nextId = Math.max(nextId, ...spirits.map(s => s.id)) + 1;
+      updateAll();
+      showToast(`Imported ${spirits.length} spirits`);
+    } catch (err) {
+      showToast('Invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============================================================
+// PROMPT
+// ============================================================
+function updatePrompt() {
+  const total = spirits.length;
+  const needed = Math.max(0, TARGET - total);
+
+  const byRarity = {};
+  RARITIES.forEach(r => byRarity[r] = spirits.filter(s => s.rarity === r));
+
+  const byCat = {};
+  CATEGORIES.forEach(c => byCat[c] = spirits.filter(s => s.category === c).length);
+
+  const avgHp = total > 0 ? (spirits.reduce((s, g) => s + g.maxHp, 0) / total).toFixed(1) : '0';
+
+  // Find imbalances
+  const imbalances = [];
+
+  // Check rarity distribution
+  const idealByRarity = { common: 0.3, uncommon: 0.25, rare: 0.25, 'ghost-rare': 0.12, legendary: 0.08 };
+  RARITIES.forEach(r => {
+    const actual = byRarity[r].length / Math.max(1, total);
+    const ideal = idealByRarity[r];
+    if (Math.abs(actual - ideal) > 0.08) {
+      const dir = actual > ideal ? 'over-represented' : 'under-represented';
+      imbalances.push(`${capitalize(r)} is ${dir} (${(actual * 100).toFixed(0)}% vs ideal ~${(ideal * 100).toFixed(0)}%)`);
+    }
+  });
+
+  // Check category balance
+  const avgPerCat = total / CATEGORIES.length;
+  CATEGORIES.forEach(c => {
+    if (byCat[c] > avgPerCat * 1.8) imbalances.push(`"${c}" is over-saturated (${byCat[c]} spirits)`);
+    if (byCat[c] < avgPerCat * 0.3 && byCat[c] < 3) imbalances.push(`"${c}" needs more spirits (only ${byCat[c]})`);
+  });
+
+  // HP Recovery warning — healing breaks the game at scale
+  if (byCat['HP Recovery'] > 0) {
+    imbalances.push(`DESIGN NOTE: HP Recovery has ${byCat['HP Recovery']} spirits. Healing more than 2 HP in a turn can break game balance. Keep HP Recovery cards rare and conservative. The game is about risk/aggression, not stalling — add healers sparingly.`);
+  }
+
+  let prompt = `Spirit Card Balance Report — ${total} / ${TARGET} spirits\n\n`;
+  prompt += `Rarity breakdown: ${RARITIES.map(r => `${capitalize(r)}: ${byRarity[r].length}`).join(', ')}\n`;
+  prompt += `Average HP: ${avgHp} | Range: ${total > 0 ? Math.min(...spirits.map(s=>s.maxHp)) + '–' + Math.max(...spirits.map(s=>s.maxHp)) : '-'}\n`;
+  prompt += `Categories: ${CATEGORIES.map(c => `${c}: ${byCat[c]}`).join(', ')}\n\n`;
+
+  if (imbalances.length > 0) {
+    prompt += `Balance flags:\n${imbalances.map(i => '  ⚠ ' + i).join('\n')}\n\n`;
+  }
+
+  if (needed > 0) {
+    prompt += `Need ${needed} more spirits. Suggested distribution:\n`;
+    RARITIES.forEach(r => {
+      const ideal = Math.round(TARGET * idealByRarity[r]);
+      const have = byRarity[r].length;
+      const need = Math.max(0, ideal - have);
+      if (need > 0) prompt += `  ${capitalize(r)}: ${need} more (have ${have}, target ~${ideal})\n`;
+    });
+
+    prompt += `\nCategory gaps to fill:\n`;
+    const targetPerCat = Math.round(TARGET / CATEGORIES.length);
+    CATEGORIES.forEach(c => {
+      const need = Math.max(0, targetPerCat - byCat[c]);
+      if (need > 0) prompt += `  ${c}: ${need} more (have ${byCat[c]}, target ~${targetPerCat})\n`;
+    });
+  }
+
+  document.getElementById('promptText').textContent = prompt;
+}
+
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋 Copy to Clipboard'; }, 2000);
+  });
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+// Card image mapping
+const CARD_IMAGES = {
+  'Kodako': 'kodako.jpg', 'Nikon': 'nikon.jpg', 'Ancient Librarian': 'AncientLibrarian.png',
+  'Wanderer': 'Wanderer.png', 'Puff': 'Puff.png', 'Fang Outside': 'FangOutside.png',
+  'Fang Undercover': 'FangUndercover.png', 'Buttons': 'Buttons.png', 'Little Boo': 'LittleBoo.png',
+  'Patrick': 'patrick.jpg', 'Villager': 'Villager.png', 'Dupy': 'Dupy.png', 'Shoo': 'Shoo.png',
+  'Jeffery': 'Jeffery.png', 'Winston': 'Winston.png', 'Chip': 'Chip.png',
+  'Boo Brothers': 'boo_brothers.jpg', 'Charlie': 'Charlie.png',
+  'Scallywags': 'Scallywags.png', 'Floop': 'Floop.png', 'Needle': 'Needle_dc.png',
+  'Ancient One': 'ancient_one.jpg', 'Powder': 'powder.jpg', 'Simon': 'simon.jpg',
+  'Cameron': 'cameron.jpg', 'Logey': 'logey.jpg', 'Fredrick': 'fredrick.jpg',
+  'Dream Cat': 'dream_cat.jpg', 'Sad Sal': 'sad_sal.jpg', 'Tommy Salami': 'tommy_salami.jpg',
+  'Gus': 'gus.jpg', 'Lou': 'lou.jpg', 'Sandwiches': 'sandwiches.jpg',
+  'Grawr': 'Grawr.png', 'Larry': 'Larry.png', 'Bill & Bob': 'Bill&Bob.png',
+  'Dealer': 'Dealer.png', 'Alucard': 'Alucard.png', 'Castle Guards': 'CastleGuards.png',
+  'Team Zippy': 'TeamZippy.png', 'Guard Thomas': 'guard_thomas.jpg', 'Doc': 'Doc.png',
+  'Outlaw': 'outlaw.jpg', 'Bubble Boys': 'bubble_boys.jpg', 'Cornelius': 'Cornelius.png',
+  'Cave Dweller': 'cave_dweller.jpg', 'Hermit': 'Hermit.png', 'Opa': 'Opa.png',
+  'Greg': 'Greg.png', 'Jackson': 'Jackson.png', 'Nicholas': 'nicholas.jpg',
+  'Hugo': 'Hugo.png', 'Bogey': 'bogey.jpg', 'Roger': 'roger.jpg',
+  'Masked Hero': 'masked_hero.jpg', 'Chad': 'chad.jpg', 'Marcus': 'marcus.jpg',
+  'Ashley': 'ashley.jpg', 'Mr Filbert': 'mr_filbert.jpg', 'Dallas': 'dallas.jpg',
+  'Suspicious Jeff': 'suspicious_jeff.jpg',
+  'Raditz': 'Raditz.png', 'Doug': 'Doug.png', 'Sparky': 'Sparky.png',
+  'Wim': 'wim.jpg', 'Munch': 'Munch.png', 'Snorton': 'snorton.jpg',
+  'Kairan': 'kairan.jpg', 'Sonya': 'Sonya.png', 'Katrina': 'katrina.jpg',
+  'Admiral': 'Admiral.png', 'Sky': 'Sky.png', 'Stone Cold': 'stone_cold.jpg',
+  'Dark Jeff': 'DarkJeff.png', 'Flora': 'flora.jpg', 'Dark Wing': 'DarkWing.png',
+  'City Cyboo': 'CityCyboo.png', 'Haywire': 'Haywire.png',
+  'Laura': 'laura.jpg', 'Bilbo': 'bilbo.jpg', 'Spockles': 'spockles.jpg',
+  'Antoinette': 'antoinette.jpg', 'Troubling Haters': 'troubling_haters.jpg',
+  'Wandering Sue': 'wandering_sue.jpg', 'Eloise': 'eloise.jpg', 'Pelter': 'pelter.jpg',
+  'Zach': 'zach.jpg', 'Pale Nimbus': 'pale_nimbus.jpg', 'Mallow': 'mallow.jpg',
+  'Jeanie': 'jeanie.jpg', 'Calvin & Anna': 'calvin_anna.jpg', 'Gary': 'gary.jpg',
+  'Bandit Pete': 'bandit_pete.jpg',
+  'Jenkins': 'Jenkins.png', 'Tabitha': 'Tabitha.png', 'Hector': 'hector.jpg',
+  'Toby': 'Toby.png', 'Redd': 'Redd.png', 'Guardian Fairy': 'GuardianFairy.png',
+  'Cyboo': 'Cyboo.png', 'Splinter': 'Splinter.png',
+  'Night Master': 'night_master.jpg', 'Skylar': 'skylar.jpg', 'Tyler': 'tyler.jpg',
+  'King Jay': 'king_jay.jpg', 'Piper': 'piper.jpg',
+  'Lucy': 'lucy.jpg', 'Bo': 'Bo.png', 'The Mountain King': 'mountain_king_leg.jpg',
+  'Shade': 'shade.jpg', 'Doom': 'doom.jpg',
+  'Prince Balatron': 'balatron.jpg', 'Romy': 'romy.jpg',
+};
+
+function openPreview(id) {
+  const s = spirits.find(sp => sp.id === id);
+  if (!s) return;
+  const colId = spirits.indexOf(s) + 1;
+  const imgFile = CARD_IMAGES[s.name];
+  const imgHtml = imgFile
+    ? `<img class="card-img" src="cards/${imgFile}" alt="${esc(s.name)}" onerror="this.outerHTML='<div class=\\'no-img\\'>Image not found</div>'">`
+    : `<div class="no-img">No card image</div>`;
+
+  document.getElementById('previewContent').innerHTML = `
+    ${imgHtml}
+    <h2>${esc(s.name)}</h2>
+    <div class="card-meta">#${colId}/200 &middot; ${capitalize(s.rarity)} &middot; ${esc(s.set || '')}</div>
+    <div class="card-detail"><strong>HP:</strong> ${s.maxHp}</div>
+    <div class="card-ability-name">${esc(s.ability)}</div>
+    <div class="card-ability-desc">${esc(s.abilityDesc)}</div>
+    <div class="card-detail"><strong>Category:</strong> ${esc(s.category)}</div>
+    <div class="card-detail"><strong>Appearance:</strong> ${esc(s.appearance || 'Unclassified')}</div>
+  `;
+  document.getElementById('previewPanel').classList.add('open');
+  document.getElementById('previewOverlay').classList.add('open');
+}
+
+function closePreview() {
+  document.getElementById('previewPanel').classList.remove('open');
+  document.getElementById('previewOverlay').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
+function capitalize(s) {
+  return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+document.getElementById('searchInput').addEventListener('input', renderTable);
+document.getElementById('rarityFilter').addEventListener('change', renderTable);
+document.getElementById('categoryFilter').addEventListener('change', renderTable);
+document.getElementById('setFilter').addEventListener('change', renderTable);
+document.getElementById('appearanceFilter').addEventListener('change', renderTable);
+
+window.addEventListener('resize', renderCharts);
+
+// Init
+updateAll();
+</script>
+</body>
+</html>
