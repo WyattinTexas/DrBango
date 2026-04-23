@@ -231,6 +231,10 @@
       <option value="HP Recovery">HP Recovery</option>
       <option value="Destruction/Instant Kill">Destruction/Instant Kill</option>
       <option value="Debuff">Debuff</option>
+      <option value="Disruption">Disruption</option>
+      <option value="Evolution">Evolution</option>
+      <option value="Dice Boost/Anti-Negation">Dice Boost/Anti-Negation</option>
+      <option value="Damage Boost">Damage Boost</option>
     </select>
     <select class="filter-select" id="appearanceFilter">
       <option value="">All Appearances</option>
@@ -243,7 +247,7 @@
       <option value="Elemental">Elemental</option>
       <option value="Origin">Origin</option>
       <option value="Corrupted">Corrupted</option>
-      <option value="">Unclassified</option>
+      <option value="__unclassified__">Unclassified</option>
     </select>
     <div style="flex:1"></div>
     <div class="target-indicator">
@@ -298,6 +302,10 @@
           <option value="HP Recovery">HP Recovery</option>
           <option value="Destruction/Instant Kill">Destruction/Instant Kill</option>
           <option value="Debuff">Debuff</option>
+          <option value="Disruption">Disruption</option>
+          <option value="Evolution">Evolution</option>
+          <option value="Dice Boost/Anti-Negation">Dice Boost/Anti-Negation</option>
+          <option value="Damage Boost">Damage Boost</option>
         </select>
       </div>
       <div class="form-group">
@@ -385,11 +393,12 @@ const SET_COLORS = { 'Set 1': '#dc2626', 'Dark Castle': '#7c3aed', 'Frost Valley
 const APPEARANCES = ['Puff', 'Shroud', 'Living Mask', 'Mimic', 'Forlorn', 'Harbinger', 'Elemental', 'Origin', 'Corrupted'];
 const APPEARANCE_COLORS = { 'Puff': '#60a5fa', 'Shroud': '#a78bfa', 'Living Mask': '#f59e0b', 'Mimic': '#34d399', 'Forlorn': '#6b7280', 'Harbinger': '#ef4444', 'Elemental': '#06b6d4', 'Origin': '#d97706', 'Corrupted': '#dc2626' };
 
-const CATEGORIES = ['Dice Modifier', 'Damage Multiplier', 'Defense/Negation', 'Resource Generation', 'Prediction/Reaction', 'HP Recovery', 'Destruction/Instant Kill', 'Debuff'];
+const CATEGORIES = ['Dice Modifier', 'Damage Multiplier', 'Defense/Negation', 'Resource Generation', 'Prediction/Reaction', 'HP Recovery', 'Destruction/Instant Kill', 'Debuff', 'Disruption', 'Evolution', 'Dice Boost/Anti-Negation', 'Damage Boost'];
 const CAT_COLORS = {
   'Dice Modifier': '#2563eb', 'Damage Multiplier': '#dc2626', 'Defense/Negation': '#059669',
   'Resource Generation': '#d97706', 'Prediction/Reaction': '#7c3aed', 'HP Recovery': '#ea580c',
-  'Destruction/Instant Kill': '#be123c', 'Debuff': '#6d28d9'
+  'Destruction/Instant Kill': '#be123c', 'Debuff': '#6d28d9',
+  'Disruption': '#0891b2', 'Evolution': '#65a30d', 'Dice Boost/Anti-Negation': '#4f46e5', 'Damage Boost': '#e11d48'
 };
 
 const TARGET = 200;
@@ -478,7 +487,7 @@ let spirits = [
   { id: 435, name: 'Willow', rarity: 'ghost-rare', maxHp: 4, ability: 'Joy of Painting', abilityDesc: 'Sideline & In Play: gain 1 extra die if you lost the last roll.', category: 'Dice Modifier', set: 'Dark Castle', appearance: '' },
   { id: 436, name: 'Princess Shade', rarity: 'rare', maxHp: 4, ability: 'Bounty', abilityDesc: 'Sideline & In Play: when the enemy Spiritkin takes damage before the roll, deal +1 additional damage.', category: 'Damage Multiplier', set: 'Dark Castle', appearance: '' },
   { id: 437, name: 'Rascals', rarity: 'common', maxHp: 3, ability: 'Stampede', abilityDesc: 'Entry: gain 3 Burn.', category: 'Disruption', set: 'Dark Castle', appearance: '' },
-  { id: 438, name: 'Champ', rarity: 'ghost rare', maxHp: 5, ability: 'Thrill', abilityDesc: 'Immune to damage from Specials. Gain 1 Surge when you or the enemy rolls Doubles or better.', category: 'Defense/Negation', set: 'Dark Castle', appearance: '' },
+  { id: 438, name: 'Champ', rarity: 'ghost-rare', maxHp: 5, ability: 'Thrill', abilityDesc: 'Immune to damage from Specials. Gain 1 Surge when you or the enemy rolls Doubles or better.', category: 'Defense/Negation', set: 'Dark Castle', appearance: '' },
   { id: 439, name: 'Lucy\'s Shadow', rarity: 'rare', maxHp: 4, ability: 'Mentor', abilityDesc: 'Sideline: while Lucy is In Play, Lucy gains 1 extra Sacred Fire on wins and her Sacred Fires deal double damage.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
   { id: 440, name: 'Gom Gom Gom', rarity: 'common', maxHp: 5, ability: 'Chaos', abilityDesc: 'Win with Doubles: gain 1 Sacred Fire.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
   { id: 441, name: 'Wendy', rarity: 'rare', maxHp: 3, ability: 'Moonbeam', abilityDesc: 'Win with Doubles or better: gain 1 Magic Firefly.', category: 'Resource Generation', set: 'Dark Castle', appearance: '' },
@@ -597,7 +606,8 @@ let spirits = [
   { id: 462, name: 'Ridley', rarity: 'uncommon', maxHp: 3, ability: 'Nimble', abilityDesc: 'Singles deal +1 damage. Doubles deal +2 damage.', category: 'Damage Boost', set: 'Rolling Hills', appearance: '' },
 ];
 
-let nextIdt sortField = 'collectionId';
+let nextId = 500;
+let sortField = 'collectionId';
 let sortDir = 1;
 let editingId = null;
 
@@ -694,7 +704,8 @@ function renderTable() {
     if (rarityFilter && s.rarity !== rarityFilter) return false;
     if (catFilter && s.category !== catFilter) return false;
     if (setFilter && s.set !== setFilter) return false;
-    if (appearanceFilter && s.appearance !== appearanceFilter) return false;
+    if (appearanceFilter === '__unclassified__' && s.appearance) return false;
+    if (appearanceFilter && appearanceFilter !== '__unclassified__' && s.appearance !== appearanceFilter) return false;
     return true;
   });
 
@@ -1042,7 +1053,9 @@ function importJSON(event) {
         maxHp: s.maxHp || 5,
         ability: s.ability || 'None',
         abilityDesc: s.abilityDesc || '',
-        category: s.category || 'Dice Modifier'
+        category: s.category || 'Dice Modifier',
+        set: s.set || 'Set 1',
+        appearance: s.appearance || ''
       }));
       nextId = Math.max(nextId, ...spirits.map(s => s.id)) + 1;
       updateAll();
