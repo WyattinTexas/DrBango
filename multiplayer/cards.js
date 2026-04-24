@@ -433,55 +433,55 @@ const GHOSTS = [
 
 const RAID_BOSS_MINIONS = [
   // --- Tyrant minions ---
-  {id:9101, name:"War Drummer", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/wardrummer.png",
+  {id:9101, name:"War Drummer", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/Brock.png",
     ability:"Battle Cadence", abilityDesc:"Sideline: boss deals +1 damage on doubles.",
     bossMinion:true, personality:"tyrant"},
-  {id:9102, name:"Shield Bearer", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/shieldbearer.png",
+  {id:9102, name:"Shield Bearer", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/CastleGuards.png",
     ability:"Phalanx", abilityDesc:"Sideline: boss takes 1 less damage per hit (minimum 1).",
     bossMinion:true, personality:"tyrant"},
-  {id:9103, name:"Blood Knight", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/bloodknight.png",
+  {id:9103, name:"Blood Knight", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/DarkFang.png",
     ability:"Siphon", abilityDesc:"Win: boss heals 2 HP from the shared pool.",
     bossMinion:true, personality:"tyrant"},
 
   // --- Trickster minions ---
-  {id:9111, name:"Mimic", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/mimic.png",
+  {id:9111, name:"Mimic", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/Alucard.png",
     ability:"Copy", abilityDesc:"Sideline: copies the player's sideline ghost passive ability.",
     bossMinion:true, personality:"trickster"},
-  {id:9112, name:"Jinxer", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/jinxer.png",
+  {id:9112, name:"Jinxer", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/PrincessShade.png",
     ability:"Hex", abilityDesc:"Sideline: player resource generation produces 1 fewer (minimum 0).",
     bossMinion:true, personality:"trickster"},
-  {id:9113, name:"Doppelganger", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/doppelganger.png",
+  {id:9113, name:"Doppelganger", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/Shade.png",
     ability:"Mirror Match", abilityDesc:"Rolls the same dice as the player — every round is a tie unless abilities modify.",
     bossMinion:true, personality:"trickster"},
 
   // --- Swarm Queen minions ---
-  {id:9121, name:"Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/drone.png",
+  {id:9121, name:"Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/Cindergrub.png",
     ability:"Expendable", abilityDesc:"No ability. Sacrifice fodder.",
     bossMinion:true, personality:"swarm"},
-  {id:9122, name:"Worker", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/worker.png",
+  {id:9122, name:"Worker", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/Beewick.png",
     ability:"Harvest", abilityDesc:"Sideline: boss gains 1 Ice Shard per round.",
     bossMinion:true, personality:"swarm"},
-  {id:9123, name:"Soldier", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/soldier.png",
+  {id:9123, name:"Soldier", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/Champ.png",
     ability:"Formation", abilityDesc:"Doubles deal +2 damage.",
     bossMinion:true, personality:"swarm"},
-  {id:9124, name:"Healer Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/healerdrone.png",
+  {id:9124, name:"Healer Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/Cornelius.png",
     ability:"Mend", abilityDesc:"Sideline: boss heals 1 HP from the shared pool per round.",
     bossMinion:true, personality:"swarm"},
-  {id:9125, name:"Spitter", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/spitter.png",
+  {id:9125, name:"Spitter", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/Cyboo.png",
     ability:"Acid Entry", abilityDesc:"Entry: deal 2 damage to player's active ghost.",
     bossMinion:true, personality:"swarm"},
 
   // --- Glacier minions ---
-  {id:9131, name:"Ice Wall", rarity:"boss-minion", maxHp:8, art:"../testroom/art/originals/icewall.png",
+  {id:9131, name:"Ice Wall", rarity:"boss-minion", maxHp:8, art:"../testroom/art/originals/BubbleBoys.png",
     ability:"Barrier", abilityDesc:"While alive: boss cannot take damage. Must be destroyed first.",
     bossMinion:true, personality:"glacier"},
-  {id:9132, name:"Frost Wisp", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/frostwisp.png",
+  {id:9132, name:"Frost Wisp", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/Chip.png",
     ability:"Deep Freeze", abilityDesc:"Sideline: Frozen Dice locks player's TWO highest dice instead of one.",
     bossMinion:true, personality:"glacier"},
-  {id:9133, name:"Blizzard Elemental", rarity:"boss-minion", maxHp:7, art:"../testroom/art/originals/blizzardelemental.png",
+  {id:9133, name:"Blizzard Elemental", rarity:"boss-minion", maxHp:7, art:"../testroom/art/originals/Millicent.png",
     ability:"Whiteout", abilityDesc:"While active: all player dice are reduced by 1 (minimum 1).",
     bossMinion:true, personality:"glacier"},
-  {id:9134, name:"Avalanche", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/avalanche.png",
+  {id:9134, name:"Avalanche", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/ancient_one.jpg",
     ability:"Collapse", abilityDesc:"On death: deal 4 damage to player's active ghost.",
     bossMinion:true, personality:"glacier"}
 ];
@@ -526,7 +526,7 @@ const RAID_BOSSES = {
     tier: 1,
     requiredBadge: null,
     bossGhost: {
-      id: 9002, name: 'The Phantom', maxHp: 8, art: '../testroom/art/originals/phantom.png',
+      id: 9002, name: 'The Phantom', maxHp: 8, art: '../testroom/art/originals/Shade.png',
       ability: 'Mirror Dice', abilityDesc: 'After rolling: swap 1 of your dice with 1 of enemy dice. On win: steal 1 random resource.'
     },
     minionsByPhase: {
@@ -556,7 +556,7 @@ const RAID_BOSSES = {
     tier: 1,
     requiredBadge: null,
     bossGhost: {
-      id: 9003, name: 'The Swarm Queen', maxHp: 7, art: '../testroom/art/originals/swarmqueen.png',
+      id: 9003, name: 'The Swarm Queen', maxHp: 7, art: '../testroom/art/originals/Beewick.png',
       ability: 'Hive Mind', abilityDesc: '+1 die per living minion. May sacrifice a sideline minion to negate damage from a losing roll (1x/round).'
     },
     minionsByPhase: {
@@ -588,7 +588,7 @@ const RAID_BOSSES = {
     tier: 2,
     requiredBadge: 'dragon_slayer',
     bossGhost: {
-      id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/glacier.png',
+      id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/Millicent.png',
       ability: 'Permafrost', abilityDesc: 'Max 3 damage per roll (resource bonuses bypass). Frost Aura: 1 cold damage to enemy active per round. Frozen Dice: lock enemy highest die to 1 next round.'
     },
     minionsByPhase: {
@@ -618,7 +618,7 @@ const RAID_BOSSES = {
     tier: 2,
     requiredBadge: 'dragon_slayer',
     bossGhost: {
-      id: 9005, name: 'Doom Ascended', maxHp: 14, art: '../testroom/art/originals/doom_ascended.png',
+      id: 9005, name: 'Doom Ascended', maxHp: 14, art: '../testroom/art/originals/Doom.png',
       ability: 'Annihilation', abilityDesc: 'Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire. Doubles+: gain 1 Surge.'
     },
     minionsByPhase: {
@@ -648,7 +648,7 @@ const RAID_BOSSES = {
     tier: 2,
     requiredBadge: 'dragon_slayer',
     bossGhost: {
-      id: 9006, name: 'The Broodmother', maxHp: 9, art: '../testroom/art/originals/broodmother.png',
+      id: 9006, name: 'The Broodmother', maxHp: 9, art: '../testroom/art/originals/Beewick.png',
       ability: 'Endless Spawn', abilityDesc: '+1 die per living minion. Sacrifice: negate damage (1x/round). On KO of any minion: immediately spawn a replacement.'
     },
     minionsByPhase: {
@@ -680,7 +680,7 @@ const RAID_BOSSES = {
     tier: 3,
     requiredBadge: 'raid_master',
     bossGhost: {
-      id: 9007, name: 'The Shepherd', maxHp: 10, art: '../testroom/art/originals/shepherd.png',
+      id: 9007, name: 'The Shepherd', maxHp: 10, art: '../testroom/art/originals/ProfessorHawking.png',
       ability: 'Grand Illusion', abilityDesc: 'Mirror Dice: swap 2 dice. Copycat: use enemy active ability. Steal 2 resources on win. Phase transitions: split into 3 copies.'
     },
     minionsByPhase: {
@@ -710,7 +710,7 @@ const RAID_BOSSES = {
     tier: 3,
     requiredBadge: 'raid_master',
     bossGhost: {
-      id: 9008, name: 'The Eternal Frost', maxHp: 12, art: '../testroom/art/originals/eternalfrost.png',
+      id: 9008, name: 'The Eternal Frost', maxHp: 12, art: '../testroom/art/originals/ancient_one.jpg',
       ability: 'Absolute Zero', abilityDesc: 'Max 2 damage per roll. Frost Aura: 2 cold damage per round. Frozen Dice: lock 2 highest dice. Phase transitions: freeze ALL resources for 5 rounds.'
     },
     minionsByPhase: {

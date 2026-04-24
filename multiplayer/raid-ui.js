@@ -79,7 +79,24 @@ function selectRaid(raidId) {
   const container = document.getElementById('raid-lobby');
   if (!container) return;
 
-  // Show queue view with team picker
+  // Use the player's current multiplayer team (already selected in collection grid)
+  // `team` is the global [id, id, id] array from index.html
+  raidTeamPicks = (typeof team !== 'undefined' ? team : []).filter(id => id != null);
+
+  // Build team display from current picks
+  const teamHtml = raidTeamPicks.length === 3
+    ? raidTeamPicks.map(id => {
+        const g = getGhost(id);
+        if (!g) return '';
+        return `<div class="raid-team-slot ${g.rarity}">
+          <img src="${g.art}" alt="${g.name}" onerror="this.src='../testroom/art/timber.jpg'">
+          <span>${g.name}</span>
+        </div>`;
+      }).join('')
+    : '<div class="raid-team-empty">Pick your team above first!</div>';
+
+  const hasTeam = raidTeamPicks.length === 3;
+
   let html = `
     <div class="raid-queue-view">
       <button class="raid-back-btn" onclick="showRaidLobby()">&#x2190; Back</button>
@@ -94,17 +111,17 @@ function selectRaid(raidId) {
         </div>
       </div>
       <div class="raid-queue-team">
-        <h3>SELECT YOUR TEAM</h3>
-        <div id="raid-team-picker" class="raid-team-picker"></div>
-        <div id="raid-selected-team" class="raid-selected-team"></div>
+        <h3>YOUR TEAM</h3>
+        <div class="raid-team-slots">${teamHtml}</div>
+        ${!hasTeam ? '<p style="color:var(--accent);font-size:0.85rem;margin-top:8px;">Select 3 Spiritkin in your collection above before joining a raid.</p>' : ''}
       </div>
       <div id="raid-queue-status" class="raid-queue-status">
         <div id="raid-queue-count">Loading queue...</div>
         <div id="raid-queue-players" class="raid-queue-players"></div>
       </div>
       <div class="raid-queue-actions">
-        <button id="raid-join-btn" class="raid-join-btn" onclick="joinRaid()" disabled>
-          SELECT 3 GHOSTS TO JOIN
+        <button id="raid-join-btn" class="raid-join-btn" onclick="joinRaid()" ${hasTeam ? '' : 'disabled'}>
+          ${hasTeam ? 'JOIN RAID' : 'SELECT A TEAM FIRST'}
         </button>
         <button id="raid-leave-btn" class="raid-leave-btn" onclick="leaveRaid()" style="display:none">
           LEAVE QUEUE
@@ -113,7 +130,6 @@ function selectRaid(raidId) {
     </div>`;
 
   container.innerHTML = html;
-  renderRaidTeamPicker();
   listenToRaidQueue(raidId);
 }
 
