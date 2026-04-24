@@ -495,6 +495,7 @@ const RAID_BOSSES = {
     personality: 'tyrant',
     tier: 1,
     requiredBadge: null,
+    requiredPlayers: 5,
     bossGhost: {
       id: 9001, name: 'The Mountain King', maxHp: 12, art: '../testroom/art/originals/mountain_king_leg.jpg',
       ability: 'Beast Mode', abilityDesc: 'Triples+: deal 1 chip damage to all enemy sideline ghosts. On KO: gain 1 Sacred Fire.'
@@ -525,6 +526,7 @@ const RAID_BOSSES = {
     personality: 'trickster',
     tier: 1,
     requiredBadge: null,
+    requiredPlayers: 1,
     bossGhost: {
       id: 9002, name: 'The Phantom', maxHp: 8, art: '../testroom/art/originals/Shade.png',
       ability: 'Mirror Dice', abilityDesc: 'After rolling: swap 1 of your dice with 1 of enemy dice. On win: steal 1 random resource.'
@@ -555,6 +557,7 @@ const RAID_BOSSES = {
     personality: 'swarm',
     tier: 1,
     requiredBadge: null,
+    requiredPlayers: 3,
     bossGhost: {
       id: 9003, name: 'The Swarm Queen', maxHp: 7, art: '../testroom/art/originals/Beewick.png',
       ability: 'Hive Mind', abilityDesc: '+1 die per living minion. May sacrifice a sideline minion to negate damage from a losing roll (1x/round).'
@@ -587,6 +590,7 @@ const RAID_BOSSES = {
     personality: 'glacier',
     tier: 2,
     requiredBadge: 'dragon_slayer',
+    requiredPlayers: 7,
     bossGhost: {
       id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/Millicent.png',
       ability: 'Permafrost', abilityDesc: 'Max 3 damage per roll (resource bonuses bypass). Frost Aura: 1 cold damage to enemy active per round. Frozen Dice: lock enemy highest die to 1 next round.'
@@ -617,6 +621,7 @@ const RAID_BOSSES = {
     personality: 'tyrant',
     tier: 2,
     requiredBadge: 'dragon_slayer',
+    requiredPlayers: 7,
     bossGhost: {
       id: 9005, name: 'Doom Ascended', maxHp: 14, art: '../testroom/art/originals/Doom.png',
       ability: 'Annihilation', abilityDesc: 'Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire. Doubles+: gain 1 Surge.'
@@ -647,6 +652,7 @@ const RAID_BOSSES = {
     personality: 'swarm',
     tier: 2,
     requiredBadge: 'dragon_slayer',
+    requiredPlayers: 7,
     bossGhost: {
       id: 9006, name: 'The Broodmother', maxHp: 9, art: '../testroom/art/originals/Beewick.png',
       ability: 'Endless Spawn', abilityDesc: '+1 die per living minion. Sacrifice: negate damage (1x/round). On KO of any minion: immediately spawn a replacement.'
@@ -679,6 +685,7 @@ const RAID_BOSSES = {
     personality: 'trickster',
     tier: 3,
     requiredBadge: 'raid_master',
+    requiredPlayers: 10,
     bossGhost: {
       id: 9007, name: 'The Shepherd', maxHp: 10, art: '../testroom/art/originals/ProfessorHawking.png',
       ability: 'Grand Illusion', abilityDesc: 'Mirror Dice: swap 2 dice. Copycat: use enemy active ability. Steal 2 resources on win. Phase transitions: split into 3 copies.'
@@ -709,6 +716,7 @@ const RAID_BOSSES = {
     personality: 'glacier',
     tier: 3,
     requiredBadge: 'raid_master',
+    requiredPlayers: 10,
     bossGhost: {
       id: 9008, name: 'The Eternal Frost', maxHp: 12, art: '../testroom/art/originals/ancient_one.jpg',
       ability: 'Absolute Zero', abilityDesc: 'Max 2 damage per roll. Frost Aura: 2 cold damage per round. Frozen Dice: lock 2 highest dice. Phase transitions: freeze ALL resources for 5 rounds.'

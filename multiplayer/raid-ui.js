@@ -40,6 +40,7 @@ function renderRaidLobby(userBadges) {
         return badge && badge.boss === raidId;
       });
 
+      const playerCount = boss.requiredPlayers || 10;
       html += `<div class="raid-boss-card ${locked ? 'locked' : ''} ${defeated ? 'defeated' : ''}"
                     onclick="${locked ? '' : `selectRaid('${raidId}')`}">
         <div class="raid-boss-art-wrap">
@@ -55,6 +56,7 @@ function renderRaidLobby(userBadges) {
             <span class="raid-hp-badge">${boss.baseHp} HP</span>
             <span class="raid-personality-badge">${boss.personality.toUpperCase()}</span>
             <span class="raid-pts-badge">${boss.rewardPoints} pts</span>
+            <span class="raid-players-badge">${playerCount} players</span>
           </div>
           ${locked ? `<div class="raid-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
         </div>
@@ -106,7 +108,7 @@ function selectRaid(raidId) {
         <div class="raid-queue-boss-info">
           <h2>${boss.name}</h2>
           <div class="raid-boss-title">${boss.title}</div>
-          <div class="raid-boss-personality">${boss.personality.toUpperCase()} &bull; ${boss.baseHp} HP &bull; Tier ${boss.tier}</div>
+          <div class="raid-boss-personality">${boss.personality.toUpperCase()} &bull; ${boss.baseHp} HP &bull; Tier ${boss.tier} &bull; ${boss.requiredPlayers || 10} players</div>
           <p class="raid-boss-desc">${boss.bossGhost.abilityDesc}</p>
         </div>
       </div>
@@ -223,7 +225,8 @@ function updateRaidQueueUI(raidId, entries) {
   const playersEl = document.getElementById('raid-queue-players');
   if (!countEl || !playersEl) return;
 
-  const max = RAID_CONFIG.MAX_PLAYERS;
+  const bossConfig = RAID_BOSSES[raidId];
+  const max = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
   countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> / <span class="raid-queue-num">${max}</span> Raiders`;
 
   let html = '';
@@ -255,6 +258,11 @@ async function joinRaid() {
 async function leaveRaid() {
   if (!selectedRaidId) return;
   await leaveRaidQueue(selectedRaidId);
+  // Swap buttons back
+  const joinBtn = document.getElementById('raid-join-btn');
+  const leaveBtn = document.getElementById('raid-leave-btn');
+  if (joinBtn) { joinBtn.style.display = ''; joinBtn.disabled = false; joinBtn.textContent = 'JOIN RAID'; }
+  if (leaveBtn) leaveBtn.style.display = 'none';
 }
 
 // ─── RAID SCREEN (Main battle view) ────────────────────────────
