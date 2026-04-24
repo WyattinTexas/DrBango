@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v814'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v815'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1904,6 +1904,7 @@ body.lite-mode .die.rolling { animation: none !important; }
             <option value="D" selected>D: Permanent 1 dmg/turn</option>
             <option value="E">E: Choose an Item</option>
             <option value="F">F: Roll die, deal damage</option>
+            <option value="G">G: Sickness clears on KO</option>
           </select>
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;user-select:none;margin-left:auto;" title="Battle animation speed">
@@ -2746,7 +2747,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v814';
+const TESTROOM_VERSION = 'v815';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -9354,7 +9355,7 @@ function doPreRollSetup() {
       let msDmg = 0;
       if (msMode === 'A' && t.moonstoneSickness > 0) {
         msDmg = t.moonstoneSickness * 2;
-      } else if (msMode === 'D' && t.moonstoneSickness > 0) {
+      } else if ((msMode === 'D' || msMode === 'G') && t.moonstoneSickness > 0) {
         msDmg = t.moonstoneSickness * 1;
       } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
         msDmg = t.moonstoneSicknessPending;
@@ -11232,11 +11233,12 @@ function applyMoonstoneSickness(team) {
     const totalPerTurn = t.moonstoneSickness * 2;
     log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
     narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
-  } else if (mode === 'D') {
+  } else if (mode === 'D' || mode === 'G') {
     t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
     const totalPerTurn = t.moonstoneSickness * 1;
-    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
-    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
+    const clearNote = mode === 'G' ? ' (clears on KO)' : '';
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll${clearNote}.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!${clearNote}`);
   } else if (mode === 'B') {
     t.moonstoneSicknessCount = (t.moonstoneSicknessCount || 0) + 1;
     t.moonstoneSicknessPending = t.moonstoneSicknessCount * 2;
@@ -16871,6 +16873,12 @@ function handleKOs() {
     const t = B[team];
     const f = active(t);
     if (f.ko) {
+      // Mode G: clear moonstone sickness on KO
+      const msModeKO = document.getElementById('moonstoneModeSelect')?.value || 'D';
+      if (msModeKO === 'G' && t.moonstoneSickness > 0) {
+        log(`<span style="color:var(--moonstone)">Moonstone Sickness cleared!</span> ${team.toUpperCase()}'s sickness lifts with ${f.name}'s defeat.`);
+        t.moonstoneSickness = 0;
+      }
       const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
       if (alive.length > 0) {
         teamsNeedingSwap.push(team);
@@ -17770,7 +17778,7 @@ function renderBattle() {
       const msMode = document.getElementById('moonstoneModeSelect')?.value || 'D';
       const stacks = t.moonstoneSickness || 0;
       const pending = t.moonstoneSicknessPending || 0;
-      if ((msMode === 'A' || msMode === 'D') && stacks > 0) {
+      if ((msMode === 'A' || msMode === 'D' || msMode === 'G') && stacks > 0) {
         const dmgPerTurn = msMode === 'A' ? stacks * 2 : stacks;
         rh += `<div class="res-tile" style="border-color:rgba(168,85,247,0.5);box-shadow:0 0 8px rgba(168,85,247,0.3);" title="Moonstone Sickness: ${dmgPerTurn} damage before every roll (${stacks} stack${stacks>1?'s':''})"><span class="res-main" style="font-size:16px;">🌑</span><span class="res-count" style="color:#a855f7;">${dmgPerTurn}</span><span class="res-label" style="color:#a855f7;">SICK×${stacks}</span></div>`;
       } else if ((msMode === 'B' || msMode === 'C') && pending > 0) {
