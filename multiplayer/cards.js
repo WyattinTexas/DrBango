@@ -427,8 +427,348 @@ const GHOSTS = [
 ];
 
 
+// ================================================================
+// RAID BOSSES & MINIONS — IDs 9001+ (bosses), 9101+ (minions)
+// ================================================================
+
+const RAID_BOSS_MINIONS = [
+  // --- Tyrant minions ---
+  {id:9101, name:"War Drummer", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/wardrummer.png",
+    ability:"Battle Cadence", abilityDesc:"Sideline: boss deals +1 damage on doubles.",
+    bossMinion:true, personality:"tyrant"},
+  {id:9102, name:"Shield Bearer", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/shieldbearer.png",
+    ability:"Phalanx", abilityDesc:"Sideline: boss takes 1 less damage per hit (minimum 1).",
+    bossMinion:true, personality:"tyrant"},
+  {id:9103, name:"Blood Knight", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/bloodknight.png",
+    ability:"Siphon", abilityDesc:"Win: boss heals 2 HP from the shared pool.",
+    bossMinion:true, personality:"tyrant"},
+
+  // --- Trickster minions ---
+  {id:9111, name:"Mimic", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/mimic.png",
+    ability:"Copy", abilityDesc:"Sideline: copies the player's sideline ghost passive ability.",
+    bossMinion:true, personality:"trickster"},
+  {id:9112, name:"Jinxer", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/jinxer.png",
+    ability:"Hex", abilityDesc:"Sideline: player resource generation produces 1 fewer (minimum 0).",
+    bossMinion:true, personality:"trickster"},
+  {id:9113, name:"Doppelganger", rarity:"boss-minion", maxHp:6, art:"../testroom/art/originals/doppelganger.png",
+    ability:"Mirror Match", abilityDesc:"Rolls the same dice as the player — every round is a tie unless abilities modify.",
+    bossMinion:true, personality:"trickster"},
+
+  // --- Swarm Queen minions ---
+  {id:9121, name:"Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/drone.png",
+    ability:"Expendable", abilityDesc:"No ability. Sacrifice fodder.",
+    bossMinion:true, personality:"swarm"},
+  {id:9122, name:"Worker", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/worker.png",
+    ability:"Harvest", abilityDesc:"Sideline: boss gains 1 Ice Shard per round.",
+    bossMinion:true, personality:"swarm"},
+  {id:9123, name:"Soldier", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/soldier.png",
+    ability:"Formation", abilityDesc:"Doubles deal +2 damage.",
+    bossMinion:true, personality:"swarm"},
+  {id:9124, name:"Healer Drone", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/healerdrone.png",
+    ability:"Mend", abilityDesc:"Sideline: boss heals 1 HP from the shared pool per round.",
+    bossMinion:true, personality:"swarm"},
+  {id:9125, name:"Spitter", rarity:"boss-minion", maxHp:4, art:"../testroom/art/originals/spitter.png",
+    ability:"Acid Entry", abilityDesc:"Entry: deal 2 damage to player's active ghost.",
+    bossMinion:true, personality:"swarm"},
+
+  // --- Glacier minions ---
+  {id:9131, name:"Ice Wall", rarity:"boss-minion", maxHp:8, art:"../testroom/art/originals/icewall.png",
+    ability:"Barrier", abilityDesc:"While alive: boss cannot take damage. Must be destroyed first.",
+    bossMinion:true, personality:"glacier"},
+  {id:9132, name:"Frost Wisp", rarity:"boss-minion", maxHp:3, art:"../testroom/art/originals/frostwisp.png",
+    ability:"Deep Freeze", abilityDesc:"Sideline: Frozen Dice locks player's TWO highest dice instead of one.",
+    bossMinion:true, personality:"glacier"},
+  {id:9133, name:"Blizzard Elemental", rarity:"boss-minion", maxHp:7, art:"../testroom/art/originals/blizzardelemental.png",
+    ability:"Whiteout", abilityDesc:"While active: all player dice are reduced by 1 (minimum 1).",
+    bossMinion:true, personality:"glacier"},
+  {id:9134, name:"Avalanche", rarity:"boss-minion", maxHp:5, art:"../testroom/art/originals/avalanche.png",
+    ability:"Collapse", abilityDesc:"On death: deal 4 damage to player's active ghost.",
+    bossMinion:true, personality:"glacier"}
+];
+
+const RAID_BOSSES = {
+  // ======================== TIER 1 ========================
+  tyrant_mountain_king: {
+    id: 'tyrant_mountain_king',
+    name: 'The Mountain King',
+    title: 'Crush and Conquer',
+    personality: 'tyrant',
+    tier: 1,
+    requiredBadge: null,
+    bossGhost: {
+      id: 9001, name: 'The Mountain King', maxHp: 12, art: '../testroom/art/originals/mountain_king_leg.jpg',
+      ability: 'Beast Mode', abilityDesc: 'Triples+: deal 1 chip damage to all enemy sideline ghosts. On KO: gain 1 Sacred Fire.'
+    },
+    minionsByPhase: {
+      1: [],                          // Fights alone
+      2: [9101],                      // War Drummer
+      3: [9101, 9102],                // War Drummer + Shield Bearer
+      4: [9101, 9103]                 // War Drummer + Blood Knight
+    },
+    baseHp: 80,
+    rewardPoints: 50,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'YOU DARE CHALLENGE THE MOUNTAIN KING?',
+      phase2: 'Is that all you have? Pathetic.',
+      phase3: 'I will NOT fall to insects!',
+      phase4: 'ENOUGH! FEEL MY WRATH!',
+      defeat: 'Impossible... the mountain... crumbles...',
+      victory: 'Kneel before the mountain.'
+    }
+  },
+
+  trickster_phantom: {
+    id: 'trickster_phantom',
+    name: 'The Phantom',
+    title: 'Nothing Is What It Seems',
+    personality: 'trickster',
+    tier: 1,
+    requiredBadge: null,
+    bossGhost: {
+      id: 9002, name: 'The Phantom', maxHp: 8, art: '../testroom/art/originals/phantom.png',
+      ability: 'Mirror Dice', abilityDesc: 'After rolling: swap 1 of your dice with 1 of enemy dice. On win: steal 1 random resource.'
+    },
+    minionsByPhase: {
+      1: [9111],                      // Mimic
+      2: [9112],                      // Jinxer
+      3: [9112, 9113],                // Jinxer + Doppelganger
+      4: [9111, 9112]                 // Mimic + Jinxer (full theft)
+    },
+    baseHp: 80,
+    rewardPoints: 50,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'Which one of me is real? Does it matter?',
+      phase2: 'Your resources... are now mine.',
+      phase3: 'I am you. You are nothing.',
+      phase4: 'THERE IS NO ESCAPE FROM THE MIRROR.',
+      defeat: 'The reflection... shatters...',
+      victory: 'You fought yourself. And lost.'
+    }
+  },
+
+  swarm_queen: {
+    id: 'swarm_queen',
+    name: 'The Swarm Queen',
+    title: 'Endless Reinforcements',
+    personality: 'swarm',
+    tier: 1,
+    requiredBadge: null,
+    bossGhost: {
+      id: 9003, name: 'The Swarm Queen', maxHp: 7, art: '../testroom/art/originals/swarmqueen.png',
+      ability: 'Hive Mind', abilityDesc: '+1 die per living minion. May sacrifice a sideline minion to negate damage from a losing roll (1x/round).'
+    },
+    minionsByPhase: {
+      1: [9121, 9122],                // Drone + Worker
+      2: [9123, 9122],                // Soldier + Worker
+      3: [9124, 9123],                // Healer + Soldier
+      4: [9123, 9125]                 // Soldier + Spitter
+    },
+    spawnInterval: { 1: 3, 2: 2, 3: 2, 4: 1 },
+    baseHp: 80,
+    rewardPoints: 50,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'My children are hungry...',
+      phase2: 'Cut one down. Two more rise.',
+      phase3: 'The hive protects its queen.',
+      phase4: 'SWARM! DEVOUR THEM ALL!',
+      defeat: 'The hive... falls silent...',
+      victory: 'The swarm consumes everything.'
+    }
+  },
+
+  // ======================== TIER 2 ========================
+  glacier_ancient: {
+    id: 'glacier_ancient',
+    name: 'The Glacier',
+    title: 'Inevitable Frozen Death',
+    personality: 'glacier',
+    tier: 2,
+    requiredBadge: 'dragon_slayer',
+    bossGhost: {
+      id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/glacier.png',
+      ability: 'Permafrost', abilityDesc: 'Max 3 damage per roll (resource bonuses bypass). Frost Aura: 1 cold damage to enemy active per round. Frozen Dice: lock enemy highest die to 1 next round.'
+    },
+    minionsByPhase: {
+      1: [9131],                      // Ice Wall (boss untouchable)
+      2: [9131, 9132],                // Ice Wall + Frost Wisp
+      3: [9133, 9132],                // Blizzard Elemental + Frost Wisp
+      4: [9134]                       // Avalanche (bomb)
+    },
+    baseHp: 100,
+    rewardPoints: 100,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'I have waited ten thousand years. I can wait ten more.',
+      phase2: 'Your fire grows cold.',
+      phase3: 'Everything freezes. Everything ends.',
+      phase4: 'ABSOLUTE ZERO.',
+      defeat: 'The ice... melts... at last...',
+      victory: 'Winter is eternal.'
+    }
+  },
+
+  tyrant_doom: {
+    id: 'tyrant_doom',
+    name: 'Doom Ascended',
+    title: 'The End of All Things',
+    personality: 'tyrant',
+    tier: 2,
+    requiredBadge: 'dragon_slayer',
+    bossGhost: {
+      id: 9005, name: 'Doom Ascended', maxHp: 14, art: '../testroom/art/originals/doom_ascended.png',
+      ability: 'Annihilation', abilityDesc: 'Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire. Doubles+: gain 1 Surge.'
+    },
+    minionsByPhase: {
+      1: [9101],
+      2: [9101, 9103],
+      3: [9103, 9102],
+      4: [9103, 9101]
+    },
+    baseHp: 100,
+    rewardPoints: 100,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'You have come to die.',
+      phase2: 'Your spirits are NOTHING.',
+      phase3: 'I am the end.',
+      phase4: 'THERE IS ONLY DOOM.',
+      defeat: 'This... changes... nothing...',
+      victory: 'All things return to dust.'
+    }
+  },
+
+  swarm_broodmother: {
+    id: 'swarm_broodmother',
+    name: 'The Broodmother',
+    title: 'Mother of a Thousand',
+    personality: 'swarm',
+    tier: 2,
+    requiredBadge: 'dragon_slayer',
+    bossGhost: {
+      id: 9006, name: 'The Broodmother', maxHp: 9, art: '../testroom/art/originals/broodmother.png',
+      ability: 'Endless Spawn', abilityDesc: '+1 die per living minion. Sacrifice: negate damage (1x/round). On KO of any minion: immediately spawn a replacement.'
+    },
+    minionsByPhase: {
+      1: [9122, 9123],
+      2: [9123, 9125],
+      3: [9124, 9123],
+      4: [9125, 9125]
+    },
+    spawnInterval: { 1: 2, 2: 2, 3: 1, 4: 1 },
+    baseHp: 100,
+    rewardPoints: 100,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'My children... protect me...',
+      phase2: 'You cannot kill them fast enough.',
+      phase3: 'For every one you slay, two are born.',
+      phase4: 'THE BROOD RISES!',
+      defeat: 'My children... avenge... me...',
+      victory: 'The nest grows forever.'
+    }
+  },
+
+  // ======================== TIER 3 ========================
+  trickster_shepherd: {
+    id: 'trickster_shepherd',
+    name: 'The Shepherd',
+    title: 'Master of the Flock',
+    personality: 'trickster',
+    tier: 3,
+    requiredBadge: 'raid_master',
+    bossGhost: {
+      id: 9007, name: 'The Shepherd', maxHp: 10, art: '../testroom/art/originals/shepherd.png',
+      ability: 'Grand Illusion', abilityDesc: 'Mirror Dice: swap 2 dice. Copycat: use enemy active ability. Steal 2 resources on win. Phase transitions: split into 3 copies.'
+    },
+    minionsByPhase: {
+      1: [9111, 9112],
+      2: [9112, 9113],
+      3: [9113, 9112],
+      4: [9111, 9113]
+    },
+    baseHp: 120,
+    rewardPoints: 200,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'Come, little lamb. The Shepherd guides all.',
+      phase2: 'You think you know what is real?',
+      phase3: 'Every move you make, I made first.',
+      phase4: 'THE FLOCK CONSUMES THE WOLF.',
+      defeat: 'The shepherd... was always... alone...',
+      victory: 'The flock grows. Always.'
+    }
+  },
+
+  glacier_eternal: {
+    id: 'glacier_eternal',
+    name: 'The Eternal Frost',
+    title: 'Heat Death of the Spirit World',
+    personality: 'glacier',
+    tier: 3,
+    requiredBadge: 'raid_master',
+    bossGhost: {
+      id: 9008, name: 'The Eternal Frost', maxHp: 12, art: '../testroom/art/originals/eternalfrost.png',
+      ability: 'Absolute Zero', abilityDesc: 'Max 2 damage per roll. Frost Aura: 2 cold damage per round. Frozen Dice: lock 2 highest dice. Phase transitions: freeze ALL resources for 5 rounds.'
+    },
+    minionsByPhase: {
+      1: [9131, 9132],
+      2: [9131, 9133],
+      3: [9133, 9134],
+      4: [9134, 9134]
+    },
+    baseHp: 120,
+    rewardPoints: 200,
+    bonusPoints: 25,
+    dialogue: {
+      intro: 'Time itself freezes before me.',
+      phase2: 'Your warmth fades.',
+      phase3: 'There is no fire hot enough.',
+      phase4: 'THE SPIRIT WORLD GOES DARK.',
+      defeat: 'The sun... rises... one last time...',
+      victory: 'Eternal winter. Eternal silence.'
+    }
+  }
+};
+
+// Badge definitions for raid progression
+const RAID_BADGES = {
+  mountain_king_slayer: { name: 'Mountain King Slayer', icon: '&#x2694;', boss: 'tyrant_mountain_king', tier: 1 },
+  phantom_hunter: { name: 'Phantom Hunter', icon: '&#x1F47B;', boss: 'trickster_phantom', tier: 1 },
+  swarm_crusher: { name: 'Swarm Crusher', icon: '&#x1F41D;', boss: 'swarm_queen', tier: 1 },
+  dragon_slayer: { name: 'Dragon Slayer', icon: '&#x1F525;', requires: ['mountain_king_slayer', 'phantom_hunter', 'swarm_crusher'], tier: 1, gates: 2 },
+  glacier_breaker: { name: 'Glacier Breaker', icon: '&#x2744;', boss: 'glacier_ancient', tier: 2 },
+  doom_ender: { name: 'Doom Ender', icon: '&#x1F480;', boss: 'tyrant_doom', tier: 2 },
+  brood_slayer: { name: 'Brood Slayer', icon: '&#x1F578;', boss: 'swarm_broodmother', tier: 2 },
+  raid_master: { name: 'Raid Master', icon: '&#x1F451;', requires: ['glacier_breaker', 'doom_ender', 'brood_slayer'], tier: 2, gates: 3 },
+  shepherd_trial: { name: "Shepherd's Trial", icon: '&#x1F9D9;', boss: 'trickster_shepherd', tier: 3 },
+  frost_eternal: { name: 'Eternal Frost Vanquisher', icon: '&#x1F300;', boss: 'glacier_eternal', tier: 3 },
+  ultimate_raider: { name: 'Ultimate Raider', icon: '&#x1F31F;', requires: ['shepherd_trial', 'frost_eternal'], tier: 3 }
+};
+
+// Raid shop items
+const RAID_SHOP_ITEMS = [
+  { id: 'pack_spirit', name: 'Spirit Pack', type: 'pack', cost: 150, desc: '5 cards, standard rarity weights' },
+  { id: 'pack_premium', name: 'Premium Spirit Pack', type: 'pack', cost: 300, desc: '5 cards, guaranteed rare+' },
+  { id: 'pack_legendary', name: 'Legendary Pack', type: 'pack', cost: 800, desc: '3 cards, guaranteed legendary' },
+  { id: 'pack_frost', name: 'Frost Valley Pack', type: 'pack', cost: 200, set: 'Frost Valley', desc: '5 Frost Valley cards' },
+  { id: 'pack_volcanic', name: 'Volcanic Isles Pack', type: 'pack', cost: 200, set: 'Volcanic Isles', desc: '5 Volcanic Isles cards' },
+  { id: 'pack_rolling', name: 'Rolling Hills Pack', type: 'pack', cost: 200, set: 'Rolling Hills', desc: '5 Rolling Hills cards' },
+  { id: 'pack_dark', name: 'Dark Castle Pack', type: 'pack', cost: 200, set: 'Dark Castle', desc: '5 Dark Castle cards' }
+];
+
 // Helper: look up a ghost by ID
-function getGhost(id) { return GHOSTS.find(g => g.id === id); }
+function getGhost(id) {
+  return GHOSTS.find(g => g.id === id) || RAID_BOSS_MINIONS.find(g => g.id === id);
+}
+
+// Helper: look up a boss ghost by boss ID (9001+)
+function getBossGhost(bossId) {
+  const boss = Object.values(RAID_BOSSES).find(b => b.bossGhost.id === bossId);
+  return boss ? boss.bossGhost : null;
+}
 
 // Get all non-shelved ghosts
 function getActiveGhosts() { return GHOSTS.filter(g => !SHELVED_IDS.has(g.id)); }
