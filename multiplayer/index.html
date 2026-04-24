@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.67'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.68'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -267,6 +267,23 @@ body {
   flex-shrink: 0;
   font-size: 12px;
 }
+.sidebar-lb-rank.rank-gold { color: #f0c560; text-shadow: 0 0 6px rgba(240,197,96,0.4); }
+.sidebar-lb-rank.rank-silver { color: #c0c0c0; text-shadow: 0 0 6px rgba(192,192,192,0.3); }
+.sidebar-lb-rank.rank-bronze { color: #cd7f32; text-shadow: 0 0 6px rgba(205,127,50,0.3); }
+.sidebar-lb-row:nth-child(1) { background: rgba(240,197,96,0.06); }
+.sidebar-lb-row:nth-child(2) { background: rgba(192,192,192,0.05); }
+.sidebar-lb-row:nth-child(3) { background: rgba(205,127,50,0.05); }
+.sidebar-lb-delta {
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  margin-right: 2px;
+}
+.sidebar-lb-delta.up { color: #2ecc71; }
+.sidebar-lb-delta.down { color: #e94560; }
+.sidebar-lb-delta.same { color: var(--text-dim); opacity: 0.3; }
 .sidebar-lb-name {
   flex: 1;
   min-width: 0;
@@ -2896,7 +2913,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="cards.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.67';
+const BBN_VERSION = 'v0.68';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -3648,6 +3665,10 @@ async function renderLeaderboard(data) {
   }
   if (fetchPromises.length > 0) await Promise.all(fetchPromises);
 
+  // Load previous rankings for rise/fall indicators
+  let prevRanks = {};
+  try { prevRanks = JSON.parse(localStorage.getItem('lb_prev_ranks') || '{}'); } catch(_) {}
+
   container.innerHTML = top15.map((entry, i) => {
     const isCurrent = currentUser && entry.uid === currentUser.uid;
     const isSelected = selectedTarget && selectedTarget.uid === entry.uid;
@@ -3674,10 +3695,28 @@ async function renderLeaderboard(data) {
     const portraitHtml = leadGhost
       ? `<img class="sidebar-lb-portrait" src="${leadGhost.art}" alt="${leadGhost.name}" onerror="this.style.display='none'">`
       : '';
+
+    // Medal color for top 3
+    const rankClass = i === 0 ? 'rank-gold' : i === 1 ? 'rank-silver' : i === 2 ? 'rank-bronze' : '';
+
+    // Rise/fall delta
+    const currentRank = i + 1;
+    const prevRank = prevRanks[entry.uid];
+    let deltaHtml = '<span class="sidebar-lb-delta same">–</span>';
+    if (prevRank !== undefined && prevRank !== currentRank) {
+      const diff = prevRank - currentRank;
+      if (diff > 0) {
+        deltaHtml = `<span class="sidebar-lb-delta up" title="Up ${diff} from #${prevRank}">▲${diff}</span>`;
+      } else {
+        deltaHtml = `<span class="sidebar-lb-delta down" title="Down ${Math.abs(diff)} from #${prevRank}">▼${Math.abs(diff)}</span>`;
+      }
+    }
+
     return `
       <div class="sidebar-lb-row ${isCurrent ? 'current-user' : 'challengeable'} ${isSelected ? 'selected-target' : ''}"
            ${!isCurrent ? `onclick="selectTarget('${entry.uid}')"` : ''}>
-        <span class="sidebar-lb-rank">${i + 1}</span>
+        <span class="sidebar-lb-rank ${rankClass}">${i + 1}</span>
+        ${deltaHtml}
         ${portraitHtml}
         <span class="sidebar-lb-name">${entry.displayName || 'Unknown'}${champHtml}${badgeHtml}</span>
         <span class="sidebar-lb-elo">${entry.elo || 1000}</span>
@@ -3685,6 +3724,11 @@ async function renderLeaderboard(data) {
       </div>
     `;
   }).join('');
+
+  // Save current rankings for next comparison
+  const newRanks = {};
+  top15.forEach((e, i) => { newRanks[e.uid] = i + 1; });
+  try { localStorage.setItem('lb_prev_ranks', JSON.stringify(newRanks)); } catch(_) {}
 
   // Show self rank if not in top 15
   if (currentUser && !currentInTop15) {
