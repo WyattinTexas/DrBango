@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v816'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v817'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1928,6 +1928,10 @@ body.lite-mode .die.rolling { animation: none !important; }
           <span id="specialsTimerLabel">Timer: 5s</span>
           <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
         </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Charlie's Rush becomes a Flick ability — Flick a die on loss or Doubles">
+          <input type="checkbox" id="flickCheckbox" style="accent-color:#f59e0b;cursor:pointer;" onchange="toggleFlick(this.checked)">
+          <span>Flick</span>
+        </label>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
 
@@ -2733,6 +2737,8 @@ body.lite-mode .die.rolling { animation: none !important; }
   if (st !== null) { document.getElementById('specialsTimerSlider').value = st; }
   const lm = localStorage.getItem('tr_liteMode');
   if (lm === '1') { document.getElementById('liteModeCheckbox').checked = true; document.body.classList.add('lite-mode'); }
+  const fl = localStorage.getItem('tr_flick');
+  if (fl === '1') { document.getElementById('flickCheckbox').checked = true; flickEnabled = true; const _ch = GHOSTS.find(g => g.id === 18); if (_ch) _ch.abilityDesc = "Upon losing a roll or rolling Doubles, you may Flick one of your dice. Any die hit changes its result on contact."; }
   // Sync visual state
   const cb = document.getElementById('handLimitCheckbox');
   document.getElementById('handLimitSlider').style.opacity = cb.checked ? '1' : '0.35';
@@ -2747,7 +2753,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v816';
+const TESTROOM_VERSION = 'v817';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -2791,6 +2797,18 @@ function getSpecialsTimerSecs() { return parseInt(document.getElementById('speci
 function toggleLiteMode(on) {
   document.body.classList.toggle('lite-mode', on);
   localStorage.setItem('tr_liteMode', on ? '1' : '0');
+}
+
+// Flick toggle — changes Charlie's Rush to a Flick ability
+let flickEnabled = false;
+const CHARLIE_DESC_ORIGINAL = "Double 2's deal 7 damage.";
+const CHARLIE_DESC_FLICK = "Upon losing a roll or rolling Doubles, you may Flick one of your dice. Any die hit changes its result on contact.";
+function toggleFlick(on) {
+  flickEnabled = on;
+  localStorage.setItem('tr_flick', on ? '1' : '0');
+  const charlie = GHOSTS.find(g => g.id === 18);
+  if (charlie) charlie.abilityDesc = on ? CHARLIE_DESC_FLICK : CHARLIE_DESC_ORIGINAL;
+  if (typeof renderGallery === 'function') renderGallery();
 }
 
 const firebaseConfig = {
@@ -12819,6 +12837,173 @@ function startSimultaneousLuckyStoneWindows() {
   if (!state.closed) restartSharedCountdown(getSpecialsTimerSecs());
 }
 
+// ============================================================
+// FLICK — Charlie (18) interactive post-roll die Flick
+// Phase 1: pick one of your dice to Flick (randomizes it)
+// Phase 2: optionally Flick into another die (randomizes target on contact)
+// ============================================================
+function showFlickPicker(team, callback) {
+  B.phase = 'flick-' + team;
+  const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+  const oppTeam = team === 'red' ? 'blue' : 'red';
+  const oppDice = team === 'red' ? B.pendingResolve.blueDice : B.pendingResolve.redDice;
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+
+  // Blue AI: auto-Flick lowest die, then aim at opponent's highest die
+  if (AI_ACTIVE && team === 'blue') {
+    const worstIdx = 0; // dice are sorted ascending
+    const oldVal = dice[worstIdx];
+    dice[worstIdx] = Math.floor(Math.random() * 6) + 1;
+    dice.sort((a, b) => a - b);
+    log(`<span class="log-ability">Charlie</span> — Rush! Flicked ${oldVal} → <b>${dice[worstIdx]}</b>!`);
+    // Aim at opponent's best die
+    if (oppDice.length > 0) {
+      const targetIdx = oppDice.length - 1;
+      const targetOld = oppDice[targetIdx];
+      oppDice[targetIdx] = Math.floor(Math.random() * 6) + 1;
+      oppDice.sort((a, b) => a - b);
+      log(`<span class="log-ability">Charlie</span> — Contact! ${oppTeam} die ${targetOld} → <b>${oppDice[oppDice.length-1]}</b>!`);
+    }
+    B.redDice = B.pendingResolve.redDice;
+    B.blueDice = B.pendingResolve.blueDice;
+    renderDice(B.redDice, B.blueDice);
+    showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Flick!', team);
+    setTimeout(() => callback(), spd(800));
+    return;
+  }
+
+  narrate(`<b class="${team}-text">${teamLabel}</b> — <b style="color:#f59e0b">Rush!</b> Pick a die to Flick!`);
+  log(`<span class="log-ability">Charlie</span> — Rush! Flick activated!`);
+  showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Pick a die to Flick!', team);
+
+  const diceEl = document.getElementById(team + '-dice');
+  const dieDivs = diceEl.querySelectorAll('.die');
+
+  dieDivs.forEach((d, i) => {
+    d.classList.add('rerollable');
+    d.style.cursor = 'pointer';
+    d.onclick = () => {
+      clearLsCountdown();
+      clearDiceClickable(team);
+      playSfx('sfxDiceRoll');
+
+      const oldVal = dice[i];
+      const newVal = Math.floor(Math.random() * 6) + 1;
+      dice[i] = newVal;
+
+      // Animate the Flick
+      d.classList.add('rolling');
+      d.textContent = '?';
+      const lrPhysics = _dicePhysics[team];
+      if (lrPhysics && lrPhysics.settled && lrPhysics.dice[i]) {
+        lrPhysics.dice[i].el.classList.add('rolling-3d');
+      }
+
+      setTimeout(() => {
+        d.classList.remove('rolling');
+        if (lrPhysics && lrPhysics.settled && lrPhysics.dice[i]) {
+          lrPhysics.dice[i].el.classList.remove('rolling-3d');
+        }
+        dice.sort((a, b) => a - b);
+        if (team === 'red') B.pendingResolve.redDice = dice;
+        else B.pendingResolve.blueDice = dice;
+        B.redDice = B.pendingResolve.redDice;
+        B.blueDice = B.pendingResolve.blueDice;
+        renderDice(B.redDice, B.blueDice);
+
+        log(`<span class="log-ability">Charlie</span> — Flicked ${oldVal} → <b>${newVal}</b>! [${dice.join(', ')}]`);
+
+        // Phase 2: optional target — Flick into another die
+        narrate(`<b class="${team}-text">${teamLabel}</b> — Flick into another die, or wait to skip!`);
+
+        const makeTargetable = (targetEl, targetDice, tTeam) => {
+          targetEl.querySelectorAll('.die').forEach((td, ti) => {
+            td.classList.add('rerollable');
+            td.style.cursor = 'pointer';
+            td.onclick = () => {
+              clearLsCountdown();
+              clearDiceClickable(team);
+              clearDiceClickable(oppTeam);
+              playSfx('sfxDiceRoll');
+
+              const targetOld = targetDice[ti];
+              const targetNew = Math.floor(Math.random() * 6) + 1;
+              targetDice[ti] = targetNew;
+
+              td.classList.add('rolling');
+              td.textContent = '?';
+              const tPhysics = _dicePhysics[tTeam];
+              if (tPhysics && tPhysics.settled && tPhysics.dice[ti]) {
+                tPhysics.dice[ti].el.classList.add('rolling-3d');
+              }
+
+              setTimeout(() => {
+                td.classList.remove('rolling');
+                if (tPhysics && tPhysics.settled && tPhysics.dice[ti]) {
+                  tPhysics.dice[ti].el.classList.remove('rolling-3d');
+                }
+                targetDice.sort((a, b) => a - b);
+                B.redDice = B.pendingResolve.redDice;
+                B.blueDice = B.pendingResolve.blueDice;
+                renderDice(B.redDice, B.blueDice);
+
+                log(`<span class="log-ability">Charlie</span> — Contact! ${tTeam} die ${targetOld} → <b>${targetNew}</b>!`);
+                narrate(`<b style="color:#f59e0b">Contact!</b> ${targetOld} → <b>${targetNew}</b>!`);
+
+                setTimeout(() => callback(), spd(800));
+              }, spd(500));
+            };
+          });
+          sync3dDiceClickable(tTeam);
+        };
+
+        // Make both teams' dice clickable as targets
+        makeTargetable(document.getElementById(team + '-dice'), dice, team);
+        makeTargetable(document.getElementById(oppTeam + '-dice'), oppDice, oppTeam);
+
+        // Timer for phase 2
+        let remaining2 = getSpecialsTimerSecs();
+        const countdownTarget2 = document.getElementById(team + '-dice');
+        showLsCountdown(countdownTarget2, remaining2);
+        lsCountdownTimer = setInterval(() => {
+          remaining2--;
+          if (remaining2 <= 0) {
+            clearLsCountdown();
+            clearDiceClickable(team);
+            clearDiceClickable(oppTeam);
+            B.redDice = B.pendingResolve.redDice;
+            B.blueDice = B.pendingResolve.blueDice;
+            renderDice(B.redDice, B.blueDice);
+            log(`<span style="color:var(--text2)">Charlie skipped the contact Flick.</span>`);
+            callback();
+          } else {
+            showLsCountdown(countdownTarget2, remaining2);
+          }
+        }, 1000);
+
+      }, spd(500));
+    };
+  });
+  sync3dDiceClickable(team);
+
+  // Timer for phase 1
+  let remaining = getSpecialsTimerSecs();
+  showLsCountdown(diceEl, remaining);
+  lsCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearLsCountdown();
+      clearDiceClickable(team);
+      log(`<span style="color:var(--text2)">Charlie didn't Flick in time.</span>`);
+      B.redDice = B.pendingResolve.redDice;
+      B.blueDice = B.pendingResolve.blueDice;
+      callback();
+    } else {
+      showLsCountdown(diceEl, remaining);
+    }
+  }, 1000);
+}
+
 function startLuckyStoneWindow(team, callback) {
   // Blue AI: auto-use lucky stone (reroll lowest die)
   if (AI_ACTIVE && team === 'blue') {
@@ -13416,6 +13601,32 @@ function _resolveRoundImpl() {
       if (bv > rv) { winner = 'blue'; tiebreaker = {value: bv}; break; }
     }
   }
+
+  // Charlie (18) — Flick: upon losing a roll or rolling Doubles, Flick a die
+  // Fires BEFORE highlights/Sylvia so new dice change the outcome.
+  // Uses B.flickResuming to skip on re-entry after dice are modified.
+  if (!B.flickResuming && flickEnabled) {
+    let flickTeam = null;
+    for (const ft of ['red', 'blue']) {
+      const f = active(B[ft]);
+      if (f.id === 18 && !f.ko) {
+        const myRoll = ft === 'red' ? rR : bR;
+        const lost = winner !== null && winner !== ft;
+        const rolledDoubles = myRoll.type === 'doubles';
+        if (lost || rolledDoubles) { flickTeam = ft; break; }
+      }
+    }
+    if (flickTeam) {
+      renderDice(B.redDice, B.blueDice);
+      showFlickPicker(flickTeam, () => {
+        B.flickResuming = true;
+        B.sylviaResuming = true;
+        _resolveRoundImpl();
+      });
+      return;
+    }
+  }
+  B.flickResuming = false;
 
   // Highlight dice immediately — winner dice glow, losers fade
   if (winner) {
@@ -14204,9 +14415,10 @@ function _resolveRoundImpl() {
   }
 
   // Charlie (18) — Rush: double 2s → exactly 7 damage (fixed output override)
+  // Skipped when Flick toggle is on (Rush becomes Flick ability instead)
   let charlieTriggered = false;
   let charlieBaseDmg = 0;
-  if (wF.id === 18 && !wF.ko && wR.type === 'doubles' && wR.value === 2) {
+  if (!flickEnabled && wF.id === 18 && !wF.ko && wR.type === 'doubles' && wR.value === 2) {
     charlieBaseDmg = dmg;
     dmg = 7;
     charlieTriggered = true;
