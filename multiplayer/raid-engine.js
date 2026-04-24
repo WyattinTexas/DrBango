@@ -136,9 +136,8 @@ async function tryCreateRaidInstance(raidId, players) {
 
   if (!result.committed) return; // Another client beat us
 
-  const bossConfig = RAID_BOSSES[raidId];
   const playerCount = players.length;
-  const scaledHp = Math.round(bossConfig.baseHp * (playerCount / RAID_CONFIG.MAX_PLAYERS));
+  const scaledHp = Math.round(bossConfig.baseHp * (playerCount / (bossConfig.requiredPlayers || RAID_CONFIG.MAX_PLAYERS)));
 
   // Create instance
   const instanceRef = db.ref('mp/raids/instances').push();
