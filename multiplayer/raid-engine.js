@@ -79,7 +79,11 @@ function startQueueListener(raidId) {
   const queueRef = db.ref(`mp/raids/queue/${raidId}`);
   raidListeners['queue_' + raidId] = queueRef.on('value', async (snap) => {
     const queue = snap.val();
-    if (!queue) return;
+    if (!queue) {
+      // Empty queue — update UI to show 0 players
+      if (typeof updateRaidQueueUI === 'function') updateRaidQueueUI(raidId, []);
+      return;
+    }
 
     const entries = Object.entries(queue)
       .map(([uid, data]) => ({ uid, ...data }))
