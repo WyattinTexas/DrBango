@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v818'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v819'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2753,7 +2753,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v818';
+const TESTROOM_VERSION = 'v819';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -12841,31 +12841,30 @@ function startSimultaneousLuckyStoneWindows() {
 }
 
 // ============================================================
-// FLICK — Charlie (18) interactive post-roll die Flick
-// Phase 1: pick one of your dice to Flick (randomizes it)
-// Phase 2: optionally Flick into another die (randomizes target on contact)
+// FLICK — Charlie (18) physics-based die fling
+// Lowest die drops below the row. Player grabs it and flings it
+// like a booger — any die it collides with scatters and all
+// moved dice get new random results.
 // ============================================================
 function showFlickPicker(team, callback) {
   B.phase = 'flick-' + team;
-  const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+  const myDice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const oppTeam = team === 'red' ? 'blue' : 'red';
   const oppDice = team === 'red' ? B.pendingResolve.blueDice : B.pendingResolve.redDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
 
-  // Blue AI: auto-Flick lowest die, then aim at opponent's highest die
+  // Blue AI: auto-Flick lowest die into opponent's highest
   if (AI_ACTIVE && team === 'blue') {
-    const worstIdx = 0; // dice are sorted ascending
-    const oldVal = dice[worstIdx];
-    dice[worstIdx] = Math.floor(Math.random() * 6) + 1;
-    dice.sort((a, b) => a - b);
-    log(`<span class="log-ability">Charlie</span> — Rush! Flicked ${oldVal} → <b>${dice[worstIdx]}</b>!`);
-    // Aim at opponent's best die
+    const oldVal = myDice[0];
+    myDice[0] = Math.floor(Math.random() * 6) + 1;
+    myDice.sort((a, b) => a - b);
+    log(`<span class="log-ability">Charlie</span> — Rush! Flicked ${oldVal} → <b>${myDice[0]}</b>!`);
     if (oppDice.length > 0) {
-      const targetIdx = oppDice.length - 1;
-      const targetOld = oppDice[targetIdx];
-      oppDice[targetIdx] = Math.floor(Math.random() * 6) + 1;
+      const ti = oppDice.length - 1;
+      const tOld = oppDice[ti];
+      oppDice[ti] = Math.floor(Math.random() * 6) + 1;
       oppDice.sort((a, b) => a - b);
-      log(`<span class="log-ability">Charlie</span> — Contact! ${oppTeam} die ${targetOld} → <b>${oppDice[oppDice.length-1]}</b>!`);
+      log(`<span class="log-ability">Charlie</span> — Contact! ${oppTeam} die ${tOld} → <b>${oppDice[oppDice.length-1]}</b>!`);
     }
     B.redDice = B.pendingResolve.redDice;
     B.blueDice = B.pendingResolve.blueDice;
@@ -12875,134 +12874,303 @@ function showFlickPicker(team, callback) {
     return;
   }
 
-  narrate(`<b class="${team}-text">${teamLabel}</b> — <b style="color:#f59e0b">Rush!</b> Pick a die to Flick!`);
+  narrate(`<b class="${team}-text">${teamLabel}</b> — <b style="color:#f59e0b">Rush!</b> Grab &amp; fling your die!`);
   log(`<span class="log-ability">Charlie</span> — Rush! Flick activated!`);
-  showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Pick a die to Flick!', team);
+  showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Fling a die!', team);
 
-  const diceEl = document.getElementById(team + '-dice');
-  const dieDivs = diceEl.querySelectorAll('.die');
+  // -- Gather layout info --
+  const tray = document.querySelector('.dice-stack');
+  const trayRect = tray.getBoundingClientRect();
+  const trayW = tray.offsetWidth;
+  const trayH = tray.offsetHeight;
+  const redDiceEl = document.getElementById('red-dice');
+  const blueDiceEl = document.getElementById('blue-dice');
+  const redDieEls = [...redDiceEl.querySelectorAll('.die')];
+  const blueDieEls = [...blueDiceEl.querySelectorAll('.die')];
+  const dieSize = redDieEls[0]?.offsetWidth || 56;
+  const dieR = dieSize / 2;
 
-  dieDivs.forEach((d, i) => {
-    d.classList.add('rerollable');
-    d.style.cursor = 'pointer';
-    d.onclick = () => {
-      clearLsCountdown();
-      clearDiceClickable(team);
-      playSfx('sfxDiceRoll');
+  // Map every visible die to a physics body
+  const getRelPos = (el) => {
+    const r = el.getBoundingClientRect();
+    return { cx: r.left - trayRect.left + r.width / 2, cy: r.top - trayRect.top + r.height / 2 };
+  };
 
-      const oldVal = dice[i];
-      const newVal = Math.floor(Math.random() * 6) + 1;
-      dice[i] = newVal;
+  const bodies = [];
+  const pushDie = (el, dTeam, idx) => {
+    const p = getRelPos(el);
+    const isFlicker = dTeam === team && idx === 0; // lowest die
+    bodies.push({
+      cx: p.cx, cy: p.cy, vx: 0, vy: 0,
+      origCx: p.cx, origCy: p.cy,
+      team: dTeam, dieIndex: idx, isFlicker, moved: false, el: null
+    });
+  };
+  redDieEls.forEach((el, i) => pushDie(el, 'red', i));
+  blueDieEls.forEach((el, i) => pushDie(el, 'blue', i));
 
-      // Animate the Flick
-      d.classList.add('rolling');
-      d.textContent = '?';
-      const lrPhysics = _dicePhysics[team];
-      if (lrPhysics && lrPhysics.settled && lrPhysics.dice[i]) {
-        lrPhysics.dice[i].el.classList.add('rolling-3d');
+  // -- Create physics overlay --
+  const overlay = document.createElement('div');
+  overlay.id = 'flick-overlay';
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:50;';
+  tray.style.position = 'relative';
+
+  bodies.forEach((b, i) => {
+    const srcEl = i < redDieEls.length ? redDieEls[i] : blueDieEls[i - redDieEls.length];
+    const el = document.createElement('div');
+    el.className = srcEl.className.replace(/rerollable/g, '').trim();
+    el.textContent = srcEl.textContent;
+    el.style.cssText = `
+      position:absolute;left:${b.cx - dieR}px;top:${b.cy - dieR}px;
+      width:${dieSize}px;height:${dieSize}px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:${Math.round(dieSize*0.5)}px;font-weight:800;
+      border-radius:11px;z-index:${b.isFlicker?60:55};
+      user-select:none;box-sizing:border-box;transition:none;
+    `;
+    if (b.isFlicker) {
+      el.style.boxShadow = '0 0 20px rgba(245,158,11,0.8), 0 0 40px rgba(245,158,11,0.4)';
+      el.style.border = '3px solid #f59e0b';
+      el.style.cursor = 'grab';
+    }
+    b.el = el;
+    overlay.appendChild(el);
+  });
+  tray.appendChild(overlay);
+
+  // Hide original dice (flat + 3D)
+  redDiceEl.style.visibility = 'hidden';
+  blueDiceEl.style.visibility = 'hidden';
+  ['red','blue'].forEach(t => {
+    const ph = _dicePhysics[t];
+    if (ph && ph.dice) ph.dice.forEach(d => { d.el.style.visibility = 'hidden'; });
+  });
+
+  // Drop the flicker die below the row
+  const flicker = bodies.find(b => b.isFlicker);
+  const dropDist = dieSize + 12;
+  flicker.cy += dropDist;
+  flicker.origCy += dropDist;
+  flicker.el.style.transition = 'top 0.3s ease-out';
+  flicker.el.style.top = (flicker.cy - dieR) + 'px';
+  setTimeout(() => { flicker.el.style.transition = 'none'; }, 350);
+
+  // -- Cleanup helper --
+  const cleanup = () => {
+    clearLsCountdown();
+    overlay.remove();
+    redDiceEl.style.visibility = '';
+    blueDiceEl.style.visibility = '';
+    ['red','blue'].forEach(t => {
+      const ph = _dicePhysics[t];
+      if (ph && ph.dice) ph.dice.forEach(d => { d.el.style.visibility = ''; });
+    });
+  };
+
+  // -- Mouse / touch fling --
+  let isDragging = false;
+  let mouseHist = []; // {x, y, t}
+  let flickRaf = null;
+  let launched = false;
+
+  const evtPos = (e) => {
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - trayRect.left, y: src.clientY - trayRect.top };
+  };
+
+  const onDown = (e) => {
+    if (launched) return;
+    e.preventDefault();
+    const p = evtPos(e);
+    const dx = p.x - flicker.cx, dy = p.y - flicker.cy;
+    if (Math.sqrt(dx*dx + dy*dy) > dieR * 2.5) return;
+    isDragging = true;
+    flicker.el.style.cursor = 'grabbing';
+    mouseHist = [{ x: p.x, y: p.y, t: performance.now() }];
+  };
+
+  const onMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const p = evtPos(e);
+    mouseHist.push({ x: p.x, y: p.y, t: performance.now() });
+    if (mouseHist.length > 12) mouseHist.shift();
+    flicker.cx = p.x;
+    flicker.cy = p.y;
+    flicker.el.style.left = (p.x - dieR) + 'px';
+    flicker.el.style.top = (p.y - dieR) + 'px';
+  };
+
+  const onUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    launched = true;
+    flicker.el.style.cursor = '';
+    clearLsCountdown();
+
+    // Calculate fling velocity from last ~120ms of mouse movement
+    const now = performance.now();
+    const recent = mouseHist.filter(p => now - p.t < 150);
+    if (recent.length >= 2) {
+      const first = recent[0], last = recent[recent.length - 1];
+      const dt = Math.max((last.t - first.t) / 16.67, 0.5);
+      flicker.vx = (last.x - first.x) / dt;
+      flicker.vy = (last.y - first.y) / dt;
+      const spd2 = Math.sqrt(flicker.vx * flicker.vx + flicker.vy * flicker.vy);
+      const maxV = 35;
+      if (spd2 > maxV) { flicker.vx = (flicker.vx / spd2) * maxV; flicker.vy = (flicker.vy / spd2) * maxV; }
+      if (spd2 < 2) { flicker.vx = 0; flicker.vy = 0; }
+    }
+
+    // Remove input listeners
+    overlay.removeEventListener('mousedown', onDown);
+    overlay.removeEventListener('mousemove', onMove);
+    overlay.removeEventListener('mouseup', onUp);
+    overlay.removeEventListener('touchstart', onDown);
+    overlay.removeEventListener('touchmove', onMove);
+    overlay.removeEventListener('touchend', onUp);
+
+    playSfx('sfxDiceRoll');
+
+    // -- Run physics --
+    const FRICTION = 0.965;
+    const BOUNCE_COEFF = 0.7;
+    const SETTLE_SPEED = 0.35;
+    const PAD = 10;
+    let collisionSfxCooldown = 0;
+
+    const physStep = () => {
+      let maxSpd = 0;
+      collisionSfxCooldown = Math.max(0, collisionSfxCooldown - 1);
+
+      // Move bodies
+      bodies.forEach(b => {
+        b.cx += b.vx; b.cy += b.vy;
+        b.vx *= FRICTION; b.vy *= FRICTION;
+      });
+
+      // Collisions (circle-circle elastic)
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const a = bodies[i], bb = bodies[j];
+          const dx = bb.cx - a.cx, dy = bb.cy - a.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < dieSize && dist > 0.01) {
+            const nx = dx / dist, ny = dy / dist;
+            const rvn = (a.vx - bb.vx) * nx + (a.vy - bb.vy) * ny;
+            if (rvn > 0) {
+              const imp = rvn * BOUNCE_COEFF;
+              a.vx -= imp * nx; a.vy -= imp * ny;
+              bb.vx += imp * nx; bb.vy += imp * ny;
+              if (collisionSfxCooldown === 0) { playSfx('sfxDiceRoll', 0.2); collisionSfxCooldown = 8; }
+            }
+            const overlap = (dieSize - dist) / 2 + 0.5;
+            a.cx -= overlap * nx; a.cy -= overlap * ny;
+            bb.cx += overlap * nx; bb.cy += overlap * ny;
+          }
+        }
       }
 
-      setTimeout(() => {
-        d.classList.remove('rolling');
-        if (lrPhysics && lrPhysics.settled && lrPhysics.dice[i]) {
-          lrPhysics.dice[i].el.classList.remove('rolling-3d');
+      // Wall bounce
+      bodies.forEach(b => {
+        if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_COEFF; }
+        if (b.cx + dieR > trayW - PAD) { b.cx = trayW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_COEFF; }
+        if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_COEFF; }
+        if (b.cy + dieR > trayH - PAD) { b.cy = trayH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_COEFF; }
+      });
+
+      // Render + track max speed
+      bodies.forEach(b => {
+        b.el.style.left = (b.cx - dieR) + 'px';
+        b.el.style.top = (b.cy - dieR) + 'px';
+        const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        if (s > maxSpd) maxSpd = s;
+        // Subtle velocity rotation
+        if (s > 0.5) {
+          const ang = Math.atan2(b.vy, b.vx) * 57.3 * 0.2;
+          b.el.style.transform = `rotate(${ang}deg)`;
+        } else {
+          b.el.style.transform = '';
         }
-        dice.sort((a, b) => a - b);
-        if (team === 'red') B.pendingResolve.redDice = dice;
-        else B.pendingResolve.blueDice = dice;
-        B.redDice = B.pendingResolve.redDice;
-        B.blueDice = B.pendingResolve.blueDice;
-        renderDice(B.redDice, B.blueDice);
+      });
 
-        log(`<span class="log-ability">Charlie</span> — Flicked ${oldVal} → <b>${newVal}</b>! [${dice.join(', ')}]`);
-
-        // Phase 2: optional target — Flick into another die
-        narrate(`<b class="${team}-text">${teamLabel}</b> — Flick into another die, or wait to skip!`);
-
-        const makeTargetable = (targetEl, targetDice, tTeam) => {
-          targetEl.querySelectorAll('.die').forEach((td, ti) => {
-            td.classList.add('rerollable');
-            td.style.cursor = 'pointer';
-            td.onclick = () => {
-              clearLsCountdown();
-              clearDiceClickable(team);
-              clearDiceClickable(oppTeam);
-              playSfx('sfxDiceRoll');
-
-              const targetOld = targetDice[ti];
-              const targetNew = Math.floor(Math.random() * 6) + 1;
-              targetDice[ti] = targetNew;
-
-              td.classList.add('rolling');
-              td.textContent = '?';
-              const tPhysics = _dicePhysics[tTeam];
-              if (tPhysics && tPhysics.settled && tPhysics.dice[ti]) {
-                tPhysics.dice[ti].el.classList.add('rolling-3d');
-              }
-
-              setTimeout(() => {
-                td.classList.remove('rolling');
-                if (tPhysics && tPhysics.settled && tPhysics.dice[ti]) {
-                  tPhysics.dice[ti].el.classList.remove('rolling-3d');
-                }
-                targetDice.sort((a, b) => a - b);
-                B.redDice = B.pendingResolve.redDice;
-                B.blueDice = B.pendingResolve.blueDice;
-                renderDice(B.redDice, B.blueDice);
-
-                log(`<span class="log-ability">Charlie</span> — Contact! ${tTeam} die ${targetOld} → <b>${targetNew}</b>!`);
-                narrate(`<b style="color:#f59e0b">Contact!</b> ${targetOld} → <b>${targetNew}</b>!`);
-
-                setTimeout(() => callback(), spd(800));
-              }, spd(500));
-            };
-          });
-          sync3dDiceClickable(tTeam);
-        };
-
-        // Make both teams' dice clickable as targets
-        makeTargetable(document.getElementById(team + '-dice'), dice, team);
-        makeTargetable(document.getElementById(oppTeam + '-dice'), oppDice, oppTeam);
-
-        // Timer for phase 2
-        let remaining2 = getSpecialsTimerSecs();
-        const countdownTarget2 = document.getElementById(team + '-dice');
-        showLsCountdown(countdownTarget2, remaining2);
-        lsCountdownTimer = setInterval(() => {
-          remaining2--;
-          if (remaining2 <= 0) {
-            clearLsCountdown();
-            clearDiceClickable(team);
-            clearDiceClickable(oppTeam);
-            B.redDice = B.pendingResolve.redDice;
-            B.blueDice = B.pendingResolve.blueDice;
-            renderDice(B.redDice, B.blueDice);
-            log(`<span style="color:var(--text2)">Charlie skipped the contact Flick.</span>`);
-            callback();
-          } else {
-            showLsCountdown(countdownTarget2, remaining2);
-          }
-        }, 1000);
-
-      }, spd(500));
+      if (maxSpd < SETTLE_SPEED) {
+        cancelAnimationFrame(flickRaf);
+        settleFlick();
+      } else {
+        flickRaf = requestAnimationFrame(physStep);
+      }
     };
-  });
-  sync3dDiceClickable(team);
 
-  // Timer for phase 1
-  let remaining = getSpecialsTimerSecs();
-  showLsCountdown(diceEl, remaining);
+    flickRaf = requestAnimationFrame(physStep);
+  };
+
+  // -- Settle: assign new values to moved dice --
+  const settleFlick = () => {
+    bodies.forEach(b => { b.el.style.transform = ''; });
+    let changed = 0;
+    bodies.forEach(b => {
+      const dx = b.cx - b.origCx, dy = b.cy - b.origCy;
+      b.moved = Math.sqrt(dx * dx + dy * dy) > 4;
+      if (b.moved) {
+        changed++;
+        const newVal = Math.floor(Math.random() * 6) + 1;
+        b.el.textContent = newVal;
+        b.el.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+        b.el.style.transform = 'scale(1.2)';
+        b.el.style.boxShadow = '0 0 16px rgba(255,255,255,0.6)';
+        setTimeout(() => { b.el.style.transform = 'scale(1)'; b.el.style.boxShadow = ''; }, 250);
+        if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = newVal;
+        else B.pendingResolve.blueDice[b.dieIndex] = newVal;
+      }
+    });
+
+    B.pendingResolve.redDice.sort((a, b) => a - b);
+    B.pendingResolve.blueDice.sort((a, b) => a - b);
+    B.redDice = B.pendingResolve.redDice;
+    B.blueDice = B.pendingResolve.blueDice;
+
+    log(`<span class="log-ability">Charlie</span> — Flick! <b>${changed}</b> dice changed on contact! → Red [${B.redDice.join(',')}] Blue [${B.blueDice.join(',')}]`);
+    if (changed > 0) narrate(`<b style="color:#f59e0b">Flick!</b> ${changed} dice changed!`);
+    else narrate(`<b style="color:var(--text2)">Flick!</b> No contact — dice unchanged.`);
+
+    setTimeout(() => {
+      cleanup();
+      renderDice(B.redDice, B.blueDice);
+      renderBattle();
+      setTimeout(() => callback(), spd(400));
+    }, spd(900));
+  };
+
+  // -- Bind input events --
+  overlay.addEventListener('mousedown', onDown);
+  overlay.addEventListener('mousemove', onMove);
+  overlay.addEventListener('mouseup', onUp);
+  overlay.addEventListener('touchstart', onDown, { passive: false });
+  overlay.addEventListener('touchmove', onMove, { passive: false });
+  overlay.addEventListener('touchend', onUp);
+
+  // -- Timeout if player doesn't fling --
+  let remaining = getSpecialsTimerSecs() + 3;
+  showLsCountdown(overlay, remaining);
   lsCountdownTimer = setInterval(() => {
     remaining--;
     if (remaining <= 0) {
       clearLsCountdown();
-      clearDiceClickable(team);
+      if (flickRaf) cancelAnimationFrame(flickRaf);
+      overlay.removeEventListener('mousedown', onDown);
+      overlay.removeEventListener('mousemove', onMove);
+      overlay.removeEventListener('mouseup', onUp);
+      overlay.removeEventListener('touchstart', onDown);
+      overlay.removeEventListener('touchmove', onMove);
+      overlay.removeEventListener('touchend', onUp);
+      cleanup();
       log(`<span style="color:var(--text2)">Charlie didn't Flick in time.</span>`);
       B.redDice = B.pendingResolve.redDice;
       B.blueDice = B.pendingResolve.blueDice;
       callback();
-    } else {
-      showLsCountdown(diceEl, remaining);
+    } else if (!launched) {
+      showLsCountdown(overlay, remaining);
     }
   }, 1000);
 }
