@@ -242,6 +242,101 @@
             line-height: 1.4;
         }
 
+        /* === SHADOW SELF CARD === */
+        .shadow-card {
+            background: linear-gradient(135deg, rgba(80, 128, 224, 0.08), rgba(144, 96, 224, 0.04));
+            border: 1px solid rgba(80, 128, 224, 0.2);
+            border-left: 3px solid var(--purple);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .shadow-card.idle { display: none; }
+
+        .shadow-card .shadow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .shadow-card .shadow-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--purple);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .shadow-card .shadow-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text2);
+            text-align: right;
+        }
+
+        .shadow-card .shadow-task {
+            background: rgba(80, 128, 224, 0.06);
+            border: 1px solid rgba(80, 128, 224, 0.12);
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+
+        .shadow-card .task-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: var(--purple);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .shadow-card .task-text {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .classification-badge {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 6px;
+            letter-spacing: 1px;
+        }
+
+        .classification-badge.green {
+            color: var(--green);
+            background: rgba(64, 200, 120, 0.15);
+        }
+
+        .classification-badge.yellow {
+            color: var(--amber);
+            background: rgba(224, 176, 64, 0.15);
+        }
+
+        .shadow-stats {
+            display: flex;
+            gap: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text2);
+            margin-top: 8px;
+        }
+
+        .shadow-stats .stat-val {
+            color: var(--purple);
+            font-weight: 700;
+        }
+
         /* === REFINER CARDS === */
         .refiners { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
 
@@ -602,6 +697,25 @@
     <div class="hb-summary" id="hbSummary" style="margin:0 24px;"></div>
 
     <div class="container">
+        <!-- Shadow Self status card -->
+        <div class="shadow-card idle" id="shadowCard">
+            <div class="shadow-header">
+                <div class="shadow-title"><span class="spinner" id="shadowSpinner"></span>Shadow Self</div>
+                <div class="shadow-meta" id="shadowMeta">loading...</div>
+            </div>
+            <div class="shadow-task" id="shadowTask" style="display:none">
+                <div class="task-label">Current Task <span class="classification-badge" id="shadowBadge"></span></div>
+                <div class="task-text" id="shadowTaskText"></div>
+            </div>
+            <div class="shadow-stats" id="shadowStats">
+                <span>Completed: <span class="stat-val" id="shadowCompleted">0</span></span>
+                <span>Remaining: <span class="stat-val" id="shadowRemaining">0</span></span>
+            </div>
+            <div class="progress-bar" id="shadowProgress" style="margin-top:8px">
+                <div class="progress-fill" id="shadowProgressFill" style="width:0%"></div>
+            </div>
+        </div>
+
         <!-- Live ticker: activity + Gary roasts side by side -->
         <div class="ticker-row" id="ticker" style="display:none">
             <div class="ticker" style="flex:1;margin-bottom:0;">
@@ -640,6 +754,15 @@
         const hbLabel = document.getElementById('hbLabel');
         const hbDetail = document.getElementById('hbDetail');
         const hbSummary = document.getElementById('hbSummary');
+        const shadowCard = document.getElementById('shadowCard');
+        const shadowMeta = document.getElementById('shadowMeta');
+        const shadowTask = document.getElementById('shadowTask');
+        const shadowBadge = document.getElementById('shadowBadge');
+        const shadowTaskText = document.getElementById('shadowTaskText');
+        const shadowCompleted = document.getElementById('shadowCompleted');
+        const shadowRemaining = document.getElementById('shadowRemaining');
+        const shadowSpinner = document.getElementById('shadowSpinner');
+        const shadowProgressFill = document.getElementById('shadowProgressFill');
 
         let lastFeedHash = '';
         let seenCycles = new Set();
@@ -803,6 +926,36 @@
 
                 lastFeedHash = newHash;
                 firstLoad = false;
+
+                // === SHADOW SELF ===
+                const shadow = data.shadow;
+                if (shadow && shadow.status && shadow.status !== 'done') {
+                    shadowCard.classList.remove('idle');
+                    const isRunning = shadow.status === 'running';
+                    shadowSpinner.style.display = isRunning ? '' : 'none';
+                    shadowMeta.textContent = isRunning
+                        ? 'until ' + esc(shadow.until) + ' · ' + timeAgo(shadow.last_update)
+                        : shadow.status;
+
+                    if (shadow.current_task) {
+                        shadowTask.style.display = '';
+                        shadowTaskText.textContent = shadow.current_task.title || shadow.current_task.id;
+                        const cls = (shadow.current_task.classification || '').toLowerCase();
+                        shadowBadge.textContent = shadow.current_task.classification || '';
+                        shadowBadge.className = 'classification-badge ' + cls;
+                        // Progress within task
+                        const used = shadow.current_task.cycles_used || 0;
+                        const max = shadow.current_task.max_cycles || 1;
+                        shadowProgressFill.style.width = Math.min(100, (used / max) * 100) + '%';
+                    } else {
+                        shadowTask.style.display = 'none';
+                    }
+
+                    shadowCompleted.textContent = shadow.tasks_completed || 0;
+                    shadowRemaining.textContent = shadow.tasks_remaining || 0;
+                } else {
+                    shadowCard.classList.add('idle');
+                }
 
                 // === ORCHESTRATOR HEARTBEAT ===
                 const check = data.orchestrator_check;
