@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.72'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.73'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2708,9 +2708,51 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .raid-nav-btn:hover { background: linear-gradient(135deg, rgba(212,160,64,0.3), rgba(212,160,64,0.1)); transform: translateY(-1px); }
 .raid-points-inline { color: var(--gold); font-weight: 700; font-size: 0.9rem; margin-left: auto; }
 
-/* Raid Section (lobby/shop container) */
+/* Raid Section (shop container) */
 .raid-section { padding: 16px 0; }
 .raid-section-title { font-family: 'Creepster', cursive; font-size: 1.8rem; letter-spacing: 3px; color: var(--gold-bright); margin-bottom: 16px; }
+
+/* Raid Lobby Overlay — epic full-screen modal */
+.raid-lobby-overlay {
+  position: fixed; inset: 0; z-index: 8000;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.35s ease;
+}
+.raid-lobby-overlay.active { display: flex; opacity: 1; }
+.raid-lobby-modal {
+  position: relative;
+  width: 92%; max-width: 900px; max-height: 88vh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(142,68,173,0.12), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(233,69,96,0.08), transparent 50%),
+    linear-gradient(180deg, #12091e 0%, #0e0818 100%);
+  border: 1px solid rgba(142,68,173,0.3);
+  border-radius: 18px;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 32px 28px 24px;
+  box-shadow: 0 0 60px rgba(142,68,173,0.2), 0 0 120px rgba(0,0,0,0.5);
+  transform: scale(0.92); transition: transform 0.35s ease;
+}
+.raid-lobby-overlay.active .raid-lobby-modal { transform: scale(1); }
+.raid-lobby-close {
+  position: absolute; top: 12px; right: 16px; z-index: 10;
+  background: none; border: none; color: var(--text2); font-size: 2rem;
+  cursor: pointer; line-height: 1; transition: color 0.2s;
+}
+.raid-lobby-close:hover { color: var(--accent); }
+.raid-lobby-inner { }
+.raid-lobby-inner .raid-section-title {
+  font-size: 2.2rem; text-align: center; letter-spacing: 5px;
+  background: linear-gradient(90deg, var(--gold), #e9d5ff, var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+.raid-lobby-subtitle {
+  text-align: center; color: var(--text-dim); font-size: 0.85rem;
+  letter-spacing: 1px; margin-bottom: 24px;
+}
 
 /* Raid Tier Group */
 .raid-tier-group { margin-bottom: 24px; }
@@ -3177,12 +3219,17 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <span class="raid-points-inline">&#x2B50; <span id="raid-points-display">0</span> pts</span>
     </div>
 
-    <!-- Raid Lobby -->
-    <div id="raid-lobby" class="raid-section" style="display:none"></div>
-
-    <!-- Raid Shop -->
+    <!-- Raid Shop (inline) -->
     <div id="raid-shop" class="raid-section" style="display:none"></div>
 
+  </div>
+</div>
+
+<!-- ===== RAID LOBBY (full-screen modal overlay) ===== -->
+<div id="raid-lobby-overlay" class="raid-lobby-overlay" onclick="if(event.target===this)closeRaidLobby()">
+  <div class="raid-lobby-modal">
+    <button class="raid-lobby-close" onclick="closeRaidLobby()">&times;</button>
+    <div id="raid-lobby" class="raid-lobby-inner"></div>
   </div>
 </div>
 
@@ -3377,7 +3424,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.72';
+const BBN_VERSION = 'v0.73';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7286,18 +7333,24 @@ async function cleanupStaleGames() {
 
 // Show/hide raid sections
 function showRaidSection(section) {
-  const lobby = document.getElementById('raid-lobby');
+  const overlay = document.getElementById('raid-lobby-overlay');
   const shop = document.getElementById('raid-shop');
 
   if (section === 'lobby') {
-    lobby.style.display = lobby.style.display === 'none' ? 'block' : 'none';
-    shop.style.display = 'none';
-    if (lobby.style.display === 'block') showRaidLobby();
+    // Open the epic full-screen raid lobby
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('active'));
+    showRaidLobby();
   } else if (section === 'shop') {
     shop.style.display = shop.style.display === 'none' ? 'block' : 'none';
-    lobby.style.display = 'none';
     if (shop.style.display === 'block') showRaidShop();
   }
+}
+
+function closeRaidLobby() {
+  const overlay = document.getElementById('raid-lobby-overlay');
+  overlay.classList.remove('active');
+  setTimeout(() => { overlay.style.display = 'none'; }, 350);
 }
 
 // Initialize raid system after auth

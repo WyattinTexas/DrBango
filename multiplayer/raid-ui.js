@@ -22,7 +22,7 @@ function renderRaidLobby(userBadges) {
   if (!container) return;
 
   const tiers = [1, 2, 3];
-  let html = '<h2 class="raid-section-title">CHOOSE YOUR RAID</h2>';
+  let html = '<h2 class="raid-section-title">CHOOSE YOUR RAID</h2><div class="raid-lobby-subtitle">Select a boss to challenge with your team</div>';
 
   tiers.forEach(tier => {
     const bosses = Object.entries(RAID_BOSSES).filter(([, b]) => b.tier === tier);
