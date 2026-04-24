@@ -21,15 +21,20 @@ function renderRaidLobby(userBadges) {
   const container = document.getElementById('raid-lobby');
   if (!container) return;
 
-  const tiers = [1, 2, 3];
-  let html = '<h2 class="raid-section-title">CHOOSE YOUR RAID</h2><div class="raid-lobby-subtitle">Select a boss to challenge with your team</div>';
+  const tierConfig = [
+    { tier: 1, name: 'Rolling Hills', color: '#2ecc71', accent: 'rgba(46,204,113,0.15)' },
+    { tier: 2, name: 'Frost Valley', color: '#75BEEB', accent: 'rgba(117,190,235,0.15)' },
+    { tier: 3, name: 'Volcanic Isles', color: '#e74c3c', accent: 'rgba(231,76,60,0.15)' },
+    { tier: 4, name: 'Dark Castle', color: '#9b59b6', accent: 'rgba(155,89,182,0.15)' }
+  ];
+  let html = '<h2 class="raid-section-title">THE ONSLAUGHT</h2><div class="raid-lobby-subtitle">Rally your team. Face the darkness.</div>';
 
-  tiers.forEach(tier => {
+  tierConfig.forEach(({ tier, name, color, accent }) => {
     const bosses = Object.entries(RAID_BOSSES).filter(([, b]) => b.tier === tier);
     if (bosses.length === 0) return;
 
     html += `<div class="raid-tier-group">
-      <div class="raid-tier-label">TIER ${tier}</div>
+      <div class="raid-tier-label" style="color:${color};border-bottom:2px solid ${color};padding-bottom:6px;">${name}</div>
       <div class="raid-boss-grid">`;
 
     bosses.forEach(([raidId, boss]) => {

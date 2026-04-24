@@ -487,13 +487,14 @@ const RAID_BOSS_MINIONS = [
 ];
 
 const RAID_BOSSES = {
-  // ======================== TIER 1 ========================
+  // ======================== ROLLING HILLS ========================
   tyrant_mountain_king: {
     id: 'tyrant_mountain_king',
     name: 'The Mountain King',
     title: 'Crush and Conquer',
     personality: 'tyrant',
     tier: 1,
+    set: 'Rolling Hills',
     requiredBadge: null,
     requiredPlayers: 5,
     bossGhost: {
@@ -524,7 +525,8 @@ const RAID_BOSSES = {
     name: 'The Phantom',
     title: 'Nothing Is What It Seems',
     personality: 'trickster',
-    tier: 1,
+    tier: 2,
+    set: 'Frost Valley',
     requiredBadge: null,
     requiredPlayers: 1,
     bossGhost: {
@@ -556,6 +558,7 @@ const RAID_BOSSES = {
     title: 'Endless Reinforcements',
     personality: 'swarm',
     tier: 1,
+    set: 'Rolling Hills',
     requiredBadge: null,
     requiredPlayers: 3,
     bossGhost: {
@@ -582,14 +585,15 @@ const RAID_BOSSES = {
     }
   },
 
-  // ======================== TIER 2 ========================
+  // ======================== FROST VALLEY ========================
   glacier_ancient: {
     id: 'glacier_ancient',
     name: 'The Glacier',
     title: 'Inevitable Frozen Death',
     personality: 'glacier',
     tier: 2,
-    requiredBadge: 'dragon_slayer',
+    set: 'Frost Valley',
+    requiredBadge: null,
     requiredPlayers: 7,
     bossGhost: {
       id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/Millicent.png',
@@ -614,12 +618,14 @@ const RAID_BOSSES = {
     }
   },
 
+  // ======================== VOLCANIC ISLES ========================
   tyrant_doom: {
     id: 'tyrant_doom',
     name: 'Doom Ascended',
     title: 'The End of All Things',
     personality: 'tyrant',
-    tier: 2,
+    tier: 3,
+    set: 'Volcanic Isles',
     requiredBadge: 'dragon_slayer',
     requiredPlayers: 7,
     bossGhost: {
@@ -650,7 +656,8 @@ const RAID_BOSSES = {
     name: 'The Broodmother',
     title: 'Mother of a Thousand',
     personality: 'swarm',
-    tier: 2,
+    tier: 3,
+    set: 'Volcanic Isles',
     requiredBadge: 'dragon_slayer',
     requiredPlayers: 7,
     bossGhost: {
@@ -677,13 +684,14 @@ const RAID_BOSSES = {
     }
   },
 
-  // ======================== TIER 3 ========================
+  // ======================== DARK CASTLE ========================
   trickster_shepherd: {
     id: 'trickster_shepherd',
     name: 'The Shepherd',
     title: 'Master of the Flock',
     personality: 'trickster',
-    tier: 3,
+    tier: 4,
+    set: 'Dark Castle',
     requiredBadge: 'raid_master',
     requiredPlayers: 10,
     bossGhost: {
@@ -714,7 +722,8 @@ const RAID_BOSSES = {
     name: 'The Eternal Frost',
     title: 'Heat Death of the Spirit World',
     personality: 'glacier',
-    tier: 3,
+    tier: 4,
+    set: 'Dark Castle',
     requiredBadge: 'raid_master',
     requiredPlayers: 10,
     bossGhost: {
