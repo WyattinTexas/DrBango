@@ -164,6 +164,9 @@ function selectRaid(raidId) {
         <button id="raid-join-btn" class="raid-join-btn" onclick="joinRaid()" ${hasTeam ? '' : 'disabled'}>
           ${hasTeam ? 'JOIN RAID' : 'SELECT A TEAM FIRST'}
         </button>
+        <button id="raid-start-btn" class="raid-start-btn" onclick="startRaidFromQueue()" style="display:none">
+          START RAID
+        </button>
         <button id="raid-leave-btn" class="raid-leave-btn" onclick="leaveRaid()" style="display:none">
           LEAVE QUEUE
         </button>
@@ -267,34 +270,38 @@ function updateRaidQueueUI(raidId, entries) {
   const bossConfig = RAID_BOSSES[raidId];
   const max = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
   const minP = RAID_BOSSES[raidId]?.minPlayers || 2;
+  const user = firebase.auth().currentUser;
+  const inQueue = entries.some(e => e.uid === user?.uid);
+  const canStart = entries.length >= minP && inQueue;
+
   if (entries.length === 0) {
     countEl.innerHTML = `<span style="color:var(--text-dim);">Waiting for raiders...</span>`;
   } else if (entries.length < minP) {
     countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> / <span class="raid-queue-num">${minP}</span> raiders needed to start`;
   } else {
-    countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders ready! <span style="color:#2ecc71;font-weight:700;">RAID LAUNCHING...</span>`;
-    if (!document.getElementById('raid-launch-countdown')) {
-      const bossConfig = RAID_BOSSES[raidId];
-      showRaidLaunchCountdown(bossConfig?.name || 'Boss');
-    }
+    countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders ready!`;
   }
 
   let html = '';
   entries.forEach((e, i) => {
-    html += `<div class="raid-queue-player">
+    const isMe = e.uid === user?.uid;
+    html += `<div class="raid-queue-player ${isMe ? 'is-me' : ''}">
       <span class="raid-queue-slot">#${i + 1}</span>
-      <span class="raid-queue-name">${e.displayName}</span>
+      <span class="raid-queue-name">${e.displayName}${isMe ? ' (you)' : ''}</span>
     </div>`;
   });
   playersEl.innerHTML = html;
 
-  // Check if we're in the queue
-  const user = firebase.auth().currentUser;
-  const inQueue = entries.some(e => e.uid === user?.uid);
+  // Show/hide buttons based on queue state
   const joinBtn = document.getElementById('raid-join-btn');
   const leaveBtn = document.getElementById('raid-leave-btn');
+  const startBtn = document.getElementById('raid-start-btn');
   if (joinBtn) joinBtn.style.display = inQueue ? 'none' : '';
   if (leaveBtn) leaveBtn.style.display = inQueue ? '' : 'none';
+  if (startBtn) {
+    startBtn.style.display = canStart ? '' : 'none';
+    startBtn.disabled = !canStart;
+  }
 }
 
 async function joinRaid() {
@@ -302,6 +309,25 @@ async function joinRaid() {
   const result = await joinRaidQueue(selectedRaidId, raidTeamPicks);
   if (result.error) {
     alert(result.error);
+  }
+}
+
+async function startRaidFromQueue() {
+  if (!selectedRaidId) return;
+  const btn = document.getElementById('raid-start-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'STARTING...'; }
+
+  const result = await startRaidManually(selectedRaidId);
+  if (result.error) {
+    alert(result.error);
+    if (btn) { btn.disabled = false; btn.textContent = 'START RAID'; }
+    return;
+  }
+
+  // Show countdown
+  const bossConfig = RAID_BOSSES[selectedRaidId];
+  if (!document.getElementById('raid-launch-countdown')) {
+    showRaidLaunchCountdown(bossConfig?.name || 'Boss');
   }
 }
 

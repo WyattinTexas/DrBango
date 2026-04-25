@@ -108,15 +108,32 @@ function startQueueListener(raidId) {
       updateRaidQueueUI(raidId, entries);
     }
 
-    const bossConfig = RAID_BOSSES[raidId];
-    const minPlayers = bossConfig?.minPlayers || 2;
-    const maxPlayers = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
-
-    // Start when we have at least minPlayers (raid can fire early)
-    if (entries.length >= minPlayers) {
-      await tryCreateRaidInstance(raidId, entries.slice(0, maxPlayers));
-    }
+    // UI handles the START button — no auto-fire
   });
+}
+
+/**
+ * Manually start a raid — called when a player clicks START RAID
+ */
+async function startRaidManually(raidId) {
+  const queueSnap = await db.ref(`mp/raids/queue/${raidId}`).once('value');
+  const queue = queueSnap.val();
+  if (!queue) return { error: 'Queue is empty' };
+
+  const entries = Object.entries(queue)
+    .map(([uid, data]) => ({ uid, ...data }))
+    .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+
+  const bossConfig = RAID_BOSSES[raidId];
+  const minPlayers = bossConfig?.minPlayers || 2;
+  const maxPlayers = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
+
+  if (entries.length < minPlayers) {
+    return { error: `Need at least ${minPlayers} players to start` };
+  }
+
+  await tryCreateRaidInstance(raidId, entries.slice(0, maxPlayers));
+  return { success: true };
 }
 
 function stopQueueListener(raidId) {
