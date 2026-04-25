@@ -69,7 +69,6 @@ function renderRaidLobby(userBadges) {
         <div class="book-boss-meta">
           <span class="book-hp">${boss.bossGhost.maxHp} HP</span>
           <span class="book-players">${playerCount} players</span>
-          <span class="book-pts">${boss.rewardPoints} pts</span>
         </div>
         ${locked ? `<div class="book-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
       </div>
