@@ -1,18 +1,20 @@
 // Smart Auto-Play Simulation — paste into browser console
 // Replaces basic autoPlay with ability-aware AI
+// v841 — console.log calls guarded behind DEBUG flag
+const DEBUG = (typeof window !== 'undefined' && window.DEBUG) || false; // set window.DEBUG=true to enable verbose logging
 function smartAutoPlay(numGames = 50) {
-  if (autoPlayRunning) { console.log('Auto-play already running'); return; }
+  if (autoPlayRunning) { if (DEBUG) console.log('Auto-play already running'); return; }
   autoPlayRunning = true;
   autoPlayQueue = numGames;
   autoPlayTotal = numGames;
-  console.log(`🧠 Smart Auto-play: starting ${numGames} games...`);
+  if (DEBUG) console.log(`🧠 Smart Auto-play: starting ${numGames} games...`);
   smartPlayNext();
 }
 
 function smartPlayNext() {
   if (autoPlayQueue <= 0) {
     autoPlayRunning = false;
-    console.log(`✅ Smart auto-play complete! ${autoPlayTotal} games played.`);
+    if (DEBUG) console.log(`✅ Smart auto-play complete! ${autoPlayTotal} games played.`);
     if (B) {
       B = null;
       document.getElementById('battle-view').style.display = 'none';
@@ -35,7 +37,7 @@ function smartPlayNext() {
   if (gameNum % 10 === 1 || gameNum === autoPlayTotal) {
     const rn = S.redPicks.map(id => ghostData(id).name);
     const bn = S.bluePicks.map(id => ghostData(id).name);
-    console.log(`🧠 Game ${gameNum}/${autoPlayTotal}: Red [${rn}] vs Blue [${bn}]`);
+    if (DEBUG) console.log(`🧠 Game ${gameNum}/${autoPlayTotal}: Red [${rn}] vs Blue [${bn}]`);
   }
 
   prevResources = { red: {}, blue: {} };
@@ -2907,4 +2909,4 @@ function smartSimRounds(gameNum) {
   setTimeout(() => smartSimRounds(gameNum), 0);
 }
 
-console.log('🧠 smartAutoPlay loaded! Run: smartAutoPlay(100)');
+if (DEBUG) console.log('🧠 smartAutoPlay loaded! Run: smartAutoPlay(100)');

@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v840'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v841'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2733,6 +2733,10 @@ body.lite-mode .die.rolling { animation: none !important; }
 
 <script>
 // ============================================================
+// DEBUG FLAG — set to true in browser console to re-enable verbose logging
+// ============================================================
+const DEBUG = false;
+// ============================================================
 // RESTORE PERSISTED SETTINGS from localStorage
 // ============================================================
 (function() {
@@ -3650,11 +3654,11 @@ let autoPlayQueue = 0;
 let autoPlayTotal = 0;
 
 function autoPlay(numGames = 5) {
-  if (autoPlayRunning) { console.log('Auto-play already running'); return; }
+  if (autoPlayRunning) { if (DEBUG) console.log('Auto-play already running'); return; }
   autoPlayRunning = true;
   autoPlayQueue = numGames;
   autoPlayTotal = numGames;
-  console.log(`🎮 Auto-play: starting ${numGames} games...`);
+  if (DEBUG) console.log(`🎮 Auto-play: starting ${numGames} games...`);
   autoPlayNext();
 }
 
@@ -3677,7 +3681,7 @@ function autoPickTeam() {
 function autoPlayNext() {
   if (autoPlayQueue <= 0) {
     autoPlayRunning = false;
-    console.log(`✅ Auto-play complete! ${autoPlayTotal} games played.`);
+    if (DEBUG) console.log(`✅ Auto-play complete! ${autoPlayTotal} games played.`);
     // Clean up battle view
     if (B) {
       B = null;
@@ -3702,7 +3706,7 @@ function autoPlayNext() {
 
   const redNames = S.redPicks.map(id => ghostData(id).name);
   const blueNames = S.bluePicks.map(id => ghostData(id).name);
-  console.log(`🎮 Game ${gameNum}/${autoPlayTotal}: Red [${redNames}] vs Blue [${blueNames}]`);
+  if (DEBUG) console.log(`🎮 Game ${gameNum}/${autoPlayTotal}: Red [${redNames}] vs Blue [${blueNames}]`);
 
   // Start battle silently (skip VS splash)
   prevResources = { red: {}, blue: {} };
@@ -3813,7 +3817,7 @@ function autoPlayNext() {
 function autoSimRounds(gameNum) {
   if (!B || B.round > 50) {
     // Safety: end as draw after 50 rounds
-    console.log(`  → Draw (50 round limit)`);
+    if (DEBUG) console.log(`  → Draw (50 round limit)`);
     autoPlayNext();
     return;
   }
@@ -3822,17 +3826,17 @@ function autoSimRounds(gameNum) {
   const redAllDown = B.red.ghosts.every(g => g.ko);
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
   if (redAllDown && blueAllDown) {
-    console.log(`  → Draw! (${B.round - 1} rounds)`);
+    if (DEBUG) console.log(`  → Draw! (${B.round - 1} rounds)`);
     autoRecordGame('draw');
     return;
   }
   if (redAllDown) {
-    console.log(`  → Blue wins! (${B.round - 1} rounds)`);
+    if (DEBUG) console.log(`  → Blue wins! (${B.round - 1} rounds)`);
     autoRecordGame('blue');
     return;
   }
   if (blueAllDown) {
-    console.log(`  → Red wins! (${B.round - 1} rounds)`);
+    if (DEBUG) console.log(`  → Red wins! (${B.round - 1} rounds)`);
     autoRecordGame('red');
     return;
   }
@@ -4638,7 +4642,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Mike (445) — Torrent: while Mike is on the team (sideline), entering ghosts are immune to Burn
   let burnEntryFired = false;
   // Debug: log burn state on every entry for tracking burn-not-firing issues
-  console.log(`[BURN DEBUG] ${f.name} (id:${f.id}) entering for ${entryTeamName}, activeIdx=${team.activeIdx}, B.burn[${entryTeamName}]=`, JSON.stringify(B.burn?.[entryTeamName] || {}));
+  if (DEBUG) console.log(`[BURN DEBUG] ${f.name} (id:${f.id}) entering for ${entryTeamName}, activeIdx=${team.activeIdx}, B.burn[${entryTeamName}]=`, JSON.stringify(B.burn?.[entryTeamName] || {}));
   if (B.burn && B.burn[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const burnCount = B.burn[entryTeamName][activeIdx] || 0;
@@ -16475,7 +16479,7 @@ function _resolveRoundImpl() {
   // Jeffery (14) — Chuckle: sideline passive — active ghost gains +3 HP when the winning roll DEFEATS the enemy ghost (lF.ko).
   // "Wins a battle" = KO an enemy ghost, NOT merely winning a roll. Filbert-aware, Cornelius-aware.
   // Phase 3 debug breadcrumb — helps Wyatt verify the Chuckle path fires correctly
-  console.log('[CHUCKLE DEBUG]', {
+  if (DEBUG) console.log('[CHUCKLE DEBUG]', {
     hasSideline: hasSideline(winTeam, 14),
     wFko: wF.ko,
     lFko: lF.ko,
