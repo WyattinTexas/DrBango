@@ -1221,8 +1221,17 @@ async function writeBattleSnapshot(snapshotData) {
  * Clean up all raid listeners and state
  */
 function cleanupRaid() {
-  Object.entries(raidListeners).forEach(([key, listener]) => {
-    // Can't easily .off() without the ref, so we track refs too
+  // Remove Firebase listeners
+  if (currentRaid?.instanceId) {
+    const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);
+    if (raidListeners['instance']) instRef.off('value', raidListeners['instance']);
+    if (raidListeners['battleState']) instRef.child('battleState').off('value', raidListeners['battleState']);
+  }
+  Object.entries(raidListeners).forEach(([key]) => {
+    if (key.startsWith('queue_')) {
+      const raidId = key.replace('queue_', '');
+      db.ref(`mp/raids/queue/${raidId}`).off('value', raidListeners[key]);
+    }
   });
   raidListeners = {};
   stopHeartbeat();

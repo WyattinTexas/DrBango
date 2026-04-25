@@ -669,7 +669,7 @@ body {
     <div class="slide-nav-title">RAID WALKTHROUGH</div>
     <div class="slide-dots" id="slide-dots"></div>
     <div style="display:flex;align-items:center;gap:16px;">
-      <div class="slide-counter"><span class="current" id="slide-current">1</span> / <span id="slide-total">11</span></div>
+      <div class="slide-counter"><span class="current" id="slide-current">1</span> / <span id="slide-total">12</span></div>
       <div class="slide-arrows">
         <button id="btn-prev" onclick="prevSlide()">&#9664;</button>
         <button id="btn-next" onclick="nextSlide()">&#9654;</button>
@@ -1387,11 +1387,55 @@ body {
 
     </div>
 
+    <div class="slide" data-slide="12">
+      <div class="slide-number">v0.76 AUDIT FIXES</div>
+      <h2>Shadow Self Raid Audit</h2>
+      <p class="slide-desc" style="margin-bottom:24px;">
+        Full code-level audit of every raid code path. Traced queue flow, testroom integration, return flow, and multi-player sequencing.
+      </p>
+
+      <div class="audit-section">
+        <h3 class="red">Bugs Fixed</h3>
+        <ul class="audit-list check">
+          <li><strong>CRITICAL: Padded ghost damage inflation</strong> -- Bosses with fewer than 3 ghosts (e.g. Dark Fang solo) pad to 3 by duplicating the boss. KO'd padding was counted as damage dealt, inflating totals by 2-3x. Fixed: damage calcs now only count real boss ghosts via RAID_PARAMS.realBossGhostCount.</li>
+          <li><strong>Double raid points</strong> -- checkRaidResult() called distributeRaidRewards() AND manually incremented points for the returning player. Killing-blow player earned 2x points. Fixed: removed inline increment, distributeRaidRewards handles all players.</li>
+          <li><strong>HP display mismatch</strong> -- Queue view showed boss.baseHp (decorative field, e.g. 60) while the engine uses bossGhost.maxHp (per-fight HP, e.g. 9). Fixed: queue now shows bossGhost.maxHp to match actual gameplay.</li>
+          <li><strong>Firebase listener leak</strong> -- cleanupRaid() had a TODO comment and never actually removed instance or queue listeners. Fixed: properly calls .off() on instance, battleState, and queue refs.</li>
+        </ul>
+      </div>
+
+      <div class="audit-section">
+        <h3 class="green">Verified Working</h3>
+        <ul class="audit-list check">
+          <li>Queue flow: selectRaid() to joinRaid() to startRaidFromQueue() -- clean transaction-based instance creation</li>
+          <li>Testroom integration: URL params correctly inject boss ghosts into GHOSTS array, pad to 3, KO padding</li>
+          <li>Boss HP bar: tracks real damage per renderBattle cycle, drains pool correctly</li>
+          <li>Return flow: testroom redirects with damage/ghostsLost/result, multiplayer drains boss HP in Firebase</li>
+          <li>Multi-player sequencing: currentFighterIdx advances, next player's activeRaid listener triggers entry</li>
+          <li>activeRaid guard: raidResult param blocks re-entry, URL cleaned before initRaidSystem runs</li>
+          <li>Badge progression gating: composite badges auto-award when all prereqs are met</li>
+          <li>Disconnect detection: heartbeat + 30s timeout + transaction-based advancement</li>
+        </ul>
+      </div>
+
+      <div class="audit-section">
+        <h3 class="yellow">Balance Assessment</h3>
+        <ul class="audit-list arrow">
+          <li>HP scaling is sub-linear (1x to 4x for 1-10 players). Each player fights a fresh copy of the boss ghost at its real maxHp. Total damage from all fights drains the shared pool.</li>
+          <li>Solo Dark Fang (pool 9, ghost 9 HP): ~60-40 player advantage. On target.</li>
+          <li>2-player Mountain King (pool 45, ghost 30 HP): each player deals ~15-20 damage. Tight but winnable. On target.</li>
+          <li>5-player Mountain King (pool 90, ghost 30 HP): each player needs ~18 avg damage. Challenging. On target.</li>
+          <li>Enrage system (+1 per fighter) keeps pressure on later fighters, preventing easy cleanup.</li>
+          <li>Minion damage counts toward boss pool drain -- all team damage is meaningful.</li>
+        </ul>
+      </div>
+    </div>
+
   </div><!-- /slides-viewport -->
 </div><!-- /slide-container -->
 
 <script>
-const TOTAL_SLIDES = 11;
+const TOTAL_SLIDES = 12;
 let currentSlide = 1;
 
 function showSlide(n) {

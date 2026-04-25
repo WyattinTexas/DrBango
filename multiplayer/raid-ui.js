@@ -147,7 +147,7 @@ function selectRaid(raidId) {
         <div class="raid-queue-boss-info">
           <h2>${boss.name}</h2>
           <div class="raid-boss-title">${boss.title}</div>
-          <div class="raid-boss-personality">${boss.personality.toUpperCase()} &bull; ${boss.baseHp} HP &bull; Tier ${boss.tier} &bull; ${boss.requiredPlayers || 10} players</div>
+          <div class="raid-boss-personality">${boss.personality.toUpperCase()} &bull; ${boss.bossGhost.maxHp} HP &bull; Tier ${boss.tier} &bull; ${boss.requiredPlayers || 10} players</div>
           <p class="raid-boss-desc">${boss.bossGhost.abilityDesc}</p>
         </div>
       </div>

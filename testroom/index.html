@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v833'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v834'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v833';
+const TESTROOM_VERSION = 'v834';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -17579,12 +17579,14 @@ function showGameOver(winner) {
       dialogueEl.textContent = bossLine;
       const goTitle = document.getElementById('goTitle');
       if (goTitle) goTitle.after(dialogueEl);
-      // Calculate total damage dealt to blue team (boss)
+      // Calculate total damage dealt to blue team (boss) — exclude padded ghosts
       let totalDamage = 0;
       if (B && B.blue) {
-        B.blue.ghosts.forEach(g => {
-          totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
-        });
+        const realCount = RAID_PARAMS.realBossGhostCount || B.blue.ghosts.length;
+        for (let i = 0; i < realCount; i++) {
+          const g = B.blue.ghosts[i];
+          if (g) totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+        }
       }
       const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
       // Calculate damage taken by player's team
@@ -18404,12 +18406,14 @@ function renderBattle() {
     el.innerHTML = html;
   });
 
-  // Raid boss HP bar: track cumulative damage to blue team
+  // Raid boss HP bar: track cumulative damage to blue team (exclude padded ghosts)
   if (RAID_MODE && RAID_PARAMS && B.blue) {
     let totalBlueDamage = 0;
-    B.blue.ghosts.forEach(g => {
-      totalBlueDamage += g.maxHp - Math.max(0, g.ko ? 0 : g.hp);
-    });
+    const realCount = RAID_PARAMS.realBossGhostCount || B.blue.ghosts.length;
+    for (let i = 0; i < realCount; i++) {
+      const g = B.blue.ghosts[i];
+      if (g) totalBlueDamage += g.maxHp - Math.max(0, g.ko ? 0 : g.hp);
+    }
     RAID_PARAMS.bossHp = Math.max(0, RAID_PARAMS.bossMaxHp - totalBlueDamage);
     updateRaidBossBar();
   }
@@ -19109,7 +19113,8 @@ document.addEventListener('keydown', e => {
     bossMaxHp: parseInt(params.get('bossMaxHp') || '50'),
     bossName: decodeURIComponent(params.get('bossName') || 'Boss'),
     personality: params.get('personality') || 'tyrant',
-    totalDamageDealt: 0
+    totalDamageDealt: 0,
+    realBossGhostCount: realBossGhostCount
   };
 
   // Set teams
