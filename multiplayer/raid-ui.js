@@ -2,8 +2,8 @@
 // RAID UI — Screen rendering, lobby, raider lineup, boss HP bar,
 //           spectator view, result screen, badge display
 // Depends on: cards.js, raid-engine.js, battle-engine.js
-// v0.87 — Added raid juice: confetti, screen shake, wipe screen,
-//          staggered reveals, MVP badge anim, sound cue stubs
+// v0.88 — Boss HP bar phase label now displays current phase number;
+//          result screen re-fetches fresh instance data for spectators
 // =================================================================
 
 // =================================================================

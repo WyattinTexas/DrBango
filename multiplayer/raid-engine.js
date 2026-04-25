@@ -2,6 +2,8 @@
 // RAID ENGINE — Boss AI, raid lifecycle, Firebase state management
 // Depends on: cards.js (RAID_BOSSES, RAID_BOSS_MINIONS, RAID_BADGES)
 //             battle-engine.js (classify, weightedRoll, etc.)
+// v0.88 — Await badge grants in distributeRaidRewards; re-fetch full
+//          instance for spectator result screen (fresh player data)
 // =================================================================
 
 const RAID_CONFIG = {
@@ -342,7 +344,16 @@ function handleRaidStateChange(data) {
       if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
       if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
       if (typeof showRaidResult === 'function') {
-        showRaidResult(data);
+        // Re-fetch full instance so result screen has fresh player data (damageDealt, ghostsLost)
+        const cid = currentRaid?.instanceId;
+        if (cid && typeof db !== 'undefined') {
+          db.ref(`mp/raids/instances/${cid}`).once('value').then(snap => {
+            const fresh = snap.val();
+            showRaidResult(fresh ? { ...data, ...fresh } : data);
+          }).catch(() => showRaidResult(data));
+        } else {
+          showRaidResult(data);
+        }
       }
       break;
   }
@@ -1063,6 +1074,7 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
   });
 
   // Calculate rewards for each player
+  const badgePromises = [];
   Object.entries(players).forEach(([slot, p]) => {
     let points = 0;
 
@@ -1102,12 +1114,11 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
       updates[`mp/users/${p.uid}/raidStats/killingBlows`] = firebase.database.ServerValue.increment(1);
     }
 
-    // Award boss badge (first-time kill)
+    // Award boss badge (first-time kill) — collect promise so we can await all badges
     if (bossDefeated) {
-      const badgeKey = Object.entries(RAID_BADGES).find(([key, badge]) => badge.boss === instance.raidId);
-      if (badgeKey) {
-        // Badge added via array union — handled client-side after checking existing badges
-        awardRaidBadge(p.uid, badgeKey[0]);
+      const badgeEntry = Object.entries(RAID_BADGES).find(([key, badge]) => badge.boss === instance.raidId);
+      if (badgeEntry) {
+        badgePromises.push(awardRaidBadge(p.uid, badgeEntry[0]));
       }
     }
 
@@ -1116,6 +1127,10 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
   });
 
   await db.ref().update(updates);
+  // Await all badge grants so spectators reliably receive their badge
+  if (badgePromises.length > 0) {
+    await Promise.all(badgePromises);
+  }
 }
 
 /**
