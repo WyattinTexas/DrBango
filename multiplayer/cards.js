@@ -792,31 +792,31 @@ const RAID_BOSSES = {
 // Cross-region gates: Lucy's badge unlocks Romy, Heart of the Hills unlocks Nerina
 const RAID_BADGES = {
   // Rolling Hills badges (open)
-  timber_slayer:     { name: 'Tamer of Wolves', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
-  dark_fang_slayer:  { name: 'Shadowbreaker', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
-  jasper_slayer:     { name: 'Trailblazer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
+  timber_slayer:     { name: 'Dances with Wolves', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
+  dark_fang_slayer:  { name: "Shade's Cloak", icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
+  jasper_slayer:     { name: 'Trail Blazer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
   heart_of_the_hills: { name: 'Heart of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
 
   // Frost Valley badges (King Jay + MK open; Romy requires Lucy's badge)
-  king_jay_slayer:   { name: 'Crownbreaker', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
+  king_jay_slayer:   { name: 'Ice King', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
   mountain_king_slayer: { name: 'Mountainbreaker', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
   romy_slayer:       { name: 'Veil Piercer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
   frostborne:        { name: 'Frostborne', icon: '&#x2744;', requires: ['king_jay_slayer', 'mountain_king_slayer', 'romy_slayer'], tier: 2 },
 
   // Volcanic Isles badges (Pip+Humar need Mountainbreaker; Nerina needs Heart of the Hills)
-  pip_slayer:        { name: 'Ember Quencher', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
+  pip_slayer:        { name: 'Smoldering', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
   humar_slayer:      { name: 'Meteorfall', icon: '&#x2604;', boss: 'raid_humar', tier: 3 },
-  nerina_slayer:     { name: 'Depths Walker', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
+  nerina_slayer:     { name: 'The Depths', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
   dark_castle_key:   { name: 'Dark Castle Key', icon: '&#x1F5DD;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3 },
 
   // Dark Castle badges (all require Dark Castle Key)
-  lucy_slayer:       { name: 'Flamesnuffer', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
-  shade_slayer:      { name: 'Silence Bringer', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
-  bigsby_slayer:     { name: 'Omen Breaker', icon: '&#x1F573;', boss: 'raid_bigsby', tier: 4 },
+  lucy_slayer:       { name: 'Blue Flame', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
+  shade_slayer:      { name: 'Shady Cloak', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
+  bigsby_slayer:     { name: 'Doom Denied', icon: '&#x1F573;', boss: 'raid_bigsby', tier: 4 },
   dark_spire_key:    { name: 'Dark Spire Key', icon: '&#x1F3F0;', requires: ['lucy_slayer', 'shade_slayer', 'bigsby_slayer'], tier: 4 },
 
   // The Dark Spire — final tier (requires Dark Spire Key)
-  valkin_slayer:     { name: 'Vanquisher of the Grand', icon: '&#x2694;', boss: 'raid_valkin', tier: 5 },
+  valkin_slayer:     { name: 'The Grand', icon: '&#x2694;', boss: 'raid_valkin', tier: 5 },
 
   // Ultimate — the title Toby's grandfather held
   spiritkin_grand_master: { name: 'Spiritkin Grand Master', icon: '&#x1F31F;', requires: ['heart_of_the_hills', 'frostborne', 'dark_castle_key', 'dark_spire_key', 'valkin_slayer'] }
