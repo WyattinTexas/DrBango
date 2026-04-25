@@ -418,57 +418,24 @@ function showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData) {
   const players = raidData.players || {};
   const currentIdx = raidData.currentFighterIdx || 0;
 
-  // Build the raid battle layout
+  // Inject boss HP bar and raider lineup ABOVE the existing PvP battle view
   raidScreen.innerHTML = `
     <div class="raid-battle-layout">
       ${renderBossHpBar(raidData.bossCurrentHp, raidData.bossMaxHp, boss.name, boss.personality)}
       ${renderRaiderLineup(players, currentIdx)}
-      <div class="raid-battle-arena" id="raid-battle-arena">
-        <!-- Battle engine renders here -->
-        <div id="battleContainer" class="raid-battle-container">
-          <div id="vsSplash" class="vs-splash">
-            <div class="vs-splash-inner">
-              <div class="vs-red"><span id="vsRedName"></span><div id="vsRedRoster" class="vs-roster"></div></div>
-              <div class="vs-text">VS</div>
-              <div class="vs-blue"><span id="vsBlueName"></span><div id="vsBlueRoster" class="vs-roster"></div></div>
-            </div>
-          </div>
-          <div id="battlefield">
-            <div id="red-side" class="fighter-side">
-              <div id="red-active" class="fighter-card"></div>
-              <div id="red-sideline" class="sideline-row"></div>
-              <div id="red-dice" class="dice-row"></div>
-              <button id="rollRedBtn" class="roll-btn red-roll" onclick="rollReady('red')">ROLL</button>
-            </div>
-            <div id="battle-center" class="battle-center">
-              <div id="narrator" class="narrator"></div>
-              <div id="round-counter" class="round-counter"></div>
-            </div>
-            <div id="blue-side" class="fighter-side">
-              <div id="blue-active" class="fighter-card"></div>
-              <div id="blue-sideline" class="sideline-row"></div>
-              <div id="blue-dice" class="dice-row"></div>
-              <button id="rollBlueBtn" class="roll-btn blue-roll" style="display:none">BOSS</button>
-            </div>
-          </div>
-          <div id="gameOver" class="game-over-overlay"></div>
-          <div id="abilitySplash" class="ability-splash"></div>
-          <div id="battle-log" class="battle-log"></div>
-        </div>
-      </div>
-      <div class="raid-spectator-feed" id="raid-spectator-feed">
-        <div class="raid-feed-title">RAID LOG</div>
-        <div id="raid-feed-content" class="raid-feed-content"></div>
-      </div>
+      <div class="raid-battle-arena" id="raid-battle-arena"></div>
     </div>`;
 
-  // Set up battle picks and start the battle engine
+  // Set up battle picks — use the player's team and the boss/minion IDs
   S.redPicks = playerTeam;
   S.bluePicks = enemyGhosts.map(g => g.id);
 
-  // Override makeTeam for boss ghosts (they may not be in GHOSTS array)
-  const originalMakeTeam = window._originalMakeTeam || makeTeam;
-  if (!window._originalMakeTeam) window._originalMakeTeam = makeTeam;
+  // Show the existing PvP battle view (it has all the correct DOM elements)
+  const pvpView = document.getElementById('pvp-battle-view');
+  if (pvpView) {
+    pvpView.classList.add('active');
+    pvpView.style.zIndex = '9100'; // above raid screen
+  }
 
   // Start battle after a brief delay
   setTimeout(() => {

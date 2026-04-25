@@ -491,7 +491,7 @@ const RAID_BOSSES = {
   raid_timber: {
     id: 'raid_timber',
     name: 'Timber',
-    title: 'Warden of the Wild',
+    title: 'Dances with Wolves',
     personality: 'tyrant',
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 5,
@@ -804,9 +804,11 @@ const RAID_SHOP_ITEMS = [
   { id: 'pack_dark', name: 'Dark Castle Pack', type: 'pack', cost: 200, set: 'Dark Castle', desc: '5 Dark Castle cards' }
 ];
 
-// Helper: look up a ghost by ID
+// Helper: look up a ghost by ID (checks regular ghosts, boss minions, AND boss ghosts)
 function getGhost(id) {
-  return GHOSTS.find(g => g.id === id) || RAID_BOSS_MINIONS.find(g => g.id === id);
+  return GHOSTS.find(g => g.id === id)
+    || RAID_BOSS_MINIONS.find(g => g.id === id)
+    || getBossGhost(id);
 }
 
 // Helper: look up a boss ghost by boss ID (9001+)

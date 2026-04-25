@@ -430,13 +430,14 @@ function pickRandomBoth() {
 // ============================================================
 // BATTLE ENGINE
 // ============================================================
-function ghostData(id) { return GHOSTS.find(g=>g.id===id); }
+function ghostData(id) { return getGhost(id); }
 
 function makeTeam(ids) {
   return {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
+      if (!g) { console.warn('[makeTeam] Unknown ghost ID:', id); return { id, name:'???', hp:5, maxHp:5, ko:false, ability:'', abilityDesc:'', rarity:'common', art:'', hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false }; }
+      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability||'', abilityDesc:g.abilityDesc||'', rarity:g.rarity||'common', art:g.art||'',
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
