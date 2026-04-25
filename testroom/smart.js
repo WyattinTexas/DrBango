@@ -1,3 +1,11 @@
+// ⚠️  DEPRECATED — use smartAutoPlay.js instead
+// smart.js is the original, stripped-down simulation (618 lines).
+// smartAutoPlay.js supersedes it entirely: all 8 functions here exist there
+// with expanded card coverage (v672+), bug fixes (see FIXLOG.md), and
+// support for 138+ playable cards. Do NOT paste this file if smartAutoPlay.js
+// is available — they export the same global names and will conflict.
+// Kept as a historical reference only. v839.
+//
 // Smart Auto-Play Simulation — paste into browser console
 // Replaces basic autoPlay with ability-aware AI
 function smartAutoPlay(numGames = 50) {
