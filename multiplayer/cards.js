@@ -213,7 +213,7 @@ const GHOSTS = [
   {id:428, name:"Jasper", rarity:"rare", maxHp:5, art:"../testroom/art/originals/Pickwick.png", ability:"Flame Dive", abilityDesc:"Win: roll 1 bonus die. Deal its value as additional damage. Jasper takes 1 damage.", category:"Damage Multiplier", set:"Rolling Hills", tags:["Final 50"], designNote:"The ghost of a joyful wanderer who never stopped moving in life and hasn't stopped in death either. Entry resource burst — one of each immediately usable resource (no Sacred Fire keeps it balanced). 6HP means he can fight, not just be hit-and-swap. RH's merchant hero. Wyatt flag: Pickwick + The Shepherd resurrection loop could refuel resources repeatedly — worth testing. Art direction: a round happy wanderer in a well-worn travelling coat, bulging pack slung over one shoulder, big grin, glowing footsteps trailing behind him on a rolling hill path."},
   {id:429, name:"Young Cap", rarity:"uncommon", maxHp:4, art:"../testroom/art/originals/OldCap.png", ability:"Energize", abilityDesc:"Before rolling: when you use a Healing Seed, also gain 1 extra die, 1 Ice Shard, and 1 Surge this roll.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"An ancient mushroom spirit — slow, unremarkable, deeply wise, and quietly spectacular at the very end. The death trigger creates a genuine sacrifice archetype: deliberately send Old Cap into danger, let it die, empower the next ghost with an HP surge. Risk-reward deckbuilding that rewards planning. +3HP overclocks per Gary's rules. Art direction: a large ancient mushroom cap creature in earthy browns and mossy greens, face like a very old tree, slowly releasing spores as it begins to fade, gentle and warm, not dramatic — just quietly complete."},
   {id:430, name:"Gordok", rarity:"uncommon", maxHp:8, art:"../testroom/art/originals/Millicent.png", ability:"River Terror", abilityDesc:"Win: you may take 2 specials from your opponent instead of dealing damage. Gain 1 extra die next roll and 1 Moonstone.", category:"Disruption", set:"Rolling Hills", tags:["Final 50"], designNote:"The cunning folk of the Rolling Hills — hedge-witch, wise-woman, someone you bring a pie to before you bring a problem. Moonstone-powered full information + theft: see everything they have, take the worst thing for them to lose. Spending Moonstone (rare resource) for information and theft is elegant. Active, decisive, satisfying for the person playing it. Art direction: a sharp-eyed older woman-shaped figure in a patchwork cloak, standing at a fork in the hill paths, wisps of blue-grey smoke curling from her hands, deeply knowing expression — she already knows what you're going to say."},
-  {id:431, name:"Pal Al", rarity:"ghost-rare", maxHp:3, art:"../testroom/art/originals/TheOvercast.png", ability:"Squall", abilityDesc:"Win: you may gain 1 Magic Firefly instead of dealing damage.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
+  {id:431, name:"Pal Al", rarity:"ghost-rare", maxHp:3, art:"../testroom/art/originals/TheOvercast.png", ability:"Squall", abilityDesc:"Win: you may gain 4 Ice Shards instead of dealing damage.", category:"Resource Generation", set:"Rolling Hills", tags:["Final 50"], designNote:"A massive cumulus giant that drifts silently above the Rolling Hills, paying tribute to the Mountain King above the peaks. THE payoff card for the entire RH Healing Seed economy — converts accumulated seeds into a single devastating hit. With 4 Healing Seeds banked: a win deals 2 base + 8 bonus = 10 damage. With zero seeds: no bonus (player decides how much to spend). Ghost-rare holo treatment on a cloud texture will look extraordinary. Lore: The Mountain King commands the cloud giants to watch the hills. The Overcast is the oldest and most loyal. Slightly somber, enormous, warm when you look closely. Midjourney art direction: a massive cumulus cloud ghost floating above rolling green hills at golden hour, enormous white-grey body with a face of deep weather-patience, subtle crown of static-grey stormclouds on its head, smaller clouds orbiting it like attendants, Spiritkin ghost aesthetic, distant mountain peaks visible on the horizon with the Mountain King's presence implied, warm and huge and ancient."},
   {id:432, name:"Valkin the Grand", rarity:"legendary", maxHp:8, art:"../testroom/art/originals/ValkinTheGrand.png", ability:"Grand Spoils", abilityDesc:"KO an enemy Spiritkin: gain 1 Sacred Fire, 2 Ice Shards, 1 Lucky Stone, 1 Moonstone, 2 Healing Seeds.", category:"Resource Generation", set:"Dark Castle", tags:["Final 50"], designNote:"THE ANTAGONIST LEGENDARY. Valkin the Grand is the main villain of the BOO: Battle of Origins lore — the tyrant who trapped Toby's grandfather and seeks to control the BOO itself. Grand Spoils embodies his greed: every KO pays him the full resource suite. 6 HP is modest-legendary so the snowball has to be earned. Art: Gemini-generated regal spirit monarch on a blue-flame throne. NOTE: this slot previously held Vela (Second Breath resurrection mechanic) — resolver code at lines ~10776 and smartAutoPlay ~1759 still references id 432 for Vela's resurrection trigger. Needs cleanup: either reassign Vela to a new ID or remove the resurrection hook from id 432."},
   {id:433, name:"Lucas", rarity:"uncommon", maxHp:5, art:"../testroom/art/originals/Vigil.png", ability:"Kindling", abilityDesc:"Sideline: when a Spiritkin is revived, it charges into play with +3 HP and +1 die next roll. The reviver steps to the sideline.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"Resurrection payoff #2. Flame-family Spiritkin: humanoid body, orange-red torchflame head, flame-orange accessories. Triggers on any resurrection source. 6 Sacred Fires = +18 committed damage on the next winning roll. Pairs with Vela (432) in the resurrection archetype."},
   {id:435, name:"Willow", rarity:"ghost-rare", maxHp:4, art:"../testroom/art/originals/Willow.png", ability:"Joy of Painting", abilityDesc:"Sideline & In Play: gain 1 extra die if you lost the last roll.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"A ghost painter at her easel by a moonlit window. Paints through the night, finds joy in every loss. The comeback mechanic — every defeat fuels the next roll. Bob Ross energy meets Dark Castle. 4HP ghost-rare, fragile but inspiring."},
@@ -501,7 +501,7 @@ const RAID_BOSSES = {
     tier: 1, set: 'Rolling Hills',
     requiredBadge: 'dark_fang_slayer', requiredPlayers: 3,
     bossGhost: {
-      id: 9001, name: 'Timber', maxHp: 18, art: '../testroom/art/timber.jpg',
+      id: 210, name: 'Timber', maxHp: 18, art: '../testroom/art/timber.jpg',
       ability: 'Howl of the Alpha', abilityDesc: 'Before each roll: remove 1 enemy die. Triples+: deal 1 chip damage to all enemy sideline ghosts.'
     },
     minionsByPhase: { 1: [], 2: [9101], 3: [9101, 9102], 4: [9101, 9103] },
@@ -523,7 +523,7 @@ const RAID_BOSSES = {
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 2, minPlayers: 1,
     bossGhost: {
-      id: 9002, name: 'Dark Fang', maxHp: 9, art: '../testroom/art/originals/DarkFang.png',
+      id: 202, name: 'Dark Fang', maxHp: 9, art: '../testroom/art/originals/DarkFang.png',
       ability: 'Pressure', abilityDesc: 'Win: deal +1 damage for each KO\'d ghost this game.'
     },
     minionsByPhase: { 1: [], 2: [], 3: [], 4: [] },
@@ -545,7 +545,7 @@ const RAID_BOSSES = {
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 2,
     bossGhost: {
-      id: 9003, name: 'Jasper', maxHp: 10, art: '../testroom/art/originals/Pickwick.png',
+      id: 428, name: 'Jasper', maxHp: 10, art: '../testroom/art/originals/Pickwick.png',
       ability: 'Flame Dive', abilityDesc: 'Win: roll 1 bonus die and deal its value as damage. Jasper takes 1 self-damage. High risk, high reward.'
     },
     minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
@@ -570,7 +570,7 @@ const RAID_BOSSES = {
     tier: 2, set: 'Frost Valley',
     requiredBadge: null, requiredPlayers: 2,
     bossGhost: {
-      id: 9004, name: 'King Jay', maxHp: 14, art: '../testroom/art/originals/king_jay.jpg',
+      id: 106, name: 'King Jay', maxHp: 14, art: '../testroom/art/originals/king_jay.jpg',
       ability: 'Reflection', abilityDesc: 'Lose roll & dice total = 7: reflect ALL damage. Permafrost: max 3 damage per hit. Frost Aura: 1 cold damage per round.'
     },
     minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9132], 4: [9134] },
@@ -592,7 +592,7 @@ const RAID_BOSSES = {
     tier: 2, set: 'Frost Valley',
     requiredBadge: 'lucy_slayer', requiredPlayers: 3,
     bossGhost: {
-      id: 9005, name: 'Romy', maxHp: 20, art: '../testroom/art/originals/romy.jpg',
+      id: 114, name: 'Romy', maxHp: 20, art: '../testroom/art/originals/romy.jpg',
       ability: 'Valley Guardian', abilityDesc: 'Predicts a die number each round. If any die matches: +3 damage. Mirror Dice: swap 1 die with player after rolling.'
     },
     minionsByPhase: { 1: [9111], 2: [9112], 3: [9112, 9113], 4: [9111, 9112] },
@@ -614,7 +614,7 @@ const RAID_BOSSES = {
     tier: 2, set: 'Frost Valley',
     requiredBadge: null, requiredPlayers: 5,
     bossGhost: {
-      id: 9006, name: 'The Mountain King', maxHp: 30, art: '../testroom/art/originals/mountain_king_leg.jpg',
+      id: 110, name: 'The Mountain King', maxHp: 30, art: '../testroom/art/originals/mountain_king_leg.jpg',
       ability: 'Beast Mode', abilityDesc: 'Doubles deal 2X damage. Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire.'
     },
     minionsByPhase: { 1: [], 2: [9101], 3: [9101, 9102], 4: [9103, 9101] },
@@ -638,7 +638,7 @@ const RAID_BOSSES = {
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'king_jay_slayer', requiredPlayers: 2,
     bossGhost: {
-      id: 9007, name: 'Pip', maxHp: 11, art: '../testroom/art/originals/Pip.png',
+      id: 418, name: 'Pip', maxHp: 11, art: '../testroom/art/originals/Pip.png',
       ability: 'Toasted', abilityDesc: 'Triples+: permanently remove 1 enemy die. +1 die per living minion. Gains 2 Sacred Fires on triples.'
     },
     minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
@@ -661,7 +661,7 @@ const RAID_BOSSES = {
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'king_jay_slayer', requiredPlayers: 3,
     bossGhost: {
-      id: 9008, name: 'Humar', maxHp: 16, art: '../testroom/art/humar.jpg',
+      id: 336, name: 'Humar', maxHp: 16, art: '../testroom/art/humar.jpg',
       ability: 'Meteor', abilityDesc: 'Win: opponent takes 2 damage before their next roll. Gain 1 Burn. On KO: gain 2 Sacred Fire.'
     },
     minionsByPhase: { 1: [9101], 2: [9101, 9103], 3: [9103, 9102], 4: [9103, 9101] },
@@ -683,7 +683,7 @@ const RAID_BOSSES = {
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'heart_of_the_hills', requiredPlayers: 5,
     bossGhost: {
-      id: 9009, name: 'Nerina', maxHp: 35, art: '../testroom/art/the_deep.jpg',
+      id: 306, name: 'Nerina', maxHp: 35, art: '../testroom/art/the_deep.jpg',
       ability: 'Leviathan', abilityDesc: 'Entry: deal 3 damage. Permafrost: max 3 damage per hit. Frost Aura: 1 damage per round. 9 HP base — a true titan.'
     },
     minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9132], 4: [9134, 9134] },
@@ -707,7 +707,7 @@ const RAID_BOSSES = {
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'dark_castle_key', requiredPlayers: 2,
     bossGhost: {
-      id: 9010, name: 'Lucy', maxHp: 16, art: '../testroom/art/originals/lucy.jpg',
+      id: 108, name: 'Lucy', maxHp: 16, art: '../testroom/art/originals/lucy.jpg',
       ability: 'Blue Fire', abilityDesc: 'Win: gain 1 Sacred Fire. Mirror Dice: swap 1 die. Steal 1 resource on win. Sacred Fires deal double damage.'
     },
     minionsByPhase: { 1: [9111], 2: [9112, 9113], 3: [9113, 9112], 4: [9111, 9113] },
@@ -729,7 +729,7 @@ const RAID_BOSSES = {
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'dark_castle_key', requiredPlayers: 2,
     bossGhost: {
-      id: 9011, name: 'Shade', maxHp: 12, art: '../testroom/art/originals/shade.jpg',
+      id: 111, name: 'Shade', maxHp: 12, art: '../testroom/art/originals/shade.jpg',
       ability: 'Haunt', abilityDesc: 'Before EVERY roll: opponent takes 2 damage. Permafrost: max 2 damage per hit. The tick damage is relentless.'
     },
     minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9134], 4: [9134, 9134] },
@@ -751,7 +751,7 @@ const RAID_BOSSES = {
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'dark_castle_key', requiredPlayers: 3,
     bossGhost: {
-      id: 9013, name: 'Bigsby', maxHp: 10, art: '../testroom/art/originals/Digby.png',
+      id: 424, name: 'Bigsby', maxHp: 10, art: '../testroom/art/originals/Digby.png',
       ability: 'Omen', abilityDesc: 'Win: deal +1 damage. Moonstone use triggers Doom transformation. +1 die per living minion.'
     },
     minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
