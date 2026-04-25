@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.86'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.87'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3391,6 +3391,149 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes raidVictoryPulse { 0%,100% { text-shadow: 0 0 40px rgba(240,197,96,0.4); } 50% { text-shadow: 0 0 60px rgba(240,197,96,0.7); } }
 @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+/* ═══════════════════════════════════════════════════════════════
+   RAID JUICE v0.87 — Screen shake, confetti, wipe screen, badge
+   animation, staggered reveals, phase flash, zone transitions
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Screen shake */
+@keyframes raid-shake {
+  0%,100%{transform:translate(0,0) rotate(0deg)}
+  12%{transform:translate(-5px,-2px) rotate(-0.5deg)}
+  25%{transform:translate(6px,2px) rotate(0.5deg)}
+  37%{transform:translate(-7px,1px) rotate(-0.3deg)}
+  50%{transform:translate(7px,-1px) rotate(0.3deg)}
+  62%{transform:translate(-4px,3px) rotate(-0.15deg)}
+  75%{transform:translate(4px,-3px) rotate(0.15deg)}
+  87%{transform:translate(-2px,2px) rotate(-0.05deg)}
+}
+.raid-shake { animation: raid-shake 0.45s ease-out; }
+.raid-shake-heavy { animation: raid-shake 0.75s ease-out; }
+
+/* Confetti canvas overlay */
+.raid-confetti-canvas { position:fixed;inset:0;z-index:99998;pointer-events:none; }
+
+/* MVP badge pop + eternal glow */
+.is-mvp .mvp-badge {
+  animation: mvp-pop 0.45s cubic-bezier(0.175,0.885,0.32,1.275) both,
+             mvp-glow 1.4s 0.5s ease-in-out infinite alternate;
+}
+@keyframes mvp-pop {
+  0%{transform:scale(0) rotate(-20deg);opacity:0}
+  60%{transform:scale(1.35) rotate(5deg)}
+  100%{transform:scale(1) rotate(0);opacity:1}
+}
+@keyframes mvp-glow {
+  from{box-shadow:0 0 6px rgba(240,197,96,0.35)}
+  to{box-shadow:0 0 18px rgba(240,197,96,0.9),0 0 4px #fffde0}
+}
+
+/* Staggered reward row reveal */
+.raid-result-row { animation: row-reveal 0.35s ease-out both; }
+@keyframes row-reveal {
+  from{transform:translateX(-22px);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+
+/* Victory title slam */
+.raid-result-screen.victory .raid-result-title {
+  animation: victory-slam 0.65s cubic-bezier(0.175,0.885,0.32,1.275) both;
+}
+@keyframes victory-slam {
+  0%{transform:scale(0.15) rotate(-6deg);opacity:0}
+  60%{transform:scale(1.14) rotate(2deg)}
+  100%{transform:scale(1) rotate(0);opacity:1}
+}
+
+/* Defeat title shake-in */
+.raid-result-screen.defeat .raid-result-title {
+  animation: defeat-shake-in 0.6s ease-out both;
+}
+@keyframes defeat-shake-in {
+  0%{transform:translateX(-40px);opacity:0}
+  25%{transform:translateX(20px)}
+  50%{transform:translateX(-12px)}
+  75%{transform:translateX(6px)}
+  100%{transform:translateX(0);opacity:1}
+}
+
+/* Wipe failure screen */
+.raid-wipe-screen {
+  position:fixed;inset:0;z-index:99999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(10,0,0,0);padding:24px;text-align:center;
+  animation:wipe-bg-in 0.65s ease-out forwards;
+  pointer-events:all;
+}
+@keyframes wipe-bg-in {
+  0%{background:rgba(10,0,0,0)}
+  100%{background:rgba(10,0,0,0.96)}
+}
+.raid-wipe-title {
+  font-family:'Creepster',cursive;
+  font-size:clamp(2.8rem,8vw,5.5rem);
+  color:var(--accent);letter-spacing:6px;
+  text-shadow:0 0 50px rgba(233,69,96,0.65),0 0 100px rgba(233,69,96,0.2);
+  animation:wipe-title-in 0.85s 0.3s cubic-bezier(0.175,0.885,0.32,1.275) both;
+}
+@keyframes wipe-title-in {
+  from{transform:scale(3.5) translateY(-20px);opacity:0;filter:blur(12px)}
+  to{transform:scale(1) translateY(0);opacity:1;filter:blur(0)}
+}
+.raid-wipe-boss {
+  font-family:'Creepster',cursive;font-size:1.35rem;
+  color:var(--text2);margin-top:8px;letter-spacing:2px;
+  animation:wipe-sub-in 0.45s 0.85s ease-out both;
+}
+.raid-wipe-quote {
+  font-style:italic;color:var(--accent2);
+  max-width:460px;margin-top:14px;font-size:1rem;line-height:1.5;
+  animation:wipe-sub-in 0.45s 1.05s ease-out both;
+}
+.raid-wipe-hp {
+  color:var(--text-dim);font-size:0.9rem;margin-top:18px;
+  animation:wipe-sub-in 0.45s 1.2s ease-out both;
+}
+.raid-wipe-hp strong{color:var(--accent);font-size:1.1rem}
+.raid-wipe-btn {
+  margin-top:26px;padding:12px 32px;
+  font-family:'Creepster',cursive;font-size:1.15rem;letter-spacing:2px;
+  background:linear-gradient(135deg,#e74c3c,#8e1c1c);
+  color:#fff;border:none;border-radius:10px;cursor:pointer;
+  animation:wipe-sub-in 0.45s 1.38s ease-out both;
+  transition:transform 0.18s,box-shadow 0.18s;
+}
+.raid-wipe-btn:hover{transform:scale(1.05);box-shadow:0 6px 22px rgba(231,76,60,0.45)}
+@keyframes wipe-sub-in {
+  from{transform:translateY(16px);opacity:0}
+  to{transform:translateY(0);opacity:1}
+}
+
+/* Phase transition — inner content pops in */
+.raid-phase-inner { animation: phase-inner-pop 0.42s 0.07s cubic-bezier(0.175,0.885,0.32,1.275) both; }
+@keyframes phase-inner-pop {
+  from{transform:scale(0.6);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
+
+/* Boss intro art slam (overrides boss-entrance) */
+.raid-boss-intro-art { animation: boss-slam 0.55s cubic-bezier(0.175,0.885,0.32,1.275) !important; }
+@keyframes boss-slam {
+  0%{transform:scale(0.15) translateY(-50px);opacity:0}
+  60%{transform:scale(1.12) translateY(4px)}
+  100%{transform:scale(1) translateY(0);opacity:1}
+}
+
+/* Zone book smooth background transition */
+.raid-book { transition: background 0.45s ease; }
+.book-tab { transition: transform 0.15s ease, opacity 0.15s ease; }
+.book-tab.active { transform: scale(1.05); animation: tab-activate 0.28s ease-out; }
+@keyframes tab-activate {
+  0%{transform:scale(0.9)}
+  60%{transform:scale(1.1)}
+  100%{transform:scale(1.05)}
+}
 </style>
 </head>
 <body>

@@ -2,7 +2,135 @@
 // RAID UI — Screen rendering, lobby, raider lineup, boss HP bar,
 //           spectator view, result screen, badge display
 // Depends on: cards.js, raid-engine.js, battle-engine.js
+// v0.87 — Added raid juice: confetti, screen shake, wipe screen,
+//          staggered reveals, MVP badge anim, sound cue stubs
 // =================================================================
+
+// =================================================================
+// RAID JUICE — Visual feedback & audio stub layer
+// =================================================================
+
+// ─── SOUND STUBS ────────────────────────────────────────────────
+// Replace null values with Audio objects to add real sound effects.
+// e.g.  RAID_SOUNDS.victory = new Audio('sounds/raid-victory.mp3');
+const RAID_SOUNDS = {
+  victory: null,        // Full raid group victory
+  defeat: null,         // Raid wipe / boss survives
+  phase_transition: null, // Boss enters new phase
+  boss_intro: null,     // Boss intro splash appears
+  wave_start: null,     // Minion wave begins
+  mvp_badge: null,      // MVP badge reveals on leaderboard
+  reward_reveal: null,  // Result screen loads
+  killing_blow: null,   // Player delivers killing blow
+  countdown_tick: null, // Countdown 3-2-1
+  zone_change: null     // Switching zones in lobby
+};
+
+/** Play a named sound cue (no-ops silently if audio not configured). */
+function raidSound(cue) {
+  // Uncomment to debug: console.log('[RAID SOUND]', cue);
+  const s = RAID_SOUNDS[cue];
+  if (s && typeof s.play === 'function') {
+    s.currentTime = 0;
+    s.play().catch(() => {});
+  }
+}
+
+// ─── SCREEN SHAKE ───────────────────────────────────────────────
+/**
+ * Apply a CSS screen-shake to document.body.
+ * @param {string} [intensity] — 'heavy' for big shake, default for light
+ */
+function raidScreenShake(intensity) {
+  const el = document.body;
+  const cls = intensity === 'heavy' ? 'raid-shake-heavy' : 'raid-shake';
+  el.classList.remove('raid-shake', 'raid-shake-heavy');
+  void el.offsetWidth; // force reflow so animation restarts cleanly
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), intensity === 'heavy' ? 760 : 460);
+}
+
+// ─── CANVAS CONFETTI ────────────────────────────────────────────
+/**
+ * Fire a confetti burst using an off-screen canvas.
+ * @param {string} [type] — 'epic' for gold/purple palette, default = colorful
+ */
+function raidConfetti(type) {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'raid-confetti-canvas';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const palette = type === 'epic'
+    ? ['#f0c560', '#e74c3c', '#9b59b6', '#ffffff', '#f39c12', '#2ecc71']
+    : ['#f0c560', '#2ecc71', '#3498db', '#ffffff', '#e91e63', '#75BEEB'];
+
+  const count = type === 'epic' ? 160 : 100;
+  const particles = Array.from({ length: count }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * -180 - 10,
+    w: Math.random() * 10 + 4,
+    h: Math.random() * 5 + 2,
+    color: palette[Math.floor(Math.random() * palette.length)],
+    vx: (Math.random() - 0.5) * 5,
+    vy: Math.random() * 3 + 1.5,
+    rot: Math.random() * Math.PI * 2,
+    drot: (Math.random() - 0.5) * 0.18
+  }));
+
+  let frame = 0;
+  const maxFrames = 220;
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const alpha = Math.max(0, 1 - Math.max(0, frame - 150) / 70);
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.drot;
+      p.vy += 0.06; // gravity
+    });
+    frame++;
+    if (frame < maxFrames) requestAnimationFrame(draw);
+    else canvas.remove();
+  }
+  requestAnimationFrame(draw);
+}
+
+// ─── RAID WIPE FAILURE SCREEN ───────────────────────────────────
+/**
+ * Show a dramatic full-screen wipe overlay when all players fail.
+ * Clicking "VIEW RESULTS" dismisses it to reveal the leaderboard beneath.
+ */
+function showRaidWipeScreen(data) {
+  const boss = RAID_BOSSES[data.raidId];
+  const hpRemaining = Math.max(0, data.bossCurrentHp || 0);
+  const hpMax = data.bossMaxHp || 1;
+  const pctLeft = Math.round((hpRemaining / hpMax) * 100);
+  const quote = boss?.dialogue?.victory || 'None can stop me!';
+
+  raidSound('defeat');
+  raidScreenShake('heavy');
+
+  const el = document.createElement('div');
+  el.className = 'raid-wipe-screen';
+  el.innerHTML = `
+    <div class="raid-wipe-title">RAID WIPED</div>
+    <div class="raid-wipe-boss">${boss?.name || 'The Boss'} remains undefeated</div>
+    <div class="raid-wipe-quote">"${quote}"</div>
+    <div class="raid-wipe-hp">Boss survived with <strong>${pctLeft}%</strong> HP remaining</div>
+    <button class="raid-wipe-btn" onclick="this.closest('.raid-wipe-screen').remove()">VIEW RESULTS</button>`;
+  document.body.appendChild(el);
+}
 
 // ─── RAID LOBBY (Boss Selection) ────────────────────────────────
 
@@ -624,6 +752,7 @@ function renderRaidBattleSpectator(snapshot) {
 function showBossIntro(bossConfig, phase, callback) {
   const raidScreen = document.getElementById('raid-screen');
   if (!raidScreen) { callback(); return; }
+  raidSound('boss_intro');
 
   const overlay = document.createElement('div');
   overlay.className = 'raid-boss-intro';
@@ -647,6 +776,8 @@ function showBossIntro(bossConfig, phase, callback) {
 function showMinionWaveIntro(waveMinions, callback) {
   const raidScreen = document.getElementById('raid-screen');
   if (!raidScreen) { callback(); return; }
+  raidSound('wave_start');
+  raidScreenShake();
 
   const overlay = document.createElement('div');
   overlay.className = 'raid-boss-intro raid-wave-intro';
@@ -689,6 +820,8 @@ function showPhaseTransition(transition, effects) {
     </div>`;
 
   document.body.appendChild(overlay);
+  raidSound('phase_transition');
+  raidScreenShake();
   setTimeout(() => overlay.classList.add('active'), 50);
   setTimeout(() => {
     overlay.classList.remove('active');
@@ -760,6 +893,26 @@ function showRaidResult(data) {
     </div>`;
 
   raidScreen.innerHTML = html;
+
+  // ─── Juice ───────────────────────────────────────────────────
+  if (bossDefeated) {
+    raidSound('victory');
+    setTimeout(() => raidConfetti('epic'), 280);
+  } else {
+    // Wipe screen appears over the leaderboard — player dismisses it to see results
+    setTimeout(() => showRaidWipeScreen(data), 380);
+  }
+
+  // Stagger the leaderboard row animations and fire MVP sound
+  raidSound('reward_reveal');
+  setTimeout(() => {
+    document.querySelectorAll('.raid-result-row').forEach((row, i) => {
+      row.style.animationDelay = (i * 0.11) + 's';
+    });
+    if (document.querySelector('.is-mvp .mvp-badge')) {
+      raidSound('mvp_badge');
+    }
+  }, 60);
 }
 
 function closeRaidResult() {
