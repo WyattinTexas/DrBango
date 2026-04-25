@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 // FIXED ENCOUNTER POOLS — each location has specific ghosts
-// 175 non-legendary cards distributed across ~30 encounter nodes
+// 175 non-legendary cards distributed across ~31 encounter nodes
 // Rarity scales with depth: early = commons, deep = rares/ghost-rares
+// v1.1 — added Crossroads pool; fixed pool count comment
 // ═══════════════════════════════════════════════════════════════
 
 const ENCOUNTER_POOLS = {
@@ -131,6 +132,17 @@ const ENCOUNTER_POOLS = {
     desc: 'The volcano\'s heart. Legends dwell here.',
     ghosts: [206,327,345,418], // Zain, Natalia, Red Hunter, Pip
     terrain: 'volcanic caldera, lava lake, heat shimmer, ancient'
+  },
+
+  // ═══════════════════════════════════
+  // CROSSROADS — neutral mid-map (between Frost Valley and Volcanic Isles)
+  // Mixed FV and VI commons/uncommons; thematically "fire meets ice"
+  // ═══════════════════════════════════
+
+  'Crossroads': {
+    desc: 'Spirits from fire and ice converge at this neutral ground.',
+    ghosts: [25,26,29,56,207,209,343,365,58,404,27,33], // Cameron, Logey, Sad Sal, Chad, Hank, Dart, Boris, Tyson, Ashley, Chagrin, Fredrick, Sandwiches
+    terrain: 'dirt crossroads, scorched earth on one side, frost on the other, cracked stone path'
   },
 
   // ═══════════════════════════════════
