@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v834'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v835'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v834';
+const TESTROOM_VERSION = 'v835';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -14323,6 +14323,17 @@ function _resolveRoundImpl() {
   const winDice = winner==='red' ? redDice : blueDice;
   const loseDice = winner==='red' ? blueDice : redDice;
 
+  // Store roll data for raid spectator snapshots
+  if (RAID_MODE) {
+    window._lastRaidRollData = {
+      player: [...redDice],
+      boss: [...blueDice],
+      winner: winner === 'red' ? 'player' : 'boss',
+      damage: wR.damage
+    };
+    window._lastRaidAbilityCallout = wF.name + ' — ' + wR.type + (wR.type !== 'singles' ? '!' : '');
+  }
+
   let dmg = wR.damage;
 
   // Antoinette (82) — Grace: +1 damage on doubles
@@ -18416,6 +18427,31 @@ function renderBattle() {
     }
     RAID_PARAMS.bossHp = Math.max(0, RAID_PARAMS.bossMaxHp - totalBlueDamage);
     updateRaidBossBar();
+
+    // Write battle snapshot to Firebase for spectators (throttled to every 2s)
+    if (RAID_PARAMS.instanceId && db) {
+      const now = Date.now();
+      if (!window._lastRaidSnapshot || now - window._lastRaidSnapshot > 2000) {
+        window._lastRaidSnapshot = now;
+        const redActive = active(B.red);
+        const blueActive = active(B.blue);
+        const snapshot = {
+          playerName: MP_PLAYER_NAMES.red || 'Raider',
+          playerGhost: { name: redActive.name, hp: redActive.hp, maxHp: redActive.maxHp, art: redActive.art || '' },
+          bossGhost: { name: blueActive.name, hp: blueActive.hp, maxHp: blueActive.maxHp, art: blueActive.art || '', isBoss: true },
+          playerSideline: B.red.ghosts.filter((_, i) => i !== B.red.activeIdx).map(g => ({ name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko })),
+          bossSideline: B.blue.ghosts.filter((_, i) => i !== B.blue.activeIdx).slice(0, realCount - 1).map(g => ({ name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko })),
+          bossPoolHp: RAID_PARAMS.bossHp,
+          bossMaxHp: RAID_PARAMS.bossMaxHp,
+          round: B.round || 1,
+          phase: B.phase || 'roll',
+          lastRoll: window._lastRaidRollData || null,
+          abilityCallout: window._lastRaidAbilityCallout || null,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP
+        };
+        db.ref(`mp/raids/instances/${RAID_PARAMS.instanceId}/battleState`).set(snapshot);
+      }
+    }
   }
 }
 

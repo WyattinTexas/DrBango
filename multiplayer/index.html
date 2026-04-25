@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.76'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.77'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3134,6 +3134,261 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .raid-pack-card.ghost-rare .raid-pack-card-rarity { color: var(--ghost-rare); }
 .raid-pack-card.legendary .raid-pack-card-rarity { color: var(--legendary); }
 .raid-pack-close { margin-top: 20px; padding: 10px 24px; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+
+/* ===== RAID WAITING ROOM (Social Lobby) ===== */
+.raid-waiting-room {
+  position: fixed; inset: 0; z-index: 9200;
+  background: linear-gradient(180deg, #0a0612 0%, #14101e 50%, #0e0820 100%);
+  display: none; flex-direction: column;
+  animation: fadeIn 0.5s ease;
+}
+.raid-waiting-room.active { display: flex; }
+
+.raid-wr-header {
+  text-align: center; padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(20,16,28,0.8);
+}
+.raid-wr-boss-art {
+  width: 120px; height: 120px; border-radius: 50%; object-fit: cover;
+  border: 3px solid var(--gold); box-shadow: 0 0 40px rgba(212,160,64,0.3);
+  animation: boss-entrance 0.8s ease-out;
+}
+.raid-wr-boss-name {
+  font-family: 'Creepster', cursive; font-size: 2rem; color: var(--gold-bright);
+  letter-spacing: 3px; margin-top: 8px;
+}
+.raid-wr-boss-title { color: var(--text2); font-style: italic; font-size: 0.95rem; }
+.raid-wr-boss-quote {
+  color: var(--accent); font-style: italic; font-size: 0.9rem;
+  margin-top: 8px; opacity: 0.85;
+}
+
+.raid-wr-players {
+  flex: 1; overflow-y: auto; padding: 16px;
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+  align-content: flex-start;
+}
+.raid-wr-player {
+  background: var(--surface2); border: 2px solid var(--border); border-radius: 12px;
+  padding: 14px; width: 160px; text-align: center;
+  transition: all 0.3s; position: relative;
+}
+.raid-wr-player.is-me { border-color: var(--gold); box-shadow: 0 0 16px rgba(212,160,64,0.15); }
+.raid-wr-player.ready { border-color: #2ecc71; }
+.raid-wr-player-name {
+  font-weight: 700; font-size: 0.95rem; color: var(--text);
+  margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.raid-wr-player-team {
+  display: flex; gap: 4px; justify-content: center;
+}
+.raid-wr-player-team img {
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--border); transition: transform 0.2s;
+}
+.raid-wr-player-team img:hover { transform: scale(1.15); }
+.raid-wr-player-status {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;
+  margin-top: 6px; color: var(--text-dim);
+}
+.raid-wr-player.ready .raid-wr-player-status { color: #2ecc71; }
+
+/* Raid Chat */
+.raid-chat {
+  border-top: 1px solid var(--border);
+  background: var(--surface); padding: 0;
+  max-height: 220px; display: flex; flex-direction: column;
+}
+.raid-chat-messages {
+  flex: 1; overflow-y: auto; padding: 8px 12px;
+  max-height: 120px; min-height: 60px;
+  font-size: 0.8rem;
+}
+.raid-chat-msg {
+  margin-bottom: 4px; line-height: 1.4;
+}
+.raid-chat-msg .chat-name {
+  font-weight: 700; color: var(--gold); margin-right: 4px;
+}
+.raid-chat-msg .chat-text { color: var(--text2); }
+.raid-chat-msg.system .chat-text { color: var(--accent); font-style: italic; }
+.raid-chat-input-row {
+  display: flex; gap: 6px; padding: 8px 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.raid-chat-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; color: var(--text);
+  font-size: 0.85rem; outline: none;
+}
+.raid-chat-input:focus { border-color: var(--gold-deep); }
+.raid-chat-send {
+  padding: 8px 14px; background: var(--gold-deep); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer; font-weight: 700;
+  font-size: 0.85rem;
+}
+.raid-chat-reactions {
+  display: flex; gap: 4px; padding: 4px 12px 8px;
+  flex-wrap: wrap;
+}
+.raid-chat-react-btn {
+  padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 16px; cursor: pointer; font-size: 0.8rem; color: var(--text);
+  transition: all 0.15s;
+}
+.raid-chat-react-btn:hover { border-color: var(--gold); background: rgba(212,160,64,0.1); }
+.raid-chat-react-btn:active { transform: scale(0.95); }
+
+/* Waiting Room Footer */
+.raid-wr-footer {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(20,16,28,0.9);
+}
+.raid-wr-timer {
+  font-family: 'Creepster', cursive; font-size: 1.3rem;
+  color: var(--accent); letter-spacing: 2px;
+}
+.raid-wr-launch-btn {
+  padding: 12px 32px; font-family: 'Creepster', cursive;
+  font-size: 1.2rem; letter-spacing: 2px;
+  background: linear-gradient(135deg, #2ecc71, #1a9e55);
+  color: #fff; border: none; border-radius: 10px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(46,204,113,0.3);
+  transition: all 0.2s;
+}
+.raid-wr-launch-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(46,204,113,0.4); }
+
+/* ===== RAID SPECTATOR VIEW (watching teammate fight) ===== */
+.raid-spectator-overlay {
+  position: fixed; inset: 0; z-index: 9100;
+  background: linear-gradient(180deg, #0a0612 0%, #14101e 50%, #0e0820 100%);
+  display: none; flex-direction: column;
+}
+.raid-spectator-overlay.active { display: flex; }
+
+.raid-spec-header {
+  text-align: center; padding: 12px 16px;
+  background: rgba(20,16,28,0.9);
+  border-bottom: 1px solid var(--border);
+}
+.raid-spec-watching {
+  font-family: 'Creepster', cursive; font-size: 1rem;
+  color: var(--gold); letter-spacing: 2px;
+}
+.raid-spec-fighter-name {
+  font-size: 1.2rem; font-weight: 800; color: var(--text);
+  margin-top: 2px;
+}
+
+.raid-spec-arena {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 20px; gap: 16px; overflow: hidden;
+}
+
+.raid-spec-combatants {
+  display: flex; justify-content: space-around; align-items: center;
+  width: 100%; max-width: 600px; gap: 12px;
+}
+
+.raid-spec-fighter {
+  text-align: center; flex: 1;
+}
+.raid-spec-fighter-art {
+  width: 90px; height: 90px; border-radius: 50%; object-fit: cover;
+  border: 3px solid var(--border); transition: all 0.4s;
+}
+.raid-spec-fighter.player .raid-spec-fighter-art { border-color: #e74c3c; }
+.raid-spec-fighter.boss .raid-spec-fighter-art { border-color: #8e44ad; box-shadow: 0 0 20px rgba(142,68,173,0.3); }
+.raid-spec-fighter-ghost-name {
+  font-size: 0.95rem; font-weight: 700; color: var(--text); margin-top: 6px;
+}
+.raid-spec-fighter-hp-bar {
+  position: relative; height: 16px; background: rgba(255,255,255,0.05);
+  border-radius: 8px; overflow: hidden; margin-top: 4px; width: 100%;
+}
+.raid-spec-fighter-hp-fill {
+  height: 100%; border-radius: 8px; transition: width 0.5s ease;
+}
+.raid-spec-fighter-hp-fill.player { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+.raid-spec-fighter-hp-fill.boss { background: linear-gradient(90deg, #6c3483, #8e44ad); }
+.raid-spec-fighter-hp-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.raid-spec-dice-display {
+  font-size: 1.3rem; font-weight: 800; color: var(--text);
+  margin-top: 8px; letter-spacing: 3px; min-height: 24px;
+}
+
+.raid-spec-vs-badge {
+  font-family: 'Creepster', cursive; font-size: 2.5rem; color: var(--gold);
+  text-shadow: 0 0 20px rgba(212,160,64,0.3);
+}
+
+.raid-spec-callout {
+  text-align: center; font-size: 0.95rem; font-weight: 700;
+  color: var(--accent); min-height: 24px; transition: all 0.3s;
+  padding: 8px 16px;
+}
+.raid-spec-callout.player-win { color: #2ecc71; }
+.raid-spec-callout.boss-win { color: #e74c3c; }
+
+.raid-spec-boss-pool {
+  width: 100%; max-width: 500px;
+  margin-top: 8px;
+}
+.raid-spec-boss-pool-label {
+  display: flex; justify-content: space-between; font-size: 0.75rem;
+  color: var(--text2); margin-bottom: 4px; font-weight: 700;
+}
+.raid-spec-boss-pool-bar {
+  position: relative; height: 22px; background: rgba(255,255,255,0.05);
+  border-radius: 11px; overflow: hidden;
+}
+.raid-spec-boss-pool-fill {
+  height: 100%; border-radius: 11px; transition: width 0.6s ease;
+  background: linear-gradient(90deg, #8e44ad, #c0392b);
+}
+.raid-spec-boss-pool-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 800; color: #fff;
+}
+
+.raid-spec-sideline-row {
+  display: flex; gap: 6px; justify-content: center; margin-top: 4px;
+}
+.raid-spec-sideline-ghost {
+  display: flex; align-items: center; gap: 3px; font-size: 0.7rem; color: var(--text2);
+  padding: 2px 8px; background: var(--surface); border-radius: 10px;
+}
+.raid-spec-sideline-ghost.ko { opacity: 0.35; text-decoration: line-through; }
+
+/* Post-fight results display */
+.raid-post-fight {
+  text-align: center; padding: 20px;
+  animation: fadeIn 0.5s ease;
+}
+.raid-post-fight-title {
+  font-family: 'Creepster', cursive; font-size: 1.6rem;
+  letter-spacing: 3px; margin-bottom: 8px;
+}
+.raid-post-fight-title.victory { color: #2ecc71; }
+.raid-post-fight-title.defeat { color: var(--accent); }
+.raid-post-fight-damage {
+  font-size: 1.3rem; font-weight: 800; color: var(--gold-bright);
+  margin: 8px 0;
+}
+.raid-post-fight-hp {
+  color: var(--text2); font-size: 0.9rem;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes raidVictoryPulse { 0%,100% { text-shadow: 0 0 40px rgba(240,197,96,0.4); } 50% { text-shadow: 0 0 60px rgba(240,197,96,0.7); } }
+@keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
 </style>
 </head>
 <body>
@@ -3347,6 +3602,85 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <!-- ===== RAID SCREEN (full-screen overlay for active raids) ===== -->
 <div id="raid-screen" class="raid-screen-overlay" style="display:none"></div>
 
+<!-- ===== RAID WAITING ROOM (Social pre-fight lobby) ===== -->
+<div id="raid-waiting-room" class="raid-waiting-room">
+  <div class="raid-wr-header">
+    <img id="raid-wr-boss-art" class="raid-wr-boss-art" src="" alt="">
+    <div id="raid-wr-boss-name" class="raid-wr-boss-name"></div>
+    <div id="raid-wr-boss-title" class="raid-wr-boss-title"></div>
+    <div id="raid-wr-boss-quote" class="raid-wr-boss-quote"></div>
+  </div>
+  <div id="raid-wr-players" class="raid-wr-players"></div>
+  <div class="raid-chat" id="raid-chat">
+    <div class="raid-chat-messages" id="raid-chat-messages"></div>
+    <div class="raid-chat-reactions" id="raid-chat-reactions"></div>
+    <div class="raid-chat-input-row">
+      <input class="raid-chat-input" id="raid-chat-input" type="text" placeholder="Say something..." maxlength="120" autocomplete="off">
+      <button class="raid-chat-send" id="raid-chat-send" onclick="sendRaidChat()">Send</button>
+    </div>
+  </div>
+  <div class="raid-wr-footer">
+    <span class="raid-wr-timer" id="raid-wr-timer">15</span>
+    <button class="raid-wr-launch-btn" id="raid-wr-launch-btn" onclick="launchFromWaitingRoom()">LAUNCH!</button>
+  </div>
+</div>
+
+<!-- ===== RAID SPECTATOR VIEW (watching teammate fight) ===== -->
+<div id="raid-spectator-overlay" class="raid-spectator-overlay">
+  <div class="raid-spec-header">
+    <div class="raid-spec-watching">WATCHING</div>
+    <div class="raid-spec-fighter-name" id="raid-spec-fighter-name">...</div>
+  </div>
+  <div class="raid-spec-arena" id="raid-spec-arena">
+    <div class="raid-spec-combatants">
+      <div class="raid-spec-fighter player">
+        <img class="raid-spec-fighter-art" id="raid-spec-p-art" src="../testroom/art/timber.jpg" alt="">
+        <div class="raid-spec-fighter-ghost-name" id="raid-spec-p-name">???</div>
+        <div class="raid-spec-fighter-hp-bar">
+          <div class="raid-spec-fighter-hp-fill player" id="raid-spec-p-hp-fill" style="width:100%"></div>
+          <div class="raid-spec-fighter-hp-text" id="raid-spec-p-hp-text">0/0</div>
+        </div>
+        <div class="raid-spec-dice-display" id="raid-spec-p-dice"></div>
+        <div class="raid-spec-sideline-row" id="raid-spec-p-sideline"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div class="raid-spec-vs-badge">VS</div>
+        <div style="font-size:0.75rem;color:var(--text-dim);">Round <span id="raid-spec-round">1</span></div>
+      </div>
+      <div class="raid-spec-fighter boss">
+        <img class="raid-spec-fighter-art" id="raid-spec-b-art" src="../testroom/art/timber.jpg" alt="">
+        <div class="raid-spec-fighter-ghost-name" id="raid-spec-b-name">???</div>
+        <div class="raid-spec-fighter-hp-bar">
+          <div class="raid-spec-fighter-hp-fill boss" id="raid-spec-b-hp-fill" style="width:100%"></div>
+          <div class="raid-spec-fighter-hp-text" id="raid-spec-b-hp-text">0/0</div>
+        </div>
+        <div class="raid-spec-dice-display" id="raid-spec-b-dice"></div>
+        <div class="raid-spec-sideline-row" id="raid-spec-b-sideline"></div>
+      </div>
+    </div>
+    <div class="raid-spec-callout" id="raid-spec-callout"></div>
+    <div class="raid-spec-boss-pool" id="raid-spec-boss-pool">
+      <div class="raid-spec-boss-pool-label">
+        <span>BOSS HP POOL</span>
+        <span id="raid-spec-pool-text">0 / 0</span>
+      </div>
+      <div class="raid-spec-boss-pool-bar">
+        <div class="raid-spec-boss-pool-fill" id="raid-spec-pool-fill" style="width:100%"></div>
+        <div class="raid-spec-boss-pool-text" id="raid-spec-pool-inner-text">0 / 0</div>
+      </div>
+    </div>
+    <div id="raid-spec-post-fight" class="raid-post-fight" style="display:none;"></div>
+  </div>
+  <div class="raid-chat" id="raid-spec-chat" style="display:none;">
+    <div class="raid-chat-messages" id="raid-spec-chat-messages"></div>
+    <div class="raid-chat-reactions" id="raid-spec-chat-reactions"></div>
+    <div class="raid-chat-input-row">
+      <input class="raid-chat-input" id="raid-spec-chat-input" type="text" placeholder="Cheer them on..." maxlength="120" autocomplete="off">
+      <button class="raid-chat-send" onclick="sendRaidChat()">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== PACK OPENING OVERLAY ===== -->
 <div class="pack-overlay" id="pack-overlay">
   <h2>New Pack!</h2>
@@ -3535,7 +3869,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.76';
+const BBN_VERSION = 'v0.77';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7516,9 +7850,9 @@ function closeRaidLobby() {
         bossDefeatedBy: user.uid,
         fightPhase: 'done'
       });
-      if (typeof distributeRaidRewards === 'function') {
-        distributeRaidRewards(instanceId, true, user.uid);
-      }
+      // distributeRaidRewards removed — it's called by raid-engine listeners
+      // on other clients when they see status:'complete'. Calling it here AND
+      // there caused double raid-point awards.
     } else if (nextSlot >= totalPlayers) {
       // All players fought, boss survived
       await db.ref(`mp/raids/instances/${instanceId}`).update({
@@ -7527,9 +7861,7 @@ function closeRaidLobby() {
         completedAt: firebase.database.ServerValue.TIMESTAMP,
         fightPhase: 'done'
       });
-      if (typeof distributeRaidRewards === 'function') {
-        distributeRaidRewards(instanceId, false, null);
-      }
+      // distributeRaidRewards removed — same reason as above
     } else {
       // Advance to next fighter
       const nextPlayer = inst.players?.[nextSlot];

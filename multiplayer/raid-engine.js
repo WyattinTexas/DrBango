@@ -289,30 +289,38 @@ function handleRaidStateChange(data) {
 
   switch (data.status) {
     case 'countdown':
-      if (typeof showRaidCountdown === 'function') {
-        showRaidCountdown(data);
-      }
-      // After countdown, transition to active
-      if (data.fightPhase === 'countdown') {
-        // The first player triggers the start
+      // Show the waiting room (social lobby) instead of the old countdown screen
+      if (typeof showRaidWaitingRoom === 'function' && data.fightPhase === 'countdown') {
+        showRaidWaitingRoom(currentRaid.instanceId, data);
+        // The first player triggers the start after 15s (or when LAUNCH is clicked)
         const slot0 = data.players && data.players[0];
         if (slot0 && slot0.uid === user.uid) {
+          // Waiting room handles its own timer — when it fires, it calls handleActiveFight
+          // Set a fallback transition after 20s in case waiting room JS doesn't trigger
           setTimeout(() => {
-            db.ref(`mp/raids/instances/${currentRaid.instanceId}`).update({
-              status: 'active',
-              startedAt: firebase.database.ServerValue.TIMESTAMP,
-              fightPhase: 'fighting'
-            });
-          }, RAID_CONFIG.COUNTDOWN_SECONDS * 1000);
+            if (currentRaid && data.fightPhase === 'countdown') {
+              db.ref(`mp/raids/instances/${currentRaid.instanceId}`).update({
+                status: 'active',
+                startedAt: firebase.database.ServerValue.TIMESTAMP,
+                fightPhase: 'fighting'
+              });
+            }
+          }, 20000);
         }
+      } else if (typeof showRaidCountdown === 'function') {
+        showRaidCountdown(data);
       }
       break;
 
     case 'active':
+      // Hide waiting room if still visible
+      if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
       handleActiveFight(data);
       break;
 
     case 'complete':
+      if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
+      if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
       if (typeof showRaidResult === 'function') {
         showRaidResult(data);
       }
@@ -339,13 +347,24 @@ function handleActiveFight(data) {
   if (mySlot === currentIdx && players[mySlot]?.status !== 'done' && players[mySlot]?.status !== 'disconnected') {
     // It's our turn to fight!
     if (!raidBattleState || raidBattleState.phase === 'waiting') {
+      // Hide spectator overlay if we were watching
+      if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
       startMyRaidFight(data);
     }
   } else {
-    // Spectator mode
-    if (typeof showRaidSpectatorView === 'function') {
+    // Spectator mode — show the enhanced live spectator overlay
+    if (typeof showRaidSpectatorOverlay === 'function') {
+      showRaidSpectatorOverlay(data, mySlot, currentIdx);
+    } else if (typeof showRaidSpectatorView === 'function') {
       showRaidSpectatorView(data, mySlot, currentIdx);
     }
+
+    // Check if a fighter just finished — show post-fight results
+    const fighter = players[currentIdx];
+    if (fighter && fighter.status === 'done' && typeof showPostFightResults === 'function') {
+      showPostFightResults(fighter, data);
+    }
+
     // Monitor for disconnects
     monitorCurrentFighter(data);
   }

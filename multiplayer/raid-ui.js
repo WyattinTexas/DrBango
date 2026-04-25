@@ -835,3 +835,388 @@ function spectateRaid(instanceId) {
     });
   }
 }
+
+// =================================================================
+// RAID WAITING ROOM — Social pre-fight lobby ("the poker table")
+// =================================================================
+
+let _wrTimerInterval = null;
+let _wrChatListener = null;
+let _wrInstanceId = null;
+
+/**
+ * Show the waiting room with all queued players, their teams, boss art, and chat.
+ * Called from raid-engine after the raid instance is created.
+ */
+function showRaidWaitingRoom(instanceId, raidData) {
+  _wrInstanceId = instanceId;
+  const boss = RAID_BOSSES[raidData.raidId];
+  if (!boss) return;
+
+  const overlay = document.getElementById('raid-waiting-room');
+  if (!overlay) return;
+
+  // Fill boss header
+  const bossArt = document.getElementById('raid-wr-boss-art');
+  const bossName = document.getElementById('raid-wr-boss-name');
+  const bossTitle = document.getElementById('raid-wr-boss-title');
+  const bossQuote = document.getElementById('raid-wr-boss-quote');
+  if (bossArt) { bossArt.src = boss.bossGhost.art || '../testroom/art/timber.jpg'; bossArt.alt = boss.name; }
+  if (bossName) bossName.textContent = boss.name;
+  if (bossTitle) bossTitle.textContent = boss.title;
+  if (bossQuote) bossQuote.textContent = '"' + (boss.dialogue?.intro || 'Prepare yourselves.') + '"';
+
+  // Render players
+  renderWaitingRoomPlayers(raidData.players || {});
+
+  // Set up reactions
+  const reactionsEl = document.getElementById('raid-chat-reactions');
+  if (reactionsEl) {
+    reactionsEl.innerHTML = [
+      { emoji: '\u2694\uFE0F', text: "Let's go!" },
+      { emoji: '\uD83C\uDFB2', text: 'Nice team!' },
+      { emoji: '\uD83D\uDD25', text: 'Fire!' },
+      { emoji: '\uD83D\uDC80', text: 'Watch out!' },
+      { emoji: '\uD83D\uDC7B', text: 'Spooky...' }
+    ].map(r => `<button class="raid-chat-react-btn" onclick="sendRaidChatReaction('${r.emoji} ${r.text}')">${r.emoji} ${r.text}</button>`).join('');
+  }
+
+  // Start chat listener
+  startRaidChatListener(instanceId);
+
+  // Chat enter-key handler
+  const chatInput = document.getElementById('raid-chat-input');
+  if (chatInput) {
+    chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendRaidChat(); };
+  }
+
+  // Show overlay
+  overlay.classList.add('active');
+
+  // Auto-launch timer (15 seconds)
+  let countdown = 15;
+  const timerEl = document.getElementById('raid-wr-timer');
+  if (timerEl) timerEl.textContent = countdown;
+
+  if (_wrTimerInterval) clearInterval(_wrTimerInterval);
+  _wrTimerInterval = setInterval(() => {
+    countdown--;
+    if (timerEl) timerEl.textContent = countdown;
+    if (countdown <= 0) {
+      clearInterval(_wrTimerInterval);
+      _wrTimerInterval = null;
+      launchFromWaitingRoom();
+    }
+  }, 1000);
+
+  // Send system join message
+  const user = firebase.auth().currentUser;
+  if (user) {
+    pushRaidChatMessage(instanceId, 'SYSTEM', user.displayName + ' entered the waiting room.', true);
+  }
+}
+
+function renderWaitingRoomPlayers(players) {
+  const container = document.getElementById('raid-wr-players');
+  if (!container) return;
+  const user = firebase.auth().currentUser;
+
+  let html = '';
+  Object.entries(players).forEach(([slot, p]) => {
+    const isMe = p.uid === user?.uid;
+    const teamHtml = (p.team || []).map(id => {
+      const g = typeof getGhost === 'function' ? getGhost(id) : null;
+      return g ? `<img src="${g.art}" alt="${g.name}" title="${g.name}" onerror="this.src='../testroom/art/timber.jpg'">` : '';
+    }).join('');
+
+    html += `<div class="raid-wr-player ${isMe ? 'is-me' : ''}">
+      <div class="raid-wr-player-name">${p.displayName}${isMe ? ' (you)' : ''}</div>
+      <div class="raid-wr-player-team">${teamHtml}</div>
+      <div class="raid-wr-player-status">#${parseInt(slot) + 1}</div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function hideRaidWaitingRoom() {
+  const overlay = document.getElementById('raid-waiting-room');
+  if (overlay) overlay.classList.remove('active');
+  if (_wrTimerInterval) { clearInterval(_wrTimerInterval); _wrTimerInterval = null; }
+  stopRaidChatListener();
+}
+
+function launchFromWaitingRoom() {
+  if (_wrTimerInterval) { clearInterval(_wrTimerInterval); _wrTimerInterval = null; }
+
+  // Disable button to prevent double-clicks
+  const btn = document.getElementById('raid-wr-launch-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'LAUNCHING...'; }
+
+  // Transition the raid from 'countdown' to 'active' in Firebase
+  // This triggers handleRaidStateChange on all clients (including ours),
+  // which hides the waiting room and starts the fight
+  if (currentRaid && currentRaid.instanceId) {
+    db.ref(`mp/raids/instances/${currentRaid.instanceId}`).update({
+      status: 'active',
+      startedAt: firebase.database.ServerValue.TIMESTAMP,
+      fightPhase: 'fighting'
+    });
+    // Send launch message to chat
+    pushRaidChatMessage(currentRaid.instanceId, 'SYSTEM', 'Raid launched! Entering battle...', true);
+  }
+}
+
+// =================================================================
+// RAID CHAT — Firebase-backed real-time messaging
+// =================================================================
+
+function startRaidChatListener(instanceId) {
+  stopRaidChatListener();
+  const chatRef = db.ref(`mp/raids/instances/${instanceId}/chat`);
+  _wrChatListener = chatRef.orderByChild('timestamp').limitToLast(50).on('child_added', (snap) => {
+    const msg = snap.val();
+    if (!msg) return;
+    appendChatMessage(msg.displayName, msg.message, msg.isSystem);
+  });
+}
+
+function stopRaidChatListener() {
+  if (_wrChatListener && _wrInstanceId) {
+    db.ref(`mp/raids/instances/${_wrInstanceId}/chat`).off('child_added', _wrChatListener);
+    _wrChatListener = null;
+  }
+}
+
+function appendChatMessage(name, message, isSystem) {
+  // Append to both waiting room and spectator chat
+  ['raid-chat-messages', 'raid-spec-chat-messages'].forEach(id => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'raid-chat-msg' + (isSystem ? ' system' : '');
+    div.innerHTML = `<span class="chat-name">${name}:</span> <span class="chat-text">${message}</span>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+function sendRaidChat() {
+  const input = document.getElementById('raid-chat-input') || document.getElementById('raid-spec-chat-input');
+  if (!input || !input.value.trim()) return;
+  const instanceId = _wrInstanceId || currentRaid?.instanceId;
+  if (!instanceId) return;
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+  pushRaidChatMessage(instanceId, user.displayName || 'Raider', input.value.trim(), false);
+  input.value = '';
+}
+
+function sendRaidChatReaction(text) {
+  const instanceId = _wrInstanceId || currentRaid?.instanceId;
+  if (!instanceId) return;
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+  pushRaidChatMessage(instanceId, user.displayName || 'Raider', text, false);
+}
+
+function pushRaidChatMessage(instanceId, displayName, message, isSystem) {
+  db.ref(`mp/raids/instances/${instanceId}/chat`).push({
+    uid: firebase.auth().currentUser?.uid || '',
+    displayName: displayName,
+    message: message,
+    isSystem: isSystem || false,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+// =================================================================
+// RAID SPECTATOR VIEW — Live battle watching
+// =================================================================
+
+let _specBattleListener = null;
+
+/**
+ * Enhanced spectator view — shows live battle state from Firebase snapshots.
+ * Called when it's NOT our turn to fight.
+ */
+function showRaidSpectatorOverlay(data, mySlot, currentIdx) {
+  const overlay = document.getElementById('raid-spectator-overlay');
+  if (!overlay) return;
+
+  const instanceId = currentRaid?.instanceId || _wrInstanceId;
+  const currentFighter = data.players?.[currentIdx];
+  const boss = RAID_BOSSES[data.raidId];
+
+  // Set fighter name
+  const nameEl = document.getElementById('raid-spec-fighter-name');
+  if (nameEl) nameEl.textContent = (currentFighter?.displayName || 'Raider') + ' vs ' + (boss?.name || 'Boss');
+
+  // Initialize boss pool bar
+  updateSpectatorBossPool(data.bossCurrentHp || 0, data.bossMaxHp || 1);
+
+  // Show chat for spectators
+  const chatEl = document.getElementById('raid-spec-chat');
+  if (chatEl) chatEl.style.display = '';
+
+  // Set up spectator chat reactions
+  const reactionsEl = document.getElementById('raid-spec-chat-reactions');
+  if (reactionsEl) {
+    reactionsEl.innerHTML = [
+      { emoji: '\uD83C\uDFB2', text: 'Nice roll!' },
+      { emoji: '\u2694\uFE0F', text: "Let's go!" },
+      { emoji: '\uD83D\uDC80', text: 'Watch out!' },
+      { emoji: '\uD83D\uDD25', text: 'Fire!' },
+      { emoji: '\uD83D\uDC7B', text: 'Spooky...' }
+    ].map(r => `<button class="raid-chat-react-btn" onclick="sendRaidChatReaction('${r.emoji} ${r.text}')">${r.emoji} ${r.text}</button>`).join('');
+  }
+
+  // Chat input enter-key
+  const chatInput = document.getElementById('raid-spec-chat-input');
+  if (chatInput) {
+    chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendRaidChat(); };
+  }
+
+  // Start chat listener if not already active
+  if (instanceId) startRaidChatListener(instanceId);
+
+  // Start battle state listener
+  startSpectatorBattleListener(instanceId);
+
+  overlay.classList.add('active');
+}
+
+function hideRaidSpectatorOverlay() {
+  const overlay = document.getElementById('raid-spectator-overlay');
+  if (overlay) overlay.classList.remove('active');
+  stopSpectatorBattleListener();
+}
+
+function startSpectatorBattleListener(instanceId) {
+  stopSpectatorBattleListener();
+  if (!instanceId) return;
+
+  const ref = db.ref(`mp/raids/instances/${instanceId}/battleState`);
+  _specBattleListener = ref.on('value', (snap) => {
+    const state = snap.val();
+    if (state) updateSpectatorBattleView(state);
+  });
+}
+
+function stopSpectatorBattleListener() {
+  if (_specBattleListener && (_wrInstanceId || currentRaid?.instanceId)) {
+    const id = _wrInstanceId || currentRaid?.instanceId;
+    db.ref(`mp/raids/instances/${id}/battleState`).off('value', _specBattleListener);
+    _specBattleListener = null;
+  }
+}
+
+/**
+ * Update the spectator battle view with a new snapshot from Firebase.
+ */
+function updateSpectatorBattleView(snapshot) {
+  if (!snapshot) return;
+
+  const pGhost = snapshot.playerGhost || {};
+  const bGhost = snapshot.bossGhost || {};
+  const lastRoll = snapshot.lastRoll || {};
+
+  // Player fighter
+  const pArt = document.getElementById('raid-spec-p-art');
+  const pName = document.getElementById('raid-spec-p-name');
+  const pHpFill = document.getElementById('raid-spec-p-hp-fill');
+  const pHpText = document.getElementById('raid-spec-p-hp-text');
+  const pDice = document.getElementById('raid-spec-p-dice');
+
+  if (pArt && pGhost.art) pArt.src = pGhost.art;
+  if (pName) pName.textContent = pGhost.name || '???';
+  if (pHpFill) pHpFill.style.width = ((pGhost.hp / (pGhost.maxHp || 1)) * 100) + '%';
+  if (pHpText) pHpText.textContent = (pGhost.hp || 0) + '/' + (pGhost.maxHp || 0);
+  if (pDice && lastRoll.player) pDice.textContent = '[' + lastRoll.player.join(', ') + ']';
+
+  // Boss fighter
+  const bArt = document.getElementById('raid-spec-b-art');
+  const bName = document.getElementById('raid-spec-b-name');
+  const bHpFill = document.getElementById('raid-spec-b-hp-fill');
+  const bHpText = document.getElementById('raid-spec-b-hp-text');
+  const bDice = document.getElementById('raid-spec-b-dice');
+
+  if (bArt && bGhost.art) bArt.src = bGhost.art;
+  if (bName) bName.textContent = bGhost.name || '???';
+  if (bHpFill) bHpFill.style.width = ((bGhost.hp / (bGhost.maxHp || 1)) * 100) + '%';
+  if (bHpText) bHpText.textContent = (bGhost.hp || 0) + '/' + (bGhost.maxHp || 0);
+  if (bDice && lastRoll.boss) bDice.textContent = '[' + lastRoll.boss.join(', ') + ']';
+
+  // Round
+  const roundEl = document.getElementById('raid-spec-round');
+  if (roundEl) roundEl.textContent = snapshot.round || 1;
+
+  // Fighter name
+  const fighterNameEl = document.getElementById('raid-spec-fighter-name');
+  if (fighterNameEl) fighterNameEl.textContent = (snapshot.playerName || 'Raider') + ' vs ' + (bGhost.name || 'Boss');
+
+  // Callout
+  const calloutEl = document.getElementById('raid-spec-callout');
+  if (calloutEl && lastRoll.winner) {
+    const isPlayerWin = lastRoll.winner === 'player';
+    calloutEl.className = 'raid-spec-callout ' + (isPlayerWin ? 'player-win' : 'boss-win');
+    calloutEl.textContent = isPlayerWin
+      ? (snapshot.playerName || 'Raider') + ' deals ' + (lastRoll.damage || 0) + ' damage!'
+      : (bGhost.name || 'Boss') + ' deals ' + (lastRoll.damage || 0) + ' damage!';
+  }
+  if (calloutEl && snapshot.abilityCallout) {
+    calloutEl.textContent = snapshot.abilityCallout;
+  }
+
+  // Boss pool HP
+  updateSpectatorBossPool(snapshot.bossPoolHp || 0, snapshot.bossMaxHp || 1);
+
+  // Player sideline
+  const pSideline = document.getElementById('raid-spec-p-sideline');
+  if (pSideline && snapshot.playerSideline) {
+    pSideline.innerHTML = snapshot.playerSideline.map(g =>
+      `<span class="raid-spec-sideline-ghost ${g.ko ? 'ko' : ''}">${g.name} ${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</span>`
+    ).join('');
+  }
+
+  // Boss sideline
+  const bSideline = document.getElementById('raid-spec-b-sideline');
+  if (bSideline && snapshot.bossSideline) {
+    bSideline.innerHTML = snapshot.bossSideline.map(g =>
+      `<span class="raid-spec-sideline-ghost ${g.ko ? 'ko' : ''}">${g.name} ${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</span>`
+    ).join('');
+  }
+}
+
+function updateSpectatorBossPool(currentHp, maxHp) {
+  const pct = Math.max(0, (currentHp / maxHp) * 100);
+  const fill = document.getElementById('raid-spec-pool-fill');
+  const text = document.getElementById('raid-spec-pool-text');
+  const innerText = document.getElementById('raid-spec-pool-inner-text');
+  if (fill) fill.style.width = pct + '%';
+  if (text) text.textContent = currentHp + ' / ' + maxHp;
+  if (innerText) innerText.textContent = currentHp + ' / ' + maxHp;
+}
+
+/**
+ * Show post-fight results in the spectator view when a fighter finishes.
+ */
+function showPostFightResults(playerData, bossData) {
+  const postFight = document.getElementById('raid-spec-post-fight');
+  if (!postFight) return;
+
+  const damage = playerData.damageDealt || 0;
+  const won = (bossData.bossCurrentHp || 0) <= 0;
+  const remaining = Math.max(0, bossData.bossCurrentHp || 0);
+
+  postFight.style.display = 'block';
+  postFight.innerHTML = `
+    <div class="raid-post-fight-title ${won ? 'victory' : 'defeat'}">
+      ${playerData.displayName || 'Raider'} ${won ? 'FINISHED THE BOSS!' : 'has fallen!'}
+    </div>
+    <div class="raid-post-fight-damage">${damage} damage dealt</div>
+    <div class="raid-post-fight-hp">Boss HP: ${remaining} remaining</div>
+    ${won ? '<div style="color:#2ecc71;font-family:Creepster,cursive;font-size:1.3rem;margin-top:12px;letter-spacing:3px;">RAID COMPLETE!</div>' : ''}
+    ${!won && remaining > 0 ? '<div style="color:var(--text2);font-size:0.85rem;margin-top:8px;">Next fighter stepping up...</div>' : ''}
+  `;
+}
