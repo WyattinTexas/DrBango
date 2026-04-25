@@ -491,7 +491,7 @@ const RAID_BOSSES = {
   raid_timber: {
     id: 'raid_timber',
     name: 'Timber',
-    title: 'Alpha of the Rolling Hills',
+    title: 'Warden of the Wild',
     personality: 'tyrant',
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 5,
@@ -513,7 +513,7 @@ const RAID_BOSSES = {
   raid_dark_fang: {
     id: 'raid_dark_fang',
     name: 'Dark Fang',
-    title: 'Shadow of the Pack',
+    title: 'The Unseen Predator',
     personality: 'trickster',
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 3,
@@ -535,7 +535,7 @@ const RAID_BOSSES = {
   raid_jasper: {
     id: 'raid_jasper',
     name: 'Jasper',
-    title: 'The Wanderer\'s Fury',
+    title: 'The Restless Flame',
     personality: 'swarm',
     tier: 1, set: 'Rolling Hills',
     requiredBadge: null, requiredPlayers: 1,
@@ -560,7 +560,7 @@ const RAID_BOSSES = {
   raid_king_jay: {
     id: 'raid_king_jay',
     name: 'King Jay',
-    title: 'Sovereign of the Frost',
+    title: 'The Frozen Throne',
     personality: 'glacier',
     tier: 2, set: 'Frost Valley',
     requiredBadge: null, requiredPlayers: 5,
@@ -582,7 +582,7 @@ const RAID_BOSSES = {
   raid_romy: {
     id: 'raid_romy',
     name: 'Romy',
-    title: 'The Valley Guardian',
+    title: 'Seer of the Frozen Vale',
     personality: 'trickster',
     tier: 2, set: 'Frost Valley',
     requiredBadge: null, requiredPlayers: 3,
@@ -604,7 +604,7 @@ const RAID_BOSSES = {
   raid_mountain_king: {
     id: 'raid_mountain_king',
     name: 'The Mountain King',
-    title: 'Lord of the Frozen Peak',
+    title: 'The Immovable',
     personality: 'tyrant',
     tier: 2, set: 'Frost Valley',
     requiredBadge: null, requiredPlayers: 7,
@@ -628,7 +628,7 @@ const RAID_BOSSES = {
   raid_pip: {
     id: 'raid_pip',
     name: 'Pip',
-    title: 'The Giggling Inferno',
+    title: 'The Living Ember',
     personality: 'swarm',
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'frost_valley_champion', requiredPlayers: 5,
@@ -651,7 +651,7 @@ const RAID_BOSSES = {
   raid_humar: {
     id: 'raid_humar',
     name: 'Humar',
-    title: 'The Blue Flame Legend',
+    title: 'Herald of the Meteor',
     personality: 'tyrant',
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'frost_valley_champion', requiredPlayers: 7,
@@ -673,7 +673,7 @@ const RAID_BOSSES = {
   raid_nerina: {
     id: 'raid_nerina',
     name: 'Nerina',
-    title: 'Leviathan of the Deep',
+    title: 'Terror of the Depths',
     personality: 'glacier',
     tier: 3, set: 'Volcanic Isles',
     requiredBadge: 'frost_valley_champion', requiredPlayers: 10,
@@ -697,7 +697,7 @@ const RAID_BOSSES = {
   raid_lucy: {
     id: 'raid_lucy',
     name: 'Lucy',
-    title: 'Keeper of the Blue Fire',
+    title: 'Warden of the Blue Flame',
     personality: 'trickster',
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
@@ -719,7 +719,7 @@ const RAID_BOSSES = {
   raid_shade: {
     id: 'raid_shade',
     name: 'Shade',
-    title: 'The Haunting',
+    title: 'The Endless Whisper',
     personality: 'glacier',
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
@@ -741,7 +741,7 @@ const RAID_BOSSES = {
   raid_valkin: {
     id: 'raid_valkin',
     name: 'Valkin the Grand',
-    title: 'Master of the Dark Castle',
+    title: 'The Corruptor',
     personality: 'tyrant',
     tier: 4, set: 'Dark Castle',
     requiredBadge: 'volcanic_isles_champion', requiredPlayers: 10,
@@ -763,33 +763,34 @@ const RAID_BOSSES = {
 };
 
 // Badge definitions for raid progression
+// Titles inspired by BOO lore: Spiritkin, Wills, the Lantern, the Overworld, Balance vs Control
 const RAID_BADGES = {
   // Rolling Hills badges
-  timber_slayer:     { name: 'Timber Slayer', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
-  dark_fang_slayer:  { name: 'Dark Fang Slayer', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
-  jasper_slayer:     { name: 'Jasper Slayer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
-  rolling_hills_champion: { name: 'Rolling Hills Champion', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
+  timber_slayer:     { name: 'Tamer of Wolves', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
+  dark_fang_slayer:  { name: 'Shadowbreaker', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
+  jasper_slayer:     { name: 'Trailblazer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
+  rolling_hills_champion: { name: 'Hierophant of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
 
   // Frost Valley badges
-  king_jay_slayer:   { name: 'King Jay Slayer', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
-  romy_slayer:       { name: 'Romy Slayer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
-  mountain_king_slayer: { name: 'Mountain King Slayer', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
-  frost_valley_champion: { name: 'Frost Valley Champion', icon: '&#x2744;', requires: ['king_jay_slayer', 'romy_slayer', 'mountain_king_slayer'], tier: 2, gates: 3 },
+  king_jay_slayer:   { name: 'Crownbreaker', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
+  romy_slayer:       { name: 'Veil Piercer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
+  mountain_king_slayer: { name: 'Mountainbreaker', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
+  frost_valley_champion: { name: 'Frostborne', icon: '&#x2744;', requires: ['king_jay_slayer', 'romy_slayer', 'mountain_king_slayer'], tier: 2, gates: 3 },
 
   // Volcanic Isles badges
-  pip_slayer:        { name: 'Pip Slayer', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
-  humar_slayer:      { name: 'Humar Slayer', icon: '&#x2604;', boss: 'raid_humar', tier: 3 },
-  nerina_slayer:     { name: 'Nerina Slayer', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
-  volcanic_isles_champion: { name: 'Volcanic Isles Champion', icon: '&#x1F30B;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3, gates: 4 },
+  pip_slayer:        { name: 'Ember Quencher', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
+  humar_slayer:      { name: 'Meteorfall', icon: '&#x2604;', boss: 'raid_humar', tier: 3 },
+  nerina_slayer:     { name: 'Depths Walker', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
+  volcanic_isles_champion: { name: 'Warden of the Isles', icon: '&#x1F30B;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3, gates: 4 },
 
   // Dark Castle badges
-  lucy_slayer:       { name: 'Lucy Slayer', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
-  shade_slayer:      { name: 'Shade Slayer', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
-  valkin_slayer:     { name: 'Valkin Slayer', icon: '&#x1F3F0;', boss: 'raid_valkin', tier: 4 },
-  dark_castle_champion: { name: 'Dark Castle Champion', icon: '&#x1F480;', requires: ['lucy_slayer', 'shade_slayer', 'valkin_slayer'], tier: 4 },
+  lucy_slayer:       { name: 'Flamesnuffer', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
+  shade_slayer:      { name: 'Silence Bringer', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
+  valkin_slayer:     { name: 'Vanquisher of the Grand', icon: '&#x1F3F0;', boss: 'raid_valkin', tier: 4 },
+  dark_castle_champion: { name: 'Keeper of Balance', icon: '&#x1F480;', requires: ['lucy_slayer', 'shade_slayer', 'valkin_slayer'], tier: 4 },
 
-  // Ultimate
-  ultimate_raider:   { name: 'Ultimate Raider', icon: '&#x1F31F;', requires: ['rolling_hills_champion', 'frost_valley_champion', 'volcanic_isles_champion', 'dark_castle_champion'] }
+  // Ultimate — the title Toby's grandfather held
+  ultimate_raider:   { name: 'Spiritkin Grand Master', icon: '&#x1F31F;', requires: ['rolling_hills_champion', 'frost_valley_champion', 'volcanic_isles_champion', 'dark_castle_champion'] }
 };
 
 // Raid shop items
