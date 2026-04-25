@@ -313,9 +313,12 @@ function handleRaidStateChange(data) {
         const slot0 = data.players && data.players[0];
         if (slot0 && slot0.uid === user.uid) {
           // Waiting room handles its own timer — when it fires, it calls handleActiveFight
-          // Set a fallback transition after 20s in case waiting room JS doesn't trigger
-          setTimeout(() => {
-            if (currentRaid && data.fightPhase === 'countdown') {
+          // Set a fallback transition after 20s in case waiting room JS doesn't trigger.
+          // Re-fetch fightPhase from Firebase to avoid the stale-closure double-write.
+          setTimeout(async () => {
+            if (!currentRaid) return;
+            const phaseSnap = await db.ref(`mp/raids/instances/${currentRaid.instanceId}/fightPhase`).once('value');
+            if (phaseSnap.val() === 'countdown') {
               db.ref(`mp/raids/instances/${currentRaid.instanceId}`).update({
                 status: 'active',
                 startedAt: firebase.database.ServerValue.TIMESTAMP,
@@ -1073,8 +1076,8 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
         points += bossConfig.bonusPoints; // MVP bonus
       }
 
-      // Players who didn't get to fight get 25% participation reward
-      if (p.status === 'registered' || p.status === 'waiting') {
+      // Players who were queued but didn't get to fight yet get 25% participation reward
+      if (p.status === 'registered') {
         points = Math.round(bossConfig.rewardPoints * 0.25);
       }
     } else {

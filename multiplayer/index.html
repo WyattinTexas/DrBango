@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.83'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.84'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3869,7 +3869,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.83';
+const BBN_VERSION = 'v0.84';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7853,9 +7853,11 @@ function closeRaidLobby() {
         bossDefeatedBy: user.uid,
         fightPhase: 'done'
       });
-      // distributeRaidRewards removed — it's called by raid-engine listeners
-      // on other clients when they see status:'complete'. Calling it here AND
-      // there caused double raid-point awards.
+      // Distribute rewards — this is the only path that runs for the completing player.
+      // Other players (spectators) never return through checkRaidResult, so no double-count.
+      if (typeof distributeRaidRewards === 'function') {
+        await distributeRaidRewards(instanceId, true, user.uid);
+      }
     } else if (nextSlot >= totalPlayers) {
       // All players fought, boss survived
       await db.ref(`mp/raids/instances/${instanceId}`).update({
@@ -7864,7 +7866,9 @@ function closeRaidLobby() {
         completedAt: firebase.database.ServerValue.TIMESTAMP,
         fightPhase: 'done'
       });
-      // distributeRaidRewards removed — same reason as above
+      if (typeof distributeRaidRewards === 'function') {
+        await distributeRaidRewards(instanceId, false, null);
+      }
     } else {
       // Advance to next fighter
       const nextPlayer = inst.players?.[nextSlot];
