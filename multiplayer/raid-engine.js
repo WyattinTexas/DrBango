@@ -228,7 +228,7 @@ function startActiveRaidListener() {
 
   // Don't auto-enter raids if we just returned from one
   const params = new URLSearchParams(window.location.search);
-  if (params.get('raidResult')) return;
+  if (params.get('raidResult') || window._raidResultPending) return;
 
   db.ref(`mp/users/${user.uid}/activeRaid`).on('value', async (snap) => {
     const instanceId = snap.val();
@@ -1318,6 +1318,9 @@ async function cleanupStaleRaids() {
 // ─── INIT ───────────────────────────────────────────────────────
 
 async function initRaidSystem() {
+  // Don't init if we're processing a raid result return
+  if (window._raidResultPending) return;
+
   // Clear any stale activeRaid from crashed sessions BEFORE starting listeners
   const user = firebase.auth().currentUser;
   if (user) {
