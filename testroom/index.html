@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v841'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v842'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2766,7 +2766,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v840';
+const TESTROOM_VERSION = 'v842'; // [shadow] Barnaby Stubborn wired; autoSim ability-wired; Zippa/Wendy sim fixes
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3888,6 +3888,9 @@ function autoSimRounds(gameNum) {
     const wF = active(wTeam), lF = active(lTeam);
     const wR = winner==='red'?rR:bR;
     let dmg = wR.damage;
+    // v842: wire key win-path damage abilities into autoSim (was ability-blind)
+    // Zippa (423) — Glimmer: +1 damage per Healing Seed held (passive, matches index.html resolver)
+    if (wF.id === 423 && !wF.ko) dmg += (wTeam.resources.healingSeed || 0);
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
     // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die
@@ -5569,6 +5572,14 @@ function usePressure(team) {
   const enemyTeamName = team === 'red' ? 'blue' : 'red';
   if (f.id !== 202 || f.ko || dylanNegates(enemy)) return;
 
+  // Barnaby (326) — Stubborn: immune to forced swaps by opponent effects
+  const _barnabyPressure = active(enemy);
+  if (_barnabyPressure && _barnabyPressure.id === 326 && !_barnabyPressure.ko) {
+    log(`<span class="log-ability">Barnaby</span> — Stubborn! Dark Fang's Pressure is blocked — ${_barnabyPressure.name} cannot be forced out.`);
+    narrate(`<b class="${team}-text">Dark Fang</b> — Pressure blocked! <b>${_barnabyPressure.name}</b> refuses to leave!`);
+    return;
+  }
+
   const aliveSideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
   if (aliveSideline.length === 0) return;
 
@@ -7197,6 +7208,17 @@ function doRaditzHuntChoice(choice) {
   // YES — check for available sideline targets
   const enemyTeamName = team === 'red' ? 'blue' : 'red';
   const enemy = B[enemyTeamName];
+
+  // Barnaby (326) — Stubborn: immune to opponent forced swaps
+  const _barnabyHunt = active(enemy);
+  if (_barnabyHunt && _barnabyHunt.id === 326 && !_barnabyHunt.ko) {
+    narrate(`<b class="${team}-text">Raditz</b> — Hunt blocked! <b>${_barnabyHunt.name}</b> is Stubborn!`);
+    log(`<span class="log-ability">Barnaby</span> — Stubborn! Raditz Hunt blocked — ${_barnabyHunt.name} cannot be forced out.`);
+    if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+    return;
+  }
+
   const aliveSideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
 
   if (aliveSideline.length === 0) {
@@ -17157,6 +17179,14 @@ function _resolveRoundImpl() {
 
       // Winston (15) — Scheme: fires after Toboggan/FangOutside, before Tyson
       const checkWinstonScheme = () => {
+        // Barnaby (326) — Stubborn: immune to opponent forced swaps
+        const _barnabyWin = active(loseTeam);
+        if (_barnabyWin && _barnabyWin.id === 326 && !_barnabyWin.ko && winstonSchemeSideline.length > 0) {
+          queueAbility('STUBBORN!', 'var(--uncommon)', `${_barnabyWin.name} — Stubborn! Winston's Scheme is blocked!`, null, loseTeamName);
+          log(`<span class="log-ability">Barnaby</span> — Stubborn! Winston Scheme blocked — ${_barnabyWin.name} cannot be forced out.`);
+          checkTysonHop();
+          return;
+        }
         if (winstonSchemeSideline.length > 0) {
           showWinstonSchemeModal(winTeamName, loseTeamName, winstonSchemeSideline, checkTysonHop);
         } else {
@@ -17177,6 +17207,18 @@ function _resolveRoundImpl() {
       // Gus (31) — Gale Force: win → force swap, new ghost takes the damage.
       const checkGaleForcePicker = () => {
         if (galeForceSwap && !wF.ko) {
+          // Barnaby (326) — Stubborn: immune to opponent forced swaps; takes galeForceDmg directly
+          const _barnabyGF = active(loseTeam);
+          if (_barnabyGF && _barnabyGF.id === 326 && !_barnabyGF.ko) {
+            queueAbility('STUBBORN!', 'var(--uncommon)', `${_barnabyGF.name} — Stubborn! Gus's Gale Force is blocked!`, () => {
+              log(`<span class="log-ability">Barnaby</span> — Stubborn! Gale Force blocked — ${_barnabyGF.name} takes ${galeForceDmg} damage directly.`);
+              _barnabyGF.hp = Math.max(0, _barnabyGF.hp - galeForceDmg);
+              if (_barnabyGF.hp <= 0) { _barnabyGF.ko = true; _barnabyGF.killedBy = 31; }
+              renderBattle();
+              afterFangUndercover();
+            }, loseTeamName);
+            return;
+          }
           B._galeForceDmg = galeForceDmg; // stash for picker
           const gfAlive = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko);
           if (gfAlive.length > 1) {

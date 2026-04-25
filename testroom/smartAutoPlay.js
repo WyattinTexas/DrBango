@@ -1,6 +1,6 @@
 // Smart Auto-Play Simulation — paste into browser console
 // Replaces basic autoPlay with ability-aware AI
-// v841 — console.log calls guarded behind DEBUG flag
+// v842 — [shadow] Zippa sim/resolver unified (removed stale pre-roll LS conversion); Wendy Lucky Stone over-grant removed
 const DEBUG = (typeof window !== 'undefined' && window.DEBUG) || false; // set window.DEBUG=true to enable verbose logging
 function smartAutoPlay(numGames = 50) {
   if (autoPlayRunning) { if (DEBUG) console.log('Auto-play already running'); return; }
@@ -614,6 +614,7 @@ function smartSimRounds(gameNum) {
     const enemy = opp(team);
     if (f.id !== 202 || f.ko || B.pressureUsed[teamKey]) return;
     if (hasSideline(enemy, 301)) return; // Dylan Scarecrow blocks Pressure
+    if (active(enemy).id === 326 && !active(enemy).ko) return; // Barnaby (326) Stubborn — immune to forced swaps (v842)
     const enemyKey = teamKey === 'red' ? 'blue' : 'red';
     const aliveSideline = B[enemyKey].ghosts
       .map((g, i) => ({ g, i }))
@@ -696,16 +697,8 @@ function smartSimRounds(gameNum) {
     }
   });
 
-  // Zippa (423) — Glimmer: before rolling, gain Lucky Stones equal to Healing Seeds held (v674: moved from win to pre-roll)
-  ['red','blue'].forEach(teamKey => {
-    const f = active(B[teamKey]);
-    if (f.id === 423 && !f.ko) {
-      const seeds = B[teamKey].resources.healingSeed || 0;
-      if (seeds > 0) {
-        B[teamKey].resources.luckyStone += seeds;
-      }
-    }
-  });
+  // Zippa (423) — Glimmer: REWORKED — now passive +1 damage per Healing Seed held (applied in win-path damage calc).
+  // v842: removed stale pre-roll Lucky Stone conversion (was v674 intermediate; index.html resolver uses damage bonus).
 
   // Forest Spirit (446) — Hex: AI auto-spends Burn to remove enemy dice + gain Sacred Fire per Burn spent
   // Matches index.html useHex: spend 1 Burn → -1 enemy die + +1 Sacred Fire
@@ -2519,15 +2512,13 @@ function smartSimRounds(gameNum) {
         wTeam.resources.healingSeed++;
       }
     }
-    // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
+    // Wendy (441) — Moonbeam: Win with doubles+ → +1 Magic Firefly (matches index.html abilityDesc)
+    // v842: removed Lucky Stone over-grant; card grants only Magic Firefly, not Moonstone or Lucky Stone
     if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
-      wTeam.resources.luckyStone++;
       wTeam.resources.firefly = (wTeam.resources.firefly || 0) + 1;
-      // Sandwiches mirror for Lucky Stone only (Fireflies are not mirrorable)
-      const sandwichLose = hasSideline(lTeam, 33);
-      if (sandwichLose) { lTeam.resources.luckyStone++; }
     }
-    // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section
+    // Zippa (423) — Glimmer: passive +1 damage per Healing Seed held (v842: wired into sim win-path; removed stale pre-roll LS conversion)
+    if (wF.id === 423 && !wF.ko) { dmg += (wTeam.resources.healingSeed || 0); }
 
     // Harvey (448) — Harvest Moon: Win: gain +1 Moonstone for each 5 you rolled
     if (wF.id === 448 && !wF.ko) {
@@ -2643,7 +2634,8 @@ function smartSimRounds(gameNum) {
     // (lowest HP) sideline ghost. Matches index.html lines 11041–11084: winstonSchemeSideline built from
     // loseTeam sideline, doWinstonSchemeChoice sets loseTeam.activeIdx. AI always swaps when sideline
     // exists — bringing in the opponent's weakest ghost is optimal play for Winston.
-    if (wF.id === 15 && !wF.ko) {
+    // Barnaby (326) — Stubborn: immune to forced swaps by opponent effects (v842)
+    if (wF.id === 15 && !wF.ko && !(active(lTeam).id === 326 && !active(lTeam).ko)) {
       const winstonTargets = lTeam.ghosts
         .map((g, i) => ({ g, i }))
         .filter(x => x.i !== lTeam.activeIdx && !x.g.ko);
