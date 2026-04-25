@@ -228,7 +228,9 @@ function startActiveRaidListener() {
 
   // Don't auto-enter raids if we just returned from one
   const params = new URLSearchParams(window.location.search);
-  if (params.get('raidResult') || window._raidResultPending) return;
+  if (params.get('raidResult') || window._raidResultPending || sessionStorage.getItem('raidJustCompleted')) return;
+  // Clear the session flag after checking (one-time gate)
+  sessionStorage.removeItem('raidJustCompleted');
 
   db.ref(`mp/users/${user.uid}/activeRaid`).on('value', async (snap) => {
     const instanceId = snap.val();
