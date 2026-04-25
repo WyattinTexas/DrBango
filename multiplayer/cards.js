@@ -563,7 +563,7 @@ const RAID_BOSSES = {
     title: 'The Frozen Throne',
     personality: 'glacier',
     tier: 2, set: 'Frost Valley',
-    requiredBadge: null, requiredPlayers: 5,
+    requiredBadge: null, requiredPlayers: 2,
     bossGhost: {
       id: 9004, name: 'King Jay', maxHp: 14, art: '../testroom/art/originals/king_jay.jpg',
       ability: 'Reflection', abilityDesc: 'Lose roll & dice total = 7: reflect ALL damage. Permafrost: max 3 damage per hit. Frost Aura: 1 cold damage per round.'
@@ -607,7 +607,7 @@ const RAID_BOSSES = {
     title: 'The Immovable',
     personality: 'tyrant',
     tier: 2, set: 'Frost Valley',
-    requiredBadge: null, requiredPlayers: 7,
+    requiredBadge: null, requiredPlayers: 5,
     bossGhost: {
       id: 9006, name: 'The Mountain King', maxHp: 18, art: '../testroom/art/originals/mountain_king_leg.jpg',
       ability: 'Beast Mode', abilityDesc: 'Doubles deal 2X damage. Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire.'
@@ -631,7 +631,7 @@ const RAID_BOSSES = {
     title: 'The Living Ember',
     personality: 'swarm',
     tier: 3, set: 'Volcanic Isles',
-    requiredBadge: 'mountain_king_slayer', requiredPlayers: 5,
+    requiredBadge: 'king_jay_slayer', requiredPlayers: 5,
     bossGhost: {
       id: 9007, name: 'Pip', maxHp: 14, art: '../testroom/art/originals/Pip.png',
       ability: 'Toasted', abilityDesc: 'Triples+: permanently remove 1 enemy die. +1 die per living minion. Gains 2 Sacred Fires on triples.'
@@ -654,7 +654,7 @@ const RAID_BOSSES = {
     title: 'Herald of the Meteor',
     personality: 'tyrant',
     tier: 3, set: 'Volcanic Isles',
-    requiredBadge: 'mountain_king_slayer', requiredPlayers: 7,
+    requiredBadge: 'king_jay_slayer', requiredPlayers: 7,
     bossGhost: {
       id: 9008, name: 'Humar', maxHp: 10, art: '../testroom/art/humar.jpg',
       ability: 'Meteor', abilityDesc: 'Win: opponent takes 2 damage before their next roll. Gain 1 Burn. On KO: gain 2 Sacred Fire.'
@@ -700,7 +700,7 @@ const RAID_BOSSES = {
     title: 'Warden of the Blue Flame',
     personality: 'trickster',
     tier: 4, set: 'Dark Castle',
-    requiredBadge: 'dark_castle_key', requiredPlayers: 7,
+    requiredBadge: 'dark_castle_key', requiredPlayers: 2,
     bossGhost: {
       id: 9010, name: 'Lucy', maxHp: 16, art: '../testroom/art/originals/lucy.jpg',
       ability: 'Blue Fire', abilityDesc: 'Win: gain 1 Sacred Fire. Mirror Dice: swap 1 die. Steal 1 resource on win. Sacred Fires deal double damage.'
@@ -722,7 +722,7 @@ const RAID_BOSSES = {
     title: 'The Endless Whisper',
     personality: 'glacier',
     tier: 4, set: 'Dark Castle',
-    requiredBadge: 'dark_castle_key', requiredPlayers: 7,
+    requiredBadge: 'dark_castle_key', requiredPlayers: 2,
     bossGhost: {
       id: 9011, name: 'Shade', maxHp: 10, art: '../testroom/art/originals/shade.jpg',
       ability: 'Haunt', abilityDesc: 'Before EVERY roll: opponent takes 2 damage. Permafrost: max 2 damage per hit. The tick damage is relentless.'
@@ -744,7 +744,7 @@ const RAID_BOSSES = {
     title: 'The Omen Bearer',
     personality: 'swarm',
     tier: 4, set: 'Dark Castle',
-    requiredBadge: 'dark_castle_key', requiredPlayers: 5,
+    requiredBadge: 'dark_castle_key', requiredPlayers: 3,
     bossGhost: {
       id: 9013, name: 'Bigsby', maxHp: 10, art: '../testroom/art/originals/Digby.png',
       ability: 'Omen', abilityDesc: 'Win: deal +1 damage. Moonstone use triggers Doom transformation. +1 die per living minion.'
@@ -769,7 +769,7 @@ const RAID_BOSSES = {
     title: 'The Corruptor',
     personality: 'tyrant',
     tier: 5, set: 'The Dark Spire',
-    requiredBadge: 'dark_spire_key', requiredPlayers: 10,
+    requiredBadge: 'dark_spire_key', requiredPlayers: 5,
     bossGhost: {
       id: 9012, name: 'Valkin the Grand', maxHp: 20, art: '../testroom/art/originals/ValkinTheGrand.png',
       ability: 'Grand Dominion', abilityDesc: 'Doubles deal 3X damage. Triples+: deal 3 chip to ALL enemies. On KO: gain 3 Sacred Fire. The final boss.'
@@ -798,10 +798,10 @@ const RAID_BADGES = {
   heart_of_the_hills: { name: 'Heart of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
 
   // Frost Valley badges (King Jay + MK open; Romy requires Lucy's badge)
-  king_jay_slayer:   { name: 'Ice King', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
+  king_jay_slayer:   { name: 'Ice Scepter', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
   mountain_king_slayer: { name: 'Mountainbreaker', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
   romy_slayer:       { name: 'Veil Piercer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
-  frostborne:        { name: 'Frostborne', icon: '&#x2744;', requires: ['king_jay_slayer', 'mountain_king_slayer', 'romy_slayer'], tier: 2 },
+  frostborne:        { name: 'Valley Hero', icon: '&#x2744;', requires: ['king_jay_slayer', 'mountain_king_slayer', 'romy_slayer'], tier: 2 },
 
   // Volcanic Isles badges (Pip+Humar need Mountainbreaker; Nerina needs Heart of the Hills)
   pip_slayer:        { name: 'Smoldering', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },

@@ -67,7 +67,7 @@ function renderRaidLobby(userBadges) {
       </div>
       <div class="book-boss-bar">
         <div class="book-boss-meta">
-          <span class="book-hp">${boss.baseHp} HP</span>
+          <span class="book-hp">${boss.bossGhost.maxHp} HP</span>
           <span class="book-players">${playerCount} players</span>
           <span class="book-pts">${boss.rewardPoints} pts</span>
         </div>
