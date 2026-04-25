@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v829'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v830'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v829';
+const TESTROOM_VERSION = 'v830';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -13115,10 +13115,10 @@ function showFlickPicker(team, callback) {
             const imp = rvn * BOUNCE_DIE;
             a.vx -= imp * nx; a.vy -= imp * ny;
             c.vx += imp * nx; c.vy += imp * ny;
-            // Spin both dice on impact — random direction, strength from impact
-            const spinForce = Math.min(rvn * 25, 720);
-            a.vrot += (Math.random() > 0.5 ? 1 : -1) * spinForce * (0.7 + Math.random() * 0.6);
-            c.vrot += (Math.random() > 0.5 ? 1 : -1) * spinForce * (0.7 + Math.random() * 0.6);
+            // 3D tumble on impact
+            const spinF = Math.min(rvn * 20, 400);
+            a.vrx += (Math.random()-0.5) * spinF; a.vry += (Math.random()-0.5) * spinF; a.vrz += (Math.random()-0.5) * spinF * 0.5;
+            c.vrx += (Math.random()-0.5) * spinF; c.vry += (Math.random()-0.5) * spinF; c.vrz += (Math.random()-0.5) * spinF * 0.5;
             if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
           }
           const ov = (dieSize - dist) / 2 + 0.5;
@@ -13130,22 +13130,23 @@ function showFlickPicker(team, callback) {
 
     // Full arena-board walls
     bodies.forEach(b => {
-      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
-      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
-      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
-      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
+      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
     });
 
-    // Update rotation + render
+    // Update 3D rotation + render
     bodies.forEach(b => {
-      b.rot += b.vrot;
-      b.vrot *= 0.92; // angular friction
+      b.rx += b.vrx; b.ry += b.vry; b.rz += b.vrz;
+      b.vrx *= 0.93; b.vry *= 0.93; b.vrz *= 0.93; // angular friction
       b.el.style.left = (b.cx - dieR) + 'px';
       b.el.style.top = (b.cy - dieR) + 'px';
       const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      const totalMotion = s + Math.abs(b.vrot);
+      const rotSpd = Math.abs(b.vrx) + Math.abs(b.vry) + Math.abs(b.vrz);
+      const totalMotion = s + rotSpd * 0.05;
       if (totalMotion > maxSpd) maxSpd = totalMotion;
-      b.el.style.transform = (s > 0.3 || Math.abs(b.vrot) > 1) ? `rotate(${b.rot}deg)` : '';
+      b.cube.style.transform = `rotateX(${b.rx}deg) rotateY(${b.ry}deg) rotateZ(${b.rz}deg)`;
     });
 
     if (maxSpd < SETTLE_THRESH) {
@@ -13156,22 +13157,27 @@ function showFlickPicker(team, callback) {
     }
   };
 
-  // 8. Settle
+  // 8. Settle — snap 3D dice to new face
   const settleFlick = () => {
     let changed = 0;
     bodies.forEach(b => {
-      b.el.style.transform = '';
       const dx = b.cx - b.origCx, dy = b.cy - b.origCy;
       b.moved = Math.sqrt(dx * dx + dy * dy) > 15;
       if (b.moved) {
         changed++;
         const nv = Math.floor(Math.random() * 6) + 1;
-        renderPips(b.el, nv);
-        b.el.style.transition = 'transform 0.2s ease';
-        b.el.style.transform = 'scale(1.2)';
-        setTimeout(() => { b.el.style.transform = 'scale(1)'; }, 250);
+        // Snap cube to correct face with smooth transition
+        const ft = FACE_TARGET[nv] || { rx: 0, ry: 0 };
+        b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
+        b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
         if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = nv;
         else B.pendingResolve.blueDice[b.dieIndex] = nv;
+      } else {
+        // Didn't move — snap back to original face
+        const origVal = b.team === 'red' ? B.pendingResolve.redDice[b.dieIndex] : B.pendingResolve.blueDice[b.dieIndex];
+        const ft = FACE_TARGET[origVal] || { rx: 0, ry: 0 };
+        b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
+        b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
       }
     });
 
