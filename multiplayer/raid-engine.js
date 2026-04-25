@@ -289,8 +289,9 @@ function handleRaidStateChange(data) {
 
   switch (data.status) {
     case 'countdown':
-      // Show the waiting room (social lobby) instead of the old countdown screen
-      if (typeof showRaidWaitingRoom === 'function' && data.fightPhase === 'countdown') {
+      // Show the waiting room (social lobby) — but only once
+      if (typeof showRaidWaitingRoom === 'function' && data.fightPhase === 'countdown' && !window._raidWaitingRoomShown) {
+        window._raidWaitingRoomShown = true;
         showRaidWaitingRoom(currentRaid.instanceId, data);
         // The first player triggers the start after 15s (or when LAUNCH is clicked)
         const slot0 = data.players && data.players[0];
@@ -1258,6 +1259,7 @@ function cleanupRaid() {
   raidBattleState = null;
   window.BOSS_MODE = false;
   window.BOSS_RAID_DATA = null;
+  window._raidWaitingRoomShown = false;
 }
 
 /**
