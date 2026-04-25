@@ -209,6 +209,10 @@ function startActiveRaidListener() {
   const user = firebase.auth().currentUser;
   if (!user) return;
 
+  // Don't auto-enter raids if we just returned from one
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('raidResult')) return;
+
   db.ref(`mp/users/${user.uid}/activeRaid`).on('value', async (snap) => {
     const instanceId = snap.val();
     if (!instanceId) {
