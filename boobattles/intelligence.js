@@ -172,6 +172,10 @@ const BOSS10_SCRIPT = {
 // Boss 11: The Mountain King (9 HP, Beast Mode — doubles deal 2x)
 // THE CHAMPIONSHIP — epic back-and-forth brawl with devastating Beast Modes
 // Player gets smashed to the edge, mounts impossible comeback with triples
+// DESIGN NOTE: Total player damage received = 4+4=8 (two Beast Mode hits).
+// Only a 9-HP ghost (Mountain King itself) survives both hits at full HP to see R8.
+// Ghosts with ≤8 HP will die to the R5 Beast Mode unless the script breaks early (20% per round).
+// This is intentional — the final boss is punishing, rewarding players who bring a tank.
 const BOSS11_SCRIPT = {
   enemy:  [[3,2,1], [5,5,6], [4,3,1], [3,1,2], [6,6,4], [2,1,3], [4,2,1], [3,1,2], [2,1,3]],
   player: [[5,4,3], [4,3,1], [5,5,4], [6,4,3], [3,2,1], [4,4,5], [6,5,4], [5,5,5], [6,6,6]]
@@ -229,14 +233,15 @@ function varyScript(base) {
   return result;
 }
 
-// Featured ghosts with individual draw boost chances
+// Featured ghosts with individual draw boost chances.
+// NOTE: boss cards (BOSS_NAMES) are always in usedCards from game start,
+// so they are never available in the draw pool. Do NOT list boss cards here
+// (Logey, Bogey, Guard Thomas, Stone Cold, Pelter, Antoinette, King Jay,
+//  Hector, Prince Balatron, Lucy, Romy, The Mountain King).
 const FEATURED_GHOSTS = [
-  { name: 'Prince Balatron', chance: 0.15 },
   { name: 'Kairan', chance: 0.15 },
   { name: 'Katrina', chance: 0.08, minBoss: 4 },
-  { name: 'Romy', chance: 0.12, minBoss: 4 },
   { name: 'Eloise', chance: 0.18 },
-  { name: 'Guard Thomas', chance: 0.18 },
 ];
 
 function drawGhost(weights) {
