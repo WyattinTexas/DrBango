@@ -260,15 +260,29 @@ function startActiveRaidListener() {
 function enterRaidScreen(instanceId) {
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
 
-  // Listen for instance state changes
-  raidListeners['instance'] = instRef.on('value', (snap) => {
-    const data = snap.val();
-    if (!data) return;
-    currentRaid = { instanceId, ...data };
-    handleRaidStateChange(data);
+  // Listen ONLY for status/fighter changes — NOT the entire tree (chat etc. would cause loops)
+  raidListeners['instance_status'] = instRef.child('status').on('value', async (snap) => {
+    const status = snap.val();
+    if (!status) return;
+    // Re-fetch minimal fields, not the whole tree
+    const [statusSnap, fighterSnap, hpSnap, phaseSnap] = await Promise.all([
+      Promise.resolve(status),
+      instRef.child('currentFighterIdx').once('value'),
+      instRef.child('bossCurrentHp').once('value'),
+      instRef.child('fightPhase').once('value')
+    ]);
+    const minimalData = {
+      ...currentRaid,
+      status: status,
+      currentFighterIdx: fighterSnap.val(),
+      bossCurrentHp: hpSnap.val(),
+      fightPhase: phaseSnap.val()
+    };
+    currentRaid = { instanceId, ...minimalData };
+    handleRaidStateChange(minimalData);
   });
 
-  // Listen for battle state (spectator feed)
+  // Listen for battle state (spectator feed) — separate, safe listener
   raidListeners['battleState'] = instRef.child('battleState').on('value', (snap) => {
     const state = snap.val();
     if (state && typeof renderRaidBattleSpectator === 'function') {
@@ -1245,6 +1259,7 @@ function cleanupRaid() {
   if (currentRaid?.instanceId) {
     const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);
     if (raidListeners['instance']) instRef.off('value', raidListeners['instance']);
+    if (raidListeners['instance_status']) instRef.child('status').off('value', raidListeners['instance_status']);
     if (raidListeners['battleState']) instRef.child('battleState').off('value', raidListeners['battleState']);
   }
   Object.entries(raidListeners).forEach(([key]) => {
@@ -1302,7 +1317,21 @@ async function cleanupStaleRaids() {
 
 // ─── INIT ───────────────────────────────────────────────────────
 
-function initRaidSystem() {
+async function initRaidSystem() {
+  // Clear any stale activeRaid from crashed sessions BEFORE starting listeners
+  const user = firebase.auth().currentUser;
+  if (user) {
+    const arSnap = await db.ref(`mp/users/${user.uid}/activeRaid`).once('value');
+    const activeId = arSnap.val();
+    if (activeId) {
+      const instSnap = await db.ref(`mp/raids/instances/${activeId}/status`).once('value');
+      const status = instSnap.val();
+      if (!status || status === 'complete' || status === 'abandoned') {
+        await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
+        console.log('[RAID] Cleared stale activeRaid:', activeId);
+      }
+    }
+  }
   startActiveRaidListener();
   cleanupStaleRaids();
 }
