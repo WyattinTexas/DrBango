@@ -19083,8 +19083,10 @@ document.addEventListener('keydown', e => {
   // Verify all blue IDs are now findable
   const validBlue = blueIds.filter(id => ghostData(id));
   if (validBlue.length === 0) { console.error('[RAID] No valid blue team ghosts'); return; }
-  // Pad to 3 if fewer (some bosses start with fewer minions)
-  while (validBlue.length < 3) validBlue.push(validBlue[validBlue.length - 1]);
+  // Track how many real boss ghosts there are (before padding)
+  const realBossGhostCount = validBlue.length;
+  // Pad to 3 for engine compatibility — padded ghosts will be auto-KO'd after battle starts
+  while (validBlue.length < 3) validBlue.push(validBlue[0]);
 
   // Set raid state
   RAID_MODE = true;
@@ -19136,6 +19138,14 @@ document.addEventListener('keydown', e => {
     switchTab('battle');
     renderPicks();
     startBattle();
+    // KO padded ghost slots so only real boss ghosts are visible
+    if (B && B.blue && realBossGhostCount < 3) {
+      for (let i = realBossGhostCount; i < B.blue.ghosts.length; i++) {
+        B.blue.ghosts[i].hp = 0;
+        B.blue.ghosts[i].ko = true;
+      }
+      renderBattle();
+    }
     startBlueAI();
   }, 300);
 })();

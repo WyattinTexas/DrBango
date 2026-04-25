@@ -521,7 +521,7 @@ const RAID_BOSSES = {
       id: 9002, name: 'Dark Fang', maxHp: 9, art: '../testroom/art/originals/DarkFang.png',
       ability: 'Pressure', abilityDesc: 'Enemy cannot heal. Win: deal +1 damage for each KO\'d ghost this game. Forces enemy swap before rolling.'
     },
-    minionsByPhase: { 1: [9111], 2: [9112], 3: [9112, 9113], 4: [9111, 9112] },
+    minionsByPhase: { 1: [], 2: [], 3: [], 4: [] },
     baseHp: 60, rewardPoints: 50, bonusPoints: 25,
     dialogue: {
       intro: 'I smell fear...',
