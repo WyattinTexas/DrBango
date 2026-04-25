@@ -20,6 +20,20 @@ const RAID_CONFIG = {
   INSTANT_KILL_FLAT_DAMAGE: 5            // Instant-kill abilities deal this instead vs bosses
 };
 
+// ─── HP SCALING ─────────────────────────────────────────────────
+// Boss HP = bossGhost.maxHp × multiplier. Each boss naturally varies
+// because their ghost maxHp differs (10-20 range). Solo fights use
+// the ghost's actual HP. Multiplayer scales sub-linearly so 10
+// players don't face 10× HP — keeps it fun, not grindy.
+function getPlayerHpMultiplier(playerCount) {
+  if (playerCount <= 1) return 1;    // solo = ghost's real HP
+  if (playerCount <= 2) return 1.5;  // duo
+  if (playerCount <= 3) return 2;    // trio
+  if (playerCount <= 5) return 3;    // squad
+  if (playerCount <= 7) return 3.5;  // large group
+  return 4;                          // full 8-10 raid
+}
+
 // ─── RAID STATE ─────────────────────────────────────────────────
 let currentRaid = null;       // Active raid instance data
 let raidListeners = {};       // Firebase listener handles
@@ -137,7 +151,7 @@ async function tryCreateRaidInstance(raidId, players) {
   if (!result.committed) return; // Another client beat us
 
   const playerCount = players.length;
-  const scaledHp = Math.round(bossConfig.baseHp * (playerCount / (bossConfig.requiredPlayers || RAID_CONFIG.MAX_PLAYERS)));
+  const scaledHp = Math.round(bossConfig.bossGhost.maxHp * getPlayerHpMultiplier(playerCount));
 
   // Create instance
   const instanceRef = db.ref('mp/raids/instances').push();
