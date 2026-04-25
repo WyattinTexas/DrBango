@@ -109,10 +109,11 @@ function startQueueListener(raidId) {
     }
 
     const bossConfig = RAID_BOSSES[raidId];
+    const minPlayers = 2;
     const maxPlayers = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
 
-    // Check if we should start
-    if (entries.length >= maxPlayers) {
+    // Start when we have at least minPlayers (raid can fire early)
+    if (entries.length >= minPlayers) {
       await tryCreateRaidInstance(raidId, entries.slice(0, maxPlayers));
     }
   });
@@ -137,14 +138,14 @@ async function tryCreateRaidInstance(raidId, players) {
 
   // Transaction: read queue, create instance, clear queue
   const bossConfig = RAID_BOSSES[raidId];
-  const needed = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
+  const minNeeded = 2;
   const result = await queueRef.transaction((currentQueue) => {
     if (!currentQueue) return currentQueue; // Queue already cleared
     const entries = Object.entries(currentQueue)
       .map(([uid, data]) => ({ uid, ...data }))
       .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 
-    if (entries.length < needed) return; // abort — not enough
+    if (entries.length < minNeeded) return; // abort — not enough
     return null; // Clear the queue
   });
 

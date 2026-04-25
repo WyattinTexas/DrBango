@@ -793,7 +793,7 @@ const RAID_BOSSES = {
 const RAID_BADGES = {
   // Rolling Hills badges (open)
   timber_slayer:     { name: 'Dances with Wolves', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
-  dark_fang_slayer:  { name: "Dark Fang's Fang", icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
+  dark_fang_slayer:  { name: 'Fang', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
   jasper_slayer:     { name: 'Trail Blazer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
   heart_of_the_hills: { name: 'Heart of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
 

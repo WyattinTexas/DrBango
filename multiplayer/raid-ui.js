@@ -68,7 +68,7 @@ function renderRaidLobby(userBadges) {
       <div class="book-boss-bar">
         <div class="book-boss-meta">
           <span class="book-hp">${boss.bossGhost.maxHp} HP</span>
-          <span class="book-players">${playerCount} players</span>
+          <span class="book-players">2-${playerCount} players</span>
         </div>
         ${locked ? `<div class="book-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
       </div>
@@ -266,7 +266,7 @@ function updateRaidQueueUI(raidId, entries) {
 
   const bossConfig = RAID_BOSSES[raidId];
   const max = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
-  countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> / <span class="raid-queue-num">${max}</span> Raiders`;
+  countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders <span style="color:var(--text-dim);font-size:0.8rem;">(starts at 2, max ${max})</span>`;
 
   let html = '';
   entries.forEach((e, i) => {
