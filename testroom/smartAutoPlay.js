@@ -1201,20 +1201,34 @@ function smartSimRounds(gameNum) {
     }
   });
   // Willow (435) — Joy of Painting: Sideline & In Play: +1 die if you lost the last roll
-  // Matches index.html lines 8044–8057. willowLostLast[team] set in win/loss/tie paths below.
+  // Cornelius (45) on enemy sideline negates sideline Willow (not active). Matches index.html.
   ['red','blue'].forEach(tName => {
     const _wf = active(B[tName]);
+    const oppK = tName === 'red' ? 'blue' : 'red';
     const hasWillowActive = _wf.id === 435 && !_wf.ko;
     const hasWillowSideline = hasSideline(B[tName], 435);
     if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tName]) {
-      if (tName === 'red') redCount++; else blueCount++;
-      // Knight Terror (401) / Knight Light (402) react to Joy of Painting
-      const oppK = tName === 'red' ? 'blue' : 'red';
-      const knight = active(B[oppK]);
-      if (knight && !knight.ko) {
-        if (knight.id === 401) { _wf.hp = Math.max(0, _wf.hp - 2); if (_wf.hp <= 0) { _wf.ko = true; _wf.killedBy = 401; } }
-        else if (knight.id === 402) { B.retributionDice[oppK] = (B.retributionDice[oppK] || 0) + 1; }
+      // Cornelius blocks sideline Willow only (active fires through)
+      if (hasWillowSideline && !hasWillowActive && hasSideline(B[oppK], 45)) {
+        // Antidote — die bonus blocked (no callout in sim)
+      } else {
+        if (tName === 'red') redCount++; else blueCount++;
+        // Knight Terror (401) / Knight Light (402) react to Joy of Painting
+        const knight = active(B[oppK]);
+        if (knight && !knight.ko) {
+          if (knight.id === 401) { _wf.hp = Math.max(0, _wf.hp - 2); if (_wf.hp <= 0) { _wf.ko = true; _wf.killedBy = 401; } }
+          else if (knight.id === 402) { B.retributionDice[oppK] = (B.retributionDice[oppK] || 0) + 1; }
+        }
       }
+    }
+  });
+  // Zach (87) — Craftsman: while on sideline, Guard Thomas (41) gets +1 die each roll.
+  // Blocked by Cornelius (45) on the enemy sideline. Matches index.html Zach pre-roll die block.
+  ['red','blue'].forEach(teamKey => {
+    const f = active(B[teamKey]);
+    const enemyKey = teamKey === 'red' ? 'blue' : 'red';
+    if (!f.ko && f.id === 41 && hasSideline(B[teamKey], 87) && !hasSideline(B[enemyKey], 45)) {
+      if (teamKey === 'red') redCount++; else blueCount++;
     }
   });
   // Haywire (78) — WILD CHORDS!: permanent +1 die bonus added every round once triggered (never consumed/cleared).

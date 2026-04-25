@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v839'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v840'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v839';
+const TESTROOM_VERSION = 'v840';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -10452,13 +10452,21 @@ function doPreRollSetup() {
   // Nick & Knack (409) — Knick Knack: dice bonus removed (ability is pre-roll steal now)
 
   // Zach (87) — Craftsman: while on sideline, Guard Thomas gets +1 die each turn
+  // Negated by Cornelius (45) — Antidote: if the enemy team has Cornelius on their sideline, die bonus is blocked.
   ['red', 'blue'].forEach(tNameZ => {
     const teamZ = B[tNameZ];
     const fZ = active(teamZ);
+    const enemyTeamObjZ = teamZ === B.red ? B.blue : B.red;
     if (fZ.id === 41 && !fZ.ko && hasSideline(teamZ, 87)) {
-      if (tNameZ === 'red') redCount++; else blueCount++;
-      preRollCallouts.push(['CRAFTSMAN!', 'var(--rare)', `Zach (sideline) — Guard Thomas +1 die!`, tNameZ]);
-      log(`<span class="log-ability">Zach</span> (sideline) — Craftsman! Guard Thomas +1 die.`);
+      if (hasSideline(enemyTeamObjZ, 45)) {
+        const cornGhostZ = getSidelineGhost(enemyTeamObjZ, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostZ ? cornGhostZ.name : 'Cornelius'} blocks Zach's Craftsman die bonus!`, tNameZ === 'red' ? 'blue' : 'red']);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Zach Craftsman die bonus blocked for ${fZ.name}.`);
+      } else {
+        if (tNameZ === 'red') redCount++; else blueCount++;
+        preRollCallouts.push(['CRAFTSMAN!', 'var(--rare)', `Zach (sideline) — Guard Thomas +1 die!`, tNameZ]);
+        log(`<span class="log-ability">Zach</span> (sideline) — Craftsman! Guard Thomas +1 die.`);
+      }
     }
   });
 
