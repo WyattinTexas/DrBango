@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v827'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v828'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v827';
+const TESTROOM_VERSION = 'v828';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -12927,6 +12927,7 @@ function showFlickPicker(team, callback) {
     const dIdx = i < redDieEls.length ? i : i - redDieEls.length;
     bodies.push({
       el, cx, cy, vx: 0, vy: 0,
+      rot: 0, vrot: 0, // rotation angle + angular velocity
       origCx: cx, origCy: cy,
       team: dTeam, dieIndex: dIdx,
       isFlicker: dTeam === team && dIdx === 0,
@@ -13112,6 +13113,10 @@ function showFlickPicker(team, callback) {
             const imp = rvn * BOUNCE_DIE;
             a.vx -= imp * nx; a.vy -= imp * ny;
             c.vx += imp * nx; c.vy += imp * ny;
+            // Spin both dice on impact — random direction, strength from impact
+            const spinForce = Math.min(rvn * 25, 720);
+            a.vrot += (Math.random() > 0.5 ? 1 : -1) * spinForce * (0.7 + Math.random() * 0.6);
+            c.vrot += (Math.random() > 0.5 ? 1 : -1) * spinForce * (0.7 + Math.random() * 0.6);
             if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
           }
           const ov = (dieSize - dist) / 2 + 0.5;
@@ -13123,18 +13128,22 @@ function showFlickPicker(team, callback) {
 
     // Full arena-board walls
     bodies.forEach(b => {
-      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; }
-      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; }
-      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; }
-      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; }
+      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
+      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
+      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
+      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrot += (Math.random()-0.5) * 200; }
     });
 
+    // Update rotation + render
     bodies.forEach(b => {
+      b.rot += b.vrot;
+      b.vrot *= 0.92; // angular friction
       b.el.style.left = (b.cx - dieR) + 'px';
       b.el.style.top = (b.cy - dieR) + 'px';
       const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      if (s > maxSpd) maxSpd = s;
-      b.el.style.transform = s > 0.5 ? `rotate(${Math.atan2(b.vy, b.vx) * 11.5}deg)` : '';
+      const totalMotion = s + Math.abs(b.vrot);
+      if (totalMotion > maxSpd) maxSpd = totalMotion;
+      b.el.style.transform = (s > 0.3 || Math.abs(b.vrot) > 1) ? `rotate(${b.rot}deg)` : '';
     });
 
     if (maxSpd < SETTLE_THRESH) {
@@ -13177,6 +13186,13 @@ function showFlickPicker(team, callback) {
     setTimeout(() => {
       restoreLayout();
       renderDice(B.redDice, B.blueDice);
+      // Re-apply pips to flat dice (renderDice creates number-based elements)
+      document.querySelectorAll('#red-dice .die').forEach((el, i) => {
+        if (B.redDice[i] >= 1 && B.redDice[i] <= 6) renderPips(el, B.redDice[i]);
+      });
+      document.querySelectorAll('#blue-dice .die').forEach((el, i) => {
+        if (B.blueDice[i] >= 1 && B.blueDice[i] <= 6) renderPips(el, B.blueDice[i]);
+      });
       renderBattle();
       setTimeout(() => callback(), spd(400));
     }, spd(900));
