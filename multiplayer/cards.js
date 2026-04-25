@@ -423,12 +423,17 @@ const GHOSTS = [
   {id:461, name:"Ronan", rarity:"common", maxHp:5, art:"../testroom/art/ronan.png", ability:"Mixup", abilityDesc:"Doubles: gain 1 Ice Shard and 1 Burn.", category:"Resource Generation", set:"Volcanic Isles", tags:["Final 50"], designNote:"Flame-headed Spiritkin meditating under a waterfall. Fire meets water — doubles generate both ice and fire resources."},
   {id:462, name:"Ridley", rarity:"uncommon", maxHp:3, art:"../testroom/art/ridley.png", ability:"Nimble", abilityDesc:"Singles deal +1 damage. Doubles deal +2 damage.", category:"Damage Boost", set:"Rolling Hills", tags:["Final 50"], designNote:"Green rabbit-like Spiritkin dashing through a mossy waterfall. Simple and effective — rewards any winning roll."},
   {id:463, name:"Zork", rarity:"common", maxHp:4, art:"../testroom/art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain 1 extra die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."},
-  {id:464, name:"Yawn Eater", rarity:"uncommon", maxHp:7, art:"../testroom/art/originals/YawnEater.png", ability:"Feast", abilityDesc:"Gain 1 extra die for each sideline ability on the enemy sideline. Odd Doubles deal +1 damage.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost #200. A smug blobby shadow creature that devours sideline energy. The more passive effects your opponent stacks, the more dice Yawn Eater rolls."},
-  {id:69, name:"Sonya", rarity:"rare", maxHp:3, art:"", ability:"Mesmerize", abilityDesc:"Each roll: you may change 1 die result to a 2.", category:"Dice Modifier", set:"Set 1", designNote:""},
-  {id:336, name:"Humar", rarity:"legendary", maxHp:5, art:"", ability:"Meteor", abilityDesc:"Win: opponent takes 2 damage before their next roll. Gain 1 Burn.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:""},
-  {id:342, name:"Calvin", rarity:"uncommon", maxHp:5, art:"", ability:"Overclock", abilityDesc:"Win: gain 1 HP (can exceed max HP). Gain 1 Healing Seed.", category:"HP Recovery", set:"Rolling Hills", designNote:""},
-  {id:345, name:"Red Hunter", rarity:"ghost-rare", maxHp:6, art:"", ability:"Rumble", abilityDesc:"Win: if your opponent has any specials, deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:""},
-  {id:352, name:"Jimmy", rarity:"common", maxHp:2, art:"", ability:"Chirp", abilityDesc:"Sideline & In Play: on a tie, gain 3 Lucky Stones and 1 Magic Firefly.", category:"Resource Generation", set:"Rolling Hills", designNote:""}
+  {id:464, name:"Yawn Eater", rarity:"uncommon", maxHp:7, art:"../testroom/art/originals/YawnEater.png", ability:"Feast", abilityDesc:"Gain 1 extra die for each sideline ability on the enemy sideline. Odd Doubles deal +1 damage.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost #200. A smug blobby shadow creature that devours sideline energy. The more passive effects your opponent stacks, the more dice Yawn Eater rolls."}
+  // REMOVED dead-code duplicate stubs (ids 69, 336, 342, 345, 352 with art:"") — these
+  // were never reachable (Array.find returns first match). abilityDesc drift vs testroom
+  // flagged below; primary entries untouched pending Wyatt review:
+  // - id:68  Kairan    multiplayer:"Roll doubles:…"  testroom:"Doubles:…"
+  // - id:205 Shade's Shadow  multiplayer:"ghost"  testroom:"Spiritkin"
+  // - id:334 Fiddle    multiplayer:"ghost"  testroom:"Spiritkin"
+  // - id:342 Calvin    multiplayer:"heal +1 HP … Gain +1 Healing Seed"  testroom:"gain 1 HP … Gain 1 Healing Seed"
+  // - id:345 Red Hunter  multiplayer:"Win a roll:"  testroom:"Win:"
+  // - id:439 Lucy's Shadow  multiplayer:"in play … +1 extra"  testroom:"In Play … 1 extra"
+  // NOTE: testroom id:438 Champ has rarity:"ghost rare" (missing hyphen) — multiplayer is correct.
 ];
 
 
