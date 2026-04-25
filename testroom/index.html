@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v828'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v829'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v828';
+const TESTROOM_VERSION = 'v829';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -13186,13 +13186,6 @@ function showFlickPicker(team, callback) {
     setTimeout(() => {
       restoreLayout();
       renderDice(B.redDice, B.blueDice);
-      // Re-apply pips to flat dice (renderDice creates number-based elements)
-      document.querySelectorAll('#red-dice .die').forEach((el, i) => {
-        if (B.redDice[i] >= 1 && B.redDice[i] <= 6) renderPips(el, B.redDice[i]);
-      });
-      document.querySelectorAll('#blue-dice .die').forEach((el, i) => {
-        if (B.blueDice[i] >= 1 && B.blueDice[i] <= 6) renderPips(el, B.blueDice[i]);
-      });
       renderBattle();
       setTimeout(() => callback(), spd(400));
     }, spd(900));
@@ -18483,6 +18476,13 @@ function update3dDice(team, values) {
   });
 }
 
+// Flat die HTML with pip dots (used when no 3D dice exist)
+function flatDieHTML(val, team) {
+  const face = team === 'red' ? 'face-red' : 'face-blue';
+  if (val === '?' || val === 0 || !val) return `<div class="die die-${team}">?</div>`;
+  return `<div class="die die-${team}"><div style="position:relative;width:100%;height:100%;" class="${face}">${pip3dHTML(val)}</div></div>`;
+}
+
 function renderDice(rd, bd) {
   const redEl = document.getElementById('red-dice');
   const blueEl = document.getElementById('blue-dice');
@@ -18504,14 +18504,12 @@ function renderDice(rd, bd) {
         // 3D dice exist with matching count — update them (works during settling too)
         if (rdPh.settled) update3dDice('red', rd);
         const flatRed = redEl.querySelectorAll('.die');
-        rd.forEach((v, i) => { if (flatRed[i]) flatRed[i].textContent = v; });
+        rd.forEach((v, i) => { if (flatRed[i]) flatRed[i].innerHTML = `<div style="position:relative;width:100%;height:100%;" class="face-red">${pip3dHTML(v)}</div>`; });
       } else if (rdPh && rd.length !== rdPh.dice.length) {
-        // Count mismatch (bonus die) — fall back to flat
         cancelAnimationFrame(rdPh.raf); rdPh.els.forEach(e => e.remove()); delete _dicePhysics['red'];
-        redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
+        redEl.innerHTML = rd.map(d => flatDieHTML(d, 'red')).join('');
       } else {
-        // No 3D dice at all
-        redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
+        redEl.innerHTML = rd.map(d => flatDieHTML(d, 'red')).join('');
       }
     }
     if (bd) {
@@ -18519,12 +18517,12 @@ function renderDice(rd, bd) {
       if (bdPh && bd.length === bdPh.dice.length) {
         if (bdPh.settled) update3dDice('blue', bd);
         const flatBlue = blueEl.querySelectorAll('.die');
-        bd.forEach((v, i) => { if (flatBlue[i]) flatBlue[i].textContent = v; });
+        bd.forEach((v, i) => { if (flatBlue[i]) flatBlue[i].innerHTML = `<div style="position:relative;width:100%;height:100%;" class="face-blue">${pip3dHTML(v)}</div>`; });
       } else if (bdPh && bd.length !== bdPh.dice.length) {
         cancelAnimationFrame(bdPh.raf); bdPh.els.forEach(e => e.remove()); delete _dicePhysics['blue'];
-        blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
+        blueEl.innerHTML = bd.map(d => flatDieHTML(d, 'blue')).join('');
       } else {
-        blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
+        blueEl.innerHTML = bd.map(d => flatDieHTML(d, 'blue')).join('');
       }
     }
   }
