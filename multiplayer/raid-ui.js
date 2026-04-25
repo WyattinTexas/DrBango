@@ -56,14 +56,16 @@ function renderRaidLobby(userBadges) {
 
     bossesHtml += `<div class="book-boss ${locked ? 'locked' : ''} ${defeated ? 'defeated' : ''}"
                         onclick="${locked ? '' : `selectRaid('${raidId}')`}">
-      <div class="book-boss-portrait">
+      <div class="book-boss-art">
         <img src="${boss.bossGhost.art}" alt="${boss.name}" onerror="this.src='../testroom/art/timber.jpg'">
         ${locked ? '<div class="book-boss-lock">&#x1F512;</div>' : ''}
         ${defeated ? '<div class="book-boss-check">&#x2714;</div>' : ''}
+        <div class="book-boss-overlay">
+          <div class="book-boss-name">${boss.name}</div>
+          <div class="book-boss-title">${boss.title}</div>
+        </div>
       </div>
-      <div class="book-boss-details">
-        <div class="book-boss-name">${boss.name}</div>
-        <div class="book-boss-title">${boss.title}</div>
+      <div class="book-boss-bar">
         <div class="book-boss-meta">
           <span class="book-hp">${boss.baseHp} HP</span>
           <span class="book-players">${playerCount} players</span>
@@ -91,7 +93,7 @@ function renderRaidLobby(userBadges) {
     : '<div></div>';
 
   container.innerHTML = `
-    <h2 class="raid-section-title">THE ONSLAUGHT</h2>
+    <h2 class="raid-section-title">SPIRIT WORLD</h2>
     ${tabsHtml}
     <div class="raid-book" style="background:${zone.bg}">
       <div class="book-page">
