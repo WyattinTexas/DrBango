@@ -444,18 +444,15 @@ function showRaidCountdown(data) {
 
 function renderBossHpBar(currentHp, maxHp, bossName, personality) {
   const pct = Math.max(0, currentHp / maxHp * 100);
-  const phase = getBossPhase(currentHp, maxHp);
-  const phaseNames = { 1: 'OPENING GAMBIT', 2: 'ESCALATION', 3: 'DESPERATION', 4: 'ENRAGE' };
-  const phaseColors = { 1: '#2ecc71', 2: '#f39c12', 3: '#e74c3c', 4: '#8e44ad' };
+  const barColor = pct > 50 ? '#2ecc71' : pct > 25 ? '#f39c12' : '#e74c3c';
 
   return `<div class="raid-boss-hp-container">
     <div class="raid-boss-hp-header">
       <span class="raid-boss-hp-name">${bossName}</span>
       <span class="raid-boss-hp-personality">${personality.toUpperCase()}</span>
-      <span class="raid-boss-hp-phase" style="color:${phaseColors[phase]}">${phaseNames[phase]}</span>
     </div>
     <div class="raid-boss-hp-bar-bg">
-      <div class="raid-boss-hp-bar-fill" style="width:${pct}%;background:${phaseColors[phase]}">
+      <div class="raid-boss-hp-bar-fill" style="width:${pct}%;background:${barColor}">
         <div class="raid-boss-hp-bar-glow"></div>
       </div>
       <div class="raid-boss-hp-markers">
