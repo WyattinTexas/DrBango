@@ -798,6 +798,14 @@ body {
   margin-top: 8px;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+@keyframes raidVictoryPulse {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 40px rgba(240,197,96,0.4); }
+  50% { transform: scale(1.05); text-shadow: 0 0 60px rgba(240,197,96,0.6); }
+}
 @keyframes pack-glow {
   0%, 100% { box-shadow: 0 0 10px rgba(212, 160, 64, 0.2); }
   50% { box-shadow: 0 0 25px rgba(212, 160, 64, 0.4), 0 0 50px rgba(212, 160, 64, 0.1); }
@@ -7553,6 +7561,9 @@ function closeRaidLobby() {
       await db.ref(`mp/users/${user.uid}/raidPoints`).set(firebase.database.ServerValue.increment(points));
     }
 
+    // Calculate raid points for display
+    const raidPts = (typeof RAID_BOSSES !== 'undefined' && RAID_BOSSES[raidId]) ? RAID_BOSSES[raidId].rewardPoints || 50 : 50;
+
     // Epic celebration overlay
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;animation:fadeIn 0.5s ease;';
@@ -7567,7 +7578,7 @@ function closeRaidLobby() {
     }
 
     overlay.innerHTML = `
-      <div style="font-family:Creepster,cursive;font-size:3rem;letter-spacing:5px;color:${isVictory ? '#f0c560' : '#e94560'};text-shadow:0 0 40px ${isVictory ? 'rgba(240,197,96,0.4)' : 'rgba(233,69,96,0.3)'};">
+      <div style="font-family:Creepster,cursive;font-size:3rem;letter-spacing:5px;color:${isVictory ? '#f0c560' : '#e94560'};text-shadow:0 0 40px ${isVictory ? 'rgba(240,197,96,0.4)' : 'rgba(233,69,96,0.3)'};${isVictory ? 'animation:raidVictoryPulse 1.5s ease-in-out infinite;' : ''}">
         ${isVictory ? 'RAID COMPLETE!' : 'RAID FAILED'}
       </div>
       <div style="font-family:Creepster,cursive;font-size:1.4rem;color:var(--text2,#a09686);letter-spacing:2px;">
@@ -7579,6 +7590,9 @@ function closeRaidLobby() {
       <div style="color:#f4ecd8;font-size:1rem;">
         ${3 - ghostsLost}/3 Spiritkin survived
       </div>
+      ${isVictory ? `<div style="color:#f0c560;font-size:1rem;margin-top:4px;">
+        +${raidPts} Raid Points earned
+      </div>` : ''}
       ${earnedBadge ? `
         <div style="margin-top:12px;padding:16px 24px;background:rgba(212,160,64,0.1);border:2px solid rgba(212,160,64,0.4);border-radius:12px;text-align:center;">
           <div style="font-size:1.8rem;">${earnedBadge[1].icon}</div>
@@ -7596,6 +7610,22 @@ function closeRaidLobby() {
       </button>
     `;
     document.body.appendChild(overlay);
+
+    // Confetti burst for victories
+    if (isVictory) {
+      for (let i = 0; i < 40; i++) {
+        const confetti = document.createElement('div');
+        const colors = ['#f0c560', '#e94560', '#2ecc71', '#75BEEB', '#9b59b6', '#fff'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const left = Math.random() * 100;
+        const delay = Math.random() * 2;
+        const size = 4 + Math.random() * 6;
+        confetti.style.cssText = `position:fixed;top:-10px;left:${left}%;width:${size}px;height:${size}px;background:${color};z-index:100000;border-radius:${Math.random()>0.5?'50%':'2px'};animation:confettiFall ${2+Math.random()*2}s ease-in ${delay}s forwards;pointer-events:none;`;
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 5000);
+      }
+    }
+
     setTimeout(() => { if (overlay.parentElement) overlay.remove(); }, 8000);
   });
 })();

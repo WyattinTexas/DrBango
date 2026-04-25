@@ -273,6 +273,10 @@ function updateRaidQueueUI(raidId, entries) {
     countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> / <span class="raid-queue-num">${minP}</span> raiders needed to start`;
   } else {
     countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders ready! <span style="color:#2ecc71;font-weight:700;">RAID LAUNCHING...</span>`;
+    if (!document.getElementById('raid-launch-countdown')) {
+      const bossConfig = RAID_BOSSES[raidId];
+      showRaidLaunchCountdown(bossConfig?.name || 'Boss');
+    }
   }
 
   let html = '';
@@ -326,6 +330,40 @@ function hideRaidScreen() {
   const raidScreen = document.getElementById('raid-screen');
   if (mainContent) mainContent.style.display = '';
   if (raidScreen) raidScreen.style.display = 'none';
+}
+
+// ─── RAID LAUNCH COUNTDOWN (Queue → Battle transition) ─────────
+
+function showRaidLaunchCountdown(bossName) {
+  const overlay = document.createElement('div');
+  overlay.id = 'raid-launch-countdown';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+  overlay.innerHTML = `
+    <div style="font-family:Creepster,cursive;font-size:1.4rem;color:#75BEEB;letter-spacing:3px;margin-bottom:8px;">RAID INCOMING</div>
+    <div style="font-family:Creepster,cursive;font-size:1.2rem;color:var(--text2,#a09686);letter-spacing:2px;">${bossName}</div>
+    <div id="raid-countdown-num" style="font-family:Creepster,cursive;font-size:8rem;color:#f0c560;text-shadow:0 0 40px rgba(240,197,96,0.4);transition:transform 0.3s ease;"></div>
+  `;
+  document.body.appendChild(overlay);
+
+  const numEl = document.getElementById('raid-countdown-num');
+  let count = 3;
+  numEl.textContent = count;
+
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      numEl.textContent = count;
+      numEl.style.transform = 'scale(1.3)';
+      setTimeout(() => { numEl.style.transform = 'scale(1)'; }, 200);
+    } else if (count === 0) {
+      numEl.textContent = 'GO!';
+      numEl.style.color = '#2ecc71';
+      numEl.style.transform = 'scale(1.5)';
+    } else {
+      clearInterval(interval);
+      // Overlay will be removed when page redirects to testroom
+    }
+  }, 1000);
 }
 
 // ─── RAID COUNTDOWN ─────────────────────────────────────────────
