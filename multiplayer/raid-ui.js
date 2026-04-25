@@ -411,36 +411,30 @@ function renderRaiderLineup(players, currentIdx) {
 // ─── RAID BATTLE UI ─────────────────────────────────────────────
 
 function showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData) {
-  const raidScreen = document.getElementById('raid-screen');
-  if (!raidScreen) return;
-
   const boss = RAID_BOSSES[raidData.raidId];
-  const players = raidData.players || {};
-  const currentIdx = raidData.currentFighterIdx || 0;
+  if (!boss) return;
 
-  // Inject boss HP bar and raider lineup ABOVE the existing PvP battle view
-  raidScreen.innerHTML = `
-    <div class="raid-battle-layout">
-      ${renderBossHpBar(raidData.bossCurrentHp, raidData.bossMaxHp, boss.name, boss.personality)}
-      ${renderRaiderLineup(players, currentIdx)}
-      <div class="raid-battle-arena" id="raid-battle-arena"></div>
-    </div>`;
+  // Build boss ghost data blob for the testroom to register
+  const bossGhostData = enemyGhosts.map(g => ({
+    id: g.id, name: g.name, maxHp: g.maxHp, art: g.art || '',
+    ability: g.ability || '', abilityDesc: g.abilityDesc || '',
+    rarity: g.rarity || 'legendary'
+  }));
 
-  // Set up battle picks — use the player's team and the boss/minion IDs
-  S.redPicks = playerTeam;
-  S.bluePicks = enemyGhosts.map(g => g.id);
+  // Redirect to testroom with raid params — full cinematic experience!
+  const url = '../testroom/?mode=raid'
+    + '&red=' + playerTeam.join(',')
+    + '&blue=' + enemyGhosts.map(g => g.id).join(',')
+    + '&raidId=' + encodeURIComponent(raidData.raidId)
+    + '&instanceId=' + encodeURIComponent(currentRaid?.instanceId || '')
+    + '&slot=' + (raidData.currentFighterIdx || 0)
+    + '&bossHp=' + (raidData.bossCurrentHp || boss.baseHp)
+    + '&bossMaxHp=' + (raidData.bossMaxHp || boss.baseHp)
+    + '&bossName=' + encodeURIComponent(boss.name)
+    + '&personality=' + encodeURIComponent(boss.personality)
+    + '&bossData=' + encodeURIComponent(JSON.stringify(bossGhostData));
 
-  // Show the existing PvP battle view (it has all the correct DOM elements)
-  const pvpView = document.getElementById('pvp-battle-view');
-  if (pvpView) {
-    pvpView.classList.add('active');
-    pvpView.style.zIndex = '9100'; // above raid screen
-  }
-
-  // Start battle after a brief delay
-  setTimeout(() => {
-    startBattle();
-  }, 500);
+  window.location.href = url;
 }
 
 // ─── SPECTATOR VIEW ─────────────────────────────────────────────

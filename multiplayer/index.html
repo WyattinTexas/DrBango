@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.73'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.74'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3462,7 +3462,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.73';
+const BBN_VERSION = 'v0.74';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7391,8 +7391,98 @@ function closeRaidLobby() {
   setTimeout(() => { overlay.style.display = 'none'; }, 350);
 }
 
+// Handle return from raid battle (testroom redirects back with ?raidResult=done)
+(function checkRaidResult() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('raidResult') !== 'done') return;
+
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
+
+  const instanceId = params.get('instanceId');
+  const raidId = params.get('raidId');
+  const damage = parseInt(params.get('damage') || '0');
+  const ghostsLost = parseInt(params.get('ghostsLost') || '0');
+  const slot = parseInt(params.get('slot') || '0');
+  const result = params.get('result') || 'loss';
+
+  console.log(`[RAID] Returned from raid: ${raidId}, damage=${damage}, ghostsLost=${ghostsLost}, result=${result}`);
+
+  // Update Firebase after auth is ready
+  firebase.auth().onAuthStateChanged(async (user) => {
+    if (!user || !instanceId) return;
+
+    // Update player's slot
+    await db.ref(`mp/raids/instances/${instanceId}/players/${slot}`).update({
+      status: 'done',
+      damageDealt: damage,
+      ghostsLost: ghostsLost
+    });
+
+    // Update total damage
+    await db.ref(`mp/raids/instances/${instanceId}/totalDamageDealt`).set(
+      firebase.database.ServerValue.increment(damage)
+    );
+
+    // Drain boss HP
+    const instSnap = await db.ref(`mp/raids/instances/${instanceId}`).once('value');
+    const inst = instSnap.val();
+    if (!inst) return;
+
+    const newBossHp = Math.max(0, (inst.bossCurrentHp || 0) - damage);
+    const totalPlayers = Object.keys(inst.players || {}).length;
+    const nextSlot = slot + 1;
+
+    if (newBossHp <= 0) {
+      // Boss defeated!
+      await db.ref(`mp/raids/instances/${instanceId}`).update({
+        bossCurrentHp: 0,
+        status: 'complete',
+        completedAt: firebase.database.ServerValue.TIMESTAMP,
+        bossDefeatedBy: user.uid,
+        fightPhase: 'done'
+      });
+      if (typeof distributeRaidRewards === 'function') {
+        distributeRaidRewards(instanceId, true, user.uid);
+      }
+    } else if (nextSlot >= totalPlayers) {
+      // All players fought, boss survived
+      await db.ref(`mp/raids/instances/${instanceId}`).update({
+        bossCurrentHp: newBossHp,
+        status: 'complete',
+        completedAt: firebase.database.ServerValue.TIMESTAMP,
+        fightPhase: 'done'
+      });
+      if (typeof distributeRaidRewards === 'function') {
+        distributeRaidRewards(instanceId, false, null);
+      }
+    } else {
+      // Advance to next fighter
+      const nextPlayer = inst.players?.[nextSlot];
+      await db.ref(`mp/raids/instances/${instanceId}`).update({
+        bossCurrentHp: newBossHp,
+        currentFighterIdx: nextSlot,
+        currentFighterUid: nextPlayer?.uid || null,
+        enrageLevel: firebase.database.ServerValue.increment(1),
+        fightPhase: 'fighting'
+      });
+    }
+
+    // Clear active raid flag
+    await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
+
+    // Show a toast with results
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(10,6,18,0.95);border:1px solid rgba(212,160,64,0.4);border-radius:12px;padding:16px 24px;color:#f4ecd8;font-family:Creepster,cursive;font-size:1.2rem;letter-spacing:2px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+    toast.innerHTML = newBossHp <= 0
+      ? `RAID COMPLETE! You dealt <span style="color:#e94560;font-weight:900">${damage}</span> damage!`
+      : `Raid fight over! You dealt <span style="color:#e94560;font-weight:900">${damage}</span> damage. Boss HP: ${newBossHp}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+  });
+})();
+
 // Initialize raid system after auth
-const _origAuthCallback = window._onAuthReady;
 firebase.auth().onAuthStateChanged(user => {
   if (user) {
     // Initialize raid system

@@ -1802,6 +1802,18 @@ body.lite-mode .die.rolling { animation: none !important; }
   <div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div>
   <div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div>
 </div>
+<!-- RAID BOSS HP BAR (hidden unless raid mode) -->
+<div id="raid-boss-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:linear-gradient(180deg,rgba(10,6,18,0.95),rgba(10,6,18,0.85));backdrop-filter:blur(8px);border-bottom:1px solid rgba(142,68,173,0.3);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span id="raid-boss-bar-name" style="font-family:'Creepster',cursive;font-size:1.3rem;color:#c084fc;letter-spacing:2px;"></span>
+    <span id="raid-boss-bar-phase" style="font-weight:700;font-size:0.8rem;letter-spacing:1px;color:#2ecc71;"></span>
+  </div>
+  <div style="position:relative;height:24px;background:rgba(255,255,255,0.05);border-radius:12px;overflow:hidden;">
+    <div id="raid-boss-bar-fill" style="height:100%;border-radius:12px;background:#2ecc71;transition:width 0.6s ease;width:100%;"></div>
+    <div id="raid-boss-bar-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.8rem;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.6);"></div>
+  </div>
+</div>
+
 <div class="app">
   <header>
     <h1>VOLCANIC ISLES & ROLLING HILLS TESTROOM</h1>
@@ -2765,6 +2777,8 @@ const TESTROOM_VERSION = 'v824';
 })();
 
 let MP_MODE = false; // set true when loaded via multiplayer page URL params
+let RAID_MODE = false; // set true when loaded via raid mode
+let RAID_PARAMS = null; // { raidId, instanceId, slot, bossHp, bossMaxHp, bossName, personality }
 let LIVE_PVP = false; // true when in real-time PvP mode
 let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
 let PVP_GAME_ID = null;
@@ -17510,7 +17524,35 @@ function showGameOver(winner) {
     }
 
     const goButtons = el.querySelector('.go-buttons');
-    if (goButtons) {
+
+    // RAID MODE: calculate damage dealt and redirect with raid results
+    if (RAID_MODE && RAID_PARAMS) {
+      // Calculate total damage dealt to blue team (boss)
+      let totalDamage = 0;
+      if (B && B.blue) {
+        B.blue.ghosts.forEach(g => {
+          totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+        });
+      }
+      const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
+
+      if (goButtons) {
+        const returnUrl = `../multiplayer/?raidResult=done`
+          + `&instanceId=${encodeURIComponent(RAID_PARAMS.instanceId)}`
+          + `&raidId=${encodeURIComponent(RAID_PARAMS.raidId)}`
+          + `&damage=${totalDamage}`
+          + `&ghostsLost=${ghostsLost}`
+          + `&slot=${RAID_PARAMS.slot}`
+          + `&result=${result}`;
+        goButtons.innerHTML = `
+          <button class="go-btn-rematch" onclick="window.location.href='${returnUrl}'">
+            Return to Raid
+          </button>
+        `;
+        // Auto-redirect after 5 seconds
+        setTimeout(() => { window.location.href = returnUrl; }, 5000);
+      }
+    } else if (goButtons) {
       // Daily mode uses dailyResult param; regular MP uses result param
       const returnUrl = MP_DAILY
         ? `../multiplayer/?dailyResult=${result}`
@@ -18933,6 +18975,124 @@ document.addEventListener('keydown', e => {
     if (!LIVE_PVP) startBlueAI();
   }, 300);
 })();
+
+// ============================================================
+// RAID MODE — Boss fights with cinematic testroom experience
+// URL: ?mode=raid&red=id,id,id&blue=bossId,minionId,minionId
+//      &raidId=...&instanceId=...&slot=...&bossHp=...&bossMaxHp=...&bossName=...&personality=...
+// ============================================================
+(function checkRaidParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('mode') !== 'raid') return;
+
+  const redParam = params.get('red');
+  const blueParam = params.get('blue');
+  if (!redParam || !blueParam) return;
+
+  // Parse red team (player's ghosts — must be valid)
+  const redIds = redParam.split(',').map(Number).filter(id => ghostData(id));
+  if (redIds.length !== 3) return;
+
+  // Parse blue team (boss + minions — may not be in GHOSTS array)
+  const blueIds = blueParam.split(',').map(Number);
+
+  // Register boss ghosts in the GHOSTS lookup so the battle engine can find them
+  // Boss ghost data is passed via URL as a JSON blob in the 'bossData' param
+  const bossDataParam = params.get('bossData');
+  if (bossDataParam) {
+    try {
+      const bossGhosts = JSON.parse(decodeURIComponent(bossDataParam));
+      bossGhosts.forEach(bg => {
+        if (!GHOSTS.find(g => g.id === bg.id)) {
+          GHOSTS.push({
+            id: bg.id, name: bg.name, maxHp: bg.maxHp, art: bg.art || '',
+            ability: bg.ability || 'Boss', abilityDesc: bg.abilityDesc || '',
+            rarity: bg.rarity || 'legendary', set: 'Raid Boss'
+          });
+        }
+      });
+    } catch (e) { console.warn('[RAID] Failed to parse bossData:', e); }
+  }
+
+  // Verify all blue IDs are now findable
+  const validBlue = blueIds.filter(id => ghostData(id));
+  if (validBlue.length === 0) { console.error('[RAID] No valid blue team ghosts'); return; }
+  // Pad to 3 if fewer (some bosses start with fewer minions)
+  while (validBlue.length < 3) validBlue.push(validBlue[validBlue.length - 1]);
+
+  // Set raid state
+  RAID_MODE = true;
+  MP_MODE = true; // reuse MP infrastructure (hide team select, auto-start, etc.)
+
+  RAID_PARAMS = {
+    raidId: params.get('raidId') || '',
+    instanceId: params.get('instanceId') || '',
+    slot: parseInt(params.get('slot') || '0'),
+    bossHp: parseInt(params.get('bossHp') || '50'),
+    bossMaxHp: parseInt(params.get('bossMaxHp') || '50'),
+    bossName: decodeURIComponent(params.get('bossName') || 'Boss'),
+    personality: params.get('personality') || 'tyrant',
+    totalDamageDealt: 0
+  };
+
+  // Set teams
+  S.redPicks = redIds;
+  S.bluePicks = validBlue;
+
+  // Force standard settings
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 0;
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true;
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4;
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 8;
+
+  // Set player names
+  MP_PLAYER_NAMES.red = 'You';
+  MP_PLAYER_NAMES.blue = RAID_PARAMS.bossName;
+
+  // Show boss HP bar
+  const bossBar = document.getElementById('raid-boss-bar');
+  if (bossBar) {
+    bossBar.style.display = 'block';
+    document.getElementById('raid-boss-bar-name').textContent = RAID_PARAMS.bossName;
+    document.getElementById('raid-boss-bar-text').textContent = `${RAID_PARAMS.bossHp} / ${RAID_PARAMS.bossMaxHp}`;
+    document.getElementById('raid-boss-bar-fill').style.width = '100%';
+    updateRaidBossBar();
+    // Push the arena down to make room for the bar
+    document.querySelector('.app').style.paddingTop = '56px';
+  }
+
+  // Switch to arena tab and auto-start
+  setTimeout(() => {
+    switchTab('battle');
+    renderPicks();
+    startBattle();
+    startBlueAI();
+  }, 300);
+})();
+
+// Raid boss bar update — called after each damage event
+function updateRaidBossBar() {
+  if (!RAID_MODE || !RAID_PARAMS) return;
+  const pct = Math.max(0, RAID_PARAMS.bossHp / RAID_PARAMS.bossMaxHp * 100);
+  const fill = document.getElementById('raid-boss-bar-fill');
+  const text = document.getElementById('raid-boss-bar-text');
+  const phase = document.getElementById('raid-boss-bar-phase');
+  if (fill) {
+    fill.style.width = pct + '%';
+    fill.style.background = pct > 75 ? '#2ecc71' : pct > 50 ? '#f39c12' : pct > 25 ? '#e74c3c' : '#8e44ad';
+  }
+  if (text) text.textContent = `${RAID_PARAMS.bossHp} / ${RAID_PARAMS.bossMaxHp}`;
+  if (phase) {
+    const phaseNames = { 1: 'OPENING GAMBIT', 2: 'ESCALATION', 3: 'DESPERATION', 4: 'ENRAGE' };
+    const p = pct > 75 ? 1 : pct > 50 ? 2 : pct > 25 ? 3 : 4;
+    phase.textContent = phaseNames[p];
+    phase.style.color = pct > 75 ? '#2ecc71' : pct > 50 ? '#f39c12' : pct > 25 ? '#e74c3c' : '#8e44ad';
+  }
+}
 
 // ============================================================
 // BLUE AI AUTO-PLAY — for MP/daily modes (not live PvP)
