@@ -68,7 +68,7 @@ function renderRaidLobby(userBadges) {
       <div class="book-boss-bar">
         <div class="book-boss-meta">
           <span class="book-hp">${boss.bossGhost.maxHp} HP</span>
-          <span class="book-players">${playerCount <= 2 ? '2 players' : '2-' + playerCount + ' players'}</span>
+          <span class="book-players">${(() => { const min = boss.minPlayers || 2; if (min === playerCount) return min + ' players'; return min + '-' + playerCount + ' players'; })()}</span>
         </div>
         ${locked ? `<div class="book-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
       </div>

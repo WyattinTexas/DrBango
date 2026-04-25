@@ -109,7 +109,7 @@ function startQueueListener(raidId) {
     }
 
     const bossConfig = RAID_BOSSES[raidId];
-    const minPlayers = 2;
+    const minPlayers = bossConfig?.minPlayers || 2;
     const maxPlayers = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
 
     // Start when we have at least minPlayers (raid can fire early)
@@ -138,7 +138,7 @@ async function tryCreateRaidInstance(raidId, players) {
 
   // Transaction: read queue, create instance, clear queue
   const bossConfig = RAID_BOSSES[raidId];
-  const minNeeded = 2;
+  const minNeeded = bossConfig?.minPlayers || 2;
   const result = await queueRef.transaction((currentQueue) => {
     if (!currentQueue) return currentQueue; // Queue already cleared
     const entries = Object.entries(currentQueue)

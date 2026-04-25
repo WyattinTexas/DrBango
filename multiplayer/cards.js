@@ -516,9 +516,9 @@ const RAID_BOSSES = {
     title: 'The Unseen Predator',
     personality: 'trickster',
     tier: 1, set: 'Rolling Hills',
-    requiredBadge: null, requiredPlayers: 2,
+    requiredBadge: null, requiredPlayers: 2, minPlayers: 1,
     bossGhost: {
-      id: 9002, name: 'Dark Fang', maxHp: 12, art: '../testroom/art/originals/DarkFang.png',
+      id: 9002, name: 'Dark Fang', maxHp: 9, art: '../testroom/art/originals/DarkFang.png',
       ability: 'Pressure', abilityDesc: 'Enemy cannot heal. Win: deal +1 damage for each KO\'d ghost this game. Forces enemy swap before rolling.'
     },
     minionsByPhase: { 1: [9111], 2: [9112], 3: [9112, 9113], 4: [9111, 9112] },
