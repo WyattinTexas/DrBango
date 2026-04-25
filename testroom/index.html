@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v824'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v825'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2760,7 +2760,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v824';
+const TESTROOM_VERSION = 'v825';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -12899,11 +12899,12 @@ function showFlickPicker(team, callback) {
   });
   renderDice(B.redDice, B.blueDice);
 
-  // 2. Use arena-center as physics space (bigger than tray)
+  // 2. Use full arena-board as physics space (entire battle screen)
+  const board = document.querySelector('.arena-board');
   const center = document.querySelector('.arena-center');
-  const centerRect = center.getBoundingClientRect();
-  const physW = center.offsetWidth;
-  const physH = center.offsetHeight;
+  const centerRect = board.getBoundingClientRect();
+  const physW = board.offsetWidth;
+  const physH = board.offsetHeight;
   const tray = document.querySelector('.dice-stack');
   const trayRect = tray.getBoundingClientRect();
   const redRow = document.getElementById('red-dice');
@@ -12937,13 +12938,13 @@ function showFlickPicker(team, callback) {
     el.innerHTML = `<div style="position:relative;width:100%;height:100%;" class="${faceClass}">${pip3dHTML(val)}</div>`;
   };
 
-  // 4. Move all dice to arena-center as absolute children, render pips
-  center.style.position = 'relative';
-  center.style.overflow = 'hidden';
+  // 4. Move all dice to arena-board as absolute children, render pips
+  board.style.position = 'relative';
+  board.style.overflow = 'hidden';
   bodies.forEach((b, i) => {
     const val = b.team === 'red' ? B.redDice[b.dieIndex] : B.blueDice[b.dieIndex];
     renderPips(b.el, val);
-    center.appendChild(b.el);
+    board.appendChild(b.el);
     b.el.style.position = 'absolute';
     b.el.style.left = (b.cx - dieR) + 'px';
     b.el.style.top = (b.cy - dieR) + 'px';
@@ -12952,10 +12953,10 @@ function showFlickPicker(team, callback) {
     b.el.style.zIndex = b.isFlicker ? '60' : '55';
   });
 
-  // 5. Position flicker die below tray, centered horizontally
+  // 5. Position flicker die below tray, centered on board
   const flicker = bodies.find(b => b.isFlicker);
   const trayBottom = trayRect.bottom - centerRect.top;
-  flicker.cx = physW / 2;
+  flicker.cx = physW / 2; // centered on the full board
   flicker.cy = trayBottom + dieSize * 0.8;
   // Clamp so it stays inside arena-center
   flicker.cy = Math.min(flicker.cy, physH - dieR - 8);
@@ -12984,7 +12985,7 @@ function showFlickPicker(team, callback) {
     });
     redDieEls.forEach(el => redRow.appendChild(el));
     blueDieEls.forEach(el => blueRow.appendChild(el));
-    center.style.overflow = '';
+    board.style.overflow = '';
   };
 
   // 6. Mouse / touch fling
@@ -13063,23 +13064,39 @@ function showFlickPicker(team, callback) {
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('touchend', onUp);
 
-  // 7. Physics — arena-center walls, NO tray walls
-  const FRICTION = 0.965;
-  const BOUNCE = 0.7;
-  const SETTLE_THRESH = 0.35;
-  const PAD = 6;
+  // 7. Physics — full arena-board walls, force-settle after 2.5s
+  const BOUNCE_WALL = 0.5;   // walls absorb energy
+  const BOUNCE_DIE = 0.85;   // die-die collisions: punchy but energy-losing
+  const SETTLE_THRESH = 0.3;
+  const PAD = 12;
   let collisionCooldown = 0;
+  const physStart = performance.now();
+  const FORCE_SETTLE_MS = 2500; // force stop after 2.5 seconds
 
   const physStep = () => {
     let maxSpd = 0;
     collisionCooldown = Math.max(0, collisionCooldown - 1);
 
+    // Time-based friction ramp: starts normal, ramps hard after 1.5s
+    const elapsed = performance.now() - physStart;
+    const baseFriction = 0.96;
+    const friction = elapsed > 1500
+      ? baseFriction * Math.pow(0.97, (elapsed - 1500) / 100) // progressive slowdown
+      : baseFriction;
+
+    // Force settle if time exceeded
+    if (elapsed > FORCE_SETTLE_MS) {
+      cancelAnimationFrame(flickRaf);
+      settleFlick();
+      return;
+    }
+
     bodies.forEach(b => {
       b.cx += b.vx; b.cy += b.vy;
-      b.vx *= FRICTION; b.vy *= FRICTION;
+      b.vx *= friction; b.vy *= friction;
     });
 
-    // Elastic collisions
+    // Elastic collisions (energy-losing, not energy-creating)
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
         const a = bodies[i], c = bodies[j];
@@ -13089,7 +13106,7 @@ function showFlickPicker(team, callback) {
           const nx = dx / dist, ny = dy / dist;
           const rvn = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
           if (rvn > 0) {
-            const imp = rvn * BOUNCE * 3;
+            const imp = rvn * BOUNCE_DIE;
             a.vx -= imp * nx; a.vy -= imp * ny;
             c.vx += imp * nx; c.vy += imp * ny;
             if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
@@ -13101,12 +13118,12 @@ function showFlickPicker(team, callback) {
       }
     }
 
-    // Arena-center walls (the whole center column, not the tray)
+    // Full arena-board walls
     bodies.forEach(b => {
-      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE; }
-      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE; }
-      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE; }
-      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE; }
+      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; }
+      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; }
+      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; }
+      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; }
     });
 
     bodies.forEach(b => {
