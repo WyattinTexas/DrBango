@@ -25,7 +25,8 @@ function renderRaidLobby(userBadges) {
     { tier: 1, name: 'Rolling Hills', color: '#2ecc71', accent: 'rgba(46,204,113,0.15)' },
     { tier: 2, name: 'Frost Valley', color: '#75BEEB', accent: 'rgba(117,190,235,0.15)' },
     { tier: 3, name: 'Volcanic Isles', color: '#e74c3c', accent: 'rgba(231,76,60,0.15)' },
-    { tier: 4, name: 'Dark Castle', color: '#9b59b6', accent: 'rgba(155,89,182,0.15)' }
+    { tier: 4, name: 'Dark Castle', color: '#9b59b6', accent: 'rgba(155,89,182,0.15)' },
+    { tier: 5, name: 'The Dark Spire', color: '#c0392b', accent: 'rgba(192,57,43,0.15)' }
   ];
   let html = '<h2 class="raid-section-title">THE ONSLAUGHT</h2><div class="raid-lobby-subtitle">Rally your team. Face the darkness.</div>';
 

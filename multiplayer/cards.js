@@ -585,7 +585,7 @@ const RAID_BOSSES = {
     title: 'Seer of the Frozen Vale',
     personality: 'trickster',
     tier: 2, set: 'Frost Valley',
-    requiredBadge: null, requiredPlayers: 3,
+    requiredBadge: 'lucy_slayer', requiredPlayers: 3,
     bossGhost: {
       id: 9005, name: 'Romy', maxHp: 16, art: '../testroom/art/originals/romy.jpg',
       ability: 'Valley Guardian', abilityDesc: 'Predicts a die number each round. If any die matches: +3 damage. Mirror Dice: swap 1 die with player after rolling.'
@@ -631,7 +631,7 @@ const RAID_BOSSES = {
     title: 'The Living Ember',
     personality: 'swarm',
     tier: 3, set: 'Volcanic Isles',
-    requiredBadge: 'frost_valley_champion', requiredPlayers: 5,
+    requiredBadge: 'mountain_king_slayer', requiredPlayers: 5,
     bossGhost: {
       id: 9007, name: 'Pip', maxHp: 14, art: '../testroom/art/originals/Pip.png',
       ability: 'Toasted', abilityDesc: 'Triples+: permanently remove 1 enemy die. +1 die per living minion. Gains 2 Sacred Fires on triples.'
@@ -654,7 +654,7 @@ const RAID_BOSSES = {
     title: 'Herald of the Meteor',
     personality: 'tyrant',
     tier: 3, set: 'Volcanic Isles',
-    requiredBadge: 'frost_valley_champion', requiredPlayers: 7,
+    requiredBadge: 'mountain_king_slayer', requiredPlayers: 7,
     bossGhost: {
       id: 9008, name: 'Humar', maxHp: 10, art: '../testroom/art/humar.jpg',
       ability: 'Meteor', abilityDesc: 'Win: opponent takes 2 damage before their next roll. Gain 1 Burn. On KO: gain 2 Sacred Fire.'
@@ -676,7 +676,7 @@ const RAID_BOSSES = {
     title: 'Terror of the Depths',
     personality: 'glacier',
     tier: 3, set: 'Volcanic Isles',
-    requiredBadge: 'frost_valley_champion', requiredPlayers: 10,
+    requiredBadge: 'heart_of_the_hills', requiredPlayers: 10,
     bossGhost: {
       id: 9009, name: 'Nerina', maxHp: 18, art: '../testroom/art/the_deep.jpg',
       ability: 'Leviathan', abilityDesc: 'Entry: deal 3 damage. Permafrost: max 3 damage per hit. Frost Aura: 1 damage per round. 9 HP base — a true titan.'
@@ -700,7 +700,7 @@ const RAID_BOSSES = {
     title: 'Warden of the Blue Flame',
     personality: 'trickster',
     tier: 4, set: 'Dark Castle',
-    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
+    requiredBadge: 'dark_castle_key', requiredPlayers: 7,
     bossGhost: {
       id: 9010, name: 'Lucy', maxHp: 16, art: '../testroom/art/originals/lucy.jpg',
       ability: 'Blue Fire', abilityDesc: 'Win: gain 1 Sacred Fire. Mirror Dice: swap 1 die. Steal 1 resource on win. Sacred Fires deal double damage.'
@@ -722,7 +722,7 @@ const RAID_BOSSES = {
     title: 'The Endless Whisper',
     personality: 'glacier',
     tier: 4, set: 'Dark Castle',
-    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
+    requiredBadge: 'dark_castle_key', requiredPlayers: 7,
     bossGhost: {
       id: 9011, name: 'Shade', maxHp: 10, art: '../testroom/art/originals/shade.jpg',
       ability: 'Haunt', abilityDesc: 'Before EVERY roll: opponent takes 2 damage. Permafrost: max 2 damage per hit. The tick damage is relentless.'
@@ -738,19 +738,44 @@ const RAID_BOSSES = {
       victory: 'The haunting never ends.'
     }
   },
+  raid_bigsby: {
+    id: 'raid_bigsby',
+    name: 'Bigsby',
+    title: 'The Omen Bearer',
+    personality: 'swarm',
+    tier: 4, set: 'Dark Castle',
+    requiredBadge: 'dark_castle_key', requiredPlayers: 5,
+    bossGhost: {
+      id: 9013, name: 'Bigsby', maxHp: 10, art: '../testroom/art/originals/Digby.png',
+      ability: 'Omen', abilityDesc: 'Win: deal +1 damage. Moonstone use triggers Doom transformation. +1 die per living minion.'
+    },
+    minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
+    spawnInterval: { 1: 3, 2: 2, 3: 2, 4: 1 },
+    baseHp: 100, rewardPoints: 200, bonusPoints: 25,
+    dialogue: {
+      intro: 'I have dug through the dark... and found only doom.',
+      phase2: 'The omen was clear. You should not have come.',
+      phase3: 'Doom stirs beneath the castle.',
+      phase4: 'THE OMEN IS FULFILLED!',
+      defeat: 'The darkness... recedes...',
+      victory: 'The omen always comes true.'
+    }
+  },
+
+  // ======================== THE DARK SPIRE ========================
   raid_valkin: {
     id: 'raid_valkin',
     name: 'Valkin the Grand',
     title: 'The Corruptor',
     personality: 'tyrant',
-    tier: 4, set: 'Dark Castle',
-    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 10,
+    tier: 5, set: 'The Dark Spire',
+    requiredBadge: 'dark_spire_key', requiredPlayers: 10,
     bossGhost: {
-      id: 9012, name: 'Valkin the Grand', maxHp: 20, art: '../testroom/art/originals/ancient_one.jpg',
+      id: 9012, name: 'Valkin the Grand', maxHp: 20, art: '../testroom/art/originals/ValkinTheGrand.png',
       ability: 'Grand Dominion', abilityDesc: 'Doubles deal 3X damage. Triples+: deal 3 chip to ALL enemies. On KO: gain 3 Sacred Fire. The final boss.'
     },
     minionsByPhase: { 1: [9101, 9102], 2: [9101, 9103], 3: [9103, 9102], 4: [9103, 9103] },
-    baseHp: 150, rewardPoints: 200, bonusPoints: 50,
+    baseHp: 150, rewardPoints: 300, bonusPoints: 50,
     dialogue: {
       intro: 'So... the little spirits have come to challenge the Grand.',
       phase2: 'I have ruled this castle for millennia.',
@@ -763,34 +788,38 @@ const RAID_BOSSES = {
 };
 
 // Badge definitions for raid progression
-// Titles inspired by BOO lore: Spiritkin, Wills, the Lantern, the Overworld, Balance vs Control
+// Non-linear gating: Rolling Hills → Frost Valley/Volcanic Isles → Dark Castle → Dark Spire
+// Cross-region gates: Lucy's badge unlocks Romy, Heart of the Hills unlocks Nerina
 const RAID_BADGES = {
-  // Rolling Hills badges
+  // Rolling Hills badges (open)
   timber_slayer:     { name: 'Tamer of Wolves', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
   dark_fang_slayer:  { name: 'Shadowbreaker', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
   jasper_slayer:     { name: 'Trailblazer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
-  rolling_hills_champion: { name: 'Hierophant of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
+  heart_of_the_hills: { name: 'Heart of the Hills', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
 
-  // Frost Valley badges
+  // Frost Valley badges (King Jay + MK open; Romy requires Lucy's badge)
   king_jay_slayer:   { name: 'Crownbreaker', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
-  romy_slayer:       { name: 'Veil Piercer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
   mountain_king_slayer: { name: 'Mountainbreaker', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
-  frost_valley_champion: { name: 'Frostborne', icon: '&#x2744;', requires: ['king_jay_slayer', 'romy_slayer', 'mountain_king_slayer'], tier: 2, gates: 3 },
+  romy_slayer:       { name: 'Veil Piercer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
+  frostborne:        { name: 'Frostborne', icon: '&#x2744;', requires: ['king_jay_slayer', 'mountain_king_slayer', 'romy_slayer'], tier: 2 },
 
-  // Volcanic Isles badges
+  // Volcanic Isles badges (Pip+Humar need Mountainbreaker; Nerina needs Heart of the Hills)
   pip_slayer:        { name: 'Ember Quencher', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
   humar_slayer:      { name: 'Meteorfall', icon: '&#x2604;', boss: 'raid_humar', tier: 3 },
   nerina_slayer:     { name: 'Depths Walker', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
-  volcanic_isles_champion: { name: 'Warden of the Isles', icon: '&#x1F30B;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3, gates: 4 },
+  dark_castle_key:   { name: 'Dark Castle Key', icon: '&#x1F5DD;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3 },
 
-  // Dark Castle badges
+  // Dark Castle badges (all require Dark Castle Key)
   lucy_slayer:       { name: 'Flamesnuffer', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
   shade_slayer:      { name: 'Silence Bringer', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
-  valkin_slayer:     { name: 'Vanquisher of the Grand', icon: '&#x1F3F0;', boss: 'raid_valkin', tier: 4 },
-  dark_castle_champion: { name: 'Keeper of Balance', icon: '&#x1F480;', requires: ['lucy_slayer', 'shade_slayer', 'valkin_slayer'], tier: 4 },
+  bigsby_slayer:     { name: 'Omen Breaker', icon: '&#x1F573;', boss: 'raid_bigsby', tier: 4 },
+  dark_spire_key:    { name: 'Dark Spire Key', icon: '&#x1F3F0;', requires: ['lucy_slayer', 'shade_slayer', 'bigsby_slayer'], tier: 4 },
+
+  // The Dark Spire — final tier (requires Dark Spire Key)
+  valkin_slayer:     { name: 'Vanquisher of the Grand', icon: '&#x2694;', boss: 'raid_valkin', tier: 5 },
 
   // Ultimate — the title Toby's grandfather held
-  ultimate_raider:   { name: 'Spiritkin Grand Master', icon: '&#x1F31F;', requires: ['rolling_hills_champion', 'frost_valley_champion', 'volcanic_isles_champion', 'dark_castle_champion'] }
+  spiritkin_grand_master: { name: 'Spiritkin Grand Master', icon: '&#x1F31F;', requires: ['heart_of_the_hills', 'frostborne', 'dark_castle_key', 'dark_spire_key', 'valkin_slayer'] }
 };
 
 // Raid shop items
