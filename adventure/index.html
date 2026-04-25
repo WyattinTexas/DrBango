@@ -872,7 +872,7 @@ const nodes=[
 
   // ── DARK CASTLE (top center) ──
   {id:26,x:.35,y:.18,type:'encounter',r:'dark_castle',   name:'Shadow Gate',           desc:'Spirits warp through rifts.'},
-  {id:27,x:.65,y:.18,type:'event',    r:'dark_castle',   name:'Haunted Corridor',      desc:'Echoes of fallen summoners.'},
+  {id:27,x:.65,y:.18,type:'encounter',r:'dark_castle',   name:'Haunted Corridor',      desc:'Echoes of fallen summoners linger here.'},
   {id:28,x:.42,y:.12,type:'event',    r:'dark_castle',   name:'Cursed Hall',           desc:'The castle fights back.'},
   {id:29,x:.58,y:.12,type:'encounter',r:'dark_castle',   name:'Dark Sanctum',          desc:'Only legends appear here.'},
   {id:30,x:.50,y:.08,type:'shrine',   r:'dark_castle',   name:'Ancient Goo\'s Altar',  desc:'Feed: 1 of every resource type.'},
@@ -1421,7 +1421,7 @@ function updateHUD() {
   const resEl = document.getElementById('hud-resources');
   resEl.innerHTML = '';
   const res = G.party.resources;
-  const icons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥'};
+  const icons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥',firefly:'✨'};
   for (const [key, icon] of Object.entries(icons)) {
     if (res[key] > 0) {
       const div = document.createElement('div');
@@ -2134,9 +2134,9 @@ function showVictoryRewards(combo, defeatedGhost, onDone) {
   const xpPctAfter = willLevelUp ? 100 : (xpAfter / XP_TO_LEVEL * 100);
 
   // Random loot drop (20% chance)
-  const lootResources = ['luckyStone','moonstone','healingSeed','surge','iceShard','sacredFire'];
-  const lootIcons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥'};
-  const lootNames = {luckyStone:'Lucky Stone',moonstone:'Moonstone',healingSeed:'Healing Seed',surge:'Surge',iceShard:'Ice Shard',sacredFire:'Sacred Fire'};
+  const lootResources = ['luckyStone','moonstone','healingSeed','surge','iceShard','sacredFire','firefly'];
+  const lootIcons = {luckyStone:'🍀',moonstone:'🌙',healingSeed:'🌱',surge:'⚡',iceShard:'❄️',sacredFire:'🔥',firefly:'✨'};
+  const lootNames = {luckyStone:'Lucky Stone',moonstone:'Moonstone',healingSeed:'Healing Seed',surge:'Surge',iceShard:'Ice Shard',sacredFire:'Sacred Fire',firefly:'Magic Firefly'};
   let lootDrop = null;
   if (Math.random() < 0.20) {
     lootDrop = lootResources[Math.floor(Math.random() * lootResources.length)];
@@ -2314,9 +2314,9 @@ function showCamp(node) {
     }},
     { text: 'REST (+2 resources of choice)', action: () => {
       // Give 2 random resources
-      const types = ['luckyStone','moonstone','healingSeed','surge','iceShard'];
+      const restTypes = ['luckyStone','moonstone','healingSeed','surge','iceShard','sacredFire'];
       for (let i = 0; i < 2; i++) {
-        const t = types[Math.floor(Math.random() * types.length)];
+        const t = restTypes[Math.floor(Math.random() * restTypes.length)];
         ENGINE.addResource(G.party.resources, t, 1);
       }
       hideModal(); showMessage('Rested!', 'Gained 2 random resources.'); updateHUD(); endTurn();
@@ -2366,10 +2366,10 @@ function doEvent(node) {
       showMessage(event.name, event.desc); updateHUD(); setTimeout(endTurn, 1500);
       break;
     case 'resources':
-      const types = ['luckyStone','moonstone','healingSeed','surge','iceShard'];
-      ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
-      ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
-      showMessage(event.name, event.desc); updateHUD(); setTimeout(endTurn, 1500);
+      { const types = ['luckyStone','moonstone','healingSeed','surge','iceShard','sacredFire'];
+        ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
+        ENGINE.addResource(G.party.resources, types[Math.floor(Math.random()*types.length)], 1);
+        showMessage(event.name, event.desc); updateHUD(); setTimeout(endTurn, 1500); }
       break;
     case 'trap':
       const active = ENGINE.activeGhost(G.party);
@@ -2386,6 +2386,17 @@ function doEvent(node) {
         showMessage(event.name, 'Your party is full!');
       }
       updateHUD(); setTimeout(endTurn, 1500);
+      break;
+    case 'loss':
+      { const resKeys = Object.keys(G.party.resources).filter(k => G.party.resources[k] > 0);
+        if (resKeys.length > 0) {
+          const lostKey = resKeys[Math.floor(Math.random() * resKeys.length)];
+          G.party.resources[lostKey]--;
+          showMessage(event.name, `${event.desc} Lost 1 ${ENGINE.RESOURCE_NAMES[lostKey] || lostKey}!`);
+        } else {
+          showMessage(event.name, 'The storm passes harmlessly — no resources to lose.');
+        }
+        updateHUD(); setTimeout(endTurn, 1500); }
       break;
     default:
       showMessage(event.name, event.desc); setTimeout(endTurn, 1500);
@@ -2435,6 +2446,13 @@ function startBossBattle(node) {
   }
 
   const boss = ENGINE.BOSSES[bossKey];
+  const bossNode = nodes.find(n => n.id === G.currentNode);
+
+  // Show boss region narration before the intro splash
+  if (typeof Narration !== 'undefined' && bossNode) {
+    const greeting = Narration.getNodeGreeting('boss', bossNode.name, bossNode.r, summonerData.name, 1);
+    if (greeting) showNPCDialogue(greeting.speaker, greeting.text, 5000);
+  }
 
   // Show boss intro splash first
   showBossIntro(bossKey, () => {
