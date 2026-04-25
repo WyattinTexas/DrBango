@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v831'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v832'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1942,7 +1942,6 @@ body.lite-mode .die.rolling { animation: none !important; }
           <span id="specialsTimerLabel">Timer: 5s</span>
           <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
         </label>
-        <button onclick="startFlickBattle()" style="padding:5px 14px;border-radius:6px;border:2px solid #f59e0b;background:rgba(245,158,11,0.15);color:#f59e0b;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.5px;transition:all 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.3)'" onmouseout="this.style.background='rgba(245,158,11,0.15)'" title="Start a Flick battle: Charlie/Shoo/Willow vs Little Boo/Buttons/Dupy">Flick</button>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
 
@@ -2762,7 +2761,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v831';
+const TESTROOM_VERSION = 'v832';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -2810,20 +2809,18 @@ function toggleLiteMode(on) {
   localStorage.setItem('tr_liteMode', on ? '1' : '0');
 }
 
-// Flick mode — Charlie's Rush becomes a physics-based Flick ability
-let flickEnabled = localStorage.getItem('tr_flick') === '1';
-const CHARLIE_DESC_ORIGINAL = "Double 2's deal 7 damage.";
-const CHARLIE_DESC_FLICK = "Upon losing a roll or rolling Doubles, you may Flick one of your dice. Any die hit changes its result on contact.";
-function startFlickBattle() {
-  flickEnabled = true;
-  localStorage.setItem('tr_flick', '1');
-  const charlie = GHOSTS.find(g => g.id === 18);
-  if (charlie) charlie.abilityDesc = CHARLIE_DESC_FLICK;
-  // Red: Charlie (18), Shoo (13), Willow (435)
-  // Blue: Little Boo (9), Buttons (8), Dupy (12)
-  S.redPicks = [18, 13, 435];
-  S.bluePicks = [9, 8, 12];
-  startBattle();
+// Charlie (18) — Flick face detection: determine die value from current 3D rotation
+function getFlickFaceValue(rx, ry) {
+  let best = 1, bestD = Infinity;
+  for (const [v, t] of Object.entries(FACE_TARGET)) {
+    const drx = ((rx % 360) + 360) % 360, try_ = ((t.rx % 360) + 360) % 360;
+    const dry = ((ry % 360) + 360) % 360, tyy = ((t.ry % 360) + 360) % 360;
+    const dx = Math.min(Math.abs(drx - try_), 360 - Math.abs(drx - try_));
+    const dy = Math.min(Math.abs(dry - tyy), 360 - Math.abs(dry - tyy));
+    const d = dx + dy;
+    if (d < bestD) { bestD = d; best = parseInt(v); }
+  }
+  return best;
 }
 
 const firebaseConfig = {
@@ -3158,7 +3155,7 @@ const GHOSTS = [
   {id:15, name:"Winston", rarity:"common", maxHp:5, art:"art/originals/Winston.png", ability:"Scheme", abilityDesc:"Win: you may swap the enemy active Spiritkin with one from their sideline. Gain +2 dice next roll.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Forced swap on win + bonus dice."},
   {id:16, name:"Chip", rarity:"common", maxHp:4, art:"art/originals/Chip.png", ability:"Acrobatic Dive", abilityDesc:"Even Doubles: +3 damage if you deal damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Even doubles specialist."},
   {id:17, name:"Boo Brothers", rarity:"common", maxHp:5, art:"art/originals/boo_brothers.jpg", ability:"Teamwork", abilityDesc:"Before rolling: you may remove 1 die to gain 1 HP. If you do, deal +1 damage this roll.", category:"HP Recovery", set:"Set 1", designNote:"Original card. Die-for-HP trade + damage bonus."},
-  {id:18, name:"Charlie", rarity:"common", maxHp:4, art:"art/originals/Charlie.png", ability:"Rush", abilityDesc:"Double 2's deal 7 damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Double 2s nuke."},
+  {id:18, name:"Charlie", rarity:"common", maxHp:4, art:"art/originals/Charlie.png", ability:"Rush", abilityDesc:"Upon losing a roll, you may Flick one of your dice. Any die hit changes its result on contact.", category:"Prediction/Reaction", set:"Set 1", designNote:"Original card. Flick mechanic — fling your lowest die into the others to change results."},
   {id:34, name:"Grawr", rarity:"uncommon", maxHp:7, art:"art/originals/Grawr.png", ability:"Menace", abilityDesc:"Entry: deal 1 damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Entry damage."},
   {id:35, name:"Larry", rarity:"uncommon", maxHp:6, art:"art/originals/Larry.png", ability:"Flying Kick", abilityDesc:"Triples deal 3X damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Triples monster."},
   {id:36, name:"Bill & Bob", rarity:"uncommon", maxHp:6, art:"art/originals/Bill&Bob.png", ability:"Bait n Switch", abilityDesc:"Below 4 HP: wins deal 2X damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Low HP berserker."},
@@ -3275,9 +3272,6 @@ const GHOSTS = [
   {id:463, name:"Zork", rarity:"common", maxHp:4, art:"art/zork.png", ability:"Smolder", abilityDesc:"Before rolling: discard Burn to gain 1 extra die per Burn discarded.", category:"Dice Modifier", set:"Volcanic Isles", tags:["Final 50"], designNote:"Pterodactyl Spiritkin in a crystal cave. Converts burn fuel into raw dice power."},
   {id:464, name:"Yawn Eater", rarity:"uncommon", maxHp:7, art:"art/originals/YawnEater.png", ability:"Feast", abilityDesc:"Gain 1 extra die for each sideline ability on the enemy sideline. Odd Doubles deal +1 damage.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Ghost #200. A smug blobby shadow creature that devours sideline energy. The more passive effects your opponent stacks, the more dice Yawn Eater rolls."}
 ];
-
-// Apply Flick toggle to Charlie's ability desc now that GHOSTS is defined
-if (flickEnabled) { const _ch = GHOSTS.find(g => g.id === 18); if (_ch) _ch.abilityDesc = CHARLIE_DESC_FLICK; }
 
 // ============================================================
 // GAME STATE
@@ -13164,25 +13158,33 @@ function showFlickPicker(team, callback) {
     }
   };
 
-  // 8. Settle — snap 3D dice to new face
+  // 8. Settle — read face value from 3D rotation, snap to nearest face
   const settleFlick = () => {
     let changed = 0;
+    const flickerBody = bodies.find(b => b.isFlicker);
     bodies.forEach(b => {
       const dx = b.cx - b.origCx, dy = b.cy - b.origCy;
-      b.moved = Math.sqrt(dx * dx + dy * dy) > 15;
+      b.moved = !b.isFlicker && Math.sqrt(dx * dx + dy * dy) > 15;
       if (b.moved) {
         changed++;
-        const nv = Math.floor(Math.random() * 6) + 1;
-        // Snap cube to correct face with smooth transition
+        // The 3D rotation determines the new value — not random!
+        const nv = getFlickFaceValue(b.rx, b.ry);
         const ft = FACE_TARGET[nv] || { rx: 0, ry: 0 };
         b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
         b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
         if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = nv;
         else B.pendingResolve.blueDice[b.dieIndex] = nv;
       } else {
-        // Didn't move — snap back to original face
-        const origVal = b.team === 'red' ? B.pendingResolve.redDice[b.dieIndex] : B.pendingResolve.blueDice[b.dieIndex];
-        const ft = FACE_TARGET[origVal] || { rx: 0, ry: 0 };
+        // Didn't move or is the flicker die — snap to original/current face
+        const val = b.isFlicker
+          ? getFlickFaceValue(b.rx, b.ry)
+          : (b.team === 'red' ? B.pendingResolve.redDice[b.dieIndex] : B.pendingResolve.blueDice[b.dieIndex]);
+        if (b.isFlicker) {
+          // Flicker die always changes its own value
+          if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = val;
+          else B.pendingResolve.blueDice[b.dieIndex] = val;
+        }
+        const ft = FACE_TARGET[val] || { rx: 0, ry: 0 };
         b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
         b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
       }
@@ -13193,10 +13195,15 @@ function showFlickPicker(team, callback) {
     B.redDice = B.pendingResolve.redDice;
     B.blueDice = B.pendingResolve.blueDice;
 
-    log(`<span class="log-ability">Charlie</span> — Flick! <b>${changed}</b> dice changed! → Red [${B.redDice.join(',')}] Blue [${B.blueDice.join(',')}]`);
-    narrate(changed > 0
-      ? `<b style="color:#f59e0b">Flick!</b> ${changed} dice changed!`
-      : `<b style="color:var(--text2)">Flick missed!</b> No contact.`);
+    if (changed > 0) {
+      log(`<span class="log-ability">Charlie</span> — Flick! <b>${changed}</b> dice changed! → Red [${B.redDice.join(',')}] Blue [${B.blueDice.join(',')}]`);
+      narrate(`<b style="color:#f59e0b">Flick!</b> ${changed} dice changed!`);
+    } else {
+      // MISS! — didn't hit any dice
+      log(`<span class="log-ability">Charlie</span> — Flick missed! No contact.`);
+      showAbilityCallout('MISS!', '#ef4444', 'Charlie whiffed the Flick!', flickerBody ? flickerBody.team : team);
+      narrate(`<b style="color:#ef4444">MISS!</b> Charlie whiffed the Flick!`);
+    }
 
     setTimeout(() => {
       restoreLayout();
@@ -13827,16 +13834,15 @@ function _resolveRoundImpl() {
 
   // Charlie (18) — Flick: upon losing a roll or rolling Doubles, Flick a die
   // Fires BEFORE highlights/Sylvia so new dice change the outcome.
+  // Charlie (18) — Rush / Flick: upon LOSING a roll, Flick a die
   // Uses B.flickResuming to skip on re-entry after dice are modified.
-  if (!B.flickResuming && flickEnabled) {
+  if (!B.flickResuming) {
     let flickTeam = null;
     for (const ft of ['red', 'blue']) {
       const f = active(B[ft]);
       if (f.id === 18 && !f.ko) {
-        const myRoll = ft === 'red' ? rR : bR;
         const lost = winner !== null && winner !== ft;
-        const rolledDoubles = myRoll.type === 'doubles';
-        if (lost || rolledDoubles) { flickTeam = ft; break; }
+        if (lost) { flickTeam = ft; break; }
       }
     }
     if (flickTeam) {
@@ -14636,17 +14642,10 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Savage! Doubles win → +5 damage!`);
   }
 
-  // Charlie (18) — Rush: double 2s → exactly 7 damage (fixed output override)
-  // Skipped when Flick toggle is on (Rush becomes Flick ability instead)
+  // Charlie (18) — Rush is now a Flick ability (triggers on loss in resolveRound)
+  // No damage modifier on win — the old "Double 2s = 7 damage" is retired.
   let charlieTriggered = false;
   let charlieBaseDmg = 0;
-  if (!flickEnabled && wF.id === 18 && !wF.ko && wR.type === 'doubles' && wR.value === 2) {
-    charlieBaseDmg = dmg;
-    dmg = 7;
-    charlieTriggered = true;
-    collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Rush! Double 2s → exactly 7 damage!`);
-  }
 
   // Bill & Bob (36) — Bait n Switch: while below 4 HP, winning rolls deal 2X damage
   let billBobTriggered = false;
