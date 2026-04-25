@@ -4572,6 +4572,9 @@ function startBattle() {
   if (splash) {
     document.getElementById('vsRedName').textContent = active(B.red).name;
     document.getElementById('vsBlueName').textContent = active(B.blue).name;
+    if (RAID_MODE && RAID_PARAMS) {
+      document.getElementById('vsBlueName').textContent = '\u2694 ' + RAID_PARAMS.bossName + ' \u2694';
+    }
     const redBench = B.red.ghosts.filter((g,i) => i !== B.red.activeIdx).map(g => g.name);
     const blueBench = B.blue.ghosts.filter((g,i) => i !== B.blue.activeIdx).map(g => g.name);
     document.getElementById('vsRedRoster').textContent = redBench.join(' / ');
@@ -12916,44 +12919,53 @@ function showFlickPicker(team, callback) {
   const dieSize = redDieEls[0]?.offsetWidth || 56;
   const dieR = dieSize / 2;
 
-  // 3. Record positions relative to arena-center
+  // 3. Record positions, create 3D physics dice
   const bodies = [];
   const allEls = [...redDieEls, ...blueDieEls];
+  const flickEls = []; // 3D elements to clean up
+
   allEls.forEach((el, i) => {
     const r = el.getBoundingClientRect();
     const cx = r.left - centerRect.left + r.width / 2;
     const cy = r.top - centerRect.top + r.height / 2;
     const dTeam = i < redDieEls.length ? 'red' : 'blue';
     const dIdx = i < redDieEls.length ? i : i - redDieEls.length;
+    const val = dTeam === 'red' ? B.redDice[dIdx] : B.blueDice[dIdx];
+
+    // Create 3D die (same structure as showRolling)
+    const die3d = document.createElement('div');
+    die3d.className = 'die-physics';
+    die3d.style.width = dieSize + 'px';
+    die3d.style.height = dieSize + 'px';
+    die3d.style.zIndex = '100';
+    die3d.style.setProperty('--dh', dieR + 'px');
+    die3d.innerHTML = `<div class="die-cube">${cube3dHTML(dTeam)}</div>`;
+    const cube = die3d.querySelector('.die-cube');
+    const ft = FACE_TARGET[val] || { rx: 0, ry: 0 };
+
     bodies.push({
-      el, cx, cy, vx: 0, vy: 0,
-      rot: 0, vrot: 0, // rotation angle + angular velocity
+      el: die3d, cube,
+      cx, cy, vx: 0, vy: 0,
+      rx: ft.rx, ry: ft.ry, rz: 0,
+      vrx: 0, vry: 0, vrz: 0,
       origCx: cx, origCy: cy,
       team: dTeam, dieIndex: dIdx,
       isFlicker: dTeam === team && dIdx === 0,
       moved: false
     });
+    flickEls.push(die3d);
   });
 
-  // Helper: render pip dots on a flat die element (reuses 3D pip CSS)
-  const renderPips = (el, val) => {
-    const faceClass = el.classList.contains('die-red') ? 'face-red' : 'face-blue';
-    el.innerHTML = `<div style="position:relative;width:100%;height:100%;" class="${faceClass}">${pip3dHTML(val)}</div>`;
-  };
-
-  // 4. Move all dice to arena-board as absolute children, render pips
+  // 4. Place 3D dice on arena-board, hide flat dice
   board.style.position = 'relative';
   board.style.overflow = 'hidden';
-  bodies.forEach((b, i) => {
-    const val = b.team === 'red' ? B.redDice[b.dieIndex] : B.blueDice[b.dieIndex];
-    renderPips(b.el, val);
-    board.appendChild(b.el);
-    b.el.style.position = 'absolute';
+  redRow.style.visibility = 'hidden';
+  blueRow.style.visibility = 'hidden';
+  bodies.forEach(b => {
     b.el.style.left = (b.cx - dieR) + 'px';
     b.el.style.top = (b.cy - dieR) + 'px';
-    b.el.style.margin = '0';
-    b.el.style.transition = 'none';
-    b.el.style.zIndex = b.isFlicker ? '60' : '55';
+    b.cube.style.transform = `rotateX(${b.rx}deg) rotateY(${b.ry}deg)`;
+    board.appendChild(b.el);
   });
 
   // 5. Position flicker die below tray, centered on board
@@ -12968,26 +12980,16 @@ function showFlickPicker(team, callback) {
   flicker.el.style.transition = 'left 0.3s ease-out, top 0.3s ease-out';
   flicker.el.style.left = (flicker.cx - dieR) + 'px';
   flicker.el.style.top = (flicker.cy - dieR) + 'px';
-  flicker.el.style.boxShadow = '0 0 20px rgba(245,158,11,0.8), 0 0 40px rgba(245,158,11,0.3)';
+  flicker.el.style.filter = 'drop-shadow(0 0 12px rgba(245,158,11,0.9))';
   flicker.el.style.cursor = 'grab';
   setTimeout(() => { flicker.el.style.transition = 'none'; }, 350);
 
   // -- Restore helper --
   const restoreLayout = () => {
     clearLsCountdown();
-    bodies.forEach(b => {
-      b.el.style.position = '';
-      b.el.style.left = '';
-      b.el.style.top = '';
-      b.el.style.margin = '';
-      b.el.style.zIndex = '';
-      b.el.style.boxShadow = '';
-      b.el.style.cursor = '';
-      b.el.style.transform = '';
-      b.el.style.transition = '';
-    });
-    redDieEls.forEach(el => redRow.appendChild(el));
-    blueDieEls.forEach(el => blueRow.appendChild(el));
+    flickEls.forEach(el => el.remove()); // remove 3D physics dice
+    redRow.style.visibility = '';
+    blueRow.style.visibility = '';
     board.style.overflow = '';
   };
 
@@ -17554,8 +17556,16 @@ function showGameOver(winner) {
 
     const goButtons = el.querySelector('.go-buttons');
 
-    // RAID MODE: calculate damage dealt and redirect with raid results
+    // RAID MODE: show boss dialogue and redirect with raid results
     if (RAID_MODE && RAID_PARAMS) {
+      const bossLine = winner === 'red'
+        ? `${RAID_PARAMS.bossName} has been defeated!`
+        : `${RAID_PARAMS.bossName} stands triumphant.`;
+      const dialogueEl = document.createElement('div');
+      dialogueEl.style.cssText = 'text-align:center;color:var(--text2);font-style:italic;font-size:1.1rem;margin:12px 0;';
+      dialogueEl.textContent = bossLine;
+      const goTitle = document.getElementById('goTitle');
+      if (goTitle) goTitle.after(dialogueEl);
       // Calculate total damage dealt to blue team (boss)
       let totalDamage = 0;
       if (B && B.blue) {
@@ -18372,6 +18382,16 @@ function renderBattle() {
     }
     el.innerHTML = html;
   });
+
+  // Raid boss HP bar: track cumulative damage to blue team
+  if (RAID_MODE && RAID_PARAMS && B.blue) {
+    let totalBlueDamage = 0;
+    B.blue.ghosts.forEach(g => {
+      totalBlueDamage += g.maxHp - Math.max(0, g.ko ? 0 : g.hp);
+    });
+    RAID_PARAMS.bossHp = Math.max(0, RAID_PARAMS.bossMaxHp - totalBlueDamage);
+    updateRaidBossBar();
+  }
 }
 
 /* ═══════ 3D Dice Physics Helpers ═══════ */
@@ -19075,7 +19095,7 @@ document.addEventListener('keydown', e => {
 
   // Force standard settings
   const speedEl = document.getElementById('speedSlider');
-  if (speedEl) speedEl.value = 0;
+  if (speedEl) speedEl.value = 2; // Faster pace for raids
   const hlCheck = document.getElementById('handLimitCheckbox');
   if (hlCheck) hlCheck.checked = true;
   const hlSlider = document.getElementById('handLimitSlider');

@@ -266,7 +266,14 @@ function updateRaidQueueUI(raidId, entries) {
 
   const bossConfig = RAID_BOSSES[raidId];
   const max = bossConfig?.requiredPlayers || RAID_CONFIG.MAX_PLAYERS;
-  countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders <span style="color:var(--text-dim);font-size:0.8rem;">(starts at 2, max ${max})</span>`;
+  const minP = RAID_BOSSES[raidId]?.minPlayers || 2;
+  if (entries.length === 0) {
+    countEl.innerHTML = `<span style="color:var(--text-dim);">Waiting for raiders...</span>`;
+  } else if (entries.length < minP) {
+    countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> / <span class="raid-queue-num">${minP}</span> raiders needed to start`;
+  } else {
+    countEl.innerHTML = `<span class="raid-queue-num">${entries.length}</span> Raiders ready! <span style="color:#2ecc71;font-weight:700;">RAID LAUNCHING...</span>`;
+  }
 
   let html = '';
   entries.forEach((e, i) => {
@@ -455,6 +462,11 @@ function showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData) {
     rarity: g.rarity || 'legendary'
   }));
 
+  // Calculate scaled HP based on player count
+  const playerCount = raidData.players ? Object.keys(raidData.players).length : 1;
+  const scaledHp = raidData.bossCurrentHp || boss.bossGhost.maxHp;
+  const scaledMaxHp = raidData.bossMaxHp || boss.bossGhost.maxHp;
+
   // Redirect to testroom with raid params — full cinematic experience!
   const url = '../testroom/?mode=raid'
     + '&red=' + playerTeam.join(',')
@@ -462,11 +474,12 @@ function showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData) {
     + '&raidId=' + encodeURIComponent(raidData.raidId)
     + '&instanceId=' + encodeURIComponent(currentRaid?.instanceId || '')
     + '&slot=' + (raidData.currentFighterIdx || 0)
-    + '&bossHp=' + (raidData.bossCurrentHp || boss.baseHp)
-    + '&bossMaxHp=' + (raidData.bossMaxHp || boss.baseHp)
+    + '&bossHp=' + scaledHp
+    + '&bossMaxHp=' + scaledMaxHp
     + '&bossName=' + encodeURIComponent(boss.name)
     + '&personality=' + encodeURIComponent(boss.personality)
-    + '&bossData=' + encodeURIComponent(JSON.stringify(bossGhostData));
+    + '&bossData=' + encodeURIComponent(JSON.stringify(bossGhostData))
+    + '&bossDialogue=' + encodeURIComponent(JSON.stringify(boss.dialogue || {}));
 
   window.location.href = url;
 }

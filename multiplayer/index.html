@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.74'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.75'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -797,6 +797,7 @@ body {
   font-size: 0.8rem;
   margin-top: 8px;
 }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pack-glow {
   0%, 100% { box-shadow: 0 0 10px rgba(212, 160, 64, 0.2); }
   50% { box-shadow: 0 0 25px rgba(212, 160, 64, 0.4), 0 0 50px rgba(212, 160, 64, 0.1); }
@@ -3518,7 +3519,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.74';
+const BBN_VERSION = 'v0.75';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7527,14 +7528,75 @@ function closeRaidLobby() {
     // Clear active raid flag
     await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
 
-    // Show a toast with results
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(10,6,18,0.95);border:1px solid rgba(212,160,64,0.4);border-radius:12px;padding:16px 24px;color:#f4ecd8;font-family:Creepster,cursive;font-size:1.2rem;letter-spacing:2px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
-    toast.innerHTML = newBossHp <= 0
-      ? `RAID COMPLETE! You dealt <span style="color:#e94560;font-weight:900">${damage}</span> damage!`
-      : `Raid fight over! You dealt <span style="color:#e94560;font-weight:900">${damage}</span> damage. Boss HP: ${newBossHp}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
+    // Award badge if boss defeated
+    if (newBossHp <= 0 && typeof RAID_BADGES !== 'undefined') {
+      const badgeEntry = Object.entries(RAID_BADGES).find(([key, b]) => b.boss === raidId);
+      if (badgeEntry) {
+        const [badgeKey] = badgeEntry;
+        const badgeSnap = await db.ref(`mp/users/${user.uid}/raidBadges`).once('value');
+        const badges = badgeSnap.val() || [];
+        if (!badges.includes(badgeKey)) {
+          badges.push(badgeKey);
+          // Check for composite badges (champion badges)
+          Object.entries(RAID_BADGES).forEach(([key, badge]) => {
+            if (badge.requires && !badges.includes(key)) {
+              if (badge.requires.every(req => badges.includes(req))) {
+                badges.push(key);
+              }
+            }
+          });
+          await db.ref(`mp/users/${user.uid}/raidBadges`).set(badges);
+        }
+      }
+      // Award raid points
+      const points = (typeof RAID_BOSSES !== 'undefined' && RAID_BOSSES[raidId]) ? RAID_BOSSES[raidId].rewardPoints || 50 : 50;
+      await db.ref(`mp/users/${user.uid}/raidPoints`).set(firebase.database.ServerValue.increment(points));
+    }
+
+    // Epic celebration overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;animation:fadeIn 0.5s ease;';
+    const isVictory = newBossHp <= 0;
+    const boss = typeof RAID_BOSSES !== 'undefined' ? RAID_BOSSES[raidId] : null;
+    const bossName = boss?.name || 'the Boss';
+
+    // Find earned badge
+    let earnedBadge = null;
+    if (isVictory && typeof RAID_BADGES !== 'undefined') {
+      earnedBadge = Object.entries(RAID_BADGES).find(([key, b]) => b.boss === raidId);
+    }
+
+    overlay.innerHTML = `
+      <div style="font-family:Creepster,cursive;font-size:3rem;letter-spacing:5px;color:${isVictory ? '#f0c560' : '#e94560'};text-shadow:0 0 40px ${isVictory ? 'rgba(240,197,96,0.4)' : 'rgba(233,69,96,0.3)'};">
+        ${isVictory ? 'RAID COMPLETE!' : 'RAID FAILED'}
+      </div>
+      <div style="font-family:Creepster,cursive;font-size:1.4rem;color:var(--text2,#a09686);letter-spacing:2px;">
+        ${bossName}
+      </div>
+      <div style="font-size:2rem;font-weight:900;color:#e94560;margin:8px 0;">
+        ${damage} DAMAGE DEALT
+      </div>
+      <div style="color:#f4ecd8;font-size:1rem;">
+        ${3 - ghostsLost}/3 Spiritkin survived
+      </div>
+      ${earnedBadge ? `
+        <div style="margin-top:12px;padding:16px 24px;background:rgba(212,160,64,0.1);border:2px solid rgba(212,160,64,0.4);border-radius:12px;text-align:center;">
+          <div style="font-size:1.8rem;">${earnedBadge[1].icon}</div>
+          <div style="font-family:Creepster,cursive;font-size:1.2rem;color:#f0c560;letter-spacing:2px;margin-top:4px;">BADGE EARNED</div>
+          <div style="color:#f4ecd8;font-weight:700;margin-top:4px;">${earnedBadge[1].name}</div>
+        </div>
+      ` : ''}
+      ${isVictory && boss ? `
+        <div style="color:var(--text2,#a09686);font-style:italic;margin-top:8px;">
+          "${boss.dialogue?.defeat || 'The battle is won...'}"
+        </div>
+      ` : ''}
+      <button onclick="this.parentElement.remove()" style="margin-top:20px;padding:14px 32px;font-family:Creepster,cursive;font-size:1.2rem;letter-spacing:2px;background:linear-gradient(135deg,#d4a040,#8a6b20);color:#fff;border:none;border-radius:10px;cursor:pointer;">
+        RETURN TO ARENA
+      </button>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => { if (overlay.parentElement) overlay.remove(); }, 8000);
   });
 })();
 
