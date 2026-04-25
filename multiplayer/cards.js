@@ -488,281 +488,308 @@ const RAID_BOSS_MINIONS = [
 
 const RAID_BOSSES = {
   // ======================== ROLLING HILLS ========================
-  tyrant_mountain_king: {
-    id: 'tyrant_mountain_king',
-    name: 'The Mountain King',
-    title: 'Crush and Conquer',
+  raid_timber: {
+    id: 'raid_timber',
+    name: 'Timber',
+    title: 'Alpha of the Rolling Hills',
     personality: 'tyrant',
-    tier: 1,
-    set: 'Rolling Hills',
-    requiredBadge: null,
-    requiredPlayers: 5,
+    tier: 1, set: 'Rolling Hills',
+    requiredBadge: null, requiredPlayers: 5,
     bossGhost: {
-      id: 9001, name: 'The Mountain King', maxHp: 12, art: '../testroom/art/originals/mountain_king_leg.jpg',
-      ability: 'Beast Mode', abilityDesc: 'Triples+: deal 1 chip damage to all enemy sideline ghosts. On KO: gain 1 Sacred Fire.'
+      id: 9001, name: 'Timber', maxHp: 12, art: '../testroom/art/timber.jpg',
+      ability: 'Howl of the Alpha', abilityDesc: 'Before each roll: remove 1 enemy die. Triples+: deal 1 chip damage to all enemy sideline ghosts.'
     },
-    minionsByPhase: {
-      1: [],                          // Fights alone
-      2: [9101],                      // War Drummer
-      3: [9101, 9102],                // War Drummer + Shield Bearer
-      4: [9101, 9103]                 // War Drummer + Blood Knight
-    },
-    baseHp: 80,
-    rewardPoints: 50,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [], 2: [9101], 3: [9101, 9102], 4: [9101, 9103] },
+    baseHp: 80, rewardPoints: 50, bonusPoints: 25,
     dialogue: {
-      intro: 'YOU DARE CHALLENGE THE MOUNTAIN KING?',
-      phase2: 'Is that all you have? Pathetic.',
-      phase3: 'I will NOT fall to insects!',
-      phase4: 'ENOUGH! FEEL MY WRATH!',
-      defeat: 'Impossible... the mountain... crumbles...',
-      victory: 'Kneel before the mountain.'
+      intro: 'The pack answers to no one.',
+      phase2: 'You think you can outrun the wolf?',
+      phase3: 'The hills belong to ME.',
+      phase4: 'AWOOOOOO!',
+      defeat: 'The alpha... rests...',
+      victory: 'The pack hunts forever.'
     }
   },
-
-  trickster_phantom: {
-    id: 'trickster_phantom',
-    name: 'The Phantom',
-    title: 'Nothing Is What It Seems',
+  raid_dark_fang: {
+    id: 'raid_dark_fang',
+    name: 'Dark Fang',
+    title: 'Shadow of the Pack',
     personality: 'trickster',
-    tier: 2,
-    set: 'Frost Valley',
-    requiredBadge: null,
-    requiredPlayers: 1,
+    tier: 1, set: 'Rolling Hills',
+    requiredBadge: null, requiredPlayers: 3,
     bossGhost: {
-      id: 9002, name: 'The Phantom', maxHp: 8, art: '../testroom/art/originals/Shade.png',
-      ability: 'Mirror Dice', abilityDesc: 'After rolling: swap 1 of your dice with 1 of enemy dice. On win: steal 1 random resource.'
+      id: 9002, name: 'Dark Fang', maxHp: 10, art: '../testroom/art/originals/DarkFang.png',
+      ability: 'Pressure', abilityDesc: 'Enemy cannot heal. Win: deal +1 damage for each KO\'d ghost this game. Forces enemy swap before rolling.'
     },
-    minionsByPhase: {
-      1: [9111],                      // Mimic
-      2: [9112],                      // Jinxer
-      3: [9112, 9113],                // Jinxer + Doppelganger
-      4: [9111, 9112]                 // Mimic + Jinxer (full theft)
-    },
-    baseHp: 80,
-    rewardPoints: 50,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9111], 2: [9112], 3: [9112, 9113], 4: [9111, 9112] },
+    baseHp: 60, rewardPoints: 50, bonusPoints: 25,
     dialogue: {
-      intro: 'Which one of me is real? Does it matter?',
-      phase2: 'Your resources... are now mine.',
-      phase3: 'I am you. You are nothing.',
-      phase4: 'THERE IS NO ESCAPE FROM THE MIRROR.',
-      defeat: 'The reflection... shatters...',
-      victory: 'You fought yourself. And lost.'
+      intro: 'I smell fear...',
+      phase2: 'Your team is falling apart.',
+      phase3: 'No one escapes the dark.',
+      phase4: 'THE HUNT ENDS NOW.',
+      defeat: 'The shadow... fades...',
+      victory: 'Darkness swallows all.'
     }
   },
-
-  swarm_queen: {
-    id: 'swarm_queen',
-    name: 'The Swarm Queen',
-    title: 'Endless Reinforcements',
+  raid_jasper: {
+    id: 'raid_jasper',
+    name: 'Jasper',
+    title: 'The Wanderer\'s Fury',
     personality: 'swarm',
-    tier: 1,
-    set: 'Rolling Hills',
-    requiredBadge: null,
-    requiredPlayers: 3,
+    tier: 1, set: 'Rolling Hills',
+    requiredBadge: null, requiredPlayers: 1,
     bossGhost: {
-      id: 9003, name: 'The Swarm Queen', maxHp: 7, art: '../testroom/art/originals/Beewick.png',
-      ability: 'Hive Mind', abilityDesc: '+1 die per living minion. May sacrifice a sideline minion to negate damage from a losing roll (1x/round).'
+      id: 9003, name: 'Jasper', maxHp: 10, art: '../testroom/art/originals/Pickwick.png',
+      ability: 'Flame Dive', abilityDesc: 'Win: roll 1 bonus die and deal its value as damage. Jasper takes 1 self-damage. High risk, high reward.'
     },
-    minionsByPhase: {
-      1: [9121, 9122],                // Drone + Worker
-      2: [9123, 9122],                // Soldier + Worker
-      3: [9124, 9123],                // Healer + Soldier
-      4: [9123, 9125]                 // Soldier + Spitter
-    },
+    minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
     spawnInterval: { 1: 3, 2: 2, 3: 2, 4: 1 },
-    baseHp: 80,
-    rewardPoints: 50,
-    bonusPoints: 25,
+    baseHp: 50, rewardPoints: 50, bonusPoints: 25,
     dialogue: {
-      intro: 'My children are hungry...',
-      phase2: 'Cut one down. Two more rise.',
-      phase3: 'The hive protects its queen.',
-      phase4: 'SWARM! DEVOUR THEM ALL!',
-      defeat: 'The hive... falls silent...',
-      victory: 'The swarm consumes everything.'
+      intro: 'A wanderer fights hardest when cornered!',
+      phase2: 'I have seen every hill and every valley.',
+      phase3: 'You cannot stop a force of nature!',
+      phase4: 'ONE LAST DIVE!',
+      defeat: 'The wanderer... finally rests...',
+      victory: 'The road goes ever on.'
     }
   },
 
   // ======================== FROST VALLEY ========================
-  glacier_ancient: {
-    id: 'glacier_ancient',
-    name: 'The Glacier',
-    title: 'Inevitable Frozen Death',
+  raid_king_jay: {
+    id: 'raid_king_jay',
+    name: 'King Jay',
+    title: 'Sovereign of the Frost',
     personality: 'glacier',
-    tier: 2,
-    set: 'Frost Valley',
-    requiredBadge: null,
-    requiredPlayers: 7,
+    tier: 2, set: 'Frost Valley',
+    requiredBadge: null, requiredPlayers: 5,
     bossGhost: {
-      id: 9004, name: 'The Glacier', maxHp: 10, art: '../testroom/art/originals/Millicent.png',
-      ability: 'Permafrost', abilityDesc: 'Max 3 damage per roll (resource bonuses bypass). Frost Aura: 1 cold damage to enemy active per round. Frozen Dice: lock enemy highest die to 1 next round.'
+      id: 9004, name: 'King Jay', maxHp: 14, art: '../testroom/art/originals/king_jay.jpg',
+      ability: 'Reflection', abilityDesc: 'Lose roll & dice total = 7: reflect ALL damage. Permafrost: max 3 damage per hit. Frost Aura: 1 cold damage per round.'
     },
-    minionsByPhase: {
-      1: [9131],                      // Ice Wall (boss untouchable)
-      2: [9131, 9132],                // Ice Wall + Frost Wisp
-      3: [9133, 9132],                // Blizzard Elemental + Frost Wisp
-      4: [9134]                       // Avalanche (bomb)
-    },
-    baseHp: 100,
-    rewardPoints: 100,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9132], 4: [9134] },
+    baseHp: 100, rewardPoints: 100, bonusPoints: 25,
     dialogue: {
-      intro: 'I have waited ten thousand years. I can wait ten more.',
-      phase2: 'Your fire grows cold.',
-      phase3: 'Everything freezes. Everything ends.',
-      phase4: 'ABSOLUTE ZERO.',
-      defeat: 'The ice... melts... at last...',
-      victory: 'Winter is eternal.'
+      intro: 'The crown of frost answers to no challenger.',
+      phase2: 'Your fire grows cold before me.',
+      phase3: 'Every kingdom falls to winter.',
+      phase4: 'BOW BEFORE THE FROST KING.',
+      defeat: 'The crown... melts...',
+      victory: 'Winter reigns eternal.'
+    }
+  },
+  raid_romy: {
+    id: 'raid_romy',
+    name: 'Romy',
+    title: 'The Valley Guardian',
+    personality: 'trickster',
+    tier: 2, set: 'Frost Valley',
+    requiredBadge: null, requiredPlayers: 3,
+    bossGhost: {
+      id: 9005, name: 'Romy', maxHp: 16, art: '../testroom/art/originals/romy.jpg',
+      ability: 'Valley Guardian', abilityDesc: 'Predicts a die number each round. If any die matches: +3 damage. Mirror Dice: swap 1 die with player after rolling.'
+    },
+    minionsByPhase: { 1: [9111], 2: [9112], 3: [9112, 9113], 4: [9111, 9112] },
+    baseHp: 80, rewardPoints: 100, bonusPoints: 25,
+    dialogue: {
+      intro: 'I have foreseen your arrival... and your defeat.',
+      phase2: 'Every number tells a story.',
+      phase3: 'The valley sees ALL.',
+      phase4: 'YOUR FATE WAS WRITTEN IN THE ICE.',
+      defeat: 'The vision... clears...',
+      victory: 'The valley predicted this.'
+    }
+  },
+  raid_mountain_king: {
+    id: 'raid_mountain_king',
+    name: 'The Mountain King',
+    title: 'Lord of the Frozen Peak',
+    personality: 'tyrant',
+    tier: 2, set: 'Frost Valley',
+    requiredBadge: null, requiredPlayers: 7,
+    bossGhost: {
+      id: 9006, name: 'The Mountain King', maxHp: 18, art: '../testroom/art/originals/mountain_king_leg.jpg',
+      ability: 'Beast Mode', abilityDesc: 'Doubles deal 2X damage. Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire.'
+    },
+    minionsByPhase: { 1: [], 2: [9101], 3: [9101, 9102], 4: [9103, 9101] },
+    baseHp: 120, rewardPoints: 100, bonusPoints: 25,
+    dialogue: {
+      intro: 'YOU DARE CLIMB MY MOUNTAIN?',
+      phase2: 'The peak crushes all who reach it.',
+      phase3: 'I AM the mountain!',
+      phase4: 'AVALANCHE!',
+      defeat: 'The mountain... crumbles...',
+      victory: 'The mountain stands forever.'
     }
   },
 
   // ======================== VOLCANIC ISLES ========================
-  tyrant_doom: {
-    id: 'tyrant_doom',
-    name: 'Doom Ascended',
-    title: 'The End of All Things',
-    personality: 'tyrant',
-    tier: 3,
-    set: 'Volcanic Isles',
-    requiredBadge: 'dragon_slayer',
-    requiredPlayers: 7,
+  raid_pip: {
+    id: 'raid_pip',
+    name: 'Pip',
+    title: 'The Giggling Inferno',
+    personality: 'swarm',
+    tier: 3, set: 'Volcanic Isles',
+    requiredBadge: 'frost_valley_champion', requiredPlayers: 5,
     bossGhost: {
-      id: 9005, name: 'Doom Ascended', maxHp: 14, art: '../testroom/art/originals/Doom.png',
-      ability: 'Annihilation', abilityDesc: 'Triples+: deal 2 chip damage to ALL enemy ghosts. On KO: gain 2 Sacred Fire. Doubles+: gain 1 Surge.'
+      id: 9007, name: 'Pip', maxHp: 14, art: '../testroom/art/originals/Pip.png',
+      ability: 'Toasted', abilityDesc: 'Triples+: permanently remove 1 enemy die. +1 die per living minion. Gains 2 Sacred Fires on triples.'
     },
-    minionsByPhase: {
-      1: [9101],
-      2: [9101, 9103],
-      3: [9103, 9102],
-      4: [9103, 9101]
-    },
-    baseHp: 100,
-    rewardPoints: 100,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9121, 9122], 2: [9123, 9122], 3: [9124, 9123], 4: [9123, 9125] },
+    spawnInterval: { 1: 3, 2: 2, 3: 2, 4: 1 },
+    baseHp: 100, rewardPoints: 150, bonusPoints: 25,
     dialogue: {
-      intro: 'You have come to die.',
-      phase2: 'Your spirits are NOTHING.',
-      phase3: 'I am the end.',
-      phase4: 'THERE IS ONLY DOOM.',
-      defeat: 'This... changes... nothing...',
-      victory: 'All things return to dust.'
+      intro: '*giggle* You wanna play? *giggle*',
+      phase2: 'Hehehe! More fire! MORE!',
+      phase3: 'Why won\'t you just MELT?!',
+      phase4: '*SCREAMING GIGGLE* EVERYTHING BURNS!',
+      defeat: '*tiny voice* ...ow...',
+      victory: '*delighted spin* Again! Again!'
     }
   },
-
-  swarm_broodmother: {
-    id: 'swarm_broodmother',
-    name: 'The Broodmother',
-    title: 'Mother of a Thousand',
-    personality: 'swarm',
-    tier: 3,
-    set: 'Volcanic Isles',
-    requiredBadge: 'dragon_slayer',
-    requiredPlayers: 7,
+  raid_humar: {
+    id: 'raid_humar',
+    name: 'Humar',
+    title: 'The Blue Flame Legend',
+    personality: 'tyrant',
+    tier: 3, set: 'Volcanic Isles',
+    requiredBadge: 'frost_valley_champion', requiredPlayers: 7,
     bossGhost: {
-      id: 9006, name: 'The Broodmother', maxHp: 9, art: '../testroom/art/originals/Beewick.png',
-      ability: 'Endless Spawn', abilityDesc: '+1 die per living minion. Sacrifice: negate damage (1x/round). On KO of any minion: immediately spawn a replacement.'
+      id: 9008, name: 'Humar', maxHp: 10, art: '../testroom/art/humar.jpg',
+      ability: 'Meteor', abilityDesc: 'Win: opponent takes 2 damage before their next roll. Gain 1 Burn. On KO: gain 2 Sacred Fire.'
     },
-    minionsByPhase: {
-      1: [9122, 9123],
-      2: [9123, 9125],
-      3: [9124, 9123],
-      4: [9125, 9125]
-    },
-    spawnInterval: { 1: 2, 2: 2, 3: 1, 4: 1 },
-    baseHp: 100,
-    rewardPoints: 100,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9101], 2: [9101, 9103], 3: [9103, 9102], 4: [9103, 9101] },
+    baseHp: 100, rewardPoints: 150, bonusPoints: 25,
     dialogue: {
-      intro: 'My children... protect me...',
-      phase2: 'You cannot kill them fast enough.',
-      phase3: 'For every one you slay, two are born.',
-      phase4: 'THE BROOD RISES!',
-      defeat: 'My children... avenge... me...',
-      victory: 'The nest grows forever.'
+      intro: 'The blue flame does not forgive.',
+      phase2: 'Feel the heat of a thousand suns.',
+      phase3: 'The isles burn at my command.',
+      phase4: 'METEOR SHOWER!',
+      defeat: 'The flame... dims...',
+      victory: 'The volcano never sleeps.'
+    }
+  },
+  raid_nerina: {
+    id: 'raid_nerina',
+    name: 'Nerina',
+    title: 'Leviathan of the Deep',
+    personality: 'glacier',
+    tier: 3, set: 'Volcanic Isles',
+    requiredBadge: 'frost_valley_champion', requiredPlayers: 10,
+    bossGhost: {
+      id: 9009, name: 'Nerina', maxHp: 18, art: '../testroom/art/the_deep.jpg',
+      ability: 'Leviathan', abilityDesc: 'Entry: deal 3 damage. Permafrost: max 3 damage per hit. Frost Aura: 1 damage per round. 9 HP base — a true titan.'
+    },
+    minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9132], 4: [9134, 9134] },
+    baseHp: 120, rewardPoints: 150, bonusPoints: 25,
+    dialogue: {
+      intro: 'The deep calls... and it is HUNGRY.',
+      phase2: 'You are drowning and you don\'t even know it.',
+      phase3: 'The ocean swallows kingdoms.',
+      phase4: 'LEVIATHAN RISES!',
+      defeat: 'The tide... retreats...',
+      victory: 'The deep claims all.'
     }
   },
 
   // ======================== DARK CASTLE ========================
-  trickster_shepherd: {
-    id: 'trickster_shepherd',
-    name: 'The Shepherd',
-    title: 'Master of the Flock',
+  raid_lucy: {
+    id: 'raid_lucy',
+    name: 'Lucy',
+    title: 'Keeper of the Blue Fire',
     personality: 'trickster',
-    tier: 4,
-    set: 'Dark Castle',
-    requiredBadge: 'raid_master',
-    requiredPlayers: 10,
+    tier: 4, set: 'Dark Castle',
+    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
     bossGhost: {
-      id: 9007, name: 'The Shepherd', maxHp: 10, art: '../testroom/art/originals/ProfessorHawking.png',
-      ability: 'Grand Illusion', abilityDesc: 'Mirror Dice: swap 2 dice. Copycat: use enemy active ability. Steal 2 resources on win. Phase transitions: split into 3 copies.'
+      id: 9010, name: 'Lucy', maxHp: 16, art: '../testroom/art/originals/lucy.jpg',
+      ability: 'Blue Fire', abilityDesc: 'Win: gain 1 Sacred Fire. Mirror Dice: swap 1 die. Steal 1 resource on win. Sacred Fires deal double damage.'
     },
-    minionsByPhase: {
-      1: [9111, 9112],
-      2: [9112, 9113],
-      3: [9113, 9112],
-      4: [9111, 9113]
-    },
-    baseHp: 120,
-    rewardPoints: 200,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9111], 2: [9112, 9113], 3: [9113, 9112], 4: [9111, 9113] },
+    baseHp: 120, rewardPoints: 200, bonusPoints: 25,
     dialogue: {
-      intro: 'Come, little lamb. The Shepherd guides all.',
-      phase2: 'You think you know what is real?',
-      phase3: 'Every move you make, I made first.',
-      phase4: 'THE FLOCK CONSUMES THE WOLF.',
-      defeat: 'The shepherd... was always... alone...',
-      victory: 'The flock grows. Always.'
+      intro: 'Welcome to the castle. You won\'t be leaving.',
+      phase2: 'The blue fire sees through all deception.',
+      phase3: 'Your resources feed MY flames.',
+      phase4: 'THE CASTLE BURNS BLUE.',
+      defeat: 'The fire... goes out...',
+      victory: 'The castle stands. The fire burns.'
     }
   },
-
-  glacier_eternal: {
-    id: 'glacier_eternal',
-    name: 'The Eternal Frost',
-    title: 'Heat Death of the Spirit World',
+  raid_shade: {
+    id: 'raid_shade',
+    name: 'Shade',
+    title: 'The Haunting',
     personality: 'glacier',
-    tier: 4,
-    set: 'Dark Castle',
-    requiredBadge: 'raid_master',
-    requiredPlayers: 10,
+    tier: 4, set: 'Dark Castle',
+    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 7,
     bossGhost: {
-      id: 9008, name: 'The Eternal Frost', maxHp: 12, art: '../testroom/art/originals/ancient_one.jpg',
-      ability: 'Absolute Zero', abilityDesc: 'Max 2 damage per roll. Frost Aura: 2 cold damage per round. Frozen Dice: lock 2 highest dice. Phase transitions: freeze ALL resources for 5 rounds.'
+      id: 9011, name: 'Shade', maxHp: 10, art: '../testroom/art/originals/shade.jpg',
+      ability: 'Haunt', abilityDesc: 'Before EVERY roll: opponent takes 2 damage. Permafrost: max 2 damage per hit. The tick damage is relentless.'
     },
-    minionsByPhase: {
-      1: [9131, 9132],
-      2: [9131, 9133],
-      3: [9133, 9134],
-      4: [9134, 9134]
-    },
-    baseHp: 120,
-    rewardPoints: 200,
-    bonusPoints: 25,
+    minionsByPhase: { 1: [9131], 2: [9131, 9132], 3: [9133, 9134], 4: [9134, 9134] },
+    baseHp: 100, rewardPoints: 200, bonusPoints: 25,
     dialogue: {
-      intro: 'Time itself freezes before me.',
-      phase2: 'Your warmth fades.',
-      phase3: 'There is no fire hot enough.',
-      phase4: 'THE SPIRIT WORLD GOES DARK.',
-      defeat: 'The sun... rises... one last time...',
-      victory: 'Eternal winter. Eternal silence.'
+      intro: '...you shouldn\'t have come here...',
+      phase2: '*whisper* ...it hurts, doesn\'t it...',
+      phase3: 'The darkness is all that remains.',
+      phase4: 'HAUNT. HAUNT. HAUNT.',
+      defeat: '...finally... silence...',
+      victory: 'The haunting never ends.'
+    }
+  },
+  raid_valkin: {
+    id: 'raid_valkin',
+    name: 'Valkin the Grand',
+    title: 'Master of the Dark Castle',
+    personality: 'tyrant',
+    tier: 4, set: 'Dark Castle',
+    requiredBadge: 'volcanic_isles_champion', requiredPlayers: 10,
+    bossGhost: {
+      id: 9012, name: 'Valkin the Grand', maxHp: 20, art: '../testroom/art/originals/ancient_one.jpg',
+      ability: 'Grand Dominion', abilityDesc: 'Doubles deal 3X damage. Triples+: deal 3 chip to ALL enemies. On KO: gain 3 Sacred Fire. The final boss.'
+    },
+    minionsByPhase: { 1: [9101, 9102], 2: [9101, 9103], 3: [9103, 9102], 4: [9103, 9103] },
+    baseHp: 150, rewardPoints: 200, bonusPoints: 50,
+    dialogue: {
+      intro: 'So... the little spirits have come to challenge the Grand.',
+      phase2: 'I have ruled this castle for millennia.',
+      phase3: 'You are NOTHING before my dominion.',
+      phase4: 'I. AM. VALKIN. THE. GRAND.',
+      defeat: 'The castle... my castle... impossible...',
+      victory: 'The Grand reigns supreme. As always.'
     }
   }
 };
 
 // Badge definitions for raid progression
 const RAID_BADGES = {
-  mountain_king_slayer: { name: 'Mountain King Slayer', icon: '&#x2694;', boss: 'tyrant_mountain_king', tier: 1 },
-  phantom_hunter: { name: 'Phantom Hunter', icon: '&#x1F47B;', boss: 'trickster_phantom', tier: 1 },
-  swarm_crusher: { name: 'Swarm Crusher', icon: '&#x1F41D;', boss: 'swarm_queen', tier: 1 },
-  dragon_slayer: { name: 'Dragon Slayer', icon: '&#x1F525;', requires: ['mountain_king_slayer', 'phantom_hunter', 'swarm_crusher'], tier: 1, gates: 2 },
-  glacier_breaker: { name: 'Glacier Breaker', icon: '&#x2744;', boss: 'glacier_ancient', tier: 2 },
-  doom_ender: { name: 'Doom Ender', icon: '&#x1F480;', boss: 'tyrant_doom', tier: 2 },
-  brood_slayer: { name: 'Brood Slayer', icon: '&#x1F578;', boss: 'swarm_broodmother', tier: 2 },
-  raid_master: { name: 'Raid Master', icon: '&#x1F451;', requires: ['glacier_breaker', 'doom_ender', 'brood_slayer'], tier: 2, gates: 3 },
-  shepherd_trial: { name: "Shepherd's Trial", icon: '&#x1F9D9;', boss: 'trickster_shepherd', tier: 3 },
-  frost_eternal: { name: 'Eternal Frost Vanquisher', icon: '&#x1F300;', boss: 'glacier_eternal', tier: 3 },
-  ultimate_raider: { name: 'Ultimate Raider', icon: '&#x1F31F;', requires: ['shepherd_trial', 'frost_eternal'], tier: 3 }
+  // Rolling Hills badges
+  timber_slayer:     { name: 'Timber Slayer', icon: '&#x1F43A;', boss: 'raid_timber', tier: 1 },
+  dark_fang_slayer:  { name: 'Dark Fang Slayer', icon: '&#x1F3D1;', boss: 'raid_dark_fang', tier: 1 },
+  jasper_slayer:     { name: 'Jasper Slayer', icon: '&#x1F525;', boss: 'raid_jasper', tier: 1 },
+  rolling_hills_champion: { name: 'Rolling Hills Champion', icon: '&#x1F33F;', requires: ['timber_slayer', 'dark_fang_slayer', 'jasper_slayer'], tier: 1 },
+
+  // Frost Valley badges
+  king_jay_slayer:   { name: 'King Jay Slayer', icon: '&#x1F451;', boss: 'raid_king_jay', tier: 2 },
+  romy_slayer:       { name: 'Romy Slayer', icon: '&#x1F52E;', boss: 'raid_romy', tier: 2 },
+  mountain_king_slayer: { name: 'Mountain King Slayer', icon: '&#x26F0;', boss: 'raid_mountain_king', tier: 2 },
+  frost_valley_champion: { name: 'Frost Valley Champion', icon: '&#x2744;', requires: ['king_jay_slayer', 'romy_slayer', 'mountain_king_slayer'], tier: 2, gates: 3 },
+
+  // Volcanic Isles badges
+  pip_slayer:        { name: 'Pip Slayer', icon: '&#x1F432;', boss: 'raid_pip', tier: 3 },
+  humar_slayer:      { name: 'Humar Slayer', icon: '&#x2604;', boss: 'raid_humar', tier: 3 },
+  nerina_slayer:     { name: 'Nerina Slayer', icon: '&#x1F30A;', boss: 'raid_nerina', tier: 3 },
+  volcanic_isles_champion: { name: 'Volcanic Isles Champion', icon: '&#x1F30B;', requires: ['pip_slayer', 'humar_slayer', 'nerina_slayer'], tier: 3, gates: 4 },
+
+  // Dark Castle badges
+  lucy_slayer:       { name: 'Lucy Slayer', icon: '&#x1F56F;', boss: 'raid_lucy', tier: 4 },
+  shade_slayer:      { name: 'Shade Slayer', icon: '&#x1F47B;', boss: 'raid_shade', tier: 4 },
+  valkin_slayer:     { name: 'Valkin Slayer', icon: '&#x1F3F0;', boss: 'raid_valkin', tier: 4 },
+  dark_castle_champion: { name: 'Dark Castle Champion', icon: '&#x1F480;', requires: ['lucy_slayer', 'shade_slayer', 'valkin_slayer'], tier: 4 },
+
+  // Ultimate
+  ultimate_raider:   { name: 'Ultimate Raider', icon: '&#x1F31F;', requires: ['rolling_hills_champion', 'frost_valley_champion', 'volcanic_isles_champion', 'dark_castle_champion'] }
 };
 
 // Raid shop items
