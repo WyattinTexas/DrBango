@@ -1101,8 +1101,8 @@ function resolveRound(pRoll, eRoll) {
           if (pick.ability === 'Unstoppable Force') {
             setTimeout(() => {
               showAbilitySplash('Unstoppable Force', 'Damage cannot be negated!', 1600, () => {
-                // Force the original damage through
-                enemyHp -= damage; updateHpDisplay();
+                // Force the original damage through (baseDmg, not 0'd `damage`)
+                enemyHp -= baseDmg; updateHpDisplay();
                 if (enemyHp <= 0) { setTimeout(enemyDefeated, 600); }
                 else { setTimeout(nextRound, 1400); }
               }, 'playerCard');
@@ -1221,7 +1221,7 @@ function resolveRound(pRoll, eRoll) {
           narrate(`<b class="gold">${pick.name} blocked the attack!</b>`);
           // Cameron enemy: Unstoppable Force — damage cannot be negated, force damage through
           if (enemy.ability === 'Unstoppable Force') {
-            playerHp -= damage; updateHpDisplay();
+            playerHp -= baseDmg; updateHpDisplay(); // use baseDmg, not 0'd `damage`
             if (playerHp <= 0) {
               setTimeout(() => { narrate(`<b class="them">Unstoppable Force! ${pick.name} takes the hit!</b>`); fadeOutMusic(); setTimeout(handlePlayerLoss, 1500); }, 600);
             } else {

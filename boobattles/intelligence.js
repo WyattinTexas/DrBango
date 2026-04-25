@@ -32,110 +32,104 @@ const BOSS0_SCRIPTS = {
   }
 };
 
-// Boss 1: Bogey (7 HP, Bogus — reflect once). Total P dmg: 2+2+2+1=7 ✓
+// Boss 1: Bogey (5 HP, Bogus — reflect once). Total P dmg to Bogey: 2+2+2=6>5 ✓
 // Arc: Player leads → reflect SURPRISE → enemy hits → player low → comeback
 const BOSS1_SCRIPT = {
   enemy:  [[3,2,1], [2,1,3], [5,5,2], [3,1,2], [2,1,3], [1,3,2]],
   player: [[4,4,6], [5,5,3], [4,3,1], [6,6,4], [5,5,4], [6,4,3]]
-  // R1: P doubles(4) wins → 2 dmg (Bogey 5/7)
+  // R1: P doubles(4) wins → 2 dmg (Bogey 3/5)
   // R2: P doubles(5) wins → 2 dmg BUT REFLECTED! Player takes 2!
   // R3: E doubles(5) wins → 2 dmg to player. DOWN LOW!
-  // R4: P doubles(6) wins → 2 dmg (Bogey 3/7). COMEBACK!
-  // R5: P doubles(5) wins → 2 dmg (Bogey 1/7)
-  // R6: P singles(6) wins → 1 dmg. BOGEY DEAD!
+  // R4: P doubles(6) wins → 2 dmg (Bogey 1/5). COMEBACK!
+  // R5: P doubles(5) wins → 2 dmg. BOGEY DEAD!
+  // (R6 script unused — Bogey dies at R5)
 };
 
-// Boss 2: Guard Thomas (9 HP, Stoic). Total P dmg: 2+2+0+2+2+2=10 (>9) ✓
-// Arc: Push below 6 → STOIC blocks! → forced doubles → grind win
+// Boss 2: Guard Thomas (6 HP, Stoic). Total P dmg to GT: 2+2+0+2=6 ✓
+// Arc: Push below 6 → STOIC blocks singles! → doubles break through → win
 const BOSS2_SCRIPT = {
   enemy:  [[3,2,1], [2,1,3], [5,4,2], [3,2,1], [5,5,3], [3,1,2], [2,1,3], [1,2,3]],
   player: [[4,4,6], [5,5,4], [4,3,1], [6,5,4], [4,2,1], [6,6,4], [4,4,5], [5,5,6]]
-  // R1: P doubles(4) → 2 dmg (GT 7/9)
-  // R2: P doubles(5) → 2 dmg (GT 5/9). BELOW 6!
+  // R1: P doubles(4) → 2 dmg (GT 4/6). BELOW 6! Stoic now active.
+  // R2: P doubles(5) → 2 dmg (GT 2/6)
   // R3: E singles(5) → 1 dmg to player
   // R4: P singles(6) wins... STOIC BLOCKS! 0 dmg!
   // R5: E doubles(5) → 2 dmg to player. Pressure!
-  // R6: P doubles(6) → 2 dmg (GT 3/9). Through!
-  // R7: P doubles(4) → 2 dmg (GT 1/9)
-  // R8: P doubles(5) → 2 dmg. GT DEAD!
+  // R6: P doubles(6) → 2 dmg (GT 0/6). GT DEAD!
+  // (R7, R8 script unused — GT dies at R6)
 };
 
-// Boss 3: Stone Cold (7 HP, One-two-one!). P dmg: 2+1+3+2=8>7, kills at R5
+// Boss 3: Stone Cold (7 HP, One-two-one!). P dmg: 2+1+3+2=8>7, kills at R4
 // Arc: Build lead → ONE-TWO-ONE! 6 dmg devastation → TRIPLES COMEBACK!
 const BOSS3_SCRIPT = {
   enemy:  [[4,2,1], [3,2,1], [1,1,4], [2,1,3], [3,2,1], [2,1,3], [1,3,2]],
   player: [[5,5,3], [6,4,3], [3,2,1], [4,4,4], [5,5,4], [6,5,4], [5,4,3]]
-  // R1: P doubles(5) → 2 dmg (SC 8/10)
-  // R2: P singles(6) → 1 dmg (SC 7/10)
-  // R3: E double 1s! ONE-TWO-ONE! 6 DMG to player!!!
-  // R4: P TRIPLES(4)! → 3 dmg (SC 4/10). COMEBACK!
-  // R5: P doubles(5) → 2 dmg (SC 2/10)
-  // R6: P singles(6) → 1 dmg (SC 1/10)
-  // R7: P singles(5) → 1 dmg. SC DEAD!
+  // R0: P doubles(5) → 2 dmg (SC 5/7)
+  // R1: P singles(6) → 1 dmg (SC 4/7)
+  // R2: E double 1s! ONE-TWO-ONE! 6 DMG to player!!!
+  // R3: P TRIPLES(4)! → 3 dmg (SC 1/7). COMEBACK!
+  // R4: P doubles(5) → 2 dmg. SC DEAD!
+  // (R5, R6 script unused — SC dies at R4)
 };
 
-// Boss 4: Pelter (11 HP, Snowball +2 on doubles). Total P dmg: 2+2+3+2+2=11 ✓
-// Arc: SNOWBALL opener 4 dmg → trades → SNOWBALL again → TRIPLES COMEBACK!
+// Boss 4: Pelter (5 HP, Snowball +2 on doubles). Total P dmg: 2+2+3=7>5 ✓
+// Arc: SNOWBALL opener 4 dmg → trades → Pelter critical → TRIPLES COMEBACK!
+// FIX: R3 enemy changed from doubles[5,5,3] to singles[5,4,3] — the second Snowball
+// was killing the player (8 total Snowball dmg) before the triples finish could fire.
 const BOSS4_SCRIPT = {
-  enemy:  [[4,4,6], [3,2,1], [2,1,3], [5,5,3], [2,1,3], [3,2,1], [1,3,2]],
+  enemy:  [[4,4,6], [3,2,1], [2,1,3], [5,4,3], [2,1,3], [3,2,1], [1,3,2]],
   player: [[5,3,2], [5,5,6], [4,4,5], [4,2,1], [6,6,6], [5,5,4], [6,6,4]]
-  // R1: E doubles(4) SNOWBALL! 4 dmg to player!
-  // R2: P doubles(5) → 2 dmg (Pelter 9/11)
-  // R3: P doubles(4) → 2 dmg (Pelter 7/11)
-  // R4: E doubles(5) SNOWBALL! 4 dmg! Player barely alive!
-  // R5: P TRIPLES(6)!!! → 3 dmg (Pelter 4/11). BIG COMEBACK!
-  // R6: P doubles(5) → 2 dmg (Pelter 2/11)
-  // R7: P doubles(6) → 2 dmg. Pelter DEAD!
+  // R0: E doubles(4) SNOWBALL! 4 dmg to player! (dramatic opener)
+  // R1: P doubles(5) → 2 dmg (Pelter 3/5). Fighting back!
+  // R2: P doubles(4) → 2 dmg (Pelter 1/5). Pelter on the ropes!
+  // R3: E singles(5) → 1 dmg to player. Still alive — Pelter at 1 HP!
+  // R4: P TRIPLES(6)!!! → 3 dmg. Pelter DEAD! BIG COMEBACK!
+  // (R5, R6 script unused — Pelter dies at R4)
 };
 
-// Boss 5: Antoinette (12 HP, Grace). Total P dmg: 2+2+1+2+3+2=12 ✓
-// Arc: Long grind, trading blows, triples turning point
+// Boss 5: Antoinette (6 HP, Grace). Total P dmg to A: 2+2+1+2=7>6 ✓
+// Arc: Trade blows, player pushes through even fight to win
 const BOSS5_SCRIPT = {
   enemy:  [[4,3,2], [5,5,4], [3,1,2], [4,4,6], [2,1,3], [5,4,3], [3,2,1], [2,1,3]],
   player: [[5,5,6], [4,3,1], [4,4,5], [3,2,1], [6,5,4], [6,6,2], [5,5,5], [4,4,6]]
-  // R1: P doubles(5) → 2 dmg (A 10/12)
-  // R2: E doubles(5) → 2 dmg to player
-  // R3: P doubles(4) → 2 dmg (A 8/12)
-  // R4: E doubles(4) → 2 dmg to player. Even fight!
-  // R5: P singles(6) → 1 dmg (A 7/12)
-  // R6: P doubles(6) → 2 dmg (A 5/12)
-  // R7: P TRIPLES(5)! → 3 dmg (A 2/12). Turning point!
-  // R8: P doubles(4) → 2 dmg. A DEAD!
+  // R0: P doubles(5) → 2 dmg (A 4/6)
+  // R1: E doubles(5) → 2 dmg to player
+  // R2: P doubles(4) → 2 dmg (A 2/6)
+  // R3: E doubles(4) → 2 dmg to player. Even fight!
+  // R4: P singles(6) → 1 dmg (A 1/6). Antoinette barely alive!
+  // R5: P doubles(6) → 2 dmg. A DEAD!
+  // (R6, R7 script unused — A dies at R5)
 };
 
-// Boss 6: King Jay (13 HP, Reflection — KJ's dice total 7 when KJ LOSES = reflect)
-// Total P dmg to KJ: 2+2+0(reflected)+2+0(reflected)+2+3+3=14>13 ✓
-// Arc: Player attacks → REFLECTION bounces damage back! → adapts → triples finish
+// Boss 6: King Jay (7 HP, Reflection — KJ's dice total 7 when KJ LOSES = reflect)
+// Total P dmg to KJ: 2+2+0(reflected)+2+0(reflected)+2=8>7 ✓
+// Arc: Player attacks → REFLECTION bounces damage back! → adapts → breaks through
 const BOSS6_SCRIPT = {
   enemy:  [[4,3,2], [4,3,1], [4,2,1], [5,4,3], [3,1,2], [4,2,1], [3,1,2], [2,1,3], [3,1,2]],
   player: [[5,5,6], [6,6,2], [6,5,3], [4,2,1], [5,5,4], [6,6,3], [4,4,5], [5,5,5], [6,6,6]]
-  // R1: P doubles(5) → 2 dmg (KJ 11/13). E total=9, safe
-  // R2: P doubles(6) → 2 dmg (KJ 9/13). E total=8, safe
-  // R3: P singles(6) wins → but E total=4+2+1=7! REFLECTION! Player takes 1!
-  // R4: E singles(5) → 1 dmg to player
-  // R5: P doubles(5) → 2 dmg (KJ 7/13). E total=6, safe
-  // R6: P doubles(6) wins → but E total=4+2+1=7! REFLECTION! Player takes 2!
-  // R7: P doubles(4) → 2 dmg (KJ 5/13). E total=6, safe
-  // R8: P TRIPLES(5)! → 3 dmg (KJ 2/13). BIG COMEBACK!
-  // R9: P TRIPLES(6)!! → 3 dmg! KJ DEAD!!!
+  // R0: P doubles(5) → 2 dmg (KJ 5/7). E total=9, no reflect
+  // R1: P doubles(6) → 2 dmg (KJ 3/7). E total=8, no reflect
+  // R2: P singles(6) wins → but E total=4+2+1=7! REFLECTION! Player takes 1!
+  // R3: E singles(5) → 1 dmg to player
+  // R4: P doubles(5) → 2 dmg (KJ 1/7). E total=6, no reflect
+  // R5: P doubles(6) wins → but E total=4+2+1=7! REFLECTION again! Player takes 2!
+  // R6: P doubles(4) → 2 dmg (KJ -1/7). KJ DEAD!
+  // (R7, R8 script unused — KJ dies at R6)
 };
 
-// Boss 7: Hector (15 HP, Protector — singles beat doubles, +1 dmg on singles)
-// Total P dmg: 1+3+1+3+1+3+1+3=16>15 ✓. Player takes 2+2=4 from Protector
-// Arc: Doubles CRUSHED by Protector → player learns TRIPLES ONLY → epic climax
+// Boss 7: Hector (6 HP, Protector — singles beat doubles, +1 dmg on singles)
+// Total P dmg: 1+3+1+3=8>6 ✓. Player takes 2+2=4 from Protector
+// Arc: Doubles CRUSHED by Protector → player learns triples → grinds out win
 const BOSS7_SCRIPT = {
   enemy:  [[6,4,2], [3,1,2], [5,3,1], [2,1,3], [5,4,2], [3,1,2], [4,3,1], [2,1,3], [5,3,2], [3,1,2]],
   player: [[5,5,3], [6,5,4], [4,4,6], [5,5,5], [6,5,3], [4,4,4], [6,5,4], [6,6,6], [6,5,4], [6,6,6]]
-  // R1: P doubles(5) vs E singles(6)... PROTECTOR! E wins! 2 dmg!
-  // R2: P singles(6) beats E singles(3) → 1 dmg (14/15)
-  // R3: P doubles(4) vs E singles(5)... PROTECTOR! 2 dmg!
-  // R4: P TRIPLES(5)! → 3 dmg (11/15). Learns the way!
-  // R5: P singles(6) beats E singles(5) → 1 dmg (10/15)
-  // R6: P TRIPLES(4)! → 3 dmg (7/15)
-  // R7: P singles(6) beats E singles(4) → 1 dmg (6/15)
-  // R8: P TRIPLES(6)!!! → 3 dmg (3/15)
-  // R9: P singles(6) beats E singles(5) → 1 dmg (2/15)
-  // R10: P TRIPLE 6s!!! → 3 dmg! HECTOR DEAD! TOURNAMENT WON!!!
+  // R0: P doubles(5) vs E singles(6)... PROTECTOR! E wins! 2 dmg to player!
+  // R1: P singles(6) beats E singles(3) → 1 dmg (Hector 5/6). Learning!
+  // R2: P doubles(4) vs E singles(5)... PROTECTOR again! 2 dmg to player!
+  // R3: P TRIPLES(5)! → 3 dmg (Hector 2/6). Breakthrough!
+  // R4: P singles(6) beats E singles(5) → 1 dmg (Hector 1/6). On the edge!
+  // R5: P TRIPLES(4)! → 3 dmg. HECTOR DEAD!
+  // (R6–R9 script unused — Hector dies at R5)
 };
 
 // Boss 8: Prince Balatron (6 HP, Party Time — lose & survive → counter die)
