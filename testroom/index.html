@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v822'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v823'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1928,10 +1928,7 @@ body.lite-mode .die.rolling { animation: none !important; }
           <span id="specialsTimerLabel">Timer: 5s</span>
           <input type="range" id="specialsTimerSlider" min="3" max="10" value="5" style="width:50px;accent-color:#a78bfa;cursor:pointer;" oninput="document.getElementById('specialsTimerLabel').textContent='Timer: '+this.value+'s';localStorage.setItem('tr_specialsTimer',this.value)">
         </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#9ca3af;user-select:none;" title="Charlie's Rush becomes a Flick ability — Flick a die on loss or Doubles">
-          <input type="checkbox" id="flickCheckbox" style="accent-color:#f59e0b;cursor:pointer;" onchange="toggleFlick(this.checked)">
-          <span>Flick</span>
-        </label>
+        <button onclick="startFlickBattle()" style="padding:5px 14px;border-radius:6px;border:2px solid #f59e0b;background:rgba(245,158,11,0.15);color:#f59e0b;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.5px;transition:all 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.3)'" onmouseout="this.style.background='rgba(245,158,11,0.15)'" title="Start a Flick battle: Charlie/Shoo/Willow vs Little Boo/Buttons/Dupy">Flick</button>
         <input type="text" id="pickSearch" placeholder="Search by name..." oninput="filterPicks()" style="padding:7px 12px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;outline:none;min-width:140px;">
       </div>
 
@@ -2737,8 +2734,8 @@ body.lite-mode .die.rolling { animation: none !important; }
   if (st !== null) { document.getElementById('specialsTimerSlider').value = st; }
   const lm = localStorage.getItem('tr_liteMode');
   if (lm === '1') { document.getElementById('liteModeCheckbox').checked = true; document.body.classList.add('lite-mode'); }
-  const fl = localStorage.getItem('tr_flick');
-  if (fl === '1') { document.getElementById('flickCheckbox').checked = true; }
+  // Flick state restored from localStorage
+  if (localStorage.getItem('tr_flick') === '1') flickEnabled = true;
   // Sync visual state
   const cb = document.getElementById('handLimitCheckbox');
   document.getElementById('handLimitSlider').style.opacity = cb.checked ? '1' : '0.35';
@@ -2753,7 +2750,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v822';
+const TESTROOM_VERSION = 'v823';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -2799,16 +2796,20 @@ function toggleLiteMode(on) {
   localStorage.setItem('tr_liteMode', on ? '1' : '0');
 }
 
-// Flick toggle — changes Charlie's Rush to a Flick ability
+// Flick mode — Charlie's Rush becomes a physics-based Flick ability
 let flickEnabled = localStorage.getItem('tr_flick') === '1';
 const CHARLIE_DESC_ORIGINAL = "Double 2's deal 7 damage.";
 const CHARLIE_DESC_FLICK = "Upon losing a roll or rolling Doubles, you may Flick one of your dice. Any die hit changes its result on contact.";
-function toggleFlick(on) {
-  flickEnabled = on;
-  localStorage.setItem('tr_flick', on ? '1' : '0');
+function startFlickBattle() {
+  flickEnabled = true;
+  localStorage.setItem('tr_flick', '1');
   const charlie = GHOSTS.find(g => g.id === 18);
-  if (charlie) charlie.abilityDesc = on ? CHARLIE_DESC_FLICK : CHARLIE_DESC_ORIGINAL;
-  if (typeof renderGallery === 'function') renderGallery();
+  if (charlie) charlie.abilityDesc = CHARLIE_DESC_FLICK;
+  // Red: Charlie (18), Shoo (13), Willow (435)
+  // Blue: Little Boo (9), Buttons (8), Dupy (12)
+  S.redPicks = [18, 13, 435];
+  S.bluePicks = [9, 8, 12];
+  startBattle();
 }
 
 const firebaseConfig = {
