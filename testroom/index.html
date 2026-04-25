@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v820'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v821'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2753,7 +2753,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v820';
+const TESTROOM_VERSION = 'v821';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -12842,10 +12842,10 @@ function startSimultaneousLuckyStoneWindows() {
 
 // ============================================================
 // FLICK — Charlie (18) physics-based die fling
-// Normal roll plays out. Lowest die drops below its row.
-// Player grabs it and flings it — any die it collides with
-// scatters. All moved dice get new random results.
-// No overlay/clones — repositions the ACTUAL die elements.
+// Normal roll plays out fully. Lowest die slides below the tray
+// into open arena space. Player grabs and flings it upward into
+// the lined-up dice. Physics runs in arena-center space — the
+// tray has NO walls. All moved dice get new random results.
 // ============================================================
 function showFlickPicker(team, callback) {
   B.phase = 'flick-' + team;
@@ -12879,18 +12879,20 @@ function showFlickPicker(team, callback) {
   log(`<span class="log-ability">Charlie</span> — Rush! Flick activated!`);
   showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Fling a die!', team);
 
-  // 1. Kill 3D dice so we work with flat dice only
+  // 1. Kill 3D dice, render flat
   ['red','blue'].forEach(t => {
     const ph = _dicePhysics[t];
     if (ph) { cancelAnimationFrame(ph.raf); ph.els.forEach(e => e.remove()); delete _dicePhysics[t]; }
   });
   renderDice(B.redDice, B.blueDice);
 
-  // 2. Gather layout
+  // 2. Use arena-center as physics space (bigger than tray)
+  const center = document.querySelector('.arena-center');
+  const centerRect = center.getBoundingClientRect();
+  const physW = center.offsetWidth;
+  const physH = center.offsetHeight;
   const tray = document.querySelector('.dice-stack');
   const trayRect = tray.getBoundingClientRect();
-  const trayW = tray.offsetWidth;
-  const trayH = tray.offsetHeight;
   const redRow = document.getElementById('red-dice');
   const blueRow = document.getElementById('blue-dice');
   const redDieEls = [...redRow.querySelectorAll('.die')];
@@ -12898,13 +12900,13 @@ function showFlickPicker(team, callback) {
   const dieSize = redDieEls[0]?.offsetWidth || 56;
   const dieR = dieSize / 2;
 
-  // 3. Record positions relative to tray, build physics bodies
+  // 3. Record positions relative to arena-center
   const bodies = [];
   const allEls = [...redDieEls, ...blueDieEls];
   allEls.forEach((el, i) => {
     const r = el.getBoundingClientRect();
-    const cx = r.left - trayRect.left + r.width / 2;
-    const cy = r.top - trayRect.top + r.height / 2;
+    const cx = r.left - centerRect.left + r.width / 2;
+    const cy = r.top - centerRect.top + r.height / 2;
     const dTeam = i < redDieEls.length ? 'red' : 'blue';
     const dIdx = i < redDieEls.length ? i : i - redDieEls.length;
     bodies.push({
@@ -12916,12 +12918,11 @@ function showFlickPicker(team, callback) {
     });
   });
 
-  // 4. Lock tray height, move all dice to tray as absolute children
-  tray.style.height = trayH + 'px';
-  tray.style.position = 'relative';
-  tray.style.overflow = 'hidden';
+  // 4. Move all dice to arena-center as absolute children
+  center.style.position = 'relative';
+  center.style.overflow = 'hidden';
   bodies.forEach(b => {
-    tray.appendChild(b.el); // detach from dice-row, attach to tray
+    center.appendChild(b.el);
     b.el.style.position = 'absolute';
     b.el.style.left = (b.cx - dieR) + 'px';
     b.el.style.top = (b.cy - dieR) + 'px';
@@ -12930,12 +12931,17 @@ function showFlickPicker(team, callback) {
     b.el.style.zIndex = b.isFlicker ? '60' : '55';
   });
 
-  // 5. Drop the flicker die below the row
+  // 5. Position flicker die below tray, centered horizontally
   const flicker = bodies.find(b => b.isFlicker);
-  const dropDist = dieSize * 0.9;
-  flicker.cy += dropDist;
-  flicker.origCy += dropDist;
-  flicker.el.style.transition = 'top 0.3s ease-out';
+  const trayBottom = trayRect.bottom - centerRect.top;
+  flicker.cx = physW / 2;
+  flicker.cy = trayBottom + dieSize * 0.8;
+  // Clamp so it stays inside arena-center
+  flicker.cy = Math.min(flicker.cy, physH - dieR - 8);
+  flicker.origCx = flicker.cx;
+  flicker.origCy = flicker.cy;
+  flicker.el.style.transition = 'left 0.3s ease-out, top 0.3s ease-out';
+  flicker.el.style.left = (flicker.cx - dieR) + 'px';
   flicker.el.style.top = (flicker.cy - dieR) + 'px';
   flicker.el.style.boxShadow = '0 0 20px rgba(245,158,11,0.8), 0 0 40px rgba(245,158,11,0.3)';
   flicker.el.style.cursor = 'grab';
@@ -12957,8 +12963,7 @@ function showFlickPicker(team, callback) {
     });
     redDieEls.forEach(el => redRow.appendChild(el));
     blueDieEls.forEach(el => blueRow.appendChild(el));
-    tray.style.height = '';
-    tray.style.overflow = '';
+    center.style.overflow = '';
   };
 
   // 6. Mouse / touch fling
@@ -12969,7 +12974,7 @@ function showFlickPicker(team, callback) {
 
   const evtXY = (e) => {
     const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - trayRect.left, y: src.clientY - trayRect.top };
+    return { x: src.clientX - centerRect.left, y: src.clientY - centerRect.top };
   };
 
   const onDown = (e) => {
@@ -12987,9 +12992,8 @@ function showFlickPicker(team, callback) {
     if (!isDragging) return;
     e.preventDefault();
     const p = evtXY(e);
-    // Clamp to tray bounds
-    p.x = Math.max(dieR, Math.min(trayW - dieR, p.x));
-    p.y = Math.max(dieR, Math.min(trayH - dieR, p.y));
+    p.x = Math.max(dieR, Math.min(physW - dieR, p.x));
+    p.y = Math.max(dieR, Math.min(physH - dieR, p.y));
     mouseHist.push({ x: p.x, y: p.y, t: performance.now() });
     if (mouseHist.length > 12) mouseHist.shift();
     flicker.cx = p.x;
@@ -13015,7 +13019,6 @@ function showFlickPicker(team, callback) {
     clearLsCountdown();
     removeListeners();
 
-    // Calculate fling velocity from recent mouse movement
     const now = performance.now();
     const recent = mouseHist.filter(p => now - p.t < 150);
     if (recent.length >= 2) {
@@ -13032,7 +13035,6 @@ function showFlickPicker(team, callback) {
     flickRaf = requestAnimationFrame(physStep);
   };
 
-  // Attach mousedown/touchstart on the flicker die, move/up on document
   flicker.el.addEventListener('mousedown', onDown);
   flicker.el.addEventListener('touchstart', onDown, { passive: false });
   document.addEventListener('mousemove', onMove);
@@ -13040,11 +13042,11 @@ function showFlickPicker(team, callback) {
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('touchend', onUp);
 
-  // 7. Physics simulation
+  // 7. Physics — arena-center walls, NO tray walls
   const FRICTION = 0.965;
   const BOUNCE = 0.7;
   const SETTLE_THRESH = 0.35;
-  const PAD = 8;
+  const PAD = 6;
   let collisionCooldown = 0;
 
   const physStep = () => {
@@ -13056,7 +13058,7 @@ function showFlickPicker(team, callback) {
       b.vx *= FRICTION; b.vy *= FRICTION;
     });
 
-    // Circle-circle elastic collisions
+    // Elastic collisions
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
         const a = bodies[i], c = bodies[j];
@@ -13078,15 +13080,14 @@ function showFlickPicker(team, callback) {
       }
     }
 
-    // Wall bounce
+    // Arena-center walls (the whole center column, not the tray)
     bodies.forEach(b => {
       if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE; }
-      if (b.cx + dieR > trayW - PAD) { b.cx = trayW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE; }
+      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE; }
       if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE; }
-      if (b.cy + dieR > trayH - PAD) { b.cy = trayH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE; }
+      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE; }
     });
 
-    // Render
     bodies.forEach(b => {
       b.el.style.left = (b.cx - dieR) + 'px';
       b.el.style.top = (b.cy - dieR) + 'px';
@@ -13103,7 +13104,7 @@ function showFlickPicker(team, callback) {
     }
   };
 
-  // 8. Settle — new values for moved dice
+  // 8. Settle
   const settleFlick = () => {
     let changed = 0;
     bodies.forEach(b => {
@@ -13142,7 +13143,7 @@ function showFlickPicker(team, callback) {
 
   // 9. Timeout
   let remaining = getSpecialsTimerSecs() + 3;
-  showLsCountdown(tray, remaining);
+  showLsCountdown(center, remaining);
   lsCountdownTimer = setInterval(() => {
     remaining--;
     if (remaining <= 0) {
@@ -13156,7 +13157,7 @@ function showFlickPicker(team, callback) {
       B.blueDice = B.pendingResolve.blueDice;
       callback();
     } else if (!launched) {
-      showLsCountdown(tray, remaining);
+      showLsCountdown(center, remaining);
     }
   }, 1000);
 }
@@ -13774,7 +13775,6 @@ function _resolveRoundImpl() {
       }
     }
     if (flickTeam) {
-      renderDice(B.redDice, B.blueDice);
       showFlickPicker(flickTeam, () => {
         B.flickResuming = true;
         B.sylviaResuming = true;
