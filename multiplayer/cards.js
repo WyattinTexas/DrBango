@@ -494,7 +494,7 @@ const RAID_BOSSES = {
     title: 'Dances with Wolves',
     personality: 'tyrant',
     tier: 1, set: 'Rolling Hills',
-    requiredBadge: null, requiredPlayers: 5,
+    requiredBadge: 'dark_fang_slayer', requiredPlayers: 5,
     bossGhost: {
       id: 9001, name: 'Timber', maxHp: 12, art: '../testroom/art/timber.jpg',
       ability: 'Howl of the Alpha', abilityDesc: 'Before each roll: remove 1 enemy die. Triples+: deal 1 chip damage to all enemy sideline ghosts.'

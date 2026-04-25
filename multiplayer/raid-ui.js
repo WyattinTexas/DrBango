@@ -17,62 +17,94 @@ function showRaidLobby() {
   });
 }
 
+let raidBookPage = 0;
+const RAID_ZONES = [
+  { tier: 1, name: 'Rolling Hills', color: '#2ecc71', bg: 'linear-gradient(135deg, #0a1a0e, #142810)', championBadge: 'heart_of_the_hills', desc: 'Where the wild packs roam and wanderers never rest.' },
+  { tier: 2, name: 'Frost Valley', color: '#75BEEB', bg: 'linear-gradient(135deg, #0a1520, #0d2040)', championBadge: 'frostborne', desc: 'A frozen kingdom where the ice king reigns and seers guard ancient secrets.' },
+  { tier: 3, name: 'Volcanic Isles', color: '#e74c3c', bg: 'linear-gradient(135deg, #1a0a0a, #281410)', championBadge: 'dark_castle_key', desc: 'Islands of fire and fury. The ember dragon giggles as the world burns.' },
+  { tier: 4, name: 'Dark Castle', color: '#9b59b6', bg: 'linear-gradient(135deg, #120a1a, #1a1028)', championBadge: 'dark_spire_key', desc: 'Where the blue flame burns and shadows whisper your name.' },
+  { tier: 5, name: 'The Dark Spire', color: '#c0392b', bg: 'linear-gradient(135deg, #1a0505, #2a0a0a)', championBadge: 'valkin_slayer', desc: 'The final ascent. Valkin the Grand awaits.' }
+];
+
 function renderRaidLobby(userBadges) {
   const container = document.getElementById('raid-lobby');
   if (!container) return;
 
-  const tierConfig = [
-    { tier: 1, name: 'Rolling Hills', color: '#2ecc71', accent: 'rgba(46,204,113,0.15)' },
-    { tier: 2, name: 'Frost Valley', color: '#75BEEB', accent: 'rgba(117,190,235,0.15)' },
-    { tier: 3, name: 'Volcanic Isles', color: '#e74c3c', accent: 'rgba(231,76,60,0.15)' },
-    { tier: 4, name: 'Dark Castle', color: '#9b59b6', accent: 'rgba(155,89,182,0.15)' },
-    { tier: 5, name: 'The Dark Spire', color: '#c0392b', accent: 'rgba(192,57,43,0.15)' }
-  ];
-  let html = '<h2 class="raid-section-title">THE ONSLAUGHT</h2><div class="raid-lobby-subtitle">Rally your team. Face the darkness.</div>';
+  const zone = RAID_ZONES[raidBookPage];
+  const bosses = Object.entries(RAID_BOSSES).filter(([, b]) => b.tier === zone.tier);
+  const champion = RAID_BADGES[zone.championBadge];
+  const hasChampion = hasRaidBadge(userBadges, zone.championBadge);
 
-  tierConfig.forEach(({ tier, name, color, accent }) => {
-    const bosses = Object.entries(RAID_BOSSES).filter(([, b]) => b.tier === tier);
-    if (bosses.length === 0) return;
+  // Build zone tabs
+  let tabsHtml = '<div class="book-tabs">';
+  RAID_ZONES.forEach((z, i) => {
+    const active = i === raidBookPage;
+    tabsHtml += `<button class="book-tab ${active ? 'active' : ''}" style="--tab-color:${z.color}" onclick="raidBookPage=${i};showRaidLobby()">${z.name}</button>`;
+  });
+  tabsHtml += '</div>';
 
-    html += `<div class="raid-tier-group">
-      <div class="raid-tier-label" style="color:${color};border-bottom:2px solid ${color};padding-bottom:6px;">${name}</div>
-      <div class="raid-boss-grid">`;
-
-    bosses.forEach(([raidId, boss]) => {
-      const locked = boss.requiredBadge && !hasRaidBadge(userBadges, boss.requiredBadge);
-      const reqBadge = boss.requiredBadge ? RAID_BADGES[boss.requiredBadge] : null;
-      const defeated = userBadges.some(b => {
-        const badge = RAID_BADGES[b];
-        return badge && badge.boss === raidId;
-      });
-
-      const playerCount = boss.requiredPlayers || 10;
-      html += `<div class="raid-boss-card ${locked ? 'locked' : ''} ${defeated ? 'defeated' : ''}"
-                    onclick="${locked ? '' : `selectRaid('${raidId}')`}">
-        <div class="raid-boss-art-wrap">
-          <img class="raid-boss-art" src="${boss.bossGhost.art}" alt="${boss.name}"
-               onerror="this.src='../testroom/art/timber.jpg'">
-          ${locked ? '<div class="raid-boss-lock">&#x1F512;</div>' : ''}
-          ${defeated ? '<div class="raid-boss-check">&#x2714;</div>' : ''}
-        </div>
-        <div class="raid-boss-info">
-          <div class="raid-boss-name">${boss.name}</div>
-          <div class="raid-boss-title">${boss.title}</div>
-          <div class="raid-boss-stats">
-            <span class="raid-hp-badge">${boss.baseHp} HP</span>
-            <span class="raid-personality-badge">${boss.personality.toUpperCase()}</span>
-            <span class="raid-pts-badge">${boss.rewardPoints} pts</span>
-            <span class="raid-players-badge">${playerCount} players</span>
-          </div>
-          ${locked ? `<div class="raid-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
-        </div>
-      </div>`;
+  // Build boss entries for this zone
+  let bossesHtml = '';
+  bosses.forEach(([raidId, boss]) => {
+    const locked = boss.requiredBadge && !hasRaidBadge(userBadges, boss.requiredBadge);
+    const reqBadge = boss.requiredBadge ? RAID_BADGES[boss.requiredBadge] : null;
+    const defeated = userBadges.some(b => {
+      const badge = RAID_BADGES[b];
+      return badge && badge.boss === raidId;
     });
+    const playerCount = boss.requiredPlayers || 10;
 
-    html += '</div></div>';
+    bossesHtml += `<div class="book-boss ${locked ? 'locked' : ''} ${defeated ? 'defeated' : ''}"
+                        onclick="${locked ? '' : `selectRaid('${raidId}')`}">
+      <div class="book-boss-portrait">
+        <img src="${boss.bossGhost.art}" alt="${boss.name}" onerror="this.src='../testroom/art/timber.jpg'">
+        ${locked ? '<div class="book-boss-lock">&#x1F512;</div>' : ''}
+        ${defeated ? '<div class="book-boss-check">&#x2714;</div>' : ''}
+      </div>
+      <div class="book-boss-details">
+        <div class="book-boss-name">${boss.name}</div>
+        <div class="book-boss-title">${boss.title}</div>
+        <div class="book-boss-meta">
+          <span class="book-hp">${boss.baseHp} HP</span>
+          <span class="book-players">${playerCount} players</span>
+          <span class="book-pts">${boss.rewardPoints} pts</span>
+        </div>
+        ${locked ? `<div class="book-boss-req">Requires: ${reqBadge?.name || boss.requiredBadge}</div>` : ''}
+      </div>
+    </div>`;
   });
 
-  container.innerHTML = html;
+  // Champion badge display
+  const championHtml = champion ? `
+    <div class="book-champion ${hasChampion ? 'earned' : ''}">
+      <span class="book-champion-icon">${champion.icon}</span>
+      <span class="book-champion-name">${champion.name}</span>
+      ${hasChampion ? '<span class="book-champion-check">&#x2714;</span>' : '<span class="book-champion-locked">Defeat all bosses</span>'}
+    </div>` : '';
+
+  // Page navigation
+  const prevBtn = raidBookPage > 0
+    ? `<button class="book-nav book-prev" onclick="raidBookPage--;showRaidLobby()">&#x25C0; ${RAID_ZONES[raidBookPage - 1].name}</button>`
+    : '<div></div>';
+  const nextBtn = raidBookPage < RAID_ZONES.length - 1
+    ? `<button class="book-nav book-next" onclick="raidBookPage++;showRaidLobby()">${RAID_ZONES[raidBookPage + 1].name} &#x25B6;</button>`
+    : '<div></div>';
+
+  container.innerHTML = `
+    <h2 class="raid-section-title">THE ONSLAUGHT</h2>
+    ${tabsHtml}
+    <div class="raid-book" style="background:${zone.bg}">
+      <div class="book-page">
+        <div class="book-page-header" style="border-bottom-color:${zone.color}">
+          <h3 class="book-zone-name" style="color:${zone.color}">${zone.name}</h3>
+          <p class="book-zone-desc">${zone.desc}</p>
+        </div>
+        <div class="book-bosses">${bossesHtml}</div>
+        ${championHtml}
+        <div class="book-page-nav">${prevBtn}${nextBtn}</div>
+      </div>
+      <div class="book-spine"></div>
+    </div>`;
 }
 
 // ─── RAID QUEUE VIEW ────────────────────────────────────────────
