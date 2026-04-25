@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v842'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v843'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2766,7 +2766,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v842'; // [shadow] Barnaby Stubborn wired; autoSim ability-wired; Zippa/Wendy sim fixes
+const TESTROOM_VERSION = 'v843'; // [shadow] perf: cap B.log at 50; cache Jenkins die selectors; batch physStep rAF reads before writes
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -4458,7 +4458,8 @@ function teamName(team) { return team===B.red ? 'Red' : 'Blue'; }
 let B = null; // battle state
 let prevResources = { red: {}, blue: {} }; // for resource-gained flash
 
-function log(html) { B.log.unshift(html); }
+const LOG_MAX = 50; // [shadow] perf: cap battle log to prevent unbounded array growth
+function log(html) { B.log.unshift(html); if (B.log.length > LOG_MAX) B.log.length = LOG_MAX; }
 
 function startBattle() {
   prevResources = { red: {}, blue: {} };
@@ -6902,44 +6903,43 @@ function doJenkinsRoll() {
   if (!jp) { finishJenkinsRoll(); return; }
 
   // Shuffle animation across all 4 dice, landing on pre-computed values
+  // [shadow] perf: cache die elements before interval to avoid 4 getElementById calls per 65ms tick
+  const jenkinsDieEls = Array.from({length: 4}, (_, i) => document.getElementById('jenkinsDie' + i));
+  const jenkinsResultEl = document.getElementById('jenkinsResult');
   let ticks = 0;
   const totalTicks = 12;
   const tickMs = 65;
   const shuffle = setInterval(() => {
     ticks++;
-    for (let i = 0; i < 4; i++) {
-      const d = document.getElementById('jenkinsDie' + i);
+    jenkinsDieEls.forEach(d => {
       if (d) {
         d.textContent = String(Math.floor(Math.random() * 6) + 1);
         d.style.transform = `rotate(${ticks * 30}deg)`;
       }
-    }
+    });
     if (ticks >= totalTicks) {
       clearInterval(shuffle);
       // Land on final values
-      for (let i = 0; i < 4; i++) {
-        const d = document.getElementById('jenkinsDie' + i);
+      jenkinsDieEls.forEach((d, i) => {
         if (d) {
           d.textContent = String(jp.dice[i]);
           d.style.transform = 'rotate(0deg)';
         }
-      }
+      });
       // Color dice based on damage result
       const dmg = jp.damage;
       let bg, border, color;
       if (dmg >= 4) { bg = 'linear-gradient(135deg,#fde68a,#f59e0b)'; border = '#f59e0b'; color = '#78350f'; }
       else if (dmg >= 2) { bg = 'linear-gradient(135deg,#fbbf24,#d97706)'; border = '#b45309'; color = '#78350f'; }
       else { bg = 'linear-gradient(135deg,#a7f3d0,#34d399)'; border = '#10b981'; color = '#064e3b'; }
-      for (let i = 0; i < 4; i++) {
-        const d = document.getElementById('jenkinsDie' + i);
+      jenkinsDieEls.forEach(d => {
         if (d) { d.style.background = bg; d.style.borderColor = border; d.style.color = color; }
-      }
+      });
       // Show result label
       const rollLabel = describeRoll(jp.roll);
-      const resultEl = document.getElementById('jenkinsResult');
-      if (resultEl) {
-        resultEl.innerHTML = `<span style="color:var(--ghost-rare);">${rollLabel}</span> → <span style="color:var(--accent);">${dmg} damage</span> to ${jp.enemyName}!`;
-        resultEl.style.display = 'block';
+      if (jenkinsResultEl) {
+        jenkinsResultEl.innerHTML = `<span style="color:var(--ghost-rare);">${rollLabel}</span> → <span style="color:var(--accent);">${dmg} damage</span> to ${jp.enemyName}!`;
+        jenkinsResultEl.style.display = 'block';
       }
       setTimeout(() => finishJenkinsRoll(), 1200);
     }
@@ -13172,16 +13172,20 @@ function showFlickPicker(team, callback) {
       });
     }
 
-    // Update 3D rotation + render
+    // Update 3D rotation — [shadow] perf: batch all JS reads before DOM writes to avoid layout thrash
+    // Pass 1: all state updates + settle-threshold check (reads only)
     bodies.forEach(b => {
       b.rx += b.vrx; b.ry += b.vry; b.rz += b.vrz;
       b.vrx *= 0.93; b.vry *= 0.93; b.vrz *= 0.93; // angular friction
-      b.el.style.left = (b.cx - dieR) + 'px';
-      b.el.style.top = (b.cy - dieR) + 'px';
       const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
       const rotSpd = Math.abs(b.vrx) + Math.abs(b.vry) + Math.abs(b.vrz);
       const totalMotion = s + rotSpd * 0.05;
       if (totalMotion > maxSpd) maxSpd = totalMotion;
+    });
+    // Pass 2: all DOM writes (batched to prevent interleaved forced reflow)
+    bodies.forEach(b => {
+      b.el.style.left = (b.cx - dieR) + 'px';
+      b.el.style.top = (b.cy - dieR) + 'px';
       b.cube.style.transform = `rotateX(${b.rx}deg) rotateY(${b.ry}deg) rotateZ(${b.rz}deg)`;
     });
 
