@@ -10,7 +10,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v830'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v831'; // MUST match TESTROOM_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2762,7 +2762,7 @@ body.lite-mode .die.rolling { animation: none !important; }
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v830';
+const TESTROOM_VERSION = 'v831';
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -13097,44 +13097,51 @@ function showFlickPicker(team, callback) {
       return;
     }
 
-    bodies.forEach(b => {
-      b.cx += b.vx; b.cy += b.vy;
-      b.vx *= friction; b.vy *= friction;
-    });
+    // Sub-step physics to prevent tunneling at high velocity
+    // At max fling (35 px/frame) and dieSize ~56, a die can skip past another.
+    // 3 sub-steps = max ~12 px/step, well within the 56px collision radius.
+    const SUB_STEPS = 3;
+    const subFric = Math.pow(friction, 1 / SUB_STEPS);
+    for (let ss = 0; ss < SUB_STEPS; ss++) {
+      bodies.forEach(b => {
+        b.cx += b.vx / SUB_STEPS; b.cy += b.vy / SUB_STEPS;
+        b.vx *= subFric; b.vy *= subFric;
+      });
 
-    // Elastic collisions (energy-losing, not energy-creating)
-    for (let i = 0; i < bodies.length; i++) {
-      for (let j = i + 1; j < bodies.length; j++) {
-        const a = bodies[i], c = bodies[j];
-        const dx = c.cx - a.cx, dy = c.cy - a.cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < dieSize && dist > 0.01) {
-          const nx = dx / dist, ny = dy / dist;
-          const rvn = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
-          if (rvn > 0) {
-            const imp = rvn * BOUNCE_DIE;
-            a.vx -= imp * nx; a.vy -= imp * ny;
-            c.vx += imp * nx; c.vy += imp * ny;
-            // 3D tumble on impact
-            const spinF = Math.min(rvn * 20, 400);
-            a.vrx += (Math.random()-0.5) * spinF; a.vry += (Math.random()-0.5) * spinF; a.vrz += (Math.random()-0.5) * spinF * 0.5;
-            c.vrx += (Math.random()-0.5) * spinF; c.vry += (Math.random()-0.5) * spinF; c.vrz += (Math.random()-0.5) * spinF * 0.5;
-            if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
+      // Elastic collisions
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const a = bodies[i], c = bodies[j];
+          const dx = c.cx - a.cx, dy = c.cy - a.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < dieSize && dist > 0.01) {
+            const nx = dx / dist, ny = dy / dist;
+            const rvn = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
+            if (rvn > 0) {
+              const imp = rvn * BOUNCE_DIE;
+              a.vx -= imp * nx; a.vy -= imp * ny;
+              c.vx += imp * nx; c.vy += imp * ny;
+              // 3D tumble on impact
+              const spinF = Math.min(rvn * 20, 400);
+              a.vrx += (Math.random()-0.5) * spinF; a.vry += (Math.random()-0.5) * spinF; a.vrz += (Math.random()-0.5) * spinF * 0.5;
+              c.vrx += (Math.random()-0.5) * spinF; c.vry += (Math.random()-0.5) * spinF; c.vrz += (Math.random()-0.5) * spinF * 0.5;
+              if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
+            }
+            const ov = (dieSize - dist) / 2 + 0.5;
+            a.cx -= ov * nx; a.cy -= ov * ny;
+            c.cx += ov * nx; c.cy += ov * ny;
           }
-          const ov = (dieSize - dist) / 2 + 0.5;
-          a.cx -= ov * nx; a.cy -= ov * ny;
-          c.cx += ov * nx; c.cy += ov * ny;
         }
       }
-    }
 
-    // Full arena-board walls
-    bodies.forEach(b => {
-      if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
-      if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
-      if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
-      if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
-    });
+      // Wall bounce
+      bodies.forEach(b => {
+        if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+      });
+    }
 
     // Update 3D rotation + render
     bodies.forEach(b => {
