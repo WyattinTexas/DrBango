@@ -889,6 +889,15 @@ function showRaidResult(data) {
         }).join('')}
       </div>
 
+      ${bossDefeated ? `
+      <div class="raid-loot-section" id="raid-loot-section" style="display:none">
+        <h3 class="raid-loot-title">LOOT ROLL</h3>
+        <div class="raid-loot-dice" id="raid-loot-dice"></div>
+        <div class="raid-loot-result" id="raid-loot-result"></div>
+        <div class="raid-loot-inventory" id="raid-loot-inventory"></div>
+      </div>
+      ` : ''}
+
       <button class="raid-result-close" onclick="closeRaidResult()">RETURN TO LOBBY</button>
     </div>`;
 
@@ -898,6 +907,13 @@ function showRaidResult(data) {
   if (bossDefeated) {
     raidSound('victory');
     setTimeout(() => raidConfetti('epic'), 280);
+
+    // Show loot roll after leaderboard reveals
+    const mySlot = Object.entries(players).find(([s, p]) => p.uid === user?.uid);
+    if (mySlot) {
+      const [slot, myPlayer] = mySlot;
+      setTimeout(() => showLootRollReveal(myPlayer, boss), 1800);
+    }
   } else {
     // Wipe screen appears over the leaderboard — player dismisses it to see results
     setTimeout(() => showRaidWipeScreen(data), 380);
@@ -913,6 +929,113 @@ function showRaidResult(data) {
       raidSound('mvp_badge');
     }
   }, 60);
+}
+
+/**
+ * Animated loot roll reveal — dice tumble, then item appears
+ */
+function showLootRollReveal(playerData, boss) {
+  const section = document.getElementById('raid-loot-section');
+  const diceEl = document.getElementById('raid-loot-dice');
+  const resultEl = document.getElementById('raid-loot-result');
+  const invEl = document.getElementById('raid-loot-inventory');
+  if (!section || !diceEl || !resultEl) return;
+
+  const roll = playerData.lootRoll || [1, 1, 1];
+  const rollType = playerData.lootType || 'singles';
+  const itemKey = playerData.lootItem;
+  const itemName = playerData.lootItemName;
+  const itemIcon = playerData.lootItemIcon;
+  const resources = playerData.lootResources || {};
+
+  section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth' });
+
+  // Phase 1: Dice tumble animation (1.5s)
+  diceEl.innerHTML = roll.map((d, i) =>
+    `<span class="loot-die tumbling" style="animation-delay:${i * 0.15}s">?</span>`
+  ).join('');
+
+  // Phase 2: Dice land (reveal values)
+  setTimeout(() => {
+    const dieFaces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    diceEl.innerHTML = roll.map((d, i) =>
+      `<span class="loot-die landed" style="animation-delay:${i * 0.1}s">${dieFaces[d-1]}</span>`
+    ).join('');
+
+    // Show roll type
+    const typeLabels = {
+      singles: '✦ COMMON DROP',
+      doubles: '✦✦ RARE DROP!',
+      triples: '✦✦✦ JACKPOT!!!'
+    };
+    const typeColors = { singles: '#aaa', doubles: '#f0c040', triples: '#ff4444' };
+    diceEl.innerHTML += `<div class="loot-roll-type" style="color:${typeColors[rollType]}">${typeLabels[rollType]}</div>`;
+
+    if (rollType === 'triples') {
+      raidConfetti('epic');
+      raidScreenShake('heavy');
+    } else if (rollType === 'doubles') {
+      raidScreenShake('light');
+    }
+  }, 1200);
+
+  // Phase 3: Item reveal (1s after dice land)
+  setTimeout(() => {
+    let html = '';
+
+    if (itemKey && itemName) {
+      const itemDef = typeof RAID_ITEMS !== 'undefined' ? RAID_ITEMS[itemKey] : null;
+      const tierClass = itemDef?.tier || 'common';
+      html += `<div class="loot-item-reveal ${tierClass}">
+        <span class="loot-item-icon">${itemIcon || '🎁'}</span>
+        <span class="loot-item-name">${itemName}</span>
+        ${itemDef?.desc ? `<span class="loot-item-desc">${itemDef.desc}</span>` : ''}
+      </div>`;
+    }
+
+    // Show resource drops
+    const resNames = {
+      healingSeed: '🌿 Healing Seed', ice: '❄️ Ice Shard', fire: '🔥 Sacred Fire',
+      surge: '⚡ Surge', luckyStone: '🍀 Lucky Stone', moonstone: '💎 Moonstone',
+      firefly: '🏮 Firefly', burn: '💥 Burn'
+    };
+    const resEntries = Object.entries(resources).filter(([k,v]) => v > 0);
+    if (resEntries.length > 0) {
+      html += `<div class="loot-resources">`;
+      resEntries.forEach(([key, amount]) => {
+        html += `<span class="loot-resource">${resNames[key] || key} ×${amount}</span>`;
+      });
+      html += `</div>`;
+    }
+
+    if (!html) html = '<div class="loot-nothing">No loot this time</div>';
+    resultEl.innerHTML = html;
+
+    raidSound('reward_reveal');
+  }, 2400);
+
+  // Phase 4: Show current raid inventory
+  setTimeout(async () => {
+    if (!invEl) return;
+    try {
+      const user = firebase.auth().currentUser;
+      if (!user) return;
+      const snap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+      const inv = snap.val();
+      if (!inv || !inv.items || inv.items.length === 0) return;
+
+      let invHtml = '<h4>YOUR RAID INVENTORY</h4><div class="loot-inv-items">';
+      inv.items.forEach(key => {
+        const def = typeof RAID_ITEMS !== 'undefined' ? RAID_ITEMS[key] : null;
+        if (def) {
+          invHtml += `<div class="loot-inv-item"><span>${def.icon}</span><span>${def.name}</span></div>`;
+        }
+      });
+      invHtml += '</div>';
+      invEl.innerHTML = invHtml;
+    } catch (e) { /* silent */ }
+  }, 3200);
 }
 
 function closeRaidResult() {

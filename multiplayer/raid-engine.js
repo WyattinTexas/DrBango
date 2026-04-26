@@ -2,8 +2,9 @@
 // RAID ENGINE — Boss AI, raid lifecycle, Firebase state management
 // Depends on: cards.js (RAID_BOSSES, RAID_BOSS_MINIONS, RAID_BADGES)
 //             battle-engine.js (classify, weightedRoll, etc.)
-// v0.88 — Await badge grants in distributeRaidRewards; re-fetch full
-//          instance for spectator result screen (fresh player data)
+// v0.89 — LOOT TABLE SYSTEM: per-boss item drops on defeat, dice roll
+//          determines rarity. Items carry within raid run, reset on end.
+//          Final boss drops unique victory badge.
 // =================================================================
 
 const RAID_CONFIG = {
@@ -21,6 +22,187 @@ const RAID_CONFIG = {
   BOSS_BASE_DICE: 4,
   INSTANT_KILL_FLAT_DAMAGE: 5            // Instant-kill abilities deal this instead vs bosses
 };
+
+// ─── LOOT TABLE SYSTEM ──────────────────────────────────────────
+// Players roll 3 dice after defeating a boss. Roll determines loot tier:
+//   Singles → common drop (resources)
+//   Doubles → rare drop (items)
+//   Triples → jackpot (legendary items + resources)
+// Items carry within the raid run, reset when raid ends.
+// Players start each boss fight with their accumulated loot equipped.
+
+const RAID_ITEMS = {
+  // === BLADES (toggle on/off, +1 die while swinging) ===
+  ice_blade:   { name: 'Ice Blade',   icon: '🗡️', type: 'blade', tier: 'rare',
+                 desc: '+1 die while swinging. Wins grant +1 Ice Shard.' },
+  flame_blade: { name: 'Flame Blade', icon: '🔥', type: 'blade', tier: 'rare',
+                 desc: '+1 die while swinging. Wins generate +5 Burn.' },
+
+  // === MASKS (toggle on/off, passive effects) ===
+  mask_of_day:   { name: 'Mask of Day',   icon: '🌅', type: 'mask', tier: 'rare',
+                   desc: 'Gain 1 Burn for each 1 or 2 you roll.' },
+  mask_of_night: { name: 'Mask of Night', icon: '🌙', type: 'mask', tier: 'rare',
+                   desc: 'Roll same dice as enemy +1. +1 damage on wins.' },
+
+  // === CHARMS (passive, always active once owned) ===
+  lucky_charm:    { name: 'Lucky Charm',    icon: '🍀', type: 'charm', tier: 'common',
+                    desc: 'Start each fight with 1 Lucky Stone.' },
+  healing_root:   { name: 'Healing Root',   icon: '🌿', type: 'charm', tier: 'common',
+                    desc: 'Start each fight with 1 Healing Seed.' },
+  ember_stone:    { name: 'Ember Stone',    icon: '🔶', type: 'charm', tier: 'common',
+                    desc: 'Start each fight with 1 Sacred Fire.' },
+  frost_shard:    { name: 'Frost Shard',    icon: '❄️', type: 'charm', tier: 'common',
+                    desc: 'Start each fight with 1 Ice Shard.' },
+  surge_crystal:  { name: 'Surge Crystal',  icon: '⚡', type: 'charm', tier: 'common',
+                    desc: 'Start each fight with 2 Surge.' },
+  moonstone_ring: { name: 'Moonstone Ring', icon: '💎', type: 'charm', tier: 'rare',
+                    desc: 'Start each fight with 1 Moonstone.' },
+  firefly_lantern:{ name: 'Firefly Lantern',icon: '🏮', type: 'charm', tier: 'rare',
+                    desc: 'Start each fight with 1 Magic Firefly.' },
+
+  // === LEGENDARY (very rare, powerful) ===
+  golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary',
+                    desc: '+1 die on your first roll of every fight.' },
+  shades_cape:   { name: 'Shade's Cape',   icon: '👑', type: 'legendary', tier: 'legendary',
+                    desc: 'Your active ghost gains +1 max HP for this raid.' },
+  valkins_crystal:   { name: "Valkin's Crystal",  icon: '💀', type: 'legendary', tier: 'legendary',
+                    desc: 'Doubles deal +1 bonus damage.' },
+};
+
+// Per-tier loot pools — what can drop at each tier
+const RAID_LOOT_TABLES = {
+  1: { // Rolling Hills
+    singles: ['lucky_charm', 'healing_root', 'ember_stone', 'frost_shard', 'surge_crystal'],
+    doubles: ['ice_blade', 'flame_blade', 'mask_of_day', 'moonstone_ring'],
+    triples: ['golden_dice', 'shades_cape'],
+    resources: { singles: {healingSeed: 1, ice: 1}, doubles: {fire: 2, luckyStone: 1}, triples: {moonstone: 1, fire: 2, ice: 2} }
+  },
+  2: { // Frost Valley
+    singles: ['lucky_charm', 'healing_root', 'frost_shard', 'surge_crystal', 'ember_stone'],
+    doubles: ['ice_blade', 'mask_of_night', 'firefly_lantern', 'moonstone_ring'],
+    triples: ['golden_dice', 'shades_cape', 'valkins_crystal'],
+    resources: { singles: {ice: 2, surge: 2}, doubles: {luckyStone: 2, moonstone: 1}, triples: {moonstone: 2, ice: 3, fire: 2} }
+  },
+  3: { // Volcanic Isles
+    singles: ['ember_stone', 'healing_root', 'surge_crystal', 'lucky_charm', 'frost_shard'],
+    doubles: ['flame_blade', 'mask_of_day', 'mask_of_night', 'firefly_lantern'],
+    triples: ['valkins_crystal', 'golden_dice', 'shades_cape'],
+    resources: { singles: {fire: 2, burn: 2}, doubles: {fire: 3, healingSeed: 2}, triples: {moonstone: 2, fire: 3, burn: 3} }
+  },
+  4: { // Dark Castle
+    singles: ['moonstone_ring', 'firefly_lantern', 'lucky_charm', 'healing_root', 'ember_stone'],
+    doubles: ['ice_blade', 'flame_blade', 'mask_of_night', 'mask_of_day'],
+    triples: ['valkins_crystal', 'shades_cape', 'golden_dice'],
+    resources: { singles: {moonstone: 1, luckyStone: 1}, doubles: {moonstone: 2, fire: 2, ice: 2}, triples: {moonstone: 3, fire: 3, ice: 3, luckyStone: 2} }
+  },
+  5: { // The Dark Spire (Valkin)
+    singles: ['moonstone_ring', 'firefly_lantern', 'ember_stone', 'frost_shard', 'surge_crystal'],
+    doubles: ['ice_blade', 'flame_blade', 'mask_of_day', 'mask_of_night'],
+    triples: ['valkins_crystal', 'golden_dice', 'shades_cape'],
+    resources: { singles: {moonstone: 2, fire: 2}, doubles: {moonstone: 3, fire: 3, ice: 3}, triples: {moonstone: 3, fire: 3, ice: 3, luckyStone: 3, healingSeed: 3} }
+  }
+};
+
+/**
+ * Roll loot after defeating a boss
+ * Returns { roll: [d1,d2,d3], type: 'singles'|'doubles'|'triples', item: {...}|null, resources: {...} }
+ */
+function rollBossLoot(tier) {
+  // Roll 3 dice
+  const roll = [
+    Math.floor(Math.random() * 6) + 1,
+    Math.floor(Math.random() * 6) + 1,
+    Math.floor(Math.random() * 6) + 1
+  ];
+
+  // Classify the roll
+  const counts = {};
+  roll.forEach(d => { counts[d] = (counts[d] || 0) + 1; });
+  const maxCount = Math.max(...Object.values(counts));
+  let rollType = 'singles';
+  if (maxCount >= 3) rollType = 'triples';
+  else if (maxCount >= 2) rollType = 'doubles';
+
+  const table = RAID_LOOT_TABLES[tier] || RAID_LOOT_TABLES[1];
+
+  // Pick an item from the appropriate pool
+  const pool = table[rollType] || [];
+  const itemKey = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+  const item = itemKey ? { key: itemKey, ...RAID_ITEMS[itemKey] } : null;
+
+  // Get resource bonus
+  const resources = table.resources?.[rollType] || {};
+
+  return { roll, rollType, item, resources };
+}
+
+/**
+ * Apply loot items to battle state at fight start
+ * Called when a player begins their boss fight with accumulated raid loot
+ */
+function applyRaidLoot(battleState, team, lootInventory) {
+  if (!lootInventory || !lootInventory.items) return;
+  const t = battleState.teams?.[team] || battleState[team];
+  if (!t) return;
+
+  lootInventory.items.forEach(item => {
+    const def = RAID_ITEMS[item];
+    if (!def) return;
+
+    switch (item) {
+      // Charms — grant starting resources
+      case 'lucky_charm':    if (t.resources) t.resources.luckyStone = (t.resources.luckyStone || 0) + 1; break;
+      case 'healing_root':   if (t.resources) t.resources.healingSeed = (t.resources.healingSeed || 0) + 1; break;
+      case 'ember_stone':    if (t.resources) t.resources.fire = (t.resources.fire || 0) + 1; break;
+      case 'frost_shard':    if (t.resources) t.resources.ice = (t.resources.ice || 0) + 1; break;
+      case 'surge_crystal':  if (t.resources) t.resources.surge = (t.resources.surge || 0) + 2; break;
+      case 'moonstone_ring': if (t.resources) t.resources.moonstone = (t.resources.moonstone || 0) + 1; break;
+      case 'firefly_lantern':if (t.resources) t.resources.firefly = (t.resources.firefly || 0) + 1; break;
+
+      // Blades — forge them immediately
+      case 'ice_blade':
+        if (battleState.iceBladeForgedPermanent) battleState.iceBladeForgedPermanent[team] = true;
+        break;
+      case 'flame_blade':
+        if (battleState.flameBlade) battleState.flameBlade[team] = true;
+        break;
+
+      // Masks — set flags
+      case 'mask_of_day':
+        battleState.maskOfDay = battleState.maskOfDay || {};
+        battleState.maskOfDay[team] = true;
+        break;
+      case 'mask_of_night':
+        battleState.maskOfNight = battleState.maskOfNight || {};
+        battleState.maskOfNight[team] = true;
+        break;
+
+      // Legendary
+      case 'golden_dice':
+        battleState.goldenDice = battleState.goldenDice || {};
+        battleState.goldenDice[team] = true; // +1 die on first roll
+        break;
+      case 'shades_cape':
+        // +1 max HP to active ghost
+        if (t.ghosts && t.ghosts[0]) t.ghosts[0].maxHp = (t.ghosts[0].maxHp || 0) + 1;
+        if (t.ghosts && t.ghosts[0]) t.ghosts[0].hp = (t.ghosts[0].hp || 0) + 1;
+        break;
+      case 'valkins_crystal':
+        battleState.valkinShard = battleState.valkinShard || {};
+        battleState.valkinShard[team] = true; // +1 damage on doubles
+        break;
+    }
+  });
+
+  // Also apply carried resources from previous boss fights
+  if (lootInventory.resources) {
+    Object.entries(lootInventory.resources).forEach(([key, amount]) => {
+      if (t.resources && typeof t.resources[key] !== 'undefined') {
+        t.resources[key] = (t.resources[key] || 0) + amount;
+      }
+    });
+  }
+}
 
 // ─── HP SCALING ─────────────────────────────────────────────────
 // Boss HP = bossGhost.maxHp × multiplier. Each boss naturally varies
@@ -62,6 +244,12 @@ async function joinRaidQueue(raidId, team) {
     if (!badges.includes(bossConfig.requiredBadge)) {
       return { error: 'Missing required badge: ' + RAID_BADGES[bossConfig.requiredBadge]?.name };
     }
+  }
+
+  // Reset raid run inventory for Tier 1 bosses (fresh start each raid run)
+  // Later tiers keep accumulated loot from earlier bosses
+  if (bossConfig.tier === 1) {
+    await db.ref(`mp/users/${user.uid}/raidRunInventory`).remove();
   }
 
   const queueRef = db.ref(`mp/raids/queue/${raidId}/${user.uid}`);
@@ -1120,6 +1308,37 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
       if (badgeEntry) {
         badgePromises.push(awardRaidBadge(p.uid, badgeEntry[0]));
       }
+    }
+
+    // === LOOT ROLL ===
+    // Each player rolls 3 dice to determine their loot drop
+    if (bossDefeated && p.status !== 'disconnected') {
+      const loot = rollBossLoot(bossConfig.tier || 1);
+
+      // Store loot roll result on the instance so UI can show it
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootRoll`] = loot.roll;
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootType`] = loot.rollType;
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItem`] = loot.item ? loot.item.key : null;
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItemName`] = loot.item ? loot.item.name : null;
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItemIcon`] = loot.item ? loot.item.icon : null;
+      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootResources`] = loot.resources;
+
+      // Save to player's raid run inventory (persists across bosses within this raid)
+      const invRef = db.ref(`mp/users/${p.uid}/raidRunInventory`);
+      const invSnap = await invRef.once('value');
+      const inv = invSnap.val() || { items: [], resources: {} };
+
+      // Add item if not already owned
+      if (loot.item && !inv.items.includes(loot.item.key)) {
+        inv.items.push(loot.item.key);
+      }
+
+      // Accumulate resources
+      Object.entries(loot.resources).forEach(([res, amount]) => {
+        inv.resources[res] = (inv.resources[res] || 0) + amount;
+      });
+
+      await invRef.set(inv);
     }
 
     // Clear active raid flag
