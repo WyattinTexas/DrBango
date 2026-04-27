@@ -418,53 +418,52 @@ function injectRaidReturnButton() {
 })();
 
 // ─── PATCH: Alternating turns — swap players after each round ───
-// In raid mode with multiple players, after each round resolves,
-// pause the battle and advance to the next player via Firebase.
+// Intercepts resetRollButtons (called after a round fully resolves)
+// to swap to the next player instead of enabling roll buttons again.
 (function _hookAlternatingTurns() {
-  const _origDoStartNextRound = window._doStartNextRound;
-  if (typeof _origDoStartNextRound !== 'function') return;
+  const _origResetRollButtons = window.resetRollButtons;
+  if (typeof _origResetRollButtons !== 'function') return;
 
-  window._doStartNextRound = function () {
+  window.resetRollButtons = function () {
     // Only intercept in raid mode with multiple players
-    if (!window.RAID_MODE || !currentRaid || !raidBattleState) {
-      return _origDoStartNextRound.call(this);
+    if (!window.RAID_MODE || !currentRaid) {
+      return _origResetRollButtons.call(this);
     }
     const players = currentRaid.players || {};
     const playerCount = Object.keys(players).length;
     if (playerCount <= 1) {
-      // Solo raid — no turn swapping needed
-      return _origDoStartNextRound.call(this);
+      return _origResetRollButtons.call(this);
     }
 
-    // Write a final snapshot so Player 2 sees the last roll result
-    _lastSnapshotHash = ''; // force write
+    // Force one last snapshot write so spectator sees the final state of this round
+    _lastSnapshotHash = '';
 
-    // Pause this player's battle — don't start next round
+    // Stop AI and snapshot sync for this player's turn
     if (typeof stopBlueAI === 'function') stopBlueAI();
     stopSnapshotSync();
 
-    // Hide roll button, show "Waiting for other player..."
+    // Hide roll button, show handoff message
     const rollBtn = document.getElementById('rollRedBtn');
     if (rollBtn) rollBtn.style.display = 'none';
     const narrator = document.getElementById('narrator');
-    if (narrator) narrator.innerHTML = 'Your turn is done — passing to the next raider...';
+    if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
-    // Advance currentFighterIdx in Firebase
-    const currentIdx = raidBattleState.currentSlot || 0;
-    const nextIdx = (currentIdx + 1) % playerCount;
+    // Advance currentFighterIdx in Firebase after a brief delay (let animations finish)
+    setTimeout(() => {
+      if (!currentRaid) return;
+      const currentIdx = raidBattleState?.currentSlot || 0;
+      const nextIdx = (currentIdx + 1) % playerCount;
+      const instanceId = currentRaid.instanceId;
 
-    // Write damage and advance turn
-    const instanceId = currentRaid.instanceId;
-    db.ref(`mp/raids/instances/${instanceId}`).update({
-      currentFighterIdx: nextIdx,
-      currentFighterUid: players[nextIdx]?.uid || null,
-      fightPhase: 'fighting'
-    }).then(() => {
-      console.log('[RAID] Turn passed to player', nextIdx);
-      // Set spectating mode — we'll see the other player fight
-      _isSpectating = true;
-      // Keep the battle screen visible so we can see updates
-    });
+      db.ref(`mp/raids/instances/${instanceId}`).update({
+        currentFighterIdx: nextIdx,
+        currentFighterUid: players[nextIdx]?.uid || null,
+        fightPhase: 'fighting'
+      }).then(() => {
+        console.log('[RAID] Turn passed to player', nextIdx);
+        _isSpectating = true;
+      });
+    }, 1500);
   };
 })();
 
