@@ -197,12 +197,47 @@ const INLINE_BATTLE = (() => {
         };
       });
 
+      // Seed starting resources — every player gets a baseline kit
+      // plus bonuses from their equipped raid loot (if any)
+      const startingRes = {
+        luckyStone: 1,   // 1 Lucky Stone to start
+        healingSeed: 1,  // 1 Healing Seed to start
+        fire: 1,         // 1 Sacred Fire
+        ice: 1,          // 1 Ice Shard
+        surge: 1,        // 1 Surge
+        moonstone: 0,
+        firefly: 0
+      };
+
+      // Apply equipped item bonuses (same logic as applyRaidLoot)
+      try {
+        const invSnap = await _db().ref(`mp/users/${pData.uid}/raidRunInventory`).once('value');
+        const inv = invSnap.val();
+        if (inv?.equipped) {
+          const equipped = inv.equipped;
+          const items = typeof RAID_ITEMS !== 'undefined' ? RAID_ITEMS : {};
+          Object.values(equipped).filter(Boolean).forEach(key => {
+            const def = items[key];
+            if (!def) return;
+            switch (key) {
+              case 'lucky_charm':    startingRes.luckyStone += 1; break;
+              case 'healing_root':   startingRes.healingSeed += 1; break;
+              case 'ember_stone':    startingRes.fire += 1; break;
+              case 'frost_shard':    startingRes.ice += 1; break;
+              case 'surge_crystal':  startingRes.surge += 2; break;
+              case 'moonstone_ring': startingRes.moonstone += 1; break;
+              case 'firefly_lantern':startingRes.firefly += 1; break;
+            }
+          });
+        }
+      } catch (e) { /* silent — baseline resources are fine */ }
+
       players[slot] = {
         uid: pData.uid,
         displayName: pData.displayName || 'Raider',
         ghosts: ghosts,
         activeIdx: 0,
-        resources: { ...EMPTY_RESOURCES },
+        resources: startingRes,
         committed: { fire: 0, ice: 0, surge: 0 },
         damageDealt: 0,
         eliminated: false
@@ -367,12 +402,21 @@ const INLINE_BATTLE = (() => {
     const enrage = state.enrageLevel || 0;
     let preRollLog = [];
 
+    // Track boss personality bonus damage for post-roll application
+    let tyrantBonusDmg = 0;
     if (personality === 'tyrant') {
-      // Tyrant auto-commits all available resources for +damage
-      // (boss doesn't have player-style resources in inline mode,
-      //  so this translates to a flat +1 damage bonus at enrage 3+)
+      // Tyrant: boss wins always deal +1 damage. At enrage 3+, steal 1 random resource.
+      tyrantBonusDmg = 1;
+      preRollLog.push('The Tyrant demands tribute — boss wins deal +1 damage!');
       if (enrage >= 3) {
-        preRollLog.push('The Tyrant channels dark energy...');
+        // Steal a random resource from the rolling player
+        const stealable = ['fire', 'ice', 'surge', 'luckyStone', 'healingSeed']
+          .filter(r => (player.resources[r] || 0) > 0);
+        if (stealable.length > 0) {
+          const stolen = stealable[Math.floor(Math.random() * stealable.length)];
+          updates[`players/${pIdx}/resources/${stolen}`] = player.resources[stolen] - 1;
+          preRollLog.push(`The Tyrant steals your ${stolen === 'luckyStone' ? 'Lucky Stone' : stolen === 'healingSeed' ? 'Healing Seed' : stolen}!`);
+        }
       }
     }
 
@@ -428,6 +472,8 @@ const INLINE_BATTLE = (() => {
       }
       // Enrage 9+: double damage
       if (enrage >= 9) finalDamage *= 2;
+      // Tyrant: boss wins deal +1 damage
+      finalDamage += tyrantBonusDmg;
     }
     // Tie: no damage
 
@@ -495,7 +541,8 @@ const INLINE_BATTLE = (() => {
       playerResult: playerResult,
       bossResult: bossResult,
       winner: winner,
-      finalDamage: finalDamage
+      finalDamage: finalDamage,
+      committedTotal: committedTotal  // preserved for Lucky Stone recalculation
     };
 
     // ─── Determine next phase ───
@@ -636,13 +683,11 @@ const INLINE_BATTLE = (() => {
     const bossResult = lastRoll.bossResult;
     const newWinner = determineWinner(newPlayerResult, bossResult);
 
-    // Recalculate damage
-    const committedTotal = (player.committed.fire || 0)
-                         + (player.committed.ice || 0)
-                         + (player.committed.surge || 0);
+    // Recalculate damage — use committed total saved at roll time (not current, which is 0)
+    const savedCommitted = lastRoll.committedTotal || 0;
     let newFinalDamage = 0;
     if (newWinner === 'player') {
-      newFinalDamage = newPlayerResult.damage + committedTotal;
+      newFinalDamage = newPlayerResult.damage + savedCommitted;
     } else if (newWinner === 'boss') {
       newFinalDamage = bossResult.damage;
       const enrage = state.enrageLevel || 0;
