@@ -210,10 +210,12 @@ function cleanupRaidBattle() {
     battleView.style.display = 'none';
   }
 
-  // ── Show main app ─────────────────────────────────────────────
-  const app = document.getElementById('app');
-  if (app) {
-    app.style.display = '';
+  // ── Show main content ──────────────────────────────────────────
+  if (typeof hideRaidScreen === 'function') {
+    hideRaidScreen(); // properly restores #main-content visibility
+  } else {
+    const mc = document.getElementById('main-content');
+    if (mc) mc.style.display = '';
   }
 
   // ── Restore blue roll button visibility ───────────────────────
