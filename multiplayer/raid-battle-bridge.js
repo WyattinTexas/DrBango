@@ -244,6 +244,17 @@ function cleanupRaidBattle() {
   }
   _registeredRaidGhostIds = [];
 
+  // ── Hide and reset game-over overlay ──────────────────────────
+  const gameOverEl = document.getElementById('gameOver');
+  if (gameOverEl) {
+    gameOverEl.style.display = 'none';
+    gameOverEl.classList.remove('active');
+    gameOverEl.innerHTML = '';
+  }
+
+  // ── Stop blue AI ─────────────────────────────────────────────
+  if (typeof stopBlueAI === 'function') stopBlueAI();
+
   // ── Clear battle state ────────────────────────────────────────
   B = null;
   S.redPicks = [];
