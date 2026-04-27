@@ -358,8 +358,23 @@ function startQueueListener(raidId) {
   raidListeners['queue_' + raidId] = queueRef.on('value', async (snap) => {
     const queue = snap.val();
     if (!queue) {
-      // Empty queue — update UI to show 0 players
+      // Empty queue — instance was likely created. Check if we should enter it.
       if (typeof updateRaidQueueUI === 'function') updateRaidQueueUI(raidId, []);
+      // Failsafe: if we have an activeRaid but aren't in a raid yet, enter it
+      const user = firebase.auth().currentUser;
+      if (user && !currentRaid) {
+        const activeSnap = await db.ref(`mp/users/${user.uid}/activeRaid`).once('value');
+        const activeId = activeSnap.val();
+        if (activeId) {
+          const instSnap = await db.ref(`mp/raids/instances/${activeId}`).once('value');
+          const inst = instSnap.val();
+          if (inst && inst.status !== 'complete' && inst.status !== 'abandoned') {
+            console.log('[RAID] Queue cleared — entering raid via failsafe:', activeId);
+            currentRaid = { instanceId: activeId, ...inst };
+            enterRaidScreen(activeId);
+          }
+        }
+      }
       return;
     }
 
@@ -499,8 +514,10 @@ function startActiveRaidListener() {
   let justCompleted = sessionStorage.getItem('raidJustCompleted');
   sessionStorage.removeItem('raidJustCompleted');
 
+  console.log('[RAID] activeRaid listener registered for', user.uid);
   db.ref(`mp/users/${user.uid}/activeRaid`).on('value', async (snap) => {
     const instanceId = snap.val();
+    console.log('[RAID] activeRaid changed:', instanceId);
     if (!instanceId) {
       if (currentRaid) {
         cleanupRaid();
