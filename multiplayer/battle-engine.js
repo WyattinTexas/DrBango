@@ -107,6 +107,55 @@ function bossWriteSnapshot(redDice, blueDice, winner, damage) {
 }
 
 
+// =================================================================
+// MP / PVP MODE FLAGS
+// =================================================================
+let MP_MODE = false; // set true when loaded via multiplayer page URL params
+let RAID_MODE = false; // set true when loaded via raid mode
+let RAID_PARAMS = null; // { raidId, instanceId, slot, bossHp, bossMaxHp, bossName, personality }
+let LIVE_PVP = false; // true when in real-time PvP mode
+let PVP_SIDE = null;  // 'red' or 'blue' — which side this client controls
+let PVP_GAME_ID = null;
+let PVP_GAME_REF = null;
+let PVP_OPPONENT_READY = false; // tracks if opponent has clicked roll
+let MP_DAILY = false; // true when loaded via daily rival mode
+let MP_PLAYER_NAMES = { red: 'Red', blue: 'Blue' }; // display names for game over screen
+let pvpAbilityEvents = []; // v721: capture ability callouts for Blue sync
+let pvpRedClickedRoll = false; // v733: async MP — AI waits for Red to click READY before rolling
+let pvpBlueResolvedLocally = false; // v725: flag to prevent double-resolution on Blue
+let pvpRedReady = false; // v726: Red has committed resources and is waiting for Blue
+
+// ============================================================
+// BATTLE SPEED — multiplier for all animation/delay timings
+// 0=1x (normal), 1=10x, 2=25x, 3=100x
+// ============================================================
+const SPEED_DIVISORS = [1, 10, 25, 100];
+const SPEED_LABELS = ['1x', '10x', '25x', '100x'];
+function getSpeedDivisor() { return SPEED_DIVISORS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
+function spd(ms) { return Math.max(1, Math.round(ms / getSpeedDivisor())); }
+function updateSpeedLabel() { document.getElementById('speedLabel').textContent = 'Speed: ' + SPEED_LABELS[parseInt(document.getElementById('speedSlider')?.value) || 0]; }
+function getSpecialsTimerSecs() { return parseInt(document.getElementById('specialsTimerSlider')?.value) || 5; }
+
+// Lite Mode — reduce animations for better performance on slower devices
+function toggleLiteMode(on) {
+  document.body.classList.toggle('lite-mode', on);
+  localStorage.setItem('tr_liteMode', on ? '1' : '0');
+}
+
+// Charlie (18) — Flick face detection: determine die value from current 3D rotation
+function getFlickFaceValue(rx, ry) {
+  let best = 1, bestD = Infinity;
+  for (const [v, t] of Object.entries(FACE_TARGET)) {
+    const drx = ((rx % 360) + 360) % 360, try_ = ((t.rx % 360) + 360) % 360;
+    const dry = ((ry % 360) + 360) % 360, tyy = ((t.ry % 360) + 360) % 360;
+    const dx = Math.min(Math.abs(drx - try_), 360 - Math.abs(drx - try_));
+    const dy = Math.min(Math.abs(dry - tyy), 360 - Math.abs(dry - tyy));
+    const d = dx + dy;
+    if (d < bestD) { bestD = d; best = parseInt(v); }
+  }
+  return best;
+}
+
 function initMatchStats() {
   B.matchStats = {
     red: {}, blue: {},
@@ -246,8 +295,6 @@ function pickMatchMvp(winnerTeamName) {
   return best;
 }
 
-let standingsVisibleSets = new Set(['Volcanic Isles','Rolling Hills','Set 1','Dark Castle','Frost Valley']); // all on by default
-
 const RARITY_ORDER = {common:0, uncommon:1, rare:2, 'ghost-rare':3, legendary:4};
 const SET_ORDER = ['Set 1','Dark Castle','Frost Valley','Volcanic Isles','Rolling Hills'];
 function getSetClass(s) {
@@ -274,6 +321,11 @@ function sortBySetThenRarity(a, b) {
 }
 function sortByRarity(a, b) { return (RARITY_ORDER[a.rarity]||0) - (RARITY_ORDER[b.rarity]||0); }
 
+// --- Curated Team Compositions (Wyatt Directive 2026-04-11) ---
+// Each team is [starter, sideline1, sideline2]. Order matters:
+//   starter  = the fighter who battles first
+//   sideline1 = primary support / second fighter
+//   sideline2 = backup / synergy piece
 const CURATED_TEAMS = [
   // ===================== HIGH TIER (15 teams) =====================
 
@@ -283,8 +335,8 @@ const CURATED_TEAMS = [
   [108, 437, 446],
   // #3  Ice Blade Forge — Zain forges Ice Blade from wins, Sylvia free Ice Shards, Finn forges Flame Blade from seeds+fire
   [206, 313, 431],
-  // #4  Resurrection Engine — Bo revives on KO + 3 Fireflies, Lucas buffs revived ghost +3HP/+1die, Granny gains resources on ally KO
-  [109, 433, 310],
+  // #4  Resurrection Engine — Miyoshi Bonzai sacrifices HP for +5 dice, Bo revives on KO + 3 Fireflies, Lucas buffs revived ghost +3HP/+1die
+  [454, 109, 433],
   // #5  Dice Destroyer — Pip triples remove opponent dice permanently, Haywire triples gain permanent die, Willow +1 die after losses
   [418, 78, 435],
   // #6  Resource Avalanche — Chester wins for seeds/fireflies, Twyla spends Lucky Stones for +dice/+seeds, Zippa converts seeds to stones
@@ -381,8 +433,106 @@ const CURATED_TEAMS = [
   [6, 7, 63],
   // #49 Chaos Reroll — Jackson removes HP to reroll dice, Sonya changes die to 2, Dealer numeric order negates damage
   [50, 69, 37],
-  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron negated damage destroys enemy, Masked Hero punishes before-roll effects
+  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron gains dice from enemy specials + damage can't be negated, Masked Hero punishes before-roll effects
   [4, 25, 55],
+
+  // ===================== NEW WAVE (25 teams) =====================
+
+  // #51 Gary's Ice Factory — Skylar boosts Ice Shards to +2, Gary generates 2 shards per 1 rolled from sideline, Artemis wins for 3 shards
+  [104, 92, 307],
+  // #52 Hermit Late Game — Powder dies first (gives 3 Ice Shards on death), Granny harvests KO resources from sideline, Hermit enters last with +2HP per KO'd ghost
+  [23, 310, 47],
+  // #53 Splinter Poison — Splinter wins once to start permanent pre-roll chip, Princess Shade amplifies every pre-roll hit +1, Shoo heals active from sideline
+  [101, 436, 13],
+  // #54 Fredrick Lockdown — Fredrick caps enemy to 3 dice, Antoinette mirrors enemy dice count for parity, Floop punishes enemy doubles with -1 die
+  [27, 82, 20],
+  // #55 Munch Cleanup Crew — Greg bullies with 2x damage when higher HP, Munch gains 4HP on KO to sustain, Calvin & Anna swap on KO for flexibility
+  [49, 66, 91],
+  // #56 Chip Even Doubles — Chip deals +3 on even doubles, Admiral boosts even doubles +2 from sideline, Natalia generates 2 Moonstones on even doubles
+  [16, 71, 327],
+  // #57 Ancient Librarian Math — Librarian stacks +1 damage per 2 rolled by anyone, Sonya forces a die to 2 every roll, Dark Jeff +1 all damage from sideline
+  [3, 69, 74],
+  // #58 Katrina Sustain — Katrina gains 1HP when lower HP, Villager heals +1HP on wins from sideline, Opa gains +1HP on every win or tie
+  [70, 11, 48],
+  // #59 Triple Threat — Larry deals 3x on triples, Haywire gains permanent die + damage on triples, Pip removes enemy die on triples permanently
+  [35, 78, 418],
+  // #60 Cave Ambush — Cave Dweller deals 3x on first-roll win, Dallas steals a die for 2 rolls on entry, Bandit Pete +3 damage when anyone rolls only 2 dice
+  [46, 60, 93],
+  // #61 Bill & Bob Berserker — Bill & Bob deal 2x below 4HP, Cyboo gives +1 die when active below 3HP from sideline, Shade's Shadow chips <4HP enemies from sideline
+  [36, 100, 205],
+  // #62 Wim All-Odds — Wim deals +5 when all dice are odd, Laura adds +3 on numeric order wins, Pale Nimbus adds +2 when roll sum <7 from sideline
+  [65, 79, 88],
+  // #63 Snorton Six Stacker — Tommy chains 6s for extra dice, Snorton deals +5 when 2+ sixes hit, Harvey generates Moonstones per 5 rolled
+  [30, 67, 448],
+  // #64 Kodako Counter — Kodako negates damage and deals 4 on 1-2-3, Little Boo turns enemy triples into 1-2-3, Dealer negates damage on numeric order
+  [1, 9, 37],
+  // #65 Professor Moonstone — Natalia generates Moonstones on even doubles, Professor Hawking rolls +2 dice while holding Moonstone, Benjamin uses Moonstones for free
+  [327, 447, 203],
+  // #66 Dark Fang Disruption — Dark Fang forces enemy swap pre-roll, Raditz forces enemy swap on entry, Winston forces enemy swap on doubles
+  [202, 62, 15],
+  // #67 Bo's Proper Setup — Munch fights first (gains 4HP on KO), Granny harvests resources on ally KO from sideline, Bo enters last to resurrect fallen ally
+  [66, 310, 109],
+  // #68 Gus Swap Punish — Gus forces enemy swap instead of damage, Nicholas deals 2 damage to every entering ghost from sideline, Lars enters with Surge + Stone + Burn
+  [31, 51, 420],
+  // #69 Charlie Double-2s — Charlie deals 7 on double 2s, Ancient Librarian stacks +1 per 2 rolled, Sonya forces a die to 2 every roll
+  [18, 3, 69],
+  // #70 Sparky One-Bomb — Sparky deals +3 per 1 rolled, Gary generates 2 Ice Shards per 1 from sideline, Sad Sal gains Ice Shard on every loss
+  [64, 92, 29],
+  // #71 King Jay Reflect — King Jay reflects all damage on lose+sum=7, Marcus gains 4 extra dice on 3+ damage taken, Puff reduces enemy doubles/triples -1
+  [106, 57, 5],
+  // #72 Patrick Stone Wall — Patrick deals 3 and negates on enemy singles (no dice rolled), Cornelius shuts down all enemy sideline effects, Villager heals +1HP on wins from sideline
+  [10, 45, 11],
+  // #73 Dream Cat Die Ladder — Dream Cat gains +2 dice on mutual doubles, Kairan gains +1 die on any doubles, TMK deals 2x damage on doubles
+  [28, 68, 110],
+  // #74 Nyx Seed Harvest — Zippa deals +1 per Healing Seed held, Harrison spends seeds for extra dice, Nyx & Bessie generate 4 seeds on KO from sideline
+  [423, 315, 415],
+  // #75 Carpenter's Workshop — Dart fights first generating Surge, Carpenter enters and uses Surge to evolve up the chain, Bilbo adds +2 singles from sideline
+  [209, 449, 80],
+  // #76 Dark Pressure — Ryder Toll forces opponent choice (1 dmg or Sacred Fire), Tyler doubles Sacred Fire damage, Princess Shade +1 on all pre-roll chip damage
+  [456, 105, 436],
+
+  // ===================== NEW WAVE 2 (20 teams) =====================
+
+  // #77 Ridley Sniper Squad — Ridley +1 singles/+2 doubles, Dark Jeff +1 all from bench, Bilbo +2 singles from bench. Singles deal +4.
+  [462, 74, 80],
+  // #78 Zork Burn Engine — Ronan generates Ice+Burn on doubles, Zork Smolders Burn into dice, Lars enters with Surge+Stone+Burn fuel
+  [461, 463, 420],
+  // #79 Maisie's Lucky Fives — Maisie 1s→5s, Eli generates Lucky Stones every round, Twyla spends stones for +dice/+seeds
+  [458, 459, 417],
+  // #80 Sophia's Dark Court — Gom wins doubles for Sacred Fire, Sophia comes in for Mask, Willow +1 die on loss from bench
+  [440, 457, 435],
+  // #81 Explorer Jeff's Hoard — Lars enters with 3 specials instantly, Explorer Jeff gets +1 die/+1 dmg at 3+ specials, Chester maintains diversity
+  [420, 455, 426],
+  // #82 Kaylee Dice Thief — Kaylee swaps 2s for opponent's best, Suspicious Jeff steals die on wins from bench, Dallas steals die on entry
+  [453, 61, 60],
+  // #83 Castle Gardener Forge — Gardener converts seeds→fire, Farmer Jeff generates seeds on 6s from bench, Finn forges Flame Blade
+  [442, 314, 204],
+  // #84 Troubling Haters Brawl — Haters grow +2 HP on 4+ damage, Shoo +2 HP when <4 from bench, Jeffery +3 HP on wins from bench
+  [83, 13, 14],
+  // #85 Tyson Tag Team — Tyson hops to dodge matchups, Redd enters with +2 dice power spike, Grawr deals 1 on entry
+  [365, 98, 34],
+  // #86 Michael's Shield Wall — Michael makes bench immune to Burn, Boopies generates stones on seed spends, Kaplan generates seeds on enemy doubles
+  [445, 419, 308],
+  // #87 City Cyboo Anti-Doubles — Cyboo no doubles damage, Puff -1 from doubles/triples, Little Boo turns enemy triples into 1-2-3
+  [77, 5, 9],
+  // #88 Wendy Firefly Factory — Wendy doubles for Fireflies, Goobs bench +5 HP + ties give Fireflies, Jimmy ties for 3 stones + Firefly
+  [441, 444, 352],
+  // #89 Jeanie's Insurance — Stone Cold 7HP tank + 3X double-1s, Jeanie forces enemy reroll once, Guardian Fairy takes hits from bench
+  [73, 90, 99],
+  // #90 Ronan's Dual Engine — Ronan generates Ice+Burn on doubles, Spockles wins for 2 Ice Shards, Ashley wins for Sacred Fire
+  [461, 81, 58],
+  // #91 Ripagoo Transform Chain — Carpenter evolves on Surge, Ripagoo gains 2 Burn per transform from bench, Dart generates Surge on wins
+  [449, 452, 209],
+  // #92 Slicer's Patience — Miyoshi Bonzais for 9 dice (quads possible), Slicer bench destroys sideline ghost on quads, Haywire gains permanent dice on triples
+  [454, 460, 78],
+  // #93 Eli's Slow Build — Eli generates Lucky Stones every round, Dark Jeff +1 all damage from bench, Twyla spends stone mountain for +dice/+seeds
+  [459, 74, 417],
+  // #94 Maisie Power — Maisie 1s→5s boosted rolls, Tabitha +2 doubles from bench, Dark Jeff +1 all from bench
+  [458, 95, 74],
+  // #95 Gom Gom to Lucy — Gom generates Sacred Fire on doubles, Lucy's Shadow waits on bench, Lucy enters and Shadow doubles her fire gains + damage
+  [440, 439, 108],
+  // #96 Ridley Snowball — Ridley +1 singles/+2 doubles, Villager heals +1 on wins from bench, Suspicious Jeff steals die on wins from bench
+  [462, 11, 61],
 ];
 
 // --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
@@ -430,18 +580,21 @@ function pickRandomBoth() {
 // ============================================================
 // BATTLE ENGINE
 // ============================================================
-function ghostData(id) { return getGhost(id); }
+// ghostData(id) defined in header — uses getGhost() from cards.js
+
 
 function makeTeam(ids) {
   return {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      if (!g) { console.warn('[makeTeam] Unknown ghost ID:', id); return { id, name:'???', hp:5, maxHp:5, ko:false, ability:'', abilityDesc:'', rarity:'common', art:'', hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false }; }
-      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability||'', abilityDesc:g.abilityDesc||'', rarity:g.rarity||'common', art:g.art||'',
+      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 }
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 },
+    moonstoneSickness: 0,       // Mode A: permanent stacking counter
+    moonstoneSicknessCount: 0,  // Mode B: escalating counter
+    moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
   };
 }
 
@@ -452,7 +605,8 @@ function teamName(team) { return team===B.red ? 'Red' : 'Blue'; }
 let B = null; // battle state
 let prevResources = { red: {}, blue: {} }; // for resource-gained flash
 
-function log(html) { B.log.unshift(html); }
+const LOG_MAX = 50; // [shadow] perf: cap battle log to prevent unbounded array growth
+function log(html) { B.log.unshift(html); if (B.log.length > LOG_MAX) B.log.length = LOG_MAX; }
 
 function startBattle() {
   prevResources = { red: {}, blue: {} };
@@ -460,8 +614,11 @@ function startBattle() {
   B = {
     red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
     round:1, log:[], phase:'ready',
-    battleStarted: false,
     pendingMoonstone:null, pendingSteal:null,
+    // === HAND LIMIT ===
+    handLimitMode: !!(document.getElementById('handLimitCheckbox')?.checked),
+    HAND_LIMIT: parseInt(document.getElementById('handLimitSlider')?.value) || 3,
+    handLimitPending: null,
     // === DUEL PHASE ===
     // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
     duelPhaseMode: true,
@@ -470,6 +627,7 @@ function startBattle() {
     duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
+    cameronBonusDice: { red: 0, blue: 0 },
     pressureUsed: { red: false, blue: false },
     romyPrediction: { red: null, blue: null },
     pureHeartDeclared: { red: null, blue: null },
@@ -485,8 +643,7 @@ function startBattle() {
     hugoWreckage: { red: 0, blue: 0 },
     logeyLockout: { red: 0, blue: 0 },
     dreamCatBonus: { red: 0, blue: 0 },
-    galeForcePending: { red: false, blue: false },
-    galeForceDecided: { red: false, blue: false },
+    // galeForcePending/galeForceDecided removed — Gus is now reactive post-win
     alucardUsed: { red: false, blue: false },
     jacksonUsedThisRound: { red: false, blue: false },
     sonyaUsedThisRound: { red: false, blue: false },
@@ -496,6 +653,8 @@ function startBattle() {
     chowDecided: { red: false, blue: false },
     zorkDecided: { red: false, blue: false },
     zorkExtraDie: { red: 0, blue: 0 },
+    bonzaiDecided: { red: false, blue: false },
+    battleStarted: false,
     cultivateDecided: { red: false, blue: false },
     willowLostLast: { red: false, blue: false },
     haywireUsed: { red: false, blue: false },
@@ -510,6 +669,12 @@ function startBattle() {
     fangUndercoverSwapPending: null,
     winstonSchemePending: null,
     winstonDiceBonus: { red: 0, blue: 0 },
+    catchyTuneUnlocked: { red: false, blue: false },
+    catchyTuneLockedDie: { red: null, blue: null },
+    catchyTunePending: null,
+    lastRollDiceCount: { red: 3, blue: 3 },
+    tysonDisabled: { red: [], blue: [] },
+    tysonPickerPending: null,
     galeForcePicker: null,
     scallywagsFrenzyBonus: { red: 0, blue: 0 },
     floopMuck: { red: 0, blue: 0 },
@@ -520,8 +685,9 @@ function startBattle() {
     pipToastedUsed: { red: false, blue: false },
     pipDieRemoval: { red: 0, blue: 0 },
     luckyStoneSpentThisTurn: { red: 0, blue: 0 },
-    preRollAbilitiesFiredThisTurn: { red: false, blue: false },
+    preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
+    burnSource: { red: {}, blue: {} },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
     flameBlade: { red: false, blue: false },
@@ -529,14 +695,19 @@ function startBattle() {
     iceBladeSwing: { red: false, blue: false },
     gordokDieBonus: { red: 0, blue: 0 },
     hexDieRemoval: { red: 0, blue: 0 },
+    carpenterHammer: { red: false, blue: false },
+    welderTorch: { red: false, blue: false },
+    foremanDieBonus: { red: 0, blue: 0 },
+    carpenterDiceTrade: { red: 0, blue: 0 },
+    sophiaMask: { red: null, blue: null },
+    sophiaMaskActive: { red: false, blue: false },
   };
   S.battle = B;
   initMatchStats();
-  if (document.getElementById('team-select')) document.getElementById('team-select').style.display = 'none';
+  document.getElementById('team-select').style.display = 'none';
   document.getElementById('battle-view').style.display = 'block';
-  const appEl = document.querySelector('.app');
-  if (appEl) appEl.classList.add('battle-active');
-  startMusic();
+  document.querySelector('.app').classList.add('battle-active');
+  startMusic(); // v721: music plays in multiplayer too
   log('<span class="log-round">Battle begins!</span>');
   renderBattle();
 
@@ -551,6 +722,9 @@ function startBattle() {
   if (splash) {
     document.getElementById('vsRedName').textContent = active(B.red).name;
     document.getElementById('vsBlueName').textContent = active(B.blue).name;
+    if (RAID_MODE && RAID_PARAMS) {
+      document.getElementById('vsBlueName').textContent = '\u2694 ' + RAID_PARAMS.bossName + ' \u2694';
+    }
     const redBench = B.red.ghosts.filter((g,i) => i !== B.red.activeIdx).map(g => g.name);
     const blueBench = B.blue.ghosts.filter((g,i) => i !== B.blue.activeIdx).map(g => g.name);
     document.getElementById('vsRedRoster').textContent = redBench.join(' / ');
@@ -568,48 +742,58 @@ function startBattle() {
       const secondTeam = (_priority === 'blue') ? B.red  : B.blue;
       const firstEntryCount = triggerEntry(firstTeam);
       renderBattle();
-      const firstEntryDelay = firstEntryCount > 0 ? firstEntryCount * 1500 : 300;
-      setTimeout(() => {
+      afterEntryWithJenkins(firstEntryCount, () => {
         const secondEntryCount = triggerEntry(secondTeam);
         renderBattle();
-        const secondEntryDelay = secondEntryCount > 0 ? secondEntryCount * 1500 : 300;
-        setTimeout(() => {
+        afterEntryWithJenkins(secondEntryCount, () => {
           // All entry effects done — check for KOs, then enable rolling
-          B.battleStarted = true;
+          B.battleStarted = true; // Nicholas Sneak Attack can now fire on swaps
           if (handleKOs()) return;
           // Duel Phase v1: check for priority before unlocking rolls
           startNextRound();
           narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
-        }, secondEntryDelay);
-      }, firstEntryDelay);
-    }, 2200);
+        });
+      });
+    }, spd(2200));
   } else {
     // No splash — fire entries in Duel Phase priority order, then enable
     const _priority2 = computeDuelPriority();
     const firstTeam2  = (_priority2 === 'blue') ? B.blue : B.red;
     const secondTeam2 = (_priority2 === 'blue') ? B.red  : B.blue;
-    triggerEntry(firstTeam2);
-    triggerEntry(secondTeam2);
-    B.battleStarted = true;
-    renderBattle();
-    if (handleKOs()) return;
-    narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
-    if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
-    if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+    const ec1 = triggerEntry(firstTeam2);
+    afterEntryWithJenkins(ec1, () => {
+      const ec2 = triggerEntry(secondTeam2);
+      afterEntryWithJenkins(ec2, () => {
+        renderBattle();
+        B.battleStarted = true; // Nicholas Sneak Attack can now fire on swaps
+        if (handleKOs()) return;
+        narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
+        if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
+        if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
+      });
+    });
   }
 }
 
 function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
   const enemy = opp(team);
-  if (skipEntryEffects) return 0; // Tyson's Hop: no entry effects
+  if (skipEntryEffects) return 0;
 
   const entryTeamName = team === B.red ? 'red' : 'blue';
+
+  // Tyson (365) — Hop: when a disabled ghost enters play, re-enable its sideline ability
+  if (B.tysonDisabled && B.tysonDisabled[entryTeamName].includes(team.activeIdx)) {
+    B.tysonDisabled[entryTeamName] = B.tysonDisabled[entryTeamName].filter(i => i !== team.activeIdx);
+    log(`<span class="log-ability">${f.name}</span> — enters play! Sideline ability re-enabled.`);
+  }
   narrate(`<b class="${entryTeamName}-text">${f.name}</b> enters the arena!`);
 
   // Castle Guide (420) — Burn: check if the entering ghost has burn on it
   // Mike (445) — Torrent: while Mike is on the team (sideline), entering ghosts are immune to Burn
   let burnEntryFired = false;
+  // Debug: log burn state on every entry for tracking burn-not-firing issues
+  if (DEBUG) console.log(`[BURN DEBUG] ${f.name} (id:${f.id}) entering for ${entryTeamName}, activeIdx=${team.activeIdx}, B.burn[${entryTeamName}]=`, JSON.stringify(B.burn?.[entryTeamName] || {}));
   if (B.burn && B.burn[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const burnCount = B.burn[entryTeamName][activeIdx] || 0;
@@ -618,20 +802,40 @@ function triggerEntry(team, skipEntryEffects) {
     if (burnCount > 0 && !f.ko && mikeProtects) {
       // Mike's Torrent: sideline immune to Burn — consume burn, deal 0
       delete B.burn[entryTeamName][activeIdx];
+      if (B.burnSource && B.burnSource[entryTeamName]) delete B.burnSource[entryTeamName][activeIdx];
       burnEntryFired = true;
       showAbilityCallout('TORRENT!', 'var(--rare)', `Mike — Torrent! Sideline immune to Burn! ${f.name} takes no damage.`, entryTeamName);
       log(`<span class="log-ability">Mike</span> — Torrent! <span class="log-heal">Sideline immune to Burn!</span> ${f.name} takes no damage.`);
     } else if (burnCount > 0 && !f.ko && f.id !== 416) {
+      // Welder (450) active OR Welder's Torch permanent: burns deal +1 extra damage
+      const oppTeamName = entryTeamName === 'red' ? 'blue' : 'red';
+      const welderBurnBonus = (active(B[oppTeamName]).id === 450 && !active(B[oppTeamName]).ko) || (B.welderTorch && B.welderTorch[oppTeamName]) ? burnCount : 0;
+      const totalBurnDmg = burnCount + welderBurnBonus;
       const burnPre = f.hp;
-      f.hp = Math.max(0, f.hp - burnCount);
-      if (f.hp <= 0) { f.ko = true; f.killedBy = -2; } // burn kill
+      f.hp = Math.max(0, f.hp - totalBurnDmg);
+      // Credit the Spiritkin who placed the most burn on this ghost
+      if (f.hp <= 0) {
+        f.ko = true;
+        let topBurner = -2;
+        const sources = B.burnSource && B.burnSource[entryTeamName] && B.burnSource[entryTeamName][activeIdx];
+        if (sources) {
+          let maxCount = 0;
+          for (const [sid, cnt] of Object.entries(sources)) {
+            if (cnt > maxCount) { maxCount = cnt; topBurner = parseInt(sid); }
+          }
+        }
+        f.killedBy = topBurner;
+      }
       delete B.burn[entryTeamName][activeIdx];
+      if (B.burnSource && B.burnSource[entryTeamName]) delete B.burnSource[entryTeamName][activeIdx];
       burnEntryFired = true;
-      showAbilityCallout('BURN!', 'var(--accent)', `${f.name} takes ${burnCount} burn damage on entry! (${burnPre} → ${f.hp} HP)${f.ko ? ' KO!' : ''}`, entryTeamName);
-      log(`<span class="log-dmg">${f.name}</span> — Burn! <span class="log-dmg">${burnCount} damage on entry!</span> (${burnPre} → ${f.hp} HP)${f.ko ? ' <span class="log-ko">KO!</span>' : ''}`);
+      const welderBurnLabel = welderBurnBonus > 0 ? ` (Welder's Torch: +${welderBurnBonus}!)` : '';
+      showAbilityCallout('BURN!', 'var(--accent)', `${f.name} takes ${totalBurnDmg} Burn damage on entry!${welderBurnLabel} (${burnPre} → ${f.hp} HP)${f.ko ? ' KO!' : ''}`, entryTeamName);
+      log(`<span class="log-dmg">${f.name}</span> — Burn! <span class="log-dmg">${totalBurnDmg} damage on entry!</span>${welderBurnLabel} (${burnPre} → ${f.hp} HP)${f.ko ? ' <span class="log-ko">KO!</span>' : ''}`);
     } else if (burnCount > 0 && f.id === 416) {
       // Rook (416) — Immune to Burn: consume burn but take no damage
       delete B.burn[entryTeamName][activeIdx];
+      if (B.burnSource && B.burnSource[entryTeamName]) delete B.burnSource[entryTeamName][activeIdx];
       burnEntryFired = true;
       showAbilityCallout('BURN IMMUNE!', 'var(--rare)', `${f.name} — Immune to Burn! No damage taken.`, entryTeamName);
       log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Burn!</span> No damage taken.`);
@@ -697,24 +901,24 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Jenkins (94) — Greeting: on entry, roll 4 dice and deal damage by roll TYPE (not sum).
-  // Boo's dice combat uses singles=1, doubles=2, triples=3, quads=4, penta=5 — Jenkins is no
-  // exception. The advantage of 4 dice is better odds of hitting doubles/triples/quads, not a
-  // bigger damage number. Previously this summed the dice face values (bug: 4×6=24 possible).
+  // Deferred to interactive modal — dice are pre-computed here, damage applied after player rolls.
   if (f.id === 94) {
     const ef = active(enemy);
     if (!ef.ko) {
       const jenkinsDice = rollDice(4);
       const jenkinsRoll = classify(jenkinsDice);
-      const jenkinsDmg = jenkinsRoll.damage; // 1/2/3/4/5 by roll type
-      ef.hp = Math.max(0, ef.hp - jenkinsDmg);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
-      const enemyName = enemy === B.red ? 'red' : 'blue';
-      const rollLabel = describeRoll(jenkinsRoll);
-      entryCallouts.push(['GREETING!', 'var(--ghost-rare)',
-        `${f.name} — rolled [${jenkinsDice.join(', ')}] — ${rollLabel} → ${jenkinsDmg} entry damage to ${ef.name}!`, entryTeamName]);
-      log(`<span class="log-ability">${f.name}</span> — Greeting! Rolled [${jenkinsDice.join(', ')}] — ${rollLabel} → <span class="log-dmg">${jenkinsDmg} entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
-      playDamageSfx(jenkinsDmg);
-      hitDamage(enemyName);
+      const jenkinsDmg = jenkinsRoll.damage;
+      const enemyTeamName = enemy === B.red ? 'red' : 'blue';
+      B.jenkinsPending = {
+        team: entryTeamName,
+        enemyTeam: enemyTeamName,
+        dice: jenkinsDice,
+        roll: jenkinsRoll,
+        damage: jenkinsDmg,
+        enemyName: ef.name,
+        jenkinsName: f.name
+      };
+      // No callout here — the modal handles the reveal
       collectKnightReactions();
     }
   }
@@ -741,7 +945,7 @@ function triggerEntry(team, skipEntryEffects) {
 
   // Hermit (47) — Solitude: on entry, gain +2 HP per ghost defeated on both teams
   if (f.id === 47) {
-    const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
+    const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko && !g.isPadded).length;
     if (koCount > 0) {
       const gain = koCount * 2;
       const before = f.hp;
@@ -811,8 +1015,9 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Nicholas (51) — Sneak Attack: while on the sideline, deal 2 damage to the entering ghost
-  // Does NOT fire at battle start (round 1) — sideline hasn't "flipped" yet. Only fires on mid-battle swaps.
-  if (hasSideline(enemy, 51) && !f.ko && B.round > 1) {
+  // Does NOT fire at initial battle setup — only fires on mid-battle swaps (KO, Pressure, Gus, etc.)
+  // B.battleStarted is set to true after the initial entry sequence completes.
+  if (hasSideline(enemy, 51) && !f.ko && B.battleStarted) {
     const nicholasGhost = getSidelineGhost(enemy, 51);
     f.hp = Math.max(0, f.hp - 2);
     if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
@@ -838,7 +1043,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Fire all entry callouts sequentially — each 1500ms after the previous
   // c[3] = team string for card-glow spotlight; undefined = narrator-only fallback
   entryCallouts.forEach((c, i) => {
-    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
   });
   return entryCallouts.length;
 }
@@ -896,13 +1101,15 @@ let afkTimer = null;
 function resetAfkTimer() {
   clearTimeout(afkTimer);
   document.querySelectorAll('#rollRedBtn, #rollBlueBtn').forEach(b => b.classList.remove('pulse'));
+  // At higher speeds, shave 1s off AFK pulse (5s→4s) — player still has plenty of time
+  const afkDelay = getSpeedDivisor() > 1 ? 4000 : 5000;
   afkTimer = setTimeout(() => {
     if (B && B.phase === 'ready') {
       document.querySelectorAll('#rollRedBtn, #rollBlueBtn').forEach(b => {
         if (!b.disabled && !b.classList.contains('locked')) b.classList.add('pulse');
       });
     }
-  }, 5000);
+  }, afkDelay);
 }
 
 function classify(dice) {
@@ -913,6 +1120,7 @@ function classify(dice) {
   const mx = Math.max(...Object.values(c));
   const vals = Object.entries(c).filter(([,v])=>v===mx).map(([k])=>+k);
   const mv = Math.max(...vals);
+  if (mx>=6) return {type:mx+'-of-a-kind',value:mv,damage:mx};
   if (mx>=5) return {type:'penta',value:mv,damage:5};
   if (mx>=4) return {type:'quads',value:mv,damage:4};
   if (mx>=3) return {type:'triples',value:mv,damage:3};
@@ -921,6 +1129,7 @@ function classify(dice) {
 }
 
 function describeRoll(r) {
+  if (r.type.endsWith('-of-a-kind')) return `${r.damage} ${r.value}'s!!!`;
   if (r.type==='penta') return `five ${r.value}'s!`;
   if (r.type==='quads') return `four ${r.value}'s!`;
   if (r.type==='triples') return `three ${r.value}'s`;
@@ -928,9 +1137,31 @@ function describeRoll(r) {
   return `${r.value} high`;
 }
 
-function isTripleOrBetter(type) { return ['triples','quads','penta'].includes(type); }
+function isTripleOrBetter(type) { return ['triples','quads','penta'].includes(type) || type.endsWith('-of-a-kind'); }
+
+// Dark Fang (202) — Pressure: returns true if the OPPONENT has Dark Fang active, blocking healing for this team
+function deathHowlBlocksHealing(teamName) {
+  if (!B) return false;
+  const oppTeamName = teamName === 'red' ? 'blue' : 'red';
+  const oppActive = active(B[oppTeamName]);
+  return oppActive && oppActive.id === 202 && !oppActive.ko;
+}
+// Masked Hero (55) — Underdog: immune to before-roll damage
+function maskedHeroImmune(ghost) {
+  return ghost && ghost.id === 55 && !ghost.ko;
+}
+// Dark Fang — guarded heal: adds HP only if not blocked. Returns true if heal went through.
+function guardedHeal(ghost, amount, teamName) {
+  if (deathHowlBlocksHealing(teamName)) {
+    log(`<span class="log-ability">Dark Fang</span> — Pressure! ${ghost.name}'s healing blocked!`);
+    return false;
+  }
+  ghost.hp += amount;
+  return true;
+}
 
 function typeLabel(type) {
+  if (type.endsWith('-of-a-kind')) return type.toUpperCase() + '!!!';
   if (type==='penta') return 'PENTA!!';
   if (type==='quads') return 'QUADS!';
   if (type==='triples') return 'TRIPLES!';
@@ -940,10 +1171,14 @@ function typeLabel(type) {
 
 // Helper: check if a team has a ghost with given id on sideline (alive)
 function hasSideline(team, id) {
-  return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+  const teamName = B && team === B.red ? 'red' : 'blue';
+  const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
+  return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
 }
 function getSidelineGhost(team, id) {
-  return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id);
+  const teamName = B && team === B.red ? 'red' : 'blue';
+  const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
+  return team.ghosts.find((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
 }
 function hasAlive(team, id) {
   return team.ghosts.some(g => !g.ko && g.id === id);
@@ -951,7 +1186,7 @@ function hasAlive(team, id) {
 function isStraight(dice) {
   if (!dice || dice.length < 2) return false;
   const sorted = [...new Set(dice)].sort((a, b) => a - b);
-  if (sorted.length !== dice.length) return false;
+  if (sorted.length !== dice.length) return false; // no repeats
   return sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
 }
 
@@ -965,7 +1200,7 @@ function popSidelineCard(teamObj, ghostId) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.classList.add('sideline-pop');
-  setTimeout(() => el.classList.remove('sideline-pop'), 1300);
+  setTimeout(() => el.classList.remove('sideline-pop'), spd(1300));
 }
 
 // Helper: check if opponent has Dylan (301) on sideline to negate before-roll effects
@@ -1003,9 +1238,61 @@ function triggerBorisHook(team) {
   });
 }
 
+// Cameron (25) — Unstoppable Force: opponent uses a special → Cameron's team gains +1 die
+// Called with the team that USED the special — Cameron must be on the OPPOSING team.
+// immediate=true: post-roll context (Lucky Stone, Moonstone) — roll an extra die and add it NOW.
+// immediate=false (default): pre-roll context — store for Phase 2 dice computation next roll.
+function triggerCameronSpecialWatch(usingTeam, immediate) {
+  if (!B) return;
+  const oppTeamName = usingTeam === 'red' ? 'blue' : 'red';
+  const oppTeam = B[oppTeamName];
+  if (!oppTeam) return;
+  const cameronAlive = oppTeam.ghosts.some(g => g.id === 25 && !g.ko);
+  if (!cameronAlive) return;
+  const camGhost = oppTeam.ghosts.find(g => g.id === 25 && !g.ko);
+  const loc = oppTeam.ghosts[oppTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
+
+  if (immediate && B.pendingResolve) {
+    // Post-roll: immediately roll 1 extra die and splice it into Cameron's team dice
+    const extraDie = Math.floor(Math.random() * 6) + 1;
+    const diceKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
+    const prKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
+    const dice = B.pendingResolve[prKey] || B[diceKey] || [];
+    dice.push(extraDie);
+    dice.sort((a, b) => a - b);
+    B.pendingResolve[prKey] = dice;
+    B[diceKey] = dice;
+    renderDice(B.redDice, B.blueDice);
+    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die rolled immediately! [${extraDie}]</span>`);
+    showAbilityCallout('UNSTOPPABLE FORCE!', 'var(--common)', `${camGhost.name} — +1 die! Rolled a ${extraDie}!`, oppTeamName);
+  } else {
+    // Pre-roll: store for next roll's Phase 2 dice computation
+    if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
+    B.cameronBonusDice[oppTeamName]++;
+    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
+  }
+}
+
 // ========================================
 // RESOURCE SPENDING
 // ========================================
+// v729: broadcast resource/committed changes live so opponent sees pre-roll decisions
+function pvpBroadcastCommitted(team) {
+  if (!LIVE_PVP || !PVP_GAME_REF || !B || team !== PVP_SIDE) return;
+  const t = B[team];
+  const f = active(t);
+  PVP_GAME_REF.child('committedUpdate').set({
+    side: team,
+    committed: { ...B.committed[team] },
+    resources: { ...t.resources },
+    activeHp: f ? f.hp : 0,
+    // v735: include burn state so opponent's engine knows about burn placement
+    burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : null,
+    burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : null,
+    ts: Date.now()
+  });
+}
+
 function cycleCommit(team, type) {
   if (!isPreRollActive(team)) return;
   const t = B[team];
@@ -1042,7 +1329,14 @@ function cycleCommit(team, type) {
     narrate(`<b class="${team}-text">${teamLabel}</b> committed <b>${c[type]} Surge</b> — <b class="gold">+${c[type]} ${c[type]>1?'dice':'die'}</b> this roll!`);
   }
   playSfx('sfxSpecial', 0.3);
+  // Carpenter (449) — transforms into Welder when a Surge is committed
+  if (type === 'surge' && c[type] > 0 && f && f.id === 449 && !f.ko) {
+    carpenterTransform(team);
+  }
+  // Cameron (25) — Unstoppable Force: opponent committed a special → Cameron gains +1 die
+  if (c[type] > 0) triggerCameronSpecialWatch(team);
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function refundCommitted() {
@@ -1066,6 +1360,13 @@ function spendHealingSeed(team) {
   const t = B[team];
   const f = active(t);
   if (t.resources.healingSeed <= 0 || f.hp >= f.maxHp) return;
+  // Dark Fang (202) — Pressure: enemy ghost cannot heal
+  if (deathHowlBlocksHealing(team)) {
+    t.resources.healingSeed--;
+    log(`<span class="log-ability">Dark Fang</span> — Pressure! ${f.name}'s Healing Seed consumed but healing blocked!`);
+    renderBattle();
+    return;
+  }
   t.resources.healingSeed--;
   f.hp = Math.min(f.maxHp, f.hp + 1);
   playSfx('sfxSpecial', 0.4);
@@ -1090,7 +1391,11 @@ function spendHealingSeed(team) {
     log(`<span class="log-ability">${boopiesName}</span> — Boopie Magic! Healing Seed spent → <span class="log-ms">+1 Lucky Stone!</span>`);
   }
 
+  // Cameron (25) — Unstoppable Force: opponent used a special
+  triggerCameronSpecialWatch(team);
+
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function sacrificeHappyCrystal(team) {
@@ -1117,6 +1422,7 @@ function toggleAuntSusan(team) {
     t.resources.healingSeed--;
   }
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function uncommitAuntSusan(team) {
@@ -1128,6 +1434,7 @@ function uncommitAuntSusan(team) {
     t.resources.healingSeed++;
   }
   renderBattle();
+  pvpBroadcastCommitted(team);
 }
 
 function toggleAuntSusanHeal(team) {
@@ -1189,6 +1496,77 @@ function useFinnFlameBlade(team) {
   renderBattle();
 }
 
+// Carpenter (449) → Welder (450) transform: called when Surge is committed while Carpenter is active
+function carpenterTransform(team) {
+  const t = B[team];
+  const g = active(t);
+  if (g.id !== 449 || g.ko) return;
+  // Preserve original identity
+  g.originalId = g.originalId || g.id;
+  g.originalName = g.originalName || g.name;
+  g.originalArt = g.originalArt || g.art;
+  g.originalMaxHp = g.originalMaxHp || g.maxHp;
+  g.originalAbility = g.originalAbility || g.ability;
+  g.originalAbilityDesc = g.originalAbilityDesc || g.abilityDesc;
+  g.originalRarity = g.originalRarity || g.rarity;
+  // Transform into Welder
+  const welderData = ghostData(450);
+  g.id = 450; g.name = welderData.name; g.maxHp = welderData.maxHp;
+  g.hp = welderData.maxHp; // Full heal on evolution
+  g.ability = welderData.ability; g.abilityDesc = welderData.abilityDesc;
+  g.art = welderData.art; g.rarity = welderData.rarity;
+  // Leave behind Carpenter's Hammer
+  if (!B.carpenterHammer) B.carpenterHammer = { red: false, blue: false };
+  B.carpenterHammer[team] = true;
+  queueAbility('TRANSFORMATION!', 'var(--rare)', `Carpenter transforms into the Welder! Carpenter's Hammer forged! (+2 singles, permanent)`, null, team);
+  log(`<span class="log-ability">Carpenter</span> — Evolution! <span class="log-ms">WELDER rises!</span> Carpenter's Hammer left behind!`);
+  checkRipagooTransform(team);
+  renderBattle();
+}
+
+// Welder (450) → Foreman (451) transform: called when any die shows a 4
+function welderTransform(team) {
+  const t = B[team];
+  const g = active(t);
+  if (g.id !== 450 || g.ko) return;
+  // Preserve original identity (may already have original from Carpenter stage)
+  g.originalId = g.originalId || g.id;
+  g.originalName = g.originalName || g.name;
+  g.originalArt = g.originalArt || g.art;
+  g.originalMaxHp = g.originalMaxHp || g.maxHp;
+  g.originalAbility = g.originalAbility || g.ability;
+  g.originalAbilityDesc = g.originalAbilityDesc || g.abilityDesc;
+  g.originalRarity = g.originalRarity || g.rarity;
+  // Transform into Foreman
+  const foremanData = ghostData(451);
+  g.id = 451; g.name = foremanData.name; g.maxHp = foremanData.maxHp;
+  g.hp = foremanData.maxHp; // Full heal on evolution
+  g.ability = foremanData.ability; g.abilityDesc = foremanData.abilityDesc;
+  g.art = foremanData.art; g.rarity = foremanData.rarity;
+  // Leave behind Welder's Torch
+  if (!B.welderTorch) B.welderTorch = { red: false, blue: false };
+  B.welderTorch[team] = true;
+  queueAbility('TRANSFORMATION!', 'var(--rare)', `Welder transforms into the Foreman! Welder's Torch forged! (burns +1, wins give Burn, permanent)`, null, team);
+  log(`<span class="log-ability">Welder</span> — Evolution! <span class="log-ms">FOREMAN rises!</span> Welder's Torch left behind!`);
+  checkRipagooTransform(team);
+  renderBattle();
+}
+
+// Ripagoo (452) — Chemical Y: sideline — if a card in play transforms, gain 2 Burn
+function checkRipagooTransform(team) {
+  const t = B[team];
+  if (hasSideline(t, 452)) {
+    if (!t.resources.burn) t.resources.burn = 0;
+    t.resources.burn += 2;
+    const rg = getSidelineGhost(t, 452);
+    const rName = rg ? rg.name : 'Ripagoo';
+    popSidelineCard(t, 452);
+    showAbilityCallout('CHEMICAL Y!', 'var(--uncommon)', `${rName} (sideline) — Transformation detected! +2 Burn!`, team);
+    log(`<span class="log-ability">${rName}</span> — Chemical Y! Transformation → <span class="log-burn">+2 Burn!</span>`);
+    renderBattle();
+  }
+}
+
 function toggleFlameBlade(team) {
   if (!isPreRollActive(team)) return;
   if (!B.flameBlade || !B.flameBlade[team]) return;
@@ -1245,9 +1623,10 @@ function uncommitHarrison(team) {
 // ============================================================
 // KNIGHT EFFECTS — Heavy Air (401) & Retribution (402)
 // ============================================================
-function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
+function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost, deferredHeavyAir) {
   // abilityTeamName = the team whose ability is triggering
   // sidelineGhost = optional: the sideline ghost using the ability (if not the active fighter)
+  // deferredHeavyAir = optional array: if provided, Heavy Air damage is stored here instead of applied immediately
   // The OPPONENT of that team might have Heavy Air or Retribution
   const oppTeamName = abilityTeamName === 'red' ? 'blue' : 'red';
   const oppTeam = B[oppTeamName];
@@ -1258,15 +1637,20 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost) {
     const abilityTeam = B[abilityTeamName];
     const target = active(abilityTeam);
     if (!target.ko) {
-      target.hp = Math.max(0, target.hp - 2);
-      if (target.hp <= 0) { target.ko = true; target.killedBy = 401; }
-      const targetName = target.name;
-      if (abilityQueueMode) {
-        queueAbility('HEAVY AIR!', 'var(--rare)', `Knight Terror — ${targetName} loses 2 HP!`, null, oppTeamName);
+      if (deferredHeavyAir) {
+        // Deferred mode: store the hit, apply only if Knight Terror survives the round
+        deferredHeavyAir.push({ target, targetName: target.name, oppTeamName });
       } else {
-        showAbilityCallout('HEAVY AIR!', 'var(--rare)', `Knight Terror — ${targetName} loses 2 HP!`, oppTeamName);
+        target.hp = Math.max(0, target.hp - 2);
+        if (target.hp <= 0) { target.ko = true; target.killedBy = 401; }
+        const targetName = target.name;
+        if (abilityQueueMode) {
+          queueAbility('HEAVY AIR!', 'var(--rare)', `Knight Terror — ${targetName} loses 2 HP!`, null, oppTeamName);
+        } else {
+          showAbilityCallout('HEAVY AIR!', 'var(--rare)', `Knight Terror — ${targetName} loses 2 HP!`, oppTeamName);
+        }
+        log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${targetName} loses 2 HP!</span> ${target.ko ? '<span class="log-ko">KO!</span>' : target.hp + ' HP left'}`);
       }
-      log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${targetName} loses 2 HP!</span> ${target.ko ? '<span class="log-ko">KO!</span>' : target.hp + ' HP left'}`);
     }
   }
 
@@ -1326,7 +1710,7 @@ function useTysonHop(team) {
 }
 
 // ============================================================
-// PRESSURE — manual pre-roll ability (Death Howl 202)
+// PRESSURE — manual pre-roll ability (Dark Fang 202)
 // ============================================================
 function usePressure(team) {
   if (!isPreRollActive(team)) return;
@@ -1335,6 +1719,14 @@ function usePressure(team) {
   const enemy = opp(t);
   const enemyTeamName = team === 'red' ? 'blue' : 'red';
   if (f.id !== 202 || f.ko || dylanNegates(enemy)) return;
+
+  // Barnaby (326) — Stubborn: immune to forced swaps by opponent effects
+  const _barnabyPressure = active(enemy);
+  if (_barnabyPressure && _barnabyPressure.id === 326 && !_barnabyPressure.ko) {
+    log(`<span class="log-ability">Barnaby</span> — Stubborn! Dark Fang's Pressure is blocked — ${_barnabyPressure.name} cannot be forced out.`);
+    narrate(`<b class="${team}-text">Dark Fang</b> — Pressure blocked! <b>${_barnabyPressure.name}</b> refuses to leave!`);
+    return;
+  }
 
   const aliveSideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
   if (aliveSideline.length === 0) return;
@@ -1351,7 +1743,7 @@ function usePressure(team) {
   const whoBanner = document.getElementById('pressureWho');
   whoBanner.className = `pm-who-banner ${enemyTeamName}`;
   whoBanner.textContent = `🎯 ${enemyLabel.toUpperCase()} PICKS`;
-  document.getElementById('pressureTitle').textContent = `Pressure! — Death Howl forces a swap`;
+  document.getElementById('pressureTitle').textContent = `Pressure! — Dark Fang forces a swap`;
   document.getElementById('pressureSub').textContent = `${enemyLabel} team: choose which ghost enters the fight.`;
   document.getElementById('pressureOptions').innerHTML = aliveSideline.map(g => {
     const realIdx = enemy.ghosts.indexOf(g);
@@ -1368,6 +1760,7 @@ function usePressure(team) {
   }).join('');
   // Lock out Roll buttons while the opponent picks — phase resets to 'ready' in doPressureSwap
   B.phase = 'pressure';
+  B.pressurePickerTeam = enemyTeamName; // v728: track which team picks (for PvP auto-resolve)
   document.getElementById('pressureOverlay').classList.add('active');
 }
 
@@ -1388,7 +1781,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
   const enemy = opp(t);
   const oldGhost = active(enemy);
   const oldName = oldGhost.name;
-  // Pressure is a forced swap by Death Howl — NOT Tyson's voluntary Hop.
+  // Pressure is a forced swap by Dark Fang — NOT Tyson's voluntary Hop.
   // Entry effects always fire for the incoming ghost regardless of who was forced out.
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
@@ -1405,13 +1798,10 @@ function doPressureSwap(attackerTeam, targetIdx) {
   // fires (triggerEntry's first setTimeout is at i=0 → ~0ms, which stomped PRESSURE! instantly).
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(enemy, false);
-    // Wait for all entry callouts to clear, then restore roll buttons.
-    // If handleKOs() returns true (entry caused a KO), openKoSwap manages its own restoration.
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (!handleKOs()) { startNextRound(); }
-    }, afterEntry);
-  }, 1500);
+    });
+  }, spd(1500));
 }
 
 // ============================================================
@@ -1455,6 +1845,8 @@ function doSeleneChoice(choice) {
       log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">2 Healing Seeds</span>!`);
     } else {
       _selTeam.resources.luckyStone += 3;
+      // Update lsAvailable so the post-roll Lucky Stone window sees these new stones
+      if (B.lsAvailable) B.lsAvailable[sp.tName] = (B.lsAvailable[sp.tName] || 0) + 3;
       log(`<span class="log-ability">${_selName}</span> — Heart of the Hills! Doubles → chose <span class="log-ms">3 Lucky Stones</span>!`);
     }
     renderBattle();
@@ -1494,10 +1886,10 @@ function doWiseAlChoice(choice) {
   B.wiseAlPending = null;
   document.getElementById('wiseAlOverlay').classList.remove('active');
   if (choice === 'ice') {
-    wp.winTeam.resources.ice += 4;
+    wp.winTeam.resources.ice = (wp.winTeam.resources.ice || 0) + 4;
     checkKnightEffects(wp.winTeamName, wp.wF.name);
     log(`<span class="log-ability">${wp.wF.name}</span> — Squall! <span class="log-ice">+4 Ice Shards</span> instead of dealing damage!`);
-    queueAbility('SQUALL!', 'var(--rare)', `${wp.wF.name} — +4 Ice Shards instead of dealing damage!`, () => { renderBattle(); }, wp.winTeamName);
+    queueAbility('SQUALL!', 'var(--rare)', `${wp.wF.name} — +4 ❄️ Ice Shards instead of dealing damage!`, () => { renderBattle(); }, wp.winTeamName);
   } else {
     // Deal the stashed damage
     wp.lF.hp = Math.max(0, wp.lF.hp - wp.dmg);
@@ -1508,12 +1900,52 @@ function doWiseAlChoice(choice) {
   drainAbilityQueue(() => { if (wp.resume) wp.resume(); });
 }
 
+// Sophia (457) — Masquerade: show choice modal
+function showSophiaModal(resumeCallback) {
+  const sp = B.sophiaPending;
+  if (!sp) { resumeCallback(); return; }
+  sp.resume = resumeCallback;
+  document.getElementById('sophiaSub').textContent = `Deal ${sp.dmg} damage or gain a mask (once per game)?`;
+  document.getElementById('sophiaDmgBtn').textContent = `⚔️ Deal ${sp.dmg} Damage`;
+  document.getElementById('sophiaOverlay').classList.add('active');
+}
+
+function doSophiaChoice(choice) {
+  const sp = B.sophiaPending;
+  if (!sp) return;
+  B.sophiaPending = null;
+  document.getElementById('sophiaOverlay').classList.remove('active');
+  if (choice === 'day' || choice === 'night') {
+    B.sophiaMask[sp.winTeamName] = choice;
+    B.sophiaMaskActive[sp.winTeamName] = true;
+    const maskName = choice === 'day' ? '☀️ Mask of Day' : '🌙 Mask of Night';
+    const maskDesc = choice === 'day' ? 'Gain 1 Burn for each 1 or 2 you roll' : 'Roll the same number of dice as the enemy ghost, +1 damage';
+    checkKnightEffects(sp.winTeamName, sp.wF.name);
+    log(`<span class="log-ability">${sp.wF.name}</span> — Masquerade! Gained <b>${maskName}</b> instead of dealing damage! (${maskDesc})`);
+    queueAbility('MASQUERADE!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
+  } else {
+    // Deal the stashed damage
+    sp.lF.hp = Math.max(0, sp.lF.hp - sp.dmg);
+    if (sp.lF.hp <= 0) { sp.lF.ko = true; sp.lF.killedBy = (sp.wF.originalId || sp.wF.id); }
+    log(`<span class="log-dmg">${sp.wF.name} deals ${sp.dmg} to ${sp.lF.name}!</span> ${sp.lF.ko?'<span class="log-ko">KO!</span>':sp.lF.hp+' HP left'}`);
+    renderBattle();
+  }
+  drainAbilityQueue(() => { if (sp.resume) sp.resume(); });
+}
+
+function toggleSophiaMask(team) {
+  if (!isPreRollActive(team)) return;
+  if (!B.sophiaMask[team]) return;
+  B.sophiaMaskActive[team] = !B.sophiaMaskActive[team];
+  renderBattle();
+}
+
 // Gordok (430) — River Terror: show choice modal
 function showGordokModal(resumeCallback) {
   const gp = B.gordokPending;
   if (!gp) { resumeCallback(); return; }
   gp.resume = resumeCallback;
-  document.getElementById('gordokSub').textContent = `Deal ${gp.dmg} damage or steal 2 resources?`;
+  document.getElementById('gordokSub').textContent = `Deal ${gp.dmg} damage or steal up to 2 resources?`;
   document.getElementById('gordokDmgBtn').textContent = `⚔️ Deal ${gp.dmg} Damage`;
   document.getElementById('gordokOverlay').classList.add('active');
 }
@@ -1617,6 +2049,85 @@ function doTimberChoice(choice) {
   abilityQueueMode = true;
   queueAbility('HOWL!', 'var(--legendary)', subtitle, null, tp.timberTeam);
   checkKnightEffects(tp.timberTeam, timberName); // queues HEAVY AIR! or RETRIBUTION! if applicable
+  abilityQueueMode = false;
+  drainAbilityQueue(() => {
+    if (tp._oppBtn) { tp._oppBtn.classList.remove('locked'); tp._oppBtn.disabled = false; }
+    if (resume) resume();
+  });
+}
+
+// Ryder (456) — Toll choice modal
+function showRiderModal(tp, resumeCallback) {
+  const oppLabel = tp.oppTeamName.charAt(0).toUpperCase() + tp.oppTeamName.slice(1);
+  const bannerEl = document.getElementById('riderBanner');
+  if (bannerEl) {
+    bannerEl.textContent = `⚔️ ${oppLabel.toUpperCase()} MUST CHOOSE`;
+    bannerEl.className = `selene-banner ${tp.oppTeamName}`;
+    bannerEl.style.background = 'linear-gradient(135deg,#1a1a2e,#4a1942)';
+  }
+  const titleEl = document.getElementById('riderTitle');
+  if (titleEl) titleEl.textContent = `Ryder — Toll!`;
+  const subEl = document.getElementById('riderSub');
+  if (subEl) subEl.textContent = `${oppLabel}: pay the toll!`;
+  narrate(`<b class="${tp.oppTeamName}-text">${oppLabel}</b>&nbsp;faces <b class="gold">RYDER!</b>&nbsp;Take 1 damage or give Ryder Sacred Fire!`);
+  B.riderPending._resumeCallback = resumeCallback;
+  document.getElementById('riderOverlay').classList.add('active');
+}
+
+function doRiderChoice(choice) {
+  const tp = B.riderPending;
+  if (!tp) return;
+  const resume = tp._resumeCallback;
+  const oppLabel = tp.oppTeamName.charAt(0).toUpperCase() + tp.oppTeamName.slice(1);
+  const riderGhost = active(B[tp.riderTeam]);
+  const riderName = riderGhost ? riderGhost.name : 'Ryder';
+  B.riderPending = null;
+  document.getElementById('riderOverlay').classList.remove('active');
+  let subtitle;
+  if (choice === 'damage') {
+    // Opponent takes 1 damage
+    const oppGhost = active(tp.team);
+    if (oppGhost && !oppGhost.ko) {
+      oppGhost.hp = Math.max(0, oppGhost.hp - 1);
+      if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 456; }
+      subtitle = `${oppLabel}'s ${oppGhost.name} takes 1 damage! (${oppGhost.hp}/${oppGhost.maxHp} HP)`;
+      log(`<span class="log-ability">${oppLabel}</span> chose to take 1 damage from Ryder's Toll! ${oppGhost.name} → ${oppGhost.hp}/${oppGhost.maxHp} HP.`);
+      // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
+      if (oppGhost.id === 24 && !oppGhost.ko) {
+        tp.team.resources.fire = (tp.team.resources.fire || 0) + 2;
+        queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Toll damage → +2 Sacred Fire!`, tp.oppTeamName);
+        log(`<span class="log-ability">Simon</span> — Brew Time! Took Toll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+      }
+      // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius 45)
+      if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
+        oppGhost.hp = Math.max(0, oppGhost.hp - 1);
+        if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 436; }
+        queueAbility('BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${oppGhost.name}!`, tp.riderTeam);
+        log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
+        popSidelineCard(B[tp.riderTeam], 436);
+        // Simon takes Bounty damage too
+        if (oppGhost.id === 24 && !oppGhost.ko) {
+          tp.team.resources.fire = (tp.team.resources.fire || 0) + 1;
+          queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Took Bounty damage → +2 Sacred Fire!`, tp.oppTeamName);
+          log(`<span class="log-ability">Simon</span> — Brew Time! Took Bounty damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+        }
+      } else if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && hasSideline(tp.team, 45)) {
+        const cornGhost = getSidelineGhost(tp.team, 45);
+        queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Princess Shade's Bounty!`, tp.oppTeamName);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Princess Shade Bounty blocked!`);
+      }
+    }
+  } else {
+    // Give Ryder +1 Sacred Fire
+    const riderTeamObj = B[tp.riderTeam];
+    riderTeamObj.resources.fire = (riderTeamObj.resources.fire || 0) + 1;
+    subtitle = `${riderName} gains +1 Sacred Fire! (${riderTeamObj.resources.fire} total)`;
+    log(`<span class="log-ability">${oppLabel}</span> chose to give ${riderName} +1 Sacred Fire! (${riderTeamObj.resources.fire} total)`);
+  }
+  renderBattle();
+  abilityQueueMode = true;
+  queueAbility('TOLL!', 'var(--rare)', subtitle, null, tp.riderTeam);
+  checkKnightEffects(tp.riderTeam, riderName);
   abilityQueueMode = false;
   drainAbilityQueue(() => {
     if (tp._oppBtn) { tp._oppBtn.classList.remove('locked'); tp._oppBtn.disabled = false; }
@@ -1855,21 +2366,24 @@ function doTylerChoice(choice) {
     log(`<span class="log-ability">${f.name}</span> — Heating Up! Spent 2 HP for +1 die (${prevHp} → ${f.hp} HP).`);
     renderBattle();
     // Short pause so the callout is visible before the dice roll
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
     narrate(`<b class="${team}-text">Tyler</b> holds HP — rolling without the trade.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
 // ============================================================
 // GUARDIAN FAIRY (99) — Wish: reactive damage swap handler
 // ============================================================
+let gfWishTimer = null;
 function doGuardianFairyReactive(choice) {
   const gfp = B.guardianFairyReactivePending;
   if (!gfp) return;
   B.guardianFairyReactivePending = null;
-  document.getElementById('guardianFairyOverlay').classList.remove('active');
+  // Clear timer and hide button
+  if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+  document.getElementById('gfWishBtn').style.display = 'none';
   const { loseTeamName, gfGhost, dmg, lF, resume } = gfp;
   const loseTeam = B[loseTeamName];
   if (choice === 'yes') {
@@ -1884,7 +2398,7 @@ function doGuardianFairyReactive(choice) {
     queueAbility('WISH!', 'var(--ghost-rare)', `${gfName} — leaps in to absorb ${dmg} damage for ${lF.name}!${gfGhost.ko ? ' GF falls!' : ' ' + gfGhost.hp + ' HP left'}`, null, loseTeamName);
     log(`<span class="log-ability">${gfName}</span> — Wish! Absorbed ${dmg} damage for ${lF.name}! ${gfGhost.ko ? '<span class="log-ko">GF falls!</span>' : gfGhost.hp + ' HP left'}`);
     renderBattle();
-    if (resume) setTimeout(resume, 1500);
+    if (resume) setTimeout(resume, spd(1500));
   } else {
     // Damage applies to the original ghost
     lF.hp = Math.max(0, lF.hp - dmg);
@@ -1893,6 +2407,33 @@ function doGuardianFairyReactive(choice) {
     renderBattle();
     if (resume) setTimeout(resume, 200);
   }
+}
+
+// Show GF Wish as a timed button with countdown — auto-declines on expiry
+function showGfWishButton() {
+  const gfp = B.guardianFairyReactivePending;
+  if (!gfp) return;
+  const gfG = gfp.gfGhost;
+  const gfName = gfG.name || 'Guardian Fairy';
+  const btn = document.getElementById('gfWishBtn');
+  const cdEl = document.getElementById('gfWishCountdown');
+  const subEl = document.getElementById('gfWishSub');
+  subEl.innerHTML = `${gfName} absorbs ${gfp.dmg} dmg for ${gfp.lF.name}!`;
+  btn.style.display = 'block';
+  btn.onclick = () => doGuardianFairyReactive('yes');
+  const secs = getSpecialsTimerSecs();
+  let remaining = secs;
+  cdEl.textContent = remaining;
+  narrate(`<b class="${gfp.loseTeamName}-text">🧚 ${gfName}</b> can take this hit! Click to activate!`);
+  if (gfWishTimer) clearInterval(gfWishTimer);
+  gfWishTimer = setInterval(() => {
+    remaining--;
+    cdEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(gfWishTimer); gfWishTimer = null;
+      doGuardianFairyReactive('no'); // auto-decline
+    }
+  }, 1000);
 }
 
 // ============================================================
@@ -1916,14 +2457,14 @@ function doChowChoice(choice) {
     renderBattle();
     // If more seeds available, allow another use (re-offer after callout clears)
     if (B[team].resources.healingSeed >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     } else {
       B.chowDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     B.chowDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -1947,34 +2488,166 @@ function useZorkStoke(team) {
 }
 
 // ============================================================
-// CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire
+// MIYOSHI (433) — Bonzai!: sacrifice 4 HP for +5 dice
 // ============================================================
-function doCultivateChoice(choice) {
-  const cp = B.cultivatePending;
-  if (!cp) return;
-  B.cultivatePending = null;
-  document.getElementById('cultivateOverlay').classList.remove('active');
-  const { team, btn } = cp;
+// ============================================================
+// KAYLEE (453) — Slipstream: interactive dice swap
+// ============================================================
+function showSlipstreamPicker(team, myDice, oppDice, callback) {
+  B.slipstreamState = { team, myDice, oppDice, callback, myIdx: null, oppIdx: null, step: 1 };
+  const myContainer = document.getElementById('slipstreamMyDice');
+  const oppContainer = document.getElementById('slipstreamOppDice');
+  const stepLabel = document.getElementById('slipstreamStep');
+  stepLabel.textContent = "Step 1: Pick YOUR die to give away";
+
+  // Render my dice as clickable buttons
+  myContainer.innerHTML = myDice.map((d, i) =>
+    `<button class="die" style="cursor:pointer;font-size:22px;min-width:44px;padding:8px 12px;" onclick="slipstreamPickMy(${i})" id="slipMy${i}">${d}</button>`
+  ).join('');
+
+  // Render opponent dice (not clickable yet)
+  oppContainer.innerHTML = oppDice.map((d, i) =>
+    `<button class="die" style="cursor:default;opacity:0.5;font-size:22px;min-width:44px;padding:8px 12px;" id="slipOpp${i}">${d}</button>`
+  ).join('');
+
+  document.getElementById('slipstreamOverlay').classList.add('active');
+}
+
+function slipstreamPickMy(idx) {
+  const s = B.slipstreamState;
+  if (!s || s.step !== 1) return;
+  s.myIdx = idx;
+  s.step = 2;
+  // Highlight selected die
+  for (let i = 0; i < s.myDice.length; i++) {
+    const el = document.getElementById('slipMy' + i);
+    if (el) el.style.opacity = i === idx ? '1' : '0.3';
+  }
+  // Enable opponent dice clicking
+  document.getElementById('slipstreamStep').textContent = "Step 2: Pick OPPONENT's die to take";
+  for (let i = 0; i < s.oppDice.length; i++) {
+    const el = document.getElementById('slipOpp' + i);
+    if (el) { el.style.cursor = 'pointer'; el.style.opacity = '1'; el.onclick = () => slipstreamPickOpp(i); }
+  }
+}
+
+function slipstreamPickOpp(idx) {
+  const s = B.slipstreamState;
+  if (!s || s.step !== 2) return;
+  s.oppIdx = idx;
+  document.getElementById('slipstreamOverlay').classList.remove('active');
+
+  // Perform the swap
+  const gave = s.myDice[s.myIdx];
+  const took = s.oppDice[s.oppIdx];
+  s.myDice[s.myIdx] = took;
+  s.oppDice[s.oppIdx] = gave;
+  s.myDice.sort((a, b) => a - b);
+  s.oppDice.sort((a, b) => a - b);
+
+  const _slipF = active(B[s.team]);
+  B.slipstreamStolen = { team: s.team, gave, took };
+  showAbilityCallout('SLIPSTREAM!', 'var(--rare)', `${_slipF.name} — Swapped ${gave} for opponent's ${took}!`, s.team);
+  log(`<span class="log-ability">${_slipF.name}</span> — Slipstream! <span class="log-dmg">Swapped ${gave} for opponent's ${took}!</span>`);
+  renderDice(B.redDice, B.blueDice);
+
+  B.slipstreamState = null;
+  // Resume resolution after a brief delay for the callout
+  setTimeout(() => s.callback(), spd(1500));
+}
+
+function doSlipstreamChoice(choice) {
+  if (choice === 'skip') {
+    document.getElementById('slipstreamOverlay').classList.remove('active');
+    const s = B.slipstreamState;
+    B.slipstreamState = null;
+    if (s && s.callback) s.callback();
+  }
+}
+
+// Bonzai pre-roll BUTTON handler (clicked before Roll)
+function useTobyButton(team) {
   const f = active(B[team]);
-  if (choice === 'yes' && f && f.id === 442 && !f.ko && B[team].resources.healingSeed >= 1) {
-    B[team].resources.healingSeed--;
-    B[team].resources.fire = (B[team].resources.fire || 0) + 1;
-    // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
-    if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
-    showAbilityCallout('CULTIVATE!', 'var(--uncommon)',
-      `${f.name} — discarded 1 Healing Seed → +1 Sacred Fire!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Cultivate! Discarded 1 Healing Seed → +1 Sacred Fire!`);
-    renderBattle();
-    // If more seeds available, re-offer (repeatable)
-    if (B[team].resources.healingSeed >= 1) {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
-    } else {
-      B.cultivateDecided[team] = true;
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+  if (!f || f.id !== 97 || f.ko) return;
+  if (!B.pureHeartDeclared || B.pureHeartDeclared[team] !== null) return;
+  B.pureHeartDeclared[team] = true;
+  showAbilityCallout('PURE HEART!', 'var(--ghost-rare)',
+    `${f.name} — declares the final roll! Win = instant KO! Toby sacrifices next round.`, team);
+  narrate(`<b class="gold">PURE HEART!</b> Toby declares the final roll — a win ends it all!`);
+  log(`<span class="log-ability">${f.name}</span> — PURE HEART declared! Win this roll = instant KO. Toby sacrifices next round.`);
+  renderBattle();
+}
+
+function useBonzaiButton(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 454 || f.ko || f.hp <= 4) return;
+  if (B.bonzaiDecided[team]) return;
+  const preHp = f.hp;
+  f.hp -= 4;
+  if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+  B.bonzaiDecided[team] = true;
+  // Store the dice bonus for consumption during roll setup
+  if (!B.bonzaiBtnDice) B.bonzaiBtnDice = { red: 0, blue: 0 };
+  B.bonzaiBtnDice[team] = 5;
+  showAbilityCallout('BONZAI!', 'var(--rare)',
+    `${f.name} — sacrificed 4 HP for +5 dice! (${preHp} → ${f.hp} HP)`, team);
+  log(`<span class="log-ability">${f.name}</span> — BONZAI! Sacrificed 4 HP → +5 dice! (${preHp} → ${f.hp} HP)`);
+  playDamageSfx(3);
+  hitDamage(team);
+  renderBattle();
+}
+
+function doBonzaiChoice(choice) {
+  const bp = B.bonzaiPending;
+  if (!bp) return;
+  B.bonzaiPending = null;
+  document.getElementById('bonzaiOverlay').classList.remove('active');
+  const { team, btn } = bp;
+  const f = active(B[team]);
+  if (choice === 'yes' && f && f.id === 454 && !f.ko && f.hp > 4) {
+    const preHp = f.hp;
+    f.hp -= 4;
+    if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+    // Add dice directly to preRoll count so they apply to THIS roll, not next
+    if (B.preRoll && B.preRoll[team]) {
+      B.preRoll[team].count = Math.min(10, B.preRoll[team].count + 5);
     }
+    showAbilityCallout('BONZAI!', 'var(--rare)',
+      `${f.name} — sacrificed 4 HP for +5 dice! (${preHp} → ${f.hp} HP)`, team);
+    log(`<span class="log-ability">${f.name}</span> — BONZAI! Sacrificed 3 HP → +5 dice! (${preHp} → ${f.hp} HP)`);
+    playDamageSfx(3);
+    hitDamage(team);
+    renderBattle();
+    B.bonzaiDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
-    B.cultivateDecided[team] = true;
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    B.bonzaiDecided[team] = true;
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+  }
+}
+
+// ============================================================
+// CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 2 Sacred Fire (pre-roll button)
+// ============================================================
+function useCultivate(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 442 || f.ko) return;
+  if (!B[team].resources || B[team].resources.healingSeed < 1) return;
+  B[team].resources.healingSeed--;
+  B[team].resources.fire = (B[team].resources.fire || 0) + 2;
+  // Boopies (419) — Boopie Magic: sideline Healing Seed spending = +1 Lucky Stone
+  if (hasSideline(B[team], 419)) { B[team].resources.luckyStone = (B[team].resources.luckyStone || 0) + 1; }
+  showAbilityCallout('CULTIVATE!', 'var(--uncommon)',
+    `${f.name} — discarded 1 Healing Seed → +2 Sacred Fire!`, team);
+  log(`<span class="log-ability">${f.name}</span> — Cultivate! Discarded 1 Healing Seed → +2 Sacred Fire!`);
+  renderBattle();
+}
+// Legacy wrapper for old overlay (no longer used)
+function doCultivateChoice(choice) {
+  document.getElementById('cultivateOverlay').classList.remove('active');
+  if (choice === 'yes') {
+    const cp = B.cultivatePending;
+    if (cp) { B.cultivatePending = null; useCultivate(cp.team); }
   }
 }
 
@@ -2032,15 +2705,18 @@ function doNickKnackSteal(team, resKey) {
     B[team].resources[resKey] = (B[team].resources[resKey] || 0) + 1;
     const resLabel = resKey === 'luckyStone' ? 'Lucky Stone' : resKey === 'moonstone' ? 'Moonstone' : resKey === 'healingSeed' ? 'Healing Seed' : resKey === 'ice' ? 'Ice Shard' : resKey === 'fire' ? 'Sacred Fire' : 'Surge';
     const f = active(B[team]);
-    // Nick & Knack gains +3 HP on steal (overclocks past maxHp per game rules)
-    f.hp += 3;
+    // Nick & Knack gains +1 HP + 2 Burn on steal
+    f.hp += 1;
+    // Grant 2 Burn as resource (player places via burn picker during pre-roll)
+    if (!B[team].resources.burn) B[team].resources.burn = 0;
+    B[team].resources.burn += 2;
     showAbilityCallout('KNICK KNACK!', 'var(--uncommon)',
-      `${f.name} — stole 1 ${resLabel} from the opponent! +3 HP! (${f.hp} HP)`, team);
-    log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span> from opponent! <span class="log-heal">+3 HP</span> (${f.hp} HP)!`);
+      `${f.name} — stole 1 ${resLabel}! +1 HP + 2 Burn!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span>! <span class="log-heal">+1 HP</span> + 2 Burn!`);
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -2092,12 +2768,34 @@ function doBurnPlace(team, ghostIndex) {
   if (!B.burn[enemyTeamName]) B.burn[enemyTeamName] = {};
   B.burn[enemyTeamName][ghostIndex] = (B.burn[enemyTeamName][ghostIndex] || 0) + 1;
 
+  // Track which Spiritkin placed this burn for KO credit
+  const burnPlacer = active(B[team]);
+  const burnPlacerId = burnPlacer ? (burnPlacer.originalId || burnPlacer.id) : 0;
+  if (!B.burnSource) B.burnSource = { red: {}, blue: {} };
+  if (!B.burnSource[enemyTeamName]) B.burnSource[enemyTeamName] = {};
+  if (!B.burnSource[enemyTeamName][ghostIndex]) B.burnSource[enemyTeamName][ghostIndex] = {};
+  B.burnSource[enemyTeamName][ghostIndex][burnPlacerId] = (B.burnSource[enemyTeamName][ghostIndex][burnPlacerId] || 0) + 1;
+
   const targetGhost = B[enemyTeamName].ghosts[ghostIndex];
   const totalBurn = B.burn[enemyTeamName][ghostIndex];
   log(`<span class="log-ability">BURN!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalBurn} total)`);
   showAbilityCallout('BURN!', 'var(--rare)', `${targetGhost.name} has been marked! ${totalBurn} Burn on entry!`, team);
 
+  // Mable Stadango (446) — Hex: when you place Burn, enemy loses 1 die next roll (in play only)
+  const mableActive = active(B[team]);
+  if (mableActive && mableActive.id === 446 && !mableActive.ko) {
+    if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
+    B.hexDieRemoval[enemyTeamName] = (B.hexDieRemoval[enemyTeamName] || 0) + 1;
+    log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
+    showAbilityCallout('HEX!', 'var(--uncommon)', `${mableActive.name} — Burn placed! Enemy -1 die next roll!`, team);
+  }
+
+  // Cameron (25) — Unstoppable Force: opponent used a special (Burn)
+  triggerCameronSpecialWatch(team);
+
   renderBattle();
+  // v735: broadcast burn state so opponent's engine knows about it
+  pvpBroadcastCommitted(team);
 
   // If still have burn to place, re-open picker after a brief delay
   if (t.resources.burn > 0) {
@@ -2135,6 +2833,8 @@ function showFireflyPicker(team) {
   const optionsEl = document.getElementById('fireflyOptions');
   let html = '';
   resources.forEach(r => {
+    // Hide Moonstone if already at cap (max 1)
+    if (r.key === 'moonstone' && (t.resources.moonstone || 0) >= 1) return;
     html += `<button class="selene-opt" onclick="doFireflyConvert('${team}','${r.key}')" style="background:linear-gradient(135deg,#8b6914,#daa520);">${r.emoji} ${r.label}</button>`;
   });
   html += `<button class="selene-opt" onclick="closeFireflyPicker()" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
@@ -2147,6 +2847,12 @@ function doFireflyConvert(team, resourceKey) {
   const t = B[team];
   if (!t.resources.firefly || t.resources.firefly <= 0) { closeFireflyPicker(); return; }
 
+  // Block moonstone conversion if already at cap
+  if (resourceKey === 'moonstone' && (t.resources.moonstone || 0) >= 1) {
+    closeFireflyPicker();
+    showFireflyPicker(team);
+    return;
+  }
   t.resources.firefly--;
   if (!t.resources[resourceKey]) t.resources[resourceKey] = 0;
   t.resources[resourceKey]++;
@@ -2254,6 +2960,175 @@ function finishJasperRoll() {
 }
 
 // ============================================================
+// SKY (72) — Elusive: damage negated + interactive counter die
+// ============================================================
+function showSkyElusiveModal(resumeCallback) {
+  const sp = B.skyElusivePending;
+  if (!sp) { if (resumeCallback) resumeCallback(); return; }
+  B.skyElusiveResume = resumeCallback;
+  document.getElementById('skyElusiveTitle').textContent = `${sp.lFName} — Elusive!`;
+  document.getElementById('skyElusiveSub').innerHTML = `Damage negated! Roll a counter die against <b>${sp.wFName}</b>!`;
+  const dieEl = document.getElementById('skyElusiveDie');
+  if (dieEl) { dieEl.textContent = '?'; dieEl.style.transform = 'rotate(0deg)'; }
+  const btn = document.getElementById('skyElusiveRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '💨 Roll Counter Die!'; }
+  document.getElementById('skyElusiveOverlay').classList.add('active');
+}
+
+function doSkyElusiveRoll() {
+  const btn = document.getElementById('skyElusiveRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const sp = B.skyElusivePending;
+  if (!sp) { finishSkyElusive(); return; }
+  const finalValue = sp.counterDie;
+  const dieEl = document.getElementById('skyElusiveDie');
+  if (!dieEl) { finishSkyElusive(); return; }
+  let ticks = 0;
+  const totalTicks = 10;
+  const shuffle = setInterval(() => {
+    ticks++;
+    dieEl.textContent = String(Math.floor(Math.random() * 6) + 1);
+    dieEl.style.transform = `rotate(${ticks * 36}deg)`;
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      dieEl.textContent = String(finalValue);
+      dieEl.style.transform = 'rotate(0deg)';
+      dieEl.style.background = finalValue >= 4
+        ? 'linear-gradient(135deg,#bfdbfe,#3b82f6)'
+        : 'linear-gradient(135deg,#dbeafe,#93c5fd)';
+      setTimeout(() => finishSkyElusive(), 900);
+    }
+  }, 70);
+}
+
+function finishSkyElusive() {
+  const sp = B.skyElusivePending;
+  const resume = B.skyElusiveResume;
+  B.skyElusivePending = null;
+  B.skyElusiveResume = null;
+  document.getElementById('skyElusiveOverlay').classList.remove('active');
+  if (sp) {
+    const wTeamName = sp.winTeamName;
+    const wTeamObj = B[wTeamName];
+    const wF = wTeamObj ? active(wTeamObj) : null;
+    if (wF && wF.name === sp.wFName) {
+      wF.hp = Math.max(0, wF.hp - sp.counterDie);
+      if (wF.hp <= 0 && !wF.ko) { wF.ko = true; wF.killedBy = 72; }
+    }
+    log(`<span class="log-ability">${sp.lFName}</span> — Elusive! Counter die: <span class="log-dmg">${sp.counterDie} damage</span> to ${sp.wFName}! ${wF && wF.ko ? '<span class="log-ko">KO!</span>' : (wF ? wF.hp + ' HP left' : '')}`);
+    renderBattle();
+  }
+  if (resume) setTimeout(resume, 300);
+}
+
+// ============================================================
+// JENKINS (94) — Greeting: interactive 4-dice entry roll modal
+// ============================================================
+function showJenkinsModal(resumeCallback) {
+  const jp = B.jenkinsPending;
+  if (!jp) { if (resumeCallback) resumeCallback(); return; }
+  B.jenkinsResume = resumeCallback;
+  document.getElementById('jenkinsTitle').textContent = `${jp.jenkinsName} — Greeting!`;
+  document.getElementById('jenkinsSub').innerHTML = `${jp.jenkinsName} enters the fight — roll 4 dice for entry damage to <b>${jp.enemyName}</b>!`;
+  document.getElementById('jenkinsResult').style.display = 'none';
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('jenkinsDie' + i);
+    if (d) { d.textContent = '?'; d.style.transform = 'rotate(0deg)'; d.style.background = 'linear-gradient(135deg,#a7f3d0,#34d399)'; d.style.borderColor = '#10b981'; d.style.color = '#064e3b'; }
+  }
+  const btn = document.getElementById('jenkinsRollBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '👋 Roll the Greeting Dice!'; }
+  narrate(`<b class="${jp.team}-text">${jp.jenkinsName}</b> — <b class="gold">GREETING!</b>`);
+  document.getElementById('jenkinsOverlay').classList.add('active');
+}
+
+function doJenkinsRoll() {
+  const btn = document.getElementById('jenkinsRollBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const jp = B.jenkinsPending;
+  if (!jp) { finishJenkinsRoll(); return; }
+
+  // Shuffle animation across all 4 dice, landing on pre-computed values
+  // [shadow] perf: cache die elements before interval to avoid 4 getElementById calls per 65ms tick
+  const jenkinsDieEls = Array.from({length: 4}, (_, i) => document.getElementById('jenkinsDie' + i));
+  const jenkinsResultEl = document.getElementById('jenkinsResult');
+  let ticks = 0;
+  const totalTicks = 12;
+  const tickMs = 65;
+  const shuffle = setInterval(() => {
+    ticks++;
+    jenkinsDieEls.forEach(d => {
+      if (d) {
+        d.textContent = String(Math.floor(Math.random() * 6) + 1);
+        d.style.transform = `rotate(${ticks * 30}deg)`;
+      }
+    });
+    if (ticks >= totalTicks) {
+      clearInterval(shuffle);
+      // Land on final values
+      jenkinsDieEls.forEach((d, i) => {
+        if (d) {
+          d.textContent = String(jp.dice[i]);
+          d.style.transform = 'rotate(0deg)';
+        }
+      });
+      // Color dice based on damage result
+      const dmg = jp.damage;
+      let bg, border, color;
+      if (dmg >= 4) { bg = 'linear-gradient(135deg,#fde68a,#f59e0b)'; border = '#f59e0b'; color = '#78350f'; }
+      else if (dmg >= 2) { bg = 'linear-gradient(135deg,#fbbf24,#d97706)'; border = '#b45309'; color = '#78350f'; }
+      else { bg = 'linear-gradient(135deg,#a7f3d0,#34d399)'; border = '#10b981'; color = '#064e3b'; }
+      jenkinsDieEls.forEach(d => {
+        if (d) { d.style.background = bg; d.style.borderColor = border; d.style.color = color; }
+      });
+      // Show result label
+      const rollLabel = describeRoll(jp.roll);
+      if (jenkinsResultEl) {
+        jenkinsResultEl.innerHTML = `<span style="color:var(--ghost-rare);">${rollLabel}</span> → <span style="color:var(--accent);">${dmg} damage</span> to ${jp.enemyName}!`;
+        jenkinsResultEl.style.display = 'block';
+      }
+      setTimeout(() => finishJenkinsRoll(), 1200);
+    }
+  }, tickMs);
+}
+
+function finishJenkinsRoll() {
+  const jp = B.jenkinsPending;
+  const resume = B.jenkinsResume;
+  B.jenkinsPending = null;
+  B.jenkinsResume = null;
+  document.getElementById('jenkinsOverlay').classList.remove('active');
+  if (jp) {
+    // Apply the deferred damage now
+    const enemyTeam = B[jp.enemyTeam];
+    const ef = enemyTeam ? active(enemyTeam) : null;
+    if (ef && ef.name === jp.enemyName && !ef.ko) {
+      ef.hp = Math.max(0, ef.hp - jp.damage);
+      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 94; }
+    }
+    const rollLabel = describeRoll(jp.roll);
+    log(`<span class="log-ability">${jp.jenkinsName}</span> — Greeting! Rolled [${jp.dice.join(', ')}] — ${rollLabel} → <span class="log-dmg">${jp.damage} entry damage to ${jp.enemyName}!</span> ${ef && ef.ko ? '<span class="log-ko">KO!</span>' : (ef ? ef.hp + ' HP left' : '')}`);
+    playDamageSfx(jp.damage);
+    hitDamage(jp.enemyTeam);
+    renderBattle();
+  }
+  if (resume) setTimeout(resume, 300);
+}
+
+// Helper: after entry callouts finish, check for Jenkins modal before continuing
+function afterEntryWithJenkins(entryCalloutCount, continuation) {
+  const delay = entryCalloutCount > 0 ? entryCalloutCount * spd(1500) : 300;
+  setTimeout(() => {
+    if (B.jenkinsPending) {
+      showJenkinsModal(continuation);
+    } else {
+      continuation();
+    }
+  }, delay);
+}
+
+// ============================================================
 // ELOISE (85) — Change of Heart: swap HP with enemy for 1 Ice Shard
 // ============================================================
 function doEloiseChoice(choice) {
@@ -2277,11 +3152,11 @@ function doEloiseChoice(choice) {
     showAbilityCallout('CHANGE OF HEART!', 'var(--rare)', `${f.name} — HP swap! (${myOldHp} → ${f.hp}) vs enemy (${oppOldHp} → ${oppF.hp})`, team);
     log(`<span class="log-ability">${f.name}</span> — Change of Heart! Spent 1 Ice Shard. Swapped HP: ${myOldHp} → ${f.hp}, enemy ${oppOldHp} → ${oppF.hp}.`);
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
   } else {
     B.eloiseUsedThisRound[team] = true; // mark used so we don't re-offer on re-render
     narrate(`<b class="${team}-text">Eloise</b> holds — no swap this round.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -2313,28 +3188,23 @@ function doMallowChoice(choice) {
     } else {
       f.hp += 3;
       const overMallow = f.hp > f.maxHp;
-      // Grant 2 Burn
-      const enemyTeam = team === 'red' ? 'blue' : 'red';
-      if (!B.burn[enemyTeam]) B.burn[enemyTeam] = {};
-      const enemySideline = B[enemyTeam].ghosts.filter((g, i) => i !== B[enemyTeam].activeIdx && !g.ko);
-      if (enemySideline.length > 0) {
-        const burnTarget = enemySideline[0];
-        B.burn[enemyTeam][burnTarget.id] = (B.burn[enemyTeam][burnTarget.id] || 0) + 2;
-      }
+      // Grant 1 Burn as a resource (player places it via burn picker during pre-roll)
+      if (!B[team].resources.burn) B[team].resources.burn = 0;
+      B[team].resources.burn += 1;
       showAbilityCallout('DOZY COZY!', 'var(--rare)',
-        `${mallowName} — spent 2 🔥! ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}) + 2 Burn!`, team);
-      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 2 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}). +2 Burn!`);
+        `${mallowName} — spent 2 🔥! ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}) + 1 Burn!`, team);
+      log(`<span class="log-ability">${mallowName}</span> — Dozy Cozy! Spent 2 Sacred Fire. ${f.name} +3 HP (${hpBefore} → ${f.hp}${overMallow ? ' · overclocked!' : ''}). +1 Burn!`);
     }
     renderBattle();
     if (f.ko) {
       // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
-      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, spd(1500));
     } else {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     log(`<span class="log-ability">Mallow</span> — holds the fire.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -2361,6 +3231,9 @@ function doBooChoice(choice) {
   const { team, btn } = bp;
   const f = active(B[team]);
   if (choice === 'yes' && f && !f.ko && B.preRoll && B.preRoll[team] && B.preRoll[team].count >= 2) {
+    // Flag: Boo Brothers used Teamwork this round → +1 damage bonus
+    if (!B.booTeamworkDmgBonus) B.booTeamworkDmgBonus = { red: 0, blue: 0 };
+    B.booTeamworkDmgBonus[team] = 1;
     const prevCount = B.preRoll[team].count;
     B.preRoll[team].count = Math.max(1, prevCount - 1);
     const prevHp = f.hp;
@@ -2381,36 +3254,83 @@ function doBooChoice(choice) {
     renderBattle();
     if (f.ko) {
       // Ghost was KO'd by Filbert's Mask Merchant curse — trigger KO handling instead of rolling
-      setTimeout(() => { if (!handleKOs()) renderBattle(); }, 1500);
+      setTimeout(() => { if (!handleKOs()) renderBattle(); }, spd(1500));
     } else {
-      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
     }
   } else {
     narrate(`<b class="${team}-text">Boo Brothers</b> hold — keeping all dice.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
 // ============================================================
-// GUS (31) — Gale Force: opt-in swap-on-win modal handler
+// GUS (31) — Gale Force: reactive post-win timed button (Guardian Fairy pattern)
 // ============================================================
-function doGusChoice(choice) {
-  const gp = B.gusPending;
+let gusGaleTimer = null;
+function doGusGaleReactive(choice) {
+  const gp = B.gusGaleReactivePending;
   if (!gp) return;
-  B.gusPending = null;
-  document.getElementById('gusOverlay').classList.remove('active');
-  const { team, btn } = gp;
-  const gusG = active(B[team]);
-  B.galeForceDecided[team] = true; // don't re-offer this round regardless of choice
-  if (choice === 'yes' && gusG && !gusG.ko) {
-    B.galeForcePending[team] = true;
-    showAbilityCallout('GALE FORCE!', 'var(--common)', `${gusG.name} — Gale Force primed! Win = force enemy swap!`, team);
-    log(`<span class="log-ability">${gusG.name}</span> — Gale Force primed! Win this roll → force enemy ghost swap.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 1500);
+  B.gusGaleReactivePending = null;
+  // Clear timer and hide button
+  if (gusGaleTimer) { clearInterval(gusGaleTimer); gusGaleTimer = null; }
+  document.getElementById('gusGaleBtn').style.display = 'none';
+  const { winTeamName, loseTeamName, dmg, wF, lF, resume } = gp;
+  const loseTeam = B[loseTeamName];
+  const winTeam = B[winTeamName];
+  if (choice === 'yes') {
+    // Force swap — new ghost takes the damage via picker
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Gale Force! ${loseTeamName} must choose a replacement — the new ghost takes ${dmg} damage!`);
+    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`, null, winTeamName);
+    // Cancel Guardian Fairy if it was pending (Gus swap takes priority)
+    if (B.guardianFairyReactivePending) {
+      B.guardianFairyReactivePending = null;
+      if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+      document.getElementById('gfWishBtn').style.display = 'none';
+    }
+    // Set up gale force swap state for the picker
+    B._gusGaleAccepted = true;
+    B._gusGaleDmg = dmg;
+    B._gusGaleWinTeam = winTeamName;
+    B._gusGaleLoseTeam = loseTeamName;
+    if (resume) setTimeout(resume, spd(1500));
   } else {
-    narrate(`<b class="${team}-text">Gus</b> holds — dealing damage if he wins.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    // Player declined — damage applies to the current opponent now
+    B._gusGaleAccepted = false;
+    lF.hp = Math.max(0, lF.hp - dmg);
+    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+    playDamageSfx(dmg);
+    hitDamage(loseTeamName);
+    renderBattle();
+    if (resume) setTimeout(resume, 200);
   }
+}
+
+// Show Gus Gale Force as a timed button with countdown — auto-declines on expiry
+function showGusGaleButton() {
+  const gp = B.gusGaleReactivePending;
+  if (!gp) return;
+  const btn = document.getElementById('gusGaleBtn');
+  const cdEl = document.getElementById('gusGaleCountdown');
+  const subEl = document.getElementById('gusGaleSub');
+  subEl.innerHTML = `Force ${gp.loseTeamName === 'red' ? 'Red' : 'Blue'} to swap — new ghost takes ${gp.dmg} dmg!`;
+  btn.style.display = 'block';
+  btn.onclick = () => doGusGaleReactive('yes');
+  const secs = getSpecialsTimerSecs();
+  let remaining = secs;
+  cdEl.textContent = remaining;
+  narrate(`<b class="${gp.winTeamName}-text">💨 ${gp.wF.name}</b> can force a swap! Click to activate!`);
+  if (gusGaleTimer) clearInterval(gusGaleTimer);
+  gusGaleTimer = setInterval(() => {
+    remaining--;
+    cdEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(gusGaleTimer); gusGaleTimer = null;
+      doGusGaleReactive('no'); // auto-decline
+    }
+  }, 1000);
 }
 
 // ============================================================
@@ -2428,20 +3348,31 @@ function doRaditzHuntChoice(choice) {
     narrate(`<b class="${team}-text">Raditz</b> — Hunt not used. Rolling as normal.`);
     // Unlock opponent's button so they can roll independently
     if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
 
   // YES — check for available sideline targets
   const enemyTeamName = team === 'red' ? 'blue' : 'red';
   const enemy = B[enemyTeamName];
+
+  // Barnaby (326) — Stubborn: immune to opponent forced swaps
+  const _barnabyHunt = active(enemy);
+  if (_barnabyHunt && _barnabyHunt.id === 326 && !_barnabyHunt.ko) {
+    narrate(`<b class="${team}-text">Raditz</b> — Hunt blocked! <b>${_barnabyHunt.name}</b> is Stubborn!`);
+    log(`<span class="log-ability">Barnaby</span> — Stubborn! Raditz Hunt blocked — ${_barnabyHunt.name} cannot be forced out.`);
+    if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
+    return;
+  }
+
   const aliveSideline = enemy.ghosts.filter((g, i) => i !== enemy.activeIdx && !g.ko);
 
   if (aliveSideline.length === 0) {
     // No valid swap targets (shouldn't happen, but guard it)
     narrate(`<b class="${team}-text">Raditz</b> — Hunt! No sideline ghosts to swap in.`);
     if (oppBtn) { oppBtn.disabled = false; oppBtn.classList.remove('locked'); }
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
 
@@ -2474,6 +3405,7 @@ function doRaditzHuntChoice(choice) {
     </div>`;
   }).join('');
   // B.phase stays 'rolling'; both buttons are still locked — pressureOverlay blocks input
+  B.pressurePickerTeam = enemyTeamName; // v728: track which team picks (for PvP auto-resolve)
   document.getElementById('pressureOverlay').classList.add('active');
 }
 
@@ -2503,8 +3435,7 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
 
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(enemy, false);
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (handleKOs()) return; // entry effect caused a KO — KO flow takes over
       renderBattle();
       // Unlock opponent's button — they can now roll independently
@@ -2513,8 +3444,8 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
       btn.disabled = false;
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
-    }, afterEntry);
-  }, 1500);
+    });
+  }, spd(1500));
 }
 
 // ============================================================
@@ -2531,7 +3462,7 @@ function doDougCautionChoice(choice) {
     // Mark as used so we don't re-offer (once-per-game skip counts as use)
     if (B.dougCautionUsed) B.dougCautionUsed[team] = true;
     narrate(`<b class="${team}-text">Doug</b> — Caution not used. Rolling as normal.`);
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, 200);
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
     return;
   }
   // YES — show ghost picker (already rendered in the overlay)
@@ -2566,8 +3497,7 @@ function doDougCautionSwap(targetIdx) {
 
   setTimeout(() => {
     const entryCalloutCount = triggerEntry(myTeam, false);
-    const afterEntry = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 300;
-    setTimeout(() => {
+    afterEntryWithJenkins(entryCalloutCount, () => {
       if (handleKOs()) return;
       // Apply +1 die bonus to the incoming ghost's roll.
       // During Duel Phase, B.preRoll doesn't exist yet (it's built later in
@@ -2581,8 +3511,8 @@ function doDougCautionSwap(targetIdx) {
       btn.disabled = false;
       btn.classList.remove('locked');
       doTeamRoll(team, btn);
-    }, afterEntry);
-  }, 1500);
+    });
+  }, spd(1500));
 }
 
 // ============================================================
@@ -2590,7 +3520,7 @@ function doDougCautionSwap(targetIdx) {
 // ============================================================
 function checkJacksonRegrow(team, dice, continuation) {
   const f = active(B[team]);
-  if (!f || f.id !== 50 || f.ko || f.hp < 2 || B.jacksonUsedThisRound[team]) {
+  if (!f || f.id !== 50 || f.ko || f.hp < 2) {
     continuation();
     return;
   }
@@ -2634,8 +3564,6 @@ function pickJacksonDie(idx) {
   // Spend 1 HP
   const prevHp = f.hp;
   f.hp -= 1;
-  B.jacksonUsedThisRound[team] = true;
-
   // Mutate the preRoll dice array IN-PLACE so postRollDone's closure sees the change.
   // (Same pattern as Sonya v284 / Jeanie v285 / Dark Wing v285)
   // Creating a new array via [...B.redDice] does NOT work: postRollDone() closes over
@@ -2656,8 +3584,10 @@ function pickJacksonDie(idx) {
   showAbilityCallout('REGROW!', 'var(--uncommon)', `${f.name} — die rerolled: ${oldVal} → ${newVal}! (${prevHp} → ${f.hp} HP)`, team);
   log(`<span class="log-ability">${f.name}</span> — Regrow! Spent 1 HP, rerolled die: ${oldVal} → ${newVal} (${prevHp} → ${f.hp} HP). New dice: [${preRollDice.join(', ')}]`);
 
-  // Short pause for callout, then continue to moonstone/lucky stones
-  setTimeout(() => { continuation(); }, 1200);
+  // Short pause for callout, then re-prompt if Jackson can go again
+  setTimeout(() => {
+    checkJacksonRegrow(team, [...preRollDice], continuation);
+  }, 1200);
 }
 
 // ============================================================
@@ -2728,7 +3658,7 @@ function doJeanieChoice(choice) {
   log(`<span class="log-ability">Jeanie</span> — Hidden Treasure! ${teamLabel} forces ${oppLabel} to reroll: [${oldDice.join(', ')}] → [${newDice.join(', ')}].`);
 
   // Pause for callout splash then continue
-  setTimeout(() => { continuation(); }, 1500);
+  setTimeout(() => { continuation(); }, spd(1500));
 }
 
 // ============================================================
@@ -3075,11 +4005,8 @@ function doTobogganChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(winTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
-  }, 1500);
+    afterEntryWithJenkins(entryCount, continuation);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -3149,11 +4076,8 @@ function doFangOutsideChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(winTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
-  }, 1500);
+    afterEntryWithJenkins(entryCount, continuation);
+  }, spd(1500));
 }
 
 // Fang Undercover (7) — Skilled Coward: arm choice handler
@@ -3221,11 +4145,8 @@ function doFangUndercoverSwapChoice(idx) {
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(fuTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
-  }, 1500);
+    afterEntryWithJenkins(entryCount, continuation);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -3298,11 +4219,93 @@ function doWinstonSchemeChoice(idx) {
   // Fire entry effects for the newly-active enemy ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(loseTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(() => {
-      continuation();
-    }, entryDelay);
-  }, 1500);
+    afterEntryWithJenkins(entryCount, continuation);
+  }, spd(1500));
+}
+
+// ============================================================
+// Tyson (365) — Hop: choose enemy sideline ghost to disable
+// ============================================================
+function showTysonHopPicker(winTeamName, loseTeamName, sidelineGhosts, continuation) {
+  const banner = document.getElementById('tysonHopBanner');
+  if (banner) {
+    banner.className = `pm-who-banner ${winTeamName}`;
+    banner.textContent = '🔥 HOP!';
+  }
+  const loseTeam = B[loseTeamName];
+  const disabled = B.tysonDisabled[loseTeamName];
+  const opts = document.getElementById('tysonHopOptions');
+  if (opts) {
+    opts.innerHTML = sidelineGhosts.filter(g => {
+      const idx = loseTeam.ghosts.indexOf(g);
+      return !disabled.includes(idx); // don't show already-disabled ghosts
+    }).map(g => {
+      const gd = ghostData(g.id);
+      const realIdx = loseTeam.ghosts.indexOf(g);
+      return `<div class="pressure-opt" onclick="doTysonHopChoice('${loseTeamName}', ${realIdx})">
+        ${gd.art ? `<img src="${gd.art}" style="width:50px;height:50px;border-radius:6px;object-fit:cover;border:1px solid var(--${gd.rarity});">` : ''}
+        <div>
+          <div style="font-weight:700;">${g.name}</div>
+          <div style="font-size:12px;color:var(--text2);"><span style="color:var(--${gd.rarity});">${gd.ability}: ${gd.abilityDesc ? gd.abilityDesc.substring(0, 60) : ''}...</span></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  B.tysonPickerPending = { winTeamName, loseTeamName, continuation };
+  B.phase = 'ko-pause';
+  document.getElementById('tysonHopOverlay').classList.add('active');
+}
+
+function doTysonHopChoice(loseTeamName, ghostIdx) {
+  const tp = B.tysonPickerPending;
+  if (!tp) return;
+  B.tysonPickerPending = null;
+  document.getElementById('tysonHopOverlay').classList.remove('active');
+
+  const { winTeamName, continuation } = tp;
+  const loseTeam = B[loseTeamName];
+  const targetGhost = loseTeam.ghosts[ghostIdx];
+  const gd = ghostData(targetGhost.id);
+
+  B.tysonDisabled[loseTeamName].push(ghostIdx);
+
+  const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
+  narrate(`<b class="${winColor}">Tyson</b> — Hop! <b>${targetGhost.name}</b>'s sideline ability disabled!`);
+  showAbilityCallout('HOP!', 'var(--common)', `${targetGhost.name}'s ${gd.ability} disabled!`, winTeamName);
+  log(`<span class="log-ability">Tyson</span> — Hop! ${targetGhost.name}'s sideline ability (${gd.ability}) disabled until it enters play.`);
+
+  continuation();
+}
+
+// ============================================================
+// Laura (79) — Catchy Tune: die picker after each roll
+// ============================================================
+function showCatchyTunePicker(teamName, dice, continuation) {
+  const banner = document.getElementById('catchyTuneBanner');
+  if (banner) {
+    banner.className = `pm-who-banner ${teamName}`;
+    banner.textContent = '🎵 CATCHY TUNE!';
+  }
+  const opts = document.getElementById('catchyTuneDiceOptions');
+  opts.innerHTML = dice.map((d, i) =>
+    `<button onclick="doCatchyTuneChoice('${teamName}', ${d}, ${JSON.stringify(dice)}, this)" style="width:60px;height:60px;font-size:28px;font-weight:bold;border-radius:12px;border:2px solid rgba(255,255,255,0.3);background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;cursor:pointer;transition:transform 0.1s;">${d}</button>`
+  ).join('');
+  B.catchyTunePending = { teamName, continuation };
+  B.phase = 'ko-pause';
+  document.getElementById('catchyTuneOverlay').classList.add('active');
+}
+
+function doCatchyTuneChoice(teamName, dieValue, allDice, btnEl) {
+  const ct = B.catchyTunePending;
+  if (!ct) return;
+  B.catchyTunePending = null;
+  document.getElementById('catchyTuneOverlay').classList.remove('active');
+  B.catchyTuneLockedDie[teamName] = dieValue;
+  const teamColor = teamName === 'red' ? 'red-text' : 'blue-text';
+  narrate(`<b class="${teamColor}">Catchy Tune</b> — locked a <b>${dieValue}</b> for next roll!`);
+  log(`<span class="log-ability">Laura</span> — Catchy Tune! Locked die: <span class="log-ms">${dieValue}</span> for next roll.`);
+  showAbilityCallout('LOCKED!', 'var(--rare)', `Die ${dieValue} locked for next roll!`, teamName);
+  ct.continuation();
 }
 
 // ============================================================
@@ -3331,7 +4334,7 @@ function showGaleForcePickerModal(winTeamName, loseTeamName, sidelineGhosts, con
       </div>`;
     }).join('');
   }
-  B.galeForcePicker = { winTeamName, loseTeamName, continuation };
+  B.galeForcePicker = { winTeamName, loseTeamName, continuation, dmg: B._galeForceDmg || 0 };
   B.phase = 'ko-pause';
   document.getElementById('galeForcePickerOverlay').classList.add('active');
 }
@@ -3342,7 +4345,7 @@ function doGaleForcePickerChoice(idx) {
   B.galeForcePicker = null;
   document.getElementById('galeForcePickerOverlay').classList.remove('active');
 
-  const { winTeamName, loseTeamName, continuation } = gfp;
+  const { winTeamName, loseTeamName, continuation, dmg } = gfp;
   const loseTeam = B[loseTeamName];
   const winTeamColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseTeamColor = loseTeamName === 'red' ? 'red-text' : 'blue-text';
@@ -3351,17 +4354,23 @@ function doGaleForcePickerChoice(idx) {
   const newGhost = loseTeam.ghosts[idx];
 
   loseTeam.activeIdx = idx;
+
+  // Apply stashed damage to the NEW ghost
+  if (dmg > 0) {
+    newGhost.hp = Math.max(0, newGhost.hp - dmg);
+    if (newGhost.hp <= 0) { newGhost.hp = 0; newGhost.ko = true; newGhost.killedBy = 31; }
+    playDamageSfx(dmg);
+  }
   renderBattle();
 
-  narrate(`<b class="${winTeamColor}">Gus</b> — Gale Force! <b class="${loseTeamColor}">${newGhost.name}</b> blown in to replace <b class="${loseTeamColor}">${oldName}</b>!`);
-  log(`<span class="log-ability">Gus</span> — Gale Force! ${oldName} forced to bench — ${newGhost.name} enters!`);
+  narrate(`<b class="${winTeamColor}">Gus</b> — Gale Force! <b class="${loseTeamColor}">${newGhost.name}</b> blown in — takes ${dmg} damage!${newGhost.ko ? ' <b>KO!</b>' : ''}`);
+  log(`<span class="log-ability">Gus</span> — Gale Force! ${oldName} forced to bench — ${newGhost.name} enters and takes <span class="log-dmg">${dmg} damage!</span>${newGhost.ko ? ' <span class="log-ko">KO!</span>' : ' ' + newGhost.hp + ' HP left'}`);
 
   // Fire entry effects for the newly-active ghost, then continue
   setTimeout(() => {
     const entryCount = triggerEntry(loseTeam, false);
-    const entryDelay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-    setTimeout(continuation, entryDelay);
-  }, 1500);
+    afterEntryWithJenkins(entryCount, continuation);
+  }, spd(1500));
 }
 
 // ============================================================
@@ -3369,20 +4378,83 @@ function doGaleForcePickerChoice(idx) {
 // ============================================================
 function rollReady(team) {
   if (!B) return;
+  // Live PvP routing:
+  // - Blue player clicking Blue Roll → send "ready" signal, don't run engine
+  // - Red player clicking Red Roll → runs normally (Red's engine)
+  // - Red's engine rolling Blue (from Firebase listener) → allowed through
+  if (LIVE_PVP) {
+    if (PVP_SIDE === 'blue' && team === 'blue') {
+      // v725: Blue runs pre-roll setup locally so pre-roll modals fire (Timber, Romy, Tyler, etc.)
+      if (B.phase === 'ready') {
+        doPreRollSetup();
+        if (B.phase !== 'ready') return; // pre-roll interrupted
+        B.phase = 'rolling';
+        renderBattle();
+      }
+      // Blue player: send committed resources + ready signal to Red's engine
+      const blueActive = active(B.blue);
+      pvpBlueResolvedLocally = false; // v725: reset for this round
+      PVP_GAME_REF.child('blueReady').set({
+        ready: true,
+        committed: B.committed.blue,
+        resources: B.blue.resources,
+        activeHp: blueActive ? blueActive.hp : 0,
+        ts: Date.now()
+      });
+      const btn2 = document.getElementById('rollBlueBtn');
+      if (btn2) { btn2.disabled = true; btn2.textContent = 'Waiting...'; }
+      // v723: show local rolling animation so Blue feels responsive
+      const blueDiceCount = B.preRoll ? B.preRoll.blue.count : (ghostData(blueActive.id)?.dice ?? 3);
+      showRolling('blue', blueDiceCount);
+      playSfx('sfxDiceRoll');
+      narrate(`<b class="blue-text">${blueActive.name}</b> rolls...`);
+      return;
+    }
+    if (PVP_SIDE === 'blue' && team === 'red') {
+      // Blue client trying to roll Red — block
+      return;
+    }
+    // v726: Red waits for Blue to be ready before generating dice.
+    // This ensures Blue has time to commit resources (Ice Shards, Fire, etc.)
+    if (PVP_SIDE === 'red' && team === 'red') {
+      // Run pre-roll setup (abilities, modals) but DON'T generate dice yet
+      if (B.phase === 'ready') {
+        const cc = doPreRollSetup();
+        if (B.phase !== 'ready') return;
+        B.phase = 'rolling';
+        renderBattle();
+        // Send Red's ready signal with committed resources
+        const preDelay = cc > 0 ? cc * spd(1500) : 0;
+        setTimeout(() => {
+          const redActive = active(B.red);
+          PVP_GAME_REF.child('redReady').set({
+            ready: true,
+            committed: B.committed.red,
+            resources: B.red.resources,
+            activeHp: redActive ? redActive.hp : 0,
+            ts: Date.now()
+          });
+          pvpRedReady = true;
+          const btn = document.getElementById('rollRedBtn');
+          if (btn) { btn.disabled = true; btn.textContent = 'Waiting...'; }
+          narrate(`<b class="red-text">${redActive.name}</b> is ready...`);
+          // If Blue is already ready, generate dice now
+          pvpTryGenerateDice();
+        }, preDelay);
+      }
+      return; // Don't fall through to normal engine
+    }
+    // Red's engine rolling Blue (from pvpTryGenerateDice) → allowed through
+  }
+  // v733: async MP — when Red clicks READY, signal the AI to roll Blue after a short delay
+  if (MP_MODE && !LIVE_PVP && team === 'red') {
+    pvpRedClickedRoll = true;
+  }
   // Duel Phase locks rolls until both players click Done
   if (B.phase === 'duel-1' || B.phase === 'duel-2') return;
   if (B.phase !== 'ready' && B.phase !== 'rolling') return;
   const btn = document.getElementById(team === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
   if (btn.classList.contains('locked')) return;
-
-  // Boss Mode: when red (player) clicks roll, auto-trigger blue (boss) roll after a delay
-  if (window.BOSS_MODE && team === 'red') {
-    setTimeout(() => {
-      if (B && !B.preRoll?.blue?.dice) {
-        rollReady('blue');
-      }
-    }, 400);
-  }
 
   // Remove pulse and reset AFK timer on click
   document.querySelectorAll('#rollRedBtn, #rollBlueBtn').forEach(b => b.classList.remove('pulse'));
@@ -3406,9 +4478,9 @@ function rollReady(team) {
     // If pre-roll callouts were queued (via setTimeout), wait for all of them to fully play
     // before dice roll — last callout starts at (N-1)*1500 and lasts ~1400ms, so N*1500 is exact
     if (calloutCount > 0) {
-      preRollDelay = calloutCount * 1500;
+      preRollDelay = calloutCount * spd(1500);
       // Store the absolute end-time so the second team's click can also wait for callouts to finish
-      B.preRollCalloutEndTime = Date.now() + calloutCount * 1500;
+      B.preRollCalloutEndTime = Date.now() + calloutCount * spd(1500);
     }
 
     // Timber choice modal — pause rolling until opponent picks
@@ -3433,6 +4505,24 @@ function rollReady(team) {
           setTimeout(() => { doTeamRoll(team, btn); }, 0);
         });
       }, timberDelay);
+      return;
+    }
+
+    // Ryder (456) — Toll choice modal — pause rolling until opponent picks
+    if (B.riderPending) {
+      const tp = B.riderPending;
+      const riderDelay = (tp.preRollCalloutCount || 0) * 1500;
+      const rBtn = document.getElementById('rollRedBtn');
+      const bBtn = document.getElementById('rollBlueBtn');
+      if (rBtn) { rBtn.classList.add('locked'); rBtn.disabled = true; }
+      if (bBtn) { bBtn.classList.add('locked'); bBtn.disabled = true; }
+      const otherBtnId = team === 'red' ? 'rollBlueBtn' : 'rollRedBtn';
+      tp._oppBtn = document.getElementById(otherBtnId);
+      setTimeout(() => {
+        showRiderModal(tp, () => {
+          setTimeout(() => { doTeamRoll(team, btn); }, 0);
+        });
+      }, riderDelay);
       return;
     }
 
@@ -3469,22 +4559,11 @@ function rollReady(team) {
       return;
     }
 
-    // Toby (97) — Pure Heart: before rolling, may declare the all-in gamble.
-    // Modal only shows when it hasn't been decided yet this round (null = undecided).
-    // Skipped if pureHeartScheduledKO is already pending (doPreRollSetup handles that).
-    const tobyActive = active(B[team]);
-    if (tobyActive && tobyActive.id === 97 && !tobyActive.ko &&
-        B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
-        !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
-      // Lock only Toby's button — opponent can still roll independently
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.tobyPending = { team, btn };
-      const tobyDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        document.getElementById('tobyOverlay').classList.add('active');
-      }, tobyDelay);
-      return;
+    // Toby (97) — Pure Heart: now handled by pre-roll ability button (useTobyButton)
+    // If Toby hasn't declared yet, auto-set to false (skip) so roll proceeds.
+    if (active(B[team])?.id === 97 && !active(B[team]).ko &&
+        B.pureHeartDeclared && B.pureHeartDeclared[team] === null) {
+      B.pureHeartDeclared[team] = false; // default to not declaring if button wasn't pressed
     }
 
     // Tyler (105) — Heating Up: opt-in 2 HP trade for +1 die
@@ -3527,28 +4606,13 @@ function rollReady(team) {
 
     // Zork (463) — Stoke: now handled by pre-roll ability button (useZorkStoke)
 
-    // Castle Gardener (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (interactive button)
-    {
-      const cultG = active(B[team]);
-      if (cultG && cultG.id === 442 && !cultG.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
-          B[team].resources && B[team].resources.healingSeed >= 1) {
-        btn.classList.add('locked');
-        btn.disabled = true;
-        B.cultivatePending = { team, btn };
-        const cultDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-        setTimeout(() => {
-          document.getElementById('cultivateSub').innerHTML =
-            `Discard 1 🌱 Healing Seed for 1 🔥 Sacred Fire?<br>` +
-            `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
-          document.getElementById('cultivateOverlay').classList.add('active');
-        }, cultDelay);
-        return;
-      }
-    }
+    // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
+
+    // Castle Gardener (442) — Cultivate: now handled by pre-roll ability button (useCultivate)
 
     // Forest Spirit (446) — Hex: now handled by pre-roll button (useHex)
 
-    // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent (interactive picker)
+    // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent → +1 HP + 2 Burn
     {
       const nnG = active(B[team]);
       const oppTeamNN = team === 'red' ? 'blue' : 'red';
@@ -3597,8 +4661,8 @@ function rollReady(team) {
       }
     }
 
-    // Mallow (89) — Dozy Cozy: spend 1 Sacred Fire for +3 HP to active ghost (sideline)
-    // Offered once per round when Mallow is on the sideline and team has ≥1 Sacred Fire.
+    // Mallow (89) — Dozy Cozy: spend 2 Sacred Fire for +3 HP + 2 Burn to active ghost (sideline)
+    // Offered once per round when Mallow is on the sideline and team has ≥2 Sacred Fire.
     if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
         B[team].resources && B[team].resources.fire >= 2) {
       btn.classList.add('locked');
@@ -3610,8 +4674,8 @@ function rollReady(team) {
         const mallowHpAfter = mF ? mF.hp + 3 : '?';
         const mallowOver = mF && (mF.hp + 3 > mF.maxHp) ? ' <i>· overclocks!</i>' : '';
         document.getElementById('mallowSub').innerHTML =
-          `Spend 1 🔥 Sacred Fire to give <b>${mF ? mF.name : 'your ghost'}</b> +3 HP?<br>` +
-          `(${mF ? mF.hp : '?'} HP → ${mallowHpAfter} HP${mallowOver} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
+          `Spend 2 🔥 Sacred Fire to give <b>${mF ? mF.name : 'your ghost'}</b> +3 HP and gain 1 🔥 Burn?<br>` +
+          `(${mF ? mF.hp : '?'} HP → ${mallowHpAfter} HP${mallowOver} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 2})`;
         document.getElementById('mallowOverlay').classList.add('active');
       }, mallowDelay);
       return;
@@ -3651,29 +4715,11 @@ function rollReady(team) {
     calloutCount = Math.max(0, Math.ceil((B.preRollCalloutEndTime - Date.now()) / 1500));
   }
 
-  // Gus (31) — Gale Force: opt-in to force enemy ghost swap on win instead of dealing damage.
-  // Offered each round when Gus is active and the opponent has ≥1 alive sideline ghost.
-  // B.galeForceDecided prevents re-offering after the player has already chosen this round.
-  {
-    const gusG = active(B[team]);
-    const gusOppTeamName = team === 'red' ? 'blue' : 'red';
-    const gusOppTeam = B[gusOppTeamName];
-    const gusOppHasSideline = gusOppTeam.ghosts.some((g, i) => i !== gusOppTeam.activeIdx && !g.ko);
-    if (gusG && gusG.id === 31 && !gusG.ko && gusOppHasSideline &&
-        B.galeForceDecided && !B.galeForceDecided[team]) {
-      btn.classList.add('locked');
-      btn.disabled = true;
-      B.gusPending = { team, btn };
-      const gusDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-      setTimeout(() => {
-        const gusOppActive = active(gusOppTeam);
-        document.getElementById('gusSub').innerHTML =
-          `If you <b>WIN</b> this roll, ${gusOppActive ? '<b>' + gusOppActive.name + '</b>' : 'the opponent'} must swap for a sideline ghost — <i>no damage dealt</i>.`;
-        document.getElementById('gusOverlay').classList.add('active');
-      }, gusDelay);
-      return;
-    }
+  // Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
 
+  // Gus (31) — Gale Force: now reactive post-win (no pre-roll modal)
+
+  {
     // Raditz (62) — Hunt: one-time forced-swap on first roll after entry
     // Fires when Raditz's team clicks Roll for the first time after Raditz enters play.
     if (B.raditzHuntReady && B.raditzHuntReady[team]) {
@@ -3780,12 +4826,19 @@ function doTeamRoll(team, btn) {
     return;
   }
   // Roll this team's dice (weighted for cinematic clutch moments)
-  const diceCount = B.preRoll[team].count;
+  let diceCount = B.preRoll[team].count;
   const override = B.preRoll[team].override;
-  const dice = override ? [1,2,3] : weightedRoll(team, diceCount);
+  // Laura (79) — Catchy Tune: if unlocked, one die is locked from last roll
+  const lockedDie = (B.catchyTuneUnlocked && B.catchyTuneUnlocked[team] && B.catchyTuneLockedDie && B.catchyTuneLockedDie[team] !== null && diceCount > 0) ? B.catchyTuneLockedDie[team] : null;
+  const rollCount = lockedDie !== null ? Math.max(0, diceCount - 1) : diceCount;
+  const dice = override ? [1,2,3] : weightedRoll(team, rollCount);
+  if (lockedDie !== null && !override) dice.push(lockedDie);
+  dice.sort((a,b) => a-b);
   B.preRoll[team].dice = dice;
+  B.lastRollDiceCount[team] = diceCount; // Frederick (27) — track for next round
   if (team === 'red') { B.redDice = dice; } else { B.blueDice = dice; }
 
+  if (lockedDie !== null && !override) log(`<span class="log-ability">Laura</span> — Catchy Tune! Locked die: <span class="log-ms">${lockedDie}</span> carried over.`);
   if (override) log(`<span class="log-ability">Bouril</span> — Slumber! Auto-rolled [1,2,3]!`);
 
   // Animate: show rolling then reveal
@@ -3818,9 +4871,9 @@ function doTeamRoll(team, btn) {
       const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
       setTimeout(() => {
         doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
-      }, eitherTripled ? 1800 : 1400);
+      }, spd(eitherTripled ? 1800 : 1400));
     }
-  }, 700);
+  }, spd(700));
 }
 
 // ============================================================
@@ -3857,14 +4910,10 @@ function hasAnyDecision(team) {
   // Eloise (85) — Change of Heart
   if (f.id === 85 && B.eloiseUsedThisRound && !B.eloiseUsedThisRound[team] &&
       r && r.ice >= 1 && oppF && !oppF.ko) return true;
-  // Mallow (89) — Dozy Cozy (sideline)
+  // Mallow (89) — Dozy Cozy (sideline) — costs 2 Sacred Fire
   if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
       r && r.fire >= 2) return true;
-  // Gus (31) — Gale Force
-  if (f.id === 31 && B.galeForceDecided && !B.galeForceDecided[team]) {
-    const gOpp = B[oppTeamName];
-    if (gOpp && gOpp.ghosts.some((g, i) => i !== gOpp.activeIdx && !g.ko)) return true;
-  }
+  // Gus (31) — Gale Force: now reactive post-win (no pre-roll check)
   // Raditz (62) — Hunt
   if (B.raditzHuntReady && B.raditzHuntReady[team]) return true;
   // Doug (63) — Caution
@@ -3967,14 +5016,8 @@ function openDuelPhasePrimers(team) {
     }
   }
 
-  // — TOBY (97) — Pure Heart: declare all-in gamble
-  if (f.id === 97 && B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
-      !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
-    disableDone();
-    B.tobyPending = { team, btn: doneBtn };
-    document.getElementById('tobyOverlay').classList.add('active');
-    return true;
-  }
+  // — TOBY (97) — Pure Heart: now handled by pre-roll ability button (useTobyButton)
+  // No modal intercept needed — button is in ability panel
 
   // — CHOW (414) — Secret Ingredient: spend 1 Healing Seed for +2 dice (Duel Phase)
   if (f.id === 414 && !f.ko && B.chowDecided && !B.chowDecided[team] &&
@@ -3990,21 +5033,13 @@ function openDuelPhasePrimers(team) {
 
   // — ZORK (463) — Stoke: now handled by pre-roll ability button (useZorkStoke)
 
-  // — CASTLE GARDENER (442) — Cultivate: discard 1 Healing Seed for 1 Sacred Fire (Duel Phase)
-  if (f.id === 442 && !f.ko && B.cultivateDecided && !B.cultivateDecided[team] &&
-      B[team].resources && B[team].resources.healingSeed >= 1) {
-    disableDone();
-    B.cultivatePending = { team, btn: doneBtn };
-    document.getElementById('cultivateSub').innerHTML =
-      `Discard 1 🌱 Healing Seed for 1 🔥 Sacred Fire?<br>` +
-      `(Seeds: ${B[team].resources.healingSeed} | Sacred Fires: ${B[team].resources.fire || 0})`;
-    document.getElementById('cultivateOverlay').classList.add('active');
-    return true;
-  }
+  // — Miyoshi (454) — Bonzai!: now handled by pre-roll ability button (useBonzaiButton)
+
+  // — CASTLE GARDENER (442) — Cultivate: now handled by pre-roll ability button (useCultivate)
 
   // — FOREST SPIRIT (446) — Hex: now handled by pre-roll button (useHex)
 
-  // — NICK & KNACK (409) — Knick Knack: steal 1 resource from opponent (Duel Phase)
+  // — NICK & KNACK (409) — Knick Knack: steal 1 resource → +1 HP + 2 Burn (Duel Phase)
   if (f.id === 409 && !f.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
     const nnOppRes = B[oppTeamName].resources;
     const nnResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
@@ -4037,7 +5072,7 @@ function openDuelPhasePrimers(team) {
     }
   }
 
-  // — MALLOW (89) — Dozy Cozy: spend 1 Sacred Fire for +3 HP (sideline)
+  // — MALLOW (89) — Dozy Cozy: spend 2 Sacred Fire for +3 HP + 2 Burn (sideline)
   if (hasSideline(B[team], 89) && B.mallowDecided && !B.mallowDecided[team] &&
       B[team].resources && B[team].resources.fire >= 2) {
     disableDone();
@@ -4045,26 +5080,13 @@ function openDuelPhasePrimers(team) {
     const mallowHpAfter = f.hp + 3;
     const mallowOver = (f.hp + 3 > f.maxHp) ? ' <i>· overclocks!</i>' : '';
     document.getElementById('mallowSub').innerHTML =
-      `Spend 1 🔥 Sacred Fire to give <b>${f.name}</b> +3 HP?<br>` +
-      `(${f.hp} HP → ${mallowHpAfter} HP${mallowOver} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 1})`;
+      `Spend 2 🔥 Sacred Fire to give <b>${f.name}</b> +3 HP and gain 1 🔥 Burn?<br>` +
+      `(${f.hp} HP → ${mallowHpAfter} HP${mallowOver} &nbsp;|&nbsp; 🔥 ${B[team].resources.fire} → ${B[team].resources.fire - 2})`;
     document.getElementById('mallowOverlay').classList.add('active');
     return true;
   }
 
-  // — GUS (31) — Gale Force: opt-in force-swap on win
-  if (f.id === 31 && B.galeForceDecided && !B.galeForceDecided[team]) {
-    const gOpp = B[oppTeamName];
-    const gOppHasSideline = gOpp && gOpp.ghosts.some((g, i) => i !== gOpp.activeIdx && !g.ko);
-    if (gOppHasSideline) {
-      disableDone();
-      B.gusPending = { team, btn: doneBtn };
-      const gOppActive = active(gOpp);
-      document.getElementById('gusSub').innerHTML =
-        `If you <b>WIN</b> this roll, ${gOppActive ? '<b>' + gOppActive.name + '</b>' : 'the opponent'} must swap for a sideline ghost — <i>no damage dealt</i>.`;
-      document.getElementById('gusOverlay').classList.add('active');
-      return true;
-    }
-  }
+  // — GUS (31) — Gale Force: now reactive post-win (no pre-roll Done check)
 
   // — RADITZ (62) — Hunt: force opponent's active ghost to the sideline (one-time on entry)
   if (B.raditzHuntReady && B.raditzHuntReady[team]) {
@@ -4218,7 +5240,7 @@ function _runDuelTeamTurn(team) {
     const name = f ? f.name : team;
     setTimeout(() => {
       narrate(`<b class="${team}-text">${name}</b> has nothing to commit — rolling!`);
-      setTimeout(() => { duelPhaseReady(team); }, 350);
+      setTimeout(() => { duelPhaseReady(team); }, spd(350));
     }, 250);
   }
   // else: team has resources to commit — leave Ready enabled, wait for manual click
@@ -4328,28 +5350,75 @@ function renderDuelUI() {
 // and either enters the Duel Phase or falls back to simultaneous ready.
 function startNextRound() {
   if (!B) return;
-  const priority = computeDuelPriority();
-  if (priority) {
-    enterDuelPhase(priority);
-  } else {
-    B.phase = 'ready';
-    B.duelActiveTeam = null;
-    B.duelPriority = null;
-    resetRollButtons();
-    renderBattle();
-    renderDuelUI();
+
+  // Laura (79) — Catchy Tune: if unlocked, show die picker before next round
+  if (!B.catchyTuneUnlocked) B.catchyTuneUnlocked = { red: false, blue: false };
+  if (!B.catchyTuneLockedDie) B.catchyTuneLockedDie = { red: null, blue: null };
+  if (!B.lastRollDiceCount) B.lastRollDiceCount = { red: 3, blue: 3 };
+  if (!B.tysonDisabled) B.tysonDisabled = { red: [], blue: [] };
+  if (!B.winstonDiceBonus) B.winstonDiceBonus = { red: 0, blue: 0 };
+  const ctRed = B.catchyTuneUnlocked.red && B.redDice && B.redDice.length > 0;
+  const ctBlue = B.catchyTuneUnlocked.blue && B.blueDice && B.blueDice.length > 0;
+  if (ctRed || ctBlue) {
+    const proceedAfterPickers = () => { _doStartNextRound(); };
+    if (ctRed && ctBlue) {
+      showCatchyTunePicker('red', B.redDice, () => {
+        showCatchyTunePicker('blue', B.blueDice, proceedAfterPickers);
+      });
+    } else if (ctRed) {
+      showCatchyTunePicker('red', B.redDice, proceedAfterPickers);
+    } else {
+      showCatchyTunePicker('blue', B.blueDice, proceedAfterPickers);
+    }
+    return;
   }
+  _doStartNextRound();
+}
+function _doStartNextRound() {
+  if (!B) return;
+  // Reset per-round Bonzai state for the new round
+  B.bonzaiDecided = { red: false, blue: false };
+  B.bonzaiBtnDice = { red: 0, blue: 0 };
+
+  // Live PvP state sync: Red is authoritative — broadcasts full state after each round.
+  if (B.phase !== 'over') pvpBroadcastState({ event: 'roundEnd' });
+  // v726: reset ready flags for next round
+  if (LIVE_PVP) { pvpRedReady = false; PVP_OPPONENT_READY = false; }
+
+  // Hand Limit check — force discards BEFORE Duel Phase or roll buttons unlock
+  checkHandLimits(() => {
+    const priority = computeDuelPriority();
+    if (priority) {
+      enterDuelPhase(priority);
+    } else {
+      B.phase = 'ready';
+      B.duelActiveTeam = null;
+      B.duelPriority = null;
+      resetRollButtons();
+      renderBattle();
+      renderDuelUI();
+    }
+  });
 }
 
 function resetRollButtons() {
   const r = document.getElementById('rollRedBtn');
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
-  // Boss Mode: hide blue roll button — boss auto-rolls when red clicks
-  if (window.BOSS_MODE) {
-    if (b) { b.style.display = 'none'; }
-  } else {
-    if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; b.style.display = ''; }
+  if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
+  // v733: async MP — Red button says "READY" (commit signal), Blue is AI-controlled
+  if (MP_MODE && !LIVE_PVP) {
+    if (r) r.textContent = 'READY';
+    if (b) b.style.display = 'none'; // hide Blue's button — AI rolls it
+    pvpRedClickedRoll = false; // reset each round
+  }
+  // Live PvP: hide opponent's button, label ours properly
+  if (LIVE_PVP) {
+    const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+    const oppBtn = document.getElementById(oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    if (oppBtn) oppBtn.style.display = 'none';
+    const myBtn = document.getElementById(PVP_SIDE === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    if (myBtn) myBtn.textContent = 'ROLL';
   }
   // Clear dice display between rounds — no leftover numbers from last roll
   ['red', 'blue'].forEach(t => {
@@ -4365,6 +5434,88 @@ function disableRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) r.disabled = true;
   if (b) b.disabled = true;
+}
+
+// ============================================================
+// HAND LIMIT MODE — cap specials at B.HAND_LIMIT (default 3)
+// ============================================================
+const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'];
+const HAND_RESOURCE_LABELS = {
+  moonstone: { emoji:'🌙', name:'Moonstone' },
+  ice:       { emoji:'❄️', name:'Ice Shard' },
+  fire:      { emoji:'🔥', name:'Sacred Fire' },
+  surge:     { emoji:'⚡', name:'Surge' },
+  healingSeed:{ emoji:'🌱', name:'Healing Seed' },
+  luckyStone:{ emoji:'🍀', name:'Lucky Stone' },
+  firefly:   { emoji:'✨', name:'Firefly' },
+  burn:      { emoji:'💥', name:'Burn' },
+};
+
+function getHandSize(team) {
+  let total = 0;
+  for (const k of HAND_RESOURCE_KEYS) total += (team.resources[k] || 0);
+  return total;
+}
+
+// Check both teams after a round resolves. If over limit, show discard modal then call callback.
+function checkHandLimits(callback) {
+  if (!B || !B.handLimitMode) { callback(); return; }
+  // Check red first, then blue, then proceed
+  checkTeamHandLimit('red', () => {
+    checkTeamHandLimit('blue', callback);
+  });
+}
+
+function checkTeamHandLimit(teamName, callback) {
+  const team = B[teamName];
+  if (getHandSize(team) <= B.HAND_LIMIT) { callback(); return; }
+  // Show discard modal
+  B.handLimitPending = { team: teamName, callback };
+  renderHandLimitModal(teamName);
+  document.getElementById('handLimitOverlay').classList.add('active');
+}
+
+function renderHandLimitModal(teamName) {
+  const team = B[teamName];
+  const handSize = getHandSize(team);
+  const over = handSize - B.HAND_LIMIT;
+  const label = teamName === 'red' ? 'Red' : 'Blue';
+  document.getElementById('handLimitTitle').textContent = `${label} Team — Discard to ${B.HAND_LIMIT}`;
+  document.getElementById('handLimitSub').textContent = `${handSize} specials (${over} over limit). Tap one to destroy it.`;
+  const container = document.getElementById('handLimitItems');
+  container.innerHTML = '';
+  for (const k of HAND_RESOURCE_KEYS) {
+    const count = team.resources[k] || 0;
+    if (count <= 0) continue;
+    const info = HAND_RESOURCE_LABELS[k];
+    for (let i = 0; i < count; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'selene-opt';
+      btn.style.cssText = 'background:linear-gradient(135deg,#374151,#1f2937);min-width:100px;margin:0;padding:8px 14px;font-size:14px;';
+      btn.textContent = `${info.emoji} ${info.name}`;
+      btn.onclick = () => doHandLimitDiscard(teamName, k);
+      container.appendChild(btn);
+    }
+  }
+}
+
+function doHandLimitDiscard(teamName, resourceKey) {
+  const team = B[teamName];
+  if ((team.resources[resourceKey] || 0) <= 0) return;
+  team.resources[resourceKey]--;
+  const info = HAND_RESOURCE_LABELS[resourceKey];
+  log(`<span class="log-ability">Hand Limit</span> — ${teamName === 'red' ? 'Red' : 'Blue'} discards ${info.emoji} ${info.name}! (${getHandSize(team)}/${B.HAND_LIMIT})`);
+  renderBattle();
+  // Still over? Re-render the modal
+  if (getHandSize(team) > B.HAND_LIMIT) {
+    renderHandLimitModal(teamName);
+    return;
+  }
+  // Done — close modal and proceed
+  document.getElementById('handLimitOverlay').classList.remove('active');
+  const pending = B.handLimitPending;
+  B.handLimitPending = null;
+  if (pending?.callback) pending.callback();
 }
 
 // Pre-roll setup — called once when the first player clicks Roll
@@ -4402,6 +5553,37 @@ function doPreRollSetup() {
   // PHASE 1: PRE-ROLL TRIGGERS
   // ========================================
 
+  // Moonstone Sickness — pre-roll damage (once per turn, does NOT hit replacement if KO)
+  if (!B.moonstoneSicknessFiredThisTurn) {
+    B.moonstoneSicknessFiredThisTurn = true;
+    const msMode = document.getElementById('moonstoneModeSelect')?.value || 'D';
+    ['red', 'blue'].forEach(teamKey => {
+      const t = B[teamKey];
+      let msDmg = 0;
+      if (msMode === 'A' && t.moonstoneSickness > 0) {
+        msDmg = t.moonstoneSickness * 2;
+      } else if ((msMode === 'D' || msMode === 'G') && t.moonstoneSickness > 0) {
+        msDmg = t.moonstoneSickness * 1;
+      } else if ((msMode === 'B' || msMode === 'C') && t.moonstoneSicknessPending > 0) {
+        msDmg = t.moonstoneSicknessPending;
+        t.moonstoneSicknessPending = 0; // clear after applying
+      }
+      if (msDmg > 0) {
+        const f = active(t);
+        if (f && !f.ko) {
+          f.hp = Math.max(0, f.hp - msDmg);
+          if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+          log(`<span class="log-dmg">Moonstone Sickness!</span> ${f.name} takes ${msDmg} damage! ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
+          narrate(`<b style="color:var(--moonstone)">Moonstone Sickness!</b> <b class="${teamKey}-text">${f.name}</b> takes ${msDmg} damage!${f.ko ? ' <b>KO!</b>' : ''}`);
+          preRollCallouts.push(['MOONSTONE SICKNESS!', 'var(--moonstone)', `${f.name} takes ${msDmg} damage!`, teamKey]);
+          playDamageSfx(msDmg);
+          hitDamage(teamKey);
+          renderBattle();
+        }
+      }
+    });
+  }
+
   // v687: Pre-roll chip damage abilities fire ONCE per turn. If they KO a ghost and
   // a replacement swaps in, doPreRollSetup re-runs — but the replacement is NOT hit
   // again. The flag is set before the first ability fires and checked on re-entry.
@@ -4409,6 +5591,30 @@ function doPreRollSetup() {
   if (!preRollAlreadyFired) {
   B.preRollAbilitiesFiredThisTurn.red = true;
   B.preRollAbilitiesFiredThisTurn.blue = true;
+
+  // Frederick (27) — Careful: deal 2 damage per extra die enemy rolled above 3 last round
+  [B.red, B.blue].forEach(team => {
+    const fFred = active(team);
+    const enemyFred = opp(team);
+    const tNameFred = team === B.red ? 'red' : 'blue';
+    const enemyNameFred = enemyFred === B.red ? 'red' : 'blue';
+    if (fFred.id === 27 && !fFred.ko) {
+      const enemyLastDice = B.lastRollDiceCount[enemyNameFred] || 3;
+      const extraDice = Math.max(0, enemyLastDice - 3);
+      if (extraDice > 0) {
+        const fredDmg = extraDice * 2;
+        const ef = active(enemyFred);
+        if (!ef.ko) {
+          ef.hp = Math.max(0, ef.hp - fredDmg);
+          if (ef.hp <= 0) { ef.hp = 0; ef.ko = true; ef.killedBy = 27; }
+          preRollCallouts.push(['CAREFUL!', 'var(--common)', `${fFred.name} — Enemy rolled ${enemyLastDice} dice last round! ${extraDice} extra × 2 = ${fredDmg} damage!`, tNameFred]);
+          log(`<span class="log-ability">${fFred.name}</span> — Careful! Enemy rolled ${enemyLastDice} dice (${extraDice} extra) → <span class="log-dmg">${fredDmg} damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
+          playDamageSfx(fredDmg);
+          hitDamage(enemyNameFred);
+        }
+      }
+    }
+  });
 
   // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
   // Phase 4: Masked Hero (55) Underdog fires BEFORE pre-roll damage — if attacker KO'd, skip damage
@@ -4420,19 +5626,11 @@ function doPreRollSetup() {
       const ef = active(enemy);
       if (!ef.ko) {
         const enemyName = enemy === B.red ? 'red' : 'blue';
-        // Masked Hero (55) — Underdog: counter 3 damage BEFORE the pre-roll effect fires
-        if (ef.id === 55 && !ef.ko) {
-          const undPre1 = f.hp;
-          f.hp = Math.max(0, f.hp - 3);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-          const undMsg1 = f.ko
-            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} HP → KO!)`
-            : `${ef.name} counters! 3 damage to ${f.name}! (${undPre1} → ${f.hp} HP)`;
-          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg1, enemyName]);
-          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-          playDamageSfx(3);
-          hitDamage(tNamePre);
-          if (f.ko) return; // Attacker KO'd by Underdog — skip pre-roll damage entirely
+        // Masked Hero (55) — Underdog: immune to before-roll damage
+        if (maskedHeroImmune(ef)) {
+          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', `${ef.name} — immune to before-roll damage!`, enemyName]);
+          log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to ${f.name}'s Swarm!`);
+          return;
         }
         ef.hp = Math.max(0, ef.hp - 1);
         if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
@@ -4442,9 +5640,9 @@ function doPreRollSetup() {
         hitDamage(enemyName);
         // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
         if (ef.id === 24 && !ef.ko) {
-          B[enemyName].resources.fire++;
-          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
-          log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+          B[enemyName].resources.fire += 2;
+          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
+          log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+2 Sacred Fire!</span>`);
         }
         // Collect Knight reactions via temp queue mode so they splice AFTER SWARM! in preRollCallouts
         const _swarmSavedKQ = abilityQueue;
@@ -4454,7 +5652,7 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _swarmSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
           const psPreHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
@@ -4465,8 +5663,8 @@ function doPreRollSetup() {
           hitDamage(enemyName);
           popSidelineCard(B[tNamePre], 436);
           if (ef.id === 24 && !ef.ko) {
-            B[enemyName].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+            B[enemyName].resources.fire += 2;
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
         } else if (!ef.ko && hasAlive(B[tNamePre], 436) && hasSideline(B[enemyName], 45)) {
@@ -4491,20 +5689,11 @@ function doPreRollSetup() {
       const shadeGhost = getSidelineGhost(team, 205);
       const ef = active(enemy);
       if (!ef.ko && ef.hp < 4) {
-        // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Shadow damage
-        if (ef.id === 55 && !ef.ko) {
-          const undPreSS = f.hp;
-          f.hp = Math.max(0, f.hp - 3);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-          const enemyNameSS = enemy === B.red ? 'red' : 'blue';
-          const undMsgSS = f.ko
-            ? `${ef.name} counters! 3 damage to ${f.name}! (${undPreSS} HP → KO!)`
-            : `${ef.name} counters! 3 damage to ${f.name}! (${undPreSS} → ${f.hp} HP)`;
-          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsgSS, enemyNameSS]);
-          log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-          playDamageSfx(3);
-          hitDamage(tNameShade);
-          if (f.ko) return; // Attacker KO'd by Underdog — skip Shade's Shadow damage
+        // Masked Hero (55) — immune to before-roll damage
+        if (maskedHeroImmune(ef)) {
+          preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', `${ef.name} — immune to Meltdown!`, tNameShade]);
+          log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to Shade's Shadow Meltdown!`);
+          return;
         }
         const preHp = ef.hp;
         ef.hp = Math.max(0, ef.hp - 1);
@@ -4520,9 +5709,9 @@ function doPreRollSetup() {
         popSidelineCard(team, 205);
         // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
         if (ef.id === 24 && !ef.ko) {
-          B[enemyName].resources.fire++;
-          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
-          log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
+          B[enemyName].resources.fire += 2;
+          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
+          log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+2 Sacred Fire!</span>`);
         }
         // Collect Knight reactions via temp queue mode so they splice AFTER MELTDOWN! in preRollCallouts
         // (not in queue mode → checkKnightEffects fires showAbilityCallout directly, stomping MELTDOWN!)
@@ -4533,7 +5722,7 @@ function doPreRollSetup() {
         abilityQueueMode = false;
         abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
         abilityQueue = _meltSavedKQ;
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
           const psPreHp2 = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
@@ -4545,8 +5734,8 @@ function doPreRollSetup() {
           popSidelineCard(B[tNameShade], 436);
           // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
           if (ef.id === 24 && !ef.ko) {
-            B[enemyName].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+            B[enemyName].resources.fire += 2;
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
         } else if (!ef.ko && hasAlive(B[tNameShade], 436) && hasSideline(enemy, 45)) {
@@ -4580,19 +5769,11 @@ function doPreRollSetup() {
           log(`<span class="log-ability">Piper</span> — Slick Coat! Shade's Haunt is negated.`);
         } else {
           const enemyName = enemy === B.red ? 'red' : 'blue';
-          // Phase 4: Masked Hero (55) Underdog fires BEFORE Shade's Haunt damage
-          if (ef.id === 55 && !ef.ko) {
-            const undPre3 = f.hp;
-            f.hp = Math.max(0, f.hp - 3);
-            if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-            const undMsg3 = f.ko
-              ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} HP → KO!)`
-              : `${ef.name} counters! 3 damage to ${f.name}! (${undPre3} → ${f.hp} HP)`;
-            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg3, enemyName]);
-            log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-            playDamageSfx(3);
-            hitDamage(tNameHaunt);
-            if (f.ko) return; // Attacker KO'd by Underdog — skip Haunt damage
+          // Masked Hero (55) — immune to before-roll damage
+          if (maskedHeroImmune(ef)) {
+            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', `${ef.name} — immune to Haunt!`, enemyName]);
+            log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to Shade's Haunt!`);
+            return;
           }
           const preHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
@@ -4606,8 +5787,8 @@ function doPreRollSetup() {
           hitDamage(enemyName);
           // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
           if (ef.id === 24 && !ef.ko) {
-            B[enemyName].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+            B[enemyName].resources.fire += 2;
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
           // Collect Knight reactions via temp queue mode so they splice AFTER HAUNT! in preRollCallouts
@@ -4618,7 +5799,7 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _hauntSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
             const psPreHp3 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
@@ -4629,8 +5810,8 @@ function doPreRollSetup() {
             hitDamage(enemyName);
             popSidelineCard(B[tNameHaunt], 436);
             if (ef.id === 24 && !ef.ko) {
-              B[enemyName].resources.fire++;
-              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+              B[enemyName].resources.fire += 2;
+              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
           } else if (!ef.ko && hasAlive(B[tNameHaunt], 436) && hasSideline(enemy, 45)) {
@@ -4696,11 +5877,11 @@ function doPreRollSetup() {
         hitDamage(tNameLucyTarget);
         // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
         if (f.id === 24 && !f.ko) {
-          B[tNameLucyTarget].resources.fire++;
-          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
+          B[tNameLucyTarget].resources.fire += 2;
+          preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, tNameLucyTarget]);
           log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
         }
-        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+        // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!f.ko && hasAlive(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
           const psPreHpL = f.hp;
           f.hp = Math.max(0, f.hp - 1);
@@ -4713,7 +5894,7 @@ function doPreRollSetup() {
           // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
           if (f.id === 24 && !f.ko) {
             B[tNameLucyTarget].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, tNameLucyTarget]);
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, tNameLucyTarget]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
         } else if (!f.ko && hasAlive(B[tNameLucyActor], 436) && hasSideline(B[tNameLucyTarget], 45)) {
@@ -4752,19 +5933,11 @@ function doPreRollSetup() {
           B.piperBlockedThisRound[tNameSplinter] = true; // v640: Slick Coat gate
         } else {
           const enemyName = enemy === B.red ? 'red' : 'blue';
-          // Phase 4: Masked Hero (55) Underdog fires BEFORE Splinter's Toxic Fumes damage
-          if (ef.id === 55 && !ef.ko) {
-            const undPre4 = f.hp;
-            f.hp = Math.max(0, f.hp - 3);
-            if (f.hp <= 0) { f.ko = true; f.killedBy = 55; }
-            const undMsg4 = f.ko
-              ? `${ef.name} counters! 3 damage to ${f.name}! (${undPre4} HP → KO!)`
-              : `${ef.name} counters! 3 damage to ${f.name}! (${undPre4} → ${f.hp} HP)`;
-            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', undMsg4, enemyName]);
-            log(`<span class="log-ability">${ef.name}</span> — Underdog! 3 counter-damage to ${f.name}!`);
-            playDamageSfx(3);
-            hitDamage(tNameSplinter);
-            if (f.ko) return; // Attacker KO'd by Underdog — skip Toxic Fumes damage
+          // Masked Hero (55) — immune to before-roll damage
+          if (maskedHeroImmune(ef)) {
+            preRollCallouts.push(['UNDERDOG!', 'var(--uncommon)', `${ef.name} — immune to Toxic Fumes!`, enemyName]);
+            log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to Splinter's Toxic Fumes!`);
+            return;
           }
           const preHp = ef.hp;
           ef.hp = Math.max(0, ef.hp - 1);
@@ -4777,8 +5950,8 @@ function doPreRollSetup() {
           playDamageSfx(1);
           hitDamage(enemyName);
           if (ef.id === 24 && !ef.ko) {
-            B[enemyName].resources.fire++;
-            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+            B[enemyName].resources.fire += 2;
+            preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
             log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
           }
           const _splinterSavedKQ = abilityQueue;
@@ -4788,7 +5961,7 @@ function doPreRollSetup() {
           abilityQueueMode = false;
           abilityQueue.forEach(item => preRollCallouts.push([item.name, item.color, item.desc, item.team]));
           abilityQueue = _splinterSavedKQ;
-          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip (blocked by Cornelius)
+          // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
             const psPreHp4 = ef.hp;
             ef.hp = Math.max(0, ef.hp - 1);
@@ -4799,8 +5972,8 @@ function doPreRollSetup() {
             hitDamage(enemyName);
             popSidelineCard(B[tNameSplinter], 436);
             if (ef.id === 24 && !ef.ko) {
-              B[enemyName].resources.fire++;
-              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +1 Sacred Fire!`, enemyName]);
+              B[enemyName].resources.fire += 2;
+              preRollCallouts.push(['BREW TIME!', 'var(--uncommon)', `Simon — Took pre-roll damage → +2 Sacred Fire!`, enemyName]);
               log(`<span class="log-ability">Simon</span> — Brew Time! Took pre-roll damage → <span class="log-ms">+1 Sacred Fire!</span>`);
             }
           } else if (!ef.ko && hasAlive(B[tNameSplinter], 436) && hasSideline(enemy, 45)) {
@@ -4860,7 +6033,7 @@ function doPreRollSetup() {
     // doKoSwap, etc.) — handleKOs() will transition to 'ko-swap' when it fires.
     B.phase = 'ko-pause';
     preRollCallouts.forEach((c, i) => {
-      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
     setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
@@ -4895,7 +6068,7 @@ function doPreRollSetup() {
     }
   });
 
-  // Nick & Knack (409) — Knick Knack: now an interactive picker (see doNickKnackSteal)
+  // Nick & Knack (409) — Knick Knack: steal 1 resource → +1 HP + 2 Burn
   B.nickKnackDecided = { red: false, blue: false };
 
   // Chow (414) — Secret Ingredient: reset decided flag only, NOT chowExtraDie
@@ -4908,11 +6081,18 @@ function doPreRollSetup() {
   if (!B.zorkExtraDie) B.zorkExtraDie = { red: 0, blue: 0 };
   B.zorkDecided = { red: false, blue: false };
 
+  // Miyoshi (454) — Bonzai!: sacrifice HP for dice
+  // bonzaiDecided and bonzaiBtnDice are set by the pre-roll button (useBonzaiButton)
+  // Do NOT reset here — they persist from button click through to dice consumption
+  if (!B.bonzaiExtraDie) B.bonzaiExtraDie = { red: 0, blue: 0 };
+  if (!B.bonzaiBtnDice) B.bonzaiBtnDice = { red: 0, blue: 0 };
+  if (!B.bonzaiDecided) B.bonzaiDecided = { red: false, blue: false };
+
   // Castle Gardener (442) — Cultivate: reset per round
   B.cultivateDecided = { red: false, blue: false };
 
-  // Forest Spirit (446) — Hex: reset per round
-  B.hexDieRemoval = { red: 0, blue: 0 };
+  // Forest Spirit (446) — Hex: NOT reset here — set by doBurnPlace, consumed at lines 8676-8687
+  if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
 
   // Aunt Susan (309)
   B.auntSusanBonus = { red: false, blue: false };
@@ -4932,20 +6112,7 @@ function doPreRollSetup() {
 
   // Finn (204) — Flame Blade: opt-in forge button (see useFinnFlameBlade), no auto-conversion
 
-  // Zippa (423) — Glimmer: before rolling, gain Lucky Stones equal to Healing Seeds held (v674: moved from win to pre-roll)
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    if (f.id === 423 && !f.ko) {
-      const seeds = team.resources.healingSeed || 0;
-      if (seeds > 0) {
-        team.resources.luckyStone += seeds;
-        preRollCallouts.push(['GLIMMER!', 'var(--uncommon)', `${f.name} — ${seeds} Healing Seed${seeds>1?'s':''} held → +${seeds} Lucky Stone${seeds>1?'s':''}!`, tName]);
-        log(`<span class="log-ability">${f.name}</span> — Glimmer! <span class="log-ms">+${seeds} Lucky Stone${seeds>1?'s':''}!</span>`);
-        checkKnightEffects(tName, f.name);
-      }
-    }
-  });
+  // Zippa (423) — Glimmer: REWORKED — now passive +1 damage per Healing Seed held (applied in damage calc section)
 
   // ========================================
   // PHASE 2: COMPUTE DICE COUNTS (rolled later per-click)
@@ -4974,6 +6141,25 @@ function doPreRollSetup() {
       }
     }
     B.retributionDice = { red: 0, blue: 0 };
+  }
+
+  // Cameron (25) — Unstoppable Force: bonus dice from opponent special usage
+  if (B.cameronBonusDice) {
+    ['red', 'blue'].forEach(tName => {
+      if (B.cameronBonusDice[tName] > 0) {
+        const camTeam = B[tName];
+        const camAlive = camTeam.ghosts.some(g => g.id === 25 && !g.ko);
+        if (camAlive) {
+          if (tName === 'red') redCount += B.cameronBonusDice.red;
+          else blueCount += B.cameronBonusDice.blue;
+          const camG = camTeam.ghosts.find(g => g.id === 25 && !g.ko);
+          const loc = camTeam.ghosts[camTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
+          preRollCallouts.push(['UNSTOPPABLE FORCE!', 'var(--common)', `${camG.name} (${loc}) — Opponent used specials! +${B.cameronBonusDice[tName]} bonus dice!`, tName]);
+          log(`<span class="log-ability">${camG.name}</span> — Unstoppable Force! <span class="log-ms">+${B.cameronBonusDice[tName]} bonus dice</span> from opponent specials!`);
+        }
+        B.cameronBonusDice[tName] = 0;
+      }
+    });
   }
 
   // Bouril (201) — first roll override
@@ -5071,6 +6257,25 @@ function doPreRollSetup() {
     }
   });
 
+  // Ryder (456) — Toll: opponent chooses take 1 damage or give Ryder +1 Sacred Fire
+  // Choice resolved via modal before dice are rolled. Negated by Dylan/Piper.
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 456 && !f.ko) {
+      const oppTeamName = team === B.red ? 'blue' : 'red';
+      const oppTeam = team === B.red ? B.blue : B.red;
+      if (dylanNegates(oppTeam)) {
+        const oppLabel = oppTeamName.charAt(0).toUpperCase() + oppTeamName.slice(1);
+        preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${oppLabel} — Scarecrow/Slick Coat negates Ryder's Toll!`, oppTeamName]);
+        log(`<span class="log-ability">${oppLabel}</span> — Dylan/Piper negates Ryder's Toll!`);
+        B.piperBlockedThisRound[team === B.red ? 'red' : 'blue'] = true;
+        return;
+      }
+      const riderTeamName = team === B.red ? 'red' : 'blue';
+      B.riderPending = { team: oppTeam, oppTeamName, riderTeam: riderTeamName };
+    }
+  });
+
   // Piper (107) — Slick Coat: -1 enemy die IF an enemy auto-fire before-roll ability was
   // actually negated this round. v640 (Wyatt 2026-04-11): reactive, not unconditional.
   // Previously Slick Coat fired the -1 die every single round whenever Piper was active,
@@ -5106,6 +6311,34 @@ function doPreRollSetup() {
         const cybGhost = getSidelineGhost(team, 100);
         preRollCallouts.push(['SPARK!', 'var(--ghost-rare)', `${cybGhost ? cybGhost.name : 'Cyboo'} (sideline) — ${f.name} is at ${f.hp} HP! +1 bonus die!`, tName]);
         log(`<span class="log-ability">Cyboo</span> (sideline) — Spark! ${f.name} at ${f.hp} HP → +1 die!`);
+      }
+    }
+  });
+
+  // Explorer Jeff (455) — Treasure Hunter: sideline & in play, if holding 3+ different specials, +1 die
+  // Negated by Cornelius (45) — Antidote (only when on sideline)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    const enemyTeamObj = team === B.red ? B.blue : B.red;
+    const ejOnSideline = hasSideline(team, 455);
+    const ejActive = f.id === 455 && !f.ko;
+    if (!f.ko && (ejOnSideline || ejActive)) {
+      const res = B[tName].resources;
+      const types = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'].filter(r => (res[r] || 0) > 0).length;
+      if (types >= 3) {
+        // Cornelius only blocks sideline abilities, not in-play
+        if (ejOnSideline && hasSideline(enemyTeamObj, 45)) {
+          const cornGhost = getSidelineGhost(enemyTeamObj, 45);
+          preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks Explorer Jeff's Treasure Hunter!`, tName === 'red' ? 'blue' : 'red']);
+          log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`);
+        } else {
+          if (tName === 'red') redCount += 1;
+          else blueCount += 1;
+          const loc = ejActive ? 'in play' : 'sideline';
+          preRollCallouts.push(['TREASURE HUNTER!', 'var(--uncommon)', `Explorer Jeff (${loc}) — ${types} specials held! +1 die!`, tName]);
+          log(`<span class="log-ability">Explorer Jeff</span> (${loc}) — Treasure Hunter! ${types} different specials → +1 die!`);
+        }
       }
     }
   });
@@ -5170,6 +6403,33 @@ function doPreRollSetup() {
   if (B.chowExtraDie && B.chowExtraDie.red > 0) { redCount += B.chowExtraDie.red; B.chowExtraDie.red = 0; }
   if (B.chowExtraDie && B.chowExtraDie.blue > 0) { blueCount += B.chowExtraDie.blue; B.chowExtraDie.blue = 0; }
 
+  // Miyoshi (454) — Bonzai!: +5 dice from pre-roll button click
+  // Dylan (301) / Piper (107) negate Bonzai — refund the 4 HP sacrifice
+  ['red', 'blue'].forEach(tName => {
+    if (B.bonzaiBtnDice && B.bonzaiBtnDice[tName] > 0) {
+      const team = tName === 'red' ? B.red : B.blue;
+      const enemyTeam = tName === 'red' ? B.blue : B.red;
+      const f = active(team);
+      if (dylanNegates(enemyTeam)) {
+        // Negate: refund HP and cancel dice
+        if (f && f.id === 454 && !f.ko) {
+          f.hp += 4;
+        } else if (f && f.id === 454 && f.ko && f.killedBy === -1) {
+          // Bonzai self-KO — revive
+          f.ko = false; f.killedBy = null; f.hp = 4;
+        }
+        const enemyTName = tName === 'red' ? 'blue' : 'red';
+        preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${enemyTName.charAt(0).toUpperCase() + enemyTName.slice(1)} — Scarecrow/Slick Coat negates Bonzai!`, enemyTName]);
+        log(`<span class="log-ability">${enemyTName.charAt(0).toUpperCase() + enemyTName.slice(1)}</span> — Dylan/Piper negates Miyoshi's Bonzai! HP refunded.`);
+        B.piperBlockedThisRound[tName] = true;
+        B.bonzaiBtnDice[tName] = 0;
+      } else {
+        if (tName === 'red') redCount += B.bonzaiBtnDice.red; else blueCount += B.bonzaiBtnDice.blue;
+        B.bonzaiBtnDice[tName] = 0;
+      }
+    }
+  });
+
   // Twyla (417) — Lucky Dance: MOVED to doLuckyReroll (v675) — bonus dice + seeds granted live when each stone is spent
 
   // Gordok (430) — River Terror: +1 die next roll after stealing (consumed after use)
@@ -5184,6 +6444,20 @@ function doPreRollSetup() {
     preRollCallouts.push(['RIVER TERROR!', 'var(--rare)', `Gordok — stolen resources! +${B.gordokDieBonus.blue} bonus die!`, 'blue']);
     log(`<span class="log-ability">Gordok</span> — River Terror! +${B.gordokDieBonus.blue} bonus die this roll.`);
     B.gordokDieBonus.blue = 0;
+  }
+
+  // Foreman (451) — Blueprint: +1 die from previous win (consumed after use)
+  if (B.foremanDieBonus && B.foremanDieBonus.red > 0) {
+    redCount += B.foremanDieBonus.red;
+    preRollCallouts.push(['BLUEPRINT!', 'var(--rare)', `Foreman — Win bonus! +${B.foremanDieBonus.red} die!`, 'red']);
+    log(`<span class="log-ability">Foreman</span> — Blueprint! +${B.foremanDieBonus.red} bonus die this roll.`);
+    B.foremanDieBonus.red = 0;
+  }
+  if (B.foremanDieBonus && B.foremanDieBonus.blue > 0) {
+    blueCount += B.foremanDieBonus.blue;
+    preRollCallouts.push(['BLUEPRINT!', 'var(--rare)', `Foreman — Win bonus! +${B.foremanDieBonus.blue} die!`, 'blue']);
+    log(`<span class="log-ability">Foreman</span> — Blueprint! +${B.foremanDieBonus.blue} bonus die this roll.`);
+    B.foremanDieBonus.blue = 0;
   }
 
   // Zork (463) — Stoke: consume committed dice from doZorkChoice
@@ -5304,14 +6578,27 @@ function doPreRollSetup() {
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tNameW = team === B.red ? 'red' : 'blue';
+    const enemyName = tNameW === 'red' ? 'blue' : 'red';
+    const enemy = B[enemyName];
     const hasWillowActive = f.id === 435 && !f.ko;
     const hasWillowSideline = hasSideline(team, 435);
-    if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tNameW]) {
+
+    // Cornelius (45) on enemy sideline negates Willow's sideline effect (not active)
+    if (hasWillowSideline && !hasWillowActive && hasSideline(enemy, 45)) {
+      if (B.willowLostLast[tNameW]) {
+        const cornG = getSidelineGhost(enemy, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornG ? cornG.name : 'Cornelius'} blocks Willow's Joy of Painting!`, enemyName]);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Willow Joy of Painting blocked!`);
+      }
+      // Skip — Cornelius negates
+    } else if ((hasWillowActive || hasWillowSideline) && B.willowLostLast[tNameW]) {
       if (tNameW === 'red') redCount++; else blueCount++;
       const wName = hasWillowActive ? f.name : (getSidelineGhost(team, 435) || {}).name || 'Willow';
       const wLabel = hasWillowActive ? '' : ' (sideline)';
       preRollCallouts.push(['JOY OF PAINTING!', 'var(--ghost-rare)', `${wName}${wLabel} — Lost last roll! +1 die!`, tNameW]);
       log(`<span class="log-ability">${wName}${wLabel}</span> — Joy of Painting! Lost last roll → +1 die!`);
+      // Knight Terror (401) / Knight Light (402) react to this ability
+      checkKnightEffects(tNameW, wName);
     }
   });
 
@@ -5334,6 +6621,40 @@ function doPreRollSetup() {
     }
     B.dreamCatBonus.blue = 0;
   }
+
+  // Nick & Knack (409) — Knick Knack: dice bonus removed (ability is pre-roll steal now)
+
+  // Zach (87) — Craftsman: while on sideline, Guard Thomas gets +1 die each turn
+  // Negated by Cornelius (45) — Antidote: if the enemy team has Cornelius on their sideline, die bonus is blocked.
+  ['red', 'blue'].forEach(tNameZ => {
+    const teamZ = B[tNameZ];
+    const fZ = active(teamZ);
+    const enemyTeamObjZ = teamZ === B.red ? B.blue : B.red;
+    if (fZ.id === 41 && !fZ.ko && hasSideline(teamZ, 87)) {
+      if (hasSideline(enemyTeamObjZ, 45)) {
+        const cornGhostZ = getSidelineGhost(enemyTeamObjZ, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhostZ ? cornGhostZ.name : 'Cornelius'} blocks Zach's Craftsman die bonus!`, tNameZ === 'red' ? 'blue' : 'red']);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Zach Craftsman die bonus blocked for ${fZ.name}.`);
+      } else {
+        if (tNameZ === 'red') redCount++; else blueCount++;
+        preRollCallouts.push(['CRAFTSMAN!', 'var(--rare)', `Zach (sideline) — Guard Thomas +1 die!`, tNameZ]);
+        log(`<span class="log-ability">Zach</span> (sideline) — Craftsman! Guard Thomas +1 die.`);
+      }
+    }
+  });
+
+  // Wandering Sue (84) — Hidden Weakness: +1 die if enemy has more HP
+  ['red', 'blue'].forEach(tNameSue => {
+    const fSue = active(B[tNameSue]);
+    if (fSue.id === 84 && !fSue.ko) {
+      const oppSue = active(B[tNameSue === 'red' ? 'blue' : 'red']);
+      if (oppSue && oppSue.hp > fSue.hp) {
+        if (tNameSue === 'red') redCount++; else blueCount++;
+        preRollCallouts.push(['HIDDEN WEAKNESS!', 'var(--uncommon)', `${fSue.name} — enemy has more HP! +1 die!`, tNameSue]);
+        log(`<span class="log-ability">${fSue.name}</span> — Hidden Weakness! Enemy HP (${oppSue.hp}) > Sue (${fSue.hp}) → +1 die!`);
+      }
+    }
+  });
 
   // Scallywags (19) — Frenzy: consume last round's all-under-4 bonus
   if (B.scallywagsFrenzyBonus && B.scallywagsFrenzyBonus.red > 0) {
@@ -5435,12 +6756,31 @@ function doPreRollSetup() {
     }
   });
 
+  // Eli (459) — Steady: before rolling, gain +1 Lucky Stone
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    if (f.id === 459 && !f.ko) {
+      const tName = team === B.red ? 'red' : 'blue';
+      team.resources.luckyStone = (team.resources.luckyStone || 0) + 1;
+      preRollCallouts.push(['STEADY!', 'var(--common)', `${f.name} — +1 Lucky Stone! (${team.resources.luckyStone} total)`, tName]);
+      log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
+      collectKC(tName, f.name);
+      // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
+      if (hasSideline(opp(team), 33)) {
+        const _sandOpp = opp(team);
+        _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
+        preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
+      }
+    }
+  });
+
   // Yawn Eater (464) — Feast: +1 die for each sideline ability on the enemy sideline
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const tName = team === B.red ? 'red' : 'blue';
     if (f.id === 464 && !f.ko) {
       const enemyTeam = opp(team);
+      // Count enemy sideline ghosts that have sideline abilities
       const sidelineCount = enemyTeam.ghosts.filter((g, i) => {
         if (i === enemyTeam.activeIdx || g.ko) return false;
         const gd = ghostData(g.id);
@@ -5579,6 +6919,21 @@ function doPreRollSetup() {
     }
   });
 
+  // Sophia (457) — Mask of Night: roll the same number of dice as the enemy ghost
+  ['red', 'blue'].forEach(tName => {
+    if (B.sophiaMask[tName] === 'night' && B.sophiaMaskActive[tName]) {
+      const myCount = tName === 'red' ? redCount : blueCount;
+      const oppCount = tName === 'red' ? blueCount : redCount;
+      if (myCount !== oppCount) {
+        if (tName === 'red') redCount = oppCount;
+        else blueCount = oppCount;
+        const f = active(B[tName]);
+        preRollCallouts.push(['MASK OF NIGHT!', 'var(--rare)', `🌙 Mask of Night — ${f.name} mirrors the enemy! Rolling ${oppCount} dice!`, tName]);
+        log(`<span class="log-ability">Mask of Night</span> — ${f.name} rolls ${oppCount} dice (matching opponent)!`);
+      }
+    }
+  });
+
   // Fredrick (27) — Careful: when Fredrick is active, opponent may only roll up to 3 dice (applied last so it overrides all bonuses)
   [B.red, B.blue].forEach(team => {
     const fredF = active(team);
@@ -5618,7 +6973,7 @@ function doPreRollSetup() {
   if (latePreRollKO && preRollCallouts.length > 0) {
     B.phase = 'ko-pause';
     preRollCallouts.forEach((c, i) => {
-      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+      setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
     setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
@@ -5640,9 +6995,14 @@ function doPreRollSetup() {
     B.timberPending.preRollCalloutCount = preRollCallouts.length;
   }
 
+  // If Ryder pending, update callout count so modal shows after callouts finish
+  if (B.riderPending) {
+    B.riderPending.preRollCalloutCount = preRollCallouts.length;
+  }
+
   // Drain pre-roll callouts sequentially — each plays for 1.4s before the next fires
   preRollCallouts.forEach((c, i) => {
-    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * 1500);
+    setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
   });
 
   renderBattle();
@@ -5659,6 +7019,44 @@ function doPostRollAndResolve(redDice, blueDice) {
 
   // Shade's Shadow (205) — MOVED TO PRE-ROLL (doPreRollSetup)
 
+  // Maisie (458) — Lucky: all 1s count as 5s (mutate dice FIRST, before any other post-roll reads them)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    if (f.id === 458 && !f.ko) {
+      const dice = tName === 'red' ? redDice : blueDice;
+      let converted = 0;
+      for (let i = 0; i < dice.length; i++) {
+        if (dice[i] === 1) { dice[i] = 5; converted++; }
+      }
+      dice.sort((a, b) => a - b);
+      if (converted > 0) {
+        queueAbility('LUCKY!', 'var(--ghost-rare)', `${f.name} — ${converted} one${converted > 1 ? 's' : ''} became 5${converted > 1 ? 's' : ''}! 🍀`, () => { renderDice(redDice, blueDice); renderBattle(); }, tName);
+        log(`<span class="log-ability">${f.name}</span> — Lucky! ${converted} one${converted > 1 ? 's' : ''} → 5${converted > 1 ? 's' : ''}! 🍀`);
+      }
+    }
+  });
+
+  // Sophia (457) — Mask of Day: gain 1 Burn for each 1 or 2 you roll
+  ['red', 'blue'].forEach(tName => {
+    if (B.sophiaMask[tName] === 'day' && B.sophiaMaskActive[tName]) {
+      const team = tName === 'red' ? B.red : B.blue;
+      const dice = tName === 'red' ? redDice : blueDice;
+      const lowRolls = countVal(dice, 1) + countVal(dice, 2);
+      if (lowRolls > 0) {
+        const _modLow = lowRolls;
+        const _modTeam = team;
+        const _modTName = tName;
+        const f = active(team);
+        queueAbility('MASK OF DAY!', 'var(--rare)', `☀️ Mask of Day — ${f.name} rolled ${lowRolls} low die${lowRolls>1?'s':''}! +${lowRolls} Burn!`, () => {
+          _modTeam.resources.burn = (_modTeam.resources.burn || 0) + _modLow;
+          log(`<span class="log-ability">Mask of Day</span> — Rolled ${_modLow} low die${_modLow>1?'s':''}! <span class="log-dmg">+${_modLow} Burn!</span>`);
+          renderBattle();
+        }, _modTName);
+      }
+    }
+  });
+
   // Hank (207) — each 4 rolled: gain 1 Lucky Stone (Tremor)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
@@ -5672,6 +7070,8 @@ function doPostRollAndResolve(redDice, blueDice) {
         const _tremName = f.name;
         queueAbility('TREMOR!', 'var(--common)', `${f.name} — rolled ${fours} four${fours>1?'s':''}! +${fours} Lucky Stone${fours>1?'s':''}!`, () => {
           _tremTeam.resources.luckyStone += _tremFours;
+          // Update lsAvailable so post-roll Lucky Stone window sees new stones
+          if (B.lsAvailable) B.lsAvailable[tNameHank] = (B.lsAvailable[tNameHank] || 0) + _tremFours;
           log(`<span class="log-ability">${_tremName}</span> — Tremor! Gained <span class="log-ms">${_tremFours} Lucky Stone${_tremFours>1?'s':''}</span>!`);
           renderBattle();
         }, tNameHank);
@@ -5695,7 +7095,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     }
   });
 
-  // Natalia (327) — even doubles (2s, 4s, 6s): gain 2 Moonstones
+  // Natalia (327) — even doubles (2s, 4s, 6s): gain 1 Moonstone (v799 — removed Lucky Stone)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
@@ -5704,15 +7104,14 @@ function doPostRollAndResolve(redDice, blueDice) {
       const _natTeam = team;
       const _natName = f.name;
       const _natSandOpp = opp(team);
-      const _natSandTotal = _natSandOpp.resources.moonstone + 2;
-      queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! Gained 2 Moonstones!`, () => {
-        _natTeam.resources.moonstone += 2;
-        log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → gained <span class="log-ms">2 Moonstones</span>!`);
+      queueAbility('MATERIALIZATION!', 'var(--ghost-rare)', `${f.name} — Even doubles! +1 Moonstone!`, () => {
+        _natTeam.resources.moonstone = Math.min((_natTeam.resources.moonstone || 0) + 1, 1);
+        log(`<span class="log-ability">${_natName}</span> — Materialization! Even doubles → <span class="log-ms">+1 Moonstone</span>!`);
         renderBattle();
       }, tNameNat);
       checkKnightEffects(tNameNat, f.name);
       if (hasSideline(opp(team), 33)) {
-        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +2 Moonstones! (${_natSandTotal} total)`, () => { _natSandOpp.resources.moonstone += 2; renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone!`, () => { _natSandOpp.resources.moonstone = Math.min((_natSandOpp.resources.moonstone || 0) + 1, 1); renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
       }
     }
   });
@@ -5741,20 +7140,25 @@ function doPostRollAndResolve(redDice, blueDice) {
 
   // Gom Gom Gom (440) — REMOVED from post-roll (moved to WIN-path only in v685)
 
-  // Captain James (443) — Final Strike: triples+ → gain 2 Sacred Fires (win or lose)
+  // Captain James (443) — Final Strike: Sideline & In Play — triples+ → gain 2 Sacred Fires (win or lose)
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     const dice = team === B.red ? redDice : blueDice;
     const tNameCJ = team === B.red ? 'red' : 'blue';
-    if (f.id === 443 && !f.ko && ['triples','quads','penta'].includes(classify(dice).type)) {
+    const cjActive = f.id === 443 && !f.ko;
+    const cjSideline = hasSideline(team, 443);
+    if ((cjActive || cjSideline) && ['triples','quads','penta'].includes(classify(dice).type)) {
       const _cjTeam = team;
-      const _cjName = f.name;
-      queueAbility('FINAL STRIKE!', 'var(--rare)', `${f.name} — Triples! +2 Sacred Fires!`, () => {
+      const cjGhost = cjActive ? f : getSidelineGhost(team, 443);
+      const _cjName = cjGhost ? cjGhost.name : 'Captain James';
+      const cjLabel = cjSideline && !cjActive ? `${_cjName} (sideline)` : _cjName;
+      queueAbility('FINAL STRIKE!', 'var(--rare)', `${cjLabel} — Triples! +2 Sacred Fires!`, () => {
         _cjTeam.resources.fire += 2;
-        log(`<span class="log-ability">${_cjName}</span> — Final Strike! Triples+ → gained <span class="log-ms">2 Sacred Fires</span>!`);
+        log(`<span class="log-ability">${cjLabel}</span> — Final Strike! Triples+ → gained <span class="log-ms">2 Sacred Fires</span>!`);
+        if (cjSideline && !cjActive) popSidelineCard(team, 443);
         renderBattle();
       }, tNameCJ);
-      checkKnightEffects(tNameCJ, f.name);
+      checkKnightEffects(tNameCJ, _cjName, cjSideline ? cjGhost : undefined);
     }
   });
 
@@ -5769,12 +7173,46 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (eitherDoubles) {
         const _champTeam = team;
         const _champName = f.name;
-        queueAbility('THRILL!', 'var(--uncommon)', `${f.name} — Doubles detected! +1 Surge!`, () => {
+        queueAbility('THRILL!', 'var(--ghost-rare)', `${f.name} — Doubles detected! +1 Surge!`, () => {
           _champTeam.resources.surge++;
           log(`<span class="log-ability">${_champName}</span> — Thrill! Doubles → gained <span class="log-ms">1 Surge</span>!`);
           renderBattle();
         }, tNameChamp);
         checkKnightEffects(tNameChamp, f.name);
+      }
+    }
+  });
+
+  // Simon (24) — Brew Time: gain 2 Sacred Fire when enemy rolls triples or better
+  [B.red, B.blue].forEach(team => {
+    const fSimon = active(team);
+    const tNameSimon = team === B.red ? 'red' : 'blue';
+    const enemyNameSimon = tNameSimon === 'red' ? 'blue' : 'red';
+    const enemyDiceSimon = tNameSimon === 'red' ? blueDice : redDice;
+    if (fSimon.id === 24 && !fSimon.ko && enemyDiceSimon) {
+      const enemyRollType = classify(enemyDiceSimon).type;
+      if (isTripleOrBetter(enemyRollType)) {
+        team.resources.fire = (team.resources.fire || 0) + 2;
+        queueAbility('BREW TIME!', 'var(--uncommon)', `Simon — Enemy rolled ${enemyRollType}! +2 Sacred Fire!`, null, tNameSimon);
+        log(`<span class="log-ability">Simon</span> — Brew Time! Enemy rolled ${enemyRollType} → <span class="log-ms">+2 Sacred Fire!</span>`);
+        collectKC(tNameSimon, fSimon.name);
+      }
+    }
+  });
+
+  // Masked Hero (55) — Underdog: gain +1 Burn for each 3 rolled (win or lose)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tNameMH = team === B.red ? 'red' : 'blue';
+    const mhDice = team === B.red ? redDice : blueDice;
+    if (f.id === 55 && !f.ko && mhDice) {
+      const threeCount = mhDice.filter(d => d === 3).length;
+      if (threeCount > 0) {
+        if (!team.resources.burn) team.resources.burn = 0;
+        team.resources.burn += threeCount;
+        queueAbility('UNDERDOG!', 'var(--uncommon)', `${f.name} — ${threeCount} three${threeCount > 1 ? 's' : ''} rolled! +${threeCount} Burn!`, null, tNameMH);
+        log(`<span class="log-ability">${f.name}</span> — Underdog! Rolled ${threeCount} three${threeCount > 1 ? 's' : ''} → <span class="log-dmg">+${threeCount} Burn!</span>`);
+        collectKC(tNameMH, f.name);
       }
     }
   });
@@ -5822,6 +7260,39 @@ function doPostRollAndResolve(redDice, blueDice) {
     const _blueHasLS = _blueLsCtx > 0 && B.blue.resources.luckyStone > 0;
     const _redHasMS  = redMsAvail > 0 && B.red.resources.moonstone > 0;
     const _blueHasMS = blueMsAvail > 0 && B.blue.resources.moonstone > 0;
+
+    // v728: PvP — each side only shows their OWN specials windows.
+    // Opponent's specials are skipped (can't make their choices).
+    if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+      // Blue's local resolution: show Blue's specials only
+      if (_blueHasMS && _blueHasLS) {
+        startSameTeamSpecialsWindow('blue', () => checkLuckyStones());
+        return;
+      }
+      if (_blueHasMS) {
+        B.phase = 'moonstone-blue';
+        showMoonstoneChoice('blue', blueDice);
+        return;
+      }
+      // No Blue moonstone — fall through to Lucky Stone check
+      checkLuckyStones();
+      return;
+    }
+    if (LIVE_PVP && PVP_SIDE === 'red') {
+      // Red's engine: show Red's specials only
+      if (_redHasMS && _redHasLS) {
+        startSameTeamSpecialsWindow('red', () => checkLuckyStones());
+        return;
+      }
+      if (_redHasMS) {
+        B.phase = 'moonstone-red';
+        showMoonstoneChoice('red', redDice);
+        return;
+      }
+      // No Red moonstone — fall through to Lucky Stone check
+      checkLuckyStones();
+      return;
+    }
 
     if (_redHasMS && _blueHasLS && !_blueHasMS && !_redHasLS) {
       startCrossTypeSpecialsWindow('red', 'blue');
@@ -5922,10 +7393,10 @@ function doPostRollAndResolve(redDice, blueDice) {
     const afterDarkWing = () => {
       const jRed  = active(B.red);
       const jBlue = active(B.blue);
-      if (jRed  && jRed.id  === 50 && !jRed.ko  && jRed.hp  >= 2 && B.jacksonUsedThisRound && !B.jacksonUsedThisRound.red) {
+      if (jRed  && jRed.id  === 50 && !jRed.ko  && jRed.hp  >= 2) {
         checkJacksonRegrow('red',  [...B.redDice],  afterJackson); return;
       }
-      if (jBlue && jBlue.id === 50 && !jBlue.ko && jBlue.hp >= 2 && B.jacksonUsedThisRound && !B.jacksonUsedThisRound.blue) {
+      if (jBlue && jBlue.id === 50 && !jBlue.ko && jBlue.hp >= 2) {
         checkJacksonRegrow('blue', [...B.blueDice], afterJackson); return;
       }
       afterJackson();
@@ -5947,13 +7418,262 @@ function doPostRollAndResolve(redDice, blueDice) {
   });
 }
 
+// ============================================================
+// SKIP SPECIALS BUTTON — lets players skip the countdown window
+// ============================================================
+function showSkipBtn(callback) {
+  B.skipSpecialsCallback = callback;
+  if (!document.getElementById('skipBtnCheckbox')?.checked) return;
+  const btn = document.getElementById('skipSpecialsBtn');
+  if (btn) btn.style.display = '';
+}
+function hideSkipBtn() {
+  B.skipSpecialsCallback = null;
+  const btn = document.getElementById('skipSpecialsBtn');
+  if (btn) btn.style.display = 'none';
+}
+function doSkipSpecials() {
+  if (!B || !B.skipSpecialsCallback) return;
+  const cb = B.skipSpecialsCallback;
+  hideSkipBtn();
+  cb();
+}
+
+// Moonstone Sickness — balance experiment
+function applyMoonstoneSickness(team) {
+  const mode = document.getElementById('moonstoneModeSelect')?.value || 'D';
+  const t = B[team];
+  if (mode === 'A') {
+    t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
+    const totalPerTurn = t.moonstoneSickness * 2;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll for the rest of the game.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!`);
+  } else if (mode === 'D' || mode === 'G') {
+    t.moonstoneSickness = (t.moonstoneSickness || 0) + 1;
+    const totalPerTurn = t.moonstoneSickness * 1;
+    const clearNote = mode === 'G' ? ' (clears on KO)' : '';
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${totalPerTurn} damage before every roll${clearNote}.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${totalPerTurn} damage before every roll!${clearNote}`);
+  } else if (mode === 'B') {
+    t.moonstoneSicknessCount = (t.moonstoneSicknessCount || 0) + 1;
+    t.moonstoneSicknessPending = t.moonstoneSicknessCount * 2;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take ${t.moonstoneSicknessPending} damage before next roll.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> ${t.moonstoneSicknessPending} damage before next roll!`);
+  } else if (mode === 'C') {
+    t.moonstoneSicknessPending = 3;
+    log(`<span class="log-dmg">Moonstone Sickness!</span> ${team.toUpperCase()} will take 3 damage before next roll.`);
+    narrate(`<b class="${team}-text" style="color:var(--moonstone)">Moonstone Sickness!</b> 3 damage before next roll!`);
+  }
+}
+
 // Moonstone — timed window like Lucky Stone (3s countdown, click die to change)
 let msCountdownTimer = null;
 
 function showMoonstoneChoice(team, dice) {
+  // Blue AI: auto-use moonstone
+  if (AI_ACTIVE && team === 'blue') {
+    const aiMsMode = document.getElementById('moonstoneModeSelect')?.value || 'D';
+    B.pendingMoonstone = { team, dice: [...dice], dieIndex: null, phase: 'pick-resource' };
+
+    if (aiMsMode === 'F') {
+      // Toggle F AI: roll die, deal damage to opponent
+      B[team].resources.moonstone--;
+      const roll = Math.floor(Math.random() * 6) + 1;
+      const oppTeam = team === 'red' ? 'blue' : 'red';
+      const oppF = active(B[oppTeam]);
+      if (oppF && !oppF.ko) {
+        oppF.hp = Math.max(0, oppF.hp - roll);
+        if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+        log(`<span class="log-ms">Moonstone Blast!</span> Blue rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
+        narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> <b class="blue-text">Blue</b> rolled <b class="gold">${roll}</b> — <b class="red-text">${oppF.name}</b> takes ${roll} damage!`);
+        playDamageSfx(roll);
+        hitDamage(oppTeam);
+      }
+      B.pendingMoonstone = null;
+      renderBattle();
+      setTimeout(() => {
+        if (B.pendingResolve) { const pr = B.pendingResolve; B.pendingResolve = null; doResolve(pr.redDice || B.redDice, pr.blueDice || B.blueDice, pr.redRoll, pr.blueRoll); }
+        else checkLuckyStonePhase();
+      }, spd(800));
+      return;
+    }
+
+    if (aiMsMode === 'E') {
+      // Toggle E AI: pick a random item
+      B[team].resources.moonstone--;
+      const pick = MS_ITEM_LIST[Math.floor(Math.random() * MS_ITEM_LIST.length)];
+      if (pick.key === 'iceBlade') { if (!B.iceBladeForgedPermanent) B.iceBladeForgedPermanent={red:false,blue:false}; B.iceBladeForgedPermanent[team]=true; }
+      else if (pick.key === 'flameBlade') { if (!B.flameBlade) B.flameBlade={red:false,blue:false}; B.flameBlade[team]=true; }
+      else if (pick.key === 'maskOfDay') { if (!B.sophiaMask) B.sophiaMask={red:null,blue:null}; if (!B.sophiaMaskActive) B.sophiaMaskActive={red:false,blue:false}; B.sophiaMask[team]='day'; B.sophiaMaskActive[team]=true; }
+      else if (pick.key === 'maskOfNight') { if (!B.sophiaMask) B.sophiaMask={red:null,blue:null}; if (!B.sophiaMaskActive) B.sophiaMaskActive={red:false,blue:false}; B.sophiaMask[team]='night'; B.sophiaMaskActive[team]=true; }
+      else if (pick.key === 'hammer') { if (!B.carpenterHammer) B.carpenterHammer={red:false,blue:false}; B.carpenterHammer[team]=true; }
+      else if (pick.key === 'torch') { if (!B.welderTorch) B.welderTorch={red:false,blue:false}; B.welderTorch[team]=true; }
+      log(`<span class="log-ms">Moonstone → Item!</span> Blue receives <b>${pick.name}</b>! ${pick.desc}`);
+      narrate(`<b style="color:var(--moonstone)">Moonstone → Item!</b> <b class="blue-text">Blue</b> receives <b>${pick.name}</b>!`);
+      B.pendingMoonstone = null;
+      renderBattle();
+      setTimeout(() => {
+        if (B.pendingResolve) { const pr = B.pendingResolve; B.pendingResolve = null; doResolve(pr.redDice || B.redDice, pr.blueDice || B.blueDice, pr.redRoll, pr.blueRoll); }
+        else checkLuckyStonePhase();
+      }, spd(800));
+      return;
+    }
+
+    // Default modes A-D: change lowest die to 6
+    // Find lowest die
+    let worstIdx = 0, worstVal = 7;
+    dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+    // Auto-use: change lowest die to 6
+    B.pendingMoonstone.dieIndex = worstIdx;
+    const newDice = [...dice];
+    newDice[worstIdx] = 6;
+    newDice.sort((a, b) => a - b);
+    B[team === 'red' ? 'redDice' : 'blueDice'] = newDice;
+    B.pendingMoonstone.dice = newDice;
+    B[team].resources.moonstone--;
+    applyMoonstoneSickness(team);
+    triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
+    log(`<span class="log-ms">${team.toUpperCase()} uses Moonstone!</span> Changed die ${worstVal} → 6!`);
+    narrate(`<b class="${team}-text">Blue</b> uses <b style="color:var(--moonstone)">Moonstone!</b> ${worstVal} → 6!`);
+    B.pendingMoonstone = null;
+    renderDice(B.redDice, B.blueDice);
+    renderBattle();
+    // Continue to resolve
+    setTimeout(() => {
+      if (B.pendingResolve) {
+        const pr = B.pendingResolve;
+        B.pendingResolve = null;
+        doResolve(pr.redDice || B.redDice, pr.blueDice || B.blueDice, pr.redRoll, pr.blueRoll);
+      } else {
+        checkLuckyStonePhase();
+      }
+    }, spd(800));
+    return;
+  }
+
+  // Toggle F: Roll die 1-6, deal that as damage to opponent
+  const msModeF = document.getElementById('moonstoneModeSelect')?.value;
+  if (msModeF === 'F') {
+    B.pendingMoonstone = { team, dice: [...dice], dieIndex: null, phase: 'pick-resource' };
+    renderDice(B.redDice, B.blueDice);
+    renderBattle();
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+    narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b>&nbsp;Click it to use!`);
+    log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to use — 5 seconds!`);
+    showSkipBtn(() => skipMoonstone());
+    const resEl = document.getElementById(team + '-resources');
+    const msEl = resEl.querySelector('.res-tile.moonstone');
+    if (msEl) {
+      msEl.classList.add('rerollable');
+      msEl.style.cursor = 'pointer';
+      let remaining = getSpecialsTimerSecs();
+      showLsCountdown(msEl, remaining);
+      msEl.onclick = () => {
+        hideSkipBtn();
+        clearInterval(msCountdownTimer);
+        clearMsCountdown(msEl);
+        msEl.classList.remove('rerollable');
+        msEl.onclick = null;
+        // Consume moonstone
+        const t = B[team];
+        const f = active(t);
+        let magicTouchFired = false;
+        if (f.id === 203 && !f.usedMagicTouch) {
+          f.usedMagicTouch = true;
+          magicTouchFired = true;
+          showAbilityCallout('MAGIC TOUCH!', 'var(--moonstone)', `${f.name} — Moonstone used without discarding!`, team);
+          log(`<span class="log-ability">${f.name}</span> — Magic Touch! Used Moonstone without discarding it!`);
+        } else {
+          t.resources.moonstone--;
+          playSfx('sfxSpecial', 0.5);
+        }
+        // Roll 1-6
+        const roll = Math.floor(Math.random() * 6) + 1;
+        const oppTeam = team === 'red' ? 'blue' : 'red';
+        const oppF = active(B[oppTeam]);
+        if (oppF && !oppF.ko) {
+          oppF.hp = Math.max(0, oppF.hp - roll);
+          if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+          showAbilityCallout('MOONSTONE BLAST!', 'var(--moonstone)', `Rolled a ${roll} — ${oppF.name} takes ${roll} damage!`, team);
+          log(`<span class="log-ms">Moonstone Blast!</span> Rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
+          narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> Rolled <b class="gold">${roll}</b> — <b class="${oppTeam}-text">${oppF.name}</b> takes ${roll} damage!${oppF.ko ? ' <b>KO!</b>' : ''}`);
+          playDamageSfx(roll);
+          hitDamage(oppTeam);
+        }
+        renderBattle();
+        B.pendingMoonstone = null;
+        setTimeout(() => {
+          const blueMsLeft = B.msAvailable ? B.msAvailable.blue : 0;
+          if (team === 'red' && blueMsLeft > 0 && B.blue.resources.moonstone > 0) {
+            B.phase = 'moonstone-blue';
+            showMoonstoneChoice('blue', B.blueDice);
+            return;
+          }
+          if (B.afterMoonstoneCallback) { const _cb = B.afterMoonstoneCallback; delete B.afterMoonstoneCallback; _cb(); return; }
+          checkLuckyStones();
+        }, magicTouchFired ? 1600 : 1200);
+      };
+      clearInterval(msCountdownTimer);
+      msCountdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(msCountdownTimer);
+          clearMsCountdown(msEl);
+          if (msEl) { msEl.classList.remove('rerollable'); msEl.onclick = null; }
+          skipMoonstone();
+        } else {
+          showLsCountdown(msEl, remaining);
+        }
+      }, 1000);
+    }
+    return;
+  }
+
+  // Toggle E: Choose an item instead of changing a die
+  const msModeE = document.getElementById('moonstoneModeSelect')?.value;
+  if (msModeE === 'E') {
+    B.pendingMoonstone = { team, dice: [...dice], dieIndex: null, phase: 'pick-resource' };
+    renderDice(B.redDice, B.blueDice);
+    renderBattle();
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+    narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b>&nbsp;Click it to choose an item!`);
+    log(`<span class="log-ms">${team.toUpperCase()} has a Moonstone!</span> Click it to choose an item — 5 seconds!`);
+    showSkipBtn(() => skipMoonstone());
+    const resEl = document.getElementById(team + '-resources');
+    const msEl = resEl.querySelector('.res-tile.moonstone');
+    if (msEl) {
+      msEl.classList.add('rerollable');
+      msEl.style.cursor = 'pointer';
+      let remaining = getSpecialsTimerSecs();
+      showLsCountdown(msEl, remaining);
+      msEl.onclick = () => {
+        hideSkipBtn();
+        clearInterval(msCountdownTimer);
+        clearMsCountdown(msEl);
+        msEl.classList.remove('rerollable');
+        msEl.onclick = null;
+        showMoonstoneItemPicker(team);
+      };
+      clearInterval(msCountdownTimer);
+      msCountdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(msCountdownTimer);
+          clearMsCountdown(msEl);
+          if (msEl) { msEl.classList.remove('rerollable'); msEl.onclick = null; }
+          skipMoonstone();
+        } else {
+          showLsCountdown(msEl, remaining);
+        }
+      }, 1000);
+    }
+    return;
+  }
+
   renderDice(B.redDice, B.blueDice);
   renderBattle();
   B.pendingMoonstone = { team, dice: [...dice], dieIndex:null, phase:'pick-resource' };
+  showSkipBtn(() => skipMoonstone());
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="${team}-text">${teamLabel}</b> has a <b style="color:var(--moonstone)">Moonstone!</b>&nbsp;Click it to use!`);
@@ -5973,6 +7693,7 @@ function showMoonstoneChoice(team, dice) {
     msEl.style.cursor = 'pointer';
     msEl.onclick = () => {
       // Player clicked Moonstone — clear the countdown and start fresh for die picking
+      hideSkipBtn();
       clearInterval(msCountdownTimer);
       clearMsCountdown(msEl);
       msEl.classList.remove('rerollable');
@@ -5985,8 +7706,9 @@ function showMoonstoneChoice(team, dice) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
+      sync3dDiceClickable(team);
       // Fresh 5s countdown for picking which die
-      let pickRemaining = 5;
+      let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(diceEl, pickRemaining);
       msCountdownTimer = setInterval(() => {
         pickRemaining--;
@@ -6009,10 +7731,11 @@ function showMoonstoneChoice(team, dice) {
       d.style.borderColor = 'var(--moonstone)';
       d.onclick = () => pickMsDie(i);
     });
+    sync3dDiceClickable(team);
   }
 
-  // Start 5s countdown — auto-skip if not used
-  let remaining = 5;
+  // Start countdown — auto-skip if not used
+  let remaining = getSpecialsTimerSecs();
   showLsCountdown(msEl, remaining);
 
   clearInterval(msCountdownTimer);
@@ -6036,6 +7759,7 @@ function clearMsCountdown(el) {
 
 function pickMsDie(idx) {
   if (!B || !B.pendingMoonstone || B.pendingMoonstone.phase !== 'pick-die') return;
+  hideSkipBtn();
   clearInterval(msCountdownTimer);
   msCountdownTimer = null; // prevent any queued interval callbacks from firing
   const team = B.pendingMoonstone.team;
@@ -6053,29 +7777,29 @@ function pickMsDie(idx) {
 
   narrate(`Die ${idx+1} selected — pick a new value!`);
 
-  // Show value picker immediately — no delay that can race with skip timers
-  const el = document.getElementById('msPicker');
-  document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${idx+1}:</p>`;
-  const step2 = document.getElementById('msStep2');
-  step2.style.display = 'flex';
-  step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
-  el.classList.add('active');
+  // Hide the full-screen overlay, show inline picker in arena center
+  document.getElementById('msPicker').classList.remove('active');
+  const inlinePicker = document.getElementById('msInlinePicker');
+  const inlineOpts = document.getElementById('msInlineOptions');
+  inlineOpts.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValue(${v})">${v}</div>`).join('');
+  inlinePicker.classList.add('active');
 
-  // Scroll into view
-  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  // Scroll arena center into view
+  const arenaCenter = inlinePicker.parentElement;
+  if (arenaCenter) arenaCenter.scrollIntoView({ behavior:'smooth', block:'center' });
 
   // Auto-skip after 7s if no value picked
   let remaining = 7;
-  showLsCountdown(el, remaining);
+  showLsCountdown(inlinePicker, remaining);
   msCountdownTimer = setInterval(() => {
     remaining--;
     if (remaining <= 0) {
       clearInterval(msCountdownTimer);
-      el.classList.remove('active');
-      clearMsCountdown(el);
+      inlinePicker.classList.remove('active');
+      clearMsCountdown(inlinePicker);
       skipMoonstone();
     } else {
-      showLsCountdown(el, remaining);
+      showLsCountdown(inlinePicker, remaining);
     }
   }, 1000);
 }
@@ -6091,6 +7815,8 @@ function pickMsValue(val) {
   const el = document.getElementById('msPicker');
   el.classList.remove('active');
   clearMsCountdown(el);
+  document.getElementById('msInlinePicker').classList.remove('active');
+  clearMsCountdown(document.getElementById('msInlinePicker'));
 
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   let magicTouchFired = false;
@@ -6103,6 +7829,8 @@ function pickMsValue(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  applyMoonstoneSickness(team); // Moonstone Sickness — fires on USE (including Magic Touch)
+  triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -6119,6 +7847,18 @@ function pickMsValue(val) {
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
+  // v731: broadcast Moonstone choice to Red's engine so it resolves with correct dice
+  if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF && team === 'blue') {
+    PVP_GAME_REF.child('specialsChoice').push({
+      type: 'moonstone',
+      side: 'blue',
+      dieIndex: ms.dieIndex,
+      chosenValue: val,
+      dice: ms.dice.slice(),
+      ts: Date.now()
+    });
+  }
+
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used,
   // Bigsby MUST be sacrificed and replaced with Doom (id 112). Mandatory transformation.
   if (f.id === 424 && !f.ko) {
@@ -6133,9 +7873,10 @@ function pickMsValue(val) {
     g.originalRarity = g.rarity;
     g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
     g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
-    g.art = "../testroom/art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
-    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
+    queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    checkRipagooTransform(team);
     renderBattle();
   }
 
@@ -6166,12 +7907,125 @@ function pickMsValue(val) {
   }, msPostDelay);
 }
 
+// Toggle E: Moonstone item picker — choose an item from the game
+const MS_ITEM_LIST = [
+  { key: 'iceBlade', name: 'Ice Blade', emoji: '🗡️', desc: '+1 die, +2 damage on wins when swinging', color: 'var(--ghost-rare)' },
+  { key: 'flameBlade', name: 'Flame Blade', emoji: '🔥', desc: '+1 die, +3 Burn on wins when swinging', color: 'var(--rare)' },
+  { key: 'maskOfDay', name: 'Mask of Day', emoji: '☀️', desc: 'Gain 1 Burn for each 1 or 2 you roll', color: '#ffd700' },
+  { key: 'maskOfNight', name: 'Mask of Night', emoji: '🌙', desc: 'Roll same dice as enemy, +1 damage on wins', color: '#4a4a8a' },
+  { key: 'hammer', name: "Carpenter's Hammer", emoji: '🔨', desc: '+2 damage on Singles', color: 'var(--moonstone)' },
+  { key: 'torch', name: "Welder's Torch", emoji: '🔦', desc: 'Burns deal +1 extra damage, wins grant 1 Burn', color: '#ff6b35' }
+];
+
+function showMoonstoneItemPicker(team) {
+  clearInterval(msCountdownTimer);
+  const inlinePicker = document.getElementById('msInlinePicker');
+  const inlineOpts = document.getElementById('msInlineOptions');
+  const h4 = inlinePicker.querySelector('h4');
+  if (h4) h4.textContent = '💎 Choose an Item';
+  inlineOpts.innerHTML = MS_ITEM_LIST.map((item, i) =>
+    `<div class="ms-die-option" style="width:auto;height:auto;padding:8px 14px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px;" onclick="pickMoonstoneItem('${item.key}','${team}')" title="${item.desc}">
+      <span style="font-size:20px;">${item.emoji}</span>
+      <span style="font-size:11px;color:${item.color};font-weight:700;">${item.name}</span>
+    </div>`
+  ).join('');
+  inlinePicker.classList.add('active');
+  const arenaCenter = inlinePicker.parentElement;
+  if (arenaCenter) arenaCenter.scrollIntoView({ behavior:'smooth', block:'center' });
+  let remaining = 10;
+  showLsCountdown(inlinePicker, remaining);
+  msCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(msCountdownTimer);
+      inlinePicker.classList.remove('active');
+      clearMsCountdown(inlinePicker);
+      skipMoonstone();
+    } else {
+      showLsCountdown(inlinePicker, remaining);
+    }
+  }, 1000);
+}
+
+function pickMoonstoneItem(key, team) {
+  clearInterval(msCountdownTimer);
+  const inlinePicker = document.getElementById('msInlinePicker');
+  inlinePicker.classList.remove('active');
+  clearMsCountdown(inlinePicker);
+
+  const t = B[team];
+  const f = active(t);
+  const item = MS_ITEM_LIST.find(i => i.key === key);
+  if (!item) { skipMoonstone(); return; }
+
+  // Consume moonstone (Benjamin Magic Touch check)
+  let magicTouchFired = false;
+  if (f.id === 203 && !f.usedMagicTouch) {
+    f.usedMagicTouch = true;
+    magicTouchFired = true;
+    showAbilityCallout('MAGIC TOUCH!', 'var(--moonstone)', `${f.name} — Moonstone used without discarding!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Magic Touch! Used Moonstone without discarding it!`);
+  } else {
+    t.resources.moonstone--;
+    playSfx('sfxSpecial', 0.5);
+  }
+
+  // Grant the item
+  if (key === 'iceBlade') {
+    if (!B.iceBladeForgedPermanent) B.iceBladeForgedPermanent = { red: false, blue: false };
+    B.iceBladeForgedPermanent[team] = true;
+  } else if (key === 'flameBlade') {
+    if (!B.flameBlade) B.flameBlade = { red: false, blue: false };
+    B.flameBlade[team] = true;
+  } else if (key === 'maskOfDay') {
+    if (!B.sophiaMask) B.sophiaMask = { red: null, blue: null };
+    if (!B.sophiaMaskActive) B.sophiaMaskActive = { red: false, blue: false };
+    B.sophiaMask[team] = 'day';
+    B.sophiaMaskActive[team] = true;
+  } else if (key === 'maskOfNight') {
+    if (!B.sophiaMask) B.sophiaMask = { red: null, blue: null };
+    if (!B.sophiaMaskActive) B.sophiaMaskActive = { red: false, blue: false };
+    B.sophiaMask[team] = 'night';
+    B.sophiaMaskActive[team] = true;
+  } else if (key === 'hammer') {
+    if (!B.carpenterHammer) B.carpenterHammer = { red: false, blue: false };
+    B.carpenterHammer[team] = true;
+  } else if (key === 'torch') {
+    if (!B.welderTorch) B.welderTorch = { red: false, blue: false };
+    B.welderTorch[team] = true;
+  }
+
+  showAbilityCallout(item.emoji + ' ' + item.name.toUpperCase() + '!', item.color, `${f.name} receives ${item.name}!`, team);
+  log(`<span class="log-ms">Moonstone → Item!</span> ${team.toUpperCase()} receives <b>${item.name}</b>! ${item.desc}`);
+  narrate(`<b style="color:var(--moonstone)">Moonstone → Item!</b> <b class="${team}-text">${f.name}</b> receives <b style="color:${item.color}">${item.name}</b>!`);
+  renderBattle();
+  B.pendingMoonstone = null;
+
+  const msPostDelay = magicTouchFired ? 1600 : 1200;
+  setTimeout(() => {
+    const blueMsLeft = B.msAvailable ? B.msAvailable.blue : 0;
+    if (team === 'red' && blueMsLeft > 0 && B.blue.resources.moonstone > 0) {
+      B.phase = 'moonstone-blue';
+      showMoonstoneChoice('blue', B.blueDice);
+      return;
+    }
+    if (B.afterMoonstoneCallback) { const _cb = B.afterMoonstoneCallback; delete B.afterMoonstoneCallback; _cb(); return; }
+    checkLuckyStones();
+  }, msPostDelay);
+}
+
 function skipMoonstone() {
   if (!B.pendingMoonstone) return;
+  hideSkipBtn();
   const team = B.pendingMoonstone.team;
   clearInterval(msCountdownTimer);
   document.getElementById('msPicker').classList.remove('active');
+  document.getElementById('msInlinePicker').classList.remove('active');
   clearDiceClickable(team);
+  // Also clear the resource tile highlight + countdown badge
+  const resEl = document.getElementById(team + '-resources');
+  const msEl = resEl && resEl.querySelector('.res-tile.moonstone');
+  if (msEl) { msEl.classList.remove('rerollable'); msEl.onclick = null; msEl.style.cursor = ''; clearMsCountdown(msEl); }
   log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
   B.pendingMoonstone = null;
 
@@ -6238,7 +8092,7 @@ function startSimultaneousMoonstoneWindows() {
     });
   };
 
-  let remaining = 5;
+  let remaining = getSpecialsTimerSecs();
   updateBadges(remaining);
   clearInterval(lsSharedTimer); lsSharedTimer = null;
   lsSharedTimer = setInterval(() => {
@@ -6301,6 +8155,7 @@ function startSimultaneousMoonstoneWindows() {
 // ============================================================
 function startSameTeamSpecialsWindow(team, finalCallback) {
   B.phase = 'specials-unified-' + team;
+  showSkipBtn(() => closeWindow());
   const tLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="${team}-text">${tLabel}</b> has a <b style="color:var(--moonstone)">Moonstone</b> and a <b class="gold">Lucky Stone!</b> Click either to use!`);
 
@@ -6334,6 +8189,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
   const closeWindow = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(sharedTimer); sharedTimer = null;
     clearAllBadges();
     const ms = getMsTile(); const ls = getLsTile();
@@ -6415,16 +8271,16 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           B.pendingMoonstone.dieIndex = i;
           B.pendingMoonstone.phase = 'pick-value';
           narrate(`Die ${i+1} selected — pick a new value!`);
-          const el = document.getElementById('msPicker');
-          document.getElementById('msStep1').innerHTML = `<p style="color:var(--text2);font-size:13px;">Pick new value for die ${i+1}:</p>`;
-          const step2 = document.getElementById('msStep2');
-          step2.style.display = 'flex';
-          step2.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValueUnified(${v})">${v}</div>`).join('');
-          el.classList.add('active');
-          el.scrollIntoView({ behavior:'smooth', block:'center' });
+          document.getElementById('msPicker').classList.remove('active');
+          const inlinePkr = document.getElementById('msInlinePicker');
+          const inlineOps = document.getElementById('msInlineOptions');
+          inlineOps.innerHTML = [1,2,3,4,5,6].map(v => `<div class="ms-die-option" onclick="pickMsValueUnified(${v})">${v}</div>`).join('');
+          inlinePkr.classList.add('active');
+          const arenaC = inlinePkr.parentElement;
+          if (arenaC) arenaC.scrollIntoView({ behavior:'smooth', block:'center' });
 
           let valRem = 7;
-          showLsCountdown(el, valRem);
+          showLsCountdown(inlinePkr, valRem);
           msCountdownTimer = setInterval(() => {
             valRem--;
             if (valRem <= 0) {
@@ -6438,7 +8294,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
               log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
               if (checkStillAvailable()) {
                 refreshLsTile();
-                startTimer(3);
+                startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
               }
             } else {
               showLsCountdown(el, valRem);
@@ -6446,6 +8302,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           }, 1000);
         };
       });
+      sync3dDiceClickable(team);
 
       // Die-pick countdown
       let pickRem = 5;
@@ -6463,7 +8320,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
           log(`<span style="color:var(--text2)">${team.toUpperCase()} holds their Moonstone.</span>`);
           if (checkStillAvailable()) {
             refreshLsTile();
-            startTimer(3);
+            startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
           }
         } else {
           showLsCountdown(diceEl, pickRem);
@@ -6509,13 +8366,14 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
               const msR = getMsTile();
               if (msR) { msR.classList.add('rerollable'); msR.style.cursor = 'pointer'; msR.onclick = msTileClick; }
             }
-            startTimer(3);
+            startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
           }
         });
       };
     });
+    sync3dDiceClickable(team);
 
-    let pickRem = 3;
+    let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
     showLsCountdown(diceEl, pickRem);
     clearInterval(lsCountdownTimer); lsCountdownTimer = null;
     lsCountdownTimer = setInterval(() => {
@@ -6532,7 +8390,7 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
             const msR2 = getMsTile();
             if (msR2) { msR2.classList.add('rerollable'); msR2.style.cursor = 'pointer'; msR2.onclick = msTileClick; }
           }
-          startTimer(3);
+          startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
         }
       } else {
         showLsCountdown(diceEl, pickRem);
@@ -6555,13 +8413,13 @@ function startSameTeamSpecialsWindow(team, finalCallback) {
     renderBattle();
     if (checkStillAvailable()) {
       refreshLsTile();
-      startTimer(3);
+      startTimer(Math.max(3, getSpecialsTimerSecs() - 2));
     }
   };
   document.addEventListener('unifiedMsDone', onMsDone);
 
   // Start the initial shared timer
-  startTimer(5);
+  startTimer(getSpecialsTimerSecs());
 }
 
 // Moonstone value picker callback for the unified specials window
@@ -6577,6 +8435,8 @@ function pickMsValueUnified(val) {
   const el = document.getElementById('msPicker');
   el.classList.remove('active');
   clearMsCountdown(el);
+  document.getElementById('msInlinePicker').classList.remove('active');
+  clearMsCountdown(document.getElementById('msInlinePicker'));
 
   // Benjamin (203) — Magic Touch: once per turn, don't decrement moonstone
   let magicTouchFired = false;
@@ -6589,6 +8449,8 @@ function pickMsValueUnified(val) {
     t.resources.moonstone--;
     playSfx('sfxSpecial', 0.5);
   }
+  applyMoonstoneSickness(team); // Moonstone Sickness — fires on USE (including Magic Touch)
+  triggerCameronSpecialWatch(team, true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
 
   ms.dice[ms.dieIndex] = val;
   ms.dice.sort((a,b)=>a-b);
@@ -6604,6 +8466,18 @@ function pickMsValueUnified(val) {
   narrate(`<b style="color:var(--moonstone)">Moonstone!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> changes die to <b class="gold">${val}</b>! → [${ms.dice.join(', ')}]`);
   B.pendingMoonstone = null;
 
+  // v731: broadcast Moonstone choice to Red's engine
+  if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF && team === 'blue') {
+    PVP_GAME_REF.child('specialsChoice').push({
+      type: 'moonstone',
+      side: 'blue',
+      dieIndex: ms.dieIndex,
+      chosenValue: val,
+      dice: ms.dice.slice(),
+      ts: Date.now()
+    });
+  }
+
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used
   if (f.id === 424 && !f.ko) {
     const g = f;
@@ -6612,9 +8486,10 @@ function pickMsValueUnified(val) {
     g.originalAbilityDesc = g.abilityDesc; g.originalRarity = g.rarity;
     g.id = 112; g.name = "Doom"; g.maxHp = 7; g.hp = 7;
     g.ability = "Fiendship"; g.abilityDesc = "+2 bonus damage!";
-    g.art = "../testroom/art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
-    queueAbility('OMEN!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
+    g.art = "art/originals/doom.jpg"; g.rarity = "legendary"; g.ko = false;
+    queueAbility('TRANSFORMATION!', 'var(--legendary)', 'Bigsby sacrifices himself — DOOM rises!', null, team);
     log(`<span class="log-ability">Bigsby</span> — Omen! <span class="log-dmg">DOOM has arrived!</span>`);
+    checkRipagooTransform(team);
     renderBattle();
   }
 
@@ -6634,6 +8509,57 @@ function pickMsValueUnified(val) {
 // If LS player acts first → MS player gets a fresh 5s after LS resolves.
 // ============================================================
 function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
+  // Blue AI: if blue has either moonstone or lucky stone in cross-type window,
+  // auto-use it so the player doesn't see blue's interactive prompts
+  if (AI_ACTIVE && (msTeam === 'blue' || lsTeam === 'blue')) {
+    // Auto-use blue's moonstone
+    if (msTeam === 'blue' && B.blue.resources.moonstone > 0) {
+      const dice = B.pendingResolve.blueDice || B.blueDice;
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      dice[worstIdx] = 6;
+      dice.sort((a, b) => a - b);
+      B.blue.resources.moonstone--;
+      applyMoonstoneSickness('blue'); // Moonstone Sickness
+      triggerCameronSpecialWatch('blue', true); // Cameron (25) — Unstoppable Force (immediate post-roll die)
+      B.blueDice = dice;
+      log(`<span class="log-ms">BLUE uses Moonstone!</span> Changed ${worstVal} → 6!`);
+      renderDice(B.redDice, B.blueDice);
+    }
+    // Auto-use blue's lucky stone
+    if (lsTeam === 'blue' && B.blue.resources.luckyStone > 0) {
+      const dice = B.pendingResolve.blueDice || B.blueDice;
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        dice[worstIdx] = Math.floor(Math.random() * 6) + 1;
+        dice.sort((a, b) => a - b);
+        B.blue.resources.luckyStone--;
+        B.blueDice = dice;
+        log(`<span class="log-ms">BLUE uses Lucky Stone!</span> Rerolled ${worstVal}!`);
+        renderDice(B.redDice, B.blueDice);
+      }
+    }
+    // If the other team (red/player) still has their special, show only their window
+    if (msTeam === 'red' && B.red.resources.moonstone > 0) {
+      showMoonstoneChoice('red', B.pendingResolve.redDice || B.redDice);
+      return;
+    }
+    if (lsTeam === 'red' && B.red.resources.luckyStone > 0) {
+      startLuckyStoneWindow('red', () => {
+        const pr = B.pendingResolve;
+        if (pr) { B.pendingResolve = null; doResolve(pr.redDice, pr.blueDice, pr.redRoll, pr.blueRoll); }
+      });
+      return;
+    }
+    // Both auto-resolved — proceed to resolve
+    setTimeout(() => {
+      const pr = B.pendingResolve;
+      if (pr) { B.pendingResolve = null; doResolve(pr.redDice, pr.blueDice, pr.redRoll, pr.blueRoll); }
+    }, spd(800));
+    return;
+  }
+
   B.phase = 'specials-shared';
   const tLabel = t => t.charAt(0).toUpperCase() + t.slice(1);
   narrate(`<b class="${msTeam}-text">${tLabel(msTeam)}</b> has a <b style="color:var(--moonstone)">Moonstone</b> and <b class="${lsTeam}-text">${tLabel(lsTeam)}</b> has a <b class="gold">Lucky Stone!</b> Click yours to use it!`);
@@ -6653,6 +8579,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
   const closeBoth = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(lsSharedTimer); lsSharedTimer = null;
     // MS tile cleanup
     if (msTile) {
@@ -6672,6 +8599,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
     clearLsCountdown();
     clearDiceClickable(lsTeam);
   };
+  showSkipBtn(() => closeBoth());
 
   // Shared countdown badges on both tiles
   const updateBadges = (r) => {
@@ -6697,7 +8625,7 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
     }
   };
 
-  let remaining = 5;
+  let remaining = getSpecialsTimerSecs();
   updateBadges(remaining);
   clearInterval(lsSharedTimer); lsSharedTimer = null;
   lsSharedTimer = setInterval(() => {
@@ -6746,7 +8674,8 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.style.borderColor = 'var(--moonstone)';
         d.onclick = () => pickMsDie(i);
       });
-      let pickRemaining = 5;
+      sync3dDiceClickable(msTeam);
+      let pickRemaining = getSpecialsTimerSecs();
       showLsCountdown(msDiceEl, pickRemaining);
       clearInterval(msCountdownTimer);
       msCountdownTimer = setInterval(() => {
@@ -6795,7 +8724,8 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(lsTeam, i, lsDice, afterLs);
       });
-      let pickRemaining = 3;
+      sync3dDiceClickable(lsTeam);
+      let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(lsDiceEl, pickRemaining);
       clearInterval(lsCountdownTimer); lsCountdownTimer = null;
       lsCountdownTimer = setInterval(() => {
@@ -6815,6 +8745,68 @@ function startCrossTypeSpecialsWindow(msTeam, lsTeam) {
 }
 
 // ============================================================
+// v731: PvP SPECIALS SYNC — Blue broadcasts "done", Red waits
+// ============================================================
+// Blue calls this after all specials (MS + LS) are finished,
+// right before resolveRound(). Red listens for the signal.
+function pvpBroadcastSpecialsDone() {
+  if (!LIVE_PVP || PVP_SIDE !== 'blue' || !PVP_GAME_REF || !B) return;
+  PVP_GAME_REF.child('specialsDone').set({
+    blueDice: (B.pendingResolve ? B.pendingResolve.blueDice : B.blueDice || []).slice(),
+    ts: Date.now()
+  });
+}
+
+// Red calls this instead of resolveRound() after its own specials.
+// If Blue had any specials available this round, Red waits for Blue's
+// "specialsDone" signal (with final dice). Otherwise resolves immediately.
+let _pvpSpecialsDoneRef = null; // listener handle for cleanup
+function pvpWaitForBlueSpecials() {
+  if (!LIVE_PVP || PVP_SIDE !== 'red' || !PVP_GAME_REF || !B) { resolveRound(); return; }
+
+  // Check if Blue had any specials this round
+  const blueMsAvail = B.msAvailable ? B.msAvailable.blue : 0;
+  const blueLsAvail = B.lsAvailable ? B.lsAvailable.blue : 0;
+  const blueHadMS = blueMsAvail > 0 && B.blue.resources.moonstone > 0;
+  const blueHadLS = blueLsAvail > 0 && B.blue.resources.luckyStone > 0;
+
+  if (!blueHadMS && !blueHadLS) { resolveRound(); return; }
+
+  // Wait for Blue's specialsDone signal (with timeout safety)
+  log(`<span style="color:var(--text2)">Waiting for Blue's specials...</span>`);
+  let resolved = false;
+  const finish = (blueDice) => {
+    if (resolved) return;
+    resolved = true;
+    if (_pvpSpecialsDoneRef) { PVP_GAME_REF.child('specialsDone').off('value', _pvpSpecialsDoneRef); _pvpSpecialsDoneRef = null; }
+    clearTimeout(safetyTimeout);
+    PVP_GAME_REF.child('specialsDone').set(null);
+    PVP_GAME_REF.child('specialsChoice').remove();
+    // Apply Blue's final dice
+    if (blueDice && blueDice.length && B.pendingResolve) {
+      B.pendingResolve.blueDice = blueDice;
+      B.blueDice = blueDice;
+      renderDice(B.pendingResolve.redDice, blueDice);
+    }
+    resolveRound();
+  };
+
+  _pvpSpecialsDoneRef = PVP_GAME_REF.child('specialsDone').on('value', snap => {
+    const data = snap.val();
+    if (!data || !data.blueDice) return;
+    finish(data.blueDice);
+  });
+
+  // Safety timeout — if Blue disconnects or something breaks, don't deadlock
+  const safetyTimeout = setTimeout(() => {
+    if (!resolved) {
+      log(`<span style="color:var(--text2)">Blue specials timed out — resolving with current dice.</span>`);
+      finish(null);
+    }
+  }, 15000);
+}
+
+// ============================================================
 // LUCKY STONE — countdown + clickable dice reroll
 // ============================================================
 let lsCountdownTimer = null;
@@ -6828,6 +8820,26 @@ function checkLuckyStones() {
   const blueHasLS = blueAvail > 0 && B.blue.resources.luckyStone > 0;
 
   if (!redHasLS && !blueHasLS) { resolveRound(); return; }
+
+  // v728: PvP Blue local resolution — show Blue's own LS picker, skip Red's
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally) {
+    if (blueHasLS) {
+      startLuckyStoneWindow('blue', () => { pvpBroadcastSpecialsDone(); resolveRound(); });
+    } else {
+      pvpBroadcastSpecialsDone(); // v731: tell Red we're done with specials
+      resolveRound();
+    }
+    return;
+  }
+  // v728: PvP Red — show Red's own LS picker, skip Blue's
+  if (LIVE_PVP && PVP_SIDE === 'red') {
+    if (redHasLS) {
+      startLuckyStoneWindow('red', () => pvpWaitForBlueSpecials());
+    } else {
+      pvpWaitForBlueSpecials(); // v731: wait for Blue's LS/MS choices before resolving
+    }
+    return;
+  }
 
   // Both teams have Lucky Stones — show simultaneously (saves up to 3s vs sequential)
   if (redHasLS && blueHasLS) {
@@ -6852,6 +8864,7 @@ function startSimultaneousLuckyStoneWindows() {
   const closeShared = () => {
     if (state.closed) return;
     state.closed = true;
+    hideSkipBtn();
     clearInterval(lsSharedTimer); lsSharedTimer = null;
     clearLsCountdown();
     ['red', 'blue'].forEach(t => {
@@ -6863,6 +8876,7 @@ function startSimultaneousLuckyStoneWindows() {
     document.querySelectorAll('.ls-shared-cd').forEach(el => el.remove());
     resolveRound();
   };
+  showSkipBtn(() => closeShared());
 
   const checkBothDone = () => { if (state.redDone && state.blueDone) closeShared(); };
 
@@ -6950,21 +8964,22 @@ function startSimultaneousLuckyStoneWindows() {
               // stillAvail is already correctly set to savedAvail-1 (line above),
               // representing the remaining authorized uses. Do NOT decrement again here —
               // the next click will capture the correct savedAvail from B.lsAvailable[team].
-              setTimeout(() => { if (state.closed) return; activateTile(team); restartSharedCountdown(5); }, 600);
+              setTimeout(() => { if (state.closed) return; activateTile(team); restartSharedCountdown(getSpecialsTimerSecs()); }, 600);
             } else {
               if (team === 'red') state.redDone = true; else state.blueDone = true;
               if (!state.closed) {
                 const otherDone = team === 'red' ? state.blueDone : state.redDone;
-                if (!otherDone) setTimeout(() => restartSharedCountdown(5), 600);
+                if (!otherDone) setTimeout(() => restartSharedCountdown(getSpecialsTimerSecs()), 600);
                 else checkBothDone();
               }
             }
           });
         };
       });
+      sync3dDiceClickable(team);
 
       // 3s die-pick sub-countdown (safe: serialized by pickingTeam)
-      let pickRem = 3;
+      let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(diceEl, pickRem);
       lsCountdownTimer = setInterval(() => {
         pickRem--;
@@ -6976,7 +8991,7 @@ function startSimultaneousLuckyStoneWindows() {
           if (team === 'red') state.redDone = true; else state.blueDone = true;
           if (!state.closed) {
             const otherDone = team === 'red' ? state.blueDone : state.redDone;
-            if (!otherDone) setTimeout(() => restartSharedCountdown(3), 100);
+            if (!otherDone) setTimeout(() => restartSharedCountdown(Math.max(3, getSpecialsTimerSecs() - 2)), 100);
             else checkBothDone();
           }
         } else { showLsCountdown(diceEl, pickRem); }
@@ -6987,14 +9002,468 @@ function startSimultaneousLuckyStoneWindows() {
   // Activate both tiles simultaneously
   activateTile('red');
   activateTile('blue');
-  checkBothDone(); // in case neither team had a tile element
-  restartSharedCountdown(5);
+
+  // AI blue: auto-use Lucky Stone (reroll lowest die) instead of waiting for DOM click
+  if (AI_ACTIVE && !state.blueDone) {
+    const dice = B.pendingResolve ? B.pendingResolve.blueDice : null;
+    if (dice && B.blue.resources.luckyStone > 0) {
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        B.blue.resources.luckyStone--;
+        B.luckyStoneSpentThisTurn.blue++;
+        const newVal = Math.floor(Math.random() * 6) + 1;
+        dice[worstIdx] = newVal;
+        dice.sort((a, b) => a - b);
+        log(`<span class="log-ms">BLUE uses Lucky Stone!</span> Rerolled ${worstVal} → ${newVal}!`);
+        narrate(`<b class="blue-text">Blue</b> uses <b class="gold">Lucky Stone!</b> ${worstVal} → ${newVal}!`);
+        renderDice(B.redDice, B.blueDice);
+        renderBattle();
+      } else {
+        log(`<span style="color:var(--text2)">BLUE holds Lucky Stone (${worstVal} is good enough).</span>`);
+      }
+    }
+    // Mark blue as done — clear its tile
+    state.blueDone = true;
+    const blueResEl = document.getElementById('blue-resources');
+    const blueLsEl = blueResEl && blueResEl.querySelector('.res-tile.luckyStone');
+    if (blueLsEl) { blueLsEl.classList.remove('rerollable'); blueLsEl.onclick = null; blueLsEl.style.cursor = ''; }
+  }
+
+  checkBothDone(); // in case neither team had a tile element (or AI already resolved blue)
+  if (!state.closed) restartSharedCountdown(getSpecialsTimerSecs());
+}
+
+// ============================================================
+// FLICK — Charlie (18) physics-based die fling
+// Normal roll plays out fully. Lowest die slides below the tray
+// into open arena space. Player grabs and flings it upward into
+// the lined-up dice. Physics runs in arena-center space — the
+// tray has NO walls. All moved dice get new random results.
+// ============================================================
+function showFlickPicker(team, callback) {
+  B.phase = 'flick-' + team;
+  const myDice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+  const oppTeam = team === 'red' ? 'blue' : 'red';
+  const oppDice = team === 'red' ? B.pendingResolve.blueDice : B.pendingResolve.redDice;
+  const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+
+  // Blue AI: auto-Flick lowest die into opponent's highest
+  if (AI_ACTIVE && team === 'blue') {
+    const oldVal = myDice[0];
+    myDice[0] = Math.floor(Math.random() * 6) + 1;
+    myDice.sort((a, b) => a - b);
+    log(`<span class="log-ability">Charlie</span> — Rush! Flicked ${oldVal} → <b>${myDice[0]}</b>!`);
+    if (oppDice.length > 0) {
+      const ti = oppDice.length - 1;
+      const tOld = oppDice[ti];
+      oppDice[ti] = Math.floor(Math.random() * 6) + 1;
+      oppDice.sort((a, b) => a - b);
+      log(`<span class="log-ability">Charlie</span> — Contact! ${oppTeam} die ${tOld} → <b>${oppDice[oppDice.length-1]}</b>!`);
+    }
+    B.redDice = B.pendingResolve.redDice;
+    B.blueDice = B.pendingResolve.blueDice;
+    renderDice(B.redDice, B.blueDice);
+    showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Flick!', team);
+    setTimeout(() => callback(), spd(800));
+    return;
+  }
+
+  narrate(`<b class="${team}-text">${teamLabel}</b> — <b style="color:#f59e0b">Rush!</b> Grab &amp; fling your lowest die!`);
+  log(`<span class="log-ability">Charlie</span> — Rush! Flick activated!`);
+  showAbilityCallout('RUSH!', '#f59e0b', 'Charlie — Fling a die!', team);
+
+  // 1. Kill 3D dice, render flat
+  ['red','blue'].forEach(t => {
+    const ph = _dicePhysics[t];
+    if (ph) { cancelAnimationFrame(ph.raf); ph.els.forEach(e => e.remove()); delete _dicePhysics[t]; }
+  });
+  renderDice(B.redDice, B.blueDice);
+
+  // 2. Use full arena-board as physics space (entire battle screen)
+  const board = document.querySelector('.arena-board');
+  const center = document.querySelector('.arena-center');
+  const centerRect = board.getBoundingClientRect();
+  const physW = board.offsetWidth;
+  const physH = board.offsetHeight;
+  const tray = document.querySelector('.dice-stack');
+  const trayRect = tray.getBoundingClientRect();
+  const redRow = document.getElementById('red-dice');
+  const blueRow = document.getElementById('blue-dice');
+  const redDieEls = [...redRow.querySelectorAll('.die')];
+  const blueDieEls = [...blueRow.querySelectorAll('.die')];
+  const dieSize = redDieEls[0]?.offsetWidth || 56;
+  const dieR = dieSize / 2;
+
+  // 3. Record positions, create 3D physics dice
+  const bodies = [];
+  const allEls = [...redDieEls, ...blueDieEls];
+  const flickEls = []; // 3D elements to clean up
+
+  allEls.forEach((el, i) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left - centerRect.left + r.width / 2;
+    const cy = r.top - centerRect.top + r.height / 2;
+    const dTeam = i < redDieEls.length ? 'red' : 'blue';
+    const dIdx = i < redDieEls.length ? i : i - redDieEls.length;
+    const val = dTeam === 'red' ? B.redDice[dIdx] : B.blueDice[dIdx];
+
+    // Create 3D die (same structure as showRolling)
+    const die3d = document.createElement('div');
+    die3d.className = 'die-physics';
+    die3d.style.width = dieSize + 'px';
+    die3d.style.height = dieSize + 'px';
+    die3d.style.zIndex = '100';
+    die3d.style.setProperty('--dh', dieR + 'px');
+    die3d.innerHTML = `<div class="die-cube">${cube3dHTML(dTeam)}</div>`;
+    const cube = die3d.querySelector('.die-cube');
+    const ft = FACE_TARGET[val] || { rx: 0, ry: 0 };
+
+    bodies.push({
+      el: die3d, cube,
+      cx, cy, vx: 0, vy: 0,
+      rx: ft.rx, ry: ft.ry, rz: 0,
+      vrx: 0, vry: 0, vrz: 0,
+      origCx: cx, origCy: cy,
+      team: dTeam, dieIndex: dIdx,
+      isFlicker: dTeam === team && dIdx === 0,
+      moved: false
+    });
+    flickEls.push(die3d);
+  });
+
+  // 4. Place 3D dice on arena-board, hide flat dice
+  board.style.position = 'relative';
+  board.style.overflow = 'hidden';
+  redRow.style.visibility = 'hidden';
+  blueRow.style.visibility = 'hidden';
+  bodies.forEach(b => {
+    b.el.style.left = (b.cx - dieR) + 'px';
+    b.el.style.top = (b.cy - dieR) + 'px';
+    b.cube.style.transform = `rotateX(${b.rx}deg) rotateY(${b.ry}deg)`;
+    board.appendChild(b.el);
+  });
+
+  // 5. Position flicker die below tray, centered on board
+  const flicker = bodies.find(b => b.isFlicker);
+  const trayBottom = trayRect.bottom - centerRect.top;
+  flicker.cx = physW / 2; // centered on the full board
+  flicker.cy = trayBottom + dieSize * 0.8;
+  // Clamp so it stays inside arena-center
+  flicker.cy = Math.min(flicker.cy, physH - dieR - 8);
+  flicker.origCx = flicker.cx;
+  flicker.origCy = flicker.cy;
+  flicker.el.style.transition = 'left 0.3s ease-out, top 0.3s ease-out';
+  flicker.el.style.left = (flicker.cx - dieR) + 'px';
+  flicker.el.style.top = (flicker.cy - dieR) + 'px';
+  flicker.el.style.filter = 'drop-shadow(0 0 12px rgba(245,158,11,0.9))';
+  flicker.el.style.cursor = 'grab';
+  setTimeout(() => { flicker.el.style.transition = 'none'; }, 350);
+
+  // -- Restore helper --
+  const restoreLayout = () => {
+    clearLsCountdown();
+    flickEls.forEach(el => el.remove()); // remove 3D physics dice
+    redRow.style.visibility = '';
+    blueRow.style.visibility = '';
+    board.style.overflow = '';
+  };
+
+  // 6. Mouse / touch fling
+  let isDragging = false;
+  let mouseHist = [];
+  let launched = false;
+  let flickRaf = null;
+
+  const evtXY = (e) => {
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - centerRect.left, y: src.clientY - centerRect.top };
+  };
+
+  const onDown = (e) => {
+    if (launched) return;
+    e.preventDefault();
+    const p = evtXY(e);
+    const dx = p.x - flicker.cx, dy = p.y - flicker.cy;
+    if (Math.sqrt(dx * dx + dy * dy) > dieR * 2.5) return;
+    isDragging = true;
+    flicker.el.style.cursor = 'grabbing';
+    mouseHist = [{ x: p.x, y: p.y, t: performance.now() }];
+  };
+
+  const onMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const p = evtXY(e);
+    p.x = Math.max(dieR, Math.min(physW - dieR, p.x));
+    p.y = Math.max(dieR, Math.min(physH - dieR, p.y));
+    mouseHist.push({ x: p.x, y: p.y, t: performance.now() });
+    if (mouseHist.length > 12) mouseHist.shift();
+    flicker.cx = p.x;
+    flicker.cy = p.y;
+    flicker.el.style.left = (p.x - dieR) + 'px';
+    flicker.el.style.top = (p.y - dieR) + 'px';
+  };
+
+  const removeListeners = () => {
+    flicker.el.removeEventListener('mousedown', onDown);
+    flicker.el.removeEventListener('touchstart', onDown);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+  };
+
+  const onUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    launched = true;
+    flicker.el.style.cursor = '';
+    clearLsCountdown();
+    removeListeners();
+
+    const now = performance.now();
+    const recent = mouseHist.filter(p => now - p.t < 150);
+    if (recent.length >= 2) {
+      const first = recent[0], last = recent[recent.length - 1];
+      const dt = Math.max((last.t - first.t) / 16.67, 0.5);
+      flicker.vx = (last.x - first.x) / dt;
+      flicker.vy = (last.y - first.y) / dt;
+      const sp = Math.sqrt(flicker.vx * flicker.vx + flicker.vy * flicker.vy);
+      if (sp > 35) { flicker.vx = (flicker.vx / sp) * 35; flicker.vy = (flicker.vy / sp) * 35; }
+      if (sp < 2) { flicker.vx = 0; flicker.vy = 0; }
+    }
+
+    playSfx('sfxDiceRoll');
+    physStart = performance.now(); // start timer NOW, not when UI appeared
+    flickRaf = requestAnimationFrame(physStep);
+  };
+
+  flicker.el.addEventListener('mousedown', onDown);
+  flicker.el.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', onUp);
+
+  // 7. Physics — full arena-board walls, force-settle after 2.5s
+  const BOUNCE_WALL = 0.5;   // walls absorb energy
+  const BOUNCE_DIE = 0.85;   // die-die collisions: punchy but energy-losing
+  const SETTLE_THRESH = 0.3;
+  const PAD = 12;
+  let collisionCooldown = 0;
+  let physStart = 0; // set when fling launches, not when UI appears
+  const FORCE_SETTLE_MS = 2500; // force stop after 2.5 seconds
+
+  const physStep = () => {
+    let maxSpd = 0;
+    collisionCooldown = Math.max(0, collisionCooldown - 1);
+
+    // Time-based friction ramp: starts normal, ramps hard after 1.5s
+    const elapsed = performance.now() - physStart;
+    const baseFriction = 0.96;
+    const friction = elapsed > 1500
+      ? baseFriction * Math.pow(0.97, (elapsed - 1500) / 100) // progressive slowdown
+      : baseFriction;
+
+    // Force settle if time exceeded
+    if (elapsed > FORCE_SETTLE_MS) {
+      cancelAnimationFrame(flickRaf);
+      settleFlick();
+      return;
+    }
+
+    // Sub-step physics to prevent tunneling at high velocity
+    // At max fling (35 px/frame) and dieSize ~56, a die can skip past another.
+    // 3 sub-steps = max ~12 px/step, well within the 56px collision radius.
+    const SUB_STEPS = 3;
+    const subFric = Math.pow(friction, 1 / SUB_STEPS);
+    for (let ss = 0; ss < SUB_STEPS; ss++) {
+      bodies.forEach(b => {
+        b.cx += b.vx / SUB_STEPS; b.cy += b.vy / SUB_STEPS;
+        b.vx *= subFric; b.vy *= subFric;
+      });
+
+      // Elastic collisions
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const a = bodies[i], c = bodies[j];
+          const dx = c.cx - a.cx, dy = c.cy - a.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < dieSize && dist > 0.01) {
+            const nx = dx / dist, ny = dy / dist;
+            const rvn = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
+            if (rvn > 0) {
+              const imp = rvn * BOUNCE_DIE;
+              a.vx -= imp * nx; a.vy -= imp * ny;
+              c.vx += imp * nx; c.vy += imp * ny;
+              // 3D tumble on impact
+              const spinF = Math.min(rvn * 20, 400);
+              a.vrx += (Math.random()-0.5) * spinF; a.vry += (Math.random()-0.5) * spinF; a.vrz += (Math.random()-0.5) * spinF * 0.5;
+              c.vrx += (Math.random()-0.5) * spinF; c.vry += (Math.random()-0.5) * spinF; c.vrz += (Math.random()-0.5) * spinF * 0.5;
+              if (collisionCooldown === 0) { playSfx('sfxDiceRoll', 0.15); collisionCooldown = 10; }
+            }
+            const ov = (dieSize - dist) / 2 + 0.5;
+            a.cx -= ov * nx; a.cy -= ov * ny;
+            c.cx += ov * nx; c.cy += ov * ny;
+          }
+        }
+      }
+
+      // Wall bounce
+      bodies.forEach(b => {
+        if (b.cx - dieR < PAD) { b.cx = PAD + dieR; b.vx = Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cx + dieR > physW - PAD) { b.cx = physW - PAD - dieR; b.vx = -Math.abs(b.vx) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cy - dieR < PAD) { b.cy = PAD + dieR; b.vy = Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+        if (b.cy + dieR > physH - PAD) { b.cy = physH - PAD - dieR; b.vy = -Math.abs(b.vy) * BOUNCE_WALL; b.vrx += (Math.random()-0.5)*120; b.vry += (Math.random()-0.5)*120; }
+      });
+    }
+
+    // Update 3D rotation — [shadow] perf: batch all JS reads before DOM writes to avoid layout thrash
+    // Pass 1: all state updates + settle-threshold check (reads only)
+    bodies.forEach(b => {
+      b.rx += b.vrx; b.ry += b.vry; b.rz += b.vrz;
+      b.vrx *= 0.93; b.vry *= 0.93; b.vrz *= 0.93; // angular friction
+      const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      const rotSpd = Math.abs(b.vrx) + Math.abs(b.vry) + Math.abs(b.vrz);
+      const totalMotion = s + rotSpd * 0.05;
+      if (totalMotion > maxSpd) maxSpd = totalMotion;
+    });
+    // Pass 2: all DOM writes (batched to prevent interleaved forced reflow)
+    bodies.forEach(b => {
+      b.el.style.left = (b.cx - dieR) + 'px';
+      b.el.style.top = (b.cy - dieR) + 'px';
+      b.cube.style.transform = `rotateX(${b.rx}deg) rotateY(${b.ry}deg) rotateZ(${b.rz}deg)`;
+    });
+
+    if (maxSpd < SETTLE_THRESH) {
+      cancelAnimationFrame(flickRaf);
+      settleFlick();
+    } else {
+      flickRaf = requestAnimationFrame(physStep);
+    }
+  };
+
+  // 8. Settle — read face value from 3D rotation, snap to nearest face
+  const settleFlick = () => {
+    let changed = 0;
+    const flickerBody = bodies.find(b => b.isFlicker);
+    bodies.forEach(b => {
+      const dx = b.cx - b.origCx, dy = b.cy - b.origCy;
+      b.moved = !b.isFlicker && Math.sqrt(dx * dx + dy * dy) > 15;
+      if (b.moved) {
+        changed++;
+        // The 3D rotation determines the new value — not random!
+        const nv = getFlickFaceValue(b.rx, b.ry);
+        const ft = FACE_TARGET[nv] || { rx: 0, ry: 0 };
+        b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
+        b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
+        if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = nv;
+        else B.pendingResolve.blueDice[b.dieIndex] = nv;
+      } else {
+        // Didn't move or is the flicker die — snap to original/current face
+        const val = b.isFlicker
+          ? getFlickFaceValue(b.rx, b.ry)
+          : (b.team === 'red' ? B.pendingResolve.redDice[b.dieIndex] : B.pendingResolve.blueDice[b.dieIndex]);
+        if (b.isFlicker) {
+          // Flicker die always changes its own value
+          if (b.team === 'red') B.pendingResolve.redDice[b.dieIndex] = val;
+          else B.pendingResolve.blueDice[b.dieIndex] = val;
+        }
+        const ft = FACE_TARGET[val] || { rx: 0, ry: 0 };
+        b.cube.style.transition = 'transform 0.35s cubic-bezier(0.25,0.1,0.25,1)';
+        b.cube.style.transform = `rotateX(${nearestSnap(b.rx, ft.rx)}deg) rotateY(${nearestSnap(b.ry, ft.ry)}deg) rotateZ(${nearestSnap(b.rz, 0)}deg)`;
+      }
+    });
+
+    B.pendingResolve.redDice.sort((a, b) => a - b);
+    B.pendingResolve.blueDice.sort((a, b) => a - b);
+    B.redDice = B.pendingResolve.redDice;
+    B.blueDice = B.pendingResolve.blueDice;
+
+    if (changed > 0) {
+      log(`<span class="log-ability">Charlie</span> — Flick! <b>${changed}</b> dice changed! → Red [${B.redDice.join(',')}] Blue [${B.blueDice.join(',')}]`);
+      narrate(`<b style="color:#f59e0b">Flick!</b> ${changed} dice changed!`);
+    } else {
+      // MISS! — didn't hit any dice
+      log(`<span class="log-ability">Charlie</span> — Flick missed! No contact.`);
+      showAbilityCallout('MISS!', '#ef4444', 'Charlie whiffed the Flick!', flickerBody ? flickerBody.team : team);
+      narrate(`<b style="color:#ef4444">MISS!</b> Charlie whiffed the Flick!`);
+    }
+
+    setTimeout(() => {
+      restoreLayout();
+      renderDice(B.redDice, B.blueDice);
+      renderBattle();
+      setTimeout(() => callback(), spd(400));
+    }, spd(900));
+  };
+
+  // 9. Timeout
+  let remaining = getSpecialsTimerSecs() + 3;
+  showLsCountdown(center, remaining);
+  lsCountdownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearLsCountdown();
+      if (flickRaf) cancelAnimationFrame(flickRaf);
+      removeListeners();
+      restoreLayout();
+      renderDice(B.redDice, B.blueDice);
+      log(`<span style="color:var(--text2)">Charlie didn't Flick in time.</span>`);
+      B.redDice = B.pendingResolve.redDice;
+      B.blueDice = B.pendingResolve.blueDice;
+      callback();
+    } else if (!launched) {
+      showLsCountdown(center, remaining);
+    }
+  }, 1000);
 }
 
 function startLuckyStoneWindow(team, callback) {
+  // Blue AI: auto-use lucky stone (reroll lowest die)
+  if (AI_ACTIVE && team === 'blue') {
+    B.phase = 'luckystone-' + team;
+    const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+    if (dice && B[team].resources.luckyStone > 0) {
+      let worstIdx = 0, worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      if (worstVal <= 4) {
+        B[team].resources.luckyStone--;
+        B.luckyStoneSpentThisTurn[team]++;
+        const newVal = Math.floor(Math.random() * 6) + 1;
+        dice[worstIdx] = newVal;
+        dice.sort((a, b) => a - b);
+        log(`<span class="log-ms">${team.toUpperCase()} uses Lucky Stone!</span> Rerolled ${worstVal} → ${newVal}!`);
+        narrate(`<b class="${team}-text">Blue</b> uses <b class="gold">Lucky Stone!</b> ${worstVal} → ${newVal}!`);
+        renderDice(B.redDice, B.blueDice);
+        renderBattle();
+      } else {
+        log(`<span style="color:var(--text2)">${team.toUpperCase()} holds Lucky Stone (${worstVal} is good enough).</span>`);
+      }
+    }
+    setTimeout(() => callback(), spd(800));
+    return;
+  }
+
   B.phase = 'luckystone-' + team;
   const dice = team === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+  let _lsSkipped = false;
+  const skipLs = () => {
+    if (_lsSkipped) return;
+    _lsSkipped = true;
+    hideSkipBtn();
+    clearInterval(lsCountdownTimer);
+    clearLsCountdown();
+    clearDiceClickable(team);
+    const resEl = document.getElementById(team + '-resources');
+    const lsEl = resEl && resEl.querySelector('.res-tile.luckyStone');
+    if (lsEl) { lsEl.classList.remove('rerollable'); lsEl.onclick = null; lsEl.style.cursor = ''; }
+    log(`<span style="color:var(--text2)">${team.toUpperCase()} skipped Lucky Stone.</span>`);
+    callback();
+  };
+  showSkipBtn(skipLs);
 
   narrate(`<b class="${team}-text">${teamLabel}</b> has a <b class="gold">Lucky Stone!</b>&nbsp;Click it to use!`);
 
@@ -7019,8 +9488,9 @@ function startLuckyStoneWindow(team, callback) {
         d.classList.add('rerollable');
         d.onclick = () => doLuckyReroll(team, i, dice, callback);
       });
+      sync3dDiceClickable(team);
       // Fresh 3s countdown on the dice row — mirrors Moonstone's pick-die phase
-      let pickRemaining = 3;
+      let pickRemaining = Math.max(3, getSpecialsTimerSecs() - 2);
       showLsCountdown(diceEl, pickRemaining);
       lsCountdownTimer = setInterval(() => {
         pickRemaining--;
@@ -7041,10 +9511,11 @@ function startLuckyStoneWindow(team, callback) {
       d.classList.add('rerollable');
       d.onclick = () => doLuckyReroll(team, i, dice, callback);
     });
+    sync3dDiceClickable(team);
   }
 
-  // Start countdown (3, 2, 1) — auto-skip if not used
-  let remaining = 3;
+  // Start countdown — auto-skip if not used
+  let remaining = getSpecialsTimerSecs();
   showLsCountdown(countdownTarget, remaining);
 
   lsCountdownTimer = setInterval(() => {
@@ -7085,6 +9556,60 @@ function clearDiceClickable(team) {
     d.classList.remove('rerollable');
     d.onclick = null;
   });
+  // Also clear 3D dice rerollable state
+  const physics = _dicePhysics[team];
+  if (physics && physics.settled) {
+    physics.dice.forEach(d => {
+      d.el.classList.remove('rerollable-3d');
+      d.el.onclick = null;
+      d.el.style.cursor = '';
+    });
+  }
+}
+
+// Sync visual highlights from flat dice to 3D dice (tiered mapping)
+function sync3dDiceHighlights(team) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.settled) return;
+  const flatDice = [...document.getElementById(team + '-dice').querySelectorAll('.die')];
+  const HL_3D = [
+    'die-win-singles-3d', 'die-win-doubles-3d', 'die-win-triples-3d', 'die-win-mega-3d',
+    'die-win-secondary-3d', 'die-loser-3d', 'triples-glow-3d',
+    'highlight-single', 'highlight-double', 'highlight-triple'
+  ];
+  physics.dice.forEach((d, i) => {
+    d.el.classList.remove(...HL_3D);
+    const flat = flatDice[i];
+    if (!flat) return;
+    // Map each flat highlight tier to its 3D equivalent
+    if (flat.classList.contains('die-win-mega')) {
+      d.el.classList.add('die-win-mega-3d');
+    } else if (flat.classList.contains('die-win-triples')) {
+      d.el.classList.add('die-win-triples-3d');
+    } else if (flat.classList.contains('die-win-doubles')) {
+      d.el.classList.add('die-win-doubles-3d');
+    } else if (flat.classList.contains('die-win')) {
+      d.el.classList.add('die-win-singles-3d');
+    } else if (flat.classList.contains('die-win-secondary')) {
+      d.el.classList.add('die-win-secondary-3d');
+    } else if (flat.classList.contains('die-loser')) {
+      d.el.classList.add('die-loser-3d');
+    }
+    if (flat.classList.contains('triples-glow')) {
+      d.el.classList.add('triples-glow-3d');
+    }
+  });
+}
+
+// Proxy click events from 3D dice to flat dice so existing handlers work unchanged
+function sync3dDiceClickable(team) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.settled) return;
+  const flatDice = [...document.getElementById(team + '-dice').querySelectorAll('.die')];
+  physics.dice.forEach((d, i) => {
+    d.el.classList.add('rerollable-3d');
+    d.el.onclick = () => { if (flatDice[i] && flatDice[i].onclick) flatDice[i].onclick(); };
+  });
 }
 
 function doLuckyReroll(team, dieIndex, dice, callback) {
@@ -7101,6 +9626,11 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
   const targetDie = dieDivs[dieIndex];
   targetDie.classList.add('rolling');
   targetDie.textContent = '?';
+  // Also spin the 3D die if present
+  const lrPhysics = _dicePhysics[team];
+  if (lrPhysics && lrPhysics.settled && lrPhysics.dice[dieIndex]) {
+    lrPhysics.dice[dieIndex].el.classList.add('rolling-3d');
+  }
   playSfx('sfxDiceRoll');
 
   setTimeout(() => {
@@ -7111,13 +9641,31 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
     dice.sort((a, b) => a - b);
     t.resources.luckyStone--;
 
+    // Cameron (25) — Unstoppable Force: opponent used a special (Lucky Stone — immediate die)
+    triggerCameronSpecialWatch(team, true);
+
     if (team === 'red') B.pendingResolve.redDice = dice;
     else B.pendingResolve.blueDice = dice;
     B.redDice = B.pendingResolve.redDice;
     B.blueDice = B.pendingResolve.blueDice;
 
+    // v731: broadcast Lucky Stone reroll to Red's engine so it resolves with correct dice
+    if (LIVE_PVP && PVP_SIDE === 'blue' && PVP_GAME_REF) {
+      PVP_GAME_REF.child('specialsChoice').push({
+        type: 'luckyStone',
+        side: 'blue',
+        dieIndex: dieIndex,
+        newValue: newVal,
+        dice: dice.slice(), // full sorted dice array for easy application
+        ts: Date.now()
+      });
+    }
+
     // Re-render dice directly (revealDice needs IDs from showRolling which aren't present here)
     targetDie.classList.remove('rolling');
+    if (lrPhysics && lrPhysics.settled && lrPhysics.dice[dieIndex]) {
+      lrPhysics.dice[dieIndex].el.classList.remove('rolling-3d');
+    }
     renderDice(
       team === 'red' ? dice : B.pendingResolve.redDice,
       team === 'blue' ? dice : B.pendingResolve.blueDice
@@ -7166,8 +9714,9 @@ function doLuckyReroll(team, dieIndex, dice, callback) {
           d.classList.add('rerollable');
           d.onclick = () => doLuckyReroll(team, i, liveDice, callback);
         });
+        sync3dDiceClickable(team);
         // Brief 3s countdown for the next die pick
-        let pickRem = 3;
+        let pickRem = Math.max(3, getSpecialsTimerSecs() - 2);
         showLsCountdown(diceElInner, pickRem);
         lsCountdownTimer = setInterval(() => {
           pickRem--;
@@ -7274,6 +9823,15 @@ function highlightWinnerDice(winTeam, winRoll, loseTeam, tiebreaker) {
       if (parseInt(d.textContent) === winRoll.value) d.classList.add(hlClass);
     });
   }
+  // Sync highlights to 3D dice
+  sync3dDiceHighlights(winTeam);
+  sync3dDiceHighlights(loseTeam);
+}
+
+// Bridge for callers that pass dice/roll explicitly after nulling B.pendingResolve
+function doResolve(redDice, blueDice, redRoll, blueRoll) {
+  B.pendingResolve = { redDice, blueDice, redRoll, blueRoll };
+  resolveRound();
 }
 
 // v386: Safe wrapper — catches any thrown error in the damage/cinematic pipeline
@@ -7362,9 +9920,37 @@ function _resolveRoundImpl() {
   }
 
   B.redDice = redDice; B.blueDice = blueDice;
-  // Sync visual dice display after Blackout may have removed dice from either array.
-  // Without this, the blacked-out die stays visible on screen even though it no longer
-  // counts in the calculation, and highlightWinnerDice indexes into stale DOM elements.
+
+  // Kaylee (453) — Slipstream: if any die shows a 2, player chooses which dice to swap
+  // Interactive modal pauses resolution — player picks one of their dice and one of opponent's
+  // Fires BEFORE winner determination so the swap changes the outcome
+  let slipstreamTeam = null;
+  if (!sylviaResuming) {
+    for (const _slipTeam of ['red', 'blue']) {
+      const _slipF = active(B[_slipTeam]);
+      if (_slipF && _slipF.id === 453 && !_slipF.ko) {
+        const myDice = _slipTeam === 'red' ? redDice : blueDice;
+        if (myDice.includes(2)) { slipstreamTeam = _slipTeam; break; }
+      }
+    }
+  }
+  if (slipstreamTeam) {
+    const myDice = slipstreamTeam === 'red' ? redDice : blueDice;
+    const oppDice = slipstreamTeam === 'red' ? blueDice : redDice;
+    // Sync dice display so player can see what they rolled
+    renderDice(B.redDice, B.blueDice);
+    // Show interactive picker — resolution resumes in callback
+    B.slipstreamResuming = true;
+    showSlipstreamPicker(slipstreamTeam, myDice, oppDice, () => {
+      // Resume resolution from the top — slipstreamResuming flag skips re-entry into slipstream
+      B.sylviaResuming = true; // reuse this flag to skip header log + blackout re-fire
+      _resolveRoundImpl();
+    });
+    return; // Pause resolution until player picks
+  }
+  B.slipstreamResuming = false;
+
+  // Sync visual dice display after Blackout/Slipstream may have modified dice arrays.
   renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
@@ -7375,10 +9961,24 @@ function _resolveRoundImpl() {
   // Captain James (443) — Final Strike: triples or higher → gain 2 Sacred Fires
   // (Fires win or lose, just needs triples+. Placed in post-roll section near Gom Gom Gom/Sable.)
 
+  // Welder (450) — Arc: if any die shows a 4, Welder transforms into Foreman
+  ['red', 'blue'].forEach(_wTeam => {
+    const _wF = active(B[_wTeam]);
+    const _wDice = _wTeam === 'red' ? redDice : blueDice;
+    if (_wF.id === 450 && !_wF.ko && _wDice.some(d => d === 4)) {
+      welderTransform(_wTeam);
+    }
+  });
+
   // Determine winner with cascading tiebreakers
   // Rule: compare best hand type first. If same type AND same value,
   // compare remaining dice highest-to-lowest. Missing dice = 0.
   const typeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
+  function getRank(type) {
+    if (typeRank[type] !== undefined) return typeRank[type];
+    if (type.endsWith('-of-a-kind')) return parseInt(type); // 6-of-a-kind → 6, 7 → 7, etc.
+    return 0;
+  }
   let winner = null;
   let tiebreaker = null; // {value: N} — the remaining die that broke the tie
 
@@ -7386,8 +9986,8 @@ function _resolveRoundImpl() {
   // Singles promote to effective rank 2.5 — still lose to triples, quads, penta, etc.
   const _rAct = active(B.red), _bAct = active(B.blue);
   const hectorActive = (_rAct.id === 96 && !_rAct.ko) || (_bAct.id === 96 && !_bAct.ko);
-  const rEffRank = (hectorActive && rR.type === 'singles' && bR.type === 'doubles') ? 2.5 : typeRank[rR.type];
-  const bEffRank = (hectorActive && bR.type === 'singles' && rR.type === 'doubles') ? 2.5 : typeRank[bR.type];
+  const rEffRank = (hectorActive && rR.type === 'singles' && bR.type === 'doubles') ? 2.5 : getRank(rR.type);
+  const bEffRank = (hectorActive && bR.type === 'singles' && rR.type === 'doubles') ? 2.5 : getRank(bR.type);
 
   if (rEffRank > bEffRank) winner = 'red';
   else if (bEffRank > rEffRank) winner = 'blue';
@@ -7418,6 +10018,30 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Charlie (18) — Flick: upon losing a roll or rolling Doubles, Flick a die
+  // Fires BEFORE highlights/Sylvia so new dice change the outcome.
+  // Charlie (18) — Rush / Flick: upon LOSING a roll, Flick a die
+  // Uses B.flickResuming to skip on re-entry after dice are modified.
+  if (!B.flickResuming) {
+    let flickTeam = null;
+    for (const ft of ['red', 'blue']) {
+      const f = active(B[ft]);
+      if (f.id === 18 && !f.ko) {
+        const lost = winner !== null && winner !== ft;
+        if (lost) { flickTeam = ft; break; }
+      }
+    }
+    if (flickTeam) {
+      showFlickPicker(flickTeam, () => {
+        B.flickResuming = true;
+        B.sylviaResuming = true;
+        _resolveRoundImpl();
+      });
+      return;
+    }
+  }
+  B.flickResuming = false;
+
   // Highlight dice immediately — winner dice glow, losers fade
   if (winner) {
     const loser = winner === 'red' ? 'blue' : 'red';
@@ -7436,8 +10060,9 @@ function _resolveRoundImpl() {
   if (winner !== null && !sylviaResuming && !B.sylviaPendingResult) {
     const loserTeamName = winner === 'red' ? 'blue' : 'red';
     const loserF = active(B[loserTeamName]);
-    const _cameronWinner = active(B[winner]);
-    if (loserF && loserF.id === 313 && !loserF.ko && !(_cameronWinner && _cameronWinner.id === 25 && !_cameronWinner.ko)) {
+    // Cameron (25) — Unstoppable Force: skip Sylvia's dodge modal when Cameron is the winner
+    const winnerF = active(B[winner]);
+    if (loserF && loserF.id === 313 && !loserF.ko && !(winnerF && winnerF.id === 25 && !winnerF.ko)) {
       showSylviaModal(loserTeamName, () => {
         B.sylviaResuming = true;
         resolveRound();
@@ -7456,6 +10081,11 @@ function _resolveRoundImpl() {
       if (el) el.querySelectorAll('.die').forEach(d => {
         d.classList.remove('die-win','die-win-doubles','die-win-triples','die-win-mega','die-win-secondary','die-loser');
       });
+      // Also clear 3D dice highlights
+      const ph = _dicePhysics[team];
+      if (ph && ph.settled) {
+        ph.dice.forEach(d => d.el.classList.remove('die-win-singles-3d','die-win-doubles-3d','die-win-triples-3d','die-win-mega-3d','die-win-secondary-3d','die-loser-3d','triples-glow-3d','highlight-single','highlight-double','highlight-triple'));
+      }
     });
 
     // Mark both active ghosts as having rolled (so Ambush/Lurk don't fire next round).
@@ -7494,7 +10124,7 @@ function _resolveRoundImpl() {
       }
     });
 
-    // Jimmy (352) — Sideline & In Play: tie → gain 5 Lucky Stones + 1 Magic Firefly
+    // Jimmy (352) — Sideline & In Play: tie → gain 3 Lucky Stones + 1 Magic Firefly
     [B.red, B.blue].forEach(team => {
       const f = active(team);
       const tNameJim = team === B.red ? 'red' : 'blue';
@@ -7503,18 +10133,18 @@ function _resolveRoundImpl() {
       if (hasJimmyActive || hasJimmySideline) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
         const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
-        const lsTotal = team.resources.luckyStone + 5;
+        const lsTotal = team.resources.luckyStone + 3;
         const ffTotal = (team.resources.firefly || 0) + 1;
         const jimmyGhost = hasJimmyActive ? f : team.ghosts.find(g => g.id === 352);
-        queueAbility('CHIRP!', 'var(--common)', `${jimmyGhost.name} — Tie! +5 Lucky Stones + 1 Magic Firefly! (${lsTotal} LS, ${ffTotal} FF)`, () => {
-          team.resources.luckyStone += 5;
+        queueAbility('CHIRP!', 'var(--common)', `${jimmyGhost.name} — Tie! +3 Lucky Stones + 1 Magic Firefly! (${lsTotal} LS, ${ffTotal} FF)`, () => {
+          team.resources.luckyStone += 3;
           team.resources.firefly = (team.resources.firefly || 0) + 1;
-          log(`<span class="log-ability">${jimmyGhost.name}</span> — Chirp! Tie → gained <span class="log-ms">5 Lucky Stones</span> + <span class="log-ms">1 Magic Firefly</span>!`);
+          log(`<span class="log-ability">${jimmyGhost.name}</span> — Chirp! Tie → gained <span class="log-ms">3 Lucky Stones</span> + <span class="log-ms">1 Magic Firefly</span>!`);
           renderBattle();
         }, tNameJim);
         checkKnightEffects(tNameJim, jimmyGhost.name);
         if (sandwichMirrorsJim) {
-          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +5 Lucky Stones + 1 Magic Firefly!`, () => { oppTeamJim.resources.luckyStone += 5; oppTeamJim.resources.firefly = (oppTeamJim.resources.firefly || 0) + 1; renderBattle(); }, tNameJim === 'red' ? 'blue' : 'red');
+          queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Chirp! +3 Lucky Stones + 1 Magic Firefly!`, () => { oppTeamJim.resources.luckyStone += 3; oppTeamJim.resources.firefly = (oppTeamJim.resources.firefly || 0) + 1; renderBattle(); }, tNameJim === 'red' ? 'blue' : 'red');
         }
       }
     });
@@ -7597,8 +10227,9 @@ function _resolveRoundImpl() {
       const scDice = team === B.red ? redDice : blueDice;
       if (f.id === 19 && !f.ko && scDice && scDice.length > 0 && scDice.every(d => d < 4)) {
         B.scallywagsFrenzyBonus[tNameSC] = (B.scallywagsFrenzyBonus[tNameSC] || 0) + 1;
-        queueAbility('FRENZY!', 'var(--common)', `${f.name} — All dice under 4 on a tie! +1 die next roll!`, null, tNameSC);
-        log(`<span class="log-ability">${f.name}</span> — Frenzy! Tie: all dice under 4 → +1 die next round.`);
+        team.resources.surge = (team.resources.surge || 0) + 1;
+        queueAbility('FRENZY!', 'var(--common)', `${f.name} — All dice under 4 on a tie! +1 die next roll + 1 Surge!`, null, tNameSC);
+        log(`<span class="log-ability">${f.name}</span> — Frenzy! Tie: all dice under 4 → +1 die next round + <span class="log-ms">+1 Surge</span>.`);
         checkKnightEffects(tNameSC, f.name);
       }
     });
@@ -7735,7 +10366,6 @@ function _resolveRoundImpl() {
 
     // Maximo (302) — end of round: gain 1 Healing Seed
     // Sandwiches (33) — Dependable: if opponent gains a seed, mirror it.
-    // (Wisp 344 is permanently shelved — no resource-denial guard here)
     [B.red, B.blue].forEach(team => {
       const f = active(team);
       const tNameMax = team === B.red ? 'red' : 'blue';
@@ -7789,7 +10419,7 @@ function _resolveRoundImpl() {
     // Duel Phase: tie rounds DON'T clear duelLastLoser — the previous non-tie loser's
     // initiative is sticky, so it carries forward through tie rounds. "Easier to
     // understand: tie round just keeps the last loser as first mover." (Wyatt, v394)
-    if (B.galeForceDecided) { B.galeForceDecided.red = false; B.galeForceDecided.blue = false; }
+    // galeForceDecided reset removed — Gus is now reactive post-win
     if (B.jacksonUsedThisRound) { B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false; }
     if (B.sonyaUsedThisRound) { B.sonyaUsedThisRound.red = false; B.sonyaUsedThisRound.blue = false; }
     // Dark Wing (76) Precision: NO per-round reset — once-per-GAME flag persists across rounds (v595)
@@ -7798,7 +10428,7 @@ function _resolveRoundImpl() {
     if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
     if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
     if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
-    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; } B.moonstoneSicknessFiredThisTurn = false;
     // Willow (435) — Joy of Painting: tie = nobody lost, clear both flags
     if (B.willowLostLast) { B.willowLostLast.red = false; B.willowLostLast.blue = false; }
     // Reset item swing toggles each round (player must actively choose to swing)
@@ -7814,6 +10444,7 @@ function _resolveRoundImpl() {
     B.selenePending = null; // discard any doubles-triggered Selene reward from this tie round — it must not ghost into the next round's post-roll flow
     B.wiseAlPending = null;
     B.gordokPending = null;
+    B.sophiaPending = null;
 
     B.round++;
     B.phase = 'ko-pause'; // brief hold on tie so narration lands
@@ -7838,7 +10469,7 @@ function _resolveRoundImpl() {
       }
       narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
       renderBattle();
-      setTimeout(() => { startNextRound(); }, 350);
+      setTimeout(() => { startNextRound(); }, spd(350));
     });
     return;
   }
@@ -7854,7 +10485,6 @@ function _resolveRoundImpl() {
   // is flipped to damage instead. filbertCursesWin = Filbert is on loseTeam's bench → wF heals → damage.
   const filbertCursesWin = hasSideline(loseTeam, 59);
   const filbertCursesLose = hasSideline(winTeam, 59);
-  // Slag Heap (339) is permanently shelved — slagResidueBlocksWin always false; dead code removed in v363
   // Sandwiches (33) — Dependable: while on the sideline, if opponent gains a Special, you gain it too.
   // sandwichForLose = Sandwiches on loseTeam bench → mirrors winTeam Special grants to loseTeam.
   // sandwichForWin  = Sandwiches on winTeam bench  → mirrors loseTeam Special grants to winTeam.
@@ -7876,6 +10506,17 @@ function _resolveRoundImpl() {
   const winDice = winner==='red' ? redDice : blueDice;
   const loseDice = winner==='red' ? blueDice : redDice;
 
+  // Store roll data for raid spectator snapshots
+  if (RAID_MODE) {
+    window._lastRaidRollData = {
+      player: [...redDice],
+      boss: [...blueDice],
+      winner: winner === 'red' ? 'player' : 'boss',
+      damage: wR.damage
+    };
+    window._lastRaidAbilityCallout = wF.name + ' — ' + wR.type + (wR.type !== 'singles' ? '!' : '');
+  }
+
   let dmg = wR.damage;
 
   // Antoinette (82) — Grace: +1 damage on doubles
@@ -7884,15 +10525,41 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Grace! Doubles → +1 damage!`);
   }
 
+  // Boo Brothers (17) — Teamwork damage bonus: +1 if they used the ability this round
+  let booTeamworkDmgTriggered = false;
+  if (wF.id === 17 && !wF.ko && B.booTeamworkDmgBonus && B.booTeamworkDmgBonus[winTeamName] > 0) {
+    dmg += 1;
+    booTeamworkDmgTriggered = true;
+    B.booTeamworkDmgBonus[winTeamName] = 0;
+    log(`<span class="log-ability">${wF.name}</span> — Teamwork Bonus! Used ability → +1 damage!`);
+  }
+  // Clear unused Boo Brothers bonus on loss
+  if (lF.id === 17 && B.booTeamworkDmgBonus && B.booTeamworkDmgBonus[loseTeamName] > 0) {
+    B.booTeamworkDmgBonus[loseTeamName] = 0;
+  }
+
+  // Zippa (423) — Glimmer: +1 damage per Healing Seed held (passive, active or sideline)
+  let zippaGlimmerBonus = 0;
+  if (wF.id === 423 && !wF.ko) {
+    const zippaSeeds = winTeam.resources.healingSeed || 0;
+    if (zippaSeeds > 0) {
+      zippaGlimmerBonus = zippaSeeds;
+      dmg += zippaSeeds;
+      log(`<span class="log-ability">${wF.name}</span> — Glimmer! ${zippaSeeds} Healing Seed${zippaSeeds>1?'s':''} → +${zippaSeeds} damage!`);
+    }
+  }
+
   // v386: collectKC defined BEFORE any ability block that might call it (was TDZ-declared
   // at line ~8163 but referenced by Skylar Winter Barrage at 8131 and Tyler Heating Up
   // at 8144 — would throw ReferenceError if either fighter was active with ice/fire
   // committed. Same bug class as v305 teamLabel and v377 calloutCount.)
   const resolveKnightCallouts = [];
+  const pendingHeavyAirHits = []; // deferred Heavy Air damage — only applied if Knight Terror survives the round
   const collectKC = (t, n, s) => {
     const savedQ = abilityQueue, savedM = abilityQueueMode;
     abilityQueue = []; abilityQueueMode = true;
-    checkKnightEffects(t, n, s);
+    // Use deferred mode: Heavy Air damage stored, not applied immediately
+    checkKnightEffects(t, n, s, pendingHeavyAirHits);
     resolveKnightCallouts.push(...abilityQueue);
     abilityQueue = savedQ; abilityQueueMode = savedM;
   };
@@ -7923,7 +10590,9 @@ function _resolveRoundImpl() {
     const tylerWins = wF.id === 105 && !wF.ko;
     const perFire = tylerWins ? 6 : 3;
     // Lucy's Shadow (439) — Mentor: doubles Sacred Fire damage when Lucy (108) is active winner
-    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439)) ? 2 : 1;
+    // Cornelius (45) Antidote blocks Lucy's Shadow sideline effect
+    const corneliusBlocksLucyShadowDmg = hasSideline(loseTeam, 45);
+    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowDmg) ? 2 : 1;
     const fireDmg = B.committed[winTeamName].fire * perFire * lucyShadowBoost;
     dmg += fireDmg;
     if (tylerWins) {
@@ -7988,7 +10657,7 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Omen! <span class="log-dmg">+1 damage!</span>`);
   }
 
-  // Mike (445) — Torrent: Win: +1 damage
+  // Michael (445) — Torrent: Even doubles → +2 damage
   if (wF.id === 445 && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 0) {
     dmg += 2;
     collectKC(winTeamName, wF.name);
@@ -8091,9 +10760,14 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Blue Fire! Gain <span class="log-ms">1 Sacred Fire</span>!`);
     // Lucy's Shadow (439) — Mentor: +1 extra Sacred Fire when Lucy wins
-    if (hasSideline(winTeam, 439)) {
+    // Cornelius (45) Antidote blocks Lucy's Shadow sideline effect
+    const corneliusBlocksLucyShadowFire = hasSideline(loseTeam, 45);
+    if (hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowFire) {
       lucyShadowExtraFire = true;
       log(`<span class="log-ability">Lucy's Shadow</span> — Mentor! +1 extra Sacred Fire!`);
+    } else if (hasSideline(winTeam, 439) && corneliusBlocksLucyShadowFire) {
+      const cornGhostLS = getSidelineGhost(loseTeam, 45);
+      log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Lucy's Shadow Mentor blocked!`);
     }
   }
 
@@ -8149,6 +10823,9 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Snowball! Doubles win → +2 damage!`);
   }
 
+  // Kaylee (453) — Slipstream: dice stealing handled pre-winner in _resolveRoundImpl
+  const slipstreamBonus = 0; // kept for callout compatibility
+
   // Doc (42) — Savage: doubles win → +5 bonus damage
   let docTriggered = false;
   let docBaseDmg = 0;
@@ -8160,16 +10837,10 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Savage! Doubles win → +5 damage!`);
   }
 
-  // Charlie (18) — Rush: double 2s → exactly 7 damage (fixed output override)
+  // Charlie (18) — Rush is now a Flick ability (triggers on loss in resolveRound)
+  // No damage modifier on win — the old "Double 2s = 7 damage" is retired.
   let charlieTriggered = false;
   let charlieBaseDmg = 0;
-  if (wF.id === 18 && !wF.ko && wR.type === 'doubles' && wR.value === 2) {
-    charlieBaseDmg = dmg;
-    dmg = 7;
-    charlieTriggered = true;
-    collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Rush! Double 2s → exactly 7 damage!`);
-  }
 
   // Bill & Bob (36) — Bait n Switch: while below 4 HP, winning rolls deal 2X damage
   let billBobTriggered = false;
@@ -8242,6 +10913,23 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Carpenter (449) — Apprentice: +2 damage on singles (active Carpenter only)
+  let carpenterTriggered = false;
+  if (wF.id === 449 && !wF.ko && wR.type === 'singles') {
+    dmg += 2;
+    carpenterTriggered = true;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Apprentice! Singles win → +2 damage!`);
+  }
+
+  // Carpenter's Hammer (permanent item) — +2 damage on singles for ANY active ghost on the team
+  let carpenterHammerTriggered = false;
+  if (B.carpenterHammer && B.carpenterHammer[winTeamName] && wR.type === 'singles' && wF.id !== 449) {
+    dmg += 2;
+    carpenterHammerTriggered = true;
+    log(`<span class="log-ability">Carpenter's Hammer</span> — +2 singles damage!`);
+  }
+
   // Greg (49) — Chase: if Greg has more HP than the opposing ghost, rolls deal 2X damage.
   // Faithfully ported from GHOSTS abilityDesc: "If Greg has more health than the opposing ghost, Greg's rolls do x2 damage."
   let gregTriggered = false;
@@ -8301,13 +10989,21 @@ function _resolveRoundImpl() {
     zainIceBladeTriggered = true;
   }
 
-  // Flame Blade: +5 Burn on win when swinging
+  // Sophia (457) — Mask of Night: +1 damage on win when active
+  let maskOfNightDmgTriggered = false;
+  if (B.sophiaMask && B.sophiaMask[winTeamName] === 'night' && B.sophiaMaskActive[winTeamName]) {
+    dmg += 1;
+    maskOfNightDmgTriggered = true;
+    log(`<span class="log-ability">Mask of Night</span> — 🌙 +1 damage!`);
+  }
+
+  // Flame Blade: +3 Burn on win when swinging
   let flameBladeWinTriggered = false;
   if (B.flameBlade && B.flameBlade[winTeamName] && B.flameBladeSwing && B.flameBladeSwing[winTeamName]) {
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
-    winTeam.resources.burn += 5;
+    winTeam.resources.burn += 3;
     flameBladeWinTriggered = true;
-    log(`<span class="log-ability">Flame Blade</span> — Win while swinging! <span class="log-dmg">+5 Burn!</span>`);
+    log(`<span class="log-ability">Flame Blade</span> — Win while swinging! <span class="log-dmg">+3 Burn!</span>`);
   }
 
   // Red Hunter (345) — if opponent has any specials (resources, including committed): +3 damage
@@ -8336,6 +11032,10 @@ function _resolveRoundImpl() {
     timpletonTriggered = true;
     collectKC(winTeamName, wF.name);
   }
+
+  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+  // Defined early so it guards Sylvia, Guard Thomas, Bogey, Kodako, Patrick, Dealer, Sky, City Cyboo, King Jay, Fang.
+  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
 
   // Sylvia (313) — loser dodge check: roll 1 die, if it's a 6 negate all damage.
   // v331: the die is rolled by the PLAYER via the Sylvia modal (showSylviaModal) before
@@ -8403,6 +11103,30 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Admiral'); log(`<span class="log-ability">Cornelius</span> — Antidote! Admiral Comrades blocked.`); }
   }
 
+  // Explorer Jeff (455) — Treasure Hunter: sideline & in play, +1 damage if 3+ different specials held
+  let explorerJeffTriggered = false;
+  let explorerJeffBaseDmg = 0;
+  const ejOnSidelineDmg = hasSideline(winTeam, 455);
+  const ejActiveDmg = wF.id === 455 && !wF.ko;
+  if ((ejOnSidelineDmg || ejActiveDmg) && !wF.ko) {
+    const ejRes = B[winTeamName].resources;
+    const ejTypes = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'].filter(r => (ejRes[r] || 0) > 0).length;
+    if (ejTypes >= 3) {
+      // Cornelius only blocks sideline, not in-play
+      if (ejOnSidelineDmg && !ejActiveDmg && corneliusBlocksRally) {
+        corneliusSidelineBlockedList.push('Explorer Jeff'); log(`<span class="log-ability">Cornelius</span> — Antidote! Explorer Jeff Treasure Hunter blocked.`);
+      } else {
+        explorerJeffBaseDmg = dmg;
+        dmg += 1;
+        explorerJeffTriggered = true;
+        const loc = ejActiveDmg ? 'in play' : 'sideline';
+        if (ejOnSidelineDmg && !ejActiveDmg) { const ejGhost = getSidelineGhost(winTeam, 455); collectKC(winTeamName, 'Explorer Jeff', ejGhost); }
+        else { collectKC(winTeamName, wF.name); }
+        log(`<span class="log-ability">Explorer Jeff</span> (${loc}) — Treasure Hunter! ${ejTypes} specials → +1 damage!`);
+      }
+    }
+  }
+
   // Dark Jeff (74) — Cackle: while on the sideline, all your rolls deal +1 damage.
   // Passive sideline damage booster — applies to any win when Dark Jeff is benched.
   let darkJeffTriggered = false;
@@ -8448,28 +11172,31 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Pale Nimbus'); log(`<span class="log-ability">Cornelius</span> — Antidote! Pale Nimbus Hidden Storm blocked.`); }
   }
 
-  // Laura (79) — Catchy Tune: Sideline & In Play: winning rolls in numeric order gain +3 damage. If triggered, also gain 2 Magic Fireflies.
-  // Sequences like 1-2-3, 2-3-4, 3-4-5, 4-5-6 all qualify (any length ≥2 consecutive run without repeats).
-  let lauraCatchyTriggered = false;
-  let lauraCatchyBaseDmg = 0;
-  const hasLauraActive = wF.id === 79 && !wF.ko;
-  const hasLauraSideline = hasSideline(winTeam, 79);
-  if ((hasLauraActive || hasLauraSideline) && winDice && winDice.length >= 2) {
-    const _lauraSorted = [...winDice].sort((a, b) => a - b);
-    const _lauraSeq = _lauraSorted.every((v, i) => i === 0 || v === _lauraSorted[i - 1] + 1);
-    if (_lauraSeq) {
-      if (!corneliusBlocksRally || hasLauraActive) {
-        lauraCatchyBaseDmg = dmg;
-        dmg += 3;
-        lauraCatchyTriggered = true;
-        // +1 Magic Firefly
-        if (!winTeam.resources.firefly) winTeam.resources.firefly = 0;
-        winTeam.resources.firefly += 2;
-        const lauraName = hasLauraActive ? wF.name : (getSidelineGhost(winTeam, 79) || {}).name || 'Laura';
-        const lauraLabel = hasLauraActive ? '' : ' (sideline)';
-        collectKC(winTeamName, lauraName);
-        log(`<span class="log-ability">${lauraName}${lauraLabel}</span> — Catchy Tune! [${_lauraSorted.join('-')}] in order → +3 damage + 2 Magic Fireflies!`);
-      } else { corneliusSidelineBlockedList.push('Laura'); log(`<span class="log-ability">Cornelius</span> — Antidote! Laura Catchy Tune blocked.`); }
+  // Laura (79) — Catchy Tune: Sideline & In Play: roll a straight to unlock permanently.
+  // Check WINNER's dice for straight activation (both teams checked separately below).
+  let catchyJustUnlockedWin = false, catchyJustUnlockedLose = false;
+  if (!B.catchyTuneUnlocked[winTeamName] && hasAlive(winTeam, 79) && winDice && isStraight(winDice)) {
+    if (!corneliusBlocksRally || wF.id === 79) {
+      B.catchyTuneUnlocked[winTeamName] = true;
+      catchyJustUnlockedWin = true;
+      const lauraG = wF.id === 79 ? wF : (getSidelineGhost(winTeam, 79) || { name: 'Laura' });
+      const lauraLoc = wF.id === 79 ? '' : ' (sideline)';
+      collectKC(winTeamName, lauraG.name);
+      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune unlocked! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      popSidelineCard(winTeam, 79);
+    } else { corneliusSidelineBlockedList.push('Laura'); }
+  }
+  // Check LOSER's dice for straight activation too (Laura is Sideline & In Play — triggers on any roll)
+  if (!B.catchyTuneUnlocked[loseTeamName] && hasAlive(loseTeam, 79) && loseDice && isStraight(loseDice)) {
+    const enemyCornelius = hasSideline(winTeam, 45);
+    if (!enemyCornelius || lF.id === 79) {
+      B.catchyTuneUnlocked[loseTeamName] = true;
+      catchyJustUnlockedLose = true;
+      const lauraGL = lF.id === 79 ? lF : (getSidelineGhost(loseTeam, 79) || { name: 'Laura' });
+      const lauraLocL = lF.id === 79 ? '' : ' (sideline)';
+      collectKC(loseTeamName, lauraGL.name);
+      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune unlocked! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      popSidelineCard(loseTeam, 79);
     }
   }
 
@@ -8558,6 +11285,16 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Acrobatic Dive! Even doubles → +3 damage! (${chipBaseDmg} + 3 = ${dmg})`);
   }
 
+  // Yawn Eater (464) — Feast: odd doubles deal +1 damage
+  let yawnEaterOddTriggered = false;
+  if (wF.id === 464 && !wF.ko && wR.type === 'doubles' && wR.value % 2 === 1 && dmg > 0) {
+    const yeBaseDmg = dmg;
+    dmg += 1;
+    yawnEaterOddTriggered = true;
+    collectKC(winTeamName, wF.name);
+    log(`<span class="log-ability">${wF.name}</span> — Feast! Odd doubles → +1 damage! (${yeBaseDmg} + 1 = ${dmg})`);
+  }
+
   // Dealer (37) — House Rules WIN: straight → +3 damage.
   let dealerWinTriggered = false;
   if (wF.id === 37 && !wF.ko && dmg > 0 && winDice && isStraight(winDice)) {
@@ -8566,6 +11303,20 @@ function _resolveRoundImpl() {
     dealerWinTriggered = true;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — House Rules! Straight [${[...winDice].sort((a,b)=>a-b).join(', ')}] → +3 damage! (${dealerWinBase} + 3 = ${dmg})`);
+  }
+
+  // Dark Fang (202) — Pressure: Win: +1 damage per KO'd ghost this game (both teams)
+  let deathHowlTriggered = false;
+  let deathHowlKOs = 0;
+  if (wF.id === 202 && !wF.ko && dmg > 0) {
+    deathHowlKOs = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko && !g.isPadded).length;
+    if (deathHowlKOs > 0) {
+      const dhBaseDmg = dmg;
+      dmg += deathHowlKOs;
+      deathHowlTriggered = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Pressure! ${deathHowlKOs} KO'd ghost${deathHowlKOs > 1 ? 's' : ''} → +${deathHowlKOs} damage! (${dhBaseDmg} + ${deathHowlKOs} = ${dmg})`);
+    }
   }
 
   // Wanderer (4) — Curiosity: roll a straight (consecutive, no repeats) → +2 damage.
@@ -8626,9 +11377,6 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Swift! 1-2-3 combo → exactly 4 damage!`);
   }
-
-  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
-  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
 
   // Guard Thomas (41) — Stoic: while Guard Thomas has less than 6 HP, singles rolls deal 0 damage to him.
   // Defensive immunity — no stat change needed, just zero out dmg and flag it.
@@ -8704,16 +11452,25 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — House Rules! Straight [${[...loseDice].sort((a,b)=>a-b).join(', ')}] — ${wF.name}'s attack negated!`);
   }
 
-  // Sky (72) — Elusive: if incoming damage is greater than 2, negate it entirely.
-  // A pure big-damage shield — lets through 1-2 damage, blocks 3+.
+  // Sky (72) — Elusive: if incoming damage is greater than 2, negate it and deal counter die damage.
+  // Counter die is pre-computed; KO flag set synchronously; HP mutation deferred to modal.
   let skyElusive = false;
   let skyElusiveBlockedDmg = 0;
   if (lF.id === 72 && !lF.ko && dmg > 2 && !cameronUnnegatable) {
     skyElusiveBlockedDmg = dmg;
     dmg = 0;
     skyElusive = true;
+    const skyCounterDie = Math.floor(Math.random() * 6) + 1;
+    const skyCounterHp = Math.max(0, wF.hp - skyCounterDie);
+    if (skyCounterHp <= 0) { wF.ko = true; wF.killedBy = 72; }
+    B.skyElusivePending = {
+      counterDie: skyCounterDie,
+      wFName: wF.name,
+      lFName: lF.name,
+      winTeamName: winTeamName
+    };
     collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Elusive! ${skyElusiveBlockedDmg} incoming damage > 2 — ${wF.name}'s hit negated!`);
+    log(`<span class="log-ability">${lF.name}</span> — Elusive! ${skyElusiveBlockedDmg} incoming damage > 2 — ${wF.name}'s hit negated! Counter die pending.`);
   }
 
   // City Cyboo (77) — Barrier: takes no damage from enemy doubles.
@@ -8729,7 +11486,7 @@ function _resolveRoundImpl() {
   }
 
   // Puff (5) — Cute: enemy doubles and triples deal -1 damage (minimum 0).
-  // Partial reduction, NOT full negation — Cute is not blocked by Cameron's Unstoppable Force (it reduces, not negates).
+  // Partial reduction, NOT full negation — Cute is not a negation (Cameron Unstoppable Force doesn't interact with it).
   let puffCute = false;
   let puffCuteOriginalDmg = 0;
   if (lF.id === 5 && !lF.ko && (wR.type === 'doubles' || wR.type === 'triples') && dmg > 0) {
@@ -8753,9 +11510,30 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Reflection! Dice total = 7! ${kingJayReflectDmg} damage reflected back to ${wF.name}!`);
   }
 
+  // Gus (31) — Gale Force: reactive post-win timed button.
+  // Defers damage — player decides in drain chain whether to force swap or deal damage.
+  // Detects BEFORE Guardian Fairy so winner gets first choice.
+  let galeForceSwap = false;
+  let galeForceSLIdx = -1;
+  let galeForceDmg = 0;
+  let gusGaleReactiveTriggered = false;
+  if (wF.id === 31 && !wF.ko && dmg > 0) {
+    galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
+    if (galeForceSLIdx >= 0) {
+      gusGaleReactiveTriggered = true;
+      galeForceDmg = dmg; // stash original damage for swap picker or decline
+      dmg = 0; // defer ALL damage — reactive handler will apply or swap
+      // Set up reactive pending (resume set later in drain chain)
+      B.gusGaleReactivePending = {
+        winTeamName, loseTeamName, dmg: galeForceDmg, wF, lF,
+        resume: null // set in drain chain
+      };
+    }
+  }
+
   // Guardian Fairy (99) — Wish: REACTIVE — if losing team has GF on sideline and damage > 0,
   // defer damage application and show a modal letting the player choose to swap GF in.
-  // GF intercepts BEFORE damage is applied to lF.
+  // GF intercepts BEFORE damage is applied to lF. (Gus Gale Force takes priority if both trigger.)
   let guardianFairyAbsorbed = false;
   let guardianFairyAbsorbedDmg = 0;
   let guardianFairyKOd = false;
@@ -8781,8 +11559,8 @@ function _resolveRoundImpl() {
   // Fang Undercover (7) — Skilled Coward: armed → negate all incoming damage, trigger post-round swap
   // Fires after Guardian Fairy (GF takes priority if both are in play; Fang Undercover fires only if GF didn't absorb)
   let fangUndercoverActivated = false;
-  if (!kingJayReflected && !guardianFairyAbsorbed &&
-      lF.id === 7 && !lF.ko && B.fangUndercoverArmed && B.fangUndercoverArmed[loseTeamName] && dmg > 0 && !cameronUnnegatable) {
+  if (!kingJayReflected && !guardianFairyAbsorbed && !cameronUnnegatable &&
+      lF.id === 7 && !lF.ko && B.fangUndercoverArmed && B.fangUndercoverArmed[loseTeamName] && dmg > 0) {
     B.fangUndercoverArmed[loseTeamName] = false; // consume the arm
     fangUndercoverActivated = true;
     B.fangUndercoverSwapPending = loseTeamName; // signal drain callback to show ghost-picker
@@ -8791,21 +11569,6 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Skilled Coward! Dodge activated! Fang will swap to the sideline!`);
   }
   if (B.fangUndercoverArmed) { B.fangUndercoverArmed[loseTeamName] = false; B.fangUndercoverArmed[winTeamName] = false; } // clear any unused arm
-
-  // Gus (31) — Gale Force: won and declared Gale Force → override all damage to 0, force enemy ghost swap.
-  // Fires after Guardian Fairy (GF absorption irrelevant here since Gus is the winner).
-  let galeForceSwap = false;
-  let galeForceSLIdx = -1;
-  if (wF.id === 31 && !wF.ko && B.galeForcePending && B.galeForcePending[winTeamName]) {
-    galeForceSLIdx = loseTeam.ghosts.findIndex((g, i) => i !== loseTeam.activeIdx && !g.ko);
-    if (galeForceSLIdx >= 0) {
-      dmg = 0; // override ALL computed damage — no hit
-      galeForceSwap = true;
-      collectKC(winTeamName, wF.name);
-      log(`<span class="log-ability">${wF.name}</span> — Gale Force! No damage — ${loseTeamName} must choose a replacement ghost!`);
-    }
-  }
-  if (B.galeForcePending) { B.galeForcePending[winTeamName] = false; B.galeForcePending[loseTeamName] = false; } // consumed or unused
 
   // --- Mirror Matt (410) — Seven Years: doubles ONLY damage reflected to winner ---
   let mirrorMattReflected = false;
@@ -8832,7 +11595,7 @@ function _resolveRoundImpl() {
     const gordokOppRes = loseTeam.resources;
     const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
     const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (gordokOppRes[r] || 0), 0);
-    if (gordokTotalRes >= 2) {
+    if (gordokTotalRes > 0) {
       if (autoPlayRunning) {
         // AI auto-picks: always steal
         let gordokStolen = 0;
@@ -8869,7 +11632,7 @@ function _resolveRoundImpl() {
       // AI auto-picks: take ice if < 6
       const wiseAlIce = winTeam.resources.ice || 0;
       if (wiseAlIce < 6) {
-        winTeam.resources.ice += 4;
+        winTeam.resources.ice = (winTeam.resources.ice || 0) + 4;
         dmg = 0;
         wiseAlSqualled = true;
         collectKC(winTeamName, wF.name);
@@ -8883,6 +11646,25 @@ function _resolveRoundImpl() {
     }
   }
 
+  // Sophia (457) — Masquerade: Win: you MAY gain Mask of Day or Mask of Night instead of dealing damage (once per game)
+  let sophiaMasqueraded = false;
+  if (wF.id === 457 && !wF.ko && dmg > 0 && !B.sophiaMask[winTeamName]) {
+    if (autoPlayRunning) {
+      // AI auto-picks: take Mask of Night (anti-dice is stronger for AI)
+      B.sophiaMask[winTeamName] = 'night';
+      B.sophiaMaskActive[winTeamName] = true;
+      dmg = 0;
+      sophiaMasqueraded = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability">${wF.name}</span> — Masquerade! Gained <b>🌙 Mask of Night</b> instead of dealing damage! (Roll the same number of dice as the enemy ghost, +1 damage)`);
+    } else {
+      // Human player: defer to modal choice
+      B.sophiaPending = { winTeam, winTeamName, loseTeam, lF, wF, dmg, resume: null };
+      dmg = 0;
+      sophiaMasqueraded = true;
+    }
+  }
+
   // --- APPLY DAMAGE (game state updates immediately) ---
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
@@ -8890,19 +11672,54 @@ function _resolveRoundImpl() {
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+
+  // Resolve deferred Heavy Air hits — only if Knight Terror survived this round's damage
+  if (pendingHeavyAirHits.length > 0) {
+    // lF is the loser; check if Knight Terror (401) is on the losing side and got KO'd
+    const knightSurvived = !lF.ko || lF.id !== 401;
+    // Also check if Knight Terror is on the winning side (he could be the winner's opponent's active)
+    const oppKnight = active(B[loseTeamName]);
+    const knightOnLosingTeamKOd = oppKnight && oppKnight.id === 401 && oppKnight.ko;
+    if (!knightOnLosingTeamKOd) {
+      // Knight Terror survived — apply all deferred Heavy Air damage
+      for (const hit of pendingHeavyAirHits) {
+        if (!hit.target.ko) {
+          hit.target.hp = Math.max(0, hit.target.hp - 2);
+          if (hit.target.hp <= 0) { hit.target.ko = true; hit.target.killedBy = 401; }
+          log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${hit.targetName} loses 2 HP!</span> ${hit.target.ko ? '<span class="log-ko">KO!</span>' : hit.target.hp + ' HP left'}`);
+        }
+      }
+    } else {
+      // Knight Terror was KO'd — discard all Heavy Air hits and callouts
+      const heavyAirCalloutCount = pendingHeavyAirHits.length;
+      // Remove the queued HEAVY AIR! callouts from resolveKnightCallouts
+      for (let i = resolveKnightCallouts.length - 1; i >= 0; i--) {
+        if (resolveKnightCallouts[i].name === 'HEAVY AIR!') resolveKnightCallouts.splice(i, 1);
+      }
+    }
+    pendingHeavyAirHits.length = 0;
+  }
   } else if (!mirrorMattReflected && !gordokStole && !wiseAlSqualled && !kingJayReflected && !guardianFairyAbsorbed && !bogeyReflected && !kodakoSwiftLose && !patrickStoneForm && !dealerHouseRules && !skyElusive && !cityCybooBarrier && !puffCute && !fangUndercoverActivated) {
     log(`${wF.name} wins but deals 0 damage.`);
   }
 
   // Jasper (428) — Flame Dive: Win: interactive bonus die reveal (Balatron-style)
-  // HP mutations deferred to showJasperModal → finishJasperRoll.
+  // HP visual deferred to showJasperModal → finishJasperRoll.
+  // KO flag set synchronously so downstream checks (Balatron Party Time, Cameron, etc.)
+  // see the correct alive/dead state immediately.
   let jasperTriggered = false;
   let jasperBonusDie = 0;
   if (wF.id === 428 && !wF.ko) {
     jasperBonusDie = Math.floor(Math.random() * 6) + 1;
     jasperTriggered = true;
     collectKC(winTeamName, wF.name);
-    // Stash for modal — HP mutations deferred to finishJasperRoll
+    // Synchronous KO check — Flame Dive bonus damage to loser
+    const jasperLFHpAfter = Math.max(0, lF.hp - jasperBonusDie);
+    if (jasperLFHpAfter <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
+    // Synchronous self-damage check — Jasper takes 1 recoil
+    const jasperSelfHpAfter = Math.max(0, wF.hp - 1);
+    if (jasperSelfHpAfter <= 0) { wF.ko = true; wF.killedBy = -1; }
+    // Stash for modal — HP visual mutations deferred to finishJasperRoll
     B.jasperPending = {
       bonusDie: jasperBonusDie,
       wFName: wF.name,
@@ -8916,7 +11733,7 @@ function _resolveRoundImpl() {
 
   // King Jay reflected damage — applies to the winner
   // wF.hp deferred to onShow so HP bar updates when REFLECTION! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Force of Nature check immediately below sees the correct KO state.
   if (kingJayReflected && kingJayReflectDmg > 0) {
     kingJayHpAfter = Math.max(0, wF.hp - kingJayReflectDmg);
     if (kingJayHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
@@ -8925,7 +11742,7 @@ function _resolveRoundImpl() {
 
   // Bogey reflected damage — applies to the winner (lF takes 0; wF eats the full hit)
   // wF.hp deferred to onShow so HP bar updates when BOGUS! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
+  // wF.ko is set synchronously so Cameron (25) Force of Nature check immediately below sees the correct KO state.
   if (bogeyReflected && bogeyReflectDmg > 0) {
     bogeyHpAfter = Math.max(0, wF.hp - bogeyReflectDmg);
     if (bogeyHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
@@ -8934,7 +11751,7 @@ function _resolveRoundImpl() {
 
   // Kodako (1) — Swift lose counter: 4 damage dealt back to the winner
   // wF.hp deferred to onShow so HP bar updates when SWIFT! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check immediately below sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Force of Nature check immediately below sees the correct KO state.
   let swiftLoseHpAfter = 0;
   if (kodakoSwiftLose) {
     swiftLoseHpAfter = Math.max(0, wF.hp - 4);
@@ -8944,14 +11761,15 @@ function _resolveRoundImpl() {
 
   // Patrick (10) — Stone Form counter: 3 damage dealt back to the winner for throwing a singles roll
   // wF.hp deferred to onShow so HP bar updates when STONE FORM! callout fires, not silently during beat 4.
-  // wF.ko is set synchronously here so Cameron (25) Unstoppable Force check at line ~8814 sees the correct KO state.
+  // wF.ko is set synchronously here so Cameron (25) Force of Nature check at line ~8814 sees the correct KO state.
   if (patrickStoneForm) {
     stoneFormHpAfter = Math.max(0, wF.hp - patrickStoneDmg);
     if (stoneFormHpAfter <= 0) { wF.ko = true; wF.killedBy = lF.id; }
     log(`<span class="log-dmg">${lF.name} — Stone Form counter! ${patrickStoneDmg} damage to ${wF.name}!</span> ${wF.ko?'<span class="log-ko">KO!</span>':stoneFormHpAfter+' HP left'}`);
   }
 
-  // Cameron (25) — Unstoppable Force: damage cannot be negated (cameronUnnegatable flag set above)
+  // Cameron (25) — Unstoppable Force: damage cannot be negated (cameronUnnegatable flag set above,
+  // all negation checks already guarded). Log a callout if Cameron wins and dealt damage.
   let cameronUnstoppableLogged = false;
   if (cameronUnnegatable && !wF.ko && dmg > 0) {
     cameronUnstoppableLogged = true;
@@ -9051,7 +11869,6 @@ function _resolveRoundImpl() {
     const loseActiveIdx = loseTeam.activeIdx;
     const slicerCandidates = loseTeam.ghosts.filter((g, i) => i !== loseActiveIdx && !g.ko);
     if (slicerCandidates.length > 0) {
-      // Pick highest HP target (most valuable to destroy)
       const best = slicerCandidates.reduce((a, b) => b.hp > a.hp ? b : a);
       slicerTarget = { ghost: best, priorHp: best.hp };
       best.hp = 0;
@@ -9110,7 +11927,9 @@ function _resolveRoundImpl() {
     }
   }
 
-  // Simon (24) — Brew Time: REMOVED from post-roll damage. Only triggers on before-the-roll effects.
+  // Simon (24) — Brew Time: REMOVED from post-roll damage. Only triggers on before-the-roll effects
+  // (Swarm, Haunt, Toxic Fumes, Blue Fire/Meteor, Princess Shade Bounty, Shade's Shadow).
+  // Pre-roll triggers live in doPreRollSetup(). No post-roll Sacred Fire generation.
   let simonBrewTriggered = false;
 
   // Sad Sal (29) — Tough Job: losing ANY roll grants +1 Ice Shard (no dmg guard — triggers even on 0 damage)
@@ -9197,12 +12016,19 @@ function _resolveRoundImpl() {
   const hasDylanWin = (wF.id === 301 && !wF.ko) || hasSideline(winTeam, 301);
   if (hasDylanWin) { collectKC(winTeamName, wF.id === 301 ? wF.name : 'Dylan'); }
   // Farmer Jeff (314) — Harvest: active OR sideline fires on any 6 rolled, win OR lose (v636 buff).
-  const hasFJWin = (wF.id === 314 && !wF.ko) || hasSideline(winTeam, 314);
+  // Cornelius (45) Antidote blocks Farmer Jeff's sideline effect (not active).
+  const fjWinIsActive = wF.id === 314 && !wF.ko;
+  const fjWinIsSideline = hasSideline(winTeam, 314);
+  const corneliusBlocksFJWin = fjWinIsSideline && !fjWinIsActive && hasSideline(loseTeam, 45);
+  const hasFJWin = (fjWinIsActive || fjWinIsSideline) && !corneliusBlocksFJWin;
   if (hasFJWin) {
     const sixes = countVal(winDice, 6);
     if (sixes > 0) { const jeffGhost = getSidelineGhost(winTeam, 314) || wF; collectKC(winTeamName, 'Farmer Jeff', jeffGhost); }
   }
-  const hasFJLose = (lF.id === 314 && !lF.ko) || hasSideline(loseTeam, 314);
+  const fjLoseIsActive = lF.id === 314 && !lF.ko;
+  const fjLoseIsSideline = hasSideline(loseTeam, 314);
+  const corneliusBlocksFJLose = fjLoseIsSideline && !fjLoseIsActive && hasSideline(winTeam, 45);
+  const hasFJLose = (fjLoseIsActive || fjLoseIsSideline) && !corneliusBlocksFJLose;
   if (hasFJLose) {
     const sixesLose = countVal(loseDice, 6);
     if (sixesLose > 0) { const jeffGhostLose = getSidelineGhost(loseTeam, 314) || lF; collectKC(loseTeamName, 'Farmer Jeff', jeffGhostLose); }
@@ -9239,8 +12065,11 @@ function _resolveRoundImpl() {
 
   // On-KO triggers (game state) — resource grants deferred to BEDTIME STORY!/BITTER END! onShow
   let powderFinalGiftTriggered = false;
+  // Cornelius (45) Antidote blocks Granny's sideline Bedtime Story (hoisted for render section access)
+  const corneliusBlocksGrannyLose = hasSideline(winTeam, 45);
+  const corneliusBlocksGrannyWin = hasSideline(loseTeam, 45);
   if (lF.ko) {
-    if (hasSideline(loseTeam, 310)) {
+    if (hasSideline(loseTeam, 310) && !corneliusBlocksGrannyLose) {
       const grannyGhost = getSidelineGhost(loseTeam, 310);
       collectKC(loseTeamName, 'Granny', grannyGhost);
     }
@@ -9254,7 +12083,7 @@ function _resolveRoundImpl() {
   }
 
   // Granny Bedtime Story fires for the WINNER's team too when the winner self-KOs (Pudge Belly Flop)
-  if (wF.ko && hasSideline(winTeam, 310)) {
+  if (wF.ko && hasSideline(winTeam, 310) && !corneliusBlocksGrannyWin) {
     const grannyGhost = getSidelineGhost(winTeam, 310);
     collectKC(winTeamName, 'Granny', grannyGhost);
   }
@@ -9363,6 +12192,7 @@ function _resolveRoundImpl() {
   if (pelterTriggered) {
     queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
+  // Kaylee (453) — Slipstream callout now handled in pre-winner section via blackoutCallouts queue
   if (docTriggered) {
     queueAbility('SAVAGE!', 'var(--uncommon)', `${wF.name} — Doubles! ${docBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
@@ -9418,6 +12248,9 @@ function _resolveRoundImpl() {
   if (darkJeffTriggered) {
     queueAbility('CACKLE!', 'var(--rare)', `Dark Jeff (sideline) — ${darkJeffBaseDmg} + 1 = ${dmg} damage!`, null, winTeamName);
   }
+  if (explorerJeffTriggered) {
+    queueAbility('TREASURE HUNTER!', 'var(--uncommon)', `Explorer Jeff (sideline) — ${explorerJeffBaseDmg} + 1 = ${dmg} damage!`, null, winTeamName);
+  }
   if (admiralTriggered) {
     queueAbility('COMRADES!', 'var(--rare)', `Admiral (sideline) — Even doubles! ${admiralBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
@@ -9428,11 +12261,14 @@ function _resolveRoundImpl() {
     const pnSum = winDice ? winDice.reduce((s, d) => s + d, 0) : '?';
     queueAbility('HIDDEN STORM!', 'var(--rare)', `Pale Nimbus (sideline) — Roll sum ${pnSum} < 7! ${paleNimbusBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
-  if (lauraCatchyTriggered) {
-    const _lSeq = winDice ? [...winDice].sort((a, b) => a - b).join('-') : '?';
-    const _lauraIsActive = wF.id === 79;
-    const _lauraLbl = _lauraIsActive ? wF.name : 'Laura (sideline)';
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `${_lauraLbl} — [${_lSeq}] In order! +3 damage + 2 Magic Fireflies!`, () => { renderBattle(); }, winTeamName);
+  // Laura (79) — Catchy Tune unlock callouts (only on first activation)
+  if (catchyJustUnlockedWin) {
+    const _lSeq = [...winDice].sort((a, b) => a - b).join('-');
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, winTeamName);
+  }
+  if (catchyJustUnlockedLose) {
+    const _lSeqL = [...loseDice].sort((a, b) => a - b).join('-');
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, loseTeamName);
   }
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards (active OR sideline, v598)
   if (garyOnesWin > 0) {
@@ -9450,6 +12286,12 @@ function _resolveRoundImpl() {
   // Bandit Pete knight reactions already collected via collectKC at game-state section (~line 9545) — do NOT double-fire here
   if (zachCraftsmanTriggered) {
     queueAbility('CRAFTSMAN!', 'var(--rare)', `Zach (sideline) — Guard Thomas doubles! ${zachCraftsmanBaseDmg} + 3 = ${dmg} damage!`, null, winTeamName);
+  }
+  if (booTeamworkDmgTriggered) {
+    queueAbility('TEAMWORK!', 'var(--common)', `${wF.name} — Used Teamwork! +1 bonus damage!`, null, winTeamName);
+  }
+  if (zippaGlimmerBonus > 0) {
+    queueAbility('GLIMMER!', 'var(--uncommon)', `${wF.name} — ${zippaGlimmerBonus} Healing Seed${zippaGlimmerBonus>1?'s':''} = +${zippaGlimmerBonus} damage!`, null, winTeamName);
   }
   // Zach knight reactions already collected via collectKC at game-state section (~line 9561) — do NOT double-fire here
   if (louBrosTriggered) {
@@ -9472,6 +12314,9 @@ function _resolveRoundImpl() {
     queueAbility('ACROBATIC DIVE!', 'var(--common)', `${wF.name} — Even doubles! +3 damage! (${chipBaseDmg} + 3 = ${dmg})`, null, winTeamName);
   }
   // Chip knight reactions already collected via collectKC at game-state section (~line 9589) — do NOT double-fire here
+  if (yawnEaterOddTriggered) {
+    queueAbility('FEAST!', 'var(--uncommon)', `${wF.name} — Odd doubles! +1 damage!`, null, winTeamName);
+  }
   if (librarianTriggered) {
     queueAbility('KNOWLEDGE!', 'var(--common)', `Ancient Librarian — ${librarianTwos} 2${librarianTwos > 1 ? 's' : ''} rolled by both teams! ${librarianBaseDmg} + ${librarianTwos} = ${dmg} damage!`, null, winTeamName);
   }
@@ -9519,9 +12364,9 @@ function _resolveRoundImpl() {
     queueAbility('ICE BLADE!', 'var(--ghost-rare)', `${wF.name} — Ice Blade strikes! +2 damage!`, null, winTeamName);
   }
   if (zainIceBladeTriggered) checkKnightEffects(winTeamName, wF.name); // Knight Terror/Light react to ICE BLADE! (committed blade)
-  // Flame Blade: +5 Burn on win callout
+  // Flame Blade: +3 Burn on win callout
   if (flameBladeWinTriggered) {
-    queueAbility('FLAME BLADE!', 'var(--rare)', `Flame Blade strikes! +5 Burn!`, null, winTeamName);
+    queueAbility('FLAME BLADE!', 'var(--rare)', `Flame Blade strikes! +3 Burn!`, null, winTeamName);
   }
   if (redHunterTriggered) {
     queueAbility('RUMBLE!', 'var(--ghost-rare)', `${wF.name} — Enemy has resources! +3 damage!`, null, winTeamName);
@@ -9565,7 +12410,10 @@ function _resolveRoundImpl() {
   if (slicerTarget) {
     const slicerGhostQ = (wF.id === 460 && !wF.ko) ? wF : getSidelineGhost(winTeam, 460);
     const slicerLabelQ = (slicerSideline && !slicerActive) ? `${slicerGhostQ ? slicerGhostQ.name : 'Slicer'} (sideline)` : (slicerGhostQ ? slicerGhostQ.name : 'Slicer');
-    queueAbility('PARTING GIFT!', 'var(--uncommon)', `${slicerLabelQ} — Quads! ${slicerTarget.ghost.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`, () => { renderBattle(); }, winTeamName);
+    queueAbility('PARTING GIFT!', 'var(--uncommon)', `${slicerLabelQ} — Quads! ${slicerTarget.ghost.name} (${slicerTarget.priorHp} HP) destroyed from the enemy sideline!`, () => {
+      if (slicerSideline && !slicerActive) popSidelineCard(winTeam, 460);
+      renderBattle();
+    }, winTeamName);
   }
 
   // Bubble Boys (44) — Pop: callout fires after Bullseye, onShow re-renders so KO greys out BB
@@ -9645,10 +12493,13 @@ function _resolveRoundImpl() {
     const _dealerWinSorted = [...winDice].sort((a, b) => a - b);
     queueAbility('HOUSE RULES!', 'var(--uncommon)', `${wF.name} — Straight [${_dealerWinSorted.join('-')}]! +3 damage!`, null, winTeamName);
   }
+  if (deathHowlTriggered) {
+    queueAbility('PRESSURE!', 'var(--rare)', `${wF.name} — ${deathHowlKOs} KO${deathHowlKOs > 1 ? 's' : ''} on the field! +${deathHowlKOs} damage!`, null, winTeamName);
+  }
 
-  // Sky (72) — Elusive: incoming big damage (>2) negated callout
+  // Sky (72) — Elusive: incoming big damage (>2) negated + counter die pending
   if (skyElusive) {
-    queueAbility('ELUSIVE!', 'var(--rare)', `${lF.name} — ${skyElusiveBlockedDmg} damage? Too much! ${wF.name}'s attack negated!`, null, loseTeamName);
+    queueAbility('ELUSIVE!', 'var(--rare)', `${lF.name} — ${skyElusiveBlockedDmg} damage? Too much! Negated + counter die incoming!`, null, loseTeamName);
   }
   // Sky knight reactions already collected via collectKC at game-state section (line ~9709) — do NOT double-fire here
 
@@ -9677,17 +12528,13 @@ function _resolveRoundImpl() {
   }
   // Fang Undercover knight reactions already collected via collectKC at game-state section (line ~9784) — do NOT double-fire here
 
+  // Cameron (25) — Unstoppable Force: damage pierced negation callout (queued after defense callouts)
   if (cameronUnstoppableLogged) {
     queueAbility('UNSTOPPABLE!', 'var(--common)', `${wF.name} — Damage cannot be negated! ${dmg} damage goes through!`, null, winTeamName);
   }
-  // Cameron knight reactions already collected via collectKC at game-state section (line ~9862) — do NOT double-fire here
+  // Cameron knight reactions already collected via collectKC at game-state section — do NOT double-fire here
 
-  // Gus (31) — Gale Force: win + primed → zero damage, opponent CHOOSES which sideline ghost to swap in.
-  // Fires after all defense callouts. The actual swap is deferred to a picker modal that opens after
-  // the queue drains (same post-drain pattern as Winston Scheme) — opponent gets to pick, not auto-pick.
-  if (galeForceSwap && !wF.ko) {
-    queueAbility('GALE FORCE!', 'var(--common)', `${wF.name} — No damage! ${loseTeamName === 'red' ? 'Red' : 'Blue'} team must choose a replacement!`, null, winTeamName);
-  }
+  // Gus (31) — Gale Force: callout now handled in doGusGaleReactive() when player accepts
   // Gus knight reactions already collected via collectKC at game-state section (line ~9798) — do NOT double-fire here
 
   // Hugo (52) — Wreckage: took real damage → attacker loses 1 die next roll
@@ -9721,8 +12568,28 @@ function _resolveRoundImpl() {
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
     const dylanName = (wF.id === 301) ? wF.name : (getSidelineGhost(winTeam, 301) || {}).name || 'Dylan';
     const dylanLabel = (wF.id === 301) ? '' : ' (sideline)';
-    queueAbility('STAINED GLASS!', 'var(--common)', `${dylanName}${dylanLabel} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
-    log(`<span class="log-ability">${dylanName}${dylanLabel}</span> — Stained Glass! Gain <span class="log-dmg">1 Burn</span>!`);
+    queueAbility('STRAW GUARDIAN!', 'var(--common)', `${dylanName}${dylanLabel} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${dylanName}${dylanLabel}</span> — Straw Guardian! Gain <span class="log-dmg">1 Burn</span>!`);
+  }
+  // Foreman (451) — Blueprint: win → +1 die next turn
+  if (wF.id === 451 && !wF.ko) {
+    if (!B.foremanDieBonus) B.foremanDieBonus = { red: 0, blue: 0 };
+    B.foremanDieBonus[winTeamName] = (B.foremanDieBonus[winTeamName] || 0) + 1;
+    collectKC(winTeamName, wF.name);
+    queueAbility('BLUEPRINT!', 'var(--rare)', `${wF.name} — Win! +1 die next turn!`, null, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Blueprint! <span class="log-ms">+1 die next turn!</span>`);
+  }
+  // Welder (450) — Arc: wins give 1 Burn (active Welder only, not duplicated by Torch)
+  if (wF.id === 450 && !wF.ko) {
+    if (!winTeam.resources.burn) winTeam.resources.burn = 0;
+    queueAbility('ARC!', 'var(--uncommon)', `${wF.name} — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Arc! Gain <span class="log-dmg">1 Burn</span>!`);
+  }
+  // Welder's Torch (permanent item) — wins give 1 Burn for ANY active ghost on the team
+  if (B.welderTorch && B.welderTorch[winTeamName] && wF.id !== 450) {
+    if (!winTeam.resources.burn) winTeam.resources.burn = 0;
+    queueAbility("WELDER'S TORCH!", 'var(--rare)', `Welder's Torch — Win! +1 Burn!`, () => { winTeam.resources.burn += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">Welder's Torch</span> — Win! <span class="log-dmg">+1 Burn!</span>`);
   }
   // Roger (54) — Tempest: win with 4+ dice containing 2 different pairs → +3 Sacred Fires
   if (wF.id === 54 && !wF.ko && winDice && winDice.length >= 4) {
@@ -9740,6 +12607,12 @@ function _resolveRoundImpl() {
   if (wF.id === 58 && !wF.ko) { queueAbility('BURNING SOUL!', 'var(--uncommon)', `${wF.name} — Win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName); }
   // Ashley knight reactions already collected via collectKC at game-state section (line ~10081) — do NOT double-fire here
   if (wF.id === 58 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Burning Soul! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
+  // Piper (107) — Slick Coat: win with singles → gain 1 Sacred Fire
+  if (wF.id === 107 && !wF.ko && wR.type === 'singles') {
+    queueAbility('SLICK COAT!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Slick Coat! Singles win → <span class="log-ms">+1 Sacred Fire!</span>`);
+    collectKC(winTeamName, wF.name);
+  }
   // Opa (48) — Rest: win → gain +1 HP (overclocks! Rule #9 — do NOT add Math.min cap)
   // Mr Filbert (59) — Mask Merchant: flips the +1 heal to -1 damage when on enemy sideline.
   if (wF.id === 48 && !wF.ko) {
@@ -9771,7 +12644,7 @@ function _resolveRoundImpl() {
     } else {
       const villagerNewHp = wF.hp + 1;
       const vilOver = villagerNewHp > wF.maxHp;
-      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP${vilOver ? ' · overclocked!' : ''})`, () => { wF.hp++; renderBattle(); }, winTeamName);
+      queueAbility('HOSPITALITY!', 'var(--common)', `Villager — ${wF.name} wins! +1 HP from the sideline! (${wF.hp}→${villagerNewHp} HP${vilOver ? ' · overclocked!' : ''})`, () => { guardedHeal(wF, 1, winTeamName); renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Hospitality! Villager sideline → +1 HP (${villagerNewHp} HP${vilOver ? ' overclocked!' : ''}).`);
     }
   }
@@ -9779,7 +12652,7 @@ function _resolveRoundImpl() {
   // Jeffery (14) — Chuckle: sideline passive — active ghost gains +3 HP when the winning roll DEFEATS the enemy ghost (lF.ko).
   // "Wins a battle" = KO an enemy ghost, NOT merely winning a roll. Filbert-aware, Cornelius-aware.
   // Phase 3 debug breadcrumb — helps Wyatt verify the Chuckle path fires correctly
-  console.log('[CHUCKLE DEBUG]', {
+  if (DEBUG) console.log('[CHUCKLE DEBUG]', {
     hasSideline: hasSideline(winTeam, 14),
     wFko: wF.ko,
     lFko: lF.ko,
@@ -9812,7 +12685,7 @@ function _resolveRoundImpl() {
       queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Overclock cursed! ${wF.name} takes 1 damage! (${wF.hp}→${calFlipped} HP)`, () => { wF.hp = calFlipped; if (wF.hp <= 0) { wF.hp = 0; wF.ko = true; wF.killedBy = 59; } renderBattle(); }, winTeamName);
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Calvin Overclock flipped to damage. ${wF.name} ${wF.hp} → ${calFlipped} HP.`);
     } else {
-      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP + 1 Healing Seed! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' · overclocked!' : ''}`, () => { wF.hp++; winTeam.resources.healingSeed++; renderBattle(); }, winTeamName);
+      queueAbility('OVERCLOCK!', 'var(--uncommon)', `${wF.name} — Win heals 1 HP + 1 Healing Seed! ${wF.hp}→${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' · overclocked!' : ''}`, () => { guardedHeal(wF, 1, winTeamName); winTeam.resources.healingSeed++; renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Overclock! +1 HP (${wF.hp + 1} HP${wF.hp + 1 > wF.maxHp ? ' overclocked!' : ''}) + <span class="log-heal">+1 Healing Seed!</span>`);
     }
   }
@@ -9828,6 +12701,17 @@ function _resolveRoundImpl() {
     queueAbility('TOXIC FUMES!', 'var(--ghost-rare)', `${wF.name} — First Win! Toxic Fumes activated — 1 chip damage before every roll from now on!`, null, winTeamName);
   }
   // Farmer Jeff (314) — Harvest: active OR sideline fires on any 6 rolled, win OR lose (v636 buff).
+  // Cornelius (45) Antidote — show block callout if Jeff's sideline Harvest was negated
+  if (corneliusBlocksFJWin && countVal(winDice, 6) > 0) {
+    const cornGhostFJW = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostFJW ? cornGhostFJW.name : 'Cornelius'} blocks Farmer Jeff's Harvest!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Farmer Jeff Harvest blocked!`);
+  }
+  if (corneliusBlocksFJLose && countVal(loseDice, 6) > 0) {
+    const cornGhostFJL = getSidelineGhost(winTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostFJL ? cornGhostFJL.name : 'Cornelius'} blocks Farmer Jeff's Harvest!`, null, winTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Farmer Jeff Harvest blocked!`);
+  }
   if (hasFJWin && countVal(winDice, 6) > 0) {
     const sx = countVal(winDice, 6);
     const fjIsActive = wF.id === 314 && !wF.ko;
@@ -9848,6 +12732,7 @@ function _resolveRoundImpl() {
   }
 
   // Simon (24) — Brew Time: post-roll trigger REMOVED. Only fires on pre-roll chip damage now.
+  // simonBrewTriggered is always false — kept for code structure compatibility.
 
   // Sad Sal (29) — Tough Job: lost → +1 Ice Shard (onShow deferred so ice tile updates WITH the splash)
   if (sadSalTriggered) {
@@ -9873,10 +12758,10 @@ function _resolveRoundImpl() {
   if (lF.id === 404 && !lF.ko && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }, winTeamName);
   // On-KO callouts — onShow applies the Granny resource grant with the splash
   if (lF.ko) {
-    if (hasSideline(loseTeam, 310)) {
+    if (hasSideline(loseTeam, 310) && !corneliusBlocksGrannyLose) {
       if (wR.type === 'singles') {
-        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 2 Lucky Stones!`, () => { loseTeam.resources.luckyStone += 2; creditGhost(loseTeamName, 310, 'ls', 2); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
-        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +2 Lucky Stones! (${winTeam.resources.luckyStone + 2} total)`, () => { winTeam.resources.luckyStone += 2; renderBattle(); }, winTeamName);
+        queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 3 Lucky Stones!`, () => { loseTeam.resources.luckyStone += 3; creditGhost(loseTeamName, 310, 'ls', 3); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
+        if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Lucky Stones! (${winTeam.resources.luckyStone + 3} total)`, () => { winTeam.resources.luckyStone += 3; renderBattle(); }, winTeamName);
       } else if (wR.type === 'doubles') {
         queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Moonstone!`, () => { loseTeam.resources.moonstone++; creditGhost(loseTeamName, 310, 'ms', 1); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${winTeam.resources.moonstone + 1} total)`, () => { winTeam.resources.moonstone++; renderBattle(); }, winTeamName);
@@ -9884,15 +12769,19 @@ function _resolveRoundImpl() {
         queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → 3 Sacred Fires!`, () => { loseTeam.resources.fire += 3; creditGhost(loseTeamName, 310, 'fire', 3); popSidelineCard(loseTeam, 310); renderBattle(); }, loseTeamName);
         if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Sacred Fires! (${winTeam.resources.fire + 3} total)`, () => { winTeam.resources.fire += 3; renderBattle(); }, winTeamName);
       }
+    } else if (hasSideline(loseTeam, 310) && corneliusBlocksGrannyLose) {
+      const cornGhostGrL = getSidelineGhost(winTeam, 45);
+      queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostGrL ? cornGhostGrL.name : 'Cornelius'} blocks Granny's Bedtime Story!`, null, winTeamName);
+      log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Granny Bedtime Story blocked!`);
     }
     if (lF.id === 404) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — KO'd but still gains 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }, loseTeamName); }
     if (lF.id === 404 && sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bitter End (KO)! +1 Surge! (${winTeam.resources.surge + 1} total)`, () => { winTeam.resources.surge++; renderBattle(); }, winTeamName);
   }
   // Granny callout when winner self-KOs (Pudge Belly Flop doubles = always surge for Granny on winner's team)
-  if (wF.ko && hasSideline(winTeam, 310)) {
+  if (wF.ko && hasSideline(winTeam, 310) && !corneliusBlocksGrannyWin) {
     if (wR.type === 'singles') {
-      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 2 Lucky Stones!`, () => { winTeam.resources.luckyStone += 2; creditGhost(winTeamName, 310, 'ls', 2); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
-      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +2 Lucky Stones! (${loseTeam.resources.luckyStone + 2} total)`, () => { loseTeam.resources.luckyStone += 2; renderBattle(); }, loseTeamName);
+      queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — singles KO → 3 Lucky Stones!`, () => { winTeam.resources.luckyStone += 3; creditGhost(winTeamName, 310, 'ls', 3); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
+      if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Lucky Stones! (${loseTeam.resources.luckyStone + 3} total)`, () => { loseTeam.resources.luckyStone += 3; renderBattle(); }, loseTeamName);
     } else if (wR.type === 'doubles') {
       queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — doubles KO → Moonstone!`, () => { winTeam.resources.moonstone++; creditGhost(winTeamName, 310, 'ms', 1); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +1 Moonstone! (${loseTeam.resources.moonstone + 1} total)`, () => { loseTeam.resources.moonstone++; renderBattle(); }, loseTeamName);
@@ -9900,6 +12789,10 @@ function _resolveRoundImpl() {
       queueAbility('BEDTIME STORY!', 'var(--uncommon)', `Granny consoles — ${wR.type} KO → 3 Sacred Fires!`, () => { winTeam.resources.fire += 3; creditGhost(winTeamName, 310, 'fire', 3); popSidelineCard(winTeam, 310); renderBattle(); }, winTeamName);
       if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Bedtime Story! +3 Sacred Fires! (${loseTeam.resources.fire + 3} total)`, () => { loseTeam.resources.fire += 3; renderBattle(); }, loseTeamName);
     }
+  } else if (wF.ko && hasSideline(winTeam, 310) && corneliusBlocksGrannyWin) {
+    const cornGhostGrW = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostGrW ? cornGhostGrW.name : 'Cornelius'} blocks Granny's Bedtime Story!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Granny Bedtime Story blocked!`);
   }
 
   // Powder (23) — Final Gift: KO'd → loseTeam gains 3 Ice Shards (onShow deferred for visual sync)
@@ -9909,12 +12802,18 @@ function _resolveRoundImpl() {
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; creditGhost(winTeamName, 33, 'ice', 3); renderBattle(); }, winTeamName);
   }
 
-  // Chester (426) — Well Read: Win: singles → +1 Healing Seed, doubles+ → +1 Magic Firefly
+  // Chester (426) — Well Read: Win: +1 Healing Seed always. Doubles+: also +2 Burn.
   if (wF.id === 426 && !wF.ko) {
     const chesterIsDoubles = ['doubles','triples','quads','penta'].includes(wR.type);
     if (chesterIsDoubles) {
-      queueAbility('WELL READ!', 'var(--uncommon)', `${wF.name} — Doubles+ Win! +1 Burn!`, () => { if (!winTeam.resources.burn) winTeam.resources.burn = 0; winTeam.resources.burn++; renderBattle(); }, winTeamName);
-      log(`<span class="log-ability">${wF.name}</span> — Well Read! +1 Burn!`);
+      // Doubles+: +1 Healing Seed AND +2 Burn (granted as resource, player places via burn picker)
+      queueAbility('WELL READ!', 'var(--uncommon)', `${wF.name} — Doubles+ Win! +1 Healing Seed + 2 Burn!`, () => {
+        winTeam.resources.healingSeed++;
+        if (!winTeam.resources.burn) winTeam.resources.burn = 0;
+        winTeam.resources.burn += 2;
+        renderBattle();
+      }, winTeamName);
+      log(`<span class="log-ability">${wF.name}</span> — Well Read! +1 Healing Seed + 2 Burn!`);
     } else {
       queueAbility('WELL READ!', 'var(--uncommon)', `${wF.name} — Win! +1 Healing Seed!`, () => { winTeam.resources.healingSeed++; renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Well Read! +1 Healing Seed!`);
@@ -9922,7 +12821,21 @@ function _resolveRoundImpl() {
     checkKnightEffects(winTeamName, wF.name);
   }
 
-  // Zippa (423) — Glimmer: v674 rework — moved to pre-roll section (before rolling, gain Lucky Stones for Healing Seeds held)
+  // Nick & Knack (409) — Knick Knack: steal is pre-roll now (win trigger removed)
+
+  // Zippa (423) — Glimmer: reworked — +1 damage per Healing Seed held
+
+  // Mable Stadango (446) — Hex: Win → +1 Burn
+  if (wF.id === 446 && !wF.ko) {
+    queueAbility('HEX!', 'var(--uncommon)', `${wF.name} — Win! +1 Burn!`, () => {
+      if (!winTeam.resources.burn) winTeam.resources.burn = 0;
+      winTeam.resources.burn += 1;
+      renderBattle();
+    }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Hex! Win → +1 Burn!`);
+    checkKnightEffects(winTeamName, wF.name);
+  }
+  // Mable Stadango (446) — Hex: in play only, no sideline win trigger
 
   // Starling (441) — Moonbeam: Win with doubles+ → +1 Moonstone + 1 Magic Firefly
   if (wF.id === 441 && !wF.ko && ['doubles','triples','quads','penta'].includes(wR.type)) {
@@ -9936,19 +12849,24 @@ function _resolveRoundImpl() {
     checkKnightEffects(winTeamName, wF.name);
   }
 
-  // Harvey (448) — Harvest Moon: Win: gain +1 Moonstone for each 5 you rolled
+  // Harvey (448) — Harvest Moon: Win: +1 damage per 5 rolled, gain 1 Moonstone if any 5s (v799 — added damage)
   if (wF.id === 448 && !wF.ko) {
     const fives = winDice.filter(d => d === 5).length;
     if (fives > 0) {
-      queueAbility('HARVEST MOON!', 'var(--uncommon)', `${wF.name} — Win! ${fives} five${fives>1?'s':''} rolled = +${fives} Moonstone${fives>1?'s':''}!`, () => {
-        winTeam.resources.moonstone += fives;
+      const harveyDmg = fives;
+      queueAbility('HARVEST MOON!', 'var(--ghost-rare)', `${wF.name} — Win with ${fives} five${fives > 1 ? 's' : ''}! +${harveyDmg} damage + 1 Moonstone!`, () => {
+        const lF = active(loseTeam);
+        if (lF && !lF.ko) {
+          lF.hp = Math.max(0, lF.hp - harveyDmg);
+          log(`<span class="log-ability">${wF.name}</span> — Harvest Moon! ${fives} five${fives > 1 ? 's' : ''} → <span class="log-dmg">${harveyDmg} bonus damage</span> + <span class="log-ms">1 Moonstone</span>!`);
+          if (lF.hp <= 0) { lF.ko = true; }
+        }
+        winTeam.resources.moonstone = Math.min((winTeam.resources.moonstone || 0) + 1, 1);
         renderBattle();
       }, winTeamName);
-      log(`<span class="log-ability">${wF.name}</span> — Harvest Moon! ${fives}x 5s → <span class="log-ms">+${fives} Moonstone${fives>1?'s':''}!</span>`);
       checkKnightEffects(winTeamName, wF.name);
-      // Sandwiches mirror for Moonstone
       if (sandwichForLose) {
-        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Moon! +${fives} Moonstone${fives>1?'s':''}!`, () => { loseTeam.resources.moonstone += fives; renderBattle(); }, loseTeamName);
+        queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Harvest Moon! +1 Moonstone!`, () => { loseTeam.resources.moonstone = Math.min((loseTeam.resources.moonstone || 0) + 1, 1); renderBattle(); }, loseTeamName);
       }
     }
   }
@@ -9971,12 +12889,18 @@ function _resolveRoundImpl() {
   }
 
   // Nyx & Bessie (415) — Moo! Caw!: sideline KO → 3 Healing Seeds
-  if (hasSideline(winTeam, 415) && !wF.ko && lF.ko) {
+  // Cornelius (45) Antidote blocks Nyx & Bessie's sideline effect
+  const corneliusBlocksNyx = hasSideline(loseTeam, 45);
+  if (hasSideline(winTeam, 415) && !wF.ko && lF.ko && !corneliusBlocksNyx) {
     const nyxG = getSidelineGhost(winTeam, 415);
     const nyxName = nyxG ? nyxG.name : 'Nyx & Bessie';
     queueAbility('MOO! CAW!', 'var(--uncommon)', `${nyxName} (sideline) — KO! +4 Healing Seeds!`, () => { winTeam.resources.healingSeed += 4; renderBattle(); }, winTeamName);
     log(`<span class="log-ability">${nyxName}</span> — Moo! Caw! KO → <span class="log-heal">+4 Healing Seeds!</span>`);
     checkKnightEffects(winTeamName, wF.name);
+  } else if (hasSideline(winTeam, 415) && !wF.ko && lF.ko && corneliusBlocksNyx) {
+    const cornGhostNyx = getSidelineGhost(loseTeam, 45);
+    queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostNyx ? cornGhostNyx.name : 'Cornelius'} blocks Nyx & Bessie's Moo! Caw!!`, null, loseTeamName);
+    log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Nyx & Bessie Moo! Caw! blocked!`);
   }
 
   // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite
@@ -10008,12 +12932,12 @@ function _resolveRoundImpl() {
       delete bt.originalMaxHp; delete bt.originalAbility; delete bt.originalAbilityDesc; delete bt.originalRarity;
     }
     const lucasActive = hasSideline(winTeam, 433);
-    const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP + 3 Magic Fireflies!`;
+    const calloutText = `${wF.name} — KO! ${bt.name} resurrected to sideline at 1 HP + 1 Magic Firefly!`;
     queueAbility('MIRACLE!', 'var(--legendary)', calloutText, () => {
       bt.ko = false;
       bt.hp = 1;
-      winTeam.resources.firefly = (winTeam.resources.firefly || 0) + 3;
-      log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span> <span class="log-ms">+3 Magic Fireflies!</span>`);
+      winTeam.resources.firefly = Math.min((winTeam.resources.firefly || 0) + 1, 1); // v736: was 3
+      log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span> <span class="log-ms">+1 Magic Firefly!</span>`);
       if (lucasActive) {
         // Lucas (433) — Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die next roll
         bt.hp += 3; // 1 + 3 = 4 HP total
@@ -10115,7 +13039,7 @@ function _resolveRoundImpl() {
     }
   });
 
-  // Dream Cat (28) — Jinx: if BOTH teams rolled doubles, Dream Cat gains +1 die next round
+  // Dream Cat (28) — Jinx: if BOTH teams rolled doubles, Dream Cat gains +2 dice next round
   [B.red, B.blue].forEach(team => {
     const f = active(team);
     if (f.id === 28 && !f.ko) {
@@ -10123,9 +13047,9 @@ function _resolveRoundImpl() {
       const ownRoll = team === B.red ? rR : bR;
       const foeRoll = team === B.red ? bR : rR;
       if (ownRoll.type === 'doubles' && foeRoll.type === 'doubles') {
-        B.dreamCatBonus[tNameDC] = (B.dreamCatBonus[tNameDC] || 0) + 1;
-        queueAbility('JINX!', 'var(--common)', `${f.name} — Both teams rolled doubles! +1 die next round!`, null, tNameDC);
-        log(`<span class="log-ability">${f.name}</span> — Jinx! Both rolled doubles → +1 die next round.`);
+        B.dreamCatBonus[tNameDC] = (B.dreamCatBonus[tNameDC] || 0) + 2;
+        queueAbility('JINX!', 'var(--common)', `${f.name} — Both teams rolled doubles! +2 dice next round!`, null, tNameDC);
+        log(`<span class="log-ability">${f.name}</span> — Jinx! Both rolled doubles → +2 dice next round.`);
         checkKnightEffects(tNameDC, f.name);
       }
     }
@@ -10140,9 +13064,11 @@ function _resolveRoundImpl() {
     if (f.id !== 19) return;
     if (!dice || dice.length === 0 || !dice.every(d => d < 4)) return;
     B.scallywagsFrenzyBonus[myTName] = (B.scallywagsFrenzyBonus[myTName] || 0) + 1;
+    const _scTeam = B[myTName];
+    _scTeam.resources.surge = (_scTeam.resources.surge || 0) + 1;
     const ctx = f === wF ? 'Win' : (f.ko ? 'Down' : 'Loss');
-    queueAbility('FRENZY!', 'var(--common)', `${f.name} — ${ctx}! All dice under 4! +1 die next roll!`, null, myTName);
-    log(`<span class="log-ability">${f.name}</span> — Frenzy! ${ctx}: all dice under 4 → +1 die next round.`);
+    queueAbility('FRENZY!', 'var(--common)', `${f.name} — ${ctx}! All dice under 4! +1 die next roll + 1 Surge!`, null, myTName);
+    log(`<span class="log-ability">${f.name}</span> — Frenzy! ${ctx}: all dice under 4 → +1 die next round + <span class="log-ms">+1 Surge</span>.`);
     checkKnightEffects(myTName, f.name);
   });
 
@@ -10254,8 +13180,8 @@ function _resolveRoundImpl() {
         }, BEAT_HP);
       }, BEAT_DAMAGE);
     } else {
-      if (galeForceSwap) {
-        narrate(`<b class="${winColor}">${wF.name}</b> wins! <b class="gold">GALE FORCE!</b> — forcing a swap instead of damage!`);
+      if (gusGaleReactiveTriggered) {
+        narrate(`<b class="${winColor}">${wF.name}</b> wins! <b class="gold">💨 GALE FORCE?</b> — choose to force a swap!`);
       } else {
         narrate(`<b class="${winColor}">${wF.name}</b> wins the roll but deals 0 damage!`);
       }
@@ -10301,7 +13227,7 @@ function _resolveRoundImpl() {
       if (B.guardianFairyStandby) { B.guardianFairyStandby.red = false; B.guardianFairyStandby.blue = false; }
       if (B.eloiseUsedThisRound) { B.eloiseUsedThisRound.red = false; B.eloiseUsedThisRound.blue = false; }
       // bogeyArmed removed v430 — Bogey reflect is now reactive (no pre-arm state)
-      if (B.galeForceDecided) { B.galeForceDecided.red = false; B.galeForceDecided.blue = false; }
+      // galeForceDecided reset removed — Gus is now reactive post-win
       if (B.jacksonUsedThisRound) { B.jacksonUsedThisRound.red = false; B.jacksonUsedThisRound.blue = false; }
       if (B.sonyaUsedThisRound) { B.sonyaUsedThisRound.red = false; B.sonyaUsedThisRound.blue = false; }
       // Dark Wing (76) Precision: NO per-round reset — once-per-GAME flag persists across rounds (v595)
@@ -10311,7 +13237,7 @@ function _resolveRoundImpl() {
       if (B.tylerDecidedThisRound) { B.tylerDecidedThisRound.red = false; B.tylerDecidedThisRound.blue = false; }
       if (B.booTeamworkDecidedThisRound) { B.booTeamworkDecidedThisRound.red = false; B.booTeamworkDecidedThisRound.blue = false; }
       if (B.luckyStoneSpentThisTurn) { B.luckyStoneSpentThisTurn.red = 0; B.luckyStoneSpentThisTurn.blue = 0; }
-    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; }
+    if (B.preRollAbilitiesFiredThisTurn) { B.preRollAbilitiesFiredThisTurn.red = false; B.preRollAbilitiesFiredThisTurn.blue = false; } B.moonstoneSicknessFiredThisTurn = false;
       // Willow (435) — Joy of Painting: winner didn't lose, loser did
       if (B.willowLostLast) { B.willowLostLast[winTeamName] = false; B.willowLostLast[loseTeamName] = true; }
       // Reset item swing toggles each round (player must actively choose to swing)
@@ -10359,18 +13285,18 @@ function _resolveRoundImpl() {
         : [];
 
       const proceedToKoHandling = () => {
+        // Live PvP: broadcast state after damage so Blue sees HP changes in near-real-time
+        pvpBroadcastState({ event: 'damageResolved' });
         if (lF.ko) {
           B.phase = 'ko-pause';
           renderBattle();
           setTimeout(() => {
             if (!handleKOs()) {
-              // Narrate the new matchup first, then enable roll buttons 350ms later —
-              // same breathing-room pattern as the no-KO path (v110/v114 fix).
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { startNextRound(); }, 350);
+              setTimeout(() => { startNextRound(); }, spd(350));
             }
-          }, 1800);
+          }, spd(900)); // v729: was 1800ms — tightened so swap picker appears faster
         } else {
           B.phase = 'ko-pause';
           renderBattle();
@@ -10380,9 +13306,9 @@ function _resolveRoundImpl() {
               // gives the player a beat to read "Round N — X vs Y" before the game unblocks.
               narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
               renderBattle();
-              setTimeout(() => { startNextRound(); }, 350);
+              setTimeout(() => { startNextRound(); }, spd(350));
             }
-          }, 750);
+          }, spd(750));
         }
       };
 
@@ -10390,12 +13316,32 @@ function _resolveRoundImpl() {
       const fuSwapTeam = B.fangUndercoverSwapPending;
       B.fangUndercoverSwapPending = null;
 
-      // Winston (15) — Scheme: fires after Toboggan/FangOutside, before KO handling
+      // Tyson (365) — Hop: win → choose enemy sideline ghost to disable
+      const checkTysonHop = () => {
+        if (wF.id === 365 && !wF.ko) {
+          const tysonTargets = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko && !B.tysonDisabled[loseTeamName].includes(i));
+          if (tysonTargets.length > 0) {
+            showTysonHopPicker(winTeamName, loseTeamName, tysonTargets, proceedToKoHandling);
+            return;
+          }
+        }
+        proceedToKoHandling();
+      };
+
+      // Winston (15) — Scheme: fires after Toboggan/FangOutside, before Tyson
       const checkWinstonScheme = () => {
+        // Barnaby (326) — Stubborn: immune to opponent forced swaps
+        const _barnabyWin = active(loseTeam);
+        if (_barnabyWin && _barnabyWin.id === 326 && !_barnabyWin.ko && winstonSchemeSideline.length > 0) {
+          queueAbility('STUBBORN!', 'var(--uncommon)', `${_barnabyWin.name} — Stubborn! Winston's Scheme is blocked!`, null, loseTeamName);
+          log(`<span class="log-ability">Barnaby</span> — Stubborn! Winston Scheme blocked — ${_barnabyWin.name} cannot be forced out.`);
+          checkTysonHop();
+          return;
+        }
         if (winstonSchemeSideline.length > 0) {
-          showWinstonSchemeModal(winTeamName, loseTeamName, winstonSchemeSideline, proceedToKoHandling);
+          showWinstonSchemeModal(winTeamName, loseTeamName, winstonSchemeSideline, checkTysonHop);
         } else {
-          proceedToKoHandling();
+          checkTysonHop();
         }
       };
 
@@ -10409,23 +13355,38 @@ function _resolveRoundImpl() {
         }
       };
 
-      // Gus (31) — Gale Force: if triggered, offer the LOSING player a ghost picker before other post-drain logic.
-      // Spec: "force your opponent to CHOOSE a different ghost" — the opponent decides which sideline ghost enters.
-      // If only 1 sideline option, auto-swap (no real choice). If multiple, show picker modal (same as Winston pattern).
+      // Gus (31) — Gale Force: win → force swap, new ghost takes the damage.
       const checkGaleForcePicker = () => {
         if (galeForceSwap && !wF.ko) {
+          // Barnaby (326) — Stubborn: immune to opponent forced swaps; takes galeForceDmg directly
+          const _barnabyGF = active(loseTeam);
+          if (_barnabyGF && _barnabyGF.id === 326 && !_barnabyGF.ko) {
+            queueAbility('STUBBORN!', 'var(--uncommon)', `${_barnabyGF.name} — Stubborn! Gus's Gale Force is blocked!`, () => {
+              log(`<span class="log-ability">Barnaby</span> — Stubborn! Gale Force blocked — ${_barnabyGF.name} takes ${galeForceDmg} damage directly.`);
+              _barnabyGF.hp = Math.max(0, _barnabyGF.hp - galeForceDmg);
+              if (_barnabyGF.hp <= 0) { _barnabyGF.ko = true; _barnabyGF.killedBy = 31; }
+              renderBattle();
+              afterFangUndercover();
+            }, loseTeamName);
+            return;
+          }
+          B._galeForceDmg = galeForceDmg; // stash for picker
           const gfAlive = loseTeam.ghosts.filter((g, i) => i !== loseTeam.activeIdx && !g.ko);
           if (gfAlive.length > 1) {
             showGaleForcePickerModal(winTeamName, loseTeamName, gfAlive, afterFangUndercover);
             return;
           } else if (gfAlive.length === 1) {
-            // Only 1 option — auto-swap, fire entry effects, then continue
-            loseTeam.activeIdx = loseTeam.ghosts.indexOf(gfAlive[0]);
+            // Only 1 option — auto-swap + apply damage
+            const autoTarget = gfAlive[0];
+            loseTeam.activeIdx = loseTeam.ghosts.indexOf(autoTarget);
+            if (galeForceDmg > 0) {
+              autoTarget.hp = Math.max(0, autoTarget.hp - galeForceDmg);
+              if (autoTarget.hp <= 0) { autoTarget.hp = 0; autoTarget.ko = true; autoTarget.killedBy = 31; }
+            }
             renderBattle();
-            log(`<span class="log-ability">Gus</span> — Gale Force! ${gfAlive[0].name} was the only option — enters automatically!`);
+            log(`<span class="log-ability">Gus</span> — Gale Force! ${autoTarget.name} was the only option — enters and takes <span class="log-dmg">${galeForceDmg} damage!</span>${autoTarget.ko ? ' <span class="log-ko">KO!</span>' : ' ' + autoTarget.hp + ' HP left'}`);
             const entryCount = triggerEntry(loseTeam, false);
-            const delay = entryCount > 0 ? entryCount * 1500 + 300 : 300;
-            setTimeout(afterFangUndercover, delay);
+            afterEntryWithJenkins(entryCount, afterFangUndercover);
             return;
           }
         }
@@ -10446,9 +13407,17 @@ function _resolveRoundImpl() {
       }
       }; // end runPostDrain
 
+      // Sky Elusive modal: show after Jasper if pending
+      const afterSkyElusive = () => {
+        runPostDrain();
+      };
       // Jasper Flame Dive modal: show after Balatron if pending
       const afterJasper = () => {
-        runPostDrain();
+        if (B.skyElusivePending) {
+          showSkyElusiveModal(afterSkyElusive);
+        } else {
+          afterSkyElusive();
+        }
       };
       const afterBalatron = () => {
         if (B.jasperPending) {
@@ -10469,19 +13438,42 @@ function _resolveRoundImpl() {
         }
       };
 
-      // Pal Al / Gordok choice modals: fire before Guardian Fairy (winner decides first)
-      const afterWiseAlGordok = () => {
-        if (B.guardianFairyReactivePending) {
-          const gfp = B.guardianFairyReactivePending;
-          gfp.resume = afterGfReactive;
-          const gfG = gfp.gfGhost;
-          const gfName = gfG.name || 'Guardian Fairy';
-          document.getElementById('guardianFairySub').innerHTML =
-            `<b>${gfName}</b> (${gfG.hp} HP) can take this ${gfp.dmg} damage hit for <b>${gfp.lF.name}</b>!<br>` +
-            `<i>Guardian Fairy swaps in and absorbs the damage. ${gfp.lF.name} goes to sideline at current HP.</i>`;
-          document.getElementById('guardianFairyOverlay').classList.add('active');
-        } else {
+      // Gus (31) — Gale Force reactive: winner decides before Guardian Fairy (loser's defense)
+      const afterGusGaleChoice = () => {
+        if (B._gusGaleAccepted) {
+          // Player accepted Gale Force — damage zeroed, swap picker needed
+          B._gusGaleAccepted = false;
+          galeForceSwap = true;
+          galeForceDmg = B._gusGaleDmg || galeForceDmg;
+          dmg = 0; // zero damage to current opponent
+          // Skip Guardian Fairy — no damage to absorb
           afterGfReactive();
+        } else {
+          // Player declined (or wasn't offered) — damage flows normally, GF may absorb
+          if (B.guardianFairyReactivePending) {
+            const gfp = B.guardianFairyReactivePending;
+            gfp.resume = afterGfReactive;
+            // v783: timed button instead of full-screen modal
+            showGfWishButton();
+          } else {
+            afterGfReactive();
+          }
+        }
+      };
+
+      // Pal Al / Gordok choice modals: fire before Gus Gale Force (winner decides first)
+      const afterWiseAlGordok = () => {
+        if (B.gusGaleReactivePending) {
+          const gp = B.gusGaleReactivePending;
+          gp.resume = afterGusGaleChoice;
+          // Auto-accept for AI/autoPlay
+          if (autoPlayRunning) {
+            doGusGaleReactive('yes');
+          } else {
+            showGusGaleButton();
+          }
+        } else {
+          afterGusGaleChoice();
         }
       };
 
@@ -10493,16 +13485,29 @@ function _resolveRoundImpl() {
         }
       };
 
-      if (B.gordokPending) {
-        showGordokModal(afterGordokChoice);
+      const afterSophiaChoice = () => {
+        if (B.gordokPending) {
+          showGordokModal(afterGordokChoice);
+        } else {
+          afterGordokChoice();
+        }
+      };
+
+      if (B.sophiaPending) {
+        showSophiaModal(afterSophiaChoice);
       } else {
-        afterGordokChoice();
+        afterSophiaChoice();
       }
     });
   }, dmgDelay);
 }
 
 function handleKOs() {
+  // Mark any ghost with hp <= 0 as KO (safety net for edge cases)
+  ['red','blue'].forEach(team => {
+    B[team].ghosts.forEach(g => { if (g.hp <= 0 && !g.ko) g.ko = true; });
+  });
+
   // Check for game-over first
   const redAllDown = B.red.ghosts.every(g => g.ko);
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
@@ -10512,14 +13517,26 @@ function handleKOs() {
 
   // Check if any active ghost is KO'd and needs a replacement pick
   const teamsNeedingSwap = [];
-  ['red','blue'].forEach(team => {
+  for (const team of ['red','blue']) {
     const t = B[team];
     const f = active(t);
     if (f.ko) {
+      // Mode G: clear moonstone sickness on KO
+      const msModeKO = document.getElementById('moonstoneModeSelect')?.value || 'D';
+      if (msModeKO === 'G' && t.moonstoneSickness > 0) {
+        log(`<span style="color:var(--moonstone)">Moonstone Sickness cleared!</span> ${team.toUpperCase()}'s sickness lifts with ${f.name}'s defeat.`);
+        t.moonstoneSickness = 0;
+      }
       const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
-      if (alive.length > 0) teamsNeedingSwap.push(team);
+      if (alive.length > 0) {
+        teamsNeedingSwap.push(team);
+      } else {
+        // Active is KO'd and no sideline — this team is fully eliminated
+        const winner = team === 'red' ? 'blue' : 'red';
+        showGameOver(winner); renderBattle(); return true;
+      }
     }
-  });
+  }
 
   if (teamsNeedingSwap.length > 0) {
     // Queue the KO swap picks — caller must NOT resume to 'ready'
@@ -10545,7 +13562,7 @@ function openKoSwap() {
     B.koSwapQueue = null;
     renderBattle();
     narrate(`<b class="gold">Round ${B.round}</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b>`);
-    setTimeout(() => { startNextRound(); }, 350);
+    setTimeout(() => { startNextRound(); }, spd(350));
     return;
   }
   const team = B.koSwapQueue[0];
@@ -10553,34 +13570,52 @@ function openKoSwap() {
   const fallen = active(t);
   const alive = t.ghosts.filter((g,i) => i !== t.activeIdx && !g.ko);
 
+  // v728: Blue's local engine auto-picks only for RED's KO swaps (can't make Red's choice).
+  // Blue's OWN KO swaps show the real picker so the player can choose.
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally && team !== 'blue') {
+    const autoIdx = t.ghosts.indexOf(alive[0]);
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
+    narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
+    setTimeout(() => doKoSwap(team, autoIdx), 400); // v729: was 800ms
+    return;
+  }
+
+  if (LIVE_PVP && PVP_SIDE === 'red' && team === 'blue') {
+    pvpBroadcastState({ event: 'koSwapNeeded', swapTeam: 'blue' });
+    const aliveIdxes = alive.map(g => t.ghosts.indexOf(g));
+    PVP_GAME_REF.child('koSwapRequest').set({
+      side: 'blue',
+      fallenName: fallen.name,
+      aliveIdxes: aliveIdxes,
+      aliveNames: alive.map(g => g.name),
+      ts: Date.now()
+    });
+    // Red waits for Blue's koSwap response via existing listener
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner) { banner.textContent = "Waiting for opponent's swap pick..."; banner.style.display = 'block'; }
+    return;
+  }
+
   // If only one option, auto-pick (no real choice)
   if (alive.length === 1) {
     const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
     narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${alive[0].name}</b> steps up!`);
-    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(alive[0])), 800);
-    return;
-  }
-
-  // Boss Mode: auto-pick for blue (boss) team — pick highest HP minion
-  if (window.BOSS_MODE && team === 'blue') {
-    const best = alive.reduce((a, b) => (b.maxHp > a.maxHp ? b : a), alive[0]);
-    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
-    narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}:</b>&nbsp;<b>${best.name}</b> enters the fray!`);
-    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(best)), 800);
+    setTimeout(() => doKoSwap(team, t.ghosts.indexOf(alive[0])), 400); // v729: was 800ms
     return;
   }
 
   const teamLabel = team.charAt(0).toUpperCase() + team.slice(1);
   narrate(`<b class="ko-text">${fallen.name} is down!</b>&nbsp;<b class="${team}-text">${teamLabel}</b> — who answers the call?`);
-  // Delay renderBattle() so the narrator text appears (drainNarrate fires at t+150ms)
-  // and is readable before the gold-pulsing picker cards become interactive.
-  // Without this delay, sideline cards go clickable at t=0 — before the player
-  // even sees the "who answers the call?" prompt. 300ms gives the text time to
-  // fade in and register before the picker lights up.
-  setTimeout(() => renderBattle(), 300); // sideline cards with ko-swap-pick class become clickable
+  // Brief delay so narrator text appears before picker lights up
+  setTimeout(() => renderBattle(), 150); // v729: was 300ms — tightened for snappier feel
 }
 
 function doKoSwap(team, idx) {
+  // v728: if Blue picks a KO swap during local resolution, broadcast to Red immediately
+  if (LIVE_PVP && PVP_SIDE === 'blue' && pvpBlueResolvedLocally && team === 'blue') {
+    PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: idx, timestamp: firebase.database.ServerValue.TIMESTAMP });
+    B._blueKoSwapPick = idx; // stash so koSwapRequest listener can use it
+  }
   const t = B[team];
   const fallen = active(t);
   // doKoSwap fires only when a ghost is KO'd by damage — entry effects always fire.
@@ -10599,61 +13634,56 @@ function doKoSwap(team, idx) {
   // Remove this team from the queue
   B.koSwapQueue.shift();
 
-  // Check if entry effects caused new KOs (e.g. Nerina's Leviathan)
-  const redAllDown = B.red.ghosts.every(g => g.ko);
-  const blueAllDown = B.blue.ghosts.every(g => g.ko);
-  if (redAllDown && blueAllDown) { showGameOver('draw'); return; }
-  if (redAllDown) { showGameOver('blue'); return; }
-  if (blueAllDown) { showGameOver('red'); return; }
+  // After entry callouts + Jenkins modal resolve, check for KOs and continue
+  afterEntryWithJenkins(entryCalloutCount > 0 ? entryCalloutCount : 0, () => {
+    // Check if entry effects caused new KOs (e.g. Nerina's Leviathan, Jenkins Greeting)
+    const redAllDown = B.red.ghosts.every(g => g.ko);
+    const blueAllDown = B.blue.ghosts.every(g => g.ko);
+    if (redAllDown && blueAllDown) { showGameOver('draw'); return; }
+    if (redAllDown) { showGameOver('blue'); return; }
+    if (blueAllDown) { showGameOver('red'); return; }
 
-  // Check if entry damage KO'd someone new — add to queue
-  ['red','blue'].forEach(tm => {
-    const tt = B[tm];
-    if (active(tt).ko && !B.koSwapQueue.includes(tm)) {
-      const alive = tt.ghosts.filter((g,i) => i !== tt.activeIdx && !g.ko);
-      if (alive.length > 0) B.koSwapQueue.push(tm);
-    }
+    // Check if entry damage KO'd someone new — add to queue
+    ['red','blue'].forEach(tm => {
+      const tt = B[tm];
+      if (active(tt).ko && !B.koSwapQueue.includes(tm)) {
+        const alive = tt.ghosts.filter((g,i) => i !== tt.activeIdx && !g.ko);
+        if (alive.length > 0) B.koSwapQueue.push(tm);
+      }
+    });
+
+    openKoSwap();
   });
-
-  // Wait for all entry callouts to finish before showing the next KO swap picker.
-  // entryCalloutCount accounts for both the entry ability AND any Knight reactions
-  // (each 1500ms apart), so 2 callouts = 3000ms.
-  // Minimum 800ms even with 0 callouts — gives the player time to read
-  // "[Ghost] enters the arena!" before the next KO picker or roll buttons appear.
-  // Matches the 800ms auto-pick delay in openKoSwap for symmetric breathing room.
-  const splashDelay = entryCalloutCount > 0 ? entryCalloutCount * 1500 : 800;
-  setTimeout(openKoSwap, splashDelay);
 }
 
 function showGameOver(winner) {
   B.phase = 'over';
+  // Live PvP: broadcast game over so both clients show it
+  if (LIVE_PVP && PVP_GAME_REF && PVP_SIDE === 'red') {
+    const stateSnap = pvpSerializeState();
+    PVP_GAME_REF.child('stateSync').set(stateSnap);
+    PVP_GAME_REF.child('gameOver').set({ winner, ts: Date.now() });
+    PVP_GAME_REF.child('roundResult').push({
+      state: stateSnap,
+      redDice: B.redDice || null,
+      blueDice: B.blueDice || null,
+      gameOver: winner,
+      ts: Date.now()
+    });
+  }
   fadeOutMusic();
   // Victory fanfare (delayed to let music fade a bit)
   setTimeout(() => playSfx('sfxVictory', 0.6), 600);
   // Clean up any active overlays/animations
-  const splash = document.getElementById('abilitySplash');
-  if (splash) splash.classList.remove('active');
+  document.getElementById('abilitySplash').classList.remove('active');
   clearLsCountdown();
   disableRollButtons();
 
-  // Boss Mode: end-of-fight hook — report damage dealt and advance to next fighter
-  if (window.BOSS_MODE && typeof endMyRaidFight === 'function') {
-    const raidState = window.BOSS_RAID_DATA;
-    if (raidState) {
-      // Count player ghosts lost
-      raidState.ghostsLost = B.red.ghosts.filter(g => g.ko).length;
-    }
-    // Delay to let game-over screen show briefly, then hand off to raid system
-    setTimeout(() => {
-      endMyRaidFight({ winner, rounds: B.round - 1 });
-    }, 3000);
-  }
-
-  // Record standings (skip for raid boss fights — raids have their own reward system)
+  // Record standings
   let matchMvp = null;
   let redMvpId = null;
   let blueMvpId = null;
-  if (!window.BOSS_MODE && (winner === 'red' || winner === 'blue')) {
+  if (winner === 'red' || winner === 'blue') {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];
@@ -10688,7 +13718,11 @@ function showGameOver(winner) {
   const title = document.getElementById('goTitle');
   const rounds = B.round - 1;
   if (winner === 'draw') { title.textContent = 'DRAW!'; title.className = ''; }
-  else { title.textContent = `TEAM ${winner.toUpperCase()} WINS!`; title.className = `${winner}-win`; }
+  else {
+    const winnerName = MP_MODE ? MP_PLAYER_NAMES[winner] : `Team ${winner.charAt(0).toUpperCase() + winner.slice(1)}`;
+    title.textContent = `${winnerName} WINS!`;
+    title.className = `${winner}-win`;
+  }
 
   // Round count
   document.getElementById('goRounds').textContent = `${rounds} round${rounds !== 1 ? 's' : ''} played`;
@@ -10724,8 +13758,9 @@ function showGameOver(winner) {
       </div>`;
     }).join('');
 
+    const displayLabel = MP_MODE ? MP_PLAYER_NAMES[teamColor] : `Team ${teamLabel}`;
     return `<div class="go-team-col">
-      <h3 class="${teamColor}-label">Team ${teamLabel}</h3>
+      <h3 class="${teamColor}-label">${displayLabel}</h3>
       ${rows}
     </div>`;
   }
@@ -10733,9 +13768,79 @@ function showGameOver(winner) {
   const summaryHtml = buildTeamCol(B.red, 'Red', 'red', redMvpId) + buildTeamCol(B.blue, 'Blue', 'blue', blueMvpId);
   document.getElementById('goSummary').innerHTML = summaryHtml;
 
-  // Callback for multiplayer to update stats
-  if (typeof onGameOver === 'function') {
-    onGameOver(winner, { matchMvp, redMvpId, blueMvpId, rounds: B.round - 1 });
+  // MULTIPLAYER MODE: replace buttons with "Return to Arena" redirect
+  if (MP_MODE) {
+    // In live PvP, result is relative to YOUR side
+    const result = LIVE_PVP
+      ? (winner === PVP_SIDE ? 'win' : (winner === 'draw' ? 'draw' : 'loss'))
+      : (winner === 'red' ? 'win' : (winner === 'blue' ? 'loss' : 'draw'));
+
+    // Clean up live PvP game
+    if (LIVE_PVP && PVP_GAME_REF) {
+      PVP_GAME_REF.child('status').set('finished');
+      PVP_GAME_REF.child('winner').set(winner);
+    }
+
+    const goButtons = el.querySelector('.go-buttons');
+
+    // RAID MODE: show boss dialogue and redirect with raid results
+    if (RAID_MODE && RAID_PARAMS) {
+      const bossLine = winner === 'red'
+        ? `${RAID_PARAMS.bossName} has been defeated!`
+        : `${RAID_PARAMS.bossName} stands triumphant.`;
+      const dialogueEl = document.createElement('div');
+      dialogueEl.style.cssText = 'text-align:center;color:var(--text2);font-style:italic;font-size:1.1rem;margin:12px 0;';
+      dialogueEl.textContent = bossLine;
+      const goTitle = document.getElementById('goTitle');
+      if (goTitle) goTitle.after(dialogueEl);
+      // Calculate total damage dealt to blue team (boss) — exclude padded ghosts
+      let totalDamage = 0;
+      if (B && B.blue) {
+        const realCount = RAID_PARAMS.realBossGhostCount || B.blue.ghosts.length;
+        for (let i = 0; i < realCount; i++) {
+          const g = B.blue.ghosts[i];
+          if (g) totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+        }
+      }
+      const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
+      // Calculate damage taken by player's team
+      let damageTaken = 0;
+      if (B && B.red) {
+        B.red.ghosts.forEach(g => {
+          damageTaken += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+        });
+      }
+
+      if (goButtons) {
+        const returnUrl = `../multiplayer/?raidResult=done`
+          + `&instanceId=${encodeURIComponent(RAID_PARAMS.instanceId)}`
+          + `&raidId=${encodeURIComponent(RAID_PARAMS.raidId)}`
+          + `&damage=${totalDamage}`
+          + `&damageTaken=${damageTaken}`
+          + `&ghostsLost=${ghostsLost}`
+          + `&slot=${RAID_PARAMS.slot}`
+          + `&result=${result}`;
+        goButtons.innerHTML = `
+          <button class="go-btn-rematch" onclick="try{sessionStorage.setItem('raidJustCompleted','1')}catch(e){};window.location.href='${returnUrl}'">
+            Return to Raid
+          </button>
+        `;
+        // Mark raid as completed in sessionStorage (survives page navigation)
+        try { sessionStorage.setItem('raidJustCompleted', '1'); } catch(e) {}
+        // Auto-redirect after 5 seconds
+        setTimeout(() => { window.location.href = returnUrl; }, 5000);
+      }
+    } else if (goButtons) {
+      // Daily mode uses dailyResult param; regular MP uses result param
+      const returnUrl = MP_DAILY
+        ? `../multiplayer/?dailyResult=${result}`
+        : `../multiplayer/?result=${result}`;
+      goButtons.innerHTML = `
+        <button class="go-btn-rematch" onclick="window.location.href='${returnUrl}'">
+          Return to Arena
+        </button>
+      `;
+    }
   }
 }
 
@@ -10778,10 +13883,16 @@ function doSwap(team, idx) {
   if (skipEntry) {
     log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
   }
-  triggerEntry(t, skipEntry);
+  const entryCount = triggerEntry(t, skipEntry);
 
   document.getElementById('swapOverlay').classList.remove('active');
-  if (!handleKOs()) renderBattle();
+  if (B.jenkinsPending) {
+    afterEntryWithJenkins(entryCount, () => {
+      if (!handleKOs()) renderBattle();
+    });
+  } else {
+    if (!handleKOs()) renderBattle();
+  }
 }
 
 // ============================================================
@@ -10836,11 +13947,39 @@ function playDamageSfx(dmg) {
   else playSfx('sfx1Damage');
 }
 
+// ============================================================
+// MUSIC SYSTEM — v740 rewrite (fixes stale listeners, fade reset, mute state)
+// ============================================================
+let _musicStarted = false;
+let _musicRetryHandler = null; // track the single retry listener so we can remove it
+
 function startMusic() {
+  if (_musicStarted) return;
+  if (_muted) { _musicStarted = true; return; }
   const music = document.getElementById('bgMusic');
   music.currentTime = 0;
   music.volume = 0.2;
-  music.play().catch(() => {});
+  // Remove any stale retry handler from a previous battle cycle
+  if (_musicRetryHandler) {
+    document.removeEventListener('click', _musicRetryHandler);
+    _musicRetryHandler = null;
+  }
+  const p = music.play();
+  if (p) {
+    p.then(() => { _musicStarted = true; }).catch(() => {
+      // Autoplay blocked — attach a single retry on next click
+      _musicRetryHandler = () => {
+        if (_musicStarted) return;
+        _musicStarted = true;
+        _musicRetryHandler = null;
+        music.volume = 0.2;
+        music.play().catch(() => {});
+      };
+      document.addEventListener('click', _musicRetryHandler, { once: true });
+    });
+  } else {
+    _musicStarted = true;
+  }
 }
 
 function fadeOutMusic() {
@@ -10848,21 +13987,82 @@ function fadeOutMusic() {
   clearInterval(music._fadeInt);
   music._fadeInt = setInterval(() => {
     if (music.volume > 0.03) { music.volume -= 0.03; }
-    else { clearInterval(music._fadeInt); music.pause(); music.volume = 0.2; }
+    else {
+      clearInterval(music._fadeInt);
+      music.pause();
+      music.volume = 0.2;
+      _musicStarted = false; // reset so music can restart on next battle
+    }
   }, 60);
 }
+
+// v734: mute toggle — persists via localStorage
+let _muted = localStorage.getItem('tr_muted') === '1';
+function toggleMute() {
+  _muted = !_muted;
+  localStorage.setItem('tr_muted', _muted ? '1' : '0');
+  const music = document.getElementById('bgMusic');
+  const btn = document.getElementById('muteToggle');
+  if (_muted) {
+    music.pause();
+    // Don't reset _musicStarted — muting is temporary, not a stop
+    btn.textContent = '\u{1F507}';
+    btn.title = 'Music off — click to unmute';
+  } else {
+    music.volume = 0.2;
+    _musicStarted = false; // allow startMusic path to re-engage
+    const p = music.play();
+    if (p) {
+      p.then(() => { _musicStarted = true; }).catch(() => {
+        // Autoplay blocked on unmute — retry on next click
+        if (_musicRetryHandler) document.removeEventListener('click', _musicRetryHandler);
+        _musicRetryHandler = () => {
+          if (_musicStarted) return;
+          _musicStarted = true;
+          _musicRetryHandler = null;
+          music.volume = 0.2;
+          music.play().catch(() => {});
+        };
+        document.addEventListener('click', _musicRetryHandler, { once: true });
+      });
+    } else {
+      _musicStarted = true;
+    }
+    btn.textContent = '\u{1F50A}';
+    btn.title = 'Music on — click to mute';
+  }
+}
+// Apply saved mute state on load
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('muteToggle');
+  if (btn && _muted) {
+    btn.textContent = '\u{1F507}';
+    btn.title = 'Music off — click to unmute';
+  }
+});
 
 function stopMusicHard() {
   const music = document.getElementById('bgMusic');
   clearInterval(music._fadeInt);
   music.pause();
   music.currentTime = 0;
+  music.volume = 0.2;
+  _musicStarted = false;
+  // Clean up any pending retry handler
+  if (_musicRetryHandler) {
+    document.removeEventListener('click', _musicRetryHandler);
+    _musicRetryHandler = null;
+  }
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
+// v726: skip bgMusic entirely — startMusic() has its own retry-on-click handler.
+// unlockAudio's play().then(pause) pattern races with startMusic's retry and kills music.
 (function unlockAudio() {
   const unlock = () => {
     document.querySelectorAll('audio').forEach(a => {
+      if (a.id === 'bgMusic') return; // handled by startMusic's own retry
+      if (!a.paused) return;
       a.play().then(() => a.pause()).catch(() => {});
     });
     document.removeEventListener('click', unlock);
@@ -10876,14 +14076,19 @@ function showTriplesEffect(side, rollType) {
   const banner = document.getElementById('triplesBanner');
   const flash = document.getElementById('triplesFlash');
   const bannerText = { penta:'PENTA!!', quads:'QUADS!', triples:'TRIPLES!' };
-  banner.textContent = bannerText[rollType] || 'TRIPLES!';
+  banner.textContent = bannerText[rollType] || (rollType.endsWith('-of-a-kind') ? rollType.toUpperCase() + '!!!' : 'TRIPLES!');
 
-  playSfx('triplesSfx', 1.0);
+  if (rollType === 'triples') playSfx('triplesSfx', 1.0);
 
   // Glow on dice
   const diceEl = document.getElementById(side + '-dice');
   if (diceEl) {
     diceEl.querySelectorAll('.die').forEach(d => d.classList.add('triples-glow'));
+  }
+  // Also glow 3D dice
+  const tripPh = _dicePhysics[side];
+  if (tripPh && tripPh.settled) {
+    tripPh.dice.forEach(d => d.el.classList.add('triples-glow-3d'));
   }
 
   // Flash
@@ -10894,7 +14099,7 @@ function showTriplesEffect(side, rollType) {
 
   // Screen shake
   document.body.classList.add('screen-shake');
-  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+  setTimeout(() => document.body.classList.remove('screen-shake'), spd(500));
 
   // Banner pop
   banner.className = 'triples-banner ' + side + '-triples';
@@ -10903,8 +14108,8 @@ function showTriplesEffect(side, rollType) {
     setTimeout(() => {
       banner.classList.remove('show');
       banner.classList.add('fade');
-      setTimeout(() => { banner.className = 'triples-banner'; }, 500);
-    }, 1200);
+      setTimeout(() => { banner.className = 'triples-banner'; }, spd(500));
+    }, spd(1200));
   });
 }
 
@@ -10959,7 +14164,7 @@ function drainAbilityQueue(callback) {
           try { log(`<span class="log-dmg">ERROR in post-drain callback:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {}
           try { B.phase = 'ready'; resetRollButtons(); renderBattle(); } catch (_) {}
         }
-      }, 1500);
+      }, spd(1500));
       return;
     }
     const a = abilityQueue[i++];
@@ -10969,7 +14174,7 @@ function drainAbilityQueue(callback) {
     if (a.onShow) {
       try { a.onShow(); } catch (e) { console.error('[ability onShow CRASH]', a.name, e); try { log(`<span class="log-dmg">ERROR in ${a.name} onShow:</span> ${e && e.message ? e.message : String(e)}`); } catch (_) {} }
     }
-    setTimeout(next, 1300);
+    setTimeout(next, spd(1300));
   }
   next();
 }
@@ -10980,13 +14185,17 @@ function drainAbilityQueue(callback) {
 // #abilitySplash DOM element kept (display:none) so .active toggling still works
 // for any external code that reads it (3 callsites) — safe no-op.
 function showAbilityCallout(name, color, desc, team) {
+  // v721: capture ability events for PvP Blue sync (hooked here to catch ALL callouts)
+  if (LIVE_PVP && PVP_SIDE === 'red') {
+    pvpAbilityEvents.push({ name: name || '', color: color || '', desc: desc || '', team: team || '' });
+  }
   // Maintain splash .active compatibility (visual no-op — CSS sets display:none)
   const el = document.getElementById('abilitySplash');
   const theme = SPLASH_THEMES[color] || '';
   el.className = 'ability-splash ' + theme;
   el.classList.add('active');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.classList.remove('active'); }, 1400);
+  el._timer = setTimeout(() => { el.classList.remove('active'); }, spd(1400));
 
   // Play the ability SFX — audio cue is good, keep it
   playSfx('sfxSpecial', 0.85);
@@ -11011,7 +14220,7 @@ function showAbilityCallout(name, color, desc, team) {
           'ability-fire-purple', 'ability-fire-green', 'ability-fire-gold',
           'ability-fire-red', 'ability-fire-default'
         );
-      }, 1200);
+      }, spd(1200));
     }
   }
 
@@ -11022,7 +14231,7 @@ function showAbilityCallout(name, color, desc, team) {
     narrator.classList.add('ability-active');
     narrator.innerHTML = '<b style="color:' + (color || 'var(--moonstone)') + '">' + name + '</b>' +
       (desc ? ' <span style="opacity:0.72;font-size:12px;font-weight:500">\u2014 ' + desc + '</span>' : '');
-    narrator._abilityTimer = setTimeout(() => { narrator.classList.remove('ability-active'); }, 1300);
+    narrator._abilityTimer = setTimeout(() => { narrator.classList.remove('ability-active'); }, spd(1300));
   }
 
   // Small hype-pop callout strip — unobtrusive, keep it
@@ -11035,7 +14244,7 @@ function showAbilityCallout(name, color, desc, team) {
     void small.offsetWidth;
     small.classList.add('hype-pop');
     clearTimeout(small._timer);
-    small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, 2200);
+    small._timer = setTimeout(() => { small.textContent = ''; small.classList.remove('hype-pop'); }, spd(2200));
   }
 }
 
@@ -11103,7 +14312,7 @@ function renderCardSlot(ghost, isFighter) {
     ${artHtml}
     <div class="ability-banner">${g.ability}</div>
     <div class="card-info">
-      <div class="ci-desc">${g.abilityDesc}</div>
+      <div class="ci-desc" title="${g.abilityDesc}">${g.abilityDesc}</div>
     </div>
     ${statusHtml ? `<div class="fighter-status">${statusHtml}</div>` : ''}`;
 }
@@ -11135,6 +14344,12 @@ function hitDamage(teamName) {
 function renderBattle() {
   if (!B) return;
 
+  // v736: enforce Moonstone cap (1) and Firefly cap (1) globally
+  ['red','blue'].forEach(s => {
+    if (B[s].resources.moonstone > 1) B[s].resources.moonstone = 1;
+    if ((B[s].resources.firefly || 0) > 1) B[s].resources.firefly = 1;
+  });
+
   ['red','blue'].forEach(team => {
     const t = B[team];
     const f = active(t);
@@ -11154,7 +14369,7 @@ function renderBattle() {
     const slRight = document.getElementById(`${team}-sl-right`);
     const isKoPickTeam = B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === team;
     [slLeft, slRight].forEach((el, i) => {
-      if (sl[i]) {
+      if (sl[i] && !sl[i].isPadded) {
         el.style.visibility = 'visible';
         const slData = ghostData(sl[i].id);
         const isPick = isKoPickTeam && !sl[i].ko;
@@ -11245,27 +14460,26 @@ function renderBattle() {
       const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
       rh += `<div class="res-tile fire ${isReady?'clickable':''}" ${burnClick} title="Burn: ${r.burn} available — click to place on an enemy sideline ghost (deals damage on entry)"><span class="res-main">🔥</span><span class="res-count">${r.burn}</span><span class="res-label">BURN</span></div>`;
     }
-    // Castle Guide (420) — Burn: show total burn already placed on enemy sideline ghosts
-    if (B.burn) {
-      const enemyTeam = team === 'red' ? 'blue' : 'red';
-      const burnObj = B.burn[enemyTeam] || {};
-      const totalBurn = Object.values(burnObj).reduce((s, v) => s + v, 0);
-      if (totalBurn > 0) {
-        const burnDetails = Object.entries(burnObj).map(([idx, cnt]) => {
-          const g = B[enemyTeam].ghosts[parseInt(idx)];
-          return g ? `${g.name}: ${cnt}` : '';
-        }).filter(Boolean).join(', ');
-        rh += `<div class="res-tile fire" title="Burn placed on enemy: ${burnDetails}"><span class="res-main">💥</span><span class="res-count">${totalBurn}</span><span class="res-label">PLACED</span></div>`;
-      }
-    }
+    // Burn placed indicator removed — burn disappears when spent, no need to track visually
     // Happy Crystal (208) — sacrifice tile
     if (isReady && f.id === 208 && !f.ko) {
       rh += `<div class="res-tile moonstone clickable" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone"><span class="res-main">💀</span><span class="res-label">Sac</span></div>`;
     }
-    // Aunt Susan (309) — commit healing seeds for damage or heal (click=add, right-click=remove)
-    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0 || c.auntSusanHeal > 0)) {
+    // Aunt Susan (309) — commit healing seeds for damage (click=add, right-click=remove)
+    if (isReady && f.id === 309 && (r.healingSeed > 0 || c.auntSusan > 0)) {
       rh += `<div class="res-tile healingSeed clickable ${c.auntSusan>0?'committed':''}" onclick="toggleAuntSusan('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusan('${team}')" title="Click: +2 dmg per seed. Right-click: remove"><span class="res-main">🌱</span><span class="res-label">${c.auntSusan>0?'+'+c.auntSusan*2+'dmg':'+2dmg'}</span></div>`;
-      rh += `<div class="res-tile healingSeed clickable ${c.auntSusanHeal>0?'committed':''}" onclick="toggleAuntSusanHeal('${team}')" oncontextmenu="event.preventDefault();uncommitAuntSusanHeal('${team}')" title="Click: +2 HP per seed. Right-click: remove" style="${c.auntSusanHeal>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}"><span class="res-main">🌱</span><span class="res-label">${c.auntSusanHeal>0?'+'+c.auntSusanHeal*2+'hp':'+2hp'}</span></div>`;
+    }
+    // Moonstone Sickness indicator
+    {
+      const msMode = document.getElementById('moonstoneModeSelect')?.value || 'D';
+      const stacks = t.moonstoneSickness || 0;
+      const pending = t.moonstoneSicknessPending || 0;
+      if ((msMode === 'A' || msMode === 'D' || msMode === 'G') && stacks > 0) {
+        const dmgPerTurn = msMode === 'A' ? stacks * 2 : stacks;
+        rh += `<div class="res-tile" style="border-color:rgba(168,85,247,0.5);box-shadow:0 0 8px rgba(168,85,247,0.3);" title="Moonstone Sickness: ${dmgPerTurn} damage before every roll (${stacks} stack${stacks>1?'s':''})"><span class="res-main" style="font-size:16px;">🌑</span><span class="res-count" style="color:#a855f7;">${dmgPerTurn}</span><span class="res-label" style="color:#a855f7;">SICK×${stacks}</span></div>`;
+      } else if ((msMode === 'B' || msMode === 'C') && pending > 0) {
+        rh += `<div class="res-tile" style="border-color:rgba(168,85,247,0.5);box-shadow:0 0 8px rgba(168,85,247,0.3);" title="Moonstone Sickness: ${pending} damage before next roll"><span class="res-main" style="font-size:16px;">🌑</span><span class="res-count" style="color:#a855f7;">${pending}</span><span class="res-label" style="color:#a855f7;">NEXT</span></div>`;
+      }
     }
     // Snapshot current resources for flash detection
     const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0 };
@@ -11287,6 +14501,8 @@ function renderBattle() {
     if (B.haywireBonus && B.haywireBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireBonus[team]} Die (Wild Chords)</div>`;
     if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
     if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">🍞 -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
+    if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Hammer: Singles hit +2 harder</div>`;
+    if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Torch: Wins give +1 Burn</div>`;
     if (permHtml) {
       const permRow = document.createElement('div');
       permRow.className = 'permanent-effects-row';
@@ -11307,7 +14523,7 @@ function renderBattle() {
     const enemy = opp(B[team]);
     let html = '';
     if (isPreRollActive(team)) {
-      // Death Howl (202) — Pressure button (once per round)
+      // Dark Fang (202) — Pressure button (once per round)
       if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
         if (enemySideline.length > 0) {
@@ -11327,10 +14543,7 @@ function renderBattle() {
         const cnt = B.committed[team].harrison;
         html += `<button class="ability-btn ${cnt>0?'committed':'pressure'}" onclick="toggleHarrison('${team}')" oncontextmenu="event.preventDefault();uncommitHarrison('${team}')" style="${cnt>0?'border-color:#22c55e;box-shadow:0 0 8px rgba(34,197,113,0.4);':''}">🌱 Ascend${cnt>0?' (+'+cnt+' dice)':''}</button>`;
       }
-      // Mable Stadango (446) — Hex: spend Burn for die removal + Sacred Fire
-      if (f.id === 446 && !f.ko && (B[team].resources.burn || 0) >= 1) {
-        html += `<button class="ability-btn pressure" onclick="useHex('${team}')">🌿 Hex (${B[team].resources.burn} Burn)</button>`;
-      }
+      // Mable Stadango (446) — Hex: now passive (triggers in doBurnPlace), no button needed
       // Finn (204) — Flame Blade: forge button (2 Healing Seeds + 1 Sacred Fire) OR swing toggle if forged
       if (B[team].ghosts.some(g => g.id === 204 && !g.ko)) {
         if (!B.flameBlade || !B.flameBlade[team]) {
@@ -11343,15 +14556,10 @@ function renderBattle() {
           }
         }
       }
-      // Zork (463) — Stoke: pre-roll button to discard Burn for dice
-      if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
-          B[team].resources && B[team].resources.burn >= 1) {
-        html += `<button class="ability-btn pressure" onclick="useZorkStoke('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🔥 SMOLDER! (${B[team].resources.burn} Burn → +${B[team].resources.burn} dice)</button>`;
-      }
       // Flame Blade toggle (if forged — shown for any active ghost on the team)
       if (B.flameBlade && B.flameBlade[team]) {
         const fbSwung = B.flameBladeSwing && B.flameBladeSwing[team];
-        html += `<button class="ability-btn ${fbSwung?'committed':'pressure'}" onclick="toggleFlameBlade('${team}')" title="${fbSwung?'Sheathing — click to stop swinging':'Swing the Flame Blade — +1 die to your roll AND +5 Burn if you win'}" style="border-color:#fb923c;color:${fbSwung?'#fff':'#fb923c'};${fbSwung?'background:linear-gradient(135deg,#b45309,#fb923c);':''}">🔥 ${fbSwung?'Flame Blade SWINGING (+1 die, +5 Burn on win)':'Swing Flame Blade'}</button>`;
+        html += `<button class="ability-btn ${fbSwung?'committed':'pressure'}" onclick="toggleFlameBlade('${team}')" title="${fbSwung?'Sheathing — click to stop swinging':'Swing the Flame Blade — +1 die to your roll AND +3 Burn if you win'}" style="border-color:#fb923c;color:${fbSwung?'#fff':'#fb923c'};${fbSwung?'background:linear-gradient(135deg,#b45309,#fb923c);':''}">🔥 ${fbSwung?'Flame Blade SWINGING (+1 die, +3 Burn on win)':'Swing Flame Blade'}</button>`;
       }
       // Zain (206) — Ice Blade: forge button (Sideline & In Play) OR swing toggle (any active ghost, if forged)
       const hasZainForForge = (f.id === 206 && !f.ko) || B[team].ghosts.some(g => g.id === 206 && !g.ko && B[team].ghosts.indexOf(g) !== B[team].activeIdx);
@@ -11369,6 +14577,18 @@ function renderBattle() {
         const ibSwung = (B.iceBladeSwing && B.iceBladeSwing[team]) || (B.committed[team].zainBlade > 0);
         html += `<button class="ability-btn ${ibSwung?'committed':'pressure'}" onclick="toggleIceBlade('${team}')" title="${ibSwung?'Sheathing — click to stop swinging':'Swing the Ice Blade — +1 die to your roll AND +2 damage if you win'}" style="border-color:#67e8f9;color:${ibSwung?'#fff':'#67e8f9'};${ibSwung?'background:linear-gradient(135deg,#0e7490,#67e8f9);':''}">🗡️ ${ibSwung?'Ice Blade SWINGING (+1 die, +2 dmg on win)':'Swing Ice Blade'}</button>`;
       }
+      // Sophia (457) — Mask toggle (shown for any active ghost on the team, if mask is owned)
+      if (B.sophiaMask && B.sophiaMask[team]) {
+        const maskType = B.sophiaMask[team];
+        const maskOn = B.sophiaMaskActive[team];
+        const maskIcon = maskType === 'day' ? '☀️' : '🌙';
+        const maskName = maskType === 'day' ? 'Mask of Day' : 'Mask of Night';
+        const maskEffect = maskType === 'day' ? 'Gain 1 Burn per 1 or 2 rolled' : 'Mirror enemy dice count, +1 dmg';
+        const maskColor = maskType === 'day' ? '#ffd700' : '#6b7aff';
+        const maskBg = maskType === 'day' ? 'background:linear-gradient(135deg,#b8860b,#ffd700);' : 'background:linear-gradient(135deg,#2a2a5a,#6b7aff);';
+        html += `<button class="ability-btn ${maskOn?'committed':'pressure'}" onclick="toggleSophiaMask('${team}')" title="${maskOn?'Remove mask':'Wear mask — '+maskEffect}" style="border-color:${maskColor};color:${maskOn?'#fff':maskColor};${maskOn?maskBg:''}">${maskIcon} ${maskOn?maskName+' ON ('+maskEffect+')':'Wear '+maskName}</button>`;
+      }
+      // Carpenter (449) — no button needed; transforms when Surge is committed via cycleCommit
       // Smudge (403) — Blackout: name a number
       if (f.id === 403 && !f.ko) {
         html += `<div class="blackout-picker">
@@ -11378,131 +14598,584 @@ function renderBattle() {
           ).join('')}
         </div>`;
       }
+      // Zork (463) — Stoke: pre-roll button to discard Burn for dice
+      if (f.id === 463 && !f.ko && B.zorkDecided && !B.zorkDecided[team] &&
+          B[team].resources && B[team].resources.burn >= 1) {
+        html += `<button class="ability-btn pressure" onclick="useZorkStoke('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🔥 SMOLDER! (${B[team].resources.burn} Burn → +${B[team].resources.burn} dice)</button>`;
+      }
+      // Miyoshi (454) — Bonzai!: pre-roll button to sacrifice HP for dice
+      if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
+        html += `<button class="ability-btn pressure" onclick="useBonzaiButton('${team}')" style="border-color:#dc2626;color:#dc2626;font-weight:bold;">⚡ BONZAI! (−4 HP, +5 dice)</button>`;
+      }
+      // Toby (97) — Pure Heart: pre-roll button to declare all-in
+      if (f.id === 97 && !f.ko &&
+          B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
+          !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) {
+        html += `<button class="ability-btn pressure" onclick="useTobyButton('${team}')" style="border-color:#7f1d1d;color:#7f1d1d;font-weight:bold;">💀 PURE HEART! (Final Roll)</button>`;
+      }
+      // Castle Gardener (442) — Cultivate: pre-roll button to trade seeds for fire
+      if (f.id === 442 && !f.ko && B[team].resources && B[team].resources.healingSeed >= 1) {
+        html += `<button class="ability-btn pressure" onclick="useCultivate('${team}')" style="border-color:#40916c;color:#40916c;font-weight:bold;">🌱 CULTIVATE! (1 Seed → 2 Sacred Fire)</button>`;
+      }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
     }
     el.innerHTML = html;
   });
+
+  // Raid boss HP bar: track cumulative damage to blue team (exclude padded ghosts)
+  if (RAID_MODE && RAID_PARAMS && B.blue) {
+    let totalBlueDamage = 0;
+    const realCount = RAID_PARAMS.realBossGhostCount || B.blue.ghosts.length;
+    for (let i = 0; i < realCount; i++) {
+      const g = B.blue.ghosts[i];
+      if (g) totalBlueDamage += g.maxHp - Math.max(0, g.ko ? 0 : g.hp);
+    }
+    RAID_PARAMS.bossHp = Math.max(0, RAID_PARAMS.bossMaxHp - totalBlueDamage);
+    updateRaidBossBar();
+
+    // Write battle snapshot to Firebase for spectators (throttled to every 2s)
+    if (RAID_PARAMS.instanceId && db) {
+      const now = Date.now();
+      if (!window._lastRaidSnapshot || now - window._lastRaidSnapshot > 2000) {
+        window._lastRaidSnapshot = now;
+        const redActive = active(B.red);
+        const blueActive = active(B.blue);
+        const snapshot = {
+          playerName: MP_PLAYER_NAMES.red || 'Raider',
+          playerGhost: { name: redActive.name, hp: redActive.hp, maxHp: redActive.maxHp, art: redActive.art || '' },
+          bossGhost: { name: blueActive.name, hp: blueActive.hp, maxHp: blueActive.maxHp, art: blueActive.art || '', isBoss: true },
+          playerSideline: B.red.ghosts.filter((_, i) => i !== B.red.activeIdx).map(g => ({ name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko })),
+          bossSideline: B.blue.ghosts.filter((_, i) => i !== B.blue.activeIdx).slice(0, realCount - 1).map(g => ({ name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko })),
+          bossPoolHp: RAID_PARAMS.bossHp,
+          bossMaxHp: RAID_PARAMS.bossMaxHp,
+          round: B.round || 1,
+          phase: B.phase || 'roll',
+          lastRoll: window._lastRaidRollData || null,
+          abilityCallout: window._lastRaidAbilityCallout || null,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP
+        };
+        db.ref(`mp/raids/instances/${RAID_PARAMS.instanceId}/battleState`).set(snapshot);
+      }
+    }
+  }
+}
+
+/* ═══════ 3D Dice Physics Helpers ═══════ */
+const PIP_LAYOUTS = {
+  1: ['c'],
+  2: ['tr','bl'],
+  3: ['tr','c','bl'],
+  4: ['tl','tr','bl','br'],
+  5: ['tl','tr','c','bl','br'],
+  6: ['tl','ml','bl','tr','mr','br']
+};
+const PIP_STYLES = {
+  tl:'top:18%;left:18%', tr:'top:18%;right:18%',
+  ml:'top:50%;left:18%;transform:translateY(-50%)',
+  c:'top:50%;left:50%;transform:translate(-50%,-50%)',
+  mr:'top:50%;right:18%;transform:translateY(-50%)',
+  bl:'bottom:18%;left:18%', br:'bottom:18%;right:18%'
+};
+function pip3dHTML(val) {
+  return (PIP_LAYOUTS[val]||PIP_LAYOUTS[1]).map(p=>`<span class="pip3d" style="${PIP_STYLES[p]}"></span>`).join('');
+}
+function cube3dHTML(team) {
+  const c='face-'+team;
+  // front=1, right=2, top=3, bottom=4, left=5, back=6
+  return [
+    ['front',1],['back',6],['right',2],['left',5],['top',3],['bottom',4]
+  ].map(([f,v])=>`<div class="die-face ${c} face-${f}">${pip3dHTML(v)}</div>`).join('');
+}
+const FACE_TARGET = {
+  1:{rx:0,ry:0}, 2:{rx:0,ry:-90}, 3:{rx:90,ry:0},
+  4:{rx:-90,ry:0}, 5:{rx:0,ry:90}, 6:{rx:0,ry:180}
+};
+function nearestSnap(cur,tgt){const n=Math.round((cur-tgt)/360);return tgt+n*360;}
+let _dicePhysics = {};
+
+/* ═══════ Throw Profiles — choreographed dice paths ═══════ */
+// Each profile generates per-die {vx, vy} based on die index and count.
+// Red throws right+up from bottom-left; Blue throws left+up from bottom-right.
+const THROW_PROFILES = [
+  // THE BLOOM — dice unfurl like petals: steep arc, wide sweep, low curl
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 13 + t * 15, vy: -(25 - t * 20) };
+  },
+  // THE BANK SHOT — all hit the top wall, spread horizontally
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 10 + t * 14, vy: -(20 + t * 4) };
+  },
+  // THE CROSS-TABLE — full send to the far wall
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 24 + t * 6, vy: -(8 + t * 10) };
+  },
+  // THE SPIRAL — widest orbit to tightest drop
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 28 - t * 18, vy: -(10 + t * 12) };
+  },
+  // THE SCATTER — each die at a very different angle
+  (i, n) => {
+    const angles = [0.15, 0.55, 0.85, 0.35, 0.7]; // spread across quadrants
+    const a = angles[i % angles.length];
+    return { vx: 14 + a * 14, vy: -(6 + (1 - a) * 20) };
+  },
+  // THE GENTLE TOSS — short lob, barely leaves the hand
+  (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 7 + t * 5, vy: -(9 + t * 3) };
+  },
+];
+
+function pickThrowProfile(count) {
+  const profile = THROW_PROFILES[Math.floor(Math.random() * THROW_PROFILES.length)];
+  const noise = () => 1 + (Math.random() - 0.5) * 0.25; // ±12.5% variation
+  return Array.from({ length: count }, (_, i) => {
+    const v = profile(i, count);
+    // 15% velocity boost for more energetic throws
+    return { vx: v.vx * noise() * 1.15, vy: v.vy * noise() * 1.15 };
+  });
+}
+
+function update3dDice(team, values) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice) return;
+  physics.values = values;
+  values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d || d.value === v) return; // no change
+    d.value = v;
+    // Clear any highlight classes
+    d.el.classList.remove('highlight-single', 'highlight-double', 'highlight-triple',
+      'die-win-singles-3d', 'die-win-doubles-3d', 'die-win-triples-3d', 'die-win-mega-3d',
+      'die-win-secondary-3d', 'die-loser-3d', 'triples-glow-3d');
+    // Smoothly rotate to new face
+    const tgt = FACE_TARGET[v];
+    d.rx = nearestSnap(d.rx, tgt.rx);
+    d.ry = nearestSnap(d.ry, tgt.ry);
+    d.el.classList.add('value-update');
+    d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    setTimeout(() => d.el.classList.remove('value-update'), 450);
+  });
+}
+
+// Flat die HTML with pip dots (used when no 3D dice exist)
+function flatDieHTML(val, team) {
+  const face = team === 'red' ? 'face-red' : 'face-blue';
+  if (val === '?' || val === 0 || !val) return `<div class="die die-${team}">?</div>`;
+  return `<div class="die die-${team}"><div style="position:relative;width:100%;height:100%;" class="${face}">${pip3dHTML(val)}</div></div>`;
 }
 
 function renderDice(rd, bd) {
   const redEl = document.getElementById('red-dice');
   const blueEl = document.getElementById('blue-dice');
   if (!rd && !bd) {
+    // Reset — also clean up any lingering 3D dice
+    ['red', 'blue'].forEach(t => {
+      if (_dicePhysics[t]) {
+        cancelAnimationFrame(_dicePhysics[t].raf);
+        _dicePhysics[t].els.forEach(e => e.remove());
+        delete _dicePhysics[t];
+      }
+    });
     redEl.innerHTML = [0,0,0].map(()=>`<div class="die die-red">?</div>`).join('');
     blueEl.innerHTML = [0,0,0].map(()=>`<div class="die die-blue">?</div>`).join('');
   } else {
-    if (rd) redEl.innerHTML = rd.map(d => `<div class="die die-red">${d}</div>`).join('');
-    if (bd) blueEl.innerHTML = bd.map(d => `<div class="die die-blue">${d}</div>`).join('');
+    if (rd) {
+      const rdPh = _dicePhysics['red'];
+      if (rdPh && rd.length === rdPh.dice.length) {
+        // 3D dice exist with matching count — update them (works during settling too)
+        if (rdPh.settled) update3dDice('red', rd);
+        const flatRed = redEl.querySelectorAll('.die');
+        rd.forEach((v, i) => { if (flatRed[i]) flatRed[i].innerHTML = `<div style="position:relative;width:100%;height:100%;" class="face-red">${pip3dHTML(v)}</div>`; });
+      } else if (rdPh && rd.length !== rdPh.dice.length) {
+        cancelAnimationFrame(rdPh.raf); rdPh.els.forEach(e => e.remove()); delete _dicePhysics['red'];
+        redEl.innerHTML = rd.map(d => flatDieHTML(d, 'red')).join('');
+      } else {
+        redEl.innerHTML = rd.map(d => flatDieHTML(d, 'red')).join('');
+      }
+    }
+    if (bd) {
+      const bdPh = _dicePhysics['blue'];
+      if (bdPh && bd.length === bdPh.dice.length) {
+        if (bdPh.settled) update3dDice('blue', bd);
+        const flatBlue = blueEl.querySelectorAll('.die');
+        bd.forEach((v, i) => { if (flatBlue[i]) flatBlue[i].innerHTML = `<div style="position:relative;width:100%;height:100%;" class="face-blue">${pip3dHTML(v)}</div>`; });
+      } else if (bdPh && bd.length !== bdPh.dice.length) {
+        cancelAnimationFrame(bdPh.raf); bdPh.els.forEach(e => e.remove()); delete _dicePhysics['blue'];
+        blueEl.innerHTML = bd.map(d => flatDieHTML(d, 'blue')).join('');
+      } else {
+        blueEl.innerHTML = bd.map(d => flatDieHTML(d, 'blue')).join('');
+      }
+    }
   }
 }
 
-// Show rolling animation for one side
+// Show rolling animation — 3D physics dice bouncing across the arena
 function showRolling(team, count) {
   const el = document.getElementById(team + '-dice');
   const cls = 'die-' + team;
-  // Give each die an ID so revealDice can target them sequentially
+  // Hidden placeholder dice for layout (keeps tray height stable)
   el.innerHTML = Array(count).fill(0).map((_, i) =>
-    `<div class="die ${cls} rolling" id="${team}-die-${i}">?</div>`
+    `<div class="die ${cls}" id="${team}-die-${i}" style="visibility:hidden">?</div>`
   ).join('');
+  if (count === 0) return;
+
+  // Roll dice across the full arena board
+  const board = document.querySelector('.arena-board');
+  const boardRect = board.getBoundingClientRect();
+  const W = boardRect.width;
+  const H = boardRect.height;
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const half = dieSize / 2;
+  const pad = 16; // board padding
+  const minX = pad, maxX = W - pad - dieSize;
+  const minY = pad, maxY = H - pad - dieSize;
+
+  // Clean up previous physics for this team
+  if (_dicePhysics[team]) {
+    cancelAnimationFrame(_dicePhysics[team].raf);
+    _dicePhysics[team].els.forEach(e => e.remove());
+  }
+
+  const dice = [];
+  const els = [];
+  const isRed = team === 'red';
+  const handX = isRed ? minX + 10 : maxX - 10;
+  const handY = maxY - 5;
+  const throwVecs = pickThrowProfile(count);
+
+  for (let i = 0; i < count; i++) {
+    const die = document.createElement('div');
+    die.className = 'die-physics';
+    die.style.width = dieSize + 'px';
+    die.style.height = dieSize + 'px';
+    die.style.zIndex = '100'; // above cards during rolling
+    die.style.setProperty('--dh', half + 'px');
+    die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
+    board.appendChild(die);
+    els.push(die);
+
+    // Beautiful choreographed throw from team's corner
+    const tv = throwVecs[i];
+    dice.push({
+      el: die, cube: die.querySelector('.die-cube'),
+      x: handX + (Math.random() - 0.5) * 6, y: handY + (Math.random() - 0.5) * 6,
+      vx: (isRed ? 1 : -1) * tv.vx,
+      vy: tv.vy,
+      rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
+      vrx: (Math.random() - 0.5) * 55,   // cranked tumble
+      vry: (Math.random() - 0.5) * 55,
+      vrz: (Math.random() - 0.5) * 40,
+      bounceCount: 0  // tracks wall hits for decaying bounce coefficient
+    });
+  }
+
+  // Per-die decaying bounce: starts at 0.65, each hit multiplies by 0.8, floor at 0.3
+  function getBounceCoeff(d) {
+    return Math.max(0.3, 0.65 * Math.pow(0.8, d.bounceCount));
+  }
+  // Speed-dependent surface friction — fast dice slide, slow dice stick
+  function getSurfaceFriction(speed) {
+    if (speed > 8) return 0.982;   // fast: ice-smooth
+    if (speed > 3) return 0.965;   // medium: felt drag
+    return 0.935;                   // slow: table grip, dice stop decisively
+  }
+  // Speed-dependent rotation friction
+  function getRotFriction(speed) {
+    if (speed > 8) return 0.972;
+    if (speed > 3) return 0.950;
+    return 0.920;                   // slow: rotation dies fast
+  }
+
+  function step() {
+    // Dice-to-dice repulsion (prevents stacking)
+    for (let a = 0; a < dice.length; a++) {
+      for (let b = a + 1; b < dice.length; b++) {
+        const da = dice[a], db = dice[b];
+        const dx = da.x - db.x, dy = da.y - db.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < dieSize && dist > 0.1) {
+          const push = (dieSize - dist) * 0.15;
+          const nx = dx / dist, ny = dy / dist;
+          da.vx += nx * push; da.vy += ny * push;
+          db.vx -= nx * push; db.vy -= ny * push;
+        }
+      }
+    }
+    dice.forEach(d => {
+      d.x += d.vx; d.y += d.vy;
+      d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
+      const speed = Math.abs(d.vx) + Math.abs(d.vy);
+
+      // Wall bounces — decaying coefficient + rotation spike on impact
+      const bc = getBounceCoeff(d);
+      if (d.x < minX) {
+        d.x = minX; d.vx = Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3; // wall clatter — spin spikes on impact
+        d.bounceCount++;
+      }
+      if (d.x > maxX) {
+        d.x = maxX; d.vx = -Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y < minY) {
+        d.y = minY; d.vy = Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y > maxY) {
+        d.y = maxY; d.vy = -Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+
+      // Speed-dependent surface friction
+      const fric = getSurfaceFriction(speed);
+      const rFric = getRotFriction(speed);
+      d.vx *= fric; d.vy *= fric;
+      d.vrx *= rFric; d.vry *= rFric; d.vrz *= rFric;
+
+      // Rotation homing — as dice slow down, settle onto nearest face (like gravity)
+      if (speed < 6) {
+        const strength = 0.08 * (1 - speed / 6);
+        d.rx += (Math.round(d.rx / 90) * 90 - d.rx) * strength;
+        d.ry += (Math.round(d.ry / 90) * 90 - d.ry) * strength;
+        d.rz += (Math.round(d.rz / 90) * 90 - d.rz) * strength;
+      }
+      // Render
+      d.el.style.left = d.x + 'px';
+      d.el.style.top = d.y + 'px';
+      d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    });
+    _dicePhysics[team].raf = requestAnimationFrame(step);
+  }
+
+  _dicePhysics[team] = { raf: requestAnimationFrame(step), dice, els };
 }
 
-// Reveal dice values one at a time — 300ms stagger (Feature 7)
+// Reveal dice values — settle 3D dice to final positions, then swap to flat dice
 function revealDice(team, values) {
-  const cls = 'die-' + team;
+  const physics = _dicePhysics[team];
+
+  if (!physics || !physics.dice.length) {
+    // Fallback for 0 dice or missing physics
+    const cls = 'die-' + team;
+    values.forEach((v, i) => {
+      setTimeout(() => {
+        const d = document.getElementById(team + '-die-' + i);
+        if (d) { d.classList.remove('rolling'); d.textContent = v; d.style.visibility = 'visible'; }
+      }, i * spd(300));
+    });
+    setTimeout(() => highlightRollPreview(team, values), values.length * spd(300) + 50);
+    return;
+  }
+
+  // Stop physics loop
+  cancelAnimationFrame(physics.raf);
+
+  // Calculate tray position within the arena board
+  const board = document.querySelector('.arena-board');
+  const boardRect = board.getBoundingClientRect();
+  const stack = document.querySelector('.dice-stack');
+  const stackRect = stack.getBoundingClientRect();
+  const offsetX = stackRect.left - boardRect.left;
+  const offsetY = stackRect.top - boardRect.top;
+  const stackW = stackRect.width;
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const gap = window.innerWidth <= 600 ? 10 : 20;
+  const rowGap = window.innerWidth <= 600 ? 8 : 18;
+
+  // Center dice in the tray with proper spacing
+  const totalDiceW = values.length * dieSize + (values.length - 1) * gap;
+  const trayStartX = offsetX + (stackW - totalDiceW) / 2;
+  const trayMidY = offsetY + stackRect.height / 2;
+
+  // Settle: rotation snaps to correct face (0.35s) while position flies to tray (0.7s).
   values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d) return;
+
+    // Target position — centered in tray, red on top row, blue on bottom
+    const tx = trayStartX + i * (dieSize + gap);
+    const ty = team === 'red'
+      ? trayMidY - dieSize - rowGap / 2
+      : trayMidY + rowGap / 2;
+
+    // Target rotation for the correct face value
+    const tgt = FACE_TARGET[v];
+    const frx = nearestSnap(d.rx, tgt.rx);
+    const fry = nearestSnap(d.ry, tgt.ry);
+    const frz = nearestSnap(d.rz, 0);
+    d.rx = frx; d.ry = fry; d.rz = frz;
+    d.value = v;
+
+    // Stagger each die slightly for a natural feel
     setTimeout(() => {
-      const d = document.getElementById(team + '-die-' + i);
-      if (d) {
-        d.classList.remove('rolling');
-        d.textContent = v;
-      }
-    }, i * 300);
+      d.el.classList.add('settling');
+      d.el.style.left = tx + 'px';
+      d.el.style.top = ty + 'px';
+      d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
+    }, i * spd(80));
   });
-  // Immediately highlight the hand type after all dice reveal
-  const revealDone = values.length * 300 + 50;
-  setTimeout(() => highlightRollPreview(team, values), revealDone);
+
+  // After all dice reach the tray
+  const settleDelay = values.length * spd(80) + spd(750);
+  setTimeout(() => {
+    physics.settled = true;
+    physics.values = values;
+    physics.els.forEach(e => e.style.zIndex = '10');
+    values.forEach((v, i) => {
+      const d = document.getElementById(team + '-die-' + i);
+      if (d) d.textContent = v;
+    });
+    highlightRollPreview(team, values);
+  }, settleDelay);
 }
 
 function highlightRollPreview(team, dice) {
   const roll = classify(dice);
   if (roll.type === 'none') return;
-  const diceEl = document.getElementById(team + '-dice');
-  if (!diceEl) return;
-  const dieDivs = [...diceEl.querySelectorAll('.die')];
 
-  if (roll.type === 'singles') {
-    // Subtle bump on the highest die
-    let done = false;
-    [...dieDivs].reverse().forEach(d => {
-      if (!done && parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.12)';
-        d.style.transition = 'transform 0.3s';
-        done = true;
-      }
-    });
-  } else if (roll.type === 'doubles') {
-    // Glow on the matching pair
-    let count = 0;
-    dieDivs.forEach(d => {
-      if (count < 2 && parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.15)';
-        d.style.boxShadow = '0 0 14px rgba(251,191,36,0.5)';
-        d.style.borderColor = '#fbbf24';
-        d.style.transition = 'all 0.3s';
-        count++;
-      }
-    });
+  const physics = _dicePhysics[team];
+  if (physics && physics.settled) {
+    // Highlight 3D dice
+    const diceObjs = physics.dice;
+    if (roll.type === 'singles') {
+      let done = false;
+      [...diceObjs].reverse().forEach(d => {
+        if (!done && d.value === roll.value) {
+          d.el.classList.add('highlight-single');
+          done = true;
+        }
+      });
+    } else if (roll.type === 'doubles') {
+      let count = 0;
+      diceObjs.forEach(d => {
+        if (count < 2 && d.value === roll.value) {
+          d.el.classList.add('highlight-double');
+          count++;
+        }
+      });
+    } else {
+      diceObjs.forEach(d => {
+        if (d.value === roll.value) {
+          d.el.classList.add('highlight-triple');
+        }
+      });
+    }
   } else {
-    // Triples+ — all matching dice glow
-    dieDivs.forEach(d => {
-      if (parseInt(d.textContent) === roll.value) {
-        d.style.transform = 'scale(1.2)';
-        d.style.boxShadow = '0 0 20px rgba(251,191,36,0.7)';
-        d.style.borderColor = '#fbbf24';
-        d.style.transition = 'all 0.3s';
-      }
-    });
+    // Fallback: highlight flat dice
+    const diceEl = document.getElementById(team + '-dice');
+    if (!diceEl) return;
+    const dieDivs = [...diceEl.querySelectorAll('.die')];
+    if (roll.type === 'singles') {
+      let done = false;
+      [...dieDivs].reverse().forEach(d => {
+        if (!done && parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.12)';
+          d.style.transition = 'transform 0.3s';
+          done = true;
+        }
+      });
+    } else if (roll.type === 'doubles') {
+      let count = 0;
+      dieDivs.forEach(d => {
+        if (count < 2 && parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.15)';
+          d.style.boxShadow = '0 0 14px rgba(251,191,36,0.5)';
+          d.style.borderColor = '#fbbf24';
+          d.style.transition = 'all 0.3s';
+          count++;
+        }
+      });
+    } else {
+      dieDivs.forEach(d => {
+        if (parseInt(d.textContent) === roll.value) {
+          d.style.transform = 'scale(1.2)';
+          d.style.boxShadow = '0 0 20px rgba(251,191,36,0.7)';
+          d.style.borderColor = '#fbbf24';
+          d.style.transition = 'all 0.3s';
+        }
+      });
+    }
   }
 }
 
 function clearAllOverlays() {
-  const overlayIds = [
-    'gameOver','swapOverlay','msPicker','stealOverlay','pressureOverlay',
-    'seleneOverlay','timberOverlay','romyOverlay','tobyOverlay','guardianFairyOverlay',
-    'tylerOverlay','eloiseOverlay','booOverlay','bogeyOverlay','gusOverlay',
-    'mallowOverlay','jacksonOverlay','jeanieOverlay','sonyaOverlay','darkWingOverlay',
-    'raditzHuntOverlay','dougCautionOverlay','tobogganOverlay','fangOutsideOverlay',
-    'fangUndercoverArmOverlay','fangUndercoverSwapOverlay','winstonSchemeOverlay',
-    'galeForcePickerOverlay','wiseAlOverlay','gordokOverlay','cultivateOverlay',
-    'chowOverlay','zorkOverlay','hexOverlay','nickKnackOverlay','jasperOverlay','balatronOverlay',
-    'tommyOverlay','sylviaOverlay','burnOverlay','fireflyOverlay','abilitySplash','vsSplash'
-  ];
-  overlayIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('active');
-  });
+  document.getElementById('gameOver').classList.remove('active');
+  document.getElementById('swapOverlay').classList.remove('active');
+  document.getElementById('msPicker').classList.remove('active');
   clearLsCountdown();
+  document.getElementById('stealOverlay').classList.remove('active');
+  document.getElementById('pressureOverlay').classList.remove('active');
+  document.getElementById('seleneOverlay').classList.remove('active');
+  document.getElementById('timberOverlay').classList.remove('active');
+  document.getElementById('romyOverlay').classList.remove('active');
+  document.getElementById('tobyOverlay').classList.remove('active');
+  document.getElementById('gfWishBtn').style.display = 'none';
+  if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+  document.getElementById('tylerOverlay').classList.remove('active');
+  document.getElementById('eloiseOverlay').classList.remove('active');
+  document.getElementById('booOverlay').classList.remove('active');
+  document.getElementById('bogeyOverlay').classList.remove('active');
+  document.getElementById('gusGaleBtn').style.display = 'none';
+  if (gusGaleTimer) { clearInterval(gusGaleTimer); gusGaleTimer = null; }
+  document.getElementById('mallowOverlay').classList.remove('active');
+  document.getElementById('jacksonOverlay').classList.remove('active');
+  document.getElementById('jeanieOverlay').classList.remove('active');
+  document.getElementById('sonyaOverlay').classList.remove('active');
+  document.getElementById('darkWingOverlay').classList.remove('active');
+  document.getElementById('raditzHuntOverlay').classList.remove('active');
+  document.getElementById('dougCautionOverlay').classList.remove('active');
+  document.getElementById('tobogganOverlay').classList.remove('active');
+  document.getElementById('fangOutsideOverlay').classList.remove('active');
+  document.getElementById('fangUndercoverArmOverlay').classList.remove('active');
+  document.getElementById('fangUndercoverSwapOverlay').classList.remove('active');
+  document.getElementById('winstonSchemeOverlay').classList.remove('active');
+  document.getElementById('catchyTuneOverlay').classList.remove('active');
+  document.getElementById('tysonHopOverlay').classList.remove('active');
+  document.getElementById('galeForcePickerOverlay').classList.remove('active');
+  document.getElementById('wiseAlOverlay').classList.remove('active');
+  document.getElementById('gordokOverlay').classList.remove('active');
+  document.getElementById('standingsOverlay').classList.remove('active');
+  document.getElementById('cultivateOverlay').classList.remove('active');
+  document.getElementById('chowOverlay').classList.remove('active');
+  document.getElementById('hexOverlay').classList.remove('active');
+  document.getElementById('nickKnackOverlay').classList.remove('active');
+  document.getElementById('jasperOverlay').classList.remove('active');
+  document.getElementById('jenkinsOverlay').classList.remove('active');
+  document.getElementById('balatronOverlay').classList.remove('active');
+  document.getElementById('tommyOverlay').classList.remove('active');
+  document.getElementById('sylviaOverlay').classList.remove('active');
+  document.getElementById('burnOverlay').classList.remove('active');
+  document.getElementById('fireflyOverlay').classList.remove('active');
+  document.getElementById('abilitySplash').classList.remove('active');
+  const vsSplash = document.getElementById('vsSplash');
+  if (vsSplash) vsSplash.classList.remove('active');
   clearTimeout(afkTimer);
 }
 
 function resetBattle() {
   stopMusicHard();
+  const skipBtn = document.getElementById('skipSpecialsBtn');
+  if (skipBtn) skipBtn.style.display = 'none';
   B = null; S.battle = null;
   S.redPicks = []; S.bluePicks = [];
   abilityQueue = [];
   abilityQueueMode = false;
   clearAllOverlays();
-  const bv = document.getElementById('battle-view');
-  if (bv) bv.style.display = 'none';
-  const ts = document.getElementById('team-select');
-  if (ts) ts.style.display = 'block';
-  const appEl = document.querySelector('.app');
-  if (appEl) appEl.classList.remove('battle-active');
+  document.getElementById('battle-view').style.display = 'none';
+  document.getElementById('team-select').style.display = 'block';
+  document.querySelector('.app').classList.remove('battle-active');
   resetRollButtons();
   narrate('');
   renderDice(null, null);
-  // Callback for multiplayer to handle post-reset
-  if (typeof onBattleReset === 'function') onBattleReset();
+  renderPicks();
 }
 
 function rematchBattle() {
@@ -11523,18 +15196,1925 @@ function rematchBattle() {
 }
 
 // ============================================================
-// KEYBOARD SHORTCUTS (adapted for multiplayer)
+// KEYBOARD SHORTCUTS
 // ============================================================
 document.addEventListener('keydown', e => {
-  if ((e.key === 'Enter' || e.key === ' ') && document.getElementById('gameOver')?.classList.contains('active')) {
+  // Enter or Space on game-over screen → rematch (or redirect in MP mode)
+  if ((e.key === 'Enter' || e.key === ' ') && document.getElementById('gameOver').classList.contains('active')) {
     e.preventDefault();
-    rematchBattle();
+    if (MP_MODE) {
+      // Determine result and redirect
+      const winner = B && B.phase === 'over' ? (document.getElementById('goTitle').className.includes('red') ? 'red' : document.getElementById('goTitle').className.includes('blue') ? 'blue' : 'draw') : 'draw';
+      const result = winner === 'red' ? 'win' : (winner === 'blue' ? 'loss' : 'draw');
+      const returnUrl = MP_DAILY
+        ? '../multiplayer/?dailyResult=' + result
+        : '../multiplayer/?result=' + result;
+      window.location.href = returnUrl;
+    } else {
+      rematchBattle();
+    }
     return;
   }
+  // Escape closes any open overlay/modal.
+  // pressureOverlay is intentionally excluded — the Pressure pick is a FORCED choice
+  // for the opponent; allowing Escape to dismiss it would bypass pressureUsed and let
+  // Dark Fang spam Pressure every round. The modal only closes via doPressureSwap().
   if (e.key === 'Escape') {
-    const overlays = ['swapOverlay','msPicker','stealOverlay','gameOver'];
+    // In MP mode, don't allow Escape to close gameOver (must use Return to Arena button)
+    const overlays = ['swapOverlay','msPicker','stealOverlay','standingsOverlay'];
+    if (!MP_MODE) overlays.push('gameOver');
     overlays.forEach(id => document.getElementById(id)?.classList.remove('active'));
   }
 });
 
-// No auto-init — multiplayer controls when battle starts
+// ============================================================
+// MULTIPLAYER MODE — URL param handler
+// ============================================================
+// When loaded with ?red=ID,ID,ID&mode=mp, auto-set teams and start battle.
+// Player controls both sides. On game end, redirect back to multiplayer page.
+// MP_MODE declared earlier (near TESTROOM_VERSION) so keyboard shortcuts can reference it.
+
+(function checkMultiplayerParams() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+  if (mode !== 'mp' && mode !== 'daily' && mode !== 'champion') return;
+  if (mode === 'daily') MP_DAILY = true;
+
+  const redParam = params.get('red');
+  if (!redParam) return;
+
+  const redIds = redParam.split(',').map(Number).filter(id => ghostData(id));
+  if (redIds.length !== 3) return;
+
+  MP_MODE = true;
+
+  // Force standard settings for all MP/daily games
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 0; // 1x speed
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true; // hand limit ON
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4; // limit of 4
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 8; // v731: 8 second timer (was 5 — too rushed)
+
+  // Set red team from URL params (player's team)
+  S.redPicks = redIds;
+
+  // For daily mode, use blue team from URL; for mp mode, pick curated team
+  const blueParam = params.get('blue');
+  if (blueParam) {
+    const blueIds = blueParam.split(',').map(Number).filter(id => ghostData(id));
+    if (blueIds.length === 3) {
+      S.bluePicks = blueIds;
+    } else {
+      S.bluePicks = getCuratedTeam(redIds);
+    }
+  } else {
+    S.bluePicks = getCuratedTeam(redIds);
+  }
+
+  // Show opponent name/elo if provided (async PvP)
+  const oppName = params.get('oppName');
+  const oppElo = params.get('oppElo');
+  MP_PLAYER_NAMES.red = 'You';
+  if (oppName) {
+    MP_PLAYER_NAMES.blue = decodeURIComponent(oppName);
+    const blueTitle = document.querySelector('.roster-title.blue');
+    if (blueTitle) {
+      blueTitle.innerHTML = `<span class="roster-dot"></span> ${MP_PLAYER_NAMES.blue} <span style="font-size:0.7em;color:var(--text2)">(${oppElo || '?'} Elo)</span>`;
+    }
+  }
+
+  // Switch to arena tab and auto-start battle
+  setTimeout(() => {
+    switchTab('battle');
+    renderPicks();
+    startBattle();
+    // Start blue AI for async/daily modes (not live PvP — that's a real player)
+    if (!LIVE_PVP) startBlueAI();
+  }, 300);
+})();
+
+// ============================================================
+// RAID MODE — Boss fights with cinematic testroom experience
+// URL: ?mode=raid&red=id,id,id&blue=bossId,minionId,minionId
+//      &raidId=...&instanceId=...&slot=...&bossHp=...&bossMaxHp=...&bossName=...&personality=...
+// ============================================================
+(function checkRaidParams() {
+  // Check URL first, then sessionStorage (survives cache-bust reload)
+  let params = new URLSearchParams(window.location.search);
+  if (params.get('mode') !== 'raid') {
+    const saved = sessionStorage.getItem('_raidParams');
+    if (saved) {
+      params = new URLSearchParams(saved);
+      sessionStorage.removeItem('_raidParams');
+    }
+  }
+  if (params.get('mode') !== 'raid') return;
+  if (window._raidParamsProcessed) return;
+  window._raidParamsProcessed = true;
+
+  // Clean URL & session immediately so refresh doesn't re-trigger
+  window.history.replaceState({}, '', window.location.pathname);
+  sessionStorage.removeItem('_raidParams');
+
+  const redParam = params.get('red');
+  const blueParam = params.get('blue');
+  if (!redParam || !blueParam) return;
+
+  // Parse red team (player's ghosts — must be valid)
+  const redIds = redParam.split(',').map(Number).filter(id => ghostData(id));
+  if (redIds.length !== 3) return;
+
+  // Parse blue team (boss + minions — may not be in GHOSTS array)
+  const blueIds = blueParam.split(',').map(Number);
+
+  // Register boss ghosts in the GHOSTS lookup so the battle engine can find them
+  // Boss ghost data is passed via URL as a JSON blob in the 'bossData' param
+  const bossDataParam = params.get('bossData');
+  if (bossDataParam) {
+    try {
+      const bossGhosts = JSON.parse(decodeURIComponent(bossDataParam));
+      bossGhosts.forEach(bg => {
+        const existingIdx = GHOSTS.findIndex(g => g.id === bg.id);
+        if (existingIdx >= 0) {
+          // Override maxHp for boss version of existing ghost (keeps all ability handlers)
+          GHOSTS[existingIdx] = { ...GHOSTS[existingIdx], maxHp: bg.maxHp };
+        } else {
+          GHOSTS.push({
+            id: bg.id, name: bg.name, maxHp: bg.maxHp, art: bg.art || '',
+            ability: bg.ability || 'Boss', abilityDesc: bg.abilityDesc || '',
+            rarity: bg.rarity || 'legendary', set: 'Raid Boss'
+          });
+        }
+      });
+    } catch (e) { console.warn('[RAID] Failed to parse bossData:', e); }
+  }
+
+  // Verify all blue IDs are now findable
+  const validBlue = blueIds.filter(id => ghostData(id));
+  if (validBlue.length === 0) { console.error('[RAID] No valid blue team ghosts'); return; }
+  // Track how many real boss ghosts there are (before padding)
+  const realBossGhostCount = validBlue.length;
+  // Pad to 3 for engine compatibility — padded ghosts will be auto-KO'd after battle starts
+  while (validBlue.length < 3) validBlue.push(validBlue[0]);
+
+  // Set raid state
+  RAID_MODE = true;
+  MP_MODE = true; // reuse MP infrastructure (hide team select, auto-start, etc.)
+
+  RAID_PARAMS = {
+    raidId: params.get('raidId') || '',
+    instanceId: params.get('instanceId') || '',
+    slot: parseInt(params.get('slot') || '0'),
+    bossHp: parseInt(params.get('bossHp') || '50'),
+    bossMaxHp: parseInt(params.get('bossMaxHp') || '50'),
+    bossName: decodeURIComponent(params.get('bossName') || 'Boss'),
+    personality: params.get('personality') || 'tyrant',
+    totalDamageDealt: 0,
+    realBossGhostCount: realBossGhostCount
+  };
+
+  // Set teams
+  S.redPicks = redIds;
+  S.bluePicks = validBlue;
+
+  // Force standard settings
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 2; // Faster pace for raids
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true;
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4;
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 8;
+
+  // Set player names
+  MP_PLAYER_NAMES.red = 'You';
+  MP_PLAYER_NAMES.blue = RAID_PARAMS.bossName;
+
+  // Show boss HP bar
+  const bossBar = document.getElementById('raid-boss-bar');
+  if (bossBar) {
+    bossBar.style.display = 'block';
+    document.getElementById('raid-boss-bar-name').textContent = RAID_PARAMS.bossName;
+    document.getElementById('raid-boss-bar-text').textContent = `${RAID_PARAMS.bossHp} / ${RAID_PARAMS.bossMaxHp}`;
+    document.getElementById('raid-boss-bar-fill').style.width = '100%';
+    updateRaidBossBar();
+    // Push the arena down to make room for the bar
+    document.querySelector('.app').style.paddingTop = '56px';
+  }
+
+  // Switch to arena tab and auto-start
+  setTimeout(() => {
+    switchTab('battle');
+    renderPicks();
+    startBattle();
+    // Mark padded ghost slots as empty placeholders — not real KOs
+    if (B && B.blue && realBossGhostCount < 3) {
+      for (let i = realBossGhostCount; i < B.blue.ghosts.length; i++) {
+        B.blue.ghosts[i].hp = 0;
+        B.blue.ghosts[i].ko = true;
+        B.blue.ghosts[i].isPadded = true; // flag: not a real ghost, exclude from KO counts
+      }
+      renderBattle();
+    }
+    startBlueAI();
+  }, 300);
+})();
+
+// Raid boss bar update — called after each damage event
+function updateRaidBossBar() {
+  if (!RAID_MODE || !RAID_PARAMS) return;
+  const pct = Math.max(0, RAID_PARAMS.bossHp / RAID_PARAMS.bossMaxHp * 100);
+  const fill = document.getElementById('raid-boss-bar-fill');
+  const text = document.getElementById('raid-boss-bar-text');
+  const phase = document.getElementById('raid-boss-bar-phase');
+  if (fill) {
+    fill.style.width = pct + '%';
+    fill.style.background = pct > 75 ? '#2ecc71' : pct > 50 ? '#f39c12' : pct > 25 ? '#e74c3c' : '#8e44ad';
+  }
+  if (text) text.textContent = `${RAID_PARAMS.bossHp} / ${RAID_PARAMS.bossMaxHp}`;
+  if (phase) {
+    const phaseNum = pct > 75 ? 1 : pct > 50 ? 2 : pct > 25 ? 3 : 4;
+    phase.textContent = 'PHASE ' + phaseNum;
+    phase.style.color = pct > 75 ? '#2ecc71' : pct > 50 ? '#f39c12' : pct > 25 ? '#e74c3c' : '#8e44ad';
+  }
+}
+
+// ============================================================
+// BLUE AI AUTO-PLAY — for MP/daily modes (not live PvP)
+// ============================================================
+// Watches for blue's roll button to become enabled, then auto-plays:
+// - Commits specials before rolling (ice shards, sacred fire, surge)
+// - Auto-rolls after a brief delay (feels natural, not instant)
+// - Auto-picks KO replacement (save best ghost for last)
+// - Auto-handles ability modals on blue's side
+let AI_ACTIVE = false;
+let aiCheckInterval = null;
+
+function startBlueAI() {
+  if (AI_ACTIVE || LIVE_PVP) return;
+  AI_ACTIVE = true;
+
+  // Poll for opportunities to act
+  aiCheckInterval = setInterval(() => {
+    if (!B || B.phase === 'over') { stopBlueAI(); return; }
+    aiTick();
+  }, 600);
+}
+
+function stopBlueAI() {
+  AI_ACTIVE = false;
+  if (aiCheckInterval) { clearInterval(aiCheckInterval); aiCheckInterval = null; }
+}
+
+function aiTick() {
+  if (!B || !AI_ACTIVE) return;
+
+  // --- Auto-roll blue when button is ready ---
+  if (B.phase === 'ready' || B.phase === 'rolling') {
+    const blueBtn = document.getElementById('rollBlueBtn');
+    if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
+      // v733: wait for Red to click READY before AI rolls Blue
+      if (!pvpRedClickedRoll) return;
+      // Commit specials before rolling
+      aiCommitSpecials('blue');
+      // v733: Red already committed — short delay for feel, then roll
+      pvpRedClickedRoll = false;
+      setTimeout(() => {
+        if (B && (B.phase === 'ready' || B.phase === 'rolling')) {
+          rollReady('blue');
+        }
+      }, 800 + Math.random() * 400);
+      return;
+    }
+  }
+
+  // --- Auto-pick KO replacement ---
+  if (B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === 'blue') {
+    const t = B.blue;
+    const alive = t.ghosts.filter((g, i) => i !== t.activeIdx && !g.ko);
+    if (alive.length > 0) {
+      // Save the best ghost for last: pick the WEAKER one now
+      // "Best" = highest rarity, then highest HP
+      const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+      // Bo (109) + Lucas (433) combo: keep Lucas on sideline for Kindling triggers
+      const boOnTeam = t.ghosts.some(g => g.id === 109 && !g.ko);
+      alive.sort((a, b) => {
+        if (boOnTeam) {
+          const aIsLucas = a.id === 433 ? 1 : 0;
+          const bIsLucas = b.id === 433 ? 1 : 0;
+          if (aIsLucas !== bIsLucas) return aIsLucas - bIsLucas;
+        }
+        // Lou (32) must stay on sideline to buff Grawr (34) — always send Grawr in first
+        const grawrOnTeam = t.ghosts.some(g => g.id === 34 && !g.ko);
+        if (grawrOnTeam) {
+          const aIsLou = a.id === 32 ? 1 : 0;
+          const bIsLou = b.id === 32 ? 1 : 0;
+          if (aIsLou !== bIsLou) return bIsLou - aIsLou; // Lou sorts to front (saved for last = kept on sideline)
+        }
+        const rd = (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0);
+        if (rd !== 0) return rd;
+        return b.hp - a.hp;
+      });
+      // Pick the WORST (last in sorted = lowest rarity/HP), saving best for last
+      const pick = alive[alive.length - 1];
+      const pickIdx = t.ghosts.indexOf(pick);
+      setTimeout(() => {
+        if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === 'blue') {
+          doKoSwap('blue', pickIdx);
+        }
+      }, 800 + Math.random() * 400);
+      return;
+    }
+  }
+
+  // --- Duel Phase: auto-click Done for blue ---
+  if ((B.phase === 'duel-1' || B.phase === 'duel-2') && B.duelActiveTeam === 'blue') {
+    aiCommitSpecials('blue');
+    const doneBtn = document.getElementById('duelDoneBlueBtn');
+    if (doneBtn && !doneBtn.disabled) {
+      setTimeout(() => {
+        if (doneBtn && !doneBtn.disabled) doneBtn.click();
+      }, 500 + Math.random() * 500);
+      return;
+    }
+  }
+
+  // --- Hand Limit discard for blue: auto-discard least valuable resource ---
+  if (B.handLimitPending && B.handLimitPending.team === 'blue') {
+    const overlay = document.getElementById('handLimitOverlay');
+    if (overlay && overlay.classList.contains('active')) {
+      const blueRes = B.blue.resources;
+      // Discard priority: least valuable first
+      const discardOrder = ['ice', 'healingSeed', 'surge', 'fire', 'luckyStone', 'moonstone', 'firefly'];
+      for (const key of discardOrder) {
+        if ((blueRes[key] || 0) > 0) {
+          setTimeout(() => doHandLimitDiscard('blue', key), 400);
+          return;
+        }
+      }
+    }
+  }
+
+  // --- Auto-handle blue ability modals ---
+  // Timber choice: always choose to discard specials (less punishing)
+  if (B.timberPending && B.timberPending.team !== 'blue') {
+    // Timber is opponent's ability affecting blue — auto-pick "discard"
+    const timberOverlay = document.getElementById('timberOverlay');
+    if (timberOverlay && timberOverlay.classList.contains('active')) {
+      setTimeout(() => doTimberChoice('discard'), 600);
+      return;
+    }
+  }
+
+  // Ryder Toll: AI takes 1 damage unless it would KO them (HP <= 1), then give Sacred Fire
+  if (B.riderPending && B.riderPending.oppTeamName === 'blue') {
+    const riderOverlay = document.getElementById('riderOverlay');
+    if (riderOverlay && riderOverlay.classList.contains('active')) {
+      const aiActive = active(B.blue);
+      const choice = (aiActive && aiActive.hp <= 1) ? 'sacredfire' : 'damage';
+      setTimeout(() => doRiderChoice(choice), 600);
+      return;
+    }
+  }
+
+  // Tyler: always opt in if HP > 4 (aggressive AI)
+  if (B.tylerPending && B.tylerPending.team === 'blue') {
+    const f = active(B.blue);
+    setTimeout(() => doTylerChoice(f && f.hp > 4 ? 'yes' : 'no'), 600);
+    return;
+  }
+
+  // Toby Pure Heart: declare when AI is losing (fewer remaining ghosts) or Toby is last ghost
+  if (B.tobyPending && B.tobyPending.team === 'blue') {
+    const blueAlive = S.blue.filter(g => g.hp > 0).length;
+    const redAlive = S.red.filter(g => g.hp > 0).length;
+    const shouldDeclare = blueAlive < redAlive || blueAlive === 1;
+    setTimeout(() => doTobyPureHeart(shouldDeclare), 600);
+    return;
+  }
+
+  // Romy prediction: pick 4 (most common high-value die)
+  if (B.romyPending && B.romyPending.team === 'blue') {
+    setTimeout(() => doRomyPrediction(4), 600);
+    return;
+  }
+
+  // Selene (305): prefer Lucky Stones (3 LS is more impactful than 2 seeds)
+  if (B.selenePending && B.selenePending.tName === 'blue') {
+    const seleneOverlay = document.getElementById('seleneOverlay');
+    if (seleneOverlay && seleneOverlay.classList.contains('active')) {
+      setTimeout(() => doSeleneChoice('stone'), 600);
+      return;
+    }
+  }
+
+  // Pal Al: always pick damage (aggressive AI)
+  if (B.wiseAlPending && B.wiseAlPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 600);
+    return;
+  }
+
+  // Sophia: AI picks Mask of Night
+  if (B.sophiaPending && B.sophiaPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.sophiaPending) doSophiaChoice('night'); }, 600);
+    return;
+  }
+
+  // Gordok: always pick damage (aggressive AI)
+  if (B.gordokPending && B.gordokPending.winTeamName === 'blue') {
+    setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 600);
+    return;
+  }
+
+  // Jackson (50): opt in if HP > 5 (aggressive but safe)
+  if (B.jacksonPending && B.jacksonPending.team === 'blue') {
+    const jacksonOverlay = document.getElementById('jacksonOverlay');
+    if (jacksonOverlay && jacksonOverlay.classList.contains('active')) {
+      const jf = active(B.blue);
+      setTimeout(() => doJacksonChoice(jf && jf.hp > 5 ? 'yes' : 'no'), 600);
+      return;
+    }
+  }
+
+  // Sonya (69): always use Mesmerize (change die to 2 — weakens opponent)
+  if (B.sonyaPending && B.sonyaPending.team === 'blue') {
+    const sonyaOverlay = document.getElementById('sonyaOverlay');
+    if (sonyaOverlay && sonyaOverlay.classList.contains('active')) {
+      setTimeout(() => doSonyaChoice('yes'), 600);
+      return;
+    }
+  }
+
+  // Jeanie (90): always use Hidden Treasure (force opponent reroll)
+  if (B.jeaniePending && B.jeaniePending.team === 'blue') {
+    const jeanieOverlay = document.getElementById('jeanieOverlay');
+    if (jeanieOverlay && jeanieOverlay.classList.contains('active')) {
+      setTimeout(() => doJeanieChoice('yes'), 600);
+      return;
+    }
+  }
+
+  // Dark Wing: always opt in
+  if (B.darkWingPending && B.darkWingPending.team === 'blue') {
+    setTimeout(() => { if (typeof doDarkWingChoice === 'function') doDarkWingChoice('yes'); }, 600);
+    return;
+  }
+
+  // Tommy chain: auto-roll the bonus die
+  if (B.tommyChainPending && B.tommyChainPending.team === 'blue') {
+    const tommyOverlay = document.getElementById('tommyOverlay');
+    if (tommyOverlay && tommyOverlay.classList.contains('active')) {
+      const tommyBtn = document.getElementById('tommyRollBtn');
+      if (tommyBtn && !tommyBtn.disabled) {
+        setTimeout(() => doTommyRoll(), 600);
+      }
+      return;
+    }
+  }
+
+  // Balatron (113): auto-roll the counter die
+  if (B.balatronPending && B.balatronPending.loseTeamName === 'blue') {
+    const balatronOverlay = document.getElementById('balatronOverlay');
+    if (balatronOverlay && balatronOverlay.classList.contains('active')) {
+      const balatronBtn = document.getElementById('balatronRollBtn');
+      if (balatronBtn && !balatronBtn.disabled) {
+        setTimeout(() => doBalatronRoll(), 600);
+      }
+      return;
+    }
+  }
+
+  // Sylvia (313): auto-roll ice shard die when modal appears
+  if (B.sylviaResume && B.sylviaTeamName === 'blue') {
+    const sylviaOverlay = document.getElementById('sylviaOverlay');
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active')) {
+      const sylviaBtn = document.getElementById('sylviaRollBtn');
+      if (sylviaBtn && !sylviaBtn.disabled) {
+        setTimeout(() => { if (sylviaBtn.onclick) sylviaBtn.onclick(); else sylviaBtn.click(); }, 600);
+      }
+      return;
+    }
+  }
+
+  // Pressure picker: blue is forced to swap — pick which of blue's own ghosts enters
+  // pressurePickerTeam = 'blue' means red attacked, blue chooses which of their own sideline ghosts comes in
+  if (B.pressurePickerTeam === 'blue') {
+    const pressureOverlay = document.getElementById('pressureOverlay');
+    if (pressureOverlay && pressureOverlay.classList.contains('active')) {
+      const blueTeam = B.blue;
+      const sidelineAlive = blueTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== blueTeam.activeIdx && !x.ghost.ko);
+      if (sidelineAlive.length > 0) {
+        // Save the best ghost: pick the weaker one now (same logic as KO swap)
+        const rarityRank = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+        // Bo (109) + Lucas (433) combo: keep Lucas on sideline for Kindling triggers
+        const boOnTeamP = blueTeam.ghosts.some(g => g.id === 109 && !g.ko);
+        sidelineAlive.sort((a, b) => {
+          if (boOnTeamP) {
+            const aIsLucas = a.ghost.id === 433 ? 1 : 0;
+            const bIsLucas = b.ghost.id === 433 ? 1 : 0;
+            if (aIsLucas !== bIsLucas) return aIsLucas - bIsLucas;
+          }
+          const rd = (rarityRank[b.ghost.rarity] || 0) - (rarityRank[a.ghost.rarity] || 0);
+          if (rd !== 0) return rd;
+          return b.ghost.hp - a.ghost.hp;
+        });
+        const pick = sidelineAlive[sidelineAlive.length - 1]; // weakest
+        setTimeout(() => doPressureSwap('red', pick.index), 600);
+      }
+      return;
+    }
+  }
+
+  // Burn picker overlay: auto-pick best target (lowest HP sideline ghost)
+  if (B.burnPickerTeam === 'blue') {
+    const burnOverlay = document.getElementById('burnOverlay');
+    if (burnOverlay && burnOverlay.classList.contains('active')) {
+      const enemyTeam = B.red;
+      const sidelineTargets = enemyTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+      if (sidelineTargets.length > 0) {
+        sidelineTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => doBurnPlace('blue', sidelineTargets[0].index), 500);
+      } else {
+        setTimeout(() => closeBurnPicker(), 400);
+      }
+      return;
+    }
+  }
+
+  // Firefly picker overlay: convert to moonstone (best default)
+  if (B.fireflyPickerTeam === 'blue') {
+    const fireflyOverlay = document.getElementById('fireflyOverlay');
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active')) {
+      setTimeout(() => doFireflyConvert('blue', 'moonstone'), 500);
+      return;
+    }
+  }
+
+  // Nick Knack picker: steal most valuable resource from opponent
+  if (B.nickKnackPending && B.nickKnackPending.team === 'blue') {
+    const nickOverlay = document.getElementById('nickKnackOverlay');
+    if (nickOverlay && nickOverlay.classList.contains('active')) {
+      const oppRes = B.red.resources;
+      // Priority: moonstone > luckyStone > surge > fire > ice > healingSeed
+      const stealOrder = ['moonstone', 'luckyStone', 'surge', 'fire', 'ice', 'healingSeed'];
+      const stealKey = stealOrder.find(k => (oppRes[k] || 0) > 0) || 'skip';
+      setTimeout(() => doNickKnackSteal('blue', stealKey), 500);
+      return;
+    }
+  }
+
+  // --- Post-roll: auto-use moonstone / lucky stone for blue ---
+  aiHandlePostRoll();
+}
+
+// AI commits available specials before rolling
+function aiCommitSpecials(team) {
+  if (!B || !B[team]) return;
+  const t = B[team];
+  const r = t.resources;
+  if (!r) return;
+  const f = active(t);
+  if (!f || f.ko) return;
+
+  // --- Magic Fireflies: convert to most useful resource FIRST (before other commits) ---
+  while ((r.firefly || 0) > 0) {
+    // Priority: moonstone > luckyStone > surge > ice > fire > healingSeed
+    // Moonstone = guaranteed die change to 6, Lucky Stone = reroll safety net
+    // Moonstone capped at 1 — skip if already holding one
+    let bestRes = (r.moonstone || 0) >= 1 ? 'luckyStone' : 'moonstone';
+    if ((r.luckyStone || 0) >= 2 && (r.moonstone || 0) >= 1) bestRes = 'surge';
+    if ((r.surge || 0) >= 2) bestRes = 'ice';
+    // If HP is low, prefer healing seed
+    if (f.hp < f.maxHp * 0.5 && (r.healingSeed || 0) < 2) bestRes = 'healingSeed';
+    doFireflyConvert(team, bestRes);
+  }
+
+  // --- Healing Seeds: use if HP below max (heal before fighting) ---
+  while (r.healingSeed > 0 && f.hp < f.maxHp) {
+    spendHealingSeed(team);
+  }
+
+  // --- Bonzai (Miyoshi 454): sacrifice 4 HP for +5 dice — use whenever survivable ---
+  if (f.id === 454 && !f.ko && f.hp > 4 && B.bonzaiDecided && !B.bonzaiDecided[team]) {
+    useBonzaiButton(team);
+    // doPreRollSetup already ran (Red clicked first), so bonzaiBtnDice was 0 when
+    // dice counts were computed. Inject the +5 directly into preRoll if it exists.
+    if (B.preRoll && B.preRoll[team]) {
+      B.preRoll[team].count = Math.min(10, B.preRoll[team].count + 5);
+    }
+  }
+
+  // --- Ice Blade: swing it if forged ---
+  if (B.iceBladeForgedPermanent && B.iceBladeForgedPermanent[team] &&
+      B.iceBladeSwing && !B.iceBladeSwing[team]) {
+    toggleIceBlade(team);
+  }
+
+  // --- Flame Blade: swing it if forged ---
+  if (B.flameBlade && B.flameBlade[team] &&
+      B.flameBladeSwing && !B.flameBladeSwing[team]) {
+    if (typeof toggleFlameBlade === 'function') toggleFlameBlade(team);
+  }
+
+  // --- Zain Ice Blade forge: forge if we have Zain + materials ---
+  if (!B.iceBladeForgedPermanent?.[team]) {
+    const zain = t.ghosts.find(g => g.id === 206 && !g.ko && !g.iceBladeForged);
+    if (zain && r.ice >= 1 && r.moonstone >= 1) {
+      useZainForge(team);
+    }
+  }
+
+  // --- Finn Flame Blade forge ---
+  if (!B.flameBlade?.[team]) {
+    const finn = t.ghosts.find(g => g.id === 204 && !g.ko);
+    if (finn && r.healingSeed >= 1 && r.fire >= 1) {
+      if (typeof useFinnFlameBlade === 'function') useFinnFlameBlade(team);
+    }
+  }
+
+  // --- Harrison (315) Ascend: commit healing seeds for extra dice ---
+  if (f.id === 315 && !f.ko && r.healingSeed > 0 && B.committed) {
+    // Commit all available seeds (each = +1 die)
+    while (r.healingSeed > 0) {
+      toggleHarrison(team);
+    }
+  }
+
+  // --- Commit resources using cycleCommit (properly moves from pool to committed) ---
+  // Commit all ice shards
+  while (r.ice > 0 && B.committed) {
+    cycleCommit(team, 'ice');
+  }
+
+  // Commit all sacred fire
+  while (r.fire > 0 && B.committed) {
+    cycleCommit(team, 'fire');
+  }
+
+  // Commit all surge for extra dice
+  while (r.surge > 0 && B.committed) {
+    cycleCommit(team, 'surge');
+  }
+
+  // --- Aunt Susan (308): commit seeds for damage if HP is full ---
+  if (r.healingSeed > 0 && f.hp >= f.maxHp && B.committed) {
+    const auntSusan = t.ghosts.find(g => g.id === 308 && !g.ko);
+    if (auntSusan) {
+      while (r.healingSeed > 0) {
+        if (typeof toggleAuntSusan === 'function') toggleAuntSusan(team);
+        else break;
+      }
+    }
+  }
+
+  // --- Aunt Susan Heal (308): commit seeds for healing if HP is low and Aunt Susan active ---
+  if (r.healingSeed > 0 && f.id === 308 && f.hp < f.maxHp && B.committed) {
+    while (r.healingSeed > 0) {
+      if (typeof toggleAuntSusanHeal === 'function') toggleAuntSusanHeal(team);
+      else break;
+    }
+  }
+
+  // --- Burn: place all burn on enemy sideline ghosts ---
+  if ((r.burn || 0) > 0) {
+    const enemyTeamName = team === 'red' ? 'blue' : 'red';
+    const enemyTeam = B[enemyTeamName];
+    // Find non-KO'd sideline ghosts on enemy team
+    const sidelineTargets = enemyTeam.ghosts
+      .map((g, i) => ({ ghost: g, index: i }))
+      .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+    if (sidelineTargets.length > 0) {
+      while ((r.burn || 0) > 0 && sidelineTargets.length > 0) {
+        // Spread burn across targets, prioritizing ghosts with lower HP
+        sidelineTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        const target = sidelineTargets[0];
+        // Call doBurnPlace directly (bypasses the overlay picker)
+        r.burn--;
+        if (!B.burn) B.burn = { red: {}, blue: {} };
+        if (!B.burn[enemyTeamName]) B.burn[enemyTeamName] = {};
+        B.burn[enemyTeamName][target.index] = (B.burn[enemyTeamName][target.index] || 0) + 1;
+        // Track burn source for KO credit
+        const burnPlacer = active(B[team]);
+        const burnPlacerId = burnPlacer ? (burnPlacer.originalId || burnPlacer.id) : 0;
+        if (!B.burnSource) B.burnSource = { red: {}, blue: {} };
+        if (!B.burnSource[enemyTeamName]) B.burnSource[enemyTeamName] = {};
+        if (!B.burnSource[enemyTeamName][target.index]) B.burnSource[enemyTeamName][target.index] = {};
+        B.burnSource[enemyTeamName][target.index][burnPlacerId] = (B.burnSource[enemyTeamName][target.index][burnPlacerId] || 0) + 1;
+        const totalBurn = B.burn[enemyTeamName][target.index];
+        log(`<span class="log-ability">BURN!</span> AI placed on <span class="log-dmg">${target.ghost.name}</span>! (${totalBurn} total)`);
+        // Mable (446) Hex: burn placement = enemy -1 die
+        const mableActive = active(B[team]);
+        if (mableActive && mableActive.id === 446 && !mableActive.ko) {
+          if (!B.hexDieRemoval) B.hexDieRemoval = { red: 0, blue: 0 };
+          B.hexDieRemoval[enemyTeamName] = (B.hexDieRemoval[enemyTeamName] || 0) + 1;
+          log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
+        }
+      }
+    }
+  }
+
+  // --- Hex (Mable 446): spend burn for -1 enemy die + sacred fire ---
+  if (f.id === 446 && !f.ko && (r.burn || 0) > 0) {
+    while ((r.burn || 0) > 0) {
+      useHex(team);
+    }
+  }
+
+  renderBattle();
+}
+
+// --- POST-ROLL AI: auto-use moonstone and lucky stone for blue ---
+function aiHandlePostRoll() {
+  if (!AI_ACTIVE || !B) return;
+
+  // Auto-use Moonstone when it pops up for blue
+  if (B.pendingMoonstone && B.pendingMoonstone.team === 'blue') {
+    const pm = B.pendingMoonstone;
+
+    if (pm.phase === 'pick-resource') {
+      // Click the moonstone tile to activate it
+      const resEl = document.getElementById('blue-resources');
+      const msEl = resEl && resEl.querySelector('.res-tile.moonstone.rerollable');
+      if (msEl) {
+        setTimeout(() => { if (msEl.onclick) msEl.onclick(); }, 600);
+      } else {
+        // If no clickable moonstone, skip
+        setTimeout(() => skipMoonstone(), 600);
+      }
+      return;
+    }
+
+    if (pm.phase === 'pick-die') {
+      // Pick the lowest die to change
+      const dice = pm.dice || B.blueDice || [];
+      let worstIdx = 0;
+      let worstVal = 7;
+      dice.forEach((d, i) => { if (d < worstVal) { worstVal = d; worstIdx = i; } });
+      setTimeout(() => { if (typeof pickMsDie === 'function') pickMsDie(worstIdx); }, 500);
+      return;
+    }
+
+    if (pm.phase === 'pick-value') {
+      // Change to 6 (best value)
+      setTimeout(() => { if (typeof pickMsValue === 'function') pickMsValue(6); }, 500);
+      return;
+    }
+  }
+
+  // Auto-use Lucky Stone when it appears for blue
+  const blueDiceEl = document.getElementById('blue-dice');
+  if (blueDiceEl) {
+    const rerollable = blueDiceEl.querySelectorAll('.die.rerollable');
+    if (rerollable.length > 0 && B.phase && B.phase.includes('luckystone') && B.blue?.resources?.luckyStone > 0) {
+      // Find lowest die and click it
+      let lowestEl = null, lowestVal = 7;
+      rerollable.forEach(el => {
+        const val = parseInt(el.textContent);
+        if (!isNaN(val) && val < lowestVal) { lowestVal = val; lowestEl = el; }
+      });
+      if (lowestEl && lowestVal <= 3) {
+        setTimeout(() => { if (lowestEl.onclick) lowestEl.onclick(); }, 600);
+      }
+    }
+  }
+}
+
+// ============================================================
+// LIVE PVP MODE — real-time 1v1 via Firebase
+// ============================================================
+// URL: ?livepvp=GAMEID&side=red|blue&red=IDS&blue=IDS
+// Each player controls ONLY their roll button + their decisions.
+// Dice sync: when you roll, your dice broadcast to opponent.
+// Opponent's dice are injected DIRECTLY into engine state (bypassing rollReady
+// to avoid pre-roll ability modals blocking on the wrong client).
+(function checkLivePvPParams() {
+  const params = new URLSearchParams(window.location.search);
+  const gameId = params.get('livepvp');
+  if (!gameId) return;
+
+  const side = params.get('side');
+  if (side !== 'red' && side !== 'blue') return;
+
+  const redParam = params.get('red');
+  const blueParam = params.get('blue');
+  if (!redParam || !blueParam) return;
+
+  const redIds = redParam.split(',').map(Number).filter(id => ghostData(id));
+  const blueIds = blueParam.split(',').map(Number).filter(id => ghostData(id));
+  if (redIds.length !== 3 || blueIds.length !== 3) return;
+
+  LIVE_PVP = true;
+  MP_MODE = true;
+  PVP_SIDE = side;
+  PVP_GAME_ID = gameId;
+  PVP_GAME_REF = db.ref(`mp/livegames/${gameId}`);
+
+  // Force standard settings
+  const speedEl = document.getElementById('speedSlider');
+  if (speedEl) speedEl.value = 0;
+  const hlCheck = document.getElementById('handLimitCheckbox');
+  if (hlCheck) hlCheck.checked = true;
+  const hlSlider = document.getElementById('handLimitSlider');
+  if (hlSlider) hlSlider.value = 4;
+  const stSlider = document.getElementById('specialsTimerSlider');
+  if (stSlider) stSlider.value = 8; // v731: 8 second timer (was 5)
+
+  // Set teams
+  S.redPicks = redIds;
+  S.bluePicks = blueIds;
+
+  // Show player labels
+  const redName = params.get('redName') || 'Red';
+  const blueName = params.get('blueName') || 'Blue';
+  MP_PLAYER_NAMES.red = decodeURIComponent(redName);
+  MP_PLAYER_NAMES.blue = decodeURIComponent(blueName);
+  const redTitle = document.querySelector('.roster-title.red');
+  const blueTitle = document.querySelector('.roster-title.blue');
+  if (redTitle) redTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(redName)}${side === 'red' ? ' (You)' : ''}`;
+  if (blueTitle) blueTitle.innerHTML = `<span class="roster-dot"></span> ${decodeURIComponent(blueName)}${side === 'blue' ? ' (You)' : ''}`;
+
+  // Switch to arena tab and hide team selection UI
+  switchTab('battle');
+  const teamRosters = document.getElementById('teamRosters');
+  if (teamRosters) teamRosters.style.display = 'none';
+  const randRow = document.querySelector('.random-pick-row');
+  if (randRow) randRow.style.display = 'none';
+  const controls = document.querySelector('.controls');
+  if (controls) controls.style.display = 'none';
+  // Hide the tab bar itself — no switching in PvP
+  const tabs = document.querySelector('.tabs');
+  if (tabs) tabs.style.display = 'none';
+
+  // Add wait banner
+  const waitBanner = document.createElement('div');
+  waitBanner.id = 'pvp-wait-banner';
+  waitBanner.style.cssText = 'text-align:center;padding:12px;font-family:Creepster,cursive;font-size:1.2rem;color:var(--gold-bright);letter-spacing:2px;display:none;';
+  waitBanner.textContent = "Waiting for opponent's roll...";
+  const bv = document.getElementById('battle-view');
+  if (bv) bv.prepend(waitBanner);
+
+  // Add turn timer display — prominent, above the dice
+  const timerBar = document.createElement('div');
+  timerBar.id = 'pvp-turn-timer';
+  timerBar.style.cssText = 'text-align:center;padding:8px 16px;font-family:Creepster,cursive;font-size:1.1rem;font-weight:700;color:var(--text2);letter-spacing:2px;background:rgba(0,0,0,0.4);border-radius:8px;margin:4px auto;max-width:400px;';
+  timerBar.textContent = '';
+  // Insert at top of battle view
+  const battleView = document.getElementById('battle-view');
+  if (battleView) battleView.prepend(timerBar);
+
+  // Start battle immediately
+  setTimeout(() => {
+    renderPicks();
+    startBattle();
+    // Duel Phase disabled in live PvP — the Firebase ready-check already ensures
+    // both players commit resources before resolution (Blue rolls when ready).
+    if (B) B.duelPhaseMode = false;
+    setupLivePvP();
+  }, 400);
+})();
+
+// ---- LIVE PVP SETUP ----
+let PVP_BLUE_READY_DATA = null;
+// v726: generate BOTH dice sets only when both players are ready.
+// Top-level so rollReady can call it from Red's roll handler.
+function pvpTryGenerateDice() {
+  if (!PVP_OPPONENT_READY || !pvpRedReady || !B) return;
+  if (B.phase !== 'rolling') return;
+
+  // Apply Blue's committed resources
+  if (PVP_BLUE_READY_DATA) {
+    if (PVP_BLUE_READY_DATA.committed) B.committed.blue = PVP_BLUE_READY_DATA.committed;
+    if (PVP_BLUE_READY_DATA.resources) B.blue.resources = PVP_BLUE_READY_DATA.resources;
+    if (PVP_BLUE_READY_DATA.activeHp != null) {
+      const blueActive = active(B.blue);
+      if (blueActive) blueActive.hp = PVP_BLUE_READY_DATA.activeHp;
+    }
+    PVP_BLUE_READY_DATA = null;
+  }
+  PVP_OPPONENT_READY = false;
+  pvpRedReady = false;
+
+  // Now generate Red's dice, then Blue's dice — standard engine flow
+  doTeamRoll('red', document.getElementById('rollRedBtn'));
+  // Small delay so Red's dice broadcast first, then Blue's
+  setTimeout(() => { rollReady('blue'); }, 50);
+}
+
+function setupLivePvP() {
+  if (!LIVE_PVP || !PVP_GAME_REF) return;
+
+  const mySide = PVP_SIDE;
+  const oppSide = mySide === 'red' ? 'blue' : 'red';
+  const oppBtnId = oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+
+  // Clean up stale data from previous games
+  PVP_GAME_REF.child('blueReady').set(false);
+  PVP_GAME_REF.child('redReady').set(false);
+  PVP_GAME_REF.child('committedUpdate').set(null);
+  PVP_GAME_REF.child('rolls').remove();
+  PVP_GAME_REF.child('roundResult').remove();
+  PVP_GAME_REF.child('koSwap').remove();
+  PVP_GAME_REF.child('koSwapRequest').remove();
+  PVP_GAME_REF.child('swap').remove();
+  PVP_GAME_REF.child('gameOver').remove();
+  PVP_GAME_REF.child('specialsChoice').remove(); // v731
+  PVP_GAME_REF.child('specialsDone').set(null);   // v731
+
+  // Hide opponent's roll button
+  const oppBtn = document.getElementById(oppBtnId);
+  if (oppBtn) oppBtn.style.display = 'none';
+
+  // Connection tracking
+  PVP_GAME_REF.child(`connected/${mySide}`).set(true);
+  PVP_GAME_REF.child(`connected/${mySide}`).onDisconnect().set(false);
+
+  // --- DICE SYNC (Red-authoritative) ---
+  // Red generates ALL dice. Blue sends "ready" signal.
+  // When both are ready, Red rolls both sides and broadcasts results.
+  if (mySide === 'blue') {
+    // v725: Blue listens for dice rolls, animates them, AND runs local combat resolution.
+    // pvpInjectOpponentDice handles Red's dice; for Blue's own dice we inject + animate directly.
+    // When both dice arrive, pvpInjectOpponentDice triggers doPostRollAndResolve locally.
+    PVP_GAME_REF.child('rolls').on('child_added', snap => {
+      const data = snap.val();
+      if (!data || !B || B.phase === 'over') return;
+      snap.ref.remove();
+      if (typeof resetPvPAfk === 'function') resetPvPAfk();
+      if (data.side === 'red') {
+        // Red's dice — inject as opponent dice (triggers resolution if Blue's dice already present)
+        pvpInjectOpponentDice('red', data.dice);
+      } else {
+        // Blue's own dice — inject into engine state + animate, then check for resolution
+        pvpInjectOwnDice('blue', data.dice);
+      }
+    });
+
+    // BLUE: listen for Red's authoritative round result
+    // v725: when pvpBlueResolvedLocally is true, Blue already ran combat locally.
+    // roundResult becomes a silent state correction — no effects, no callouts.
+    let pvpBluePendingResults = []; // v729: queue results while Blue is in interactive state
+
+    function pvpBlueProcessEvent(data) {
+      // v730: queue roundResult while Blue is in any KO-related phase or mid-resolution.
+      // Red's broadcasts (damageResolved, koSwap) arrive while Blue's local engine is
+      // still processing — don't stomp the interactive KO picker or ability flow.
+      if (B && (B.phase === 'ko-swap' || B.phase === 'ko-pause') && pvpBlueResolvedLocally) {
+        pvpBluePendingResults.push(data);
+        return;
+      }
+
+      // v722: reset AFK timer — Blue is actively watching, not idle
+      if (typeof resetPvPAfk === 'function') resetPvPAfk();
+
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
+
+      // v726: dismiss stale PvP KO swap overlay if present
+      const koOverlay = document.getElementById('pvp-ko-swap-overlay');
+      if (koOverlay) koOverlay.style.display = 'none';
+
+      if (pvpBlueResolvedLocally) {
+        // v725: Blue already saw the full combat experience locally.
+        // v728: Only re-render if Red's authoritative state actually differs from local state.
+        const stateChanged = pvpApplyState(data.state);
+        if (stateChanged) renderBattle();
+
+        // Reset for next round on roundEnd
+        if (data.event === 'roundEnd' || !data.event) {
+          B.phase = 'ready';
+          B.preRoll = null;
+          B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+          pvpBlueResolvedLocally = false;
+          const myBtn = document.getElementById('rollBlueBtn');
+          if (myBtn && B.phase !== 'over') {
+            myBtn.disabled = false;
+            myBtn.textContent = 'ROLL';
+          }
+          renderBattle();
+          if (typeof resetPvPAfk === 'function') resetPvPAfk();
+          // v729: drain any results queued while Blue was in interactive phase
+          while (pvpBluePendingResults.length > 0) {
+            pvpBlueProcessEvent(pvpBluePendingResults.shift());
+          }
+        }
+
+        // If game over from Red's authority
+        if (data.gameOver) {
+          setTimeout(() => {
+            if (B && B.phase !== 'over') showGameOver(data.gameOver);
+          }, 800);
+        }
+        return;
+      }
+
+      // Fallback: Blue hasn't resolved locally (shouldn't happen in v725, but safe)
+      const abilities = data.abilityEvents || [];
+      const hasAbilities = abilities.length > 0;
+
+      // v724: Dice are animated live from the `rolls` listener.
+      if (B.redDice && B.blueDice) {
+        renderDice(B.redDice, B.blueDice);
+        highlightRollPreview('red', B.redDice);
+        highlightRollPreview('blue', B.blueDice);
+      }
+
+      if (hasAbilities) {
+        const last = abilities[abilities.length - 1];
+        showAbilityCallout(last.name, last.color, last.desc, last.team);
+      }
+      pvpApplyState(data.state);
+      renderBattle();
+
+      if (data.event === 'roundEnd' || !data.event) {
+        B.phase = 'ready';
+        B.preRoll = null;
+        B.committed.blue = { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 };
+        const myBtn = document.getElementById('rollBlueBtn');
+        if (myBtn && B.phase !== 'over') {
+          myBtn.disabled = false;
+          myBtn.textContent = 'ROLL';
+        }
+        renderBattle();
+        if (typeof resetPvPAfk === 'function') resetPvPAfk();
+      }
+
+      if (data.gameOver) {
+        setTimeout(() => {
+          if (B && B.phase !== 'over') showGameOver(data.gameOver);
+        }, 800);
+      }
+    }
+
+    PVP_GAME_REF.child('roundResult').on('child_added', snap => {
+      const data = snap.val();
+      if (!data || !B || B.phase === 'over') return;
+      snap.ref.remove();
+      pvpBlueProcessEvent(data);
+    });
+  } else {
+    // v726: RED waits for BOTH ready signals before generating dice.
+    // This gives Blue time to commit resources (Ice Shards, Fire, etc.)
+    PVP_OPPONENT_READY = false;
+    PVP_BLUE_READY_DATA = null;
+    pvpRedReady = false;
+
+    PVP_GAME_REF.child('blueReady').on('value', snap => {
+      const data = snap.val();
+      if (!data || !data.ready || !B || B.phase === 'over') return;
+      PVP_OPPONENT_READY = true;
+      PVP_BLUE_READY_DATA = data;
+      PVP_GAME_REF.child('blueReady').set(false);
+
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
+
+      pvpTryGenerateDice();
+    });
+
+    // Poll: if both ready but phase wasn't right, retry
+    setInterval(() => {
+      if (PVP_OPPONENT_READY && pvpRedReady && B && B.phase !== 'over') pvpTryGenerateDice();
+    }, 500);
+  }
+
+  // --- KO SWAP SYNC ---
+  PVP_GAME_REF.child('koSwap').on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+    snap.ref.remove();
+
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner) banner.style.display = 'none';
+
+    if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
+      doKoSwap(oppSide, data.idx);
+    }
+  });
+
+  // --- KO SWAP REQUEST (Blue receives from Red when Blue needs to pick) ---
+  // v726: Blue now runs engine locally and auto-resolves KO swaps during resolution.
+  // This Firebase listener is only needed as a FALLBACK when local resolution didn't handle it.
+  if (mySide === 'blue') {
+    PVP_GAME_REF.child('koSwapRequest').on('value', snap => {
+      const data = snap.val();
+      if (!data || data.side !== 'blue' || !B) return;
+      PVP_GAME_REF.child('koSwapRequest').set(null);
+
+      // v728: if Blue already resolved locally, the local engine showed the real picker.
+      // Blue's doKoSwap already broadcast the choice — just skip the redundant picker.
+      if (pvpBlueResolvedLocally) {
+        // If Blue already picked (doKoSwap broadcast), skip. If not yet picked, the local
+        // picker is still active and doKoSwap will broadcast when Blue chooses.
+        if (B._blueKoSwapPick != null) {
+          // Already broadcast — nothing to do
+          B._blueKoSwapPick = null;
+        }
+        // Either way, don't show a second picker — local engine is handling it
+        return;
+      }
+
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'none';
+
+      const aliveIdxes = data.aliveIdxes || [];
+      const aliveNames = data.aliveNames || [];
+      const fallenName = data.fallenName || 'Your ghost';
+
+      if (aliveIdxes.length === 1) {
+        narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">${aliveNames[0]}</b> steps up!`);
+        PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: aliveIdxes[0], timestamp: firebase.database.ServerValue.TIMESTAMP });
+        return;
+      }
+
+      narrate(`<b class="ko-text">${fallenName} is down!</b> <b class="blue-text">Blue</b> — who answers the call?`);
+
+      let overlay = document.getElementById('pvp-ko-swap-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pvp-ko-swap-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+        document.body.appendChild(overlay);
+      }
+      overlay.innerHTML = '<div style="font-family:Creepster,cursive;font-size:1.6rem;color:var(--gold-bright);letter-spacing:2px;margin-bottom:8px;">Choose your next ghost!</div>';
+      aliveIdxes.forEach((idx, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = aliveNames[i];
+        btn.style.cssText = 'font-family:Creepster,cursive;font-size:1.3rem;padding:14px 32px;border-radius:10px;border:2px solid var(--gold-bright);background:rgba(30,30,50,0.95);color:var(--text);cursor:pointer;min-width:200px;transition:transform 0.15s;';
+        btn.onmouseenter = () => { btn.style.transform = 'scale(1.08)'; };
+        btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+        btn.onclick = () => {
+          overlay.style.display = 'none';
+          PVP_GAME_REF.child('koSwap').push({ side: 'blue', idx: idx, timestamp: firebase.database.ServerValue.TIMESTAMP });
+          narrate(`<b class="blue-text">${aliveNames[i]}</b> answers the call!`);
+        };
+        overlay.appendChild(btn);
+      });
+      overlay.style.display = 'flex';
+    });
+  }
+
+  // --- v729: LIVE RESOURCE COMMIT SYNC ---
+  // See opponent commit Ice Shards, Fire, Surge in real-time (the theater of the game)
+  PVP_GAME_REF.child('committedUpdate').on('value', snap => {
+    const data = snap.val();
+    if (!data || data.side === mySide || !B) return;
+    // Apply opponent's committed resources + updated resource pool + active HP
+    if (data.committed) B.committed[data.side] = { ...data.committed };
+    if (data.resources) Object.assign(B[data.side].resources, data.resources);
+    if (data.activeHp != null) {
+      const oppActive = active(B[data.side]);
+      if (oppActive) oppActive.hp = data.activeHp;
+    }
+    // v735: sync burn state — critical for entry damage on KO swaps
+    if (data.burn) {
+      B.burn = data.burn;
+      if (!B.burn.red) B.burn.red = {};
+      if (!B.burn.blue) B.burn.blue = {};
+    }
+    if (data.burnSource) B.burnSource = data.burnSource;
+    renderBattle();
+    playSfx('sfxSpecial', 0.15); // subtle audio cue that opponent is doing something
+  });
+
+  // --- VOLUNTARY SWAP SYNC ---
+  PVP_GAME_REF.child('swap').on('child_added', snap => {
+    const data = snap.val();
+    if (!data || data.side !== oppSide) return;
+    snap.ref.remove();
+    if (B && B.phase === 'ready') doSwap(oppSide, data.idx);
+  });
+
+  // --- DISCONNECT DETECTION ---
+  // If opponent disconnects, they forfeit
+  PVP_GAME_REF.child(`connected/${oppSide}`).on('value', snap => {
+    const connected = snap.val();
+    // Only trigger forfeit if game is in progress (not during initial load)
+    if (connected === false && B && B.phase !== 'over' && B.round > 1) {
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) {
+        banner.textContent = 'Opponent disconnected — you win!';
+        banner.style.display = 'block';
+        banner.style.color = 'var(--uncommon)';
+      }
+      // Trigger game over — we win
+      setTimeout(() => {
+        if (B && B.phase !== 'over') showGameOver(mySide);
+      }, 1500);
+    }
+  });
+
+  // --- TURN TIMER + AFK TIMEOUT ---
+  let pvpAfkTimer = null;
+  let pvpAfkWarned = false;
+  let pvpTurnStart = Date.now();
+  let pvpTimerInterval = null;
+
+  function updateTurnTimer() {
+    const timerEl = document.getElementById('pvp-turn-timer');
+    if (!timerEl || !B || B.phase === 'over') {
+      if (timerEl) timerEl.textContent = '';
+      return;
+    }
+
+    const elapsed = Math.floor((Date.now() - pvpTurnStart) / 1000);
+    const remaining = Math.max(0, 45 - elapsed); // v722: 45s total (was 25s — too tight with ability replays)
+
+    // Determine whose turn it is
+    const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+    const myTurnToRoll = myBtn && !myBtn.disabled && !myBtn.classList.contains('locked') &&
+                         (B.phase === 'ready' || B.phase === 'rolling');
+
+    if (B.phase === 'ko-swap') {
+      const whoSwaps = B.koSwapQueue && B.koSwapQueue[0];
+      if (whoSwaps === mySide) {
+        timerEl.textContent = `Your pick — ${remaining}s`;
+        timerEl.style.color = remaining <= 10 ? 'var(--accent)' : 'var(--gold-bright)';
+      } else {
+        timerEl.textContent = `Opponent picking...`;
+        timerEl.style.color = 'var(--text2)';
+      }
+    } else if (myTurnToRoll) {
+      if (remaining <= 10) {
+        timerEl.textContent = `ROLL NOW! ${remaining}s`;
+        timerEl.style.color = 'var(--accent)';
+        timerEl.style.fontSize = '1.4rem';
+        timerEl.style.background = 'rgba(233,69,96,0.2)';
+        timerEl.style.animation = 'pvpTimerPulse 0.5s ease-in-out infinite';
+      } else if (remaining <= 20) {
+        timerEl.textContent = `Your roll — ${remaining}s`;
+        timerEl.style.color = 'var(--accent)';
+        timerEl.style.fontSize = '1.2rem';
+        timerEl.style.background = 'rgba(233,69,96,0.1)';
+        timerEl.style.animation = '';
+      } else {
+        timerEl.textContent = `Your roll — ${remaining}s`;
+        timerEl.style.color = 'var(--gold-bright)';
+        timerEl.style.fontSize = '1.1rem';
+        timerEl.style.background = 'rgba(0,0,0,0.4)';
+        timerEl.style.animation = '';
+      }
+    } else if (B.phase === 'ready' || B.phase === 'rolling') {
+      timerEl.textContent = `Waiting for opponent...`;
+      timerEl.style.color = 'var(--text2)';
+      timerEl.style.fontSize = '1.1rem';
+      timerEl.style.background = 'rgba(0,0,0,0.4)';
+      timerEl.style.animation = '';
+    } else {
+      timerEl.textContent = '';
+    }
+  }
+
+  // Start the visible timer
+  pvpTimerInterval = setInterval(updateTurnTimer, 1000);
+
+  function resetPvPAfk() {
+    clearTimeout(pvpAfkTimer);
+    pvpAfkWarned = false;
+    pvpTurnStart = Date.now();
+    const warn = document.getElementById('pvp-afk-warning');
+    if (warn) warn.style.display = 'none';
+
+    pvpAfkTimer = setTimeout(() => {
+      if (!B || B.phase === 'over' || !LIVE_PVP) return;
+      const myBtn = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+      if (!myBtn || myBtn.disabled || myBtn.classList.contains('locked')) return;
+      if (B.phase !== 'ready' && B.phase !== 'rolling') return;
+
+      pvpAfkWarned = true;
+      let warn = document.getElementById('pvp-afk-warning');
+      if (!warn) {
+        warn = document.createElement('div');
+        warn.id = 'pvp-afk-warning';
+        warn.style.cssText = 'text-align:center;padding:10px;font-weight:800;font-size:1rem;color:var(--accent);display:none;';
+        document.querySelector('.battle-arena')?.prepend(warn);
+      }
+      warn.textContent = 'Roll now or forfeit in 15 seconds!';
+      warn.style.display = 'block';
+
+      setTimeout(() => {
+        if (!pvpAfkWarned || !B || B.phase === 'over') return;
+        const myBtn2 = document.getElementById(mySide === 'red' ? 'rollRedBtn' : 'rollBlueBtn');
+        if (myBtn2 && !myBtn2.disabled && !myBtn2.classList.contains('locked') &&
+            (B.phase === 'ready' || B.phase === 'rolling')) {
+          warn.textContent = 'Time expired — you forfeit!';
+          PVP_GAME_REF.child(`connected/${mySide}`).set(false);
+          setTimeout(() => {
+            if (B && B.phase !== 'over') {
+              const winSide = mySide === 'red' ? 'blue' : 'red';
+              showGameOver(winSide);
+            }
+          }, 1000);
+        }
+      }, 15000); // v722: 15s forfeit window (was 10s)
+    }, 30000); // v722: 30s before warning (was 15s)
+  }
+
+  // v736: only reset AFK timer on clicks during roll phases, not during ko-swap.
+  // During ko-swap the timer was resetting on every click (including swap card clicks),
+  // making the countdown jump back to 45s and preventing players from swapping.
+  document.addEventListener('click', () => {
+    if (B && (B.phase === 'ko-swap' || B.phase === 'ko-pause')) return; // don't reset during swaps
+    resetPvPAfk();
+  });
+  // Start initial timer
+  resetPvPAfk();
+
+  // Cleanup
+  window.addEventListener('beforeunload', () => {
+    if (PVP_GAME_REF) PVP_GAME_REF.child(`connected/${mySide}`).set(false);
+    clearTimeout(pvpAfkTimer);
+    clearInterval(pvpTimerInterval);
+  });
+
+  // --- v722: CHOICE MODAL SPECTATING ---
+  // When Red opens a choice modal (Pal Al, Gordok, Selene, etc.), broadcast it
+  // so Blue sees what's happening instead of staring at a blank screen.
+  if (mySide === 'red') {
+    // Watch all selene-overlay elements for .active class
+    const overlays = document.querySelectorAll('.selene-overlay');
+    overlays.forEach(ol => {
+      const obs = new MutationObserver(() => {
+        if (ol.classList.contains('active')) {
+          // Extract the ability name from the overlay's banner or h3
+          const banner = ol.querySelector('.selene-banner');
+          const h3 = ol.querySelector('h3');
+          const abilityText = banner ? banner.textContent.trim() : (h3 ? h3.textContent.trim() : 'Making a choice...');
+          PVP_GAME_REF.child('choiceModal').set({ text: abilityText, ts: Date.now() });
+        } else {
+          PVP_GAME_REF.child('choiceModal').set(null);
+        }
+      });
+      obs.observe(ol, { attributes: true, attributeFilter: ['class'] });
+    });
+  } else {
+    // Blue: show spectator banner when Red has a choice modal open
+    PVP_GAME_REF.child('choiceModal').on('value', snap => {
+      const data = snap.val();
+      let spectBanner = document.getElementById('pvp-choice-spectate');
+      if (!spectBanner) {
+        spectBanner = document.createElement('div');
+        spectBanner.id = 'pvp-choice-spectate';
+        spectBanner.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+          'background:rgba(0,0,0,0.85);border:2px solid var(--gold-bright);border-radius:14px;padding:20px 32px;' +
+          'font-family:Creepster,cursive;font-size:1.3rem;color:var(--gold-bright);text-align:center;letter-spacing:2px;' +
+          'display:none;pointer-events:none;animation:pvpTimerPulse 1.5s ease-in-out infinite;';
+        document.body.appendChild(spectBanner);
+      }
+      if (data && data.text) {
+        spectBanner.textContent = '⚔️ ' + data.text;
+        spectBanner.style.display = 'block';
+        if (typeof resetPvPAfk === 'function') resetPvPAfk();
+      } else {
+        spectBanner.style.display = 'none';
+      }
+    });
+  }
+}
+
+// v723: Animate dice on Blue's screen without running resolution.
+// Blue sees the full dice show (shake → reveal → triples) but combat
+// resolution still comes from Red's roundResult broadcast.
+function pvpAnimateDice(side, dice) {
+  if (!B) return;
+  // Create minimal preRoll structure if needed (don't run doPreRollSetup — that triggers abilities)
+  if (!B.preRoll) {
+    B.preRoll = {
+      red: { count: ghostData(active(B.red).id)?.dice ?? 3, dice: null },
+      blue: { count: ghostData(active(B.blue).id)?.dice ?? 3, dice: null }
+    };
+    B.phase = 'rolling';
+    renderBattle();
+  }
+  // Store dice in engine state
+  B.preRoll[side].dice = dice;
+  if (side === 'red') B.redDice = dice;
+  else B.blueDice = dice;
+
+  const f = active(B[side]);
+  const cls = side === 'red' ? 'red-text' : 'blue-text';
+  const diceCount = dice.length;
+
+  // Full dice animation: shake → SFX → reveal → triples
+  showRolling(side, diceCount);
+  if (diceCount > 0) playSfx('sfxDiceRoll');
+  narrate(`<b class="${cls}">${f.name}</b> rolls...`);
+
+  setTimeout(() => {
+    revealDice(side, dice);
+    const roll = classify(dice);
+    const tl = typeLabel(roll.type);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    if (isTripleOrBetter(roll.type)) showTriplesEffect(side, roll.type);
+    // NO resolution here — Blue waits for roundResult from Red
+  }, spd(700));
+}
+
+// Inject opponent's dice directly into the engine — bypasses rollReady entirely.
+// This avoids all pre-roll ability modals (Timber, Romy, Tyler, etc.) firing
+// on the wrong client. Those modals only fire when YOU click YOUR roll button.
+function pvpInjectOpponentDice(oppSide, dice) {
+  if (!B) return;
+
+  // If pre-roll hasn't been set up yet (we haven't clicked our own roll),
+  // we need to trigger it first so B.preRoll exists with correct dice counts.
+  if (!B.preRoll) {
+    doPreRollSetup();
+    if (B.phase === 'ready') B.phase = 'rolling';
+    renderBattle();
+  }
+
+  // Set opponent's dice in engine state
+  B.preRoll[oppSide].dice = dice;
+  if (oppSide === 'red') B.redDice = dice;
+  else B.blueDice = dice;
+
+  // Show rolling animation + reveal for opponent's side
+  const f = active(B[oppSide]);
+  const cls = oppSide === 'red' ? 'red-text' : 'blue-text';
+  const diceCount = dice.length;
+
+  showRolling(oppSide, diceCount);
+  if (diceCount > 0) playSfx('sfxDiceRoll');
+  narrate(`<b class="${cls}">${f.name}</b> rolls...`);
+
+  setTimeout(() => {
+    revealDice(oppSide, dice);
+    const roll = classify(dice);
+    const tl = typeLabel(roll.type);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    if (isTripleOrBetter(roll.type)) showTriplesEffect(oppSide, roll.type);
+
+    // Check if both sides have rolled — resolve
+    if (B.preRoll && B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
+      B.preRoll.resolved = true;
+      // v725: mark Blue as resolving locally so roundResult becomes a silent correction
+      if (LIVE_PVP && PVP_SIDE === 'blue') pvpBlueResolvedLocally = true;
+      const otherRoll = classify(B.preRoll[PVP_SIDE]?.dice || []);
+      const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
+      setTimeout(() => {
+        doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
+      }, spd(eitherTripled ? 1800 : 1400));
+    }
+  }, spd(700));
+}
+
+// v725: Inject Blue's own dice (received from Red's broadcast) into the engine.
+// Similar to pvpInjectOpponentDice but for Blue's own side.
+function pvpInjectOwnDice(side, dice) {
+  if (!B) return;
+  // Ensure preRoll exists (should already from doPreRollSetup in rollReady)
+  if (!B.preRoll) {
+    B.preRoll = {
+      red: { count: ghostData(active(B.red).id)?.dice ?? 3, dice: null },
+      blue: { count: ghostData(active(B.blue).id)?.dice ?? 3, dice: null }
+    };
+    if (B.phase === 'ready') B.phase = 'rolling';
+    renderBattle();
+  }
+
+  // Store authoritative dice from Red (overrides any local placeholder)
+  B.preRoll[side].dice = dice;
+  if (side === 'red') B.redDice = dice;
+  else B.blueDice = dice;
+
+  // Reveal Blue's own dice (rolling animation already started in rollReady)
+  const f = active(B[side]);
+  const cls = side === 'red' ? 'red-text' : 'blue-text';
+
+  setTimeout(() => {
+    revealDice(side, dice);
+    const roll = classify(dice);
+    const tl = typeLabel(roll.type);
+    narrate(`<b class="${cls}">${f.name}</b>&nbsp;rolled [${dice.join(', ')}]${tl ? '&nbsp;<b class="gold">'+tl+'</b>' : ''}`);
+    if (isTripleOrBetter(roll.type)) showTriplesEffect(side, roll.type);
+
+    // Check if both sides have rolled — resolve
+    if (B.preRoll && B.preRoll.red.dice && B.preRoll.blue.dice && !B.preRoll.resolved) {
+      B.preRoll.resolved = true;
+      pvpBlueResolvedLocally = true;
+      const otherRoll = classify(B.preRoll[side === 'red' ? 'blue' : 'red']?.dice || []);
+      const eitherTripled = isTripleOrBetter(roll.type) || isTripleOrBetter(otherRoll.type);
+      setTimeout(() => {
+        doPostRollAndResolve(B.preRoll.red.dice, B.preRoll.blue.dice);
+      }, spd(eitherTripled ? 1800 : 1400));
+    }
+  }, spd(400)); // shorter delay since rolling animation already started
+}
+
+// ---- HOOKS: broadcast our actions to Firebase ----
+
+// Hook doTeamRoll — after our side rolls, broadcast dice
+const _origDoTeamRollFn = doTeamRoll;
+doTeamRoll = function(team, btn) {
+  _origDoTeamRollFn(team, btn);
+
+  // v723: Red broadcasts ALL dice (both sides) so Blue can animate them
+  if (LIVE_PVP && PVP_SIDE === 'red' && B && B.preRoll && B.preRoll[team]?.dice) {
+    PVP_GAME_REF.child('rolls').push({
+      side: team,
+      round: B.round,
+      dice: B.preRoll[team].dice,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+
+    // Show waiting banner if opponent hasn't rolled yet
+    const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+    if (!B.preRoll[oppSide]?.dice) {
+      const banner = document.getElementById('pvp-wait-banner');
+      if (banner) banner.style.display = 'block';
+    }
+  }
+};
+
+// Hook doKoSwap — broadcast our swap choice
+const _origDoKoSwapFn = doKoSwap;
+doKoSwap = function(team, idx) {
+  if (LIVE_PVP && team === PVP_SIDE) {
+    PVP_GAME_REF.child('koSwap').push({
+      side: team, idx: idx,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  _origDoKoSwapFn(team, idx);
+  // Broadcast state after KO swap so Blue sees the new active ghost immediately
+  pvpBroadcastState({ event: 'koSwap', swapTeam: team, swapIdx: idx });
+};
+
+// Hook doSwap — broadcast voluntary swaps
+const _origDoSwapFn = doSwap;
+doSwap = function(team, idx) {
+  if (LIVE_PVP && team === PVP_SIDE) {
+    PVP_GAME_REF.child('swap').push({
+      side: team, idx: idx,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  _origDoSwapFn(team, idx);
+};
+
+// ---- PVP STATE SYNC: Red is authoritative ----
+function pvpBroadcastState(extras) {
+  if (!LIVE_PVP || PVP_SIDE !== 'red' || !PVP_GAME_REF || !B) return;
+  const state = pvpSerializeState();
+  PVP_GAME_REF.child('stateSync').set(state);
+  // v721: include ability events so Blue can replay callouts
+  const abilityEvts = pvpAbilityEvents.length > 0 ? pvpAbilityEvents.slice() : null;
+  pvpAbilityEvents = [];
+  PVP_GAME_REF.child('roundResult').push({
+    state: state,
+    redDice: B.redDice || null,
+    blueDice: B.blueDice || null,
+    abilityEvents: abilityEvts,
+    gameOver: null,
+    ...extras,
+    ts: Date.now()
+  });
+}
+
+function pvpSerializeState() {
+  if (!B) return null;
+  return {
+    round: B.round,
+    phase: B.phase || null,
+    koSwapQueue: B.koSwapQueue ? B.koSwapQueue.slice() : null,
+    red: {
+      activeIdx: B.red.activeIdx,
+      ghosts: B.red.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
+      resources: { ...B.red.resources },
+      committed: B.committed.red ? { ...B.committed.red } : null
+    },
+    blue: {
+      activeIdx: B.blue.activeIdx,
+      ghosts: B.blue.ghosts.map(g => ({ id: g.id, hp: g.hp, maxHp: g.maxHp, ko: g.ko, killedBy: g.killedBy || null })),
+      resources: { ...B.blue.resources },
+      committed: B.committed.blue ? { ...B.committed.blue } : null
+    },
+    willowLostLast: B.willowLostLast ? { ...B.willowLostLast } : { red: false, blue: false },
+    iceBladeForgedPermanent: B.iceBladeForgedPermanent ? { ...B.iceBladeForgedPermanent } : { red: false, blue: false },
+    flameBlade: B.flameBlade ? { ...B.flameBlade } : { red: false, blue: false },
+    sophiaMask: B.sophiaMask ? { ...B.sophiaMask } : { red: null, blue: null },
+    sophiaMaskActive: B.sophiaMaskActive ? { ...B.sophiaMaskActive } : { red: false, blue: false },
+    duelLastLoser: B.duelLastLoser || null,
+    burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
+    log: B.log.slice(0, 20),
+    ts: Date.now()
+  };
+}
+
+function pvpApplyState(state) {
+  if (!B || !state) return;
+  B.round = state.round;
+
+  // v728: track whether anything actually changed, to avoid unnecessary re-renders
+  let changed = false;
+
+  // Sync ghosts: HP, KO, activeIdx — only update if values actually differ
+  ['red', 'blue'].forEach(side => {
+    if (!state[side]) return;
+    // v736: skip activeIdx update during Blue's local resolution — prevents
+    // "old ghost" flash where Red's state correction briefly shows the wrong fighter
+    if (B[side].activeIdx !== state[side].activeIdx) {
+      if (!(pvpBlueResolvedLocally && (B.phase === 'ko-swap' || B.phase === 'ko-pause'))) {
+        B[side].activeIdx = state[side].activeIdx;
+        changed = true;
+      }
+    }
+    state[side].ghosts.forEach((sg, i) => {
+      const g = B[side].ghosts[i];
+      if (!g) return;
+      if (g.hp !== sg.hp) { g.hp = sg.hp; changed = true; }
+      if (g.maxHp !== sg.maxHp) { g.maxHp = sg.maxHp; changed = true; }
+      if (g.ko !== sg.ko) { g.ko = sg.ko; changed = true; }
+      if (sg.killedBy) g.killedBy = sg.killedBy;
+    });
+    // Sync resources — only update keys that differ
+    if (state[side].resources) {
+      const sr = state[side].resources;
+      const br = B[side].resources;
+      for (const k in sr) {
+        if (br[k] !== sr[k]) { br[k] = sr[k]; changed = true; }
+      }
+    }
+    // v724: sync committed resources so Blue sees Red's specials (and vice versa)
+    if (state[side].committed) {
+      B.committed[side] = { ...state[side].committed };
+    }
+  });
+
+  // Sync battle flags
+  if (state.willowLostLast) B.willowLostLast = state.willowLostLast;
+  if (state.iceBladeForgedPermanent) B.iceBladeForgedPermanent = state.iceBladeForgedPermanent;
+  if (state.flameBlade) B.flameBlade = state.flameBlade;
+  if (state.sophiaMask) B.sophiaMask = state.sophiaMask;
+  if (state.sophiaMaskActive) B.sophiaMaskActive = state.sophiaMaskActive;
+  if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
+  if (state.burn) B.burn = state.burn;
+  if (state.log) B.log = state.log;
+
+  return changed; // v728: caller can skip renderBattle() if nothing changed
+}
+
+// Also sync game over: if Red declares game over, Blue should see it
+if (LIVE_PVP && PVP_GAME_REF) {
+  PVP_GAME_REF.child('gameOver').on('value', snap => {
+    const data = snap.val();
+    if (data && data.winner && B && B.phase !== 'over') {
+      // Red declared game over — show it on Blue's client too
+      setTimeout(() => {
+        if (B && B.phase !== 'over') showGameOver(data.winner);
+      }, 500);
+    }
+  });
+}
+
+// ---- PVP: Auto-resolve ability modals ----
+// v728: Both sides auto-resolve ONLY the opponent's modals.
+// Blue's own interactive abilities (Lucky Stone, Moonstone, KO swap, etc.) now show real pickers.
+// Red's roundResult silently corrects any divergence afterward.
+if (LIVE_PVP) {
+  const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+  const mySide = PVP_SIDE;
+  // v728: auto-resolve opponent's modals only — never auto-resolve your own team's choices
+  const shouldAutoResolve = (modalTeam) => {
+    return modalTeam === oppSide;
+  };
+
+  // Poll for modals and auto-resolve them
+  setInterval(() => {
+    if (!B || B.phase === 'over') return;
+
+    // Pal Al — auto-pick damage (aggressive)
+    if (B.wiseAlPending && shouldAutoResolve(B.wiseAlPending.winTeamName)) {
+      setTimeout(() => { if (B.wiseAlPending) doWiseAlChoice('damage'); }, 300);
+    }
+    // Gordok — auto-pick damage
+    if (B.gordokPending && shouldAutoResolve(B.gordokPending.winTeamName)) {
+      setTimeout(() => { if (B.gordokPending) doGordokChoice('damage'); }, 300);
+    }
+    // Sophia — auto-pick Mask of Night (AI prefers dice mirroring)
+    if (B.sophiaPending && shouldAutoResolve(B.sophiaPending.winTeamName)) {
+      setTimeout(() => { if (B.sophiaPending) doSophiaChoice('night'); }, 300);
+    }
+    // Selene — auto-pick heal
+    if (B.selenePending && shouldAutoResolve(B.selenePending.tName)) {
+      const overlay = document.getElementById('seleneOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doSeleneChoice === 'function') doSeleneChoice('heal'); }, 300);
+      }
+    }
+    // Pressure / Raditz Hunt — auto-pick first available when overlay is active
+    // v728: only auto-pick if the picker is for the OPPONENT's team
+    const pressureOvl = document.getElementById('pressureOverlay');
+    if (pressureOvl && pressureOvl.classList.contains('active') && B.pressurePickerTeam && shouldAutoResolve(B.pressurePickerTeam)) {
+      const firstOpt = pressureOvl.querySelector('.pressure-opt');
+      if (firstOpt) {
+        setTimeout(() => { firstOpt.click(); }, 300);
+      }
+    }
+    // Hand Limit — auto-discard first available resource
+    // v728: only auto-discard for the opponent's team
+    const handLimitOvl = document.getElementById('handLimitOverlay');
+    if (handLimitOvl && handLimitOvl.classList.contains('active') && B.handLimitPending && shouldAutoResolve(B.handLimitPending.team)) {
+      const hlTeam = B.handLimitPending.team;
+      const hlRes = B[hlTeam]?.resources;
+      if (hlRes) {
+        const hlKey = Object.keys(hlRes).find(k => (hlRes[k] || 0) > 0);
+        if (hlKey) setTimeout(() => { if (typeof doHandLimitDiscard === 'function') doHandLimitDiscard(hlTeam, hlKey); }, 300);
+      }
+    }
+    // Sylvia — auto-roll (don't skip)
+    const sylviaOverlay = document.getElementById('sylviaOverlay');
+    if (sylviaOverlay && sylviaOverlay.classList.contains('active') && B.sylviaResume && B.sylviaTeamName && shouldAutoResolve(B.sylviaTeamName)) {
+      setTimeout(() => { if (typeof doSylviaRoll === 'function') doSylviaRoll(); }, 300);
+    }
+    // Balatron — auto-roll
+    const balatronOverlay = document.getElementById('balatronOverlay');
+    if (balatronOverlay && balatronOverlay.classList.contains('active') && B.balatronPending && shouldAutoResolve(B.balatronPending.loseTeamName)) {
+      setTimeout(() => { if (typeof doBalatronRoll === 'function') doBalatronRoll(); }, 300);
+    }
+    // DarkWing — auto-yes (reroll)
+    if (B.darkWingPending && shouldAutoResolve(B.darkWingPending.team)) {
+      const overlay = document.getElementById('darkWingOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doDarkWingChoice === 'function') doDarkWingChoice('yes'); }, 300);
+      }
+    }
+    // Jeanie — auto-yes (force reroll)
+    if (B.jeaniePending && shouldAutoResolve(B.jeaniePending.team)) {
+      const overlay = document.getElementById('jeanieOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        setTimeout(() => { if (typeof doJeanieChoice === 'function') doJeanieChoice('yes'); }, 300);
+      }
+    }
+    // Nick Knack — auto-pick first option
+    const nickOverlay = document.getElementById('nickKnackOverlay');
+    if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && shouldAutoResolve(B.nickKnackPending.team)) {
+      setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal(B.nickKnackPending.team, 'moonstone'); }, 300);
+    }
+    // Burn picker — auto-pick first enemy sideline
+    const burnOverlay = document.getElementById('burnOverlay');
+    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerPending && shouldAutoResolve(B.burnPickerPending.team)) {
+      const autoPickTeam = B.burnPickerPending.team === 'red' ? B.blue : B.red;
+      const target = autoPickTeam.ghosts.find((g, i) => i !== autoPickTeam.activeIdx && !g.ko);
+      if (target) {
+        const idx = autoPickTeam.ghosts.indexOf(target);
+        setTimeout(() => { if (typeof doBurnPick === 'function') doBurnPick(idx); }, 300);
+      }
+    }
+    // Firefly picker — auto-pick moonstone
+    const fireflyOverlay = document.getElementById('fireflyOverlay');
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPending && shouldAutoResolve(B.fireflyPending.team)) {
+      setTimeout(() => { if (typeof doFireflyChoice === 'function') doFireflyChoice('moonstone'); }, 300);
+    }
+    // Tommy — auto-yes / auto-roll chain
+    const tommyOverlay = document.getElementById('tommyOverlay');
+    if (tommyOverlay && tommyOverlay.classList.contains('active')) {
+      if (B.tommyPending && shouldAutoResolve(B.tommyPending.team)) {
+        setTimeout(() => { if (typeof doTommyChoice === 'function') doTommyChoice('yes'); }, 300);
+      } else if (B.tommyChainPending && shouldAutoResolve(B.tommyChainPending.team)) {
+        setTimeout(() => { if (typeof doTommyRoll === 'function') doTommyRoll(); }, 300);
+      }
+    }
+    // Jackson — auto-yes
+    const jacksonOverlay = document.getElementById('jacksonOverlay');
+    if (jacksonOverlay && jacksonOverlay.classList.contains('active') && B.jacksonPending && shouldAutoResolve(B.jacksonPending.team)) {
+      setTimeout(() => { if (typeof doJacksonChoice === 'function') doJacksonChoice('yes'); }, 300);
+    }
+    // Sonya — auto-yes
+    const sonyaOverlay = document.getElementById('sonyaOverlay');
+    if (sonyaOverlay && sonyaOverlay.classList.contains('active') && B.sonyaPending && shouldAutoResolve(B.sonyaPending.team)) {
+      setTimeout(() => { if (typeof doSonyaChoice === 'function') doSonyaChoice('yes'); }, 300);
+    }
+    // Toboggan — auto-pick first ghost
+    const tobogganOverlay = document.getElementById('tobogganOverlay');
+    if (tobogganOverlay && tobogganOverlay.classList.contains('active') && B.tobogganPending && shouldAutoResolve(B.tobogganPending.winTeamName)) {
+      const tobTeam = B[B.tobogganPending.winTeamName];
+      const tobAlive = tobTeam.ghosts.filter((g,i) => i !== tobTeam.activeIdx && !g.ko);
+      const tobIdx = tobAlive.length > 0 ? tobTeam.ghosts.indexOf(tobAlive[0]) : -1;
+      setTimeout(() => { if (typeof doTobogganChoice === 'function') doTobogganChoice(tobIdx); }, 300);
+    }
+    // Fang Outside — auto-skip (don't swap)
+    const fangOutsideOverlay = document.getElementById('fangOutsideOverlay');
+    if (fangOutsideOverlay && fangOutsideOverlay.classList.contains('active') && B.fangOutsidePending && shouldAutoResolve(B.fangOutsidePending.winTeamName)) {
+      setTimeout(() => { if (typeof doFangOutsideChoice === 'function') doFangOutsideChoice(-1); }, 300);
+    }
+    // Winston Scheme — auto-pick first target
+    const winstonOverlay = document.getElementById('winstonSchemeOverlay');
+    if (winstonOverlay && winstonOverlay.classList.contains('active') && B.winstonSchemePending && shouldAutoResolve(B.winstonSchemePending.winTeamName)) {
+      const wsTeam = B[B.winstonSchemePending.loseTeamName];
+      const wsAlive = wsTeam.ghosts.filter((g,i) => i !== wsTeam.activeIdx && !g.ko);
+      const wsIdx = wsAlive.length > 0 ? wsTeam.ghosts.indexOf(wsAlive[0]) : -1;
+      setTimeout(() => { if (typeof doWinstonSchemeChoice === 'function') doWinstonSchemeChoice(wsIdx); }, 300);
+    }
+    // Gus Gale Force picker — auto-pick first available
+    const gfPickerOverlay = document.getElementById('galeForcePickerOverlay');
+    if (gfPickerOverlay && gfPickerOverlay.classList.contains('active') && B.galeForcePicker && shouldAutoResolve(B.galeForcePicker.winTeamName)) {
+      const gfLoseTeam = B[B.galeForcePicker.loseTeamName];
+      const gfAlive = gfLoseTeam?.ghosts?.filter((g,i) => i !== gfLoseTeam.activeIdx && !g.ko);
+      if (gfAlive && gfAlive.length > 0) {
+        const gfIdx = gfLoseTeam.ghosts.indexOf(gfAlive[0]);
+        setTimeout(() => { if (typeof doGaleForcePickerChoice === 'function') doGaleForcePickerChoice(gfIdx); }, 300);
+      }
+    }
+    // Gus Gale Force — auto-accept (always force swap for rival AI)
+    const gusGaleBtnEl = document.getElementById('gusGaleBtn');
+    if (gusGaleBtnEl && gusGaleBtnEl.style.display !== 'none' && B.gusGaleReactivePending && shouldAutoResolve(B.gusGaleReactivePending.winTeamName)) {
+      setTimeout(() => { if (typeof doGusGaleReactive === 'function') doGusGaleReactive('yes'); }, 300);
+    }
+    // Guardian Fairy — auto-decline (let damage apply normally)
+    const gfReactiveOverlay = document.getElementById('guardianFairyOverlay');
+    if (gfReactiveOverlay && gfReactiveOverlay.classList.contains('active') && B.guardianFairyReactivePending && shouldAutoResolve(B.guardianFairyReactivePending.loseTeamName)) {
+      setTimeout(() => { if (typeof doGuardianFairyReactive === 'function') doGuardianFairyReactive('no'); }, 300);
+    }
+    // Jenkins — auto-roll greeting dice
+    const jenkinsOverlay = document.getElementById('jenkinsOverlay');
+    if (jenkinsOverlay && jenkinsOverlay.classList.contains('active') && B.jenkinsPending && shouldAutoResolve(B.jenkinsPending.team)) {
+      setTimeout(() => { if (typeof doJenkinsRoll === 'function') doJenkinsRoll(); }, 300);
+    }
+    // Jasper — auto-roll flame dive
+    const jasperOverlay = document.getElementById('jasperOverlay');
+    if (jasperOverlay && jasperOverlay.classList.contains('active') && B.jasperPending && shouldAutoResolve(B.jasperPending.winTeamName)) {
+      setTimeout(() => { if (typeof doJasperRoll === 'function') doJasperRoll(); }, 300);
+    }
+    // Sky Elusive — auto-roll counter die
+    const skyElOverlay = document.getElementById('skyElusiveOverlay');
+    if (skyElOverlay && skyElOverlay.classList.contains('active') && B.skyElusivePending && shouldAutoResolve(B.skyElusivePending.winTeamName)) {
+      setTimeout(() => { if (typeof doSkyElusiveRoll === 'function') doSkyElusiveRoll(); }, 300);
+    }
+    // Fang Undercover swap — auto-pick first available sideline ghost
+    const fuSwapOverlay = document.getElementById('fangUndercoverSwapOverlay');
+    if (fuSwapOverlay && fuSwapOverlay.classList.contains('active') && B.fangUndercoverSwapData) {
+      const fuLoseTeam = B[B.fangUndercoverSwapData.loseTeamName];
+      if (fuLoseTeam && shouldAutoResolve(B.fangUndercoverSwapData.loseTeamName)) {
+        const fuAlive = fuLoseTeam.ghosts.filter((g,i) => i !== fuLoseTeam.activeIdx && !g.ko);
+        if (fuAlive.length > 0) {
+          const fuIdx = fuLoseTeam.ghosts.indexOf(fuAlive[0]);
+          setTimeout(() => { if (typeof doFangUndercoverSwapChoice === 'function') doFangUndercoverSwapChoice(fuIdx); }, 300);
+        }
+      }
+    }
+  }, 500);
+}
+
+// Hook renderBattle — hide opponent's controls after each render
+const _origRenderBattle = renderBattle;
+renderBattle = function() {
+  _origRenderBattle();
+  if (!LIVE_PVP) return;
+  const oppSide = PVP_SIDE === 'red' ? 'blue' : 'red';
+
+  // Always hide opponent's roll button
+  const oppBtnId = oppSide === 'red' ? 'rollRedBtn' : 'rollBlueBtn';
+  const oppBtn = document.getElementById(oppBtnId);
+  if (oppBtn) oppBtn.style.display = 'none';
+
+  // Block clicking opponent's specials/resources
+  const oppResources = document.getElementById(`${oppSide}-resources`);
+  if (oppResources) {
+    oppResources.style.pointerEvents = 'none';
+    oppResources.style.opacity = '0.7';
+  }
+
+  // Block ALL opponent-side sideline interactions
+  document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
+    el.style.pointerEvents = 'none';
+  });
+
+  // During KO swap: only allow clicking YOUR OWN sideline when it's YOUR swap turn
+  if (B && B.phase === 'ko-swap' && B.koSwapQueue) {
+    const whoSwaps = B.koSwapQueue[0];
+    // Block YOUR sideline if it's NOT your turn to swap
+    if (whoSwaps !== PVP_SIDE) {
+      document.querySelectorAll(`#${PVP_SIDE}-sl-left, #${PVP_SIDE}-sl-right`).forEach(el => {
+        el.style.pointerEvents = 'none';
+      });
+    }
+    // Block opponent's sideline always (they pick on their own client)
+    document.querySelectorAll(`#${oppSide}-sl-left, #${oppSide}-sl-right`).forEach(el => {
+      el.style.pointerEvents = 'none';
+    });
+  }
+
+  // v730: manage wait banner during KO swaps
+  if (B && B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === oppSide) {
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner) {
+      banner.textContent = "Waiting for opponent to choose replacement...";
+      banner.style.display = 'block';
+    }
+  } else if (B && LIVE_PVP) {
+    // Dismiss banner when it's our turn or not in ko-swap
+    const banner = document.getElementById('pvp-wait-banner');
+    if (banner && B.phase !== 'rolling') banner.style.display = 'none';
+  }
+};
+
+
