@@ -5,6 +5,10 @@
 // with ~250 lines of glue code
 // =================================================================
 
+// Tracked state for cleanup
+var _registeredRaidGhostIds = [];
+var _originalGhostData = {};
+
 /**
  * Initialize and launch a raid battle in-page using battle-engine.js.
  * Called by launchRaidBattle() instead of redirecting to the testroom.
@@ -25,26 +29,34 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     battleView.style.display = 'block';
   }
 
-  // ── 2. Register boss/minion ghosts so getGhost() can find them ─
-  // cards.js getGhost() already searches RAID_BOSS_MINIONS and
-  // calls getBossGhost() for 9000+ IDs. But wave minions and
-  // custom boss builds may not be in those arrays yet.
-  // Push any missing ghosts into RAID_BOSS_MINIONS as a catch-all.
+  // ── 2. Register/override boss ghosts so getGhost() returns boss versions ─
+  // Boss ghosts often share IDs with regular ghosts (e.g. Dark Fang 202) but
+  // have different maxHp. We need makeTeam() to use the BOSS version.
+  // Strategy: temporarily override the ghost in the GHOSTS array.
   _registeredRaidGhostIds = [];
+  _originalGhostData = {};
   enemyGhosts.forEach(g => {
-    const existing = getGhost(g.id);
-    if (!existing && typeof RAID_BOSS_MINIONS !== 'undefined') {
-      RAID_BOSS_MINIONS.push({
-        id: g.id,
-        name: g.name,
-        rarity: g.rarity || 'legendary',
-        maxHp: g.maxHp,
-        art: g.art || '',
-        ability: g.ability || '',
-        abilityDesc: g.abilityDesc || '',
-        _raidBridgeRegistered: true   // tag so we can clean up later
-      });
-      _registeredRaidGhostIds.push(g.id);
+    if (typeof GHOSTS !== 'undefined') {
+      const idx = GHOSTS.findIndex(gh => gh.id === g.id);
+      if (idx >= 0) {
+        // Save original and override with boss version
+        _originalGhostData[g.id] = { ...GHOSTS[idx] };
+        GHOSTS[idx] = { ...GHOSTS[idx], maxHp: g.maxHp, art: g.art || GHOSTS[idx].art };
+        _registeredRaidGhostIds.push(g.id);
+      } else {
+        // Ghost doesn't exist at all — add it
+        GHOSTS.push({
+          id: g.id,
+          name: g.name,
+          rarity: g.rarity || 'legendary',
+          maxHp: g.maxHp,
+          art: g.art || '',
+          ability: g.ability || '',
+          abilityDesc: g.abilityDesc || '',
+          _raidBridgeRegistered: true
+        });
+        _registeredRaidGhostIds.push(g.id);
+      }
     }
   });
 
@@ -102,8 +114,7 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   renderBossHpPool(bossHp, bossMaxHp);
 }
 
-// Track which ghost IDs we injected so cleanup can remove them
-let _registeredRaidGhostIds = [];
+// (_registeredRaidGhostIds declared at top of file)
 
 // ─── BOSS HP POOL BAR ──────────────────────────────────────────
 
@@ -207,15 +218,21 @@ function cleanupRaidBattle() {
     poolBar.remove();
   }
 
-  // ── Remove injected ghost data from RAID_BOSS_MINIONS ─────────
-  if (_registeredRaidGhostIds.length > 0 && typeof RAID_BOSS_MINIONS !== 'undefined') {
-    for (let i = RAID_BOSS_MINIONS.length - 1; i >= 0; i--) {
-      if (RAID_BOSS_MINIONS[i]._raidBridgeRegistered) {
-        RAID_BOSS_MINIONS.splice(i, 1);
-      }
-    }
-    _registeredRaidGhostIds = [];
+  // ── Restore original ghost data (undo boss HP overrides) ──────
+  if (_originalGhostData && typeof GHOSTS !== 'undefined') {
+    Object.entries(_originalGhostData).forEach(([id, original]) => {
+      const idx = GHOSTS.findIndex(g => g.id === parseInt(id));
+      if (idx >= 0) GHOSTS[idx] = original;
+    });
+    _originalGhostData = {};
   }
+  // Remove any ghosts that were injected (not overridden)
+  if (typeof GHOSTS !== 'undefined') {
+    for (let i = GHOSTS.length - 1; i >= 0; i--) {
+      if (GHOSTS[i]._raidBridgeRegistered) GHOSTS.splice(i, 1);
+    }
+  }
+  _registeredRaidGhostIds = [];
 
   // ── Clear battle state ────────────────────────────────────────
   B = null;
