@@ -1325,7 +1325,7 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
 
   // Calculate rewards for each player
   const badgePromises = [];
-  Object.entries(players).forEach(([slot, p]) => {
+  for (const [slot, p] of Object.entries(players)) {
     let points = 0;
 
     if (bossDefeated) {
@@ -1414,7 +1414,7 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
 
     // Clear active raid flag
     updates[`mp/users/${p.uid}/activeRaid`] = null;
-  });
+  }
 
   await db.ref().update(updates);
   // Await all badge grants so spectators reliably receive their badge
