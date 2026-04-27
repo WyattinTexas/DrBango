@@ -985,20 +985,29 @@
       const pDice = lastRoll.playerDice || [];
       const bDice = lastRoll.bossDice || [];
       const winner = lastRoll.winner;
-      // Detect new roll — animate only once per roll
       const rollKey = pDice.join(',') + '|' + bDice.join(',');
-      if (rollKey !== window._lastRollKey) {
+
+      // Skip dice updates while animation is playing
+      if (_animatingDice) {
+        // Do nothing — let the animation finish
+      } else if (rollKey !== window._lastRollKey) {
+        // New roll — trigger animation
         window._lastRollKey = rollKey;
-        // Animate: tumble → land → highlight
         animateDiceRoll(pDice, bDice, () => {
-          redDiceEl.innerHTML = renderDice(pDice, 'red', winner === 'player');
-          blueDiceEl.innerHTML = renderDice(bDice, 'blue', winner === 'boss');
+          // Animation done — show final highlighted dice
+          const r = document.getElementById('red-dice');
+          const b = document.getElementById('blue-dice');
+          if (r) r.innerHTML = renderDice(pDice, 'red', winner === 'player');
+          if (b) b.innerHTML = renderDice(bDice, 'blue', winner === 'boss');
         });
       }
+      // If same rollKey and not animating, dice are already showing — leave them
     } else if (redDiceEl && blueDiceEl) {
-      redDiceEl.innerHTML = '';
-      blueDiceEl.innerHTML = '';
-      window._lastRollKey = null;
+      if (!_animatingDice) {
+        redDiceEl.innerHTML = '';
+        blueDiceEl.innerHTML = '';
+        window._lastRollKey = null;
+      }
     }
 
     // ── Turn Indicator ──
