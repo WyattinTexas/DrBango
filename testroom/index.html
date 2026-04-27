@@ -9,8 +9,14 @@
 <title>Boo! Battle of Origins</title>
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
+// If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v843'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v847'; // MUST match TESTROOM_VERSION — bump both together
+  // Preserve raid params across cache-bust reloads
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('mode') === 'raid') {
+    sessionStorage.setItem('_raidParams', window.location.search);
+  }
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -2766,7 +2772,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v846'; // [shadow] fix "Once per game" → "Once Per Game" in Shepherd + Ash Phoenix abilityDesc
+const TESTROOM_VERSION = 'v847'; // Fix raid redirect flicker — sync all 3 version strings, preserve raid params across cache-bust
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -19219,13 +19225,22 @@ document.addEventListener('keydown', e => {
 //      &raidId=...&instanceId=...&slot=...&bossHp=...&bossMaxHp=...&bossName=...&personality=...
 // ============================================================
 (function checkRaidParams() {
-  const params = new URLSearchParams(window.location.search);
+  // Check URL first, then sessionStorage (survives cache-bust reload)
+  let params = new URLSearchParams(window.location.search);
+  if (params.get('mode') !== 'raid') {
+    const saved = sessionStorage.getItem('_raidParams');
+    if (saved) {
+      params = new URLSearchParams(saved);
+      sessionStorage.removeItem('_raidParams');
+    }
+  }
   if (params.get('mode') !== 'raid') return;
   if (window._raidParamsProcessed) return;
   window._raidParamsProcessed = true;
 
-  // Clean URL immediately so refresh doesn't re-trigger
+  // Clean URL & session immediately so refresh doesn't re-trigger
   window.history.replaceState({}, '', window.location.pathname);
+  sessionStorage.removeItem('_raidParams');
 
   const redParam = params.get('red');
   const blueParam = params.get('blue');
