@@ -160,6 +160,13 @@ const INLINE_BATTLE = (() => {
    * @param {object} raidData   — full raid instance data from Firebase
    */
   async function initInlineBattle(instanceId, raidData) {
+    // Idempotent: if battle already exists, don't overwrite it
+    const existing = await _battleRef(instanceId).once('value');
+    if (existing.val()) {
+      console.log('[INLINE] Battle already initialized, skipping init');
+      return existing.val();
+    }
+
     const raidId = raidData.raidId;
     const bossConfig = typeof RAID_BOSSES !== 'undefined' ? RAID_BOSSES[raidId] : null;
     if (!bossConfig) {
@@ -823,8 +830,11 @@ const INLINE_BATTLE = (() => {
    * and distributes rewards if the boss was defeated.
    */
   async function endInlineBattle(instanceId, bossDefeated) {
+    // Only the active turn player's client should finalize
     const state = await _getState(instanceId);
     if (!state) return;
+    const turnPlayer = state.players?.[state.turnPlayerIdx];
+    if (turnPlayer && turnPlayer.uid !== _uid()) return; // not our job
 
     // Calculate per-player damage totals
     const playerDamage = {};

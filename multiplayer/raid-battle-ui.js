@@ -415,7 +415,7 @@
     const user = firebase.auth().currentUser;
     if (!user || !state) return false;
     const players = state.players || {};
-    const idx = state.currentPlayerIdx;
+    const idx = state.turnPlayerIdx;
     const current = players[idx];
     return current && current.uid === user.uid;
   }
@@ -567,8 +567,9 @@
 
   /** Build the VS matchup section. */
   function renderMatchupHTML(state) {
-    const bossGhost = state.bossActiveGhost || {};
-    const playerGhost = state.currentPlayerGhost || {};
+    const bossGhost = (state.boss?.ghosts?.[state.boss?.activeIdx]) || {};
+    const turnPlayer = state.players?.[state.turnPlayerIdx];
+    const playerGhost = (turnPlayer?.ghosts?.[turnPlayer?.activeIdx]) || {};
     const round = state.round || 1;
 
     return `<div class="rib-matchup">
@@ -650,7 +651,7 @@
     const myIdx = myPlayerIdx(state);
     const playerData = (state.players || {})[myIdx];
     const resources = (playerData && playerData.resources) || state.resources || {};
-    const committed = state.committed || {};
+    const committed = (playerData && playerData.committed) || {};
     const phase = state.phase || 'pre-roll';
 
     const defs = [
@@ -695,8 +696,8 @@
     const phase = state.phase || '';
     const myIdx = myPlayerIdx(state);
     const playerData = (state.players || {})[myIdx];
-    const resources = (playerData && playerData.resources) || state.resources || {};
-    const ghost = state.currentPlayerGhost || {};
+    const resources = (playerData && playerData.resources) || {};
+    const ghost = playerData ? (playerData.ghosts?.[playerData.activeIdx] || {}) : {};
 
     // ROLL button
     const showRoll = mine && phase === 'pre-roll';
@@ -728,7 +729,7 @@
   function renderTurnIndicatorHTML(state) {
     const user = firebase.auth().currentUser;
     const players = state.players || {};
-    const currentIdx = state.currentPlayerIdx;
+    const currentIdx = state.turnPlayerIdx;
     const currentPlayer = players[currentIdx];
     const mine = isMyTurn(state);
     const myIdx = myPlayerIdx(state);
@@ -782,7 +783,7 @@
     let rows = '';
 
     Object.entries(players).forEach(([idx, p]) => {
-      const sideline = p.sideline || [];
+      const sideline = (p.ghosts || []).filter((g, i) => i !== p.activeIdx);
       if (sideline.length === 0) return;
 
       const ghostParts = sideline.map(g => {
@@ -847,11 +848,13 @@
     const playerData = (state.players || {})[myIdx];
     if (!playerData) return '';
 
-    const sideline = (playerData.sideline || []).filter(g => !g.ko && g.hp > 0);
+    const sideline = (playerData.ghosts || [])
+      .map((g, origIdx) => ({ ...g, origIdx }))
+      .filter(g => g.origIdx !== playerData.activeIdx && !g.ko && g.hp > 0);
     if (sideline.length === 0) return '';
 
-    const cards = sideline.map((g, i) => {
-      return `<div class="rib-ko-card" data-action="ko-swap" data-player="${myIdx}" data-ghost="${g.sidelineIdx !== undefined ? g.sidelineIdx : i}">
+    const cards = sideline.map((g) => {
+      return `<div class="rib-ko-card" data-action="ko-swap" data-player="${myIdx}" data-ghost="${g.origIdx}">
         <img src="${ghostArt(g)}" alt="${g.name}" onerror="this.src='../testroom/art/timber.jpg'">
         <div class="rib-ko-card-name">${g.name}</div>
         <div class="rib-ko-card-hp">${g.hp}/${g.maxHp}</div>
