@@ -490,10 +490,13 @@ function startActiveRaidListener() {
   const user = firebase.auth().currentUser;
   if (!user) return;
 
-  // Don't auto-enter raids if we just returned from one
+  // Don't auto-enter raids if we just returned from one (URL param only)
   const params = new URLSearchParams(window.location.search);
-  if (params.get('raidResult') || window._raidResultPending || sessionStorage.getItem('raidJustCompleted')) return;
-  // Clear the session flag after checking (one-time gate)
+  if (params.get('raidResult') || window._raidResultPending) return;
+
+  // Clear stale session flag — but ALWAYS register the listener
+  // (previous bug: stale raidJustCompleted blocked the listener permanently)
+  let justCompleted = sessionStorage.getItem('raidJustCompleted');
   sessionStorage.removeItem('raidJustCompleted');
 
   db.ref(`mp/users/${user.uid}/activeRaid`).on('value', async (snap) => {
@@ -502,6 +505,13 @@ function startActiveRaidListener() {
       if (currentRaid) {
         cleanupRaid();
       }
+      return;
+    }
+
+    // Skip auto-joining stale raids from a just-completed session (one-time gate)
+    if (justCompleted) {
+      justCompleted = null; // consumed — next trigger will work normally
+      await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
       return;
     }
 
