@@ -18,6 +18,9 @@ function ghostData(id) { return getGhost(id); }
   };
 })();
 
+// Missing globals from testroom
+var DEBUG = false;
+
 // Stubs for testroom-specific functions not needed in multiplayer
 function recordWin(id) {}
 function recordLoss(id) {}
@@ -14534,6 +14537,8 @@ function renderBattle() {
   // Ability buttons (pre-roll actions)
   ['red','blue'].forEach(team => {
     const el = document.getElementById(`${team}-ability-buttons`);
+    // Boss mode: skip blue ability buttons — boss doesn't get interactive buttons
+    if (window.BOSS_MODE && team === 'blue') { el.innerHTML = ''; return; }
     const f = active(B[team]);
     const enemy = opp(B[team]);
     let html = '';
