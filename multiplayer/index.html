@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.92'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.93'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3169,6 +3169,55 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 }
 .equip-inv-chip.is-equipped { border-color: rgba(212,160,64,0.4); color: var(--gold-bright); background: rgba(212,160,64,0.08); }
 
+/* ─── Equip Model Layout (MMO style) ─── */
+.equip-model-layout { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.equip-model-top { display: flex; justify-content: center; }
+.equip-model-middle { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.equip-model-left, .equip-model-right { flex-shrink: 0; }
+
+/* Character model in center */
+.equip-model-character {
+  position: relative; width: 140px; height: 180px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.equip-model-glow {
+  position: absolute; inset: 10px; border-radius: 50%;
+  filter: blur(24px); opacity: 0.3; pointer-events: none;
+  background: radial-gradient(circle, rgba(212,160,64,0.6), transparent 70%);
+}
+.equip-model-glow.legendary { background: radial-gradient(circle, rgba(255,68,68,0.5), rgba(212,160,64,0.3), transparent 70%); opacity: 0.4; }
+.equip-model-glow.ghost-rare { background: radial-gradient(circle, rgba(142,68,173,0.5), transparent 70%); }
+.equip-model-glow.rare { background: radial-gradient(circle, rgba(240,192,64,0.5), transparent 70%); }
+.equip-model-glow.uncommon { background: radial-gradient(circle, rgba(46,204,113,0.4), transparent 70%); }
+.equip-model-glow.common { background: radial-gradient(circle, rgba(160,150,134,0.3), transparent 70%); }
+.equip-model-art {
+  width: 120px; height: 140px; object-fit: cover; border-radius: 14px;
+  border: 2px solid rgba(212,160,64,0.4); position: relative; z-index: 1;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.equip-model-name {
+  font-family: 'Creepster', cursive; font-size: 0.9rem; color: var(--text);
+  letter-spacing: 1.5px; margin-top: 6px; text-align: center; position: relative; z-index: 1;
+}
+
+/* Equipment slot tiles (around the model) */
+.equip-model-slot {
+  width: 90px; height: 90px; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer; text-align: center;
+  background: rgba(255,255,255,0.03); border: 2px dashed rgba(255,255,255,0.12);
+  transition: all 0.2s ease; position: relative;
+}
+.equip-model-slot:hover { border-color: rgba(212,160,64,0.5); background: rgba(212,160,64,0.06); transform: scale(1.05); }
+.equip-model-slot.filled { border-style: solid; border-color: rgba(212,160,64,0.5); background: rgba(212,160,64,0.08); }
+.equip-model-slot.filled.legendary { border-color: rgba(255,68,68,0.6); background: rgba(255,68,68,0.08); box-shadow: 0 0 16px rgba(255,68,68,0.15); }
+.equip-model-slot.filled.rare { border-color: rgba(240,192,64,0.5); box-shadow: 0 0 12px rgba(240,192,64,0.1); }
+.equip-model-slot-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); font-weight: 700; }
+.equip-model-slot-icon { font-size: 1.6rem; line-height: 1; }
+.equip-model-slot.empty .equip-model-slot-icon { opacity: 0.2; }
+.equip-model-slot-name { font-size: 0.65rem; color: var(--text); font-weight: 600; line-height: 1.15; max-width: 80px; }
+.equip-model-slot.empty .equip-model-slot-name { color: var(--text-dim); font-style: italic; font-weight: 400; }
+
 /* ─── Equip Character Screen (in-raid select view) ─── */
 .raid-equip-section { margin: 16px 0; }
 .equip-title { font-family: 'Creepster', cursive; color: var(--gold-bright); letter-spacing: 2px; font-size: 1rem; text-align: center; margin-bottom: 10px; }
@@ -4179,7 +4228,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.92';
+const BBN_VERSION = 'v0.93';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -8133,39 +8182,54 @@ async function renderEquipOverlay() {
   const items = inv?.items || [];
   const equipped = inv?.equipped || { head: null, weapon: null, accessory: null };
 
-  if (items.length === 0) {
-    slotsEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px 0">No raid loot yet. Defeat a boss to earn gear!</p>';
-    if (invEl) invEl.innerHTML = '';
-    return;
-  }
+  // Get lead ghost for character model
+  const leadId = (typeof team !== 'undefined' && team[0]) ? team[0] : null;
+  const leadGhost = leadId ? getGhost(leadId) : null;
+  const ghostArt = leadGhost ? leadGhost.art : '../testroom/art/timber.jpg';
+  const ghostName = leadGhost ? leadGhost.name : 'Select a team';
+  const ghostRarity = leadGhost ? (leadGhost.rarity || 'common') : 'common';
 
-  // Render the 3 slots
-  const slotOrder = ['head', 'weapon', 'accessory'];
-  slotsEl.innerHTML = slotOrder.map(slot => {
+  // Build slot HTML helper
+  function slotHtml(slot) {
     const slotDef = EQUIP_SLOTS[slot];
     const itemKey = equipped[slot];
     const item = itemKey ? RAID_ITEMS[itemKey] : null;
     const tierClass = item?.tier || '';
-
     if (item) {
-      return `<div class="equip-slot filled ${tierClass}" onclick="openEquipPicker('${slot}')">
-        <div class="equip-slot-label">${slotDef.label}</div>
-        <div class="equip-slot-icon">${item.icon}</div>
-        <div class="equip-slot-name">${item.name}</div>
-        <div class="equip-slot-hint">tap to change</div>
-      </div>`;
-    } else {
-      return `<div class="equip-slot empty" onclick="openEquipPicker('${slot}')">
-        <div class="equip-slot-label">${slotDef.label}</div>
-        <div class="equip-slot-icon">${slotDef.icon}</div>
-        <div class="equip-slot-name">${slotDef.empty}</div>
-        <div class="equip-slot-hint">tap to equip</div>
+      return `<div class="equip-model-slot filled ${tierClass}" onclick="openEquipPicker('${slot}')">
+        <div class="equip-model-slot-label">${slotDef.label}</div>
+        <div class="equip-model-slot-icon">${item.icon}</div>
+        <div class="equip-model-slot-name">${item.name}</div>
       </div>`;
     }
-  }).join('');
+    return `<div class="equip-model-slot empty" onclick="openEquipPicker('${slot}')">
+      <div class="equip-model-slot-label">${slotDef.label}</div>
+      <div class="equip-model-slot-icon">${slotDef.icon}</div>
+      <div class="equip-model-slot-name">${slotDef.empty}</div>
+    </div>`;
+  }
 
-  // Render full inventory below
+  // MMO-style layout: Head on top, Weapon left, Accessory right, character center
+  slotsEl.innerHTML = `
+    <div class="equip-model-layout">
+      <div class="equip-model-top">${slotHtml('head')}</div>
+      <div class="equip-model-middle">
+        <div class="equip-model-left">${slotHtml('weapon')}</div>
+        <div class="equip-model-character">
+          <div class="equip-model-glow ${ghostRarity}"></div>
+          <img class="equip-model-art" src="${ghostArt}" alt="${ghostName}" onerror="this.src='../testroom/art/timber.jpg'">
+          <div class="equip-model-name">${ghostName}</div>
+        </div>
+        <div class="equip-model-right">${slotHtml('accessory')}</div>
+      </div>
+    </div>`;
+
+  // Inventory section below
   if (invEl) {
+    if (items.length === 0) {
+      invEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:12px 0;font-size:0.85rem;font-style:italic">Defeat a boss to earn gear!</p>';
+      return;
+    }
     const equippedKeys = new Set(Object.values(equipped).filter(Boolean));
     let invHtml = '<h4>INVENTORY</h4><div class="equip-inv-grid">';
     items.forEach(key => {
