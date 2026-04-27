@@ -417,6 +417,89 @@ function injectRaidReturnButton() {
   };
 })();
 
+// ─── PATCH: Alternating turns — swap players after each round ───
+// In raid mode with multiple players, after each round resolves,
+// pause the battle and advance to the next player via Firebase.
+(function _hookAlternatingTurns() {
+  const _origDoStartNextRound = window._doStartNextRound;
+  if (typeof _origDoStartNextRound !== 'function') return;
+
+  window._doStartNextRound = function () {
+    // Only intercept in raid mode with multiple players
+    if (!window.RAID_MODE || !currentRaid || !raidBattleState) {
+      return _origDoStartNextRound.call(this);
+    }
+    const players = currentRaid.players || {};
+    const playerCount = Object.keys(players).length;
+    if (playerCount <= 1) {
+      // Solo raid — no turn swapping needed
+      return _origDoStartNextRound.call(this);
+    }
+
+    // Write a final snapshot so Player 2 sees the last roll result
+    _lastSnapshotHash = ''; // force write
+
+    // Pause this player's battle — don't start next round
+    if (typeof stopBlueAI === 'function') stopBlueAI();
+    stopSnapshotSync();
+
+    // Hide roll button, show "Waiting for other player..."
+    const rollBtn = document.getElementById('rollRedBtn');
+    if (rollBtn) rollBtn.style.display = 'none';
+    const narrator = document.getElementById('narrator');
+    if (narrator) narrator.innerHTML = 'Your turn is done — passing to the next raider...';
+
+    // Advance currentFighterIdx in Firebase
+    const currentIdx = raidBattleState.currentSlot || 0;
+    const nextIdx = (currentIdx + 1) % playerCount;
+
+    // Write damage and advance turn
+    const instanceId = currentRaid.instanceId;
+    db.ref(`mp/raids/instances/${instanceId}`).update({
+      currentFighterIdx: nextIdx,
+      currentFighterUid: players[nextIdx]?.uid || null,
+      fightPhase: 'fighting'
+    }).then(() => {
+      console.log('[RAID] Turn passed to player', nextIdx);
+      // Set spectating mode — we'll see the other player fight
+      _isSpectating = true;
+      // Keep the battle screen visible so we can see updates
+    });
+  };
+})();
+
+// ─── PATCH: Spectator detects game completion ──────────────────
+// Player 2 needs to see a result screen when the raid completes.
+// Listen for raid status changes even while spectating.
+(function _hookSpectatorGameOver() {
+  // Poll raid status while spectating
+  setInterval(() => {
+    if (!_isSpectating || !currentRaid) return;
+    db.ref(`mp/raids/instances/${currentRaid.instanceId}/status`).once('value').then(snap => {
+      if (snap.val() === 'complete') {
+        // Raid is over — show return to lobby
+        const raidScreen = document.getElementById('raid-screen');
+        if (!raidScreen || raidScreen.style.display === 'none') return;
+        // Don't show if we already have a game-over overlay
+        const existing = document.getElementById('gameOver');
+        if (existing && existing.style.display !== 'none' && existing.innerHTML) return;
+
+        // Show a simple result overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+        overlay.innerHTML = `
+          <h1 style="font-family:Creepster,cursive;font-size:2.5rem;color:#2ecc71;letter-spacing:4px;">RAID COMPLETE</h1>
+          <p style="color:var(--text2);font-size:1.1rem;">The raid has ended.</p>
+          <button style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;"
+            onclick="this.parentElement.remove(); cleanupRaidBattle(); if(typeof showRaidLobby==='function') showRaidLobby();">
+            RETURN TO LOBBY
+          </button>`;
+        document.body.appendChild(overlay);
+      }
+    }).catch(() => {});
+  }, 2000);
+})();
+
 // ─── SNAPSHOT SYNC: Poll battle state and write to Firebase ─────
 // Simple interval that writes B state to Firebase every 500ms while
 // the active player is fighting. Player 2's battleState listener
