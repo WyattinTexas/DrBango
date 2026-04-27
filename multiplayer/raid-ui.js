@@ -658,7 +658,11 @@ function showRaidLaunchCountdown(bossName) {
       numEl.style.transform = 'scale(1.5)';
     } else {
       clearInterval(interval);
-      // Overlay will be removed when page redirects to testroom
+      // Remove the countdown overlay after a brief flash
+      const el = document.getElementById('raid-launch-countdown');
+      if (el) {
+        setTimeout(() => el.remove(), 600);
+      }
     }
   }, 1000);
 }
@@ -1089,7 +1093,6 @@ function showLootRollReveal(playerData, boss) {
   const itemKey = playerData.lootItem;
   const itemName = playerData.lootItemName;
   const itemIcon = playerData.lootItemIcon;
-  const resources = playerData.lootResources || {};
 
   section.style.display = 'block';
   section.scrollIntoView({ behavior: 'smooth' });
@@ -1106,13 +1109,13 @@ function showLootRollReveal(playerData, boss) {
       `<span class="loot-die landed" style="animation-delay:${i * 0.1}s">${dieFaces[d-1]}</span>`
     ).join('');
 
-    // Show roll type
+    // Show roll type — green / blue / orange rarity
     const typeLabels = {
-      singles: '✦ COMMON DROP',
-      doubles: '✦✦ RARE DROP!',
-      triples: '✦✦✦ JACKPOT!!!'
+      singles: '✦ COMMON',
+      doubles: '✦✦ RARE',
+      triples: '✦✦✦ LEGENDARY'
     };
-    const typeColors = { singles: '#aaa', doubles: '#f0c040', triples: '#ff4444' };
+    const typeColors = { singles: '#4CAF50', doubles: '#2196F3', triples: '#FF9800' };
     diceEl.innerHTML += `<div class="loot-roll-type" style="color:${typeColors[rollType]}">${typeLabels[rollType]}</div>`;
 
     if (rollType === 'triples') {
@@ -1135,21 +1138,6 @@ function showLootRollReveal(playerData, boss) {
         <span class="loot-item-name">${itemName}</span>
         ${itemDef?.desc ? `<span class="loot-item-desc">${itemDef.desc}</span>` : ''}
       </div>`;
-    }
-
-    // Show resource drops
-    const resNames = {
-      healingSeed: '🌿 Healing Seed', ice: '❄️ Ice Shard', fire: '🔥 Sacred Fire',
-      surge: '⚡ Surge', luckyStone: '🍀 Lucky Stone', moonstone: '💎 Moonstone',
-      firefly: '🏮 Firefly', burn: '💥 Burn'
-    };
-    const resEntries = Object.entries(resources).filter(([k,v]) => v > 0);
-    if (resEntries.length > 0) {
-      html += `<div class="loot-resources">`;
-      resEntries.forEach(([key, amount]) => {
-        html += `<span class="loot-resource">${resNames[key] || key} ×${amount}</span>`;
-      });
-      html += `</div>`;
     }
 
     if (!html) html = '<div class="loot-nothing">No loot this time</div>';
