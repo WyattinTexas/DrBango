@@ -424,14 +424,24 @@ function injectRaidReturnButton() {
   const _origResetRollButtons = window.resetRollButtons;
   if (typeof _origResetRollButtons !== 'function') return;
 
+  var _raidRoundsPlayed = 0;
+
   window.resetRollButtons = function () {
     // Only intercept in raid mode with multiple players
     if (!window.RAID_MODE || !currentRaid) {
+      _raidRoundsPlayed = 0;
       return _origResetRollButtons.call(this);
     }
     const players = currentRaid.players || {};
     const playerCount = Object.keys(players).length;
     if (playerCount <= 1) {
+      return _origResetRollButtons.call(this);
+    }
+
+    // First call is during startBattle init — let it through so the roll button appears
+    // Only intercept AFTER at least one round has been played (B.round > 1)
+    if (!B || B.round <= 1) {
+      _raidRoundsPlayed = 0;
       return _origResetRollButtons.call(this);
     }
 
