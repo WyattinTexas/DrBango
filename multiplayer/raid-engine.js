@@ -626,22 +626,8 @@ function handleRaidStateChange(data) {
     case 'active':
       // Hide waiting room if still visible
       if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
-      // Use inline battle (alternating turns, no testroom redirect)
-      if (typeof INLINE_BATTLE !== 'undefined') {
-        // Show the raid screen
-        if (typeof showRaidScreen === 'function') showRaidScreen(currentRaid.instanceId);
-        // Init battle (idempotent — if state exists, just starts listening)
-        INLINE_BATTLE.initInlineBattle(currentRaid.instanceId, data);
-        // Start listening and rendering
-        INLINE_BATTLE.listenToInlineBattle(currentRaid.instanceId, (state) => {
-          if (typeof renderInlineBattle === 'function') {
-            renderInlineBattle(state, currentRaid.instanceId);
-          }
-        });
-      } else {
-        // Fallback: old sequential system
-        handleActiveFight(data);
-      }
+      // Use battle-engine.js via bridge (the real testroom experience)
+      handleActiveFight(data);
       break;
 
     case 'complete':
@@ -879,13 +865,17 @@ function launchRaidBattle(raidData, enemyGhosts, isWave) {
   const playerData = raidData.players[raidData.currentFighterIdx || 0];
   const playerTeam = playerData.team;
 
-  // Set boss mode flag for battle engine
-  window.BOSS_MODE = true;
-  window.BOSS_RAID_DATA = raidBattleState;
-  window.IS_WAVE_FIGHT = isWave;
-
-  if (typeof showRaidBattleUI === 'function') {
-    showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData);
+  // Use bridge to run battle in-page (no testroom redirect)
+  if (typeof initRaidBattleInPage === 'function') {
+    initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave);
+  } else {
+    // Fallback: old testroom redirect
+    window.BOSS_MODE = true;
+    window.BOSS_RAID_DATA = raidBattleState;
+    window.IS_WAVE_FIGHT = isWave;
+    if (typeof showRaidBattleUI === 'function') {
+      showRaidBattleUI(playerTeam, enemyGhosts, isWave, raidData);
+    }
   }
 }
 
