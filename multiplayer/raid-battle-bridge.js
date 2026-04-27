@@ -321,8 +321,10 @@ function injectRaidReturnButton() {
   window.showGameOver = function (winner) {
     _origShowGameOver.call(this, winner);
     if (window.RAID_MODE) {
-      // Replace ALL buttons in game-over with our return-to-lobby button
-      requestAnimationFrame(() => {
+      // endMyRaidFight is called by _origShowGameOver after 3s — it writes
+      // results to Firebase and advances currentFighterIdx to the next player.
+      // Show RETURN TO LOBBY only AFTER that completes (4s delay).
+      setTimeout(() => {
         const goButtons = document.querySelector('.go-buttons');
         if (goButtons) {
           goButtons.innerHTML = `
@@ -331,9 +333,7 @@ function injectRaidReturnButton() {
               RETURN TO LOBBY
             </button>`;
         }
-        // endMyRaidFight is called by battle-engine.js showGameOver() already
-        // — don't call it again here (would double-count or crash)
-      });
+      }, 4500);
     }
   };
 })();

@@ -575,6 +575,18 @@ function enterRaidScreen(instanceId) {
     handleRaidStateChange(minimalData);
   });
 
+  // Listen for fighter index changes — this is how Player 2 detects it's their turn
+  raidListeners['fighterIdx'] = instRef.child('currentFighterIdx').on('value', async (snap) => {
+    const idx = snap.val();
+    if (idx == null || !currentRaid) return;
+    // Re-fetch instance data for the new fighter
+    const freshSnap = await instRef.once('value');
+    const freshData = freshSnap.val();
+    if (!freshData || freshData.status !== 'active') return;
+    currentRaid = { instanceId, ...freshData };
+    handleActiveFight(freshData);
+  });
+
   // Listen for battle state (spectator feed) — separate, safe listener
   raidListeners['battleState'] = instRef.child('battleState').on('value', (snap) => {
     const state = snap.val();
@@ -667,9 +679,18 @@ function handleActiveFight(data) {
 
   if (mySlot === currentIdx && players[mySlot]?.status !== 'done' && players[mySlot]?.status !== 'disconnected') {
     // It's our turn to fight!
-    if (!raidBattleState || raidBattleState.phase === 'waiting') {
+    if (!raidBattleState || raidBattleState.phase === 'waiting' || raidBattleState.phase === 'done') {
       // Hide spectator overlay if we were watching
       if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
+      // Clean up previous battle UI before starting ours
+      if (typeof cleanupRaidBattle === 'function' && raidBattleState?.phase === 'done') {
+        // Don't call full cleanup — just reset the battle view
+        const gameOverEl = document.getElementById('gameOver');
+        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+        if (typeof stopBlueAI === 'function') stopBlueAI();
+        B = null;
+        raidBattleState = null;
+      }
       startMyRaidFight(data);
     }
   } else {
