@@ -433,12 +433,19 @@ async function doEquip(itemKey) {
   closeEquipPicker();
   await equipRaidItem(itemKey);
   renderEquipScreen();
+  // Also refresh the standalone overlay if it's open
+  if (typeof renderEquipOverlay === 'function' && document.getElementById('equip-overlay')?.style.display !== 'none') {
+    renderEquipOverlay();
+  }
 }
 
 async function doUnequip(slot) {
   closeEquipPicker();
   await unequipRaidSlot(slot);
   renderEquipScreen();
+  if (typeof renderEquipOverlay === 'function' && document.getElementById('equip-overlay')?.style.display !== 'none') {
+    renderEquipOverlay();
+  }
 }
 
 let raidTeamPicks = [];

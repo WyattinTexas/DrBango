@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.91'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.92'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3103,7 +3103,73 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .loot-inv-item.equipped { border-color: rgba(212,160,64,0.6); background: rgba(212,160,64,0.18); }
 #raid-loot-inventory h4 { font-family: 'Creepster', cursive; color: var(--gold-bright); letter-spacing: 2px; margin-top: 20px; margin-bottom: 4px; font-size: 1rem; }
 
-/* ─── Equip Character Screen ─── */
+/* ─── Equip Side Tab ─── */
+.equip-side-tab {
+  position: fixed;
+  right: 0;
+  top: calc(50% + 220px);
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, #1a1a0e, #2a2410);
+  border: 1px solid rgba(212,160,64,0.5);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  padding: 10px 10px 10px 12px;
+  cursor: pointer;
+  z-index: 50;
+  text-align: center;
+  box-shadow: -2px 0 16px rgba(212,160,64,0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+  writing-mode: vertical-lr;
+  font-family: 'Creepster', cursive;
+  font-size: 0.85rem;
+  color: #d4a040;
+  letter-spacing: 2px;
+  line-height: 1.2;
+}
+.equip-side-tab:hover {
+  transform: translateY(-50%) translateX(-4px);
+  box-shadow: -4px 0 24px rgba(212,160,64,0.5);
+  color: #f0c560;
+}
+.equip-tab-icon { writing-mode: horizontal-tb; font-size: 1.2rem; margin-bottom: 4px; display: block; }
+
+/* ─── Equip Overlay ─── */
+.equip-overlay {
+  position: fixed; inset: 0; z-index: 8000;
+  background: rgba(0,0,0,0.88); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.25s ease;
+}
+.equip-overlay-inner {
+  width: 400px; max-width: 94vw; max-height: 85vh;
+  background: var(--bg, #0a0a14); border: 1px solid var(--border);
+  border-radius: 20px; padding: 24px 20px; position: relative;
+  overflow-y: auto;
+}
+.equip-overlay-close {
+  position: absolute; top: 12px; right: 16px;
+  background: none; border: none; color: var(--text-dim); font-size: 1.6rem;
+  cursor: pointer; line-height: 1;
+}
+.equip-overlay-close:hover { color: #fff; }
+.equip-overlay-title {
+  font-family: 'Creepster', cursive; color: var(--gold-bright);
+  letter-spacing: 3px; font-size: 1.4rem; text-align: center; margin-bottom: 16px;
+}
+.equip-inventory-section { margin-top: 20px; }
+.equip-inventory-section h4 {
+  font-family: 'Creepster', cursive; color: var(--text-dim);
+  letter-spacing: 2px; font-size: 0.85rem; margin-bottom: 8px; text-align: center;
+}
+.equip-inv-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.equip-inv-chip {
+  display: flex; align-items: center; gap: 5px; padding: 4px 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.78rem; color: var(--text-dim);
+}
+.equip-inv-chip.is-equipped { border-color: rgba(212,160,64,0.4); color: var(--gold-bright); background: rgba(212,160,64,0.08); }
+
+/* ─── Equip Character Screen (in-raid select view) ─── */
 .raid-equip-section { margin: 16px 0; }
 .equip-title { font-family: 'Creepster', cursive; color: var(--gold-bright); letter-spacing: 2px; font-size: 1rem; text-align: center; margin-bottom: 10px; }
 .equip-slots { display: flex; gap: 10px; justify-content: center; }
@@ -3720,6 +3786,20 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   <!-- Raids Tab (right sidebar) -->
   <div class="raid-side-tab" id="raid-side-tab" onclick="showRaidSection('lobby')"><span class="raid-tab-icon">&#x2694;</span>Raids</div>
 
+  <!-- Equip Tab (right sidebar, below raids) -->
+  <div class="equip-side-tab" id="equip-side-tab" onclick="showEquipOverlay()"><span class="equip-tab-icon">&#x1F6E1;</span>Equip</div>
+
+  <!-- Equip Overlay (full screen) -->
+  <div id="equip-overlay" class="equip-overlay" style="display:none">
+    <div class="equip-overlay-inner">
+      <button class="equip-overlay-close" onclick="closeEquipOverlay()">&times;</button>
+      <h2 class="equip-overlay-title">LOADOUT</h2>
+      <div id="equip-overlay-slots" class="equip-slots"></div>
+      <div id="equip-overlay-inventory" class="equip-inventory-section"></div>
+      <div id="equip-picker-overlay" class="equip-picker-overlay" style="display:none"></div>
+    </div>
+  </div>
+
   <!-- Champion of the Day (right sidebar) -->
   <div class="champion-tab" id="champion-tab" onclick="expandChampion()"><span class="tab-crown">👑</span>Champion</div>
   <div class="champion-sidebar" id="champion-sidebar" style="display:none;">
@@ -4099,7 +4179,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-shop.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.91';
+const BBN_VERSION = 'v0.92';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -8026,6 +8106,78 @@ function closeRaidLobby() {
   const overlay = document.getElementById('raid-lobby-overlay');
   overlay.classList.remove('active');
   setTimeout(() => { overlay.style.display = 'none'; }, 350);
+}
+
+// ─── EQUIP OVERLAY ─────────────────────────────────────────────
+function showEquipOverlay() {
+  const overlay = document.getElementById('equip-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  renderEquipOverlay();
+}
+
+function closeEquipOverlay() {
+  const overlay = document.getElementById('equip-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function renderEquipOverlay() {
+  const slotsEl = document.getElementById('equip-overlay-slots');
+  const invEl = document.getElementById('equip-overlay-inventory');
+  if (!slotsEl) return;
+
+  const user = firebase.auth().currentUser;
+  if (!user) { slotsEl.innerHTML = '<p style="color:var(--text-dim);text-align:center">Log in to manage loadout</p>'; return; }
+
+  const snap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+  const inv = snap.val();
+  const items = inv?.items || [];
+  const equipped = inv?.equipped || { head: null, weapon: null, accessory: null };
+
+  if (items.length === 0) {
+    slotsEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px 0">No raid loot yet. Defeat a boss to earn gear!</p>';
+    if (invEl) invEl.innerHTML = '';
+    return;
+  }
+
+  // Render the 3 slots
+  const slotOrder = ['head', 'weapon', 'accessory'];
+  slotsEl.innerHTML = slotOrder.map(slot => {
+    const slotDef = EQUIP_SLOTS[slot];
+    const itemKey = equipped[slot];
+    const item = itemKey ? RAID_ITEMS[itemKey] : null;
+    const tierClass = item?.tier || '';
+
+    if (item) {
+      return `<div class="equip-slot filled ${tierClass}" onclick="openEquipPicker('${slot}')">
+        <div class="equip-slot-label">${slotDef.label}</div>
+        <div class="equip-slot-icon">${item.icon}</div>
+        <div class="equip-slot-name">${item.name}</div>
+        <div class="equip-slot-hint">tap to change</div>
+      </div>`;
+    } else {
+      return `<div class="equip-slot empty" onclick="openEquipPicker('${slot}')">
+        <div class="equip-slot-label">${slotDef.label}</div>
+        <div class="equip-slot-icon">${slotDef.icon}</div>
+        <div class="equip-slot-name">${slotDef.empty}</div>
+        <div class="equip-slot-hint">tap to equip</div>
+      </div>`;
+    }
+  }).join('');
+
+  // Render full inventory below
+  if (invEl) {
+    const equippedKeys = new Set(Object.values(equipped).filter(Boolean));
+    let invHtml = '<h4>INVENTORY</h4><div class="equip-inv-grid">';
+    items.forEach(key => {
+      const def = RAID_ITEMS[key];
+      if (def) {
+        const isEq = equippedKeys.has(key);
+        invHtml += `<div class="equip-inv-chip ${isEq ? 'is-equipped' : ''}">${def.icon} ${def.name}${isEq ? ' ✓' : ''}</div>`;
+      }
+    });
+    invHtml += '</div>';
+    invEl.innerHTML = invHtml;
+  }
 }
 
 // Handle return from raid battle (testroom redirects back with ?raidResult=done)
