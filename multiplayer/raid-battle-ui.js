@@ -534,12 +534,12 @@
 #raid-screen .die-physics {
   position: absolute;
   z-index: 10;
-  perspective: 350px;
+  pointer-events: none;
 }
-#raid-screen .die-cube {
-  width: 100%; height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
+#raid-screen .die-physics .die {
+  width: 100% !important; height: 100% !important;
+  margin: 0 !important;
+  border-radius: 6px;
 }
 #raid-screen .die-face {
   position: absolute;
@@ -1528,14 +1528,15 @@
       die.style.width = dieSize + 'px';
       die.style.height = dieSize + 'px';
       die.style.zIndex = '100';
-      die.style.setProperty('--dh', half + 'px');
-      die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
+      // Use flat parchment dice (no 3D cubes — more reliable cross-browser)
+      const randomFace = Math.floor(Math.random() * 6) + 1;
+      die.innerHTML = `<div class="die die-${team}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0;font-size:${dieSize > 44 ? 24 : 18}px;">${randomFace}</div>`;
       board.appendChild(die);
       els.push(die);
 
       const tv = throwVecs[i];
       dice.push({
-        el: die, cube: die.querySelector('.die-cube'),
+        el: die, cube: die.querySelector('.die'),
         x: handX + (Math.random() - 0.5) * 6, y: handY + (Math.random() - 0.5) * 6,
         vx: (isRed ? 1 : -1) * tv.vx,
         vy: tv.vy,
@@ -1620,10 +1621,17 @@
           d.ry += (Math.round(d.ry / 90) * 90 - d.ry) * strength;
           d.rz += (Math.round(d.rz / 90) * 90 - d.rz) * strength;
         }
-        // Render
+        // Render position + flat 2D rotation (rz only) + random face while tumbling
         d.el.style.left = d.x + 'px';
         d.el.style.top = d.y + 'px';
-        d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+        if (d.cube) {
+          d.cube.style.transform = `rotate(${d.rz}deg)`;
+          // Cycle random face numbers while tumbling fast
+          const speed = Math.abs(d.vx) + Math.abs(d.vy);
+          if (speed > 3 && Math.random() < 0.3) {
+            d.cube.textContent = Math.floor(Math.random() * 6) + 1;
+          }
+        }
       });
       _raidDicePhysics[team].raf = requestAnimationFrame(step);
     }
@@ -1679,20 +1687,17 @@
         ? trayMidY - dieSize - rowGap / 2
         : trayMidY + rowGap / 2;
 
-      // Target rotation for the correct face value
-      const tgt = FACE_TARGET[v];
-      const frx = nearestSnap(d.rx, tgt.rx);
-      const fry = nearestSnap(d.ry, tgt.ry);
-      const frz = nearestSnap(d.rz, 0);
-      d.rx = frx; d.ry = fry; d.rz = frz;
       d.value = v;
 
-      // Stagger each die slightly for a natural feel
+      // Stagger each die — fly to tray and show final value
       setTimeout(() => {
         d.el.classList.add('settling');
         d.el.style.left = tx + 'px';
         d.el.style.top = ty + 'px';
-        d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
+        if (d.cube) {
+          d.cube.textContent = v;
+          d.cube.style.transform = 'rotate(0deg)';
+        }
       }, i * 80);
     });
 
@@ -1834,6 +1839,9 @@
     // Phase 1: Launch physics dice for both teams simultaneously
     raidShowRolling('red', playerDice.length);
     raidShowRolling('blue', bossDice.length);
+    // Sound — match testroom
+    if (typeof playSfx === 'function') playSfx('sfxDiceRoll');
+    else { try { const a = document.getElementById('sfxDiceRoll'); if (a) { a.currentTime = 0; a.volume = 0.8; a.play().catch(()=>{}); } } catch(e){} }
 
     // Phase 2: After ~1.5s of tumbling, reveal final values
     setTimeout(() => {
