@@ -27,10 +27,11 @@ const RAID_CONFIG = {
 // ─── LOOT TABLE SYSTEM ──────────────────────────────────────────
 // Players roll 3 dice after defeating a boss. Roll determines loot tier:
 //   Singles → common drop (resources)
-//   Doubles → rare drop (items)
-//   Triples → jackpot (legendary items + resources)
+//   Doubles → rare drop (blue)
+//   Triples → legendary drop (orange)
 // Items carry within the raid run, reset when raid ends.
 // Players start each boss fight with their accumulated loot equipped.
+// 3 equipment slots: Head, Weapon, Accessory. That's all you get.
 
 const RAID_ITEMS = {
   // === BLADES → weapon slot ===
@@ -55,11 +56,11 @@ const RAID_ITEMS = {
   frost_shard:    { name: 'Frost Shard',    icon: '❄️', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 1 Ice Shard.' },
   surge_crystal:  { name: 'Surge Crystal',  icon: '⚡', type: 'charm', tier: 'common', slot: 'accessory',
-                    desc: 'Start each fight with 2 Surge.' },
-  moonstone_ring: { name: 'Moonstone Ring', icon: '💎', type: 'charm', tier: 'rare', slot: 'accessory',
+                    desc: 'Start each fight with 1 Surge.' },
+  moonstone_ring: { name: 'Moonstone Ring', icon: '💎', type: 'legendary', tier: 'legendary', slot: 'accessory',
                     desc: 'Start each fight with 1 Moonstone.' },
   firefly_lantern:{ name: 'Firefly Lantern',icon: '🏮', type: 'charm', tier: 'rare', slot: 'accessory',
-                    desc: 'Start each fight with 1 Magic Firefly.' },
+                    desc: 'Start each fight with 1 Magic Firefly. Take 2 damage immediately.' },
 
   // === LEGENDARY → weapon or head slot ===
   golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary', slot: 'weapon',
@@ -81,39 +82,34 @@ const EQUIP_SLOTS = {
 const RAID_LOOT_TABLES = {
   1: { // Rolling Hills
     singles: ['lucky_charm', 'healing_root', 'ember_stone', 'frost_shard', 'surge_crystal'],
-    doubles: ['ice_blade', 'flame_blade', 'mask_of_day', 'moonstone_ring'],
-    triples: ['golden_dice', 'shades_cape'],
-    resources: { singles: {healingSeed: 1, ice: 1}, doubles: {fire: 2, luckyStone: 1}, triples: {moonstone: 1, fire: 2, ice: 2} }
+    doubles: ['ice_blade', 'flame_blade', 'mask_of_day', 'firefly_lantern'],
+    triples: ['golden_dice', 'shades_cape', 'moonstone_ring']
   },
   2: { // Frost Valley
     singles: ['lucky_charm', 'healing_root', 'frost_shard', 'surge_crystal', 'ember_stone'],
-    doubles: ['ice_blade', 'mask_of_night', 'firefly_lantern', 'moonstone_ring'],
-    triples: ['golden_dice', 'shades_cape', 'valkins_crystal'],
-    resources: { singles: {ice: 2, surge: 2}, doubles: {luckyStone: 2, moonstone: 1}, triples: {moonstone: 2, ice: 3, fire: 2} }
+    doubles: ['ice_blade', 'mask_of_night', 'firefly_lantern', 'flame_blade'],
+    triples: ['golden_dice', 'shades_cape', 'valkins_crystal', 'moonstone_ring']
   },
   3: { // Volcanic Isles
     singles: ['ember_stone', 'healing_root', 'surge_crystal', 'lucky_charm', 'frost_shard'],
     doubles: ['flame_blade', 'mask_of_day', 'mask_of_night', 'firefly_lantern'],
-    triples: ['valkins_crystal', 'golden_dice', 'shades_cape'],
-    resources: { singles: {fire: 2, burn: 2}, doubles: {fire: 3, healingSeed: 2}, triples: {moonstone: 2, fire: 3, burn: 3} }
+    triples: ['valkins_crystal', 'golden_dice', 'shades_cape', 'moonstone_ring']
   },
   4: { // Dark Castle
-    singles: ['moonstone_ring', 'firefly_lantern', 'lucky_charm', 'healing_root', 'ember_stone'],
+    singles: ['lucky_charm', 'healing_root', 'ember_stone', 'frost_shard', 'surge_crystal'],
     doubles: ['ice_blade', 'flame_blade', 'mask_of_night', 'mask_of_day'],
-    triples: ['valkins_crystal', 'shades_cape', 'golden_dice'],
-    resources: { singles: {moonstone: 1, luckyStone: 1}, doubles: {moonstone: 2, fire: 2, ice: 2}, triples: {moonstone: 3, fire: 3, ice: 3, luckyStone: 2} }
+    triples: ['valkins_crystal', 'shades_cape', 'golden_dice', 'moonstone_ring']
   },
   5: { // The Dark Spire (Valkin)
-    singles: ['moonstone_ring', 'firefly_lantern', 'ember_stone', 'frost_shard', 'surge_crystal'],
+    singles: ['lucky_charm', 'healing_root', 'ember_stone', 'frost_shard', 'surge_crystal'],
     doubles: ['ice_blade', 'flame_blade', 'mask_of_day', 'mask_of_night'],
-    triples: ['valkins_crystal', 'golden_dice', 'shades_cape'],
-    resources: { singles: {moonstone: 2, fire: 2}, doubles: {moonstone: 3, fire: 3, ice: 3}, triples: {moonstone: 3, fire: 3, ice: 3, luckyStone: 3, healingSeed: 3} }
+    triples: ['valkins_crystal', 'golden_dice', 'shades_cape', 'moonstone_ring']
   }
 };
 
 /**
  * Roll loot after defeating a boss
- * Returns { roll: [d1,d2,d3], type: 'singles'|'doubles'|'triples', item: {...}|null, resources: {...} }
+ * Returns { roll: [d1,d2,d3], rollType: 'singles'|'doubles'|'triples', item: {...}|null }
  */
 function rollBossLoot(tier) {
   // Roll 3 dice
@@ -138,10 +134,7 @@ function rollBossLoot(tier) {
   const itemKey = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
   const item = itemKey ? { key: itemKey, ...RAID_ITEMS[itemKey] } : null;
 
-  // Get resource bonus
-  const resources = table.resources?.[rollType] || {};
-
-  return { roll, rollType, item, resources };
+  return { roll, rollType, item };
 }
 
 /**
@@ -170,9 +163,13 @@ function applyRaidLoot(battleState, team, lootInventory) {
       case 'healing_root':   if (t.resources) t.resources.healingSeed = (t.resources.healingSeed || 0) + 1; break;
       case 'ember_stone':    if (t.resources) t.resources.fire = (t.resources.fire || 0) + 1; break;
       case 'frost_shard':    if (t.resources) t.resources.ice = (t.resources.ice || 0) + 1; break;
-      case 'surge_crystal':  if (t.resources) t.resources.surge = (t.resources.surge || 0) + 2; break;
+      case 'surge_crystal':  if (t.resources) t.resources.surge = (t.resources.surge || 0) + 1; break;
       case 'moonstone_ring': if (t.resources) t.resources.moonstone = (t.resources.moonstone || 0) + 1; break;
-      case 'firefly_lantern':if (t.resources) t.resources.firefly = (t.resources.firefly || 0) + 1; break;
+      case 'firefly_lantern':
+        if (t.resources) t.resources.firefly = (t.resources.firefly || 0) + 1;
+        // Firefly Lantern costs 2 HP on equip
+        if (t.ghosts && t.ghosts[0]) t.ghosts[0].hp = Math.max(1, (t.ghosts[0].hp || 1) - 2);
+        break;
 
       // Blades — forge them immediately
       case 'ice_blade':
@@ -1398,12 +1395,11 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
       updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItem`] = loot.item ? loot.item.key : null;
       updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItemName`] = loot.item ? loot.item.name : null;
       updates[`mp/raids/instances/${instanceId}/players/${slot}/lootItemIcon`] = loot.item ? loot.item.icon : null;
-      updates[`mp/raids/instances/${instanceId}/players/${slot}/lootResources`] = loot.resources;
 
       // Save to player's raid run inventory (persists across bosses within this raid)
       const invRef = db.ref(`mp/users/${p.uid}/raidRunInventory`);
       const invSnap = await invRef.once('value');
-      const inv = invSnap.val() || { items: [], resources: {} };
+      const inv = invSnap.val() || { items: [] };
 
       // Add item if not already owned
       if (loot.item && !inv.items.includes(loot.item.key)) {
@@ -1418,11 +1414,6 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
           }
         }
       }
-
-      // Accumulate resources
-      Object.entries(loot.resources).forEach(([res, amount]) => {
-        inv.resources[res] = (inv.resources[res] || 0) + amount;
-      });
 
       await invRef.set(inv);
     }
