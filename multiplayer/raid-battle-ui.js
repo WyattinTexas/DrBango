@@ -725,7 +725,7 @@
 
     // Default: show whose turn it is
     if (isMyTurn(state)) {
-      el.innerHTML = 'Commit resources and <b class="red-text">ROLL</b> when ready!';
+      el.innerHTML = '<b class="red-text">YOUR TURN</b> — Roll!';
     } else {
       const turnPlayer = (state.players || {})[state.turnPlayerIdx];
       el.innerHTML = `Watching <b class="red-text">${turnPlayer ? turnPlayer.displayName : 'Player'}</b>...`;
@@ -973,28 +973,9 @@
       });
     }
 
-    // ── Resources (current turn player's resources) ──
+    // ── Resources — hidden for raids (V1: just roll, no resource management) ──
     const resEl = document.getElementById('red-resources');
-    if (resEl && turnPlayer) {
-      resEl.innerHTML = renderResourceTiles(
-        turnPlayer.resources || {},
-        turnPlayer.committed || {},
-        mine,
-        instanceId
-      );
-      // Bind resource click events
-      resEl.querySelectorAll('[data-action="commit"]').forEach(tile => {
-        tile.addEventListener('click', function () {
-          const type = this.dataset.resource;
-          if (typeof commitResource === 'function') commitResource(instanceId, type);
-        });
-      });
-      resEl.querySelectorAll('[data-action="heal"]').forEach(tile => {
-        tile.addEventListener('click', function () {
-          if (typeof useHealingSeed === 'function') useHealingSeed(instanceId);
-        });
-      });
-    }
+    if (resEl) resEl.style.display = 'none';
 
     // ── Dice Display ──
     const redDiceEl = document.getElementById('red-dice');

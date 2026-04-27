@@ -1000,7 +1000,16 @@ const INLINE_BATTLE = (() => {
 // ─── GLOBAL SHIMS ─────────────────────────────────────────────
 // Expose action functions globally so raid-battle-ui.js onclick handlers work
 if (typeof INLINE_BATTLE !== 'undefined') {
-  window.doPlayerRoll = INLINE_BATTLE.doPlayerRoll;
+  window.doPlayerRoll = async function(instanceId) {
+    console.log('[RAID] doPlayerRoll called, instanceId:', instanceId);
+    try {
+      const result = await INLINE_BATTLE.doPlayerRoll(instanceId);
+      console.log('[RAID] doPlayerRoll result:', result);
+      return result;
+    } catch (e) {
+      console.error('[RAID] doPlayerRoll error:', e);
+    }
+  };
   window.commitResource = INLINE_BATTLE.commitResource;
   window.useHealingSeed = INLINE_BATTLE.useHealingSeed;
   window.useLuckyStone = INLINE_BATTLE.useLuckyStone;
