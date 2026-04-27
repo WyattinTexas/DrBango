@@ -10649,11 +10649,11 @@ function showGameOver(winner) {
     }, 3000);
   }
 
-  // Record standings
+  // Record standings (skip for raid boss fights — raids have their own reward system)
   let matchMvp = null;
   let redMvpId = null;
   let blueMvpId = null;
-  if (winner === 'red' || winner === 'blue') {
+  if (!window.BOSS_MODE && (winner === 'red' || winner === 'blue')) {
     const winTeam = B[winner];
     const loseTeamName = winner === 'red' ? 'blue' : 'red';
     const loseTeamObj = B[loseTeamName];

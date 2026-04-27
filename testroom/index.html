@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v848'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v849'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2772,7 +2772,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v848'; // Fix boss padded ghosts counting as KOs (Dark Fang/Hermit), hide empty boss sideline slots
+const TESTROOM_VERSION = 'v849'; // Standings: use update() instead of set() to prevent cross-client wipe, guard against saving before loaded
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3388,8 +3388,8 @@ function loadStandingsFromFirebase() {
 loadStandingsFromFirebase();
 
 function saveStandingsToFirebase() {
-  if (!firebaseReady) return;
-  // Only save ghosts that have games played
+  if (!firebaseReady || !standingsLoaded) return;
+  // Only save ghosts that have games played — use update() to avoid wiping other clients' data
   const toSave = {};
   Object.keys(standings).forEach(id => {
     const s = standings[id];
@@ -3397,7 +3397,7 @@ function saveStandingsToFirebase() {
       toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0, kills: s.kills || 0, mvp: s.mvp || 0 };
     }
   });
-  db.ref('testroom/standings').set(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
+  db.ref('testroom/standings').update(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
 }
 
 function recordWin(ghostId) {

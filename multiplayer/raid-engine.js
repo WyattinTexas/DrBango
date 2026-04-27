@@ -110,22 +110,37 @@ const RAID_LOOT_TABLES = {
 /**
  * Roll loot after defeating a boss
  * Returns { roll: [d1,d2,d3], rollType: 'singles'|'doubles'|'triples', item: {...}|null }
+ *
+ * Rarity is weighted (not natural dice odds):
+ *   Singles 55%, Doubles 35%, Triples 10%
+ * Dice visuals are generated to match the chosen rarity.
  */
 function rollBossLoot(tier) {
-  // Roll 3 dice
-  const roll = [
-    Math.floor(Math.random() * 6) + 1,
-    Math.floor(Math.random() * 6) + 1,
-    Math.floor(Math.random() * 6) + 1
-  ];
+  const d = () => Math.floor(Math.random() * 6) + 1;
 
-  // Classify the roll
-  const counts = {};
-  roll.forEach(d => { counts[d] = (counts[d] || 0) + 1; });
-  const maxCount = Math.max(...Object.values(counts));
-  let rollType = 'singles';
-  if (maxCount >= 3) rollType = 'triples';
-  else if (maxCount >= 2) rollType = 'doubles';
+  // Weighted rarity pick: 55% singles, 35% doubles, 10% triples
+  const r = Math.random();
+  let rollType, roll;
+  if (r < 0.10) {
+    // Triples — all three dice match
+    rollType = 'triples';
+    const v = d();
+    roll = [v, v, v];
+  } else if (r < 0.45) {
+    // Doubles — exactly two match, third differs
+    rollType = 'doubles';
+    const v = d();
+    let third = d();
+    while (third === v) third = d();
+    roll = [v, v, third].sort(() => Math.random() - 0.5);
+  } else {
+    // Singles — all three different
+    rollType = 'singles';
+    const a = d();
+    let b = d(); while (b === a) b = d();
+    let c = d(); while (c === a || c === b) c = d();
+    roll = [a, b, c].sort(() => Math.random() - 0.5);
+  }
 
   const table = RAID_LOOT_TABLES[tier] || RAID_LOOT_TABLES[1];
 
