@@ -694,21 +694,32 @@ function handleActiveFight(data) {
       startMyRaidFight(data);
     }
   } else {
-    // Spectator mode — show the enhanced live spectator overlay
-    if (typeof showRaidSpectatorOverlay === 'function') {
-      showRaidSpectatorOverlay(data, mySlot, currentIdx);
-    } else if (typeof showRaidSpectatorView === 'function') {
-      showRaidSpectatorView(data, mySlot, currentIdx);
+    // Not our turn — show the SAME battle screen the active player sees,
+    // but with roll button hidden (watch mode). This replaces the old
+    // spectator overlay that showed broken ??? cards.
+    if (typeof initRaidBattleInPage === 'function') {
+      const currentPlayer = players[currentIdx];
+      if (currentPlayer && currentPlayer.team) {
+        // Build the boss team so we can show it
+        const bossConfig = RAID_BOSSES[data.raidId];
+        if (bossConfig) {
+          const phase = getBossPhase(data.bossCurrentHp || bossConfig.bossGhost.maxHp, data.bossMaxHp || bossConfig.bossGhost.maxHp);
+          const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
+          const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
+          // Show the battle screen in watch mode (no roll button)
+          initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
+          // Hide roll button — we're watching
+          const rollBtn = document.getElementById('rollRedBtn');
+          if (rollBtn) { rollBtn.style.display = 'none'; }
+          // Show a "Watching [player]..." banner
+          const narrator = document.getElementById('narrator');
+          if (narrator) {
+            const name = currentPlayer.displayName || 'Player ' + (currentIdx + 1);
+            narrator.innerHTML = `Watching <b class="red-text">${name}</b> fight...`;
+          }
+        }
+      }
     }
-
-    // Check if a fighter just finished — show post-fight results
-    const fighter = players[currentIdx];
-    if (fighter && fighter.status === 'done' && typeof showPostFightResults === 'function') {
-      showPostFightResults(fighter, data);
-    }
-
-    // Monitor for disconnects
-    monitorCurrentFighter(data);
   }
 }
 
