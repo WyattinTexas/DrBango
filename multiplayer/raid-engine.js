@@ -1338,7 +1338,7 @@ async function endMyRaidFight(result) {
   // Clear boss mode
   window.BOSS_MODE = false;
   window.BOSS_RAID_DATA = null;
-  raidBattleState.phase = 'done';
+  if (raidBattleState) raidBattleState.phase = 'done';
 }
 
 // ─── REWARDS ────────────────────────────────────────────────────

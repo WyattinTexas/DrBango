@@ -310,10 +310,8 @@ function injectRaidReturnButton() {
               RETURN TO LOBBY
             </button>`;
         }
-        // Also call endMyRaidFight to report results to Firebase
-        if (typeof endMyRaidFight === 'function') {
-          try { endMyRaidFight({ damage: 0, ghostsLost: 0 }); } catch(e) { console.warn('[RAID] endMyRaidFight error:', e); }
-        }
+        // endMyRaidFight is called by battle-engine.js showGameOver() already
+        // — don't call it again here (would double-count or crash)
       });
     }
   };

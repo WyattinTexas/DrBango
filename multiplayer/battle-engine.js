@@ -8,13 +8,18 @@ function ghostData(id) { return getGhost(id); }
 
 // Safety: testroom code does getElementById().style/.classList without null checks.
 // In multiplayer, some elements may not exist. Wrap to return a safe dummy.
+// Exception: audio elements (sfx*) must return null so playSfx() can handle gracefully.
 (function() {
   const _orig = document.getElementById.bind(document);
   const _dummy = document.createElement('div');
   _dummy.id = '_battle_dummy';
   _dummy.style.display = 'none';
   document.getElementById = function(id) {
-    return _orig(id) || _dummy;
+    const el = _orig(id);
+    if (el) return el;
+    // Don't return dummy for audio elements — playSfx needs null to skip
+    if (id && (id.startsWith('sfx') || id.startsWith('bg') || id === 'triplesSfx')) return null;
+    return _dummy;
   };
 })();
 
@@ -13953,7 +13958,7 @@ function drainNarrate() {
 // ============================================================
 function playSfx(id, vol) {
   const el = document.getElementById(id);
-  if (!el) return;
+  if (!el || typeof el.play !== 'function') return;
   el.currentTime = 0;
   el.volume = Math.min(vol || 0.8, 1.0);
   el.play().catch(() => {});
