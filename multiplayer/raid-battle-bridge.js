@@ -16,8 +16,12 @@ var _isSpectating = false; // true when we're watching another player fight
  * Updates the local B state and re-renders so Player 2 sees live dice/HP changes.
  */
 function updateSpectatorFromSnapshot(snapshot) {
-  if (!_isSpectating || !B) return;
+  if (!_isSpectating || !B) {
+    console.log('[RAID SYNC] spectator skip: spectating=', _isSpectating, 'B=', !!B);
+    return;
+  }
   if (!snapshot) return;
+  console.log('[RAID SYNC] updating spectator view, round:', snapshot.round);
 
   // Update red (player) fighter HP
   if (snapshot.playerGhost && B.red) {
@@ -186,7 +190,10 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     startBlueAI();
   }
 
-  // ── 9. Render the boss HP pool bar ───────────────────────────
+  // ── 9a. Start snapshot sync (writes B state to Firebase for spectators)
+  startSnapshotSync();
+
+  // ── 10. Render the boss HP pool bar ──────────────────────────
   const bossHp    = raidData.bossCurrentHp || 0;
   const bossMaxHp = raidData.bossMaxHp || 1;
   _ensureBossHpPoolBar();
@@ -261,6 +268,9 @@ function renderBossHpPool(bossHp, bossMaxHp) {
  * Resets flags, hides the raid screen, removes injected ghosts.
  */
 function cleanupRaidBattle() {
+  // ── Stop snapshot sync ───────────────────────────────────────
+  stopSnapshotSync();
+
   // ── Reset global flags ────────────────────────────────────────
   window.BOSS_MODE = false;
   window.RAID_MODE = false;
@@ -407,30 +417,55 @@ function injectRaidReturnButton() {
   };
 })();
 
-// ─── PATCH: Write battle snapshots to Firebase after each render ───
-// This allows Player 2 (spectator) to see live HP/dice updates.
-(function _hookRenderBattleForSync() {
-  const _origRenderBattle = window.renderBattle;
-  if (typeof _origRenderBattle !== 'function') return;
+// ─── SNAPSHOT SYNC: Poll battle state and write to Firebase ─────
+// Simple interval that writes B state to Firebase every 500ms while
+// the active player is fighting. Player 2's battleState listener
+// picks up changes and calls updateSpectatorFromSnapshot.
+var _snapshotInterval = null;
+var _lastSnapshotHash = '';
 
-  window.renderBattle = function () {
-    _origRenderBattle.call(this);
-    // Only write snapshots when we're the active fighter (not spectating)
-    if (window.RAID_MODE && !_isSpectating && B && typeof writeBattleSnapshot === 'function') {
-      try {
-        writeBattleSnapshot({
-          playerName: firebase.auth().currentUser?.displayName || 'Raider',
-          playerGhost: active(B.red) || {},
-          bossGhost: active(B.blue) || {},
-          playerSideline: B.red ? B.red.ghosts.filter((g, i) => i !== B.red.activeIdx) : [],
-          bossSideline: B.blue ? B.blue.ghosts.filter((g, i) => i !== B.blue.activeIdx) : [],
-          lastRoll: { player: B.redDice || [], boss: B.blueDice || [] },
-          bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp,
-          bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp,
-          round: B.round || 1,
-          isWave: window.IS_WAVE_FIGHT || false
-        });
-      } catch (e) { /* silent — snapshot writes are best-effort */ }
-    }
-  };
-})();
+function startSnapshotSync() {
+  stopSnapshotSync();
+  _snapshotInterval = setInterval(() => {
+    if (!window.RAID_MODE || _isSpectating || !B || !currentRaid) return;
+    if (typeof writeBattleSnapshot !== 'function') return;
+
+    // Build a hash to avoid writing identical snapshots
+    const rf = active(B.red);
+    const bf = active(B.blue);
+    const hash = [
+      rf?.hp, rf?.name, rf?.ko,
+      bf?.hp, bf?.name, bf?.ko,
+      B.round, B.phase,
+      (B.redDice || []).join(','),
+      (B.blueDice || []).join(',')
+    ].join('|');
+
+    if (hash === _lastSnapshotHash) return;
+    _lastSnapshotHash = hash;
+    console.log('[RAID SYNC] writing snapshot, round:', B.round, 'redHP:', rf?.hp, 'bossHP:', bf?.hp);
+
+    try {
+      writeBattleSnapshot({
+        playerName: firebase.auth().currentUser?.displayName || 'Raider',
+        playerGhost: rf || {},
+        bossGhost: bf || {},
+        playerSideline: B.red ? B.red.ghosts.filter((g, i) => i !== B.red.activeIdx) : [],
+        bossSideline: B.blue ? B.blue.ghosts.filter((g, i) => i !== B.blue.activeIdx) : [],
+        lastRoll: { player: B.redDice || [], boss: B.blueDice || [] },
+        bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp,
+        bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp,
+        round: B.round || 1,
+        isWave: window.IS_WAVE_FIGHT || false
+      });
+    } catch (e) { console.warn('[RAID SYNC] snapshot error:', e); }
+  }, 500);
+}
+
+function stopSnapshotSync() {
+  if (_snapshotInterval) {
+    clearInterval(_snapshotInterval);
+    _snapshotInterval = null;
+  }
+  _lastSnapshotHash = '';
+}
