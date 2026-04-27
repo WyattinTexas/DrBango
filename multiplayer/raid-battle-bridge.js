@@ -300,8 +300,21 @@ function injectRaidReturnButton() {
   window.showGameOver = function (winner) {
     _origShowGameOver.call(this, winner);
     if (window.RAID_MODE) {
-      // Inject after the overlay has rendered (next frame)
-      requestAnimationFrame(() => injectRaidReturnButton());
+      // Replace ALL buttons in game-over with our return-to-lobby button
+      requestAnimationFrame(() => {
+        const goButtons = document.querySelector('.go-buttons');
+        if (goButtons) {
+          goButtons.innerHTML = `
+            <button class="go-btn-rematch" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.4);"
+              onclick="cleanupRaidBattle(); if(typeof showRaidLobby==='function') showRaidLobby(); if(typeof closeRaidResult==='function') closeRaidResult();">
+              RETURN TO LOBBY
+            </button>`;
+        }
+        // Also call endMyRaidFight to report results to Firebase
+        if (typeof endMyRaidFight === 'function') {
+          try { endMyRaidFight({ damage: 0, ghostsLost: 0 }); } catch(e) { console.warn('[RAID] endMyRaidFight error:', e); }
+        }
+      });
     }
   };
 })();
