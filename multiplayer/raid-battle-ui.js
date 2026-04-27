@@ -977,7 +977,7 @@
     const resEl = document.getElementById('red-resources');
     if (resEl) resEl.style.display = 'none';
 
-    // ── Dice Display ──
+    // ── Dice Display (with animation) ──
     const redDiceEl = document.getElementById('red-dice');
     const blueDiceEl = document.getElementById('blue-dice');
     const lastRoll = state.lastRoll;
@@ -985,11 +985,20 @@
       const pDice = lastRoll.playerDice || [];
       const bDice = lastRoll.bossDice || [];
       const winner = lastRoll.winner;
-      redDiceEl.innerHTML = renderDice(pDice, 'red', winner === 'player');
-      blueDiceEl.innerHTML = renderDice(bDice, 'blue', winner === 'boss');
+      // Detect new roll — animate only once per roll
+      const rollKey = pDice.join(',') + '|' + bDice.join(',');
+      if (rollKey !== window._lastRollKey) {
+        window._lastRollKey = rollKey;
+        // Animate: tumble → land → highlight
+        animateDiceRoll(pDice, bDice, () => {
+          redDiceEl.innerHTML = renderDice(pDice, 'red', winner === 'player');
+          blueDiceEl.innerHTML = renderDice(bDice, 'blue', winner === 'boss');
+        });
+      }
     } else if (redDiceEl && blueDiceEl) {
       redDiceEl.innerHTML = '';
       blueDiceEl.innerHTML = '';
+      window._lastRollKey = null;
     }
 
     // ── Turn Indicator ──
@@ -1119,28 +1128,45 @@
       blueDiceEl.querySelectorAll('.die.rolling').forEach(el => {
         el.textContent = Math.floor(Math.random() * 6) + 1;
       });
-    }, 80);
+    }, 70);
 
-    // Phase 3: Land on final values
+    // Phase 3: Land on final values (staggered, like testroom)
     setTimeout(() => {
       clearInterval(randomInterval);
 
-      // Determine winner for highlighting
-      let pDmg = 0, bDmg = 0;
-      if (typeof INLINE_BATTLE !== 'undefined' && INLINE_BATTLE.classify) {
-        const pClass = INLINE_BATTLE.classify(playerDice);
-        const bClass = INLINE_BATTLE.classify(bossDice);
-        pDmg = pClass.damage || 0;
-        bDmg = bClass.damage || 0;
-      }
-      const winner = pDmg > bDmg ? 'player' : bDmg > pDmg ? 'boss' : null;
+      // Land red dice first
+      playerDice.forEach((val, i) => {
+        const dieEl = redDiceEl.querySelectorAll('.die')[i];
+        if (dieEl) {
+          setTimeout(() => {
+            dieEl.classList.remove('rolling');
+            dieEl.textContent = val;
+          }, i * 100);
+        }
+      });
 
-      redDiceEl.innerHTML = renderDice(playerDice, 'red', winner === 'player');
-      blueDiceEl.innerHTML = renderDice(bossDice, 'blue', winner === 'boss');
+      // Land blue dice after a beat
+      setTimeout(() => {
+        bossDice.forEach((val, i) => {
+          const dieEl = blueDiceEl.querySelectorAll('.die')[i];
+          if (dieEl) {
+            setTimeout(() => {
+              dieEl.classList.remove('rolling');
+              dieEl.textContent = val;
+            }, i * 100);
+          }
+        });
+      }, 200);
 
-      _animatingDice = false;
-      if (callback) setTimeout(callback, 200);
-    }, 650);
+      // Phase 4: Highlight winners after all dice land
+      const totalLandTime = 200 + bossDice.length * 100 + 300;
+      setTimeout(() => {
+        redDiceEl.innerHTML = renderDice(playerDice, 'red', true);
+        blueDiceEl.innerHTML = renderDice(bossDice, 'blue', true);
+        _animatingDice = false;
+        if (callback) setTimeout(callback, 300);
+      }, totalLandTime);
+    }, 700);
   };
 
   // ═══════════════════════════════════════════════════════════════
