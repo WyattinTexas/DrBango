@@ -210,6 +210,14 @@ function cleanupRaidBattle() {
     battleView.style.display = 'none';
   }
 
+  // ── Clean up raid-engine state (currentRaid, listeners, activeRaid) ─
+  if (typeof cleanupRaid === 'function') cleanupRaid();
+  // Clear activeRaid from Firebase so we don't re-enter the old raid
+  const user = firebase.auth().currentUser;
+  if (user) {
+    db.ref(`mp/users/${user.uid}/activeRaid`).remove();
+  }
+
   // ── Show main content ──────────────────────────────────────────
   if (typeof hideRaidScreen === 'function') {
     hideRaidScreen(); // properly restores #main-content visibility
