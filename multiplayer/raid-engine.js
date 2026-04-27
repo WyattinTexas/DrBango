@@ -587,7 +587,22 @@ function handleRaidStateChange(data) {
     case 'active':
       // Hide waiting room if still visible
       if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
-      handleActiveFight(data);
+      // Use inline battle (alternating turns, no testroom redirect)
+      if (typeof INLINE_BATTLE !== 'undefined') {
+        // Show the raid screen
+        if (typeof showRaidScreen === 'function') showRaidScreen(currentRaid.instanceId);
+        // Init battle (idempotent — if state exists, just starts listening)
+        INLINE_BATTLE.initInlineBattle(currentRaid.instanceId, data);
+        // Start listening and rendering
+        INLINE_BATTLE.listenToInlineBattle(currentRaid.instanceId, (state) => {
+          if (typeof renderInlineBattle === 'function') {
+            renderInlineBattle(state, currentRaid.instanceId);
+          }
+        });
+      } else {
+        // Fallback: old sequential system
+        handleActiveFight(data);
+      }
       break;
 
     case 'complete':

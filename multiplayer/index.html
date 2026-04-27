@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v0.94'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v0.95'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -3275,6 +3275,256 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .equip-pick-badge { font-size: 0.6rem; font-weight: 800; color: var(--gold-bright); letter-spacing: 1px; flex-shrink: 0; }
 .equip-pick-empty { text-align: center; color: var(--text-dim); padding: 20px; font-style: italic; font-size: 0.85rem; }
 
+/* ─── Raid Inline Battle ─── */
+.rib-arena {
+  max-width: 720px; margin: 0 auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 100vh; position: relative;
+}
+
+/* Boss HP Pool Bar */
+.rib-boss-pool {
+  position: relative; width: 100%; height: 32px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  overflow: hidden;
+}
+.rib-boss-pool-fill {
+  height: 100%; border-radius: 10px; transition: width 0.6s ease, background 0.4s;
+  background: #2ecc71;
+}
+.rib-boss-pool-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 0.85rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  letter-spacing: 1px;
+}
+
+/* Matchup Row */
+.rib-matchup {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+}
+.rib-vs {
+  font-family: 'Creepster', cursive; font-size: 1.6rem; color: var(--accent, #e74c3c);
+  text-shadow: 0 0 12px rgba(231,76,60,0.4); flex-shrink: 0;
+}
+.rib-round-label {
+  font-size: 0.7rem; color: var(--text-dim); text-align: center; margin-top: 2px;
+}
+
+/* Fighter Card */
+.rib-fighter {
+  width: 140px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.rib-fighter-art {
+  width: 120px; height: 120px; border-radius: 14px; object-fit: cover;
+  border: 2px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.rib-fighter.boss .rib-fighter-art { border-color: rgba(142,68,173,0.6); }
+.rib-fighter.player .rib-fighter-art { border-color: rgba(231,76,60,0.4); }
+.rib-fighter.active-turn .rib-fighter-art { border-color: var(--gold-bright); box-shadow: 0 0 20px rgba(212,160,64,0.4); }
+.rib-fighter-name {
+  font-family: 'Creepster', cursive; font-size: 0.95rem; color: var(--text);
+  letter-spacing: 1px; margin-top: 6px;
+}
+.rib-fighter-hp-bar {
+  width: 100%; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08);
+  margin-top: 4px; overflow: hidden;
+}
+.rib-fighter-hp-fill {
+  height: 100%; border-radius: 4px; transition: width 0.4s ease;
+}
+.rib-fighter-hp-text { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+.rib-fighter.ko { opacity: 0.35; }
+.rib-fighter.ko .rib-fighter-art { filter: grayscale(1); }
+
+/* Dice Display */
+.rib-dice-row {
+  display: flex; justify-content: center; gap: 24px; margin: 4px 0;
+}
+.rib-dice-set {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.rib-dice {
+  display: flex; gap: 6px; font-family: 'Inter', monospace; font-size: 1.3rem; font-weight: 800;
+  color: var(--text); letter-spacing: 2px;
+}
+.rib-die { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); }
+.rib-die.matched { color: var(--gold-bright); background: rgba(212,160,64,0.15); }
+.rib-die.triple-match { color: #e74c3c; background: rgba(231,76,60,0.15); }
+.rib-die.tumbling { animation: rib-tumble 0.12s infinite; }
+@keyframes rib-tumble { 0%,100%{transform:rotate(0)} 25%{transform:rotate(6deg)} 75%{transform:rotate(-6deg)} }
+.rib-roll-label {
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+}
+.rib-roll-label.singles { color: var(--text-dim); }
+.rib-roll-label.doubles { color: var(--gold-bright); }
+.rib-roll-label.triples { color: #e74c3c; }
+.rib-roll-label.quads { color: #c084fc; }
+.rib-roll-label.penta { color: #ff4444; text-shadow: 0 0 8px rgba(255,68,68,0.4); }
+.rib-winner-label {
+  font-family: 'Creepster', cursive; font-size: 1rem; letter-spacing: 2px;
+  text-align: center; margin: 4px 0;
+}
+.rib-winner-label.player-wins { color: #2ecc71; }
+.rib-winner-label.boss-wins { color: #e74c3c; }
+.rib-winner-label.tie { color: var(--text-dim); }
+
+/* Damage Callout */
+.rib-damage-callout {
+  position: absolute; font-family: 'Creepster', cursive; font-size: 2.5rem; font-weight: 900;
+  pointer-events: none; z-index: 100;
+  animation: rib-dmg-pop 0.8s ease forwards;
+}
+.rib-damage-callout.to-player { color: #e74c3c; }
+.rib-damage-callout.to-boss { color: #2ecc71; }
+@keyframes rib-dmg-pop {
+  0% { opacity:1; transform:scale(0.5) translateY(0); }
+  40% { opacity:1; transform:scale(1.3) translateY(-20px); }
+  100% { opacity:0; transform:scale(1) translateY(-50px); }
+}
+
+/* Sideline Row */
+.rib-sidelines {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  padding: 8px; background: rgba(255,255,255,0.02); border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.rib-sideline-group { display: flex; align-items: center; gap: 6px; }
+.rib-sideline-label { font-size: 0.65rem; color: var(--text-dim); font-weight: 700; }
+.rib-sideline-ghost {
+  display: flex; align-items: center; gap: 4px; padding: 3px 8px;
+  background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 0.72rem;
+}
+.rib-sideline-ghost.ko { opacity: 0.35; text-decoration: line-through; }
+.rib-sideline-ghost img {
+  width: 24px; height: 24px; border-radius: 4px; object-fit: cover;
+}
+
+/* Resources */
+.rib-resources {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px 0;
+}
+.rib-resource-tile {
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px;
+  border-radius: 8px; font-size: 0.78rem; font-weight: 600;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.rib-resource-tile:hover { border-color: var(--gold-deep); background: rgba(212,160,64,0.06); }
+.rib-resource-tile.committed { border-color: var(--gold-bright); background: rgba(212,160,64,0.15); color: var(--gold-bright); }
+.rib-resource-tile.disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.rib-resource-tile .rib-res-count { font-weight: 800; }
+
+/* Action Buttons */
+.rib-actions {
+  display: flex; gap: 10px; justify-content: center; padding: 8px 0;
+}
+.rib-roll-btn {
+  padding: 14px 48px; font-family: 'Creepster', cursive; font-size: 1.4rem;
+  letter-spacing: 3px; color: #fff; border: none; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  box-shadow: 0 4px 20px rgba(231,76,60,0.4);
+  transition: all 0.2s; text-transform: uppercase;
+}
+.rib-roll-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(231,76,60,0.6); }
+.rib-roll-btn:active { transform: translateY(0); }
+.rib-roll-btn:disabled { background: var(--surface); color: var(--text-dim); box-shadow: none; cursor: default; }
+.rib-heal-btn {
+  padding: 10px 20px; font-size: 0.85rem; font-weight: 700;
+  background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.4);
+  color: #2ecc71; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+}
+.rib-heal-btn:hover { background: rgba(46,204,113,0.25); }
+.rib-heal-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Turn Indicator */
+.rib-turn-indicator {
+  text-align: center; padding: 8px; font-size: 0.85rem; font-weight: 700;
+  border-radius: 8px; letter-spacing: 1px;
+}
+.rib-turn-indicator.your-turn {
+  color: var(--gold-bright); background: rgba(212,160,64,0.1);
+  border: 1px solid rgba(212,160,64,0.3);
+  animation: rib-pulse 2s ease-in-out infinite;
+}
+.rib-turn-indicator.waiting { color: var(--text-dim); }
+.rib-turn-indicator.eliminated { color: #e74c3c; font-style: italic; }
+@keyframes rib-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(212,160,64,0); }
+  50% { box-shadow: 0 0 16px 4px rgba(212,160,64,0.2); }
+}
+
+/* Battle Log */
+.rib-log {
+  max-height: 160px; overflow-y: auto; padding: 8px 12px;
+  background: rgba(0,0,0,0.3); border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.75rem; color: var(--text-dim); line-height: 1.6;
+}
+.rib-log-entry { padding: 1px 0; }
+.rib-log-entry .log-dmg { color: #e74c3c; font-weight: 700; }
+.rib-log-entry .log-heal { color: #2ecc71; font-weight: 700; }
+.rib-log-entry .log-ability { color: var(--gold-bright); font-weight: 600; }
+.rib-log-entry .log-ko { color: #e74c3c; font-weight: 800; text-transform: uppercase; }
+
+/* KO Swap Picker */
+.rib-ko-picker {
+  text-align: center; padding: 16px;
+  background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 12px;
+}
+.rib-ko-picker h3 {
+  font-family: 'Creepster', cursive; color: #e74c3c; letter-spacing: 2px; margin-bottom: 12px;
+}
+.rib-ko-picker-options { display: flex; gap: 12px; justify-content: center; }
+.rib-ko-pick-card {
+  width: 100px; padding: 8px; border-radius: 10px; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--border);
+  text-align: center; transition: all 0.2s;
+}
+.rib-ko-pick-card:hover { border-color: var(--gold-bright); transform: translateY(-3px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.rib-ko-pick-card img { width: 80px; height: 80px; border-radius: 8px; object-fit: cover; }
+.rib-ko-pick-card .name { font-size: 0.75rem; font-weight: 700; margin-top: 4px; }
+.rib-ko-pick-card .hp { font-size: 0.65rem; color: var(--text-dim); }
+
+/* Game Over Overlay */
+.rib-game-over {
+  position: absolute; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.88); backdrop-filter: blur(6px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; animation: fadeIn 0.5s ease;
+}
+.rib-game-over h1 {
+  font-family: 'Creepster', cursive; font-size: 2.5rem; letter-spacing: 4px;
+}
+.rib-game-over.victory h1 { color: #2ecc71; text-shadow: 0 0 24px rgba(46,204,113,0.4); }
+.rib-game-over.defeat h1 { color: #e74c3c; text-shadow: 0 0 24px rgba(231,76,60,0.4); }
+.rib-game-over-stats {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+}
+.rib-game-over-player {
+  text-align: center; padding: 12px 20px; background: var(--surface);
+  border-radius: 12px; border: 1px solid var(--border);
+}
+.rib-game-over-player .name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+.rib-game-over-player .dmg { color: var(--gold-bright); font-size: 1.2rem; font-weight: 900; }
+.rib-game-over-player .dmg-label { font-size: 0.65rem; color: var(--text-dim); }
+.rib-return-btn {
+  padding: 12px 36px; font-family: 'Creepster', cursive; font-size: 1.1rem;
+  letter-spacing: 2px; color: #fff; border: none; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(135deg, var(--gold-bright), #8a6b20);
+  margin-top: 8px; transition: all 0.2s;
+}
+.rib-return-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(212,160,64,0.4); }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .rib-fighter-art { width: 90px; height: 90px; }
+  .rib-fighter { width: 110px; }
+  .rib-vs { font-size: 1.2rem; }
+  .rib-roll-btn { padding: 12px 32px; font-size: 1.2rem; }
+  .rib-dice { font-size: 1.1rem; }
+}
+
 /* Raid Active Banner */
 .raid-active-banner {
   display: flex; align-items: center; gap: 10px; padding: 10px 16px;
@@ -4226,9 +4476,11 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-engine.js"></script>
 <script src="raid-ui.js"></script>
 <script src="raid-shop.js"></script>
+<script src="raid-battle-inline.js"></script>
+<script src="raid-battle-ui.js"></script>
 
 <script>
-const BBN_VERSION = 'v0.94';
+const BBN_VERSION = 'v0.95';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
