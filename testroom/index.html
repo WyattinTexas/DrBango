@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v847'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v848'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2772,7 +2772,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v847'; // Fix raid redirect flicker — sync all 3 version strings, preserve raid params across cache-bust
+const TESTROOM_VERSION = 'v848'; // Fix boss padded ghosts counting as KOs (Dark Fang/Hermit), hide empty boss sideline slots
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -4868,7 +4868,7 @@ function triggerEntry(team, skipEntryEffects) {
 
   // Hermit (47) — Solitude: on entry, gain +2 HP per ghost defeated on both teams
   if (f.id === 47) {
-    const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
+    const koCount = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko && !g.isPadded).length;
     if (koCount > 0) {
       const gain = koCount * 2;
       const before = f.hp;
@@ -15232,7 +15232,7 @@ function _resolveRoundImpl() {
   let deathHowlTriggered = false;
   let deathHowlKOs = 0;
   if (wF.id === 202 && !wF.ko && dmg > 0) {
-    deathHowlKOs = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko).length;
+    deathHowlKOs = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko && !g.isPadded).length;
     if (deathHowlKOs > 0) {
       const dhBaseDmg = dmg;
       dmg += deathHowlKOs;
@@ -18292,7 +18292,7 @@ function renderBattle() {
     const slRight = document.getElementById(`${team}-sl-right`);
     const isKoPickTeam = B.phase === 'ko-swap' && B.koSwapQueue && B.koSwapQueue[0] === team;
     [slLeft, slRight].forEach((el, i) => {
-      if (sl[i]) {
+      if (sl[i] && !sl[i].isPadded) {
         el.style.visibility = 'visible';
         const slData = ghostData(sl[i].id);
         const isPick = isKoPickTeam && !sl[i].ko;
@@ -19334,11 +19334,12 @@ document.addEventListener('keydown', e => {
     switchTab('battle');
     renderPicks();
     startBattle();
-    // KO padded ghost slots so only real boss ghosts are visible
+    // Mark padded ghost slots as empty placeholders — not real KOs
     if (B && B.blue && realBossGhostCount < 3) {
       for (let i = realBossGhostCount; i < B.blue.ghosts.length; i++) {
         B.blue.ghosts[i].hp = 0;
         B.blue.ghosts[i].ko = true;
+        B.blue.ghosts[i].isPadded = true; // flag: not a real ghost, exclude from KO counts
       }
       renderBattle();
     }
