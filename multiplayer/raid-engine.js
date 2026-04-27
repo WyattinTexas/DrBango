@@ -1604,26 +1604,31 @@ async function writeBattleSnapshot(snapshotData) {
   if (!currentRaid) return;
   const instanceId = currentRaid.instanceId;
 
-  await db.ref(`mp/raids/instances/${instanceId}/battleState`).set({
-    playerName: snapshotData.playerName,
+  // Firebase rejects undefined values — coerce all fields to non-undefined
+  const pg = snapshotData.playerGhost || {};
+  const bg = snapshotData.bossGhost || {};
+  const snapshot = {
+    playerName: snapshotData.playerName || 'Raider',
     playerGhost: {
-      name: snapshotData.playerGhost.name,
-      hp: snapshotData.playerGhost.hp,
-      maxHp: snapshotData.playerGhost.maxHp,
-      art: snapshotData.playerGhost.art
+      name: pg.name || '???',
+      hp: pg.hp || 0,
+      maxHp: pg.maxHp || 1,
+      art: pg.art || '',
+      ko: pg.ko || false
     },
     bossGhost: {
-      name: snapshotData.bossGhost.name,
-      hp: snapshotData.bossGhost.hp,
-      maxHp: snapshotData.bossGhost.maxHp,
-      art: snapshotData.bossGhost.art,
-      isBoss: snapshotData.bossGhost.isBoss || false
+      name: bg.name || '???',
+      hp: bg.hp || 0,
+      maxHp: bg.maxHp || 1,
+      art: bg.art || '',
+      isBoss: true,
+      ko: bg.ko || false
     },
     playerSideline: (snapshotData.playerSideline || []).map(g => ({
-      name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko
+      name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko, art: g.art || ''
     })),
     bossSideline: (snapshotData.bossSideline || []).map(g => ({
-      name: g.name, hp: g.hp, maxHp: g.maxHp, ko: g.ko
+      name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko, art: g.art || ''
     })),
     lastRoll: snapshotData.lastRoll || null,
     bossPoolHp: raidBattleState?.currentBossHp || 0,
@@ -1631,7 +1636,8 @@ async function writeBattleSnapshot(snapshotData) {
     round: snapshotData.round || 0,
     isWave: snapshotData.isWave || false,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
+  };
+  await db.ref(`mp/raids/instances/${instanceId}/battleState`).set(snapshot);
 }
 
 // ─── CLEANUP ────────────────────────────────────────────────────

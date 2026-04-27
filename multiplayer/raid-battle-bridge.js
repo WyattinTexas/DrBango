@@ -446,15 +446,18 @@ function startSnapshotSync() {
     console.log('[RAID SYNC] writing snapshot, round:', B.round, 'redHP:', rf?.hp, 'bossHP:', bf?.hp);
 
     try {
+      // Sanitize: Firebase rejects undefined — coerce everything
+      const redDice = (B.redDice || []).map(d => d || 0);
+      const blueDice = (B.blueDice || []).map(d => d || 0);
       writeBattleSnapshot({
         playerName: firebase.auth().currentUser?.displayName || 'Raider',
-        playerGhost: rf || {},
-        bossGhost: bf || {},
+        playerGhost: rf || { name: '???', hp: 0, maxHp: 1, art: '' },
+        bossGhost: bf || { name: '???', hp: 0, maxHp: 1, art: '' },
         playerSideline: B.red ? B.red.ghosts.filter((g, i) => i !== B.red.activeIdx) : [],
         bossSideline: B.blue ? B.blue.ghosts.filter((g, i) => i !== B.blue.activeIdx) : [],
-        lastRoll: { player: B.redDice || [], boss: B.blueDice || [] },
-        bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp,
-        bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp,
+        lastRoll: redDice.length > 0 ? { player: redDice, boss: blueDice } : null,
+        bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp || 0,
+        bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp || 1,
         round: B.round || 1,
         isWave: window.IS_WAVE_FIGHT || false
       });
