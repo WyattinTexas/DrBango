@@ -68,6 +68,8 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   window.BOSS_MODE = true;
   window.RAID_MODE = true;
   window.IS_WAVE_FIGHT = !!isWave;
+  // MP_MODE must be true for the blue AI to respond to red's roll
+  if (typeof MP_MODE !== 'undefined') MP_MODE = true;
 
   // ── 5. Build BOSS_RAID_DATA from the live raidBattleState ────
   // raidBattleState is maintained by raid-engine.js (startMyRaidFight).
