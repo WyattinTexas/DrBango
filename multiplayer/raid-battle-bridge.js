@@ -8,6 +8,75 @@
 // Tracked state for cleanup
 var _registeredRaidGhostIds = [];
 var _originalGhostData = {};
+var _isSpectating = false; // true when we're watching another player fight
+
+/**
+ * Update the spectator's arena from a Firebase battleState snapshot.
+ * Called when the battleState listener fires on Player 2's client.
+ * Updates the local B state and re-renders so Player 2 sees live dice/HP changes.
+ */
+function updateSpectatorFromSnapshot(snapshot) {
+  if (!_isSpectating || !B) return;
+  if (!snapshot) return;
+
+  // Update red (player) fighter HP
+  if (snapshot.playerGhost && B.red) {
+    const rf = active(B.red);
+    if (rf) {
+      rf.hp = snapshot.playerGhost.hp;
+      rf.maxHp = snapshot.playerGhost.maxHp;
+      if (snapshot.playerGhost.ko) rf.ko = true;
+    }
+  }
+
+  // Update red sideline HP
+  if (snapshot.playerSideline && B.red) {
+    const sideline = B.red.ghosts.filter((g, i) => i !== B.red.activeIdx);
+    snapshot.playerSideline.forEach((sg, i) => {
+      if (sideline[i]) {
+        sideline[i].hp = sg.hp || 0;
+        sideline[i].ko = sg.ko || false;
+      }
+    });
+  }
+
+  // Update blue (boss) fighter HP
+  if (snapshot.bossGhost && B.blue) {
+    const bf = active(B.blue);
+    if (bf) {
+      bf.hp = snapshot.bossGhost.hp;
+      bf.maxHp = snapshot.bossGhost.maxHp;
+      if (snapshot.bossGhost.ko) bf.ko = true;
+    }
+  }
+
+  // Update round
+  if (snapshot.round) B.round = snapshot.round;
+
+  // Show dice from the last roll
+  if (snapshot.lastRoll) {
+    const redDiceEl = document.getElementById('red-dice');
+    const blueDiceEl = document.getElementById('blue-dice');
+    if (redDiceEl && snapshot.lastRoll.player) {
+      redDiceEl.innerHTML = snapshot.lastRoll.player.map(v =>
+        `<div class="die die-red">${v}</div>`
+      ).join('');
+    }
+    if (blueDiceEl && snapshot.lastRoll.boss) {
+      blueDiceEl.innerHTML = snapshot.lastRoll.boss.map(v =>
+        `<div class="die die-blue">${v}</div>`
+      ).join('');
+    }
+  }
+
+  // Update boss HP pool bar
+  if (snapshot.bossPoolHp != null) {
+    renderBossHpPool(snapshot.bossPoolHp, snapshot.bossMaxHp || 1);
+  }
+
+  // Re-render the battle UI with updated state
+  if (typeof renderBattle === 'function') renderBattle();
+}
 
 /**
  * Initialize and launch a raid battle in-page using battle-engine.js.
@@ -334,6 +403,34 @@ function injectRaidReturnButton() {
             </button>`;
         }
       }, 4500);
+    }
+  };
+})();
+
+// ─── PATCH: Write battle snapshots to Firebase after each render ───
+// This allows Player 2 (spectator) to see live HP/dice updates.
+(function _hookRenderBattleForSync() {
+  const _origRenderBattle = window.renderBattle;
+  if (typeof _origRenderBattle !== 'function') return;
+
+  window.renderBattle = function () {
+    _origRenderBattle.call(this);
+    // Only write snapshots when we're the active fighter (not spectating)
+    if (window.RAID_MODE && !_isSpectating && B && typeof writeBattleSnapshot === 'function') {
+      try {
+        writeBattleSnapshot({
+          playerName: firebase.auth().currentUser?.displayName || 'Raider',
+          playerGhost: active(B.red) || {},
+          bossGhost: active(B.blue) || {},
+          playerSideline: B.red ? B.red.ghosts.filter((g, i) => i !== B.red.activeIdx) : [],
+          bossSideline: B.blue ? B.blue.ghosts.filter((g, i) => i !== B.blue.activeIdx) : [],
+          lastRoll: { player: B.redDice || [], boss: B.blueDice || [] },
+          bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp,
+          bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp,
+          round: B.round || 1,
+          isWave: window.IS_WAVE_FIGHT || false
+        });
+      } catch (e) { /* silent — snapshot writes are best-effort */ }
     }
   };
 })();

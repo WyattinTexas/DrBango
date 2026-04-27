@@ -587,11 +587,13 @@ function enterRaidScreen(instanceId) {
     handleActiveFight(freshData);
   });
 
-  // Listen for battle state (spectator feed) — separate, safe listener
+  // Listen for battle state (spectator feed) — updates Player 2's arena live
   raidListeners['battleState'] = instRef.child('battleState').on('value', (snap) => {
     const state = snap.val();
-    if (state && typeof renderRaidBattleSpectator === 'function') {
-      renderRaidBattleSpectator(state);
+    if (!state) return;
+    // Use the bridge's spectator sync (updates real arena) if available
+    if (typeof updateSpectatorFromSnapshot === 'function') {
+      updateSpectatorFromSnapshot(state);
     }
   });
 
@@ -679,6 +681,7 @@ function handleActiveFight(data) {
 
   if (mySlot === currentIdx && players[mySlot]?.status !== 'done' && players[mySlot]?.status !== 'disconnected') {
     // It's our turn to fight!
+    if (typeof _isSpectating !== 'undefined') _isSpectating = false;
     if (!raidBattleState || raidBattleState.phase === 'waiting' || raidBattleState.phase === 'done') {
       // Hide spectator overlay if we were watching
       if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
@@ -694,6 +697,8 @@ function handleActiveFight(data) {
       startMyRaidFight(data);
     }
   } else {
+    // Mark as spectating so the bridge's updateSpectatorFromSnapshot works
+    if (typeof _isSpectating !== 'undefined') _isSpectating = true;
     // Not our turn — show the SAME battle screen the active player sees,
     // but with roll button hidden (watch mode). This replaces the old
     // spectator overlay that showed broken ??? cards.
