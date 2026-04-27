@@ -2,6 +2,8 @@
 // RAID UI — Screen rendering, lobby, raider lineup, boss HP bar,
 //           spectator view, result screen, badge display
 // Depends on: cards.js, raid-engine.js, battle-engine.js
+// v0.90 — Equip Character screen: 3 slots (Head/Weapon/Accessory),
+//          tap-to-swap picker, auto-equip on loot drop, loadout display
 // v0.88 — Boss HP bar phase label now displays current phase number;
 //          result screen re-fetches fresh instance data for spectators
 // =================================================================
@@ -133,6 +135,11 @@ function showRaidWipeScreen(data) {
 }
 
 // ─── RAID LOBBY (Boss Selection) ────────────────────────────────
+
+// Safety: ensure hasRaidBadge is available even if raid-engine hasn't fully loaded
+if (typeof window.hasRaidBadge === 'undefined') {
+  window.hasRaidBadge = function(badges, key) { return (badges || []).includes(key); };
+}
 
 function showRaidLobby() {
   const user = firebase.auth().currentUser;
@@ -284,6 +291,7 @@ function selectRaid(raidId) {
         <div class="raid-team-slots">${teamHtml}</div>
         ${!hasTeam ? '<p style="color:var(--accent);font-size:0.85rem;margin-top:8px;">Select 3 Spiritkin in your collection above before joining a raid.</p>' : ''}
       </div>
+      <div id="raid-equip-section" class="raid-equip-section"></div>
       <div id="raid-queue-status" class="raid-queue-status">
         <div id="raid-queue-count">Loading queue...</div>
         <div id="raid-queue-players" class="raid-queue-players"></div>
@@ -302,7 +310,135 @@ function selectRaid(raidId) {
     </div>`;
 
   container.innerHTML = html;
+  renderEquipScreen();
   listenToRaidQueue(raidId);
+}
+
+// ─── EQUIP CHARACTER SCREEN ─────────────────────────────────────
+// 3 slots: Head, Weapon, Accessory. Tap a slot to swap or unequip.
+
+async function renderEquipScreen() {
+  const section = document.getElementById('raid-equip-section');
+  if (!section) return;
+
+  const user = firebase.auth().currentUser;
+  if (!user) { section.innerHTML = ''; return; }
+
+  // Fetch inventory + equipped state
+  const snap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+  const inv = snap.val();
+  const items = inv?.items || [];
+  const equipped = inv?.equipped || { head: null, weapon: null, accessory: null };
+
+  // If no items yet, show nothing
+  if (items.length === 0) { section.innerHTML = ''; return; }
+
+  const slotOrder = ['head', 'weapon', 'accessory'];
+
+  let slotsHtml = slotOrder.map(slot => {
+    const slotDef = EQUIP_SLOTS[slot];
+    const itemKey = equipped[slot];
+    const item = itemKey ? RAID_ITEMS[itemKey] : null;
+    const tierClass = item?.tier || '';
+
+    if (item) {
+      return `<div class="equip-slot filled ${tierClass}" onclick="openEquipPicker('${slot}')">
+        <div class="equip-slot-label">${slotDef.label}</div>
+        <div class="equip-slot-icon">${item.icon}</div>
+        <div class="equip-slot-name">${item.name}</div>
+        <div class="equip-slot-hint">tap to change</div>
+      </div>`;
+    } else {
+      return `<div class="equip-slot empty" onclick="openEquipPicker('${slot}')">
+        <div class="equip-slot-label">${slotDef.label}</div>
+        <div class="equip-slot-icon">${slotDef.icon}</div>
+        <div class="equip-slot-name">${slotDef.empty}</div>
+        <div class="equip-slot-hint">tap to equip</div>
+      </div>`;
+    }
+  }).join('');
+
+  section.innerHTML = `
+    <h3 class="equip-title">LOADOUT</h3>
+    <div class="equip-slots">${slotsHtml}</div>
+    <div id="equip-picker-overlay" class="equip-picker-overlay" style="display:none"></div>`;
+}
+
+/** Open the item picker for a specific slot */
+function openEquipPicker(slot) {
+  const overlay = document.getElementById('equip-picker-overlay');
+  if (!overlay) return;
+
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+
+  db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value').then(snap => {
+    const inv = snap.val();
+    const items = inv?.items || [];
+    const equipped = inv?.equipped || { head: null, weapon: null, accessory: null };
+    const slotDef = EQUIP_SLOTS[slot];
+
+    // Filter items that fit this slot
+    const available = items.filter(key => {
+      const def = RAID_ITEMS[key];
+      return def && def.slot === slot;
+    });
+
+    let pickerHtml = `
+      <div class="equip-picker">
+        <div class="equip-picker-header">
+          <span>${slotDef.icon} ${slotDef.label}</span>
+          <button class="equip-picker-close" onclick="closeEquipPicker()">X</button>
+        </div>
+        <div class="equip-picker-items">`;
+
+    // Unequip option
+    if (equipped[slot]) {
+      pickerHtml += `<div class="equip-pick-item unequip" onclick="doUnequip('${slot}')">
+        <span class="equip-pick-icon">--</span>
+        <span class="equip-pick-name">Unequip</span>
+      </div>`;
+    }
+
+    if (available.length === 0) {
+      pickerHtml += `<div class="equip-pick-empty">No ${slotDef.label.toLowerCase()} items found.</div>`;
+    }
+
+    available.forEach(key => {
+      const def = RAID_ITEMS[key];
+      const isEquipped = equipped[slot] === key;
+      pickerHtml += `<div class="equip-pick-item ${def.tier} ${isEquipped ? 'currently-equipped' : ''}"
+                          onclick="doEquip('${key}')">
+        <span class="equip-pick-icon">${def.icon}</span>
+        <div class="equip-pick-info">
+          <span class="equip-pick-name">${def.name}</span>
+          <span class="equip-pick-desc">${def.desc}</span>
+        </div>
+        ${isEquipped ? '<span class="equip-pick-badge">EQUIPPED</span>' : ''}
+      </div>`;
+    });
+
+    pickerHtml += `</div></div>`;
+    overlay.innerHTML = pickerHtml;
+    overlay.style.display = 'flex';
+  });
+}
+
+function closeEquipPicker() {
+  const overlay = document.getElementById('equip-picker-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function doEquip(itemKey) {
+  closeEquipPicker();
+  await equipRaidItem(itemKey);
+  renderEquipScreen();
+}
+
+async function doUnequip(slot) {
+  closeEquipPicker();
+  await unequipRaidSlot(slot);
+  renderEquipScreen();
 }
 
 let raidTeamPicks = [];
@@ -1025,11 +1161,15 @@ function showLootRollReveal(playerData, boss) {
       const inv = snap.val();
       if (!inv || !inv.items || inv.items.length === 0) return;
 
-      let invHtml = '<h4>YOUR RAID INVENTORY</h4><div class="loot-inv-items">';
+      const equipped = inv.equipped || {};
+      const equippedKeys = new Set(Object.values(equipped).filter(Boolean));
+
+      let invHtml = '<h4>YOUR LOADOUT</h4><div class="loot-inv-items">';
       inv.items.forEach(key => {
         const def = typeof RAID_ITEMS !== 'undefined' ? RAID_ITEMS[key] : null;
         if (def) {
-          invHtml += `<div class="loot-inv-item"><span>${def.icon}</span><span>${def.name}</span></div>`;
+          const isEq = equippedKeys.has(key);
+          invHtml += `<div class="loot-inv-item${isEq ? ' equipped' : ''}"><span>${def.icon}</span><span>${def.name}</span>${isEq ? '<span style="font-size:0.6rem;color:var(--gold-bright);margin-left:4px">EQUIPPED</span>' : ''}</div>`;
         }
       });
       invHtml += '</div>';

@@ -2,9 +2,10 @@
 // RAID ENGINE — Boss AI, raid lifecycle, Firebase state management
 // Depends on: cards.js (RAID_BOSSES, RAID_BOSS_MINIONS, RAID_BADGES)
 //             battle-engine.js (classify, weightedRoll, etc.)
-// v0.89 — LOOT TABLE SYSTEM: per-boss item drops on defeat, dice roll
-//          determines rarity. Items carry within raid run, reset on end.
-//          Final boss drops unique victory badge.
+// v0.90 — EQUIP SYSTEM: 3 slots (Head, Weapon, Accessory). Players choose
+//          which items to equip from their raid inventory. Only equipped items
+//          apply in battle. New loot auto-equips into empty slots.
+//          (v0.89: loot tables, v0.88: phase labels)
 // =================================================================
 
 const RAID_CONFIG = {
@@ -32,41 +33,48 @@ const RAID_CONFIG = {
 // Players start each boss fight with their accumulated loot equipped.
 
 const RAID_ITEMS = {
-  // === BLADES (toggle on/off, +1 die while swinging) ===
-  ice_blade:   { name: 'Ice Blade',   icon: '🗡️', type: 'blade', tier: 'rare',
+  // === BLADES → weapon slot ===
+  ice_blade:   { name: 'Ice Blade',   icon: '🗡️', type: 'blade', tier: 'rare', slot: 'weapon',
                  desc: '+1 die while swinging. Wins grant +1 Ice Shard.' },
-  flame_blade: { name: 'Flame Blade', icon: '🔥', type: 'blade', tier: 'rare',
+  flame_blade: { name: 'Flame Blade', icon: '🔥', type: 'blade', tier: 'rare', slot: 'weapon',
                  desc: '+1 die while swinging. Wins generate +5 Burn.' },
 
-  // === MASKS (toggle on/off, passive effects) ===
-  mask_of_day:   { name: 'Mask of Day',   icon: '🌅', type: 'mask', tier: 'rare',
+  // === MASKS → head slot ===
+  mask_of_day:   { name: 'Mask of Day',   icon: '🌅', type: 'mask', tier: 'rare', slot: 'head',
                    desc: 'Gain 1 Burn for each 1 or 2 you roll.' },
-  mask_of_night: { name: 'Mask of Night', icon: '🌙', type: 'mask', tier: 'rare',
+  mask_of_night: { name: 'Mask of Night', icon: '🌙', type: 'mask', tier: 'rare', slot: 'head',
                    desc: 'Roll same dice as enemy +1. +1 damage on wins.' },
 
-  // === CHARMS (passive, always active once owned) ===
-  lucky_charm:    { name: 'Lucky Charm',    icon: '🍀', type: 'charm', tier: 'common',
+  // === CHARMS → accessory slot ===
+  lucky_charm:    { name: 'Lucky Charm',    icon: '🍀', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 1 Lucky Stone.' },
-  healing_root:   { name: 'Healing Root',   icon: '🌿', type: 'charm', tier: 'common',
+  healing_root:   { name: 'Healing Root',   icon: '🌿', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 1 Healing Seed.' },
-  ember_stone:    { name: 'Ember Stone',    icon: '🔶', type: 'charm', tier: 'common',
+  ember_stone:    { name: 'Ember Stone',    icon: '🔶', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 1 Sacred Fire.' },
-  frost_shard:    { name: 'Frost Shard',    icon: '❄️', type: 'charm', tier: 'common',
+  frost_shard:    { name: 'Frost Shard',    icon: '❄️', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 1 Ice Shard.' },
-  surge_crystal:  { name: 'Surge Crystal',  icon: '⚡', type: 'charm', tier: 'common',
+  surge_crystal:  { name: 'Surge Crystal',  icon: '⚡', type: 'charm', tier: 'common', slot: 'accessory',
                     desc: 'Start each fight with 2 Surge.' },
-  moonstone_ring: { name: 'Moonstone Ring', icon: '💎', type: 'charm', tier: 'rare',
+  moonstone_ring: { name: 'Moonstone Ring', icon: '💎', type: 'charm', tier: 'rare', slot: 'accessory',
                     desc: 'Start each fight with 1 Moonstone.' },
-  firefly_lantern:{ name: 'Firefly Lantern',icon: '🏮', type: 'charm', tier: 'rare',
+  firefly_lantern:{ name: 'Firefly Lantern',icon: '🏮', type: 'charm', tier: 'rare', slot: 'accessory',
                     desc: 'Start each fight with 1 Magic Firefly.' },
 
-  // === LEGENDARY (very rare, powerful) ===
-  golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary',
+  // === LEGENDARY → weapon or head slot ===
+  golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary', slot: 'weapon',
                     desc: '+1 die on your first roll of every fight.' },
-  shades_cape:   { name: 'Shade's Cape',   icon: '👑', type: 'legendary', tier: 'legendary',
+  shades_cape:   { name: 'Shade\'s Cape',   icon: '👑', type: 'legendary', tier: 'legendary', slot: 'head',
                     desc: 'Your active ghost gains +1 max HP for this raid.' },
-  valkins_crystal:   { name: "Valkin's Crystal",  icon: '💀', type: 'legendary', tier: 'legendary',
+  valkins_crystal:   { name: "Valkin's Crystal",  icon: '💀', type: 'legendary', tier: 'legendary', slot: 'accessory',
                     desc: 'Doubles deal +1 bonus damage.' },
+};
+
+// Equipment slot labels & icons
+const EQUIP_SLOTS = {
+  head:      { label: 'Head',      icon: '👤', empty: 'No headgear' },
+  weapon:    { label: 'Weapon',    icon: '⚔️', empty: 'No weapon' },
+  accessory: { label: 'Accessory', icon: '💍', empty: 'No accessory' }
 };
 
 // Per-tier loot pools — what can drop at each tier
@@ -137,15 +145,22 @@ function rollBossLoot(tier) {
 }
 
 /**
- * Apply loot items to battle state at fight start
- * Called when a player begins their boss fight with accumulated raid loot
+ * Apply loot items to battle state at fight start.
+ * Only EQUIPPED items are applied (head, weapon, accessory slots).
+ * Falls back to applying all items if no equipment data exists (backwards compat).
  */
 function applyRaidLoot(battleState, team, lootInventory) {
   if (!lootInventory || !lootInventory.items) return;
   const t = battleState.teams?.[team] || battleState[team];
   if (!t) return;
 
-  lootInventory.items.forEach(item => {
+  // Determine which items to apply — equipped items take priority
+  const equipped = lootInventory.equipped;
+  const itemsToApply = equipped
+    ? Object.values(equipped).filter(Boolean)   // only the 3 equipped slots
+    : lootInventory.items;                       // legacy: apply everything
+
+  itemsToApply.forEach(item => {
     const def = RAID_ITEMS[item];
     if (!def) return;
 
@@ -202,6 +217,53 @@ function applyRaidLoot(battleState, team, lootInventory) {
       }
     });
   }
+}
+
+// ─── EQUIP SYSTEM ───────────────────────────────────────────────
+// Players equip items into 3 slots: head, weapon, accessory.
+// Equipped state persists in Firebase alongside the raid run inventory.
+
+/**
+ * Equip an item from raid inventory into the matching slot.
+ * Returns the updated equipped map.
+ */
+async function equipRaidItem(itemKey) {
+  const user = firebase.auth().currentUser;
+  if (!user) return null;
+  const def = RAID_ITEMS[itemKey];
+  if (!def || !def.slot) return null;
+
+  const ref = db.ref(`mp/users/${user.uid}/raidRunInventory`);
+  const snap = await ref.once('value');
+  const inv = snap.val();
+  if (!inv || !inv.items || !inv.items.includes(itemKey)) return null;
+
+  const equipped = inv.equipped || { head: null, weapon: null, accessory: null };
+  equipped[def.slot] = itemKey;
+  await ref.child('equipped').set(equipped);
+  return equipped;
+}
+
+/**
+ * Unequip a slot (head/weapon/accessory).
+ */
+async function unequipRaidSlot(slot) {
+  const user = firebase.auth().currentUser;
+  if (!user) return null;
+
+  const ref = db.ref(`mp/users/${user.uid}/raidRunInventory/equipped/${slot}`);
+  await ref.remove();
+}
+
+/**
+ * Get current equipped items for display.
+ */
+async function getRaidEquipped() {
+  const user = firebase.auth().currentUser;
+  if (!user) return { head: null, weapon: null, accessory: null };
+  const snap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+  const inv = snap.val();
+  return inv?.equipped || { head: null, weapon: null, accessory: null };
 }
 
 // ─── HP SCALING ─────────────────────────────────────────────────
@@ -1331,6 +1393,15 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
       // Add item if not already owned
       if (loot.item && !inv.items.includes(loot.item.key)) {
         inv.items.push(loot.item.key);
+
+        // Auto-equip into empty slot
+        const itemDef = RAID_ITEMS[loot.item.key];
+        if (itemDef?.slot) {
+          inv.equipped = inv.equipped || { head: null, weapon: null, accessory: null };
+          if (!inv.equipped[itemDef.slot]) {
+            inv.equipped[itemDef.slot] = loot.item.key;
+          }
+        }
       }
 
       // Accumulate resources
