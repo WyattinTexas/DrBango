@@ -101,10 +101,18 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     B.duelPhaseMode = false;   // boss fights skip duel phase
   }
 
-  // ── 8. Hide blue roll button (boss auto-rolls) ──────────────
+  // ── 8. Hide blue roll button (boss auto-rolls via AI) ───────
   const blueBtn = document.getElementById('rollBlueBtn');
   if (blueBtn) {
     blueBtn.style.display = 'none';
+  }
+
+  // ── 9. Start blue AI — this is what makes the boss auto-roll ─
+  // In the testroom, startBlueAI() polls every 600ms and clicks
+  // the blue roll button when it's ready. Without this, the boss
+  // never rolls back after the player rolls.
+  if (typeof startBlueAI === 'function') {
+    startBlueAI();
   }
 
   // ── 9. Render the boss HP pool bar ───────────────────────────
