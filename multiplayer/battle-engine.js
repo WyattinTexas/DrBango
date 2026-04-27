@@ -6,6 +6,18 @@
 // Alias: testroom uses ghostData, cards.js uses getGhost
 function ghostData(id) { return getGhost(id); }
 
+// Safety: testroom code does getElementById().style/.classList without null checks.
+// In multiplayer, some elements may not exist. Wrap to return a safe dummy.
+(function() {
+  const _orig = document.getElementById.bind(document);
+  const _dummy = document.createElement('div');
+  _dummy.id = '_battle_dummy';
+  _dummy.style.display = 'none';
+  document.getElementById = function(id) {
+    return _orig(id) || _dummy;
+  };
+})();
+
 // Stubs for testroom-specific functions not needed in multiplayer
 function recordWin(id) {}
 function recordLoss(id) {}
@@ -703,11 +715,14 @@ function startBattle() {
     sophiaMaskActive: { red: false, blue: false },
   };
   S.battle = B;
-  initMatchStats();
-  document.getElementById('team-select').style.display = 'none';
-  document.getElementById('battle-view').style.display = 'block';
-  document.querySelector('.app').classList.add('battle-active');
-  startMusic(); // v721: music plays in multiplayer too
+  if (typeof initMatchStats === 'function') initMatchStats();
+  const _teamSel = document.getElementById('team-select');
+  if (_teamSel) _teamSel.style.display = 'none';
+  const _battleView = document.getElementById('battle-view');
+  if (_battleView) _battleView.style.display = 'block';
+  const _appEl = document.querySelector('.app');
+  if (_appEl) _appEl.classList.add('battle-active');
+  if (typeof startMusic === 'function') startMusic();
   log('<span class="log-round">Battle begins!</span>');
   renderBattle();
 
