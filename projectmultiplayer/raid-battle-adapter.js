@@ -297,6 +297,15 @@ const RaidBattleAdapter = {
     const playerData = players[currentFighterIdx];
     if (!playerData || !bossConfig) { this._fightStarted = false; return; }
 
+    // Start transcript recording
+    if (typeof RaidTranscript !== 'undefined') {
+      const user = firebase.auth().currentUser;
+      if (!RaidTranscript._active) {
+        RaidTranscript.start(user?.displayName || 'Player', bossConfig.name, RaidState.raidId);
+      }
+      RaidTranscript.recordTurnStart(playerData.displayName || 'Player ' + currentFighterIdx, currentFighterIdx);
+    }
+
     // Hide any waiting room/countdown overlays from the entry flow
     if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
     const launchCountdown = document.getElementById('raid-launch-countdown');
@@ -648,6 +657,12 @@ const RaidBattleAdapter = {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
 
+    // Record turn end in transcript
+    if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+      const user = firebase.auth().currentUser;
+      RaidTranscript.recordTurnEnd(user?.displayName || 'Player');
+    }
+
     // Reset fight lock so next turn can start _startMyFight again
     this._fightStarted = false;
 
@@ -691,6 +706,13 @@ const RaidBattleAdapter = {
   _handleRaidGameOver(winner) {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
+
+    // Record game over and auto-download transcript
+    if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+      RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
+      RaidTranscript.stop();
+      RaidTranscript.download();
+    }
 
     const B = BattleEngine.getState();
     const currentIdx = RaidState.mySlot;
