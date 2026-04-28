@@ -85,16 +85,25 @@ const RaidBattleAdapter = {
     const user = firebase.auth().currentUser;
     if (!user) return;
 
+    // Guard: don't re-enter if already in a raid
+    if (RaidState.isActive() && RaidState.instanceId === instanceId) return;
+
     // Load state from Firebase
     RaidState.loadFromFirebase(instanceId, data, user.uid);
 
-    // Connect sync layer
+    // Transition out of idle BEFORE connecting Firebase listener.
+    // If we connect first, the listener fires immediately, which calls
+    // _handleFirebaseUpdate, which sees phase==='idle' and calls _enterRaid
+    // again → infinite recursion.
+    RaidState.transition('lobby');
+
+    // Now safe to connect — phase is no longer 'idle'
     RaidSync.connect(instanceId);
 
     // Determine initial phase
     switch (data.status) {
       case 'countdown':
-        RaidState.transition('lobby');
+        // Already in 'lobby' from above
         if (typeof showRaidWaitingRoom === 'function') {
           showRaidWaitingRoom(instanceId, data);
         }
@@ -108,19 +117,16 @@ const RaidBattleAdapter = {
         break;
 
       case 'active':
+        // Already in 'lobby' from above — go to countdown then fight/spectate
+        RaidState.transition('countdown');
         if (RaidState.isMyTurn()) {
-          RaidState.transition('lobby'); // temp state for valid transition
-          RaidState.transition('countdown');
           RaidState.transition('fighting');
         } else {
-          RaidState.transition('lobby');
-          RaidState.transition('countdown');
           RaidState.transition('spectating');
         }
         break;
 
       case 'complete':
-        RaidState.transition('lobby');
         RaidState.transition('countdown');
         RaidState.transition('complete');
         break;
