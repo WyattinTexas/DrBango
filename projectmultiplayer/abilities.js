@@ -4455,16 +4455,12 @@ function resetRollButtons() {
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
   if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
-  // v733: async MP — Red button says "READY" (commit signal), Blue is AI-controlled
-  // In RAID mode: button says "ROLL" — no commit handshake needed, boss AI auto-rolls
+  // v733: async MP — Red button says "ROLL" (commit signal), Blue is AI-controlled
+  // Player uses pre-roll abilities (Miyoshi Bonzai, Tyler, etc.) then clicks ROLL.
+  // Boss AI waits for pvpRedClickedRoll before rolling — gives player time for abilities.
   if (MP_MODE && !LIVE_PVP) {
-    if (window.BOSS_MODE) {
-      if (r) r.textContent = 'ROLL';
-      pvpRedClickedRoll = true; // auto-ready — boss AI rolls immediately after player
-    } else {
-      if (r) r.textContent = 'READY';
-      pvpRedClickedRoll = false; // reset each round
-    }
+    if (r) r.textContent = 'ROLL';
+    pvpRedClickedRoll = false; // player must click ROLL — AI waits for this signal
     if (b) b.style.display = 'none'; // hide Blue's button — AI rolls it
   }
   // Live PvP: hide opponent's button, label ours properly
@@ -5166,16 +5162,7 @@ function doPreRollSetup() {
   // PHASE 2: COMPUTE DICE COUNTS (rolled later per-click)
   // ========================================
   let redCount = 3, blueCount = 3;
-  // Boss mode: boss starts with 4 base dice + enrage bonuses
-  if (window.BOSS_MODE && typeof RAID_CONFIG !== 'undefined') {
-    blueCount = RAID_CONFIG.BOSS_BASE_DICE || 4;
-    const enrage = (typeof RaidState !== 'undefined') ? RaidState.enrageLevel : 0;
-    if (RAID_CONFIG.ENRAGE_DICE_BONUS) {
-      Object.entries(RAID_CONFIG.ENRAGE_DICE_BONUS).forEach(([level, bonus]) => {
-        if (enrage >= parseInt(level)) blueCount += bonus;
-      });
-    }
-  }
+  // Bosses roll 3 dice like regular ghosts — their power is extra HP, not extra dice
   // Doug (63) Caution duel-phase swap promised the incoming ghost +1 die — apply now.
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.red) { redCount++; B.dougCautionDieBonus.red = false; }
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.blue) { blueCount++; B.dougCautionDieBonus.blue = false; }

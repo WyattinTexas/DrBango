@@ -17,6 +17,8 @@ const RaidTranscript = {
     this._lines = [];
     this._active = true;
     this._startTime = Date.now();
+    this._lastLoggedRound = -1;
+    this._lastLoggedPhase = '';
     this._playerName = playerName || 'Player';
     this._bossName = bossName || 'Boss';
     this._raidId = raidId || '';
@@ -93,6 +95,11 @@ const RaidTranscript = {
         const red = B.red, blue = B.blue;
         const rF = red.ghosts[red.activeIdx];
         const bF = blue.ghosts[blue.activeIdx];
+
+        // Dedup: skip if we already logged this round (hook fires from both handleKOs and doKoSwap)
+        if (self._lastLoggedRound === B.round && self._lastLoggedPhase === B.phase) return;
+        self._lastLoggedRound = B.round;
+        self._lastLoggedPhase = B.phase;
 
         self.add('RESOLVE', `Round ${B.round} resolved`);
         self.add('STATE', `Red active: ${rF?.name} ${rF?.hp}/${rF?.maxHp} HP${rF?.ko ? ' [KO]' : ''}`);

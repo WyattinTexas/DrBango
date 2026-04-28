@@ -631,8 +631,12 @@ function renderBattle() {
   }
 
   // Ability buttons (pre-roll actions)
+  // Spectators see NO ability buttons — they can't interact
+  const isSpectator = typeof RaidState !== 'undefined' && RaidState.amSpectator && RaidState.amSpectator();
   ['red','blue'].forEach(team => {
     const el = document.getElementById(`${team}-ability-buttons`);
+    // Spectators: clear ALL ability buttons
+    if (isSpectator) { el.innerHTML = ''; return; }
     // Boss mode: skip blue ability buttons — boss doesn't get interactive buttons
     if (window.BOSS_MODE && team === 'blue') { el.innerHTML = ''; return; }
     const f = active(B[team]);
