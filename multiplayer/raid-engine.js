@@ -554,6 +554,7 @@ function startActiveRaidListener() {
 
 var _currentRaidRole = null;   // 'fighter' | 'spectator' | null
 var _currentFighterIdx = -1;   // which fighter index we last processed
+var _lastTurnCounter = -1;     // turn counter — distinguishes repeated same-index turns
 
 function enterRaidScreen(instanceId) {
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
@@ -635,10 +636,12 @@ function handleActiveFight(data) {
   }
 
   const currentIdx = data.currentFighterIdx || 0;
+  const turnCounter = data.turnCounter || 0;
 
-  // Only process each fighter index once
-  if (currentIdx === _currentFighterIdx) return;
+  // Only process each turn once — turnCounter distinguishes repeated same-index turns
+  if (currentIdx === _currentFighterIdx && turnCounter === _lastTurnCounter) return;
   _currentFighterIdx = currentIdx;
+  _lastTurnCounter = turnCounter;
 
   const isMyTurn = (mySlot === currentIdx) &&
                    players[mySlot]?.status !== 'done' &&
@@ -1645,6 +1648,7 @@ async function writeBattleSnapshot(snapshotData) {
 function cleanupRaid() {
   _currentRaidRole = null;
   _currentFighterIdx = -1;
+  _lastTurnCounter = -1;
   // Remove Firebase listeners
   if (currentRaid?.instanceId) {
     const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);

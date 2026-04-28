@@ -768,12 +768,15 @@ function injectRaidReturnButton() {
 
       // ATOMIC write: player ghost state + fighter advance in ONE update
       // Prevents race where listener fires on index change before ghost state is saved
+      // turnCounter increments each swap so the listener can distinguish repeated same-index turns
+      const prevTurnCounter = currentRaid.turnCounter || 0;
       const update = {
         currentFighterIdx: nextIdx,
         currentFighterUid: players[nextIdx]?.uid || null,
         fightPhase: 'fighting',
         bossCurrentHp: poolNow,
-        bossGhostState: savedBossState
+        bossGhostState: savedBossState,
+        turnCounter: prevTurnCounter + 1
       };
       if (user && savedPlayerState.ghosts.length > 0) {
         update[`playerGhostState/${user.uid}`] = savedPlayerState;
