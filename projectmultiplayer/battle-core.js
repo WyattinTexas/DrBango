@@ -8,21 +8,24 @@
 function ghostData(id) { return getGhost(id); }
 
 // Safety: testroom code does getElementById().style/.classList without null checks.
-// In multiplayer, some elements may not exist. We use a safe getter helper instead
-// of overriding the global getElementById (which breaks other libraries).
-function safeEl(id) {
-  const el = document.getElementById(id);
-  if (el) return el;
-  // Audio elements must return null so playSfx() can handle gracefully
-  if (id && (id.startsWith('sfx') || id.startsWith('bg') || id === 'triplesSfx')) return null;
-  // Return a dummy div for DOM access safety (style, classList, etc.)
-  if (!safeEl._dummy) {
-    safeEl._dummy = document.createElement('div');
-    safeEl._dummy.id = '_battle_dummy';
-    safeEl._dummy.style.display = 'none';
-  }
-  return safeEl._dummy;
-}
+// In multiplayer, many elements may not exist during raid transitions.
+// Override getElementById to return a dummy element instead of null.
+// Audio elements still return null so playSfx() can skip gracefully.
+(function() {
+  const _orig = document.getElementById.bind(document);
+  const _dummy = document.createElement('div');
+  _dummy.id = '_battle_dummy';
+  _dummy.style.display = 'none';
+  document.getElementById = function(id) {
+    const el = _orig(id);
+    if (el) return el;
+    if (id && (id.startsWith('sfx') || id.startsWith('bg') || id === 'triplesSfx')) return null;
+    return _dummy;
+  };
+})();
+
+// safeEl alias (for code that explicitly wants the safe version)
+function safeEl(id) { return document.getElementById(id); }
 
 // ── Hook system ──────────────────────────────────────────────────
 // Registered hooks fire before default behavior. resetRollButtons hooks

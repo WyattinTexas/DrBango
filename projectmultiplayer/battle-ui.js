@@ -453,8 +453,6 @@ function hitDamage(teamName) {
 
 function renderBattle() {
   if (!B) return;
-  // Bail if battle arena DOM isn't mounted (e.g., raid screen loading)
-  if (!document.getElementById('red-fighter') || !document.getElementById('blue-fighter')) return;
 
   // v736: enforce Moonstone cap (1) and Firefly cap (1) globally
   ['red','blue'].forEach(s => {
