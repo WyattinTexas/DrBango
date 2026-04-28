@@ -193,14 +193,16 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     }
 
     // ── 7b. Clear dice from previous player's turn ──────────────
-    const redDice = document.getElementById('red-dice');
-    const blueDice = document.getElementById('blue-dice');
-    if (redDice) redDice.innerHTML = '';
-    if (blueDice) blueDice.innerHTML = '';
+    B.redDice = null;
+    B.blueDice = null;
+    const redDiceEl = document.getElementById('red-dice');
+    const blueDiceEl = document.getElementById('blue-dice');
+    if (redDiceEl) redDiceEl.innerHTML = '';
+    if (blueDiceEl) blueDiceEl.innerHTML = '';
     // Also clear any 3D physics dice lingering on the board
     document.querySelectorAll('.die-physics').forEach(el => el.remove());
 
-    // Re-render with correct HP
+    // Re-render with correct HP (dice won't show because B.redDice/blueDice are null)
     renderBattle();
   }
 
@@ -501,6 +503,14 @@ function injectRaidReturnButton() {
     const narrator = document.getElementById('narrator');
     if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
+    // Calculate boss damage dealt this turn and sync to Firebase
+    // The boss ghost HP in B reflects damage dealt during this round
+    let bossHpNow = 0;
+    if (B && B.blue) {
+      const bossGhost = B.blue.ghosts[B.blue.activeIdx];
+      if (bossGhost) bossHpNow = bossGhost.hp;
+    }
+
     // Advance currentFighterIdx in Firebase after a brief delay (let animations finish)
     setTimeout(() => {
       if (!currentRaid) return;
@@ -508,11 +518,20 @@ function injectRaidReturnButton() {
       const nextIdx = (currentIdx + 1) % playerCount;
       const instanceId = currentRaid.instanceId;
 
+      // Calculate new boss pool HP from the boss ghost's current HP
+      // Boss ghost started with HP proportional to pool, so scale back
+      const bossConfig = RAID_BOSSES[currentRaid.raidId];
+      const bossMaxGhostHp = bossConfig?.bossGhost?.maxHp || 9;
+      const poolMax = currentRaid.bossMaxHp || 15;
+      const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHp)));
+
       db.ref(`mp/raids/instances/${instanceId}`).update({
         currentFighterIdx: nextIdx,
         currentFighterUid: players[nextIdx]?.uid || null,
-        fightPhase: 'fighting'
+        fightPhase: 'fighting',
+        bossCurrentHp: poolNow
       }).then(() => {
+        console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
         console.log('[RAID] Turn passed to player', nextIdx);
         _isSpectating = true;
         window._raidMyFightActive = false; // allow spectator branch to work
