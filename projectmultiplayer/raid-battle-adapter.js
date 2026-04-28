@@ -231,7 +231,9 @@ const RaidBattleAdapter = {
     this._lastProcessedTurn = currentIdx;
     this._lastProcessedCounter = turnCounter;
 
-    const isMyTurn = RaidState.isMyTurn() &&
+    // Check slot directly — don't use isMyTurn() which requires phase==='fighting'
+    // (we haven't transitioned yet — that's what we're deciding here)
+    const isMyTurn = (RaidState.mySlot === currentIdx) &&
       RaidState.players[RaidState.mySlot]?.status !== 'done' &&
       RaidState.players[RaidState.mySlot]?.status !== 'disconnected';
 

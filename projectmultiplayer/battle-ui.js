@@ -467,6 +467,7 @@ function renderBattle() {
 
     // Fighter
     const fighterEl = document.getElementById(`${team}-fighter`);
+    if (!fighterEl) return; // battle view DOM not ready yet
     const fData = ghostData(f.id);
     fighterEl.className = `arena-card fighter-slot team-${team} rarity-${fData.rarity} ${f.ko?'ko':''}`;
     fighterEl.innerHTML = renderCardSlot(f, true);
