@@ -193,6 +193,17 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   // ── 9a. Start snapshot sync (writes B state to Firebase for spectators)
   startSnapshotSync();
 
+  // ── 9b. Ensure red roll button is visible and enabled ────────
+  // The spectator path may have hidden it before we got here.
+  setTimeout(() => {
+    const redBtn = document.getElementById('rollRedBtn');
+    if (redBtn && B && B.phase === 'ready') {
+      redBtn.style.display = '';
+      redBtn.disabled = false;
+      redBtn.textContent = 'ROLL';
+    }
+  }, 300);
+
   // ── 10. Render the boss HP pool bar ──────────────────────────
   const bossHp    = raidData.bossCurrentHp || 0;
   const bossMaxHp = raidData.bossMaxHp || 1;
@@ -452,9 +463,13 @@ function injectRaidReturnButton() {
     if (typeof stopBlueAI === 'function') stopBlueAI();
     stopSnapshotSync();
 
-    // Hide roll button, show handoff message
+    // Hide roll button, clear dice, show handoff message
     const rollBtn = document.getElementById('rollRedBtn');
     if (rollBtn) rollBtn.style.display = 'none';
+    const redDice = document.getElementById('red-dice');
+    const blueDice = document.getElementById('blue-dice');
+    if (redDice) redDice.innerHTML = '';
+    if (blueDice) blueDice.innerHTML = '';
     const narrator = document.getElementById('narrator');
     if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
