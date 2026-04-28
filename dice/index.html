@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOO! Battle of Origins — Dice Sets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #0a0a0f;
+  color: #e8e8e8;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(60,60,120,0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(80,40,100,0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(40,80,100,0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+header {
+  text-align: center;
+  padding: 60px 20px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, #c9a84c, #f5e6a3, #c9a84c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+header p {
+  font-size: 1rem;
+  color: #888;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.sets-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.dice-set {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.3s;
+}
+.dice-set:hover { border-color: rgba(255,255,255,0.12); }
+
+.set-header { text-align: center; margin-bottom: 24px; }
+.set-header h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.set-header .set-subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dice-pair { display: flex; justify-content: center; gap: 50px; flex-wrap: wrap; }
+
+.die-card { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.die-canvas-wrap {
+  width: 260px; height: 260px;
+  cursor: grab;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.die-canvas-wrap:active { cursor: grabbing; }
+.die-canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+
+.die-label { font-weight: 600; font-size: 0.9rem; color: #aaa; letter-spacing: 0.05em; }
+
+.color-controls { display: flex; gap: 14px; align-items: center; }
+
+.color-group { display: flex; align-items: center; gap: 6px; }
+.color-group label {
+  font-size: 0.75rem; color: #777;
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+.color-group input[type="color"] {
+  -webkit-appearance: none;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 8px; width: 36px; height: 36px;
+  cursor: pointer; background: transparent; padding: 2px;
+  transition: border-color 0.2s;
+}
+.color-group input[type="color"]:hover { border-color: rgba(255,255,255,0.35); }
+.color-group input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-group input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+.sparkle-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.sparkle-toggle input[type="checkbox"] { display: none; }
+.sparkle-switch {
+  width: 34px; height: 18px;
+  background: rgba(255,255,255,0.1); border-radius: 9px;
+  position: relative; transition: background 0.3s;
+}
+.sparkle-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; background: #555;
+  border-radius: 50%; transition: all 0.3s;
+}
+.sparkle-toggle input:checked + .sparkle-switch { background: rgba(255,215,0,0.3); }
+.sparkle-toggle input:checked + .sparkle-switch::after {
+  left: 18px; background: #ffd700; box-shadow: 0 0 6px rgba(255,215,0,0.5);
+}
+.sparkle-label {
+  font-size: 0.7rem; color: #666;
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+
+.drag-hint {
+  text-align: center; color: #555; font-size: 0.78rem;
+  margin-top: -10px; margin-bottom: 10px; letter-spacing: 0.05em;
+}
+
+.set-sliders {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.opacity-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+}
+
+.opacity-control label {
+  font-size: 0.8rem;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.opacity-control input[type="range"] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.opacity-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #c9a84c;
+  border: 2px solid rgba(255,255,255,0.3);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(201,168,76,0.4);
+}
+
+.opacity-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #c9a84c;
+  min-width: 52px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.dice-set[data-set="dark-castle"] .set-header h2 { color: #6ea8fe; }
+.dice-set[data-set="frost-valley"] .set-header h2 { color: #8ec5fc; }
+.dice-set[data-set="volcanic-isles"] .set-header h2 { color: #ff8a65; }
+.dice-set[data-set="rolling-hills"] .set-header h2 { color: #81c784; }
+
+@media (max-width: 600px) {
+  .dice-pair { gap: 20px; }
+  .die-canvas-wrap { width: 170px; height: 170px; }
+  .dice-set { padding: 20px 16px; }
+  header { padding: 40px 16px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Dice Collection</h1>
+  <p>BOO! Battle of Origins</p>
+</header>
+<p class="drag-hint">Drag to rotate &bull; Pick colors below each die</p>
+
+
+<div class="sets-container" id="setsContainer"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// Official Three.js RoundedBoxGeometry (inlined from r128 addon)
+// Source: three.js/examples/jsm/geometries/RoundedBoxGeometry.js
+// ══════════════════════════════════════════════════════════════
+(function() {
+  const _tempNormal = new THREE.Vector3();
+
+  function getUv(faceDirVector, normal, uvAxis, projectionAxis, radius, sideLength) {
+    const totArcLength = 2 * Math.PI * radius / 4;
+    const centerLength = Math.max(sideLength - 2 * radius, 0);
+    const halfArc = Math.PI / 4;
+
+    _tempNormal.copy(normal);
+    _tempNormal[projectionAxis] = 0;
+    _tempNormal.normalize();
+
+    const arcUvRatio = 0.5 * totArcLength / (totArcLength + centerLength);
+    const arcAngleRatio = 1.0 - (_tempNormal.angleTo(faceDirVector) / halfArc);
+
+    if (Math.sign(_tempNormal[uvAxis]) === 1) {
+      return arcAngleRatio * arcUvRatio;
+    } else {
+      const lenUv = centerLength / (totArcLength + centerLength);
+      return lenUv + arcUvRatio + arcUvRatio * (1.0 - arcAngleRatio);
+    }
+  }
+
+  class RoundedBoxGeometry extends THREE.BoxGeometry {
+    constructor(width, height, depth, segments, radius) {
+      width = width || 1;
+      height = height || 1;
+      depth = depth || 1;
+      segments = segments || 2;
+      radius = radius || 0.1;
+
+      segments = segments * 2 + 1;
+      radius = Math.min(width / 2, height / 2, depth / 2, radius);
+
+      super(1, 1, 1, segments, segments, segments);
+
+      if (segments === 1) return;
+
+      const geometry2 = this.toNonIndexed();
+
+      this.index = null;
+      this.attributes.position = geometry2.attributes.position;
+      this.attributes.normal = geometry2.attributes.normal;
+      this.attributes.uv = geometry2.attributes.uv;
+
+      const position = new THREE.Vector3();
+      const normal = new THREE.Vector3();
+      const box = new THREE.Vector3(width, height, depth).divideScalar(2).subScalar(radius);
+
+      const positions = this.attributes.position.array;
+      const normals = this.attributes.normal.array;
+      const uvs = this.attributes.uv.array;
+
+      const faceTris = positions.length / 6;
+      const faceDirVector = new THREE.Vector3();
+      const halfSegmentSize = 0.5 / segments;
+
+      for (let i = 0, j = 0; i < positions.length; i += 3, j += 2) {
+        position.fromArray(positions, i);
+        normal.copy(position);
+        normal.x -= Math.sign(normal.x) * halfSegmentSize;
+        normal.y -= Math.sign(normal.y) * halfSegmentSize;
+        normal.z -= Math.sign(normal.z) * halfSegmentSize;
+        normal.normalize();
+
+        positions[i + 0] = box.x * Math.sign(position.x) + normal.x * radius;
+        positions[i + 1] = box.y * Math.sign(position.y) + normal.y * radius;
+        positions[i + 2] = box.z * Math.sign(position.z) + normal.z * radius;
+
+        normals[i + 0] = normal.x;
+        normals[i + 1] = normal.y;
+        normals[i + 2] = normal.z;
+
+        const side = Math.floor(i / faceTris);
+
+        switch (side) {
+          case 0:
+            faceDirVector.set(1, 0, 0);
+            uvs[j + 0] = getUv(faceDirVector, normal, 'z', 'y', radius, depth);
+            uvs[j + 1] = 1.0 - getUv(faceDirVector, normal, 'y', 'z', radius, height);
+            break;
+          case 1:
+            faceDirVector.set(-1, 0, 0);
+            uvs[j + 0] = 1.0 - getUv(faceDirVector, normal, 'z', 'y', radius, depth);
+            uvs[j + 1] = 1.0 - getUv(faceDirVector, normal, 'y', 'z', radius, height);
+            break;
+          case 2:
+            faceDirVector.set(0, 1, 0);
+            uvs[j + 0] = 1.0 - getUv(faceDirVector, normal, 'x', 'z', radius, width);
+            uvs[j + 1] = getUv(faceDirVector, normal, 'z', 'x', radius, depth);
+            break;
+          case 3:
+            faceDirVector.set(0, -1, 0);
+            uvs[j + 0] = 1.0 - getUv(faceDirVector, normal, 'x', 'z', radius, width);
+            uvs[j + 1] = 1.0 - getUv(faceDirVector, normal, 'z', 'x', radius, depth);
+            break;
+          case 4:
+            faceDirVector.set(0, 0, 1);
+            uvs[j + 0] = 1.0 - getUv(faceDirVector, normal, 'x', 'y', radius, width);
+            uvs[j + 1] = 1.0 - getUv(faceDirVector, normal, 'y', 'x', radius, height);
+            break;
+          case 5:
+            faceDirVector.set(0, 0, -1);
+            uvs[j + 0] = getUv(faceDirVector, normal, 'x', 'y', radius, width);
+            uvs[j + 1] = 1.0 - getUv(faceDirVector, normal, 'y', 'x', radius, height);
+            break;
+        }
+      }
+    }
+  }
+
+  THREE.RoundedBoxGeometry = RoundedBoxGeometry;
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Dice App
+// ══════════════════════════════════════════════════════════════
+
+const SETS = [
+  {
+    id: 'dark-castle', name: 'Dark Castle', subtitle: 'Shadows & Blue Flame',
+    dice: [
+      { label: 'Shadow Die', bodyColor: '#1a1a2e', pipColor: '#4a9eff', sparkle: true },
+      { label: 'Flame Die',  bodyColor: '#0f0f1e', pipColor: '#00c8ff', sparkle: true }
+    ]
+  },
+  {
+    id: 'frost-valley', name: 'Frost Valley', subtitle: 'Ice & Snow',
+    dice: [
+      { label: 'Frost Die', bodyColor: '#5d9fcf', pipColor: '#ffffff', sparkle: true },
+      { label: 'Snow Die',  bodyColor: '#e8eef5', pipColor: '#4a8bbf', sparkle: true }
+    ]
+  },
+  {
+    id: 'volcanic-isles', name: 'Volcanic Isles', subtitle: 'Magma & Obsidian',
+    dice: [
+      { label: 'Magma Die',   bodyColor: '#c62828', pipColor: '#ffab00', sparkle: false },
+      { label: 'Obsidian Die', bodyColor: '#212121', pipColor: '#ff5722', sparkle: false }
+    ]
+  },
+  {
+    id: 'rolling-hills', name: 'Rolling Hills', subtitle: 'Forest & Earth',
+    dice: [
+      { label: 'Forest Die', bodyColor: '#2e7d32', pipColor: '#f5f5dc', sparkle: false },
+      { label: 'Earth Die',  bodyColor: '#5d4037', pipColor: '#a5d6a7', sparkle: false }
+    ]
+  }
+];
+
+const PIP_LAYOUTS = {
+  1: [[0.5, 0.5]],
+  2: [[0.3, 0.3], [0.7, 0.7]],
+  3: [[0.3, 0.3], [0.5, 0.5], [0.7, 0.7]],
+  4: [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]],
+  5: [[0.3, 0.3], [0.7, 0.3], [0.5, 0.5], [0.3, 0.7], [0.7, 0.7]],
+  6: [[0.3, 0.25], [0.7, 0.25], [0.3, 0.5], [0.7, 0.5], [0.3, 0.75], [0.7, 0.75]]
+};
+
+// ── Face Texture ──
+function createFaceTexture(faceNum, bodyHex, pipHex, sparkle) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const rb = parseInt(bodyHex.slice(1,3),16);
+  const gb = parseInt(bodyHex.slice(3,5),16);
+  const bb = parseInt(bodyHex.slice(5,7),16);
+
+  // Base
+  ctx.fillStyle = bodyHex;
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle depth shading — darken edges only, no center brightening
+  const glow = ctx.createRadialGradient(size*0.45, size*0.42, size*0.25, size*0.5, size*0.5, size*0.7);
+  glow.addColorStop(0, 'rgba(0,0,0,0)');
+  glow.addColorStop(0.7, 'rgba(0,0,0,0.05)');
+  glow.addColorStop(1, 'rgba(0,0,0,0.15)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, size, size);
+
+  // Sparkle glitter particles
+  if (sparkle) {
+    let seed = faceNum * 7919 + 31;
+    const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+    for (let i = 0; i < 100; i++) {
+      const sx = srand() * size, sy = srand() * size;
+      const sz = 0.3 + srand() * 1.6;
+      const br = 0.08 + srand() * 0.45;
+
+      ctx.fillStyle = srand() > 0.35
+        ? `rgba(255,255,255,${br})`
+        : `rgba(${Math.min(255,rb+80)},${Math.min(255,gb+80)},${Math.min(255,bb+80)},${br*0.5})`;
+
+      ctx.beginPath();
+      ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (srand() > 0.92) {
+        ctx.strokeStyle = `rgba(255,255,255,${br * 0.2})`;
+        ctx.lineWidth = 0.3;
+        const fl = sz * 3;
+        ctx.beginPath(); ctx.moveTo(sx-fl, sy); ctx.lineTo(sx+fl, sy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx, sy-fl); ctx.lineTo(sx, sy+fl); ctx.stroke();
+      }
+    }
+  }
+
+  // Diagonal glass sweep — very subtle
+  const sweep = ctx.createLinearGradient(0, 0, size, size*0.7);
+  sweep.addColorStop(0, 'rgba(255,255,255,0)');
+  sweep.addColorStop(0.45, 'rgba(255,255,255,0.015)');
+  sweep.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+  sweep.addColorStop(0.55, 'rgba(255,255,255,0.015)');
+  sweep.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sweep;
+  ctx.fillRect(0, 0, size, size);
+
+  // Pips
+  const pips = PIP_LAYOUTS[faceNum];
+  const pipR = size * 0.08;
+  pips.forEach(([u, v]) => {
+    const x = u * size, y = v * size;
+
+    // Recess shadow
+    ctx.beginPath();
+    ctx.arc(x, y, pipR + 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fill();
+
+    // Pip
+    ctx.beginPath();
+    ctx.arc(x, y, pipR, 0, Math.PI * 2);
+    ctx.fillStyle = pipHex;
+    ctx.fill();
+
+    // Highlight
+    const pg = ctx.createRadialGradient(x - pipR*0.3, y - pipR*0.3, 0, x, y, pipR);
+    pg.addColorStop(0, 'rgba(255,255,255,0.35)');
+    pg.addColorStop(0.5, 'rgba(255,255,255,0.08)');
+    pg.addColorStop(1, 'rgba(0,0,0,0.06)');
+    ctx.beginPath();
+    ctx.arc(x, y, pipR, 0, Math.PI * 2);
+    ctx.fillStyle = pg;
+    ctx.fill();
+  });
+
+  // ── Per-pixel alpha: body = 95% opaque, pips = 100% opaque ──
+  const bodyAlpha = 0.95;
+  const imageData = ctx.getImageData(0, 0, size, size);
+  const data = imageData.data;
+
+  // Build pip mask — 1 = pip area (stays fully opaque)
+  const pipMask = new Uint8Array(size * size);
+  pips.forEach(([u, v]) => {
+    const cx = u * size, cy = v * size;
+    const r2 = (pipR + 3) * (pipR + 3);
+    const yMin = Math.max(0, Math.floor(cy - pipR - 3));
+    const yMax = Math.min(size, Math.ceil(cy + pipR + 3));
+    const xMin = Math.max(0, Math.floor(cx - pipR - 3));
+    const xMax = Math.min(size, Math.ceil(cx + pipR + 3));
+    for (let py = yMin; py < yMax; py++) {
+      for (let px = xMin; px < xMax; px++) {
+        const dx = px - cx, dy = py - cy;
+        if (dx * dx + dy * dy <= r2) {
+          pipMask[py * size + px] = 1;
+        }
+      }
+    }
+  });
+
+  // Reduce alpha of non-pip pixels
+  for (let i = 0; i < size * size; i++) {
+    if (!pipMask[i]) {
+      data[i * 4 + 3] = Math.round(data[i * 4 + 3] * bodyAlpha);
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding; // critical: tell Three.js this is sRGB, not linear
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// ── Interior sparkle particle system ──
+function createSparkles(count) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const phases = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    pos[i*3]   = (Math.random()-0.5) * 1.6;
+    pos[i*3+1] = (Math.random()-0.5) * 1.6;
+    pos[i*3+2] = (Math.random()-0.5) * 1.6;
+    phases[i] = Math.random() * Math.PI * 2;
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('phase', new THREE.Float32BufferAttribute(phases, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0 },
+      pr: { value: Math.min(window.devicePixelRatio, 2) }
+    },
+    vertexShader: `
+      attribute float phase;
+      uniform float time;
+      uniform float pr;
+      varying float vB;
+      void main() {
+        vB = 0.15 + 0.85 * pow(sin(time * 2.0 + phase) * 0.5 + 0.5, 4.0);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = 2.0 * pr * (50.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      varying float vB;
+      void main() {
+        float d = length(gl_PointCoord - vec2(0.5));
+        if (d > 0.5) discard;
+        float g = 1.0 - smoothstep(0.0, 0.5, d);
+        gl_FragColor = vec4(1.0, 1.0, 1.0, g * vB * 0.4);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
+// ── Die Scene ──
+function setupDie(canvasEl, bodyHex, pipHex, sparkleOn) {
+  const w = canvasEl.clientWidth, h = canvasEl.clientHeight;
+
+  const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, w/h, 0.1, 100);
+  camera.position.set(4, 3.5, 4.5);
+  camera.lookAt(0, 0, 0);
+
+  // Lighting — balanced for color accuracy
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+  const key = new THREE.DirectionalLight(0xffffff, 0.7);
+  key.position.set(5, 8, 5);
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0x8899cc, 0.15);
+  fill.position.set(-4, 3, -3);
+  scene.add(fill);
+
+  const rim = new THREE.DirectionalLight(0xffffff, 0.2);
+  rim.position.set(-3, 5, 6);
+  scene.add(rim);
+
+  // Materials — face order: +X(2), -X(5), +Y(1), -Y(6), +Z(3), -Z(4)
+  const faceOrder = [2, 5, 1, 6, 3, 4];
+  let sparkleEnabled = sparkleOn;
+
+  // Two-pass rendering: back faces first (inner walls), then front faces
+  // This lets you see THROUGH the die to the back wall
+  const makeMats = (body, pip, sparkle) => faceOrder.map(n =>
+    new THREE.MeshPhysicalMaterial({
+      map: createFaceTexture(n, body, pip, sparkle),
+      roughness: 0.22,
+      metalness: 0.0,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.1,
+      transparent: true,
+      opacity: 0.88,
+      side: THREE.FrontSide,
+      depthWrite: false,
+    })
+  );
+
+  const makeBackMats = (body, pip, sparkle) => faceOrder.map(n =>
+    new THREE.MeshPhysicalMaterial({
+      map: createFaceTexture(n, body, pip, sparkle),
+      roughness: 0.4,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.BackSide,
+      depthWrite: false,
+    })
+  );
+
+  // Geometry — official Three.js RoundedBoxGeometry
+  const geo = new THREE.RoundedBoxGeometry(2, 2, 2, 3, 0.3);
+
+  // Back-face mesh (renders first — the inner walls you see through)
+  const dieBack = new THREE.Mesh(geo, makeBackMats(bodyHex, pipHex, sparkleOn));
+  dieBack.renderOrder = 0;
+
+  // Front-face mesh (renders on top — the surface you look at)
+  const die = new THREE.Mesh(geo, makeMats(bodyHex, pipHex, sparkleOn));
+  die.renderOrder = 1;
+
+  // Group them so they rotate together
+  const dieGroup = new THREE.Group();
+  dieGroup.add(dieBack);
+  dieGroup.add(die);
+  dieGroup.rotation.set(0.55, 0.75, 0);
+  scene.add(dieGroup);
+
+  // Interior sparkles
+  let sparkles = null;
+  if (sparkleOn) {
+    sparkles = createSparkles(70);
+    dieGroup.add(sparkles);
+  }
+
+  // Ground shadow
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8, 32),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -1.35;
+  scene.add(shadow);
+
+  // Interaction
+  let dragging = false, px = 0, py = 0, autoRot = true, vx = 0, vy = 0;
+  canvasEl.addEventListener('pointerdown', e => {
+    dragging = true; px = e.clientX; py = e.clientY;
+    autoRot = false; vx = vy = 0;
+    canvasEl.setPointerCapture(e.pointerId);
+  });
+  canvasEl.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - px, dy = e.clientY - py;
+    dieGroup.rotation.y += dx * 0.008;
+    dieGroup.rotation.x += dy * 0.008;
+    vx = dx * 0.006; vy = dy * 0.006;
+    px = e.clientX; py = e.clientY;
+  });
+  canvasEl.addEventListener('pointerup', () => {
+    dragging = false;
+    setTimeout(() => { autoRot = true; }, 3000);
+  });
+
+  const clock = new THREE.Clock();
+  (function animate() {
+    requestAnimationFrame(animate);
+    if (autoRot) {
+      dieGroup.rotation.y += 0.003;
+    } else if (!dragging) {
+      dieGroup.rotation.y += vx; dieGroup.rotation.x += vy;
+      vx *= 0.96; vy *= 0.96;
+    }
+    if (sparkles && sparkleEnabled)
+      sparkles.material.uniforms.time.value = clock.getElapsedTime();
+    renderer.render(scene, camera);
+  })();
+
+  return {
+    updateColors(body, pip) {
+      die.material = makeMats(body, pip, sparkleEnabled);
+      dieBack.material = makeBackMats(body, pip, sparkleEnabled);
+    },
+    setSparkle(on, body, pip) {
+      sparkleEnabled = on;
+      if (on && !sparkles) { sparkles = createSparkles(70); dieGroup.add(sparkles); }
+      if (sparkles) sparkles.visible = on;
+      die.material = makeMats(body, pip, on);
+      dieBack.material = makeBackMats(body, pip, on);
+    },
+    setOpacity(frontOp, backOp) {
+      die.material.forEach(m => {
+        m.opacity = frontOp;
+        m.depthWrite = (frontOp >= 1.0);
+      });
+      dieBack.material.forEach(m => { m.opacity = backOp; });
+      dieBack.visible = backOp > 0.01;
+    }
+  };
+}
+
+// ── Build Page ──
+const container = document.getElementById('setsContainer');
+
+SETS.forEach(set => {
+  const div = document.createElement('div');
+  div.className = 'dice-set';
+  div.dataset.set = set.id;
+  div.innerHTML = `
+    <div class="set-header">
+      <h2>${set.name}</h2>
+      <div class="set-subtitle">${set.subtitle}</div>
+    </div>
+    <div class="dice-pair">
+      ${set.dice.map((d, i) => `
+        <div class="die-card">
+          <div class="die-canvas-wrap">
+            <canvas id="die-${set.id}-${i}"></canvas>
+          </div>
+          <div class="die-label">${d.label}</div>
+          <div class="color-controls">
+            <div class="color-group">
+              <label>Die</label>
+              <input type="color" id="body-${set.id}-${i}" value="${d.bodyColor}">
+            </div>
+            <div class="color-group">
+              <label>Pips</label>
+              <input type="color" id="pip-${set.id}-${i}" value="${d.pipColor}">
+            </div>
+            <label class="sparkle-toggle">
+              <input type="checkbox" id="sparkle-${set.id}-${i}" ${d.sparkle ? 'checked' : ''}>
+              <span class="sparkle-switch"></span>
+              <span class="sparkle-label">Sparkle</span>
+            </label>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="set-sliders">
+      <div class="opacity-control">
+        <label>Front Face</label>
+        <input type="range" id="front-${set.id}" min="50" max="100" value="88" step="1">
+        <span class="opacity-value" id="front-val-${set.id}">88%</span>
+      </div>
+      <div class="opacity-control">
+        <label>Inner Walls</label>
+        <input type="range" id="back-${set.id}" min="0" max="100" value="45" step="1">
+        <span class="opacity-value" id="back-val-${set.id}">45%</span>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+
+  requestAnimationFrame(() => {
+    const setControllers = [];
+
+    set.dice.forEach((d, i) => {
+      const canvas = document.getElementById(`die-${set.id}-${i}`);
+      const ctrl = setupDie(canvas, d.bodyColor, d.pipColor, d.sparkle);
+      setControllers.push(ctrl);
+      const bp = document.getElementById(`body-${set.id}-${i}`);
+      const pp = document.getElementById(`pip-${set.id}-${i}`);
+      const sp = document.getElementById(`sparkle-${set.id}-${i}`);
+      bp.addEventListener('input', () => ctrl.updateColors(bp.value, pp.value));
+      pp.addEventListener('input', () => ctrl.updateColors(bp.value, pp.value));
+      sp.addEventListener('change', () => ctrl.setSparkle(sp.checked, bp.value, pp.value));
+    });
+
+    // Per-set opacity sliders
+    const fs = document.getElementById(`front-${set.id}`);
+    const fv = document.getElementById(`front-val-${set.id}`);
+    const bs = document.getElementById(`back-${set.id}`);
+    const bv = document.getElementById(`back-val-${set.id}`);
+
+    function updateSetOpacity() {
+      const f = parseInt(fs.value) / 100;
+      const b = parseInt(bs.value) / 100;
+      fv.textContent = fs.value + '%';
+      bv.textContent = bs.value + '%';
+      setControllers.forEach(ctrl => ctrl.setOpacity(f, b));
+    }
+
+    fs.addEventListener('input', updateSetOpacity);
+    bs.addEventListener('input', updateSetOpacity);
+  });
+});
+</script>
+</body>
+</html>
