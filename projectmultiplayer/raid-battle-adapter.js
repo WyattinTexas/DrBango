@@ -81,12 +81,18 @@ const RaidBattleAdapter = {
   // RAID ENTRY
   // ══════════════════════════════════════════════════════════════════
 
+  _entering: false, // hard lock to prevent any re-entry
+
   _enterRaid(instanceId, data) {
     const user = firebase.auth().currentUser;
     if (!user) return;
 
+    // Hard lock — prevents recursion from Firebase listener firing during connect
+    if (this._entering) return;
     // Guard: don't re-enter if already in a raid
     if (RaidState.isActive() && RaidState.instanceId === instanceId) return;
+
+    this._entering = true;
 
     // Load state from Firebase
     RaidState.loadFromFirebase(instanceId, data, user.uid);
@@ -133,6 +139,7 @@ const RaidBattleAdapter = {
     }
 
     if (typeof showRaidScreen === 'function') showRaidScreen(instanceId);
+    this._entering = false;
   },
 
   // ══════════════════════════════════════════════════════════════════
@@ -687,6 +694,7 @@ const RaidBattleAdapter = {
   // ══════════════════════════════════════════════════════════════════
 
   _cleanup() {
+    this._entering = false; // release lock
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
     RaidSync.disconnect();

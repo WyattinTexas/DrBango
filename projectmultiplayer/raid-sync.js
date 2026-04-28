@@ -429,6 +429,17 @@ const RaidSync = {
         return;
       }
 
+      // Clear stale instances stuck in countdown for over 5 minutes
+      if (instance.status === 'countdown' && instance.created) {
+        const age = Date.now() - instance.created;
+        if (age > 5 * 60 * 1000) {
+          console.log('[RaidSync] Clearing stale countdown instance:', instanceId, '(age:', Math.round(age/1000), 's)');
+          await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
+          await db.ref(`mp/raids/instances/${instanceId}/status`).set('abandoned');
+          return;
+        }
+      }
+
       RaidState._emit('raid-assigned', { instanceId, data: instance });
     });
   },
