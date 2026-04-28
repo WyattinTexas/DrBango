@@ -47,6 +47,7 @@ const RaidBattleAdapter = {
         this._startMyFight();
       }
       if (to === 'spectating') {
+        this._fightStarted = false; // reset so next turn can start
         this._startSpectating();
       }
       if (to === 'complete') {
@@ -623,18 +624,22 @@ const RaidBattleAdapter = {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
 
+    // Reset fight lock so next turn can start _startMyFight again
+    this._fightStarted = false;
+
     // Force one last snapshot write
     RaidSync._lastSnapshotHash = '';
     const B = BattleEngine.getState();
     if (B) RaidSync.writeBattleSnapshot(B);
 
-    // Hide roll button, show handoff message
+    // Hide roll button, clear all dice (including 3D physics dice)
     const rollBtn = document.getElementById('rollRedBtn');
     if (rollBtn) rollBtn.style.display = 'none';
     const redDice = document.getElementById('red-dice');
     const blueDice = document.getElementById('blue-dice');
     if (redDice) redDice.innerHTML = '';
     if (blueDice) blueDice.innerHTML = '';
+    document.querySelectorAll('.die-physics').forEach(el => el.remove());
     const narrator = document.getElementById('narrator');
     if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
