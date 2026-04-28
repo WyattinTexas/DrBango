@@ -311,6 +311,13 @@ const RaidBattleAdapter = {
     const launchCountdown = document.getElementById('raid-launch-countdown');
     if (launchCountdown) launchCountdown.remove();
 
+    // Clear ALL stale dice from spectating (3D physics dice block click events)
+    document.querySelectorAll('.die-physics').forEach(el => el.remove());
+    const rdEl = document.getElementById('red-dice');
+    const bdEl = document.getElementById('blue-dice');
+    if (rdEl) rdEl.innerHTML = '';
+    if (bdEl) bdEl.innerHTML = '';
+
     // Show raid screen and battle view
     const raidScreen = document.getElementById('raid-screen');
     if (raidScreen) raidScreen.style.display = 'block';
@@ -381,8 +388,7 @@ const RaidBattleAdapter = {
     // Keep patched getGhost — renderBattle and entry abilities need it
     // throughout the fight. Restore only on cleanup.
 
-    // Restore splash element
-    if (vsSplash) setTimeout(() => { vsSplash.style.display = ''; }, 3000);
+    // Keep splash hidden for the entire raid — no restore needed
 
     // Clear skip-entry flag after entries have been suppressed
     if (window._raidSkipEntry) {
