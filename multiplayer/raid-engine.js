@@ -547,194 +547,148 @@ function startActiveRaidListener() {
 
 // ─── RAID SCREEN FLOW ───────────────────────────────────────────
 
-/**
- * Enter the raid screen — start countdown, listen for state changes
- */
+// ─── SINGLE LISTENER ARCHITECTURE ──────────────────────────────
+// One listener on the full instance replaces the old 3-listener system
+// (status, fighterIdx, battleState) that caused race conditions.
+// ONE role variable (_currentRaidRole) replaces 5+ flags.
+
+var _currentRaidRole = null;   // 'fighter' | 'spectator' | null
+var _currentFighterIdx = -1;   // which fighter index we last processed
+
 function enterRaidScreen(instanceId) {
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
 
-  // Listen ONLY for status/fighter changes — NOT the entire tree (chat etc. would cause loops)
-  raidListeners['instance_status'] = instRef.child('status').on('value', async (snap) => {
-    const status = snap.val();
-    if (!status) return;
-    // Re-fetch minimal fields, not the whole tree
-    const [statusSnap, fighterSnap, hpSnap, phaseSnap] = await Promise.all([
-      Promise.resolve(status),
-      instRef.child('currentFighterIdx').once('value'),
-      instRef.child('bossCurrentHp').once('value'),
-      instRef.child('fightPhase').once('value')
-    ]);
-    const minimalData = {
-      ...currentRaid,
-      status: status,
-      currentFighterIdx: fighterSnap.val(),
-      bossCurrentHp: hpSnap.val(),
-      fightPhase: phaseSnap.val()
-    };
-    currentRaid = { instanceId, ...minimalData };
-    handleRaidStateChange(minimalData);
-  });
+  // SINGLE listener — no more races between status/fighterIdx/battleState
+  raidListeners['instance'] = instRef.on('value', (snap) => {
+    const data = snap.val();
+    if (!data) return;
 
-  // Listen for fighter index changes — this is how Player 2 detects it's their turn
-  raidListeners['fighterIdx'] = instRef.child('currentFighterIdx').on('value', async (snap) => {
-    const idx = snap.val();
-    if (idx == null || !currentRaid) return;
-    // Re-fetch instance data for the new fighter
-    const freshSnap = await instRef.once('value');
-    const freshData = freshSnap.val();
-    if (!freshData || freshData.status !== 'active') return;
-    currentRaid = { instanceId, ...freshData };
-    handleActiveFight(freshData);
-  });
+    currentRaid = { instanceId, ...data };
 
-  // Listen for battle state (spectator feed) — updates Player 2's arena live
-  raidListeners['battleState'] = instRef.child('battleState').on('value', (snap) => {
-    const state = snap.val();
-    if (!state) return;
-    // Use the bridge's spectator sync (updates real arena) if available
-    if (typeof updateSpectatorFromSnapshot === 'function') {
-      updateSpectatorFromSnapshot(state);
+    switch (data.status) {
+      case 'countdown':
+        if (!window._raidWaitingRoomShown) {
+          window._raidWaitingRoomShown = true;
+          if (typeof showRaidWaitingRoom === 'function')
+            showRaidWaitingRoom(instanceId, data);
+          // Fallback auto-start after 20s
+          const user = firebase.auth().currentUser;
+          const slot0 = data.players && data.players[0];
+          if (slot0 && user && slot0.uid === user.uid) {
+            setTimeout(async () => {
+              if (!currentRaid) return;
+              const ps = await db.ref(`mp/raids/instances/${instanceId}/fightPhase`).once('value');
+              if (ps.val() === 'countdown') {
+                db.ref(`mp/raids/instances/${instanceId}`).update({
+                  status: 'active', startedAt: firebase.database.ServerValue.TIMESTAMP, fightPhase: 'fighting'
+                });
+              }
+            }, 20000);
+          }
+        }
+        break;
+
+      case 'active':
+        if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
+        handleActiveFight(data);
+        // Spectator sync: update spectator's view from battleState
+        if (_currentRaidRole === 'spectator' && data.battleState) {
+          if (typeof updateSpectatorFromSnapshot === 'function') {
+            updateSpectatorFromSnapshot(data.battleState);
+          }
+        }
+        break;
+
+      case 'complete':
+        handleRaidComplete(data);
+        break;
     }
   });
 
-  if (typeof showRaidScreen === 'function') {
-    showRaidScreen(instanceId);
+  if (typeof showRaidScreen === 'function') showRaidScreen(instanceId);
+}
+
+/**
+ * Handle raid completion — show results for both players
+ */
+function handleRaidComplete(data) {
+  if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
+  if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
+  if (typeof showRaidResult === 'function') {
+    showRaidResult(data);
   }
 }
 
 /**
- * Handle raid state transitions
+ * Handle active fight — single decision point: fighter or spectator.
+ * Called from the single instance listener. Only processes each
+ * fighter index ONCE — no debounce flags needed.
  */
-function handleRaidStateChange(data) {
-  const user = firebase.auth().currentUser;
-
-  switch (data.status) {
-    case 'countdown':
-      // Show the waiting room (social lobby) — but only once
-      if (typeof showRaidWaitingRoom === 'function' && data.fightPhase === 'countdown' && !window._raidWaitingRoomShown) {
-        window._raidWaitingRoomShown = true;
-        showRaidWaitingRoom(currentRaid.instanceId, data);
-        // The first player triggers the start after 15s (or when LAUNCH is clicked)
-        const slot0 = data.players && data.players[0];
-        if (slot0 && slot0.uid === user.uid) {
-          // Waiting room handles its own timer — when it fires, it calls handleActiveFight
-          // Set a fallback transition after 20s in case waiting room JS doesn't trigger.
-          // Re-fetch fightPhase from Firebase to avoid the stale-closure double-write.
-          setTimeout(async () => {
-            if (!currentRaid) return;
-            const phaseSnap = await db.ref(`mp/raids/instances/${currentRaid.instanceId}/fightPhase`).once('value');
-            if (phaseSnap.val() === 'countdown') {
-              db.ref(`mp/raids/instances/${currentRaid.instanceId}`).update({
-                status: 'active',
-                startedAt: firebase.database.ServerValue.TIMESTAMP,
-                fightPhase: 'fighting'
-              });
-            }
-          }, 20000);
-        }
-      } else if (typeof showRaidCountdown === 'function') {
-        showRaidCountdown(data);
-      }
-      break;
-
-    case 'active':
-      // Hide waiting room if still visible
-      if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
-      // Use battle-engine.js via bridge (the real testroom experience)
-      handleActiveFight(data);
-      break;
-
-    case 'complete':
-      if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
-      if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
-      if (typeof showRaidResult === 'function') {
-        // Re-fetch full instance so result screen has fresh player data (damageDealt, ghostsLost)
-        const cid = currentRaid?.instanceId;
-        if (cid && typeof db !== 'undefined') {
-          db.ref(`mp/raids/instances/${cid}`).once('value').then(snap => {
-            const fresh = snap.val();
-            showRaidResult(fresh ? { ...data, ...fresh } : data);
-          }).catch(() => showRaidResult(data));
-        } else {
-          showRaidResult(data);
-        }
-      }
-      break;
-  }
-}
-
-/**
- * Handle active fight — determine if it's our turn
- */
-var _lastHandledFighterIdx = -1;
 function handleActiveFight(data) {
   const user = firebase.auth().currentUser;
   if (!user) return;
 
-  // Debounce: don't re-process the same fighter index
-  const incomingIdx = data.currentFighterIdx || 0;
-  if (incomingIdx === _lastHandledFighterIdx && window._raidMyFightActive) return;
-  _lastHandledFighterIdx = incomingIdx;
-
-  // Find our slot
   const players = data.players || {};
   let mySlot = -1;
-  Object.entries(players).forEach(([slot, p]) => {
+  for (const [slot, p] of Object.entries(players)) {
     if (p.uid === user.uid) mySlot = parseInt(slot);
-  });
+  }
 
   const currentIdx = data.currentFighterIdx || 0;
 
-  if (mySlot === currentIdx && players[mySlot]?.status !== 'done' && players[mySlot]?.status !== 'disconnected') {
-    // It's our turn to fight!
-    const wasSpectating = (typeof _isSpectating !== 'undefined') && _isSpectating;
-    if (typeof _isSpectating !== 'undefined') _isSpectating = false;
-    window._raidMyFightActive = true; // prevent spectator branch from overriding
+  // Only process each fighter index once
+  if (currentIdx === _currentFighterIdx) return;
+  _currentFighterIdx = currentIdx;
 
-    // Start our fight if: no battle state, or we were spectating (turn just swapped to us),
-    // or previous battle is done/waiting
-    if (!raidBattleState || wasSpectating || raidBattleState.phase === 'waiting' || raidBattleState.phase === 'done') {
-      // Hide spectator overlay if we were watching
-      if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
-      // Clean up previous battle UI before starting ours
-      const gameOverEl = document.getElementById('gameOver');
-      if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
-      if (typeof stopBlueAI === 'function') stopBlueAI();
-      B = null;
-      raidBattleState = null;
-      startMyRaidFight(data);
-    }
+  const isMyTurn = (mySlot === currentIdx) &&
+                   players[mySlot]?.status !== 'done' &&
+                   players[mySlot]?.status !== 'disconnected';
+
+  if (isMyTurn) {
+    _currentRaidRole = 'fighter';
+    // Clean up any previous battle
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+    if (typeof stopBlueAI === 'function') stopBlueAI();
+    B = null;
+    raidBattleState = null;
+    startMyRaidFight(data);
   } else {
-    // Don't enter spectator mode if we're actively fighting
-    if (window._raidMyFightActive) return;
-    // Mark as spectating so the bridge's updateSpectatorFromSnapshot works
-    if (typeof _isSpectating !== 'undefined') _isSpectating = true;
-    // Not our turn — show the SAME battle screen the active player sees,
-    // but with roll button hidden (watch mode). This replaces the old
-    // spectator overlay that showed broken ??? cards.
-    if (typeof initRaidBattleInPage === 'function') {
-      const currentPlayer = players[currentIdx];
-      if (currentPlayer && currentPlayer.team) {
-        // Build the boss team so we can show it
-        const bossConfig = RAID_BOSSES[data.raidId];
-        if (bossConfig) {
-          const phase = getBossPhase(data.bossCurrentHp || bossConfig.bossGhost.maxHp, data.bossMaxHp || bossConfig.bossGhost.maxHp);
-          const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
-          const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
-          // Show the battle screen in watch mode (no roll button)
-          initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
-          // Hide roll button — we're watching
-          const rollBtn = document.getElementById('rollRedBtn');
-          if (rollBtn) { rollBtn.style.display = 'none'; }
-          // Show a "Watching [player]..." banner
-          const narrator = document.getElementById('narrator');
-          if (narrator) {
-            const name = currentPlayer.displayName || 'Player ' + (currentIdx + 1);
-            narrator.innerHTML = `Watching <b class="red-text">${name}</b> fight...`;
-          }
-        }
-      }
-    }
+    _currentRaidRole = 'spectator';
+    setupSpectatorView(data, currentIdx, players);
+  }
+}
+
+/**
+ * Set up spectator view — show the active player's battle in watch mode
+ */
+function setupSpectatorView(data, currentIdx, players) {
+  const currentPlayer = players[currentIdx];
+  if (!currentPlayer || !currentPlayer.team) return;
+
+  const bossConfig = RAID_BOSSES[data.raidId];
+  if (!bossConfig) return;
+
+  const phase = getBossPhase(
+    data.bossCurrentHp || bossConfig.bossGhost.maxHp,
+    data.bossMaxHp || bossConfig.bossGhost.maxHp
+  );
+  const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
+  const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
+
+  if (typeof initRaidBattleInPage === 'function') {
+    initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
+  }
+
+  // Hide roll button — spectators can't roll
+  const rollBtn = document.getElementById('rollRedBtn');
+  if (rollBtn) rollBtn.style.display = 'none';
+
+  // Show watching banner
+  const narrator = document.getElementById('narrator');
+  if (narrator) {
+    const name = currentPlayer.displayName || 'Player ' + (currentIdx + 1);
+    narrator.innerHTML = `Watching <b class="red-text">${name}</b> fight...`;
   }
 }
 
@@ -1656,13 +1610,15 @@ async function writeBattleSnapshot(snapshotData) {
  * Clean up all raid listeners and state
  */
 function cleanupRaid() {
-  _lastHandledFighterIdx = -1;
-  window._raidMyFightActive = false;
+  _currentRaidRole = null;
+  _currentFighterIdx = -1;
   // Remove Firebase listeners
   if (currentRaid?.instanceId) {
     const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);
     if (raidListeners['instance']) instRef.off('value', raidListeners['instance']);
+    // Legacy cleanup (in case old listeners exist)
     if (raidListeners['instance_status']) instRef.child('status').off('value', raidListeners['instance_status']);
+    if (raidListeners['fighterIdx']) instRef.child('currentFighterIdx').off('value', raidListeners['fighterIdx']);
     if (raidListeners['battleState']) instRef.child('battleState').off('value', raidListeners['battleState']);
   }
   Object.entries(raidListeners).forEach(([key]) => {

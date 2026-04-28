@@ -8,7 +8,7 @@
 // Tracked state for cleanup
 var _registeredRaidGhostIds = [];
 var _originalGhostData = {};
-var _isSpectating = false; // true when we're watching another player fight
+// _currentRaidRole is declared in raid-engine.js: 'fighter' | 'spectator' | null
 
 /**
  * Update the spectator's arena from a Firebase battleState snapshot.
@@ -16,12 +16,8 @@ var _isSpectating = false; // true when we're watching another player fight
  * Updates the local B state and re-renders so Player 2 sees live dice/HP changes.
  */
 function updateSpectatorFromSnapshot(snapshot) {
-  // Strict guard: only update if we are DEFINITELY spectating and B exists with valid teams
-  if (!_isSpectating || !B || !B.red || !B.blue) {
-    return;
-  }
-  // Don't update if our own fight is active (we're the fighter, not spectator)
-  if (window._raidMyFightActive) return;
+  // Only update if we are spectating and B exists with valid teams
+  if (_currentRaidRole !== 'spectator' || !B || !B.red || !B.blue) return;
   if (!snapshot) return;
   console.log('[RAID SYNC] updating spectator view, round:', snapshot.round);
 
@@ -534,9 +530,7 @@ function injectRaidReturnButton() {
         bossCurrentHp: poolNow
       }).then(() => {
         console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
-        console.log('[RAID] Turn passed to player', nextIdx);
-        _isSpectating = true;
-        window._raidMyFightActive = false; // allow spectator branch to work
+        _currentRaidRole = 'spectator';
       });
     }, 1500);
   };
@@ -548,7 +542,7 @@ function injectRaidReturnButton() {
 (function _hookSpectatorGameOver() {
   // Poll raid status while spectating
   setInterval(() => {
-    if (!_isSpectating || !currentRaid) return;
+    if (_currentRaidRole !== 'spectator' || !currentRaid) return;
     db.ref(`mp/raids/instances/${currentRaid.instanceId}/status`).once('value').then(snap => {
       if (snap.val() === 'complete') {
         // Raid is over — show return to lobby
@@ -584,7 +578,7 @@ var _lastSnapshotHash = '';
 function startSnapshotSync() {
   stopSnapshotSync();
   _snapshotInterval = setInterval(() => {
-    if (!window.RAID_MODE || _isSpectating || !B || !currentRaid) return;
+    if (!window.RAID_MODE || _currentRaidRole !== 'fighter' || !B || !currentRaid) return;
     if (typeof writeBattleSnapshot !== 'function') return;
 
     // Build a hash to avoid writing identical snapshots
