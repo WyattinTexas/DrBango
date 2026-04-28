@@ -183,9 +183,10 @@ const RaidBattleAdapter = {
         if (RaidState.phase === 'idle') {
           this._enterRaid(instanceId, data);
         }
-        if (typeof showRaidWaitingRoom === 'function') {
-          showRaidWaitingRoom(instanceId, data);
-        }
+        // Only show waiting room ONCE — _enterRaid already calls it.
+        // Calling it on every Firebase update causes an infinite loop:
+        // showRaidWaitingRoom → pushRaidChatMessage → Firebase write →
+        // listener fires → _handleFirebaseUpdate → showRaidWaitingRoom → ...
         break;
 
       case 'active':
