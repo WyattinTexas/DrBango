@@ -29,6 +29,10 @@ function updateSpectatorFromSnapshot(snapshot) {
         B.red.ghosts[i].hp = sg.hp;
         B.red.ghosts[i].maxHp = sg.maxHp;
         B.red.ghosts[i].ko = !!sg.ko;
+        // Sync identity so spectator sees transforms and correct ghost info
+        if (sg.id) B.red.ghosts[i].id = sg.id;
+        if (sg.name) B.red.ghosts[i].name = sg.name;
+        if (sg.art) B.red.ghosts[i].art = sg.art;
       }
     });
     // Sync activeIdx — this is what tracks ghost swaps
@@ -51,6 +55,9 @@ function updateSpectatorFromSnapshot(snapshot) {
         B.blue.ghosts[i].hp = sg.hp;
         B.blue.ghosts[i].maxHp = sg.maxHp;
         B.blue.ghosts[i].ko = !!sg.ko;
+        if (sg.id) B.blue.ghosts[i].id = sg.id;
+        if (sg.name) B.blue.ghosts[i].name = sg.name;
+        if (sg.art) B.blue.ghosts[i].art = sg.art;
       }
     });
     if (snapshot.bossActiveIdx != null) {
@@ -186,8 +193,12 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
 
   // ── 6. Start the battle via battle-engine.js ─────────────────
   // ── 6a. Read saved player state from raidData (already in currentRaid from listener)
+  // IMPORTANT: Only restore saved state for the FIGHTER, not the spectator.
+  // Spectators get live updates via snapshot sync — restoring their own state
+  // here would overwrite the fighter's team with the spectator's KO'd ghosts.
   const user = firebase.auth().currentUser;
-  const savedState = (raidData.playerGhostState && user) ? raidData.playerGhostState[user.uid] : null;
+  const isFighter = _currentRaidRole === 'fighter';
+  const savedState = (isFighter && raidData.playerGhostState && user) ? raidData.playerGhostState[user.uid] : null;
 
   // ── 6b. Skip the VS splash in raids — just start fighting ────
   const vsSplash = document.getElementById('vsSplash');
