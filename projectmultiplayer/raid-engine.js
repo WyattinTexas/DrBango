@@ -216,6 +216,7 @@ function getBossPhase(currentHp, maxHp) {
 function buildBossTeam(bossConfig, phase, enrageLevel) {
   const bossGhost = {
     ...bossConfig.bossGhost,
+    rarity: bossConfig.bossGhost.rarity || 'legendary',
     hp: bossConfig.bossGhost.maxHp,
     ko: false,
     isBoss: true
@@ -583,6 +584,37 @@ async function handleFighterDisconnect(data, slotIdx) {
     }
     return current;
   });
+}
+
+// ─── BOSS HP POOL DRAIN ─────────────────────────────────────────
+// Called by bossDamageTracker (battle-core.js) when damage is dealt
+// to the boss team. Updates RaidState, visual bar, and Firebase.
+function drainBossHpPool(damage) {
+  if (!RaidState.isActive() || damage <= 0) return;
+
+  const oldHp = RaidState.bossCurrentHp;
+  const newHp = Math.max(0, oldHp - damage);
+  RaidState.bossCurrentHp = newHp;
+  RaidState.totalDamageDealt += damage;
+
+  // Update visual boss HP bar
+  if (typeof renderBossHpPool === 'function') {
+    renderBossHpPool(newHp, RaidState.bossMaxHp);
+  }
+
+  // Write to Firebase (non-blocking)
+  if (RaidSync._instanceRef) {
+    RaidSync._instanceRef.update(firebaseSafe({
+      bossCurrentHp: newHp,
+      totalDamageDealt: firebase.database.ServerValue.increment(damage)
+    })).catch(e => console.warn('[drainBossHpPool] Firebase write error:', e));
+  }
+
+  // Check for boss defeat
+  if (newHp <= 0) {
+    console.log('[drainBossHpPool] Boss defeated!');
+    // The game-over hook in the adapter will handle this via showGameOver
+  }
 }
 
 // ─── INIT ───────────────────────────────────────────────────────

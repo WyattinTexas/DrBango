@@ -5160,6 +5160,16 @@ function doPreRollSetup() {
   // PHASE 2: COMPUTE DICE COUNTS (rolled later per-click)
   // ========================================
   let redCount = 3, blueCount = 3;
+  // Boss mode: boss starts with 4 base dice + enrage bonuses
+  if (window.BOSS_MODE && typeof RAID_CONFIG !== 'undefined') {
+    blueCount = RAID_CONFIG.BOSS_BASE_DICE || 4;
+    const enrage = (typeof RaidState !== 'undefined') ? RaidState.enrageLevel : 0;
+    if (RAID_CONFIG.ENRAGE_DICE_BONUS) {
+      Object.entries(RAID_CONFIG.ENRAGE_DICE_BONUS).forEach(([level, bonus]) => {
+        if (enrage >= parseInt(level)) blueCount += bonus;
+      });
+    }
+  }
   // Doug (63) Caution duel-phase swap promised the incoming ghost +1 die — apply now.
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.red) { redCount++; B.dougCautionDieBonus.red = false; }
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.blue) { blueCount++; B.dougCautionDieBonus.blue = false; }

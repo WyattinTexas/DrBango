@@ -116,8 +116,9 @@ function startBattle() {
   if (bBtn) { bBtn.disabled = true; }
 
   // Show VS splash FIRST, then entry abilities cinematic sequence
+  // Skip splash in raid mode — adapter hides it, no point waiting 2.2s for an invisible animation
   const splash = document.getElementById('vsSplash');
-  if (splash) {
+  if (splash && splash.style.display !== 'none') {
     document.getElementById('vsRedName').textContent = active(B.red).name;
     document.getElementById('vsBlueName').textContent = active(B.blue).name;
     if (RAID_MODE && RAID_PARAMS) {
@@ -2016,6 +2017,10 @@ function _resolveRoundImpl() {
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+    // Boss mode: drain shared HP pool when damage is dealt to the boss team
+    if (window.BOSS_MODE && loseTeamName === 'blue' && typeof bossDamageTracker === 'function') {
+      bossDamageTracker(dmg, lF);
+    }
 
   // Resolve deferred Heavy Air hits — only if Knight Terror survived this round's damage
   if (pendingHeavyAirHits.length > 0) {
