@@ -700,6 +700,9 @@ function typeLabel(type) {
 }
 
 // Helper: check if a team has a ghost with given id on sideline (alive)
+function hasOnTeam(team, id) {
+  return hasSideline(team, id) || (active(team).id === id && !active(team).ko);
+}
 function hasSideline(team, id) {
   const teamName = B && team === B.red ? 'red' : 'blue';
   const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
