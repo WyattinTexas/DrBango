@@ -19,10 +19,24 @@ function updateSpectatorFromSnapshot(snapshot) {
   // Only update if we are spectating and B exists with valid teams
   if (_currentRaidRole !== 'spectator' || !B || !B.red || !B.blue) return;
   if (!snapshot) return;
-  console.log('[RAID SYNC] updating spectator view, round:', snapshot.round);
 
-  // Update red (player) fighter HP
-  if (snapshot.playerGhost && B.red) {
+  // ── Sync ALL ghost HP, KO status, and activeIdx ──────────────
+  // This is the key fix: update every ghost in the team, not just
+  // the active one. Handles KO swaps, sideline damage, etc.
+  if (snapshot.allPlayerGhosts && B.red) {
+    snapshot.allPlayerGhosts.forEach((sg, i) => {
+      if (B.red.ghosts[i]) {
+        B.red.ghosts[i].hp = sg.hp;
+        B.red.ghosts[i].maxHp = sg.maxHp;
+        B.red.ghosts[i].ko = !!sg.ko;
+      }
+    });
+    // Sync activeIdx — this is what tracks ghost swaps
+    if (snapshot.playerActiveIdx != null) {
+      B.red.activeIdx = snapshot.playerActiveIdx;
+    }
+  } else if (snapshot.playerGhost && B.red) {
+    // Fallback for old snapshots without allPlayerGhosts
     const rf = active(B.red);
     if (rf) {
       rf.hp = snapshot.playerGhost.hp;
@@ -31,19 +45,18 @@ function updateSpectatorFromSnapshot(snapshot) {
     }
   }
 
-  // Update red sideline HP
-  if (snapshot.playerSideline && B.red) {
-    const sideline = B.red.ghosts.filter((g, i) => i !== B.red.activeIdx);
-    snapshot.playerSideline.forEach((sg, i) => {
-      if (sideline[i]) {
-        sideline[i].hp = sg.hp || 0;
-        sideline[i].ko = sg.ko || false;
+  if (snapshot.allBossGhosts && B.blue) {
+    snapshot.allBossGhosts.forEach((sg, i) => {
+      if (B.blue.ghosts[i]) {
+        B.blue.ghosts[i].hp = sg.hp;
+        B.blue.ghosts[i].maxHp = sg.maxHp;
+        B.blue.ghosts[i].ko = !!sg.ko;
       }
     });
-  }
-
-  // Update blue (boss) fighter HP
-  if (snapshot.bossGhost && B.blue) {
+    if (snapshot.bossActiveIdx != null) {
+      B.blue.activeIdx = snapshot.bossActiveIdx;
+    }
+  } else if (snapshot.bossGhost && B.blue) {
     const bf = active(B.blue);
     if (bf) {
       bf.hp = snapshot.bossGhost.hp;
@@ -740,29 +753,46 @@ function startSnapshotSync() {
     if (!window.RAID_MODE || _currentRaidRole !== 'fighter' || !B || !currentRaid) return;
     if (typeof writeBattleSnapshot !== 'function') return;
 
-    // Build a hash to avoid writing identical snapshots
+    // Build a hash to detect changes — includes activeIdx so swaps trigger writes
     const rf = active(B.red);
     const bf = active(B.blue);
     const hash = [
       rf?.hp, rf?.name, rf?.ko,
       bf?.hp, bf?.name, bf?.ko,
+      B.red?.activeIdx, B.blue?.activeIdx,
       B.round, B.phase,
       (B.redDice || []).join(','),
-      (B.blueDice || []).join(',')
+      (B.blueDice || []).join(','),
+      B.red?.ghosts?.map(g => g.hp + '/' + (g.ko ? 'K' : '')).join(','),
+      B.blue?.ghosts?.map(g => g.hp + '/' + (g.ko ? 'K' : '')).join(',')
     ].join('|');
 
     if (hash === _lastSnapshotHash) return;
     _lastSnapshotHash = hash;
-    console.log('[RAID SYNC] writing snapshot, round:', B.round, 'redHP:', rf?.hp, 'bossHP:', bf?.hp);
 
     try {
-      // Sanitize: Firebase rejects undefined — coerce everything
       const redDice = (B.redDice || []).map(d => d || 0);
       const blueDice = (B.blueDice || []).map(d => d || 0);
+
+      // Send ALL ghosts with full state so spectator can track swaps and KOs
+      const allPlayerGhosts = B.red ? B.red.ghosts.map(g => ({
+        name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+        ko: !!g.ko, art: g.art || '', id: g.id || 0
+      })) : [];
+      const allBossGhosts = B.blue ? B.blue.ghosts.map(g => ({
+        name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+        ko: !!g.ko, art: g.art || '', id: g.id || 0
+      })) : [];
+
       writeBattleSnapshot({
         playerName: firebase.auth().currentUser?.displayName || 'Raider',
         playerGhost: rf || { name: '???', hp: 0, maxHp: 1, art: '' },
         bossGhost: bf || { name: '???', hp: 0, maxHp: 1, art: '' },
+        // Full ghost arrays + activeIdx for spectator sync
+        allPlayerGhosts: allPlayerGhosts,
+        allBossGhosts: allBossGhosts,
+        playerActiveIdx: B.red ? B.red.activeIdx : 0,
+        bossActiveIdx: B.blue ? B.blue.activeIdx : 0,
         playerSideline: B.red ? B.red.ghosts.filter((g, i) => i !== B.red.activeIdx) : [],
         bossSideline: B.blue ? B.blue.ghosts.filter((g, i) => i !== B.blue.activeIdx) : [],
         lastRoll: redDice.length > 0 ? { player: redDice, boss: blueDice } : null,

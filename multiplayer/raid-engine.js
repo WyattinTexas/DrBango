@@ -1609,6 +1609,17 @@ async function writeBattleSnapshot(snapshotData) {
       isBoss: true,
       ko: bg.ko || false
     },
+    // Full ghost arrays + activeIdx so spectator can track swaps and KOs
+    allPlayerGhosts: (snapshotData.allPlayerGhosts || []).map(g => ({
+      name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+      ko: !!g.ko, art: g.art || '', id: g.id || 0
+    })),
+    allBossGhosts: (snapshotData.allBossGhosts || []).map(g => ({
+      name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+      ko: !!g.ko, art: g.art || '', id: g.id || 0
+    })),
+    playerActiveIdx: snapshotData.playerActiveIdx || 0,
+    bossActiveIdx: snapshotData.bossActiveIdx || 0,
     playerSideline: (snapshotData.playerSideline || []).map(g => ({
       name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko, art: g.art || ''
     })),
