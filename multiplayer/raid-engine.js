@@ -555,6 +555,7 @@ function startActiveRaidListener() {
 var _currentRaidRole = null;   // 'fighter' | 'spectator' | null
 var _currentFighterIdx = -1;   // which fighter index we last processed
 var _lastTurnCounter = -1;     // turn counter — distinguishes repeated same-index turns
+var _raidRoleTransitioning = false; // lock: prevents snapshot updates during role changes
 
 function enterRaidScreen(instanceId) {
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
@@ -593,7 +594,7 @@ function enterRaidScreen(instanceId) {
         if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
         handleActiveFight(data);
         // Spectator sync: update the battle arena from fighter's snapshot
-        if (_currentRaidRole === 'spectator' && data.battleState) {
+        if (_currentRaidRole === 'spectator' && !_raidRoleTransitioning && data.battleState) {
           if (typeof updateSpectatorFromSnapshot === 'function') {
             updateSpectatorFromSnapshot(data.battleState);
           }
@@ -643,27 +644,37 @@ function handleActiveFight(data) {
   _currentFighterIdx = currentIdx;
   _lastTurnCounter = turnCounter;
 
+  // Lock: prevent snapshot updates from landing on half-initialized B during transition
+  _raidRoleTransitioning = true;
+  // Safety net: always clear the lock even if something throws
+  const _clearTransitionLock = () => { _raidRoleTransitioning = false; };
+  setTimeout(_clearTransitionLock, 2000);
+
   const isMyTurn = (mySlot === currentIdx) &&
                    players[mySlot]?.status !== 'done' &&
                    players[mySlot]?.status !== 'disconnected';
 
-  if (isMyTurn) {
-    _currentRaidRole = 'fighter';
-    // Clean up spectator overlay if transitioning from spectator → fighter
-    if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
-    // Clean up any previous battle
-    const gameOverEl = document.getElementById('gameOver');
-    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
-    if (typeof stopBlueAI === 'function') stopBlueAI();
-    B = null;
-    raidBattleState = null;
-    // Show battle view (spectator may have hidden it)
-    const battleView = document.getElementById('battle-view');
-    if (battleView) battleView.style.display = 'block';
-    startMyRaidFight(data);
-  } else {
-    _currentRaidRole = 'spectator';
-    setupSpectatorView(data, currentIdx, players);
+  try {
+    if (isMyTurn) {
+      _currentRaidRole = 'fighter';
+      // Clean up spectator overlay if transitioning from spectator → fighter
+      if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
+      // Clean up any previous battle
+      const gameOverEl = document.getElementById('gameOver');
+      if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+      if (typeof stopBlueAI === 'function') stopBlueAI();
+      B = null;
+      raidBattleState = null;
+      // Show battle view (spectator may have hidden it)
+      const battleView = document.getElementById('battle-view');
+      if (battleView) battleView.style.display = 'block';
+      startMyRaidFight(data);
+    } else {
+      _currentRaidRole = 'spectator';
+      setupSpectatorView(data, currentIdx, players);
+    }
+  } finally {
+    _clearTransitionLock();
   }
 }
 
@@ -1615,11 +1626,13 @@ async function writeBattleSnapshot(snapshotData) {
     // Full ghost arrays + activeIdx so spectator can track swaps and KOs
     allPlayerGhosts: (snapshotData.allPlayerGhosts || []).map(g => ({
       name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-      ko: !!g.ko, art: g.art || '', id: g.id || 0
+      ko: !!g.ko, art: g.art || '', id: g.id || 0,
+      ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
     })),
     allBossGhosts: (snapshotData.allBossGhosts || []).map(g => ({
       name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-      ko: !!g.ko, art: g.art || '', id: g.id || 0
+      ko: !!g.ko, art: g.art || '', id: g.id || 0,
+      ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
     })),
     playerActiveIdx: snapshotData.playerActiveIdx || 0,
     bossActiveIdx: snapshotData.bossActiveIdx || 0,
@@ -1649,6 +1662,7 @@ function cleanupRaid() {
   _currentRaidRole = null;
   _currentFighterIdx = -1;
   _lastTurnCounter = -1;
+  _raidRoleTransitioning = false;
   // Remove Firebase listeners
   if (currentRaid?.instanceId) {
     const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);

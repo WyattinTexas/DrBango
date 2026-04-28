@@ -17,7 +17,7 @@ var _originalGhostData = {};
  */
 function updateSpectatorFromSnapshot(snapshot) {
   // Only update if we are spectating and B exists with valid teams
-  if (_currentRaidRole !== 'spectator' || !B || !B.red || !B.blue) return;
+  if (_currentRaidRole !== 'spectator' || _raidRoleTransitioning || !B || !B.red || !B.blue) return;
   if (!snapshot) return;
 
   // ── Sync ALL ghost HP, KO status, and activeIdx ──────────────
@@ -29,10 +29,13 @@ function updateSpectatorFromSnapshot(snapshot) {
         B.red.ghosts[i].hp = sg.hp;
         B.red.ghosts[i].maxHp = sg.maxHp;
         B.red.ghosts[i].ko = !!sg.ko;
-        // Sync identity so spectator sees transforms and correct ghost info
+        // Sync full identity so spectator sees transforms + correct ability text
         if (sg.id) B.red.ghosts[i].id = sg.id;
         if (sg.name) B.red.ghosts[i].name = sg.name;
         if (sg.art) B.red.ghosts[i].art = sg.art;
+        if (sg.ability) B.red.ghosts[i].ability = sg.ability;
+        if (sg.abilityDesc) B.red.ghosts[i].abilityDesc = sg.abilityDesc;
+        if (sg.rarity) B.red.ghosts[i].rarity = sg.rarity;
       }
     });
     // Sync activeIdx — this is what tracks ghost swaps
@@ -58,6 +61,9 @@ function updateSpectatorFromSnapshot(snapshot) {
         if (sg.id) B.blue.ghosts[i].id = sg.id;
         if (sg.name) B.blue.ghosts[i].name = sg.name;
         if (sg.art) B.blue.ghosts[i].art = sg.art;
+        if (sg.ability) B.blue.ghosts[i].ability = sg.ability;
+        if (sg.abilityDesc) B.blue.ghosts[i].abilityDesc = sg.abilityDesc;
+        if (sg.rarity) B.blue.ghosts[i].rarity = sg.rarity;
       }
     });
     if (snapshot.bossActiveIdx != null) {
@@ -327,16 +333,14 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     blueBtn.style.display = 'none';
   }
 
-  // ── 9. Start blue AI — this is what makes the boss auto-roll ─
-  // In the testroom, startBlueAI() polls every 600ms and clicks
-  // the blue roll button when it's ready. Without this, the boss
-  // never rolls back after the player rolls.
-  if (typeof startBlueAI === 'function') {
-    startBlueAI();
+  // ── 9. Start blue AI + snapshot sync — FIGHTER ONLY ──────────
+  // Spectators must never write snapshots or run boss AI. Previously
+  // both started here and were stopped ~50ms later in setupSpectatorView,
+  // leaving a window for corrupt writes.
+  if (_currentRaidRole === 'fighter') {
+    if (typeof startBlueAI === 'function') startBlueAI();
+    startSnapshotSync();
   }
-
-  // ── 9a. Start snapshot sync (writes B state to Firebase for spectators)
-  startSnapshotSync();
 
   // ── 9b. Ensure red roll button is visible ONLY for the fighter ─
   setTimeout(() => {
@@ -879,7 +883,8 @@ function startSnapshotSync() {
       // Send ALL ghosts with full state so spectator can track swaps and KOs
       const allPlayerGhosts = B.red ? B.red.ghosts.map(g => ({
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-        ko: !!g.ko, art: g.art || '', id: g.id || 0
+        ko: !!g.ko, art: g.art || '', id: g.id || 0,
+        ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
       })) : [];
       // Scrub undefined values — Firebase rejects them and silently fails the write
       const _rawRes = B.red ? (B.red.resources || {}) : {};
@@ -887,7 +892,8 @@ function startSnapshotSync() {
       for (const k of Object.keys(_rawRes)) { if (_rawRes[k] !== undefined) playerResources[k] = _rawRes[k]; }
       const allBossGhosts = B.blue ? B.blue.ghosts.map(g => ({
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-        ko: !!g.ko, art: g.art || '', id: g.id || 0
+        ko: !!g.ko, art: g.art || '', id: g.id || 0,
+        ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
       })) : [];
 
       writeBattleSnapshot({
