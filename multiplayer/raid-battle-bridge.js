@@ -580,19 +580,23 @@ function injectRaidReturnButton() {
         }
 
         // Save player ghost state (with identity for transforms)
+        // IMPORTANT: Firebase rejects undefined — coerce every field
         const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
         if (B && B.red) {
           savedPlayerState.activeIdx = B.red.activeIdx || 0;
-          savedPlayerState.resources = B.red.resources || {};
+          const rawRes = B.red.resources || {};
+          const cleanRes = {};
+          for (const k of Object.keys(rawRes)) { if (rawRes[k] !== undefined) cleanRes[k] = rawRes[k]; }
+          savedPlayerState.resources = cleanRes;
           B.red.ghosts.forEach(g => {
             const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
-                         id: g.id, name: g.name, art: g.art,
-                         ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity };
+                         id: g.id || 0, name: g.name || '???', art: g.art || '',
+                         ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common' };
             if (g.originalId != null) {
-              gs.originalId = g.originalId; gs.originalName = g.originalName;
-              gs.originalArt = g.originalArt; gs.originalMaxHp = g.originalMaxHp;
-              gs.originalAbility = g.originalAbility; gs.originalAbilityDesc = g.originalAbilityDesc;
-              gs.originalRarity = g.originalRarity;
+              gs.originalId = g.originalId || 0; gs.originalName = g.originalName || '';
+              gs.originalArt = g.originalArt || ''; gs.originalMaxHp = g.originalMaxHp || 1;
+              gs.originalAbility = g.originalAbility || ''; gs.originalAbilityDesc = g.originalAbilityDesc || '';
+              gs.originalRarity = g.originalRarity || 'common';
             }
             savedPlayerState.ghosts.push(gs);
           });
@@ -724,20 +728,25 @@ function injectRaidReturnButton() {
     }
     // Save red team ghost state + resources + activeIdx
     // Includes identity fields so transforms persist across player swaps
+    // IMPORTANT: Firebase rejects undefined — coerce every field to a safe default
     const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
     if (B && B.red) {
       savedPlayerState.activeIdx = B.red.activeIdx || 0;
-      savedPlayerState.resources = B.red.resources || {};
+      // Scrub undefined from resources (Firebase rejects it)
+      const rawRes = B.red.resources || {};
+      const cleanRes = {};
+      for (const k of Object.keys(rawRes)) { if (rawRes[k] !== undefined) cleanRes[k] = rawRes[k]; }
+      savedPlayerState.resources = cleanRes;
       B.red.ghosts.forEach(g => {
         const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
-                     id: g.id, name: g.name, art: g.art,
-                     ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity };
+                     id: g.id || 0, name: g.name || '???', art: g.art || '',
+                     ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common' };
         // Preserve original identity so reverse-transform still works
         if (g.originalId != null) {
-          gs.originalId = g.originalId; gs.originalName = g.originalName;
-          gs.originalArt = g.originalArt; gs.originalMaxHp = g.originalMaxHp;
-          gs.originalAbility = g.originalAbility; gs.originalAbilityDesc = g.originalAbilityDesc;
-          gs.originalRarity = g.originalRarity;
+          gs.originalId = g.originalId || 0; gs.originalName = g.originalName || '';
+          gs.originalArt = g.originalArt || ''; gs.originalMaxHp = g.originalMaxHp || 1;
+          gs.originalAbility = g.originalAbility || ''; gs.originalAbilityDesc = g.originalAbilityDesc || '';
+          gs.originalRarity = g.originalRarity || 'common';
         }
         savedPlayerState.ghosts.push(gs);
       });
@@ -749,8 +758,8 @@ function injectRaidReturnButton() {
       savedBossState.activeIdx = B.blue.activeIdx || 0;
       B.blue.ghosts.forEach(g => {
         savedBossState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
-                                     id: g.id, name: g.name, art: g.art,
-                                     ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity });
+                                     id: g.id || 0, name: g.name || '???', art: g.art || '',
+                                     ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common' });
       });
     }
 
@@ -785,7 +794,7 @@ function injectRaidReturnButton() {
       db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
         console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
         _currentRaidRole = 'spectator';
-      });
+      }).catch(e => console.error('[RAID] Turn handoff Firebase write FAILED:', e));
     }, 1500);
   };
 })();
@@ -861,7 +870,10 @@ function startSnapshotSync() {
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
         ko: !!g.ko, art: g.art || '', id: g.id || 0
       })) : [];
-      const playerResources = B.red ? { ...(B.red.resources || {}) } : {};
+      // Scrub undefined values — Firebase rejects them and silently fails the write
+      const _rawRes = B.red ? (B.red.resources || {}) : {};
+      const playerResources = {};
+      for (const k of Object.keys(_rawRes)) { if (_rawRes[k] !== undefined) playerResources[k] = _rawRes[k]; }
       const allBossGhosts = B.blue ? B.blue.ghosts.map(g => ({
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
         ko: !!g.ko, art: g.art || '', id: g.id || 0
