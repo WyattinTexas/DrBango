@@ -681,19 +681,20 @@ function handleActiveFight(data) {
 
   if (mySlot === currentIdx && players[mySlot]?.status !== 'done' && players[mySlot]?.status !== 'disconnected') {
     // It's our turn to fight!
+    const wasSpectating = (typeof _isSpectating !== 'undefined') && _isSpectating;
     if (typeof _isSpectating !== 'undefined') _isSpectating = false;
-    if (!raidBattleState || raidBattleState.phase === 'waiting' || raidBattleState.phase === 'done') {
+
+    // Start our fight if: no battle state, or we were spectating (turn just swapped to us),
+    // or previous battle is done/waiting
+    if (!raidBattleState || wasSpectating || raidBattleState.phase === 'waiting' || raidBattleState.phase === 'done') {
       // Hide spectator overlay if we were watching
       if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
       // Clean up previous battle UI before starting ours
-      if (typeof cleanupRaidBattle === 'function' && raidBattleState?.phase === 'done') {
-        // Don't call full cleanup — just reset the battle view
-        const gameOverEl = document.getElementById('gameOver');
-        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
-        if (typeof stopBlueAI === 'function') stopBlueAI();
-        B = null;
-        raidBattleState = null;
-      }
+      const gameOverEl = document.getElementById('gameOver');
+      if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+      if (typeof stopBlueAI === 'function') stopBlueAI();
+      B = null;
+      raidBattleState = null;
       startMyRaidFight(data);
     }
   } else {
