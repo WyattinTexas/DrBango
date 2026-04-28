@@ -362,8 +362,8 @@ function showAbilityCallout(name, color, desc, team) {
 // RENDERING
 // ============================================================
 function renderCardSlot(ghost, isFighter) {
-  const g = ghostData(ghost.id);
-  const rarityLabel = g.rarity.replace('-',' ');
+  const g = ghostData(ghost.id) || ghost; // fallback to ghost object itself (boss ghosts)
+  const rarityLabel = (g.rarity || 'legendary').replace('-',' ');
   const artHtml = g.art
     ? `<img class="card-img" src="${g.art}" alt="${ghost.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-img-placeholder\\'>👻</div>'">`
     : `<div class="card-img-placeholder">👻</div>`;
@@ -467,8 +467,8 @@ function renderBattle() {
 
     // Fighter
     const fighterEl = document.getElementById(`${team}-fighter`);
-    const fData = ghostData(f.id);
-    fighterEl.className = `arena-card fighter-slot team-${team} rarity-${fData.rarity} ${f.ko?'ko':''}`;
+    const fData = ghostData(f.id) || f;
+    fighterEl.className = `arena-card fighter-slot team-${team} rarity-${fData.rarity || 'legendary'} ${f.ko?'ko':''}`;
     fighterEl.innerHTML = renderCardSlot(f, true);
 
     // HP Bar
@@ -481,10 +481,10 @@ function renderBattle() {
     [slLeft, slRight].forEach((el, i) => {
       if (sl[i] && !sl[i].isPadded) {
         el.style.visibility = 'visible';
-        const slData = ghostData(sl[i].id);
+        const slData = ghostData(sl[i].id) || sl[i];
         const isPick = isKoPickTeam && !sl[i].ko;
         const realIdx = t.ghosts.indexOf(sl[i]);
-        el.className = `arena-card sideline-slot rarity-${slData.rarity} ${sl[i].ko?'ko':''} ${isPick?'ko-swap-pick':''}`;
+        el.className = `arena-card sideline-slot rarity-${slData.rarity || 'legendary'} ${sl[i].ko?'ko':''} ${isPick?'ko-swap-pick':''}`;
         let slCardHtml = renderCardSlot(sl[i], false);
         // Burn badge: show how much burn is stacked on this sideline ghost
         if (B.burn && B.burn[team] && B.burn[team][realIdx]) {

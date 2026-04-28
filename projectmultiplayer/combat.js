@@ -4208,14 +4208,14 @@ function openSwap(team) {
   document.getElementById('swapTitle').textContent = `Swap ${team.toUpperCase()} Active Ghost`;
   document.getElementById('swapOptions').innerHTML = opts.map(g => {
     const realIdx = t.ghosts.indexOf(g);
-    const gd = ghostData(g.id);
+    const gd = ghostData(g.id) || g;
     const hpRatio = g.hp / g.maxHp;
     const hpColor = hpRatio > 0.6 ? 'var(--hp-green)' : hpRatio > 0.3 ? 'var(--hp-yellow)' : 'var(--hp-red)';
     return `<div class="swap-option ${g.ko?'ko':''}" onclick="doSwap('${team}',${realIdx})" style="display:flex; gap:10px; align-items:center;">
-      ${gd.art ? `<img src="${gd.art}" style="width:50px; height:50px; border-radius:6px; object-fit:cover; border:1px solid var(--${gd.rarity});">` : ''}
+      ${gd.art ? `<img src="${gd.art}" style="width:50px; height:50px; border-radius:6px; object-fit:cover; border:1px solid var(--${gd.rarity || 'legendary'});">` : ''}
       <div>
         <div class="so-name">${g.name}</div>
-        <div class="so-info"><span style="color:${hpColor}; font-weight:700;">&hearts; ${g.hp}/${g.maxHp}</span> ${g.ko?'<span style="color:var(--accent); font-weight:800;">(KO)</span>':''} &middot; <span style="color:var(--moonstone);">${gd.ability}</span></div>
+        <div class="so-info"><span style="color:${hpColor}; font-weight:700;">&hearts; ${g.hp}/${g.maxHp}</span> ${g.ko?'<span style="color:var(--accent); font-weight:800;">(KO)</span>':''} &middot; <span style="color:var(--moonstone);">${gd.ability || ''}</span></div>
       </div>
     </div>`;
   }).join('');
