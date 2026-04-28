@@ -591,10 +591,15 @@ function enterRaidScreen(instanceId) {
       case 'active':
         if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
         handleActiveFight(data);
-        // Spectator sync: update spectator's view from battleState
+        // Spectator sync: update spectator overlay from battleState
+        // Uses raid-ui.js's DOM-based updater (no B state dependency)
         if (_currentRaidRole === 'spectator' && data.battleState) {
-          if (typeof updateSpectatorFromSnapshot === 'function') {
-            updateSpectatorFromSnapshot(data.battleState);
+          if (typeof updateSpectatorBattleView === 'function') {
+            updateSpectatorBattleView(data.battleState);
+          }
+          // Also update boss pool bar
+          if (typeof renderBossHpPool === 'function' && data.battleState.bossPoolHp != null) {
+            renderBossHpPool(data.battleState.bossPoolHp, data.battleState.bossMaxHp || 1);
           }
         }
         break;
@@ -646,12 +651,17 @@ function handleActiveFight(data) {
 
   if (isMyTurn) {
     _currentRaidRole = 'fighter';
+    // Clean up spectator overlay if transitioning from spectator → fighter
+    if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
     // Clean up any previous battle
     const gameOverEl = document.getElementById('gameOver');
     if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
     if (typeof stopBlueAI === 'function') stopBlueAI();
     B = null;
     raidBattleState = null;
+    // Show battle view (spectator may have hidden it)
+    const battleView = document.getElementById('battle-view');
+    if (battleView) battleView.style.display = 'block';
     startMyRaidFight(data);
   } else {
     _currentRaidRole = 'spectator';
@@ -660,52 +670,45 @@ function handleActiveFight(data) {
 }
 
 /**
- * Set up spectator view — show the active player's battle in watch mode
+ * Set up spectator view — show the active player's battle in watch mode.
+ * Truly read-only: does NOT call startBattle() or create a B state.
+ * Uses the spectator overlay from raid-ui.js driven by Firebase snapshots.
  */
 function setupSpectatorView(data, currentIdx, players) {
   const currentPlayer = players[currentIdx];
-  if (!currentPlayer || !currentPlayer.team) return;
+  if (!currentPlayer) return;
 
-  const bossConfig = RAID_BOSSES[data.raidId];
-  if (!bossConfig) return;
-
-  // Show the raid screen
+  // Show the raid screen, hide the battle arena (spectator uses overlay)
   const raidScreen = document.getElementById('raid-screen');
   if (raidScreen) raidScreen.style.display = 'block';
+  const battleView = document.getElementById('battle-view');
+  if (battleView) battleView.style.display = 'none';
 
-  // Set up the arena with the fighter's team and boss — but do NOT call
-  // startBattle() (that creates independent dice rolls). Instead, build
-  // the visual layout and let updateSpectatorFromSnapshot handle live updates.
-  const phase = getBossPhase(
-    data.bossCurrentHp || bossConfig.bossGhost.maxHp,
-    data.bossMaxHp || bossConfig.bossGhost.maxHp
-  );
-  const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
-  const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
+  // Set minimal raid flags (no startBattle, no B state, no AI)
+  window.RAID_MODE = true;
 
-  // Register boss ghosts so getGhost() works for rendering
-  if (typeof initRaidBattleInPage === 'function') {
-    // We still call initRaidBattleInPage to set up ghosts, flags, and arena HTML,
-    // but we immediately stop the blue AI and snapshot sync since we're spectating.
-    initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
-    if (typeof stopBlueAI === 'function') stopBlueAI();
-    if (typeof stopSnapshotSync === 'function') stopSnapshotSync();
-  }
-
-  // Hide roll button — spectators can't roll
+  // Hide all roll buttons — spectators can't interact
   const rollBtn = document.getElementById('rollRedBtn');
   if (rollBtn) rollBtn.style.display = 'none';
   const blueBtn = document.getElementById('rollBlueBtn');
   if (blueBtn) blueBtn.style.display = 'none';
 
-  // Show watching banner
-  const narrator = document.getElementById('narrator');
-  if (narrator) {
-    const name = currentPlayer.displayName || 'Player ' + (currentIdx + 1);
-    narrator.innerHTML = `Watching <b class="red-text">${name}</b> fight...`;
+  // Find our slot
+  const user = firebase.auth().currentUser;
+  let mySlot = -1;
+  if (user) {
+    for (const [slot, p] of Object.entries(players)) {
+      if (p.uid === user.uid) mySlot = parseInt(slot);
+    }
+  }
+
+  // Show the spectator overlay (live Firebase-driven UI from raid-ui.js)
+  if (typeof showRaidSpectatorOverlay === 'function') {
+    showRaidSpectatorOverlay(data, mySlot, currentIdx);
   }
 
   // Boss HP pool bar
+  if (typeof _ensureBossHpPoolBar === 'function') _ensureBossHpPoolBar();
   if (typeof renderBossHpPool === 'function') {
     renderBossHpPool(data.bossCurrentHp || 0, data.bossMaxHp || 1);
   }

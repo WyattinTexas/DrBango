@@ -801,7 +801,7 @@ function startBattle() {
 function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
   const enemy = opp(team);
-  if (skipEntryEffects) return 0;
+  if (skipEntryEffects || window._raidSkipEntry) return 0;
 
   const entryTeamName = team === B.red ? 'red' : 'blue';
 
@@ -4838,6 +4838,9 @@ function rollReady(team) {
 }
 
 function doTeamRoll(team, btn) {
+  // Guard: B or preRoll may have been cleared (round-end, raid sync, etc.)
+  if (!B || !B.preRoll || !B.preRoll[team]) return;
+
   // Duel Phase intercept: if a modal primer resolved during Duel Phase, the
   // choice handler calls doTeamRoll() as its "proceed" signal. We catch that
   // here, re-enable the Ready button (so the player can commit resources),

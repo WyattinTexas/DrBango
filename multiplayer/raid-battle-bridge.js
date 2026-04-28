@@ -175,10 +175,24 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   const vsSplash = document.getElementById('vsSplash');
   if (vsSplash) vsSplash.style.display = 'none';
 
+  // ── 6c. Skip entry abilities if resuming a saved turn ──────────
+  // When a player resumes after spectating, startBattle() would re-fire
+  // entry abilities on ghosts that already entered. The flag is checked
+  // by triggerEntry() and auto-cleared after a short delay.
+  if (savedState) {
+    window._raidSkipEntry = true;
+  }
+
   startBattle();
 
   // Restore splash element (hidden by display:none, won't show because active class is cleared)
   if (vsSplash) setTimeout(() => { vsSplash.style.display = ''; }, 3000);
+
+  // Clear the skip-entry flag after startBattle's entry callbacks have had time to fire.
+  // 6s covers the worst case: VS splash (2.2s) + 2 entry chains with Jenkins modals (~3.5s).
+  if (window._raidSkipEntry) {
+    setTimeout(() => { window._raidSkipEntry = false; }, 6000);
+  }
 
   // ── 7. Post-init tweaks on the B battle state ────────────────
   if (B) {
@@ -347,6 +361,7 @@ function cleanupRaidBattle() {
   window.RAID_MODE = false;
   window.BOSS_RAID_DATA = null;
   window.IS_WAVE_FIGHT = false;
+  window._raidSkipEntry = false;
 
   // ── Hide raid screen ──────────────────────────────────────────
   const raidScreen = document.getElementById('raid-screen');
@@ -470,10 +485,46 @@ function injectRaidReturnButton() {
 
   window.showGameOver = function (winner) {
     _origShowGameOver.call(this, winner);
-    if (window.RAID_MODE) {
-      // endMyRaidFight is called by _origShowGameOver after 3s — it writes
-      // results to Firebase and advances currentFighterIdx to the next player.
-      // Show RETURN TO LOBBY only AFTER that completes (4s delay).
+    if (window.RAID_MODE && currentRaid) {
+      // Sync boss ghost HP back to the shared pool in Firebase
+      // and call endMyRaidFight to update player stats + advance turn.
+      const instanceId = currentRaid.instanceId;
+      let bossHpNow = 0;
+      let bossMaxGhostHp = 9;
+      if (B && B.blue) {
+        // Always read the boss ghost (index 0), not the active ghost —
+        // activeIdx could point to a minion if the boss retreated.
+        const bossGhost = B.blue.ghosts[0];
+        if (bossGhost) {
+          bossHpNow = bossGhost.ko ? 0 : bossGhost.hp;
+          bossMaxGhostHp = bossGhost.maxHp || 9; // use actual ghost maxHp, not config
+        }
+      }
+      // Calculate pool HP from ghost HP ratio
+      const poolMax = currentRaid.bossMaxHp || 15;
+      const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHp)));
+
+      // Write updated pool HP to Firebase
+      db.ref(`mp/raids/instances/${instanceId}`).update({
+        bossCurrentHp: poolNow
+      });
+
+      // Stop AI and snapshot sync
+      if (typeof stopBlueAI === 'function') stopBlueAI();
+      stopSnapshotSync();
+
+      // Force one final snapshot so spectator sees the end state
+      _lastSnapshotHash = '';
+
+      // Call endMyRaidFight to record stats and advance to next player
+      if (typeof endMyRaidFight === 'function') {
+        const result = winner === 'red' ? 'victory' : 'defeat';
+        setTimeout(() => {
+          endMyRaidFight(result);
+        }, 2000);
+      }
+
+      // Show RETURN TO LOBBY after endMyRaidFight completes
       setTimeout(() => {
         const goButtons = document.querySelector('.go-buttons');
         if (goButtons) {
@@ -533,11 +584,16 @@ function injectRaidReturnButton() {
     const narrator = document.getElementById('narrator');
     if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
-    // Save player ghost HP to Firebase so it persists when their turn comes back
+    // Save boss ghost HP — always read index 0 (the boss), not activeIdx
+    // (activeIdx could point to a minion if the boss retreated)
     let bossHpNow = 0;
+    let bossMaxGhostHpForTurn = 9;
     if (B && B.blue) {
-      const bossGhost = B.blue.ghosts[B.blue.activeIdx];
-      if (bossGhost) bossHpNow = bossGhost.hp;
+      const bossGhost = B.blue.ghosts[0];
+      if (bossGhost) {
+        bossHpNow = bossGhost.ko ? 0 : bossGhost.hp;
+        bossMaxGhostHpForTurn = bossGhost.maxHp || 9;
+      }
     }
     // Save red team ghost state + resources + activeIdx
     const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
@@ -564,10 +620,9 @@ function injectRaidReturnButton() {
 
       // Calculate new boss pool HP from the boss ghost's current HP
       // Boss ghost started with HP proportional to pool, so scale back
-      const bossConfig = RAID_BOSSES[currentRaid.raidId];
-      const bossMaxGhostHp = bossConfig?.bossGhost?.maxHp || 9;
+      // Uses actual ghost maxHp (captured above), not config value
       const poolMax = currentRaid.bossMaxHp || 15;
-      const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHp)));
+      const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHpForTurn)));
 
       db.ref(`mp/raids/instances/${instanceId}`).update({
         currentFighterIdx: nextIdx,
