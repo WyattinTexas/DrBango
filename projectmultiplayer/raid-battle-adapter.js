@@ -8,6 +8,7 @@
 const RaidBattleAdapter = {
   // Boss ghost lookup (scoped, not global GHOSTS mutation)
   _bossGhostLookup: {},
+  _origGetGhost: null, // saved original for cleanup
 
   // ── Initialize: register hooks once at load time ──────────────
   init() {
@@ -305,10 +306,11 @@ const RaidBattleAdapter = {
     S.redPicks = playerData.team;
     S.bluePicks = blueGhosts.map(g => g.id);
 
-    // Scoped getGhost patch — only during synchronous startBattle()->makeTeam() call
-    const _origGetGhost = window.getGhost;
+    // Patch getGhost for the duration of the fight (boss ghost IDs need resolving
+    // not just during makeTeam, but also during renderBattle and ability callbacks)
+    this._origGetGhost = window.getGhost;
     const lookup = this._bossGhostLookup;
-    window.getGhost = (id) => lookup[id] || _origGetGhost(id);
+    window.getGhost = (id) => lookup[id] || this._origGetGhost(id);
 
     // Suppress entry abilities if resuming a saved turn
     const user = firebase.auth().currentUser;
@@ -326,8 +328,8 @@ const RaidBattleAdapter = {
 
     BattleEngine.startBattle();
 
-    // Restore getGhost immediately (makeTeam already ran synchronously)
-    window.getGhost = _origGetGhost;
+    // Keep patched getGhost — renderBattle and entry abilities need it
+    // throughout the fight. Restore only on cleanup.
 
     // Restore splash element
     if (vsSplash) setTimeout(() => { vsSplash.style.display = ''; }, 3000);
@@ -717,6 +719,11 @@ const RaidBattleAdapter = {
     this._entering = false;
     this._fightStarted = false;
     this._processingUpdate = false;
+    // Restore original getGhost
+    if (this._origGetGhost) {
+      window.getGhost = this._origGetGhost;
+      this._origGetGhost = null;
+    }
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
     RaidSync.disconnect();
