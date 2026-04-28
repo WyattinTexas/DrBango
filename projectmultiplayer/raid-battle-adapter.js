@@ -146,9 +146,21 @@ const RaidBattleAdapter = {
   // FIREBASE UPDATE HANDLER
   // ══════════════════════════════════════════════════════════════════
 
+  _processingUpdate: false, // lock to prevent re-entrant Firebase processing
+
   _handleFirebaseUpdate(instanceId, data) {
     const user = firebase.auth().currentUser;
     if (!user) return;
+
+    // Prevent re-entrant processing (Firebase listener can fire synchronously
+    // during connect() or when we write back to the same instance)
+    if (this._processingUpdate) return;
+    this._processingUpdate = true;
+    try { this.__handleFirebaseUpdateInner(instanceId, data); }
+    finally { this._processingUpdate = false; }
+  },
+
+  __handleFirebaseUpdateInner(instanceId, data) {
 
     // Update RaidState from Firebase data
     RaidState.currentFighterIdx = data.currentFighterIdx || 0;
@@ -259,10 +271,15 @@ const RaidBattleAdapter = {
   // FIGHTER: START MY FIGHT
   // ══════════════════════════════════════════════════════════════════
 
+  _fightStarted: false, // prevent double startBattle
+
   _startMyFight() {
+    if (this._fightStarted) return;
+    this._fightStarted = true;
+
     const { bossConfig, players, currentFighterIdx, bossGhostState, playerGhostState } = RaidState;
     const playerData = players[currentFighterIdx];
-    if (!playerData || !bossConfig) return;
+    if (!playerData || !bossConfig) { this._fightStarted = false; return; }
 
     // Show raid screen and battle view
     const raidScreen = document.getElementById('raid-screen');
@@ -694,7 +711,9 @@ const RaidBattleAdapter = {
   // ══════════════════════════════════════════════════════════════════
 
   _cleanup() {
-    this._entering = false; // release lock
+    this._entering = false;
+    this._fightStarted = false;
+    this._processingUpdate = false;
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
     RaidSync.disconnect();
