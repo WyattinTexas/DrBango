@@ -689,7 +689,8 @@ function setupSpectatorView(data, currentIdx, players) {
   const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
   const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
 
-  // Suppress entry abilities — spectator is watching, not entering fresh
+  // Suppress entry abilities — spectator is watching, not entering fresh.
+  // Flag stays set for 6s to cover async entry callbacks in startBattle().
   window._raidSkipEntry = true;
 
   // Set up the full battle arena (ghosts, art, HP bars, layout)
@@ -701,8 +702,8 @@ function setupSpectatorView(data, currentIdx, players) {
   if (typeof stopBlueAI === 'function') stopBlueAI();
   if (typeof stopSnapshotSync === 'function') stopSnapshotSync();
 
-  // Clear skip-entry flag (arena is set up, entries were suppressed)
-  window._raidSkipEntry = false;
+  // Clear skip-entry flag after async entries have had time to be suppressed
+  setTimeout(() => { window._raidSkipEntry = false; }, 6000);
 
   // Hide roll buttons — spectators can't interact
   const rollBtn = document.getElementById('rollRedBtn');
@@ -786,14 +787,12 @@ function getWaveChance(slotIdx) {
 }
 
 /**
- * Get the current boss phase (1-4) based on HP percentage
+ * Get the current boss phase — DISABLED, always returns 1.
+ * Phase system removed for cleaner gameplay. Can re-enable later
+ * by restoring the HP-percentage thresholds.
  */
 function getBossPhase(currentHp, maxHp) {
-  const pct = currentHp / maxHp;
-  if (pct > 0.75) return 1;
-  if (pct > 0.50) return 2;
-  if (pct > 0.25) return 3;
-  return 4;
+  return 1;
 }
 
 /**
@@ -1208,21 +1207,10 @@ function isIceWallActive(bossTeam) {
 }
 
 /**
- * Check for boss phase transition
+ * Check for boss phase transition — DISABLED.
+ * Always returns no transition since phases are removed.
  */
 function checkBossPhaseTransition(oldHp, newHp, maxHp, personality, bossConfig) {
-  const oldPhase = getBossPhase(oldHp, maxHp);
-  const newPhase = getBossPhase(newHp, maxHp);
-
-  if (newPhase > oldPhase) {
-    return {
-      transitioned: true,
-      fromPhase: oldPhase,
-      toPhase: newPhase,
-      dialogue: bossConfig.dialogue['phase' + newPhase] || '',
-      personality: personality
-    };
-  }
   return { transitioned: false };
 }
 

@@ -486,55 +486,113 @@ function injectRaidReturnButton() {
   window.showGameOver = function (winner) {
     _origShowGameOver.call(this, winner);
     if (window.RAID_MODE && currentRaid) {
-      // Sync boss ghost HP back to the shared pool in Firebase
-      // and call endMyRaidFight to update player stats + advance turn.
-      const instanceId = currentRaid.instanceId;
-      let bossHpNow = 0;
-      let bossMaxGhostHp = 9;
-      if (B && B.blue) {
-        // Always read the boss ghost (index 0), not the active ghost —
-        // activeIdx could point to a minion if the boss retreated.
-        const bossGhost = B.blue.ghosts[0];
-        if (bossGhost) {
-          bossHpNow = bossGhost.ko ? 0 : bossGhost.hp;
-          bossMaxGhostHp = bossGhost.maxHp || 9; // use actual ghost maxHp, not config
+      try {
+        // Sync boss ghost HP back to the shared pool in Firebase
+        const instanceId = currentRaid.instanceId;
+        let bossHpNow = 0;
+        let bossMaxGhostHp = 9;
+        if (B && B.blue) {
+          const bossGhost = B.blue.ghosts[0];
+          if (bossGhost) {
+            bossHpNow = bossGhost.ko ? 0 : bossGhost.hp;
+            bossMaxGhostHp = bossGhost.maxHp || 9;
+          }
         }
-      }
-      // Calculate pool HP from ghost HP ratio
-      const poolMax = currentRaid.bossMaxHp || 15;
-      const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHp)));
+        const poolMax = currentRaid.bossMaxHp || 15;
+        const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHp)));
 
-      // Write updated pool HP to Firebase
-      db.ref(`mp/raids/instances/${instanceId}`).update({
-        bossCurrentHp: poolNow
-      });
+        // Stop AI and snapshot sync
+        if (typeof stopBlueAI === 'function') stopBlueAI();
+        stopSnapshotSync();
 
-      // Stop AI and snapshot sync
-      if (typeof stopBlueAI === 'function') stopBlueAI();
-      stopSnapshotSync();
+        // Atomic write: pool HP + player ghost state + advance turn
+        const user = firebase.auth().currentUser;
+        const players = currentRaid.players || {};
+        const playerCount = Object.keys(players).length;
+        const currentIdx = raidBattleState?.currentSlot || 0;
+        const nextIdx = currentIdx + 1;
+        const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
+        let totalDamage = 0;
+        if (B && B.blue) {
+          B.blue.ghosts.forEach(g => {
+            if (g) totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+          });
+        }
 
-      // Force one final snapshot so spectator sees the end state
-      _lastSnapshotHash = '';
+        // Save player ghost state
+        const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
+        if (B && B.red) {
+          savedPlayerState.activeIdx = B.red.activeIdx || 0;
+          savedPlayerState.resources = B.red.resources || {};
+          B.red.ghosts.forEach(g => {
+            savedPlayerState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+          });
+        }
 
-      // Call endMyRaidFight to record stats and advance to next player
-      if (typeof endMyRaidFight === 'function') {
-        const result = winner === 'red' ? 'victory' : 'defeat';
+        // Build atomic update
+        const update = {
+          bossCurrentHp: poolNow,
+          [`players/${currentIdx}/status`]: 'done',
+          [`players/${currentIdx}/damageDealt`]: totalDamage,
+          [`players/${currentIdx}/ghostsLost`]: ghostsLost
+        };
+        if (user) {
+          update[`playerGhostState/${user.uid}`] = savedPlayerState;
+        }
+
+        // Check if boss is dead or all players done
+        if (poolNow <= 0) {
+          update.status = 'complete';
+          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+          update.bossDefeatedBy = user?.uid || null;
+          update.fightPhase = 'done';
+        } else if (nextIdx >= playerCount) {
+          // All players fought, boss survived
+          update.status = 'complete';
+          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+          update.fightPhase = 'done';
+        } else {
+          // Advance to next fighter
+          update.currentFighterIdx = nextIdx;
+          update.currentFighterUid = players[nextIdx]?.uid || null;
+          update.fightPhase = 'fighting';
+          update.enrageLevel = firebase.database.ServerValue.increment(1);
+        }
+
         setTimeout(() => {
-          endMyRaidFight(result);
-        }, 2000);
+          db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
+            console.log('[RAID] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
+            if (poolNow <= 0 && typeof distributeRaidRewards === 'function') {
+              distributeRaidRewards(instanceId, true, user?.uid);
+            } else if (nextIdx >= playerCount && typeof distributeRaidRewards === 'function') {
+              distributeRaidRewards(instanceId, false, null);
+            }
+          }).catch(e => console.warn('[RAID] game-over update error:', e));
+        }, 1500);
+
+      } catch (e) {
+        console.error('[RAID] showGameOver hook error:', e);
       }
 
-      // Show RETURN TO LOBBY after endMyRaidFight completes
+      // ALWAYS show return button — even if Firebase fails, player shouldn't be stuck
       setTimeout(() => {
+        // Try .go-buttons first, fall back to injecting into gameOver overlay
         const goButtons = document.querySelector('.go-buttons');
-        if (goButtons) {
-          goButtons.innerHTML = `
-            <button class="go-btn-rematch" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.4);"
+        const gameOver = document.getElementById('gameOver');
+        const target = goButtons || gameOver;
+        if (target) {
+          const btnHtml = `
+            <button class="go-btn-rematch" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.4);margin-top:16px;"
               onclick="cleanupRaidBattle(); if(typeof showRaidLobby==='function') showRaidLobby(); if(typeof closeRaidResult==='function') closeRaidResult();">
               RETURN TO LOBBY
             </button>`;
+          if (goButtons) {
+            goButtons.innerHTML = btnHtml;
+          } else {
+            target.insertAdjacentHTML('beforeend', btnHtml);
+          }
         }
-      }, 4500);
+      }, 3500);
     }
   };
 })();
@@ -611,25 +669,25 @@ function injectRaidReturnButton() {
       const currentIdx = raidBattleState?.currentSlot || 0;
       const nextIdx = (currentIdx + 1) % playerCount;
       const instanceId = currentRaid.instanceId;
-
-      // Write player state to Firebase for persistence (ghosts + resources + activeIdx)
       const user = firebase.auth().currentUser;
-      if (user && savedPlayerState.ghosts.length > 0) {
-        db.ref(`mp/raids/instances/${instanceId}/playerGhostState/${user.uid}`).set(savedPlayerState);
-      }
 
       // Calculate new boss pool HP from the boss ghost's current HP
-      // Boss ghost started with HP proportional to pool, so scale back
-      // Uses actual ghost maxHp (captured above), not config value
       const poolMax = currentRaid.bossMaxHp || 15;
       const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHpForTurn)));
 
-      db.ref(`mp/raids/instances/${instanceId}`).update({
+      // ATOMIC write: player ghost state + fighter advance in ONE update
+      // Prevents race where listener fires on index change before ghost state is saved
+      const update = {
         currentFighterIdx: nextIdx,
         currentFighterUid: players[nextIdx]?.uid || null,
         fightPhase: 'fighting',
         bossCurrentHp: poolNow
-      }).then(() => {
+      };
+      if (user && savedPlayerState.ghosts.length > 0) {
+        update[`playerGhostState/${user.uid}`] = savedPlayerState;
+      }
+
+      db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
         console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
         _currentRaidRole = 'spectator';
       });
