@@ -145,6 +145,10 @@ function showRaidLobby() {
   const user = firebase.auth().currentUser;
   if (!user) return;
 
+  // Dismiss any lingering raid result / battle screen from a previous raid
+  const raidScreen = document.getElementById('raid-screen');
+  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
+
   // Get user's badges
   db.ref(`mp/users/${user.uid}/raidBadges`).once('value').then(snap => {
     const badges = snap.val() || [];
@@ -251,6 +255,10 @@ function selectRaid(raidId) {
   selectedRaidId = raidId;
   const boss = RAID_BOSSES[raidId];
   if (!boss) return;
+
+  // Dismiss any lingering result screen from a previous raid
+  const raidScreen = document.getElementById('raid-screen');
+  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
 
   const container = document.getElementById('raid-lobby');
   if (!container) return;
