@@ -221,6 +221,28 @@ header p {
   .dice-set { padding: 20px 16px; }
   header { padding: 40px 16px 10px; }
 }
+
+.export-btn {
+  display: block;
+  margin: 16px auto 0;
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #c9a84c, #e6c869);
+  color: #1a1a2e;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+  z-index: 1;
+}
+.export-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(201,168,76,0.3);
+}
 </style>
 </head>
 <body>
@@ -230,6 +252,7 @@ header p {
   <p>BOO! Battle of Origins</p>
 </header>
 <p class="drag-hint">Drag to rotate &bull; Pick colors below each die</p>
+<button class="export-btn" id="exportBtn">Export Spec Sheet (PDF)</button>
 
 
 <div class="sets-container" id="setsContainer"></div>
@@ -810,6 +833,98 @@ SETS.forEach(set => {
     fs.addEventListener('input', updateSetOpacity);
     bs.addEventListener('input', updateSetOpacity);
   });
+});
+
+// ── Export Spec Sheet ──
+document.getElementById('exportBtn').addEventListener('click', () => {
+  // Snapshot all canvases and gather current color values
+  const specData = SETS.map(set => {
+    const dice = set.dice.map((d, i) => {
+      const canvas = document.getElementById(`die-${set.id}-${i}`);
+      const bp = document.getElementById(`body-${set.id}-${i}`);
+      const pp = document.getElementById(`pip-${set.id}-${i}`);
+      const sp = document.getElementById(`sparkle-${set.id}-${i}`);
+      return {
+        label: d.label,
+        bodyColor: bp.value.toUpperCase(),
+        pipColor: pp.value.toUpperCase(),
+        sparkle: sp.checked,
+        image: canvas.toDataURL('image/png')
+      };
+    });
+    const fs = document.getElementById(`front-${set.id}`);
+    const bs = document.getElementById(`back-${set.id}`);
+    return {
+      name: set.name,
+      subtitle: set.subtitle,
+      frontOpacity: fs.value + '%',
+      innerOpacity: bs.value + '%',
+      dice
+    };
+  });
+
+  // Build printable spec sheet
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html><head>
+<title>BOO! Battle of Origins — Dice Spec Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#fff; color:#222; padding:40px; }
+  .page-header { text-align:center; margin-bottom:40px; border-bottom:3px solid #222; padding-bottom:20px; }
+  .page-header h1 { font-family:'Cinzel',serif; font-size:28px; font-weight:900; letter-spacing:0.06em; margin-bottom:4px; }
+  .page-header p { font-size:12px; color:#666; letter-spacing:0.1em; text-transform:uppercase; }
+  .set-block { margin-bottom:36px; page-break-inside:avoid; border:1px solid #ddd; border-radius:12px; padding:24px; }
+  .set-title { font-family:'Cinzel',serif; font-size:20px; font-weight:700; margin-bottom:2px; }
+  .set-sub { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:16px; }
+  .dice-row { display:flex; gap:40px; justify-content:center; flex-wrap:wrap; }
+  .die-spec { text-align:center; width:260px; }
+  .die-spec img { width:200px; height:200px; object-fit:contain; margin-bottom:10px; border-radius:8px; background:#f5f5f5; }
+  .die-name { font-weight:700; font-size:14px; margin-bottom:8px; }
+  .color-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .color-table td { padding:6px 8px; border:1px solid #e0e0e0; }
+  .color-table td:first-child { font-weight:600; background:#f8f8f8; width:90px; }
+  .swatch { display:inline-block; width:18px; height:18px; border-radius:4px; border:1px solid #ccc; vertical-align:middle; margin-right:6px; }
+  .set-meta { margin-top:12px; font-size:11px; color:#666; text-align:center; }
+  .footer { text-align:center; margin-top:40px; font-size:10px; color:#aaa; border-top:1px solid #ddd; padding-top:16px; }
+  @media print {
+    body { padding:20px; }
+    .set-block { break-inside:avoid; }
+  }
+</style>
+</head><body>
+<div class="page-header">
+  <h1>Dice Collection — Spec Sheet</h1>
+  <p>BOO! Battle of Origins &bull; ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</p>
+</div>
+${specData.map(s => `
+<div class="set-block">
+  <div class="set-title">${s.name}</div>
+  <div class="set-sub">${s.subtitle}</div>
+  <div class="dice-row">
+    ${s.dice.map(d => `
+    <div class="die-spec">
+      <img src="${d.image}" alt="${d.label}">
+      <div class="die-name">${d.label}</div>
+      <table class="color-table">
+        <tr><td>Body</td><td><span class="swatch" style="background:${d.bodyColor}"></span>${d.bodyColor}</td></tr>
+        <tr><td>Pips</td><td><span class="swatch" style="background:${d.pipColor}"></span>${d.pipColor}</td></tr>
+        <tr><td>Sparkle</td><td>${d.sparkle ? 'Yes' : 'No'}</td></tr>
+      </table>
+    </div>
+    `).join('')}
+  </div>
+  <div class="set-meta">Front Opacity: ${s.frontOpacity} &bull; Inner Walls: ${s.innerOpacity}</div>
+</div>
+`).join('')}
+<div class="footer">
+  Corkscrew Games LLC &bull; Generated from drbango.com/dice
+</div>
+</body></html>`);
+  win.document.close();
+  // Auto-trigger print after images load
+  win.onload = () => setTimeout(() => win.print(), 300);
 });
 </script>
 </body>
