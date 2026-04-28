@@ -1059,7 +1059,16 @@ function showRaidResult(data) {
       <button class="raid-result-close" onclick="closeRaidResult()">RETURN TO LOBBY</button>
     </div>`;
 
-  raidScreen.innerHTML = html;
+  // Append as overlay — do NOT replace innerHTML (destroys the arena template)
+  let resultOverlay = document.getElementById('raid-result-overlay');
+  if (!resultOverlay) {
+    resultOverlay = document.createElement('div');
+    resultOverlay.id = 'raid-result-overlay';
+    resultOverlay.style.cssText = 'position:fixed;inset:0;z-index:9500;overflow-y:auto;background:linear-gradient(180deg,#0a0612,#14101e,#0e0820);';
+    raidScreen.appendChild(resultOverlay);
+  }
+  resultOverlay.innerHTML = html;
+  raidScreen.style.display = 'block';
 
   // ─── Juice ───────────────────────────────────────────────────
   if (bossDefeated) {
@@ -1185,6 +1194,9 @@ function showLootRollReveal(playerData, boss) {
 }
 
 function closeRaidResult() {
+  // Remove result overlay (preserves arena template)
+  const resultOverlay = document.getElementById('raid-result-overlay');
+  if (resultOverlay) resultOverlay.remove();
   hideRaidScreen();
   cleanupRaid();
   showRaidLobby();

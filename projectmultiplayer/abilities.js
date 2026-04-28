@@ -4456,10 +4456,16 @@ function resetRollButtons() {
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
   if (b) { b.classList.remove('locked', 'pulse'); b.disabled = false; b.textContent = 'Blue Roll'; }
   // v733: async MP — Red button says "READY" (commit signal), Blue is AI-controlled
+  // In RAID mode: button says "ROLL" — no commit handshake needed, boss AI auto-rolls
   if (MP_MODE && !LIVE_PVP) {
-    if (r) r.textContent = 'READY';
+    if (window.BOSS_MODE) {
+      if (r) r.textContent = 'ROLL';
+      pvpRedClickedRoll = true; // auto-ready — boss AI rolls immediately after player
+    } else {
+      if (r) r.textContent = 'READY';
+      pvpRedClickedRoll = false; // reset each round
+    }
     if (b) b.style.display = 'none'; // hide Blue's button — AI rolls it
-    pvpRedClickedRoll = false; // reset each round
   }
   // Live PvP: hide opponent's button, label ours properly
   if (LIVE_PVP) {

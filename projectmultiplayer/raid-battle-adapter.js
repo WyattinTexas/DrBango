@@ -749,13 +749,17 @@ const RaidBattleAdapter = {
     this._lastProcessedCounter = -1;
     this._bossGhostLookup = {};
 
+    // Remove result overlay if present (preserves arena template)
+    const resultOverlay = document.getElementById('raid-result-overlay');
+    if (resultOverlay) resultOverlay.remove();
+
     // Hide raid screen
     const raidScreen = document.getElementById('raid-screen');
     if (raidScreen) raidScreen.style.display = 'none';
     const battleView = document.getElementById('battle-view');
     if (battleView) battleView.style.display = 'none';
 
-    // Remove boss HP pool bar
+    // Remove boss HP pool bar (adapter-created, not part of template)
     const poolBar = document.getElementById('raid-boss-pool');
     if (poolBar) poolBar.remove();
 
