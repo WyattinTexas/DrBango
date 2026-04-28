@@ -325,9 +325,14 @@ const RaidBattleAdapter = {
 
     // Patch getGhost for the duration of the fight (boss ghost IDs need resolving
     // not just during makeTeam, but also during renderBattle and ability callbacks)
-    this._origGetGhost = window.getGhost;
+    // IMPORTANT: Save original only ONCE — on subsequent turns, window.getGhost is
+    // already our patch. Re-saving would create a recursive reference.
+    if (!this._origGetGhost) {
+      this._origGetGhost = window.getGhost;
+    }
     const lookup = this._bossGhostLookup;
-    window.getGhost = (id) => lookup[id] || this._origGetGhost(id);
+    const origFn = this._origGetGhost;
+    window.getGhost = (id) => lookup[id] || origFn(id);
 
     // Suppress entry abilities if resuming a saved turn
     const user = firebase.auth().currentUser;
@@ -344,6 +349,25 @@ const RaidBattleAdapter = {
     MP_MODE = true;
 
     BattleEngine.startBattle();
+
+    // Fix: if a player ghost shares an ID with a boss ghost, startBattle gave
+    // it boss stats (higher HP, boss art, etc.). Restore regular data for red team.
+    const B_post = BattleEngine.getState();
+    if (B_post && B_post.red) {
+      B_post.red.ghosts.forEach(g => {
+        if (lookup[g.id]) {
+          const regular = origFn(g.id);
+          if (regular) {
+            g.maxHp = regular.maxHp;
+            g.hp = regular.maxHp; // full HP
+            g.rarity = regular.rarity;
+            g.art = regular.art;
+            g.ability = regular.ability;
+            g.abilityDesc = regular.abilityDesc;
+          }
+        }
+      });
+    }
 
     // Keep patched getGhost — renderBattle and entry abilities need it
     // throughout the fight. Restore only on cleanup.
