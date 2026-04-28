@@ -669,6 +669,13 @@ function setupSpectatorView(data, currentIdx, players) {
   const bossConfig = RAID_BOSSES[data.raidId];
   if (!bossConfig) return;
 
+  // Show the raid screen
+  const raidScreen = document.getElementById('raid-screen');
+  if (raidScreen) raidScreen.style.display = 'block';
+
+  // Set up the arena with the fighter's team and boss — but do NOT call
+  // startBattle() (that creates independent dice rolls). Instead, build
+  // the visual layout and let updateSpectatorFromSnapshot handle live updates.
   const phase = getBossPhase(
     data.bossCurrentHp || bossConfig.bossGhost.maxHp,
     data.bossMaxHp || bossConfig.bossGhost.maxHp
@@ -676,19 +683,31 @@ function setupSpectatorView(data, currentIdx, players) {
   const bossTeam = buildBossTeam(bossConfig, phase, data.enrageLevel || 0);
   const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
 
+  // Register boss ghosts so getGhost() works for rendering
   if (typeof initRaidBattleInPage === 'function') {
+    // We still call initRaidBattleInPage to set up ghosts, flags, and arena HTML,
+    // but we immediately stop the blue AI and snapshot sync since we're spectating.
     initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
+    if (typeof stopBlueAI === 'function') stopBlueAI();
+    if (typeof stopSnapshotSync === 'function') stopSnapshotSync();
   }
 
   // Hide roll button — spectators can't roll
   const rollBtn = document.getElementById('rollRedBtn');
   if (rollBtn) rollBtn.style.display = 'none';
+  const blueBtn = document.getElementById('rollBlueBtn');
+  if (blueBtn) blueBtn.style.display = 'none';
 
   // Show watching banner
   const narrator = document.getElementById('narrator');
   if (narrator) {
     const name = currentPlayer.displayName || 'Player ' + (currentIdx + 1);
     narrator.innerHTML = `Watching <b class="red-text">${name}</b> fight...`;
+  }
+
+  // Boss HP pool bar
+  if (typeof renderBossHpPool === 'function') {
+    renderBossHpPool(data.bossCurrentHp || 0, data.bossMaxHp || 1);
   }
 }
 
