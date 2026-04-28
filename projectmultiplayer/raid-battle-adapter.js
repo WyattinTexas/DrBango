@@ -589,9 +589,15 @@ const RaidBattleAdapter = {
 
     RaidState.transition('turn-handoff');
 
-    // Advance to next fighter after brief delay (cinematic feel)
+    // Advance to next fighter — skip dead/done players
     const currentIdx = RaidState.mySlot;
-    const nextIdx = (currentIdx + 1) % RaidState.players.length;
+    const playerCount = RaidState.players.length;
+    let nextIdx = (currentIdx + 1) % playerCount;
+    while (nextIdx !== currentIdx &&
+           (RaidState.players[nextIdx]?.status === 'done' ||
+            RaidState.players[nextIdx]?.status === 'disconnected')) {
+      nextIdx = (nextIdx + 1) % playerCount;
+    }
 
     setTimeout(() => {
       RaidSync.advanceTurn(B, currentIdx, nextIdx, RaidState.players.length);

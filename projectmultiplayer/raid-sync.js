@@ -5,6 +5,20 @@
 // Depends on: raid-state-machine.js (RaidState), Firebase (db)
 // =================================================================
 
+// Firebase rejects `undefined` values SILENTLY — the entire .update()
+// call fails with no error. This helper recursively scrubs them.
+function firebaseSafe(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(v => firebaseSafe(v));
+  const clean = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue; // drop undefined keys
+    clean[k] = firebaseSafe(v);
+  }
+  return clean;
+}
+
 const RaidSync = {
   _instanceRef: null,
   _listeners: {},
@@ -51,7 +65,7 @@ const RaidSync = {
     this._lastSnapshotHash = hash;
 
     const snapshot = this._serializeSnapshot(B);
-    this._instanceRef.child('battleState').set(snapshot)
+    this._instanceRef.child('battleState').set(firebaseSafe(snapshot))
       .catch(e => console.warn('[RaidSync] Snapshot write error:', e));
   },
 
@@ -87,7 +101,7 @@ const RaidSync = {
     }
 
     try {
-      await this._instanceRef.update(update);
+      await this._instanceRef.update(firebaseSafe(update));
       console.log('[RaidSync] Turn advanced to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
     } catch (e) {
       console.error('[RaidSync] Turn handoff write FAILED:', e);
@@ -150,7 +164,7 @@ const RaidSync = {
     }
 
     try {
-      await this._instanceRef.update(update);
+      await this._instanceRef.update(firebaseSafe(update));
       console.log('[RaidSync] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
 
       // Distribute rewards if raid is complete
