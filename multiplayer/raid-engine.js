@@ -1629,6 +1629,7 @@ async function writeBattleSnapshot(snapshotData) {
     lastRoll: snapshotData.lastRoll || null,
     bossPoolHp: raidBattleState?.currentBossHp || 0,
     bossMaxHp: raidBattleState?.maxBossHp || 100,
+    playerResources: snapshotData.playerResources || {},
     round: snapshotData.round || 0,
     isWave: snapshotData.isWave || false,
     updatedAt: firebase.database.ServerValue.TIMESTAMP

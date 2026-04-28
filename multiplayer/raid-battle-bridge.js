@@ -89,6 +89,11 @@ function updateSpectatorFromSnapshot(snapshot) {
     renderBossHpPool(snapshot.bossPoolHp, snapshot.bossMaxHp || 1);
   }
 
+  // Sync the active fighter's resources so spectator sees their specials, not their own
+  if (snapshot.playerResources && B.red) {
+    B.red.resources = { ...snapshot.playerResources };
+  }
+
   // Re-render the battle UI with updated state
   if (typeof renderBattle === 'function') renderBattle();
 }
@@ -221,6 +226,16 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
           B.blue.ghosts[i].hp = gs.hp;
           B.blue.ghosts[i].ko = !!gs.ko;
           if (gs.ko) B.blue.ghosts[i].hp = 0;
+          // Restore identity (boss transforms, if any)
+          if (gs.id != null) {
+            B.blue.ghosts[i].id = gs.id;
+            B.blue.ghosts[i].name = gs.name;
+            B.blue.ghosts[i].art = gs.art;
+            B.blue.ghosts[i].maxHp = gs.maxHp;
+            B.blue.ghosts[i].ability = gs.ability;
+            B.blue.ghosts[i].abilityDesc = gs.abilityDesc;
+            B.blue.ghosts[i].rarity = gs.rarity;
+          }
         }
       });
       if (savedBoss.activeIdx != null) {
@@ -240,7 +255,7 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
-    // ── 7b. Restore player ghost HP + resources from saved state ──
+    // ── 7b. Restore player ghost HP, identity, + resources from saved state ──
     // savedState was read from raidData (already in memory from listener)
     // so this is SYNCHRONOUS — no race condition
     if (savedState && savedState.ghosts) {
@@ -249,6 +264,26 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
           B.red.ghosts[i].hp = gs.hp;
           B.red.ghosts[i].ko = !!gs.ko;
           if (gs.ko) B.red.ghosts[i].hp = 0;
+          // Restore identity (keeps transforms intact across swaps)
+          if (gs.id != null) {
+            B.red.ghosts[i].id = gs.id;
+            B.red.ghosts[i].name = gs.name;
+            B.red.ghosts[i].art = gs.art;
+            B.red.ghosts[i].maxHp = gs.maxHp;
+            B.red.ghosts[i].ability = gs.ability;
+            B.red.ghosts[i].abilityDesc = gs.abilityDesc;
+            B.red.ghosts[i].rarity = gs.rarity;
+          }
+          // Restore original* fields so reverse-transform still works
+          if (gs.originalId != null) {
+            B.red.ghosts[i].originalId = gs.originalId;
+            B.red.ghosts[i].originalName = gs.originalName;
+            B.red.ghosts[i].originalArt = gs.originalArt;
+            B.red.ghosts[i].originalMaxHp = gs.originalMaxHp;
+            B.red.ghosts[i].originalAbility = gs.originalAbility;
+            B.red.ghosts[i].originalAbilityDesc = gs.originalAbilityDesc;
+            B.red.ghosts[i].originalRarity = gs.originalRarity;
+          }
         }
       });
       // Restore active ghost index (in case a ghost was KO'd and swapped)
@@ -544,13 +579,22 @@ function injectRaidReturnButton() {
           });
         }
 
-        // Save player ghost state
+        // Save player ghost state (with identity for transforms)
         const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
         if (B && B.red) {
           savedPlayerState.activeIdx = B.red.activeIdx || 0;
           savedPlayerState.resources = B.red.resources || {};
           B.red.ghosts.forEach(g => {
-            savedPlayerState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+            const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
+                         id: g.id, name: g.name, art: g.art,
+                         ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity };
+            if (g.originalId != null) {
+              gs.originalId = g.originalId; gs.originalName = g.originalName;
+              gs.originalArt = g.originalArt; gs.originalMaxHp = g.originalMaxHp;
+              gs.originalAbility = g.originalAbility; gs.originalAbilityDesc = g.originalAbilityDesc;
+              gs.originalRarity = g.originalRarity;
+            }
+            savedPlayerState.ghosts.push(gs);
           });
         }
 
@@ -679,21 +723,34 @@ function injectRaidReturnButton() {
       }
     }
     // Save red team ghost state + resources + activeIdx
+    // Includes identity fields so transforms persist across player swaps
     const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
     if (B && B.red) {
       savedPlayerState.activeIdx = B.red.activeIdx || 0;
       savedPlayerState.resources = B.red.resources || {};
       B.red.ghosts.forEach(g => {
-        savedPlayerState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+        const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
+                     id: g.id, name: g.name, art: g.art,
+                     ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity };
+        // Preserve original identity so reverse-transform still works
+        if (g.originalId != null) {
+          gs.originalId = g.originalId; gs.originalName = g.originalName;
+          gs.originalArt = g.originalArt; gs.originalMaxHp = g.originalMaxHp;
+          gs.originalAbility = g.originalAbility; gs.originalAbilityDesc = g.originalAbilityDesc;
+          gs.originalRarity = g.originalRarity;
+        }
+        savedPlayerState.ghosts.push(gs);
       });
     }
-    // Save boss team ghost state (HP, KO, activeIdx for every boss ghost)
+    // Save boss team ghost state (HP, KO, activeIdx + identity for every boss ghost)
     // so the next player inherits the exact boss state — not just pool HP
     const savedBossState = { ghosts: [], activeIdx: 0 };
     if (B && B.blue) {
       savedBossState.activeIdx = B.blue.activeIdx || 0;
       B.blue.ghosts.forEach(g => {
-        savedBossState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+        savedBossState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
+                                     id: g.id, name: g.name, art: g.art,
+                                     ability: g.ability, abilityDesc: g.abilityDesc, rarity: g.rarity });
       });
     }
 
@@ -801,6 +858,7 @@ function startSnapshotSync() {
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
         ko: !!g.ko, art: g.art || '', id: g.id || 0
       })) : [];
+      const playerResources = B.red ? { ...(B.red.resources || {}) } : {};
       const allBossGhosts = B.blue ? B.blue.ghosts.map(g => ({
         name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
         ko: !!g.ko, art: g.art || '', id: g.id || 0
@@ -820,6 +878,7 @@ function startSnapshotSync() {
         lastRoll: redDice.length > 0 ? { player: redDice, boss: blueDice } : null,
         bossPoolHp: window.BOSS_RAID_DATA?.currentBossHp || 0,
         bossMaxHp: window.BOSS_RAID_DATA?.maxBossHp || 1,
+        playerResources: playerResources,
         round: B.round || 1,
         isWave: window.IS_WAVE_FIGHT || false
       });
