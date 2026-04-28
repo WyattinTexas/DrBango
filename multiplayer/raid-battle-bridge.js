@@ -167,7 +167,11 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   }
 
   // ── 6. Start the battle via battle-engine.js ─────────────────
-  // ── 6a. Skip the VS splash in raids — just start fighting ────
+  // ── 6a. Read saved player state from raidData (already in currentRaid from listener)
+  const user = firebase.auth().currentUser;
+  const savedState = (raidData.playerGhostState && user) ? raidData.playerGhostState[user.uid] : null;
+
+  // ── 6b. Skip the VS splash in raids — just start fighting ────
   const vsSplash = document.getElementById('vsSplash');
   if (vsSplash) vsSplash.style.display = 'none';
 
@@ -197,24 +201,25 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
-    // ── 7b. Restore player ghost HP from Firebase (if returning for another turn) ─
-    const user = firebase.auth().currentUser;
-    if (user && currentRaid) {
-      try {
-        const gsSnap = db.ref(`mp/raids/instances/${currentRaid.instanceId}/playerGhostState/${user.uid}`);
-        gsSnap.once('value').then(snap => {
-          const saved = snap.val();
-          if (saved && B && B.red) {
-            saved.forEach((gs, i) => {
-              if (B.red.ghosts[i]) {
-                B.red.ghosts[i].hp = gs.hp;
-                B.red.ghosts[i].ko = gs.ko;
-              }
-            });
-            if (typeof renderBattle === 'function') renderBattle();
-          }
-        });
-      } catch (e) { /* silent */ }
+    // ── 7b. Restore player ghost HP + resources from saved state ──
+    // savedState was read from raidData (already in memory from listener)
+    // so this is SYNCHRONOUS — no race condition
+    if (savedState && savedState.ghosts) {
+      savedState.ghosts.forEach((gs, i) => {
+        if (B.red.ghosts[i]) {
+          B.red.ghosts[i].hp = gs.hp;
+          B.red.ghosts[i].ko = !!gs.ko;
+          if (gs.ko) B.red.ghosts[i].hp = 0;
+        }
+      });
+      // Restore active ghost index (in case a ghost was KO'd and swapped)
+      if (savedState.activeIdx != null) {
+        B.red.activeIdx = savedState.activeIdx;
+      }
+      // Restore resources (firefly, lucky stone, etc.)
+      if (savedState.resources) {
+        B.red.resources = { ...B.red.resources, ...savedState.resources };
+      }
     }
 
     // ── 7c. Clear dice from previous player's turn ──────────────
@@ -534,11 +539,13 @@ function injectRaidReturnButton() {
       const bossGhost = B.blue.ghosts[B.blue.activeIdx];
       if (bossGhost) bossHpNow = bossGhost.hp;
     }
-    // Save red team ghost state
-    const savedGhostState = [];
+    // Save red team ghost state + resources + activeIdx
+    const savedPlayerState = { ghosts: [], resources: {}, activeIdx: 0 };
     if (B && B.red) {
+      savedPlayerState.activeIdx = B.red.activeIdx || 0;
+      savedPlayerState.resources = B.red.resources || {};
       B.red.ghosts.forEach(g => {
-        savedGhostState.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+        savedPlayerState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
       });
     }
 
@@ -549,10 +556,10 @@ function injectRaidReturnButton() {
       const nextIdx = (currentIdx + 1) % playerCount;
       const instanceId = currentRaid.instanceId;
 
-      // Write player ghost state to Firebase for persistence
+      // Write player state to Firebase for persistence (ghosts + resources + activeIdx)
       const user = firebase.auth().currentUser;
-      if (user && savedGhostState.length > 0) {
-        db.ref(`mp/raids/instances/${instanceId}/playerGhostState/${user.uid}`).set(savedGhostState);
+      if (user && savedPlayerState.ghosts.length > 0) {
+        db.ref(`mp/raids/instances/${instanceId}/playerGhostState/${user.uid}`).set(savedPlayerState);
       }
 
       // Calculate new boss pool HP from the boss ghost's current HP
