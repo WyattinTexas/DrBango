@@ -212,9 +212,10 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
 
   // ── 6c. Skip entry abilities if resuming a saved turn ──────────
   // When a player resumes after spectating, startBattle() would re-fire
-  // entry abilities on ghosts that already entered. The flag is checked
-  // by triggerEntry() and auto-cleared after a short delay.
-  if (savedState) {
+  // entry abilities on ghosts that already entered. Also suppress for
+  // spectators (they're watching, not entering). Only allow entries on
+  // a player's genuine first fight (no saved state).
+  if (savedState || !isFighter) {
     window._raidSkipEntry = true;
   }
 
@@ -223,10 +224,11 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   // Restore splash element (hidden by display:none, won't show because active class is cleared)
   if (vsSplash) setTimeout(() => { vsSplash.style.display = ''; }, 3000);
 
-  // Clear the skip-entry flag after startBattle's entry callbacks have had time to fire.
-  // 6s covers the worst case: VS splash (2.2s) + 2 entry chains with Jenkins modals (~3.5s).
+  // Clear the skip-entry flag ONLY after entries have actually been suppressed.
+  // startBattle fires entries via setTimeout(spd(2200)) on the splash path.
+  // We clear at 8s to cover worst case (boss intro delay + splash + Jenkins modals).
   if (window._raidSkipEntry) {
-    setTimeout(() => { window._raidSkipEntry = false; }, 6000);
+    setTimeout(() => { window._raidSkipEntry = false; }, 8000);
   }
 
   // ── 7. Post-init tweaks on the B battle state ────────────────
