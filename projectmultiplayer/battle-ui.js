@@ -622,9 +622,10 @@ function renderBattle() {
   });
 
   document.getElementById('turnIndicator').textContent = '';
-  const logWrap = document.getElementById('battleLog').parentElement;
-  document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
-  logWrap.scrollTop = 0;
+  const battleLogEl = document.getElementById('battleLog');
+  const logWrap = battleLogEl.parentElement;
+  battleLogEl.innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
+  if (logWrap) logWrap.scrollTop = 0;
 
   // Ability buttons (pre-roll actions)
   ['red','blue'].forEach(team => {
