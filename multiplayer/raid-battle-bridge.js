@@ -211,20 +211,32 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   if (B) {
     B.duelPhaseMode = false;   // boss fights skip duel phase
 
-    // ── 7a. Carry over boss HP from Firebase (don't reset to full) ──
-    // The boss's shared HP pool persists across player turns. Each new
-    // startBattle() creates fresh ghosts at full HP — we must override
-    // the boss ghost's HP with the current raid pool HP.
-    const bossCurHp = raidData.bossCurrentHp;
-    const bossMaxHp = raidData.bossMaxHp;
-    if (bossCurHp != null && B.blue) {
-      const bossGhost = B.blue.ghosts[B.blue.activeIdx];
-      if (bossGhost) {
-        // Scale: boss ghost HP proportional to pool HP remaining
-        // e.g., pool is 10/15, boss maxHp is 9 → boss hp = 9 * (10/15) = 6
-        const ratio = bossMaxHp > 0 ? bossCurHp / bossMaxHp : 1;
-        bossGhost.hp = Math.max(1, Math.round(bossGhost.maxHp * ratio));
-        if (bossCurHp <= 0) bossGhost.hp = 0;
+    // ── 7a. Carry over boss ghost state from Firebase (don't reset to full) ──
+    // The previous player saved the exact HP/KO/activeIdx of every boss ghost.
+    // Restore that so damage persists across player turns.
+    const savedBoss = raidData.bossGhostState;
+    if (savedBoss && savedBoss.ghosts && B.blue) {
+      savedBoss.ghosts.forEach((gs, i) => {
+        if (B.blue.ghosts[i]) {
+          B.blue.ghosts[i].hp = gs.hp;
+          B.blue.ghosts[i].ko = !!gs.ko;
+          if (gs.ko) B.blue.ghosts[i].hp = 0;
+        }
+      });
+      if (savedBoss.activeIdx != null) {
+        B.blue.activeIdx = savedBoss.activeIdx;
+      }
+    } else {
+      // Fallback: no saved boss ghost state (legacy), use pool ratio
+      const bossCurHp = raidData.bossCurrentHp;
+      const bossMaxHp = raidData.bossMaxHp;
+      if (bossCurHp != null && B.blue) {
+        const bossGhost = B.blue.ghosts[B.blue.activeIdx];
+        if (bossGhost) {
+          const ratio = bossMaxHp > 0 ? bossCurHp / bossMaxHp : 1;
+          bossGhost.hp = Math.max(1, Math.round(bossGhost.maxHp * ratio));
+          if (bossCurHp <= 0) bossGhost.hp = 0;
+        }
       }
     }
 
@@ -675,6 +687,15 @@ function injectRaidReturnButton() {
         savedPlayerState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
       });
     }
+    // Save boss team ghost state (HP, KO, activeIdx for every boss ghost)
+    // so the next player inherits the exact boss state — not just pool HP
+    const savedBossState = { ghosts: [], activeIdx: 0 };
+    if (B && B.blue) {
+      savedBossState.activeIdx = B.blue.activeIdx || 0;
+      B.blue.ghosts.forEach(g => {
+        savedBossState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+      });
+    }
 
     // Advance currentFighterIdx in Firebase after a brief delay
     setTimeout(() => {
@@ -694,7 +715,8 @@ function injectRaidReturnButton() {
         currentFighterIdx: nextIdx,
         currentFighterUid: players[nextIdx]?.uid || null,
         fightPhase: 'fighting',
-        bossCurrentHp: poolNow
+        bossCurrentHp: poolNow,
+        bossGhostState: savedBossState
       };
       if (user && savedPlayerState.ghosts.length > 0) {
         update[`playerGhostState/${user.uid}`] = savedPlayerState;
