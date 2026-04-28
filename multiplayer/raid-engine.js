@@ -666,9 +666,15 @@ function handleRaidStateChange(data) {
 /**
  * Handle active fight — determine if it's our turn
  */
+var _lastHandledFighterIdx = -1;
 function handleActiveFight(data) {
   const user = firebase.auth().currentUser;
   if (!user) return;
+
+  // Debounce: don't re-process the same fighter index
+  const incomingIdx = data.currentFighterIdx || 0;
+  if (incomingIdx === _lastHandledFighterIdx && window._raidMyFightActive) return;
+  _lastHandledFighterIdx = incomingIdx;
 
   // Find our slot
   const players = data.players || {};
@@ -1650,6 +1656,8 @@ async function writeBattleSnapshot(snapshotData) {
  * Clean up all raid listeners and state
  */
 function cleanupRaid() {
+  _lastHandledFighterIdx = -1;
+  window._raidMyFightActive = false;
   // Remove Firebase listeners
   if (currentRaid?.instanceId) {
     const instRef = db.ref(`mp/raids/instances/${currentRaid.instanceId}`);

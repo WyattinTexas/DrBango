@@ -16,10 +16,12 @@ var _isSpectating = false; // true when we're watching another player fight
  * Updates the local B state and re-renders so Player 2 sees live dice/HP changes.
  */
 function updateSpectatorFromSnapshot(snapshot) {
-  if (!_isSpectating || !B) {
-    console.log('[RAID SYNC] spectator skip: spectating=', _isSpectating, 'B=', !!B);
+  // Strict guard: only update if we are DEFINITELY spectating and B exists with valid teams
+  if (!_isSpectating || !B || !B.red || !B.blue) {
     return;
   }
+  // Don't update if our own fight is active (we're the fighter, not spectator)
+  if (window._raidMyFightActive) return;
   if (!snapshot) return;
   console.log('[RAID SYNC] updating spectator view, round:', snapshot.round);
 
