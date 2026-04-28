@@ -450,7 +450,7 @@ function _resolveRoundImpl() {
       if (hasSideline(team, 303)) {
         const tweakGhost = getSidelineGhost(team, 303);
         const oppTeamTweak = opp(team);
-        const sandwichMirrorsTweak = hasSideline(oppTeamTweak, 33);
+        const sandwichMirrorsTweak = hasOnTeam(oppTeamTweak, 33);
         const surgeTotal = team.resources.surge + 4;
         queueAbility('ROARING CROWD!', 'var(--common)', `Tweak and Twonk — Tie! +4 Surge! (${surgeTotal} total)`, () => {
           team.resources.surge += 4;
@@ -476,7 +476,7 @@ function _resolveRoundImpl() {
       const hasJimmySideline = hasSideline(team, 352);
       if (hasJimmyActive || hasJimmySideline) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
-        const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
+        const sandwichMirrorsJim = hasOnTeam(oppTeamJim, 33);
         const lsTotal = team.resources.luckyStone + 3;
         const ffTotal = (team.resources.firefly || 0) + 1;
         const jimmyGhost = hasJimmyActive ? f : team.ghosts.find(g => g.id === 352);
@@ -715,7 +715,7 @@ function _resolveRoundImpl() {
       const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
-        const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
+        const sandwichMirrorsMax = hasOnTeam(oppTeamMax, 33);
         queueAbility('NAP!', 'var(--common)', `${f.name} — +1 Healing Seed and +1 Lucky Stone while napping!`, () => {
           team.resources.healingSeed++;
           team.resources.luckyStone++;
@@ -832,8 +832,8 @@ function _resolveRoundImpl() {
   // Sandwiches (33) — Dependable: while on the sideline, if opponent gains a Special, you gain it too.
   // sandwichForLose = Sandwiches on loseTeam bench → mirrors winTeam Special grants to loseTeam.
   // sandwichForWin  = Sandwiches on winTeam bench  → mirrors loseTeam Special grants to winTeam.
-  const sandwichForLose = hasSideline(loseTeam, 33);
-  const sandwichForWin  = hasSideline(winTeam, 33);
+  const sandwichForLose = hasOnTeam(loseTeam, 33);
+  const sandwichForWin  = hasOnTeam(winTeam, 33);
   const wF = active(winTeam);
   const lF = active(loseTeam);
   // Per-ghost first-roll tracking for Nikon (2) Ambush and Cave Dweller (46) Lurk.

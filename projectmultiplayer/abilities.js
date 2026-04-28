@@ -192,7 +192,7 @@ function triggerEntry(team, skipEntryEffects) {
     entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
     collectKnightReactions();
-    if (hasSideline(enemy, 33)) {
+    if (hasOnTeam(enemy, 33)) {
       enemy.resources.ice += 2;
       entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`, entryTeamName === 'red' ? 'blue' : 'red']);
       log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
@@ -909,7 +909,7 @@ function doSeleneChoice(choice) {
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
   // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline.
   // Capture totals at queue-build time (before any grant fires) so the preview subtitle is correct.
-  if (hasSideline(opp(sp.team), 33)) {
+  if (hasOnTeam(opp(sp.team), 33)) {
     if (choice === 'seed') {
       const _sandSeedOpp = opp(sp.team);
       const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 2;
@@ -5808,7 +5808,7 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
       collectKC(tName, f.name);
       // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         const _sandOpp = opp(team);
         _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
         preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
@@ -6118,7 +6118,7 @@ function doPostRollAndResolve(redDice, blueDice) {
           renderBattle();
         }, tNameHank);
         checkKnightEffects(tNameHank, f.name);
-        if (hasSideline(opp(team), 33)) {
+        if (hasOnTeam(opp(team), 33)) {
           const _sandOpp = opp(team);
           const _sandTotal = _sandOpp.resources.luckyStone + fours;
           queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); }, tNameHank === 'red' ? 'blue' : 'red');
@@ -6152,7 +6152,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameNat);
       checkKnightEffects(tNameNat, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone!`, () => { _natSandOpp.resources.moonstone = Math.min((_natSandOpp.resources.moonstone || 0) + 1, 1); renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
       }
     }
@@ -6174,7 +6174,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameKap);
       checkKnightEffects(tNameKap, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); }, tNameKap === 'red' ? 'blue' : 'red');
       }
     }

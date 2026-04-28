@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v849'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v851'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2772,7 +2772,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v849'; // Standings: use update() instead of set() to prevent cross-client wipe, guard against saving before loaded
+const TESTROOM_VERSION = 'v851'; // Standings: use update() instead of set() to prevent cross-client wipe, guard against saving before loaded
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3298,7 +3298,7 @@ const GHOSTS = [
   {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6: gain 1 extra die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Chain-6s bonus dice."},
   {id:31, name:"Gus", rarity:"common", maxHp:6, art:"art/originals/gus.jpg", ability:"Gale Force", abilityDesc:"Win: you may force the opponent to swap their active Spiritkin. The new Spiritkin takes the damage.", category:"Disruption", set:"Frost Valley", designNote:"Frost Valley. Win → force swap, new ghost eats the damage."},
   {id:32, name:"Lou", rarity:"common", maxHp:7, art:"art/originals/lou.jpg", ability:"Bros", abilityDesc:"Sideline: Grawr gains +1 damage and 1 HP on wins.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Grawr synergy."},
-  {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"Sideline: if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
+  {id:33, name:"Sandwiches", rarity:"common", maxHp:6, art:"art/originals/sandwiches.jpg", ability:"Dependable", abilityDesc:"Sideline & In Play: if your opponent gains a Special, you gain it as well.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Resource mirror."},
   {id:53, name:"Bogey", rarity:"uncommon", maxHp:5, art:"art/originals/bogey.jpg", ability:"Bogus", abilityDesc:"When damage would hit Bogey, you may reflect it back at the attacker. Once Per Game.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley. One-shot reactive reflect."},
   {id:54, name:"Roger", rarity:"uncommon", maxHp:6, art:"art/originals/roger.jpg", ability:"Tempest", abilityDesc:"Roll 2 pairs of Doubles (4+ dice): gain 3 Sacred Fires.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Double-pair jackpot."},
   {id:55, name:"Masked Hero", rarity:"uncommon", maxHp:5, art:"art/originals/masked_hero.jpg", ability:"Underdog", abilityDesc:"Immune to before-roll damage. Gain 1 Burn for each 3 you roll.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll immunity + Burn generation on 3s."},
@@ -4457,6 +4457,21 @@ const CURATED_TEAMS = [
   [440, 439, 108],
   // #96 Ridley Snowball — Ridley +1 singles/+2 doubles, Villager heals +1 on wins from bench, Suspicious Jeff steals die on wins from bench
   [462, 11, 61],
+
+  // ===================== NEW WAVE 3 (6 teams) =====================
+
+  // #97 Raditz Dirty Swap — Raditz forces swap on entry, Mountain King 2X doubles, Tabitha +2 doubles from bench. Filthy burst damage.
+  [62, 110, 95],
+  // #98 Doc Dark Wing Classic — Doc +5 on doubles glass cannon, Cyboo +1 die below 3HP from bench, Dark Wing rerolls singles once. OG synergy.
+  [42, 100, 76],
+  // #99 Doc City Cyboo Filth — Doc +5 on doubles, Cyboo +1 die below 3HP from bench, City Cyboo immune to doubles (1HP bait tank). Disgusting.
+  [42, 100, 77],
+  // #100 Beatdown Squad — Wim +5 all-odd, Castle Guards 3s double damage, Doom +2 flat. Pure face-punching, no tricks.
+  [65, 39, 112],
+  // #101 Katrina Heal Engine — Katrina gains 1HP when lower HP (stays alive), Gary generates Ice Shards per 1 from bench, Skylar boosts shards to +2. Grindy.
+  [70, 92, 104],
+  // #102 Twyla Lucky Stone Factory — Twyla spends Lucky Stones for +dice/+seeds, Boopies converts seed spends into stones, Farmer Jeff generates seeds on 6s from bench. Self-sustaining loop.
+  [417, 419, 314],
 ];
 
 // --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
@@ -4888,7 +4903,7 @@ function triggerEntry(team, skipEntryEffects) {
     entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
     collectKnightReactions();
-    if (hasSideline(enemy, 33)) {
+    if (hasOnTeam(enemy, 33)) {
       enemy.resources.ice += 2;
       entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`, entryTeamName === 'red' ? 'blue' : 'red']);
       log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
@@ -5097,6 +5112,10 @@ function hasSideline(team, id) {
   const teamName = B && team === B.red ? 'red' : 'blue';
   const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
   return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
+}
+// Helper: check if a team has a ghost with given id anywhere (sideline OR active, alive)
+function hasOnTeam(team, id) {
+  return hasSideline(team, id) || (active(team).id === id && !active(team).ko);
 }
 function getSidelineGhost(team, id) {
   const teamName = B && team === B.red ? 'red' : 'blue';
@@ -5777,7 +5796,7 @@ function doSeleneChoice(choice) {
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
   // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline.
   // Capture totals at queue-build time (before any grant fires) so the preview subtitle is correct.
-  if (hasSideline(opp(sp.team), 33)) {
+  if (hasOnTeam(opp(sp.team), 33)) {
     if (choice === 'seed') {
       const _sandSeedOpp = opp(sp.team);
       const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 2;
@@ -10689,7 +10708,7 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
       collectKC(tName, f.name);
       // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         const _sandOpp = opp(team);
         _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
         preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
@@ -10999,7 +11018,7 @@ function doPostRollAndResolve(redDice, blueDice) {
           renderBattle();
         }, tNameHank);
         checkKnightEffects(tNameHank, f.name);
-        if (hasSideline(opp(team), 33)) {
+        if (hasOnTeam(opp(team), 33)) {
           const _sandOpp = opp(team);
           const _sandTotal = _sandOpp.resources.luckyStone + fours;
           queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); }, tNameHank === 'red' ? 'blue' : 'red');
@@ -11033,7 +11052,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameNat);
       checkKnightEffects(tNameNat, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone!`, () => { _natSandOpp.resources.moonstone = Math.min((_natSandOpp.resources.moonstone || 0) + 1, 1); renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
       }
     }
@@ -11055,7 +11074,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameKap);
       checkKnightEffects(tNameKap, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); }, tNameKap === 'red' ? 'blue' : 'red');
       }
     }
@@ -14029,7 +14048,7 @@ function _resolveRoundImpl() {
       if (hasSideline(team, 303)) {
         const tweakGhost = getSidelineGhost(team, 303);
         const oppTeamTweak = opp(team);
-        const sandwichMirrorsTweak = hasSideline(oppTeamTweak, 33);
+        const sandwichMirrorsTweak = hasOnTeam(oppTeamTweak, 33);
         const surgeTotal = team.resources.surge + 4;
         queueAbility('ROARING CROWD!', 'var(--common)', `Tweak and Twonk — Tie! +4 Surge! (${surgeTotal} total)`, () => {
           team.resources.surge += 4;
@@ -14055,7 +14074,7 @@ function _resolveRoundImpl() {
       const hasJimmySideline = hasSideline(team, 352);
       if (hasJimmyActive || hasJimmySideline) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
-        const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
+        const sandwichMirrorsJim = hasOnTeam(oppTeamJim, 33);
         const lsTotal = team.resources.luckyStone + 3;
         const ffTotal = (team.resources.firefly || 0) + 1;
         const jimmyGhost = hasJimmyActive ? f : team.ghosts.find(g => g.id === 352);
@@ -14294,7 +14313,7 @@ function _resolveRoundImpl() {
       const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
-        const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
+        const sandwichMirrorsMax = hasOnTeam(oppTeamMax, 33);
         queueAbility('NAP!', 'var(--common)', `${f.name} — +1 Healing Seed and +1 Lucky Stone while napping!`, () => {
           team.resources.healingSeed++;
           team.resources.luckyStone++;
@@ -14411,8 +14430,8 @@ function _resolveRoundImpl() {
   // Sandwiches (33) — Dependable: while on the sideline, if opponent gains a Special, you gain it too.
   // sandwichForLose = Sandwiches on loseTeam bench → mirrors winTeam Special grants to loseTeam.
   // sandwichForWin  = Sandwiches on winTeam bench  → mirrors loseTeam Special grants to winTeam.
-  const sandwichForLose = hasSideline(loseTeam, 33);
-  const sandwichForWin  = hasSideline(winTeam, 33);
+  const sandwichForLose = hasOnTeam(loseTeam, 33);
+  const sandwichForWin  = hasOnTeam(winTeam, 33);
   const wF = active(winTeam);
   const lF = active(loseTeam);
   // Per-ghost first-roll tracking for Nikon (2) Ambush and Cave Dweller (46) Lurk.

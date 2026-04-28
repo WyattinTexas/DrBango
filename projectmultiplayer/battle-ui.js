@@ -621,11 +621,14 @@ function renderBattle() {
     }
   });
 
-  document.getElementById('turnIndicator').textContent = '';
+  const turnEl = document.getElementById('turnIndicator');
+  if (turnEl) turnEl.textContent = '';
   const battleLogEl = document.getElementById('battleLog');
-  const logWrap = battleLogEl.parentElement;
-  battleLogEl.innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
-  if (logWrap) logWrap.scrollTop = 0;
+  if (battleLogEl) {
+    const logWrap = battleLogEl.parentElement;
+    battleLogEl.innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
+    if (logWrap) logWrap.scrollTop = 0;
+  }
 
   // Ability buttons (pre-roll actions)
   ['red','blue'].forEach(team => {

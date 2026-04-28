@@ -998,7 +998,7 @@ function triggerEntry(team, skipEntryEffects) {
     entryCallouts.push(['SPLOOP!', 'var(--uncommon)', `${f.name} — +2 Ice Shards! (${team.resources.ice} total)`, entryTeamName]);
     log(`<span class="log-ability">${f.name}</span> — Sploop! Gained <span class="log-ice">2 Ice Shards</span>! (${team.resources.ice} total)`);
     collectKnightReactions();
-    if (hasSideline(enemy, 33)) {
+    if (hasOnTeam(enemy, 33)) {
       enemy.resources.ice += 2;
       entryCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Sploop! +2 Ice Shards! (${enemy.resources.ice} total)`, entryTeamName === 'red' ? 'blue' : 'red']);
       log(`<span class="log-ability">Sandwiches</span> — Dependable! Mirrors Sploop: +<span class="log-ice">2 Ice Shards</span>! (${enemy.resources.ice} total)`);
@@ -1207,6 +1207,10 @@ function hasSideline(team, id) {
   const teamName = B && team === B.red ? 'red' : 'blue';
   const disabled = B && B.tysonDisabled ? B.tysonDisabled[teamName] : [];
   return team.ghosts.some((g,i) => i !== team.activeIdx && !g.ko && g.id === id && !disabled.includes(i));
+}
+// Helper: check if a team has a ghost with given id anywhere (sideline OR active, alive)
+function hasOnTeam(team, id) {
+  return hasSideline(team, id) || (active(team).id === id && !active(team).ko);
 }
 function getSidelineGhost(team, id) {
   const teamName = B && team === B.red ? 'red' : 'blue';
@@ -1887,7 +1891,7 @@ function doSeleneChoice(choice) {
   checkKnightEffects(sp.tName, f.name); // queues HEAVY AIR! or RETRIBUTION! if applicable
   // Sandwiches (33) — Dependable: mirror the chosen resource to opponent if Sandwiches on sideline.
   // Capture totals at queue-build time (before any grant fires) so the preview subtitle is correct.
-  if (hasSideline(opp(sp.team), 33)) {
+  if (hasOnTeam(opp(sp.team), 33)) {
     if (choice === 'seed') {
       const _sandSeedOpp = opp(sp.team);
       const _sandSeedTotal = _sandSeedOpp.resources.healingSeed + 2;
@@ -6806,7 +6810,7 @@ function doPreRollSetup() {
       log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
       collectKC(tName, f.name);
       // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         const _sandOpp = opp(team);
         _sandOpp.resources.luckyStone = (_sandOpp.resources.luckyStone || 0) + 1;
         preRollCallouts.push(['DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Steady! +1 Lucky Stone! (${_sandOpp.resources.luckyStone} total)`, tName === 'red' ? 'blue' : 'red']);
@@ -7116,7 +7120,7 @@ function doPostRollAndResolve(redDice, blueDice) {
           renderBattle();
         }, tNameHank);
         checkKnightEffects(tNameHank, f.name);
-        if (hasSideline(opp(team), 33)) {
+        if (hasOnTeam(opp(team), 33)) {
           const _sandOpp = opp(team);
           const _sandTotal = _sandOpp.resources.luckyStone + fours;
           queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Tremor! +${fours} Lucky Stone${fours>1?'s':''}! (${_sandTotal} total)`, () => { _sandOpp.resources.luckyStone += _tremFours; renderBattle(); }, tNameHank === 'red' ? 'blue' : 'red');
@@ -7150,7 +7154,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameNat);
       checkKnightEffects(tNameNat, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Materialization! +1 Moonstone!`, () => { _natSandOpp.resources.moonstone = Math.min((_natSandOpp.resources.moonstone || 0) + 1, 1); renderBattle(); }, tNameNat === 'red' ? 'blue' : 'red');
       }
     }
@@ -7172,7 +7176,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         renderBattle();
       }, tNameKap);
       checkKnightEffects(tNameKap, f.name);
-      if (hasSideline(opp(team), 33)) {
+      if (hasOnTeam(opp(team), 33)) {
         queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Pollinate! +1 Healing Seed! (${_kapSandTotal} total)`, () => { _kapSandOpp.resources.healingSeed++; renderBattle(); }, tNameKap === 'red' ? 'blue' : 'red');
       }
     }
@@ -10146,7 +10150,7 @@ function _resolveRoundImpl() {
       if (hasSideline(team, 303)) {
         const tweakGhost = getSidelineGhost(team, 303);
         const oppTeamTweak = opp(team);
-        const sandwichMirrorsTweak = hasSideline(oppTeamTweak, 33);
+        const sandwichMirrorsTweak = hasOnTeam(oppTeamTweak, 33);
         const surgeTotal = team.resources.surge + 4;
         queueAbility('ROARING CROWD!', 'var(--common)', `Tweak and Twonk — Tie! +4 Surge! (${surgeTotal} total)`, () => {
           team.resources.surge += 4;
@@ -10172,7 +10176,7 @@ function _resolveRoundImpl() {
       const hasJimmySideline = hasSideline(team, 352);
       if (hasJimmyActive || hasJimmySideline) {
         const oppTeamJim = team === B.red ? B.blue : B.red;
-        const sandwichMirrorsJim = hasSideline(oppTeamJim, 33);
+        const sandwichMirrorsJim = hasOnTeam(oppTeamJim, 33);
         const lsTotal = team.resources.luckyStone + 3;
         const ffTotal = (team.resources.firefly || 0) + 1;
         const jimmyGhost = hasJimmyActive ? f : team.ghosts.find(g => g.id === 352);
@@ -10411,7 +10415,7 @@ function _resolveRoundImpl() {
       const tNameMax = team === B.red ? 'red' : 'blue';
       if (f.id === 302 && !f.ko) {
         const oppTeamMax    = opp(team);
-        const sandwichMirrorsMax = hasSideline(oppTeamMax, 33);
+        const sandwichMirrorsMax = hasOnTeam(oppTeamMax, 33);
         queueAbility('NAP!', 'var(--common)', `${f.name} — +1 Healing Seed and +1 Lucky Stone while napping!`, () => {
           team.resources.healingSeed++;
           team.resources.luckyStone++;
@@ -10528,8 +10532,8 @@ function _resolveRoundImpl() {
   // Sandwiches (33) — Dependable: while on the sideline, if opponent gains a Special, you gain it too.
   // sandwichForLose = Sandwiches on loseTeam bench → mirrors winTeam Special grants to loseTeam.
   // sandwichForWin  = Sandwiches on winTeam bench  → mirrors loseTeam Special grants to winTeam.
-  const sandwichForLose = hasSideline(loseTeam, 33);
-  const sandwichForWin  = hasSideline(winTeam, 33);
+  const sandwichForLose = hasOnTeam(loseTeam, 33);
+  const sandwichForWin  = hasOnTeam(winTeam, 33);
   const wF = active(winTeam);
   const lF = active(loseTeam);
   // Per-ghost first-roll tracking for Nikon (2) Ambush and Cave Dweller (46) Lurk.

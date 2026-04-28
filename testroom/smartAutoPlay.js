@@ -1464,7 +1464,7 @@ function smartSimRounds(gameNum) {
       if (fours > 0) {
         t.resources.luckyStone += fours;
         const oppKey = teamKey === 'red' ? 'blue' : 'red';
-        if (hasSideline(B[oppKey], 33)) B[oppKey].resources.luckyStone += fours; // DEPENDABLE! mirror
+        if (hasOnTeam(B[oppKey], 33)) B[oppKey].resources.luckyStone += fours; // DEPENDABLE! mirror
       }
     }
   });
@@ -1499,7 +1499,7 @@ function smartSimRounds(gameNum) {
     if (f.id === 327 && !f.ko && hasEvenDoubles(dice)) {
       t.resources.moonstone += 2;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.moonstone += 2; // DEPENDABLE! mirror
+      if (hasOnTeam(B[oppKey], 33)) B[oppKey].resources.moonstone += 2; // DEPENDABLE! mirror
     }
   });
 
@@ -1510,7 +1510,7 @@ function smartSimRounds(gameNum) {
     if (f.id === 308 && !f.ko && classify(oppDice).type === 'doubles') {
       t.resources.healingSeed++;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) B[oppKey].resources.healingSeed++; // DEPENDABLE! mirror
+      if (hasOnTeam(B[oppKey], 33)) B[oppKey].resources.healingSeed++; // DEPENDABLE! mirror
     }
   });
 
@@ -1665,7 +1665,7 @@ function smartSimRounds(gameNum) {
       if (hasSideline(B[teamKey], 303)) {
         B[teamKey].resources.surge += 4;
         const oppKey = teamKey === 'red' ? 'blue' : 'red';
-        if (hasSideline(B[oppKey], 33)) B[oppKey].resources.surge += 4; // DEPENDABLE! mirror
+        if (hasOnTeam(B[oppKey], 33)) B[oppKey].resources.surge += 4; // DEPENDABLE! mirror
       }
     });
     // Jimmy (352) Sideline & In Play: tie → +3 Lucky Stones + 1 Magic Firefly
@@ -1678,7 +1678,7 @@ function smartSimRounds(gameNum) {
         B[teamKey].resources.luckyStone += 3;
         B[teamKey].resources.firefly = (B[teamKey].resources.firefly || 0) + 1;
         const oppKey = teamKey === 'red' ? 'blue' : 'red';
-        if (hasSideline(B[oppKey], 33)) {
+        if (hasOnTeam(B[oppKey], 33)) {
           B[oppKey].resources.luckyStone += 3;
           B[oppKey].resources.firefly = (B[oppKey].resources.firefly || 0) + 1;
         }
@@ -2290,7 +2290,7 @@ function smartSimRounds(gameNum) {
     });
 
     // On-win resource gains — Sandwiches (33) DEPENDABLE! mirrors Specials to lTeam when on their sideline
-    const sandwichLose = hasSideline(lTeam, 33);
+    const sandwichLose = hasOnTeam(lTeam, 33);
     if (wF.id === 209 && !wF.ko) { wTeam.resources.surge += 2;       if (sandwichLose) lTeam.resources.surge += 2; }       // Dart: +2 Surge
     if (wF.id === 307 && !wF.ko) { wTeam.resources.ice += 3; if (sandwichLose) { lTeam.resources.ice += 3; } } // Artemis: v674 — +3 Ice Shards (was Surge+Ice)
     if (wF.id === 342 && !wF.ko) {
@@ -2413,7 +2413,7 @@ function smartSimRounds(gameNum) {
     });
 
     // On-lose resource gains — Sandwiches (33) DEPENDABLE! mirrors Specials to wTeam when on their sideline
-    const sandwichWin = hasSideline(wTeam, 33);
+    const sandwichWin = hasOnTeam(wTeam, 33);
     const loseDice = winner === 'red' ? blueDice : redDice;
     if (lF.id === 24 && dmg > 0) { lTeam.resources.fire++;    if (sandwichWin) wTeam.resources.fire++;   }  // Simon (24): Brew Time — dmg guard, no KO guard (matches index.html line 9998)
     if (lF.id === 29)            { lTeam.resources.ice++;     if (sandwichWin) wTeam.resources.ice++;    }  // Sad Sal (29): Tough Job — loss only, no dmg/KO guard (matches index.html line 10007)
@@ -2526,7 +2526,7 @@ function smartSimRounds(gameNum) {
       if (fives > 0) {
         wTeam.resources.moonstone += fives;
         // Sandwiches mirror for Moonstone
-        const sandwichLoseH = hasSideline(lTeam, 33);
+        const sandwichLoseH = hasOnTeam(lTeam, 33);
         if (sandwichLoseH) { lTeam.resources.moonstone += fives; }
       }
     }
@@ -2540,7 +2540,7 @@ function smartSimRounds(gameNum) {
         else if (wR.type === 'doubles') lTeam.resources.moonstone++;
         else if (['triples','quads','penta'].includes(wR.type)) lTeam.resources.fire += 3;
         // DEPENDABLE! mirror — Sandwiches (33) on wTeam grants wTeam the same consolation resources
-        if (hasSideline(wTeam, 33)) {
+        if (hasOnTeam(wTeam, 33)) {
           if (wR.type === 'singles') wTeam.resources.luckyStone += 2;         // matches index.html line 10816: luckyStone += 2
           else if (wR.type === 'doubles') wTeam.resources.moonstone++;
           else if (['triples','quads','penta'].includes(wR.type)) wTeam.resources.fire += 3;
@@ -2608,7 +2608,7 @@ function smartSimRounds(gameNum) {
       else if (wR.type === 'doubles') wTeam.resources.moonstone++;
       else if (['triples','quads','penta'].includes(wR.type)) wTeam.resources.fire += 3;
       // DEPENDABLE! mirror — Sandwiches (33) on lTeam grants lTeam the same consolation resources
-      if (hasSideline(lTeam, 33)) {
+      if (hasOnTeam(lTeam, 33)) {
         if (wR.type === 'singles') lTeam.resources.luckyStone++;
         else if (wR.type === 'doubles') lTeam.resources.moonstone++;
         else if (['triples','quads','penta'].includes(wR.type)) lTeam.resources.fire += 3;
@@ -2653,7 +2653,7 @@ function smartSimRounds(gameNum) {
       B[teamKey].resources.healingSeed++;
       B[teamKey].resources.luckyStone++;
       const oppKey = teamKey === 'red' ? 'blue' : 'red';
-      if (hasSideline(B[oppKey], 33)) { B[oppKey].resources.healingSeed++; B[oppKey].resources.luckyStone++; }
+      if (hasOnTeam(B[oppKey], 33)) { B[oppKey].resources.healingSeed++; B[oppKey].resources.luckyStone++; }
     }
   });
 
