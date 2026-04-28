@@ -7,21 +7,31 @@
 function ghostData(id) { return getGhost(id); }
 
 // Safety: testroom code does getElementById().style/.classList without null checks.
-// In multiplayer, some elements may not exist. Wrap to return a safe dummy.
-// Exception: audio elements (sfx*) must return null so playSfx() can handle gracefully.
-(function() {
-  const _orig = document.getElementById.bind(document);
-  const _dummy = document.createElement('div');
-  _dummy.id = '_battle_dummy';
-  _dummy.style.display = 'none';
-  document.getElementById = function(id) {
-    const el = _orig(id);
-    if (el) return el;
-    // Don't return dummy for audio elements — playSfx needs null to skip
-    if (id && (id.startsWith('sfx') || id.startsWith('bg') || id === 'triplesSfx')) return null;
-    return _dummy;
-  };
-})();
+// In multiplayer, some elements may not exist. We use a safe getter helper instead
+// of overriding the global getElementById (which breaks other libraries).
+function safeEl(id) {
+  const el = document.getElementById(id);
+  if (el) return el;
+  // Audio elements must return null so playSfx() can handle gracefully
+  if (id && (id.startsWith('sfx') || id.startsWith('bg') || id === 'triplesSfx')) return null;
+  // Return a dummy div for DOM access safety (style, classList, etc.)
+  if (!safeEl._dummy) {
+    safeEl._dummy = document.createElement('div');
+    safeEl._dummy.id = '_battle_dummy';
+    safeEl._dummy.style.display = 'none';
+  }
+  return safeEl._dummy;
+}
+
+// ── Hook system ──────────────────────────────────────────────────
+// Registered hooks fire before default behavior. resetRollButtons hooks
+// can return true to consume (skip default). Replaces monkey-patching.
+const _gameOverHooks = [];
+const _resetRollHooks = [];
+const _postResolveHooks = [];
+function onGameOver(fn) { _gameOverHooks.push(fn); }
+function onResetRollButtons(fn) { _resetRollHooks.push(fn); }
+function onPostResolve(fn) { _postResolveHooks.push(fn); }
 
 // Missing globals from testroom
 var DEBUG = false;
@@ -5428,6 +5438,10 @@ function _doStartNextRound() {
 }
 
 function resetRollButtons() {
+  // Fire registered hooks — if any hook returns true, skip default behavior
+  for (const fn of _resetRollHooks) {
+    try { if (fn()) return; } catch(e) { console.error('[resetRollButtons hook error]', e); }
+  }
   const r = document.getElementById('rollRedBtn');
   const b = document.getElementById('rollBlueBtn');
   if (r) { r.classList.remove('locked', 'pulse'); r.disabled = false; r.textContent = 'Red Roll'; }
@@ -13534,6 +13548,9 @@ function handleKOs() {
     B[team].ghosts.forEach(g => { if (g.hp <= 0 && !g.ko) g.ko = true; });
   });
 
+  // Fire post-resolve hooks (event-driven spectator snapshot)
+  for (const fn of _postResolveHooks) { try { fn(B); } catch(e) {} }
+
   // Check for game-over first
   const redAllDown = B.red.ghosts.every(g => g.ko);
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
@@ -13657,6 +13674,9 @@ function doKoSwap(team, idx) {
 
   renderBattle();
 
+  // Fire post-resolve hooks (spectator snapshot after KO swap)
+  for (const fn of _postResolveHooks) { try { fn(B); } catch(e) {} }
+
   // Remove this team from the queue
   B.koSwapQueue.shift();
 
@@ -13684,6 +13704,10 @@ function doKoSwap(team, idx) {
 
 function showGameOver(winner) {
   B.phase = 'over';
+  // Fire registered hooks BEFORE the default game-over logic
+  for (const fn of _gameOverHooks) {
+    try { fn(winner); } catch(e) { console.error('[showGameOver hook error]', e); }
+  }
   // Live PvP: broadcast game over so both clients show it
   if (LIVE_PVP && PVP_GAME_REF && PVP_SIDE === 'red') {
     const stateSnap = pvpSerializeState();
@@ -17145,4 +17169,36 @@ renderBattle = function() {
   }
 };
 
+// =================================================================
+// BATTLE ENGINE EXPORT — Clean interface for raid adapter & other modules
+// =================================================================
+window.BattleEngine = {
+  // Core battle lifecycle
+  startBattle,
+  renderBattle,
+  showGameOver,
+  resetRollButtons,
+  startNextRound,
 
+  // Dice & classification
+  classify,
+  rollDice,
+  weightedRoll,
+
+  // Team management
+  active,
+
+  // AI control
+  startBlueAI,
+  stopBlueAI,
+
+  // Hook registration
+  onGameOver,
+  onResetRollButtons,
+  onPostResolve,
+
+  // State access
+  getState: () => B,
+  setState: (state) => { B = state; S.battle = B; },
+  getS: () => S
+};
