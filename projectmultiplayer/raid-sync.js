@@ -502,17 +502,20 @@ const RaidSync = {
   async init() {
     if (window._raidResultPending) return;
 
-    // Clear stale activeRaid before starting listeners
+    // ALWAYS clear activeRaid on init — no resume behavior in test deployment.
+    // This prevents stale/crashed raids from freezing the page on load.
     const user = firebase.auth().currentUser;
     if (user) {
       const arSnap = await db.ref(`mp/users/${user.uid}/activeRaid`).once('value');
       const activeId = arSnap.val();
       if (activeId) {
+        console.log('[RaidSync] Clearing activeRaid on init:', activeId);
+        await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
+        // Also abandon the instance so it doesn't haunt other players
         const instSnap = await db.ref(`mp/raids/instances/${activeId}/status`).once('value');
         const status = instSnap.val();
-        if (!status || status === 'complete' || status === 'abandoned') {
-          await db.ref(`mp/users/${user.uid}/activeRaid`).remove();
-          console.log('[RaidSync] Cleared stale activeRaid:', activeId);
+        if (status && status !== 'complete' && status !== 'abandoned') {
+          await db.ref(`mp/raids/instances/${activeId}/status`).set('abandoned');
         }
       }
     }
