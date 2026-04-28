@@ -536,7 +536,8 @@ function updateRaidSelectedTeam() {
 function listenToRaidQueue(raidId) {
   // Show initial empty state immediately (Firebase may not have this path yet)
   updateRaidQueueUI(raidId, []);
-  startQueueListener(raidId);
+  if (typeof RaidSync !== 'undefined') RaidSync.startQueueListener(raidId);
+  else if (typeof startQueueListener === 'function') startQueueListener(raidId);
 }
 
 function updateRaidQueueUI(raidId, entries) {

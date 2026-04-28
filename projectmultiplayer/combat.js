@@ -1,15 +1,7 @@
 // combat.js — Layer 4: Resolution pipeline, KO handling, game over, AI, PvP networking.
-// Depends on: battle-core.js, dice.js, battle-ui.js, abilities.js
-
-function active(t) { return t.ghosts[t.activeIdx]; }
-function opp(team) { return team===B.red ? B.blue : B.red; }
-function teamName(team) { return team===B.red ? 'Red' : 'Blue'; }
-
-let B = null; // battle state
-let prevResources = { red: {}, blue: {} }; // for resource-gained flash
-
-const LOG_MAX = 50; // [shadow] perf: cap battle log to prevent unbounded array growth
-function log(html) { B.log.unshift(html); if (B.log.length > LOG_MAX) B.log.length = LOG_MAX; }
+// Depends on: battle-core.js (B, S, active, opp, log, classify, spd, makeTeam, etc.)
+//             dice.js, battle-ui.js, abilities.js
+// NOTE: B, active, opp, teamName, log, prevResources, LOG_MAX are in battle-core.js
 
 function startBattle() {
   prevResources = { red: {}, blue: {} };
