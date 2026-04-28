@@ -881,7 +881,9 @@ function startBossFight(raidData, bossConfig) {
   // Build the blue team array (boss + minions) for battle engine
   const blueGhosts = [bossTeam.boss, ...bossTeam.minions].slice(0, 3);
 
-  if (typeof showBossIntro === 'function') {
+  // Only show boss intro on the first fighter's turn — skip on subsequent turns
+  const isFirstFighter = (raidData.currentFighterIdx || 0) === 0;
+  if (isFirstFighter && typeof showBossIntro === 'function') {
     showBossIntro(bossConfig, phase, () => {
       launchRaidBattle(raidData, blueGhosts, false);
     });
