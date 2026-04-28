@@ -167,7 +167,14 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   }
 
   // ── 6. Start the battle via battle-engine.js ─────────────────
+  // ── 6a. Skip the VS splash in raids — just start fighting ────
+  const vsSplash = document.getElementById('vsSplash');
+  if (vsSplash) vsSplash.style.display = 'none';
+
   startBattle();
+
+  // Restore splash element (hidden by display:none, won't show because active class is cleared)
+  if (vsSplash) setTimeout(() => { vsSplash.style.display = ''; }, 3000);
 
   // ── 7. Post-init tweaks on the B battle state ────────────────
   if (B) {
@@ -190,7 +197,27 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
-    // ── 7b. Clear dice from previous player's turn ──────────────
+    // ── 7b. Restore player ghost HP from Firebase (if returning for another turn) ─
+    const user = firebase.auth().currentUser;
+    if (user && currentRaid) {
+      try {
+        const gsSnap = db.ref(`mp/raids/instances/${currentRaid.instanceId}/playerGhostState/${user.uid}`);
+        gsSnap.once('value').then(snap => {
+          const saved = snap.val();
+          if (saved && B && B.red) {
+            saved.forEach((gs, i) => {
+              if (B.red.ghosts[i]) {
+                B.red.ghosts[i].hp = gs.hp;
+                B.red.ghosts[i].ko = gs.ko;
+              }
+            });
+            if (typeof renderBattle === 'function') renderBattle();
+          }
+        });
+      } catch (e) { /* silent */ }
+    }
+
+    // ── 7c. Clear dice from previous player's turn ──────────────
     B.redDice = null;
     B.blueDice = null;
     const redDiceEl = document.getElementById('red-dice');
@@ -501,20 +528,32 @@ function injectRaidReturnButton() {
     const narrator = document.getElementById('narrator');
     if (narrator) narrator.innerHTML = 'Passing to the next raider...';
 
-    // Calculate boss damage dealt this turn and sync to Firebase
-    // The boss ghost HP in B reflects damage dealt during this round
+    // Save player ghost HP to Firebase so it persists when their turn comes back
     let bossHpNow = 0;
     if (B && B.blue) {
       const bossGhost = B.blue.ghosts[B.blue.activeIdx];
       if (bossGhost) bossHpNow = bossGhost.hp;
     }
+    // Save red team ghost state
+    const savedGhostState = [];
+    if (B && B.red) {
+      B.red.ghosts.forEach(g => {
+        savedGhostState.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko });
+      });
+    }
 
-    // Advance currentFighterIdx in Firebase after a brief delay (let animations finish)
+    // Advance currentFighterIdx in Firebase after a brief delay
     setTimeout(() => {
       if (!currentRaid) return;
       const currentIdx = raidBattleState?.currentSlot || 0;
       const nextIdx = (currentIdx + 1) % playerCount;
       const instanceId = currentRaid.instanceId;
+
+      // Write player ghost state to Firebase for persistence
+      const user = firebase.auth().currentUser;
+      if (user && savedGhostState.length > 0) {
+        db.ref(`mp/raids/instances/${instanceId}/playerGhostState/${user.uid}`).set(savedGhostState);
+      }
 
       // Calculate new boss pool HP from the boss ghost's current HP
       // Boss ghost started with HP proportional to pool, so scale back
