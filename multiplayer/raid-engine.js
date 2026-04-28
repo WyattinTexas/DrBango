@@ -683,6 +683,7 @@ function handleActiveFight(data) {
     // It's our turn to fight!
     const wasSpectating = (typeof _isSpectating !== 'undefined') && _isSpectating;
     if (typeof _isSpectating !== 'undefined') _isSpectating = false;
+    window._raidMyFightActive = true; // prevent spectator branch from overriding
 
     // Start our fight if: no battle state, or we were spectating (turn just swapped to us),
     // or previous battle is done/waiting
@@ -698,6 +699,8 @@ function handleActiveFight(data) {
       startMyRaidFight(data);
     }
   } else {
+    // Don't enter spectator mode if we're actively fighting
+    if (window._raidMyFightActive) return;
     // Mark as spectating so the bridge's updateSpectatorFromSnapshot works
     if (typeof _isSpectating !== 'undefined') _isSpectating = true;
     // Not our turn — show the SAME battle screen the active player sees,

@@ -472,6 +472,7 @@ function injectRaidReturnButton() {
       }).then(() => {
         console.log('[RAID] Turn passed to player', nextIdx);
         _isSpectating = true;
+        window._raidMyFightActive = false; // allow spectator branch to work
       });
     }, 1500);
   };
