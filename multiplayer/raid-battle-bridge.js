@@ -221,9 +221,9 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   // ── 9a. Start snapshot sync (writes B state to Firebase for spectators)
   startSnapshotSync();
 
-  // ── 9b. Ensure red roll button is visible and enabled ────────
-  // The spectator path may have hidden it before we got here.
+  // ── 9b. Ensure red roll button is visible ONLY for the fighter ─
   setTimeout(() => {
+    if (_currentRaidRole !== 'fighter') return; // spectators don't get a roll button
     const redBtn = document.getElementById('rollRedBtn');
     if (redBtn && B && B.phase === 'ready') {
       redBtn.style.display = '';
