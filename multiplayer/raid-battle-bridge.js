@@ -174,6 +174,34 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   // ── 7. Post-init tweaks on the B battle state ────────────────
   if (B) {
     B.duelPhaseMode = false;   // boss fights skip duel phase
+
+    // ── 7a. Carry over boss HP from Firebase (don't reset to full) ──
+    // The boss's shared HP pool persists across player turns. Each new
+    // startBattle() creates fresh ghosts at full HP — we must override
+    // the boss ghost's HP with the current raid pool HP.
+    const bossCurHp = raidData.bossCurrentHp;
+    const bossMaxHp = raidData.bossMaxHp;
+    if (bossCurHp != null && B.blue) {
+      const bossGhost = B.blue.ghosts[B.blue.activeIdx];
+      if (bossGhost) {
+        // Scale: boss ghost HP proportional to pool HP remaining
+        // e.g., pool is 10/15, boss maxHp is 9 → boss hp = 9 * (10/15) = 6
+        const ratio = bossMaxHp > 0 ? bossCurHp / bossMaxHp : 1;
+        bossGhost.hp = Math.max(1, Math.round(bossGhost.maxHp * ratio));
+        if (bossCurHp <= 0) bossGhost.hp = 0;
+      }
+    }
+
+    // ── 7b. Clear dice from previous player's turn ──────────────
+    const redDice = document.getElementById('red-dice');
+    const blueDice = document.getElementById('blue-dice');
+    if (redDice) redDice.innerHTML = '';
+    if (blueDice) blueDice.innerHTML = '';
+    // Also clear any 3D physics dice lingering on the board
+    document.querySelectorAll('.die-physics').forEach(el => el.remove());
+
+    // Re-render with correct HP
+    renderBattle();
   }
 
   // ── 8. Hide blue roll button (boss auto-rolls via AI) ───────
