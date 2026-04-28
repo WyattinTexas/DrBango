@@ -340,6 +340,8 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
   // both started here and were stopped ~50ms later in setupSpectatorView,
   // leaving a window for corrupt writes.
   if (_currentRaidRole === 'fighter') {
+    // Force-stop first to clear any stale AI_ACTIVE flag from a previous raid
+    if (typeof stopBlueAI === 'function') stopBlueAI();
     if (typeof startBlueAI === 'function') startBlueAI();
     startSnapshotSync();
   }
@@ -430,7 +432,8 @@ function renderBossHpPool(bossHp, bossMaxHp) {
  * Resets flags, hides the raid screen, removes injected ghosts.
  */
 function cleanupRaidBattle() {
-  // ── Stop snapshot sync ───────────────────────────────────────
+  // ── Stop AI + snapshot sync ──────────────────────────────────
+  if (typeof stopBlueAI === 'function') stopBlueAI();
   stopSnapshotSync();
 
   // ── Reset global flags ────────────────────────────────────────

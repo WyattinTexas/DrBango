@@ -145,9 +145,13 @@ function showRaidLobby() {
   const user = firebase.auth().currentUser;
   if (!user) return;
 
-  // Dismiss any lingering raid result / battle screen from a previous raid
+  // Dismiss any lingering raid result overlay — but DON'T clear innerHTML,
+  // the permanent battle arena template (battle-view, dice, HP bars) lives inside raid-screen
   const raidScreen = document.getElementById('raid-screen');
-  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
+  if (raidScreen) {
+    raidScreen.style.display = 'none';
+    raidScreen.querySelectorAll('.raid-result-screen').forEach(el => el.remove());
+  }
 
   // Get user's badges
   db.ref(`mp/users/${user.uid}/raidBadges`).once('value').then(snap => {
@@ -256,9 +260,12 @@ function selectRaid(raidId) {
   const boss = RAID_BOSSES[raidId];
   if (!boss) return;
 
-  // Dismiss any lingering result screen from a previous raid
+  // Dismiss any lingering result overlay — preserve the battle arena template
   const raidScreen = document.getElementById('raid-screen');
-  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
+  if (raidScreen) {
+    raidScreen.style.display = 'none';
+    raidScreen.querySelectorAll('.raid-result-screen').forEach(el => el.remove());
+  }
 
   const container = document.getElementById('raid-lobby');
   if (!container) return;
