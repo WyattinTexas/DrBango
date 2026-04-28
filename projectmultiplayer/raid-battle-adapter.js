@@ -105,12 +105,24 @@ const RaidBattleAdapter = {
     RaidState.transition('lobby');
 
     // Now safe to connect — phase is no longer 'idle'
+    // NOTE: connect() fires the Firebase listener SYNCHRONOUSLY. If the instance
+    // status is already 'active', _handleFirebaseUpdate will transition to
+    // 'fighting' and call _startMyFight BEFORE we reach the switch below.
+    // We must check the CURRENT phase after connect, not the original data.
     RaidSync.connect(instanceId);
 
-    // Determine initial phase
+    // If the Firebase listener already advanced us to fighting/spectating,
+    // don't show the waiting room or try to transition again.
+    if (RaidState.phase === 'fighting' || RaidState.phase === 'spectating') {
+      // Battle already started via Firebase handler — just show the raid screen
+      if (typeof showRaidScreen === 'function') showRaidScreen(instanceId);
+      this._entering = false;
+      return;
+    }
+
+    // Still in lobby/countdown — handle based on Firebase data status
     switch (data.status) {
       case 'countdown':
-        // Already in 'lobby' from above
         if (typeof showRaidWaitingRoom === 'function') {
           showRaidWaitingRoom(instanceId, data);
         }
@@ -124,9 +136,8 @@ const RaidBattleAdapter = {
         break;
 
       case 'active':
-        // Already in 'lobby' from above — go to countdown then fight/spectate
         RaidState.transition('countdown');
-        if (RaidState.isMyTurn()) {
+        if (RaidState.mySlot === RaidState.currentFighterIdx) {
           RaidState.transition('fighting');
         } else {
           RaidState.transition('spectating');
@@ -284,6 +295,11 @@ const RaidBattleAdapter = {
     const { bossConfig, players, currentFighterIdx, bossGhostState, playerGhostState } = RaidState;
     const playerData = players[currentFighterIdx];
     if (!playerData || !bossConfig) { this._fightStarted = false; return; }
+
+    // Hide any waiting room/countdown overlays from the entry flow
+    if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
+    const launchCountdown = document.getElementById('raid-launch-countdown');
+    if (launchCountdown) launchCountdown.remove();
 
     // Show raid screen and battle view
     const raidScreen = document.getElementById('raid-screen');
