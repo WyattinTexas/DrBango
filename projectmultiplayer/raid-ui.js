@@ -146,8 +146,9 @@ function showRaidLobby() {
   if (!user) return;
 
   // Dismiss any lingering raid result / battle screen from a previous raid
+  // NOTE: do NOT clear innerHTML — the arena template HTML is static and must survive
   const raidScreen = document.getElementById('raid-screen');
-  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
+  if (raidScreen) { raidScreen.style.display = 'none'; }
 
   // Get user's badges
   db.ref(`mp/users/${user.uid}/raidBadges`).once('value').then(snap => {
@@ -257,8 +258,9 @@ function selectRaid(raidId) {
   if (!boss) return;
 
   // Dismiss any lingering result screen from a previous raid
+  // NOTE: do NOT clear innerHTML — the arena template HTML is static and must survive
   const raidScreen = document.getElementById('raid-screen');
-  if (raidScreen) { raidScreen.style.display = 'none'; raidScreen.innerHTML = ''; }
+  if (raidScreen) { raidScreen.style.display = 'none'; }
 
   const container = document.getElementById('raid-lobby');
   if (!container) return;
