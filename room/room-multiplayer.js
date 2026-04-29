@@ -9,11 +9,16 @@ const RoomMP = {
     scene: null,
     enabled: false,
     _lastSend: 0,
-    SEND_INTERVAL: 80,  // ms between position broadcasts
+    _paused: false,
+    SEND_INTERVAL: 100,     // ms between position broadcasts
+    AFK_TIMEOUT: 60000,     // 60s — stop sending if no input
+    STALE_TIMEOUT: 15000,   // 15s — remove other players with no updates
+    _lastInput: 0,
 
     init(scene) {
         this.scene = scene;
         this.enabled = true;
+        this._lastInput = Date.now();
 
         // Firebase init
         const firebaseConfig = {
@@ -26,15 +31,13 @@ const RoomMP = {
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         this.db = firebase.database();
 
-        // Get name from URL or generate one
         const params = new URLSearchParams(window.location.search);
         this.displayName = params.get('name') || 'Wanderer-' + Math.floor(Math.random() * 999);
 
-        // Generate a random client ID (no auth needed)
         this.uid = 'r_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
         this.playersRef = this.db.ref('mp/room/players');
 
-        // Clean up on disconnect
+        // Firebase auto-removes us on disconnect
         this.playersRef.child(this.uid).onDisconnect().remove();
 
         // Write initial presence
@@ -50,10 +53,24 @@ const RoomMP = {
         this.playersRef.on('child_changed', (snap) => this._onPlayerMove(snap));
         this.playersRef.on('child_removed', (snap) => this._onPlayerLeave(snap));
 
-        // Update player count display
         this._updateCount();
-
         console.log('[Room MP] Connected as', this.displayName);
+
+        // Track any input to reset AFK timer
+        const resetAfk = () => { this._lastInput = Date.now(); this._rejoinIfNeeded(); };
+        window.addEventListener('keydown', resetAfk);
+        window.addEventListener('mousemove', resetAfk);
+        window.addEventListener('mousedown', resetAfk);
+
+        // Pause when tab is hidden, resume when visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this._pause();
+            } else {
+                this._lastInput = Date.now();
+                this._rejoinIfNeeded();
+            }
+        });
 
         // Clean up on page unload
         window.addEventListener('beforeunload', () => {
@@ -63,9 +80,38 @@ const RoomMP = {
         });
     },
 
-    // Send our position to Firebase (throttled)
+    _pause() {
+        if (this._paused) return;
+        this._paused = true;
+        // Remove ourselves from Firebase so others don't see a ghost
+        if (this.uid && this.playersRef) {
+            this.playersRef.child(this.uid).remove();
+        }
+        console.log('[Room MP] Paused (tab hidden or AFK)');
+    },
+
+    _rejoinIfNeeded() {
+        if (!this._paused) return;
+        this._paused = false;
+        // Re-add ourselves
+        this.playersRef.child(this.uid).onDisconnect().remove();
+        this.playersRef.child(this.uid).set({
+            name: this.displayName,
+            x: 0, y: 0, z: 0, rot: 0,
+            color: Math.random() * 0xffffff | 0,
+            t: firebase.database.ServerValue.TIMESTAMP,
+        });
+        console.log('[Room MP] Rejoined');
+    },
+
     sendPosition(pos, rot) {
-        if (!this.enabled || !this.uid) return;
+        if (!this.enabled || !this.uid || this._paused) return;
+
+        // AFK check — stop sending after 60s of no input
+        if (Date.now() - this._lastInput > this.AFK_TIMEOUT) {
+            this._pause();
+            return;
+        }
 
         const now = Date.now();
         if (now - this._lastSend < this.SEND_INTERVAL) return;
@@ -80,7 +126,6 @@ const RoomMP = {
         });
     },
 
-    // Interpolate other players toward their target positions
     update(dt) {
         if (!this.enabled) return;
 
@@ -101,7 +146,7 @@ const RoomMP = {
             const gy = Collision.getGroundHeight(p.group.position.x, p.group.position.z);
             if (p.group.position.y < gy) p.group.position.y = gy;
 
-            // Simple walk animation
+            // Walk animation
             const dx = p.targetPos.x - p.group.position.x;
             const dz = p.targetPos.z - p.group.position.z;
             const moving = Math.sqrt(dx * dx + dz * dz) > 0.05;
@@ -120,11 +165,13 @@ const RoomMP = {
             }
         }
 
-        // Prune stale players (no update in 10s)
+        // Prune stale players
         const now = Date.now();
         for (const uid in this.players) {
-            if (now - this.players[uid].lastUpdate > 10000) {
+            if (now - this.players[uid].lastUpdate > this.STALE_TIMEOUT) {
                 this._removePlayer(uid);
+                // Also clean them from Firebase in case their disconnect didn't fire
+                this.playersRef.child(uid).remove();
             }
         }
     },
@@ -133,8 +180,14 @@ const RoomMP = {
         const uid = snap.key;
         if (uid === this.uid) return;
         const data = snap.val();
+        if (!data) return;
 
-        // Create other player's character
+        // Skip stale entries (older than 15s)
+        if (data.t && Date.now() - data.t > this.STALE_TIMEOUT) {
+            this.playersRef.child(uid).remove();
+            return;
+        }
+
         const { group, leftLeg, rightLeg, leftArm, rightArm } = this._createOtherPlayer(data.color, data.name);
         group.position.set(data.x, data.y, data.z);
         this.scene.add(group);
@@ -155,6 +208,7 @@ const RoomMP = {
         const uid = snap.key;
         if (uid === this.uid) return;
         const data = snap.val();
+        if (!data) return;
 
         if (!this.players[uid]) {
             this._onPlayerJoin(snap);
@@ -175,13 +229,14 @@ const RoomMP = {
         if (this.players[uid]) {
             this.scene.remove(this.players[uid].group);
             delete this.players[uid];
+            this._updateCount();
         }
     },
 
     _updateCount() {
         const el = document.getElementById('player-count');
         if (el) {
-            const count = Object.keys(this.players).length + 1;
+            const count = Object.keys(this.players).length + (this._paused ? 0 : 1);
             el.textContent = count + (count === 1 ? ' player' : ' players');
         }
     },
@@ -218,8 +273,12 @@ const RoomMP = {
         // Eyes
         const eyeGeo = new THREE.SphereGeometry(0.04, 4, 4);
         const eyeMat = mat(0x222222);
-        body.add(Object.assign(new THREE.Mesh(eyeGeo, eyeMat), {})).position.set(-0.08, 1.48, 0.22);
-        body.add(Object.assign(new THREE.Mesh(eyeGeo, eyeMat), {})).position.set(0.08, 1.48, 0.22);
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.08, 1.48, 0.22);
+        body.add(leftEye);
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.08, 1.48, 0.22);
+        body.add(rightEye);
 
         // Arms
         const armGeo = new THREE.BoxGeometry(0.14, 0.45, 0.14);
@@ -241,10 +300,14 @@ const RoomMP = {
         body.add(rightLeg);
 
         // Shoes
-        body.add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.24), mat(0x664422))).position.set(-0.12, 0.22, 0.03);
-        body.add(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.24), mat(0x664422))).position.set(0.12, 0.22, 0.03);
+        const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.24), mat(0x664422));
+        leftShoe.position.set(-0.12, 0.22, 0.03);
+        body.add(leftShoe);
+        const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.24), mat(0x664422));
+        rightShoe.position.set(0.12, 0.22, 0.03);
+        body.add(rightShoe);
 
-        // Name label above head
+        // Name label
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 48;
@@ -263,7 +326,6 @@ const RoomMP = {
             new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
         );
         label.position.y = 2.1;
-        // Billboard: always face camera (handled in update would be better, but this is simple)
         label.onBeforeRender = function(renderer, scene, camera) {
             label.quaternion.copy(camera.quaternion);
         };
@@ -272,9 +334,11 @@ const RoomMP = {
         // Shadow
         const shadowGeo = new THREE.CircleGeometry(0.35, 8);
         shadowGeo.rotateX(-Math.PI / 2);
-        group.add(new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({
+        const shadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({
             color: 0x000000, transparent: true, opacity: 0.2, depthWrite: false,
-        }))).position.y = 0.02;
+        }));
+        shadow.position.y = 0.02;
+        group.add(shadow);
 
         return { group, leftLeg, rightLeg, leftArm, rightArm };
     },
