@@ -4816,11 +4816,28 @@ function triggerEntry(team, skipEntryEffects) {
   }
 
   // Frostbite — consume stacks on entry, set dice penalty for first roll only
+  // Mike (445) — Torrent: sideline immunity to Frostbite (same as Burn)
+  // Rook (416) — Immune to Frostbite: consume but apply zero penalty
   let frostbiteEntryFired = false;
   if (B.frostbite && B.frostbite[entryTeamName]) {
     const activeIdx = team.activeIdx;
     const fbCount = B.frostbite[entryTeamName][activeIdx] || 0;
-    if (fbCount > 0 && !f.ko) {
+    const mikeProtectsFrostbite = hasSideline(team, 445);
+    if (fbCount > 0 && !f.ko && mikeProtectsFrostbite) {
+      // Mike's Torrent: sideline immune to Frostbite — consume, apply zero
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('TORRENT!', 'var(--rare)', `Mike — Torrent! Sideline immune to Frostbite! ${f.name} keeps all dice.`, entryTeamName);
+      log(`<span class="log-ability">Mike</span> — Torrent! <span class="log-heal">Sideline immune to Frostbite!</span> ${f.name} keeps all dice.`);
+    } else if (fbCount > 0 && !f.ko && f.id === 416) {
+      // Rook — Immune to Frostbite: consume but no dice penalty
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('FROSTBITE IMMUNE!', 'var(--rare)', `${f.name} — Immune to Frostbite! No dice lost.`, entryTeamName);
+      log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Frostbite!</span> No dice lost.`);
+    } else if (fbCount > 0 && !f.ko) {
       if (!B.frostbiteDicePenalty) B.frostbiteDicePenalty = { red: 0, blue: 0 };
       B.frostbiteDicePenalty[entryTeamName] = fbCount;
       delete B.frostbite[entryTeamName][activeIdx];
@@ -5950,7 +5967,7 @@ function doGordokChoice(choice) {
   document.getElementById('gordokOverlay').classList.remove('active');
   if (choice === 'steal') {
     const gordokOppRes = gp.loseTeam.resources;
-    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed', 'burn', 'frostbite'];
     let gordokStolen = 0;
     const gordokStolenList = [];
     for (let i = 0; i < 2 && gordokStolen < 2; i++) {
@@ -5995,7 +6012,7 @@ function showTimberModal(tp, resumeCallback) {
   const discardBtn = document.getElementById('timberDiscardBtn');
   if (discardBtn) {
     const r = tp.team.resources;
-    const totalSpecials = ['surge','ice','healingSeed','luckyStone','fire','moonstone']
+    const totalSpecials = ['surge','ice','healingSeed','luckyStone','fire','moonstone','burn','frostbite']
       .reduce((sum, t) => sum + (r[t] || 0), 0);
     discardBtn.disabled = totalSpecials < 2;
   }
@@ -6018,7 +6035,7 @@ function doTimberChoice(choice) {
     // Discard 2 specials from most abundant first
     const r = tp.team.resources;
     let toDiscard = 2;
-    const types = ['surge','ice','healingSeed','luckyStone','fire','moonstone'];
+    const types = ['surge','ice','healingSeed','luckyStone','fire','moonstone','burn','frostbite'];
     types.sort((a,b) => (r[b]||0) - (r[a]||0));
     for (const t of types) {
       while (toDiscard > 0 && (r[t]||0) > 0) {
@@ -6673,7 +6690,9 @@ function showNickKnackPicker(team, oppTeam) {
     { key: 'surge', label: 'Surge', emoji: '⚡' },
     { key: 'luckyStone', label: 'Lucky Stone', emoji: '🍀' },
     { key: 'moonstone', label: 'Moonstone', emoji: '💎' },
-    { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' }
+    { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' },
+    { key: 'burn', label: 'Burn', emoji: '🔥' },
+    { key: 'frostbite', label: 'Frostbite', emoji: '❄️' }
   ];
   const available = resTypes.filter(r => (oppRes[r.key] || 0) > 0);
   const optionsEl = document.getElementById('nickKnackOptions');
@@ -6946,7 +6965,8 @@ function showFireflyPicker(team) {
     { key: 'moonstone', label: 'Moonstone', emoji: '🌙' },
     { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' },
     { key: 'surge', label: 'Surge', emoji: '⚡' },
-    { key: 'burn', label: 'Burn', emoji: '🔥' }
+    { key: 'burn', label: 'Burn', emoji: '🔥' },
+    { key: 'frostbite', label: 'Frostbite', emoji: '❄️' }
   ];
 
   const optionsEl = document.getElementById('fireflyOptions');
@@ -10328,7 +10348,7 @@ function doPreRollSetup() {
         return;
       }
       const r = oppTeam.resources;
-      const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
+      const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0) + (r.burn||0) + (r.frostbite||0);
       if (totalSpecials < 2) {
         // Not enough specials — forced to lose die
         B.timberDieReduction[oppTeamName] = true;
@@ -15123,7 +15143,9 @@ function _resolveRoundImpl() {
       || (eRes.fire + (eCom.fire||0)) > 0
       || (eRes.surge + (eCom.surge||0)) > 0
       || (eRes.healingSeed + (eCom.healingSeed||0)) > 0
-      || (eRes.luckyStone + (eCom.luckyStone||0)) > 0;
+      || (eRes.luckyStone + (eCom.luckyStone||0)) > 0
+      || (eRes.burn||0) > 0
+      || (eRes.frostbite||0) > 0;
     if (hasSpecials) {
       dmg += 3;
       redHunterTriggered = true;
@@ -15729,7 +15751,7 @@ function _resolveRoundImpl() {
   let gordokStole = false;
   if (wF.id === 430 && !wF.ko && dmg > 0) {
     const gordokOppRes = loseTeam.resources;
-    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed', 'burn', 'frostbite'];
     const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (gordokOppRes[r] || 0), 0);
     if (gordokTotalRes > 0) {
       if (autoPlayRunning) {
@@ -16412,6 +16434,10 @@ function _resolveRoundImpl() {
     const _pelterWinG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
     const _pelterWinLoc = winPelterActive ? 'active' : 'sideline';
     queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterWinG.name} (${_pelterWinLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!winPelterActive) popSidelineCard(winTeam, 86); renderBattle(); }, winTeamName);
+    if (sandwichForLose) {
+      if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +1 Frostbite!`, () => { loseTeam.resources.frostbite += 1; renderBattle(); }, loseTeamName);
+    }
   }
   if (banditPeteTriggered) {
     const bpWhoQ = winDice && winDice.length === 2 ? 'Your ghost rolled only 2 dice!' : 'Opponent rolled only 2 dice!';
@@ -16702,12 +16728,20 @@ function _resolveRoundImpl() {
     if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
     queueAbility("WINTER'S HARVEST!", '#3b82f6', `${wF.name} — Win! +1 Frostbite + 1 Ice Shard!`, () => { winTeam.resources.frostbite += 1; winTeam.resources.ice += 1; creditGhost(winTeamName, 25, 'ice', 1); renderBattle(); }, winTeamName);
     log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Winter's Harvest! +1 Frostbite + 1 Ice Shard!`);
+    if (sandwichForLose) {
+      if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Winter's Harvest! +1 Frostbite + 1 Ice Shard!`, () => { loseTeam.resources.frostbite += 1; loseTeam.resources.ice += 1; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
+    }
   }
   // Calvin & Anna (91) — Frost Surge: win → +1 Frostbite
   if (wF.id === 91 && !wF.ko) {
     if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
     queueAbility('FROST SURGE!', '#3b82f6', `${wF.name} — Win! +1 Frostbite!`, () => { winTeam.resources.frostbite += 1; renderBattle(); }, winTeamName);
     log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Frost Surge! +1 Frostbite!`);
+    if (sandwichForLose) {
+      if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Frost Surge! +1 Frostbite!`, () => { loseTeam.resources.frostbite += 1; renderBattle(); }, loseTeamName);
+    }
   }
   // Dylan (301) — Stained Glass: Sideline & In Play, winning rolls gain +1 Burn
   if (hasDylanWin) {
@@ -16902,6 +16936,10 @@ function _resolveRoundImpl() {
     const _pelterLoseG = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
     const _pelterLoseLoc = losePelterActive ? 'active' : 'sideline';
     queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterLoseG.name} (${_pelterLoseLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!losePelterActive) popSidelineCard(loseTeam, 86); renderBattle(); }, loseTeamName);
+    if (sandwichForWin) {
+      if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +1 Frostbite!`, () => { winTeam.resources.frostbite += 1; renderBattle(); }, winTeamName);
+    }
   }
 
   // On-lose callouts — onShow applies the surge grant with the splash
@@ -19920,8 +19958,8 @@ function aiTick() {
     const nickOverlay = document.getElementById('nickKnackOverlay');
     if (nickOverlay && nickOverlay.classList.contains('active')) {
       const oppRes = B.red.resources;
-      // Priority: moonstone > luckyStone > surge > fire > ice > healingSeed
-      const stealOrder = ['moonstone', 'luckyStone', 'surge', 'fire', 'ice', 'healingSeed'];
+      // Priority: moonstone > luckyStone > surge > fire > ice > healingSeed > burn > frostbite
+      const stealOrder = ['moonstone', 'luckyStone', 'surge', 'fire', 'ice', 'healingSeed', 'burn', 'frostbite'];
       const stealKey = stealOrder.find(k => (oppRes[k] || 0) > 0) || 'skip';
       setTimeout(() => doNickKnackSteal('blue', stealKey), 500);
       return;
