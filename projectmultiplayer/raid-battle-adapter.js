@@ -846,29 +846,26 @@ const RaidBattleAdapter = {
       RaidTranscript.download();
     }
 
-    // Atomic Firebase write after brief delay
+    // Write game-over to Firebase (includes status=complete atomically)
     setTimeout(() => {
       RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
     }, 1500);
 
-    // Show "Return to Lobby" button
+    // Local fallback: if Firebase listener hasn't triggered the result screen
+    // within 5 seconds, force-show it locally. Prevents hanging on slow Firebase.
     setTimeout(() => {
-      const goButtons = document.querySelector('.go-buttons');
-      const gameOver = document.getElementById('gameOver');
-      const target = goButtons || gameOver;
-      if (target) {
-        const btnHtml = `
-          <button class="go-btn-rematch" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.4);margin-top:16px;"
-            onclick="RaidBattleAdapter._returnToLobby()">
-            RETURN TO LOBBY
-          </button>`;
-        if (goButtons) {
-          goButtons.innerHTML = btnHtml;
-        } else {
-          target.insertAdjacentHTML('beforeend', btnHtml);
+      if (RaidState.phase !== 'complete') {
+        console.warn('[Raid] Result screen fallback triggered — forcing locally');
+        if (['fighting', 'spectating', 'turn-handoff'].includes(RaidState.phase)) {
+          RaidState.transition('complete');
         }
       }
-    }, 3500);
+    }, 6500);
+
+    // Don't show a "Return to Lobby" button here — _showResults handles that.
+    // Hide any game-over overlay from the battle engine.
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
   },
 
   // ══════════════════════════════════════════════════════════════════

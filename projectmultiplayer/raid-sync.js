@@ -150,7 +150,15 @@ const RaidSync = {
     // Raid complete if boss is dead OR no alive players remain
     const raidComplete = poolNow <= 0 || nextIdx === -1;
 
-    if (!raidComplete) {
+    if (raidComplete) {
+      // Include status=complete in the SAME atomic write as player stats.
+      // This ensures the Firebase listener fires with complete status immediately —
+      // no gap where listeners see 'active' then 'complete' in two separate events.
+      update.status = 'complete';
+      update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+      update.bossDefeatedBy = poolNow <= 0 ? (user?.uid || null) : null;
+      update.fightPhase = 'done';
+    } else {
       // Advance to next alive fighter — raid continues
       update.currentFighterIdx = nextIdx;
       update.currentFighterUid = RaidState.players[nextIdx]?.uid || null;
@@ -159,14 +167,11 @@ const RaidSync = {
     }
 
     try {
-      // Write player stats first (damage, ghosts lost, etc.)
       await this._instanceRef.update(firebaseSafe(update));
-      console.log('[RaidSync] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
+      console.log('[RaidSync] Game over processed. Winner:', winner, '| Pool HP:', poolNow, '| Complete:', raidComplete);
 
+      // Distribute rewards AFTER the atomic write (non-blocking, non-fatal)
       if (raidComplete) {
-        // Try to distribute rewards first so loot data is in Firebase
-        // when listeners fire showRaidResult. But NEVER let reward errors
-        // prevent status=complete from being written — that hangs the raid.
         try {
           if (typeof distributeRaidRewards === 'function') {
             await distributeRaidRewards(RaidState.instanceId, poolNow <= 0, poolNow <= 0 ? user?.uid : null);
@@ -174,13 +179,6 @@ const RaidSync = {
         } catch (rewardErr) {
           console.error('[RaidSync] Reward distribution failed (non-fatal):', rewardErr);
         }
-        // ALWAYS mark raid as complete
-        await this._instanceRef.update(firebaseSafe({
-          status: 'complete',
-          completedAt: firebase.database.ServerValue.TIMESTAMP,
-          bossDefeatedBy: poolNow <= 0 ? (user?.uid || null) : null,
-          fightPhase: 'done'
-        }));
       }
     } catch (e) {
       console.error('[RaidSync] Game-over write error:', e);
