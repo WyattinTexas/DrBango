@@ -159,12 +159,17 @@ const RaidSync = {
       console.log('[RaidSync] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
 
       if (raidComplete) {
-        // Distribute rewards BEFORE setting status=complete so loot data
-        // is already in Firebase when listeners fire showRaidResult
-        if (typeof distributeRaidRewards === 'function') {
-          await distributeRaidRewards(RaidState.instanceId, poolNow <= 0, poolNow <= 0 ? user?.uid : null);
+        // Try to distribute rewards first so loot data is in Firebase
+        // when listeners fire showRaidResult. But NEVER let reward errors
+        // prevent status=complete from being written — that hangs the raid.
+        try {
+          if (typeof distributeRaidRewards === 'function') {
+            await distributeRaidRewards(RaidState.instanceId, poolNow <= 0, poolNow <= 0 ? user?.uid : null);
+          }
+        } catch (rewardErr) {
+          console.error('[RaidSync] Reward distribution failed (non-fatal):', rewardErr);
         }
-        // NOW mark raid as complete — listeners will see loot data
+        // ALWAYS mark raid as complete
         await this._instanceRef.update(firebaseSafe({
           status: 'complete',
           completedAt: firebase.database.ServerValue.TIMESTAMP,
