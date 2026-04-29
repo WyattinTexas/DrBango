@@ -5163,6 +5163,11 @@ function doPreRollSetup() {
   // ========================================
   let redCount = 3, blueCount = 3;
   // Bosses roll 3 dice like regular ghosts — their power is extra HP, not extra dice
+  // Golden Dice (raid item): +1 die on first roll of the fight
+  if (B.goldenDice) {
+    if (B.goldenDice.red && B.round === 1) { redCount++; B.goldenDice.red = false; queueAbility('Golden Dice', 'var(--gold)', '+1 die on first roll!', 'red'); }
+    if (B.goldenDice.blue && B.round === 1) { blueCount++; B.goldenDice.blue = false; }
+  }
   // Doug (63) Caution duel-phase swap promised the incoming ghost +1 die — apply now.
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.red) { redCount++; B.dougCautionDieBonus.red = false; }
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.blue) { blueCount++; B.dougCautionDieBonus.blue = false; }

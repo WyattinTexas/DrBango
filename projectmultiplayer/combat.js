@@ -870,6 +870,13 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Grace! Doubles → +1 damage!`);
   }
 
+  // Valkin's Crystal (raid item): +1 damage on doubles
+  if (B.valkinShard && B.valkinShard[winTeamName] && wR.type === 'doubles') {
+    dmg += 1;
+    queueAbility("Valkin's Crystal", 'var(--legendary)', 'Doubles deal +1 bonus damage!', winTeamName);
+    log(`<span class="log-ability">Valkin's Crystal</span> — Doubles → +1 damage!`);
+  }
+
   // Boo Brothers (17) — Teamwork damage bonus: +1 if they used the ability this round
   let booTeamworkDmgTriggered = false;
   if (wF.id === 17 && !wF.ko && B.booTeamworkDmgBonus && B.booTeamworkDmgBonus[winTeamName] > 0) {

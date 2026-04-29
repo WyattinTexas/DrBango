@@ -122,7 +122,7 @@ function applyRaidLoot(battleState, team, lootInventory) {
       case 'healing_root':   if (t.resources) t.resources.healingSeed = (t.resources.healingSeed || 0) + 1; break;
       case 'ember_stone':    if (t.resources) t.resources.fire = (t.resources.fire || 0) + 1; break;
       case 'frost_shard':    if (t.resources) t.resources.ice = (t.resources.ice || 0) + 1; break;
-      case 'surge_crystal':  if (t.resources) t.resources.surge = (t.resources.surge || 0) + 1; break;
+      case 'surge_crystal':  if (t.resources) t.resources.surge = (t.resources.surge || 0) + 2; break; // gives 2 Surge per spec
       case 'moonstone_ring': if (t.resources) t.resources.moonstone = (t.resources.moonstone || 0) + 1; break;
       case 'firefly_lantern':
         if (t.resources) t.resources.firefly = (t.resources.firefly || 0) + 1;
@@ -135,21 +135,28 @@ function applyRaidLoot(battleState, team, lootInventory) {
         if (battleState.flameBlade) battleState.flameBlade[team] = true;
         break;
       case 'mask_of_day':
-        battleState.maskOfDay = battleState.maskOfDay || {};
-        battleState.maskOfDay[team] = true;
+        // Integrate with Sophia's mask system (same combat mechanics)
+        battleState.sophiaMask = battleState.sophiaMask || { red: null, blue: null };
+        battleState.sophiaMaskActive = battleState.sophiaMaskActive || { red: false, blue: false };
+        battleState.sophiaMask[team] = 'day';
+        battleState.sophiaMaskActive[team] = true;
         break;
       case 'mask_of_night':
-        battleState.maskOfNight = battleState.maskOfNight || {};
-        battleState.maskOfNight[team] = true;
+        battleState.sophiaMask = battleState.sophiaMask || { red: null, blue: null };
+        battleState.sophiaMaskActive = battleState.sophiaMaskActive || { red: false, blue: false };
+        battleState.sophiaMask[team] = 'night';
+        battleState.sophiaMaskActive[team] = true;
         break;
       case 'golden_dice':
         battleState.goldenDice = battleState.goldenDice || {};
         battleState.goldenDice[team] = true;
         break;
-      case 'shades_cape':
-        if (t.ghosts && t.ghosts[0]) t.ghosts[0].maxHp = (t.ghosts[0].maxHp || 0) + 1;
-        if (t.ghosts && t.ghosts[0]) t.ghosts[0].hp = (t.ghosts[0].hp || 0) + 1;
+      case 'shades_cape': {
+        // +1 max HP to the active ghost (not always index 0)
+        const activeGhost = t.ghosts && t.ghosts[t.activeIdx || 0];
+        if (activeGhost) { activeGhost.maxHp = (activeGhost.maxHp || 0) + 1; activeGhost.hp = (activeGhost.hp || 0) + 1; }
         break;
+      }
       case 'valkins_crystal':
         battleState.valkinShard = battleState.valkinShard || {};
         battleState.valkinShard[team] = true;

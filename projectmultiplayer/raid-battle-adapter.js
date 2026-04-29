@@ -299,13 +299,23 @@ const RaidBattleAdapter = {
 
   _fightStarted: false, // prevent double startBattle
 
-  _startMyFight() {
+  async _startMyFight() {
     if (this._fightStarted) return;
     this._fightStarted = true;
 
     const { bossConfig, players, currentFighterIdx, bossGhostState, playerGhostState } = RaidState;
     const playerData = players[currentFighterIdx];
     if (!playerData || !bossConfig) { this._fightStarted = false; return; }
+
+    // Preload player's equipped items from Firebase
+    let playerInventory = null;
+    try {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        const invSnap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+        playerInventory = invSnap.val();
+      }
+    } catch (e) { console.warn('[RaidAdapter] Failed to load inventory:', e); }
 
     // Start transcript recording
     if (typeof RaidTranscript !== 'undefined') {
@@ -472,6 +482,30 @@ const RaidBattleAdapter = {
       if (redDiceEl) redDiceEl.innerHTML = '';
       if (blueDiceEl) blueDiceEl.innerHTML = '';
       document.querySelectorAll('.die-physics').forEach(el => el.remove());
+
+      // ── APPLY EQUIPPED ITEMS ──────────────────────────────────────
+      // Items are loaded from Firebase (preloaded at the top of _startMyFight).
+      // applyRaidLoot grants starting resources, forges blades, sets mask/dice flags.
+      if (playerInventory && typeof applyRaidLoot === 'function') {
+        applyRaidLoot(B, 'red', playerInventory);
+
+        // Log applied items in transcript
+        if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+          const equipped = playerInventory.equipped || {};
+          const slots = ['head', 'weapon', 'accessory'];
+          slots.forEach(slot => {
+            const itemKey = equipped[slot];
+            if (itemKey && RAID_ITEMS[itemKey]) {
+              RaidTranscript.add('ITEM', `Equipped [${slot}]: ${RAID_ITEMS[itemKey].name} — ${RAID_ITEMS[itemKey].desc}`);
+            }
+          });
+          // Log resulting resources after item application
+          const res = B.red.resources || {};
+          const resKeys = ['moonstone', 'ice', 'fire', 'surge', 'healingSeed', 'luckyStone', 'firefly'];
+          const resStr = resKeys.filter(k => res[k]).map(k => `${k}:${res[k]}`).join(', ');
+          if (resStr) RaidTranscript.add('ITEM', `Starting resources after items: ${resStr}`);
+        }
+      }
 
       BattleEngine.renderBattle();
     }
