@@ -388,7 +388,6 @@ const RaidBattleAdapter = {
 
     // Hide battle view during startBattle → restore gap to prevent
     // a frame where KO'd ghosts appear alive at full HP
-    const battleView = document.getElementById('battle-view');
     if (battleView) battleView.style.opacity = '0';
 
     // Save battle log before startBattle resets it (B.log = [])
@@ -640,7 +639,6 @@ const RaidBattleAdapter = {
     // SPECTATOR LOCKDOWN: prevent ALL game logic from running.
     // startBattle created a full B state — neutralize it so no modals,
     // abilities, or roll handlers can trigger on the spectator's client.
-    const B_spec = BattleEngine.getState();
     if (B_spec) {
       B_spec.phase = 'spectating'; // no game logic checks this phase
       B_spec.duelPhaseMode = false;
