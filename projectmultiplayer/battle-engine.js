@@ -800,9 +800,8 @@ function startBattle() {
         renderBattle();
         B.battleStarted = true; // Nicholas Sneak Attack can now fire on swaps
         if (handleKOs()) return;
+        startNextRound();
         narrate(`<b class="gold">Round 1</b> — <b class="red-text">${active(B.red).name}</b>&nbsp;vs&nbsp;<b class="blue-text">${active(B.blue).name}</b> — <b class="gold">Fight!</b>`);
-        if (rBtn) { rBtn.disabled = false; rBtn.classList.add('pulse'); }
-        if (bBtn) { bBtn.disabled = false; bBtn.classList.add('pulse'); }
       });
     });
   }
