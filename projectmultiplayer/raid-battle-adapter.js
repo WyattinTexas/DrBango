@@ -82,6 +82,9 @@ const RaidBattleAdapter = {
 
     // ── React to raid cleared ─────────────────────────────────────
     RaidState.on('raid-cleared', () => {
+      // Don't clean up if results are showing — distributeRaidRewards
+      // clears activeRaid which fires this, but the result screen must stay.
+      if (RaidState.phase === 'complete') return;
       if (RaidState.isActive()) {
         this._cleanup();
         RaidState.reset();
