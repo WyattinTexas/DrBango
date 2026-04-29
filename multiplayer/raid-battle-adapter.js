@@ -624,29 +624,34 @@ const RaidBattleAdapter = {
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
 
+    const poolHp = RaidState.bossCurrentHp;
+
     // ── Player eliminated but raid continues ──────────────────────
-    if (winner === 'blue' && playerCount > 1) {
-      const bossHpNow = RaidSync._getBossGhostHp(B);
+    if (winner === 'blue' && playerCount > 1 && poolHp > 0) {
       const otherPlayersAlive = RaidState.players.some((p, i) =>
         i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
       );
 
-      if (bossHpNow > 0 && otherPlayersAlive) {
+      if (otherPlayersAlive) {
         setTimeout(() => {
           RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
         }, 1500);
 
         const gameOverEl = document.getElementById('gameOver');
         if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
-
         const narrator = document.getElementById('narrator');
         if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
-
         return;
       }
     }
 
-    // ── Raid truly over ───────────────────────────────────────────
+    // ── Boss ghosts all KO'd but pool still has HP (swarm sacrifice) ──
+    if (winner === 'red' && poolHp > 0) {
+      this._handleTurnHandoff();
+      return;
+    }
+
+    // ── Raid truly over (pool depleted or all players out) ────────
     // Atomic Firebase write after brief delay
     setTimeout(() => {
       RaidSync.writeGameOver(B, winner, currentIdx, playerCount);

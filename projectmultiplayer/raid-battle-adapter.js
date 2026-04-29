@@ -797,43 +797,48 @@ const RaidBattleAdapter = {
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
 
+    // ── Check if the raid POOL is actually depleted ────────────────
+    // The battle engine fires showGameOver when all ghosts on one side KO.
+    // But in raids, KO'ing all boss ghosts doesn't mean the raid is won —
+    // the sacrifice mechanic can prevent pool drain while ghosts still die.
+    // Use the REAL pool HP to decide, not the local ghost HP.
+    const poolHp = RaidState.bossCurrentHp;
+
     // ── Player eliminated but raid continues ──────────────────────
-    // If the boss won this local fight but is still alive and other players
-    // remain, this player is OUT — transition to permanent spectator.
-    if (winner === 'blue' && playerCount > 1) {
-      const bossHpNow = RaidSync._getBossGhostHp(B);
+    if (winner === 'blue' && playerCount > 1 && poolHp > 0) {
       const otherPlayersAlive = RaidState.players.some((p, i) =>
         i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
       );
 
-      if (bossHpNow > 0 && otherPlayersAlive) {
-        // Record elimination in transcript (not a full game-over)
+      if (otherPlayersAlive) {
         if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
-          RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
+          RaidTranscript.recordGameOver(winner, poolHp, RaidState.bossMaxHp);
         }
-
-        // Mark player as done and advance turn via Firebase
         setTimeout(() => {
           RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
         }, 1500);
 
-        // Hide game-over overlay and transition to spectating
         const gameOverEl = document.getElementById('gameOver');
         if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
-
         const narrator = document.getElementById('narrator');
         if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
-
-        // Reset fight lock so spectating can start
         this._fightStarted = false;
-
-        // The Firebase update from writeGameOver will advance currentFighterIdx,
-        // which triggers _handleActiveFight → _startSpectating on this client.
         return;
       }
     }
 
-    // ── Raid truly over (boss defeated or all players out) ────────
+    // ── Boss ghosts all KO'd but pool still has HP (swarm sacrifice) ──
+    // Treat this as a successful turn — hand off to next player, not a raid win.
+    if (winner === 'red' && poolHp > 0) {
+      if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+        RaidTranscript.recordGameOver(winner, poolHp, RaidState.bossMaxHp);
+      }
+      // Use the normal turn handoff flow
+      this._handleTurnHandoff();
+      return;
+    }
+
+    // ── Raid truly over (boss pool depleted or all players out) ───
     // Record game over and auto-download transcript
     if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
       RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
