@@ -25,6 +25,12 @@
     const phys = createPhysicsController(char.group);
     const cam = createCamera(renderer);
 
+    // Multiplayer (only activates if ?mp is in URL)
+    RoomMP.init(scene);
+    if (RoomMP.enabled) {
+        document.getElementById('player-count').style.display = 'block';
+    }
+
     // Hide loading overlay
     const overlay = document.getElementById('loading');
     if (overlay) {
@@ -39,13 +45,17 @@
         const dt = Math.min(clock.getDelta(), 0.05);
         elapsed += dt;
 
-        phys.update(dt, cam.getForward(), cam.getRight(), world);
+        phys.update(dt, cam.getForward(), cam.getRight());
 
         const groundY = Collision.getGroundHeight(char.group.position.x, char.group.position.z);
         char.update(phys.velocity, phys.grounded, dt, groundY);
         cam.update(dt, char.group.position);
         world.update(dt, elapsed);
         portals.update(elapsed);
+
+        // Multiplayer sync
+        RoomMP.sendPosition(char.group.position, char.group.children[0].rotation.y);
+        RoomMP.update(dt);
 
         // Check portal entry
         const url = portals.checkEntry(char.group.position.x, char.group.position.z);
