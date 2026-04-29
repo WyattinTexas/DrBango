@@ -597,9 +597,11 @@ const RaidBattleAdapter = {
     const bossConfig = data.bossConfig;
     if (!bossConfig) return;
 
-    // Show raid screen
+    // Show raid screen, hide battle view during setup (prevent boss ghost flash)
     const raidScreen = document.getElementById('raid-screen');
     if (raidScreen) raidScreen.style.display = 'block';
+    const specBattleView = document.getElementById('battle-view');
+    if (specBattleView) specBattleView.style.opacity = '0';
 
     // Build boss team for arena visuals
     const bossTeam = buildBossTeam(bossConfig, 1, data.enrageLevel || 0);
@@ -672,6 +674,9 @@ const RaidBattleAdapter = {
     // Boss HP pool bar
     this._ensureBossHpPoolBar();
     renderBossHpPool(data.bossCurrentHp || 0, data.bossMaxHp || 1);
+
+    // Restore battle view now that spectator state is set up (no ghost flash)
+    if (specBattleView) specBattleView.style.opacity = '1';
   },
 
   // ── Spectator view update (from Firebase snapshot) ──────────────
@@ -885,11 +890,23 @@ const RaidBattleAdapter = {
     if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
     if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
 
+    // Ensure raid screen is visible and battle view doesn't block results
+    const raidScreen = document.getElementById('raid-screen');
+    if (raidScreen) raidScreen.style.display = 'block';
+    const battleView = document.getElementById('battle-view');
+    if (battleView) battleView.style.display = 'none';
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+
+    // Stop any lingering AI/heartbeat
+    BattleEngine.stopBlueAI();
+    RaidSync.stopHeartbeat();
+
     // Show result screen if we have the UI function
     if (typeof showRaidResult === 'function') {
       showRaidResult({
         ...RaidState,
-        bossDefeatedBy: null, // will be in Firebase data
+        bossDefeatedBy: null,
         players: RaidState.players
       });
     } else {
