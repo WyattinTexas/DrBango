@@ -4509,8 +4509,12 @@ function aiTick() {
 
   // --- Auto-roll blue when button is ready ---
   if (B.phase === 'ready' || B.phase === 'rolling') {
+    // Boss mode: simplified check — blue button is hidden, just check state
     const blueBtn = document.getElementById('rollBlueBtn');
-    if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
+    const btnReady = window.BOSS_MODE
+      ? (B.phase === 'ready' || B.phase === 'rolling') // boss always ready if phase allows
+      : (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked'));
+    if (btnReady) {
       // v733: wait for Red to click READY before AI rolls Blue
       if (!pvpRedClickedRoll) return;
       // Commit specials before rolling

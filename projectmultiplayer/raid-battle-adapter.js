@@ -861,6 +861,13 @@ const RaidBattleAdapter = {
       window.getGhost = this._origGetGhost;
       this._origGetGhost = null;
     }
+    // Download transcript on ANY exit
+    if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+      RaidTranscript.add('GAME', 'RAID EXITED');
+      RaidTranscript.stop();
+      RaidTranscript.download();
+    }
+
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
     RaidSync.disconnect();
