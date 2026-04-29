@@ -87,6 +87,10 @@ function bossDamageTracker(damage, ghost) {
   if (typeof drainBossHpPool === 'function') {
     drainBossHpPool(damage);
   }
+  // Keep local pool HP in sync (RaidState is the single source of truth)
+  if (typeof RaidState !== 'undefined') {
+    RaidState.bossCurrentHp = Math.max(0, (RaidState.bossCurrentHp || 0) - damage);
+  }
 }
 
 /**

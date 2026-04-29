@@ -73,6 +73,9 @@ function bossDamageTracker(damage, ghost) {
   if (typeof drainBossHpPool === 'function') {
     drainBossHpPool(damage);
   }
+  if (typeof RaidState !== 'undefined') {
+    RaidState.bossCurrentHp = Math.max(0, (RaidState.bossCurrentHp || 0) - damage);
+  }
 }
 
 /**
@@ -13528,7 +13531,12 @@ function handleKOs() {
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
   if (redAllDown && blueAllDown) { showGameOver('draw'); renderBattle(); return true; }
   if (redAllDown) { showGameOver('blue'); renderBattle(); return true; }
-  if (blueAllDown) { showGameOver('red'); renderBattle(); return true; }
+  if (blueAllDown) {
+    if (window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
+      return false;
+    }
+    showGameOver('red'); renderBattle(); return true;
+  }
 
   // Check if any active ghost is KO'd and needs a replacement pick
   const teamsNeedingSwap = [];
@@ -13546,8 +13554,10 @@ function handleKOs() {
       if (alive.length > 0) {
         teamsNeedingSwap.push(team);
       } else {
-        // Active is KO'd and no sideline — this team is fully eliminated
         const winner = team === 'red' ? 'blue' : 'red';
+        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
+          return false;
+        }
         showGameOver(winner); renderBattle(); return true;
       }
     }

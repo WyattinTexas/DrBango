@@ -65,11 +65,7 @@ const RaidSync = {
     const savedPlayerState = this._serializePlayerState(B);
     const savedBossState = this._serializeBossState(B);
 
-    // Calculate boss pool HP from the boss ghost's current HP
-    const bossHpNow = this._getBossGhostHp(B);
-    const bossMaxGhostHp = this._getBossGhostMaxHp(B);
-    const poolMax = RaidState.bossMaxHp || 15;
-    const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / (bossMaxGhostHp || 1))));
+    const poolNow = Math.max(0, RaidState.bossCurrentHp || 0);
 
     const prevTurnCounter = RaidState.turnCounter || 0;
 
@@ -102,10 +98,7 @@ const RaidSync = {
     const savedPlayerState = this._serializePlayerState(B);
     const savedBossState = this._serializeBossState(B);
 
-    const bossHpNow = this._getBossGhostHp(B);
-    const bossMaxGhostHp = this._getBossGhostMaxHp(B);
-    const poolMax = RaidState.bossMaxHp || 15;
-    const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / (bossMaxGhostHp || 1))));
+    const poolNow = Math.max(0, RaidState.bossCurrentHp || 0);
 
     const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
     let totalDamage = 0;
