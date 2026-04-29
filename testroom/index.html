@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v852'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v853'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v852'; // Frostbite special: sideline dice debuff (Burn's sister)
+const TESTROOM_VERSION = 'v853'; // Frostbite counts towards hand limit + Pelter buff: 1 Frostbite per 1 rolled
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3342,7 +3342,7 @@ const GHOSTS = [
   {id:83, name:"Troubling Haters", rarity:"uncommon", maxHp:3, art:"art/originals/troubling_haters.jpg", ability:"Growing Mob", abilityDesc:"Deal 4+ damage: gain 2 HP.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Big damage = HP growth."},
   {id:84, name:"Wandering Sue", rarity:"uncommon", maxHp:4, art:"art/originals/wandering_sue.jpg", ability:"Hidden Weakness", abilityDesc:"Before rolling: if the enemy has more HP than Sue, gain 1 extra die.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Underdog dice bonus — almost always active at 4HP."},
   {id:85, name:"Eloise", rarity:"rare", maxHp:5, art:"art/originals/eloise.jpg", ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. HP swap for Ice Shard."},
-  {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball Fight", abilityDesc:"Sideline & In Play: gain 1 Frostbite if you roll any 1s.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Frostbite generator from 1s. Pairs with Gary for ice+frostbite from 1s."},
+  {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball Fight", abilityDesc:"Sideline & In Play: gain 1 Frostbite for each 1 you roll.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Frostbite generator from 1s. Pairs with Gary for ice+frostbite from 1s."},
   {id:87, name:"Zach", rarity:"rare", maxHp:7, art:"art/originals/zach.jpg", ability:"Craftsman", abilityDesc:"Sideline: Guard Thomas gains +3 damage on Doubles and +1 die each roll.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Guard Thomas synergy. Buffed: now also grants +1 die per turn."},
   {id:88, name:"Pale Nimbus", rarity:"rare", maxHp:4, art:"art/originals/pale_nimbus.jpg", ability:"Hidden Storm", abilityDesc:"Sideline: +2 damage if your total dice add to less than 7.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Low-roll sideline booster."},
   {id:89, name:"Mallow", rarity:"rare", maxHp:5, art:"art/originals/mallow.jpg", ability:"Dozy Cozy", abilityDesc:"Sideline: before rolling, you may spend 2 Sacred Fire to give your active Spiritkin 3 HP and gain 1 Burn.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Sacred Fire healing. Costs 2 fire to slow the Lucy loop. Grants 1 Burn as upside. 5 HP restored."},
@@ -9578,7 +9578,7 @@ function disableRollButtons() {
 // ============================================================
 // HAND LIMIT MODE — cap specials at B.HAND_LIMIT (default 3)
 // ============================================================
-const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'];
+const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn','frostbite'];
 const HAND_RESOURCE_LABELS = {
   moonstone: { emoji:'🌙', name:'Moonstone' },
   ice:       { emoji:'❄️', name:'Ice Shard' },
@@ -9588,6 +9588,7 @@ const HAND_RESOURCE_LABELS = {
   luckyStone:{ emoji:'🍀', name:'Lucky Stone' },
   firefly:   { emoji:'✨', name:'Firefly' },
   burn:      { emoji:'💥', name:'Burn' },
+  frostbite: { emoji:'❄️', name:'Frostbite' },
 };
 
 function getHandSize(team) {
@@ -15356,17 +15357,18 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">Gary</span> (${loseLoc}) — Lucky Novice! ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''} → +${garyIceLose} Ice Shards!`);
   }
 
-  // Pelter (86) — Snowball Fight: Sideline & In Play, gain 1 Frostbite if you roll any 1s
+  // Pelter (86) — Snowball Fight: Sideline & In Play, gain 1 Frostbite for each 1 you roll
   // Win-team check
   const winPelterActive = wF.id === 86 && !wF.ko;
   const winPelterSide = hasSideline(winTeam, 86);
-  if ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice && winDice.some(d => d === 1)) {
+  const pelterOnesWin = ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice) ? winDice.filter(d => d === 1).length : 0;
+  if (pelterOnesWin > 0) {
     if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
-    winTeam.resources.frostbite += 1;
+    winTeam.resources.frostbite += pelterOnesWin;
     const pelterG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
     const pelterLoc = winPelterActive ? '' : ' (sideline)';
     collectKC(winTeamName, pelterG.name, pelterG);
-    log(`<span class="log-ability" style="color:#60a5fa">${pelterG.name}${pelterLoc}</span> — Snowball Fight! Rolled a 1 → +1 Frostbite!`);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterG.name}${pelterLoc}</span> — Snowball Fight! ${pelterOnesWin} rolled 1${pelterOnesWin > 1 ? 's' : ''} → +${pelterOnesWin} Frostbite!`);
   } else if (winPelterSide && corneliusBlocksRally && winDice && winDice.some(d => d === 1)) {
     corneliusSidelineBlockedList.push('Pelter');
   }
@@ -15374,13 +15376,14 @@ function _resolveRoundImpl() {
   const losePelterActive = lF.id === 86 && !lF.ko;
   const losePelterSide = hasSideline(loseTeam, 86);
   const corneliusBlocksPelterLose = losePelterSide && !losePelterActive && hasSideline(winTeam, 45);
-  if ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice && loseDice.some(d => d === 1)) {
+  const pelterOnesLose = ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice) ? loseDice.filter(d => d === 1).length : 0;
+  if (pelterOnesLose > 0) {
     if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
-    loseTeam.resources.frostbite += 1;
+    loseTeam.resources.frostbite += pelterOnesLose;
     const pelterGL = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
     const pelterLocL = losePelterActive ? '' : ' (sideline)';
     collectKC(loseTeamName, pelterGL.name, pelterGL);
-    log(`<span class="log-ability" style="color:#60a5fa">${pelterGL.name}${pelterLocL}</span> — Snowball Fight! Rolled a 1 → +1 Frostbite!`);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterGL.name}${pelterLocL}</span> — Snowball Fight! ${pelterOnesLose} rolled 1${pelterOnesLose > 1 ? 's' : ''} → +${pelterOnesLose} Frostbite!`);
   } else if (losePelterSide && corneliusBlocksPelterLose && loseDice && loseDice.some(d => d === 1)) {
     corneliusSidelineBlockedList.push('Pelter');
   }
@@ -16430,13 +16433,13 @@ function _resolveRoundImpl() {
     // Knight reactions already collected via collectKC at game-state section (line ~9526) — do NOT double-fire here
   }
   // Pelter (86) — Snowball Fight: win-team callout (frostbite already added in game-state section)
-  if ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice && winDice.some(d => d === 1)) {
+  if (pelterOnesWin > 0) {
     const _pelterWinG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
     const _pelterWinLoc = winPelterActive ? 'active' : 'sideline';
-    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterWinG.name} (${_pelterWinLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!winPelterActive) popSidelineCard(winTeam, 86); renderBattle(); }, winTeamName);
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterWinG.name} (${_pelterWinLoc}) — ${pelterOnesWin} rolled 1${pelterOnesWin > 1 ? 's' : ''}! +${pelterOnesWin} Frostbite!`, () => { if (!winPelterActive) popSidelineCard(winTeam, 86); renderBattle(); }, winTeamName);
     if (sandwichForLose) {
       if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +1 Frostbite!`, () => { loseTeam.resources.frostbite += 1; renderBattle(); }, loseTeamName);
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +${pelterOnesWin} Frostbite!`, () => { loseTeam.resources.frostbite += pelterOnesWin; renderBattle(); }, loseTeamName);
     }
   }
   if (banditPeteTriggered) {
@@ -16932,13 +16935,13 @@ function _resolveRoundImpl() {
     // Gary lose-path knight reactions already collected via collectKC at game-state section (line ~9531) — do NOT double-fire here
   }
   // Pelter (86) — Snowball Fight: lose-team callout (frostbite already added in game-state section)
-  if ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice && loseDice.some(d => d === 1)) {
+  if (pelterOnesLose > 0) {
     const _pelterLoseG = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
     const _pelterLoseLoc = losePelterActive ? 'active' : 'sideline';
-    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterLoseG.name} (${_pelterLoseLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!losePelterActive) popSidelineCard(loseTeam, 86); renderBattle(); }, loseTeamName);
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterLoseG.name} (${_pelterLoseLoc}) — ${pelterOnesLose} rolled 1${pelterOnesLose > 1 ? 's' : ''}! +${pelterOnesLose} Frostbite!`, () => { if (!losePelterActive) popSidelineCard(loseTeam, 86); renderBattle(); }, loseTeamName);
     if (sandwichForWin) {
       if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
-      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +1 Frostbite!`, () => { winTeam.resources.frostbite += 1; renderBattle(); }, winTeamName);
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +${pelterOnesLose} Frostbite!`, () => { winTeam.resources.frostbite += pelterOnesLose; renderBattle(); }, winTeamName);
     }
   }
 
