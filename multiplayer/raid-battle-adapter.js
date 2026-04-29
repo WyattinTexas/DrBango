@@ -17,19 +17,11 @@ const RaidBattleAdapter = {
       if (!RaidState.isActive() || !RaidState.amFighter()) return false;
 
       const B = BattleEngine.getState();
-      if (!B || B.round <= 1) return false; // first round — let default run
-      if (B.phase === 'over') return false; // game over already fired — don't race with handoff
+      if (!B || B.round <= 1) return false;
+      if (B.phase === 'over') return false;
 
-      // Boss pool depleted — the raid is won even if the active ghost hasn't KO'd yet.
-      // Let the cinematic finish and showGameOver handle the endgame. Don't hand off.
-      if (RaidState.bossCurrentHp <= 0 || (RaidState.bossMaxHp > 0 && RaidState.bossCurrentHp <= 0)) return false;
-      if (B.blue && B.blue.ghosts && B.blue.ghosts.every(g => g.ko)) return false;
-
-      if (RaidState.players.length <= 1) return false; // solo — let default run
-
-      // This IS a turn boundary — handle the handoff
       this._handleTurnHandoff();
-      return true; // consumed — skip default resetRollButtons behavior
+      return true;
     });
 
     // ── Game over hook ────────────────────────────────────────────
@@ -624,57 +616,31 @@ const RaidBattleAdapter = {
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
 
-    const poolHp = RaidState.bossCurrentHp;
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
 
-    // ── Player eliminated but raid continues ──────────────────────
-    if (winner === 'blue' && playerCount > 1 && poolHp > 0) {
+    // ── CASE 1: Player eliminated ────────────────────────────────
+    if (winner === 'blue') {
       const otherPlayersAlive = RaidState.players.some((p, i) =>
         i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
       );
-
       if (otherPlayersAlive) {
-        setTimeout(() => {
-          RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
-        }, 1500);
-
-        const gameOverEl = document.getElementById('gameOver');
-        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+        setTimeout(() => { RaidSync.writeGameOver(B, winner, currentIdx, playerCount); }, 1500);
         const narrator = document.getElementById('narrator');
         if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
         return;
       }
     }
 
-    // ── Boss ghosts all KO'd but pool still has HP (swarm sacrifice) ──
-    if (winner === 'red' && poolHp > 0) {
-      this._handleTurnHandoff();
-      return;
-    }
-
-    // ── Raid truly over (pool depleted or all players out) ────────
-    // Atomic Firebase write after brief delay
+    // ── CASE 2: Raid truly over ──────────────────────────────────
+    setTimeout(() => { RaidSync.writeGameOver(B, winner, currentIdx, playerCount); }, 1500);
     setTimeout(() => {
-      RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
-    }, 1500);
-
-    // Show "Return to Lobby" button
-    setTimeout(() => {
-      const goButtons = document.querySelector('.go-buttons');
-      const gameOver = document.getElementById('gameOver');
-      const target = goButtons || gameOver;
-      if (target) {
-        const btnHtml = `
-          <button class="go-btn-rematch" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.4);margin-top:16px;"
-            onclick="RaidBattleAdapter._returnToLobby()">
-            RETURN TO LOBBY
-          </button>`;
-        if (goButtons) {
-          goButtons.innerHTML = btnHtml;
-        } else {
-          target.insertAdjacentHTML('beforeend', btnHtml);
+      if (RaidState.phase !== 'complete') {
+        if (['fighting', 'spectating', 'turn-handoff'].includes(RaidState.phase)) {
+          RaidState.transition('complete');
         }
       }
-    }, 3500);
+    }, 6500);
   },
 
   // ══════════════════════════════════════════════════════════════════

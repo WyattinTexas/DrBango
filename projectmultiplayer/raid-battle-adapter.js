@@ -19,17 +19,11 @@ const RaidBattleAdapter = {
 
       const B = BattleEngine.getState();
       if (!B || B.round <= 1) return false; // first round — let default run
-      if (B.phase === 'over') return false; // game over already fired — don't race with handoff
+      if (B.phase === 'over') return false;  // onGameOver already owns the endgame
 
-      // Boss pool depleted — the raid is won even if the active ghost hasn't KO'd yet.
-      // Let the cinematic finish and showGameOver handle the endgame. Don't hand off.
-      if (RaidState.bossCurrentHp <= 0 || (RaidState.bossMaxHp > 0 && RaidState.bossCurrentHp <= 0)) return false;
-      // Also check B.blue directly — if all boss ghosts are KO'd, game-over is imminent
-      if (B.blue && B.blue.ghosts && B.blue.ghosts.every(g => g.ko)) return false;
-
-      if (RaidState.players.length <= 1) return false; // solo — let default run
-
-      // This IS a turn boundary — handle the handoff
+      // Pure handoff — no pool/KO checks here. Those belong in onGameOver.
+      // If this hook fires, it means handleKOs didn't trigger game-over,
+      // which means the round ended normally. Hand off.
       this._handleTurnHandoff();
       return true; // consumed — skip default resetRollButtons behavior
     });
@@ -832,49 +826,37 @@ const RaidBattleAdapter = {
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
 
-    // ── Check if the raid POOL is actually depleted ────────────────
-    // The battle engine fires showGameOver when all ghosts on one side KO.
-    // But in raids, KO'ing all boss ghosts doesn't mean the raid is won —
-    // the sacrifice mechanic can prevent pool drain while ghosts still die.
-    // Use the REAL pool HP to decide, not the local ghost HP.
-    const poolHp = RaidState.bossCurrentHp;
+    // Hide battle engine's game-over overlay — raid adapter owns all endgame UI
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
 
-    // ── Player eliminated but raid continues ──────────────────────
-    if (winner === 'blue' && playerCount > 1 && poolHp > 0) {
+    // ── CASE 1: Player eliminated (winner='blue') ────────────────
+    // This player's team is wiped. Check if other players can continue.
+    if (winner === 'blue') {
       const otherPlayersAlive = RaidState.players.some((p, i) =>
         i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
       );
 
       if (otherPlayersAlive) {
+        // Raid continues — mark this player as done, hand off
         if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
-          RaidTranscript.recordGameOver(winner, poolHp, RaidState.bossMaxHp);
+          RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
         }
         setTimeout(() => {
           RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
         }, 1500);
 
-        const gameOverEl = document.getElementById('gameOver');
-        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
         const narrator = document.getElementById('narrator');
         if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
         this._fightStarted = false;
+        // Firebase update will trigger _startSpectating via _handleActiveFight
         return;
       }
+      // No other players alive — fall through to raid-over
     }
 
-    // ── Boss ghosts all KO'd but pool still has HP ──
-    // Treat this as a successful turn — hand off to next player, not a raid win.
-    if (winner === 'red' && poolHp > 0) {
-      if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
-        RaidTranscript.recordGameOver(winner, poolHp, RaidState.bossMaxHp);
-      }
-      // Use the normal turn handoff flow
-      this._handleTurnHandoff();
-      return;
-    }
-
-    // ── Raid truly over (boss pool depleted or all players out) ───
-    // Record game over and auto-download transcript
+    // ── CASE 2: Raid truly over ──────────────────────────────────
+    // Either: winner='red' (pool=0, victory) or winner='blue' (all players out, defeat)
     if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
       RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
       RaidTranscript.stop();
@@ -886,21 +868,15 @@ const RaidBattleAdapter = {
       RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
     }, 1500);
 
-    // Local fallback: if Firebase listener hasn't triggered the result screen
-    // within 5 seconds, force-show it locally. Prevents hanging on slow Firebase.
+    // Local fallback: if Firebase hasn't triggered results in 6.5s, force locally
     setTimeout(() => {
       if (RaidState.phase !== 'complete') {
-        console.warn('[Raid] Result screen fallback triggered — forcing locally');
+        console.warn('[Raid] Result screen fallback — forcing locally');
         if (['fighting', 'spectating', 'turn-handoff'].includes(RaidState.phase)) {
           RaidState.transition('complete');
         }
       }
     }, 6500);
-
-    // Don't show a "Return to Lobby" button here — _showResults handles that.
-    // Hide any game-over overlay from the battle engine.
-    const gameOverEl = document.getElementById('gameOver');
-    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
   },
 
   // ══════════════════════════════════════════════════════════════════
