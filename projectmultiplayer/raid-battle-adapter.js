@@ -391,7 +391,22 @@ const RaidBattleAdapter = {
     // Set MP_MODE so blue AI responds to red's roll
     MP_MODE = true;
 
+    // Hide battle view during startBattle → restore gap to prevent
+    // a frame where KO'd ghosts appear alive at full HP
+    const battleView = document.getElementById('battle-view');
+    if (battleView) battleView.style.opacity = '0';
+
+    // Save battle log before startBattle resets it (B.log = [])
+    const savedLog = BattleEngine.getState()?.log || [];
+
     BattleEngine.startBattle();
+
+    // Restore log from previous turns + add turn separator
+    const B_new = BattleEngine.getState();
+    if (B_new && savedLog.length > 0) {
+      const turnNum = (RaidState.turnCounter || 0) + 1;
+      B_new.log = [...savedLog, `<span class="log-round">── Turn ${turnNum} ──</span>`, ...B_new.log];
+    }
 
     // Fix: if a player ghost shares an ID with a boss ghost, startBattle gave
     // it boss stats (higher HP, boss art, etc.). Restore regular data for red team.
@@ -522,6 +537,9 @@ const RaidBattleAdapter = {
       }
 
       BattleEngine.renderBattle();
+
+      // Restore battle view now that state is correct (no ghost flash)
+      if (battleView) battleView.style.opacity = '1';
     }
 
     // Hide blue roll button (boss auto-rolls via AI)
@@ -570,6 +588,13 @@ const RaidBattleAdapter = {
   // ══════════════════════════════════════════════════════════════════
 
   _startSpectating() {
+    // Clear stale dice from previous fight/turn
+    const redDiceEl = document.getElementById('red-dice');
+    const blueDiceEl = document.getElementById('blue-dice');
+    if (redDiceEl) redDiceEl.innerHTML = '';
+    if (blueDiceEl) blueDiceEl.innerHTML = '';
+    document.querySelectorAll('.die-physics').forEach(el => el.remove());
+
     const data = RaidState;
     const currentIdx = data.currentFighterIdx;
     const currentPlayer = data.players[currentIdx];
@@ -604,7 +629,16 @@ const RaidBattleAdapter = {
 
     MP_MODE = true;
 
+    // Save battle log before startBattle resets it
+    const savedLog = BattleEngine.getState()?.log || [];
+
     BattleEngine.startBattle();
+
+    // Restore log from previous turns
+    const B_spec = BattleEngine.getState();
+    if (B_spec && savedLog.length > 0) {
+      B_spec.log = [...savedLog, ...B_spec.log];
+    }
 
     window.getGhost = _origGetGhost;
 
