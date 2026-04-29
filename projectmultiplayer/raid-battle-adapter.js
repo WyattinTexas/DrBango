@@ -37,8 +37,9 @@ const RaidBattleAdapter = {
     // ── Game over hook ────────────────────────────────────────────
     // Replaces the 130-line showGameOver monkey-patch in the old bridge
     BattleEngine.onGameOver((winner) => {
-      if (!RaidState.isActive()) return; // not in raid
+      if (!RaidState.isActive()) return false; // not in raid — let default UI run
       this._handleRaidGameOver(winner);
+      return true; // consumed — skip default showGameOver UI (prevents 5s auto-redirect)
     });
 
     // ── Post-resolve hook (event-driven snapshot) ─────────────────

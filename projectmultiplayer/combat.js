@@ -4023,10 +4023,13 @@ function doKoSwap(team, idx) {
 
 function showGameOver(winner) {
   B.phase = 'over';
-  // Fire registered hooks BEFORE the default game-over logic
+  // Fire registered hooks BEFORE the default game-over logic.
+  // If a hook returns true, it consumed the event — skip default UI.
+  let consumed = false;
   for (const fn of _gameOverHooks) {
-    try { fn(winner); } catch(e) { console.error('[showGameOver hook error]', e); }
+    try { if (fn(winner)) consumed = true; } catch(e) { console.error('[showGameOver hook error]', e); }
   }
+  if (consumed) return;
   // Live PvP: broadcast game over so both clients show it
   if (LIVE_PVP && PVP_GAME_REF && PVP_SIDE === 'red') {
     const stateSnap = pvpSerializeState();
