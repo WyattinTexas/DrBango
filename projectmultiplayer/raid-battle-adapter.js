@@ -197,7 +197,8 @@ const RaidBattleAdapter = {
     RaidState.currentFighterIdx = data.currentFighterIdx || 0;
     RaidState.currentFighterUid = data.currentFighterUid || null;
     RaidState.turnCounter = data.turnCounter || 0;
-    RaidState.bossCurrentHp = data.bossCurrentHp || 0;
+    // Default to bossMaxHp if bossCurrentHp hasn't been written yet (raid just started)
+    RaidState.bossCurrentHp = data.bossCurrentHp != null ? data.bossCurrentHp : (RaidState.bossMaxHp || data.bossMaxHp || 15);
     RaidState.enrageLevel = data.enrageLevel || 0;
     RaidState.bossGhostState = data.bossGhostState || null;
     RaidState.playerGhostState = data.playerGhostState || {};

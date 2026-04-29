@@ -3878,8 +3878,9 @@ function handleKOs() {
   if (blueAllDown) {
     // Raid mode: boss pool may still have HP even when all ghosts KO'd.
     // Don't declare victory — let the turn hand off for another round.
-    if (window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
-      return false; // pool alive — turn handoff will handle this
+    if (window.BOSS_MODE && typeof RaidState !== 'undefined' &&
+        (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
+      return false; // pool alive or not yet initialized — turn handoff will handle this
     }
     showGameOver('red'); renderBattle(); return true;
   }
@@ -3903,7 +3904,8 @@ function handleKOs() {
         // Active is KO'd and no sideline — this team is fully eliminated
         const winner = team === 'red' ? 'blue' : 'red';
         // Raid mode: if blue team wiped but pool > 0, don't end — hand off instead
-        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
+        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' &&
+            (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
           return false;
         }
         showGameOver(winner); renderBattle(); return true;

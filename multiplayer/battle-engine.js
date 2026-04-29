@@ -13532,7 +13532,8 @@ function handleKOs() {
   if (redAllDown && blueAllDown) { showGameOver('draw'); renderBattle(); return true; }
   if (redAllDown) { showGameOver('blue'); renderBattle(); return true; }
   if (blueAllDown) {
-    if (window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
+    if (window.BOSS_MODE && typeof RaidState !== 'undefined' &&
+        (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
       return false;
     }
     showGameOver('red'); renderBattle(); return true;
@@ -13555,7 +13556,8 @@ function handleKOs() {
         teamsNeedingSwap.push(team);
       } else {
         const winner = team === 'red' ? 'blue' : 'red';
-        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' && RaidState.bossCurrentHp > 0) {
+        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' &&
+            (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
           return false;
         }
         showGameOver(winner); renderBattle(); return true;
