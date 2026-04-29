@@ -18,6 +18,7 @@ const RaidBattleAdapter = {
 
       const B = BattleEngine.getState();
       if (!B || B.round <= 1) return false; // first round — let default run
+      if (B.phase === 'over') return false; // game over already fired — don't race with handoff
 
       if (RaidState.players.length <= 1) return false; // solo — let default run
 
