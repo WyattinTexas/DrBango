@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v859'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v860'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v859'; // Add Mirror Theft team (#109)
+const TESTROOM_VERSION = 'v860'; // City Cyboo rework: 1HP = opponent -1 die, Simon desc fix
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3286,7 +3286,7 @@ const GHOSTS = [
   {id:74, name:"Dark Jeff", rarity:"rare", maxHp:3, art:"art/originals/DarkJeff.png", ability:"Cackle", abilityDesc:"Sideline: +1 damage to all your rolls.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Passive sideline damage."},
   {id:75, name:"Flora", rarity:"rare", maxHp:4, art:"art/originals/flora.jpg", ability:"Restore", abilityDesc:"Doubles: gain 2 HP after damage is applied.", category:"HP Recovery", set:"Set 1", designNote:"Original card. The very first card Wyatt made as a kid."},
   {id:76, name:"Dark Wing", rarity:"rare", maxHp:2, art:"art/originals/DarkWing.png", ability:"Precision", abilityDesc:"Once Per Game: if Dark Wing rolls Singles, reroll all dice.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. One-shot precision reroll — only offered on singles (doubles or better is already fine)."},
-  {id:77, name:"City Cyboo", rarity:"rare", maxHp:1, art:"art/originals/CityCyboo.png", ability:"Barrier", abilityDesc:"Takes no damage from enemy Doubles.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. 1 HP doubles immune."},
+  {id:77, name:"City Cyboo", rarity:"rare", maxHp:1, art:"art/originals/CityCyboo.png", ability:"Barrier", abilityDesc:"In Play & Sideline: if your active Spiritkin has exactly 1 HP, the opponent loses 1 die.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. 1 HP dice denial from anywhere."},
   {id:94, name:"Jenkins", rarity:"ghost-rare", maxHp:5, art:"art/originals/Jenkins.png", ability:"Greeting", abilityDesc:"Entry: roll 4 dice and deal damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Entry nuke."},
   {id:95, name:"Tabitha", rarity:"ghost-rare", maxHp:1, art:"art/originals/Tabitha.png", ability:"Rally", abilityDesc:"Sideline: +2 damage on Doubles.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Sideline doubles buff."},
   {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"Sideline: when your active Spiritkin is about to take damage, Guardian Fairy leaps in and takes the hit instead.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
@@ -3318,7 +3318,7 @@ const GHOSTS = [
   // FROST VALLEY
   // ============================================================
   {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Blizzard", abilityDesc:"Discard 1 Ice Shard: place 2 Frostbite on each enemy sideline ghost.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Ice Shard → Frostbite converter. Blankets the enemy bench."},
-  {id:24, name:"Simon", rarity:"common", maxHp:4, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"Sideline: you may discard 3 Specials to gain 1 Moonstone.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Sideline moonstone converter. Trade 3 specials for 1 Moonstone pre-roll."},
+  {id:24, name:"Simon", rarity:"common", maxHp:4, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"Sideline: before rolling, you may discard 3 Specials to gain 1 Moonstone.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Sideline moonstone converter. Trade 3 specials for 1 Moonstone pre-roll."},
   {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Winter's Harvest", abilityDesc:"Roll Doubles: gain 1 Frostbite and 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Doubles-based Frostbite + Ice Shard generator. Fuels Powder and Calvin & Anna."},
   {id:26, name:"Logey", rarity:"common", maxHp:4, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Fredrick gains 1 extra die. Fredrick's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation."},
@@ -10387,6 +10387,33 @@ function doPreRollSetup() {
     }
   });
 
+  // City Cyboo (77) — Barrier: In Play & Sideline, if your active ghost has exactly 1 HP, opponent loses 1 die
+  // Negated by Cornelius (45) — Antidote (only when on sideline)
+  [B.red, B.blue].forEach(team => {
+    const f = active(team);
+    const tName = team === B.red ? 'red' : 'blue';
+    const enemyName = tName === 'red' ? 'blue' : 'red';
+    const enemyTeamObj = team === B.red ? B.blue : B.red;
+    const cityCybooActive = f.id === 77 && !f.ko;
+    const cityCybooSide = hasSideline(team, 77);
+    if ((cityCybooActive || cityCybooSide) && f.hp === 1 && !f.ko) {
+      const corneliusBlocksCC = cityCybooSide && !cityCybooActive && hasSideline(enemyTeamObj, 45);
+      if (corneliusBlocksCC) {
+        const cornGhost = getSidelineGhost(enemyTeamObj, 45);
+        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks City Cyboo's Barrier!`, enemyName]);
+        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! City Cyboo Barrier blocked!`);
+      } else {
+        if (enemyName === 'red') redCount = Math.max(0, redCount - 1);
+        else blueCount = Math.max(0, blueCount - 1);
+        const ccGhost = cityCybooActive ? f : (getSidelineGhost(team, 77) || { name: 'City Cyboo' });
+        const ccLoc = cityCybooActive ? '' : ' (sideline)';
+        preRollCallouts.push(['BARRIER!', 'var(--rare)', `${ccGhost.name}${ccLoc} — ${f.name} at 1 HP! Opponent loses 1 die!`, tName]);
+        log(`<span class="log-ability">${ccGhost.name}</span>${ccLoc} — Barrier! ${f.name} at 1 HP → opponent -1 die!`);
+        collectKC(tName, ccGhost.name, ccGhost);
+      }
+    }
+  });
+
   // Explorer Jeff (455) — Treasure Hunter: sideline & in play, if holding 3+ different specials, +1 die
   // Negated by Cornelius (45) — Antidote (only when on sideline)
   [B.red, B.blue].forEach(team => {
@@ -15582,17 +15609,8 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${lF.name}</span> — Elusive! ${skyElusiveBlockedDmg} incoming damage > 2 — ${wF.name}'s hit negated! Counter die pending.`);
   }
 
-  // City Cyboo (77) — Barrier: takes no damage from enemy doubles.
-  // A 1 HP doubles-immune defender — the win roll type must be 'doubles' for Barrier to trigger.
-  let cityCybooBarrier = false;
-  let cityCybooBlockedDmg = 0;
-  if (lF.id === 77 && !lF.ko && wR.type === 'doubles' && dmg > 0 && !cameronUnnegatable) {
-    cityCybooBlockedDmg = dmg;
-    dmg = 0;
-    cityCybooBarrier = true;
-    collectKC(loseTeamName, lF.name);
-    log(`<span class="log-ability">${lF.name}</span> — Barrier! Enemy doubles blocked! ${cityCybooBlockedDmg} damage negated!`);
-  }
+  // City Cyboo (77) — Barrier: REMOVED (now dice modifier — see dice count section)
+  let cityCybooBarrier = false; // kept for code structure compatibility
 
   // Puff (5) — Cute: enemy doubles and triples deal -1 damage (minimum 0).
   // Partial reduction, NOT full negation — Cute is not a negation (Cameron Unstoppable Force doesn't interact with it).
@@ -16615,10 +16633,7 @@ function _resolveRoundImpl() {
   // Sky knight reactions already collected via collectKC at game-state section (line ~9709) — do NOT double-fire here
 
   // City Cyboo (77) — Barrier: enemy doubles negated callout
-  if (cityCybooBarrier) {
-    queueAbility('BARRIER!', 'var(--rare)', `${lF.name} — Enemy doubles BLOCKED! ${cityCybooBlockedDmg} damage negated!`, null, loseTeamName);
-  }
-  // City Cyboo knight reactions already collected via collectKC at game-state section (line ~9721) — do NOT double-fire here
+  // City Cyboo (77) — Barrier: REMOVED (now dice modifier — callout in dice count section)
 
   // Puff (5) — Cute: doubles/triples softened by 1 callout
   if (puffCute) {
