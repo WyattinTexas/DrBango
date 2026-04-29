@@ -21,6 +21,12 @@ const RaidBattleAdapter = {
       if (!B || B.round <= 1) return false; // first round — let default run
       if (B.phase === 'over') return false; // game over already fired — don't race with handoff
 
+      // Boss pool depleted — the raid is won even if the active ghost hasn't KO'd yet.
+      // Let the cinematic finish and showGameOver handle the endgame. Don't hand off.
+      if (RaidState.bossCurrentHp <= 0 || (RaidState.bossMaxHp > 0 && RaidState.bossCurrentHp <= 0)) return false;
+      // Also check B.blue directly — if all boss ghosts are KO'd, game-over is imminent
+      if (B.blue && B.blue.ghosts && B.blue.ghosts.every(g => g.ko)) return false;
+
       if (RaidState.players.length <= 1) return false; // solo — let default run
 
       // This IS a turn boundary — handle the handoff
