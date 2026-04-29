@@ -25,11 +25,9 @@
     const phys = createPhysicsController(char.group);
     const cam = createCamera(renderer);
 
-    // Multiplayer (only activates if ?mp is in URL)
+    // Multiplayer — always on
     RoomMP.init(scene);
-    if (RoomMP.enabled) {
-        document.getElementById('player-count').style.display = 'block';
-    }
+    document.getElementById('player-count').style.display = 'block';
 
     // Hide loading overlay
     const overlay = document.getElementById('loading');

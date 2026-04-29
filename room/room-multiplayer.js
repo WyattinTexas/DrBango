@@ -13,9 +13,6 @@ const RoomMP = {
 
     init(scene) {
         this.scene = scene;
-
-        // Only enable if ?mp param is present
-        if (!new URLSearchParams(window.location.search).has('mp')) return;
         this.enabled = true;
 
         // Firebase init
