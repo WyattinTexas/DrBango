@@ -533,6 +533,10 @@ const RaidBattleAdapter = {
       }
     }, 300);
 
+    // Watchdog: if game gets stuck (no phase change for 20s while fighting),
+    // log diagnostic info and try to recover
+    this._startWatchdog();
+
     // Render boss HP pool bar
     this._ensureBossHpPoolBar();
     renderBossHpPool(RaidState.bossCurrentHp, RaidState.bossMaxHp);
@@ -587,17 +591,32 @@ const RaidBattleAdapter = {
 
     window.getGhost = _origGetGhost;
 
-    // Stop AI and snapshot sync — spectator is read-only
+    // SPECTATOR LOCKDOWN: prevent ALL game logic from running.
+    // startBattle created a full B state — neutralize it so no modals,
+    // abilities, or roll handlers can trigger on the spectator's client.
+    const B_spec = BattleEngine.getState();
+    if (B_spec) {
+      B_spec.phase = 'spectating'; // no game logic checks this phase
+      B_spec.duelPhaseMode = false;
+    }
     BattleEngine.stopBlueAI();
 
-    // Clear skip-entry flag after async entries suppressed
-    setTimeout(() => { window._raidSkipEntry = false; }, 6000);
+    // Clear ALL overlays that startBattle may have triggered
+    if (typeof clearAllOverlays === 'function') clearAllOverlays();
 
-    // Hide roll buttons
+    // Clear skip-entry flag
+    window._raidSkipEntry = false;
+
+    // Hide ALL interactive elements
     const rollBtn = document.getElementById('rollRedBtn');
     if (rollBtn) rollBtn.style.display = 'none';
     const blueBtn = document.getElementById('rollBlueBtn');
     if (blueBtn) blueBtn.style.display = 'none';
+    // Clear ability buttons explicitly
+    ['red', 'blue'].forEach(t => {
+      const el = document.getElementById(`${t}-ability-buttons`);
+      if (el) el.innerHTML = '';
+    });
 
     // Show watching banner
     const narrator = document.getElementById('narrator');
@@ -836,6 +855,7 @@ const RaidBattleAdapter = {
     this._entering = false;
     this._fightStarted = false;
     this._processingUpdate = false;
+    this._stopWatchdog();
     // Restore original getGhost
     if (this._origGetGhost) {
       window.getGhost = this._origGetGhost;
@@ -900,6 +920,60 @@ const RaidBattleAdapter = {
     RaidState.reset();
     if (typeof showRaidLobby === 'function') showRaidLobby();
     if (typeof closeRaidResult === 'function') closeRaidResult();
+  },
+
+  // ══════════════════════════════════════════════════════════════════
+  // WATCHDOG — detects stuck game state and recovers
+  // ══════════════════════════════════════════════════════════════════
+
+  _watchdogTimer: null,
+  _watchdogLastPhase: '',
+  _watchdogLastRound: -1,
+
+  _startWatchdog() {
+    this._stopWatchdog();
+    this._watchdogTimer = setInterval(() => {
+      if (!RaidState.amFighter()) { this._stopWatchdog(); return; }
+      const B = BattleEngine.getState();
+      if (!B) return;
+
+      // Check if state has changed since last tick
+      const key = `${B.phase}:${B.round}`;
+      if (key === this._watchdogLastPhase) {
+        // Same state for 20 seconds — game might be stuck
+        if (B.phase !== 'ready' && B.phase !== 'over') {
+          console.warn('[Watchdog] Game appears stuck!', {
+            phase: B.phase, round: B.round,
+            redDice: B.redDice, blueDice: B.blueDice,
+            koSwapQueue: B.koSwapQueue,
+            pendingMoonstone: B.pendingMoonstone,
+            pendingResolve: !!B.pendingResolve,
+            abilityQueueMode: typeof abilityQueueMode !== 'undefined' ? abilityQueueMode : '?'
+          });
+
+          // Log to transcript
+          if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+            RaidTranscript.add('WATCHDOG', `Game stuck! phase=${B.phase} round=${B.round}`);
+          }
+
+          // Attempt recovery: force to ready state
+          console.warn('[Watchdog] Attempting recovery — forcing phase to ready');
+          B.phase = 'ready';
+          if (typeof clearAllOverlays === 'function') clearAllOverlays();
+          if (typeof resetRollButtons === 'function') resetRollButtons();
+          if (typeof renderBattle === 'function') renderBattle();
+        }
+      }
+      this._watchdogLastPhase = key;
+    }, 20000); // check every 20 seconds
+  },
+
+  _stopWatchdog() {
+    if (this._watchdogTimer) {
+      clearInterval(this._watchdogTimer);
+      this._watchdogTimer = null;
+    }
+    this._watchdogLastPhase = '';
   },
 
   // ══════════════════════════════════════════════════════════════════
