@@ -667,13 +667,17 @@ const RaidSync = {
   // Get boss ghost current HP (always index 0, not activeIdx)
   _getBossGhostHp(B) {
     if (!B || !B.blue) return 0;
-    const bossGhost = B.blue.ghosts[0];
-    return bossGhost ? (bossGhost.ko ? 0 : bossGhost.hp) : 0;
+    // Sum ALL boss ghosts' HP — not just ghosts[0] (the main boss).
+    // Swarm bosses like Jasper have minions (Drone, Worker) whose HP counts.
+    let total = 0;
+    B.blue.ghosts.forEach(g => { if (g && !g.ko) total += (g.hp || 0); });
+    return total;
   },
 
   _getBossGhostMaxHp(B) {
     if (!B || !B.blue) return 9;
-    const bossGhost = B.blue.ghosts[0];
-    return bossGhost ? (bossGhost.maxHp || 9) : 9;
+    let total = 0;
+    B.blue.ghosts.forEach(g => { if (g) total += (g.maxHp || 0); });
+    return total || 9;
   }
 };
