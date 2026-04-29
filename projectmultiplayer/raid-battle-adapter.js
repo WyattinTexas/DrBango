@@ -827,7 +827,7 @@ const RaidBattleAdapter = {
       }
     }
 
-    // ── Boss ghosts all KO'd but pool still has HP (swarm sacrifice) ──
+    // ── Boss ghosts all KO'd but pool still has HP ──
     // Treat this as a successful turn — hand off to next player, not a raid win.
     if (winner === 'red' && poolHp > 0) {
       if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {

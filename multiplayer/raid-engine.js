@@ -836,7 +836,6 @@ function buildBossTeam(bossConfig, phase, enrageLevel) {
     enrageLevel: enrageLevel,
     phase: phase,
     personality: bossConfig.personality,
-    sacrificeUsedThisRound: false,
     spawnCounter: 0,
     swapCooldown: 0,
     roundsSinceSwap: 0
@@ -1001,10 +1000,8 @@ function bossPreRoll(personality, phase, enrage, bossTeam, playerTeam, battleSta
         const emptySlot = bossTeam.minions.findIndex(m => !m || m.ko);
         if (emptySlot >= 0) {
           actions.push({ type: 'spawn_minion', slot: emptySlot });
-        } else {
-          // Sacrifice weakest minion to heal boss 3 HP
-          actions.push({ type: 'sacrifice_heal', amount: 3 });
         }
+        // No empty slot — skip spawn this cycle (all minions alive)
         bossTeam.spawnCounter = 0;
       }
       break;
@@ -1102,23 +1099,6 @@ function bossDefenseDamageModifier(baseDamage, resourceDamage, personality, phas
 /**
  * Check if boss should sacrifice a minion to negate damage (Swarm Queen)
  */
-function bossCheckSacrifice(personality, bossTeam, incomingDamage) {
-  if (personality !== 'swarm') return false;
-  if (bossTeam.sacrificeUsedThisRound) return false;
-
-  // Only sacrifice if damage would be significant (>= 2)
-  if (incomingDamage < 2) return false;
-
-  const sacrificeTarget = bossTeam.minions.find(m => m && !m.ko);
-  if (!sacrificeTarget) return false;
-
-  bossTeam.sacrificeUsedThisRound = true;
-  sacrificeTarget.ko = true;
-  sacrificeTarget.hp = 0;
-
-  return { sacrificed: sacrificeTarget, negatedDamage: incomingDamage };
-}
-
 /**
  * Handle Trickster's resource steal on win
  */

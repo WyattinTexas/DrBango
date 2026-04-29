@@ -78,20 +78,6 @@ function bossDamageTracker(damage, ghost) {
     }
   }
 
-  // Swarm Queen sacrifice check
-  if (raidState.bossConfig?.personality === 'swarm' && typeof bossCheckSacrifice === 'function') {
-    const sacrificeResult = bossCheckSacrifice('swarm', raidState.bossTeam, damage);
-    if (sacrificeResult) {
-      if (typeof showAbilityCallout === 'function') {
-        showAbilityCallout('SACRIFICE!', 'var(--ghost-rare)', `${sacrificeResult.sacrificed.name} is sacrificed to negate ${damage} damage!`, 'blue');
-      }
-      return; // Damage negated
-    }
-  }
-
-  // Permafrost (Glacier): cap base damage. Resource damage tracked separately by caller
-  // This is handled at the resolve level, not here — bossDamageTracker receives final damage
-
   // Drain the shared HP pool
   raidState.totalDamageDealt += damage;
   if (typeof drainBossHpPool === 'function') {
