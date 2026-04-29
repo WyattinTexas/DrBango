@@ -115,7 +115,16 @@ const RaidSync = {
       });
     }
 
-    const nextIdx = currentIdx + 1;
+    // Find next ALIVE player (wrapping around), skipping done/disconnected
+    let nextIdx = -1;
+    for (let i = 1; i < playerCount; i++) {
+      const candidate = (currentIdx + i) % playerCount;
+      const p = RaidState.players[candidate];
+      if (p && p.status !== 'done' && p.status !== 'disconnected') {
+        nextIdx = candidate;
+        break;
+      }
+    }
 
     const update = {
       bossCurrentHp: poolNow,
@@ -129,10 +138,11 @@ const RaidSync = {
       update[`playerGhostState/${user.uid}`] = savedPlayerState;
     }
 
-    const raidComplete = poolNow <= 0 || nextIdx >= playerCount;
+    // Raid complete if boss is dead OR no alive players remain
+    const raidComplete = poolNow <= 0 || nextIdx === -1;
 
     if (!raidComplete) {
-      // Advance to next fighter — raid continues
+      // Advance to next alive fighter — raid continues
       update.currentFighterIdx = nextIdx;
       update.currentFighterUid = RaidState.players[nextIdx]?.uid || null;
       update.fightPhase = 'fighting';
