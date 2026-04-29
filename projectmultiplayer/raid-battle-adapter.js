@@ -471,6 +471,11 @@ const RaidBattleAdapter = {
         });
         if (savedState.activeIdx != null) B.red.activeIdx = savedState.activeIdx;
         if (savedState.resources) B.red.resources = { ...B.red.resources, ...savedState.resources };
+        // Restore willowLostLast so Joy of Painting carries across raid turns
+        if (savedState.willowLostLast != null) {
+          B.willowLostLast = B.willowLostLast || { red: false, blue: false };
+          B.willowLostLast.red = !!savedState.willowLostLast;
+        }
       }
 
       // Clear dice from previous player's turn
@@ -780,16 +785,53 @@ const RaidBattleAdapter = {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
 
+    const B = BattleEngine.getState();
+    const currentIdx = RaidState.mySlot;
+    const playerCount = RaidState.players.length;
+
+    // ── Player eliminated but raid continues ──────────────────────
+    // If the boss won this local fight but is still alive and other players
+    // remain, this player is OUT — transition to permanent spectator.
+    if (winner === 'blue' && playerCount > 1) {
+      const bossHpNow = RaidSync._getBossGhostHp(B);
+      const otherPlayersAlive = RaidState.players.some((p, i) =>
+        i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
+      );
+
+      if (bossHpNow > 0 && otherPlayersAlive) {
+        // Record elimination in transcript (not a full game-over)
+        if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+          RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
+        }
+
+        // Mark player as done and advance turn via Firebase
+        setTimeout(() => {
+          RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
+        }, 1500);
+
+        // Hide game-over overlay and transition to spectating
+        const gameOverEl = document.getElementById('gameOver');
+        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+
+        const narrator = document.getElementById('narrator');
+        if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
+
+        // Reset fight lock so spectating can start
+        this._fightStarted = false;
+
+        // The Firebase update from writeGameOver will advance currentFighterIdx,
+        // which triggers _handleActiveFight → _startSpectating on this client.
+        return;
+      }
+    }
+
+    // ── Raid truly over (boss defeated or all players out) ────────
     // Record game over and auto-download transcript
     if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
       RaidTranscript.recordGameOver(winner, RaidState.bossCurrentHp, RaidState.bossMaxHp);
       RaidTranscript.stop();
       RaidTranscript.download();
     }
-
-    const B = BattleEngine.getState();
-    const currentIdx = RaidState.mySlot;
-    const playerCount = RaidState.players.length;
 
     // Atomic Firebase write after brief delay
     setTimeout(() => {

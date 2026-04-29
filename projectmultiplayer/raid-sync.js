@@ -143,20 +143,10 @@ const RaidSync = {
       update[`playerGhostState/${user.uid}`] = savedPlayerState;
     }
 
-    // Determine if raid is over
-    if (poolNow <= 0) {
-      // Boss defeated!
-      update.status = 'complete';
-      update.completedAt = firebase.database.ServerValue.TIMESTAMP;
-      update.bossDefeatedBy = user?.uid || null;
-      update.fightPhase = 'done';
-    } else if (nextIdx >= playerCount) {
-      // All players fought, boss survived
-      update.status = 'complete';
-      update.completedAt = firebase.database.ServerValue.TIMESTAMP;
-      update.fightPhase = 'done';
-    } else {
-      // Advance to next fighter
+    const raidComplete = poolNow <= 0 || nextIdx >= playerCount;
+
+    if (!raidComplete) {
+      // Advance to next fighter — raid continues
       update.currentFighterIdx = nextIdx;
       update.currentFighterUid = RaidState.players[nextIdx]?.uid || null;
       update.fightPhase = 'fighting';
@@ -164,12 +154,23 @@ const RaidSync = {
     }
 
     try {
+      // Write player stats first (damage, ghosts lost, etc.)
       await this._instanceRef.update(firebaseSafe(update));
       console.log('[RaidSync] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
 
-      // Distribute rewards if raid is complete
-      if ((poolNow <= 0 || nextIdx >= playerCount) && typeof distributeRaidRewards === 'function') {
-        await distributeRaidRewards(RaidState.instanceId, poolNow <= 0, poolNow <= 0 ? user?.uid : null);
+      if (raidComplete) {
+        // Distribute rewards BEFORE setting status=complete so loot data
+        // is already in Firebase when listeners fire showRaidResult
+        if (typeof distributeRaidRewards === 'function') {
+          await distributeRaidRewards(RaidState.instanceId, poolNow <= 0, poolNow <= 0 ? user?.uid : null);
+        }
+        // NOW mark raid as complete — listeners will see loot data
+        await this._instanceRef.update(firebaseSafe({
+          status: 'complete',
+          completedAt: firebase.database.ServerValue.TIMESTAMP,
+          bossDefeatedBy: poolNow <= 0 ? (user?.uid || null) : null,
+          fightPhase: 'done'
+        }));
       }
     } catch (e) {
       console.error('[RaidSync] Game-over write error:', e);
@@ -614,6 +615,9 @@ const RaidSync = {
     for (const k of Object.keys(rawRes)) {
       if (rawRes[k] !== undefined) state.resources[k] = rawRes[k];
     }
+
+    // Persist willowLostLast so Joy of Painting carries across raid turns
+    if (B.willowLostLast) state.willowLostLast = !!B.willowLostLast.red;
 
     B.red.ghosts.forEach(g => {
       const gs = {

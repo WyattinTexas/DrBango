@@ -360,6 +360,11 @@ const RaidBattleAdapter = {
         });
         if (savedState.activeIdx != null) B.red.activeIdx = savedState.activeIdx;
         if (savedState.resources) B.red.resources = { ...B.red.resources, ...savedState.resources };
+        // Restore willowLostLast so Joy of Painting carries across raid turns
+        if (savedState.willowLostLast != null) {
+          B.willowLostLast = B.willowLostLast || { red: false, blue: false };
+          B.willowLostLast.red = !!savedState.willowLostLast;
+        }
       }
 
       // Clear dice from previous player's turn
@@ -612,6 +617,29 @@ const RaidBattleAdapter = {
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
 
+    // ── Player eliminated but raid continues ──────────────────────
+    if (winner === 'blue' && playerCount > 1) {
+      const bossHpNow = RaidSync._getBossGhostHp(B);
+      const otherPlayersAlive = RaidState.players.some((p, i) =>
+        i !== currentIdx && p && p.status !== 'done' && p.status !== 'disconnected'
+      );
+
+      if (bossHpNow > 0 && otherPlayersAlive) {
+        setTimeout(() => {
+          RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
+        }, 1500);
+
+        const gameOverEl = document.getElementById('gameOver');
+        if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+
+        const narrator = document.getElementById('narrator');
+        if (narrator) narrator.innerHTML = 'Your team is out! Watching the raid continue...';
+
+        return;
+      }
+    }
+
+    // ── Raid truly over ───────────────────────────────────────────
     // Atomic Firebase write after brief delay
     setTimeout(() => {
       RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
