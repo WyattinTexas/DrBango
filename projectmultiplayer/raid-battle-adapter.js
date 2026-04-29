@@ -483,10 +483,12 @@ const RaidBattleAdapter = {
       if (blueDiceEl) blueDiceEl.innerHTML = '';
       document.querySelectorAll('.die-physics').forEach(el => el.remove());
 
-      // ── APPLY EQUIPPED ITEMS ──────────────────────────────────────
-      // Items are loaded from Firebase (preloaded at the top of _startMyFight).
-      // applyRaidLoot grants starting resources, forges blades, sets mask/dice flags.
-      if (playerInventory && typeof applyRaidLoot === 'function') {
+      // ── APPLY EQUIPPED ITEMS (first turn only) ─────────────────────
+      // Only apply once — item resources (healing seed, lucky stone, etc.) should
+      // not stack every turn. Blade forges and mask flags are also one-time.
+      const isFirstPlayerTurn = !this._itemsApplied;
+      if (isFirstPlayerTurn && playerInventory && typeof applyRaidLoot === 'function') {
+        this._itemsApplied = true;
         applyRaidLoot(B, 'red', playerInventory);
 
         // Log applied items in transcript
@@ -855,6 +857,7 @@ const RaidBattleAdapter = {
     this._entering = false;
     this._fightStarted = false;
     this._processingUpdate = false;
+    this._itemsApplied = false;
     this._stopWatchdog();
     // Restore original getGhost
     if (this._origGetGhost) {

@@ -3432,7 +3432,12 @@ function doGaleForcePickerChoice(idx) {
 // TWO-BUTTON ROLL SYSTEM — each side rolls independently
 // ============================================================
 function rollReady(team) {
-  if (!B) return;
+  if (!B) { console.warn('[rollReady] B is null!'); return; }
+  // Diagnostic: log every rollReady call in raids
+  if (window.BOSS_MODE) {
+    console.log('[rollReady]', team, '| phase:', B.phase, '| round:', B.round,
+      '| pvpRedClickedRoll:', pvpRedClickedRoll, '| AI_ACTIVE:', AI_ACTIVE);
+  }
   // Live PvP routing:
   // - Blue player clicking Blue Roll → send "ready" signal, don't run engine
   // - Red player clicking Red Roll → runs normally (Red's engine)
