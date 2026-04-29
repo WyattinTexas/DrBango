@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v857'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v858'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v857'; // Simon brew cost 4→3, add Speed Blade team (#108)
+const TESTROOM_VERSION = 'v858'; // Nick & Knack: voluntary pre-roll button (was auto-modal), stolen resources now usable
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -6712,7 +6712,10 @@ function useHex(team) {
 // ============================================================
 // NICK & KNACK (409) — Knick Knack: steal 1 resource from opponent
 // ============================================================
-function showNickKnackPicker(team, oppTeam) {
+function useNickKnackSteal(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 409 || f.ko) return;
+  const oppTeam = team === 'red' ? 'blue' : 'red';
   const oppRes = B[oppTeam].resources;
   const resTypes = [
     { key: 'ice', label: 'Ice Shard', emoji: '❄️' },
@@ -6725,12 +6728,14 @@ function showNickKnackPicker(team, oppTeam) {
     { key: 'frostbite', label: 'Frostbite', emoji: '❄️' }
   ];
   const available = resTypes.filter(r => (oppRes[r.key] || 0) > 0);
+  if (available.length === 0) return;
+  B.nickKnackPending = { team, oppTeam };
   const optionsEl = document.getElementById('nickKnackOptions');
   let html = '';
   available.forEach(r => {
     html += `<button class="selene-opt" onclick="doNickKnackSteal('${team}','${r.key}')" style="background:linear-gradient(135deg,#065f46,#059669);">${r.emoji} ${r.label} (${oppRes[r.key]})</button>`;
   });
-  html += `<button class="selene-opt" onclick="doNickKnackSteal('${team}','skip')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Skip</button>`;
+  html += `<button class="selene-opt" onclick="doNickKnackSteal('${team}','skip')" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
   optionsEl.innerHTML = html;
   document.getElementById('nickKnackOverlay').classList.add('active');
 }
@@ -6740,12 +6745,12 @@ function doNickKnackSteal(team, resKey) {
   if (!nnp) return;
   B.nickKnackPending = null;
   document.getElementById('nickKnackOverlay').classList.remove('active');
-  const { btn, oppTeam } = nnp;
-  B.nickKnackDecided[team] = true;
+  const { oppTeam } = nnp;
   if (resKey !== 'skip') {
+    B.nickKnackDecided[team] = true;
     B[oppTeam].resources[resKey]--;
     B[team].resources[resKey] = (B[team].resources[resKey] || 0) + 1;
-    const resLabel = resKey === 'luckyStone' ? 'Lucky Stone' : resKey === 'moonstone' ? 'Moonstone' : resKey === 'healingSeed' ? 'Healing Seed' : resKey === 'ice' ? 'Ice Shard' : resKey === 'fire' ? 'Sacred Fire' : 'Surge';
+    const resLabel = resKey === 'luckyStone' ? 'Lucky Stone' : resKey === 'moonstone' ? 'Moonstone' : resKey === 'healingSeed' ? 'Healing Seed' : resKey === 'ice' ? 'Ice Shard' : resKey === 'fire' ? 'Sacred Fire' : resKey === 'burn' ? 'Burn' : resKey === 'frostbite' ? 'Frostbite' : 'Surge';
     const f = active(B[team]);
     // Nick & Knack gains +1 HP + 2 Burn on steal
     f.hp += 1;
@@ -6756,9 +6761,6 @@ function doNickKnackSteal(team, resKey) {
       `${f.name} — stole 1 ${resLabel}! +1 HP + 2 Burn!`, team);
     log(`<span class="log-ability">${f.name}</span> — Knick Knack! Stole 1 <span class="log-ms">${resLabel}</span>! <span class="log-heal">+1 HP</span> + 2 Burn!`);
     renderBattle();
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(1500));
-  } else {
-    setTimeout(() => { btn.disabled = false; btn.classList.remove('locked'); doTeamRoll(team, btn); }, spd(200));
   }
 }
 
@@ -8781,28 +8783,7 @@ function rollReady(team) {
 
     // Forest Spirit (446) — Hex: now handled by pre-roll button (useHex)
 
-    // Nick & Knack (409) — Knick Knack: steal 1 resource from opponent → +1 HP + 2 Burn
-    {
-      const nnG = active(B[team]);
-      const oppTeamNN = team === 'red' ? 'blue' : 'red';
-      if (nnG && nnG.id === 409 && !nnG.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
-        const oppRes = B[oppTeamNN].resources;
-        const resTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
-        const available = resTypes.filter(r => (oppRes[r] || 0) > 0);
-        if (available.length > 0) {
-          btn.classList.add('locked');
-          btn.disabled = true;
-          B.nickKnackPending = { team, btn, oppTeam: oppTeamNN };
-          const nnDelay = (calloutCount > 0) ? calloutCount * 1500 : 0;
-          setTimeout(() => {
-            showNickKnackPicker(team, oppTeamNN);
-          }, nnDelay);
-          return;
-        } else {
-          B.nickKnackDecided[team] = true;
-        }
-      }
-    }
+    // Nick & Knack (409) — Knick Knack: now handled by pre-roll button (useNickKnackSteal)
 
     // Guardian Fairy (99) — Wish: now reactive (post-damage modal), no pre-roll standby needed
 
@@ -9208,20 +9189,7 @@ function openDuelPhasePrimers(team) {
 
   // — FOREST SPIRIT (446) — Hex: now handled by pre-roll button (useHex)
 
-  // — NICK & KNACK (409) — Knick Knack: steal 1 resource → +1 HP + 2 Burn (Duel Phase)
-  if (f.id === 409 && !f.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
-    const nnOppRes = B[oppTeamName].resources;
-    const nnResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
-    const nnAvailable = nnResTypes.filter(r => (nnOppRes[r] || 0) > 0);
-    if (nnAvailable.length > 0) {
-      disableDone();
-      B.nickKnackPending = { team, btn: doneBtn, oppTeam: oppTeamName };
-      showNickKnackPicker(team, oppTeamName);
-      return true;
-    } else {
-      B.nickKnackDecided[team] = true;
-    }
-  }
+  // — NICK & KNACK (409) — Knick Knack: now handled by pre-roll button (useNickKnackSteal)
 
   // Guardian Fairy (99) — Wish: now reactive (post-damage modal), no pre-roll standby
 
@@ -18784,7 +18752,18 @@ function renderBattle() {
       if (f.id === 23 && !f.ko && B[team].resources && B[team].resources.ice >= 1) {
         html += `<button class="ability-btn pressure" onclick="usePowderBlizzard('${team}')" style="border-color:#3b82f6;color:#3b82f6;font-weight:bold;">❄️ BLIZZARD! (1 Ice → 2 Frostbite on all sideline)</button>`;
       }
-      // Simon (24) — Brew Time: sideline button to trade 4 specials for 1 Moonstone
+      // Nick & Knack (409) — Knick Knack: pre-roll button to steal 1 special from opponent
+      if (f.id === 409 && !f.ko && B.nickKnackDecided && !B.nickKnackDecided[team]) {
+        const nnOppTeam = team === 'red' ? 'blue' : 'red';
+        const nnOppRes = B[nnOppTeam].resources;
+        const nnAvailable = ['ice','fire','surge','luckyStone','moonstone','healingSeed','burn','frostbite'].filter(r => (nnOppRes[r] || 0) > 0);
+        if (nnAvailable.length > 0) {
+          html += `<button class="ability-btn pressure" onclick="useNickKnackSteal('${team}')" style="border-color:#059669;color:#059669;font-weight:bold;">🫳 KNICK KNACK! (Steal 1 Special → +1 HP + 2 Burn)</button>`;
+        } else {
+          html += `<button class="ability-btn pressure" disabled style="border-color:#4b5563;color:#4b5563;opacity:0.4;cursor:not-allowed;">🫳 KNICK KNACK! (No enemy specials to steal)</button>`;
+        }
+      }
+      // Simon (24) — Brew Time: sideline button to trade 3 specials for 1 Moonstone
       if (hasSideline(B[team], 24)) {
         const simonHandSize = getHandSize(B[team]);
         if (simonHandSize >= 3) {
