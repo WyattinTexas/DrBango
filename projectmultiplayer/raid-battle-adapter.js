@@ -286,10 +286,9 @@ const RaidBattleAdapter = {
         if (RaidState.phase === 'lobby') RaidState.transition('countdown');
         RaidState.transition('spectating');
       }
-      // Update spectator from current snapshot
-      if (data.battleState) {
-        this._updateSpectatorView(data.battleState);
-      }
+      // Don't apply the stale battleState from the previous fighter's turn —
+      // _startSpectating() just built the correct team via startBattle().
+      // Fresh snapshots from the new fighter will arrive on subsequent Firebase events.
     }
   },
 
@@ -523,7 +522,9 @@ const RaidBattleAdapter = {
     // Update player status
     RaidSync.setPlayerStatus(RaidState.mySlot, 'fighting');
 
-    // Ensure red roll button is visible
+    // Ensure red roll button is visible and unlocked
+    // The 'locked' class may persist from a previous turn because the raid hook
+    // consumes resetRollButtons (skipping the default classList.remove('locked')).
     setTimeout(() => {
       if (!RaidState.amFighter()) return;
       const redBtn = document.getElementById('rollRedBtn');
@@ -531,6 +532,7 @@ const RaidBattleAdapter = {
       if (redBtn && B2 && B2.phase === 'ready') {
         redBtn.style.display = '';
         redBtn.disabled = false;
+        redBtn.classList.remove('locked');
         redBtn.textContent = 'ROLL';
       }
     }, 300);
