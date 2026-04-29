@@ -48,6 +48,16 @@ const RaidBattleAdapter = {
       }
       if (to === 'spectating') {
         this._fightStarted = false; // reset so next turn can start
+        // Record spectating in transcript
+        if (typeof RaidTranscript !== 'undefined' && RaidTranscript._active) {
+          const currentPlayer = RaidState.players[RaidState.currentFighterIdx];
+          RaidTranscript.recordSpectating(
+            currentPlayer?.displayName || 'Unknown',
+            RaidState.currentFighterIdx,
+            RaidState.bossCurrentHp,
+            RaidState.bossMaxHp
+          );
+        }
         this._startSpectating();
       }
       if (to === 'complete') {
