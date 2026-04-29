@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v851'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v852'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -1557,6 +1557,25 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   0%,100% { box-shadow:0 0 0 2px #ef4444, 0 0 18px rgba(239,68,68,0.6); }
   50%      { box-shadow:0 0 0 3px #ef4444, 0 0 32px rgba(239,68,68,0.95); }
 }
+.frostbite-badge {
+  position:absolute; top:4px; left:4px; z-index:5;
+  background:linear-gradient(135deg,#1e6091,#60a5fa); color:#fff;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:8px;
+  box-shadow:0 0 8px rgba(96,165,250,0.7); pointer-events:none;
+  display:flex; align-items:center; gap:2px;
+}
+.sideline-slot.frostbite-pick {
+  cursor:pointer !important;
+  border-color:#60a5fa !important;
+  box-shadow:0 0 0 2px #60a5fa, 0 0 22px rgba(96,165,250,0.7) !important;
+  animation:frostbitePickPulse 0.75s ease-in-out infinite;
+  transform:scale(1.04); z-index:2;
+}
+.sideline-slot.frostbite-pick:hover { box-shadow:0 0 0 3px #60a5fa, 0 0 36px rgba(96,165,250,1) !important; }
+@keyframes frostbitePickPulse {
+  0%,100% { box-shadow:0 0 0 2px #60a5fa, 0 0 18px rgba(96,165,250,0.6); }
+  50%      { box-shadow:0 0 0 3px #60a5fa, 0 0 32px rgba(96,165,250,0.95); }
+}
 .so-name { font-weight:700; }
 .so-info { font-size:12px; color:var(--text2); }
 
@@ -2477,6 +2496,16 @@ body.lite-mode .die.rolling { animation: none !important; }
   </div>
 </div>
 
+<!-- Frostbite Picker — place frostbite on enemy sideline ghost -->
+<div class="selene-overlay" id="frostbiteOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);">❄️ PLACE FROSTBITE</div>
+    <h3>Choose an enemy sideline ghost to Frostbite!</h3>
+    <p class="selene-sub" id="frostbitePickerSub">The selected ghost loses dice when it enters battle.</p>
+    <div class="selene-options" id="frostbitePickerOptions"></div>
+  </div>
+</div>
+
 <!-- Firefly Picker — convert Magic Fireflies to any resource -->
 <div class="selene-overlay" id="fireflyOverlay">
   <div class="selene-modal">
@@ -2772,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v851'; // Standings: use update() instead of set() to prevent cross-client wipe, guard against saving before loaded
+const TESTROOM_VERSION = 'v852'; // Frostbite special: sideline dice debuff (Burn's sister)
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3288,11 +3317,11 @@ const GHOSTS = [
   // ============================================================
   // FROST VALLEY
   // ============================================================
-  {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Final Gift", abilityDesc:"When defeated: gain 3 Ice Shards for your next Spiritkin.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Death-triggered resource gen."},
+  {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Blizzard", abilityDesc:"Discard 3 Ice Shards: place 2 Frostbite on each enemy sideline ghost.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Ice Shard → Frostbite converter. Blankets the enemy bench."},
   {id:24, name:"Simon", rarity:"common", maxHp:7, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"Gain 2 Sacred Fire when taking before-roll damage. Gain 2 Sacred Fire when the enemy rolls Triples or better.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Pre-roll fire + triples punisher. Always has a chance to trigger."},
-  {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Cameron gains 1 extra die. Cameron's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation — Guard Thomas, Bogey, Patrick, Pyrope, etc."},
+  {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Winter's Harvest", abilityDesc:"Win: gain 1 Frostbite and 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Win-based Frostbite + Ice Shard generator. Fuels Powder and Calvin & Anna."},
   {id:26, name:"Logey", rarity:"common", maxHp:4, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
-  {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Careful", abilityDesc:"Before rolling: deal 2 damage for each extra die the enemy rolled above 3 last round.", category:"Disruption", set:"Frost Valley", designNote:"Frost Valley. Punishes dice stacking — 4 dice = 2 dmg, 5 dice = 4 dmg."},
+  {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Fredrick gains 1 extra die. Fredrick's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation."},
   {id:28, name:"Dream Cat", rarity:"common", maxHp:4, art:"art/originals/dream_cat.jpg", ability:"Jinx", abilityDesc:"Both roll Doubles: gain 2 extra dice next roll.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Mutual doubles reward. Buffed: +2 dice (was +1)."},
   {id:29, name:"Sad Sal", rarity:"common", maxHp:5, art:"art/originals/sad_sal.jpg", ability:"Tough Job", abilityDesc:"Lose: gain 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Loss-triggered resources."},
   {id:30, name:"Tommy Salami", rarity:"common", maxHp:6, art:"art/originals/tommy_salami_new.png", ability:"Regulator", abilityDesc:"When you roll a 6: gain 1 extra die and roll it immediately. Repeats as long as you keep rolling 6s.", category:"Dice Modifier", set:"Frost Valley", tags:["Final 50"], designNote:"Frost Valley. Chain-6s bonus dice."},
@@ -3313,12 +3342,12 @@ const GHOSTS = [
   {id:83, name:"Troubling Haters", rarity:"uncommon", maxHp:3, art:"art/originals/troubling_haters.jpg", ability:"Growing Mob", abilityDesc:"Deal 4+ damage: gain 2 HP.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Big damage = HP growth."},
   {id:84, name:"Wandering Sue", rarity:"uncommon", maxHp:4, art:"art/originals/wandering_sue.jpg", ability:"Hidden Weakness", abilityDesc:"Before rolling: if the enemy has more HP than Sue, gain 1 extra die.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. Underdog dice bonus — almost always active at 4HP."},
   {id:85, name:"Eloise", rarity:"rare", maxHp:5, art:"art/originals/eloise.jpg", ability:"Change of Heart", abilityDesc:"Spend 1 Ice Shard to swap HP with enemy before rolling.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. HP swap for Ice Shard."},
-  {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball", abilityDesc:"Doubles: deal +2 damage.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Doubles damage booster."},
+  {id:86, name:"Pelter", rarity:"rare", maxHp:5, art:"art/originals/pelter.jpg", ability:"Snowball Fight", abilityDesc:"Sideline & In Play: gain 1 Frostbite if you roll any 1s.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Frostbite generator from 1s. Pairs with Gary for ice+frostbite from 1s."},
   {id:87, name:"Zach", rarity:"rare", maxHp:7, art:"art/originals/zach.jpg", ability:"Craftsman", abilityDesc:"Sideline: Guard Thomas gains +3 damage on Doubles and +1 die each roll.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Guard Thomas synergy. Buffed: now also grants +1 die per turn."},
   {id:88, name:"Pale Nimbus", rarity:"rare", maxHp:4, art:"art/originals/pale_nimbus.jpg", ability:"Hidden Storm", abilityDesc:"Sideline: +2 damage if your total dice add to less than 7.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Low-roll sideline booster."},
   {id:89, name:"Mallow", rarity:"rare", maxHp:5, art:"art/originals/mallow.jpg", ability:"Dozy Cozy", abilityDesc:"Sideline: before rolling, you may spend 2 Sacred Fire to give your active Spiritkin 3 HP and gain 1 Burn.", category:"HP Recovery", set:"Frost Valley", designNote:"Frost Valley. Sacred Fire healing. Costs 2 fire to slow the Lucy loop. Grants 1 Burn as upside. 5 HP restored."},
   {id:90, name:"Jeanie", rarity:"rare", maxHp:4, art:"art/originals/jeanie.jpg", ability:"Hidden Treasure", abilityDesc:"Sideline: you may force the opponent to reroll all dice. Once Per Game.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley. One-shot reroll."},
-  {id:91, name:"Calvin & Anna", rarity:"rare", maxHp:6, art:"art/originals/calvin_anna.jpg", ability:"Toboggan", abilityDesc:"Defeat a Spiritkin: you may switch Calvin & Anna with a Spiritkin from your sideline.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley. Kill-swap."},
+  {id:91, name:"Calvin & Anna", rarity:"rare", maxHp:6, art:"art/originals/calvin_anna.jpg", ability:"Frost Surge", abilityDesc:"Win: gain 1 Frostbite. +1 damage for each Frostbite stack on the enemy sideline.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Self-fueling Frostbite scaler. Wins generate Frostbite AND scale damage off it."},
   {id:92, name:"Gary", rarity:"rare", maxHp:6, art:"art/originals/gary.jpg", ability:"Lucky Novice", abilityDesc:"Sideline & In Play: gain 2 Ice Shards for each 1 you roll.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. The real Gary. v598 buff: fires whether Gary is in play or on the sideline. v599 buff: +2 Ice Shards per 1 rolled (was +1). Balance comp: Zain Ice Blade + Skylar Winter Barrage lines just got a serious fuel injection."},
   {id:93, name:"Bandit Pete", rarity:"uncommon", maxHp:5, art:"art/originals/bandit_pete.jpg", ability:"Bandit", abilityDesc:"Sideline: if either player rolls only 2 dice, your active Spiritkin gains +3 damage.", category:"Damage Multiplier", set:"Frost Valley", designNote:"Frost Valley. Low-dice sideline booster."},
   {id:103, name:"Night Master", rarity:"ghost-rare", maxHp:5, art:"art/originals/night_master.jpg", ability:"Bullseye", abilityDesc:"Win with Doubles: destroy an enemy sideline Spiritkin with less than 4 HP.", category:"Destruction/Instant Kill", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Sideline sniper."},
@@ -3852,6 +3881,9 @@ function autoPlayNext() {
     preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
     burnSource: { red: {}, blue: {} }, // tracks which Spiritkin placed burn: { teamName: { ghostIdx: { spiritkinId: count } } }
+    frostbite: { red: {}, blue: {} },
+    frostbiteSource: { red: {}, blue: {} },
+    frostbiteDicePenalty: { red: 0, blue: 0 },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
     flameBlade: { red: false, blue: false },
@@ -4320,7 +4352,7 @@ const CURATED_TEAMS = [
   [414, 314, 302],
   // #32 Gordok Pirate — Gordok steals 2 specials on win + Moonstone, Nick & Knack steals 1 special + 3HP, Sandwiches mirrors enemy specials
   [430, 409, 33],
-  // #33 Frost Valley Snipers — Night Master doubles+win → destroy <4HP sideline ghost, Pelter +2 doubles damage, Bogey reflects damage once
+  // #33 Frost Valley Snipers — Night Master doubles+win → destroy <4HP sideline ghost, Pelter generates Frostbite from 1s, Bogey reflects damage once
   [103, 86, 53],
   // #34 Redd Entrance — Redd entry +2 dice, Hugo enemy loses die on hit, Floop enemy loses die on doubles
   [98, 52, 20],
@@ -4357,20 +4389,20 @@ const CURATED_TEAMS = [
   [6, 7, 63],
   // #49 Chaos Reroll — Jackson removes HP to reroll dice, Sonya changes die to 2, Dealer numeric order negates damage
   [50, 69, 37],
-  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron gains dice from enemy specials + damage can't be negated, Masked Hero punishes before-roll effects
+  // #50 Wanderer's Gambit — Wanderer 8HP reveals hidden cards, Cameron gains Frostbite+Ice on wins, Masked Hero punishes before-roll effects
   [4, 25, 55],
 
   // ===================== NEW WAVE (25 teams) =====================
 
   // #51 Gary's Ice Factory — Skylar boosts Ice Shards to +2, Gary generates 2 shards per 1 rolled from sideline, Artemis wins for 3 shards
   [104, 92, 307],
-  // #52 Hermit Late Game — Powder dies first (gives 3 Ice Shards on death), Granny harvests KO resources from sideline, Hermit enters last with +2HP per KO'd ghost
+  // #52 Hermit Late Game — Powder converts Ice Shards to Frostbite, Granny harvests KO resources from sideline, Hermit enters last with +2HP per KO'd ghost
   [23, 310, 47],
   // #53 Splinter Poison — Splinter wins once to start permanent pre-roll chip, Princess Shade amplifies every pre-roll hit +1, Shoo heals active from sideline
   [101, 436, 13],
-  // #54 Fredrick Lockdown — Fredrick caps enemy to 3 dice, Antoinette mirrors enemy dice count for parity, Floop punishes enemy doubles with -1 die
+  // #54 Fredrick Force — Fredrick gains dice from enemy specials + damage can't be negated, Antoinette mirrors enemy dice count, Floop punishes enemy doubles with -1 die
   [27, 82, 20],
-  // #55 Munch Cleanup Crew — Greg bullies with 2x damage when higher HP, Munch gains 4HP on KO to sustain, Calvin & Anna swap on KO for flexibility
+  // #55 Munch Cleanup Crew — Greg bullies with 2x damage when higher HP, Munch gains 4HP on KO to sustain, Calvin & Anna boost damage from Frostbite
   [49, 66, 91],
   // #56 Chip Even Doubles — Chip deals +3 on even doubles, Admiral boosts even doubles +2 from sideline, Natalia generates 2 Moonstones on even doubles
   [16, 71, 327],
@@ -4529,7 +4561,7 @@ function makeTeam(ids) {
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 },
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
     moonstoneSickness: 0,       // Mode A: permanent stacking counter
     moonstoneSicknessCount: 0,  // Mode B: escalating counter
     moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
@@ -4626,6 +4658,9 @@ function startBattle() {
     preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
     burnSource: { red: {}, blue: {} },
+    frostbite: { red: {}, blue: {} },
+    frostbiteSource: { red: {}, blue: {} },
+    frostbiteDicePenalty: { red: 0, blue: 0 },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
     flameBlade: { red: false, blue: false },
@@ -4777,6 +4812,22 @@ function triggerEntry(team, skipEntryEffects) {
       burnEntryFired = true;
       showAbilityCallout('BURN IMMUNE!', 'var(--rare)', `${f.name} — Immune to Burn! No damage taken.`, entryTeamName);
       log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Burn!</span> No damage taken.`);
+    }
+  }
+
+  // Frostbite — consume stacks on entry, set dice penalty for first roll only
+  let frostbiteEntryFired = false;
+  if (B.frostbite && B.frostbite[entryTeamName]) {
+    const activeIdx = team.activeIdx;
+    const fbCount = B.frostbite[entryTeamName][activeIdx] || 0;
+    if (fbCount > 0 && !f.ko) {
+      if (!B.frostbiteDicePenalty) B.frostbiteDicePenalty = { red: 0, blue: 0 };
+      B.frostbiteDicePenalty[entryTeamName] = fbCount;
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('FROSTBITE!', '#3b82f6', `${f.name} enters frostbitten! -${fbCount} dice this roll!`, entryTeamName);
+      log(`<span class="log-ability" style="color:#60a5fa">${f.name}</span> — Frostbite! <span class="log-dmg">-${fbCount} dice on entry!</span>`);
     }
   }
 
@@ -5180,8 +5231,8 @@ function triggerBorisHook(team) {
   });
 }
 
-// Cameron (25) — Unstoppable Force: opponent uses a special → Cameron's team gains +1 die
-// Called with the team that USED the special — Cameron must be on the OPPOSING team.
+// Fredrick (27) — Unstoppable Force: opponent uses a special → Fredrick's team gains +1 die
+// Called with the team that USED the special — Fredrick must be on the OPPOSING team.
 // immediate=true: post-roll context (Lucky Stone, Moonstone) — roll an extra die and add it NOW.
 // immediate=false (default): pre-roll context — store for Phase 2 dice computation next roll.
 function triggerCameronSpecialWatch(usingTeam, immediate) {
@@ -5189,29 +5240,26 @@ function triggerCameronSpecialWatch(usingTeam, immediate) {
   const oppTeamName = usingTeam === 'red' ? 'blue' : 'red';
   const oppTeam = B[oppTeamName];
   if (!oppTeam) return;
-  const cameronAlive = oppTeam.ghosts.some(g => g.id === 25 && !g.ko);
-  if (!cameronAlive) return;
-  const camGhost = oppTeam.ghosts.find(g => g.id === 25 && !g.ko);
-  const loc = oppTeam.ghosts[oppTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
+  const fredAlive = oppTeam.ghosts.some(g => g.id === 27 && !g.ko);
+  if (!fredAlive) return;
+  const fredGhost = oppTeam.ghosts.find(g => g.id === 27 && !g.ko);
+  const loc = oppTeam.ghosts[oppTeam.activeIdx]?.id === 27 ? 'active' : 'sideline';
 
   if (immediate && B.pendingResolve) {
-    // Post-roll: immediately roll 1 extra die and splice it into Cameron's team dice
     const extraDie = Math.floor(Math.random() * 6) + 1;
     const diceKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
-    const prKey = oppTeamName === 'red' ? 'redDice' : 'blueDice';
-    const dice = B.pendingResolve[prKey] || B[diceKey] || [];
+    const dice = B.pendingResolve[diceKey] || B[diceKey] || [];
     dice.push(extraDie);
     dice.sort((a, b) => a - b);
-    B.pendingResolve[prKey] = dice;
+    B.pendingResolve[diceKey] = dice;
     B[diceKey] = dice;
     renderDice(B.redDice, B.blueDice);
-    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die rolled immediately! [${extraDie}]</span>`);
-    showAbilityCallout('UNSTOPPABLE FORCE!', 'var(--common)', `${camGhost.name} — +1 die! Rolled a ${extraDie}!`, oppTeamName);
+    log(`<span class="log-ability">${fredGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die rolled immediately! [${extraDie}]</span>`);
+    showAbilityCallout('UNSTOPPABLE FORCE!', 'var(--common)', `${fredGhost.name} — +1 die! Rolled a ${extraDie}!`, oppTeamName);
   } else {
-    // Pre-roll: store for next roll's Phase 2 dice computation
     if (!B.cameronBonusDice) B.cameronBonusDice = { red: 0, blue: 0 };
     B.cameronBonusDice[oppTeamName]++;
-    log(`<span class="log-ability">${camGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
+    log(`<span class="log-ability">${fredGhost.name}</span> (${loc}) — Unstoppable Force! Opponent used a special → <span class="log-ms">+1 die next roll!</span> (${B.cameronBonusDice[oppTeamName]} stored)`);
   }
 }
 
@@ -5231,6 +5279,9 @@ function pvpBroadcastCommitted(team) {
     // v735: include burn state so opponent's engine knows about burn placement
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : null,
     burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : null,
+    // v852: include frostbite state
+    frostbite: B.frostbite ? { red: { ...B.frostbite.red }, blue: { ...B.frostbite.blue } } : null,
+    frostbiteSource: B.frostbiteSource ? JSON.parse(JSON.stringify(B.frostbiteSource)) : null,
     ts: Date.now()
   });
 }
@@ -6750,6 +6801,132 @@ function doBurnPlace(team, ghostIndex) {
 function closeBurnPicker() {
   document.getElementById('burnOverlay').classList.remove('active');
   B.burnPickerTeam = null;
+}
+
+// ============================================================
+// POWDER (23) — Blizzard: discard 3 Ice Shards → 2 Frostbite on all enemy sideline
+// ============================================================
+function usePowderBlizzard(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 23 || f.ko) return;
+  if (!B[team].resources || B[team].resources.ice < 3) return;
+
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+  const enemyTeam = B[enemyTeamName];
+
+  // Find non-KO'd sideline ghosts
+  const sidelineGhosts = enemyTeam.ghosts
+    .map((g, i) => ({ ghost: g, index: i }))
+    .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+
+  if (sidelineGhosts.length === 0) {
+    log('<span class="log-ability">BLIZZARD</span> — No enemy sideline ghosts to frostbite!');
+    return;
+  }
+
+  // Consume 3 Ice Shards
+  B[team].resources.ice -= 3;
+
+  // Place 2 Frostbite on each enemy sideline ghost
+  if (!B.frostbite) B.frostbite = { red: {}, blue: {} };
+  if (!B.frostbite[enemyTeamName]) B.frostbite[enemyTeamName] = {};
+  if (!B.frostbiteSource) B.frostbiteSource = { red: {}, blue: {} };
+  if (!B.frostbiteSource[enemyTeamName]) B.frostbiteSource[enemyTeamName] = {};
+
+  const placerId = f.originalId || f.id;
+  let targetNames = [];
+  sidelineGhosts.forEach(({ ghost, index }) => {
+    B.frostbite[enemyTeamName][index] = (B.frostbite[enemyTeamName][index] || 0) + 2;
+    if (!B.frostbiteSource[enemyTeamName][index]) B.frostbiteSource[enemyTeamName][index] = {};
+    B.frostbiteSource[enemyTeamName][index][placerId] = (B.frostbiteSource[enemyTeamName][index][placerId] || 0) + 2;
+    targetNames.push(ghost.name);
+  });
+
+  showAbilityCallout('BLIZZARD!', '#3b82f6', `${f.name} — 3 Ice Shards → 2 Frostbite on ${targetNames.join(' & ')}!`, team);
+  log(`<span class="log-ability" style="color:#60a5fa">${f.name}</span> — Blizzard! Discarded 3 Ice Shards → <span class="log-dmg">2 Frostbite on ${targetNames.join(' & ')}!</span>`);
+
+  // Cameron (25) — Unstoppable Force: opponent used a special
+  triggerCameronSpecialWatch(team);
+
+  renderBattle();
+  pvpBroadcastCommitted(team);
+}
+
+// ============================================================
+// FROSTBITE — Place dice debuff on enemy sideline ghosts
+// ============================================================
+function showFrostbitePicker(team) {
+  const t = B[team];
+  const fbCount = t.resources.frostbite || 0;
+  if (fbCount <= 0) return;
+
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+  const enemyTeam = B[enemyTeamName];
+
+  const sidelineGhosts = enemyTeam.ghosts
+    .map((g, i) => ({ ghost: g, index: i }))
+    .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+
+  if (sidelineGhosts.length === 0) {
+    log('<span class="log-ability">FROSTBITE</span> — No enemy sideline ghosts to frostbite!');
+    return;
+  }
+
+  B.frostbitePickerTeam = team;
+
+  const optionsEl = document.getElementById('frostbitePickerOptions');
+  let html = '';
+  sidelineGhosts.forEach(({ ghost, index }) => {
+    const existingFb = (B.frostbite && B.frostbite[enemyTeamName] && B.frostbite[enemyTeamName][index]) || 0;
+    const fbLabel = existingFb > 0 ? ` (${existingFb} Frostbite already)` : '';
+    html += `<button class="selene-opt" onclick="doFrostbitePlace('${team}',${index})" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);">❄️ ${ghost.name} — ${ghost.hp}/${ghost.maxHp} HP${fbLabel}</button>`;
+  });
+  html += `<button class="selene-opt" onclick="closeFrostbitePicker()" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
+  optionsEl.innerHTML = html;
+  document.getElementById('frostbitePickerSub').innerHTML = `You have <b>${fbCount}</b> Frostbite to place. Each stack removes 1 die when the ghost enters battle (one roll only).`;
+  document.getElementById('frostbiteOverlay').classList.add('active');
+}
+
+function doFrostbitePlace(team, ghostIndex) {
+  const t = B[team];
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+
+  if (!t.resources.frostbite || t.resources.frostbite <= 0) { closeFrostbitePicker(); return; }
+
+  t.resources.frostbite--;
+  if (!B.frostbite) B.frostbite = { red: {}, blue: {} };
+  if (!B.frostbite[enemyTeamName]) B.frostbite[enemyTeamName] = {};
+  B.frostbite[enemyTeamName][ghostIndex] = (B.frostbite[enemyTeamName][ghostIndex] || 0) + 1;
+
+  // Track which Spiritkin placed this frostbite
+  const fbPlacer = active(B[team]);
+  const fbPlacerId = fbPlacer ? (fbPlacer.originalId || fbPlacer.id) : 0;
+  if (!B.frostbiteSource) B.frostbiteSource = { red: {}, blue: {} };
+  if (!B.frostbiteSource[enemyTeamName]) B.frostbiteSource[enemyTeamName] = {};
+  if (!B.frostbiteSource[enemyTeamName][ghostIndex]) B.frostbiteSource[enemyTeamName][ghostIndex] = {};
+  B.frostbiteSource[enemyTeamName][ghostIndex][fbPlacerId] = (B.frostbiteSource[enemyTeamName][ghostIndex][fbPlacerId] || 0) + 1;
+
+  const targetGhost = B[enemyTeamName].ghosts[ghostIndex];
+  const totalFb = B.frostbite[enemyTeamName][ghostIndex];
+  log(`<span class="log-ability">FROSTBITE!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalFb} total)`);
+  showAbilityCallout('FROSTBITE!', '#3b82f6', `${targetGhost.name} has been marked! -${totalFb} dice on entry!`, team);
+
+  // Cameron (25) — Unstoppable Force: opponent used a special (Frostbite)
+  triggerCameronSpecialWatch(team);
+
+  renderBattle();
+  pvpBroadcastCommitted(team);
+
+  if (t.resources.frostbite > 0) {
+    setTimeout(() => showFrostbitePicker(team), 800);
+  } else {
+    closeFrostbitePicker();
+  }
+}
+
+function closeFrostbitePicker() {
+  document.getElementById('frostbiteOverlay').classList.remove('active');
+  B.frostbitePickerTeam = null;
 }
 
 // ============================================================
@@ -9534,29 +9711,7 @@ function doPreRollSetup() {
   B.preRollAbilitiesFiredThisTurn.red = true;
   B.preRollAbilitiesFiredThisTurn.blue = true;
 
-  // Frederick (27) — Careful: deal 2 damage per extra die enemy rolled above 3 last round
-  [B.red, B.blue].forEach(team => {
-    const fFred = active(team);
-    const enemyFred = opp(team);
-    const tNameFred = team === B.red ? 'red' : 'blue';
-    const enemyNameFred = enemyFred === B.red ? 'red' : 'blue';
-    if (fFred.id === 27 && !fFred.ko) {
-      const enemyLastDice = B.lastRollDiceCount[enemyNameFred] || 3;
-      const extraDice = Math.max(0, enemyLastDice - 3);
-      if (extraDice > 0) {
-        const fredDmg = extraDice * 2;
-        const ef = active(enemyFred);
-        if (!ef.ko) {
-          ef.hp = Math.max(0, ef.hp - fredDmg);
-          if (ef.hp <= 0) { ef.hp = 0; ef.ko = true; ef.killedBy = 27; }
-          preRollCallouts.push(['CAREFUL!', 'var(--common)', `${fFred.name} — Enemy rolled ${enemyLastDice} dice last round! ${extraDice} extra × 2 = ${fredDmg} damage!`, tNameFred]);
-          log(`<span class="log-ability">${fFred.name}</span> — Careful! Enemy rolled ${enemyLastDice} dice (${extraDice} extra) → <span class="log-dmg">${fredDmg} damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
-          playDamageSfx(fredDmg);
-          hitDamage(enemyNameFred);
-        }
-      }
-    }
-  });
+  // Frederick (27) — Unstoppable Force: pre-roll chip damage removed (v852), now gains dice from specials
 
   // Ember Force (304) — deal 1 damage to enemy active (negated by Dylan)
   // Phase 4: Masked Hero (55) Underdog fires BEFORE pre-roll damage — if attacker KO'd, skip damage
@@ -10085,19 +10240,19 @@ function doPreRollSetup() {
     B.retributionDice = { red: 0, blue: 0 };
   }
 
-  // Cameron (25) — Unstoppable Force: bonus dice from opponent special usage
+  // Fredrick (27) — Unstoppable Force: bonus dice from opponent special usage
   if (B.cameronBonusDice) {
     ['red', 'blue'].forEach(tName => {
       if (B.cameronBonusDice[tName] > 0) {
-        const camTeam = B[tName];
-        const camAlive = camTeam.ghosts.some(g => g.id === 25 && !g.ko);
-        if (camAlive) {
+        const fredTeam = B[tName];
+        const fredAlive = fredTeam.ghosts.some(g => g.id === 27 && !g.ko);
+        if (fredAlive) {
           if (tName === 'red') redCount += B.cameronBonusDice.red;
           else blueCount += B.cameronBonusDice.blue;
-          const camG = camTeam.ghosts.find(g => g.id === 25 && !g.ko);
-          const loc = camTeam.ghosts[camTeam.activeIdx]?.id === 25 ? 'active' : 'sideline';
-          preRollCallouts.push(['UNSTOPPABLE FORCE!', 'var(--common)', `${camG.name} (${loc}) — Opponent used specials! +${B.cameronBonusDice[tName]} bonus dice!`, tName]);
-          log(`<span class="log-ability">${camG.name}</span> — Unstoppable Force! <span class="log-ms">+${B.cameronBonusDice[tName]} bonus dice</span> from opponent specials!`);
+          const fredG = fredTeam.ghosts.find(g => g.id === 27 && !g.ko);
+          const loc = fredTeam.ghosts[fredTeam.activeIdx]?.id === 27 ? 'active' : 'sideline';
+          preRollCallouts.push(['UNSTOPPABLE FORCE!', 'var(--common)', `${fredG.name} (${loc}) — Opponent used specials! +${B.cameronBonusDice[tName]} bonus dice!`, tName]);
+          log(`<span class="log-ability">${fredG.name}</span> — Unstoppable Force! <span class="log-ms">+${B.cameronBonusDice[tName]} bonus dice</span> from opponent specials!`);
         }
         B.cameronBonusDice[tName] = 0;
       }
@@ -10876,21 +11031,22 @@ function doPreRollSetup() {
     }
   });
 
-  // Fredrick (27) — Careful: when Fredrick is active, opponent may only roll up to 3 dice (applied last so it overrides all bonuses)
-  [B.red, B.blue].forEach(team => {
-    const fredF = active(team);
-    if (fredF && fredF.id === 27 && !fredF.ko) {
-      const enemyTName = (team === B.red) ? 'blue' : 'red';
-      const currentEnemyCount = enemyTName === 'red' ? redCount : blueCount;
-      if (currentEnemyCount > 3) {
-        if (enemyTName === 'red') redCount = 3;
-        else blueCount = 3;
-        const enemyF = active(team === B.red ? B.blue : B.red);
-        preRollCallouts.push(['CAREFUL!', 'var(--common)', `${fredF.name} — Careful! ${enemyF ? enemyF.name : 'Opponent'} capped at 3 dice!`, enemyTName === 'red' ? 'blue' : 'red']);
-        log(`<span class="log-ability">${fredF.name}</span> — Careful! Opponent capped at 3 dice this round.`);
+  // Fredrick (27) — Unstoppable Force: dice cap removed (v852), bonus dice from specials handled above
+
+  // Frostbite dice penalty — consumed on first roll after entry (one roll only)
+  if (B.frostbiteDicePenalty) {
+    ['red', 'blue'].forEach(tName => {
+      const penalty = B.frostbiteDicePenalty[tName] || 0;
+      if (penalty > 0) {
+        if (tName === 'red') redCount = Math.max(1, redCount - penalty);
+        else blueCount = Math.max(1, blueCount - penalty);
+        const penaltyF = active(B[tName]);
+        preRollCallouts.push(['FROSTBITTEN!', '#3b82f6', `${penaltyF.name} — Frostbite! -${penalty} dice this roll!`, tName]);
+        log(`<span class="log-ability" style="color:#60a5fa">${penaltyF.name}</span> — Frostbitten! -${penalty} dice this roll.`);
+        B.frostbiteDicePenalty[tName] = 0; // consumed — one roll only
       }
-    }
-  });
+    });
+  }
 
   // Patrick (10) — Stone Form: "Don't roll." Forced LAST so no other modifier restores dice.
   // With 0 dice, classify returns type:'none' which auto-loses to any real roll. The existing
@@ -14754,15 +14910,24 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Fissure! Two 6s → +5 damage!`);
   }
 
-  // Pelter (86) — Snowball: doubles win → +2 bonus damage
-  let pelterTriggered = false;
-  let pelterBaseDmg = 0;
-  if (wF.id === 86 && !wF.ko && wR.type === 'doubles') {
-    pelterBaseDmg = dmg;
-    dmg += 2;
-    pelterTriggered = true;
-    collectKC(winTeamName, wF.name);
-    log(`<span class="log-ability">${wF.name}</span> — Snowball! Doubles win → +2 damage!`);
+  // Calvin & Anna (91) — Frost Surge: +1 damage for each Frostbite stack on enemy sideline
+  let calvinAnnaTriggered = false;
+  let calvinAnnaBonus = 0;
+  let calvinAnnaBaseDmg = 0;
+  if (wF.id === 91 && !wF.ko) {
+    const enemyTeamName = winTeamName === 'red' ? 'blue' : 'red';
+    let totalFrostbite = 0;
+    if (B.frostbite && B.frostbite[enemyTeamName]) {
+      Object.values(B.frostbite[enemyTeamName]).forEach(count => { totalFrostbite += count; });
+    }
+    if (totalFrostbite > 0) {
+      calvinAnnaBaseDmg = dmg;
+      calvinAnnaBonus = totalFrostbite;
+      dmg += totalFrostbite;
+      calvinAnnaTriggered = true;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Frost Surge! ${totalFrostbite} Frostbite on enemy sideline → +${totalFrostbite} damage!`);
+    }
   }
 
   // Kaylee (453) — Slipstream: dice stealing handled pre-winner in _resolveRoundImpl
@@ -14975,9 +15140,9 @@ function _resolveRoundImpl() {
     collectKC(winTeamName, wF.name);
   }
 
-  // Cameron (25) — Unstoppable Force: Cameron's damage cannot be negated.
+  // Fredrick (27) — Unstoppable Force: Fredrick's damage cannot be negated.
   // Defined early so it guards Sylvia, Guard Thomas, Bogey, Kodako, Patrick, Dealer, Sky, City Cyboo, King Jay, Fang.
-  const cameronUnnegatable = (wF.id === 25 && !wF.ko);
+  const cameronUnnegatable = (wF.id === 27 && !wF.ko);
 
   // Sylvia (313) — loser dodge check: roll 1 die, if it's a 6 negate all damage.
   // v331: the die is rolled by the PLAYER via the Sylvia modal (showSylviaModal) before
@@ -15167,6 +15332,35 @@ function _resolveRoundImpl() {
     collectKC(loseTeamName, 'Gary', garyLoseGhost);
     const loseLoc = loseGaryActive ? 'active' : 'sideline';
     log(`<span class="log-ability">Gary</span> (${loseLoc}) — Lucky Novice! ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''} → +${garyIceLose} Ice Shards!`);
+  }
+
+  // Pelter (86) — Snowball Fight: Sideline & In Play, gain 1 Frostbite if you roll any 1s
+  // Win-team check
+  const winPelterActive = wF.id === 86 && !wF.ko;
+  const winPelterSide = hasSideline(winTeam, 86);
+  if ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice && winDice.some(d => d === 1)) {
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    winTeam.resources.frostbite += 1;
+    const pelterG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
+    const pelterLoc = winPelterActive ? '' : ' (sideline)';
+    collectKC(winTeamName, pelterG.name, pelterG);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterG.name}${pelterLoc}</span> — Snowball Fight! Rolled a 1 → +1 Frostbite!`);
+  } else if (winPelterSide && corneliusBlocksRally && winDice && winDice.some(d => d === 1)) {
+    corneliusSidelineBlockedList.push('Pelter');
+  }
+  // Lose-team check
+  const losePelterActive = lF.id === 86 && !lF.ko;
+  const losePelterSide = hasSideline(loseTeam, 86);
+  const corneliusBlocksPelterLose = losePelterSide && !losePelterActive && hasSideline(winTeam, 45);
+  if ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice && loseDice.some(d => d === 1)) {
+    if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+    loseTeam.resources.frostbite += 1;
+    const pelterGL = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
+    const pelterLocL = losePelterActive ? '' : ' (sideline)';
+    collectKC(loseTeamName, pelterGL.name, pelterGL);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterGL.name}${pelterLocL}</span> — Snowball Fight! Rolled a 1 → +1 Frostbite!`);
+  } else if (losePelterSide && corneliusBlocksPelterLose && loseDice && loseDice.some(d => d === 1)) {
+    corneliusSidelineBlockedList.push('Pelter');
   }
 
   // Bandit Pete (93) — Bandit: while on the sideline, if either player rolls only 2 dice, active ghost gains +3 damage.
@@ -15710,8 +15904,7 @@ function _resolveRoundImpl() {
     log(`<span class="log-dmg">${lF.name} — Stone Form counter! ${patrickStoneDmg} damage to ${wF.name}!</span> ${wF.ko?'<span class="log-ko">KO!</span>':stoneFormHpAfter+' HP left'}`);
   }
 
-  // Cameron (25) — Unstoppable Force: damage cannot be negated (cameronUnnegatable flag set above,
-  // all negation checks already guarded). Log a callout if Cameron wins and dealt damage.
+  // Fredrick (27) — Unstoppable Force: damage cannot be negated. Log callout if Fredrick wins and dealt damage.
   let cameronUnstoppableLogged = false;
   if (cameronUnnegatable && !wF.ko && dmg > 0) {
     cameronUnstoppableLogged = true;
@@ -16006,7 +16199,6 @@ function _resolveRoundImpl() {
   // NOTE: Sad Sal (29) collectKC already called at line ~10004 (no-ko-guard block) — do NOT add a second one here
 
   // On-KO triggers (game state) — resource grants deferred to BEDTIME STORY!/BITTER END! onShow
-  let powderFinalGiftTriggered = false;
   // Cornelius (45) Antidote blocks Granny's sideline Bedtime Story (hoisted for render section access)
   const corneliusBlocksGrannyLose = hasSideline(winTeam, 45);
   const corneliusBlocksGrannyWin = hasSideline(loseTeam, 45);
@@ -16014,12 +16206,6 @@ function _resolveRoundImpl() {
     if (hasSideline(loseTeam, 310) && !corneliusBlocksGrannyLose) {
       const grannyGhost = getSidelineGhost(loseTeam, 310);
       collectKC(loseTeamName, 'Granny', grannyGhost);
-    }
-    // Powder (23) — Final Gift: KO'd → team gains 3 Ice Shards for the next ghost
-    if (lF.id === 23) {
-      powderFinalGiftTriggered = true;
-      collectKC(loseTeamName, lF.name); // Knight reactions fire on FINAL GIFT! (same pattern as Granny/Chagrin KO paths)
-      log(`<span class="log-ability">${lF.name}</span> — Final Gift! KO'd... leaving 3 Ice Shards for the next ghost.`);
     }
     if (lF.id === 404) { collectKC(loseTeamName, lF.name); } // Chagrin on-KO surge → BITTER END! onShow below
   }
@@ -16125,14 +16311,14 @@ function _resolveRoundImpl() {
   if (snortonTriggered) {
     queueAbility('FISSURE!', 'var(--rare)', `${wF.name} — Two 6s! ${snortonBaseDmg} + 5 = ${dmg} damage!`, null, winTeamName);
   }
+  if (calvinAnnaTriggered) {
+    queueAbility('FROST SURGE!', '#3b82f6', `${wF.name} — ${calvinAnnaBonus} Frostbite on enemy sideline! ${calvinAnnaBaseDmg} + ${calvinAnnaBonus} = ${dmg} damage!`, null, winTeamName);
+  }
   if (floraRestored) {
     queueAbility('RESTORE!', 'var(--rare)', `${floraRestoredName} — Doubles! +2 HP! Now at ${floraRestoredHp} HP!`, () => { floraGhost.hp = floraRestoredHp; renderBattle(); }, floraGhost === wF ? winTeamName : loseTeamName);
   }
   if (floraFlipped) {
     queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Restore cursed! ${floraFlippedName} takes 2 damage instead! (${floraFlippedFrom} → ${floraFlippedTo} HP)`, () => { floraGhost.hp = floraFlippedTo; renderBattle(); }, floraGhost === wF ? winTeamName : loseTeamName);
-  }
-  if (pelterTriggered) {
-    queueAbility('SNOWBALL!', 'var(--rare)', `${wF.name} — Doubles! ${pelterBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
   // Kaylee (453) — Slipstream callout now handled in pre-winner section via blackoutCallouts queue
   if (docTriggered) {
@@ -16220,6 +16406,12 @@ function _resolveRoundImpl() {
     queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (${_garyWinLoc}) — ${garyOnesWin} rolled 1${garyOnesWin > 1 ? 's' : ''}! +${garyIceWin} Ice Shards! (${garyWinIceTotal} total)`, () => { winTeam.resources.ice += garyIceWin; creditGhost(winTeamName, _garyWinId, 'ice', garyIceWin); renderBattle(); }, winTeamName);
     if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyIceWin} Ice Shards! (${loseTeam.resources.ice + garyIceWin} total)`, () => { loseTeam.resources.ice += garyIceWin; creditGhost(loseTeamName, 33, 'ice', garyIceWin); renderBattle(); }, loseTeamName);
     // Knight reactions already collected via collectKC at game-state section (line ~9526) — do NOT double-fire here
+  }
+  // Pelter (86) — Snowball Fight: win-team callout (frostbite already added in game-state section)
+  if ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice && winDice.some(d => d === 1)) {
+    const _pelterWinG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
+    const _pelterWinLoc = winPelterActive ? 'active' : 'sideline';
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterWinG.name} (${_pelterWinLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!winPelterActive) popSidelineCard(winTeam, 86); renderBattle(); }, winTeamName);
   }
   if (banditPeteTriggered) {
     const bpWhoQ = winDice && winDice.length === 2 ? 'Your ghost rolled only 2 dice!' : 'Opponent rolled only 2 dice!';
@@ -16505,6 +16697,18 @@ function _resolveRoundImpl() {
   if (wF.id === 206 && !wF.ko) { queueAbility('ICE SHARD!', 'var(--ghost-rare)', `${wF.name} — Win! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 206, 'ice', 1); renderBattle(); }, winTeamName); }
   // Zain ICE SHARD knight reactions already collected via collectKC at game-state section (line ~10082) — do NOT double-fire here
   if (wF.id === 206 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Ice Shard! +1 Ice Shard! (${loseTeam.resources.ice + 1} total)`, () => { loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
+  // Cameron (25) — Winter's Harvest: win → +1 Frostbite + 1 Ice Shard
+  if (wF.id === 25 && !wF.ko) {
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    queueAbility("WINTER'S HARVEST!", '#3b82f6', `${wF.name} — Win! +1 Frostbite + 1 Ice Shard!`, () => { winTeam.resources.frostbite += 1; winTeam.resources.ice += 1; creditGhost(winTeamName, 25, 'ice', 1); renderBattle(); }, winTeamName);
+    log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Winter's Harvest! +1 Frostbite + 1 Ice Shard!`);
+  }
+  // Calvin & Anna (91) — Frost Surge: win → +1 Frostbite
+  if (wF.id === 91 && !wF.ko) {
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    queueAbility('FROST SURGE!', '#3b82f6', `${wF.name} — Win! +1 Frostbite!`, () => { winTeam.resources.frostbite += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Frost Surge! +1 Frostbite!`);
+  }
   // Dylan (301) — Stained Glass: Sideline & In Play, winning rolls gain +1 Burn
   if (hasDylanWin) {
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
@@ -16693,6 +16897,12 @@ function _resolveRoundImpl() {
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyIceLose} Ice Shards! (${winTeam.resources.ice + garyIceLose} total)`, () => { winTeam.resources.ice += garyIceLose; creditGhost(winTeamName, 33, 'ice', garyIceLose); renderBattle(); }, winTeamName);
     // Gary lose-path knight reactions already collected via collectKC at game-state section (line ~9531) — do NOT double-fire here
   }
+  // Pelter (86) — Snowball Fight: lose-team callout (frostbite already added in game-state section)
+  if ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice && loseDice.some(d => d === 1)) {
+    const _pelterLoseG = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
+    const _pelterLoseLoc = losePelterActive ? 'active' : 'sideline';
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterLoseG.name} (${_pelterLoseLoc}) — Rolled a 1! +1 Frostbite!`, () => { if (!losePelterActive) popSidelineCard(loseTeam, 86); renderBattle(); }, loseTeamName);
+  }
 
   // On-lose callouts — onShow applies the surge grant with the splash
   if (lF.id === 404 && !lF.ko) { queueAbility('BITTER END!', 'var(--rare)', `${lF.name} — Lost but gained 1 Surge!`, () => { loseTeam.resources.surge++; renderBattle(); }, loseTeamName); }
@@ -16735,13 +16945,6 @@ function _resolveRoundImpl() {
     const cornGhostGrW = getSidelineGhost(loseTeam, 45);
     queueAbility('ANTIDOTE!', 'var(--uncommon)', `${cornGhostGrW ? cornGhostGrW.name : 'Cornelius'} blocks Granny's Bedtime Story!`, null, loseTeamName);
     log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Granny Bedtime Story blocked!`);
-  }
-
-  // Powder (23) — Final Gift: KO'd → loseTeam gains 3 Ice Shards (onShow deferred for visual sync)
-  if (powderFinalGiftTriggered) {
-    const powderIceTotal = loseTeam.resources.ice + 3;
-    queueAbility('FINAL GIFT!', 'var(--common)', `${lF.name} — Defeated... but leaves 3 Ice Shards behind! (${powderIceTotal} total)`, () => { loseTeam.resources.ice += 3; creditGhost(loseTeamName, 23, 'ice', 3); renderBattle(); }, loseTeamName);
-    if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Final Gift! +3 Ice Shards! (${winTeam.resources.ice + 3} total)`, () => { winTeam.resources.ice += 3; creditGhost(winTeamName, 33, 'ice', 3); renderBattle(); }, winTeamName);
   }
 
   // Chester (426) — Well Read: Win: +1 Healing Seed always. Doubles+: also +2 Burn.
@@ -17211,10 +17414,8 @@ function _resolveRoundImpl() {
       renderDice(redDice, blueDice);
       highlightWinnerDice(winTeamName, wR, loseTeamName, tiebreaker);
 
-      // Calvin & Anna (91) — Toboggan: when C&A scores a KO, offer to swap with sideline ghost
-      const tobogganAlive = (wF.id === 91 && !wF.ko && lF.ko)
-        ? winTeam.ghosts.filter((g, i) => i !== winTeam.activeIdx && !g.ko)
-        : [];
+      // Calvin & Anna (91) — Frost Surge: damage bonus ability (no longer Toboggan swap)
+      const tobogganAlive = [];
 
       // Fang Outside (6) — Skillful Coward: after any win, offer to swap Fang to sideline
       const fangOutsideAlive = (wF.id === 6 && !wF.ko)
@@ -18323,6 +18524,11 @@ function renderBattle() {
           const bc = B.burn[team][realIdx];
           slCardHtml += `<div class="burn-badge">🔥${bc}</div>`;
         }
+        // Frostbite badge: show how much frostbite is stacked on this sideline ghost
+        if (B.frostbite && B.frostbite[team] && B.frostbite[team][realIdx]) {
+          const fc = B.frostbite[team][realIdx];
+          slCardHtml += `<div class="frostbite-badge">❄️${fc}</div>`;
+        }
         el.innerHTML = slCardHtml;
         el.onclick = isPick ? () => doKoSwap(team, realIdx) : null;
       } else {
@@ -18401,6 +18607,11 @@ function renderBattle() {
     if (r.burn > 0) {
       const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
       rh += `<div class="res-tile fire ${isReady?'clickable':''}" ${burnClick} title="Burn: ${r.burn} available — click to place on an enemy sideline ghost (deals damage on entry)"><span class="res-main">🔥</span><span class="res-count">${r.burn}</span><span class="res-label">BURN</span></div>`;
+    }
+    // Frostbite resource pool — clickable to place on enemy sideline ghosts (pre-roll only)
+    if (r.frostbite > 0) {
+      const fbClick = isReady ? `onclick="showFrostbitePicker('${team}')"` : '';
+      rh += `<div class="res-tile ice ${isReady?'clickable':''}" ${fbClick} title="Frostbite: ${r.frostbite} available — click to place on an enemy sideline ghost (loses dice on entry)"><span class="res-main">❄️</span><span class="res-count">${r.frostbite}</span><span class="res-label">FROSTBITE</span></div>`;
     }
     // Burn placed indicator removed — burn disappears when spent, no need to track visually
     // Happy Crystal (208) — sacrifice tile
@@ -18558,6 +18769,10 @@ function renderBattle() {
       // Castle Gardener (442) — Cultivate: pre-roll button to trade seeds for fire
       if (f.id === 442 && !f.ko && B[team].resources && B[team].resources.healingSeed >= 1) {
         html += `<button class="ability-btn pressure" onclick="useCultivate('${team}')" style="border-color:#40916c;color:#40916c;font-weight:bold;">🌱 CULTIVATE! (1 Seed → 2 Sacred Fire)</button>`;
+      }
+      // Powder (23) — Blizzard: discard 3 Ice Shards → 2 Frostbite on all enemy sideline
+      if (f.id === 23 && !f.ko && B[team].resources && B[team].resources.ice >= 3) {
+        html += `<button class="ability-btn pressure" onclick="usePowderBlizzard('${team}')" style="border-color:#3b82f6;color:#3b82f6;font-weight:bold;">❄️ BLIZZARD! (3 Ice → 2 Frostbite on all sideline)</button>`;
       }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
     }
@@ -20322,6 +20537,13 @@ function setupLivePvP() {
       if (!B.burn.blue) B.burn.blue = {};
     }
     if (data.burnSource) B.burnSource = data.burnSource;
+    // v852: sync frostbite state
+    if (data.frostbite) {
+      B.frostbite = data.frostbite;
+      if (!B.frostbite.red) B.frostbite.red = {};
+      if (!B.frostbite.blue) B.frostbite.blue = {};
+    }
+    if (data.frostbiteSource) B.frostbiteSource = data.frostbiteSource;
     renderBattle();
     playSfx('sfxSpecial', 0.15); // subtle audio cue that opponent is doing something
   });
