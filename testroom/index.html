@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v856'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v857'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v856'; // 5 new Frost Valley synergy teams (#103-#107)
+const TESTROOM_VERSION = 'v857'; // Simon brew cost 4→3, add Speed Blade team (#108)
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3318,7 +3318,7 @@ const GHOSTS = [
   // FROST VALLEY
   // ============================================================
   {id:23, name:"Powder", rarity:"common", maxHp:5, art:"art/originals/powder.jpg", ability:"Blizzard", abilityDesc:"Discard 1 Ice Shard: place 2 Frostbite on each enemy sideline ghost.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Ice Shard → Frostbite converter. Blankets the enemy bench."},
-  {id:24, name:"Simon", rarity:"common", maxHp:4, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"Sideline: you may discard 4 Specials to gain 1 Moonstone.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Sideline moonstone converter. Trade 4 specials for 1 Moonstone pre-roll."},
+  {id:24, name:"Simon", rarity:"common", maxHp:4, art:"art/originals/simon.jpg", ability:"Brew Time", abilityDesc:"Sideline: you may discard 3 Specials to gain 1 Moonstone.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Sideline moonstone converter. Trade 3 specials for 1 Moonstone pre-roll."},
   {id:25, name:"Cameron", rarity:"common", maxHp:6, art:"art/originals/cameron.jpg", ability:"Winter's Harvest", abilityDesc:"Roll Doubles: gain 1 Frostbite and 1 Ice Shard.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley. Doubles-based Frostbite + Ice Shard generator. Fuels Powder and Calvin & Anna."},
   {id:26, name:"Logey", rarity:"common", maxHp:4, art:"art/originals/logey.jpg", ability:"Heinous", abilityDesc:"Opponent's 5+ dice are unavailable next roll.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley. High-die lockout."},
   {id:27, name:"Fredrick", rarity:"common", maxHp:5, art:"art/originals/fredrick.jpg", ability:"Unstoppable Force", abilityDesc:"If the opponent uses a special, Fredrick gains 1 extra die. Fredrick's damage cannot be negated.", category:"Dice Boost/Anti-Negation", set:"Frost Valley", designNote:"Frost Valley. Punishes special usage with bonus dice. Damage pierces all negation."},
@@ -4344,7 +4344,7 @@ const CURATED_TEAMS = [
   [304, 413, 416],
   // #28 Entry Damage Blitz — Grawr 1 damage on entry, Jenkins rolls 4 dice damage on entry, Nicholas 2 damage to enemy on entry
   [34, 94, 51],
-  // #29 Simon's Moonstone Brew — Simon converts 4 specials → 1 Moonstone from sideline, Marcus 3+ damage → 4 extra dice, Mallow removes fire for 3HP from sideline
+  // #29 Simon's Moonstone Brew — Simon converts 3 specials → 1 Moonstone from sideline, Marcus 3+ damage → 4 extra dice, Mallow removes fire for 3HP from sideline
   [24, 57, 89],
   // #30 Surge Builder — Dart wins for 2 Surge, Boris spends Surge for +2HP, Chagrin loses for 1 Surge
   [209, 343, 404],
@@ -4508,12 +4508,14 @@ const CURATED_TEAMS = [
   [91, 86, 206],
   // #104 Blizzard Engine — Pelter generates Frostbite per 1, Calvin & Anna convert enemy Frostbite stacks into Ice Shards on win, Powder spends 1 Ice to blanket enemy sideline with Frostbite
   [91, 86, 23],
-  // #105 Moonstone Brew Line — Gary + Pelter both fire on 1s (Ice Shards + Frostbite), Simon converts 4 specials into Moonstones from sideline
+  // #105 Moonstone Brew Line — Gary + Pelter both fire on 1s (Ice Shards + Frostbite), Simon converts 3 specials into Moonstones from sideline
   [92, 86, 24],
-  // #106 Cameron Doubles Forge — Cameron doubles → Frostbite + Ice, Zain wins → Ice + forges Ice Blade, Simon converts excess specials to Moonstone for the forge cost
+  // #106 Cameron Doubles Forge — Cameron doubles → Frostbite + Ice, Zain wins → Ice + forges Ice Blade, Simon converts 3 specials to Moonstone for the forge cost
   [25, 206, 24],
   // #107 Full Frost Lockdown — Pelter + Cameron generate Frostbite, Powder converts Ice into mass Frostbite blanket. Strip all enemy dice.
   [23, 86, 25],
+  // #108 Speed Blade — Zain wins for Ice, Gary generates 2 Ice per 1 from sideline, Simon brews 3 specials into Moonstone. Turn-1 Ice Blade if you roll two 1s.
+  [206, 92, 24],
 ];
 
 // --- Quick-fill helpers (Wyatt Directive 2026-04-11) ---
@@ -6667,10 +6669,10 @@ function doCultivateChoice(choice) {
 function useSimonBrew(team) {
   if (!hasSideline(B[team], 24)) return;
   const handSize = getHandSize(B[team]);
-  if (handSize < 4) return;
+  if (handSize < 3) return;
 
-  // Consume 4 specials — take from most abundant first
-  let toRemove = 4;
+  // Consume 3 specials — take from most abundant first
+  let toRemove = 3;
   const keys = [...HAND_RESOURCE_KEYS].sort((a, b) => (B[team].resources[b] || 0) - (B[team].resources[a] || 0));
   for (const k of keys) {
     if (toRemove <= 0) break;
@@ -6682,8 +6684,8 @@ function useSimonBrew(team) {
 
   B[team].resources.moonstone = (B[team].resources.moonstone || 0) + 1;
   const simonG = getSidelineGhost(B[team], 24) || { name: 'Simon' };
-  showAbilityCallout('BREW TIME!', '#f59e0b', `${simonG.name} (sideline) — 4 Specials → +1 Moonstone!`, team);
-  log(`<span class="log-ability" style="color:#f59e0b">${simonG.name}</span> (sideline) — Brew Time! 4 Specials → <span class="log-ms">+1 Moonstone!</span>`);
+  showAbilityCallout('BREW TIME!', '#f59e0b', `${simonG.name} (sideline) — 3 Specials → +1 Moonstone!`, team);
+  log(`<span class="log-ability" style="color:#f59e0b">${simonG.name}</span> (sideline) — Brew Time! 3 Specials → <span class="log-ms">+1 Moonstone!</span>`);
   popSidelineCard(B[team], 24);
   collectKC(team, simonG.name, simonG);
   renderBattle();
@@ -18785,10 +18787,10 @@ function renderBattle() {
       // Simon (24) — Brew Time: sideline button to trade 4 specials for 1 Moonstone
       if (hasSideline(B[team], 24)) {
         const simonHandSize = getHandSize(B[team]);
-        if (simonHandSize >= 4) {
-          html += `<button class="ability-btn pressure" onclick="useSimonBrew('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🧪 BREW TIME! (4 Specials → 1 Moonstone)</button>`;
+        if (simonHandSize >= 3) {
+          html += `<button class="ability-btn pressure" onclick="useSimonBrew('${team}')" style="border-color:#f59e0b;color:#f59e0b;font-weight:bold;">🧪 BREW TIME! (3 Specials → 1 Moonstone)</button>`;
         } else {
-          html += `<button class="ability-btn pressure" disabled style="border-color:#4b5563;color:#4b5563;opacity:0.4;cursor:not-allowed;">🧪 BREW TIME! (4 Specials → 1 Moonstone)</button>`;
+          html += `<button class="ability-btn pressure" disabled style="border-color:#4b5563;color:#4b5563;opacity:0.4;cursor:not-allowed;">🧪 BREW TIME! (3 Specials → 1 Moonstone)</button>`;
         }
       }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
