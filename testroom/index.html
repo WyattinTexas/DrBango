@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v865'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v866'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -603,6 +603,14 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .res-tile.healingSeed .res-count { color:#22c55e; }
 .res-tile.luckyStone { border-color:rgba(251,191,36,0.4); box-shadow:0 0 8px rgba(251,191,36,0.15); }
 .res-tile.luckyStone .res-count { color:#fbbf24; }
+.res-tile.gf-wish { border-color:rgba(167,139,250,0.5); box-shadow:0 0 8px rgba(167,139,250,0.2); }
+.res-tile.gf-wish .res-count { color:#a78bfa; }
+.res-tile.gf-wish.rerollable { border-color:#a78bfa !important; outline-color:#a78bfa; }
+@keyframes gfWishPulse {
+  0%,100% { box-shadow:0 0 12px rgba(167,139,250,0.5), 0 0 24px rgba(167,139,250,0.2); transform:scale(1.15); }
+  50% { box-shadow:0 0 24px rgba(167,139,250,0.9), 0 0 48px rgba(167,139,250,0.4); transform:scale(1.25); }
+}
+.res-tile.gf-wish.rerollable { animation:gfWishPulse 0.6s ease-in-out infinite; }
 .res-tile.burn { border-color:rgba(239,68,68,0.5); box-shadow:0 0 8px rgba(239,68,68,0.2); }
 .res-tile.burn .res-count { color:#ef4444; }
 .res-tile.firefly { border-color:rgba(255,215,0,0.5); box-shadow:0 0 10px rgba(255,215,0,0.25); }
@@ -2313,20 +2321,7 @@ body.lite-mode .die.rolling { animation: none !important; }
   </div>
 </div>
 
-<!-- Guardian Fairy — Wish timed button (replaces old full-screen modal) -->
-<div id="gfWishBtn" style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:9999;
-  background:linear-gradient(135deg,#5b21b6,#7c3aed); color:#fff; border:2px solid #a78bfa; border-radius:14px;
-  padding:12px 28px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 0 30px rgba(139,92,246,0.5);
-  text-align:center; min-width:200px; user-select:none; animation:gfPulse 1s ease-in-out infinite;">
-  <div style="font-size:11px;opacity:0.8;margin-bottom:2px;" id="gfWishSub">Guardian Fairy can take this hit!</div>
-  <span>🧚 WISH!</span>
-  <div id="gfWishCountdown" style="position:absolute;top:-10px;right:-10px;background:#ef4444;color:#fff;
-    border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
-    font-size:13px;font-weight:800;box-shadow:0 0 8px rgba(239,68,68,0.6);"></div>
-</div>
-<style>
-@keyframes gfPulse { 0%,100% { box-shadow:0 0 30px rgba(139,92,246,0.5); } 50% { box-shadow:0 0 50px rgba(139,92,246,0.8); } }
-</style>
+<!-- Guardian Fairy — Wish: injected as a resource tile at runtime (see showGfWishButton) -->
 
 <!-- Eloise (85) — Change of Heart: spend 1 Ice Shard to swap HP with enemy before rolling -->
 <div class="selene-overlay" id="eloiseOverlay">
@@ -2801,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v865'; // Selene Heart of the Hills: move doubles prompt to after damage resolution
+const TESTROOM_VERSION = 'v866'; // Guardian Fairy Wish: restyle as resource tile with specials-style countdown
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -6400,9 +6395,9 @@ function doGuardianFairyReactive(choice) {
   const gfp = B.guardianFairyReactivePending;
   if (!gfp) return;
   B.guardianFairyReactivePending = null;
-  // Clear timer and hide button
+  // Clear timer and remove tile
   if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
-  document.getElementById('gfWishBtn').style.display = 'none';
+  document.querySelectorAll('.res-tile.gf-wish').forEach(el => el.remove());
   const { loseTeamName, gfGhost, dmg, lF, resume } = gfp;
   const loseTeam = B[loseTeamName];
   if (choice === 'yes') {
@@ -6428,28 +6423,47 @@ function doGuardianFairyReactive(choice) {
   }
 }
 
-// Show GF Wish as a timed button with countdown — auto-declines on expiry
+// Show GF Wish as a resource tile with countdown — matches specials window style
 function showGfWishButton() {
   const gfp = B.guardianFairyReactivePending;
   if (!gfp) return;
   const gfG = gfp.gfGhost;
   const gfName = gfG.name || 'Guardian Fairy';
-  const btn = document.getElementById('gfWishBtn');
-  const cdEl = document.getElementById('gfWishCountdown');
-  const subEl = document.getElementById('gfWishSub');
-  subEl.innerHTML = `${gfName} absorbs ${gfp.dmg} dmg for ${gfp.lF.name}!`;
-  btn.style.display = 'block';
-  btn.onclick = () => doGuardianFairyReactive('yes');
+  const resEl = document.getElementById(gfp.loseTeamName + '-resources');
+  if (!resEl) return;
+  // Remove any existing GF tile
+  const old = resEl.querySelector('.gf-wish');
+  if (old) old.remove();
+  // Create resource tile
+  const tile = document.createElement('div');
+  tile.className = 'res-tile gf-wish rerollable clickable';
+  tile.title = `${gfName}: click to swap in and absorb ${gfp.dmg} damage for ${gfp.lF.name}`;
+  tile.style.position = 'relative';
+  tile.style.cursor = 'pointer';
+  tile.innerHTML = `<span class="res-main">🧚</span><span class="res-count">!</span><span class="res-label">WISH</span>`;
+  tile.onclick = () => {
+    if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
+    tile.remove();
+    doGuardianFairyReactive('yes');
+  };
+  resEl.appendChild(tile);
+  // Countdown badge
+  const cd = document.createElement('div');
+  cd.className = 'reroll-countdown';
+  cd.style.color = '#a78bfa';
+  cd.style.textShadow = '0 0 10px rgba(167,139,250,0.6)';
+  tile.appendChild(cd);
   const secs = getSpecialsTimerSecs();
   let remaining = secs;
-  cdEl.textContent = remaining;
+  cd.textContent = remaining;
   narrate(`<b class="${gfp.loseTeamName}-text">🧚 ${gfName}</b> can take this hit! Click to activate!`);
   if (gfWishTimer) clearInterval(gfWishTimer);
   gfWishTimer = setInterval(() => {
     remaining--;
-    cdEl.textContent = remaining;
+    cd.textContent = remaining;
     if (remaining <= 0) {
       clearInterval(gfWishTimer); gfWishTimer = null;
+      tile.remove();
       doGuardianFairyReactive('no'); // auto-decline
     }
   }, 1000);
@@ -7465,7 +7479,7 @@ function doGusGaleReactive(choice) {
     if (B.guardianFairyReactivePending) {
       B.guardianFairyReactivePending = null;
       if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
-      document.getElementById('gfWishBtn').style.display = 'none';
+      document.querySelectorAll('.res-tile.gf-wish').forEach(el => el.remove());
     }
     // Set up gale force swap state for the picker
     B._gusGaleAccepted = true;
@@ -19309,7 +19323,7 @@ function clearAllOverlays() {
   document.getElementById('timberOverlay').classList.remove('active');
   document.getElementById('romyOverlay').classList.remove('active');
   document.getElementById('tobyOverlay').classList.remove('active');
-  document.getElementById('gfWishBtn').style.display = 'none';
+  document.querySelectorAll('.res-tile.gf-wish').forEach(el => el.remove());
   if (gfWishTimer) { clearInterval(gfWishTimer); gfWishTimer = null; }
   document.getElementById('tylerOverlay').classList.remove('active');
   document.getElementById('eloiseOverlay').classList.remove('active');
@@ -21229,8 +21243,7 @@ if (LIVE_PVP) {
       setTimeout(() => { if (typeof doGusGaleReactive === 'function') doGusGaleReactive('yes'); }, 300);
     }
     // Guardian Fairy — auto-decline (let damage apply normally)
-    const gfReactiveOverlay = document.getElementById('guardianFairyOverlay');
-    if (gfReactiveOverlay && gfReactiveOverlay.classList.contains('active') && B.guardianFairyReactivePending && shouldAutoResolve(B.guardianFairyReactivePending.loseTeamName)) {
+    if (B.guardianFairyReactivePending && shouldAutoResolve(B.guardianFairyReactivePending.loseTeamName) && document.querySelector('.res-tile.gf-wish')) {
       setTimeout(() => { if (typeof doGuardianFairyReactive === 'function') doGuardianFairyReactive('no'); }, 300);
     }
     // Jenkins — auto-roll greeting dice
