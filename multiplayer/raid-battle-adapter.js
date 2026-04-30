@@ -20,6 +20,11 @@ const RaidBattleAdapter = {
       if (!B || B.round <= 1) return false;
       if (B.phase === 'over') return false;
 
+      if (RaidState.bossCurrentHp <= 0 && RaidState.bossCurrentHp != null) {
+        this._handleRaidGameOver('red');
+        return true;
+      }
+
       this._handleTurnHandoff();
       return true;
     });
