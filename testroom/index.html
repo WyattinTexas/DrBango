@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v864'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v865'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v864'; // Fix Eli Steady crash: remove collectKC call (not in doPreRollSetup scope)
+const TESTROOM_VERSION = 'v865'; // Selene Heart of the Hills: move doubles prompt to after damage resolution
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -9495,6 +9495,17 @@ function renderDuelUI() {
 function startNextRound() {
   if (!B) return;
 
+  // Selene (305) — Heart of the Hills: show choice modal after damage resolution
+  if (B.selenePending) {
+    B.selenePending._continue = () => { _startNextRoundAfterSelene(); };
+    showSeleneModal();
+    return;
+  }
+  _startNextRoundAfterSelene();
+}
+function _startNextRoundAfterSelene() {
+  if (!B) return;
+
   // Laura (79) — Catchy Tune: if unlocked, show die picker before next round
   if (!B.catchyTuneUnlocked) B.catchyTuneUnlocked = { red: false, blue: false };
   if (!B.catchyTuneLockedDie) B.catchyTuneLockedDie = { red: null, blue: null };
@@ -11459,11 +11470,7 @@ function doPostRollAndResolve(redDice, blueDice) {
     // → then Jeanie (90) — Hidden Treasure: sideline force-opponent-reroll (once per game)
     // → then Selene → postRollDone
     const afterJeanie = () => {
-      if (B.selenePending) {
-        B.selenePending._continue = postRollDone;
-        showSeleneModal();
-        return;
-      }
+      // Selene (305) — Heart of the Hills: moved to startNextRound (after damage resolution)
       postRollDone();
     };
     const afterSonya = () => {
