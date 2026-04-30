@@ -84,7 +84,7 @@ const RaidSync = {
 
     try {
       await this._instanceRef.update(update);
-      console.log('[RaidSync] Turn advanced to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
+      console.log('[RaidSync] Turn advanced to player', nextIdx, '| Boss pool HP:', poolNow, '/', RaidState.bossMaxHp);
     } catch (e) {
       console.error('[RaidSync] Turn handoff write FAILED:', e);
     }
