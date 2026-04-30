@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v878'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v879'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v878'; // Twyla Lucky Dance: +1 dmg per Lucky Stone spent (was +1 Healing Seed)
+const TESTROOM_VERSION = 'v879'; // Young Cap Energize respects hand limit
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -5399,13 +5399,21 @@ function spendHealingSeed(team) {
   log(`<span class="log-heal">${f.name}</span> used a Healing Seed! Healed to ${f.hp} HP.`);
 
   // Young Cap (429) — Energize: when active uses a Healing Seed, +1 die this roll + 1 Ice Shard + 1 Surge
+  // Respect hand limit — only grant resources if under the cap
   if (f.id === 429 && !f.ko) {
     if (!f.youngCapDieBonus) f.youngCapDieBonus = 0;
     f.youngCapDieBonus++;
-    t.resources.ice++;
-    t.resources.surge++;
-    showAbilityCallout('ENERGIZE!', 'var(--uncommon)', `${f.name} — Healing Seed used! +1 die, +1 Ice Shard, +1 Surge!`, team);
-    log(`<span class="log-ability">${f.name}</span> — Energize! Healing Seed → +1 die this roll, <span class="log-ice">+1 Ice Shard</span>, <span class="log-ms">+1 Surge</span>.`);
+    let ycIce = 0, ycSurge = 0;
+    const ycHandSize = getHandSize(t);
+    const ycLimit = B.handLimitMode ? B.HAND_LIMIT : Infinity;
+    if (ycHandSize < ycLimit) { t.resources.ice++; ycIce = 1; }
+    if (ycHandSize + ycIce < ycLimit) { t.resources.surge++; ycSurge = 1; }
+    const ycParts = ['+1 die'];
+    if (ycIce) ycParts.push('+1 Ice Shard');
+    if (ycSurge) ycParts.push('+1 Surge');
+    if (!ycIce || !ycSurge) ycParts.push('(hand limit reached)');
+    showAbilityCallout('ENERGIZE!', 'var(--uncommon)', `${f.name} — Healing Seed used! ${ycParts.join(', ')}!`, team);
+    log(`<span class="log-ability">${f.name}</span> — Energize! Healing Seed → ${ycParts.join(', ')}.`);
   }
 
   // Boopies (419) — Boopie Magic: sideline — when active spends Healing Seed, gain 1 Lucky Stone
