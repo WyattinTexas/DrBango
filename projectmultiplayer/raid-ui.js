@@ -1199,6 +1199,8 @@ function closeRaidResult() {
   if (resultOverlay) resultOverlay.remove();
   hideRaidScreen();
   cleanupRaid();
+  // Clear activeRaid (was deferred from distributeRaidRewards to prevent race)
+  if (typeof RaidSync !== 'undefined') RaidSync.clearActiveRaid();
   showRaidLobby();
   // Refresh main UI
   if (typeof renderMainScreen === 'function') renderMainScreen();

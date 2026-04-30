@@ -1462,8 +1462,8 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
       await invRef.set(inv);
     }
 
-    // Clear active raid flag
-    updates[`mp/users/${p.uid}/activeRaid`] = null;
+    // DON'T clear activeRaid here — races with status=complete listener.
+    // Cleared when user clicks "Return to Lobby" on result screen.
   }
 
   await db.ref().update(updates);
