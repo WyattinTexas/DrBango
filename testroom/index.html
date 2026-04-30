@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v870'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v871'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v870'; // Remove all collectKC calls outside resolveRound scope (Cameron, Simon, Gus, Masked Hero, City Cyboo)
+const TESTROOM_VERSION = 'v871'; // Laura Catchy Tune: remove once-per-game limit, stacking +1 die per straight
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3302,7 +3302,7 @@ const GHOSTS = [
   {id:51, name:"Nicholas", rarity:"uncommon", maxHp:1, art:"art/originals/nicholas.jpg", ability:"Sneak Attack", abilityDesc:"Sideline: deal 2 damage to the enemy Spiritkin when they enter play.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Entry punisher."},
   {id:52, name:"Hugo", rarity:"uncommon", maxHp:5, art:"art/originals/Hugo.png", ability:"Wreckage", abilityDesc:"When Hugo takes damage: the opponent loses 1 die next roll.", category:"Debuff", set:"Dark Castle", designNote:"Dark Castle. Damage retaliation."},
   {id:78, name:"Haywire", rarity:"rare", maxHp:7, art:"art/originals/Haywire.png", ability:"Wild Chords", abilityDesc:"Triples or better: gain 1 permanent die. Haywire gains +2 permanent damage. Once Per Game.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Dark Castle. Main character — dice growth + personal damage snowball. Two subjects: the die belongs to the player's pool, the +2 damage is Haywire's personal buff."},
-  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Sideline & In Play: Roll a straight to unlock Catchy Tune. Catchy Tune: gain +1 permanent die and choose one die after each roll to lock for the next roll.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Rolling Hills. Straight unlocks permanent die-lock. Player chooses which die to carry over."},
+  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Sideline & In Play: Roll a straight to gain +1 permanent die and lock one die after each roll for the next roll. Stacks.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Rolling Hills. Straight unlocks permanent die-lock. Player chooses which die to carry over."},
   {id:80, name:"Bilbo", rarity:"rare", maxHp:2, art:"art/originals/bilbo.jpg", ability:"Little Buddy", abilityDesc:"Sideline: your active Spiritkin deals +2 damage on Singles.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Sideline singles booster."},
   {id:96, name:"Hector", rarity:"ghost-rare", maxHp:6, art:"art/originals/hector.jpg", ability:"Protector", abilityDesc:"Singles beat Doubles. +1 damage on Singles.", category:"Defense/Negation", set:"Dark Castle", designNote:"Dark Castle ghost-rare. Flips the hierarchy."},
   {id:97, name:"Toby", rarity:"ghost-rare", maxHp:7, art:"art/originals/Toby.png", ability:"Pure Heart", abilityDesc:"Before rolling: you may declare the final roll. Toby is defeated next roll. Win: defeat the enemy Spiritkin.", category:"Destruction/Instant Kill", set:"Dark Castle", designNote:"Dark Castle ghost-rare. All-in gamble."},
@@ -3991,8 +3991,8 @@ function autoSimRounds(gameNum) {
     // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die + +1 die
     const winDiceAP = winner === 'red' ? redDice : blueDice;
     const loseDiceAP = winner === 'red' ? blueDice : redDice;
-    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && isStraight(winDiceAP)) { B.catchyTuneUnlocked[winner] = true; B.catchyTuneDieBonus[winner] = (B.catchyTuneDieBonus[winner] || 0) + 1; }
-    if (!B.catchyTuneUnlocked[lTeamName] && hasAlive(lTeam, 79) && isStraight(loseDiceAP)) { B.catchyTuneUnlocked[lTeamName] = true; B.catchyTuneDieBonus[lTeamName] = (B.catchyTuneDieBonus[lTeamName] || 0) + 1; }
+    if (hasAlive(wTeam, 79) && isStraight(winDiceAP)) { B.catchyTuneUnlocked[winner] = true; B.catchyTuneDieBonus[winner] = (B.catchyTuneDieBonus[winner] || 0) + 1; }
+    if (hasAlive(lTeam, 79) && isStraight(loseDiceAP)) { B.catchyTuneUnlocked[lTeamName] = true; B.catchyTuneDieBonus[lTeamName] = (B.catchyTuneDieBonus[lTeamName] || 0) + 1; }
     if (B.catchyTuneUnlocked[winner] && winDiceAP.length > 0) B.catchyTuneLockedDie[winner] = Math.max(...winDiceAP);
     if (B.catchyTuneUnlocked[lTeamName] && loseDiceAP.length > 0) B.catchyTuneLockedDie[lTeamName] = Math.max(...loseDiceAP);
   }
@@ -15339,10 +15339,10 @@ function _resolveRoundImpl() {
     } else { corneliusSidelineBlockedList.push('Pale Nimbus'); log(`<span class="log-ability">Cornelius</span> — Antidote! Pale Nimbus Hidden Storm blocked.`); }
   }
 
-  // Laura (79) — Catchy Tune: Sideline & In Play: roll a straight to unlock permanently.
+  // Laura (79) — Catchy Tune: Sideline & In Play: roll a straight → +1 permanent die (stacks).
   // Check WINNER's dice for straight activation (both teams checked separately below).
   let catchyJustUnlockedWin = false, catchyJustUnlockedLose = false;
-  if (!B.catchyTuneUnlocked[winTeamName] && hasAlive(winTeam, 79) && winDice && isStraight(winDice)) {
+  if (hasAlive(winTeam, 79) && winDice && isStraight(winDice)) {
     if (!corneliusBlocksRally || wF.id === 79) {
       B.catchyTuneUnlocked[winTeamName] = true;
       if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
@@ -15351,12 +15351,12 @@ function _resolveRoundImpl() {
       const lauraG = wF.id === 79 ? wF : (getSidelineGhost(winTeam, 79) || { name: 'Laura' });
       const lauraLoc = wF.id === 79 ? '' : ' (sideline)';
       collectKC(winTeamName, lauraG.name);
-      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune unlocked! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die & choose a die to lock after each roll!`);
+      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die! (${B.catchyTuneDieBonus[winTeamName]} total bonus)`);
       popSidelineCard(winTeam, 79);
     } else { corneliusSidelineBlockedList.push('Laura'); }
   }
   // Check LOSER's dice for straight activation too (Laura is Sideline & In Play — triggers on any roll)
-  if (!B.catchyTuneUnlocked[loseTeamName] && hasAlive(loseTeam, 79) && loseDice && isStraight(loseDice)) {
+  if (hasAlive(loseTeam, 79) && loseDice && isStraight(loseDice)) {
     const enemyCornelius = hasSideline(winTeam, 45);
     if (!enemyCornelius || lF.id === 79) {
       B.catchyTuneUnlocked[loseTeamName] = true;
@@ -15366,7 +15366,7 @@ function _resolveRoundImpl() {
       const lauraGL = lF.id === 79 ? lF : (getSidelineGhost(loseTeam, 79) || { name: 'Laura' });
       const lauraLocL = lF.id === 79 ? '' : ' (sideline)';
       collectKC(loseTeamName, lauraGL.name);
-      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune unlocked! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die & choose a die to lock after each roll!`);
+      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die! (${B.catchyTuneDieBonus[loseTeamName]} total bonus)`);
       popSidelineCard(loseTeam, 79);
     }
   }
@@ -16446,14 +16446,16 @@ function _resolveRoundImpl() {
     const pnSum = winDice ? winDice.reduce((s, d) => s + d, 0) : '?';
     queueAbility('HIDDEN STORM!', 'var(--rare)', `Pale Nimbus (sideline) — Roll sum ${pnSum} < 7! ${paleNimbusBaseDmg} + 2 = ${dmg} damage!`, null, winTeamName);
   }
-  // Laura (79) — Catchy Tune unlock callouts (only on first activation)
+  // Laura (79) — Catchy Tune callouts (fires every straight)
   if (catchyJustUnlockedWin) {
     const _lSeq = [...winDice].sort((a, b) => a - b).join('-');
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! +1 permanent die & lock a die after each roll!`, () => { renderBattle(); }, winTeamName);
+    const _lBonus = B.catchyTuneDieBonus[winTeamName] || 1;
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! +1 permanent die! (${_lBonus} total bonus dice)`, () => { renderBattle(); }, winTeamName);
   }
   if (catchyJustUnlockedLose) {
     const _lSeqL = [...loseDice].sort((a, b) => a - b).join('-');
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! +1 permanent die & lock a die after each roll!`, () => { renderBattle(); }, loseTeamName);
+    const _lBonusL = B.catchyTuneDieBonus[loseTeamName] || 1;
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! +1 permanent die! (${_lBonusL} total bonus dice)`, () => { renderBattle(); }, loseTeamName);
   }
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards (active OR sideline, v598)
   if (garyOnesWin > 0) {

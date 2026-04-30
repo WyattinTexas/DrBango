@@ -2030,13 +2030,13 @@ function smartSimRounds(gameNum) {
     if (hasSideline(wTeam, 87) && wF.id === 41 && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 3; }
     // Laura (79) — Catchy Tune: Sideline & In Play: straight unlocks permanent die-lock.
     // AI auto-locks highest die. Check both winner and loser for straight activation.
-    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && winDice && isStraight(winDice) && !hasSideline(lTeam, 45)) {
+    if (hasAlive(wTeam, 79) && winDice && isStraight(winDice) && !hasSideline(lTeam, 45)) {
       B.catchyTuneUnlocked[winner] = true;
       if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
       B.catchyTuneDieBonus[winner] = (B.catchyTuneDieBonus[winner] || 0) + 1;
     }
     const loser = winner === 'red' ? 'blue' : 'red';
-    if (!B.catchyTuneUnlocked[loser] && hasAlive(lTeam, 79) && loseDice && isStraight(loseDice) && !hasSideline(wTeam, 45)) {
+    if (hasAlive(lTeam, 79) && loseDice && isStraight(loseDice) && !hasSideline(wTeam, 45)) {
       B.catchyTuneUnlocked[loser] = true;
       if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
       B.catchyTuneDieBonus[loser] = (B.catchyTuneDieBonus[loser] || 0) + 1;
