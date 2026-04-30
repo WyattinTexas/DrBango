@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v875'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v876'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v875'; // Knight Terror HP nerf: 7 → 6
+const TESTROOM_VERSION = 'v876'; // Knight Terror: active-only trigger, Splinter desc clarify non-stacking
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3208,7 +3208,7 @@ const GHOSTS = [
   {id:367, name:"Dragonclaw", rarity:"rare", maxHp:7, art:"art/dragonclaw.webp", ability:"Rake", abilityDesc:"Win with 3 different numbers: deal +3 damage.", category:"Damage Multiplier", set:"Volcanic Isles", designNote:"Rewards diverse rolls. ~55% trigger rate."},
   // === EJ'S GHOSTS ===
   {id:401, name:"Knight Terror", rarity:"rare", maxHp:6, art:"art/knight_terror.webp",
-    ability:"Heavy Air", abilityDesc:"While active: after any opponent ability triggers, the enemy active Spiritkin loses 2 HP.",
+    ability:"Heavy Air", abilityDesc:"While active: after the opponent's active Spiritkin's ability triggers, it loses 2 HP.",
     category:"Debuff", set:"Dark Castle",
     designNote:"EJ's dark knight. Suppression tank — the opponent's whole team bleeds just for playing the game. Abilities still work, but at a cost."},
   {id:402, name:"Knight Light", rarity:"uncommon", maxHp:6, art:"art/knight_light.png",
@@ -3286,7 +3286,7 @@ const GHOSTS = [
   {id:95, name:"Tabitha", rarity:"ghost-rare", maxHp:1, art:"art/originals/Tabitha.png", ability:"Rally", abilityDesc:"Sideline: +2 damage on Doubles.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Sideline doubles buff."},
   {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"Sideline: when your active Spiritkin is about to take damage, Guardian Fairy leaps in and takes the hit instead.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
   {id:100, name:"Cyboo", rarity:"ghost-rare", maxHp:3, art:"art/originals/Cyboo.png", ability:"Spark", abilityDesc:"Sideline: your active Spiritkin gains 1 extra die when below 3 HP.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. Low HP dice boost."},
-  {id:101, name:"Splinter", rarity:"ghost-rare", maxHp:4, art:"art/originals/Splinter.png", ability:"Toxic Fumes", abilityDesc:"Win: deal 1 damage before each roll.", category:"Debuff", set:"Set 1", designNote:"Original card. Stacking poison."},
+  {id:101, name:"Splinter", rarity:"ghost-rare", maxHp:4, art:"art/originals/Splinter.png", ability:"Toxic Fumes", abilityDesc:"Win once to activate Toxic Fumes permanently. While active: deal 1 damage to the enemy before each roll.", category:"Debuff", set:"Set 1", designNote:"Original card. Stacking poison."},
   {id:109, name:"Bo", rarity:"legendary", maxHp:5, art:"art/originals/Bo.png", ability:"Miracle", abilityDesc:"Defeat a Spiritkin: return one of your defeated Spiritkin to your sideline. Gain 1 Magic Firefly.", category:"HP Recovery", set:"Set 1", designNote:"Original legendary. Resurrection on kill."},
   {id:110, name:"The Mountain King", rarity:"legendary", maxHp:9, art:"art/originals/mountain_king_leg.jpg", ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original legendary. Doubles doubler."},
   {id:111, name:"Shade", rarity:"legendary", maxHp:5, art:"art/originals/shade.jpg", ability:"Haunt", abilityDesc:"Before each roll, opponent takes 1 damage.", category:"Debuff", set:"Set 1", designNote:"Original legendary. Tick damage every round, including round 1."},
@@ -5656,11 +5656,13 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost, de
   const oppTeam = B[oppTeamName];
   const oppActive = active(oppTeam);
 
-  // Heavy Air (401) — after opponent ability resolves, enemy active ghost loses 2 HP
+  // Heavy Air (401) — after opponent ACTIVE ability resolves, enemy active ghost loses 2 HP
+  // Only triggers from the opponent's active Spiritkin's abilities, NOT sideline abilities.
   if (oppActive.id === 401 && !oppActive.ko) {
     const abilityTeam = B[abilityTeamName];
     const target = active(abilityTeam);
-    if (!target.ko) {
+    const isActiveAbility = !sidelineGhost && target && target.name === abilityGhostName;
+    if (isActiveAbility && !target.ko) {
       if (deferredHeavyAir) {
         // Deferred mode: store the hit, apply only if Knight Terror survives the round
         deferredHeavyAir.push({ target, targetName: target.name, oppTeamName });
