@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v867'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v868'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v867'; // Fix GF Wish: remove old callout that KO'd GF before player choice
+const TESTROOM_VERSION = 'v868'; // Jeffery Chuckle: trigger on Balatron/Sky counter die KOs
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -6319,6 +6319,24 @@ function finishBalatronRoll() {
       wF.hp = bp.hpAfter;
     }
     log(`<span class="log-ability">${bp.lFName}</span> — Party Time! Counter die: <b>${bp.counterDie}</b> damage to ${bp.wFName}! ${bp.wasKo?'<span class="log-ko">KO!</span>':bp.hpAfter+' HP left'}`);
+    // Jeffery (14) — Chuckle: if Balatron's counter die KO'd the winner, Jeffery on Balatron's team heals Balatron +3 HP
+    if (bp.wasKo) {
+      const loseTeam = B[bp.loseTeamName];
+      const lF = loseTeam ? active(loseTeam) : null;
+      if (lF && !lF.ko && hasSideline(loseTeam, 14)) {
+        const cornBlocks = hasSideline(B[wTeamName], 45);
+        if (cornBlocks) {
+          queueAbility('ANTIDOTE!', 'var(--uncommon)', `Cornelius neutralizes Jeffery's Chuckle — heal blocked!`, null, bp.loseTeamName);
+          log(`<span class="log-ability">Cornelius</span> — Antidote! Jeffery Chuckle blocked.`);
+        } else {
+          const jeffNewHp = lF.hp + 3;
+          const jeffOver = jeffNewHp > lF.maxHp;
+          const jeffGhost = lF;
+          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${bp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { jeffGhost.hp += 3; renderBattle(); }, bp.loseTeamName);
+          log(`<span class="log-ability">${lF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
+        }
+      }
+    }
     renderBattle();
   }
   if (resume) resume();
@@ -7209,6 +7227,25 @@ function finishSkyElusive() {
       if (wF.hp <= 0 && !wF.ko) { wF.ko = true; wF.killedBy = 72; }
     }
     log(`<span class="log-ability">${sp.lFName}</span> — Elusive! Counter die: <span class="log-dmg">${sp.counterDie} damage</span> to ${sp.wFName}! ${wF && wF.ko ? '<span class="log-ko">KO!</span>' : (wF ? wF.hp + ' HP left' : '')}`);
+    // Jeffery (14) — Chuckle: if Sky's counter die KO'd the winner, Jeffery on Sky's team heals +3 HP
+    if (wF && wF.ko) {
+      const loseTeamName = sp.winTeamName === 'red' ? 'blue' : 'red';
+      const loseTeam = B[loseTeamName];
+      const lF = loseTeam ? active(loseTeam) : null;
+      if (lF && !lF.ko && hasSideline(loseTeam, 14)) {
+        const cornBlocks = hasSideline(B[sp.winTeamName], 45);
+        if (cornBlocks) {
+          queueAbility('ANTIDOTE!', 'var(--uncommon)', `Cornelius neutralizes Jeffery's Chuckle — heal blocked!`, null, loseTeamName);
+          log(`<span class="log-ability">Cornelius</span> — Antidote! Jeffery Chuckle blocked.`);
+        } else {
+          const jeffNewHp = lF.hp + 3;
+          const jeffOver = jeffNewHp > lF.maxHp;
+          const jeffGhost = lF;
+          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${sp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { jeffGhost.hp += 3; renderBattle(); }, loseTeamName);
+          log(`<span class="log-ability">${lF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
+        }
+      }
+    }
     renderBattle();
   }
   if (resume) setTimeout(resume, 300);
