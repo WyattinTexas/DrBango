@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v871'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v872'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v871'; // Laura Catchy Tune: remove once-per-game limit, stacking +1 die per straight
+const TESTROOM_VERSION = 'v872'; // Knight Terror/Light audit: add checkKnightEffects to 13 missing abilities
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -10694,12 +10694,14 @@ function doPreRollSetup() {
     redCount += B.lucasKindlingBonus.red;
     preRollCallouts.push(['KINDLING!', 'var(--rare)', `Lucas — Kindling! +${B.lucasKindlingBonus.red} bonus die!`, 'red']);
     log(`<span class="log-ability">Lucas</span> — Kindling! +${B.lucasKindlingBonus.red} bonus die this roll.`);
+    checkKnightEffects('red', 'Lucas');
     B.lucasKindlingBonus.red = 0;
   }
   if (B.lucasKindlingBonus && B.lucasKindlingBonus.blue > 0) {
     blueCount += B.lucasKindlingBonus.blue;
     preRollCallouts.push(['KINDLING!', 'var(--rare)', `Lucas — Kindling! +${B.lucasKindlingBonus.blue} bonus die!`, 'blue']);
     log(`<span class="log-ability">Lucas</span> — Kindling! +${B.lucasKindlingBonus.blue} bonus die this roll.`);
+    checkKnightEffects('blue', 'Lucas');
     B.lucasKindlingBonus.blue = 0;
   }
 
@@ -10738,6 +10740,7 @@ function doPreRollSetup() {
       if (tName === 'red') redCount += 2; else blueCount += 2;
       preRollCallouts.push(['WISDOM!', 'var(--rare)', `${f.name} — Holding Moonstone! +2 dice!`, tName]);
       log(`<span class="log-ability">${f.name}</span> — Wisdom! Holding <span class="log-ms">Moonstone</span> → +2 dice!`);
+      checkKnightEffects(tName, f.name);
     }
   });
 
@@ -10776,6 +10779,7 @@ function doPreRollSetup() {
     if (dcRed && dcRed.id === 28 && !dcRed.ko) {
       preRollCallouts.push(['JINX!', 'var(--common)', `${dcRed.name} — Both rolled doubles! +${B.dreamCatBonus.red} bonus die!`, 'red']);
       log(`<span class="log-ability">${dcRed.name}</span> — Jinx! Both doubles → +${B.dreamCatBonus.red} bonus die this round.`);
+      checkKnightEffects('red', dcRed.name);
     }
     B.dreamCatBonus.red = 0;
   }
@@ -10785,6 +10789,7 @@ function doPreRollSetup() {
     if (dcBlue && dcBlue.id === 28 && !dcBlue.ko) {
       preRollCallouts.push(['JINX!', 'var(--common)', `${dcBlue.name} — Both rolled doubles! +${B.dreamCatBonus.blue} bonus die!`, 'blue']);
       log(`<span class="log-ability">${dcBlue.name}</span> — Jinx! Both doubles → +${B.dreamCatBonus.blue} bonus die this round.`);
+      checkKnightEffects('blue', dcBlue.name);
     }
     B.dreamCatBonus.blue = 0;
   }
@@ -10806,6 +10811,7 @@ function doPreRollSetup() {
         if (tNameZ === 'red') redCount++; else blueCount++;
         preRollCallouts.push(['CRAFTSMAN!', 'var(--rare)', `Zach (sideline) — Guard Thomas +1 die!`, tNameZ]);
         log(`<span class="log-ability">Zach</span> (sideline) — Craftsman! Guard Thomas +1 die.`);
+        checkKnightEffects(tNameZ, 'Zach');
       }
     }
   });
@@ -10819,6 +10825,7 @@ function doPreRollSetup() {
         if (tNameSue === 'red') redCount++; else blueCount++;
         preRollCallouts.push(['HIDDEN WEAKNESS!', 'var(--uncommon)', `${fSue.name} — enemy has more HP! +1 die!`, tNameSue]);
         log(`<span class="log-ability">${fSue.name}</span> — Hidden Weakness! Enemy HP (${oppSue.hp}) > Sue (${fSue.hp}) → +1 die!`);
+        checkKnightEffects(tNameSue, fSue.name);
       }
     }
   });
@@ -10830,6 +10837,7 @@ function doPreRollSetup() {
     if (scRed && scRed.id === 19 && !scRed.ko) {
       preRollCallouts.push(['FRENZY!', 'var(--common)', `${scRed.name} — All dice were under 4! +${B.scallywagsFrenzyBonus.red} bonus die!`, 'red']);
       log(`<span class="log-ability">${scRed.name}</span> — Frenzy! All dice under 4 last round → +${B.scallywagsFrenzyBonus.red} bonus die.`);
+      checkKnightEffects('red', scRed.name);
     }
     B.scallywagsFrenzyBonus.red = 0;
   }
@@ -10839,6 +10847,7 @@ function doPreRollSetup() {
     if (scBlue && scBlue.id === 19 && !scBlue.ko) {
       preRollCallouts.push(['FRENZY!', 'var(--common)', `${scBlue.name} — All dice were under 4! +${B.scallywagsFrenzyBonus.blue} bonus die!`, 'blue']);
       log(`<span class="log-ability">${scBlue.name}</span> — Frenzy! All dice under 4 last round → +${B.scallywagsFrenzyBonus.blue} bonus die.`);
+      checkKnightEffects('blue', scBlue.name);
     }
     B.scallywagsFrenzyBonus.blue = 0;
   }
@@ -10931,6 +10940,7 @@ function doPreRollSetup() {
       team.resources.luckyStone = (team.resources.luckyStone || 0) + 1;
       preRollCallouts.push(['STEADY!', 'var(--common)', `${f.name} — +1 Lucky Stone! (${team.resources.luckyStone} total)`, tName]);
       log(`<span class="log-ability">${f.name}</span> — Steady! +1 Lucky Stone (${team.resources.luckyStone} total)`);
+      checkKnightEffects(tName, f.name);
       // Sandwiches (33) — Dependable: opponent mirrors the Lucky Stone gain
       if (hasOnTeam(opp(team), 33)) {
         const _sandOpp = opp(team);
@@ -10957,6 +10967,7 @@ function doPreRollSetup() {
         else blueCount += sidelineCount;
         preRollCallouts.push(['FEAST!', 'var(--uncommon)', `${f.name} — ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''}! +${sidelineCount} dice!`, tName]);
         log(`<span class="log-ability">${f.name}</span> — Feast! ${sidelineCount} enemy sideline effect${sidelineCount > 1 ? 's' : ''} → +${sidelineCount} dice!`);
+        checkKnightEffects(tName, f.name);
       }
     }
   });
@@ -11200,6 +11211,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       if (converted > 0) {
         queueAbility('LUCKY!', 'var(--ghost-rare)', `${f.name} — ${converted} one${converted > 1 ? 's' : ''} became 5${converted > 1 ? 's' : ''}! 🍀`, () => { renderDice(redDice, blueDice); renderBattle(); }, tName);
         log(`<span class="log-ability">${f.name}</span> — Lucky! ${converted} one${converted > 1 ? 's' : ''} → 5${converted > 1 ? 's' : ''}! 🍀`);
+        checkKnightEffects(tName, f.name);
       }
     }
   });
@@ -11220,6 +11232,7 @@ function doPostRollAndResolve(redDice, blueDice) {
           log(`<span class="log-ability">Mask of Day</span> — Rolled ${_modLow} low die${_modLow>1?'s':''}! <span class="log-dmg">+${_modLow} Burn!</span>`);
           renderBattle();
         }, _modTName);
+        checkKnightEffects(_modTName, f.name);
       }
     }
   });
@@ -11362,6 +11375,7 @@ function doPostRollAndResolve(redDice, blueDice) {
       creditGhost(tNameCam, 25, 'ice', 1);
       queueAbility("WINTER'S HARVEST!", '#3b82f6', `${fCam.name} — Doubles! +1 Frostbite + 1 Ice Shard!`, () => { renderBattle(); }, tNameCam);
       log(`<span class="log-ability" style="color:#60a5fa">${fCam.name}</span> — Winter's Harvest! Doubles → +1 Frostbite + 1 Ice Shard!`);
+      checkKnightEffects(tNameCam, fCam.name);
     }
   });
 
@@ -11377,6 +11391,7 @@ function doPostRollAndResolve(redDice, blueDice) {
         team.resources.burn += threeCount;
         queueAbility('UNDERDOG!', 'var(--uncommon)', `${f.name} — ${threeCount} three${threeCount > 1 ? 's' : ''} rolled! +${threeCount} Burn!`, null, tNameMH);
         log(`<span class="log-ability">${f.name}</span> — Underdog! Rolled ${threeCount} three${threeCount > 1 ? 's' : ''} → <span class="log-dmg">+${threeCount} Burn!</span>`);
+        checkKnightEffects(tNameMH, f.name);
       }
     }
   });
