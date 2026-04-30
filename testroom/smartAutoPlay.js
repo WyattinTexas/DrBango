@@ -2025,9 +2025,9 @@ function smartSimRounds(gameNum) {
     // Pale Nimbus (88) — Hidden Storm: while on sideline, +2 damage if winning dice sum < 7.
     // Cornelius (45) on enemy sideline blocks it. Matches index.html lines 9499–9511.
     if (hasSideline(wTeam, 88) && !wF.ko && winDice && winDice.reduce((s,d)=>s+d,0) < 7 && !hasSideline(lTeam, 45)) { dmg += 2; }
-    // Zach (87) — Craftsman: while on sideline, Guard Thomas (41) active doubles win → +3 damage.
+    // Zach (87) — Craftsman: while on sideline, Guard Thomas (41) active doubles win → +2 damage.
     // Cornelius (45) on enemy sideline blocks it. Matches index.html lines 9566–9578.
-    if (hasSideline(wTeam, 87) && wF.id === 41 && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 3; }
+    if (hasSideline(wTeam, 87) && wF.id === 41 && !wF.ko && wR.type === 'doubles' && !hasSideline(lTeam, 45)) { dmg += 2; }
     // Laura (79) — Catchy Tune: Sideline & In Play: straight unlocks permanent die-lock.
     // AI auto-locks highest die. Check both winner and loser for straight activation.
     if (hasAlive(wTeam, 79) && winDice && isStraight(winDice) && !hasSideline(lTeam, 45)) {
