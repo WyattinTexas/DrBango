@@ -878,71 +878,72 @@ const RaidBattleAdapter = {
       RaidSync.writeGameOver(B, winner, currentIdx, playerCount);
     }, 1500);
 
-    // Local fallback: if Firebase hasn't triggered results in 6.5s, force locally
-    setTimeout(() => {
-      if (RaidState.phase !== 'complete') {
-        console.warn('[Raid] Result screen fallback — forcing locally');
-        if (['fighting', 'spectating', 'turn-handoff'].includes(RaidState.phase)) {
-          RaidState.transition('complete');
-        }
-      }
-    }, 6500);
+    // Show result screen DIRECTLY — don't wait for Firebase round-trip
+    this._showRaidEndScreen(winner);
   },
 
   // ══════════════════════════════════════════════════════════════════
-  // RESULTS
+  // RESULTS — bulletproof inline-styled screen, no CSS class dependencies
   // ══════════════════════════════════════════════════════════════════
 
+  // Called by Firebase listener when status=complete (for spectators)
   _showResults() {
-    if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
-    if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
+    // If the end screen is already showing, don't duplicate
+    if (document.getElementById('raid-end-screen')) return;
+    // Determine winner from boss HP
+    const winner = (RaidState.bossCurrentHp <= 0) ? 'red' : 'blue';
+    this._showRaidEndScreen(winner);
+  },
 
-    // Ensure raid screen is visible and battle view doesn't block results
-    const raidScreen = document.getElementById('raid-screen');
-    if (raidScreen) raidScreen.style.display = 'block';
-    const battleView = document.getElementById('battle-view');
-    if (battleView) battleView.style.display = 'none';
-    const gameOverEl = document.getElementById('gameOver');
-    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+  // Called DIRECTLY from _handleRaidGameOver (for fighter) and _showResults (for spectator)
+  _showRaidEndScreen(winner) {
+    // Prevent duplicates
+    if (document.getElementById('raid-end-screen')) return;
 
-    // Stop any lingering AI/heartbeat
+    // Stop everything
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
+    if (typeof fadeOutMusic === 'function') fadeOutMusic();
 
-    // Show result screen if we have the UI function
-    if (typeof showRaidResult === 'function') {
-      try {
-        showRaidResult({
-          ...RaidState,
-          bossDefeatedBy: null,
-          players: RaidState.players
-        });
-      } catch (e) {
-        console.error('[Raid] showRaidResult crashed:', e);
-        // Fallback: show simple result so players aren't stuck on blank screen
-        const fallback = document.createElement('div');
-        fallback.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;font-family:Creepster,cursive;';
-        fallback.innerHTML = `<h1 style="font-size:2.5rem;color:#2ecc71">RAID COMPLETE</h1><button style="padding:12px 32px;font-size:1rem;background:#9b59b6;color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="this.parentElement.remove();if(typeof closeRaidResult==='function')closeRaidResult();else if(typeof RaidBattleAdapter!=='undefined')RaidBattleAdapter._returnToLobby();">RETURN TO LOBBY</button>`;
-        document.body.appendChild(fallback);
-      }
-    } else {
-      // Simple result overlay for spectators
-      const raidScreen = document.getElementById('raid-screen');
-      if (!raidScreen || raidScreen.style.display === 'none') return;
-      const existing = document.getElementById('gameOver');
-      if (existing && existing.style.display !== 'none' && existing.innerHTML) return;
+    const victory = (winner === 'red');
+    const bossName = RaidState.bossConfig?.name || 'The Boss';
+    const players = RaidState.players || [];
 
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
-      overlay.innerHTML = `
-        <h1 style="font-family:Creepster,cursive;font-size:2.5rem;color:#2ecc71;letter-spacing:4px;">RAID COMPLETE</h1>
-        <p style="color:var(--text2);font-size:1.1rem;">The raid has ended.</p>
-        <button style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;"
-          onclick="this.parentElement.remove(); RaidBattleAdapter._returnToLobby();">
-          RETURN TO LOBBY
-        </button>`;
-      document.body.appendChild(overlay);
-    }
+    // Build player rows
+    let playerRows = '';
+    players.forEach((p, i) => {
+      if (!p) return;
+      const dmg = p.damageDealt || 0;
+      const lost = p.ghostsLost || 0;
+      playerRows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(255,255,255,0.04);border-radius:8px;margin:4px 0;">
+        <span style="font-weight:700;color:#e8e2f0;">${p.displayName || 'Player ' + i}</span>
+        <span style="color:#a89ec4;font-size:0.85rem;">${dmg} dmg &bull; ${3 - lost}/3 survived</span>
+      </div>`;
+    });
+
+    // Create the overlay — 100% inline styles, appended to document.body
+    const el = document.createElement('div');
+    el.id = 'raid-end-screen';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:linear-gradient(180deg,#0a0612,#14101e,#0e0820);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:sans-serif;';
+    el.innerHTML = `
+      <h1 style="font-family:Creepster,cursive;font-size:3rem;letter-spacing:4px;margin:0;color:${victory ? '#f0c560' : '#e94560'};">
+        ${victory ? 'RAID COMPLETE!' : 'RAID FAILED'}
+      </h1>
+      <div style="font-size:1.1rem;color:#a89ec4;margin-bottom:8px;">
+        ${victory ? bossName + ' has been defeated!' : bossName + ' stands triumphant.'}
+      </div>
+      <div style="width:300px;max-width:90%;margin:8px 0;">
+        ${playerRows || '<div style="color:#6a5d7e;text-align:center;">No player data</div>'}
+      </div>
+      <button onclick="document.getElementById('raid-end-screen').remove(); if(typeof closeRaidResult==='function') closeRaidResult(); else RaidBattleAdapter._returnToLobby();"
+        style="margin-top:16px;padding:14px 40px;font-size:1rem;font-weight:700;font-family:Creepster,cursive;letter-spacing:2px;
+        background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;border-radius:10px;
+        cursor:pointer;text-transform:uppercase;box-shadow:0 4px 20px rgba(155,89,182,0.4);">
+        RETURN TO LOBBY
+      </button>
+    `;
+    document.body.appendChild(el);
+    console.log('[Raid] End screen shown:', victory ? 'VICTORY' : 'DEFEAT');
   },
 
   // ══════════════════════════════════════════════════════════════════
