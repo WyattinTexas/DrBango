@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v876'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v877'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v876'; // Knight Terror: active-only trigger, Splinter desc clarify non-stacking
+const TESTROOM_VERSION = 'v877'; // City Cyboo → Aftershock: post-roll bonus die removes matching enemy dice
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3281,7 +3281,7 @@ const GHOSTS = [
   {id:74, name:"Dark Jeff", rarity:"rare", maxHp:3, art:"art/originals/DarkJeff.png", ability:"Cackle", abilityDesc:"Sideline: +1 damage to all your rolls.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Passive sideline damage."},
   {id:75, name:"Flora", rarity:"rare", maxHp:4, art:"art/originals/flora.jpg", ability:"Restore", abilityDesc:"Doubles: gain 2 HP after damage is applied.", category:"HP Recovery", set:"Set 1", designNote:"Original card. The very first card Wyatt made as a kid."},
   {id:76, name:"Dark Wing", rarity:"rare", maxHp:2, art:"art/originals/DarkWing.png", ability:"Precision", abilityDesc:"Once Per Game: if Dark Wing rolls Singles, reroll all dice.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. One-shot precision reroll — only offered on singles (doubles or better is already fine)."},
-  {id:77, name:"City Cyboo", rarity:"rare", maxHp:1, art:"art/originals/CityCyboo.png", ability:"Barrier", abilityDesc:"In Play & Sideline: if your active Spiritkin has exactly 1 HP, the opponent loses 1 die.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. 1 HP dice denial from anywhere."},
+  {id:77, name:"City Cyboo", rarity:"rare", maxHp:1, art:"art/originals/CityCyboo.png", ability:"Aftershock", abilityDesc:"In Play: after rolling, roll 1 bonus die. Any enemy dice showing that number are removed.", category:"Dice Modifier", set:"Set 1", designNote:"Original card. Post-roll Blackout — rolls a bonus die that erases matching enemy dice. 1 HP glass cannon disruptor."},
   {id:94, name:"Jenkins", rarity:"ghost-rare", maxHp:5, art:"art/originals/Jenkins.png", ability:"Greeting", abilityDesc:"Entry: roll 4 dice and deal damage.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Entry nuke."},
   {id:95, name:"Tabitha", rarity:"ghost-rare", maxHp:1, art:"art/originals/Tabitha.png", ability:"Rally", abilityDesc:"Sideline: +2 damage on Doubles.", category:"Damage Multiplier", set:"Set 1", designNote:"Original card. Sideline doubles buff."},
   {id:99, name:"Guardian Fairy", rarity:"ghost-rare", maxHp:3, art:"art/originals/GuardianFairy.png", ability:"Wish", abilityDesc:"Sideline: when your active Spiritkin is about to take damage, Guardian Fairy leaps in and takes the hit instead.", category:"Defense/Negation", set:"Set 1", designNote:"Original card. Sacrifice bodyguard."},
@@ -10454,31 +10454,7 @@ function doPreRollSetup() {
     }
   });
 
-  // City Cyboo (77) — Barrier: In Play & Sideline, if your active ghost has exactly 1 HP, opponent loses 1 die
-  // Negated by Cornelius (45) — Antidote (only when on sideline)
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    const enemyName = tName === 'red' ? 'blue' : 'red';
-    const enemyTeamObj = team === B.red ? B.blue : B.red;
-    const cityCybooActive = f.id === 77 && !f.ko;
-    const cityCybooSide = hasSideline(team, 77);
-    if ((cityCybooActive || cityCybooSide) && f.hp === 1 && !f.ko) {
-      const corneliusBlocksCC = cityCybooSide && !cityCybooActive && hasSideline(enemyTeamObj, 45);
-      if (corneliusBlocksCC) {
-        const cornGhost = getSidelineGhost(enemyTeamObj, 45);
-        preRollCallouts.push(['ANTIDOTE!', 'var(--uncommon)', `${cornGhost ? cornGhost.name : 'Cornelius'} blocks City Cyboo's Barrier!`, enemyName]);
-        log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! City Cyboo Barrier blocked!`);
-      } else {
-        if (enemyName === 'red') redCount = Math.max(0, redCount - 1);
-        else blueCount = Math.max(0, blueCount - 1);
-        const ccGhost = cityCybooActive ? f : (getSidelineGhost(team, 77) || { name: 'City Cyboo' });
-        const ccLoc = cityCybooActive ? '' : ' (sideline)';
-        preRollCallouts.push(['BARRIER!', 'var(--rare)', `${ccGhost.name}${ccLoc} — ${f.name} at 1 HP! Opponent loses 1 die!`, tName]);
-        log(`<span class="log-ability">${ccGhost.name}</span>${ccLoc} — Barrier! ${f.name} at 1 HP → opponent -1 die!`);
-      }
-    }
-  });
+  // City Cyboo (77) — Aftershock: MOVED to post-roll section (in play only, not sideline)
 
   // Explorer Jeff (455) — Treasure Hunter: sideline & in play, if holding 3+ different specials, +1 die
   // Negated by Cornelius (45) — Antidote (only when on sideline)
@@ -14127,7 +14103,35 @@ function _resolveRoundImpl() {
   }
   B.slipstreamResuming = false;
 
-  // Sync visual dice display after Blackout/Slipstream may have modified dice arrays.
+  // City Cyboo (77) — Aftershock: in play only, roll 1 bonus die, remove matching enemy dice
+  if (!sylviaResuming) {
+    ['red', 'blue'].forEach(ccTeam => {
+      const ccF = active(B[ccTeam]);
+      if (ccF && ccF.id === 77 && !ccF.ko) {
+        const oppTeamName = ccTeam === 'red' ? 'blue' : 'red';
+        const oppDice = ccTeam === 'red' ? blueDice : redDice;
+        const bonusDie = Math.floor(Math.random() * 6) + 1;
+        const filtered = [];
+        let removed = 0;
+        oppDice.forEach(d => {
+          if (d === bonusDie) { removed++; }
+          else { filtered.push(d); }
+        });
+        if (removed > 0) {
+          if (oppTeamName === 'red') { redDice.splice(0, redDice.length, ...filtered); }
+          else { blueDice.splice(0, blueDice.length, ...filtered); }
+          blackoutCallouts.push({ name: 'AFTERSHOCK!', color: 'var(--rare)', desc: `${ccF.name} — Bonus die: ${bonusDie}! ${removed} enemy dice removed!`, team: ccTeam });
+          log(`<span class="log-ability" style="color:var(--rare)">${ccF.name}</span> — Aftershock! Rolled bonus [${bonusDie}] → <span class="log-dmg">${removed} enemy dice showing ${bonusDie} removed!</span>`);
+        } else {
+          blackoutCallouts.push({ name: 'AFTERSHOCK!', color: 'var(--rare)', desc: `${ccF.name} — Bonus die: ${bonusDie}! No enemy dice matched.`, team: ccTeam });
+          log(`<span class="log-ability" style="color:var(--rare)">${ccF.name}</span> — Aftershock! Rolled bonus [${bonusDie}] — no enemy dice matched.`);
+        }
+        collectKC(ccTeam, ccF.name);
+      }
+    });
+  }
+
+  // Sync visual dice display after Blackout/Slipstream/Aftershock may have modified dice arrays.
   renderDice(B.redDice, B.blueDice);
 
   const rR = classify(redDice), bR = classify(blueDice);
