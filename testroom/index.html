@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v879'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v880'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2796,7 +2796,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v879'; // Young Cap Energize respects hand limit
+const TESTROOM_VERSION = 'v880'; // Piper: Slick Coat → Sacred Waters (singles win → fire + frostbite)
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3349,7 +3349,7 @@ const GHOSTS = [
   {id:104, name:"Skylar", rarity:"ghost-rare", maxHp:7, art:"art/originals/skylar.jpg", ability:"Winter Barrage", abilityDesc:"Ice Shards deal +2 damage instead of +1.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Ice Shard amplifier."},
   {id:105, name:"Tyler", rarity:"ghost-rare", maxHp:7, art:"art/originals/tyler.jpg", ability:"Heating Up", abilityDesc:"Before rolling: spend 2 HP to gain 1 extra die. Sacred Fires deal 2X damage.", category:"Dice Modifier", set:"Frost Valley", designNote:"Frost Valley ghost-rare. HP-for-dice + Sacred Fire doubler."},
   {id:106, name:"King Jay", rarity:"ghost-rare", maxHp:7, art:"art/originals/king_jay.jpg", ability:"Reflection", abilityDesc:"Lose roll & dice total = 7: reflect all damage.", category:"Defense/Negation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Lucky 7 reflector."},
-  {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Slick Coat", abilityDesc:"Negate enemy before-rolling effects. -1 enemy die next roll. Win with Singles: gain 1 Sacred Fire.", category:"Debuff", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Pre-roll negation + die reduction + singles Sacred Fire."},
+  {id:107, name:"Piper", rarity:"ghost-rare", maxHp:6, art:"art/originals/piper.jpg", ability:"Sacred Waters", abilityDesc:"Win with Singles: gain 1 Sacred Fire and 1 Frostbite.", category:"Resource Generation", set:"Frost Valley", designNote:"Frost Valley ghost-rare. Singles win → Sacred Fire + Frostbite. Simple, clean resource engine."},
   {id:113, name:"Prince Balatron", rarity:"legendary", maxHp:6, art:"art/originals/balatron.jpg", ability:"Party Time", abilityDesc:"Lose and survive: roll 1 counter die for damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Counter-attack on loss."},
   {id:114, name:"Romy", rarity:"legendary", maxHp:8, art:"art/originals/romy.jpg", ability:"Valley Guardian", abilityDesc:"Predict a die number. If any die matches: +3 damage.", category:"Prediction/Reaction", set:"Frost Valley", designNote:"Frost Valley legendary. Prediction specialist."},
   {id:453, name:"Kaylee", rarity:"ghost-rare", maxHp:6, art:"art/originals/Kaylee.jpeg", ability:"Slipstream", abilityDesc:"If any of your dice shows a 2: you may swap one of your dice with one of your opponent's dice.", category:"Dice Modifier", set:"Rolling Hills", tags:["Final 50"], designNote:"A joyful aquatic spirit of impossible intelligence — not a dolphin, not an orca, but its own luminous being that lives in the glassy mirror-still lakes of the Rolling Hills. Slipstream triggers when Kaylee rolls a 2: she swaps it for the opponent's best die. Trade your 2 for their 6. The smartest creature in the water reads the current and redirects it. Playful, optimistic, team-reshaping — you want Kaylee in play as long as possible because she tilts every fight."},
@@ -10425,21 +10425,7 @@ function doPreRollSetup() {
     }
   });
 
-  // Piper (107) — Slick Coat: -1 enemy die IF an enemy auto-fire before-roll ability was
-  // actually negated this round. v640 (Wyatt 2026-04-11): reactive, not unconditional.
-  // Previously Slick Coat fired the -1 die every single round whenever Piper was active,
-  // even when the enemy had nothing to negate — Wyatt's playtest observation.
-  [B.red, B.blue].forEach(team => {
-    const f = active(team);
-    const tName = team === B.red ? 'red' : 'blue';
-    const oppTeamName = tName === 'red' ? 'blue' : 'red';
-    if (f.id === 107 && !f.ko && B.piperBlockedThisRound[oppTeamName]) {
-      if (oppTeamName === 'red') redCount = Math.max(1, redCount - 1);
-      else blueCount = Math.max(1, blueCount - 1);
-      preRollCallouts.push(['SLICK COAT!', 'var(--ghost-rare)', `${f.name} — negation + enemy rolls 1 fewer die!`, team === B.red ? 'red' : 'blue']);
-      log(`<span class="log-ability">${f.name}</span> — Slick Coat! Negated enemy effect + -1 enemy die.`);
-    }
-  });
+  // Piper (107) — Sacred Waters: pre-roll negation + die removal REMOVED (v879). Now just singles win → fire + frostbite.
 
   // Cyboo (100) — Spark: while on the sideline, active ghost gains +1 die if it has < 3 HP
   // Negated by Cornelius (45) — Antidote: if the enemy team has Cornelius on their sideline, Spark is blocked.
@@ -16852,10 +16838,11 @@ function _resolveRoundImpl() {
   if (wF.id === 58 && !wF.ko) { queueAbility('BURNING SOUL!', 'var(--uncommon)', `${wF.name} — Win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName); }
   // Ashley knight reactions already collected via collectKC at game-state section (line ~10081) — do NOT double-fire here
   if (wF.id === 58 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Burning Soul! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
-  // Piper (107) — Slick Coat: win with singles → gain 1 Sacred Fire
+  // Piper (107) — Sacred Waters: win with singles → gain 1 Sacred Fire + 1 Frostbite
   if (wF.id === 107 && !wF.ko && wR.type === 'singles') {
-    queueAbility('SLICK COAT!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
-    log(`<span class="log-ability">${wF.name}</span> — Slick Coat! Singles win → <span class="log-ms">+1 Sacred Fire!</span>`);
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    queueAbility('SACRED WATERS!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 Sacred Fire + 1 Frostbite!`, () => { winTeam.resources.fire++; winTeam.resources.frostbite++; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Sacred Waters! Singles win → <span class="log-ms">+1 Sacred Fire</span> + <span class="log-ice">+1 Frostbite!</span>`);
     collectKC(winTeamName, wF.name);
   }
   // Opa (48) — Rest: win → gain +1 HP (overclocks! Rule #9 — do NOT add Math.min cap)
