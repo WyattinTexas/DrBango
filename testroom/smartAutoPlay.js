@@ -1231,6 +1231,10 @@ function smartSimRounds(gameNum) {
   if ((B.haywireBonus.red || 0) > 0) redCount += B.haywireBonus.red;
   if ((B.haywireBonus.blue || 0) > 0) blueCount += B.haywireBonus.blue;
 
+  // Laura (79) — Catchy Tune: permanent +1 die bonus (awarded once per game on straight)
+  if (B.catchyTuneDieBonus && (B.catchyTuneDieBonus.red || 0) > 0) redCount += B.catchyTuneDieBonus.red;
+  if (B.catchyTuneDieBonus && (B.catchyTuneDieBonus.blue || 0) > 0) blueCount += B.catchyTuneDieBonus.blue;
+
   // Marcus (57) — GLACIAL POUNDING!: +4 bonus dice next roll after taking 3+ damage
   // Bonus goes to the PLAYER — whoever is active gets the dice, even if Marcus died from the hit.
   ['red','blue'].forEach(tName => {
@@ -2028,10 +2032,14 @@ function smartSimRounds(gameNum) {
     // AI auto-locks highest die. Check both winner and loser for straight activation.
     if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && winDice && isStraight(winDice) && !hasSideline(lTeam, 45)) {
       B.catchyTuneUnlocked[winner] = true;
+      if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
+      B.catchyTuneDieBonus[winner] = (B.catchyTuneDieBonus[winner] || 0) + 1;
     }
     const loser = winner === 'red' ? 'blue' : 'red';
     if (!B.catchyTuneUnlocked[loser] && hasAlive(lTeam, 79) && loseDice && isStraight(loseDice) && !hasSideline(wTeam, 45)) {
       B.catchyTuneUnlocked[loser] = true;
+      if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
+      B.catchyTuneDieBonus[loser] = (B.catchyTuneDieBonus[loser] || 0) + 1;
     }
     // AI locks highest die for next roll
     if (B.catchyTuneUnlocked[winner] && winDice && winDice.length > 0) {

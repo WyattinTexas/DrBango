@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v860'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v863'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2801,7 +2801,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v860'; // City Cyboo rework: 1HP = opponent -1 die, Simon desc fix
+const TESTROOM_VERSION = 'v863'; // Laura Catchy Tune: +1 permanent die on straight, Mable Hex 0-dice fix
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3307,7 +3307,7 @@ const GHOSTS = [
   {id:51, name:"Nicholas", rarity:"uncommon", maxHp:1, art:"art/originals/nicholas.jpg", ability:"Sneak Attack", abilityDesc:"Sideline: deal 2 damage to the enemy Spiritkin when they enter play.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Entry punisher."},
   {id:52, name:"Hugo", rarity:"uncommon", maxHp:5, art:"art/originals/Hugo.png", ability:"Wreckage", abilityDesc:"When Hugo takes damage: the opponent loses 1 die next roll.", category:"Debuff", set:"Dark Castle", designNote:"Dark Castle. Damage retaliation."},
   {id:78, name:"Haywire", rarity:"rare", maxHp:7, art:"art/originals/Haywire.png", ability:"Wild Chords", abilityDesc:"Triples or better: gain 1 permanent die. Haywire gains +2 permanent damage. Once Per Game.", category:"Dice Modifier", set:"Dark Castle", tags:["Final 50"], designNote:"Dark Castle. Main character — dice growth + personal damage snowball. Two subjects: the die belongs to the player's pool, the +2 damage is Haywire's personal buff."},
-  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Roll a straight to unlock Catchy Tune. Catchy Tune: choose one die after each roll to lock for the next roll.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Rolling Hills. Straight unlocks permanent die-lock. Player chooses which die to carry over."},
+  {id:79, name:"Laura", rarity:"rare", maxHp:4, art:"art/originals/laura.jpg", ability:"Catchy Tune", abilityDesc:"Sideline & In Play: Roll a straight to unlock Catchy Tune. Catchy Tune: gain +1 permanent die and choose one die after each roll to lock for the next roll.", category:"Dice Modifier", set:"Rolling Hills", designNote:"Rolling Hills. Straight unlocks permanent die-lock. Player chooses which die to carry over."},
   {id:80, name:"Bilbo", rarity:"rare", maxHp:2, art:"art/originals/bilbo.jpg", ability:"Little Buddy", abilityDesc:"Sideline: your active Spiritkin deals +2 damage on Singles.", category:"Damage Multiplier", set:"Dark Castle", designNote:"Dark Castle. Sideline singles booster."},
   {id:96, name:"Hector", rarity:"ghost-rare", maxHp:6, art:"art/originals/hector.jpg", ability:"Protector", abilityDesc:"Singles beat Doubles. +1 damage on Singles.", category:"Defense/Negation", set:"Dark Castle", designNote:"Dark Castle ghost-rare. Flips the hierarchy."},
   {id:97, name:"Toby", rarity:"ghost-rare", maxHp:7, art:"art/originals/Toby.png", ability:"Pure Heart", abilityDesc:"Before rolling: you may declare the final roll. Toby is defeated next roll. Win: defeat the enemy Spiritkin.", category:"Destruction/Instant Kill", set:"Dark Castle", designNote:"Dark Castle ghost-rare. All-in gamble."},
@@ -3864,6 +3864,7 @@ function autoPlayNext() {
     winstonDiceBonus: { red: 0, blue: 0 },
     catchyTuneUnlocked: { red: false, blue: false },
     catchyTuneLockedDie: { red: null, blue: null },
+    catchyTuneDieBonus: { red: 0, blue: 0 },
     catchyTunePending: null,
     lastRollDiceCount: { red: 3, blue: 3 },
     tysonDisabled: { red: [], blue: [] },
@@ -3950,11 +3951,14 @@ function autoSimRounds(gameNum) {
     }
   });
 
-  // Roll dice (with Catchy Tune locked die injection)
+  // Roll dice (with Catchy Tune locked die injection + permanent die bonus)
   const _ctRedLocked = (B.catchyTuneUnlocked.red && B.catchyTuneLockedDie.red !== null) ? B.catchyTuneLockedDie.red : null;
   const _ctBlueLocked = (B.catchyTuneUnlocked.blue && B.catchyTuneLockedDie.blue !== null) ? B.catchyTuneLockedDie.blue : null;
-  const redDice = weightedRoll('red', _ctRedLocked !== null ? 2 : 3).sort((a,b)=>a-b);
-  const blueDice = weightedRoll('blue', _ctBlueLocked !== null ? 2 : 3).sort((a,b)=>a-b);
+  const _ctRedBonus = (B.catchyTuneDieBonus && B.catchyTuneDieBonus.red) || 0;
+  const _ctBlueBonus = (B.catchyTuneDieBonus && B.catchyTuneDieBonus.blue) || 0;
+  let _redBase = 3 + _ctRedBonus, _blueBase = 3 + _ctBlueBonus;
+  const redDice = weightedRoll('red', _ctRedLocked !== null ? Math.max(0, _redBase - 1) : _redBase).sort((a,b)=>a-b);
+  const blueDice = weightedRoll('blue', _ctBlueLocked !== null ? Math.max(0, _blueBase - 1) : _blueBase).sort((a,b)=>a-b);
   if (_ctRedLocked !== null) { redDice.push(_ctRedLocked); redDice.sort((a,b)=>a-b); }
   if (_ctBlueLocked !== null) { blueDice.push(_ctBlueLocked); blueDice.sort((a,b)=>a-b); }
 
@@ -3989,11 +3993,11 @@ function autoSimRounds(gameNum) {
     if (wF.id === 423 && !wF.ko) dmg += (wTeam.resources.healingSeed || 0);
     lF.hp = Math.max(0, lF.hp - dmg);
     if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
-    // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die
+    // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die + +1 die
     const winDiceAP = winner === 'red' ? redDice : blueDice;
     const loseDiceAP = winner === 'red' ? blueDice : redDice;
-    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && isStraight(winDiceAP)) B.catchyTuneUnlocked[winner] = true;
-    if (!B.catchyTuneUnlocked[lTeamName] && hasAlive(lTeam, 79) && isStraight(loseDiceAP)) B.catchyTuneUnlocked[lTeamName] = true;
+    if (!B.catchyTuneUnlocked[winner] && hasAlive(wTeam, 79) && isStraight(winDiceAP)) { B.catchyTuneUnlocked[winner] = true; B.catchyTuneDieBonus[winner] = (B.catchyTuneDieBonus[winner] || 0) + 1; }
+    if (!B.catchyTuneUnlocked[lTeamName] && hasAlive(lTeam, 79) && isStraight(loseDiceAP)) { B.catchyTuneUnlocked[lTeamName] = true; B.catchyTuneDieBonus[lTeamName] = (B.catchyTuneDieBonus[lTeamName] || 0) + 1; }
     if (B.catchyTuneUnlocked[winner] && winDiceAP.length > 0) B.catchyTuneLockedDie[winner] = Math.max(...winDiceAP);
     if (B.catchyTuneUnlocked[lTeamName] && loseDiceAP.length > 0) B.catchyTuneLockedDie[lTeamName] = Math.max(...loseDiceAP);
   }
@@ -4655,6 +4659,7 @@ function startBattle() {
     winstonDiceBonus: { red: 0, blue: 0 },
     catchyTuneUnlocked: { red: false, blue: false },
     catchyTuneLockedDie: { red: null, blue: null },
+    catchyTuneDieBonus: { red: 0, blue: 0 },
     catchyTunePending: null,
     lastRollDiceCount: { red: 3, blue: 3 },
     tysonDisabled: { red: [], blue: [] },
@@ -10643,6 +10648,10 @@ function doPreRollSetup() {
   if (B.haywireBonus && B.haywireBonus.red > 0) redCount += B.haywireBonus.red;
   if (B.haywireBonus && B.haywireBonus.blue > 0) blueCount += B.haywireBonus.blue;
 
+  // Laura (79) — Catchy Tune: permanent +1 die bonus (awarded once per game on straight)
+  if (B.catchyTuneDieBonus && B.catchyTuneDieBonus.red > 0) redCount += B.catchyTuneDieBonus.red;
+  if (B.catchyTuneDieBonus && B.catchyTuneDieBonus.blue > 0) blueCount += B.catchyTuneDieBonus.blue;
+
   // Pip (418) — Toasted: permanent die removal applied to opponent
   if (B.pipDieRemoval && B.pipDieRemoval.red > 0) redCount = Math.max(1, redCount - B.pipDieRemoval.red);
   if (B.pipDieRemoval && B.pipDieRemoval.blue > 0) blueCount = Math.max(1, blueCount - B.pipDieRemoval.blue);
@@ -10650,13 +10659,13 @@ function doPreRollSetup() {
   // Mable Stadango (446) — Hex: consume die removal from Burn spend (applied to opponent's count)
   // FIX: callout name corrected from "Forest Spirit" to "Mable Stadango"
   if (B.hexDieRemoval && B.hexDieRemoval.red > 0) {
-    redCount = Math.max(1, redCount - B.hexDieRemoval.red);
+    redCount = Math.max(0, redCount - B.hexDieRemoval.red);
     preRollCallouts.push(['HEX!', 'var(--uncommon)', `Mable Stadango — Hex! Red loses ${B.hexDieRemoval.red} die this roll!`, 'blue']);
     log(`<span class="log-ability">Mable Stadango</span> — Hex! <span class="log-dmg">Red loses ${B.hexDieRemoval.red} die this roll!</span>`);
     B.hexDieRemoval.red = 0;
   }
   if (B.hexDieRemoval && B.hexDieRemoval.blue > 0) {
-    blueCount = Math.max(1, blueCount - B.hexDieRemoval.blue);
+    blueCount = Math.max(0, blueCount - B.hexDieRemoval.blue);
     preRollCallouts.push(['HEX!', 'var(--uncommon)', `Mable Stadango — Hex! Blue loses ${B.hexDieRemoval.blue} die this roll!`, 'red']);
     log(`<span class="log-ability">Mable Stadango</span> — Hex! <span class="log-dmg">Blue loses ${B.hexDieRemoval.blue} die this roll!</span>`);
     B.hexDieRemoval.blue = 0;
@@ -15283,11 +15292,13 @@ function _resolveRoundImpl() {
   if (!B.catchyTuneUnlocked[winTeamName] && hasAlive(winTeam, 79) && winDice && isStraight(winDice)) {
     if (!corneliusBlocksRally || wF.id === 79) {
       B.catchyTuneUnlocked[winTeamName] = true;
+      if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
+      B.catchyTuneDieBonus[winTeamName] = (B.catchyTuneDieBonus[winTeamName] || 0) + 1;
       catchyJustUnlockedWin = true;
       const lauraG = wF.id === 79 ? wF : (getSidelineGhost(winTeam, 79) || { name: 'Laura' });
       const lauraLoc = wF.id === 79 ? '' : ' (sideline)';
       collectKC(winTeamName, lauraG.name);
-      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune unlocked! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      log(`<span class="log-ability">${lauraG.name}${lauraLoc}</span> — Catchy Tune unlocked! Straight [${[...winDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die & choose a die to lock after each roll!`);
       popSidelineCard(winTeam, 79);
     } else { corneliusSidelineBlockedList.push('Laura'); }
   }
@@ -15296,11 +15307,13 @@ function _resolveRoundImpl() {
     const enemyCornelius = hasSideline(winTeam, 45);
     if (!enemyCornelius || lF.id === 79) {
       B.catchyTuneUnlocked[loseTeamName] = true;
+      if (!B.catchyTuneDieBonus) B.catchyTuneDieBonus = { red: 0, blue: 0 };
+      B.catchyTuneDieBonus[loseTeamName] = (B.catchyTuneDieBonus[loseTeamName] || 0) + 1;
       catchyJustUnlockedLose = true;
       const lauraGL = lF.id === 79 ? lF : (getSidelineGhost(loseTeam, 79) || { name: 'Laura' });
       const lauraLocL = lF.id === 79 ? '' : ' (sideline)';
       collectKC(loseTeamName, lauraGL.name);
-      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune unlocked! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! Choose a die to lock after each roll!`);
+      log(`<span class="log-ability">${lauraGL.name}${lauraLocL}</span> — Catchy Tune unlocked! Straight [${[...loseDice].sort((a,b)=>a-b).join('-')}]! +1 permanent die & choose a die to lock after each roll!`);
       popSidelineCard(loseTeam, 79);
     }
   }
@@ -16383,11 +16396,11 @@ function _resolveRoundImpl() {
   // Laura (79) — Catchy Tune unlock callouts (only on first activation)
   if (catchyJustUnlockedWin) {
     const _lSeq = [...winDice].sort((a, b) => a - b).join('-');
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, winTeamName);
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeq}]! +1 permanent die & lock a die after each roll!`, () => { renderBattle(); }, winTeamName);
   }
   if (catchyJustUnlockedLose) {
     const _lSeqL = [...loseDice].sort((a, b) => a - b).join('-');
-    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! Catchy Tune unlocked permanently!`, () => { renderBattle(); }, loseTeamName);
+    queueAbility('CATCHY TUNE!', 'var(--rare)', `Laura — Straight [${_lSeqL}]! +1 permanent die & lock a die after each roll!`, () => { renderBattle(); }, loseTeamName);
   }
   // Gary (92) — Lucky Novice: win-team Gary — 1s in winning dice grant ice shards (active OR sideline, v598)
   if (garyOnesWin > 0) {
@@ -18648,6 +18661,7 @@ function renderBattle() {
     let permHtml = '';
     if (B.haywireBonus && B.haywireBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireBonus[team]} Die (Wild Chords)</div>`;
     if (B.haywireDamageBonus && B.haywireDamageBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.haywireDamageBonus[team]} Dmg (Wild Chords)</div>`;
+    if (B.catchyTuneDieBonus && B.catchyTuneDieBonus[team] > 0) permHtml += `<div class="permanent-buff">\u{1F3B5} +${B.catchyTuneDieBonus[team]} Die (Catchy Tune)</div>`;
     if (B.pipDieRemoval && B.pipDieRemoval[team] > 0) permHtml += `<div class="permanent-debuff">🍞 -${B.pipDieRemoval[team]} Die (Toasted)</div>`;
     if (B.carpenterHammer && B.carpenterHammer[team]) permHtml += `<div class="permanent-buff">🔨 Hammer: Singles hit +2 harder</div>`;
     if (B.welderTorch && B.welderTorch[team]) permHtml += `<div class="permanent-buff">💥 Torch: Wins give +1 Burn</div>`;
