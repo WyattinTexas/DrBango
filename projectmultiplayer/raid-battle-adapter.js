@@ -826,6 +826,12 @@ const RaidBattleAdapter = {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
 
+    // Fade music — the default showGameOver was consumed so it never ran fadeOutMusic
+    if (typeof fadeOutMusic === 'function') fadeOutMusic();
+
+    // Boss KO = pool is 0 (abilities like Meltdown can cause drift, so force sync)
+    if (winner === 'red') RaidState.bossCurrentHp = 0;
+
     const B = BattleEngine.getState();
     const currentIdx = RaidState.mySlot;
     const playerCount = RaidState.players.length;
@@ -905,11 +911,20 @@ const RaidBattleAdapter = {
 
     // Show result screen if we have the UI function
     if (typeof showRaidResult === 'function') {
-      showRaidResult({
-        ...RaidState,
-        bossDefeatedBy: null,
-        players: RaidState.players
-      });
+      try {
+        showRaidResult({
+          ...RaidState,
+          bossDefeatedBy: null,
+          players: RaidState.players
+        });
+      } catch (e) {
+        console.error('[Raid] showRaidResult crashed:', e);
+        // Fallback: show simple result so players aren't stuck on blank screen
+        const fallback = document.createElement('div');
+        fallback.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;font-family:Creepster,cursive;';
+        fallback.innerHTML = `<h1 style="font-size:2.5rem;color:#2ecc71">RAID COMPLETE</h1><button style="padding:12px 32px;font-size:1rem;background:#9b59b6;color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="this.parentElement.remove();if(typeof closeRaidResult==='function')closeRaidResult();else if(typeof RaidBattleAdapter!=='undefined')RaidBattleAdapter._returnToLobby();">RETURN TO LOBBY</button>`;
+        document.body.appendChild(fallback);
+      }
     } else {
       // Simple result overlay for spectators
       const raidScreen = document.getElementById('raid-screen');

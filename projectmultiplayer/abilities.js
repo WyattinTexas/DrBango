@@ -2,6 +2,20 @@
 // Entry abilities, pre-roll modals, post-roll abilities, specials windows.
 // Depends on: battle-core.js, dice.js, battle-ui.js
 
+// Helper: deal direct damage to a ghost AND track it in boss pool.
+// Use this instead of raw `ef.hp -= N` for any ability that damages an enemy.
+function dealAbilityDamage(ghost, amount, teamName) {
+  if (!ghost || ghost.ko || amount <= 0) return;
+  const before = ghost.hp;
+  ghost.hp = Math.max(0, ghost.hp - amount);
+  if (ghost.hp <= 0) ghost.ko = true;
+  // Track in boss pool if this is a blue (boss) ghost
+  const actualDmg = before - ghost.hp;
+  if (actualDmg > 0 && window.BOSS_MODE && teamName !== 'red') {
+    if (typeof bossDamageTracker === 'function') bossDamageTracker(actualDmg, ghost);
+  }
+}
+
 function triggerEntry(team, skipEntryEffects) {
   const f = active(team);
   const enemy = opp(team);
@@ -100,9 +114,9 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 306) {
     const ef = active(enemy);
     if (!ef.ko) {
-      ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
+      dealAbilityDamage(ef, 3, enemyName);
+      if (ef.ko) ef.killedBy = (f.originalId || f.id);
       entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
       playDamageSfx(3);
@@ -159,9 +173,9 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 34) {
     const ef = active(enemy);
     if (!ef.ko) {
-      ef.hp = Math.max(0, ef.hp - 1);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
+      dealAbilityDamage(ef, 1, enemyName);
+      if (ef.ko) ef.killedBy = (f.originalId || f.id);
       entryCallouts.push(['MENACE!', 'var(--uncommon)', `${f.name} — 1 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Menace! <span class="log-dmg">1 entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
       playDamageSfx(1);
@@ -1143,8 +1157,8 @@ function doRiderChoice(choice) {
     // Opponent takes 1 damage
     const oppGhost = active(tp.team);
     if (oppGhost && !oppGhost.ko) {
-      oppGhost.hp = Math.max(0, oppGhost.hp - 1);
-      if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 456; }
+      dealAbilityDamage(oppGhost, 1, tp.oppTeamName);
+      if (oppGhost.ko) oppGhost.killedBy = 456;
       subtitle = `${oppLabel}'s ${oppGhost.name} takes 1 damage! (${oppGhost.hp}/${oppGhost.maxHp} HP)`;
       log(`<span class="log-ability">${oppLabel}</span> chose to take 1 damage from Ryder's Toll! ${oppGhost.name} → ${oppGhost.hp}/${oppGhost.maxHp} HP.`);
       // Simon (24) — Brew Time: gain 1 Sacred Fire when taking ANY damage
@@ -1155,8 +1169,8 @@ function doRiderChoice(choice) {
       }
       // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius 45)
       if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
-        oppGhost.hp = Math.max(0, oppGhost.hp - 1);
-        if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 436; }
+        dealAbilityDamage(oppGhost, 1, tp.oppTeamName);
+        if (oppGhost.ko) oppGhost.killedBy = 436;
         queueAbility('BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${oppGhost.name}!`, tp.riderTeam);
         log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
         popSidelineCard(B[tp.riderTeam], 436);
@@ -4654,8 +4668,8 @@ function doPreRollSetup() {
         const fredDmg = extraDice * 2;
         const ef = active(enemyFred);
         if (!ef.ko) {
-          ef.hp = Math.max(0, ef.hp - fredDmg);
-          if (ef.hp <= 0) { ef.hp = 0; ef.ko = true; ef.killedBy = 27; }
+          dealAbilityDamage(ef, fredDmg, enemyNameFred);
+          if (ef.ko) ef.killedBy = 27;
           preRollCallouts.push(['CAREFUL!', 'var(--common)', `${fFred.name} — Enemy rolled ${enemyLastDice} dice last round! ${extraDice} extra × 2 = ${fredDmg} damage!`, tNameFred]);
           log(`<span class="log-ability">${fFred.name}</span> — Careful! Enemy rolled ${enemyLastDice} dice (${extraDice} extra) → <span class="log-dmg">${fredDmg} damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
           playDamageSfx(fredDmg);
@@ -4681,8 +4695,8 @@ function doPreRollSetup() {
           log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to ${f.name}'s Swarm!`);
           return;
         }
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
+        dealAbilityDamage(ef, 1, enemyName);
+        if (ef.ko) ef.killedBy = (f.originalId || f.id);
         preRollCallouts.push(['SWARM!', 'var(--uncommon)', `${f.name} — 1 damage to ${ef.name}!`, tNamePre]);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
@@ -4704,8 +4718,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
           const psPreHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          dealAbilityDamage(ef, 1, enemyName);
+          if (ef.ko) ef.killedBy = 436;
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNamePre]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
@@ -4745,9 +4759,9 @@ function doPreRollSetup() {
           return;
         }
         const preHp = ef.hp;
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
+        dealAbilityDamage(ef, 1, enemyName);
+        if (ef.ko) ef.killedBy = 205;
         const meltMsg = ef.ko
           ? `Shade's Shadow finishes ${ef.name}! (${preHp} HP → KO!)`
           : `Shade's Shadow chips ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -4774,8 +4788,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
           const psPreHp2 = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          dealAbilityDamage(ef, 1, enemyName);
+          if (ef.ko) ef.killedBy = 436;
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameShade]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
@@ -4825,8 +4839,8 @@ function doPreRollSetup() {
             return;
           }
           const preHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
+          dealAbilityDamage(ef, 1, enemyName);
+          if (ef.ko) ef.killedBy = 111;
           const hauntMsg = ef.ko
             ? `Shade haunts ${ef.name}! (${preHp} HP → KO!)`
             : `Shade haunts ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -4851,8 +4865,8 @@ function doPreRollSetup() {
           // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
             const psPreHp3 = ef.hp;
-            ef.hp = Math.max(0, ef.hp - 1);
-            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            dealAbilityDamage(ef, 1, enemyName);
+            if (ef.ko) ef.killedBy = 436;
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameHaunt]);
             log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
@@ -4899,8 +4913,8 @@ function doPreRollSetup() {
           const lucyAttacker = active(B[tNameLucyActor]);
           if (lucyAttacker && !lucyAttacker.ko) {
             const undPreL = lucyAttacker.hp;
-            lucyAttacker.hp = Math.max(0, lucyAttacker.hp - 3);
-            if (lucyAttacker.hp <= 0) { lucyAttacker.ko = true; lucyAttacker.killedBy = 55; }
+            dealAbilityDamage(lucyAttacker, 3, tNameLucyActor);
+            if (lucyAttacker.ko) lucyAttacker.killedBy = 55;
             const undMsgL = lucyAttacker.ko
               ? `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} HP → KO!)`
               : `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} → ${lucyAttacker.hp} HP)`;
@@ -4915,8 +4929,8 @@ function doPreRollSetup() {
           }
         }
         const preHp = f.hp;
-        f.hp = Math.max(0, f.hp - pendingDmg);
-        if (f.hp <= 0) { f.ko = true; f.killedBy = isHumar ? 336 : 108; }
+        dealAbilityDamage(f, pendingDmg, tNameLucyTarget);
+        if (f.ko) f.killedBy = isHumar ? 336 : 108;
         const lucyMsg = f.ko
           ? `${abilityLabel} burns ${f.name}! (${preHp} HP → KO!)`
           : `${abilityLabel} burns ${f.name}! (${preHp} → ${f.hp} HP)`;
@@ -4933,8 +4947,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!f.ko && hasAlive(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
           const psPreHpL = f.hp;
-          f.hp = Math.max(0, f.hp - 1);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 436; }
+          dealAbilityDamage(f, 1, tNameLucyTarget);
+          if (f.ko) f.killedBy = 436;
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${f.name}!`, tNameLucyActor]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
           playDamageSfx(1);
@@ -4989,8 +5003,8 @@ function doPreRollSetup() {
             return;
           }
           const preHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
+          dealAbilityDamage(ef, 1, enemyName);
+          if (ef.ko) ef.killedBy = 101;
           const fumesMsg = ef.ko
             ? `Toxic Fumes choke ${ef.name}! (${preHp} HP → KO!)`
             : `Toxic Fumes choke ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -5013,8 +5027,8 @@ function doPreRollSetup() {
           // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
             const psPreHp4 = ef.hp;
-            ef.hp = Math.max(0, ef.hp - 1);
-            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            dealAbilityDamage(ef, 1, enemyName);
+            if (ef.ko) ef.killedBy = 436;
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
             log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
@@ -5060,8 +5074,8 @@ function doPreRollSetup() {
       const ef = active(enemy);
       if (!ef.ko && ef.hp >= 12) {
         const preHp = ef.hp;
-        ef.hp = 0;
-        ef.ko = true;
+        const enemyNameSue = enemy === B.red ? 'red' : 'blue';
+        dealAbilityDamage(ef, ef.hp, enemyNameSue);
         ef.killedBy = 84;
         preRollCallouts.push(['HIDDEN WEAKNESS!', 'var(--rare)', `${ef.name} has ${preHp} HP — exposed and destroyed!`, team === B.red ? 'red' : 'blue']);
         log(`<span class="log-ability">${f.name}</span> — Hidden Weakness! ${ef.name} had ${preHp} HP (≥12) — <span class="log-ko">instant KO!</span>`);
@@ -5170,8 +5184,8 @@ function doPreRollSetup() {
   // Bosses roll 3 dice like regular ghosts — their power is extra HP, not extra dice
   // Golden Dice (raid item): +1 die on first roll of the fight
   if (B.goldenDice) {
-    if (B.goldenDice.red && B.round === 1) { redCount++; B.goldenDice.red = false; queueAbility('Golden Dice', 'var(--gold)', '+1 die on first roll!', 'red'); }
-    if (B.goldenDice.blue && B.round === 1) { blueCount++; B.goldenDice.blue = false; }
+    if (B.goldenDice.red && B.round === 1) { redCount++; B.goldenDice.red = false; queueAbility('Golden Dice', 'var(--gold)', '+1 die on first roll!', null, 'red'); }
+    if (B.goldenDice.blue && B.round === 1) { blueCount++; B.goldenDice.blue = false; queueAbility('Golden Dice', 'var(--gold)', '+1 die on first roll!', null, 'blue'); }
   }
   // Doug (63) Caution duel-phase swap promised the incoming ghost +1 die — apply now.
   if (B.dougCautionDieBonus && B.dougCautionDieBonus.red) { redCount++; B.dougCautionDieBonus.red = false; }
@@ -6538,8 +6552,7 @@ function showMoonstoneChoice(team, dice) {
       const oppTeam = team === 'red' ? 'blue' : 'red';
       const oppF = active(B[oppTeam]);
       if (oppF && !oppF.ko) {
-        oppF.hp = Math.max(0, oppF.hp - roll);
-        if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+        dealAbilityDamage(oppF, roll, oppTeam);
         log(`<span class="log-ms">Moonstone Blast!</span> Blue rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
         narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> <b class="blue-text">Blue</b> rolled <b class="gold">${roll}</b> — <b class="red-text">${oppF.name}</b> takes ${roll} damage!`);
         playDamageSfx(roll);
@@ -6648,8 +6661,7 @@ function showMoonstoneChoice(team, dice) {
         const oppTeam = team === 'red' ? 'blue' : 'red';
         const oppF = active(B[oppTeam]);
         if (oppF && !oppF.ko) {
-          oppF.hp = Math.max(0, oppF.hp - roll);
-          if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+          dealAbilityDamage(oppF, roll, oppTeam);
           showAbilityCallout('MOONSTONE BLAST!', 'var(--moonstone)', `Rolled a ${roll} — ${oppF.name} takes ${roll} damage!`, team);
           log(`<span class="log-ms">Moonstone Blast!</span> Rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
           narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> Rolled <b class="gold">${roll}</b> — <b class="${oppTeam}-text">${oppF.name}</b> takes ${roll} damage!${oppF.ko ? ' <b>KO!</b>' : ''}`);
