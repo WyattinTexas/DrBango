@@ -2564,7 +2564,8 @@ function smartSimRounds(gameNum) {
       if (wF.id === 432 && !wF.ko) {
         wTeam.resources.fire += 1;
         wTeam.resources.ice += 2;
-        wTeam.resources.luckyStone += 1;
+        if (!wTeam.resources.frostbite) wTeam.resources.frostbite = 0;
+        wTeam.resources.frostbite += 1;
         wTeam.resources.moonstone += 1;
         wTeam.resources.healingSeed += 2;
       }
