@@ -13531,13 +13531,7 @@ function handleKOs() {
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
   if (redAllDown && blueAllDown) { showGameOver('draw'); renderBattle(); return true; }
   if (redAllDown) { showGameOver('blue'); renderBattle(); return true; }
-  if (blueAllDown) {
-    if (window.BOSS_MODE && typeof RaidState !== 'undefined' &&
-        (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
-      return false;
-    }
-    showGameOver('red'); renderBattle(); return true;
-  }
+  if (blueAllDown) { showGameOver('red'); renderBattle(); return true; }
 
   // Check if any active ghost is KO'd and needs a replacement pick
   const teamsNeedingSwap = [];
@@ -13556,10 +13550,6 @@ function handleKOs() {
         teamsNeedingSwap.push(team);
       } else {
         const winner = team === 'red' ? 'blue' : 'red';
-        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' &&
-            (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
-          return false;
-        }
         showGameOver(winner); renderBattle(); return true;
       }
     }

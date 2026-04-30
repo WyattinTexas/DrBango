@@ -21,15 +21,7 @@ const RaidBattleAdapter = {
       if (!B || B.round <= 1) return false; // first round — let default run
       if (B.phase === 'over') return false;  // onGameOver already owns the endgame
 
-      // Pool depleted? → victory. Pool and ghost HP are independent —
-      // the pool can hit 0 while boss ghosts still have HP. handleKOs
-      // only checks ghost KOs, so it won't catch this. We must.
-      if (RaidState.bossCurrentHp <= 0 && RaidState.bossCurrentHp != null) {
-        this._handleRaidGameOver('red');
-        return true;
-      }
-
-      // Pool alive → normal turn handoff
+      // Turn handoff — boss KO is handled by handleKOs → showGameOver
       this._handleTurnHandoff();
       return true;
     });

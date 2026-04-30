@@ -3875,15 +3875,7 @@ function handleKOs() {
   const blueAllDown = B.blue.ghosts.every(g => g.ko);
   if (redAllDown && blueAllDown) { showGameOver('draw'); renderBattle(); return true; }
   if (redAllDown) { showGameOver('blue'); renderBattle(); return true; }
-  if (blueAllDown) {
-    // Raid mode: boss pool may still have HP even when all ghosts KO'd.
-    // Don't declare victory — let the turn hand off for another round.
-    if (window.BOSS_MODE && typeof RaidState !== 'undefined' &&
-        (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
-      return false; // pool alive or not yet initialized — turn handoff will handle this
-    }
-    showGameOver('red'); renderBattle(); return true;
-  }
+  if (blueAllDown) { showGameOver('red'); renderBattle(); return true; }
 
   // Check if any active ghost is KO'd and needs a replacement pick
   const teamsNeedingSwap = [];
@@ -3903,11 +3895,6 @@ function handleKOs() {
       } else {
         // Active is KO'd and no sideline — this team is fully eliminated
         const winner = team === 'red' ? 'blue' : 'red';
-        // Raid mode: if blue team wiped but pool > 0, don't end — hand off instead
-        if (winner === 'red' && window.BOSS_MODE && typeof RaidState !== 'undefined' &&
-            (RaidState.bossCurrentHp > 0 || RaidState.bossCurrentHp == null)) {
-          return false;
-        }
         showGameOver(winner); renderBattle(); return true;
       }
     }
