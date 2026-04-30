@@ -1059,16 +1059,17 @@ function showRaidResult(data) {
       <button class="raid-result-close" onclick="closeRaidResult()">RETURN TO LOBBY</button>
     </div>`;
 
-  // Append as overlay — do NOT replace innerHTML (destroys the arena template)
+  // Append to document.body — NOT raidScreen. raidScreen's position:fixed + z-index
+  // creates a stacking context that traps children, making them invisible behind
+  // other fixed-position elements. Body-level avoids this entirely.
   let resultOverlay = document.getElementById('raid-result-overlay');
   if (!resultOverlay) {
     resultOverlay = document.createElement('div');
     resultOverlay.id = 'raid-result-overlay';
-    resultOverlay.style.cssText = 'position:fixed;inset:0;z-index:9500;overflow-y:auto;background:linear-gradient(180deg,#0a0612,#14101e,#0e0820);';
-    raidScreen.appendChild(resultOverlay);
+    resultOverlay.style.cssText = 'position:fixed;inset:0;z-index:9900;overflow-y:auto;background:linear-gradient(180deg,#0a0612,#14101e,#0e0820);';
+    document.body.appendChild(resultOverlay);
   }
   resultOverlay.innerHTML = html;
-  raidScreen.style.display = 'block';
 
   // ─── Juice ───────────────────────────────────────────────────
   if (bossDefeated) {
