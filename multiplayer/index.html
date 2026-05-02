@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v1.64'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v1.65'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4761,17 +4761,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 </div>
 
 <!-- Forest Spirit / Mable Stadango (446) — Hex -->
-<div class="selene-overlay" id="hexOverlay">
-  <div class="selene-modal">
-    <div class="selene-banner" style="background:linear-gradient(135deg,#1a4731,#059669);">&#x1F33F; HEX</div>
-    <h3>Mable Stadango — Hex!</h3>
-    <p class="selene-sub" id="hexSub">Spend 1 Burn to remove 1 enemy die + gain 1 Sacred Fire?</p>
-    <div class="selene-options">
-      <button class="selene-opt" onclick="doHexChoice('yes')" style="background:linear-gradient(135deg,#1a4731,#059669);">&#x1F33F; Yes — trade Burn for die removal + Sacred Fire!</button>
-      <button class="selene-opt" onclick="doHexChoice('no')" style="background:linear-gradient(135deg,#374151,#1f2937);">&#x2716; No — keep Burn for later</button>
-    </div>
-  </div>
-</div>
+<!-- Hex overlay removed — Mable's Hex is now passive (triggers via burn placement) -->
 
 <!-- Nick & Knack (409) — Knick Knack -->
 <div class="selene-overlay" id="nickKnackOverlay">
@@ -5362,7 +5352,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v1.64';
+const BBN_VERSION = 'v1.65';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -8355,8 +8345,9 @@ async function processChampionResult(result) {
       userProfile.dailyChallengeWon = true;
       userProfile.dailyChallengeDate = dateKey;
       userProfile.collection = updatedCollection;
-      // Defer reward cards to after the result modal closes
-      window._pendingRewardCards = bonusCards;
+      // Merge with any existing arena win cards instead of overwriting
+      const existingCards = window._pendingRewardCards || [];
+      window._pendingRewardCards = [...existingCards, ...bonusCards];
       window._pendingRewardCardsTitle = 'Champion & Rival Defeated!';
       window._pendingRewardCardsCallback = () => {
         renderDailyChallenge();

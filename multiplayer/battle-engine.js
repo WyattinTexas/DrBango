@@ -17187,6 +17187,8 @@ function pvpSerializeState() {
     duelLastLoser: B.duelLastLoser || null,
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
     frostbite: B.frostbite ? { red: { ...B.frostbite.red }, blue: { ...B.frostbite.blue } } : { red: {}, blue: {} },
+    frostbiteSource: B.frostbiteSource ? JSON.parse(JSON.stringify(B.frostbiteSource)) : { red: {}, blue: {} },
+    burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : { red: {}, blue: {} },
     log: B.log.slice(0, 20),
     ts: Date.now()
   };
@@ -17240,7 +17242,9 @@ function pvpApplyState(state) {
   if (state.sophiaMaskActive) B.sophiaMaskActive = state.sophiaMaskActive;
   if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
   if (state.burn) B.burn = state.burn;
+  if (state.burnSource) B.burnSource = state.burnSource;
   if (state.frostbite) B.frostbite = state.frostbite;
+  if (state.frostbiteSource) B.frostbiteSource = state.frostbiteSource;
   if (state.log) B.log = state.log;
 
   return changed; // v728: caller can skip renderBattle() if nothing changed
