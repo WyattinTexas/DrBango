@@ -4425,10 +4425,17 @@ function showTysonHopPicker(winTeamName, loseTeamName, sidelineGhosts, continuat
   const disabled = B.tysonDisabled[loseTeamName];
   const opts = document.getElementById('tysonHopOptions');
   if (opts) {
-    opts.innerHTML = sidelineGhosts.filter(g => {
+    const validTargets = sidelineGhosts.filter(g => {
       const idx = loseTeam.ghosts.indexOf(g);
-      return !disabled.includes(idx); // don't show already-disabled ghosts
-    }).map(g => {
+      return !disabled.includes(idx);
+    });
+    if (validTargets.length === 0) {
+      // No valid targets — auto-skip Tyson's Hop
+      B.tysonPickerPending = null;
+      continuation();
+      return;
+    }
+    opts.innerHTML = validTargets.map(g => {
       const gd = ghostData(g.id);
       const realIdx = loseTeam.ghosts.indexOf(g);
       return `<div class="pressure-opt" onclick="doTysonHopChoice('${loseTeamName}', ${realIdx})">
@@ -16107,6 +16114,109 @@ function aiTick() {
     }
   }
 
+  // --- Pre-roll interactive overlays: auto-resolve for Blue AI ---
+
+  // Chow (414) — Secret Ingredient: always spend seeds for +2 dice
+  if (B.chowPending && B.chowPending.team === 'blue') {
+    const chowOverlay = document.getElementById('chowOverlay');
+    if (chowOverlay && chowOverlay.classList.contains('active')) {
+      setTimeout(() => { if (typeof doChowChoice === 'function') doChowChoice('yes'); }, 500);
+      return;
+    }
+  }
+
+  // Eloise (85) — Change of Heart: swap HP if enemy has more HP
+  if (B.eloisePending && B.eloisePending.team === 'blue') {
+    const eloiseOverlay = document.getElementById('eloiseOverlay');
+    if (eloiseOverlay && eloiseOverlay.classList.contains('active')) {
+      const eloiseAI = active(B.blue);
+      const eloiseOpp = active(B.red);
+      const shouldSwap = eloiseAI && eloiseOpp && eloiseOpp.hp > eloiseAI.hp;
+      setTimeout(() => { if (typeof doEloiseChoice === 'function') doEloiseChoice(shouldSwap ? 'yes' : 'no'); }, 500);
+      return;
+    }
+  }
+
+  // Mallow (89) — Dozy Cozy: use if active ghost HP < maxHP
+  if (B.mallowPending && B.mallowPending.team === 'blue') {
+    const mallowOverlay = document.getElementById('mallowOverlay');
+    if (mallowOverlay && mallowOverlay.classList.contains('active')) {
+      const mallowActive = active(B.blue);
+      const shouldHeal = mallowActive && mallowActive.hp < mallowActive.maxHp;
+      setTimeout(() => { if (typeof doMallowChoice === 'function') doMallowChoice(shouldHeal ? 'yes' : 'no'); }, 500);
+      return;
+    }
+  }
+
+  // Boo Brothers (17) — Teamwork: trade die for HP if HP < maxHP
+  if (B.booPending && B.booPending.team === 'blue') {
+    const booOverlay = document.getElementById('booOverlay');
+    if (booOverlay && booOverlay.classList.contains('active')) {
+      const booActive = active(B.blue);
+      const shouldTrade = booActive && booActive.hp < booActive.maxHp;
+      setTimeout(() => { if (typeof doBooChoice === 'function') doBooChoice(shouldTrade ? 'yes' : 'no'); }, 500);
+      return;
+    }
+  }
+
+  // Doug (63) — Caution: skip (stay in fight) — AI keeps Doug active
+  if (B.dougCautionPending && B.dougCautionPending.team === 'blue') {
+    const dougOverlay = document.getElementById('dougCautionOverlay');
+    if (dougOverlay && dougOverlay.classList.contains('active')) {
+      setTimeout(() => { if (typeof doDougCautionSkip === 'function') doDougCautionSkip(); }, 500);
+      return;
+    }
+  }
+
+  // Raditz (62) — Hunt: force swap lowest HP enemy sideline ghost
+  if (B.raditzHuntPending && B.raditzHuntPending.team === 'blue') {
+    const raditzOverlay = document.getElementById('raditzHuntOverlay');
+    if (raditzOverlay && raditzOverlay.classList.contains('active')) {
+      const huntEnemy = B.red;
+      const huntTargets = huntEnemy.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== huntEnemy.activeIdx && !x.ghost.ko);
+      if (huntTargets.length > 0) {
+        huntTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => { if (typeof doRaditzHuntChoice === 'function') doRaditzHuntChoice('yes', huntTargets[0].index); }, 500);
+      } else {
+        setTimeout(() => { if (typeof doRaditzHuntChoice === 'function') doRaditzHuntChoice('no'); }, 500);
+      }
+      return;
+    }
+  }
+
+  // Fang Undercover (7) — Skilled Coward: always arm the dodge
+  if (B.fangUndercoverPending && B.fangUndercoverPending.team === 'blue') {
+    const fuOverlay = document.getElementById('fangUndercoverArmOverlay');
+    if (fuOverlay && fuOverlay.classList.contains('active')) {
+      setTimeout(() => { if (typeof doFangUndercoverArm === 'function') doFangUndercoverArm('yes'); }, 500);
+      return;
+    }
+  }
+
+  // Bogey (53) — Bogus: always reflect damage
+  {
+    const bogeyOverlay = document.getElementById('bogeyOverlay');
+    if (bogeyOverlay && bogeyOverlay.classList.contains('active') && B.bogeyReflectTeam === 'blue') {
+      setTimeout(() => { if (typeof doBogeyReflectChoice === 'function') doBogeyReflectChoice('reflect'); }, 500);
+      return;
+    }
+  }
+
+  // Catchy Tune (Laura 79) — pick highest die to lock
+  {
+    const catchyOverlay = document.getElementById('catchyTuneOverlay');
+    if (catchyOverlay && catchyOverlay.classList.contains('active') && B.catchyTuneTeam === 'blue') {
+      const blueDice = B.blueDice || [];
+      if (blueDice.length > 0) {
+        const highestIdx = blueDice.indexOf(Math.max(...blueDice));
+        setTimeout(() => { if (typeof doCatchyTunePick === 'function') doCatchyTunePick(highestIdx); }, 500);
+      }
+      return;
+    }
+  }
+
   // --- Post-roll: auto-use moonstone / lucky stone for blue ---
   aiHandlePostRoll();
 }
@@ -17189,6 +17299,7 @@ function pvpSerializeState() {
     frostbite: B.frostbite ? { red: { ...B.frostbite.red }, blue: { ...B.frostbite.blue } } : { red: {}, blue: {} },
     frostbiteSource: B.frostbiteSource ? JSON.parse(JSON.stringify(B.frostbiteSource)) : { red: {}, blue: {} },
     burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : { red: {}, blue: {} },
+    hexDieRemoval: B.hexDieRemoval ? { ...B.hexDieRemoval } : { red: 0, blue: 0 },
     log: B.log.slice(0, 20),
     ts: Date.now()
   };
@@ -17245,6 +17356,7 @@ function pvpApplyState(state) {
   if (state.burnSource) B.burnSource = state.burnSource;
   if (state.frostbite) B.frostbite = state.frostbite;
   if (state.frostbiteSource) B.frostbiteSource = state.frostbiteSource;
+  if (state.hexDieRemoval) B.hexDieRemoval = state.hexDieRemoval;
   if (state.log) B.log = state.log;
 
   return changed; // v728: caller can skip renderBattle() if nothing changed
