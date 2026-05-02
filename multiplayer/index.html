@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v1.59'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v1.60'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -5320,7 +5320,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v1.59';
+const BBN_VERSION = 'v1.60';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5436,9 +5436,15 @@ db.ref('.info/connected').on('value', snap => {
 // ============================================================
 // AUTH
 // ============================================================
-document.getElementById('google-signin-btn').addEventListener('click', () => {
+document.getElementById('google-signin-btn').addEventListener('click', async () => {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithRedirect(provider);
+  try {
+    await auth.signInWithPopup(provider);
+  } catch (err) {
+    console.error('Sign-in error:', err);
+    const msg = err.code || err.message || String(err);
+    showToast('Sign-in failed: ' + msg);
+  }
 });
 
 auth.onAuthStateChanged(async (user) => {
