@@ -5367,6 +5367,9 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+auth.getRedirectResult().catch(err => {
+  if (err.code) console.error('Redirect sign-in error:', err.code, err.message);
+});
 const db = firebase.database();
 
 // ============================================================
@@ -5436,7 +5439,15 @@ db.ref('.info/connected').on('value', snap => {
 document.getElementById('google-signin-btn').addEventListener('click', () => {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(err => {
-    showToast('Sign-in failed. Try again.');
+    console.error('Sign-in error:', err.code, err.message);
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+      showToast('Popup blocked — trying redirect...');
+      auth.signInWithRedirect(provider);
+    } else if (err.code === 'auth/unauthorized-domain') {
+      showToast('Domain not authorized. Contact admin.');
+    } else {
+      showToast('Sign-in failed: ' + (err.code || 'unknown error'));
+    }
   });
 });
 
