@@ -651,6 +651,16 @@ const RaidBattleAdapter = {
     if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
     if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
 
+    // Hide battle overlays that could block the result screen
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+    const battleView = document.getElementById('battle-view');
+    if (battleView) battleView.style.display = 'none';
+
+    // Make sure raid screen is visible (result renders inside it)
+    const raidScreenCheck = document.getElementById('raid-screen');
+    if (raidScreenCheck) raidScreenCheck.style.display = 'block';
+
     // Show result screen if we have the UI function
     if (typeof showRaidResult === 'function') {
       showRaidResult({
