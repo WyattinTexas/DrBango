@@ -905,6 +905,14 @@ const RaidBattleAdapter = {
     RaidSync.stopHeartbeat();
     if (typeof fadeOutMusic === 'function') fadeOutMusic();
 
+    // Hide the raid arena so it doesn't block the result screen
+    const raidScreen = document.getElementById('raid-screen');
+    if (raidScreen) raidScreen.style.display = 'none';
+    const battleView = document.getElementById('battle-view');
+    if (battleView) battleView.style.display = 'none';
+    const gameOverEl = document.getElementById('gameOver');
+    if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; }
+
     const victory = (winner === 'red');
     const bossName = RaidState.bossConfig?.name || 'The Boss';
     const players = RaidState.players || [];
