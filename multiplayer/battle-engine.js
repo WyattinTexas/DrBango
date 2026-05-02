@@ -752,6 +752,7 @@ function startBattle() {
       // Lower-HP ghost's entry fires first (the underdog strikes). If HP tied,
       // compute priority via the helper (which uses rarity and finally coin flip).
       // If fully symmetric (mirror match), fall back to Red-first as before.
+      if (!B || !B.red || !B.blue) return; // Guard: battle state cleaned up
       const _priority = computeDuelPriority();
       const firstTeam  = (_priority === 'blue') ? B.blue : B.red;
       const secondTeam = (_priority === 'blue') ? B.red  : B.blue;

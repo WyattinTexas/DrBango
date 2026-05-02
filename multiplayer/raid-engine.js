@@ -554,6 +554,7 @@ var _lastTurnCounter = -1;     // turn counter — distinguishes repeated same-i
 var _raidRoleTransitioning = false; // lock: prevents snapshot updates during role changes
 
 function enterRaidScreen(instanceId) {
+  _raidResultShown = false; // Reset for new raid
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
 
   // SINGLE listener — no more races between status/fighterIdx/battleState
@@ -609,7 +610,10 @@ function enterRaidScreen(instanceId) {
 /**
  * Handle raid completion — show results for both players
  */
+let _raidResultShown = false;
 function handleRaidComplete(data) {
+  if (_raidResultShown) return; // Prevent re-entry from Firebase listener re-fires
+  _raidResultShown = true;
   if (typeof hideRaidSpectatorOverlay === 'function') hideRaidSpectatorOverlay();
   if (typeof hideRaidWaitingRoom === 'function') hideRaidWaitingRoom();
   if (typeof showRaidResult === 'function') {
