@@ -17308,6 +17308,8 @@ function pvpSerializeState() {
 function pvpApplyState(state) {
   if (!B || !state) return;
   B.round = state.round;
+  if (state.phase && B.phase !== state.phase) B.phase = state.phase;
+  if (state.koSwapQueue) B.koSwapQueue = state.koSwapQueue;
 
   // v728: track whether anything actually changed, to avoid unnecessary re-renders
   let changed = false;
@@ -17459,30 +17461,40 @@ if (LIVE_PVP) {
     if (nickOverlay && nickOverlay.classList.contains('active') && B.nickKnackPending && shouldAutoResolve(B.nickKnackPending.team)) {
       setTimeout(() => { if (typeof doNickKnackSteal === 'function') doNickKnackSteal(B.nickKnackPending.team, 'moonstone'); }, 300);
     }
-    // Burn picker — auto-pick first enemy sideline
+    // Burn picker — auto-pick lowest HP enemy sideline ghost
     const burnOverlay = document.getElementById('burnOverlay');
-    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerPending && shouldAutoResolve(B.burnPickerPending.team)) {
-      const autoPickTeam = B.burnPickerPending.team === 'red' ? B.blue : B.red;
-      const target = autoPickTeam.ghosts.find((g, i) => i !== autoPickTeam.activeIdx && !g.ko);
-      if (target) {
-        const idx = autoPickTeam.ghosts.indexOf(target);
-        setTimeout(() => { if (typeof doBurnPick === 'function') doBurnPick(idx); }, 300);
+    if (burnOverlay && burnOverlay.classList.contains('active') && B.burnPickerTeam && shouldAutoResolve(B.burnPickerTeam)) {
+      const burnEnemyName = B.burnPickerTeam === 'red' ? 'blue' : 'red';
+      const burnEnemyTeam = B[burnEnemyName];
+      const burnTargets = burnEnemyTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== burnEnemyTeam.activeIdx && !x.ghost.ko);
+      if (burnTargets.length > 0) {
+        burnTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => doBurnPlace(B.burnPickerTeam, burnTargets[0].index), 300);
+      } else {
+        setTimeout(() => closeBurnPicker(), 300);
       }
     }
-    // Frostbite picker — auto-pick first enemy sideline
+    // Frostbite picker — auto-pick lowest HP enemy sideline ghost
     const frostbiteOverlay = document.getElementById('frostbiteOverlay');
-    if (frostbiteOverlay && frostbiteOverlay.classList.contains('active') && B.frostbitePickerTeam) {
-      const autoPickTeamFb = B.frostbitePickerTeam === 'red' ? B.blue : B.red;
-      const targetFb = autoPickTeamFb.ghosts.find((g, i) => i !== autoPickTeamFb.activeIdx && !g.ko);
-      if (targetFb) {
-        const idxFb = autoPickTeamFb.ghosts.indexOf(targetFb);
-        setTimeout(() => { if (typeof doFrostbitePlace === 'function') doFrostbitePlace(B.frostbitePickerTeam, idxFb); }, 300);
+    if (frostbiteOverlay && frostbiteOverlay.classList.contains('active') && B.frostbitePickerTeam && shouldAutoResolve(B.frostbitePickerTeam)) {
+      const fbEnemyName = B.frostbitePickerTeam === 'red' ? 'blue' : 'red';
+      const fbEnemyTeam = B[fbEnemyName];
+      const fbTargets = fbEnemyTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== fbEnemyTeam.activeIdx && !x.ghost.ko);
+      if (fbTargets.length > 0) {
+        fbTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => doFrostbitePlace(B.frostbitePickerTeam, fbTargets[0].index), 300);
+      } else {
+        setTimeout(() => closeFrostbitePicker(), 300);
       }
     }
-    // Firefly picker — auto-pick moonstone
+    // Firefly picker — auto-convert to moonstone
     const fireflyOverlay = document.getElementById('fireflyOverlay');
-    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPending && shouldAutoResolve(B.fireflyPending.team)) {
-      setTimeout(() => { if (typeof doFireflyChoice === 'function') doFireflyChoice('moonstone'); }, 300);
+    if (fireflyOverlay && fireflyOverlay.classList.contains('active') && B.fireflyPickerTeam && shouldAutoResolve(B.fireflyPickerTeam)) {
+      setTimeout(() => doFireflyConvert(B.fireflyPickerTeam, 'moonstone'), 300);
     }
     // Tommy — auto-yes / auto-roll chain
     const tommyOverlay = document.getElementById('tommyOverlay');
