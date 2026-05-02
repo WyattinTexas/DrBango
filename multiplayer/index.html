@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v1.63'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v1.64'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4013,6 +4013,35 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   60%{transform:scale(1.1)}
   100%{transform:scale(1.05)}
 }
+
+/* Burn badge on sideline ghosts */
+.burn-badge {
+  position:absolute; top:4px; right:4px; z-index:5;
+  background:linear-gradient(135deg,#b91c1c,#ef4444); color:#fff;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:8px;
+  box-shadow:0 0 8px rgba(239,68,68,0.7); pointer-events:none;
+  display:flex; align-items:center; gap:2px;
+}
+/* Frostbite badge on sideline ghosts */
+.frostbite-badge {
+  position:absolute; top:4px; left:4px; z-index:5;
+  background:linear-gradient(135deg,#1e6091,#60a5fa); color:#fff;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:8px;
+  box-shadow:0 0 8px rgba(96,165,250,0.7); pointer-events:none;
+  display:flex; align-items:center; gap:2px;
+}
+.sideline-slot.frostbite-pick {
+  cursor:pointer !important;
+  border-color:#60a5fa !important;
+  box-shadow:0 0 0 2px #60a5fa, 0 0 22px rgba(96,165,250,0.7) !important;
+  animation:frostbitePickPulse 0.75s ease-in-out infinite;
+  transform:scale(1.04); z-index:2;
+}
+.sideline-slot.frostbite-pick:hover { box-shadow:0 0 0 3px #60a5fa, 0 0 36px rgba(96,165,250,1) !important; }
+@keyframes frostbitePickPulse {
+  0%,100% { box-shadow:0 0 0 2px #60a5fa, 0 0 18px rgba(96,165,250,0.6); }
+  50%      { box-shadow:0 0 0 3px #60a5fa, 0 0 32px rgba(96,165,250,0.95); }
+}
 </style>
 </head>
 <body>
@@ -4764,6 +4793,16 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   </div>
 </div>
 
+<!-- Frostbite Picker — place frostbite on enemy sideline Spiritkin -->
+<div class="selene-overlay" id="frostbiteOverlay">
+  <div class="selene-modal">
+    <div class="selene-banner" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);">&#x2744;&#xFE0F; PLACE FROSTBITE</div>
+    <h3>Choose an enemy sideline ghost to Frostbite!</h3>
+    <p class="selene-sub" id="frostbitePickerSub">The selected Spiritkin loses dice when it enters battle.</p>
+    <div class="selene-options" id="frostbitePickerOptions"></div>
+  </div>
+</div>
+
 <!-- Firefly Picker — convert Magic Fireflies to any resource -->
 <div class="selene-overlay" id="fireflyOverlay">
   <div class="selene-modal">
@@ -5323,7 +5362,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v1.63';
+const BBN_VERSION = 'v1.64';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;

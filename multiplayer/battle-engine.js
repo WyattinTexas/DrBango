@@ -600,7 +600,7 @@ function makeTeam(ids) {
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
     }),
     activeIdx: 0,
-    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0 },
+    resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
     moonstoneSickness: 0,       // Mode A: permanent stacking counter
     moonstoneSicknessCount: 0,  // Mode B: escalating counter
     moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
@@ -697,6 +697,9 @@ function startBattle() {
     preRollAbilitiesFiredThisTurn: { red: false, blue: false }, moonstoneSicknessFiredThisTurn: false,
     burn: { red: {}, blue: {} },
     burnSource: { red: {}, blue: {} },
+    frostbite: { red: {}, blue: {} },
+    frostbiteSource: { red: {}, blue: {} },
+    frostbiteDicePenalty: { red: 0, blue: 0 },
     lucasKindlingBonus: { red: 0, blue: 0 },
     iceBladeForgedPermanent: { red: false, blue: false },
     flameBlade: { red: false, blue: false },
@@ -850,6 +853,39 @@ function triggerEntry(team, skipEntryEffects) {
       burnEntryFired = true;
       showAbilityCallout('BURN IMMUNE!', 'var(--rare)', `${f.name} — Immune to Burn! No damage taken.`, entryTeamName);
       log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Burn!</span> No damage taken.`);
+    }
+  }
+
+  // Frostbite — consume stacks on entry, set dice penalty for first roll only
+  // Mike (445) — Torrent: sideline immunity to Frostbite (same as Burn)
+  // Rook (416) — Immune to Frostbite: consume but apply zero penalty
+  let frostbiteEntryFired = false;
+  if (B.frostbite && B.frostbite[entryTeamName]) {
+    const activeIdx = team.activeIdx;
+    const fbCount = B.frostbite[entryTeamName][activeIdx] || 0;
+    const mikeProtectsFrostbite = hasSideline(team, 445);
+    if (fbCount > 0 && !f.ko && mikeProtectsFrostbite) {
+      // Mike's Torrent: sideline immune to Frostbite — consume, apply zero
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('TORRENT!', 'var(--rare)', `Mike — Torrent! Sideline immune to Frostbite! ${f.name} keeps all dice.`, entryTeamName);
+      log(`<span class="log-ability">Mike</span> — Torrent! <span class="log-heal">Sideline immune to Frostbite!</span> ${f.name} keeps all dice.`);
+    } else if (fbCount > 0 && !f.ko && f.id === 416) {
+      // Rook — Immune to Frostbite: consume but no dice penalty
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('FROSTBITE IMMUNE!', 'var(--rare)', `${f.name} — Immune to Frostbite! No dice lost.`, entryTeamName);
+      log(`<span class="log-ability">${f.name}</span> — <span class="log-heal">Immune to Frostbite!</span> No dice lost.`);
+    } else if (fbCount > 0 && !f.ko) {
+      if (!B.frostbiteDicePenalty) B.frostbiteDicePenalty = { red: 0, blue: 0 };
+      B.frostbiteDicePenalty[entryTeamName] = fbCount;
+      delete B.frostbite[entryTeamName][activeIdx];
+      if (B.frostbiteSource && B.frostbiteSource[entryTeamName]) delete B.frostbiteSource[entryTeamName][activeIdx];
+      frostbiteEntryFired = true;
+      showAbilityCallout('FROSTBITE!', '#3b82f6', `${f.name} enters frostbitten! -${fbCount} dice this roll!`, entryTeamName);
+      log(`<span class="log-ability" style="color:#60a5fa">${f.name}</span> — Frostbite! <span class="log-dmg">-${fbCount} dice on entry!</span>`);
     }
   }
 
@@ -1304,6 +1340,9 @@ function pvpBroadcastCommitted(team) {
     // v735: include burn state so opponent's engine knows about burn placement
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : null,
     burnSource: B.burnSource ? JSON.parse(JSON.stringify(B.burnSource)) : null,
+    // v1.64: include frostbite state so opponent's engine knows about frostbite placement
+    frostbite: B.frostbite ? { red: { ...B.frostbite.red }, blue: { ...B.frostbite.blue } } : null,
+    frostbiteSource: B.frostbiteSource ? JSON.parse(JSON.stringify(B.frostbiteSource)) : null,
     ts: Date.now()
   });
 }
@@ -1972,7 +2011,7 @@ function doGordokChoice(choice) {
   document.getElementById('gordokOverlay').classList.remove('active');
   if (choice === 'steal') {
     const gordokOppRes = gp.loseTeam.resources;
-    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed', 'burn', 'frostbite'];
     let gordokStolen = 0;
     const gordokStolenList = [];
     for (let i = 0; i < 2 && gordokStolen < 2; i++) {
@@ -2017,7 +2056,7 @@ function showTimberModal(tp, resumeCallback) {
   const discardBtn = document.getElementById('timberDiscardBtn');
   if (discardBtn) {
     const r = tp.team.resources;
-    const totalSpecials = ['surge','ice','healingSeed','luckyStone','fire','moonstone']
+    const totalSpecials = ['surge','ice','healingSeed','luckyStone','fire','moonstone','burn','frostbite']
       .reduce((sum, t) => sum + (r[t] || 0), 0);
     discardBtn.disabled = totalSpecials < 2;
   }
@@ -2829,6 +2868,137 @@ function closeBurnPicker() {
 }
 
 // ============================================================
+// POWDER (23) — Blizzard: discard 1 Ice Shard → 2 Frostbite on all enemy sideline
+// ============================================================
+function usePowderBlizzard(team) {
+  const f = active(B[team]);
+  if (!f || f.id !== 23 || f.ko) return;
+  if (!B[team].resources || B[team].resources.ice < 1) return;
+
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+  const enemyTeam = B[enemyTeamName];
+
+  // Find non-KO'd sideline ghosts
+  const sidelineGhosts = enemyTeam.ghosts
+    .map((g, i) => ({ ghost: g, index: i }))
+    .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+
+  if (sidelineGhosts.length === 0) {
+    log('<span class="log-ability">BLIZZARD</span> — No enemy sideline ghosts to frostbite!');
+    return;
+  }
+
+  // Consume 1 Ice Shard
+  B[team].resources.ice -= 1;
+
+  // Place 2 Frostbite on each enemy sideline ghost
+  if (!B.frostbite) B.frostbite = { red: {}, blue: {} };
+  if (!B.frostbite[enemyTeamName]) B.frostbite[enemyTeamName] = {};
+  if (!B.frostbiteSource) B.frostbiteSource = { red: {}, blue: {} };
+  if (!B.frostbiteSource[enemyTeamName]) B.frostbiteSource[enemyTeamName] = {};
+
+  const placerId = f.originalId || f.id;
+  let targetNames = [];
+  sidelineGhosts.forEach(({ ghost, index }) => {
+    B.frostbite[enemyTeamName][index] = (B.frostbite[enemyTeamName][index] || 0) + 2;
+    if (!B.frostbiteSource[enemyTeamName][index]) B.frostbiteSource[enemyTeamName][index] = {};
+    B.frostbiteSource[enemyTeamName][index][placerId] = (B.frostbiteSource[enemyTeamName][index][placerId] || 0) + 2;
+    targetNames.push(ghost.name);
+  });
+
+  showAbilityCallout('BLIZZARD!', '#3b82f6', `${f.name} — 1 Ice Shard → 2 Frostbite on ${targetNames.join(' & ')}!`, team);
+  log(`<span class="log-ability" style="color:#60a5fa">${f.name}</span> — Blizzard! Discarded 1 Ice Shard → <span class="log-dmg">2 Frostbite on ${targetNames.join(' & ')}!</span>`);
+
+  // Cameron (25) — Unstoppable Force: opponent used a special
+  triggerCameronSpecialWatch(team);
+
+  renderBattle();
+  pvpBroadcastCommitted(team);
+}
+
+// ============================================================
+// FROSTBITE — Place dice debuff on enemy sideline ghosts
+// ============================================================
+function showFrostbitePicker(team) {
+  const t = B[team];
+  const fbCount = t.resources.frostbite || 0;
+  if (fbCount <= 0) return;
+
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+  const enemyTeam = B[enemyTeamName];
+
+  const sidelineGhosts = enemyTeam.ghosts
+    .map((g, i) => ({ ghost: g, index: i }))
+    .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+
+  if (sidelineGhosts.length === 0) {
+    log('<span class="log-ability">FROSTBITE</span> — No enemy sideline ghosts to frostbite!');
+    t.resources.frostbite = 0;
+    showToast('No sideline targets — Frostbite fizzled!');
+    renderBattle();
+    return;
+  }
+
+  B.frostbitePickerTeam = team;
+
+  const optionsEl = document.getElementById('frostbitePickerOptions');
+  let html = '';
+  sidelineGhosts.forEach(({ ghost, index }) => {
+    const existingFb = (B.frostbite && B.frostbite[enemyTeamName] && B.frostbite[enemyTeamName][index]) || 0;
+    const fbLabel = existingFb > 0 ? ` (${existingFb} Frostbite already)` : '';
+    html += `<button class="selene-opt" onclick="doFrostbitePlace('${team}',${index})" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);">❄️ ${ghost.name} — ${ghost.hp}/${ghost.maxHp} HP${fbLabel}</button>`;
+  });
+  html += `<button class="selene-opt" onclick="closeFrostbitePicker()" style="background:linear-gradient(135deg,#374151,#1f2937);">✖ Cancel</button>`;
+  optionsEl.innerHTML = html;
+  document.getElementById('frostbitePickerSub').innerHTML = `You have <b>${fbCount}</b> Frostbite to place. Each stack removes 1 die when the ghost enters battle (one roll only).`;
+  document.getElementById('frostbiteOverlay').classList.add('active');
+}
+
+function doFrostbitePlace(team, ghostIndex) {
+  const t = B[team];
+  const enemyTeamName = team === 'red' ? 'blue' : 'red';
+
+  if (!t.resources.frostbite || t.resources.frostbite <= 0) { closeFrostbitePicker(); return; }
+
+  t.resources.frostbite--;
+  if (!B.frostbite) B.frostbite = { red: {}, blue: {} };
+  if (!B.frostbite[enemyTeamName]) B.frostbite[enemyTeamName] = {};
+  B.frostbite[enemyTeamName][ghostIndex] = (B.frostbite[enemyTeamName][ghostIndex] || 0) + 1;
+
+  // Track which Spiritkin placed this frostbite
+  const fbPlacer = active(B[team]);
+  const fbPlacerId = fbPlacer ? (fbPlacer.originalId || fbPlacer.id) : 0;
+  if (!B.frostbiteSource) B.frostbiteSource = { red: {}, blue: {} };
+  if (!B.frostbiteSource[enemyTeamName]) B.frostbiteSource[enemyTeamName] = {};
+  if (!B.frostbiteSource[enemyTeamName][ghostIndex]) B.frostbiteSource[enemyTeamName][ghostIndex] = {};
+  B.frostbiteSource[enemyTeamName][ghostIndex][fbPlacerId] = (B.frostbiteSource[enemyTeamName][ghostIndex][fbPlacerId] || 0) + 1;
+
+  const targetGhost = B[enemyTeamName].ghosts[ghostIndex];
+  const totalFb = B.frostbite[enemyTeamName][ghostIndex];
+  log(`<span class="log-ability">FROSTBITE!</span> placed on <span class="log-dmg">${targetGhost.name}</span>! (${totalFb} total)`);
+  showAbilityCallout('FROSTBITE!', '#3b82f6', `${targetGhost.name} has been marked! -${totalFb} dice on entry!`, team);
+
+  // Cameron (25) — Unstoppable Force: opponent used a special (Frostbite)
+  triggerCameronSpecialWatch(team);
+
+  renderBattle();
+  // v1.64: broadcast frostbite state so opponent's engine knows about it
+  pvpBroadcastCommitted(team);
+
+  // If still have frostbite to place, re-open picker after a brief delay
+  if (t.resources.frostbite > 0) {
+    setTimeout(() => showFrostbitePicker(team), 800);
+  } else {
+    closeFrostbitePicker();
+  }
+}
+
+function closeFrostbitePicker() {
+  document.getElementById('frostbiteOverlay').classList.remove('active');
+  B.frostbitePickerTeam = null;
+}
+
+// ============================================================
 // MAGIC FIREFLIES — Convert wildcard firefly to any resource
 // ============================================================
 function showFireflyPicker(team) {
@@ -2845,7 +3015,8 @@ function showFireflyPicker(team) {
     { key: 'moonstone', label: 'Moonstone', emoji: '🌙' },
     { key: 'healingSeed', label: 'Healing Seed', emoji: '🌱' },
     { key: 'surge', label: 'Surge', emoji: '⚡' },
-    { key: 'burn', label: 'Burn', emoji: '🔥' }
+    { key: 'burn', label: 'Burn', emoji: '🔥' },
+    { key: 'frostbite', label: 'Frostbite', emoji: '❄️' }
   ];
 
   const optionsEl = document.getElementById('fireflyOptions');
@@ -2875,7 +3046,7 @@ function doFireflyConvert(team, resourceKey) {
   if (!t.resources[resourceKey]) t.resources[resourceKey] = 0;
   t.resources[resourceKey]++;
 
-  const labelMap = { fire:'Sacred Fire', ice:'Ice Shard', luckyStone:'Lucky Stone', moonstone:'Moonstone', healingSeed:'Healing Seed', surge:'Surge', burn:'Burn' };
+  const labelMap = { fire:'Sacred Fire', ice:'Ice Shard', luckyStone:'Lucky Stone', moonstone:'Moonstone', healingSeed:'Healing Seed', surge:'Surge', burn:'Burn', frostbite:'Frostbite' };
   const resLabel = labelMap[resourceKey] || resourceKey;
   log(`<span class="log-ability">MAGIC FIREFLIES!</span> Converted to <span class="log-ms">${resLabel}</span>!`);
   showAbilityCallout('MAGIC FIREFLIES!', '#ffd700', `Converted to ${resLabel}!`, team);
@@ -5460,7 +5631,7 @@ function disableRollButtons() {
 // ============================================================
 // HAND LIMIT MODE — cap specials at B.HAND_LIMIT (default 3)
 // ============================================================
-const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn'];
+const HAND_RESOURCE_KEYS = ['moonstone','ice','fire','surge','healingSeed','luckyStone','firefly','burn','frostbite'];
 const HAND_RESOURCE_LABELS = {
   moonstone: { emoji:'🌙', name:'Moonstone' },
   ice:       { emoji:'❄️', name:'Ice Shard' },
@@ -5470,6 +5641,7 @@ const HAND_RESOURCE_LABELS = {
   luckyStone:{ emoji:'🍀', name:'Lucky Stone' },
   firefly:   { emoji:'✨', name:'Firefly' },
   burn:      { emoji:'💥', name:'Burn' },
+  frostbite: { emoji:'❄️', name:'Frostbite' },
 };
 
 function getHandSize(team) {
@@ -6252,7 +6424,7 @@ function doPreRollSetup() {
         return;
       }
       const r = oppTeam.resources;
-      const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0);
+      const totalSpecials = (r.ice||0) + (r.fire||0) + (r.surge||0) + (r.moonstone||0) + (r.healingSeed||0) + (r.luckyStone||0) + (r.burn||0) + (r.frostbite||0);
       if (totalSpecials < 2) {
         // Not enough specials — forced to lose die
         B.timberDieReduction[oppTeamName] = true;
@@ -6971,6 +7143,21 @@ function doPreRollSetup() {
     }
   });
 
+  // Frostbite dice penalty — consumed on first roll after entry (one roll only)
+  if (B.frostbiteDicePenalty) {
+    ['red', 'blue'].forEach(tName => {
+      const penalty = B.frostbiteDicePenalty[tName] || 0;
+      if (penalty > 0) {
+        if (tName === 'red') redCount = Math.max(0, redCount - penalty);
+        else blueCount = Math.max(0, blueCount - penalty);
+        const penaltyF = active(B[tName]);
+        preRollCallouts.push(['FROSTBITTEN!', '#3b82f6', `${penaltyF.name} — Frostbite! -${penalty} dice this roll!`, tName]);
+        log(`<span class="log-ability" style="color:#60a5fa">${penaltyF.name}</span> — Frostbitten! -${penalty} dice this roll.`);
+        B.frostbiteDicePenalty[tName] = 0; // consumed — one roll only
+      }
+    });
+  }
+
   // Patrick (10) — Stone Form: "Don't roll." Forced LAST so no other modifier restores dice.
   // With 0 dice, classify returns type:'none' which auto-loses to any real roll. The existing
   // Stone Form singles-counter at resolveRound ~8055 still fires: when opponent rolled singles,
@@ -7201,6 +7388,22 @@ function doPostRollAndResolve(redDice, blueDice) {
         }, tNameChamp);
         checkKnightEffects(tNameChamp, f.name);
       }
+    }
+  });
+
+  // Cameron (25) — Winter's Harvest: roll doubles (win or lose) → +1 Frostbite + 1 Ice Shard
+  [B.red, B.blue].forEach(team => {
+    const fCam = active(team);
+    const tNameCam = team === B.red ? 'red' : 'blue';
+    const camDice = team === B.red ? redDice : blueDice;
+    if (fCam.id === 25 && !fCam.ko && camDice && classify(camDice).type === 'doubles') {
+      if (!team.resources.frostbite) team.resources.frostbite = 0;
+      team.resources.frostbite += 1;
+      team.resources.ice = (team.resources.ice || 0) + 1;
+      creditGhost(tNameCam, 25, 'ice', 1);
+      queueAbility("WINTER'S HARVEST!", '#3b82f6', `${fCam.name} — Doubles! +1 Frostbite + 1 Ice Shard!`, () => { renderBattle(); }, tNameCam);
+      log(`<span class="log-ability" style="color:#60a5fa">${fCam.name}</span> — Winter's Harvest! Doubles → +1 Frostbite + 1 Ice Shard!`);
+      checkKnightEffects(tNameCam, fCam.name);
     }
   });
 
@@ -10844,6 +11047,21 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">${wF.name}</span> — Snowball! Doubles win → +2 damage!`);
   }
 
+  // Calvin & Anna (91) — Frost Surge: +1 Ice Shard for each Frostbite stack on enemy sideline (on win)
+  let calvinAnnaIceGain = 0;
+  if (wF.id === 91) {
+    const enemyTeamName = winTeamName === 'red' ? 'blue' : 'red';
+    let totalFrostbite = 0;
+    if (B.frostbite && B.frostbite[enemyTeamName]) {
+      Object.values(B.frostbite[enemyTeamName]).forEach(count => { totalFrostbite += count; });
+    }
+    if (totalFrostbite > 0) {
+      calvinAnnaIceGain = totalFrostbite;
+      collectKC(winTeamName, wF.name);
+      log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Frost Surge! ${totalFrostbite} Frostbite on enemy sideline → +${totalFrostbite} Ice Shard${totalFrostbite > 1 ? 's' : ''}!`);
+    }
+  }
+
   // Kaylee (453) — Slipstream: dice stealing handled pre-winner in _resolveRoundImpl
   const slipstreamBonus = 0; // kept for callout compatibility
 
@@ -11248,6 +11466,31 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">Gary</span> (${loseLoc}) — Lucky Novice! ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''} → +${garyIceLose} Ice Shards!`);
   }
 
+  // Pelter (86) — Snowball Fight: Sideline & In Play, gain 1 Frostbite for each 1 rolled (win or lose)
+  const winPelterActive = wF.id === 86 && !wF.ko;
+  const winPelterSide = hasSideline(winTeam, 86);
+  const pelterOnesWin = ((winPelterActive || (winPelterSide && !corneliusBlocksRally)) && winDice) ? winDice.filter(d => d === 1).length : 0;
+  if (pelterOnesWin > 0) {
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    winTeam.resources.frostbite += pelterOnesWin;
+    const pelterG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
+    const pelterLoc = winPelterActive ? '' : ' (sideline)';
+    collectKC(winTeamName, pelterG.name, winPelterSide ? pelterG : undefined);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterG.name}${pelterLoc}</span> — Snowball Fight! ${pelterOnesWin} rolled 1${pelterOnesWin > 1 ? 's' : ''} → +${pelterOnesWin} Frostbite!`);
+  }
+  const losePelterActive = lF.id === 86 && !lF.ko;
+  const losePelterSide = hasSideline(loseTeam, 86);
+  const corneliusBlocksPelterLose = hasSideline(winTeam, 45);
+  const pelterOnesLose = ((losePelterActive || (losePelterSide && !corneliusBlocksPelterLose)) && loseDice) ? loseDice.filter(d => d === 1).length : 0;
+  if (pelterOnesLose > 0) {
+    if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+    loseTeam.resources.frostbite += pelterOnesLose;
+    const pelterGL = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
+    const pelterLocL = losePelterActive ? '' : ' (sideline)';
+    collectKC(loseTeamName, pelterGL.name, losePelterSide ? pelterGL : undefined);
+    log(`<span class="log-ability" style="color:#60a5fa">${pelterGL.name}${pelterLocL}</span> — Snowball Fight! ${pelterOnesLose} rolled 1${pelterOnesLose > 1 ? 's' : ''} → +${pelterOnesLose} Frostbite!`);
+  }
+
   // Bandit Pete (93) — Bandit: while on the sideline, if either player rolls only 2 dice, active ghost gains +3 damage.
   // Frost Valley sideline booster — punishes die-drain builds (Piper, Hugo, Outlaw) by turning a 2-die roll into a damage trigger.
   let banditPeteTriggered = false;
@@ -11614,7 +11857,7 @@ function _resolveRoundImpl() {
   let gordokStole = false;
   if (wF.id === 430 && !wF.ko && dmg > 0) {
     const gordokOppRes = loseTeam.resources;
-    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed'];
+    const gordokResTypes = ['ice', 'fire', 'surge', 'luckyStone', 'moonstone', 'healingSeed', 'burn', 'frostbite'];
     const gordokTotalRes = gordokResTypes.reduce((sum, r) => sum + (gordokOppRes[r] || 0), 0);
     if (gordokTotalRes > 0) {
       if (autoPlayRunning) {
@@ -12300,6 +12543,16 @@ function _resolveRoundImpl() {
     if (sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyIceWin} Ice Shards! (${loseTeam.resources.ice + garyIceWin} total)`, () => { loseTeam.resources.ice += garyIceWin; creditGhost(loseTeamName, 33, 'ice', garyIceWin); renderBattle(); }, loseTeamName);
     // Knight reactions already collected via collectKC at game-state section (line ~9526) — do NOT double-fire here
   }
+  // Pelter (86) — Snowball Fight: win-team callout (frostbite already added in game-state section)
+  if (pelterOnesWin > 0) {
+    const _pelterWinG = winPelterActive ? wF : (getSidelineGhost(winTeam, 86) || { name: 'Pelter' });
+    const _pelterWinLoc = winPelterActive ? 'active' : 'sideline';
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterWinG.name} (${_pelterWinLoc}) — ${pelterOnesWin} rolled 1${pelterOnesWin > 1 ? 's' : ''}! +${pelterOnesWin} Frostbite!`, () => { if (!winPelterActive) popSidelineCard(winTeam, 86); renderBattle(); }, winTeamName);
+    if (sandwichForLose) {
+      if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +${pelterOnesWin} Frostbite!`, () => { loseTeam.resources.frostbite += pelterOnesWin; renderBattle(); }, loseTeamName);
+    }
+  }
   if (banditPeteTriggered) {
     const bpWhoQ = winDice && winDice.length === 2 ? 'Your ghost rolled only 2 dice!' : 'Opponent rolled only 2 dice!';
     queueAbility('BANDIT!', 'var(--rare)', `Bandit Pete (sideline) — ${bpWhoQ} ${banditPeteBaseDmg} + 3 = ${dmg} damage!`, null, winTeamName);
@@ -12584,6 +12837,24 @@ function _resolveRoundImpl() {
   if (wF.id === 206 && !wF.ko) { queueAbility('ICE SHARD!', 'var(--ghost-rare)', `${wF.name} — Win! +1 Ice Shard! (${winTeam.resources.ice + 1} total)`, () => { winTeam.resources.ice++; creditGhost(winTeamName, 206, 'ice', 1); renderBattle(); }, winTeamName); }
   // Zain ICE SHARD knight reactions already collected via collectKC at game-state section (line ~10082) — do NOT double-fire here
   if (wF.id === 206 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Ice Shard! +1 Ice Shard! (${loseTeam.resources.ice + 1} total)`, () => { loseTeam.resources.ice++; creditGhost(loseTeamName, 33, 'ice', 1); renderBattle(); }, loseTeamName);
+  // Calvin & Anna (91) — Frost Surge: win → +1 Frostbite
+  // No !wF.ko guard — C&A still earns Frostbite even if KO'd by a counter die (Balatron/Sky/Patrick)
+  if (wF.id === 91) {
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    queueAbility('FROST SURGE!', '#3b82f6', `${wF.name} — Win! +1 Frostbite!`, () => { winTeam.resources.frostbite += 1; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability" style="color:#60a5fa">${wF.name}</span> — Frost Surge! +1 Frostbite!`);
+    if (sandwichForLose) {
+      if (!loseTeam.resources.frostbite) loseTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Frost Surge! +1 Frostbite!`, () => { loseTeam.resources.frostbite += 1; renderBattle(); }, loseTeamName);
+    }
+  }
+  // Calvin & Anna (91) — Frost Surge: +1 Ice Shard per Frostbite stack on enemy sideline (callout)
+  if (calvinAnnaIceGain > 0) {
+    queueAbility('FROST SURGE!', '#3b82f6', `${wF.name} — ${calvinAnnaIceGain} Frostbite on enemy sideline → +${calvinAnnaIceGain} Ice Shard${calvinAnnaIceGain > 1 ? 's' : ''}!`, () => { winTeam.resources.ice += calvinAnnaIceGain; creditGhost(winTeamName, 91, 'ice', calvinAnnaIceGain); renderBattle(); }, winTeamName);
+    if (sandwichForLose) {
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Frost Surge! +${calvinAnnaIceGain} Ice Shards!`, () => { loseTeam.resources.ice += calvinAnnaIceGain; renderBattle(); }, loseTeamName);
+    }
+  }
   // Dylan (301) — Stained Glass: Sideline & In Play, winning rolls gain +1 Burn
   if (hasDylanWin) {
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
@@ -12628,10 +12899,11 @@ function _resolveRoundImpl() {
   if (wF.id === 58 && !wF.ko) { queueAbility('BURNING SOUL!', 'var(--uncommon)', `${wF.name} — Win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName); }
   // Ashley knight reactions already collected via collectKC at game-state section (line ~10081) — do NOT double-fire here
   if (wF.id === 58 && !wF.ko && sandwichForLose) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Burning Soul! +1 Sacred Fire! (${loseTeam.resources.fire + 1} total)`, () => { loseTeam.resources.fire++; renderBattle(); }, loseTeamName);
-  // Piper (107) — Slick Coat: win with singles → gain 1 Sacred Fire
+  // Piper (107) — Sacred Waters: win with singles → gain 1 Sacred Fire + 1 Frostbite
   if (wF.id === 107 && !wF.ko && wR.type === 'singles') {
-    queueAbility('SLICK COAT!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 Sacred Fire! (${winTeam.resources.fire + 1} total)`, () => { winTeam.resources.fire++; renderBattle(); }, winTeamName);
-    log(`<span class="log-ability">${wF.name}</span> — Slick Coat! Singles win → <span class="log-ms">+1 Sacred Fire!</span>`);
+    if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+    queueAbility('SACRED WATERS!', 'var(--ghost-rare)', `${wF.name} — Singles win! +1 Sacred Fire + 1 Frostbite!`, () => { winTeam.resources.fire++; winTeam.resources.frostbite++; renderBattle(); }, winTeamName);
+    log(`<span class="log-ability">${wF.name}</span> — Sacred Waters! Singles win → <span class="log-ms">+1 Sacred Fire</span> + <span class="log-ice">+1 Frostbite!</span>`);
     collectKC(winTeamName, wF.name);
   }
   // Opa (48) — Rest: win → gain +1 HP (overclocks! Rule #9 — do NOT add Math.min cap)
@@ -12771,6 +13043,16 @@ function _resolveRoundImpl() {
     queueAbility('LUCKY NOVICE!', 'var(--rare)', `Gary (${_garyLoseLoc}) — ${garyOnesLose} rolled 1${garyOnesLose > 1 ? 's' : ''}! +${garyIceLose} Ice Shards! (${garyLoseIceTotal} total)`, () => { loseTeam.resources.ice += garyIceLose; creditGhost(loseTeamName, _garyLoseId, 'ice', garyIceLose); renderBattle(); }, loseTeamName);
     if (sandwichForWin) queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Lucky Novice! +${garyIceLose} Ice Shards! (${winTeam.resources.ice + garyIceLose} total)`, () => { winTeam.resources.ice += garyIceLose; creditGhost(winTeamName, 33, 'ice', garyIceLose); renderBattle(); }, winTeamName);
     // Gary lose-path knight reactions already collected via collectKC at game-state section (line ~9531) — do NOT double-fire here
+  }
+  // Pelter (86) — Snowball Fight: lose-team callout (frostbite already added in game-state section)
+  if (pelterOnesLose > 0) {
+    const _pelterLoseG = losePelterActive ? lF : (getSidelineGhost(loseTeam, 86) || { name: 'Pelter' });
+    const _pelterLoseLoc = losePelterActive ? 'active' : 'sideline';
+    queueAbility('SNOWBALL FIGHT!', '#3b82f6', `${_pelterLoseG.name} (${_pelterLoseLoc}) — ${pelterOnesLose} rolled 1${pelterOnesLose > 1 ? 's' : ''}! +${pelterOnesLose} Frostbite!`, () => { if (!losePelterActive) popSidelineCard(loseTeam, 86); renderBattle(); }, loseTeamName);
+    if (sandwichForWin) {
+      if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+      queueAbility('DEPENDABLE!', 'var(--common)', `Sandwiches — mirrors Snowball Fight! +${pelterOnesLose} Frostbite!`, () => { winTeam.resources.frostbite += pelterOnesLose; renderBattle(); }, winTeamName);
+    }
   }
 
   // On-lose callouts — onShow applies the surge grant with the splash
@@ -12924,17 +13206,18 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Nyx & Bessie Moo! Caw! blocked!`);
   }
 
-  // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite
+  // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite (includes Frostbite)
   if (wF.id === 432 && !wF.ko && lF.ko) {
-    queueAbility('GRAND SPOILS!', 'var(--legendary)', `${wF.name} — KO! Grand Spoils: +1 Fire, +2 Ice, +1 Lucky, +1 Moon, +2 Seed!`, () => {
+    queueAbility('GRAND SPOILS!', 'var(--legendary)', `${wF.name} — KO! Grand Spoils: +1 Fire, +2 Ice, +1 Frostbite, +1 Moon, +2 Seed!`, () => {
       winTeam.resources.fire += 1;
       winTeam.resources.ice += 2;
-      winTeam.resources.luckyStone += 1;
+      if (!winTeam.resources.frostbite) winTeam.resources.frostbite = 0;
+      winTeam.resources.frostbite += 1;
       winTeam.resources.moonstone += 1;
       winTeam.resources.healingSeed += 2;
       renderBattle();
     }, winTeamName);
-    log(`<span class="log-ability">${wF.name}</span> — Grand Spoils! KO → <span class="log-ms">+1🔥 +2❄️ +1🍀 +1🌙 +2🌱!</span>`);
+    log(`<span class="log-ability">${wF.name}</span> — Grand Spoils! KO → <span class="log-ms">+1🔥 +2❄️ +1❄️FB +1🌙 +2🌱!</span>`);
     checkKnightEffects(winTeamName, wF.name);
   }
 
@@ -14401,6 +14684,11 @@ function renderBattle() {
           const bc = B.burn[team][realIdx];
           slCardHtml += `<div class="burn-badge">🔥${bc}</div>`;
         }
+        // Frostbite badge: show how much frostbite is stacked on this sideline ghost
+        if (B.frostbite && B.frostbite[team] && B.frostbite[team][realIdx]) {
+          const fc = B.frostbite[team][realIdx];
+          slCardHtml += `<div class="frostbite-badge">❄️${fc}</div>`;
+        }
         el.innerHTML = slCardHtml;
         el.onclick = isPick ? () => doKoSwap(team, realIdx) : null;
       } else {
@@ -14480,7 +14768,11 @@ function renderBattle() {
       const burnClick = isReady ? `onclick="showBurnPicker('${team}')"` : '';
       rh += `<div class="res-tile fire ${isReady?'clickable':''}" ${burnClick} title="Burn: ${r.burn} available — click to place on an enemy sideline ghost (deals damage on entry)"><span class="res-main">🔥</span><span class="res-count">${r.burn}</span><span class="res-label">BURN</span></div>`;
     }
-    // Burn placed indicator removed — burn disappears when spent, no need to track visually
+    // Frostbite resource pool — clickable to place on enemy sideline ghosts (pre-roll only)
+    if (r.frostbite > 0) {
+      const fbClick = isReady ? `onclick="showFrostbitePicker('${team}')"` : '';
+      rh += `<div class="res-tile ice ${isReady?'clickable':''}" ${fbClick} title="Frostbite: ${r.frostbite} available — click to place on an enemy sideline ghost (loses dice on entry)"><span class="res-main">❄️</span><span class="res-count">${r.frostbite}</span><span class="res-label">FROSTBITE</span></div>`;
+    }
     // Happy Crystal (208) — sacrifice tile
     if (isReady && f.id === 208 && !f.ko) {
       rh += `<div class="res-tile moonstone clickable" onclick="sacrificeHappyCrystal('${team}')" title="Sacrifice for 1 Moonstone"><span class="res-main">💀</span><span class="res-label">Sac</span></div>`;
@@ -14502,7 +14794,7 @@ function renderBattle() {
       }
     }
     // Snapshot current resources for flash detection
-    const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0 };
+    const newSnap = { moonstone:r.moonstone, ice:totalIce, fire:totalFire, surge:r.surge+c.surge, healingSeed:r.healingSeed, luckyStone:r.luckyStone, firefly:r.firefly||0, frostbite:r.frostbite||0 };
     const prev = prevResources[team] || {};
     document.getElementById(`${team}-resources`).innerHTML = rh;
     // Flash any resource tile that increased
@@ -14638,6 +14930,10 @@ function renderBattle() {
       // Castle Gardener (442) — Cultivate: pre-roll button to trade seeds for fire
       if (f.id === 442 && !f.ko && B[team].resources && B[team].resources.healingSeed >= 1) {
         html += `<button class="ability-btn pressure" onclick="useCultivate('${team}')" style="border-color:#40916c;color:#40916c;font-weight:bold;">🌱 CULTIVATE! (1 Seed → 2 Sacred Fire)</button>`;
+      }
+      // Powder (23) — Blizzard: discard 1 Ice Shard → 2 Frostbite on all enemy sideline
+      if (f.id === 23 && !f.ko && B[team].resources && B[team].resources.ice >= 1) {
+        html += `<button class="ability-btn pressure" onclick="usePowderBlizzard('${team}')" style="border-color:#3b82f6;color:#3b82f6;font-weight:bold;">❄️ BLIZZARD! (1 Ice → 2 Frostbite on all sideline)</button>`;
       }
       // No voluntary swap — swapping only happens via abilities (Tyson Hop, Pressure) or KO
     }
@@ -15771,6 +16067,24 @@ function aiTick() {
     }
   }
 
+  // Frostbite picker overlay: auto-pick best target (lowest HP sideline ghost)
+  if (B.frostbitePickerTeam === 'blue') {
+    const fbOverlay = document.getElementById('frostbiteOverlay');
+    if (fbOverlay && fbOverlay.classList.contains('active')) {
+      const enemyTeam = B.red;
+      const sidelineTargets = enemyTeam.ghosts
+        .map((g, i) => ({ ghost: g, index: i }))
+        .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
+      if (sidelineTargets.length > 0) {
+        sidelineTargets.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        setTimeout(() => doFrostbitePlace('blue', sidelineTargets[0].index), 500);
+      } else {
+        setTimeout(() => closeFrostbitePicker(), 400);
+      }
+      return;
+    }
+  }
+
   // Firefly picker overlay: convert to moonstone (best default)
   if (B.fireflyPickerTeam === 'blue') {
     const fireflyOverlay = document.getElementById('fireflyOverlay');
@@ -15945,6 +16259,41 @@ function aiCommitSpecials(team) {
       log(`<span class="log-ability">BURN</span> — no enemy sideline targets, ${r.burn} Burn fizzles!`);
       r.burn = 0;
     }
+  }
+
+  // --- Frostbite: place all frostbite on enemy sideline ghosts ---
+  if ((r.frostbite || 0) > 0) {
+    const enemyTeamNameFb = team === 'red' ? 'blue' : 'red';
+    const enemyTeamFb = B[enemyTeamNameFb];
+    const sidelineTargetsFb = enemyTeamFb.ghosts
+      .map((g, i) => ({ ghost: g, index: i }))
+      .filter(x => x.index !== enemyTeamFb.activeIdx && !x.ghost.ko);
+    if (sidelineTargetsFb.length > 0) {
+      while ((r.frostbite || 0) > 0 && sidelineTargetsFb.length > 0) {
+        sidelineTargetsFb.sort((a, b) => a.ghost.hp - b.ghost.hp);
+        const target = sidelineTargetsFb[0];
+        r.frostbite--;
+        if (!B.frostbite) B.frostbite = { red: {}, blue: {} };
+        if (!B.frostbite[enemyTeamNameFb]) B.frostbite[enemyTeamNameFb] = {};
+        B.frostbite[enemyTeamNameFb][target.index] = (B.frostbite[enemyTeamNameFb][target.index] || 0) + 1;
+        const fbPlacer = active(B[team]);
+        const fbPlacerId = fbPlacer ? (fbPlacer.originalId || fbPlacer.id) : 0;
+        if (!B.frostbiteSource) B.frostbiteSource = { red: {}, blue: {} };
+        if (!B.frostbiteSource[enemyTeamNameFb]) B.frostbiteSource[enemyTeamNameFb] = {};
+        if (!B.frostbiteSource[enemyTeamNameFb][target.index]) B.frostbiteSource[enemyTeamNameFb][target.index] = {};
+        B.frostbiteSource[enemyTeamNameFb][target.index][fbPlacerId] = (B.frostbiteSource[enemyTeamNameFb][target.index][fbPlacerId] || 0) + 1;
+        const totalFb = B.frostbite[enemyTeamNameFb][target.index];
+        log(`<span class="log-ability">FROSTBITE!</span> AI placed on <span class="log-dmg">${target.ghost.name}</span>! (${totalFb} total)`);
+      }
+    } else {
+      log(`<span class="log-ability">FROSTBITE</span> — no enemy sideline targets, ${r.frostbite} Frostbite fizzles!`);
+      r.frostbite = 0;
+    }
+  }
+
+  // --- Powder (23) Blizzard: AI auto-uses if Powder is active with ice ---
+  if (f.id === 23 && !f.ko && (r.ice || 0) >= 1) {
+    usePowderBlizzard(team);
   }
 
   // --- Hex (Mable 446): spend burn for -1 enemy die + sacred fire ---
@@ -16406,6 +16755,13 @@ function setupLivePvP() {
       if (!B.burn.blue) B.burn.blue = {};
     }
     if (data.burnSource) B.burnSource = data.burnSource;
+    // v1.64: sync frostbite state
+    if (data.frostbite) {
+      B.frostbite = data.frostbite;
+      if (!B.frostbite.red) B.frostbite.red = {};
+      if (!B.frostbite.blue) B.frostbite.blue = {};
+    }
+    if (data.frostbiteSource) B.frostbiteSource = data.frostbiteSource;
     renderBattle();
     playSfx('sfxSpecial', 0.15); // subtle audio cue that opponent is doing something
   });
@@ -16830,6 +17186,7 @@ function pvpSerializeState() {
     sophiaMaskActive: B.sophiaMaskActive ? { ...B.sophiaMaskActive } : { red: false, blue: false },
     duelLastLoser: B.duelLastLoser || null,
     burn: B.burn ? { red: { ...B.burn.red }, blue: { ...B.burn.blue } } : { red: {}, blue: {} },
+    frostbite: B.frostbite ? { red: { ...B.frostbite.red }, blue: { ...B.frostbite.blue } } : { red: {}, blue: {} },
     log: B.log.slice(0, 20),
     ts: Date.now()
   };
@@ -16883,6 +17240,7 @@ function pvpApplyState(state) {
   if (state.sophiaMaskActive) B.sophiaMaskActive = state.sophiaMaskActive;
   if (state.duelLastLoser !== undefined) B.duelLastLoser = state.duelLastLoser;
   if (state.burn) B.burn = state.burn;
+  if (state.frostbite) B.frostbite = state.frostbite;
   if (state.log) B.log = state.log;
 
   return changed; // v728: caller can skip renderBattle() if nothing changed
@@ -16993,6 +17351,16 @@ if (LIVE_PVP) {
       if (target) {
         const idx = autoPickTeam.ghosts.indexOf(target);
         setTimeout(() => { if (typeof doBurnPick === 'function') doBurnPick(idx); }, 300);
+      }
+    }
+    // Frostbite picker — auto-pick first enemy sideline
+    const frostbiteOverlay = document.getElementById('frostbiteOverlay');
+    if (frostbiteOverlay && frostbiteOverlay.classList.contains('active') && B.frostbitePickerTeam) {
+      const autoPickTeamFb = B.frostbitePickerTeam === 'red' ? B.blue : B.red;
+      const targetFb = autoPickTeamFb.ghosts.find((g, i) => i !== autoPickTeamFb.activeIdx && !g.ko);
+      if (targetFb) {
+        const idxFb = autoPickTeamFb.ghosts.indexOf(targetFb);
+        setTimeout(() => { if (typeof doFrostbitePlace === 'function') doFrostbitePlace(B.frostbitePickerTeam, idxFb); }, 300);
       }
     }
     // Firefly picker — auto-pick moonstone
