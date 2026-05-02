@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v1.62'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v1.63'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -5323,7 +5323,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v1.62';
+const BBN_VERSION = 'v1.63';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6666,10 +6666,15 @@ function closeResultModal() {
   // Show reward card reveal if there are pending rewards
   if (window._pendingRewardCards && window._pendingRewardCards.length > 0) {
     const cards = window._pendingRewardCards;
+    const title = window._pendingRewardCardsTitle || 'Victory Rewards!';
+    const cb = window._pendingRewardCardsCallback;
     window._pendingRewardCards = null;
+    window._pendingRewardCardsTitle = null;
+    window._pendingRewardCardsCallback = null;
     setTimeout(() => {
-      showRewardCards(cards, 'Victory Rewards!', () => {
+      showRewardCards(cards, title, () => {
         renderCollection();
+        if (cb) cb();
         checkDailyCompletionPack();
       });
     }, 400);
@@ -8311,20 +8316,24 @@ async function processChampionResult(result) {
       userProfile.dailyChallengeWon = true;
       userProfile.dailyChallengeDate = dateKey;
       userProfile.collection = updatedCollection;
-      showRewardCards(bonusCards, 'Champion & Rival Defeated!', () => {
+      // Defer reward cards to after the result modal closes
+      window._pendingRewardCards = bonusCards;
+      window._pendingRewardCardsTitle = 'Champion & Rival Defeated!';
+      window._pendingRewardCardsCallback = () => {
         renderDailyChallenge();
         renderCollection();
+        renderChampion();
         db.ref('mp/leaderboard').once('value', snap => renderLeaderboard(snap.val()));
-      });
+      };
     }
+    renderChampion();
   } else {
     // Champion defended
     if (currentChampion.type === 'player') {
       await incrementChampionDefenses();
     }
+    renderChampion();
   }
-
-  renderChampion();
 }
 
 // Also handle champion claims from daily rival wins

@@ -2752,7 +2752,10 @@ function showBurnPicker(team) {
     .filter(x => x.index !== enemyTeam.activeIdx && !x.ghost.ko);
 
   if (sidelineGhosts.length === 0) {
-    log('<span class="log-ability">BURN</span> — No enemy sideline ghosts to burn!');
+    log('<span class="log-ability">BURN</span> — No enemy sideline ghosts to burn! Burn fizzles.');
+    t.resources.burn = 0;
+    showToast('No sideline targets — Burn fizzled!');
+    renderBattle();
     return;
   }
 
@@ -15937,6 +15940,10 @@ function aiCommitSpecials(team) {
           log(`<span class="log-ability">${mableActive.name}</span> — Hex! Burn placed → enemy -1 die next roll!`);
         }
       }
+    } else {
+      // No sideline targets — discard unplaceable burn so it doesn't block the game
+      log(`<span class="log-ability">BURN</span> — no enemy sideline targets, ${r.burn} Burn fizzles!`);
+      r.burn = 0;
     }
   }
 
