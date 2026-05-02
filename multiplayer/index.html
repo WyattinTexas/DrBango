@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v1.60'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v1.61'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -5302,6 +5302,9 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   </div>
 </div>
 
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -5320,7 +5323,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v1.60';
+const BBN_VERSION = 'v1.61';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5367,9 +5370,6 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-auth.getRedirectResult().catch(err => {
-  if (err.code) console.error('Redirect sign-in error:', err.code, err.message);
-});
 const db = firebase.database();
 
 // ============================================================
@@ -5436,15 +5436,27 @@ db.ref('.info/connected').on('value', snap => {
 // ============================================================
 // AUTH
 // ============================================================
-document.getElementById('google-signin-btn').addEventListener('click', async () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  try {
-    await auth.signInWithPopup(provider);
-  } catch (err) {
-    console.error('Sign-in error:', err);
-    const msg = err.code || err.message || String(err);
-    showToast('Sign-in failed: ' + msg);
-  }
+const GIS_CLIENT_ID = '711812846396-80med38e2jihv1vkmjka0r90nh9a6ovr.apps.googleusercontent.com';
+
+document.getElementById('google-signin-btn').addEventListener('click', () => {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GIS_CLIENT_ID,
+    scope: 'email profile',
+    callback: async (response) => {
+      if (response.error) {
+        showToast('Sign-in failed: ' + response.error);
+        return;
+      }
+      try {
+        const credential = firebase.auth.GoogleAuthProvider.credential(null, response.access_token);
+        await auth.signInWithCredential(credential);
+      } catch (err) {
+        console.error('Firebase credential error:', err);
+        showToast('Sign-in failed: ' + (err.message || 'unknown error'));
+      }
+    }
+  });
+  client.requestAccessToken();
 });
 
 auth.onAuthStateChanged(async (user) => {
