@@ -6069,7 +6069,7 @@ function doPreRollSetup() {
       setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
-    setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
+    setTimeout(() => handleKOs(), preRollCallouts.length * spd(1500));
     return;
   }
   if (handleKOs()) {
@@ -7009,7 +7009,7 @@ function doPreRollSetup() {
       setTimeout(() => showAbilityCallout(c[0], c[1], c[2], c[3]), i * spd(1500));
     });
     refundCommitted();
-    setTimeout(() => handleKOs(), preRollCallouts.length * 1500);
+    setTimeout(() => handleKOs(), preRollCallouts.length * spd(1500));
     return;
   }
   if (latePreRollKO && handleKOs()) {
@@ -13696,6 +13696,8 @@ function doKoSwap(team, idx) {
 
 function showGameOver(winner) {
   B.phase = 'over';
+  // Always disable roll buttons — game is over regardless of hooks
+  disableRollButtons();
   // Fire registered hooks BEFORE the default game-over logic.
   // If a hook returns true, it consumed the event — skip default UI.
   let consumed = false;

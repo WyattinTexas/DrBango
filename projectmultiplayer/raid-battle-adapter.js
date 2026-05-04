@@ -825,6 +825,11 @@ const RaidBattleAdapter = {
   _handleRaidGameOver(winner) {
     BattleEngine.stopBlueAI();
     RaidSync.stopHeartbeat();
+    // Disable roll buttons — showGameOver skips this when hook consumes
+    const _rBtn = document.getElementById('rollRedBtn');
+    const _bBtn = document.getElementById('rollBlueBtn');
+    if (_rBtn) { _rBtn.disabled = true; _rBtn.classList.remove('pulse'); }
+    if (_bBtn) { _bBtn.disabled = true; _bBtn.classList.remove('pulse'); }
 
     // Fade music — the default showGameOver was consumed so it never ran fadeOutMusic
     if (typeof fadeOutMusic === 'function') fadeOutMusic();
