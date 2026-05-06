@@ -1785,7 +1785,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.6.3';
+const VERSION = 'v3.7.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3078,9 +3078,14 @@ let G = {
   inBattle: false,
   // Presence
   lastSeen: 0,
-  // Resources (display-only)
+  // Resources (all 7 types from adventure engine)
   iceShards: 0,
   sacredFire: 0,
+  healingSeeds: 0,
+  luckyStones: 0,
+  surge: 0,
+  moonstone: 0,
+  firefly: 0,
   // Mastery
   mastery: {
     weapon: { xp: 0 },
@@ -5866,6 +5871,14 @@ function battleRoll() {
       }
     }
 
+    // ── END-OF-ROUND PASSIVES ──
+    // Maximo (302): gain 1 Healing Seed + 1 Lucky Stone each round
+    if (pg.id === 302 && !pg.ko) {
+      B.resources.healingSeeds = Math.min(5, (B.resources.healingSeeds || 0) + 1);
+      B.resources.luckyStones = Math.min(5, (B.resources.luckyStones || 0) + 1);
+      B.log.push({ text: `${pg.name} (Nap): +1 Healing Seed, +1 Lucky Stone`, type: 'ability' });
+    }
+
     B.round++;
     B.phase = 'ready';
     if (rollBtn) rollBtn.disabled = false;
@@ -8076,6 +8089,11 @@ function createCharacter() {
   G.xp = 0;
   G.iceShards = 0;
   G.sacredFire = 0;
+  G.healingSeeds = 0;
+  G.luckyStones = 0;
+  G.surge = 0;
+  G.moonstone = 0;
+  G.firefly = 0;
   G.mastery = { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
   G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
   G.titles = [];
@@ -8176,6 +8194,11 @@ async function initFirebase() {
     G.activeIdx = data.activeIdx || 0;
     G.iceShards = data.iceShards || 0;
     G.sacredFire = data.sacredFire || 0;
+    G.healingSeeds = data.healingSeeds || 0;
+    G.luckyStones = data.luckyStones || 0;
+    G.surge = data.surge || 0;
+    G.moonstone = data.moonstone || 0;
+    G.firefly = data.firefly || 0;
     G.mastery = data.mastery || { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
     G.rep = data.rep || { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
     G.titles = data.titles || [];
@@ -8262,6 +8285,11 @@ function saveGame() {
     activeIdx: G.activeIdx,
     iceShards: G.iceShards,
     sacredFire: G.sacredFire,
+    healingSeeds: G.healingSeeds,
+    luckyStones: G.luckyStones,
+    surge: G.surge,
+    moonstone: G.moonstone,
+    firefly: G.firefly,
     mastery: G.mastery,
     rep: G.rep,
     titles: G.titles || [],
