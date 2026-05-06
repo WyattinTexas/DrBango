@@ -1772,7 +1772,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.2.0';
+const VERSION = 'v3.3.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3593,9 +3593,38 @@ function render() {
       const sx = tx * TILE - camX;
       const sy = ty * TILE - camY;
 
-      // Base tile
-      ctx.fillStyle = TILE_COLORS[tile] || '#333';
-      ctx.fillRect(sx, sy, TILE, TILE);
+      // Base tile — try tileset sprite first, fallback to colored rect
+      const tileVariant = ((tx * 7 + ty * 13) % 3); // position-seeded variation
+      let tileDrawn = false;
+
+      if (tile === 0) { // Snow — TilesetField light tile
+        const snowCols = [0, 1, 2];
+        tileDrawn = drawTile(ctx, 'field', snowCols[tileVariant], 0, sx, sy);
+      } else if (tile === 2) { // Path — TilesetField dirt
+        const pathCols = [3, 4, 5];
+        tileDrawn = drawTile(ctx, 'field', pathCols[tileVariant], 0, sx, sy);
+      } else if (tile === 3) { // Water — TilesetWater
+        tileDrawn = drawTile(ctx, 'water', tileVariant, 0, sx, sy);
+      } else if (tile === 9) { // Grass — TilesetField green
+        const grassCols = [0, 1, 2];
+        tileDrawn = drawTile(ctx, 'field', grassCols[tileVariant], 3, sx, sy);
+      } else if (tile === 5) { // Building — TilesetHouse
+        tileDrawn = drawTile(ctx, 'house', 0, 4, sx, sy);
+      } else if (tile === 7) { // Mountain — TilesetRelief
+        const mtnCols = [0, 1, 2];
+        tileDrawn = drawTile(ctx, 'relief', mtnCols[tileVariant], 0, sx, sy);
+      } else if (tile === 17) { // Ash ground — TilesetDesert dark
+        const ashCols = [0, 1, 2];
+        tileDrawn = drawTile(ctx, 'desert', ashCols[tileVariant], 2, sx, sy);
+      } else if (tile === 20) { // Sand — TilesetDesert light
+        const sandCols = [2, 3, 4];
+        tileDrawn = drawTile(ctx, 'desert', sandCols[tileVariant], 0, sx, sy);
+      }
+
+      if (!tileDrawn) {
+        ctx.fillStyle = TILE_COLORS[tile] || '#333';
+        ctx.fillRect(sx, sy, TILE, TILE);
+      }
 
       // Tile details
       if (tile === 1) { // Tree — varied by position
@@ -3648,7 +3677,7 @@ function render() {
           ctx.lineTo(sx + TILE/2 - 5, sy + 8);
           ctx.fill();
         }
-      } else if (tile === 7) { // Mountain
+      } else if (tile === 7 && !tileDrawn) { // Mountain (fallback only)
         ctx.fillStyle = '#5a5a6a';
         ctx.beginPath();
         ctx.moveTo(sx + TILE/2, sy + 2);
@@ -3661,7 +3690,7 @@ function render() {
         ctx.lineTo(sx + TILE/2 + 5, sy + 10);
         ctx.lineTo(sx + TILE/2 - 5, sy + 10);
         ctx.fill();
-      } else if (tile === 5) { // Building
+      } else if (tile === 5 && !tileDrawn) { // Building (fallback only)
         // Walls
         ctx.fillStyle = '#8a7a5a';
         ctx.fillRect(sx + 2, sy + 10, TILE - 4, TILE - 10);
@@ -3744,7 +3773,7 @@ function render() {
           ctx.arc(sx + Math.random() * TILE, sy + Math.random() * TILE, 1 + Math.random() * 2, 0, Math.PI * 2);
           ctx.fill();
         }
-      } else if (tile === 3) { // Water
+      } else if (tile === 3 && !tileDrawn) { // Water (fallback only)
         const wv = Math.sin(time * 1.5 + tx * 0.8) * 15;
         ctx.fillStyle = `rgb(${42 + wv}, ${74 + wv}, ${138 + wv})`;
         ctx.fillRect(sx, sy, TILE, TILE);
@@ -3752,7 +3781,7 @@ function render() {
         const iv = Math.sin(time * 0.5 + tx + ty) * 10;
         ctx.fillStyle = `rgb(${138 + iv}, ${184 + iv}, ${216 + iv})`;
         ctx.fillRect(sx, sy, TILE, TILE);
-      } else if (tile === 9) { // Grass
+      } else if (tile === 9 && !tileDrawn) { // Grass (fallback only)
         // Subtle grass texture
         if ((tx + ty) % 2 === 0) {
           ctx.fillStyle = 'rgba(80,140,50,0.3)';
@@ -3861,13 +3890,15 @@ function render() {
         ctx.arc(sx + TILE - 10 + Math.sin(time * 0.6 + ty) * 4, sy + TILE - 10, 1.5, 0, Math.PI * 2);
         ctx.fill();
       } else if (tile === 17) { // Ash ground
-        // Subtle darker texture
-        if ((tx + ty) % 2 === 0) {
-          ctx.fillStyle = 'rgba(0,0,0,0.08)';
-          ctx.fillRect(sx + 6, sy + 10, 3, 3);
-          ctx.fillRect(sx + 20, sy + 4, 2, 2);
+        if (!tileDrawn) {
+          // Subtle darker texture (fallback only)
+          if ((tx + ty) % 2 === 0) {
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.fillRect(sx + 6, sy + 10, 3, 3);
+            ctx.fillRect(sx + 20, sy + 4, 2, 2);
+          }
         }
-        // Occasional ember particles
+        // Occasional ember particles (always — adds life on top of sprite)
         if (Math.random() < 0.01) {
           ctx.fillStyle = `rgba(255,${120 + Math.floor(Math.random() * 80)},40,${0.4 + Math.random() * 0.4})`;
           ctx.beginPath();
@@ -3905,7 +3936,7 @@ function render() {
         ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 2, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(255,220,100,0.3)';
         ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 5, 0, Math.PI * 2); ctx.fill();
-      } else if (tile === 20) { // Sand (beach)
+      } else if (tile === 20 && !tileDrawn) { // Sand (beach, fallback only)
         // Subtle dot pattern like beach sand
         ctx.fillStyle = 'rgba(200,180,120,0.3)';
         if ((tx + ty) % 2 === 0) {
@@ -3949,7 +3980,7 @@ function render() {
           ctx.lineTo(cx + Math.cos(angle) * 12, cy + Math.sin(angle) * 12);
           ctx.stroke();
         }
-      } else if (tile === 0) { // Snow detail
+      } else if (tile === 0 && !tileDrawn) { // Snow detail (fallback only)
         // Subtle snow texture
         if ((tx + ty) % 3 === 0) {
           ctx.fillStyle = 'rgba(255,255,255,0.1)';
@@ -8362,11 +8393,38 @@ const SPRITE_DEFS = [
 // ═══════ SPRITE IMAGE PRELOADER ═══════
 
 const spriteImages = {};
+// ═══════ TILESET IMAGES ═══════
+const tilesetImages = {};
+const TILESET_SOURCES = {
+  nature: 'assets/tiles/TilesetNature.png',
+  water: 'assets/tiles/TilesetWater.png',
+  field: 'assets/tiles/TilesetField.png',
+  house: 'assets/tiles/TilesetHouse.png',
+  desert: 'assets/tiles/TilesetDesert.png',
+  relief: 'assets/tiles/TilesetRelief.png',
+};
+
+// Draw a 16x16 tile from a tileset, scaled to TILE size
+function drawTile(ctx, tilesetId, srcCol, srcRow, destX, destY) {
+  const img = tilesetImages[tilesetId];
+  if (!img || !img.complete || !img.naturalWidth) return false;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, srcCol * 16, srcRow * 16, 16, 16, destX, destY, TILE, TILE);
+  ctx.imageSmoothingEnabled = true;
+  return true;
+}
+
 function preloadSprites() {
   for (const def of SPRITE_DEFS) {
     const img = new Image();
     img.src = def.sheet;
     spriteImages[def.id] = img;
+  }
+  // Tileset images
+  for (const [id, src] of Object.entries(TILESET_SOURCES)) {
+    const img = new Image();
+    img.src = src;
+    tilesetImages[id] = img;
   }
   // Monster sprites for roaming enemies
   const monsterSheets = {
