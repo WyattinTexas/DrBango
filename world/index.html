@@ -323,7 +323,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ═══════ MINIMAP ═══════ */
 #minimap {
-  position: fixed; bottom: 12px; right: 12px; width: 140px; height: 164px;
+  position: fixed; bottom: 12px; right: 12px; width: 210px; height: 164px;
   background: rgba(0,0,0,0.6); border: 1px solid #334; border-radius: 8px;
   z-index: 100; overflow: hidden;
 }
@@ -525,6 +525,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #regionBanner.show { opacity: 1; }
 #regionBanner.frost { background: rgba(30,40,80,0.85); border: 1px solid rgba(100,160,255,0.4); color: #8cf; }
 #regionBanner.hills { background: rgba(30,60,20,0.85); border: 1px solid rgba(100,200,80,0.4); color: #9ddb6a; }
+#regionBanner.volcanic { background: rgba(60,20,10,0.85); border: 1px solid rgba(255,100,40,0.5); color: #ff8844; }
 
 /* ═══════ CANTINA OVERLAY ═══════ */
 #cantinaOverlay {
@@ -690,7 +691,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   .vs-badge { font-size: 18px; }
   #chatBox { width: 200px; }
   #chatMessages { height: 80px; font-size: 10px; }
-  #minimap { width: 100px; height: 100px; }
+  #minimap { width: 140px; height: 110px; }
   #inventoryPanel { width: 260px; }
   .starter-grid { grid-template-columns: 1fr; gap: 8px; }
   .discipline-grid { grid-template-columns: 1fr; }
@@ -970,7 +971,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 </div>
 
 <!-- MINIMAP -->
-<canvas id="minimap" width="140" height="164" style="display:none;"></canvas>
+<canvas id="minimap" width="210" height="164" style="display:none;"></canvas>
 
 <!-- TOUCH HINT (mobile only) -->
 <div id="touchHint">Drag to move &bull; Double-tap to interact</div>
@@ -988,7 +989,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v0.6.1';
+const VERSION = 'v0.7.0';
 
 // ═══════ SOUND DESIGN (Web Audio API — procedural) ═══════
 let sfxMuted = false;
@@ -1269,6 +1270,8 @@ const ENCOUNTER_ZONES = [
   { name: 'Permafrost Depths', x: 48, y: 28, w: 6, h: 6 },
   { name: 'Sunlit Meadow', x: 12, y: 52, w: 8, h: 6 },
   { name: 'Bramble Thicket', x: 35, y: 55, w: 7, h: 5 },
+  { name: 'Magma Pools', x: 68, y: 10, w: 7, h: 5 },
+  { name: 'Obsidian Fields', x: 78, y: 25, w: 8, h: 6 },
 ];
 
 // ═══════ ZONE QUALITY SYSTEM (12-hour rotation) ═══════
@@ -1431,8 +1434,11 @@ let currentRegion = 'frost_valley';
 
 function checkRegionBanner() {
   const py = Math.floor(G.y);
+  const px = Math.floor(G.x);
   let region;
-  if (py >= 45) {
+  if (px > 60 && py < 43) {
+    region = 'volcanic_isles';
+  } else if (py >= 45) {
     region = 'rolling_hills';
   } else {
     region = 'frost_valley';
@@ -1440,7 +1446,10 @@ function checkRegionBanner() {
   if (region !== currentRegion) {
     currentRegion = region;
     const banner = document.getElementById('regionBanner');
-    if (region === 'rolling_hills') {
+    if (region === 'volcanic_isles') {
+      banner.textContent = 'Now entering: Volcanic Isles';
+      banner.className = 'volcanic';
+    } else if (region === 'rolling_hills') {
       banner.textContent = 'Now entering: Rolling Hills';
       banner.className = 'hills';
     } else {
@@ -1506,6 +1515,13 @@ const ALL_CARDS = [
   {id:308,name:"Kaplan",rarity:"uncommon",maxHp:5,ability:"Pollinate",desc:"When opponent rolls doubles: gain 1 Healing Seed.",set:"Rolling Hills",art:"../testroom/art/kaplan.webp"},
   {id:314,name:"Farmer Jeff",rarity:"ghost-rare",maxHp:5,ability:"Harvest",desc:"Gain 1 Healing Seed for each 6 you roll.",set:"Rolling Hills",art:"../testroom/art/farmer_jeff.webp"},
   {id:309,name:"Aunt Susan",rarity:"rare",maxHp:4,ability:"Harvest Dance",desc:"Discard 1 Healing Seed: deal +2 damage. Win: +2 Healing Seeds.",set:"Rolling Hills",art:"../testroom/art/aunt_susan.webp"},
+  // Volcanic Isles
+  {id:201,name:"Bouril",rarity:"common",maxHp:10,ability:"Slumber",desc:"Entry: your first roll is automatically 1-2-3.",set:"Volcanic Isles",art:"../testroom/art/old_hank.jpg"},
+  {id:304,name:"The Ember Force",rarity:"uncommon",maxHp:3,ability:"Swarm",desc:"Before rolling: deal 1 damage to the enemy active ghost.",set:"Volcanic Isles",art:"../testroom/art/ember_force.webp"},
+  {id:206,name:"Zain",rarity:"ghost-rare",maxHp:6,ability:"Ice Blade",desc:"Win: gain 1 Ice Shard. Forge the Ice Blade with Ice Shard + Moonstone.",set:"Volcanic Isles",art:"../testroom/art/zain.webp"},
+  {id:209,name:"Dart",rarity:"common",maxHp:3,ability:"Plunder",desc:"Win: gain 2 Surge.",set:"Volcanic Isles",art:"../testroom/art/dart.webp"},
+  {id:306,name:"Nerina",rarity:"legendary",maxHp:9,ability:"Leviathan",desc:"Entry: deal 3 damage to the enemy active ghost.",set:"Volcanic Isles",art:"../testroom/art/nerina.webp"},
+  {id:336,name:"Humar",rarity:"legendary",maxHp:5,ability:"Meteor",desc:"Win: opponent takes 2 damage before their next roll.",set:"Volcanic Isles",art:"../testroom/art/humar.webp"},
 ];
 
 // ═══════ STARTERS ═══════
@@ -1653,7 +1669,7 @@ let canvas, ctx;
 let camX = 0, camY = 0;
 let keys = {};
 const TILE = 32;
-const WORLD_W = 60; // tiles
+const WORLD_W = 90; // tiles
 const WORLD_H = 70;
 const MOVE_SPEED = 2.5;
 
@@ -1787,11 +1803,102 @@ function generateWorld() {
   worldMap[rhSettleY+1][rhSettleX+1] = 5;
   worldMap[rhSettleY+1][rhSettleX+3] = 5;
 
+  // ═══ VOLCANIC ISLES (x: 62 to 88, y: 5 to 40) ═══
+
+  // Mountain wall on east side of Frost Valley (x:58-61)
+  for (let y = 2; y < 43; y++) {
+    for (let x = 58; x < 62; x++) {
+      if (x < WORLD_W) worldMap[y][x] = 7;
+    }
+  }
+
+  // Fill Volcanic Isles with ash ground
+  for (let y = 3; y < 42; y++) {
+    for (let x = 62; x < 88; x++) {
+      if (x < WORLD_W - 2 && y < WORLD_H - 2) worldMap[y][x] = 17; // ash_ground
+    }
+  }
+
+  // Volcanic rock border
+  for (let x = 62; x < 88; x++) {
+    if (x < WORLD_W - 2) {
+      worldMap[3][x] = 14; worldMap[4][x] = 14;
+      worldMap[40][x] = 14; worldMap[41][x] = 14;
+    }
+  }
+  for (let y = 3; y < 42; y++) {
+    worldMap[y][62] = 14; worldMap[y][63] = 14;
+    if (87 < WORLD_W - 2) { worldMap[y][86] = 14; worldMap[y][87] = 14; }
+  }
+
+  // East border mountains
+  for (let y = 0; y < WORLD_H; y++) {
+    if (88 < WORLD_W) worldMap[y][88] = 7;
+    if (89 < WORLD_W) worldMap[y][89] = 7;
+  }
+
+  // Carve passage from Frost Valley into Volcanic Isles (y:20-22, x:58-63)
+  for (let y = 20; y <= 22; y++) {
+    for (let x = 58; x <= 63; x++) {
+      worldMap[y][x] = 2; // path
+    }
+  }
+
+  // Lava rivers (3 snaking paths)
+  // River 1: flows from top-left to bottom-right
+  for (let i = 0; i < 25; i++) {
+    const lx = 66 + Math.floor(Math.sin(i * 0.4) * 2) + Math.floor(i * 0.4);
+    const ly = 6 + i;
+    if (lx >= 64 && lx < 86 && ly >= 5 && ly < 40) { worldMap[ly][lx] = 15; worldMap[ly][lx+1] = 15; }
+  }
+  // River 2: horizontal lava flow
+  for (let x = 70; x < 85; x++) {
+    const ly = 22 + Math.floor(Math.sin(x * 0.5) * 2);
+    if (ly >= 5 && ly < 40 && x < 86) { worldMap[ly][x] = 15; }
+  }
+  // River 3: short vertical flow
+  for (let y = 30; y < 38; y++) {
+    const lx = 74 + Math.floor(Math.sin(y * 0.6) * 2);
+    if (lx >= 64 && lx < 86) { worldMap[y][lx] = 15; }
+  }
+
+  // Obsidian formations (small clusters)
+  const obsidianClusters = [
+    {x:68, y:15}, {x:72, y:8}, {x:80, y:12}, {x:83, y:30}, {x:70, y:35},
+    {x:76, y:18}, {x:82, y:20}, {x:69, y:28}, {x:77, y:37},
+  ];
+  for (const oc of obsidianClusters) {
+    if (oc.x >= 64 && oc.x < 86 && oc.y >= 5 && oc.y < 40) {
+      worldMap[oc.y][oc.x] = 16;
+      if (oc.x+1 < 86) worldMap[oc.y][oc.x+1] = 16;
+      if (oc.y+1 < 40) worldMap[oc.y+1][oc.x] = 16;
+    }
+  }
+
+  // Magma crystal nodes scattered
+  for (let i = 0; i < 25; i++) {
+    const mx = 64 + Math.floor(Math.random() * 22);
+    const my = 5 + Math.floor(Math.random() * 34);
+    if (mx < 86 && my < 40 && worldMap[my][mx] === 17) worldMap[my][mx] = 18;
+  }
+
+  // Volcanic hub settlement at approximately (75, 15)
+  const vhX = 74, vhY = 14;
+  for (let y = vhY; y < vhY + 4; y++) for (let x = vhX; x < vhX + 6; x++) {
+    if (x < 86 && y < 40) worldMap[y][x] = 17; // clear area
+  }
+  // Path to settlement
+  for (let x = 64; x <= vhX; x++) { worldMap[vhY+1][x] = 2; worldMap[vhY+2][x] = 2; }
+  // Buildings
+  worldMap[vhY+1][vhX+1] = 5; worldMap[vhY+1][vhX+2] = 5; // forge
+  worldMap[vhY+1][vhX+4] = 5; // outpost
+  worldMap[vhY+3][vhX+2] = 5; // tavern
+
   // Encounter zones (all of them)
   for (const zone of ENCOUNTER_ZONES) {
     for (let y = zone.y; y < zone.y + zone.h && y < WORLD_H - 2; y++) {
       for (let x = zone.x; x < zone.x + zone.w && x < WORLD_W - 2; x++) {
-        if (worldMap[y][x] === 0 || worldMap[y][x] === 9) worldMap[y][x] = 6;
+        if (worldMap[y][x] === 0 || worldMap[y][x] === 9 || worldMap[y][x] === 17) worldMap[y][x] = 6;
       }
     }
   }
@@ -1824,6 +1931,11 @@ const TILE_COLORS = {
   11: '#7cb342', // rolling hill
   12: '#7a5a2a', // cantina
   13: '#3a6a2a', // warm tree (Rolling Hills)
+  14: '#3a2020', // volcanic_rock
+  15: '#cc4400', // lava
+  16: '#1a1a2a', // obsidian
+  17: '#4a4040', // ash_ground
+  18: '#4a4040', // magma_crystal (base same as ash, detail drawn in render)
 };
 
 // ═══════ ZONE BOUNDARY COLORS (slightly different at edges) ═══════
@@ -1836,6 +1948,13 @@ const HUB_LABELS = [
   { offX: 1.5, offY: 3, label: 'Workshop' },
   { offX: 5.5, offY: 3, label: 'Frostwind Inn' },
   { offX: 3.5, offY: 5, label: 'Cantina' },
+];
+
+// Volcanic hub building labels (absolute coords)
+const VOLCANIC_HUB_LABELS = [
+  { x: 75.5, y: 15, label: 'Ember Forge' },
+  { x: 78, y: 15, label: 'Outpost' },
+  { x: 76.5, y: 17, label: 'Magma Tavern' },
 ];
 
 // ═══════ RENDERING ═══════
@@ -2005,6 +2124,73 @@ function render() {
         ctx.fill();
         ctx.fillStyle = '#5a3a1a';
         ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 8);
+      } else if (tile === 14) { // Volcanic rock
+        ctx.fillStyle = '#4a2828';
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 2);
+        ctx.lineTo(sx + TILE - 3, sy + TILE);
+        ctx.lineTo(sx + 3, sy + TILE);
+        ctx.fill();
+        // Red tint glow
+        ctx.fillStyle = 'rgba(200,60,20,0.15)';
+        ctx.fillRect(sx, sy, TILE, TILE);
+      } else if (tile === 15) { // Lava (animated)
+        const lavaShift = Math.sin(time * 2.5 + tx * 0.7 + ty * 0.5) * 30;
+        const lavaShift2 = Math.sin(time * 1.8 + tx * 0.3 + ty * 0.9) * 20;
+        ctx.fillStyle = `rgb(${204 + lavaShift}, ${68 + lavaShift2}, ${0 + Math.abs(lavaShift2)})`;
+        ctx.fillRect(sx, sy, TILE, TILE);
+        // Bright glow center
+        const glowAlpha = 0.3 + Math.sin(time * 3 + tx + ty) * 0.2;
+        ctx.fillStyle = `rgba(255,200,60,${glowAlpha})`;
+        ctx.beginPath();
+        ctx.arc(sx + TILE/2 + Math.sin(time + tx) * 4, sy + TILE/2 + Math.cos(time + ty) * 4, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tile === 16) { // Obsidian
+        ctx.fillStyle = '#1a1a2a';
+        ctx.fillRect(sx, sy, TILE, TILE);
+        // Glossy shine dot that shifts with time
+        const shineX = sx + 8 + Math.sin(time * 0.8 + tx) * 6;
+        const shineY = sy + 8 + Math.cos(time * 0.8 + ty) * 6;
+        ctx.fillStyle = 'rgba(180,200,255,0.5)';
+        ctx.beginPath();
+        ctx.arc(shineX, shineY, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Secondary subtle shine
+        ctx.fillStyle = 'rgba(140,160,220,0.3)';
+        ctx.beginPath();
+        ctx.arc(sx + TILE - 10 + Math.sin(time * 0.6 + ty) * 4, sy + TILE - 10, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tile === 17) { // Ash ground
+        // Subtle darker texture
+        if ((tx + ty) % 2 === 0) {
+          ctx.fillStyle = 'rgba(0,0,0,0.08)';
+          ctx.fillRect(sx + 6, sy + 10, 3, 3);
+          ctx.fillRect(sx + 20, sy + 4, 2, 2);
+        }
+        // Occasional ember particles
+        if (Math.random() < 0.01) {
+          ctx.fillStyle = `rgba(255,${120 + Math.floor(Math.random() * 80)},40,${0.4 + Math.random() * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(sx + Math.random() * TILE, sy + Math.random() * TILE * 0.5, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (tile === 18) { // Magma crystal
+        // Ash base already drawn
+        // Glowing orange diamond shapes
+        const crystalGlow = 0.6 + Math.sin(time * 2 + tx * 1.5 + ty) * 0.3;
+        ctx.fillStyle = `rgba(255,160,40,${crystalGlow})`;
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 4);
+        ctx.lineTo(sx + TILE/2 + 5, sy + TILE/2);
+        ctx.lineTo(sx + TILE/2, sy + TILE - 4);
+        ctx.lineTo(sx + TILE/2 - 5, sy + TILE/2);
+        ctx.closePath();
+        ctx.fill();
+        // Bright core
+        ctx.fillStyle = `rgba(255,220,100,${crystalGlow * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(sx + TILE/2, sy + TILE/2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
       } else if (tile === 0) { // Snow detail
         // Subtle snow texture
         if ((tx + ty) % 3 === 0) {
@@ -2068,6 +2254,15 @@ function render() {
           ctx.fillStyle = 'rgba(120, 60, 220, 0.12)';
           ctx.fillRect(esx, esy, TILE, TILE);
         }
+        // Lava glows through darkness at night
+        if (tile2 === 15) {
+          const lsx = tx2 * TILE - camX;
+          const lsy = ty2 * TILE - camY;
+          ctx.fillStyle = 'rgba(255, 120, 40, 0.2)';
+          ctx.beginPath();
+          ctx.arc(lsx + TILE/2, lsy + TILE/2, TILE, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   }
@@ -2114,6 +2309,22 @@ function render() {
     ctx.roundRect(lx - tw/2, ly - 8, tw, 14, 4);
     ctx.fill();
     ctx.fillStyle = '#ddd';
+    ctx.fillText(lbl.label, lx, ly + 3);
+  }
+
+  // ═══════ VOLCANIC HUB BUILDING LABELS ═══════
+  for (const lbl of VOLCANIC_HUB_LABELS) {
+    const lx = lbl.x * TILE - camX;
+    const ly = lbl.y * TILE - camY - 8;
+    if (lx < -100 || lx > W + 100 || ly < -50 || ly > H + 50) continue;
+    const tw = ctx.measureText(lbl.label).width + 10;
+    ctx.fillStyle = 'rgba(60,20,10,0.7)';
+    ctx.beginPath();
+    ctx.roundRect(lx - tw/2, ly - 8, tw, 14, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ff9966';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
     ctx.fillText(lbl.label, lx, ly + 3);
   }
 
@@ -2441,8 +2652,8 @@ function gameLoop() {
     const newY = G.y + dy * 0.05;
     const tileAtNew = worldMap[Math.floor(newY)]?.[Math.floor(newX)] ?? 7;
 
-    // Collision check (block: trees, water, mountains, warm trees)
-    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7 && tileAtNew !== 13) {
+    // Collision check (block: trees, water, mountains, warm trees, lava, obsidian)
+    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7 && tileAtNew !== 13 && tileAtNew !== 15 && tileAtNew !== 16) {
       G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
       G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
 
@@ -2474,7 +2685,10 @@ function getCard(id) { return ALL_CARDS.find(c => c.id === id); }
 function getWildEncounter() {
   // Determine which region the player is in
   const inRollingHills = Math.floor(G.y) >= 45;
-  const regionSets = inRollingHills
+  const inVolcanicIsles = Math.floor(G.x) > 60;
+  const regionSets = inVolcanicIsles
+    ? ['Volcanic Isles', 'Set 1']
+    : inRollingHills
     ? ['Rolling Hills', 'Set 1']
     : ['Frost Valley', 'Set 1'];
   const fvCards = ALL_CARDS.filter(c => regionSets.includes(c.set) && c.rarity !== 'legendary');
@@ -3091,6 +3305,8 @@ const ZONE_ESSENCE_SUBTYPES = {
   'Permafrost Depths': { subtype: 'Permafrost', bonusStat: ['stability','potency'], bonusAmount: 100 },
   'Sunlit Meadow': { subtype: 'Sun', bonusStat: ['resonance','purity'], bonusAmount: 100 },
   'Bramble Thicket': { subtype: 'Bramble', bonusStat: 'potency', bonusAmount: 100 },
+  'Magma Pools': { subtype: 'Magma', bonusStat: ['potency','resonance'], bonusAmount: 100 },
+  'Obsidian Fields': { subtype: 'Obsidian', bonusStat: ['stability','purity'], bonusAmount: 100 },
 };
 
 function generateEssence(card, zoneIdx) {
@@ -3105,7 +3321,7 @@ function generateEssence(card, zoneIdx) {
     zoneMultiplier = getZoneQuality(zoneIdx, cycleId);
   }
 
-  const zoneName = zoneIdx >= 0 ? ENCOUNTER_ZONES[zoneIdx].name : 'Frost Valley';
+  const zoneName = zoneIdx >= 0 ? ENCOUNTER_ZONES[zoneIdx].name : (Math.floor(G.x) > 60 ? 'Volcanic Isles' : Math.floor(G.y) >= 45 ? 'Rolling Hills' : 'Frost Valley');
   const subtypeInfo = ZONE_ESSENCE_SUBTYPES[zoneName];
   const subtypeName = subtypeInfo ? subtypeInfo.subtype : '';
 
