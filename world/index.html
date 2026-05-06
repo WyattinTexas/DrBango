@@ -1169,7 +1169,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v0.9.3';
+const VERSION = 'v1.0.0';
 
 // ═══════ SOUND DESIGN (Web Audio API — procedural) ═══════
 let sfxMuted = false;
@@ -2624,6 +2624,40 @@ function render() {
     ctx.fill();
   }
 
+  // ── ROAMING DANGER WISPS (visual threat indicators) ──
+  // Show small red/orange wisps in dangerous areas away from hubs
+  if (!G.inBattle) {
+    const seed = Math.floor(time * 0.5); // change positions slowly
+    for (let i = 0; i < 12; i++) {
+      // Deterministic position from seed + index
+      const wx = ((seed * 7 + i * 31) % (WORLD_W - 10)) + 5;
+      const wy = ((seed * 13 + i * 47) % (WORLD_H - 10)) + 5;
+      // Only in dangerous areas (far from hubs)
+      const dFH = Math.sqrt(Math.pow(wx - (HUB.x+3), 2) + Math.pow(wy - (HUB.y+3), 2));
+      const dRH = Math.sqrt(Math.pow(wx - 25, 2) + Math.pow(wy - 59, 2));
+      const dVI = Math.sqrt(Math.pow(wx - 75, 2) + Math.pow(wy - 15, 2));
+      if (Math.min(dFH, dRH, dVI) < 10) continue; // skip near hubs
+      const tile = worldMap[wy]?.[wx];
+      if (tile === 7 || tile === 3 || tile === 1 || tile === 15 || tile === 16) continue; // skip impassable
+
+      const wsx = wx * TILE - camX + TILE/2;
+      const wsy = wy * TILE - camY + TILE/2;
+      if (wsx < -20 || wsx > W + 20 || wsy < -20 || wsy > H + 20) continue;
+
+      const bob = Math.sin(time * 2 + i * 1.5) * 4;
+      const alpha = 0.15 + Math.sin(time * 3 + i) * 0.1;
+      ctx.fillStyle = `rgba(200, 60, 60, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(wsx, wsy + bob, 3 + Math.sin(time + i) * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Tiny glow
+      ctx.fillStyle = `rgba(255, 80, 40, ${alpha * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(wsx, wsy + bob, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // Draw other players
   for (const [pid, p] of Object.entries(otherPlayers)) {
     if (pid === uid) continue;
@@ -2882,9 +2916,34 @@ function gameLoop() {
       // Footstep sound (throttled)
       SFX.footstep();
 
-      // Check encounter zone (rate modified by time of day)
+      // Check encounter zone (higher rate inside zones)
       if (tileAtNew === 6 && !G.inBattle && Math.random() < 0.008 * getEncounterRateMultiplier()) {
         triggerWildEncounter();
+      }
+
+      // ── ROAMING AGGRESSIVE SPIRITKIN ──
+      // Outside encounter zones: the further from a hub, the more dangerous
+      // Safe zone: within 8 tiles of any hub building (tile 5 or 8)
+      // Paths (tile 2) are safer — 50% reduced rate
+      if (tileAtNew !== 6 && !G.inBattle) {
+        const px = Math.floor(G.x), py = Math.floor(G.y);
+        // Check distance to nearest hub
+        const distToFrostHub = Math.sqrt(Math.pow(px - (HUB.x + 3), 2) + Math.pow(py - (HUB.y + 3), 2));
+        const distToRHHub = Math.sqrt(Math.pow(px - 25, 2) + Math.pow(py - 59, 2));
+        const distToVIHub = Math.sqrt(Math.pow(px - 75, 2) + Math.pow(py - 15, 2));
+        const nearestHubDist = Math.min(distToFrostHub, distToRHHub, distToVIHub);
+
+        if (nearestHubDist > 8) { // outside safe zone
+          // Danger scales with distance: 0 at 8 tiles, max at 25+ tiles
+          const dangerFactor = Math.min(1, (nearestHubDist - 8) / 17);
+          const pathSafety = (tileAtNew === 2) ? 0.5 : 1.0; // paths are safer
+          const nightDanger = getEncounterRateMultiplier(); // higher at night
+          const aggroRate = 0.002 * dangerFactor * pathSafety * nightDanger;
+
+          if (Math.random() < aggroRate) {
+            triggerAggressiveEncounter(dangerFactor);
+          }
+        }
       }
 
       // Check region banner
@@ -2898,6 +2957,59 @@ function gameLoop() {
   }
 
   setTimeout(gameLoop, 16);
+}
+
+// ═══════ AGGRESSIVE ENCOUNTER (roaming danger) ═══════
+
+function triggerAggressiveEncounter(dangerFactor) {
+  if (G.inBattle || G.team.length === 0) return;
+  // Aggressive encounters are tougher — higher rarity weighted by danger
+  const pool = ALL_CARDS.filter(c => {
+    if (c.rarity === 'legendary') return dangerFactor > 0.7;
+    if (c.rarity === 'ghost-rare') return dangerFactor > 0.5;
+    if (c.rarity === 'rare') return dangerFactor > 0.2;
+    return true;
+  });
+  if (!pool.length) return;
+
+  // Pick a random card, biased toward tougher ones at higher danger
+  const card = pool[Math.floor(Math.random() * pool.length)];
+
+  // Aggressive encounters get a warning flavor
+  const warnings = [
+    `A wild ${card.name} ambushes you!`,
+    `${card.name} emerges from the shadows!`,
+    `You've wandered too far... ${card.name} attacks!`,
+    `${card.name} blocks your path!`,
+    `Something stirs in the darkness... ${card.name}!`,
+  ];
+  const warning = warnings[Math.floor(Math.random() * warnings.length)];
+
+  G.inBattle = true;
+  SFX.encounterStart();
+
+  const activeGhost = G.team[G.activeIdx];
+  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
+
+  B = {
+    round: 1,
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    enemyCard: card,
+    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity },
+    log: [],
+    phase: 'ready',
+    playerDice: [],
+    enemyDice: [],
+    entryFired: false,
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
+    isAggressive: true, // flag for different flee penalty
+  };
+
+  const overlay = document.getElementById('battleOverlay');
+  overlay.classList.add('active');
+  document.getElementById('battleTitle').textContent = warning;
+  renderBattle();
+  notify(`⚠️ ${warning}`);
 }
 
 // ═══════ ENCOUNTER SYSTEM ═══════
@@ -3310,7 +3422,22 @@ function battleRoll() {
 
 function fleeBattle() {
   if (!B) return;
-  B.log.push({ text: 'You fled the battle!', type: '' });
+
+  // Aggressive encounters cost you for fleeing
+  if (B.isAggressive) {
+    const coinLoss = Math.min(G.coins, 2 + Math.floor(Math.random() * 3));
+    G.coins = Math.max(0, G.coins - coinLoss);
+    // Take 1 damage to active team member
+    const active = G.team.find(g => !g.ko);
+    if (active) {
+      active.hp = Math.max(1, active.hp - 1);
+    }
+    B.log.push({ text: `You barely escaped! Lost ${coinLoss} coins and took a hit.`, type: 'damage' });
+    notify(`🏃 Escaped! Lost ${coinLoss} coins.`);
+  } else {
+    B.log.push({ text: 'You fled the battle!', type: '' });
+  }
+
   battleFledThisSession = true;
   // Reset "no flee" quest progress
   if (G.quests?.active) {
