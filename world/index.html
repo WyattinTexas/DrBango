@@ -1996,7 +1996,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.2.0';
+const VERSION = 'v4.3.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5578,9 +5578,10 @@ function render() {
 
     // Draw monster sprite (or fallback circle)
     const monImg = getMonsterSprite(e);
-    const mFrame = (Math.floor(Date.now() / 300) % 2 === 0) ? 1 : 3;
+    const mFrame = (Math.floor(Date.now() / 300) % 2 === 0) ? 0 : 1;
     // Direction based on stable e.dir (updated in updateRoamingEnemies)
-    const dirLookup = { down: 0, up: 1, left: 2, right: 3 };
+    // Ninja Adventure standard: Row 0=down, 1=left, 2=right, 3=up
+    const dirLookup = { down: 0, left: 1, right: 2, up: 3 };
     const mDir = dirLookup[e.dir || 'down'] || 0;
 
     if (e.state === 'chase') {
@@ -10479,12 +10480,12 @@ function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
   }
 
   // Sprite sheet: 4 cols x 4 rows, 16x16 per cell
-  // Rows: 0=down, 1=up, 2=left, 3=right
-  // Cols: 0=stand, 1=step-L, 2=stand-alt, 3=step-R
+  // Ninja Adventure standard: Row 0=down, 1=left, 2=right, 3=up
+  // Cols: 0=idle, 1=step (only use 0 and 1 to avoid cross-direction frames)
   const frameW = 16, frameH = 16;
-  const dirMap = { down: 0, up: 1, left: 2, right: 3 };
+  const dirMap = { down: 0, left: 1, right: 2, up: 3 };
   const dirRow = dirMap[direction] !== undefined ? dirMap[direction] : 0;
-  const col = (frame === 1 || frame === 3) ? frame : 0; // only allow valid step frames
+  const col = frame === 1 ? 1 : 0; // only idle(0) and step(1) — no col 3
 
   const sx = col * frameW;
   const sy = dirRow * frameH;
@@ -10534,7 +10535,7 @@ function updateSpriteAnimation() {
     // 2-frame walk cycle: alternate between frame 0 and frame 2
     // This gives a clean left-foot/right-foot step instead of 4-frame wobble
     if (now - lastSpriteFrameTime > 250) {
-      G.frame = G.frame === 1 ? 3 : 1; // step-left(1) <-> step-right(3)
+      G.frame = G.frame === 1 ? 0 : 1; // idle(0) <-> step(1) — clean 2-frame walk
       lastSpriteFrameTime = now;
     }
   } else {
