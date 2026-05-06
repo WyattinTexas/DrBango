@@ -1652,10 +1652,17 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 
 <!-- INTERIOR EXIT BUTTON (always visible when inside a building) -->
+<style>
+@keyframes exitPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,60,60,0.4), 0 0 20px rgba(255,60,60,0.2); transform: scale(1); }
+  50% { box-shadow: 0 0 16px rgba(255,60,60,0.7), 0 0 36px rgba(255,60,60,0.35); transform: scale(1.05); }
+}
+</style>
 <button id="interiorExitBtn" style="display:none;position:fixed;top:50px;right:20px;z-index:999;
-  background:rgba(200,50,50,0.9);color:#fff;border:2px solid #fff;border-radius:8px;
-  padding:10px 24px;font-size:16px;font-weight:bold;cursor:pointer;
-  text-shadow:0 1px 2px rgba(0,0,0,0.5);box-shadow:0 2px 10px rgba(0,0,0,0.3);"
+  background:rgba(220,40,40,0.95);color:#fff;border:3px solid #fff;border-radius:10px;
+  padding:14px 32px;font-size:20px;font-weight:bold;cursor:pointer;
+  text-shadow:0 2px 4px rgba(0,0,0,0.6);letter-spacing:1px;
+  animation: exitPulse 1.8s ease-in-out infinite;"
   onclick="exitCurrentInterior()">EXIT BUILDING</button>
 
 <!-- GAME CANVAS -->
@@ -1997,7 +2004,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.5.0';
+const VERSION = 'v4.6.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -12303,10 +12310,12 @@ function openQuickCraft() {
 function exitCurrentInterior() {
   if (typeof cantinaActive !== 'undefined' && cantinaActive && typeof exitCantina === 'function') { exitCantina(); }
   else if (typeof workshopActive !== 'undefined' && workshopActive && typeof exitWorkshop === 'function') { exitWorkshop(); }
-  else if (typeof arenaInteriorActive !== 'undefined' && arenaInteriorActive && typeof exitArena === 'function') { exitArena(); }
+  else if (typeof arenaActive !== 'undefined' && arenaActive && typeof exitArena === 'function') { exitArena(); }
   else if (typeof innActive !== 'undefined' && innActive && typeof exitInn === 'function') { exitInn(); }
   else if (typeof tradingPostActive !== 'undefined' && tradingPostActive && typeof exitTradingPost === 'function') { exitTradingPost(); }
   updateExitButton();
+  // Delayed check in case exit function sets state asynchronously
+  setTimeout(updateExitButton, 100);
 }
 
 function updateExitButton() {
@@ -12314,7 +12323,7 @@ function updateExitButton() {
   if (!btn) return;
   const inInterior = (typeof cantinaActive !== 'undefined' && cantinaActive) ||
     (typeof workshopActive !== 'undefined' && workshopActive) ||
-    (typeof arenaInteriorActive !== 'undefined' && arenaInteriorActive) ||
+    (typeof arenaActive !== 'undefined' && arenaActive) ||
     (typeof innActive !== 'undefined' && innActive) ||
     (typeof tradingPostActive !== 'undefined' && tradingPostActive);
   btn.style.display = inInterior ? 'block' : 'none';
