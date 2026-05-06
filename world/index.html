@@ -1552,7 +1552,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.6.0';
+const VERSION = 'v1.7.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -1718,7 +1718,7 @@ function triggerRoamingBattle(enemy) {
     round: 1,
     playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
     enemyCard: card,
-    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity },
+    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity, usedOncePerGame: false },
     log: [],
     phase: 'ready',
     playerDice: [],
@@ -4057,7 +4057,7 @@ function triggerWildEncounter() {
     round: 1,
     playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
     enemyCard: wildCard,
-    enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity },
+    enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity, usedOncePerGame: false },
     log: [],
     phase: 'ready', // ready, rolling, resolved
     playerDice: [],
@@ -4217,8 +4217,7 @@ function battleRoll() {
     }
     if (pg.id === 94) { // Jenkins — Barrage: roll 4 dice for damage
       const jDice = rollDice(4);
-      const jTotal = jDice.reduce((a, b) => a + b, 0);
-      const jDmg = Math.ceil(jTotal / 6); // scale damage
+      const jDmg = classify(jDice).damage;
       eg.hp = Math.max(0, eg.hp - jDmg);
       B.log.push({ text: `${pg.name} (Barrage): Entry roll [${jDice.join(', ')}] = ${jDmg} damage!`, type: 'ability' });
       if (eg.hp <= 0) { eg.ko = true; }
@@ -4235,10 +4234,30 @@ function battleRoll() {
     }
     if (eg.id === 94) { // Jenkins
       const jDice = rollDice(4);
-      const jDmg = Math.ceil(jDice.reduce((a, b) => a + b, 0) / 6);
+      const jDmg = classify(jDice).damage;
       pg.hp = Math.max(0, pg.hp - jDmg);
       B.log.push({ text: `${eg.name} (Barrage): Entry roll [${jDice.join(', ')}] = ${jDmg} damage!`, type: 'damage' });
       if (pg.hp <= 0) { pg.ko = true; }
+    }
+    // Nerina (306): Leviathan — 3 damage on entry
+    if (pg.id === 306) {
+      eg.hp = Math.max(0, eg.hp - 3);
+      B.log.push({ text: `${pg.name} (Leviathan): 3 damage on entry!`, type: 'ability' });
+      if (eg.hp <= 0) eg.ko = true;
+    }
+    if (eg.id === 306) {
+      pg.hp = Math.max(0, pg.hp - 3);
+      B.log.push({ text: `${eg.name} (Leviathan): 3 damage on entry!`, type: 'damage' });
+      if (pg.hp <= 0) pg.ko = true;
+    }
+    // Bouril (201): Slumber — first roll is 1-2-3
+    if (pg.id === 201) {
+      B.log.push({ text: `${pg.name} (Slumber): First roll is 1-2-3...`, type: 'ability' });
+      B.bourilActive = 'player';
+    }
+    if (eg.id === 201) {
+      B.log.push({ text: `${eg.name} (Slumber): First roll is 1-2-3...`, type: 'ability' });
+      B.bourilActive = 'enemy';
     }
 
     // If someone KO'd from entry, stop here
@@ -4262,6 +4281,18 @@ function battleRoll() {
     flashHpBar('pHpBar');
     if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
   }
+  // Ember Force (304): deal 1 damage before roll
+  if (pg.id === 304 && !eg.ko) {
+    eg.hp = Math.max(0, eg.hp - 1);
+    B.log.push({ text: `${pg.name} (Ember Force): Opponent takes 1 damage before the roll.`, type: 'ability' });
+    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
+  if (eg.id === 304 && !pg.ko) {
+    pg.hp = Math.max(0, pg.hp - 1);
+    B.log.push({ text: `${eg.name} (Ember Force): You take 1 damage before the roll.`, type: 'damage' });
+    flashHpBar('pHpBar');
+    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
 
   // ── DICE ANIMATION: show "?" first ──
   SFX.diceRoll();
@@ -4279,19 +4310,69 @@ function battleRoll() {
 
   setTimeout(() => {
     // ── ACTUAL ROLL ──
-    const pDice = rollDice(pDiceCount);
-    const eDice = rollDice(eDiceCount);
+    let pDice = rollDice(pDiceCount);
+    let eDice = rollDice(eDiceCount);
+
+    // Bouril (201): force first roll to 1-2-3
+    if (B.bourilActive === 'player') {
+      pDice = [1, 2, 3];
+      B.bourilActive = null;
+    } else if (B.bourilActive === 'enemy') {
+      eDice = [1, 2, 3];
+      B.bourilActive = null;
+    }
+
+    // Tommy Salami (30): rolling a 6 gains +1 die
+    if (pg.id === 30) {
+      let sixes = pDice.filter(d => d === 6).length;
+      while (sixes > 0) {
+        const extraDie = rollDie();
+        pDice.push(extraDie);
+        B.log.push({ text: `${pg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
+        sixes = (extraDie === 6) ? 1 : 0;
+      }
+    }
+    if (eg.id === 30) {
+      let sixes = eDice.filter(d => d === 6).length;
+      while (sixes > 0) {
+        const extraDie = rollDie();
+        eDice.push(extraDie);
+        B.log.push({ text: `${eg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
+        sixes = (extraDie === 6) ? 1 : 0;
+      }
+    }
+
     B.playerDice = pDice;
     B.enemyDice = eDice;
 
-    const pRoll = classify(pDice);
-    const eRoll = classify(eDice);
-    const winner = compareRolls(pRoll, eRoll);
+    let pRoll = classify(pDice);
+    let eRoll = classify(eDice);
+    let winner = compareRolls(pRoll, eRoll);
+
+    // Kodako (1): if dice are exactly [1,2,3], negate enemy damage and deal 4
+    if (pg.id === 1 && pDice.length === 3 && pDice.slice().sort((a,b)=>a-b).join(',') === '1,2,3') {
+      eg.hp = Math.max(0, eg.hp - 4);
+      B.log.push({ text: `${pg.name} (Origin Surge): 1-2-3 = negate damage & deal 4!`, type: 'ability' });
+      if (eg.hp <= 0) { eg.ko = true; }
+      winner = 'kodako';
+    }
+    if (eg.id === 1 && eDice.length === 3 && eDice.slice().sort((a,b)=>a-b).join(',') === '1,2,3') {
+      pg.hp = Math.max(0, pg.hp - 4);
+      B.log.push({ text: `${eg.name} (Origin Surge): 1-2-3 = negate damage & deal 4!`, type: 'damage' });
+      if (pg.hp <= 0) { pg.ko = true; }
+      winner = 'kodako';
+    }
 
     B.log.push({ text: `Round ${B.round}: You rolled [${pDice.join(', ')}] --- ${pRoll.type} (${pRoll.value}'s)`, type: 'ability' });
     B.log.push({ text: `${eg.name} rolled [${eDice.join(', ')}] --- ${eRoll.type} (${eRoll.value}'s)`, type: 'ability' });
 
-    if (winner === 'a') {
+    if (winner === 'kodako') {
+      // Kodako ability already applied damage, skip normal resolution
+      B.round++;
+      B.phase = 'ready';
+      if (rollBtn) rollBtn.disabled = false;
+      renderBattle();
+    } else if (winner === 'a') {
       let dmg = pRoll.damage;
 
       // Hunter bonus
@@ -4299,7 +4380,7 @@ function battleRoll() {
 
       // ── WIN BONUS ABILITIES (player) ──
       // Doc (42): +5 on doubles
-      if (pg.id === 42 && (pRoll.type === 'doubles' || pRoll.type === 'triples' || pRoll.type === 'quads' || pRoll.type === 'penta')) {
+      if (pg.id === 42 && pRoll.type === 'doubles') {
         dmg += 5;
         B.log.push({ text: `${pg.name} (Savage): +5 damage on doubles!`, type: 'ability' });
       }
@@ -4312,11 +4393,36 @@ function battleRoll() {
         }
       }
       // Pelter (86): doubles +2
-      if (pg.id === 86 && (pRoll.type === 'doubles' || pRoll.type === 'triples' || pRoll.type === 'quads' || pRoll.type === 'penta')) {
+      if (pg.id === 86 && pRoll.type === 'doubles') {
         dmg += 2;
         B.log.push({ text: `${pg.name} (Snowball): +2 damage on doubles!`, type: 'ability' });
       }
+      // Pudge (311): doubles +2 damage, take 1 self-damage
+      if (pg.id === 311 && pRoll.type === 'doubles') {
+        dmg += 2;
+        B.log.push({ text: `${pg.name} (Heavyweight): +2 damage on doubles!`, type: 'ability' });
+        pg.hp = Math.max(1, pg.hp - 1);
+        B.log.push({ text: `${pg.name} takes 1 self-damage from the effort.`, type: 'damage' });
+      }
+      // Humar (336): +2 bonus damage on win
+      if (pg.id === 336) {
+        dmg += 2;
+        B.log.push({ text: `${pg.name} (Meteor): +2 damage!`, type: 'ability' });
+      }
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
+
+      // Resource damage bonuses
+      if (B.resources.iceShards > 0) {
+        dmg += B.resources.iceShards;
+        B.log.push({ text: `Ice Shards: +${B.resources.iceShards} damage!`, type: 'ability' });
+        B.resources.iceShards = 0;
+      }
+      if (B.resources.sacredFire > 0) {
+        const fireDmg = B.resources.sacredFire * 3;
+        dmg += fireDmg;
+        B.log.push({ text: `Sacred Fire: +${fireDmg} damage!`, type: 'ability' });
+        B.resources.sacredFire = 0;
+      }
 
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
@@ -4345,10 +4451,20 @@ function battleRoll() {
       }
 
       // Flora (75): doubles = +2 HP
-      if (pg.id === 75 && (pRoll.type === 'doubles' || pRoll.type === 'triples' || pRoll.type === 'quads' || pRoll.type === 'penta')) {
+      if (pg.id === 75 && pRoll.type === 'doubles') {
         const healAmt = Math.min(2, pg.maxHp - pg.hp);
         pg.hp += healAmt;
         if (healAmt > 0) B.log.push({ text: `${pg.name} (Restore): +2 HP from doubles!`, type: 'heal' });
+      }
+
+      // Dart (209): win = gain 2 Surge
+      if (pg.id === 209) {
+        B.log.push({ text: `${pg.name} (Surge): +2 Surge on win!`, type: 'ability' });
+      }
+      // Zain (206): win = gain 1 Ice Shard
+      if (pg.id === 206) {
+        B.resources.iceShards += 1;
+        B.log.push({ text: `${pg.name} (Frostblade): +1 Ice Shard on win! [Total: ${B.resources.iceShards}]`, type: 'ability' });
       }
 
       SFX.hit();
@@ -4361,7 +4477,7 @@ function battleRoll() {
 
       // Puff (5): enemy doubles/triples -1 damage
       if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples')) {
-        dmg = Math.max(1, dmg - 1);
+        dmg = Math.max(0, dmg - 1);
         B.log.push({ text: `${pg.name} (Cute): Enemy doubles/triples do -1 damage!`, type: 'ability' });
       }
 
@@ -4384,10 +4500,25 @@ function battleRoll() {
       // Prince Balatron (113): lose & survive = counter die
       if (pg.id === 113 && !pg.ko) {
         const counterDie = rollDie();
-        const counterDmg = Math.ceil(counterDie / 2);
+        const counterDmg = counterDie;
         eg.hp = Math.max(0, eg.hp - counterDmg);
         B.log.push({ text: `${pg.name} (Party Time): Counter die [${counterDie}] = ${counterDmg} damage!`, type: 'ability' });
         if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by counter!`, type: 'damage' }); }
+      }
+
+      // Bogey (53): reflect damage once per game
+      if (eg.id === 53 && !eg.usedOncePerGame && !pg.ko) {
+        eg.usedOncePerGame = true;
+        pg.hp = Math.max(0, pg.hp - dmg);
+        eg.hp = Math.min(eg.maxHp, eg.hp + dmg);
+        B.log.push({ text: `${eg.name} (Reflector): Reflects ${dmg} damage back!`, type: 'ability' });
+        if (pg.hp <= 0) pg.ko = true;
+      }
+
+      // Powder (23): death trigger — gain 3 Ice Shards on KO
+      if (pg.id === 23 && pg.ko) {
+        B.resources.iceShards += 3;
+        B.log.push({ text: `${pg.name} (Frost Legacy): +3 Ice Shards on defeat! [Total: ${B.resources.iceShards}]`, type: 'ability' });
       }
 
       if (pg.ko) B.log.push({ text: `${pg.name} is defeated...`, type: 'damage' });
@@ -4885,7 +5016,7 @@ function renderCraftUI() {
   const previewEl = document.getElementById('craftPreview');
   if (craftState.selectedEssences.length >= needed) {
     previewEl.style.display = 'block';
-    document.getElementById('expFill').style.width = (craftState.experimentPoints * 15) + '%';
+    document.getElementById('expFill').style.width = Math.min(100, craftState.experimentPoints * 15) + '%';
     document.getElementById('expText').textContent = `Experiment Points: ${craftState.experimentPoints} | Mastery: ${masteryInfo.name} (${masteryXp} XP)`;
   } else {
     previewEl.style.display = 'none';
@@ -5527,7 +5658,7 @@ function renderMarket() {
         const isMine = sellerId === uid;
         html += `<div class="market-listing">
           <div class="ml-info">
-            <div class="ml-name">${listing.item.name}</div>
+            <div class="ml-name">${listing.item.icon ? listing.item.icon + ' ' : ''}${listing.item.name} <span style="color:${listing.item.qualityTier === 'Mastercraft' ? '#4fc878' : listing.item.qualityTier === 'Superior' ? '#c8b040' : listing.item.qualityTier === 'Standard' ? '#c89040' : '#c85040'};font-size:10px;">[${listing.item.qualityTier}]</span></div>
             <div class="ml-seller">by ${data.name || 'Unknown'}</div>
             <div class="ml-quality">Quality ${listing.item.quality} | ${listing.item.qualityTier}</div>
           </div>
@@ -5585,7 +5716,7 @@ function renderMarket() {
       if (!listing || !listing.item) continue;
       html += `<div class="market-listing">
         <div class="ml-info">
-          <div class="ml-name">${listing.item.name}</div>
+          <div class="ml-name">${listing.item.icon ? listing.item.icon + ' ' : ''}${listing.item.name} <span style="color:${listing.item.qualityTier === 'Mastercraft' ? '#4fc878' : listing.item.qualityTier === 'Superior' ? '#c8b040' : listing.item.qualityTier === 'Standard' ? '#c89040' : '#c85040'};font-size:10px;">[${listing.item.qualityTier}]</span></div>
           <div class="ml-quality">Quality ${listing.item.quality} | ${listing.item.qualityTier}</div>
         </div>
         <div class="ml-price">${listing.price} coins</div>
