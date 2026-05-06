@@ -1785,7 +1785,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.6.1';
+const VERSION = 'v3.6.2';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2361,11 +2361,16 @@ function triggerRoamingBattle(enemy) {
   SFX.encounterStart();
 
   const activeGhost = G.team[G.activeIdx];
-  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
+  let playerGhost = (activeGhost && !activeGhost.ko && activeGhost.hp > 0) ? activeGhost : G.team.find(g => !g.ko && g.hp > 0);
+  if (!playerGhost) {
+    playerGhost = G.team[0];
+    playerGhost.hp = Math.max(1, playerGhost.hp);
+    playerGhost.ko = false;
+  }
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
+    playerGhost: { ...playerGhost, hp: Math.max(1, playerGhost.hp), maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
     enemyCard: card,
     enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity, usedOncePerGame: false },
     log: [],
@@ -5029,13 +5034,19 @@ function triggerWildEncounter() {
   battleFledThisSession = false;
   G.inBattle = true;
 
-  // Use active team member
+  // Use active team member — ensure they have HP
   const activeGhost = G.team[G.activeIdx];
-  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
+  let playerGhost = (activeGhost && !activeGhost.ko && activeGhost.hp > 0) ? activeGhost : G.team.find(g => !g.ko && g.hp > 0);
+  if (!playerGhost) {
+    // All team members KO'd or 0 HP — force heal first member to 1 HP
+    playerGhost = G.team[0];
+    playerGhost.hp = Math.max(1, playerGhost.hp);
+    playerGhost.ko = false;
+  }
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
+    playerGhost: { ...playerGhost, hp: Math.max(1, playerGhost.hp), maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
     enemyCard: wildCard,
     enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity, usedOncePerGame: false },
     log: [],
