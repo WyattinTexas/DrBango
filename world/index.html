@@ -661,6 +661,45 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 .sprite-option .sprite-name { font-weight: bold; color: #fff; font-size: 12px; margin-top: 4px; }
 .sprite-option .sprite-desc { font-size: 10px; color: #888; }
 .sprite-option canvas { display: block; margin: 0 auto; image-rendering: pixelated; }
+
+/* ═══════ MOBILE RESPONSIVE ═══════ */
+@media (max-width: 768px) {
+  #hud { flex-wrap: wrap; gap: 4px; padding: 4px 8px; font-size: 11px; }
+  #hud .hud-left { gap: 8px; }
+  #hud .hud-right { gap: 6px; }
+  .hud-btn { padding: 3px 8px; font-size: 10px; }
+  .modal { padding: 20px 16px; max-height: 85vh; }
+  .modal h2 { font-size: 18px; }
+  .battle-arena { padding: 16px; }
+  .fighter-card { padding: 10px; }
+  .fighter-card .f-name { font-size: 14px; }
+  .fighter-card img { width: 56px; height: 56px; }
+  .vs-badge { font-size: 18px; }
+  #chatBox { width: 200px; }
+  #chatMessages { height: 80px; font-size: 10px; }
+  #minimap { width: 100px; height: 100px; }
+  #inventoryPanel { width: 260px; }
+  .starter-grid { grid-template-columns: 1fr; gap: 8px; }
+  .discipline-grid { grid-template-columns: 1fr; }
+  .sprite-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 480px) {
+  #minimap { display: none !important; }
+  #chatBox { width: 160px; bottom: 8px; left: 8px; }
+  #chatMessages { height: 60px; }
+  .battle-fighters { flex-direction: column; gap: 8px; }
+  .vs-badge { display: none; }
+}
+
+/* ═══════ TOUCH HINT ═══════ */
+#touchHint {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: rgba(255,255,255,0.3); z-index: 50;
+  display: none; text-align: center;
+}
+@media (hover: none) and (pointer: coarse) {
+  #touchHint { display: block; }
+}
 </style>
 </head>
 <body>
@@ -916,6 +955,9 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <!-- MINIMAP -->
 <canvas id="minimap" width="140" height="164" style="display:none;"></canvas>
 
+<!-- TOUCH HINT (mobile only) -->
+<div id="touchHint">Drag to move &bull; Double-tap to interact</div>
+
 <!-- ═══════════════════════════════════════════ -->
 <!-- FIREBASE SDK -->
 <!-- ═══════════════════════════════════════════ -->
@@ -929,7 +971,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v0.6.0';
+const VERSION = 'v0.6.1';
 
 // ═══════ SOUND DESIGN (Web Audio API — procedural) ═══════
 let sfxMuted = false;
@@ -2276,12 +2318,69 @@ function renderMinimap() {
 
 function setupInput() {
   window.addEventListener('keydown', e => {
+    // Don't capture keys when typing in an input field
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     keys[e.key.toLowerCase()] = true;
     if (e.key === 'e' || e.key === 'E') tryInteract();
     if (e.key === 'i' || e.key === 'I') toggleInventory();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
+    if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
+    if (e.key === 'Escape') {
+      // Close any open overlay
+      document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active')
+        .forEach(el => el.classList.remove('active'));
+      document.getElementById('inventoryPanel')?.classList.remove('open');
+    }
+    if (e.key === 'm' || e.key === 'M') toggleMute();
   });
-  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('keyup', e => {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    keys[e.key.toLowerCase()] = false;
+  });
+  // Blur chat input on Enter to return keyboard control to game
+  document.getElementById('chatInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.target.blur(); }
+  });
+
+  // ═══ MOBILE TOUCH CONTROLS ═══
+  let touchStartX = 0, touchStartY = 0, touchActive = false;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchActive = true;
+    // Init audio on first touch (browser policy)
+    if (!SFX.ctx) SFX.init();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!touchActive) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const deadzone = 15;
+    // Set movement keys based on touch drag direction
+    keys['a'] = dx < -deadzone;
+    keys['d'] = dx > deadzone;
+    keys['w'] = dy < -deadzone;
+    keys['s'] = dy > deadzone;
+    keys['arrowleft'] = false; keys['arrowright'] = false;
+    keys['arrowup'] = false; keys['arrowdown'] = false;
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    touchActive = false;
+    keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+  });
+  // Double-tap to interact
+  let lastTap = 0;
+  canvas.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTap < 300) tryInteract();
+    lastTap = now;
+  });
 
   canvas.addEventListener('click', e => {
     const rect = canvas.getBoundingClientRect();
