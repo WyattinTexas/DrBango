@@ -1630,7 +1630,25 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.1.0';
+const VERSION = 'v2.2.0';
+
+// ═══════ PASSIVE PROFESSION XP ═══════
+function addProfessionXP(type, amount) {
+  if (!G.professionXP) G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
+  const prev = G.professionXP[type] || 0;
+  G.professionXP[type] = prev + amount;
+
+  // Milestone notifications (every 100 XP)
+  const prevMilestone = Math.floor(prev / 100);
+  const newMilestone = Math.floor(G.professionXP[type] / 100);
+  if (newMilestone > prevMilestone) {
+    const typeNames = { combat:'Combat', exploration:'Exploration', crafting:'Crafting', trade:'Trade', charisma:'Charisma' };
+    notify(`${typeNames[type]} XP milestone: ${G.professionXP[type]}!`);
+  }
+
+  // Auto-save periodically (don't save on every tiny XP gain)
+  if (amount >= 10) saveGame();
+}
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -4020,6 +4038,14 @@ function gameLoop() {
       G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
       G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
 
+      // Profession XP: exploration (new tile visited)
+      const tileKey = Math.floor(G.x) + ',' + Math.floor(G.y);
+      if (!G.visitedTiles) G.visitedTiles = new Set();
+      if (!G.visitedTiles.has(tileKey)) {
+        G.visitedTiles.add(tileKey);
+        addProfessionXP('exploration', 1);
+      }
+
       // Footstep sound (throttled)
       SFX.footstep();
 
@@ -4909,6 +4935,12 @@ function endBattle(won) {
     checkQuestProgress('battle_won', { rarity: B.enemyCard.rarity });
     checkQuestProgress('essence_collected', essence);
 
+    // Profession XP: combat
+    addProfessionXP('combat', 10);
+    if (B.enemyCard && ['rare','ghost-rare','legendary'].includes(B.enemyCard.rarity)) {
+      addProfessionXP('combat', 10); // bonus for rare+ kills
+    }
+
     // Onboarding: after first battle win, show crafting hint
     advanceOnboarding(2);
     setTimeout(() => advanceOnboarding(3), 3000);
@@ -4939,6 +4971,9 @@ function endBattle(won) {
     // Heal team
     G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.5)); g.ko = false; });
     notify('Defeated... Respawning at hub.');
+
+    // Profession XP: combat (loss — still earns some)
+    addProfessionXP('combat', 5);
   }
 
   G.inBattle = false;
@@ -5754,6 +5789,10 @@ function finishExperiment() {
 
   G.gear.push(gear);
 
+  // Profession XP: crafting
+  const craftXP = gear.qualityTier === 'Mastercraft' ? 50 : gear.qualityTier === 'Superior' ? 30 : 15;
+  addProfessionXP('crafting', craftXP);
+
   SFX.craftSuccess();
 
   // Quest progress: craft complete
@@ -6006,6 +6045,8 @@ function listMarketItem(gearIdx) {
   G.rep.itemsSold++;
   checkAndNotifyTitles();
 
+  addProfessionXP('trade', 10); // selling
+
   saveGame();
   notify(`Listed ${gear.name} for ${price} coins!`);
   renderMarket();
@@ -6060,6 +6101,8 @@ function buyMarketItem(sellerId, listingIdx) {
 
   // Track seller reputation
   if (G.rep) { G.rep.itemsSold = (G.rep.itemsSold || 0); } // buyer side — seller tracks on their next load
+
+  addProfessionXP('trade', 5); // buying
 
   saveGame();
   updateHUD();
@@ -6518,7 +6561,13 @@ function tryInteract() {
 
 function updateHUD() {
   document.getElementById('hudName').textContent = G.name;
-  document.getElementById('hudDiscipline').textContent = 'Warden';
+  // Show top profession XP instead of static "Warden"
+  const topProf = Object.entries(G.professionXP || {}).sort((a,b) => b[1] - a[1])[0];
+  if (topProf && topProf[1] > 0) {
+    document.getElementById('hudDiscipline').textContent = topProf[0].charAt(0).toUpperCase() + topProf[0].slice(1) + ' ' + topProf[1];
+  } else {
+    document.getElementById('hudDiscipline').textContent = 'Warden';
+  }
   document.getElementById('hudLevel').textContent = `Lv.${G.level}`;
   document.getElementById('hudCoins').textContent = G.coins;
   const xpNeeded = G.level * 3;
@@ -6688,6 +6737,7 @@ function createCharacter() {
   G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
   G.professionSkills = {};  // unlocked skill box IDs -> true
   G.skillPointsUsed = 0;
+  G.visitedTiles = new Set();
 
   // Close modal
   document.getElementById('charCreateOverlay').classList.remove('active');
@@ -6755,6 +6805,7 @@ async function initFirebase() {
       G.professionXP = data.professionXP || { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
       G.professionSkills = data.professionSkills || {};
       G.skillPointsUsed = data.skillPointsUsed || 0;
+      G.visitedTiles = new Set(data.visitedTiles || []);
       G.direction = 'down';
       G.frame = 0;
       if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -6821,6 +6872,7 @@ function saveGame() {
     professionXP: G.professionXP,
     professionSkills: G.professionSkills,
     skillPointsUsed: G.skillPointsUsed,
+    visitedTiles: [...(G.visitedTiles || [])].slice(-500),
     lastSeen: firebase.database.ServerValue.TIMESTAMP,
     version: VERSION,
   });
@@ -6932,11 +6984,17 @@ function sendChat() {
   const guildPrefix = G.guild ? `[${G.guild.tag}] ` : '';
   const senderName = guildPrefix + (title ? `[${title}] ${G.name}` : G.name);
 
+  // Check if this is an emote command
+  const isEmote = ['/wave','/cheer','/craft','/sit','/dance'].includes(text.toLowerCase());
+
   db.ref('overworld/chat').push({
     sender: senderName,
     text: text.slice(0, 200),
     ts: firebase.database.ServerValue.TIMESTAMP,
   });
+
+  // Profession XP: charisma
+  addProfessionXP('charisma', isEmote ? 3 : 1);
 
   input.value = '';
 }
@@ -7037,6 +7095,7 @@ function sendCantinaChat() {
       emote: true,
       ts: firebase.database.ServerValue.TIMESTAMP,
     });
+    addProfessionXP('charisma', 3); // emote in cantina
   } else {
     db.ref('overworld/cantina_chat').push({
       sender: senderName,
@@ -7044,6 +7103,7 @@ function sendCantinaChat() {
       emote: false,
       ts: firebase.database.ServerValue.TIMESTAMP,
     });
+    addProfessionXP('charisma', 1); // cantina chat
   }
 
   input.value = '';
@@ -8068,6 +8128,7 @@ function confirmCreateGuild() {
 
   closeGuildCreate();
   updateHUD();
+  addProfessionXP('charisma', 10); // guild creation
   saveGame();
   notify(`Guild [${tag}] ${name} created!`);
   renderGuildPanel();
@@ -8085,6 +8146,7 @@ function inviteToGuild(targetUid, targetName) {
     invitedAt: Date.now(),
   });
 
+  addProfessionXP('charisma', 10); // guild invite
   notify(`Guild invite sent to ${targetName}!`);
 }
 
@@ -8677,6 +8739,8 @@ function processTipCommand(text) {
     ts: firebase.database.ServerValue.TIMESTAMP,
     isTip: true,
   });
+
+  addProfessionXP('trade', 2); // tipping
 
   saveGame();
   updateHUD();
