@@ -114,7 +114,9 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #battleOverlay {
   position: fixed; inset: 0; background: #e8e8e0; z-index: 900;
   display: none; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.4s ease;
 }
+#battleOverlay.visible { opacity: 1; }
 #battleOverlay.active { display: flex; }
 .battle-arena {
   width: 100%; max-width: 720px; height: 100vh; max-height: 520px;
@@ -191,13 +193,13 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 }
 .dice-set { display: flex; gap: 4px; }
 .die {
-  width: 32px; height: 32px; background: #f8f0e0; border: 2px solid #555;
-  border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: bold; color: #222; transition: all 0.3s;
-  box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+  width: 38px; height: 38px; background: #f8f0e0; border: 2px solid #555;
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: bold; color: #222; transition: all 0.3s;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.25);
 }
-.die.player { border-color: #2266aa; color: #1a4488; }
-.die.enemy { border-color: #aa3333; color: #882222; }
+.die.player { border-color: #2266aa; color: #fff; background: linear-gradient(135deg, #3378cc, #2060a0); }
+.die.enemy { border-color: #aa3333; color: #fff; background: linear-gradient(135deg, #cc4444, #a03030); }
 .die.rolling { color: #888; animation: diceFlicker 0.1s infinite; }
 @keyframes diceFlicker {
   0% { opacity: 0.5; }
@@ -213,8 +215,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   display: flex; flex-direction: column; justify-content: space-between;
 }
 .narrator-text {
-  font-size: 14px; color: #222; line-height: 1.5; min-height: 42px;
-  font-family: 'Segoe UI', sans-serif;
+  font-size: 15px; color: #1a1a1a; line-height: 1.6; min-height: 48px;
+  font-family: 'Segoe UI', sans-serif; padding: 2px 0;
 }
 .narrator-text .dmg { color: #c03030; font-weight: bold; }
 .narrator-text .heal { color: #30a030; font-weight: bold; }
@@ -257,6 +259,17 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   0% { opacity: 1; transform: translateY(0) scale(1.2); }
   60% { opacity: 1; transform: translateY(-40px) scale(1); }
   100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+
+/* ── SPRITE ART FALLBACK ── */
+.sprite-fallback {
+  width: 160px; height: 160px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: bold; color: #fff; text-align: center;
+  margin: 0 auto; padding: 12px;
+  border: 3px solid rgba(0,0,0,0.2);
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.4));
+  line-height: 1.2;
 }
 
 /* ── SPRITE REACTIONS ── */
@@ -1772,7 +1785,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.3.0';
+const VERSION = 'v3.4.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2367,8 +2380,7 @@ function triggerRoamingBattle(enemy) {
     damageTakenThisRound: 0,
   };
 
-  const overlay = document.getElementById('battleOverlay');
-  overlay.classList.add('active');
+  showBattleOverlay();
   document.getElementById('battleTitle').textContent = warnings[Math.floor(Math.random() * warnings.length)];
   renderBattle();
   notify(`⚠️ ${card.name} attacks!`);
@@ -5050,12 +5062,17 @@ function triggerWildEncounter() {
   };
 
   // Show battle overlay
-  const overlay = document.getElementById('battleOverlay');
-  overlay.classList.add('active');
+  showBattleOverlay();
   document.getElementById('battleTitle').textContent = `Wild ${wildCard.name} appeared!`;
 
   renderBattle();
   notify(`Wild ${wildCard.name} appeared!`);
+}
+
+function showBattleOverlay() {
+  const overlay = document.getElementById('battleOverlay');
+  overlay.classList.add('active');
+  requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('visible')));
 }
 
 function renderBattle() {
@@ -5069,9 +5086,19 @@ function renderBattle() {
   document.getElementById('pFighterName').textContent = pg.name;
   document.getElementById('pFighterAbility').textContent = pg.ability;
   const pArt = document.getElementById('pFighterArt');
+  pArt.parentElement.querySelector('.sprite-fallback')?.remove();
   pArt.src = pCard?.art || '';
   pArt.style.display = '';
-  pArt.onerror = function() { this.style.display = 'none'; };
+  pArt.onerror = function() {
+    this.style.display = 'none';
+    this.parentElement.querySelector('.sprite-fallback')?.remove();
+    const fb = document.createElement('div');
+    fb.className = 'sprite-fallback';
+    const rarityBg = {common:'#555',uncommon:'#2a6a2a',rare:'#2a4a8a','ghost-rare':'#6a2a8a',legendary:'#8a6a1a'}[pg.rarity] || '#444';
+    fb.style.background = rarityBg;
+    fb.textContent = pg.name;
+    this.parentElement.insertBefore(fb, this);
+  };
   const pPct = Math.max(0, pg.hp / pg.maxHp * 100);
   const pBar = document.getElementById('pHpBar');
   pBar.style.width = pPct + '%';
@@ -5084,9 +5111,19 @@ function renderBattle() {
   document.getElementById('eFighterName').textContent = eg.name;
   document.getElementById('eFighterAbility').textContent = eg.ability;
   const eArt = document.getElementById('eFighterArt');
+  eArt.parentElement.querySelector('.sprite-fallback')?.remove();
   eArt.src = eCard?.art || '';
   eArt.style.display = '';
-  eArt.onerror = function() { this.style.display = 'none'; };
+  eArt.onerror = function() {
+    this.style.display = 'none';
+    this.parentElement.querySelector('.sprite-fallback')?.remove();
+    const fb = document.createElement('div');
+    fb.className = 'sprite-fallback';
+    const rarityBg = {common:'#555',uncommon:'#2a6a2a',rare:'#2a4a8a','ghost-rare':'#6a2a8a',legendary:'#8a6a1a'}[eg.rarity] || '#444';
+    fb.style.background = rarityBg;
+    fb.textContent = eg.name;
+    this.parentElement.insertBefore(fb, this);
+  };
   const ePct = Math.max(0, eg.hp / eg.maxHp * 100);
   const eBar = document.getElementById('eHpBar');
   eBar.style.width = ePct + '%';
@@ -5742,7 +5779,7 @@ function fleeBattle() {
   G.luckyStones = B.resources?.luckyStones || G.luckyStones;
   G.inBattle = false;
   B = null;
-  document.getElementById('battleOverlay').classList.remove('active');
+  document.getElementById('battleOverlay').classList.remove('active', 'visible');
   requestAnimationFrame(render);
   gameLoop();
 }
@@ -5775,7 +5812,7 @@ function endBattle(won) {
 
     G.inBattle = false;
     B = null;
-    document.getElementById('battleOverlay').classList.remove('active');
+    document.getElementById('battleOverlay').classList.remove('active', 'visible');
     updateHUD();
     saveGame();
     requestAnimationFrame(render);
@@ -5854,7 +5891,7 @@ function endBattle(won) {
       // Don't close battle overlay yet, recruit modal sits on top
       G.inBattle = false;
       B = null;
-      document.getElementById('battleOverlay').classList.remove('active');
+      document.getElementById('battleOverlay').classList.remove('active', 'visible');
       updateHUD();
       saveGame();
       return;
@@ -5880,7 +5917,7 @@ function endBattle(won) {
 
   G.inBattle = false;
   B = null;
-  document.getElementById('battleOverlay').classList.remove('active');
+  document.getElementById('battleOverlay').classList.remove('active', 'visible');
 
   updateHUD();
   saveGame();
@@ -9042,8 +9079,7 @@ function engageWorldBoss() {
     bossStartHp: engagementHp,
   };
 
-  const overlay = document.getElementById('battleOverlay');
-  overlay.classList.add('active');
+  showBattleOverlay();
   document.getElementById('battleTitle').textContent = `WORLD BOSS: ${bossCard.name}!`;
   document.getElementById('battleTitle').style.color = '#ff4444';
 
