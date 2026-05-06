@@ -1630,7 +1630,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.2.0';
+const VERSION = 'v2.3.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -1648,6 +1648,212 @@ function addProfessionXP(type, amount) {
 
   // Auto-save periodically (don't save on every tiny XP gain)
   if (amount >= 10) saveGame();
+}
+
+// ═══════ PROFESSION SKILL TREE ═══════
+const SKILL_POINT_CAP = 80;
+
+const PROFESSION_TREE = {
+  hunter: { name:'Hunter', icon:'🏹', xpType:'combat', tier:1, color:'#c44',
+    boxes: [
+      { id:'hunt_1', cost:5, xpReq:100, name:'Tracker', desc:'+5% battle damage' },
+      { id:'hunt_2', cost:5, xpReq:200, name:'Trapper', desc:'+10% recruit chance' },
+      { id:'hunt_3', cost:5, xpReq:350, name:'Stalker', desc:'Enemies visible from further' },
+      { id:'hunt_4', cost:5, xpReq:500, name:'Warden', desc:'Unlock Spirit Hunter' },
+    ]},
+  spiritHunter: { name:'Spirit Hunter', icon:'👻', xpType:'combat', tier:2, requires:'hunt_4', color:'#e44',
+    boxes: [
+      { id:'sh_1', cost:8, xpReq:800, name:'Ghost Tracker', desc:'+1 die first roll' },
+      { id:'sh_2', cost:8, xpReq:1200, name:'Rare Seeker', desc:'Rare enemies more often' },
+      { id:'sh_3', cost:8, xpReq:1600, name:'Spirit Breaker', desc:'+15% dmg to Ghost-Rare+' },
+      { id:'sh_4', cost:8, xpReq:2000, name:'Ghost Slayer', desc:'Legendaries in wild + auto-swap' },
+    ]},
+  scout: { name:'Scout', icon:'🗺️', xpType:'exploration', tier:1, color:'#4a4',
+    boxes: [
+      { id:'sct_1', cost:5, xpReq:100, name:'Pathfinder', desc:'+20% survey concentration' },
+      { id:'sct_2', cost:5, xpReq:200, name:'Cartographer', desc:'Nodes visible on minimap' },
+      { id:'sct_3', cost:5, xpReq:350, name:'Wayfinder', desc:'Move 10% faster' },
+      { id:'sct_4', cost:5, xpReq:500, name:'Ranger', desc:'Unlock Wilderness Master' },
+    ]},
+  ranger: { name:'Wilderness Master', icon:'🌲', xpType:'exploration', tier:2, requires:'sct_4', color:'#2a6',
+    boxes: [
+      { id:'rng_1', cost:8, xpReq:800, name:'Trailblazer', desc:'Spirit Wisps visible longer' },
+      { id:'rng_2', cost:8, xpReq:1200, name:'Forager', desc:'Resource nodes yield double' },
+      { id:'rng_3', cost:8, xpReq:1600, name:'Survivalist', desc:'No flee penalty' },
+      { id:'rng_4', cost:8, xpReq:2000, name:'Wilderness Master', desc:'Reveal hidden zones' },
+    ]},
+  tinkerer: { name:'Tinkerer', icon:'🔧', xpType:'crafting', tier:1, color:'#4ac',
+    boxes: [
+      { id:'tnk_1', cost:5, xpReq:100, name:'Apprentice', desc:'+1 experiment point' },
+      { id:'tnk_2', cost:5, xpReq:200, name:'Assembler', desc:'Assembly roll +10' },
+      { id:'tnk_3', cost:5, xpReq:350, name:'Journeyman', desc:'Craft commons anywhere' },
+      { id:'tnk_4', cost:5, xpReq:500, name:'Artisan', desc:'Unlock craft specializations' },
+    ]},
+  blacksmith: { name:'Blacksmith', icon:'⚒️', xpType:'crafting', tier:2, requires:'tnk_4', color:'#888',
+    boxes: [
+      { id:'bs_1', cost:8, xpReq:800, name:'Forge Hand', desc:'Weapon+armor quality +50' },
+      { id:'bs_2', cost:8, xpReq:1200, name:'Smith', desc:'Can use infusions' },
+      { id:'bs_3', cost:8, xpReq:1600, name:'Master Smith', desc:'Unlock Armorer' },
+      { id:'bs_4', cost:8, xpReq:2000, name:'Grand Smith', desc:'Legendary armor crafting' },
+    ]},
+  armorer: { name:'Armorer', icon:'🛡️', xpType:'crafting', tier:3, requires:'bs_3', color:'#68a',
+    boxes: [
+      { id:'arm_1', cost:10, xpReq:2500, name:'Plate Worker', desc:'Armor quality +100' },
+      { id:'arm_2', cost:10, xpReq:3000, name:'Shield Master', desc:'+1 damage reduction' },
+      { id:'arm_3', cost:10, xpReq:3500, name:'Iron Wall', desc:'Mastercraft armor guaranteed' },
+    ]},
+  swordsmith: { name:'Swordsmith', icon:'⚔️', xpType:'crafting', tier:2, requires:'tnk_4', color:'#a66',
+    boxes: [
+      { id:'ss_1', cost:8, xpReq:800, name:'Blade Apprentice', desc:'Blade quality +50' },
+      { id:'ss_2', cost:8, xpReq:1200, name:'Swordsmith', desc:'+1 experiment on blades' },
+      { id:'ss_3', cost:8, xpReq:1600, name:'Blade Master', desc:'Mastercraft blades' },
+      { id:'ss_4', cost:8, xpReq:2000, name:'Sword Master', desc:'Unique blade schematics' },
+    ]},
+  blasterEng: { name:'Blaster Engineering', icon:'🔫', xpType:'crafting', tier:2, requires:'tnk_4', color:'#6a8',
+    boxes: [
+      { id:'be_1', cost:8, xpReq:800, name:'Tinkerer', desc:'Blaster quality +50' },
+      { id:'be_2', cost:8, xpReq:1200, name:'Engineer', desc:'+1 experiment on blasters' },
+      { id:'be_3', cost:8, xpReq:1600, name:'Blaster Smith', desc:'Mastercraft blasters' },
+      { id:'be_4', cost:8, xpReq:2000, name:'Deadeye Engineer', desc:'Unique blaster schematics' },
+    ]},
+  frostMagic: { name:'Frost Magic', icon:'❄️', xpType:'crafting', tier:2, requires:'tnk_4', color:'#68c',
+    boxes: [
+      { id:'fm_1', cost:8, xpReq:800, name:'Frost Novice', desc:'Craft Frost Infusions' },
+      { id:'fm_2', cost:8, xpReq:1200, name:'Frost Adept', desc:'Ice essence +15%' },
+      { id:'fm_3', cost:8, xpReq:1600, name:'Frost Mage', desc:'Basic ice gear' },
+      { id:'fm_4', cost:8, xpReq:2000, name:'Glacial Artisan', desc:'Master ice gear' },
+    ]},
+  flameMagic: { name:'Flame Magic', icon:'🔥', xpType:'crafting', tier:2, requires:'tnk_4', color:'#c64',
+    boxes: [
+      { id:'flm_1', cost:8, xpReq:800, name:'Flame Novice', desc:'Craft Flame Cores' },
+      { id:'flm_2', cost:8, xpReq:1200, name:'Flame Adept', desc:'Fire essence +15%' },
+      { id:'flm_3', cost:8, xpReq:1600, name:'Flame Mage', desc:'Basic fire gear' },
+      { id:'flm_4', cost:8, xpReq:2000, name:'Volcanic Artisan', desc:'Master fire gear' },
+    ]},
+  maskMaker: { name:'Mask Maker', icon:'🎭', xpType:'crafting', tier:2, requires:'tnk_4', color:'#a6a',
+    boxes: [
+      { id:'mm_1', cost:8, xpReq:800, name:'Mask Apprentice', desc:'Craft basic masks' },
+      { id:'mm_2', cost:8, xpReq:1200, name:'Mask Maker', desc:'Craft Mask Cores' },
+      { id:'mm_3', cost:8, xpReq:1600, name:'Mask Artist', desc:'Mastercraft masks' },
+      { id:'mm_4', cost:8, xpReq:2000, name:'Face Shaper', desc:'Unique mask schematics' },
+    ]},
+  charmCrafting: { name:'Charm Crafting', icon:'💎', xpType:'crafting', tier:2, requires:'tnk_4', color:'#6ac',
+    boxes: [
+      { id:'cc_1', cost:8, xpReq:800, name:'Charm Novice', desc:'Craft basic charms' },
+      { id:'cc_2', cost:8, xpReq:1200, name:'Charm Crafter', desc:'Craft Enchantments' },
+      { id:'cc_3', cost:8, xpReq:1600, name:'Spirit Weaver', desc:'Mastercraft charms' },
+      { id:'cc_4', cost:8, xpReq:2000, name:'Spiritbinder', desc:'Unique charm schematics' },
+    ]},
+  merchant: { name:'Merchant', icon:'💰', xpType:'trade', tier:1, color:'#ca4',
+    boxes: [
+      { id:'mrc_1', cost:5, xpReq:100, name:'Peddler', desc:'+1 market listing slot' },
+      { id:'mrc_2', cost:5, xpReq:200, name:'Trader', desc:'NPC trade hints' },
+      { id:'mrc_3', cost:5, xpReq:350, name:'Dealer', desc:'Traps 25% faster' },
+      { id:'mrc_4', cost:5, xpReq:500, name:'Broker', desc:'Unlock Tycoon' },
+    ]},
+  tycoon: { name:'Tycoon', icon:'👑', xpType:'trade', tier:2, requires:'mrc_4', color:'#ea4',
+    boxes: [
+      { id:'tyc_1', cost:8, xpReq:800, name:'Mogul', desc:'+2 market listing slots' },
+      { id:'tyc_2', cost:8, xpReq:1200, name:'Baron', desc:'Market fees reduced' },
+      { id:'tyc_3', cost:8, xpReq:1600, name:'Magnate', desc:'See all zone quality remotely' },
+      { id:'tyc_4', cost:8, xpReq:2000, name:'Tycoon', desc:'Exclusive trade schematics' },
+    ]},
+  socialite: { name:'Socialite', icon:'🎉', xpType:'charisma', tier:1, color:'#c8a',
+    boxes: [
+      { id:'soc_1', cost:5, xpReq:100, name:'Regular', desc:'Tips doubled for receiver' },
+      { id:'soc_2', cost:5, xpReq:200, name:'Networker', desc:'Guild invite range+' },
+      { id:'soc_3', cost:5, xpReq:350, name:'Influencer', desc:'Cantina buffs' },
+      { id:'soc_4', cost:5, xpReq:500, name:'Mayor', desc:'Unlock Governor' },
+    ]},
+  governor: { name:'Governor', icon:'🏛️', xpType:'charisma', tier:2, requires:'soc_4', color:'#e8c',
+    boxes: [
+      { id:'gov_1', cost:8, xpReq:800, name:'Councilor', desc:'Guild max size +5' },
+      { id:'gov_2', cost:8, xpReq:1200, name:'Senator', desc:'Guild-wide crafting bonus' },
+      { id:'gov_3', cost:8, xpReq:1600, name:'Chancellor', desc:'Zone buff aura' },
+      { id:'gov_4', cost:8, xpReq:2000, name:'Governor', desc:'Name a landmark' },
+    ]},
+};
+
+// Check if a skill box can be unlocked
+function canUnlockBox(boxId) {
+  if (!G.professionSkills) G.professionSkills = {};
+  if (G.professionSkills[boxId]) return false; // already unlocked
+
+  // Find the box in the tree
+  for (const [profId, prof] of Object.entries(PROFESSION_TREE)) {
+    const boxIdx = prof.boxes.findIndex(b => b.id === boxId);
+    if (boxIdx === -1) continue;
+
+    const box = prof.boxes[boxIdx];
+
+    // Check skill point cap
+    if ((G.skillPointsUsed || 0) + box.cost > SKILL_POINT_CAP) return false;
+
+    // Check XP requirement
+    if ((G.professionXP?.[prof.xpType] || 0) < box.xpReq) return false;
+
+    // Check prerequisite profession unlock
+    if (prof.requires && !G.professionSkills[prof.requires]) return false;
+
+    // Check previous box in same profession (must unlock in order)
+    if (boxIdx > 0 && !G.professionSkills[prof.boxes[boxIdx - 1].id]) return false;
+
+    return true;
+  }
+  return false;
+}
+
+// Unlock a skill box
+function unlockSkillBox(boxId) {
+  if (!canUnlockBox(boxId)) return false;
+
+  for (const [profId, prof] of Object.entries(PROFESSION_TREE)) {
+    const box = prof.boxes.find(b => b.id === boxId);
+    if (!box) continue;
+
+    G.professionSkills[boxId] = true;
+    G.skillPointsUsed = (G.skillPointsUsed || 0) + box.cost;
+
+    notify(`🌟 Skill Unlocked: ${box.name} (${prof.name})`);
+    SFX.levelUp();
+    saveGame();
+    return true;
+  }
+  return false;
+}
+
+// Check if player has a specific skill
+function hasSkill(boxId) {
+  return !!(G.professionSkills && G.professionSkills[boxId]);
+}
+
+// Get all active effects from unlocked skills
+function getActiveEffects() {
+  const effects = {};
+  if (!G.professionSkills) return effects;
+
+  for (const [profId, prof] of Object.entries(PROFESSION_TREE)) {
+    for (const box of prof.boxes) {
+      if (G.professionSkills[box.id]) {
+        // Merge effect into accumulator
+        Object.assign(effects, { [box.id]: true });
+      }
+    }
+  }
+  return effects;
+}
+
+// Get the highest unlocked title in each profession
+function getProfessionTitles() {
+  const titles = [];
+  for (const [profId, prof] of Object.entries(PROFESSION_TREE)) {
+    let highestBox = null;
+    for (const box of prof.boxes) {
+      if (G.professionSkills?.[box.id]) highestBox = box;
+    }
+    if (highestBox) titles.push({ prof: prof.name, icon: prof.icon, title: highestBox.name });
+  }
+  return titles;
 }
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
