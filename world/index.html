@@ -1772,7 +1772,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.1.0';
+const VERSION = 'v3.2.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -4500,7 +4500,8 @@ function render() {
 
     // Name label (only when close or chasing)
     const distToPlayer = Math.sqrt((e.x - G.x)**2 + (e.y - G.y)**2);
-    if (distToPlayer < 8 || e.state === 'chase') {
+    const nameLabelDist = hasSkill('rng_2') ? 12 : 8;
+    if (distToPlayer < nameLabelDist || e.state === 'chase') {
       ctx.fillStyle = e.state === 'chase' ? '#ff4444' : '#aa6666';
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
@@ -4787,8 +4788,9 @@ function gameLoop() {
       G.direction = dy > 0 ? 'down' : 'up';
     }
 
-    const newX = G.x + dx * 0.05;
-    const newY = G.y + dy * 0.05;
+    const speedMult = hasSkill('rng_1') ? 1.1 : 1.0;
+    const newX = G.x + dx * 0.05 * speedMult;
+    const newY = G.y + dy * 0.05 * speedMult;
     const tileAtNew = worldMap[Math.floor(newY)]?.[Math.floor(newX)] ?? 7;
 
     // Collision check (block: trees, water, mountains, warm trees, lava, obsidian, palm trees)
@@ -4925,6 +4927,12 @@ function getWildEncounter() {
   if (G.discipline === 'scout') {
     weights.rare = 20;
     weights['ghost-rare'] = 8;
+  }
+
+  // Tracker skill: rare enemies 50% more frequent
+  if (hasSkill('rng_2')) {
+    weights.rare = Math.floor(weights.rare * 1.5);
+    weights['ghost-rare'] = Math.floor(weights['ghost-rare'] * 1.5);
   }
 
   const weighted = [];
@@ -5281,6 +5289,12 @@ function battleRoll() {
   B.nextRoundMods = { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 };
   B.damageTakenThisRound = 0;
 
+  // Ghost Tracker skill: +1 die on first roll
+  if (hasSkill('sr_2') && B.round === 1) {
+    pDiceCount += 1;
+    B.log.push({ text: 'Ghost Tracker: +1 die on first roll!', type: 'ability' });
+  }
+
   // Fredrick (27): opponent may only roll up to 3 dice
   if (pg.id === 27) { eDiceCount = Math.min(eDiceCount, 3); }
   if (eg.id === 27) { pDiceCount = Math.min(pDiceCount, 3); }
@@ -5488,6 +5502,13 @@ function battleRoll() {
         }
       }
 
+      // Spirit Breaker skill: +15% damage to ghost-rare+
+      if (hasSkill('sr_3') && ['ghost-rare', 'legendary'].includes(B.enemyCard?.rarity)) {
+        const bonusDmg = Math.max(1, Math.floor(dmg * 0.15));
+        dmg += bonusDmg;
+        B.log.push({ text: `Spirit Breaker: +${bonusDmg} damage vs ${B.enemyCard.rarity}!`, type: 'ability' });
+      }
+
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
       B.log.push({ text: `You deal ${dmg} damage!`, type: 'damage' });
@@ -5656,8 +5677,8 @@ function battleRoll() {
 function fleeBattle() {
   if (!B) return;
 
-  // Aggressive encounters cost you for fleeing
-  if (B.isAggressive) {
+  // Aggressive encounters cost you for fleeing (Wilderness Master skips penalty)
+  if (B.isAggressive && !hasSkill('sr_4')) {
     const coinLoss = Math.min(G.coins, 2 + Math.floor(Math.random() * 3));
     G.coins = Math.max(0, G.coins - coinLoss);
     // Take 1 damage to active team member
@@ -5667,6 +5688,9 @@ function fleeBattle() {
     }
     B.log.push({ text: `You barely escaped! Lost ${coinLoss} coins and took a hit.`, type: 'damage' });
     notify(`🏃 Escaped! Lost ${coinLoss} coins.`);
+  } else if (B.isAggressive && hasSkill('sr_4')) {
+    B.log.push({ text: 'Wilderness Master: clean escape!', type: 'ability' });
+    notify('🏃 Clean escape! (Wilderness Master)');
   } else {
     B.log.push({ text: 'You fled the battle!', type: '' });
   }
@@ -5790,7 +5814,8 @@ function endBattle(won) {
     }
 
     // ── RECRUITMENT CHECK ──
-    const recruitChance = G.discipline === 'hunter' ? 0.6 : 0.4;
+    let recruitChance = G.discipline === 'hunter' ? 0.6 : 0.4;
+    if (hasSkill('sr_2')) recruitChance += 0.1; // Ghost Tracker: +10% recruit chance
     if (Math.random() < recruitChance) {
       showRecruitModal(B.enemyCard);
       // Don't close battle overlay yet, recruit modal sits on top
@@ -5802,6 +5827,12 @@ function endBattle(won) {
       return;
     }
   } else {
+    // Wilderness Master: auto-swap to next alive ghost on KO
+    if (hasSkill('sr_4')) {
+      const nextAlive = G.team.findIndex(g => !g.ko && g.hp > 0);
+      if (nextAlive >= 0) G.activeIdx = nextAlive;
+    }
+
     SFX.defeat();
     // Respawn at hub
     G.x = 16; G.y = 9;
@@ -6141,9 +6172,9 @@ function clickUnlockBox(boxId) {
 }
 
 function openCrafting() {
-  // Check if near workshop
+  // Check if near workshop (Journeyman can craft commons anywhere)
   const nearWorkshop = isNearWorkshop();
-  if (!nearWorkshop) {
+  if (!nearWorkshop && !hasSkill('tnk_3')) {
     notify('Find a workshop in the hub town to craft!');
     return;
   }
@@ -6157,7 +6188,8 @@ function openCrafting() {
   const masteryXp = G.mastery[masteryType]?.xp || 0;
   const masteryLvl = getMasteryLevel(masteryXp);
   const baseExp = G.discipline === 'artificer' ? 3 : 1;
-  craftState = { selectedEssences: [], schematic: SCHEMATICS[0], experimentPoints: baseExp + masteryLvl };
+  const tnkBonus = hasSkill('tnk_1') ? 1 : 0; // Apprentice: +1 experiment point
+  craftState = { selectedEssences: [], schematic: SCHEMATICS[0], experimentPoints: baseExp + masteryLvl + tnkBonus };
   renderCraftUI();
   document.getElementById('craftOverlay').classList.add('active');
 }
@@ -6325,7 +6357,8 @@ function selectSchematic(id) {
   const masteryXp = G.mastery[masteryType]?.xp || 0;
   const masteryLvl = getMasteryLevel(masteryXp);
   const baseExp = G.discipline === 'artificer' ? 3 : 1;
-  craftState.experimentPoints = baseExp + masteryLvl;
+  const tnkBonus2 = hasSkill('tnk_1') ? 1 : 0; // Apprentice: +1 experiment point
+  craftState.experimentPoints = baseExp + masteryLvl + tnkBonus2;
   renderCraftUI();
 }
 
@@ -6441,6 +6474,12 @@ function doCraft() {
   const schem = craftState.schematic;
   if (essences.length < schem.essencesNeeded) return;
 
+  // Journeyman: can craft commons anywhere, but rare+ still needs workshop
+  if (!isNearWorkshop() && hasSkill('tnk_3') && schem.tier !== 'common') {
+    notify('Rare+ schematics still require a workshop!');
+    return;
+  }
+
   // Check material requirements
   if (schem.requiresMaterial) {
     for (const [matId, qty] of Object.entries(schem.requiresMaterial)) {
@@ -6552,7 +6591,8 @@ function startAssemblyPhase() {
 function resolveAssembly() {
   const roll = Math.floor(Math.random() * 100) + 1;
   const masteryBonus = expState.masteryLvl * 5;
-  const adjustedRoll = Math.min(100, roll + masteryBonus);
+  const assemblerBonus = hasSkill('tnk_2') ? 10 : 0; // Assembler: +10
+  const adjustedRoll = Math.min(100, roll + masteryBonus + assemblerBonus);
 
   const spinner = document.getElementById('assemblySpinner');
   const resultText = document.getElementById('assemblyResultText');
@@ -6771,7 +6811,12 @@ function finishExperiment() {
   }
 
   // Create the gear with directed experiment results factored in
-  const quality = Math.max(1, expState.baseQuality + expState.expQuality);
+  let quality = Math.max(1, expState.baseQuality + expState.expQuality);
+
+  // Profession skill quality bonuses
+  if (hasSkill('bs_1') && (schem.type === 'weapon' || schem.type === 'armor')) quality += 50; // Forge Hand
+  if (hasSkill('ss_1') && schem.id.includes('blade')) quality += 50; // Blade Apprentice
+  if (hasSkill('be_1') && schem.id.includes('blaster')) quality += 50; // Blaster Tinkerer
   const qualityTier = quality > 600 ? 'Mastercraft' : quality > 400 ? 'Superior' : quality > 200 ? 'Standard' : 'Basic';
 
   const essences = craftState.selectedEssences;
@@ -7055,7 +7100,8 @@ function listMarketItem(gearIdx) {
   // Read existing listings
   const myData = marketListings[uid] || { name: G.name, listings: [] };
   const listings = (myData.listings || []).filter(l => l);
-  if (listings.length >= 3) { notify('Max 3 listings. Remove one first.'); return; }
+  const maxListings = 3 + (hasSkill('mrc_1') ? 1 : 0); // Peddler: +1 slot
+  if (listings.length >= maxListings) { notify(`Max ${maxListings} listings. Remove one first.`); return; }
 
   listings.push({ item: { ...gear }, price, listedAt: Date.now() });
 
@@ -9360,6 +9406,9 @@ function getSurveyConcentration(tileX, tileY, zoneIdx) {
   // Scout discipline bonus: +20%
   if (G.discipline === 'scout') concentration += 20;
 
+  // Pathfinder skill: +20% concentration
+  if (hasSkill('rng_1')) concentration += 20;
+
   return Math.min(100, Math.max(0, Math.round(concentration)));
 }
 
@@ -9630,7 +9679,8 @@ function collectFromTrap(trapId) {
 
     const now = Date.now();
     const hoursSinceLast = (now - trap.lastCollected) / (1000 * 60 * 60);
-    const interval = trap.type === 'advanced' ? 0.5 : 1; // hours
+    let interval = trap.type === 'advanced' ? 0.5 : 1; // hours
+    if (hasSkill('mrc_3')) interval *= 0.75; // Dealer: traps 25% faster
     const essencesReady = Math.floor(hoursSinceLast / interval);
 
     if (essencesReady < 1) {
@@ -9744,7 +9794,8 @@ function renderTrapsInInventory() {
   const now = Date.now();
   el.innerHTML = playerTraps.map(t => {
     const hoursSinceLast = (now - t.lastCollected) / (1000 * 60 * 60);
-    const interval = t.type === 'advanced' ? 0.5 : 1;
+    let interval = t.type === 'advanced' ? 0.5 : 1;
+    if (hasSkill('mrc_3')) interval *= 0.75; // Dealer: traps 25% faster
     const essencesReady = Math.floor(hoursSinceLast / interval);
     const minutesToNext = essencesReady < 1 ? Math.ceil((interval * 60) - (hoursSinceLast * 60)) : 0;
 
@@ -9842,9 +9893,12 @@ function processTipCommand(text) {
   // Transfer coins
   G.coins -= amount;
 
+  // Regular skill: tips doubled for receiver
+  const tipAmount = hasSkill('soc_1') ? amount * 2 : amount;
+
   // Credit recipient via Firebase transaction
   db.ref(`overworld/players/${targetUid}/coins`).transaction(current => {
-    return (current || 0) + amount;
+    return (current || 0) + tipAmount;
   });
 
   // Post system message in chat
@@ -9853,7 +9907,7 @@ function processTipCommand(text) {
 
   db.ref('overworld/chat').push({
     sender: 'system',
-    text: `💰 ${senderDisplay} tipped ${targetName} ${amount} coin${amount > 1 ? 's' : ''}!`,
+    text: `💰 ${senderDisplay} tipped ${targetName} ${tipAmount} coin${tipAmount > 1 ? 's' : ''}!${tipAmount > amount ? ' (Regular doubled it!)' : ''}`,
     ts: firebase.database.ServerValue.TIMESTAMP,
     isTip: true,
   });
@@ -9862,7 +9916,7 @@ function processTipCommand(text) {
 
   saveGame();
   updateHUD();
-  notify(`Tipped ${targetName} ${amount} coins!`);
+  notify(`Tipped ${targetName} ${tipAmount} coins!${tipAmount > amount ? ' (Regular doubled!)' : ''}`);
   return true;
 }
 
@@ -9882,7 +9936,8 @@ function openQuickCraft() {
   const baseExp = G.discipline === 'artificer' ? 3 : 1;
   // Find first common schematic
   const firstCommon = SCHEMATICS.find(s => s.tier === 'common') || SCHEMATICS[0];
-  craftState = { selectedEssences: [], schematic: firstCommon, experimentPoints: baseExp + masteryLvl };
+  const tnkBonus3 = hasSkill('tnk_1') ? 1 : 0; // Apprentice: +1 experiment point
+  craftState = { selectedEssences: [], schematic: firstCommon, experimentPoints: baseExp + masteryLvl + tnkBonus3 };
   renderCraftUI();
   document.getElementById('craftOverlay').classList.add('active');
 }
