@@ -1825,6 +1825,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="cantina-module.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1832,7 +1833,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.7.1';
+const VERSION = 'v3.8.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3684,6 +3685,7 @@ const RH_HUB_LABELS = [
 function render() {
   if (!canvas) return;
   const W = canvas.width, H = canvas.height;
+  if (typeof cantinaActive !== 'undefined' && cantinaActive) { renderCantina(ctx, W, H); requestAnimationFrame(render); return; }
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, W, H);
 
@@ -4850,13 +4852,26 @@ function setupInput() {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     keys[e.key.toLowerCase()] = true;
-    if (e.key === 'e' || e.key === 'E') tryInteract();
+    if (e.key === 'e' || e.key === 'E') {
+      if (typeof cantinaActive !== 'undefined' && cantinaActive) {
+        if (typeof cantinaDialogueActive !== 'undefined' && cantinaDialogueActive) closeCantinaDialogue();
+        else if (typeof cantinaInteract === 'function') cantinaInteract();
+        return;
+      }
+      tryInteract();
+    }
     if (e.key === 'q' || e.key === 'Q') startSurvey();
     if (e.key === 'i' || e.key === 'I') toggleInventory();
     if (e.key === 'k' || e.key === 'K') openProfTree();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
     if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
     if (e.key === 'Escape') {
+      // If in cantina, handle cantina exit
+      if (typeof cantinaActive !== 'undefined' && cantinaActive) {
+        if (typeof cantinaDialogueActive !== 'undefined' && cantinaDialogueActive) closeCantinaDialogue();
+        else if (typeof exitCantina === 'function') exitCantina();
+        return;
+      }
       // Close any open overlay
       document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active, #guildCreateOverlay.active, #profTreeOverlay.active')
         .forEach(el => el.classList.remove('active'));
@@ -4934,6 +4949,7 @@ function setupInput() {
 
 function gameLoop() {
   if (G.inBattle) return;
+  if (typeof cantinaActive !== 'undefined' && cantinaActive) { updateCantina(16, keys); setTimeout(gameLoop, 16); return; }
 
   let dx = 0, dy = 0;
   if (keys['w'] || keys['arrowup']) dy = -MOVE_SPEED;
@@ -4982,6 +4998,18 @@ function gameLoop() {
 
       // Check region banner
       checkRegionBanner();
+
+      // Check ambient events (throttled — max once per 10 seconds)
+      const now = Date.now();
+      if (now - lastAmbientTime > 10000) {
+        for (const evt of AMBIENT_EVENTS) {
+          if (evt.region === currentRegion && Math.random() < evt.chance) {
+            notifyAmbient(evt.text);
+            lastAmbientTime = now;
+            break;
+          }
+        }
+      }
 
       // Check workshop proximity
       if (tileAtNew === 8) {
@@ -7818,6 +7846,9 @@ function renderInventory() {
   // Guild info
   renderInventoryGuildInfo();
 
+  // Lore tablets
+  renderLoreInInventory();
+
   // Team with Set Active buttons
   const teamEl = document.getElementById('teamList');
   teamEl.innerHTML = G.team.map((g, idx) => {
@@ -7989,7 +8020,7 @@ function tryInteract() {
   // Check for cantina nearby
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     if (worldMap[tileY+dy]?.[tileX+dx] === 12) {
-      openCantina();
+      if (typeof enterCantina === 'function') { enterCantina(); } else { openCantina(); }
       return;
     }
   }
@@ -8146,6 +8177,58 @@ function notify(text) {
   el.textContent = text;
   container.appendChild(el);
   setTimeout(() => el.remove(), 3000);
+}
+
+// ═══════ AMBIENT NOTIFICATION ═══════
+function notifyAmbient(text) {
+  const container = document.getElementById('notifContainer');
+  const el = document.createElement('div');
+  el.className = 'notif-ambient';
+  el.textContent = text;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+// ═══════ LORE COLLECTION ═══════
+function collectLore(lore) {
+  if (!G.loreCollected) G.loreCollected = [];
+  if (G.loreCollected.includes(lore.id)) return;
+  G.loreCollected.push(lore.id);
+  SFX.notify();
+  // Show lore modal
+  document.getElementById('loreModalTitle').textContent = lore.title;
+  const regionNames = { frost: 'Frost Valley', hills: 'Rolling Hills', volcanic: 'Volcanic Isles', passage: 'Border Passage' };
+  document.getElementById('loreModalRegion').textContent = regionNames[lore.region] || lore.region;
+  document.getElementById('loreModalText').textContent = lore.text;
+  document.getElementById('loreModalCount').textContent = `${G.loreCollected.length} / ${LORE_ITEMS.length} Collected`;
+  document.getElementById('loreModal').classList.add('active');
+  addProfessionXP('exploration', 15);
+  saveGame();
+  renderInventory();
+}
+
+function closeLoreModal() {
+  document.getElementById('loreModal').classList.remove('active');
+}
+
+function renderLoreInInventory() {
+  const el = document.getElementById('loreList');
+  if (!el) return;
+  const collected = G.loreCollected || [];
+  if (collected.length === 0) {
+    el.innerHTML = '<p style="color:#555;font-size:12px;">No lore tablets found. Explore the world \u2014 look for the golden "?" markers.</p>';
+    return;
+  }
+  const regionNames = { frost: 'Frost Valley', hills: 'Rolling Hills', volcanic: 'Volcanic Isles', passage: 'Border Passage' };
+  el.innerHTML = collected.map(id => {
+    const lore = LORE_ITEMS.find(l => l.id === id);
+    if (!lore) return '';
+    return `<div class="lore-entry">
+      <div class="lore-title">${lore.title}</div>
+      <div class="lore-region">${regionNames[lore.region] || lore.region}</div>
+      <div class="lore-text">"${lore.text}"</div>
+    </div>`;
+  }).join('') + `<p style="font-size:10px;color:#666;margin-top:8px;text-align:center;">${collected.length} / ${LORE_ITEMS.length} tablets discovered</p>`;
 }
 
 // ═══════ CHARACTER CREATION ═══════
@@ -8348,6 +8431,7 @@ async function initFirebase() {
     G.skillPointsUsed = data.skillPointsUsed || 0;
     G.visitedTiles = new Set(data.visitedTiles || []);
     G.materials = data.materials || {};
+    G.loreCollected = data.loreCollected || [];
     G.direction = 'down';
     G.frame = 0;
     if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -8437,6 +8521,7 @@ function saveGame() {
     skillPointsUsed: G.skillPointsUsed,
     visitedTiles: [...(G.visitedTiles || [])].slice(-500),
     materials: G.materials || {},
+    loreCollected: G.loreCollected || [],
     version: VERSION,
   };
 
