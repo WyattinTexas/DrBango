@@ -553,6 +553,32 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   color: #b89a5a; padding: 8px 28px; border-radius: 6px; cursor: pointer; font-size: 13px;
 }
 .cantina-close:hover { background: rgba(255,255,255,0.15); }
+
+/* ═══════ QUEST SYSTEM ═══════ */
+.quest-item {
+  background: #0a0a1e; border: 1px solid #334; border-radius: 6px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.quest-item .quest-title { font-weight: bold; color: #daa520; }
+.quest-item .quest-npc { font-size: 10px; color: #888; }
+.quest-item .quest-desc { font-size: 11px; color: #aaa; margin-top: 2px; }
+.quest-progress-bar {
+  background: #1a1a1a; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px;
+}
+.quest-progress-fill {
+  height: 100%; background: linear-gradient(90deg, #daa520, #f0c040);
+  border-radius: 4px; transition: width 0.3s;
+}
+.quest-reward { font-size: 10px; color: #ca4; margin-top: 2px; }
+.quest-accept-btn {
+  background: #2a5caa; color: #fff; border: 1px solid #4a7cd4;
+  padding: 4px 14px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px;
+}
+.quest-accept-btn:hover { background: #3a6cba; }
+.quest-complete-badge {
+  display: inline-block; background: rgba(40,200,80,0.2); border: 1px solid rgba(40,200,80,0.4);
+  color: #4f8; padding: 1px 8px; border-radius: 8px; font-size: 10px; margin-left: 6px;
+}
 </style>
 </head>
 <body>
@@ -582,6 +608,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <button class="hud-btn" onclick="openMarket()">&#128722; Market</button>
     <button class="hud-btn" onclick="openResourceReport()">&#128202; Zones</button>
     <div class="hud-stat"><span class="icon">&#128101;</span><span id="hudPlayers">1</span></div>
+    <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
   </div>
 </div>
 
@@ -667,6 +694,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <div id="gearList"></div>
   <h3 style="margin-top:16px;">&#128295; Craft Mastery</h3>
   <div id="masteryList"></div>
+  <h3 style="margin-top:16px;">&#128220; Quests</h3>
+  <div id="questList"></div>
   <h3 style="margin-top:16px;">&#128123; Team</h3>
   <div id="teamList"></div>
 </div>
@@ -715,6 +744,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <div class="dialogue-portrait" id="dialoguePortrait"></div>
     <div class="dialogue-npc-name" id="dialogueNpcName">???</div>
     <div class="dialogue-text" id="dialogueText">...</div>
+    <div id="dialogueQuestArea" style="margin-bottom:12px;"></div>
     <button class="dialogue-close" onclick="closeDialogue()">Close</button>
   </div>
 </div>
@@ -800,7 +830,260 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v0.4.0';
+const VERSION = 'v0.5.0';
+
+// ═══════ SOUND DESIGN (Web Audio API — procedural) ═══════
+let sfxMuted = false;
+const SFX = {
+  ctx: null,
+  windSource: null,
+  windGain: null,
+  _footstepLast: 0,
+  _initialized: false,
+  init() {
+    if (this._initialized) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this._initialized = true;
+    this.startWind();
+  },
+  _ensureCtx() {
+    if (!this.ctx) return false;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return !sfxMuted;
+  },
+  // (a) Ambient Wind — continuous filtered noise
+  startWind() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    const gain = ctx.createGain();
+    gain.gain.value = sfxMuted ? 0 : 0.04;
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.start();
+    this.windSource = source;
+    this.windGain = gain;
+  },
+  updateWindVolume() {
+    if (!this.windGain) return;
+    if (sfxMuted) { this.windGain.gain.value = 0; return; }
+    const tod = getTimeOfDay();
+    const vol = 0.03 + tod.nightFactor * 0.05;
+    this.windGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.5);
+  },
+  // (b) Footstep Tick — throttled tiny sine burst
+  footstep() {
+    if (!this._ensureCtx()) return;
+    const now = Date.now();
+    if (now - this._footstepLast < 200) return;
+    this._footstepLast = now;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 200;
+    gain.gain.value = 0.05;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.03);
+  },
+  // (c) Battle Dice Roll — rapid ascending beeps
+  diceRoll() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 300 + (500 * i / steps);
+      gain.gain.value = 0.1;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.04 + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.04);
+      osc.stop(ctx.currentTime + i * 0.04 + 0.04);
+    }
+  },
+  // (d) Damage Hit — punchy low thud
+  hit() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const bufferSize = Math.floor(ctx.sampleRate * 0.05);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 200;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.15;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.start();
+    source.stop(ctx.currentTime + 0.05);
+  },
+  // (e) Victory Jingle — C5, E5, G5
+  victory() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const notes = [523, 659, 784];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.1;
+      gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.15);
+    });
+  },
+  // (f) Defeat Sound — descending minor
+  defeat() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const notes = [392, 311, 262];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.08;
+      gain.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.2 + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.2);
+      osc.stop(ctx.currentTime + i * 0.2 + 0.2);
+    });
+  },
+  // (g) Craft Success — sparkle chime
+  craftSuccess() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    // Sweep 800->1600
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(800, ctx.currentTime);
+    osc1.frequency.linearRampToValueAtTime(1600, ctx.currentTime + 0.2);
+    gain1.gain.value = 0.08;
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start();
+    osc1.stop(ctx.currentTime + 0.2);
+    // Bell tone at 1200Hz
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = 1200;
+    gain2.gain.value = 0.08;
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.05);
+    osc2.stop(ctx.currentTime + 0.3);
+  },
+  // (h) Notification Ding — single bright ping
+  notify() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.06;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  },
+  // (i) Level Up — triumphant ascending arpeggio
+  levelUp() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const notes = [523, 659, 784, 1046];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.12;
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.12);
+    });
+  },
+  // (j) Encounter Start — dramatic low rumble + high accent
+  encounterStart() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    // Low saw rumble
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.value = 100;
+    gain1.gain.value = 0.1;
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start();
+    osc1.stop(ctx.currentTime + 0.2);
+    // High sine ping
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = 600;
+    gain2.gain.value = 0.1;
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.25);
+  },
+};
+
+// Initialize audio on first user interaction
+let sfxInitDone = false;
+function initSfxOnInteraction() {
+  if (sfxInitDone) return;
+  sfxInitDone = true;
+  SFX.init();
+}
+document.addEventListener('click', initSfxOnInteraction, { once: false });
+document.addEventListener('keydown', initSfxOnInteraction, { once: false });
+
+function toggleMute() {
+  sfxMuted = !sfxMuted;
+  const btn = document.getElementById('muteBtn');
+  if (btn) btn.textContent = sfxMuted ? '\uD83D\uDD07 Muted' : '\uD83D\uDD0A Sound';
+  if (SFX.windGain) SFX.windGain.gain.value = sfxMuted ? 0 : 0.04;
+}
 
 // ═══════ HUB TOWN GLOBAL ═══════
 const HUB = { x: 13, y: 6 };
@@ -1087,6 +1370,11 @@ const SCHEMATICS = [
   { id: 'frost_blaster', name: 'Frost Blaster', type: 'weapon', essencesNeeded: 2, desc: 'Spiritkin gear: +1 damage on winning rolls', basePower: 3 },
   { id: 'ice_shield', name: 'Ice Shield', type: 'armor', essencesNeeded: 2, desc: 'Spiritkin gear: -1 damage taken from doubles', basePower: 2 },
   { id: 'spirit_lens', name: 'Spirit Lens', type: 'accessory', essencesNeeded: 1, desc: 'Reveals enemy stats before battle', basePower: 1 },
+  { id: 'spirit_bow', name: 'Spirit Bow', type: 'weapon', essencesNeeded: 2, desc: '+1 die on first roll each battle', basePower: 3 },
+  { id: 'warden_cloak', name: 'Warden Cloak', type: 'armor', essencesNeeded: 3, desc: 'Reduce all damage by 1', basePower: 4 },
+  { id: 'healers_staff', name: "Healer's Staff", type: 'accessory', essencesNeeded: 2, desc: 'Heal 1 HP after each winning roll', basePower: 3 },
+  { id: 'lucky_charm', name: 'Lucky Charm', type: 'accessory', essencesNeeded: 1, desc: 'Reroll 1 die per battle', basePower: 2 },
+  { id: 'frostfire_blade', name: 'Frostfire Blade', type: 'weapon', essencesNeeded: 3, desc: '+2 damage, Ice Shards deal double', basePower: 5 },
 ];
 
 // ═══════ NPC DIALOGUE DATA ═══════
@@ -1182,6 +1470,11 @@ let G = {
     raresFound: 0,
   },
   titles: [],
+  // Quests
+  quests: {
+    active: [],
+    completed: [],
+  },
 };
 
 // Other players
@@ -1941,6 +2234,9 @@ function gameLoop() {
       G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
       G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
 
+      // Footstep sound (throttled)
+      SFX.footstep();
+
       // Check encounter zone (rate modified by time of day)
       if (tileAtNew === 6 && !G.inBattle && Math.random() < 0.008 * getEncounterRateMultiplier()) {
         triggerWildEncounter();
@@ -2034,6 +2330,8 @@ function triggerWildEncounter() {
   const wildCard = getWildEncounter();
   if (!wildCard) return;
 
+  SFX.encounterStart();
+  battleFledThisSession = false;
   G.inBattle = true;
 
   // Use active team member
@@ -2206,6 +2504,7 @@ function battleRoll() {
   }
 
   // ── DICE ANIMATION: show "?" first ──
+  SFX.diceRoll();
   const pDiceCount = 3;
   const eDiceCount = 3;
 
@@ -2290,6 +2589,7 @@ function battleRoll() {
         if (healAmt > 0) B.log.push({ text: `${pg.name} (Restore): +2 HP from doubles!`, type: 'heal' });
       }
 
+      SFX.hit();
       battleShake();
       flashHpBar('eHpBar');
       if (eg.ko) B.log.push({ text: `${eg.name} is defeated!`, type: 'damage' });
@@ -2307,6 +2607,7 @@ function battleRoll() {
       if (pg.hp <= 0) pg.ko = true;
       B.log.push({ text: `${eg.name} deals ${dmg} damage to you!`, type: 'damage' });
 
+      SFX.hit();
       battleShake();
       flashHpBar('pHpBar');
 
@@ -2358,6 +2659,13 @@ function battleRoll() {
 function fleeBattle() {
   if (!B) return;
   B.log.push({ text: 'You fled the battle!', type: '' });
+  battleFledThisSession = true;
+  // Reset "no flee" quest progress
+  if (G.quests?.active) {
+    G.quests.active.forEach(q => {
+      if (q.type === 'win_no_flee' && !q.completed) q.progress = 0;
+    });
+  }
   // Save resources back
   G.iceShards = B.resources?.iceShards || G.iceShards;
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
@@ -2390,6 +2698,7 @@ function endBattle(won) {
     if (G.xp >= xpNeeded) {
       G.level++;
       G.xp -= xpNeeded;
+      SFX.levelUp();
       notify(`Level Up! You are now level ${G.level}!`);
       // Heal team on level up
       G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
@@ -2411,7 +2720,12 @@ function endBattle(won) {
     }
     checkAndNotifyTitles();
 
+    SFX.victory();
     notify(`+${xpGain} XP, +${coinGain} coins, +1 ${essence.name}`);
+
+    // Quest progress: battle won + essence collected
+    checkQuestProgress('battle_won', { rarity: B.enemyCard.rarity });
+    checkQuestProgress('essence_collected', essence);
 
     // Update team HP from battle
     const teamGhost = G.team.find(g => g.id === B.playerGhost.id);
@@ -2433,6 +2747,7 @@ function endBattle(won) {
       return;
     }
   } else {
+    SFX.defeat();
     // Respawn at hub
     G.x = 16; G.y = 9;
     // Heal team
@@ -2555,6 +2870,17 @@ function swapRecruit(idx) {
 
 // ═══════ SPIRIT ESSENCE (Resource Quality System) ═══════
 
+// ═══════ ESSENCE SUBTYPES ═══════
+const ZONE_ESSENCE_SUBTYPES = {
+  'Crystal Glade': { subtype: 'Crystal', bonusStat: 'resonance', bonusAmount: 100 },
+  'Frozen Hollow': { subtype: 'Frost', bonusStat: 'stability', bonusAmount: 100 },
+  'Aurora Fields': { subtype: 'Aurora', bonusStat: 'purity', bonusAmount: 100 },
+  'Shimmer Basin': { subtype: 'Shimmer', bonusStat: 'potency', bonusAmount: 100 },
+  'Permafrost Depths': { subtype: 'Permafrost', bonusStat: ['stability','potency'], bonusAmount: 100 },
+  'Sunlit Meadow': { subtype: 'Sun', bonusStat: ['resonance','purity'], bonusAmount: 100 },
+  'Bramble Thicket': { subtype: 'Bramble', bonusStat: 'potency', bonusAmount: 100 },
+};
+
 function generateEssence(card, zoneIdx) {
   // Quality influenced by rarity + discipline + zone quality
   const rarityBonus = { common: 0, uncommon: 100, rare: 200, 'ghost-rare': 350, legendary: 500 }[card.rarity] || 0;
@@ -2567,24 +2893,38 @@ function generateEssence(card, zoneIdx) {
     zoneMultiplier = getZoneQuality(zoneIdx, cycleId);
   }
 
-  function stat() {
-    const base = Math.min(1000, Math.max(1, Math.floor(Math.random() * 600) + rarityBonus + scoutBonus + Math.floor(Math.random() * 200)));
+  const zoneName = zoneIdx >= 0 ? ENCOUNTER_ZONES[zoneIdx].name : 'Frost Valley';
+  const subtypeInfo = ZONE_ESSENCE_SUBTYPES[zoneName];
+  const subtypeName = subtypeInfo ? subtypeInfo.subtype : '';
+
+  function stat(statName) {
+    let bonus = 0;
+    if (subtypeInfo) {
+      const bs = subtypeInfo.bonusStat;
+      if (Array.isArray(bs)) {
+        if (bs.includes(statName)) bonus = subtypeInfo.bonusAmount;
+      } else if (bs === statName) {
+        bonus = subtypeInfo.bonusAmount;
+      }
+    }
+    const base = Math.min(1000, Math.max(1, Math.floor(Math.random() * 600) + rarityBonus + scoutBonus + Math.floor(Math.random() * 200) + bonus));
     return Math.min(1000, Math.max(1, Math.floor(base * zoneMultiplier)));
   }
 
-  const zoneName = zoneIdx >= 0 ? ENCOUNTER_ZONES[zoneIdx].name : 'Frost Valley';
+  const essenceName = subtypeName ? `${subtypeName} ${card.name} Essence` : `${card.name} Essence`;
 
   return {
     id: Date.now() + Math.random(),
-    name: `${card.name} Essence`,
+    name: essenceName,
+    subtype: subtypeName,
     fromCard: card.id,
     fromName: card.name,
     region: zoneName,
     rarity: card.rarity,
-    potency: stat(),
-    stability: stat(),
-    resonance: stat(),
-    purity: stat(),
+    potency: stat('potency'),
+    stability: stat('stability'),
+    resonance: stat('resonance'),
+    purity: stat('purity'),
     timestamp: Date.now(),
   };
 }
@@ -2891,6 +3231,11 @@ function finishExperiment() {
 
   G.gear.push(gear);
 
+  SFX.craftSuccess();
+
+  // Quest progress: craft complete
+  checkQuestProgress('craft_complete', { qualityTier: gear.qualityTier });
+
   // Reputation: crafts completed
   if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
   G.rep.craftsCompleted++;
@@ -2969,6 +3314,7 @@ function showDialogue(npcName) {
   document.getElementById('dialoguePortrait').style.background = data.portraitBg;
   document.getElementById('dialogueNpcName').textContent = npcName;
   document.getElementById('dialogueText').textContent = data.getLine();
+  renderQuestAreaInDialogue(npcName);
   document.getElementById('dialogueOverlay').classList.add('active');
 }
 
@@ -3185,6 +3531,192 @@ function buyMarketItem(sellerId, listingIdx) {
   renderMarket();
 }
 
+// ═══════ NPC QUEST SYSTEM ═══════
+
+function getDaySeed() {
+  return Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+}
+
+const QUEST_POOL = {
+  'Elder Frost': [
+    { id_prefix: 'ef_001', title: 'Premium Essence', desc: 'Bring me an essence with Potency above 700.', type: 'collect_essence', requirement: { stat: 'potency', min: 700 }, reward: { coins: 15, title: null }, target: 1 },
+    { id_prefix: 'ef_002', title: 'Essence Harvest', desc: 'Collect 3 essences from any zone.', type: 'collect_essences_count', requirement: { count: 3 }, reward: { coins: 10, title: null }, target: 3 },
+    { id_prefix: 'ef_003', title: 'Perfect Specimen', desc: 'Find an essence with all stats above 500.', type: 'collect_essence_allstats', requirement: { min: 500 }, reward: { coins: 20, title: null, schematicUnlock: true }, target: 1 },
+  ],
+  'Smith Ember': [
+    { id_prefix: 'se_001', title: 'Superior Work', desc: 'Craft a Superior or better item.', type: 'craft_quality', requirement: { minTier: 'Superior' }, reward: { coins: 15, title: null }, target: 1 },
+    { id_prefix: 'se_002', title: 'Double Down', desc: 'Craft 2 items of any quality.', type: 'craft_count', requirement: { count: 2 }, reward: { coins: 10, title: null }, target: 2 },
+    { id_prefix: 'se_003', title: 'Masterwork', desc: 'Craft a Mastercraft item.', type: 'craft_quality', requirement: { minTier: 'Mastercraft' }, reward: { coins: 30, title: 'Forge Master' }, target: 1 },
+  ],
+  'Keeper Zara': [
+    { id_prefix: 'kz_001', title: 'Spirit Patrol', desc: 'Win 5 wild encounters.', type: 'win_battles', requirement: { count: 5 }, reward: { coins: 12, title: null }, target: 5 },
+    { id_prefix: 'kz_002', title: 'Rare Hunt', desc: 'Defeat a rare or better Spiritkin.', type: 'defeat_rarity', requirement: { minRarity: 'rare' }, reward: { coins: 20, title: null }, target: 1 },
+    { id_prefix: 'kz_003', title: 'No Retreat', desc: 'Win 3 encounters without fleeing.', type: 'win_no_flee', requirement: { count: 3 }, reward: { coins: 15, title: null }, target: 3 },
+  ],
+};
+
+function getNpcDailyQuest(npcName) {
+  const daySeed = getDaySeed();
+  const pool = QUEST_POOL[npcName];
+  if (!pool) return null;
+  const idx = ((daySeed * 7 + npcName.length * 13) % pool.length);
+  const template = pool[idx];
+  const questId = `${template.id_prefix}_${daySeed}`;
+  return { ...template, id: questId, npc: npcName, progress: 0, completed: false };
+}
+
+function getActiveQuestForNpc(npcName) {
+  if (!G.quests) G.quests = { active: [], completed: [] };
+  return G.quests.active.find(q => q.npc === npcName && !q.completed);
+}
+
+function isQuestCompletedToday(npcName) {
+  if (!G.quests) G.quests = { active: [], completed: [] };
+  const daySeed = getDaySeed();
+  return G.quests.completed.some(id => id.endsWith('_' + daySeed) && id.startsWith(QUEST_POOL[npcName]?.[0]?.id_prefix?.split('_')[0] || ''));
+}
+
+function acceptQuest(npcName) {
+  if (!G.quests) G.quests = { active: [], completed: [] };
+  const quest = getNpcDailyQuest(npcName);
+  if (!quest) return;
+  // Prevent duplicates
+  if (G.quests.active.some(q => q.id === quest.id)) return;
+  if (G.quests.completed.includes(quest.id)) return;
+  G.quests.active.push(quest);
+  notify(`Quest accepted: ${quest.title}`);
+  saveGame();
+  // Re-render dialogue with quest update
+  showDialogue(npcName);
+}
+
+function completeQuest(quest) {
+  if (!quest || quest.completed) return;
+  quest.completed = true;
+  // Grant rewards
+  G.coins += quest.reward.coins;
+  if (quest.reward.title) {
+    // Add title to earned titles (via reputation system)
+    notify(`Title earned: ${quest.reward.title}!`);
+    if (!G.titles.includes(quest.reward.title)) G.titles.push(quest.reward.title);
+  }
+  notify(`Quest complete: ${quest.title} (+${quest.reward.coins} coins)`);
+  // Move to completed
+  if (!G.quests.completed) G.quests.completed = [];
+  G.quests.completed.push(quest.id);
+  G.quests.active = G.quests.active.filter(q => q.id !== quest.id);
+  // Clean old completed quest IDs (keep only last 30 days)
+  const oldestKeep = getDaySeed() - 30;
+  G.quests.completed = G.quests.completed.filter(id => {
+    const parts = id.split('_');
+    const daySeed = parseInt(parts[parts.length - 1]);
+    return !isNaN(daySeed) && daySeed >= oldestKeep;
+  });
+  updateHUD();
+  saveGame();
+}
+
+function checkQuestProgress(type, data) {
+  if (!G.quests?.active) return;
+  for (const quest of G.quests.active) {
+    if (quest.completed) continue;
+
+    if (type === 'battle_won' && quest.type === 'win_battles') {
+      quest.progress++;
+    }
+    if (type === 'battle_won' && quest.type === 'win_no_flee') {
+      quest.progress++;
+    }
+    if (type === 'battle_won' && quest.type === 'defeat_rarity') {
+      const rarityOrder = ['common','uncommon','rare','ghost-rare','legendary'];
+      const minIdx = rarityOrder.indexOf(quest.requirement.minRarity);
+      const defeatedIdx = rarityOrder.indexOf(data?.rarity);
+      if (defeatedIdx >= minIdx) quest.progress++;
+    }
+    if (type === 'essence_collected' && quest.type === 'collect_essence') {
+      const ess = data;
+      if (ess && ess[quest.requirement.stat] >= quest.requirement.min) quest.progress++;
+    }
+    if (type === 'essence_collected' && quest.type === 'collect_essences_count') {
+      quest.progress++;
+    }
+    if (type === 'essence_collected' && quest.type === 'collect_essence_allstats') {
+      const ess = data;
+      if (ess && ess.potency >= quest.requirement.min && ess.stability >= quest.requirement.min &&
+          ess.resonance >= quest.requirement.min && ess.purity >= quest.requirement.min) {
+        quest.progress++;
+      }
+    }
+    if (type === 'craft_complete' && quest.type === 'craft_count') {
+      quest.progress++;
+    }
+    if (type === 'craft_complete' && quest.type === 'craft_quality') {
+      const tierOrder = ['Basic','Standard','Superior','Mastercraft'];
+      const minIdx = tierOrder.indexOf(quest.requirement.minTier);
+      const craftedIdx = tierOrder.indexOf(data?.qualityTier);
+      if (craftedIdx >= minIdx) quest.progress++;
+    }
+
+    // Check completion
+    if (quest.progress >= quest.target && !quest.completed) {
+      completeQuest(quest);
+    }
+  }
+}
+
+function renderQuestAreaInDialogue(npcName) {
+  const area = document.getElementById('dialogueQuestArea');
+  if (!area) return;
+  if (!G.quests) G.quests = { active: [], completed: [] };
+
+  const activeQuest = getActiveQuestForNpc(npcName);
+  const completedToday = isQuestCompletedToday(npcName);
+
+  if (activeQuest) {
+    const pct = Math.min(100, Math.floor(activeQuest.progress / activeQuest.target * 100));
+    area.innerHTML = `<div class="quest-item" style="text-align:left;">
+      <span class="quest-title">${activeQuest.title}</span>
+      <div class="quest-desc">${activeQuest.desc}</div>
+      <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
+      <div class="quest-reward">Progress: ${activeQuest.progress}/${activeQuest.target} | Reward: ${activeQuest.reward.coins} coins${activeQuest.reward.title ? ' + "' + activeQuest.reward.title + '"' : ''}</div>
+    </div>`;
+  } else if (completedToday) {
+    area.innerHTML = `<div style="font-size:12px;color:#666;font-style:italic;margin-top:8px;">No more quests today. Come back tomorrow.</div>`;
+  } else {
+    const quest = getNpcDailyQuest(npcName);
+    if (quest) {
+      area.innerHTML = `<div class="quest-item" style="text-align:left;">
+        <span class="quest-title">Quest: ${quest.title}</span>
+        <div class="quest-desc">${quest.desc}</div>
+        <div class="quest-reward">Reward: ${quest.reward.coins} coins${quest.reward.title ? ' + "' + quest.reward.title + '"' : ''}</div>
+        <button class="quest-accept-btn" onclick="acceptQuest('${npcName}')">Accept Quest</button>
+      </div>`;
+    }
+  }
+}
+
+function renderQuestsInInventory() {
+  const el = document.getElementById('questList');
+  if (!el) return;
+  if (!G.quests?.active || G.quests.active.length === 0) {
+    el.innerHTML = '<p style="color:#555;font-size:12px;">No active quests. Talk to NPCs in the hub!</p>';
+    return;
+  }
+  el.innerHTML = G.quests.active.map(q => {
+    const pct = Math.min(100, Math.floor(q.progress / q.target * 100));
+    return `<div class="quest-item">
+      <span class="quest-title">${q.title}</span> <span class="quest-npc">(${q.npc})</span>
+      ${q.completed ? '<span class="quest-complete-badge">Complete!</span>' : ''}
+      <div class="quest-desc">${q.desc}</div>
+      <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
+      <div class="quest-reward">Progress: ${q.progress}/${q.target} | Reward: ${q.reward.coins} coins</div>
+    </div>`;
+  }).join('');
+}
+
+// Track flee count for "no flee" quest
+let battleFledThisSession = false;
+
 // ═══════ INVENTORY ═══════
 
 function toggleInventory() {
@@ -3245,6 +3777,9 @@ function renderInventory() {
   }
   masteryHtml += '</div>';
   masteryEl.innerHTML = masteryHtml;
+
+  // Quests
+  renderQuestsInInventory();
 
   // Team with Set Active buttons
   const teamEl = document.getElementById('teamList');
@@ -3417,6 +3952,7 @@ function updateHUD() {
 // ═══════ NOTIFICATIONS ═══════
 
 function notify(text) {
+  SFX.notify();
   const container = document.getElementById('notifContainer');
   const el = document.createElement('div');
   el.className = 'notif';
@@ -3507,6 +4043,7 @@ function createCharacter() {
   G.mastery = { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
   G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
   G.titles = [];
+  G.quests = { active: [], completed: [] };
 
   // Close modal
   document.getElementById('charCreateOverlay').classList.remove('active');
@@ -3556,6 +4093,9 @@ async function initFirebase() {
       G.mastery = data.mastery || { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
       G.rep = data.rep || { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
       G.titles = data.titles || [];
+      G.quests = data.quests || { active: [], completed: [] };
+      if (!G.quests.active) G.quests.active = [];
+      if (!G.quests.completed) G.quests.completed = [];
 
       // Ensure mastery keys exist
       if (!G.mastery.weapon) G.mastery.weapon = { xp: 0 };
@@ -3611,6 +4151,7 @@ function saveGame() {
     mastery: G.mastery,
     rep: G.rep,
     titles: G.titles || [],
+    quests: G.quests || { active: [], completed: [] },
     lastSeen: firebase.database.ServerValue.TIMESTAMP,
     version: VERSION,
   });
@@ -3816,10 +4357,11 @@ setInterval(() => {
   if (cantinaOpen) renderCantinaPatrons();
 }, 3000);
 
-// Periodically update time of day in HUD
+// Periodically update time of day in HUD + wind volume
 setInterval(() => {
   const todEl = document.getElementById('hudTimeOfDay');
   if (todEl) todEl.textContent = getTimeIcon(getTimeOfDay().phase);
+  SFX.updateWindVolume();
 }, 5000);
 
 // ═══════ RESIZE ═══════
