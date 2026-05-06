@@ -1201,6 +1201,77 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   transition: all 0.2s;
 }
 .directed-exp-finish-btn:hover { background: linear-gradient(135deg, #3a6cba, #2a4c8a); }
+
+/* ═══════ ONBOARDING HINTS ═══════ */
+.onboarding-hint {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 10, 30, 0.92);
+  border: 2px solid rgba(100, 180, 255, 0.5);
+  border-radius: 14px;
+  padding: 20px 28px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  z-index: 1500;
+  pointer-events: none;
+  animation: hintFadeIn 0.5s ease, hintFadeOut 0.5s ease 4.5s forwards;
+}
+.onboarding-hint .hint-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+.onboarding-hint .hint-text {
+  font-size: 16px;
+  color: #e8e8ff;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.onboarding-hint .hint-sub {
+  font-size: 12px;
+  color: rgba(180, 200, 255, 0.6);
+  margin-top: 6px;
+}
+@keyframes hintFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes hintFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ═══════ HELP MODAL ═══════ */
+#helpBtn {
+  background: rgba(100, 160, 255, 0.15);
+  border: 1px solid rgba(100, 160, 255, 0.4);
+  color: #8cf;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  font-size: 15px; font-weight: bold;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+#helpBtn:hover { background: rgba(100, 160, 255, 0.3); }
+#helpPanel {
+  position: fixed;
+  top: 44px; right: 10px;
+  background: rgba(15, 15, 35, 0.95);
+  border: 1px solid #445;
+  border-radius: 10px;
+  padding: 16px 20px;
+  z-index: 1200;
+  display: none;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+#helpPanel h3 { color: #8cf; margin: 0 0 10px; font-size: 14px; }
+#helpPanel .help-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+#helpPanel .help-key { color: #fff; font-weight: bold; min-width: 60px; }
+#helpPanel .help-desc { color: #999; }
 </style>
 </head>
 <body>
@@ -1241,7 +1312,20 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <div class="hud-stat"><span class="icon">&#128101;</span><span id="hudPlayers">1</span></div>
     <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">&#128270; Survey</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
+    <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
   </div>
+</div>
+
+<!-- HELP PANEL -->
+<div id="helpPanel">
+  <h3>Controls</h3>
+  <div class="help-row"><span class="help-key">WASD</span><span class="help-desc">Move</span></div>
+  <div class="help-row"><span class="help-key">E</span><span class="help-desc">Interact (NPCs, buildings)</span></div>
+  <div class="help-row"><span class="help-key">Q</span><span class="help-desc">Survey (in encounter zones)</span></div>
+  <div class="help-row"><span class="help-key">I</span><span class="help-desc">Inventory</span></div>
+  <div class="help-row"><span class="help-key">M</span><span class="help-desc">Mute / Unmute</span></div>
+  <div class="help-row"><span class="help-key">Enter</span><span class="help-desc">Chat</span></div>
+  <div class="help-row"><span class="help-key">Escape</span><span class="help-desc">Close menus</span></div>
 </div>
 
 <!-- ZONE QUALITY HUD -->
@@ -1552,7 +1636,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.7.0';
+const VERSION = 'v1.9.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -1726,6 +1810,9 @@ function triggerRoamingBattle(enemy) {
     entryFired: false,
     resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
     isAggressive: true,
+    nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+    enemyUsedResource: false,
+    damageTakenThisRound: 0,
   };
 
   const overlay = document.getElementById('battleOverlay');
@@ -2453,6 +2540,8 @@ let G = {
   arenaLosses: 0,
   // Guild
   guild: null, // { id, name, tag, role }
+  // Onboarding
+  onboarding: { step: 0, hintsShown: {} },
 };
 
 // Other players
@@ -3845,6 +3934,7 @@ function setupInput() {
         .forEach(el => el.classList.remove('active'));
       document.getElementById('inventoryPanel')?.classList.remove('open');
       document.getElementById('guildPanel')?.classList.remove('open');
+      document.getElementById('helpPanel').style.display = 'none';
     }
     if (e.key === 'm' || e.key === 'M') toggleMute();
   });
@@ -4065,6 +4155,9 @@ function triggerWildEncounter() {
     entryFired: false,
     resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
     zoneIdx: getCurrentZone(G.x, G.y),
+    nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+    enemyUsedResource: false,
+    damageTakenThisRound: 0,
   };
 
   // Show battle overlay
@@ -4197,6 +4290,8 @@ function showBattleResultBanner(won) {
 function battleRoll() {
   if (!B || B.phase === 'rolling') return;
   B.phase = 'rolling';
+  B.enemyUsedResource = false;
+  B.cameronActive = false;
 
   const pg = B.playerGhost;
   const eg = B.enemyGhost;
@@ -4228,9 +4323,11 @@ function battleRoll() {
       pg.hp = Math.max(0, pg.hp - 1);
       B.log.push({ text: `${eg.name} (Menace): Deals 1 damage on entry!`, type: 'damage' });
       if (pg.hp <= 0) { pg.ko = true; }
+      B.enemyUsedResource = true;
     }
     if (eg.id === 56) { // Chad
       B.log.push({ text: `${eg.name} (Sploop!): Enemy gained 2 Ice Shards.`, type: 'ability' });
+      B.enemyUsedResource = true;
     }
     if (eg.id === 94) { // Jenkins
       const jDice = rollDice(4);
@@ -4268,6 +4365,19 @@ function battleRoll() {
     }
   }
 
+  // ── MASKED HERO (55): If enemy has pre-roll ability (Shade/Ember Force), deal 3 damage before it triggers ──
+  if (pg.id === 55 && (eg.id === 111 || eg.id === 304) && !eg.ko) {
+    eg.hp = Math.max(0, eg.hp - 3);
+    B.log.push({ text: `${pg.name} (Masked Hero): Intercepts enemy pre-roll ability — 3 damage!`, type: 'ability' });
+    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
+  if (eg.id === 55 && (pg.id === 111 || pg.id === 304) && !pg.ko) {
+    pg.hp = Math.max(0, pg.hp - 3);
+    B.log.push({ text: `${eg.name} (Masked Hero): Intercepts your pre-roll ability — 3 damage!`, type: 'damage' });
+    flashHpBar('pHpBar');
+    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
+
   // ── BEFORE-ROLL ABILITIES ──
   // Shade (111) — Haunt: deal 1 damage before roll
   if (pg.id === 111 && !eg.ko) {
@@ -4279,6 +4389,7 @@ function battleRoll() {
     pg.hp = Math.max(0, pg.hp - 1);
     B.log.push({ text: `${eg.name} (Haunt): You take 1 damage before the roll.`, type: 'damage' });
     flashHpBar('pHpBar');
+    B.enemyUsedResource = true;
     if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
   }
   // Ember Force (304): deal 1 damage before roll
@@ -4291,13 +4402,29 @@ function battleRoll() {
     pg.hp = Math.max(0, pg.hp - 1);
     B.log.push({ text: `${eg.name} (Ember Force): You take 1 damage before the roll.`, type: 'damage' });
     flashHpBar('pHpBar');
+    B.enemyUsedResource = true;
     if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
   }
 
-  // ── DICE ANIMATION: show "?" first ──
+  // ── DICE COUNTS (apply nextRoundMods) ──
   SFX.diceRoll();
-  const pDiceCount = 3;
-  const eDiceCount = 3;
+  let pDiceCount = Math.min(3 + B.nextRoundMods.playerExtraDice, B.nextRoundMods.playerMaxDice);
+  let eDiceCount = Math.min(3 + B.nextRoundMods.enemyExtraDice, B.nextRoundMods.enemyMaxDice);
+  // Reset mods after applying
+  B.nextRoundMods = { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 };
+  B.damageTakenThisRound = 0;
+
+  // Fredrick (27): opponent may only roll up to 3 dice
+  if (pg.id === 27) { eDiceCount = Math.min(eDiceCount, 3); }
+  if (eg.id === 27) { pDiceCount = Math.min(pDiceCount, 3); }
+
+  // Antoinette (82): roll as many dice as opponent
+  if (pg.id === 82) { pDiceCount = eDiceCount; B.log.push({ text: `${pg.name} (Mirror Roll): Matching opponent's ${eDiceCount} dice!`, type: 'ability' }); }
+  if (eg.id === 82) { eDiceCount = pDiceCount; B.log.push({ text: `${eg.name} (Mirror Roll): Matching your ${pDiceCount} dice!`, type: 'ability' }); }
+
+  // Ensure at least 1 die
+  pDiceCount = Math.max(1, pDiceCount);
+  eDiceCount = Math.max(1, eDiceCount);
 
   const pDiceEl = document.getElementById('pDice');
   const eDiceEl = document.getElementById('eDice');
@@ -4366,6 +4493,32 @@ function battleRoll() {
     B.log.push({ text: `Round ${B.round}: You rolled [${pDice.join(', ')}] --- ${pRoll.type} (${pRoll.value}'s)`, type: 'ability' });
     B.log.push({ text: `${eg.name} rolled [${eDice.join(', ')}] --- ${eRoll.type} (${eRoll.value}'s)`, type: 'ability' });
 
+    // Logey (26): opponent's 5+ dice are unavailable next roll — reduce their dice count
+    if (pg.id === 26) {
+      const enemyHighDice = eDice.filter(d => d >= 5).length;
+      if (enemyHighDice > 0) {
+        B.nextRoundMods.enemyExtraDice -= enemyHighDice;
+        B.log.push({ text: `${pg.name} (Dream Drain): Enemy rolled ${enemyHighDice} high dice (5+) — they lose ${enemyHighDice} dice next round!`, type: 'ability' });
+      }
+    }
+    if (eg.id === 26) {
+      const playerHighDice = pDice.filter(d => d >= 5).length;
+      if (playerHighDice > 0) {
+        B.nextRoundMods.playerExtraDice -= playerHighDice;
+        B.log.push({ text: `${eg.name} (Dream Drain): You rolled ${playerHighDice} high dice (5+) — you lose ${playerHighDice} dice next round!`, type: 'ability' });
+      }
+    }
+
+    // Dream Cat (28): both roll doubles — player gains +2 dice next turn
+    if (pg.id === 28 && pRoll.type === 'doubles' && eRoll.type === 'doubles') {
+      B.nextRoundMods.playerExtraDice += 2;
+      B.log.push({ text: `${pg.name} (Dream Doubles): Both rolled doubles — +2 dice next round!`, type: 'ability' });
+    }
+    if (eg.id === 28 && pRoll.type === 'doubles' && eRoll.type === 'doubles') {
+      B.nextRoundMods.enemyExtraDice += 2;
+      B.log.push({ text: `${eg.name} (Dream Doubles): Both rolled doubles — enemy gains +2 dice next round!`, type: 'ability' });
+    }
+
     if (winner === 'kodako') {
       // Kodako ability already applied damage, skip normal resolution
       B.round++;
@@ -4424,6 +4577,17 @@ function battleRoll() {
         B.resources.sacredFire = 0;
       }
 
+      // Romy (114): predict a die number, if any die matches, +3 damage
+      if (pg.id === 114) {
+        const dieCounts = {};
+        pDice.forEach(d => { dieCounts[d] = (dieCounts[d] || 0) + 1; });
+        const predicted = parseInt(Object.entries(dieCounts).sort((a,b) => b[1] - a[1])[0][0]);
+        if (pDice.includes(predicted)) {
+          dmg += 3;
+          B.log.push({ text: `${pg.name} (Foresight): Predicted ${predicted} — match! +3 damage!`, type: 'ability' });
+        }
+      }
+
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
       B.log.push({ text: `You deal ${dmg} damage!`, type: 'damage' });
@@ -4467,6 +4631,16 @@ function battleRoll() {
         B.log.push({ text: `${pg.name} (Frostblade): +1 Ice Shard on win! [Total: ${B.resources.iceShards}]`, type: 'ability' });
       }
 
+      // Cameron (25): if enemy used a resource this round, +1 die next round
+      if (pg.id === 25) {
+        if (B.enemyUsedResource) {
+          B.nextRoundMods.playerExtraDice += 1;
+          B.log.push({ text: `${pg.name} (Relentless): Enemy used a special — +1 die next round!`, type: 'ability' });
+        }
+        // "Damage cannot be negated" — flag checked against Puff
+        B.cameronActive = true;
+      }
+
       SFX.hit();
       battleShake();
       flashHpBar('eHpBar');
@@ -4475,13 +4649,14 @@ function battleRoll() {
     } else if (winner === 'b') {
       let dmg = eRoll.damage;
 
-      // Puff (5): enemy doubles/triples -1 damage
-      if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples')) {
+      // Puff (5): enemy doubles/triples -1 damage (negated by Cameron's "cannot be negated")
+      if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples') && eg.id !== 25) {
         dmg = Math.max(0, dmg - 1);
         B.log.push({ text: `${pg.name} (Cute): Enemy doubles/triples do -1 damage!`, type: 'ability' });
       }
 
       pg.hp = Math.max(0, pg.hp - dmg);
+      B.damageTakenThisRound = dmg;
       if (pg.hp <= 0) pg.ko = true;
       B.log.push({ text: `${eg.name} deals ${dmg} damage to you!`, type: 'damage' });
       showDmgFloat('player', dmg, false);
@@ -4519,6 +4694,22 @@ function battleRoll() {
       if (pg.id === 23 && pg.ko) {
         B.resources.iceShards += 3;
         B.log.push({ text: `${pg.name} (Frost Legacy): +3 Ice Shards on defeat! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+      }
+
+      // King Jay (106): lose & dice total = 7 — reflect all damage
+      if (pg.id === 106 && !pg.ko) {
+        const pSum = pDice.reduce((a, b) => a + b, 0);
+        if (pSum === 7) {
+          eg.hp = Math.max(0, eg.hp - dmg);
+          B.log.push({ text: `${pg.name} (Lucky Seven): Dice total = 7 — reflects ${dmg} damage!`, type: 'ability' });
+          if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by reflection!`, type: 'damage' }); }
+        }
+      }
+
+      // Marcus (57): take 3+ damage — gain 4 extra dice next round
+      if (pg.id === 57 && !pg.ko && B.damageTakenThisRound >= 3) {
+        B.nextRoundMods.playerExtraDice += 4;
+        B.log.push({ text: `${pg.name} (Rage): Took ${B.damageTakenThisRound} damage — +4 dice next round!`, type: 'ability' });
       }
 
       if (pg.ko) B.log.push({ text: `${pg.name} is defeated...`, type: 'damage' });
@@ -4663,6 +4854,10 @@ function endBattle(won) {
     // Quest progress: battle won + essence collected
     checkQuestProgress('battle_won', { rarity: B.enemyCard.rarity });
     checkQuestProgress('essence_collected', essence);
+
+    // Onboarding: after first battle win, show crafting hint
+    advanceOnboarding(2);
+    setTimeout(() => advanceOnboarding(3), 3000);
 
     // Update team HP from battle
     const teamGhost = G.team.find(g => g.id === B.playerGhost.id);
@@ -5515,6 +5710,9 @@ function finishExperiment() {
   G.rep.craftsCompleted++;
   checkAndNotifyTitles();
 
+  // Onboarding: after first craft, show market hint
+  advanceOnboarding(4);
+
   // Grant mastery XP
   if (!G.mastery[schem.type]) G.mastery[schem.type] = { xp: 0 };
   G.mastery[schem.type].xp += 1;
@@ -6301,6 +6499,55 @@ function updateHUD() {
   }
 }
 
+// ═══════ HELP PANEL ═══════
+
+function toggleHelp() {
+  const panel = document.getElementById('helpPanel');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+// ═══════ ONBOARDING ═══════
+
+function showOnboardingHint(icon, text, sub) {
+  const old = document.querySelector('.onboarding-hint');
+  if (old) old.remove();
+
+  const el = document.createElement('div');
+  el.className = 'onboarding-hint';
+  el.innerHTML = `<div class="hint-icon">${icon}</div><div class="hint-text">${text}</div>${sub ? `<div class="hint-sub">${sub}</div>` : ''}`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+function advanceOnboarding(step) {
+  if (!G.onboarding) G.onboarding = { step: 0, hintsShown: {} };
+  if (G.onboarding.hintsShown[step]) return;
+  G.onboarding.hintsShown[step] = true;
+  G.onboarding.step = step + 1;
+  saveGame();
+
+  const hints = {
+    0: { icon: '\u2728', text: 'Welcome to Polaris! Use <strong>WASD</strong> to move around.', sub: 'Press ? in the top-right for all controls' },
+    1: { icon: '\uD83D\uDD2E', text: 'The purple zones are <strong>Spirit Fields</strong> \u2014 walk in to find wild Spiritkin!', sub: '' },
+    2: { icon: '\uD83C\uDFB2', text: 'Press <strong>FIGHT</strong> to roll dice in battle. Higher roll wins!', sub: '' },
+    3: { icon: '\u2699\uFE0F', text: 'You earned a Spirit Essence! Visit the <strong>Workshop</strong> to craft gear.', sub: '' },
+    4: { icon: '\uD83D\uDCB0', text: 'List your crafted items on the <strong>Market Board</strong> for other players to buy!', sub: '' },
+  };
+
+  const h = hints[step];
+  if (h) showOnboardingHint(h.icon, h.text, h.sub);
+}
+
+function startOnboardingTimers() {
+  if (!G.onboarding) G.onboarding = { step: 0, hintsShown: {} };
+  if (!G.onboarding.hintsShown[0]) {
+    setTimeout(() => advanceOnboarding(0), 1500);
+  }
+  if (!G.onboarding.hintsShown[1]) {
+    setTimeout(() => advanceOnboarding(1), 5000);
+  }
+}
+
 // ═══════ NOTIFICATIONS ═══════
 
 function notify(text) {
@@ -6444,6 +6691,10 @@ function createCharacter() {
   notify(`Welcome to Frost Valley, ${name}!`);
   addChatMessage('system', `${name} has entered the Overworld.`);
 
+  // Start onboarding for new players
+  G.onboarding = { step: 0, hintsShown: {} };
+  startOnboardingTimers();
+
   requestAnimationFrame(render);
   gameLoop();
 }
@@ -6482,6 +6733,7 @@ async function initFirebase() {
       if (!G.quests.completed) G.quests.completed = [];
       G.sprite = data.sprite || 1;
       G.guild = data.guild || null;
+      G.onboarding = data.onboarding || { step: 0, hintsShown: {} };
       G.direction = 'down';
       G.frame = 0;
       if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -6544,6 +6796,7 @@ function saveGame() {
     quests: G.quests || { active: [], completed: [] },
     sprite: G.sprite || 1,
     guild: G.guild || null,
+    onboarding: G.onboarding || { step: 0, hintsShown: {} },
     lastSeen: firebase.database.ServerValue.TIMESTAMP,
     version: VERSION,
   });
