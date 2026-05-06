@@ -1980,7 +1980,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.12.1';
+const VERSION = 'v3.12.2';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2400,8 +2400,8 @@ setInterval(spawnFriendlySpirits, FRIENDLY_SPAWN_INTERVAL);
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
-const ROAM_SPAWN_INTERVAL = 8000; // check spawns every 8s
-const ROAM_MAX = 15; // max enemies on map at once
+const ROAM_SPAWN_INTERVAL = 5000; // check spawns every 5s
+const ROAM_MAX = 25; // max enemies on map at once
 const ROAM_DETECT_RANGE = 6; // tiles — how far they can "see" you
 const ROAM_CHASE_SPEED = 0.03; // tiles per frame — slightly slower than player
 const ROAM_LEASH_RANGE = 14; // tiles — give up chase after this distance from home
@@ -3508,9 +3508,9 @@ for (let i = 0; i < 60; i++) {
 
 // ═══════ NPC DATA ═══════
 const NPCS = [
-  { name: 'Elder Frost', x: HUB.x + 1.5, y: HUB.y + 0.2, color: '#daa520' },
-  { name: 'Smith Ember', x: HUB.x + 1.5, y: HUB.y + 4.2, color: '#e07020' },
-  { name: 'Keeper Zara', x: HUB.x + 5.5, y: HUB.y + 0.2, color: '#c0a040' },
+  { name: 'Elder Frost', x: HUB.x + 1.5, y: HUB.y + 0.2, color: '#daa520', sprite: 'npc_elder' },
+  { name: 'Smith Ember', x: HUB.x + 1.5, y: HUB.y + 4.2, color: '#e07020', sprite: 'npc_smith' },
+  { name: 'Keeper Zara', x: HUB.x + 5.5, y: HUB.y + 0.2, color: '#c0a040', sprite: 'npc_zara' },
 ];
 
 // ═══════ TILE MAP (Frost Valley) ═══════
@@ -4549,14 +4549,22 @@ function render() {
     ctx.ellipse(nx + TILE/2, ny + TILE - 2, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Body — larger NPC
-    ctx.fillStyle = npc.color;
-    ctx.beginPath();
-    ctx.arc(nx + TILE/2, ny + TILE/2 - 2, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // Body — use NPC sprite if available, fallback to circle
+    const npcImg = npc.sprite ? spriteImages[npc.sprite] : null;
+    if (npcImg && npcImg.complete && npcImg.naturalWidth) {
+      const npcFrame = Math.floor(Date.now() / 500) % Math.max(1, Math.floor(npcImg.naturalWidth / 16));
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(npcImg, npcFrame * 16, 0, 16, 16, nx + TILE/2 - 24, ny + TILE/2 - 24, 48, 48);
+      ctx.imageSmoothingEnabled = true;
+    } else {
+      ctx.fillStyle = npc.color;
+      ctx.beginPath();
+      ctx.arc(nx + TILE/2, ny + TILE/2 - 2, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
 
     // Name
     ctx.fillStyle = '#ffe0a0';
@@ -9664,6 +9672,17 @@ function preloadSprites() {
     const img = new Image();
     img.src = src;
     spriteImages['monster_' + id] = img;
+  }
+  // NPC character sprites
+  const npcSheets = {
+    npc_elder: 'assets/characters/NPC_Inspector_idle.png',
+    npc_smith: 'assets/characters/NPC_GoldStatue_idle.png',
+    npc_zara: 'assets/characters/NPC_GladiatorBlue_idle.png',
+  };
+  for (const [id, src] of Object.entries(npcSheets)) {
+    const img = new Image();
+    img.src = src;
+    spriteImages[id] = img;
   }
   // Friendly animal sprites
   const animalSheetSrcs = {
