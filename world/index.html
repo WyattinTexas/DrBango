@@ -245,6 +245,75 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   padding: 2px 12px; border-radius: 10px; z-index: 15; letter-spacing: 1px;
 }
 
+/* ── FLOATING DAMAGE NUMBERS ── */
+.dmg-float {
+  position: absolute; z-index: 50; font-size: 28px; font-weight: 900;
+  color: #e02020; text-shadow: 0 0 6px rgba(0,0,0,0.5), 2px 2px 0 #600;
+  pointer-events: none; animation: dmgFloatUp 1s ease-out forwards;
+  font-family: 'Segoe UI', sans-serif;
+}
+.dmg-float.heal { color: #20c040; text-shadow: 0 0 6px rgba(0,0,0,0.5), 2px 2px 0 #060; }
+@keyframes dmgFloatUp {
+  0% { opacity: 1; transform: translateY(0) scale(1.2); }
+  60% { opacity: 1; transform: translateY(-40px) scale(1); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+
+/* ── SPRITE REACTIONS ── */
+.battle-sprite img.sprite-bounce {
+  animation: spriteBounce 0.4s ease;
+}
+@keyframes spriteBounce {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-12px); }
+  50% { transform: translateY(0); }
+  70% { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+.battle-sprite.player img.sprite-bounce {
+  animation: spriteBounceFlipped 0.4s ease;
+}
+@keyframes spriteBounceFlipped {
+  0% { transform: scaleX(-1) translateY(0); }
+  30% { transform: scaleX(-1) translateY(-12px); }
+  50% { transform: scaleX(-1) translateY(0); }
+  70% { transform: scaleX(-1) translateY(-5px); }
+  100% { transform: scaleX(-1) translateY(0); }
+}
+.battle-sprite img.sprite-celebrate {
+  animation: spriteCelebrate 0.6s ease;
+}
+@keyframes spriteCelebrate {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.15) rotate(-3deg); }
+  50% { transform: scale(1.1) rotate(3deg); }
+  75% { transform: scale(1.12) rotate(-2deg); }
+  100% { transform: scale(1); }
+}
+
+/* ── VICTORY/DEFEAT BANNERS ── */
+.battle-result-banner {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+  z-index: 30; font-size: 36px; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 3px; padding: 8px 32px; border-radius: 8px;
+  animation: bannerPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s forwards;
+  pointer-events: none;
+}
+.battle-result-banner.victory {
+  color: #fff; background: linear-gradient(135deg, #2a8a2a, #44cc44);
+  border: 3px solid #1a6a1a; text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 0 30px rgba(68,204,68,0.4);
+}
+.battle-result-banner.defeat {
+  color: #fff; background: linear-gradient(135deg, #8a2a2a, #cc4444);
+  border: 3px solid #6a1a1a; text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 0 30px rgba(204,68,68,0.4);
+}
+@keyframes bannerPop {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
 /* ═══════ RARITY GLOW ═══════ */
 .rarity-glow-common { text-shadow: 0 0 6px rgba(139,149,165,0.5); color: #8b95a5; }
 .rarity-glow-uncommon { text-shadow: 0 0 8px rgba(46,204,113,0.6); color: #2ecc71; }
@@ -1218,6 +1287,9 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <!-- BATTLE OVERLAY -->
 <div id="battleOverlay">
   <div class="battle-arena" id="battleArena">
+    <!-- BATTLE TITLE — "Wild X appeared!" -->
+    <div id="battleTitle" style="text-align:center;font-size:16px;font-weight:bold;color:#333;padding:6px 0;background:#f0e8d8;border-bottom:2px solid #ccc;font-family:'Segoe UI',sans-serif;letter-spacing:0.5px;"></div>
+
     <!-- BATTLE FIELD — sprites center stage -->
     <div class="battle-field">
       <div class="battle-round-badge" id="battleRound">Round 1</div>
@@ -2393,7 +2465,7 @@ let marketListings = {};
 let canvas, ctx;
 let camX = 0, camY = 0;
 let keys = {};
-const TILE = 32;
+const TILE = 48;
 const WORLD_W = 90; // tiles
 const WORLD_H = 70;
 const MOVE_SPEED = 2.5;
@@ -2719,15 +2791,56 @@ function render() {
       ctx.fillRect(sx, sy, TILE, TILE);
 
       // Tile details
-      if (tile === 1) { // Tree
-        ctx.fillStyle = '#1a3a2a';
-        ctx.beginPath();
-        ctx.moveTo(sx + TILE/2, sy + 4);
-        ctx.lineTo(sx + TILE - 4, sy + TILE - 4);
-        ctx.lineTo(sx + 4, sy + TILE - 4);
-        ctx.fill();
+      if (tile === 1) { // Tree — varied by position
+        const treeVar = (tx * 7 + ty * 13) % 4;
         ctx.fillStyle = '#5a3a1a';
-        ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 8);
+        ctx.fillRect(sx + TILE/2 - 3, sy + TILE - 12, 6, 12);
+        if (treeVar === 0) {
+          ctx.fillStyle = '#1a3a2a';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy + 2);
+          ctx.lineTo(sx + TILE - 4, sy + TILE - 12);
+          ctx.lineTo(sx + 4, sy + TILE - 12);
+          ctx.fill();
+        } else if (treeVar === 1) {
+          // Layered pine
+          ctx.fillStyle = '#1a3a2a';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy + 2);
+          ctx.lineTo(sx + TILE/2 + 14, sy + TILE/2 - 2);
+          ctx.lineTo(sx + TILE/2 - 14, sy + TILE/2 - 2);
+          ctx.fill();
+          ctx.fillStyle = '#1e4232';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy + TILE/2 - 10);
+          ctx.lineTo(sx + TILE/2 + 18, sy + TILE - 12);
+          ctx.lineTo(sx + TILE/2 - 18, sy + TILE - 12);
+          ctx.fill();
+        } else if (treeVar === 2) {
+          // Round bushy
+          ctx.fillStyle = '#1e4a30';
+          ctx.beginPath();
+          ctx.arc(sx + TILE/2, sy + TILE/2 - 2, 16, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#164022';
+          ctx.beginPath();
+          ctx.arc(sx + TILE/2 - 5, sy + TILE/2 - 6, 10, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Tall narrow + snow cap
+          ctx.fillStyle = '#1a3a2a';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy);
+          ctx.lineTo(sx + TILE/2 + 10, sy + TILE - 12);
+          ctx.lineTo(sx + TILE/2 - 10, sy + TILE - 12);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(220,230,255,0.4)';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy);
+          ctx.lineTo(sx + TILE/2 + 5, sy + 8);
+          ctx.lineTo(sx + TILE/2 - 5, sy + 8);
+          ctx.fill();
+        }
       } else if (tile === 7) { // Mountain
         ctx.fillStyle = '#5a5a6a';
         ctx.beginPath();
@@ -2742,17 +2855,48 @@ function render() {
         ctx.lineTo(sx + TILE/2 - 5, sy + 10);
         ctx.fill();
       } else if (tile === 5) { // Building
+        // Walls
         ctx.fillStyle = '#8a7a5a';
-        ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
+        ctx.fillRect(sx + 2, sy + 10, TILE - 4, TILE - 10);
+        // Wall highlight
+        ctx.fillStyle = '#9a8a6a';
+        ctx.fillRect(sx + 3, sy + 11, TILE - 6, 2);
+        // Roof
         ctx.fillStyle = '#a05030';
         ctx.beginPath();
-        ctx.moveTo(sx + 1, sy + 6);
+        ctx.moveTo(sx, sy + 10);
         ctx.lineTo(sx + TILE/2, sy);
-        ctx.lineTo(sx + TILE - 1, sy + 6);
+        ctx.lineTo(sx + TILE, sy + 10);
         ctx.fill();
+        // Roof ridge
+        ctx.strokeStyle = '#804020';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy);
+        ctx.lineTo(sx + TILE/2, sy + 10);
+        ctx.stroke();
+        // Windows
+        ctx.fillStyle = 'rgba(200,220,255,0.7)';
+        ctx.fillRect(sx + 6, sy + 16, 8, 8);
+        ctx.fillRect(sx + TILE - 14, sy + 16, 8, 8);
+        // Window frames
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 6, sy + 16, 8, 8);
+        ctx.strokeRect(sx + TILE - 14, sy + 16, 8, 8);
+        // Window cross
+        ctx.beginPath();
+        ctx.moveTo(sx + 10, sy + 16); ctx.lineTo(sx + 10, sy + 24);
+        ctx.moveTo(sx + 6, sy + 20); ctx.lineTo(sx + 14, sy + 20);
+        ctx.moveTo(sx + TILE - 10, sy + 16); ctx.lineTo(sx + TILE - 10, sy + 24);
+        ctx.moveTo(sx + TILE - 14, sy + 20); ctx.lineTo(sx + TILE - 6, sy + 20);
+        ctx.stroke();
         // Door
         ctx.fillStyle = '#3a2a1a';
-        ctx.fillRect(sx + TILE/2 - 3, sy + TILE - 10, 6, 10);
+        ctx.fillRect(sx + TILE/2 - 5, sy + TILE - 14, 10, 14);
+        // Doorknob
+        ctx.fillStyle = '#daa520';
+        ctx.fillRect(sx + TILE/2 + 2, sy + TILE - 8, 2, 2);
       } else if (tile === 8) { // Workshop
         ctx.fillStyle = '#7a6a4a';
         ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
@@ -2840,15 +2984,39 @@ function render() {
         ctx.fillStyle = 'rgba(255,200,80,0.6)';
         ctx.fillRect(sx + 6, sy + 12, 5, 5);
         ctx.fillRect(sx + TILE - 11, sy + 12, 5, 5);
-      } else if (tile === 13) { // Warm tree (Rolling Hills)
-        ctx.fillStyle = '#3a6a2a';
-        ctx.beginPath();
-        ctx.moveTo(sx + TILE/2, sy + 2);
-        ctx.lineTo(sx + TILE - 4, sy + TILE - 4);
-        ctx.lineTo(sx + 4, sy + TILE - 4);
-        ctx.fill();
+      } else if (tile === 13) { // Warm tree (Rolling Hills) — varied
+        const warmVar = (tx * 11 + ty * 3) % 3;
         ctx.fillStyle = '#5a3a1a';
-        ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 8);
+        ctx.fillRect(sx + TILE/2 - 3, sy + TILE - 12, 6, 12);
+        if (warmVar === 0) {
+          // Round oak
+          ctx.fillStyle = '#3a7a2a';
+          ctx.beginPath();
+          ctx.arc(sx + TILE/2, sy + TILE/2 - 4, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#2a6a1a';
+          ctx.beginPath();
+          ctx.arc(sx + TILE/2 + 6, sy + TILE/2 - 8, 10, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (warmVar === 1) {
+          // Leafy triangle
+          ctx.fillStyle = '#3a6a2a';
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE/2, sy + 2);
+          ctx.lineTo(sx + TILE - 4, sy + TILE - 12);
+          ctx.lineTo(sx + 4, sy + TILE - 12);
+          ctx.fill();
+        } else {
+          // Wide canopy
+          ctx.fillStyle = '#4a7a3a';
+          ctx.beginPath();
+          ctx.ellipse(sx + TILE/2, sy + TILE/2 - 2, 20, 14, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#3a6a2a';
+          ctx.beginPath();
+          ctx.ellipse(sx + TILE/2 - 4, sy + TILE/2 - 6, 12, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (tile === 14) { // Volcanic rock
         ctx.fillStyle = '#4a2828';
         ctx.beginPath();
@@ -3062,31 +3230,31 @@ function render() {
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
-    ctx.ellipse(nx + TILE/2, ny + TILE - 2, 7, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(nx + TILE/2, ny + TILE - 2, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Body
+    // Body — larger NPC
     ctx.fillStyle = npc.color;
     ctx.beginPath();
-    ctx.arc(nx + TILE/2, ny + TILE/2, 9, 0, Math.PI * 2);
+    ctx.arc(nx + TILE/2, ny + TILE/2 - 2, 14, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     // Name
     ctx.fillStyle = '#ffe0a0';
-    ctx.font = 'bold 9px sans-serif';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(npc.name, nx + TILE/2, ny - 2);
+    ctx.fillText(npc.name, nx + TILE/2, ny - 6);
 
     // Interaction indicator if player is near
     const dist = Math.sqrt((G.x - npc.x) ** 2 + (G.y - npc.y) ** 2);
     if (dist < 2.5) {
       const promptAlpha = 0.5 + Math.sin(time * 3) * 0.3;
       ctx.fillStyle = `rgba(255,224,160,${promptAlpha})`;
-      ctx.font = 'bold 9px sans-serif';
-      ctx.fillText('[E] Talk', nx + TILE/2, ny - 12);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('[E] Talk', nx + TILE/2, ny - 18);
     }
   }
 
@@ -3158,13 +3326,13 @@ function render() {
     // Shadow
     ctx.fillStyle = 'rgba(80,0,0,0.3)';
     ctx.beginPath();
-    ctx.ellipse(ex + TILE/2, ey + TILE, 8, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + TILE/2, ey + TILE, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (e.state === 'chase') {
       // ── CHASING: pulsing red, larger, angry ──
       // Danger glow ring
-      const pulseR = 14 + Math.sin(time * 8) * 3;
+      const pulseR = 20 + Math.sin(time * 8) * 4;
       ctx.strokeStyle = `rgba(255, 40, 20, ${0.4 + Math.sin(time * 6) * 0.2})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -3173,44 +3341,44 @@ function render() {
       // Body — angry red
       ctx.fillStyle = rarityColor;
       ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 10, 0, Math.PI * 2);
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 15, 0, Math.PI * 2);
       ctx.fill();
       // Angry eyes — bright white/red
       ctx.fillStyle = '#fff';
-      ctx.fillRect(ex + TILE/2 - 5, ey + TILE/2 + bob - 3, 3, 3);
-      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 3, 3, 3);
+      ctx.fillRect(ex + TILE/2 - 7, ey + TILE/2 + bob - 4, 4, 4);
+      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 4, 4, 4);
       ctx.fillStyle = '#ff0000';
-      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 2, 2);
-      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 2, 2, 2);
+      ctx.fillRect(ex + TILE/2 - 6, ey + TILE/2 + bob - 3, 3, 3);
+      ctx.fillRect(ex + TILE/2 + 4, ey + TILE/2 + bob - 3, 3, 3);
 
     } else if (e.state === 'alert') {
       // ── ALERT: noticed you, exclamation mark ──
       ctx.fillStyle = rarityColor;
       ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 9, 0, Math.PI * 2);
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 13, 0, Math.PI * 2);
       ctx.fill();
       // Eyes — wide
       ctx.fillStyle = '#ffcc00';
-      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 3, 2);
-      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 2, 3, 2);
+      ctx.fillRect(ex + TILE/2 - 6, ey + TILE/2 + bob - 3, 4, 3);
+      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 3, 4, 3);
       // "!" above head
       ctx.fillStyle = '#ffdd00';
-      ctx.font = 'bold 14px sans-serif';
+      ctx.font = 'bold 18px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('!', ex + TILE/2, ey - 2 + bob);
+      ctx.fillText('!', ex + TILE/2, ey - 6 + bob);
 
     } else {
       // ── PATROL / RETURNING: calm, drifting ──
       ctx.fillStyle = rarityColor;
       ctx.globalAlpha = 0.7;
       ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 7, 0, Math.PI * 2);
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 11, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       // Dim eyes
       ctx.fillStyle = 'rgba(255,200,100,0.6)';
-      ctx.fillRect(ex + TILE/2 - 3, ey + TILE/2 + bob - 1, 2, 2);
-      ctx.fillRect(ex + TILE/2 + 1, ey + TILE/2 + bob - 1, 2, 2);
+      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 3, 3);
+      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 2, 3, 3);
     }
 
     // Name label (only when close or chasing)
@@ -3231,9 +3399,9 @@ function render() {
     if (opx < -50 || opx > W + 50 || opy < -50 || opy > H + 50) continue;
 
     // Draw sprite for other players
-    const otherSpriteScale = 1.0;
+    const otherSpriteScale = 2.0;
     const otherSpriteX = opx + TILE/2 - 8 * otherSpriteScale;
-    const otherSpriteY = opy + TILE/2 - 12 * otherSpriteScale;
+    const otherSpriteY = opy + TILE - 24 * otherSpriteScale;
     drawSprite(ctx, p.sprite || 1, otherSpriteX, otherSpriteY, otherSpriteScale, p.direction || 'down', 0);
 
     // Name (with guild tag)
@@ -3257,9 +3425,9 @@ function render() {
   const playerSY = G.y * TILE - camY;
 
   // Draw procedural sprite instead of circle
-  const spriteScale = 1.2;
+  const spriteScale = 2.2;
   const spriteOffX = playerSX + TILE/2 - 8 * spriteScale;
-  const spriteOffY = playerSY + TILE/2 - 12 * spriteScale;
+  const spriteOffY = playerSY + TILE - 24 * spriteScale;
   drawSprite(ctx, G.sprite || 1, spriteOffX, spriteOffY, spriteScale, G.direction || 'down', G.frame || 0);
 
   // Player glow ring
@@ -3269,7 +3437,7 @@ function render() {
   ctx.shadowColor = myDiscColor;
   ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.ellipse(playerSX + TILE/2, playerSY + TILE - 2, 10, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(playerSX + TILE/2, playerSY + TILE - 2, 16, 6, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.shadowBlur = 0;
 
@@ -3682,6 +3850,7 @@ function renderBattle() {
   if (B.playerGhost.ko || B.enemyGhost.ko) {
     const won = B.enemyGhost.ko;
     actionsEl.innerHTML = `<button class="battle-btn btn-roll" onclick="endBattle(${won})">${won ? '&#127881; Victory!' : '&#128128; Defeated...'}</button>`;
+    if (!B._bannerShown) { B._bannerShown = true; showBattleResultBanner(won); }
   }
 }
 
@@ -3700,6 +3869,46 @@ function flashHpBar(barId) {
   if (!bar) return;
   bar.classList.add('flash-red');
   setTimeout(() => bar.classList.remove('flash-red'), 200);
+}
+
+// ═══════ FLOATING DAMAGE NUMBER ═══════
+function showDmgFloat(target, amount, isHeal) {
+  const spriteEl = document.querySelector(`.battle-sprite.${target} img`);
+  if (!spriteEl) return;
+  const rect = spriteEl.getBoundingClientRect();
+  const arena = document.getElementById('battleArena');
+  const arenaRect = arena.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'dmg-float' + (isHeal ? ' heal' : '');
+  el.textContent = (isHeal ? '+' : '-') + amount;
+  el.style.left = (rect.left - arenaRect.left + rect.width / 2 - 20) + 'px';
+  el.style.top = (rect.top - arenaRect.top + 10) + 'px';
+  arena.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// ═══════ SPRITE HIT REACTION ═══════
+function spriteHitReact(target) {
+  const img = document.querySelector(`.battle-sprite.${target} img`);
+  if (!img) return;
+  img.classList.remove('hit', 'sprite-bounce');
+  void img.offsetWidth;
+  img.classList.add('hit', 'sprite-bounce');
+  setTimeout(() => img.classList.remove('hit', 'sprite-bounce'), 400);
+}
+
+// ═══════ VICTORY/DEFEAT BANNER ═══════
+function showBattleResultBanner(won) {
+  const arena = document.getElementById('battleArena');
+  const existing = arena.querySelector('.battle-result-banner');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'battle-result-banner ' + (won ? 'victory' : 'defeat');
+  el.textContent = won ? 'VICTORY' : 'DEFEAT';
+  arena.appendChild(el);
+  // Winner sprite celebrates
+  const winSprite = document.querySelector(`.battle-sprite.${won ? 'player' : 'enemy'} img`);
+  if (winSprite) { winSprite.classList.add('sprite-celebrate'); }
 }
 
 // ═══════ ABILITY-AWARE BATTLE ROLL ═══════
@@ -3831,12 +4040,14 @@ function battleRoll() {
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
       B.log.push({ text: `You deal ${dmg} damage!`, type: 'damage' });
+      showDmgFloat('enemy', dmg, false);
+      spriteHitReact('enemy');
 
       // Munch (66): heal 4 HP on KO
       if (pg.id === 66 && eg.ko) {
         const healAmt = Math.min(4, pg.maxHp - pg.hp);
         pg.hp += healAmt;
-        if (healAmt > 0) B.log.push({ text: `${pg.name} (Scraps): Healed ${healAmt} HP from KO!`, type: 'heal' });
+        if (healAmt > 0) { B.log.push({ text: `${pg.name} (Scraps): Healed ${healAmt} HP from KO!`, type: 'heal' }); showDmgFloat('player', healAmt, true); }
       }
 
       // Spockles (81): win = +2 Ice Shards
@@ -3876,6 +4087,8 @@ function battleRoll() {
       pg.hp = Math.max(0, pg.hp - dmg);
       if (pg.hp <= 0) pg.ko = true;
       B.log.push({ text: `${eg.name} deals ${dmg} damage to you!`, type: 'damage' });
+      showDmgFloat('player', dmg, false);
+      spriteHitReact('player');
 
       SFX.hit();
       battleShake();
