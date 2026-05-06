@@ -2004,7 +2004,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.6.0';
+const VERSION = 'v4.7.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3916,6 +3916,35 @@ const LORE_ITEMS = [
   { x: 102, y: 35, id: 'lore_dc_2', title: 'Dark Seal', text: 'This seal was meant to keep the Dark Castle closed forever. Someone broke it from the inside.', region: 'dark_castle' },
 ];
 
+// ═══════ REGION CRYSTALS ═══════
+const REGION_CRYSTALS = [
+  { id: 'crystal_frost', x: 45, y: 10, region: 'frost', name: 'Frost Crystal', color: '#88ccff', found: false },
+  { id: 'crystal_hills', x: 40, y: 58, region: 'hills', name: 'Meadow Crystal', color: '#88dd66', found: false },
+  { id: 'crystal_volcanic', x: 82, y: 8, region: 'volcanic', name: 'Flame Crystal', color: '#ff8844', found: false },
+  { id: 'crystal_dark', x: 105, y: 15, region: 'dark', name: 'Shadow Crystal', color: '#aa66dd', found: false },
+];
+
+// ═══════ HIDDEN TREASURE CHESTS ═══════
+const TREASURE_CHESTS = [
+  { id: 'chest_0', x: 5, y: 38, reward: { coins: 50, material: 'frozen_crystal' }, opened: false },
+  { id: 'chest_1', x: 52, y: 5, reward: { coins: 30, material: 'iron_ore' }, opened: false },
+  { id: 'chest_2', x: 48, y: 42, reward: { coins: 40, material: 'ancient_wood' }, opened: false },
+  { id: 'chest_3', x: 15, y: 65, reward: { coins: 35, material: 'spirit_thread' }, opened: false },
+  { id: 'chest_4', x: 85, y: 35, reward: { coins: 45, material: 'volcanic_glass' }, opened: false },
+  { id: 'chest_5', x: 70, y: 5, reward: { coins: 60, material: 'ember_dust' }, opened: false },
+  { id: 'chest_6', x: 100, y: 35, reward: { coins: 75, material: 'mask_fragment' }, opened: false },
+  { id: 'chest_7', x: 95, y: 5, reward: { coins: 100, essence: true }, opened: false },
+];
+
+// ═══════ SCENIC VIEWPOINTS ═══════
+const VIEWPOINTS = [
+  { id: 'vp_0', x: 30, y: 3, name: 'Northern Peak', desc: 'The entirety of Frost Valley stretches below.' },
+  { id: 'vp_1', x: 55, y: 22, name: 'Mountain Pass Overlook', desc: 'You can see both Frost Valley and the Volcanic Isles from here.' },
+  { id: 'vp_2', x: 75, y: 3, name: 'Volcanic Rim', desc: 'Lava rivers glow like veins of fire across the islands.' },
+  { id: 'vp_3', x: 25, y: 67, name: 'Southern Meadow', desc: 'Flowers stretch as far as you can see.' },
+  { id: 'vp_4', x: 105, y: 3, name: 'Dark Castle Tower', desc: 'The entire Overworld is visible from Valkin\'s tower. Everything he wanted to control.' },
+];
+
 // ═══════ AMBIENT EVENTS ═══════
 const AMBIENT_EVENTS = [
   // Frost Valley
@@ -4610,6 +4639,20 @@ function render() {
   // Clamp camera
   camX = Math.max(0, Math.min(WORLD_W * TILE - W, camX));
   camY = Math.max(0, Math.min(WORLD_H * TILE - H, camY));
+
+  // Viewpoint zoom effect
+  if (window._viewpointZoom && window._viewpointZoom !== 1) {
+    const z = window._viewpointZoom;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(z, z);
+    ctx.translate(-W / 2, -H / 2);
+    // Adjust camera to keep player centered during zoom
+    camX = G.x * TILE - W / (2 * z);
+    camY = G.y * TILE - H / (2 * z);
+    camX = Math.max(0, Math.min(WORLD_W * TILE - W / z, camX));
+    camY = Math.max(0, Math.min(WORLD_H * TILE - H / z, camY));
+  }
 
   // Draw tiles
   const startTX = Math.max(0, Math.floor(camX / TILE));
@@ -5987,6 +6030,150 @@ function render() {
     }
   }
 
+  // ═══════ REGION CRYSTALS ═══════
+  for (const crystal of REGION_CRYSTALS) {
+    if (G.crystalsFound && G.crystalsFound.includes(crystal.id)) continue;
+    const cx = crystal.x * TILE - camX;
+    const cy = crystal.y * TILE - camY;
+    if (cx < -80 || cx > W + 80 || cy < -80 || cy > H + 80) continue;
+    const dist = Math.sqrt((G.x - crystal.x) ** 2 + (G.y - crystal.y) ** 2);
+    if (dist < 6) {
+      const glow = dist < 3;
+      const pulse = 0.4 + Math.sin(time * 3) * 0.3;
+      const rotate = time * 2;
+      ctx.save();
+      ctx.translate(cx + TILE / 2, cy + TILE / 2);
+      // Particle aura when glowing
+      if (glow) {
+        for (let p = 0; p < 6; p++) {
+          const pa = (time * 1.5 + p * Math.PI / 3) % (Math.PI * 2);
+          const pr = 12 + Math.sin(time * 4 + p) * 4;
+          ctx.globalAlpha = 0.3 + Math.sin(time * 5 + p) * 0.2;
+          ctx.fillStyle = crystal.color;
+          ctx.beginPath();
+          ctx.arc(Math.cos(pa) * pr, Math.sin(pa) * pr, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Rotating diamond shape
+      ctx.globalAlpha = glow ? (0.7 + pulse * 0.3) : 0.35;
+      ctx.rotate(rotate);
+      ctx.fillStyle = crystal.color;
+      ctx.shadowColor = crystal.color;
+      ctx.shadowBlur = glow ? 16 : 4;
+      ctx.beginPath();
+      ctx.moveTo(0, -10); ctx.lineTo(7, 0); ctx.lineTo(0, 10); ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Bright core
+      ctx.globalAlpha = glow ? 0.9 : 0.5;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, -4); ctx.lineTo(3, 0); ctx.lineTo(0, 4); ctx.lineTo(-3, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // [E] prompt
+      if (dist < 1.5) {
+        const eAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(255,255,255,${eAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E] Collect', cx + TILE / 2, cy - 20);
+      }
+    }
+  }
+
+  // ═══════ TREASURE CHESTS ═══════
+  for (const chest of TREASURE_CHESTS) {
+    if (G.chestsOpened && G.chestsOpened.includes(chest.id)) continue;
+    const chx = chest.x * TILE - camX;
+    const chy = chest.y * TILE - camY;
+    if (chx < -60 || chx > W + 60 || chy < -60 || chy > H + 60) continue;
+    const dist = Math.sqrt((G.x - chest.x) ** 2 + (G.y - chest.y) ** 2);
+    if (dist < 5) {
+      ctx.save();
+      const bx = chx + TILE / 2;
+      const by = chy + TILE / 2;
+      // Chest body (brown box)
+      ctx.fillStyle = '#8B5E3C';
+      ctx.fillRect(bx - 8, by - 4, 16, 11);
+      // Chest lid
+      ctx.fillStyle = '#6B3E1C';
+      ctx.fillRect(bx - 9, by - 7, 18, 5);
+      // Golden clasp
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(bx - 2, by - 5, 4, 3);
+      // Keyhole dot
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.arc(bx, by - 3.5, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // [E] prompt
+      if (dist < 1.5) {
+        const eAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(218,165,32,${eAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E] Open', chx + TILE / 2, chy - 16);
+      }
+    }
+  }
+
+  // ═══════ SCENIC VIEWPOINTS ═══════
+  for (const vp of VIEWPOINTS) {
+    if (G.viewpointsDiscovered && G.viewpointsDiscovered.includes(vp.id)) continue;
+    const vx = vp.x * TILE - camX;
+    const vy = vp.y * TILE - camY;
+    if (vx < -60 || vx > W + 60 || vy < -60 || vy > H + 60) continue;
+    const dist = Math.sqrt((G.x - vp.x) ** 2 + (G.y - vp.y) ** 2);
+    if (dist < 5) {
+      ctx.save();
+      const tx = vx + TILE / 2;
+      const ty = vy + TILE / 2;
+      const bob = Math.sin(time * 2) * 2;
+      // Telescope body
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = '#c0a060';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(tx - 5, ty + 6 + bob);
+      ctx.lineTo(tx + 5, ty - 6 + bob);
+      ctx.stroke();
+      // Lens (wider end)
+      ctx.fillStyle = '#aadeff';
+      ctx.beginPath();
+      ctx.arc(tx + 5, ty - 6 + bob, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#907040';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Eyepiece (narrow end)
+      ctx.fillStyle = '#c0a060';
+      ctx.beginPath();
+      ctx.arc(tx - 5, ty + 6 + bob, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Tripod legs
+      ctx.strokeStyle = '#807050';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty + 2 + bob); ctx.lineTo(tx - 6, ty + 10);
+      ctx.moveTo(tx, ty + 2 + bob); ctx.lineTo(tx + 6, ty + 10);
+      ctx.moveTo(tx, ty + 2 + bob); ctx.lineTo(tx, ty + 11);
+      ctx.stroke();
+      ctx.restore();
+      // [E] prompt
+      if (dist < 1.5) {
+        const eAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(200,220,255,${eAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E] Look', vx + TILE / 2, vy - 16);
+      }
+    }
+  }
+
   // ═══════ INTERACTION PROMPT ═══════
   const ptx = Math.floor(G.x);
   const pty = Math.floor(G.y);
@@ -6011,6 +6198,11 @@ function render() {
 
   // Minimap
   renderMinimap();
+
+  // Restore viewpoint zoom transform
+  if (window._viewpointZoom && window._viewpointZoom !== 1) {
+    ctx.restore();
+  }
 
   if (!G.inBattle) requestAnimationFrame(render);
 }
@@ -9520,6 +9712,78 @@ function tryInteract() {
     }
   }
 
+  // Check for nearby region crystals
+  for (const crystal of REGION_CRYSTALS) {
+    if (G.crystalsFound && G.crystalsFound.includes(crystal.id)) continue;
+    const dist = Math.sqrt((G.x - crystal.x) ** 2 + (G.y - crystal.y) ** 2);
+    if (dist < 1.5) {
+      if (!G.crystalsFound) G.crystalsFound = [];
+      G.crystalsFound.push(crystal.id);
+      addProfessionXP('exploration', 50);
+      notify(`💎 ${crystal.name} collected! (+50 Exploration XP) [${G.crystalsFound.length}/4]`);
+      SFX.notify();
+      saveGame();
+      return;
+    }
+  }
+
+  // Check for nearby treasure chests
+  for (const chest of TREASURE_CHESTS) {
+    if (G.chestsOpened && G.chestsOpened.includes(chest.id)) continue;
+    const dist = Math.sqrt((G.x - chest.x) ** 2 + (G.y - chest.y) ** 2);
+    if (dist < 1.5) {
+      if (!G.chestsOpened) G.chestsOpened = [];
+      G.chestsOpened.push(chest.id);
+      G.coins = (G.coins || 0) + chest.reward.coins;
+      let rewardText = `+${chest.reward.coins} coins`;
+      if (chest.reward.material) {
+        if (!G.materials) G.materials = {};
+        G.materials[chest.reward.material] = (G.materials[chest.reward.material] || 0) + 1;
+        rewardText += `, +1 ${chest.reward.material.replace(/_/g, ' ')}`;
+      }
+      if (chest.reward.essence) {
+        rewardText += `, +1 mysterious essence`;
+      }
+      addProfessionXP('exploration', 20);
+      notify(`📦 Treasure chest opened! ${rewardText}`);
+      SFX.notify();
+      saveGame();
+      return;
+    }
+  }
+
+  // Check for nearby scenic viewpoints
+  for (const vp of VIEWPOINTS) {
+    if (G.viewpointsDiscovered && G.viewpointsDiscovered.includes(vp.id)) continue;
+    const dist = Math.sqrt((G.x - vp.x) ** 2 + (G.y - vp.y) ** 2);
+    if (dist < 1.5) {
+      if (!G.viewpointsDiscovered) G.viewpointsDiscovered = [];
+      G.viewpointsDiscovered.push(vp.id);
+      addProfessionXP('exploration', 25);
+      notify(`🔭 You discovered: ${vp.name}! — "${vp.desc}" (+25 Exploration XP)`);
+      SFX.notify();
+      // Brief camera zoom-out effect
+      const origTile = TILE;
+      const zoomSteps = 20;
+      let step = 0;
+      const zoomOut = setInterval(() => {
+        step++;
+        if (step <= zoomSteps / 2) {
+          // Zoom out
+          window._viewpointZoom = 1 - (step / (zoomSteps / 2)) * 0.3; // down to 0.7x
+        } else if (step <= zoomSteps) {
+          // Zoom back in
+          window._viewpointZoom = 0.7 + ((step - zoomSteps / 2) / (zoomSteps / 2)) * 0.3;
+        } else {
+          window._viewpointZoom = null;
+          clearInterval(zoomOut);
+        }
+      }, 80);
+      saveGame();
+      return;
+    }
+  }
+
   // Check for nearby friendly spirits
   for (let i = friendlySpirits.length - 1; i >= 0; i--) {
     const f = friendlySpirits[i];
@@ -10145,6 +10409,9 @@ function createCharacter() {
   G.skillPointsUsed = 0;
   G.visitedTiles = new Set();
   G.materials = {};
+  G.crystalsFound = [];
+  G.chestsOpened = [];
+  G.viewpointsDiscovered = [];
 
   // Close modal
   document.getElementById('charCreateOverlay').classList.remove('active');
@@ -10260,6 +10527,9 @@ async function initFirebase() {
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
     G.maskQuest = data.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
+    G.crystalsFound = data.crystalsFound || [];
+    G.chestsOpened = data.chestsOpened || [];
+    G.viewpointsDiscovered = data.viewpointsDiscovered || [];
     G.direction = 'down';
     G.frame = 0;
     if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -10358,6 +10628,9 @@ function saveGame() {
     loreCollected: G.loreCollected || [],
     house: G.house || null,
     maskQuest: G.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 },
+    crystalsFound: G.crystalsFound || [],
+    chestsOpened: G.chestsOpened || [],
+    viewpointsDiscovered: G.viewpointsDiscovered || [],
     version: VERSION,
   };
 
