@@ -1630,7 +1630,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.5.0';
+const VERSION = 'v2.6.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2010,6 +2010,57 @@ function completeHarvest() {
   harvestingNode = null;
   saveGame();
 }
+
+// ═══════ FRIENDLY SPIRITKIN — peaceful drops near hubs ═══════
+const friendlySpirits = [];
+const FRIENDLY_MAX = 8;
+const FRIENDLY_SPAWN_INTERVAL = 10000; // check every 10s
+const FRIENDLY_COLLECT_RANGE = 1.5; // tiles — must be close
+const FRIENDLY_SCARE_SPEED = 0.08; // how fast player must be moving to scare them
+
+const FRIENDLY_TYPES = [
+  { id: 'little_boo', name: 'Little Boo', color: '#aaccff', bodyColor: '#88aadd', eyeColor: '#fff', drop: { id: 'essence_fragment', name: 'Essence Fragment' } },
+  { id: 'puff_pal', name: 'Puff', color: '#ffccdd', bodyColor: '#ddaabb', eyeColor: '#fff', drop: { id: 'spirit_dust', name: 'Spirit Dust' } },
+  { id: 'happy_crystal', name: 'Happy Crystal', color: '#ccffcc', bodyColor: '#aaddaa', eyeColor: '#fff', drop: { id: 'crystal_chip', name: 'Crystal Chip' } },
+  { id: 'tiny_glow', name: 'Tiny Glow', color: '#ffffaa', bodyColor: '#dddd88', eyeColor: '#fff', drop: { id: 'glow_mote', name: 'Glow Mote' } },
+];
+
+function spawnFriendlySpirits() {
+  if (friendlySpirits.length >= FRIENDLY_MAX) return;
+
+  // Spawn near one of the hub locations
+  const hubs = [
+    { x: HUB.x + 3, y: HUB.y + 3, name: 'Polaris' },     // Frost Valley hub
+    { x: 25, y: 59, name: 'Meadowbrook' },                  // Rolling Hills hub
+    { x: 75, y: 15, name: 'Volcanic' },                     // Volcanic hub
+  ];
+
+  const hub = hubs[Math.floor(Math.random() * hubs.length)];
+
+  // Spawn within safe radius of hub (5-7 tiles away)
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 3 + Math.random() * 4;
+  const sx = hub.x + Math.cos(angle) * dist;
+  const sy = hub.y + Math.sin(angle) * dist;
+
+  // Check tile is walkable
+  const tile = worldMap[Math.floor(sy)]?.[Math.floor(sx)];
+  if (tile === undefined || tile === 1 || tile === 3 || tile === 7 || tile === 15 || tile === 16 || tile === 21 || tile === 13) return;
+
+  const fType = FRIENDLY_TYPES[Math.floor(Math.random() * FRIENDLY_TYPES.length)];
+  friendlySpirits.push({
+    x: sx, y: sy,
+    homeX: sx, homeY: sy,
+    type: fType,
+    spawnedAt: Date.now(),
+    angle: Math.random() * Math.PI * 2,
+    state: 'idle', // idle, wandering, scared, gifting
+    giftCooldown: 0, // can't be gifted from again until cooldown
+    scaredTimer: 0,
+  });
+}
+
+setInterval(spawnFriendlySpirits, FRIENDLY_SPAWN_INTERVAL);
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -4130,6 +4181,61 @@ function render() {
     ctx.fillRect(barX, barY, barW * progress, barH);
   }
 
+  // ── FRIENDLY SPIRITS ──
+  for (const f of friendlySpirits) {
+    const fx = f.x * TILE - camX;
+    const fy = f.y * TILE - camY;
+    if (fx < -30 || fx > W + 30 || fy < -30 || fy > H + 30) continue;
+
+    const bob = Math.sin(Date.now() * 0.002 + f.homeX) * 3;
+    const alpha = f.state === 'scared' ? 0.4 : 0.85;
+
+    // Soft glow
+    ctx.globalAlpha = alpha * 0.2;
+    ctx.fillStyle = f.type.color;
+    ctx.beginPath();
+    ctx.arc(fx + TILE/2, fy + TILE/2 + bob, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body — soft round shape
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = f.type.bodyColor;
+    ctx.beginPath();
+    ctx.arc(fx + TILE/2, fy + TILE/2 + bob, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Happy eyes — dots, not angry
+    ctx.fillStyle = f.type.eyeColor;
+    ctx.beginPath();
+    ctx.arc(fx + TILE/2 - 3, fy + TILE/2 + bob - 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(fx + TILE/2 + 3, fy + TILE/2 + bob - 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Smile — small arc
+    ctx.strokeStyle = f.type.eyeColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(fx + TILE/2, fy + TILE/2 + bob + 1, 3, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+
+    // Name + E prompt when close
+    const playerDist = Math.sqrt((G.x - f.x) ** 2 + (G.y - f.y) ** 2);
+    if (playerDist < 3) {
+      ctx.fillStyle = f.type.color;
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(f.type.name, fx + TILE/2, fy - 4 + bob);
+      if (f.state !== 'scared') {
+        ctx.fillStyle = '#fff';
+        ctx.fillText('[E] Gift', fx + TILE/2, fy + TILE + 10 + bob);
+      }
+    }
+  }
+
   // ── SPIRIT WISPS ──
   const wispTime = Date.now() * 0.001;
   for (const w of spiritWisps) {
@@ -4572,6 +4678,46 @@ function gameLoop() {
 
   // Update harvest progress
   updateHarvest();
+
+  // ── Update Friendly Spirits ──
+  const playerSpeed = Math.sqrt((keys['w']||keys['arrowup']?1:0) + (keys['s']||keys['arrowdown']?1:0) + (keys['a']||keys['arrowleft']?1:0) + (keys['d']||keys['arrowright']?1:0));
+
+  for (let i = friendlySpirits.length - 1; i >= 0; i--) {
+    const f = friendlySpirits[i];
+    const distToPlayer = Math.sqrt((f.x - G.x) ** 2 + (f.y - G.y) ** 2);
+
+    if (f.state === 'scared') {
+      // Run away from player
+      const awayAngle = Math.atan2(f.y - G.y, f.x - G.x);
+      f.x += Math.cos(awayAngle) * 0.06;
+      f.y += Math.sin(awayAngle) * 0.06;
+      f.scaredTimer--;
+      if (f.scaredTimer <= 0) {
+        spiritWisps.length; // no-op reference
+        friendlySpirits.splice(i, 1); // vanish
+        continue;
+      }
+    } else {
+      // Gentle wandering near home
+      f.angle += (Math.random() - 0.5) * 0.08;
+      const nx = f.x + Math.cos(f.angle) * 0.005;
+      const ny = f.y + Math.sin(f.angle) * 0.005;
+      const homeDist = Math.sqrt((nx - f.homeX) ** 2 + (ny - f.homeY) ** 2);
+      if (homeDist < 4) { f.x = nx; f.y = ny; }
+      else { f.angle = Math.atan2(f.homeY - f.y, f.homeX - f.x); }
+
+      // Player is sprinting nearby — get scared!
+      if (distToPlayer < 3 && playerSpeed > 0) {
+        f.state = 'scared';
+        f.scaredTimer = 60; // ~1 second before vanishing
+      }
+    }
+
+    // Despawn if too old (5 minutes)
+    if (Date.now() - f.spawnedAt > 300000) {
+      friendlySpirits.splice(i, 1);
+    }
+  }
 
   // ── Update Spirit Wisps ──
   for (let i = spiritWisps.length - 1; i >= 0; i--) {
@@ -7032,6 +7178,23 @@ function closeInspect() {
 function tryInteract() {
   const tileX = Math.floor(G.x);
   const tileY = Math.floor(G.y);
+
+  // Check for nearby friendly spirits
+  for (let i = friendlySpirits.length - 1; i >= 0; i--) {
+    const f = friendlySpirits[i];
+    const dist = Math.sqrt((G.x - f.x) ** 2 + (G.y - f.y) ** 2);
+    if (dist < FRIENDLY_COLLECT_RANGE && f.state !== 'scared') {
+      // Gentle collection — give gift
+      if (!G.materials) G.materials = {};
+      G.materials[f.type.drop.id] = (G.materials[f.type.drop.id] || 0) + 1;
+      notify(`${f.type.name} gave you a ${f.type.drop.name}! (${G.materials[f.type.drop.id]} total)`);
+      SFX.notify();
+      addProfessionXP('charisma', 2); // gentle interaction = charisma
+      friendlySpirits.splice(i, 1);
+      saveGame();
+      return;
+    }
+  }
 
   // Check for world boss interaction first
   if (worldBossState && worldBossState.active && worldBossState.hp > 0) {
