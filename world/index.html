@@ -1630,7 +1630,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.4.0';
+const VERSION = 'v2.5.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -1912,6 +1912,102 @@ function collectWisp(wisp) {
   // Exploration XP for catching wisps
   addProfessionXP('exploration', 3);
 
+  saveGame();
+}
+
+// ═══════ RESOURCE NODES — harvestable deposits ═══════
+const RESOURCE_NODE_TYPES = [
+  { id: 'iron_ore', name: 'Iron Ore', color: '#8a7a6a', glowColor: 'rgba(160,140,120,0.3)', desc: 'Used by Blacksmiths and Swordsmiths', shape: 'rock' },
+  { id: 'volcanic_glass', name: 'Volcanic Glass', color: '#cc4400', glowColor: 'rgba(200,60,0,0.3)', desc: 'Used in Flame Magic crafting', shape: 'crystal' },
+  { id: 'frozen_crystal', name: 'Frozen Crystal', color: '#88ccee', glowColor: 'rgba(100,180,230,0.3)', desc: 'Used in Frost Magic crafting', shape: 'crystal' },
+  { id: 'ancient_wood', name: 'Ancient Wood', color: '#6a5a3a', glowColor: 'rgba(100,80,50,0.3)', desc: 'Used by Blaster Engineers', shape: 'log' },
+];
+
+// Fixed node positions — always in dangerous spots
+const RESOURCE_NODES = [
+  // Frost Valley — mountain passes and frozen lake edges
+  { x: 29, y: 43, type: 'iron_ore' },      // mountain pass south
+  { x: 30, y: 44, type: 'iron_ore' },      // mountain pass south
+  { x: 38, y: 20, type: 'frozen_crystal' }, // near frozen lake
+  { x: 42, y: 19, type: 'frozen_crystal' }, // frozen lake edge
+  { x: 50, y: 30, type: 'ancient_wood' },   // deep forest east
+
+  // Mountain passage (between regions — very dangerous)
+  { x: 59, y: 21, type: 'iron_ore' },      // east passage
+  { x: 60, y: 20, type: 'volcanic_glass' }, // transition zone
+
+  // Volcanic Isles — near lava, on beaches
+  { x: 70, y: 8, type: 'volcanic_glass' },  // near lava river
+  { x: 75, y: 20, type: 'volcanic_glass' }, // volcanic interior
+  { x: 80, y: 30, type: 'volcanic_glass' }, // deep volcanic
+  { x: 68, y: 35, type: 'ancient_wood' },   // palm forest
+
+  // Rolling Hills — scattered in open fields far from Meadowbrook
+  { x: 15, y: 55, type: 'ancient_wood' },   // deep woods
+  { x: 40, y: 50, type: 'iron_ore' },       // hillside deposit
+  { x: 45, y: 60, type: 'frozen_crystal' }, // cold stream
+  { x: 20, y: 65, type: 'ancient_wood' },   // far south forest
+];
+
+// Track node respawn times
+const nodeRespawnTimers = {}; // nodeIndex -> timestamp when available again
+const NODE_RESPAWN_TIME = 300000; // 5 minutes
+
+let harvestingNode = null; // currently harvesting node index
+let harvestStartTime = 0;
+const HARVEST_DURATION = 4000; // 4 seconds
+
+function startHarvest(nodeIdx) {
+  const node = RESOURCE_NODES[nodeIdx];
+  if (!node) return;
+
+  // Check respawn timer
+  if (nodeRespawnTimers[nodeIdx] && Date.now() < nodeRespawnTimers[nodeIdx]) {
+    const secs = Math.ceil((nodeRespawnTimers[nodeIdx] - Date.now()) / 1000);
+    notify(`This node is depleted. Respawns in ${secs}s.`);
+    return;
+  }
+
+  harvestingNode = nodeIdx;
+  harvestStartTime = Date.now();
+  notify(`Harvesting ${RESOURCE_NODE_TYPES.find(t => t.id === node.type).name}...`);
+}
+
+function updateHarvest() {
+  if (harvestingNode === null) return;
+
+  // Cancel if player moves too far from node
+  const node = RESOURCE_NODES[harvestingNode];
+  const dist = Math.sqrt((G.x - node.x) ** 2 + (G.y - node.y) ** 2);
+  if (dist > 2.5 || G.inBattle) {
+    harvestingNode = null;
+    notify('Harvesting interrupted!');
+    return;
+  }
+
+  // Check if harvest is complete
+  if (Date.now() - harvestStartTime >= HARVEST_DURATION) {
+    completeHarvest();
+  }
+}
+
+function completeHarvest() {
+  if (harvestingNode === null) return;
+  const node = RESOURCE_NODES[harvestingNode];
+  const nodeType = RESOURCE_NODE_TYPES.find(t => t.id === node.type);
+
+  // Add material
+  if (!G.materials) G.materials = {};
+  G.materials[node.type] = (G.materials[node.type] || 0) + 1;
+
+  // Set respawn timer
+  nodeRespawnTimers[harvestingNode] = Date.now() + NODE_RESPAWN_TIME;
+
+  SFX.craftSuccess();
+  notify(`⛏️ Harvested ${nodeType.name}! (${G.materials[node.type]} total)`);
+  addProfessionXP('crafting', 5);
+
+  harvestingNode = null;
   saveGame();
 }
 
@@ -3951,6 +4047,89 @@ function render() {
     ctx.fill();
   }
 
+  // ── RESOURCE NODES ──
+  for (let i = 0; i < RESOURCE_NODES.length; i++) {
+    const node = RESOURCE_NODES[i];
+    const nx = node.x * TILE - camX;
+    const ny = node.y * TILE - camY;
+    if (nx < -40 || nx > W + 40 || ny < -40 || ny > H + 40) continue;
+
+    const nodeType = RESOURCE_NODE_TYPES.find(t => t.id === node.type);
+    const depleted = nodeRespawnTimers[i] && Date.now() < nodeRespawnTimers[i];
+    const nTime = Date.now() * 0.001;
+
+    if (depleted) {
+      // Depleted — dim gray
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.arc(nx + TILE/2, ny + TILE/2, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      // Active — glowing
+      const pulse = 0.6 + Math.sin(nTime * 2 + i) * 0.3;
+
+      // Glow
+      ctx.fillStyle = nodeType.glowColor;
+      ctx.globalAlpha = pulse * 0.4;
+      ctx.beginPath();
+      ctx.arc(nx + TILE/2, ny + TILE/2, 16, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Shape
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = nodeType.color;
+      if (nodeType.shape === 'crystal') {
+        // Diamond shape
+        ctx.beginPath();
+        ctx.moveTo(nx + TILE/2, ny + TILE/2 - 10);
+        ctx.lineTo(nx + TILE/2 + 7, ny + TILE/2);
+        ctx.lineTo(nx + TILE/2, ny + TILE/2 + 10);
+        ctx.lineTo(nx + TILE/2 - 7, ny + TILE/2);
+        ctx.fill();
+      } else if (nodeType.shape === 'log') {
+        // Horizontal rectangle
+        ctx.fillRect(nx + TILE/2 - 9, ny + TILE/2 - 4, 18, 8);
+        ctx.fillStyle = '#4a3a2a';
+        ctx.fillRect(nx + TILE/2 - 7, ny + TILE/2 - 2, 14, 4);
+      } else {
+        // Rock — irregular circle
+        ctx.beginPath();
+        ctx.arc(nx + TILE/2, ny + TILE/2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.2;
+        ctx.beginPath();
+        ctx.arc(nx + TILE/2 - 2, ny + TILE/2 - 3, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // "E" prompt when player is near
+      const playerDist = Math.sqrt((G.x - node.x) ** 2 + (G.y - node.y) ** 2);
+      if (playerDist < 2.5) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E] Harvest', nx + TILE/2, ny - 4);
+      }
+    }
+  }
+
+  // ── HARVEST PROGRESS BAR ──
+  if (harvestingNode !== null) {
+    const progress = Math.min(1, (Date.now() - harvestStartTime) / HARVEST_DURATION);
+    const barW = 40, barH = 6;
+    const barX = G.x * TILE - camX + TILE/2 - barW/2;
+    const barY = G.y * TILE - camY - 20;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+    ctx.fillStyle = '#4a8';
+    ctx.fillRect(barX, barY, barW * progress, barH);
+  }
+
   // ── SPIRIT WISPS ──
   const wispTime = Date.now() * 0.001;
   for (const w of spiritWisps) {
@@ -4227,6 +4406,15 @@ function renderMinimap() {
     mctx.fillRect(e.x * scale - 0.5, e.y * scale - 0.5, 2, 2);
   }
 
+  // Resource node dots
+  for (let i = 0; i < RESOURCE_NODES.length; i++) {
+    const node = RESOURCE_NODES[i];
+    const depleted = nodeRespawnTimers[i] && Date.now() < nodeRespawnTimers[i];
+    const nt = RESOURCE_NODE_TYPES.find(t => t.id === node.type);
+    mctx.fillStyle = depleted ? '#444' : nt.color;
+    mctx.fillRect(node.x * scale - 1, node.y * scale - 1, 3, 3);
+  }
+
   // Spirit wisp dots
   for (const w of spiritWisps) {
     mctx.fillStyle = w.type.color;
@@ -4381,6 +4569,9 @@ function gameLoop() {
       }
     }
   }
+
+  // Update harvest progress
+  updateHarvest();
 
   // ── Update Spirit Wisps ──
   for (let i = spiritWisps.length - 1; i >= 0; i--) {
@@ -6847,6 +7038,16 @@ function tryInteract() {
     const bossDist = Math.sqrt((G.x - worldBossState.x) ** 2 + (G.y - worldBossState.y) ** 2);
     if (bossDist < 4) {
       engageWorldBoss();
+      return;
+    }
+  }
+
+  // Check for nearby resource nodes
+  for (let i = 0; i < RESOURCE_NODES.length; i++) {
+    const node = RESOURCE_NODES[i];
+    const dist = Math.sqrt((G.x - node.x) ** 2 + (G.y - node.y) ** 2);
+    if (dist < 2) {
+      startHarvest(i);
       return;
     }
   }
