@@ -1833,7 +1833,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.8.0';
+const VERSION = 'v3.8.1';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -4961,12 +4961,17 @@ function gameLoop() {
   if (dx && dy) { dx *= 0.707; dy *= 0.707; }
 
   if (dx || dy) {
-    // Update facing direction — only change if significantly different from current
-    // This prevents diagonal flicker where direction rapidly switches
-    if (Math.abs(dx) > Math.abs(dy) * 1.2) {
-      G.direction = dx > 0 ? 'right' : 'left';
-    } else if (Math.abs(dy) > Math.abs(dx) * 1.2) {
-      G.direction = dy > 0 ? 'down' : 'up';
+    // Update facing direction — throttled to prevent flicker
+    if (!G._lastDirChange) G._lastDirChange = 0;
+    const now_d = Date.now();
+    if (now_d - G._lastDirChange > 100) { // only change direction every 100ms
+      if (Math.abs(dx) > Math.abs(dy) * 1.5) {
+        const newDir = dx > 0 ? 'right' : 'left';
+        if (G.direction !== newDir) { G.direction = newDir; G._lastDirChange = now_d; }
+      } else if (Math.abs(dy) > Math.abs(dx) * 1.5) {
+        const newDir = dy > 0 ? 'down' : 'up';
+        if (G.direction !== newDir) { G.direction = newDir; G._lastDirChange = now_d; }
+      }
     }
     // If roughly equal (diagonal), keep current direction — no flicker
 
@@ -8907,8 +8912,17 @@ function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
   }
   requestAnimationFrame(() => { window._sDbg = 0; });
 
-  ctx.imageSmoothingEnabled = false; // pixel-perfect scaling
-  ctx.drawImage(img, sx, sy, frameW, frameH, x, y, dw, dh);
+  ctx.imageSmoothingEnabled = false;
+  // Clamp source coordinates to image bounds
+  const clampedSx = Math.min(sx, img.naturalWidth - frameW);
+  const clampedSy = Math.min(sy, img.naturalHeight - frameH);
+  try {
+    ctx.drawImage(img, clampedSx, clampedSy, frameW, frameH, x, y, dw, dh);
+  } catch(e) {
+    // Fallback on any draw error
+    ctx.fillStyle = '#4af';
+    ctx.fillRect(x, y, dw, dh);
+  }
   ctx.imageSmoothingEnabled = true;
 }
 
