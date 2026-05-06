@@ -545,6 +545,40 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 @keyframes notifIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes notifOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
 
+/* ═══════ AMBIENT NOTIFICATIONS ═══════ */
+.notif-ambient {
+  background: rgba(10,10,30,0.75); border: 1px solid rgba(200,180,120,0.2); border-radius: 8px;
+  padding: 8px 20px; font-size: 12px; font-style: italic; color: rgba(200,200,180,0.8);
+  animation: ambientIn 0.6s ease, ambientOut 0.6s ease 4.4s forwards;
+}
+@keyframes ambientIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ambientOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px); } }
+
+/* ═══════ LORE ITEM STYLING ═══════ */
+.lore-entry {
+  background: rgba(218,165,32,0.08); border: 1px solid rgba(218,165,32,0.2); border-radius: 6px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.lore-entry .lore-title { font-weight: bold; color: #daa520; font-size: 13px; }
+.lore-entry .lore-region { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.lore-entry .lore-text { color: #bbb; font-style: italic; margin-top: 4px; line-height: 1.4; }
+
+/* ═══════ LORE MODAL ═══════ */
+#loreModal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+}
+#loreModal.active { display: flex; }
+.lore-modal-inner {
+  background: linear-gradient(180deg, #1a1520, #12101e); border: 2px solid rgba(218,165,32,0.5);
+  border-radius: 12px; padding: 32px; max-width: 460px; width: 90%; text-align: center;
+  box-shadow: 0 0 40px rgba(218,165,32,0.15);
+}
+.lore-modal-inner h2 { color: #daa520; font-size: 20px; margin-bottom: 4px; }
+.lore-modal-inner .lore-subtitle { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.lore-modal-inner .lore-body { color: #ccc; font-size: 15px; line-height: 1.7; font-style: italic; margin-bottom: 20px; }
+.lore-modal-inner .lore-count { font-size: 11px; color: #666; margin-bottom: 16px; }
+
 /* ═══════ LOADING ═══════ */
 #loadingScreen {
   position: fixed; inset: 0; background: #0a0a1a; z-index: 2000;
@@ -1579,6 +1613,19 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <div id="teamList"></div>
   <h3 style="margin-top:16px;">&#9876;&#65039; Guild</h3>
   <div id="inventoryGuildInfo"></div>
+  <h3 style="margin-top:16px;">&#128220; Lore Tablets</h3>
+  <div id="loreList"></div>
+</div>
+
+<!-- LORE DISCOVERY MODAL -->
+<div id="loreModal">
+  <div class="lore-modal-inner">
+    <h2 id="loreModalTitle">Ancient Tablet</h2>
+    <div class="lore-subtitle" id="loreModalRegion">Frost Valley</div>
+    <div class="lore-body" id="loreModalText">...</div>
+    <div class="lore-count" id="loreModalCount">1 / 12 Collected</div>
+    <button class="dialogue-close" onclick="closeLoreModal()">Continue</button>
+  </div>
 </div>
 
 <!-- CRAFTING MODAL -->
@@ -1785,7 +1832,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.7.0';
+const VERSION = 'v3.7.1';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3024,6 +3071,9 @@ function getElderFrostDialogue() {
     `Heard the ${worstName}'s quality dropped this cycle. I'd skip it if I were you.`,
     `The ${bestName} is running hot right now. If you're grinding essences, that's your spot.`,
     `Back in my day we didn't have zone reports. You had to walk to every field and just... feel the energy. Kids these days.`,
+    `You found a lore tablet? Good. The young ones need to know where we came from.`,
+    `The Dark Castle... don't ask me about the Dark Castle. Some doors should stay sealed.`,
+    `Polaris wasn't always called that. We renamed it after the first star appeared in the Spirit Sky.`,
   ];
   return lines[Math.floor(Math.random() * lines.length)];
 }
@@ -3036,6 +3086,9 @@ function getSmithEmberDialogue() {
     `You want Mastercraft? Get your mastery up. A Novice gets lucky sometimes. A Master gets consistent.`,
     `The experiment gamble is where the magic happens. High risk, high reward. Don't be afraid to roll.`,
     `Every piece of gear tells a story. Who made it, what essences went in, how the experiments landed. That's craft.`,
+    `Iron from the mountain pass makes the strongest frames. Worth the dangerous trip.`,
+    `A Frost Infusion and a Flame Core in the same item? That's ambitious. I like it.`,
+    `The old Wardens didn't have workshops. They crafted in the field with their bare hands.`,
   ];
   return lines[Math.floor(Math.random() * lines.length)];
 }
@@ -3048,6 +3101,9 @@ function getKeeperZaraDialogue() {
     `Ghost-rare essences are where the real money is. Those quality stats are on another level.`,
     `Sometimes the best strategy is knowing when to flee. No shame in regrouping at the inn.`,
     `The market board's changed everything. Used to be you were stuck with whatever you crafted. Now there's a whole economy.`,
+    `The Spirit Ranger who mapped all three regions? Legend says they could talk to wild Spiritkin.`,
+    `World bosses aren't just strong. They're ancient. Valkin has been here since the Rift opened.`,
+    `If you find all the lore tablets, bring them to Elder Frost. He'll want to see them.`,
   ];
   return lines[Math.floor(Math.random() * lines.length)];
 }
@@ -3057,6 +3113,44 @@ const NPC_DIALOGUE_MAP = {
   'Smith Ember': { getLine: getSmithEmberDialogue, portrait: '&#128296;', portraitBg: '#3a1a0a' },
   'Keeper Zara': { getLine: getKeeperZaraDialogue, portrait: '&#9876;&#65039;', portraitBg: '#2a2a1a' },
 };
+
+// ═══════ LORE ITEMS ═══════
+const LORE_ITEMS = [
+  // Frost Valley
+  { x: 35, y: 15, id: 'lore_1', title: 'Ancient Tablet', text: 'The Spiritkin were not always bound to this world. They came through the Rift when the Overworld fractured...', region: 'frost' },
+  { x: 20, y: 35, id: 'lore_2', title: 'Frozen Journal', text: 'Elder Frost was the first Warden. He taught the others that Spiritkin are not pets \u2014 they are partners.', region: 'frost' },
+  { x: 45, y: 25, id: 'lore_3', title: 'Ice Crystal Memory', text: 'The Crystal Glade was once a battlefield. The spirits who fell there became the first wild Spiritkin.', region: 'frost' },
+  { x: 10, y: 18, id: 'lore_4', title: 'Warden\'s Note', text: 'To anyone who finds this: the path between Frost Valley and the Rolling Hills is not natural. Someone carved it.', region: 'frost' },
+  // Rolling Hills
+  { x: 30, y: 55, id: 'lore_5', title: 'Meadow Stone', text: 'The Rolling Hills remember a time of peace. Before the Volcanic eruption, all three regions were one land.', region: 'hills' },
+  { x: 18, y: 62, id: 'lore_6', title: 'Farmer\'s Diary', text: 'The Spiritkin here are gentle. Selene watches over the hills at night. I\'ve seen her light from my window.', region: 'hills' },
+  { x: 42, y: 48, id: 'lore_7', title: 'Old Map Fragment', text: 'There was once a fourth region \u2014 the Dark Castle. The entrance was sealed after Valkin\'s betrayal.', region: 'hills' },
+  // Volcanic Isles
+  { x: 72, y: 12, id: 'lore_8', title: 'Obsidian Shard', text: 'The volcanic glass holds memories. Touch it and you can feel the heat of the eruption that split the land.', region: 'volcanic' },
+  { x: 80, y: 28, id: 'lore_9', title: 'Lava-Sealed Letter', text: 'Nerina guards the deep waters. She is not hostile \u2014 she is mourning. Her home was destroyed in the eruption.', region: 'volcanic' },
+  { x: 68, y: 38, id: 'lore_10', title: 'Palm Bark Carving', text: 'The Volcanic Isles were a paradise once, and they will be again. The lava creates new land even as it destroys.', region: 'volcanic' },
+  // Passages (dangerous spots)
+  { x: 59, y: 21, id: 'lore_11', title: 'Carved Warning', text: 'TURN BACK. The passage between regions is watched. The roaming spirits here are stronger than they appear.', region: 'passage' },
+  { x: 29, y: 44, id: 'lore_12', title: 'Border Marker', text: 'This stone marks the boundary between Frost Valley and the Rolling Hills. Placed by the First Wardens.', region: 'passage' },
+];
+
+// ═══════ AMBIENT EVENTS ═══════
+const AMBIENT_EVENTS = [
+  // Frost Valley
+  { region: 'frost_valley', text: 'A cold wind sweeps through. The snow sparkles.', chance: 0.001 },
+  { region: 'frost_valley', text: 'You hear distant howling from the mountains.', chance: 0.001 },
+  { region: 'frost_valley', text: 'Aurora light dances across the sky above you.', chance: 0.0008 },
+  // Rolling Hills
+  { region: 'rolling_hills', text: 'Wildflowers sway in a gentle breeze.', chance: 0.001 },
+  { region: 'rolling_hills', text: 'A butterfly Spiritkin flutters past but doesn\'t stop.', chance: 0.0008 },
+  { region: 'rolling_hills', text: 'The grass here smells sweet. You feel at peace.', chance: 0.001 },
+  // Volcanic Isles
+  { region: 'volcanic_isles', text: 'The ground rumbles faintly beneath your feet.', chance: 0.001 },
+  { region: 'volcanic_isles', text: 'Steam rises from a crack in the obsidian.', chance: 0.001 },
+  { region: 'volcanic_isles', text: 'A wave crashes on the distant beach. Paradise and danger.', chance: 0.0008 },
+];
+
+let lastAmbientTime = 0;
 
 // ═══════ GAME STATE ═══════
 let G = {
@@ -3117,6 +3211,8 @@ let G = {
   guild: null, // { id, name, tag, role }
   // Onboarding
   onboarding: { step: 0, hintsShown: {} },
+  // Lore
+  loreCollected: [],
 };
 
 // Other players
@@ -4609,6 +4705,35 @@ function render() {
 
   // ═══════ UPDATE SURVEY BUTTON VISIBILITY ═══════
   updateSurveyButton();
+
+  // ═══════ LORE ITEMS ═══════
+  for (const lore of LORE_ITEMS) {
+    if (G.loreCollected && G.loreCollected.includes(lore.id)) continue;
+    const lx = lore.x * TILE - camX;
+    const ly = lore.y * TILE - camY;
+    if (lx < -80 || lx > W + 80 || ly < -80 || ly > H + 80) continue;
+    const dist = Math.sqrt((G.x - lore.x) ** 2 + (G.y - lore.y) ** 2);
+    if (dist < 4) {
+      // Golden "?" marker
+      const pulse = 0.6 + Math.sin(time * 2.5) * 0.35;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#daa520';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#daa520';
+      ctx.shadowBlur = 12;
+      ctx.fillText('?', lx + TILE / 2, ly - 4);
+      ctx.restore();
+      if (dist < 1.5) {
+        const eAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(218,165,32,${eAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E] Examine', lx + TILE / 2, ly - 20);
+      }
+    }
+  }
 
   // ═══════ INTERACTION PROMPT ═══════
   const ptx = Math.floor(G.x);
@@ -7806,6 +7931,16 @@ function tryInteract() {
   const tileX = Math.floor(G.x);
   const tileY = Math.floor(G.y);
 
+  // Check for nearby lore items
+  for (const lore of LORE_ITEMS) {
+    if (G.loreCollected && G.loreCollected.includes(lore.id)) continue;
+    const dist = Math.sqrt((G.x - lore.x) ** 2 + (G.y - lore.y) ** 2);
+    if (dist < 1.5) {
+      collectLore(lore);
+      return;
+    }
+  }
+
   // Check for nearby friendly spirits
   for (let i = friendlySpirits.length - 1; i >= 0; i--) {
     const f = friendlySpirits[i];
@@ -8666,16 +8801,26 @@ function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
     return;
   }
 
-  // Sprite sheet layout: 4 columns x 4 rows, each frame 16x16
-  // Row 0 = down, Row 1 = up, Row 2 = left, Row 3 = right
+  // Sprite sheet: 4 cols x 4 rows, 16x16 per cell
+  // Rows: 0=down, 1=up, 2=left, 3=right
+  // Cols: 0=stand, 1=step-L, 2=stand-alt, 3=step-R
   const frameW = 16, frameH = 16;
-  const dirRow = { down: 0, up: 1, left: 2, right: 3 }[direction] || 0;
-  const col = (frame || 0) % 4;
+  const dirMap = { down: 0, up: 1, left: 2, right: 3 };
+  const dirRow = dirMap[direction] !== undefined ? dirMap[direction] : 0;
+  const col = (frame === 1 || frame === 3) ? frame : 0; // only allow valid step frames
 
   const sx = col * frameW;
   const sy = dirRow * frameH;
   const dw = frameW * scale;
   const dh = frameH * scale;
+
+  // Live debug overlay
+  if (!window._sDbg) window._sDbg = 0;
+  if (window._sDbg++ < 1) {
+    const vb = document.getElementById('versionBadge');
+    if (vb) vb.textContent = VERSION + ' d:' + direction + '(r' + dirRow + ') f:' + frame + '(c' + col + ') ' + sx + ',' + sy + ' ' + img.naturalWidth + 'x' + img.naturalHeight;
+  }
+  requestAnimationFrame(() => { window._sDbg = 0; });
 
   ctx.imageSmoothingEnabled = false; // pixel-perfect scaling
   ctx.drawImage(img, sx, sy, frameW, frameH, x, y, dw, dh);
