@@ -746,7 +746,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #regionBanner.show { opacity: 1; }
 #regionBanner.frost { background: rgba(30,40,80,0.85); border: 1px solid rgba(100,160,255,0.4); color: #8cf; }
 #regionBanner.hills { background: rgba(30,60,20,0.85); border: 1px solid rgba(100,200,80,0.4); color: #9ddb6a; }
-#regionBanner.volcanic { background: rgba(60,20,10,0.85); border: 1px solid rgba(255,100,40,0.5); color: #ff8844; }
+#regionBanner.volcanic { background: rgba(10,40,50,0.85); border: 1px solid rgba(40,180,200,0.5); color: #4ad8e0; }
 
 /* ═══════ CANTINA OVERLAY ═══════ */
 #cantinaOverlay {
@@ -1552,7 +1552,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.4.0';
+const VERSION = 'v1.6.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -1576,7 +1576,7 @@ function spawnRoamingEnemies() {
       const sy = 4 + Math.floor(Math.random() * (WORLD_H - 8));
       const tile = worldMap[sy]?.[sx];
       // Must be walkable
-      if (tile === 1 || tile === 3 || tile === 7 || tile === 5 || tile === 8 || tile === 12 || tile === 15 || tile === 16 || tile === 13) continue;
+      if (tile === 1 || tile === 3 || tile === 7 || tile === 5 || tile === 8 || tile === 12 || tile === 15 || tile === 16 || tile === 13 || tile === 21) continue;
       // Must be far from hubs
       const dFH = Math.sqrt((sx - (HUB.x+3))**2 + (sy - (HUB.y+3))**2);
       const dRH = Math.sqrt((sx - 25)**2 + (sy - 59)**2);
@@ -1632,7 +1632,7 @@ function updateRoamingEnemies() {
         const pdy = Math.sin(e.patrolAngle) * e.speed;
         const pnx = e.x + pdx, pny = e.y + pdy;
         const ptile = worldMap[Math.floor(pny)]?.[Math.floor(pnx)];
-        if (ptile !== undefined && ptile !== 1 && ptile !== 3 && ptile !== 7 && ptile !== 15 && ptile !== 16 && ptile !== 13) {
+        if (ptile !== undefined && ptile !== 1 && ptile !== 3 && ptile !== 7 && ptile !== 15 && ptile !== 16 && ptile !== 13 && ptile !== 21) {
           e.x = pnx; e.y = pny;
         } else {
           e.patrolAngle += Math.PI * 0.5; // turn on collision
@@ -1661,7 +1661,7 @@ function updateRoamingEnemies() {
         const cdy = Math.sin(angle) * e.chaseSpeed;
         const cnx = e.x + cdx, cny = e.y + cdy;
         const ctile = worldMap[Math.floor(cny)]?.[Math.floor(cnx)];
-        if (ctile !== undefined && ctile !== 1 && ctile !== 3 && ctile !== 7 && ctile !== 15 && ctile !== 16 && ctile !== 13) {
+        if (ctile !== undefined && ctile !== 1 && ctile !== 3 && ctile !== 7 && ctile !== 15 && ctile !== 16 && ctile !== 13 && ctile !== 21) {
           e.x = cnx; e.y = cny;
         }
         // Catch player — trigger battle!
@@ -2210,13 +2210,13 @@ function checkRegionBanner() {
     currentRegion = region;
     const banner = document.getElementById('regionBanner');
     if (region === 'volcanic_isles') {
-      banner.textContent = 'Now entering: Volcanic Isles';
+      banner.textContent = 'Now entering: The Volcanic Isles';
       banner.className = 'volcanic';
     } else if (region === 'rolling_hills') {
-      banner.textContent = 'Now entering: Rolling Hills';
+      banner.textContent = 'Now entering: Meadowbrook';
       banner.className = 'hills';
     } else {
-      banner.textContent = 'Now entering: Frost Valley';
+      banner.textContent = 'Welcome to Polaris';
       banner.className = 'frost';
     }
     banner.classList.add('show');
@@ -2491,7 +2491,7 @@ const NPCS = [
 ];
 
 // ═══════ TILE MAP (Frost Valley) ═══════
-// 0=snow, 1=tree, 2=path, 3=water, 4=ice, 5=building, 6=encounter_zone, 7=mountain, 8=craft_building, 9=grass, 10=flowers, 11=rolling_hill, 12=cantina, 13=warm_tree
+// 0=snow, 1=tree, 2=path, 3=water, 4=ice, 5=building, 6=encounter_zone, 7=mountain, 8=craft_building, 9=grass, 10=flowers, 11=rolling_hill, 12=cantina, 13=warm_tree, 19=plaza, 20=sand, 21=palm_tree
 let worldMap = [];
 
 function generateWorld() {
@@ -2527,22 +2527,77 @@ function generateWorld() {
   // Vertical path to hub
   for (let y = 8; y < 25; y++) { worldMap[y][15] = 2; worldMap[y][16] = 2; }
 
-  // Hub Town (cluster of buildings)
+  // ═══ POLARIS HUB TOWN (expanded 10x10 area) ═══
   const hubX = HUB.x, hubY = HUB.y;
-  for (let y = hubY; y < hubY + 5; y++) for (let x = hubX; x < hubX + 8; x++) worldMap[y][x] = 2; // clear area
-  worldMap[hubY+1][hubX+1] = 5; worldMap[hubY+1][hubX+2] = 5; // shop
+  // Clear a large area for Polaris (10 wide, 10 tall, centered roughly on hub)
+  const polarisX = hubX - 1, polarisY = hubY - 1;
+  for (let y = polarisY; y < polarisY + 10; y++) {
+    for (let x = polarisX; x < polarisX + 10; x++) {
+      if (y >= 2 && y < WORLD_H - 2 && x >= 2 && x < WORLD_W - 2) worldMap[y][x] = 2; // path around hub
+    }
+  }
+  // Central plaza (4x4 warm tan stone in the middle)
+  const plazaCX = hubX + 2, plazaCY = hubY + 2;
+  for (let y = plazaCY; y < plazaCY + 4; y++) {
+    for (let x = plazaCX; x < plazaCX + 4; x++) {
+      worldMap[y][x] = 19; // plaza tile
+    }
+  }
+  // Decorative path border around plaza
+  for (let x = plazaCX - 1; x <= plazaCX + 4; x++) {
+    if (x >= 2 && x < WORLD_W - 2) {
+      worldMap[plazaCY - 1][x] = 2;
+      worldMap[plazaCY + 4][x] = 2;
+    }
+  }
+  for (let y = plazaCY; y < plazaCY + 4; y++) {
+    worldMap[y][plazaCX - 1] = 2;
+    worldMap[y][plazaCX + 4] = 2;
+  }
+  // Buildings arranged around the plaza
+  worldMap[hubY+1][hubX+1] = 5; worldMap[hubY+1][hubX+2] = 5; // trading post
   worldMap[hubY+1][hubX+5] = 5; worldMap[hubY+1][hubX+6] = 5; // arena
   worldMap[hubY+3][hubX+1] = 8; worldMap[hubY+3][hubX+2] = 8; // workshop
   worldMap[hubY+3][hubX+5] = 5; worldMap[hubY+3][hubX+6] = 5; // inn
+  // Wider path approaches to Polaris
+  for (let y = polarisY - 2; y < polarisY; y++) {
+    for (let x = hubX + 1; x < hubX + 5; x++) {
+      if (y >= 2) worldMap[y][x] = 2;
+    }
+  }
+  for (let y = polarisY + 10; y < polarisY + 12; y++) {
+    for (let x = hubX + 1; x < hubX + 5; x++) {
+      if (y < WORLD_H - 2) worldMap[y][x] = 2;
+    }
+  }
 
   // Mountain divider between Frost Valley and Rolling Hills (y: 43-44)
   for (let x = 0; x < WORLD_W; x++) { worldMap[43][x] = 7; worldMap[44][x] = 7; }
 
-  // Cantina building (hub area)
+  // Cantina/Frozen Mug building (hub area)
   worldMap[hubY+5][hubX+3] = 12; worldMap[hubY+5][hubX+4] = 12;
   // Clear path to cantina
   worldMap[hubY+4][hubX+3] = 2; worldMap[hubY+4][hubX+4] = 2;
   worldMap[hubY+5][hubX+2] = 2; worldMap[hubY+5][hubX+5] = 2;
+
+  // ═══ FROST VALLEY — Enhanced ice and tree clusters ═══
+  // More ice tiles around frozen lake
+  for (let y = 17; y < 25; y++) for (let x = 34; x < 46; x++) {
+    if (worldMap[y][x] === 0) worldMap[y][x] = 4;
+  }
+  // Tree clusters (2x2 groups)
+  const treeClusters = [{x:6,y:8},{x:20,y:16},{x:42,y:14},{x:50,y:20},{x:10,y:35},{x:38,y:36}];
+  for (const tc of treeClusters) {
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+      const ty = tc.y + dy, tx = tc.x + dx;
+      if (ty >= 2 && ty < 43 && tx >= 2 && tx < WORLD_W - 2 && worldMap[ty][tx] === 0) worldMap[ty][tx] = 1;
+    }
+  }
+  // More path connections between zones
+  // Path from frozen lake to Crystal Glade
+  for (let x = 25; x < 36; x++) { if (worldMap[18][x] === 0) worldMap[18][x] = 2; }
+  // Path from hub south
+  for (let y = 12; y < 22; y++) { if (worldMap[y][20] === 0) worldMap[y][20] = 2; }
 
   // ═══ ROLLING HILLS ZONE (y: 45 to 68) ═══
 
@@ -2594,13 +2649,33 @@ function generateWorld() {
     if (px+1 < WORLD_W && worldMap[y][px+1] !== 7) worldMap[y][px+1] = 2;
   }
 
-  // Rolling Hills settlement (2 buildings)
-  const rhSettleX = 24, rhSettleY = 58;
-  for (let y = rhSettleY; y < rhSettleY + 3; y++) for (let x = rhSettleX; x < rhSettleX + 5; x++) worldMap[y][x] = 2;
-  worldMap[rhSettleY+1][rhSettleX+1] = 5;
-  worldMap[rhSettleY+1][rhSettleX+3] = 5;
+  // More flower clusters in Rolling Hills
+  for (let i = 0; i < 35; i++) {
+    const fx = 4 + Math.floor(Math.random() * (WORLD_W - 8));
+    const fy = 46 + Math.floor(Math.random() * 20);
+    if (fy < 68 && worldMap[fy][fx] === 9) worldMap[fy][fx] = 10;
+  }
 
-  // ═══ VOLCANIC ISLES (x: 62 to 88, y: 5 to 40) ═══
+  // Meadowbrook pond/lake (3x4 water tiles)
+  for (let y = 50; y < 54; y++) for (let x = 45; x < 48; x++) {
+    if (y < 68) worldMap[y][x] = 3;
+  }
+  // Ice edges around pond
+  worldMap[49][45] = 4; worldMap[49][46] = 4; worldMap[49][47] = 4;
+  worldMap[54][45] = 4; worldMap[54][46] = 4; worldMap[54][47] = 4;
+
+  // Rolling Hills settlement — expanded "Meadowbrook" (5 buildings)
+  const rhSettleX = 24, rhSettleY = 58;
+  for (let y = rhSettleY - 1; y < rhSettleY + 5; y++) for (let x = rhSettleX - 2; x < rhSettleX + 7; x++) {
+    if (y >= 45 && y < 68 && x >= 2 && x < WORLD_W - 2) worldMap[y][x] = 2;
+  }
+  worldMap[rhSettleY+1][rhSettleX+1] = 5; // inn
+  worldMap[rhSettleY+1][rhSettleX+3] = 5; // seed shop
+  worldMap[rhSettleY+1][rhSettleX-1] = 5; // meadow hall
+  worldMap[rhSettleY+3][rhSettleX+1] = 5; // herbalist
+  worldMap[rhSettleY+3][rhSettleX+3] = 5; // greenhouse
+
+  // ═══ VOLCANIC ISLES — Tropical Paradise with Volcanoes (x: 62 to 88, y: 3 to 42) ═══
 
   // Mountain wall on east side of Frost Valley (x:58-61)
   for (let y = 2; y < 43; y++) {
@@ -2609,23 +2684,88 @@ function generateWorld() {
     }
   }
 
-  // Fill Volcanic Isles with ash ground
+  // Fill Volcanic Isles with ash ground (interior land)
   for (let y = 3; y < 42; y++) {
     for (let x = 62; x < 88; x++) {
       if (x < WORLD_W - 2 && y < WORLD_H - 2) worldMap[y][x] = 17; // ash_ground
     }
   }
 
-  // Volcanic rock border
+  // Blue ocean water around the edges — making these ISLANDS
+  // Top water strip (y:3-5)
   for (let x = 62; x < 88; x++) {
     if (x < WORLD_W - 2) {
-      worldMap[3][x] = 14; worldMap[4][x] = 14;
-      worldMap[40][x] = 14; worldMap[41][x] = 14;
+      worldMap[3][x] = 3; worldMap[4][x] = 3;
     }
   }
+  // Bottom water strip (y:38-41)
+  for (let x = 62; x < 88; x++) {
+    if (x < WORLD_W - 2) {
+      worldMap[38][x] = 3; worldMap[39][x] = 3;
+      worldMap[40][x] = 3; worldMap[41][x] = 3;
+    }
+  }
+  // Right water strip (x:85-87)
   for (let y = 3; y < 42; y++) {
-    worldMap[y][62] = 14; worldMap[y][63] = 14;
-    if (87 < WORLD_W - 2) { worldMap[y][86] = 14; worldMap[y][87] = 14; }
+    worldMap[y][85] = 3; worldMap[y][86] = 3;
+    if (87 < WORLD_W - 2) worldMap[y][87] = 3;
+  }
+  // Left water (x:62-63) — partial, leave passage area dry
+  for (let y = 3; y < 42; y++) {
+    if (y < 19 || y > 23) { // leave passage clear
+      worldMap[y][62] = 3; worldMap[y][63] = 3;
+    }
+  }
+
+  // Sand beaches between water and land (1-2 tiles wide)
+  // Top beach
+  for (let x = 64; x < 85; x++) {
+    if (x < WORLD_W - 2) {
+      worldMap[5][x] = 20; worldMap[6][x] = 20;
+    }
+  }
+  // Bottom beach
+  for (let x = 64; x < 85; x++) {
+    if (x < WORLD_W - 2) {
+      worldMap[36][x] = 20; worldMap[37][x] = 20;
+    }
+  }
+  // Right beach
+  for (let y = 5; y < 38; y++) {
+    worldMap[y][83] = 20; worldMap[y][84] = 20;
+  }
+  // Left beach (where no water passage)
+  for (let y = 5; y < 19; y++) { worldMap[y][64] = 20; }
+  for (let y = 24; y < 38; y++) { worldMap[y][64] = 20; }
+
+  // Palm trees on beaches and near water
+  const palmPositions = [
+    {x:65,y:5},{x:67,y:6},{x:70,y:5},{x:73,y:6},{x:76,y:5},{x:79,y:6},{x:82,y:5},
+    {x:65,y:37},{x:68,y:36},{x:71,y:37},{x:74,y:36},{x:77,y:37},{x:80,y:36},{x:83,y:37},
+    {x:83,y:8},{x:84,y:12},{x:83,y:16},{x:84,y:20},{x:83,y:24},{x:84,y:28},{x:83,y:32},
+    {x:64,y:8},{x:64,y:14},{x:64,y:26},{x:64,y:32},
+    // Scattered interior palms
+    {x:68,y:10},{x:72,y:12},{x:78,y:8},{x:80,y:18},{x:70,y:30},{x:76,y:34},
+  ];
+  for (const pp of palmPositions) {
+    if (pp.x >= 64 && pp.x < 85 && pp.y >= 5 && pp.y < 38) {
+      const t = worldMap[pp.y][pp.x];
+      if (t === 17 || t === 20) worldMap[pp.y][pp.x] = 21;
+    }
+  }
+
+  // Blue lagoons (3x3 water pools) scattered through islands
+  const lagoons = [{x:69,y:12},{x:78,y:28},{x:73,y:32}];
+  for (const lag of lagoons) {
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
+      const ly = lag.y + dy, lx = lag.x + dx;
+      if (ly >= 5 && ly < 38 && lx >= 64 && lx < 85) worldMap[ly][lx] = 3;
+    }
+    // Sand around lagoons
+    for (let dy = -1; dy <= 3; dy++) for (let dx = -1; dx <= 3; dx++) {
+      const ly = lag.y + dy, lx = lag.x + dx;
+      if (ly >= 5 && ly < 38 && lx >= 64 && lx < 85 && worldMap[ly][lx] === 17) worldMap[ly][lx] = 20;
+    }
   }
 
   // East border mountains
@@ -2636,56 +2776,69 @@ function generateWorld() {
 
   // Carve passage from Frost Valley into Volcanic Isles (y:20-22, x:58-63)
   for (let y = 20; y <= 22; y++) {
-    for (let x = 58; x <= 63; x++) {
+    for (let x = 58; x <= 65; x++) {
       worldMap[y][x] = 2; // path
     }
   }
 
-  // Lava rivers (3 snaking paths)
+  // Lava rivers — flowing THROUGH the tropical paradise (contrast!)
   // River 1: flows from top-left to bottom-right
   for (let i = 0; i < 25; i++) {
     const lx = 66 + Math.floor(Math.sin(i * 0.4) * 2) + Math.floor(i * 0.4);
-    const ly = 6 + i;
-    if (lx >= 64 && lx < 86 && ly >= 5 && ly < 40) { worldMap[ly][lx] = 15; worldMap[ly][lx+1] = 15; }
+    const ly = 8 + i;
+    if (lx >= 65 && lx < 84 && ly >= 7 && ly < 36) {
+      if (worldMap[ly][lx] !== 3) worldMap[ly][lx] = 15;
+      if (lx+1 < 84 && worldMap[ly][lx+1] !== 3) worldMap[ly][lx+1] = 15;
+    }
   }
   // River 2: horizontal lava flow
-  for (let x = 70; x < 85; x++) {
+  for (let x = 70; x < 83; x++) {
     const ly = 22 + Math.floor(Math.sin(x * 0.5) * 2);
-    if (ly >= 5 && ly < 40 && x < 86) { worldMap[ly][x] = 15; }
+    if (ly >= 7 && ly < 36 && x < 84 && worldMap[ly][x] !== 3) { worldMap[ly][x] = 15; }
   }
   // River 3: short vertical flow
-  for (let y = 30; y < 38; y++) {
+  for (let y = 28; y < 35; y++) {
     const lx = 74 + Math.floor(Math.sin(y * 0.6) * 2);
-    if (lx >= 64 && lx < 86) { worldMap[y][lx] = 15; }
+    if (lx >= 65 && lx < 84 && worldMap[y][lx] !== 3) { worldMap[y][lx] = 15; }
   }
 
-  // Obsidian formations (small clusters)
+  // Obsidian formations (dramatic dark crystals amid tropical greenery)
   const obsidianClusters = [
-    {x:68, y:15}, {x:72, y:8}, {x:80, y:12}, {x:83, y:30}, {x:70, y:35},
-    {x:76, y:18}, {x:82, y:20}, {x:69, y:28}, {x:77, y:37},
+    {x:68, y:16}, {x:72, y:9}, {x:80, y:13}, {x:81, y:30}, {x:70, y:33},
+    {x:76, y:18}, {x:80, y:20}, {x:69, y:26}, {x:77, y:34},
   ];
   for (const oc of obsidianClusters) {
-    if (oc.x >= 64 && oc.x < 86 && oc.y >= 5 && oc.y < 40) {
-      worldMap[oc.y][oc.x] = 16;
-      if (oc.x+1 < 86) worldMap[oc.y][oc.x+1] = 16;
-      if (oc.y+1 < 40) worldMap[oc.y+1][oc.x] = 16;
+    if (oc.x >= 65 && oc.x < 84 && oc.y >= 7 && oc.y < 36) {
+      if (worldMap[oc.y][oc.x] !== 3) worldMap[oc.y][oc.x] = 16;
+      if (oc.x+1 < 84 && worldMap[oc.y][oc.x+1] !== 3) worldMap[oc.y][oc.x+1] = 16;
+      if (oc.y+1 < 36 && worldMap[oc.y+1][oc.x] !== 3) worldMap[oc.y+1][oc.x] = 16;
     }
   }
 
   // Magma crystal nodes scattered
   for (let i = 0; i < 25; i++) {
-    const mx = 64 + Math.floor(Math.random() * 22);
-    const my = 5 + Math.floor(Math.random() * 34);
-    if (mx < 86 && my < 40 && worldMap[my][mx] === 17) worldMap[my][mx] = 18;
+    const mx = 65 + Math.floor(Math.random() * 18);
+    const my = 7 + Math.floor(Math.random() * 28);
+    if (mx < 84 && my < 36 && worldMap[my][mx] === 17) worldMap[my][mx] = 18;
   }
 
-  // Volcanic hub settlement at approximately (75, 15)
+  // Volcanic hub settlement — surrounded by palm trees and sand
   const vhX = 74, vhY = 14;
+  for (let y = vhY - 1; y < vhY + 5; y++) for (let x = vhX - 1; x < vhX + 7; x++) {
+    if (x >= 65 && x < 84 && y >= 7 && y < 36) {
+      worldMap[y][x] = 20; // sand around settlement
+    }
+  }
   for (let y = vhY; y < vhY + 4; y++) for (let x = vhX; x < vhX + 6; x++) {
-    if (x < 86 && y < 40) worldMap[y][x] = 17; // clear area
+    if (x < 84 && y < 36) worldMap[y][x] = 2; // clear walkable area
+  }
+  // Palm trees framing the settlement
+  const settlePalms = [{x:vhX-1,y:vhY-1},{x:vhX+6,y:vhY-1},{x:vhX-1,y:vhY+4},{x:vhX+6,y:vhY+4}];
+  for (const sp of settlePalms) {
+    if (sp.x >= 65 && sp.x < 84 && sp.y >= 7 && sp.y < 36) worldMap[sp.y][sp.x] = 21;
   }
   // Path to settlement
-  for (let x = 64; x <= vhX; x++) { worldMap[vhY+1][x] = 2; worldMap[vhY+2][x] = 2; }
+  for (let x = 65; x <= vhX; x++) { worldMap[vhY+1][x] = 2; worldMap[vhY+2][x] = 2; }
   // Buildings
   worldMap[vhY+1][vhX+1] = 5; worldMap[vhY+1][vhX+2] = 5; // forge
   worldMap[vhY+1][vhX+4] = 5; // outpost
@@ -2695,14 +2848,14 @@ function generateWorld() {
   for (const zone of ENCOUNTER_ZONES) {
     for (let y = zone.y; y < zone.y + zone.h && y < WORLD_H - 2; y++) {
       for (let x = zone.x; x < zone.x + zone.w && x < WORLD_W - 2; x++) {
-        if (worldMap[y][x] === 0 || worldMap[y][x] === 9 || worldMap[y][x] === 17) worldMap[y][x] = 6;
+        if (worldMap[y][x] === 0 || worldMap[y][x] === 9 || worldMap[y][x] === 17 || worldMap[y][x] === 20) worldMap[y][x] = 6;
       }
     }
   }
 
   // Clear trees from paths and buildings
   for (let y = 0; y < WORLD_H; y++) for (let x = 0; x < WORLD_W; x++) {
-    if (worldMap[y][x] === 2 || worldMap[y][x] === 5 || worldMap[y][x] === 8 || worldMap[y][x] === 12) {
+    if (worldMap[y][x] === 2 || worldMap[y][x] === 5 || worldMap[y][x] === 8 || worldMap[y][x] === 12 || worldMap[y][x] === 19) {
       // Clear adjacent trees for breathing room
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const ny = y+dy, nx = x+dx;
@@ -2733,6 +2886,9 @@ const TILE_COLORS = {
   16: '#1a1a2a', // obsidian
   17: '#4a4040', // ash_ground
   18: '#4a4040', // magma_crystal (base same as ash, detail drawn in render)
+  19: '#c8b888', // plaza (warm tan/gold stone)
+  20: '#e8d8a0', // sand (warm yellow beach)
+  21: '#2a8a3a', // palm_tree (bright green)
 };
 
 // ═══════ ZONE BOUNDARY COLORS (slightly different at edges) ═══════
@@ -2740,11 +2896,11 @@ const ZONE_EDGE_COLOR = 'rgba(120, 80, 220, 0.12)';
 
 // ═══════ HUB BUILDING LABELS ═══════
 const HUB_LABELS = [
-  { offX: 1.5, offY: 1, label: 'General Store' },
-  { offX: 5.5, offY: 1, label: 'Battle Arena' },
+  { offX: 1.5, offY: 1, label: 'Polaris Trading Post' },
+  { offX: 5.5, offY: 1, label: 'Polaris Arena' },
   { offX: 1.5, offY: 3, label: 'Workshop' },
-  { offX: 5.5, offY: 3, label: 'Frostwind Inn' },
-  { offX: 3.5, offY: 5, label: 'Cantina' },
+  { offX: 5.5, offY: 3, label: 'Polaris Inn' },
+  { offX: 3.5, offY: 5, label: 'The Frozen Mug' },
 ];
 
 // Volcanic hub building labels (absolute coords)
@@ -2752,6 +2908,15 @@ const VOLCANIC_HUB_LABELS = [
   { x: 75.5, y: 15, label: 'Ember Forge' },
   { x: 78, y: 15, label: 'Outpost' },
   { x: 76.5, y: 17, label: 'Magma Tavern' },
+];
+
+// Rolling Hills hub labels
+const RH_HUB_LABELS = [
+  { x: 25, y: 59, label: 'Meadowbrook Inn' },
+  { x: 27, y: 59, label: 'Seed Shop' },
+  { x: 22, y: 59, label: 'Meadow Hall' },
+  { x: 25, y: 61, label: 'Herbalist' },
+  { x: 27, y: 61, label: 'Greenhouse' },
 ];
 
 // ═══════ RENDERING ═══════
@@ -3084,6 +3249,64 @@ function render() {
         ctx.beginPath();
         ctx.arc(sx + TILE/2, sy + TILE/2, 2.5, 0, Math.PI * 2);
         ctx.fill();
+      } else if (tile === 19) { // Plaza (warm tan/gold stone)
+        // Subtle grid pattern
+        ctx.strokeStyle = 'rgba(160,140,100,0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 2); ctx.lineTo(sx + TILE/2, sy + TILE - 2);
+        ctx.moveTo(sx + 2, sy + TILE/2); ctx.lineTo(sx + TILE - 2, sy + TILE/2);
+        ctx.stroke();
+        // Decorative lantern post dots at grid intersections
+        ctx.fillStyle = 'rgba(218,165,32,0.5)';
+        ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,220,100,0.3)';
+        ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 5, 0, Math.PI * 2); ctx.fill();
+      } else if (tile === 20) { // Sand (beach)
+        // Subtle dot pattern like beach sand
+        ctx.fillStyle = 'rgba(200,180,120,0.3)';
+        if ((tx + ty) % 2 === 0) {
+          ctx.fillRect(sx + 6, sy + 8, 1, 1);
+          ctx.fillRect(sx + 18, sy + 14, 1, 1);
+          ctx.fillRect(sx + 30, sy + 6, 1, 1);
+          ctx.fillRect(sx + 12, sy + 28, 1, 1);
+        }
+        ctx.fillStyle = 'rgba(220,200,140,0.2)';
+        ctx.fillRect(sx + 24, sy + 20, 1, 1);
+        ctx.fillRect(sx + 8, sy + 36, 1, 1);
+      } else if (tile === 21) { // Palm tree
+        // Sand/ground base
+        ctx.fillStyle = '#e8d8a0';
+        ctx.fillRect(sx, sy, TILE, TILE);
+        // Brown trunk curving to the right
+        ctx.strokeStyle = '#6a4a1a';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2 - 2, sy + TILE);
+        ctx.quadraticCurveTo(sx + TILE/2, sy + TILE/2, sx + TILE/2 + 8, sy + 8);
+        ctx.stroke();
+        // Round bright green canopy at top
+        ctx.fillStyle = '#2a8a3a';
+        ctx.beginPath();
+        ctx.arc(sx + TILE/2 + 8, sy + 8, 14, 0, Math.PI * 2);
+        ctx.fill();
+        // Lighter highlight on canopy
+        ctx.fillStyle = '#3aaa4a';
+        ctx.beginPath();
+        ctx.arc(sx + TILE/2 + 5, sy + 5, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // Frond details (radiating lines)
+        ctx.strokeStyle = '#1a6a2a';
+        ctx.lineWidth = 1.5;
+        const cx = sx + TILE/2 + 8, cy = sy + 8;
+        for (let a = 0; a < 6; a++) {
+          const angle = a * Math.PI / 3;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.cos(angle) * 12, cy + Math.sin(angle) * 12);
+          ctx.stroke();
+        }
       } else if (tile === 0) { // Snow detail
         // Subtle snow texture
         if ((tx + ty) % 3 === 0) {
@@ -3218,6 +3441,64 @@ function render() {
     ctx.fillStyle = '#ff9966';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
+    ctx.fillText(lbl.label, lx, ly + 3);
+  }
+
+  // ═══════ POLARIS TOWN SIGN ═══════
+  {
+    const polarisLabelX = (HUB.x + 3.5) * TILE - camX;
+    const polarisLabelY = (HUB.y - 2) * TILE - camY;
+    if (polarisLabelX > -200 && polarisLabelX < W + 200 && polarisLabelY > -80 && polarisLabelY < H + 80) {
+      ctx.save();
+      ctx.font = 'bold 24px sans-serif';
+      ctx.textAlign = 'center';
+      // Golden glow
+      ctx.shadowColor = 'rgba(218,165,32,0.6)';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#daa520';
+      ctx.fillText('POLARIS', polarisLabelX, polarisLabelY);
+      ctx.shadowBlur = 0;
+      // Subtitle
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = 'rgba(200,180,120,0.7)';
+      ctx.fillText('Frost Valley Hub Town', polarisLabelX, polarisLabelY + 14);
+      ctx.restore();
+    }
+  }
+
+  // ═══════ MEADOWBROOK TOWN SIGN ═══════
+  {
+    const mbLabelX = 25.5 * TILE - camX;
+    const mbLabelY = 57 * TILE - camY;
+    if (mbLabelX > -200 && mbLabelX < W + 200 && mbLabelY > -80 && mbLabelY < H + 80) {
+      ctx.save();
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(100,180,60,0.5)';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#6ab04c';
+      ctx.fillText('MEADOWBROOK', mbLabelX, mbLabelY);
+      ctx.shadowBlur = 0;
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = 'rgba(140,200,100,0.6)';
+      ctx.fillText('Rolling Hills Settlement', mbLabelX, mbLabelY + 14);
+      ctx.restore();
+    }
+  }
+
+  // ═══════ ROLLING HILLS HUB LABELS ═══════
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  for (const lbl of RH_HUB_LABELS) {
+    const lx = lbl.x * TILE - camX;
+    const ly = lbl.y * TILE - camY - 8;
+    if (lx < -100 || lx > W + 100 || ly < -50 || ly > H + 50) continue;
+    const tw = ctx.measureText(lbl.label).width + 10;
+    ctx.fillStyle = 'rgba(20,50,10,0.7)';
+    ctx.beginPath();
+    ctx.roundRect(lx - tw/2, ly - 8, tw, 14, 4);
+    ctx.fill();
+    ctx.fillStyle = '#9ddb6a';
     ctx.fillText(lbl.label, lx, ly + 3);
   }
 
@@ -3657,8 +3938,8 @@ function gameLoop() {
     const newY = G.y + dy * 0.05;
     const tileAtNew = worldMap[Math.floor(newY)]?.[Math.floor(newX)] ?? 7;
 
-    // Collision check (block: trees, water, mountains, warm trees, lava, obsidian)
-    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7 && tileAtNew !== 13 && tileAtNew !== 15 && tileAtNew !== 16) {
+    // Collision check (block: trees, water, mountains, warm trees, lava, obsidian, palm trees)
+    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7 && tileAtNew !== 13 && tileAtNew !== 15 && tileAtNew !== 16 && tileAtNew !== 21) {
       G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
       G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
 
