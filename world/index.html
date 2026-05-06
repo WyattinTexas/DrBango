@@ -1431,6 +1431,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 <!-- INVENTORY PANEL -->
 <div id="inventoryPanel">
+  <h3>🧱 Materials</h3>
+  <div id="materialsList"></div>
   <h3>&#127890; Spirit Essences</h3>
   <div id="essenceList"></div>
   <h3 style="margin-top:16px;">&#9876;&#65039; Crafted Gear</h3>
@@ -1630,7 +1632,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.6.0';
+const VERSION = 'v2.7.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2848,6 +2850,14 @@ const SCHEMATICS = [
   { id: 'golden_dice', name: 'Golden Dice', type: 'weapon', slot: 'weapon', essencesNeeded: 3, desc: '+1 die on your first roll of every fight.', basePower: 5, icon: '🎲', tier: 'legendary', weights: { potency: 0.45, stability: 0.1, resonance: 0.35, purity: 0.1 } },
   { id: 'shades_cape', name: "Shade's Cape", type: 'armor', slot: 'head', essencesNeeded: 3, desc: 'Your active ghost gains +1 max HP.', basePower: 5, icon: '👑', tier: 'legendary', weights: { potency: 0.1, stability: 0.45, resonance: 0.1, purity: 0.35 } },
   { id: 'valkins_crystal', name: "Valkin's Crystal", type: 'accessory', slot: 'accessory', essencesNeeded: 3, desc: 'Doubles deal +1 bonus damage.', basePower: 5, icon: '💀', tier: 'legendary', weights: { potency: 0.2, stability: 0.2, resonance: 0.3, purity: 0.3 } },
+
+  // ── SUB-COMPONENTS (intermediate crafting items) ──
+  { id: 'frost_infusion', name: 'Frost Infusion', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Ice-infused component. Blacksmiths use this to enhance armor.', basePower: 0, icon: '❄️', tier: 'rare', weights: { potency:0.1, stability:0.3, resonance:0.2, purity:0.4 }, requiresSkill: 'fm_1', requiresMaterial: { frozen_crystal: 1, frost_shard: 2 } },
+  { id: 'flame_core', name: 'Flame Core', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Fire-infused component. Blacksmiths use this to enhance armor.', basePower: 0, icon: '🔥', tier: 'rare', weights: { potency:0.3, stability:0.1, resonance:0.4, purity:0.2 }, requiresSkill: 'flm_1', requiresMaterial: { volcanic_glass: 1, ember_dust: 2 } },
+  { id: 'enchantment', name: 'Spirit Enchantment', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Magical enchantment. Blacksmiths use this to enhance gear.', basePower: 0, icon: '✨', tier: 'rare', weights: { potency:0.2, stability:0.2, resonance:0.3, purity:0.3 }, requiresSkill: 'cc_2', requiresMaterial: { spirit_thread: 2, essence_fragment: 1 } },
+  { id: 'mask_core', name: 'Mask Core', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Shaped mask base. Mask Makers finish these, or Blacksmiths set them.', basePower: 0, icon: '🎭', tier: 'rare', weights: { potency:0.15, stability:0.15, resonance:0.35, purity:0.35 }, requiresSkill: 'mm_2', requiresMaterial: { mask_fragment: 2, crystal_chip: 1 } },
+  { id: 'iron_frame', name: 'Iron Frame', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Sturdy base frame for weapons and armor.', basePower: 0, icon: '🔩', tier: 'common', weights: { potency:0.3, stability:0.4, resonance:0.1, purity:0.2 }, requiresSkill: 'bs_1', requiresMaterial: { iron_ore: 2 } },
+  { id: 'ancient_stock', name: 'Ancient Stock', type: 'component', slot: 'none', essencesNeeded: 1, desc: 'Polished ancient wood stock for blasters.', basePower: 0, icon: '🪵', tier: 'common', weights: { potency:0.2, stability:0.3, resonance:0.2, purity:0.3 }, requiresSkill: 'be_1', requiresMaterial: { ancient_wood: 2 } },
 ];
 
 // ═══════ NPC DIALOGUE DATA ═══════
@@ -5882,7 +5892,7 @@ function renderCraftUI() {
 
   // ── LEFT PANEL: Schematic cards grouped by slot ──
   const slotsEl = document.getElementById('craftSlots');
-  const slotGroups = { weapon: [], head: [], accessory: [] };
+  const slotGroups = { weapon: [], head: [], accessory: [], none: [] };
   const nearWS = isNearWorkshop();
   for (const s of SCHEMATICS) {
     // Craft location rules: quick mode = common only; not near workshop = common only
@@ -5894,8 +5904,9 @@ function renderCraftUI() {
   let leftHtml = '';
   for (const [slot, items] of Object.entries(slotGroups)) {
     if (!items.length) continue;
-    const slotIcon = slot === 'weapon' ? '⚔️' : slot === 'head' ? '🛡️' : '💍';
-    leftHtml += `<div class="cw-section-label" style="margin-top:12px;">${slotIcon} ${slot}</div>`;
+    const slotIcon = slot === 'weapon' ? '⚔️' : slot === 'head' ? '🛡️' : slot === 'none' ? '🔧' : '💍';
+    const slotLabel = slot === 'none' ? 'Components' : slot;
+    leftHtml += `<div class="cw-section-label" style="margin-top:12px;">${slotIcon} ${slotLabel}</div>`;
     for (const s of items) {
       const sel = s.id === craftState.schematic.id;
       const tc = tierColor[s.tier] || '#888';
@@ -5938,12 +5949,30 @@ function renderCraftUI() {
     return `<span style="color:${color}">${w.name}:${pct}%</span>`;
   }).join(' ');
 
+  // Material & skill requirements display
+  let matReqHtml = '';
+  if (sel.requiresMaterial) {
+    const matNames = { frost_shard:'Frost Shard', ember_dust:'Ember Dust', spirit_thread:'Spirit Thread', mask_fragment:'Mask Fragment', iron_ore:'Iron Ore', volcanic_glass:'Volcanic Glass', frozen_crystal:'Frozen Crystal', ancient_wood:'Ancient Wood', essence_fragment:'Essence Fragment', crystal_chip:'Crystal Chip', glow_mote:'Glow Mote', spirit_dust:'Spirit Dust' };
+    matReqHtml = '<div style="margin-top:6px;font-size:11px;">';
+    for (const [matId, qty] of Object.entries(sel.requiresMaterial)) {
+      const have = G.materials?.[matId] || 0;
+      const ok = have >= qty;
+      matReqHtml += `<span style="color:${ok ? '#4a8' : '#a44'};">${matNames[matId] || matId}: ${have}/${qty} ${ok ? '✓' : '✗'}</span> `;
+    }
+    matReqHtml += '</div>';
+  }
+  if (sel.requiresSkill) {
+    const skillOk = hasSkill(sel.requiresSkill);
+    matReqHtml += `<div style="font-size:11px;color:${skillOk ? '#4a8' : '#a44'};">Skill: ${sel.requiresSkill} ${skillOk ? '✓' : '🔒'}</div>`;
+  }
+
   document.getElementById('cwSelectedSchematic').innerHTML = `
     <div class="cw-sel-icon">${sel.icon || '?'}</div>
     <div class="cw-sel-name" style="color:${tc};">${sel.name}</div>
     <div class="cw-sel-desc">${sel.desc}</div>
     <div class="cw-sel-slots">Needs ${sel.essencesNeeded} essence${sel.essencesNeeded > 1 ? 's' : ''} &bull; Slot: ${sel.slot || sel.type} &bull; Mastery: ${masteryInfo.name}</div>
     <div style="font-size:10px;color:#888;margin-top:4px;">Stat Weights: ${weightStr}</div>
+    ${matReqHtml}
   `;
 
   // Essence slots
@@ -6135,6 +6164,32 @@ function doCraft() {
   const essences = craftState.selectedEssences;
   const schem = craftState.schematic;
   if (essences.length < schem.essencesNeeded) return;
+
+  // Check material requirements
+  if (schem.requiresMaterial) {
+    for (const [matId, qty] of Object.entries(schem.requiresMaterial)) {
+      if ((G.materials?.[matId] || 0) < qty) {
+        const matNames = {
+          frozen_crystal:'Frozen Crystal', frost_shard:'Frost Shard', volcanic_glass:'Volcanic Glass',
+          ember_dust:'Ember Dust', spirit_thread:'Spirit Thread', essence_fragment:'Essence Fragment',
+          mask_fragment:'Mask Fragment', crystal_chip:'Crystal Chip', iron_ore:'Iron Ore',
+          ancient_wood:'Ancient Wood', glow_mote:'Glow Mote', spirit_dust:'Spirit Dust',
+        };
+        notify(`Need ${qty} ${matNames[matId] || matId}! (Have ${G.materials?.[matId] || 0})`);
+        return;
+      }
+    }
+    // Consume materials
+    for (const [matId, qty] of Object.entries(schem.requiresMaterial)) {
+      G.materials[matId] -= qty;
+    }
+  }
+
+  // Check skill requirement
+  if (schem.requiresSkill && !hasSkill(schem.requiresSkill)) {
+    notify(`Requires skill: ${schem.requiresSkill}. Check your profession tree!`);
+    return;
+  }
 
   // Calculate base stats from essences using WEIGHTED average
   const w = schem.weights || { potency: 0.25, stability: 0.25, resonance: 0.25, purity: 0.25 };
@@ -6476,7 +6531,13 @@ function finishExperiment() {
     assemblyMod: expState.assemblyMod,
   };
 
-  G.gear.push(gear);
+  if (expState.schem.type === 'component') {
+    // Components go to materials inventory, not gear
+    if (!G.materials) G.materials = {};
+    G.materials[expState.schem.id] = (G.materials[expState.schem.id] || 0) + 1;
+  } else {
+    G.gear.push(gear);
+  }
 
   // Profession XP: crafting
   const craftXP = gear.qualityTier === 'Mastercraft' ? 50 : gear.qualityTier === 'Superior' ? 30 : 15;
@@ -6994,6 +7055,32 @@ function toggleInventory() {
 }
 
 function renderInventory() {
+  // Materials
+  const matsEl = document.getElementById('materialsList');
+  if (matsEl) {
+    const matNames = {
+      frost_shard:'❄️ Frost Shard', ember_dust:'🔥 Ember Dust', spirit_thread:'✨ Spirit Thread',
+      mask_fragment:'🎭 Mask Fragment', iron_ore:'⛏️ Iron Ore', volcanic_glass:'🌋 Volcanic Glass',
+      frozen_crystal:'💎 Frozen Crystal', ancient_wood:'🪵 Ancient Wood',
+      essence_fragment:'💫 Essence Fragment', spirit_dust:'🌟 Spirit Dust',
+      crystal_chip:'💎 Crystal Chip', glow_mote:'✨ Glow Mote',
+      frost_infusion:'❄️ Frost Infusion', flame_core:'🔥 Flame Core',
+      enchantment:'✨ Spirit Enchantment', mask_core:'🎭 Mask Core',
+      iron_frame:'🔩 Iron Frame', ancient_stock:'🪵 Ancient Stock',
+    };
+    const mats = Object.entries(G.materials || {}).filter(([k,v]) => v > 0);
+    if (mats.length === 0) {
+      matsEl.innerHTML = '<p style="color:#555;font-size:12px;">No materials. Chase wisps, harvest nodes, or befriend spirits!</p>';
+    } else {
+      matsEl.innerHTML = mats.map(([id, qty]) =>
+        `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #1a1a2a;">
+          <span style="color:#ccc;">${matNames[id] || id}</span>
+          <span style="color:#4a8;font-weight:bold;">${qty}</span>
+        </div>`
+      ).join('');
+    }
+  }
+
   // Essences
   const essEl = document.getElementById('essenceList');
   if (G.essences.length === 0) {
