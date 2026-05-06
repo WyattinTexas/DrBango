@@ -334,6 +334,41 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 .rarity-glow-ghost-rare { text-shadow: 0 0 12px rgba(155,89,182,0.7); color: #9b59b6; }
 .rarity-glow-legendary { text-shadow: 0 0 14px rgba(243,156,18,0.8); color: #f39c12; }
 
+/* ═══════ HOUSING MODAL ═══════ */
+#housingOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 950;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+#housingOverlay.active { display: flex; }
+.housing-modal {
+  background: #1a1a2e; border: 2px solid #daa520; border-radius: 12px;
+  padding: 32px; max-width: 440px; width: 90%; text-align: center;
+  box-shadow: 0 0 40px rgba(218,165,32,0.2);
+}
+.housing-modal h2 { color: #daa520; margin-bottom: 12px; font-size: 20px; }
+.housing-modal .house-info { font-size: 13px; color: #aaa; margin-bottom: 16px; }
+.housing-modal .house-name { font-size: 18px; font-weight: bold; color: #fff; margin: 8px 0; }
+.housing-btn {
+  display: block; width: 100%; padding: 10px; margin: 6px 0;
+  background: #0f0f24; border: 1px solid #334; border-radius: 6px;
+  color: #ccc; font-size: 13px; cursor: pointer; transition: all 0.2s; text-align: left;
+}
+.housing-btn:hover { border-color: #daa520; background: #16162a; color: #fff; }
+.housing-btn .btn-icon { margin-right: 8px; }
+.housing-close {
+  margin-top: 16px; padding: 8px 24px; background: none;
+  border: 1px solid #556; color: #888; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.housing-close:hover { color: #fff; border-color: #888; }
+.trophy-list { text-align: left; margin: 8px 0; max-height: 140px; overflow-y: auto; }
+.trophy-item {
+  background: #0a0a1e; border: 1px solid #223; border-radius: 4px;
+  padding: 6px 10px; margin: 4px 0; font-size: 12px; color: #ccc;
+}
+.trophy-item .trophy-icon { margin-right: 6px; }
+#hudHomeBtn { display: none; }
+#hudHomeBtn.visible { display: inline-block; }
+
 /* ═══════ RECRUIT MODAL ═══════ */
 #recruitOverlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 950;
@@ -1476,6 +1511,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <div class="hud-stat"><span class="icon">&#128101;</span><span id="hudPlayers">1</span></div>
     <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">&#128270; Survey</button>
     <button class="hud-btn" onclick="openProfTree()">&#127775; Skills</button>
+    <button class="hud-btn" id="hudHomeBtn" onclick="panToHome()">&#127968; Home</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
     <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
   </div>
@@ -1778,6 +1814,17 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   </div>
 </div>
 
+<!-- HOUSING OVERLAY -->
+<div id="housingOverlay">
+  <div class="housing-modal">
+    <h2 id="housingTitle">House</h2>
+    <div class="house-name" id="housingName"></div>
+    <div class="house-info" id="housingInfo"></div>
+    <div id="housingActions"></div>
+    <button class="housing-close" onclick="closeHousing()">Close</button>
+  </div>
+</div>
+
 <!-- CHAT -->
 <div id="chatBox" style="display:none;">
   <div id="chatMessages"></div>
@@ -1826,6 +1873,10 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="cantina-module.js"></script>
+<script src="workshop-module.js"></script>
+<script src="arena-module.js"></script>
+<script src="inn-module.js"></script>
+<script src="tradingpost-module.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1833,7 +1884,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.8.1';
+const VERSION = 'v3.10.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -3210,10 +3261,41 @@ let G = {
   arenaLosses: 0,
   // Guild
   guild: null, // { id, name, tag, role }
+  // Housing
+  house: null, // { plotId, houseName, built, trophies }
   // Onboarding
   onboarding: { step: 0, hintsShown: {} },
   // Lore
   loreCollected: [],
+};
+
+// ═══════ PLAYER HOUSING ═══════
+const HOUSE_PLOTS = [
+  // Frost Valley — near Polaris
+  { id: 'fv_1', x: 22, y: 8, region: 'frost', name: 'Polaris North' },
+  { id: 'fv_2', x: 8, y: 14, region: 'frost', name: 'Snowfield West' },
+  { id: 'fv_3', x: 25, y: 22, region: 'frost', name: 'Crystal Path' },
+  // Rolling Hills — near Meadowbrook
+  { id: 'rh_1', x: 18, y: 55, region: 'hills', name: 'Meadow Edge' },
+  { id: 'rh_2', x: 35, y: 62, region: 'hills', name: 'Hillside View' },
+  // Volcanic Isles
+  { id: 'vi_1', x: 70, y: 18, region: 'volcanic', name: 'Beach Cove' },
+  { id: 'vi_2', x: 82, y: 12, region: 'volcanic', name: 'Lagoon Point' },
+];
+let housingData = {}; // plotId -> { owner, ownerName, houseName, built, claimedAt, trophies }
+let showHomeOnMinimap = false;
+
+const TROPHY_DEFS = {
+  boss_slayer: { icon: '\u2694\uFE0F', name: 'Boss Slayer', desc: 'Defeated a world boss' },
+  mastercraft_weapon: { icon: '\uD83D\uDD28', name: 'Master Weaponsmith', desc: 'Crafted a Mastercraft weapon' },
+  mastercraft_armor: { icon: '\uD83D\uDEE1\uFE0F', name: 'Master Armorsmith', desc: 'Crafted a Mastercraft armor' },
+  lore_frost: { icon: '\u2744\uFE0F', name: 'Frost Lorekeeper', desc: 'Collected all Frost Valley lore' },
+  lore_hills: { icon: '\uD83C\uDF3F', name: 'Hills Lorekeeper', desc: 'Collected all Rolling Hills lore' },
+  lore_volcanic: { icon: '\uD83C\uDF0B', name: 'Volcanic Lorekeeper', desc: 'Collected all Volcanic Isles lore' },
+  master_combat: { icon: '\uD83C\uDFC6', name: 'Combat Master', desc: 'Max combat profession XP' },
+  master_exploration: { icon: '\uD83E\uDDED', name: 'Explorer Supreme', desc: 'Max exploration profession XP' },
+  collector_rare: { icon: '\uD83D\uDC8E', name: 'Rare Collector', desc: 'Found 10+ rare Spiritkin' },
+  arena_champion: { icon: '\uD83E\uDD47', name: 'Arena Champion', desc: '20+ arena victories' },
 };
 
 // Other players
@@ -3686,6 +3768,10 @@ function render() {
   if (!canvas) return;
   const W = canvas.width, H = canvas.height;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { renderCantina(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof workshopActive !== 'undefined' && workshopActive) { renderWorkshop(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof arenaActive !== 'undefined' && arenaActive) { renderArena(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof innActive !== 'undefined' && innActive) { renderInn(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { renderTradingPost(ctx, W, H); requestAnimationFrame(render); return; }
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, W, H);
 
@@ -4666,6 +4752,127 @@ function render() {
     ctx.fillText(otherDisplayName, opx + TILE/2, opy - 8);
   }
 
+  // ═══════ DRAW HOUSING PLOTS ═══════
+  for (const plot of HOUSE_PLOTS) {
+    const px = plot.x * TILE - camX;
+    const py = plot.y * TILE - camY;
+    if (px < -60 || px > W + 60 || py < -60 || py > H + 60) continue;
+
+    const owner = housingData[plot.id];
+    const isMyHouse = owner && owner.owner === uid;
+
+    if (owner && owner.built) {
+      // ── Draw claimed house ──
+      const roofColor = isMyHouse ? '#daa520' : '#a05030';
+      const wallColor = isMyHouse ? '#a08840' : '#8a7a5a';
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(px + TILE/2, py + TILE + 2, 22, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Walls
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(px + 4, py + 14, TILE - 8, TILE - 14);
+
+      // Roof
+      ctx.fillStyle = roofColor;
+      ctx.beginPath();
+      ctx.moveTo(px, py + 14);
+      ctx.lineTo(px + TILE/2, py - 2);
+      ctx.lineTo(px + TILE, py + 14);
+      ctx.fill();
+
+      // Roof highlight
+      if (isMyHouse) {
+        ctx.fillStyle = 'rgba(255,220,100,0.3)';
+        ctx.beginPath();
+        ctx.moveTo(px + TILE/2, py - 2);
+        ctx.lineTo(px + TILE/2 + 8, py + 14);
+        ctx.lineTo(px + TILE/2 - 8, py + 14);
+        ctx.fill();
+      }
+
+      // Windows
+      ctx.fillStyle = 'rgba(200,220,255,0.7)';
+      ctx.fillRect(px + 8, py + 20, 7, 7);
+      ctx.fillRect(px + TILE - 15, py + 20, 7, 7);
+
+      // Window warm glow at night
+      const tod2 = getTimeOfDay();
+      if (tod2.phase === 'night' || tod2.phase === 'dusk') {
+        ctx.fillStyle = 'rgba(255,200,80,0.6)';
+        ctx.fillRect(px + 8, py + 20, 7, 7);
+        ctx.fillRect(px + TILE - 15, py + 20, 7, 7);
+        ctx.fillStyle = 'rgba(255,200,60,0.08)';
+        ctx.beginPath();
+        ctx.arc(px + TILE/2, py + TILE/2, 24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Door
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fillRect(px + TILE/2 - 4, py + TILE - 12, 8, 12);
+      ctx.fillStyle = '#daa520';
+      ctx.fillRect(px + TILE/2 + 1, py + TILE - 7, 2, 2);
+
+      // Owner name
+      ctx.fillStyle = isMyHouse ? '#ffe0a0' : '#aaa';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(owner.houseName || (owner.ownerName + "'s House"), px + TILE/2, py - 8);
+
+      // [E] prompt when near
+      const hDist = Math.sqrt((G.x - plot.x) ** 2 + (G.y - plot.y) ** 2);
+      if (hDist < 2) {
+        const promptAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(255,224,160,${promptAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(isMyHouse ? '[E] Enter Home' : '[E] Visit', px + TILE/2, py - 20);
+      }
+    } else {
+      // ── Draw "For Sale" sign ──
+      // Post
+      ctx.fillStyle = '#6a5a3a';
+      ctx.fillRect(px + TILE/2 - 2, py + 10, 4, TILE - 10);
+
+      // Sign board
+      ctx.fillStyle = '#c8b070';
+      ctx.fillRect(px + TILE/2 - 14, py + 8, 28, 16);
+      ctx.strokeStyle = '#8a7a4a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + TILE/2 - 14, py + 8, 28, 16);
+
+      // "FOR SALE" text
+      ctx.fillStyle = '#3a2a1a';
+      ctx.font = 'bold 7px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('FOR SALE', px + TILE/2, py + 19);
+
+      // Plot outline (dashed)
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = 'rgba(218,165,32,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px - 2, py - 2, TILE + 4, TILE + 4);
+      ctx.setLineDash([]);
+
+      // [E] prompt when near
+      const hDist = Math.sqrt((G.x - plot.x) ** 2 + (G.y - plot.y) ** 2);
+      if (hDist < 2) {
+        const promptAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = `rgba(218,165,32,${promptAlpha})`;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('[E] Claim Plot (100 coins)', px + TILE/2, py - 6);
+
+        // Plot name
+        ctx.fillStyle = 'rgba(200,180,120,0.7)';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(plot.name, px + TILE/2, py + TILE + 14);
+      }
+    }
+  }
+
   // Draw spirit traps
   renderTrapsOnMap(ctx, camX, camY);
 
@@ -4839,6 +5046,30 @@ function renderMinimap() {
     mctx.fillRect(w.x * scale - 0.5, w.y * scale - 0.5, 2, 2);
   }
 
+  // Housing dots on minimap
+  for (const plot of HOUSE_PLOTS) {
+    const owner = housingData[plot.id];
+    if (owner && owner.built) {
+      const isMyHouse = owner.owner === uid;
+      if (isMyHouse && showHomeOnMinimap) {
+        // Blinking gold dot for own house
+        const blink = Math.sin(Date.now() * 0.008) > 0;
+        if (blink) {
+          mctx.fillStyle = '#daa520';
+          mctx.beginPath();
+          mctx.arc(plot.x * scale, plot.y * scale, 3, 0, Math.PI * 2);
+          mctx.fill();
+        }
+      } else if (isMyHouse) {
+        mctx.fillStyle = '#daa520';
+        mctx.fillRect(plot.x * scale - 1, plot.y * scale - 1, 3, 3);
+      } else {
+        mctx.fillStyle = '#8a7a5a';
+        mctx.fillRect(plot.x * scale - 1, plot.y * scale - 1, 2, 2);
+      }
+    }
+  }
+
   // Player dot
   mctx.fillStyle = '#fff';
   mctx.fillRect(G.x * scale - 1.5, G.y * scale - 1.5, 4, 4);
@@ -4858,6 +5089,26 @@ function setupInput() {
         else if (typeof cantinaInteract === 'function') cantinaInteract();
         return;
       }
+      if (typeof workshopActive !== 'undefined' && workshopActive) {
+        if (typeof workshopDialogueActive !== 'undefined' && workshopDialogueActive) closeWorkshopDialogue();
+        else if (typeof workshopInteract === 'function') workshopInteract();
+        return;
+      }
+      if (typeof arenaActive !== 'undefined' && arenaActive) {
+        if (typeof arenaDialogueActive !== 'undefined' && arenaDialogueActive) closeArenaDialogue();
+        else if (typeof arenaInteract === 'function') arenaInteract();
+        return;
+      }
+      if (typeof innActive !== 'undefined' && innActive) {
+        if (typeof innDialogueActive !== 'undefined' && innDialogueActive) closeInnDialogue();
+        else if (typeof innInteract === 'function') innInteract();
+        return;
+      }
+      if (typeof tradingPostActive !== 'undefined' && tradingPostActive) {
+        if (typeof tradingPostDialogueActive !== 'undefined' && tradingPostDialogueActive) closeTradingPostDialogue();
+        else if (typeof tradingPostInteract === 'function') tradingPostInteract();
+        return;
+      }
       tryInteract();
     }
     if (e.key === 'q' || e.key === 'Q') startSurvey();
@@ -4872,8 +5123,28 @@ function setupInput() {
         else if (typeof exitCantina === 'function') exitCantina();
         return;
       }
+      if (typeof workshopActive !== 'undefined' && workshopActive) {
+        if (typeof workshopDialogueActive !== 'undefined' && workshopDialogueActive) closeWorkshopDialogue();
+        else if (typeof exitWorkshop === 'function') exitWorkshop();
+        return;
+      }
+      if (typeof arenaActive !== 'undefined' && arenaActive) {
+        if (typeof arenaDialogueActive !== 'undefined' && arenaDialogueActive) closeArenaDialogue();
+        else if (typeof exitArena === 'function') exitArena();
+        return;
+      }
+      if (typeof innActive !== 'undefined' && innActive) {
+        if (typeof innDialogueActive !== 'undefined' && innDialogueActive) closeInnDialogue();
+        else if (typeof exitInn === 'function') exitInn();
+        return;
+      }
+      if (typeof tradingPostActive !== 'undefined' && tradingPostActive) {
+        if (typeof tradingPostDialogueActive !== 'undefined' && tradingPostDialogueActive) closeTradingPostDialogue();
+        else if (typeof exitTradingPost === 'function') exitTradingPost();
+        return;
+      }
       // Close any open overlay
-      document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active, #guildCreateOverlay.active, #profTreeOverlay.active')
+      document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active, #guildCreateOverlay.active, #profTreeOverlay.active, #housingOverlay.active')
         .forEach(el => el.classList.remove('active'));
       document.getElementById('inventoryPanel')?.classList.remove('open');
       document.getElementById('guildPanel')?.classList.remove('open');
@@ -4950,6 +5221,10 @@ function setupInput() {
 function gameLoop() {
   if (G.inBattle) return;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { updateCantina(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof workshopActive !== 'undefined' && workshopActive) { updateWorkshop(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof arenaActive !== 'undefined' && arenaActive) { updateArena(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof innActive !== 'undefined' && innActive) { updateInn(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { updateTradingPost(16, keys); setTimeout(gameLoop, 16); return; }
 
   let dx = 0, dy = 0;
   if (keys['w'] || keys['arrowup']) dy = -MOVE_SPEED;
@@ -7967,6 +8242,24 @@ function tryInteract() {
   const tileX = Math.floor(G.x);
   const tileY = Math.floor(G.y);
 
+  // Check for nearby housing plots
+  for (const plot of HOUSE_PLOTS) {
+    const dist = Math.sqrt((G.x - plot.x) ** 2 + (G.y - plot.y) ** 2);
+    if (dist < 2) {
+      const owner = housingData[plot.id];
+      if (owner && owner.built) {
+        if (owner.owner === uid) {
+          openMyHouse(plot);
+        } else {
+          openOtherHouse(plot, owner);
+        }
+      } else {
+        tryClaimPlot(plot);
+      }
+      return;
+    }
+  }
+
   // Check for nearby lore items
   for (const lore of LORE_ITEMS) {
     if (G.loreCollected && G.loreCollected.includes(lore.id)) continue;
@@ -8033,7 +8326,7 @@ function tryInteract() {
   // Check for workshop nearby
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     if (worldMap[tileY+dy]?.[tileX+dx] === 8) {
-      openCrafting();
+      if (typeof enterWorkshop === 'function') { enterWorkshop(); } else { openCrafting(); }
       return;
     }
   }
@@ -8043,19 +8336,32 @@ function tryInteract() {
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === arenaX1 || cx === arenaX2) && cy === arenaY1) {
-      openArena();
+      if (typeof enterArena === 'function') { enterArena(); } else { openArena(); }
       return;
     }
   }
 
-  // Check for buildings (shop, inn)
+  // Check for inn (HUB.x+5/6, HUB.y+3)
+  const innX1 = HUB.x + 5, innX2 = HUB.x + 6, innY1 = HUB.y + 3;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-    if (worldMap[tileY+dy]?.[tileX+dx] === 5) {
-      // Heal at inn
-      G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
-      notify('Rested at the inn. Team fully healed!');
-      saveGame();
-      updateHUD();
+    const cx = tileX + dx, cy = tileY + dy;
+    if ((cx === innX1 || cx === innX2) && cy === innY1) {
+      if (typeof enterInn === 'function') { enterInn(); } else {
+        G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+        notify('Rested at the inn. Team fully healed!');
+        saveGame();
+        updateHUD();
+      }
+      return;
+    }
+  }
+
+  // Check for trading post (HUB.x+1/2, HUB.y+1)
+  const tpX1 = HUB.x + 1, tpX2 = HUB.x + 2, tpY1 = HUB.y + 1;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const cx = tileX + dx, cy = tileY + dy;
+    if ((cx === tpX1 || cx === tpX2) && cy === tpY1) {
+      if (typeof enterTradingPost === 'function') { enterTradingPost(); } else { openMarket(); }
       return;
     }
   }
@@ -8068,6 +8374,257 @@ function tryInteract() {
       placeSpiritTrap();
       return;
     }
+  }
+}
+
+// ═══════ PLAYER HOUSING ═══════
+
+function tryClaimPlot(plot) {
+  if (G.house) {
+    notify('You already own a house! Demolish it first to claim a new plot.');
+    return;
+  }
+  if (G.coins < 100) {
+    notify('You need 100 coins to claim this plot!');
+    return;
+  }
+
+  const overlay = document.getElementById('housingOverlay');
+  document.getElementById('housingTitle').innerHTML = '&#127968; Claim Plot';
+  document.getElementById('housingName').textContent = plot.name;
+  document.getElementById('housingInfo').textContent = `Region: ${plot.region} | Cost: 100 coins | You have ${G.coins} coins`;
+  document.getElementById('housingActions').innerHTML = `
+    <button class="housing-btn" onclick="confirmClaimPlot('${plot.id}')">
+      <span class="btn-icon">&#128176;</span> Claim for 100 coins
+    </button>
+  `;
+  overlay.classList.add('active');
+}
+
+function confirmClaimPlot(plotId) {
+  if (G.coins < 100) { notify('Not enough coins!'); closeHousing(); return; }
+  if (G.house) { notify('You already own a house!'); closeHousing(); return; }
+
+  G.coins -= 100;
+  const plot = HOUSE_PLOTS.find(p => p.id === plotId);
+  G.house = { plotId, houseName: G.name + "'s Cottage", built: true, trophies: [] };
+
+  const houseRecord = {
+    owner: uid,
+    ownerName: G.name,
+    houseName: G.house.houseName,
+    built: true,
+    claimedAt: firebase.database.ServerValue.TIMESTAMP,
+    trophies: [],
+  };
+
+  housingData[plotId] = { ...houseRecord, owner: uid, ownerName: G.name, claimedAt: Date.now() };
+
+  // Save to Firebase
+  if (!window._useLocalStorage) {
+    try { db.ref(`overworld/housing/${plotId}`).set(houseRecord); } catch(e) {}
+  }
+
+  saveGame();
+  updateHUD();
+  closeHousing();
+  notify(`You claimed "${plot.name}"! Welcome home!`);
+  SFX.notify();
+}
+
+function openMyHouse(plot) {
+  const overlay = document.getElementById('housingOverlay');
+  document.getElementById('housingTitle').innerHTML = '&#127968; Welcome Home!';
+  document.getElementById('housingName').textContent = G.house.houseName || (G.name + "'s House");
+  document.getElementById('housingInfo').textContent = `Plot: ${plot.name} | ${plot.region}`;
+
+  let trophyHtml = '';
+  if (G.house.trophies && G.house.trophies.length > 0) {
+    trophyHtml = '<div class="trophy-list">' + G.house.trophies.map(tid => {
+      const t = TROPHY_DEFS[tid];
+      return t ? `<div class="trophy-item"><span class="trophy-icon">${t.icon}</span> ${t.name}</div>` : '';
+    }).join('') + '</div>';
+  } else {
+    trophyHtml = '<div style="color:#666;font-size:12px;margin:8px 0;">No trophies displayed yet.</div>';
+  }
+
+  // Check which trophies the player has earned
+  const earnedTrophies = checkEarnedTrophies();
+  const availableTrophies = earnedTrophies.filter(t => !(G.house.trophies || []).includes(t));
+
+  let addTrophyBtn = '';
+  if (availableTrophies.length > 0 && (G.house.trophies || []).length < 5) {
+    addTrophyBtn = `<button class="housing-btn" onclick="showAddTrophy()">
+      <span class="btn-icon">&#127942;</span> Display a Trophy (${availableTrophies.length} available)
+    </button>`;
+  }
+
+  document.getElementById('housingActions').innerHTML = `
+    <button class="housing-btn" onclick="showTrophies()">
+      <span class="btn-icon">&#127942;</span> View Trophies (${(G.house.trophies||[]).length}/5)
+    </button>
+    ${addTrophyBtn}
+    <button class="housing-btn" onclick="renameHouse()">
+      <span class="btn-icon">&#9999;&#65039;</span> Rename House
+    </button>
+    <button class="housing-btn" onclick="demolishHouse()" style="border-color:#6a3a3a;">
+      <span class="btn-icon">&#128465;&#65039;</span> Demolish (refund 50 coins)
+    </button>
+  `;
+
+  overlay.classList.add('active');
+}
+
+function openOtherHouse(plot, owner) {
+  const overlay = document.getElementById('housingOverlay');
+  document.getElementById('housingTitle').innerHTML = '&#127968; ' + (owner.ownerName || 'Unknown') + "'s House";
+  document.getElementById('housingName').textContent = owner.houseName || (owner.ownerName + "'s House");
+  document.getElementById('housingInfo').textContent = `Plot: ${plot.name}`;
+
+  let trophyHtml = '<div style="color:#666;font-size:12px;margin:8px 0;">No trophies displayed.</div>';
+  if (owner.trophies && owner.trophies.length > 0) {
+    trophyHtml = '<div class="trophy-list">' + owner.trophies.map(tid => {
+      const t = TROPHY_DEFS[tid];
+      return t ? `<div class="trophy-item"><span class="trophy-icon">${t.icon}</span> ${t.name} <span style="color:#666;font-size:10px;">${t.desc}</span></div>` : '';
+    }).join('') + '</div>';
+  }
+
+  document.getElementById('housingActions').innerHTML = trophyHtml;
+  overlay.classList.add('active');
+}
+
+function closeHousing() {
+  document.getElementById('housingOverlay').classList.remove('active');
+}
+
+function showTrophies() {
+  const actionsEl = document.getElementById('housingActions');
+  const trophies = G.house?.trophies || [];
+
+  if (trophies.length === 0) {
+    actionsEl.innerHTML = '<div style="color:#666;font-size:12px;margin:12px 0;">No trophies yet. Defeat bosses, master crafting, or collect rare lore to earn them!</div>' +
+      '<button class="housing-btn" onclick="openMyHouse(HOUSE_PLOTS.find(p=>p.id===G.house.plotId))"><span class="btn-icon">&#8592;</span> Back</button>';
+    return;
+  }
+
+  actionsEl.innerHTML = '<div class="trophy-list">' + trophies.map(tid => {
+    const t = TROPHY_DEFS[tid];
+    return t ? `<div class="trophy-item"><span class="trophy-icon">${t.icon}</span> <strong>${t.name}</strong> — <span style="color:#888;">${t.desc}</span></div>` : '';
+  }).join('') + '</div>' +
+    '<button class="housing-btn" onclick="openMyHouse(HOUSE_PLOTS.find(p=>p.id===G.house.plotId))"><span class="btn-icon">&#8592;</span> Back</button>';
+}
+
+function checkEarnedTrophies() {
+  const earned = [];
+  if ((G.rep?.battlesWon || 0) >= 10) earned.push('boss_slayer');
+  if ((G.mastery?.weapon?.xp || 0) >= 500) earned.push('mastercraft_weapon');
+  if ((G.mastery?.armor?.xp || 0) >= 500) earned.push('mastercraft_armor');
+  if ((G.professionXP?.combat || 0) >= 1000) earned.push('master_combat');
+  if ((G.professionXP?.exploration || 0) >= 1000) earned.push('master_exploration');
+  if ((G.rep?.raresFound || 0) >= 10) earned.push('collector_rare');
+  if ((G.rep?.arenaWins || 0) >= 20) earned.push('arena_champion');
+  // Lore trophies — check if all lore in region collected
+  const frostLore = (typeof LORE_ITEMS !== 'undefined') ? LORE_ITEMS.filter(l => l.region === 'frost_valley') : [];
+  const hillsLore = (typeof LORE_ITEMS !== 'undefined') ? LORE_ITEMS.filter(l => l.region === 'rolling_hills') : [];
+  const volcanicLore = (typeof LORE_ITEMS !== 'undefined') ? LORE_ITEMS.filter(l => l.region === 'volcanic_isles') : [];
+  if (frostLore.length > 0 && frostLore.every(l => (G.loreCollected || []).includes(l.id))) earned.push('lore_frost');
+  if (hillsLore.length > 0 && hillsLore.every(l => (G.loreCollected || []).includes(l.id))) earned.push('lore_hills');
+  if (volcanicLore.length > 0 && volcanicLore.every(l => (G.loreCollected || []).includes(l.id))) earned.push('lore_volcanic');
+  return earned;
+}
+
+function showAddTrophy() {
+  const earned = checkEarnedTrophies();
+  const displayed = G.house?.trophies || [];
+  const available = earned.filter(t => !displayed.includes(t));
+
+  if (available.length === 0) { notify('No new trophies to add!'); return; }
+  if (displayed.length >= 5) { notify('Trophy display is full! (5/5)'); return; }
+
+  const actionsEl = document.getElementById('housingActions');
+  actionsEl.innerHTML = '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">Choose a trophy to display:</div>' +
+    available.map(tid => {
+      const t = TROPHY_DEFS[tid];
+      return `<button class="housing-btn" onclick="addTrophy('${tid}')"><span class="btn-icon">${t.icon}</span> ${t.name} — <span style="color:#888;">${t.desc}</span></button>`;
+    }).join('') +
+    '<button class="housing-btn" onclick="openMyHouse(HOUSE_PLOTS.find(p=>p.id===G.house.plotId))"><span class="btn-icon">&#8592;</span> Back</button>';
+}
+
+function addTrophy(trophyId) {
+  if (!G.house) return;
+  if (!G.house.trophies) G.house.trophies = [];
+  if (G.house.trophies.length >= 5) { notify('Trophy display is full!'); return; }
+  if (G.house.trophies.includes(trophyId)) { notify('Already displayed!'); return; }
+
+  G.house.trophies.push(trophyId);
+
+  // Update Firebase
+  if (!window._useLocalStorage) {
+    try { db.ref(`overworld/housing/${G.house.plotId}/trophies`).set(G.house.trophies); } catch(e) {}
+  }
+  // Update local cache
+  if (housingData[G.house.plotId]) housingData[G.house.plotId].trophies = [...G.house.trophies];
+
+  saveGame();
+  const t = TROPHY_DEFS[trophyId];
+  notify(`${t.icon} ${t.name} trophy displayed!`);
+  openMyHouse(HOUSE_PLOTS.find(p => p.id === G.house.plotId));
+}
+
+function renameHouse() {
+  const newName = prompt('Enter a new name for your house (max 24 chars):', G.house.houseName || '');
+  if (!newName || !newName.trim()) return;
+  const trimmed = newName.trim().slice(0, 24);
+  G.house.houseName = trimmed;
+
+  if (housingData[G.house.plotId]) housingData[G.house.plotId].houseName = trimmed;
+  if (!window._useLocalStorage) {
+    try { db.ref(`overworld/housing/${G.house.plotId}/houseName`).set(trimmed); } catch(e) {}
+  }
+
+  saveGame();
+  notify(`House renamed to "${trimmed}"`);
+  openMyHouse(HOUSE_PLOTS.find(p => p.id === G.house.plotId));
+}
+
+function demolishHouse() {
+  if (!G.house) return;
+  if (!confirm('Are you sure? You will get 50 coins back.')) return;
+
+  const plotId = G.house.plotId;
+  G.coins += 50;
+  G.house = null;
+  delete housingData[plotId];
+
+  if (!window._useLocalStorage) {
+    try { db.ref(`overworld/housing/${plotId}`).remove(); } catch(e) {}
+  }
+
+  saveGame();
+  updateHUD();
+  closeHousing();
+  notify('House demolished. 50 coins refunded.');
+}
+
+function panToHome() {
+  if (!G.house) return;
+  const plot = HOUSE_PLOTS.find(p => p.id === G.house.plotId);
+  if (!plot) return;
+  // Flash the minimap home dot
+  showHomeOnMinimap = true;
+  setTimeout(() => { showHomeOnMinimap = false; }, 5000);
+  notify(`Your home is at ${plot.name} (${plot.region})`);
+}
+
+function initHousingListener() {
+  if (window._useLocalStorage) return;
+  try {
+    db.ref('overworld/housing').on('value', snap => {
+      const data = snap.val() || {};
+      housingData = data;
+    });
+  } catch(e) {
+    console.warn('Housing listener failed:', e);
   }
 }
 
@@ -8120,6 +8677,12 @@ function updateHUD() {
     ).join('');
   } else {
     titlesEl.innerHTML = '';
+  }
+
+  // Home button visibility
+  const homeBtn = document.getElementById('hudHomeBtn');
+  if (homeBtn) {
+    homeBtn.classList.toggle('visible', !!G.house);
   }
 }
 
@@ -8323,6 +8886,7 @@ function createCharacter() {
   G.quests = { active: [], completed: [] };
   G.sprite = selectedSprite || 1;
   G.guild = null;
+  G.house = null;
   G.direction = 'down';
   G.frame = 0;
   G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
@@ -8342,6 +8906,7 @@ function createCharacter() {
   updateHUD();
   saveGame();
   startPresence();
+  initHousingListener();
 
   notify(`Welcome to Frost Valley, ${name}!`);
   addChatMessage('system', `${name} has entered the Overworld.`);
@@ -8437,6 +9002,7 @@ async function initFirebase() {
     G.visitedTiles = new Set(data.visitedTiles || []);
     G.materials = data.materials || {};
     G.loreCollected = data.loreCollected || [];
+    G.house = data.house || null;
     G.direction = 'down';
     G.frame = 0;
     if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -8458,6 +9024,7 @@ async function initFirebase() {
 
     updateHUD();
     startPresence();
+    initHousingListener();
 
     // Show offline indicator if using localStorage
     if (window._useLocalStorage) {
@@ -8527,6 +9094,7 @@ function saveGame() {
     visitedTiles: [...(G.visitedTiles || [])].slice(-500),
     materials: G.materials || {},
     loreCollected: G.loreCollected || [],
+    house: G.house || null,
     version: VERSION,
   };
 
