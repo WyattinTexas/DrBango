@@ -1785,7 +1785,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.4.0';
+const VERSION = 'v3.5.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5616,6 +5616,12 @@ function battleRoll() {
         B.enemyUsedResource = true;
       }
 
+      // Outlaw (43): roll doubles on win — remove 1 opponent die next turn
+      if (pg.id === 43 && pRoll.type === 'doubles') {
+        B.nextRoundMods.enemyExtraDice -= 1;
+        B.log.push({ text: `${pg.name} (Thief): Doubles! Stealing 1 enemy die next round!`, type: 'ability' });
+      }
+
       // Flora (75): doubles = +2 HP
       if (pg.id === 75 && pRoll.type === 'doubles') {
         const healAmt = Math.min(2, pg.maxHp - pg.hp);
@@ -5712,6 +5718,12 @@ function battleRoll() {
       if (pg.id === 57 && !pg.ko && B.damageTakenThisRound >= 3) {
         B.nextRoundMods.playerExtraDice += 4;
         B.log.push({ text: `${pg.name} (Rage): Took ${B.damageTakenThisRound} damage — +4 dice next round!`, type: 'ability' });
+      }
+
+      // Outlaw (43): enemy wins with doubles — remove 1 player die next turn
+      if (eg.id === 43 && eRoll.type === 'doubles') {
+        B.nextRoundMods.playerExtraDice -= 1;
+        B.log.push({ text: `${eg.name} (Thief): Doubles! Stealing 1 of your dice next round!`, type: 'ability' });
       }
 
       if (pg.ko) B.log.push({ text: `${pg.name} is defeated...`, type: 'damage' });
