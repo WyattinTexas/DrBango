@@ -946,6 +946,78 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 @media (hover: none) and (pointer: coarse) {
   #touchHint { display: block; }
 }
+
+/* ═══════ SURVEY SYSTEM ═══════ */
+#surveyOverlay {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(20,15,40,0.95); border: 2px solid rgba(120,80,220,0.6);
+  border-radius: 14px; padding: 24px 32px; z-index: 500;
+  text-align: center; min-width: 280px; display: none;
+  box-shadow: 0 0 40px rgba(120,60,220,0.3);
+}
+#surveyOverlay.active { display: block; }
+#surveyOverlay h3 { color: #c8b0ff; font-size: 16px; margin-bottom: 8px; }
+.survey-concentration {
+  font-size: 36px; font-weight: bold; margin: 8px 0;
+  transition: color 0.3s;
+}
+.survey-concentration.high { color: #4f8; text-shadow: 0 0 15px rgba(60,255,120,0.5); }
+.survey-concentration.medium { color: #ca8; text-shadow: 0 0 10px rgba(200,160,60,0.4); }
+.survey-concentration.low { color: #f88; text-shadow: 0 0 10px rgba(255,80,80,0.4); }
+.survey-progress-wrap {
+  width: 100%; height: 10px; background: rgba(255,255,255,0.08);
+  border-radius: 5px; overflow: hidden; margin: 12px 0; border: 1px solid rgba(255,255,255,0.06);
+}
+.survey-progress-fill {
+  height: 100%; width: 0%; border-radius: 5px;
+  background: linear-gradient(90deg, #6a3a9a, #c8b0ff);
+  transition: width 0.1s linear;
+}
+.survey-status { font-size: 13px; color: #aaa; margin-top: 6px; min-height: 20px; }
+.survey-ring {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  border: 2px solid rgba(120,80,220,0.5);
+  animation: surveyRingPulse 1.5s ease-out infinite;
+}
+@keyframes surveyRingPulse {
+  0% { width: 10px; height: 10px; opacity: 0.8; }
+  100% { width: 80px; height: 80px; opacity: 0; }
+}
+.hud-btn.survey-btn {
+  background: rgba(120,80,220,0.2); border-color: rgba(120,80,220,0.4);
+  color: #c8b0ff; display: none;
+}
+.hud-btn.survey-btn.visible { display: inline-block; }
+
+/* ═══════ SPIRIT TRAPS ═══════ */
+.trap-section { margin-top: 12px; }
+.trap-item {
+  background: #0f0a1e; border: 1px solid #3a2a5a; border-radius: 6px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.trap-item .trap-name { font-weight: bold; color: #daa520; }
+.trap-item .trap-zone { font-size: 10px; color: #888; }
+.trap-item .trap-status { font-size: 10px; color: #4f8; margin-top: 2px; }
+.trap-collect-btn {
+  background: #1a4a2a; color: #4f8; border: 1px solid #2a6a3a;
+  padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 4px;
+}
+.trap-collect-btn:hover { background: #2a5a3a; }
+
+/* ═══════ TIPPING ═══════ */
+.chat-tip {
+  color: #daa520; font-weight: bold;
+  background: rgba(200,160,40,0.08); border-radius: 4px;
+  padding: 1px 4px; margin: 1px 0;
+}
+
+/* ═══════ QUICK CRAFT BUTTON ═══════ */
+.quick-craft-btn {
+  background: rgba(218,165,32,0.15); border: 1px solid rgba(218,165,32,0.3);
+  color: #daa520; padding: 4px 12px; border-radius: 4px; cursor: pointer;
+  font-size: 11px; margin-top: 6px; display: inline-block;
+}
+.quick-craft-btn:hover { background: rgba(218,165,32,0.25); }
 </style>
 </head>
 <body>
@@ -984,6 +1056,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <button class="hud-btn" onclick="openResourceReport()">&#128202; Zones</button>
     <button class="hud-btn" id="hudGuildBtn" onclick="toggleGuildPanel()">&#9876;&#65039; Guild</button>
     <div class="hud-stat"><span class="icon">&#128101;</span><span id="hudPlayers">1</span></div>
+    <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">&#128270; Survey</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
   </div>
 </div>
@@ -1102,6 +1175,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <div id="masteryList"></div>
   <h3 style="margin-top:16px;">&#128220; Quests</h3>
   <div id="questList"></div>
+  <h3 style="margin-top:16px;">&#129704; Spirit Traps</h3>
+  <div id="trapList"></div>
   <h3 style="margin-top:16px;">&#128123; Team</h3>
   <div id="teamList"></div>
   <h3 style="margin-top:16px;">&#9876;&#65039; Guild</h3>
@@ -1272,6 +1347,14 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <!-- MINIMAP -->
 <canvas id="minimap" width="210" height="164" style="display:none;"></canvas>
 
+<!-- SURVEY OVERLAY -->
+<div id="surveyOverlay">
+  <h3>&#128270; Resource Survey</h3>
+  <div class="survey-concentration" id="surveyConcentration">---%</div>
+  <div class="survey-progress-wrap"><div class="survey-progress-fill" id="surveyProgressFill"></div></div>
+  <div class="survey-status" id="surveyStatus">Analyzing spirit energy...</div>
+</div>
+
 <!-- TOUCH HINT (mobile only) -->
 <div id="touchHint">Drag to move &bull; Double-tap to interact</div>
 
@@ -1288,7 +1371,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.3.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -1681,6 +1764,22 @@ const SFX = {
       osc.stop(ctx.currentTime + i * 0.1 + 0.12);
     });
   },
+  // (j-1) Survey Hum — low rising tone
+  surveyHum() {
+    if (!this._ensureCtx()) return;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 120;
+    osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 3);
+    gain.gain.value = 0.06;
+    gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 3.5);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 3.5);
+  },
   // (j) Encounter Start — dramatic low rumble + high accent
   encounterStart() {
     if (!this._ensureCtx()) return;
@@ -2050,6 +2149,10 @@ const SCHEMATICS = [
   { id: 'frost_shard_charm', name: 'Frost Shard', type: 'accessory', slot: 'accessory', essencesNeeded: 1, desc: 'Start each fight with 1 Ice Shard.', basePower: 2, icon: '❄️', tier: 'common' },
   { id: 'surge_crystal', name: 'Surge Crystal', type: 'accessory', slot: 'accessory', essencesNeeded: 1, desc: 'Start each fight with 1 Surge.', basePower: 2, icon: '⚡', tier: 'common' },
   { id: 'firefly_lantern', name: 'Firefly Lantern', type: 'accessory', slot: 'accessory', essencesNeeded: 2, desc: 'Start each fight with 1 Magic Firefly. Take 2 damage.', basePower: 3, icon: '🏮', tier: 'rare' },
+
+  // ── SPIRIT TRAPS ──
+  { id: 'spirit_trap', name: 'Spirit Trap', type: 'accessory', slot: 'accessory', essencesNeeded: 1, desc: 'Place in a zone to passively collect essences over time.', basePower: 2, icon: '🪤', tier: 'common' },
+  { id: 'spirit_trap_adv', name: 'Advanced Spirit Trap', type: 'accessory', slot: 'accessory', essencesNeeded: 2, desc: 'Collects higher quality essences passively.', basePower: 3, icon: '⚡', tier: 'rare' },
 
   // ── LEGENDARY GEAR — from Multiplayer ──
   { id: 'moonstone_ring', name: 'Moonstone Ring', type: 'accessory', slot: 'accessory', essencesNeeded: 3, desc: 'Start each fight with 1 Moonstone.', basePower: 5, icon: '💎', tier: 'legendary' },
@@ -3030,6 +3133,9 @@ function render() {
     ctx.fillText(otherDisplayName, opx + TILE/2, opy - 4);
   }
 
+  // Draw spirit traps
+  renderTrapsOnMap(ctx, camX, camY);
+
   // Draw world boss
   renderWorldBoss(ctx, camX, camY, time);
 
@@ -3059,6 +3165,12 @@ function render() {
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(getDisplayName(), playerSX + TILE/2, playerSY - 6);
+
+  // ═══════ SURVEY RING EFFECT ═══════
+  renderSurveyRing(ctx, camX, camY, time);
+
+  // ═══════ UPDATE SURVEY BUTTON VISIBILITY ═══════
+  updateSurveyButton();
 
   // ═══════ INTERACTION PROMPT ═══════
   const ptx = Math.floor(G.x);
@@ -3161,6 +3273,7 @@ function setupInput() {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     keys[e.key.toLowerCase()] = true;
     if (e.key === 'e' || e.key === 'E') tryInteract();
+    if (e.key === 'q' || e.key === 'Q') startSurvey();
     if (e.key === 'i' || e.key === 'I') toggleInventory();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
     if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
@@ -4021,14 +4134,18 @@ function generateEssence(card, zoneIdx) {
 
 let craftState = { selectedEssences: [], schematic: SCHEMATICS[0], experimentPoints: 0 };
 
-function openCrafting() {
-  // Check if near workshop
+function isNearWorkshop() {
   const tileX = Math.floor(G.x);
   const tileY = Math.floor(G.y);
-  let nearWorkshop = false;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-    if (worldMap[tileY+dy]?.[tileX+dx] === 8) nearWorkshop = true;
+    if (worldMap[tileY+dy]?.[tileX+dx] === 8) return true;
   }
+  return false;
+}
+
+function openCrafting() {
+  // Check if near workshop
+  const nearWorkshop = isNearWorkshop();
   if (!nearWorkshop) {
     notify('Find a workshop in the hub town to craft!');
     return;
@@ -4038,6 +4155,7 @@ function openCrafting() {
     return;
   }
 
+  craftQuickMode = false;
   const masteryType = SCHEMATICS[0].type;
   const masteryXp = G.mastery[masteryType]?.xp || 0;
   const masteryLvl = getMasteryLevel(masteryXp);
@@ -4054,7 +4172,13 @@ function renderCraftUI() {
   // ── LEFT PANEL: Schematic cards grouped by slot ──
   const slotsEl = document.getElementById('craftSlots');
   const slotGroups = { weapon: [], head: [], accessory: [] };
-  for (const s of SCHEMATICS) (slotGroups[s.slot || s.type] || slotGroups.accessory).push(s);
+  const nearWS = isNearWorkshop();
+  for (const s of SCHEMATICS) {
+    // Craft location rules: quick mode = common only; not near workshop = common only
+    if (craftQuickMode && s.tier !== 'common') continue;
+    if (!nearWS && s.tier !== 'common') continue;
+    (slotGroups[s.slot || s.type] || slotGroups.accessory).push(s);
+  }
 
   let leftHtml = '';
   for (const [slot, items] of Object.entries(slotGroups)) {
@@ -4066,11 +4190,12 @@ function renderCraftUI() {
       const tc = tierColor[s.tier] || '#888';
       const mxp = G.mastery[s.type]?.xp || 0;
       const mInfo = getMasteryInfo(mxp);
-      leftHtml += `<div class="cw-schem-card ${sel ? 'selected' : ''}" onclick="selectSchematic('${s.id}')">
+      const isLegendaryLocked = s.tier === 'legendary' && getMasteryLevel(mxp) < 3;
+      leftHtml += `<div class="cw-schem-card ${sel ? 'selected' : ''}${isLegendaryLocked ? ' locked' : ''}" onclick="selectSchematic('${s.id}')" style="${isLegendaryLocked ? 'opacity:0.5;' : ''}">
         <div class="cw-schem-icon">${s.icon || '?'}</div>
         <div class="cw-schem-info">
-          <div class="cw-schem-name">${s.name}</div>
-          <div class="cw-schem-desc">${s.desc}</div>
+          <div class="cw-schem-name">${s.name}${isLegendaryLocked ? ' 🔒' : ''}</div>
+          <div class="cw-schem-desc">${isLegendaryLocked ? 'Requires Journeyman mastery' : s.desc}</div>
           <div class="cw-schem-meta">
             <span class="cw-schem-tag ${s.tier}">${s.tier}</span>
             <span class="cw-schem-tag" style="color:#666;">${s.essencesNeeded} essence${s.essencesNeeded > 1 ? 's' : ''}</span>
@@ -4148,7 +4273,19 @@ function renderCraftUI() {
 }
 
 function selectSchematic(id) {
-  craftState.schematic = SCHEMATICS.find(s => s.id === id) || SCHEMATICS[0];
+  const schem = SCHEMATICS.find(s => s.id === id) || SCHEMATICS[0];
+
+  // Legendary tier: requires Journeyman mastery (level 3+)
+  if (schem.tier === 'legendary') {
+    const mxp = G.mastery[schem.type]?.xp || 0;
+    const mlvl = getMasteryLevel(mxp);
+    if (mlvl < 3) {
+      notify(`Requires Journeyman mastery in ${schem.type} to craft legendary items.`);
+      return;
+    }
+  }
+
+  craftState.schematic = schem;
   craftState.selectedEssences = [];
   // Recalculate experiment points based on mastery for new schematic type
   const masteryType = craftState.schematic.type;
@@ -4398,6 +4535,7 @@ function finishExperiment() {
 
 function closeCrafting() {
   document.getElementById('craftOverlay').classList.remove('active');
+  craftQuickMode = false;
 }
 
 // ═══════ RESOURCE REPORT ═══════
@@ -4909,6 +5047,15 @@ function renderInventory() {
   // Quests
   renderQuestsInInventory();
 
+  // Spirit Traps
+  renderTrapsInInventory();
+
+  // Quick Craft button (common items, anywhere)
+  const gearEl2 = document.getElementById('gearList');
+  if (gearEl2 && G.essences.length > 0) {
+    gearEl2.innerHTML += `<button class="quick-craft-btn" onclick="openQuickCraft()">🔧 Quick Craft (Common)</button>`;
+  }
+
   // Guild info
   renderInventoryGuildInfo();
 
@@ -5077,6 +5224,16 @@ function tryInteract() {
       notify('Rested at the inn. Team fully healed!');
       saveGame();
       updateHUD();
+      return;
+    }
+  }
+
+  // Check if in encounter zone — offer to place trap
+  const zoneIdxHere = getCurrentZone(G.x, G.y);
+  if (zoneIdxHere >= 0) {
+    const hasTrap = G.gear.some(g => g.schematic === 'spirit_trap' || g.schematic === 'spirit_trap_adv');
+    if (hasTrap && playerTraps.length < 2) {
+      placeSpiritTrap();
       return;
     }
   }
@@ -5437,7 +5594,10 @@ function startPresence() {
 function addChatMessage(sender, text) {
   const el = document.getElementById('chatMessages');
   const div = document.createElement('div');
-  if (sender === 'system') {
+  if (sender === 'system' && text.includes('tipped')) {
+    div.className = 'chat-tip';
+    div.textContent = text;
+  } else if (sender === 'system') {
     div.className = 'chat-system';
     div.textContent = text;
   } else {
@@ -5458,6 +5618,14 @@ function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
+
+  // Check for /tip command
+  if (text.toLowerCase().startsWith('/tip')) {
+    input.value = '';
+    processTipCommand(text);
+    input.blur();
+    return;
+  }
 
   const title = getHighestTitle();
   const guildPrefix = G.guild ? `[${G.guild.tag}] ` : '';
@@ -6690,6 +6858,552 @@ function getDisplayName() {
   return G.name;
 }
 
+// ═══════ RESOURCE SURVEYING SYSTEM ═══════
+
+const depletedSpots = new Map(); // key: "tileX,tileY" → depletion timestamp
+let surveyActive = false;
+let surveyTimer = null;
+
+function getSurveyConcentration(tileX, tileY, zoneIdx) {
+  const cycleId = getZoneCycleId();
+  // Deterministic concentration seeded from position + cycle
+  const raw = seededHash(tileX * 3571 + tileY * 7919, cycleId * 51929);
+  let concentration = raw * 100; // 0-100%
+
+  // Zone quality boosts concentration
+  if (zoneIdx >= 0) {
+    const zoneQ = getZoneQuality(zoneIdx, cycleId);
+    concentration *= (0.6 + zoneQ * 0.4); // quality scales it
+  }
+
+  // Scout discipline bonus: +20%
+  if (G.discipline === 'scout') concentration += 20;
+
+  return Math.min(100, Math.max(0, Math.round(concentration)));
+}
+
+function startSurvey() {
+  if (G.inBattle || surveyActive) return;
+
+  // Check if in or near an encounter zone
+  const tileX = Math.floor(G.x);
+  const tileY = Math.floor(G.y);
+  let zoneIdx = getCurrentZone(G.x, G.y);
+
+  // Also check nearby tiles for zone proximity
+  if (zoneIdx < 0) {
+    for (let dy = -2; dy <= 2 && zoneIdx < 0; dy++) {
+      for (let dx = -2; dx <= 2 && zoneIdx < 0; dx++) {
+        zoneIdx = getCurrentZone(G.x + dx, G.y + dy);
+      }
+    }
+  }
+
+  if (zoneIdx < 0) {
+    notify('No spirit energy here. Move to an encounter zone to survey.');
+    return;
+  }
+
+  // Check if spot is depleted
+  const spotKey = `${tileX},${tileY}`;
+  const depletedAt = depletedSpots.get(spotKey);
+  if (depletedAt && Date.now() - depletedAt < 60000) {
+    const remaining = Math.ceil((60000 - (Date.now() - depletedAt)) / 1000);
+    notify(`This spot is depleted. Try another or wait ${remaining}s.`);
+    return;
+  }
+
+  surveyActive = true;
+  const concentration = getSurveyConcentration(tileX, tileY, zoneIdx);
+
+  // Show survey overlay
+  const overlay = document.getElementById('surveyOverlay');
+  overlay.classList.add('active');
+
+  const concEl = document.getElementById('surveyConcentration');
+  concEl.textContent = `${concentration}%`;
+  concEl.className = 'survey-concentration ' + (concentration > 60 ? 'high' : concentration > 30 ? 'medium' : 'low');
+
+  const statusEl = document.getElementById('surveyStatus');
+  const progressEl = document.getElementById('surveyProgressFill');
+  progressEl.style.width = '0%';
+
+  // Survey sound: low hum
+  if (SFX._ensureCtx && SFX._ensureCtx()) {
+    const ctx = SFX.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 120;
+    gain.gain.value = 0.06;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    // Will stop after survey completes
+    SFX._surveyOsc = osc;
+    SFX._surveyGain = gain;
+  }
+
+  // Determine success
+  let willSucceed = false;
+  if (concentration > 60) {
+    willSucceed = true;
+  } else if (concentration > 30) {
+    willSucceed = Math.random() < 0.5;
+  } else {
+    willSucceed = false;
+  }
+
+  statusEl.textContent = 'Surveying spirit energy...';
+
+  // 3-second extraction progress
+  let elapsed = 0;
+  const totalTime = 3000;
+  const stepInterval = 50;
+  surveyTimer = setInterval(() => {
+    elapsed += stepInterval;
+    const pct = Math.min(100, (elapsed / totalTime) * 100);
+    progressEl.style.width = pct + '%';
+
+    if (elapsed >= totalTime) {
+      clearInterval(surveyTimer);
+      surveyTimer = null;
+
+      // Stop survey sound + rise pitch on success
+      if (SFX._surveyOsc) {
+        if (willSucceed && SFX._surveyGain) {
+          SFX._surveyOsc.frequency.linearRampToValueAtTime(400, SFX.ctx.currentTime + 0.2);
+          SFX._surveyGain.gain.linearRampToValueAtTime(0.001, SFX.ctx.currentTime + 0.3);
+          setTimeout(() => { try { SFX._surveyOsc.stop(); } catch(e) {} }, 400);
+        } else {
+          try { SFX._surveyOsc.stop(); } catch(e) {}
+        }
+        SFX._surveyOsc = null;
+        SFX._surveyGain = null;
+      }
+
+      if (willSucceed) {
+        // Extract an essence!
+        const zone = ENCOUNTER_ZONES[zoneIdx];
+        // Pick a random card from region
+        const regionSets = zone.name.includes('Magma') || zone.name.includes('Obsidian')
+          ? ['Volcanic Isles', 'Set 1']
+          : zone.name.includes('Sunlit') || zone.name.includes('Bramble')
+          ? ['Rolling Hills', 'Set 1']
+          : ['Frost Valley', 'Set 1'];
+        const pool = ALL_CARDS.filter(c => regionSets.includes(c.set) && c.rarity !== 'legendary');
+        const card = pool[Math.floor(Math.random() * pool.length)] || ALL_CARDS[0];
+        const essence = generateEssence(card, zoneIdx);
+        G.essences.push(essence);
+
+        // Reputation
+        if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
+        G.rep.essencesCollected++;
+        checkAndNotifyTitles();
+        checkQuestProgress('essence_collected', essence);
+
+        statusEl.innerHTML = `<span style="color:#4f8;">Extracted: ${essence.name}!</span>`;
+        SFX.craftSuccess();
+
+        // Deplete this spot for 60 seconds
+        depletedSpots.set(spotKey, Date.now());
+
+        saveGame();
+      } else {
+        statusEl.innerHTML = `<span style="color:#f88;">No concentration here. Try another spot.</span>`;
+      }
+
+      // Auto-close after 2 seconds
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        surveyActive = false;
+      }, 2000);
+    }
+  }, stepInterval);
+}
+
+// Show/hide survey button based on zone proximity
+function updateSurveyButton() {
+  const btn = document.getElementById('hudSurveyBtn');
+  if (!btn) return;
+  let nearZone = getCurrentZone(G.x, G.y) >= 0;
+  if (!nearZone) {
+    for (let dy = -2; dy <= 2 && !nearZone; dy++) {
+      for (let dx = -2; dx <= 2 && !nearZone; dx++) {
+        if (getCurrentZone(G.x + dx, G.y + dy) >= 0) nearZone = true;
+      }
+    }
+  }
+  btn.classList.toggle('visible', nearZone);
+}
+
+// Clean depleted spots periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of depletedSpots) {
+    if (now - ts > 60000) depletedSpots.delete(key);
+  }
+}, 10000);
+
+// Draw survey ring on canvas when surveying
+function renderSurveyRing(ctx, camX, camY, time) {
+  if (!surveyActive) return;
+  const px = G.x * TILE - camX + TILE / 2;
+  const py = G.y * TILE - camY + TILE / 2;
+
+  // Pulsing ring
+  const ringPhase = (time * 2) % 1;
+  const ringRadius = 10 + ringPhase * 40;
+  const ringAlpha = Math.max(0, 0.6 - ringPhase * 0.8);
+
+  const zoneIdx = getCurrentZone(G.x, G.y);
+  const concentration = zoneIdx >= 0 ? getSurveyConcentration(Math.floor(G.x), Math.floor(G.y), zoneIdx) : 0;
+  const ringColor = concentration > 60 ? '60,255,120' : concentration > 30 ? '200,160,60' : '255,80,80';
+
+  ctx.strokeStyle = `rgba(${ringColor},${ringAlpha})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(px, py, ringRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Second ring offset
+  const ring2Phase = ((time * 2) + 0.5) % 1;
+  const ring2Radius = 10 + ring2Phase * 40;
+  const ring2Alpha = Math.max(0, 0.4 - ring2Phase * 0.6);
+  ctx.strokeStyle = `rgba(${ringColor},${ring2Alpha})`;
+  ctx.beginPath();
+  ctx.arc(px, py, ring2Radius, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+// ═══════ SPIRIT TRAP SYSTEM ═══════
+
+let playerTraps = []; // local cache of player's traps
+
+function loadPlayerTraps() {
+  if (!uid) return;
+  db.ref('overworld/traps').orderByChild('owner').equalTo(uid).on('value', snap => {
+    const data = snap.val() || {};
+    playerTraps = Object.entries(data).map(([id, t]) => ({ ...t, trapId: id }));
+  });
+}
+
+function placeSpiritTrap() {
+  if (!uid) return;
+
+  // Check if near encounter zone
+  const zoneIdx = getCurrentZone(G.x, G.y);
+  if (zoneIdx < 0) {
+    notify('Must be inside an encounter zone to place a trap.');
+    return;
+  }
+
+  // Check max traps (2 per player)
+  if (playerTraps.length >= 2) {
+    notify('Maximum 2 traps placed. Collect from existing traps first.');
+    return;
+  }
+
+  // Find a spirit trap in gear
+  const trapIdx = G.gear.findIndex(g => g.schematic === 'spirit_trap' || g.schematic === 'spirit_trap_adv');
+  if (trapIdx < 0) {
+    notify('You need a crafted Spirit Trap in your gear.');
+    return;
+  }
+
+  const trap = G.gear[trapIdx];
+  const isAdvanced = trap.schematic === 'spirit_trap_adv';
+  const zone = ENCOUNTER_ZONES[zoneIdx];
+  const now = Date.now();
+
+  const trapData = {
+    owner: uid,
+    ownerName: G.name,
+    zoneIdx: zoneIdx,
+    zoneName: zone.name,
+    x: Math.round(G.x * 10) / 10,
+    y: Math.round(G.y * 10) / 10,
+    quality: trap.quality || 100,
+    placedAt: now,
+    lastCollected: now,
+    type: isAdvanced ? 'advanced' : 'basic',
+  };
+
+  const trapId = uid + '_trap_' + now;
+  db.ref(`overworld/traps/${trapId}`).set(trapData);
+
+  // Remove trap from gear
+  G.gear.splice(trapIdx, 1);
+  saveGame();
+
+  notify(`${isAdvanced ? 'Advanced ' : ''}Spirit Trap placed in ${zone.name}!`);
+  SFX.craftSuccess();
+}
+
+function collectFromTrap(trapId) {
+  if (!uid) return;
+
+  db.ref(`overworld/traps/${trapId}`).once('value').then(snap => {
+    const trap = snap.val();
+    if (!trap || trap.owner !== uid) return;
+
+    const now = Date.now();
+    const hoursSinceLast = (now - trap.lastCollected) / (1000 * 60 * 60);
+    const interval = trap.type === 'advanced' ? 0.5 : 1; // hours
+    const essencesReady = Math.floor(hoursSinceLast / interval);
+
+    if (essencesReady < 1) {
+      const minutesLeft = Math.ceil((interval * 60) - (hoursSinceLast * 60));
+      notify(`No essences ready. Next in ~${minutesLeft} min.`);
+      return;
+    }
+
+    // Maintenance cost: 5 coins per day (~0.2 per hour)
+    const daysFraction = hoursSinceLast / 24;
+    const maintenanceCost = Math.floor(daysFraction * 5);
+    if (maintenanceCost > 0 && G.coins < maintenanceCost) {
+      // Trap breaks — return to inventory
+      notify('Not enough coins for trap maintenance! Trap returned to inventory.');
+      const returnedGear = {
+        id: Date.now(),
+        name: trap.type === 'advanced' ? 'Broken Advanced Spirit Trap' : 'Broken Spirit Trap',
+        schematic: trap.type === 'advanced' ? 'spirit_trap_adv' : 'spirit_trap',
+        type: 'accessory', slot: 'accessory',
+        icon: trap.type === 'advanced' ? '⚡' : '🪤',
+        tier: trap.type === 'advanced' ? 'rare' : 'common',
+        quality: Math.floor((trap.quality || 100) * 0.8),
+        qualityTier: 'Basic',
+        desc: 'A recovered spirit trap. Needs repair.',
+        craftedBy: G.name, craftedAt: Date.now(),
+      };
+      G.gear.push(returnedGear);
+      db.ref(`overworld/traps/${trapId}`).remove();
+      saveGame();
+      renderInventory();
+      return;
+    }
+
+    if (maintenanceCost > 0) {
+      G.coins -= maintenanceCost;
+    }
+
+    // Generate essences
+    const cycleId = getZoneCycleId();
+    const zoneQ = trap.zoneIdx >= 0 ? getZoneQuality(trap.zoneIdx, cycleId) : 1.0;
+    const qualityFactor = trap.type === 'advanced' ? 1.3 : 1.0;
+
+    for (let i = 0; i < Math.min(essencesReady, 5); i++) { // cap at 5 per collection
+      const regionSets = trap.zoneName.includes('Magma') || trap.zoneName.includes('Obsidian')
+        ? ['Volcanic Isles', 'Set 1']
+        : trap.zoneName.includes('Sunlit') || trap.zoneName.includes('Bramble')
+        ? ['Rolling Hills', 'Set 1']
+        : ['Frost Valley', 'Set 1'];
+      const pool = ALL_CARDS.filter(c => regionSets.includes(c.set) && c.rarity !== 'legendary' && c.rarity !== 'ghost-rare');
+      const card = pool[Math.floor(Math.random() * pool.length)] || ALL_CARDS[0];
+      const essence = generateEssence(card, trap.zoneIdx);
+      // Apply trap quality factor
+      essence.potency = Math.min(1000, Math.floor(essence.potency * qualityFactor));
+      essence.stability = Math.min(1000, Math.floor(essence.stability * qualityFactor));
+      essence.resonance = Math.min(1000, Math.floor(essence.resonance * qualityFactor));
+      essence.purity = Math.min(1000, Math.floor(essence.purity * qualityFactor));
+      G.essences.push(essence);
+
+      if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
+      G.rep.essencesCollected++;
+    }
+
+    // Update lastCollected
+    db.ref(`overworld/traps/${trapId}/lastCollected`).set(now);
+
+    const collected = Math.min(essencesReady, 5);
+    notify(`Collected ${collected} essence${collected > 1 ? 's' : ''} from trap!${maintenanceCost > 0 ? ` (-${maintenanceCost} coins maintenance)` : ''}`);
+    SFX.craftSuccess();
+    checkAndNotifyTitles();
+    saveGame();
+    renderInventory();
+  });
+}
+
+function removeTrap(trapId) {
+  if (!uid) return;
+  db.ref(`overworld/traps/${trapId}`).once('value').then(snap => {
+    const trap = snap.val();
+    if (!trap || trap.owner !== uid) return;
+
+    // Return trap as gear
+    const returnedGear = {
+      id: Date.now(),
+      name: trap.type === 'advanced' ? 'Advanced Spirit Trap' : 'Spirit Trap',
+      schematic: trap.type === 'advanced' ? 'spirit_trap_adv' : 'spirit_trap',
+      type: 'accessory', slot: 'accessory',
+      icon: trap.type === 'advanced' ? '⚡' : '🪤',
+      tier: trap.type === 'advanced' ? 'rare' : 'common',
+      quality: trap.quality || 100,
+      qualityTier: 'Standard',
+      desc: trap.type === 'advanced' ? 'Collects higher quality essences passively.' : 'Place in a zone to passively collect essences over time.',
+      craftedBy: G.name, craftedAt: Date.now(),
+    };
+    G.gear.push(returnedGear);
+    db.ref(`overworld/traps/${trapId}`).remove();
+    saveGame();
+    notify('Trap recovered to inventory.');
+    renderInventory();
+  });
+}
+
+function renderTrapsInInventory() {
+  const el = document.getElementById('trapList');
+  if (!el) return;
+
+  if (playerTraps.length === 0) {
+    el.innerHTML = '<p style="color:#555;font-size:12px;">No traps placed. Craft a Spirit Trap and place it in a zone!</p>';
+    return;
+  }
+
+  const now = Date.now();
+  el.innerHTML = playerTraps.map(t => {
+    const hoursSinceLast = (now - t.lastCollected) / (1000 * 60 * 60);
+    const interval = t.type === 'advanced' ? 0.5 : 1;
+    const essencesReady = Math.floor(hoursSinceLast / interval);
+    const minutesToNext = essencesReady < 1 ? Math.ceil((interval * 60) - (hoursSinceLast * 60)) : 0;
+
+    return `<div class="trap-item">
+      <span class="trap-name">${t.type === 'advanced' ? '⚡' : '🪤'} ${t.type === 'advanced' ? 'Advanced ' : ''}Spirit Trap</span>
+      <div class="trap-zone">${t.zoneName} (${Math.round(t.x)}, ${Math.round(t.y)})</div>
+      <div class="trap-status">${essencesReady > 0
+        ? `<span style="color:#4f8;">${Math.min(essencesReady, 5)} essence${Math.min(essencesReady, 5) > 1 ? 's' : ''} ready!</span>`
+        : `<span style="color:#888;">Next essence in ~${minutesToNext} min</span>`
+      }</div>
+      ${essencesReady > 0 ? `<button class="trap-collect-btn" onclick="collectFromTrap('${t.trapId}')">Collect</button>` : ''}
+      <button class="trap-collect-btn" style="background:#3a1a1a;color:#f88;border-color:#6a3a3a;margin-left:4px;" onclick="removeTrap('${t.trapId}')">Recover</button>
+    </div>`;
+  }).join('');
+}
+
+// Render other players' traps on minimap + main map
+let allTraps = []; // all traps (for rendering)
+function loadAllTraps() {
+  db.ref('overworld/traps').on('value', snap => {
+    const data = snap.val() || {};
+    allTraps = Object.entries(data).map(([id, t]) => ({ ...t, trapId: id }));
+  });
+}
+
+function renderTrapsOnMap(ctx, camX, camY) {
+  for (const trap of allTraps) {
+    const tx = trap.x * TILE - camX;
+    const ty = trap.y * TILE - camY;
+    if (tx < -20 || tx > canvas.width + 20 || ty < -20 || ty > canvas.height + 20) continue;
+
+    // Small orange diamond
+    const size = 4;
+    ctx.fillStyle = trap.owner === uid ? '#daa520' : '#aa6a20';
+    ctx.beginPath();
+    ctx.moveTo(tx + TILE/2, ty + TILE/2 - size);
+    ctx.lineTo(tx + TILE/2 + size, ty + TILE/2);
+    ctx.lineTo(tx + TILE/2, ty + TILE/2 + size);
+    ctx.lineTo(tx + TILE/2 - size, ty + TILE/2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Owner name on hover proximity
+    const dist = Math.sqrt((G.x - trap.x)**2 + (G.y - trap.y)**2);
+    if (dist < 4) {
+      ctx.fillStyle = '#aa8a40';
+      ctx.font = '8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${trap.ownerName}'s trap`, tx + TILE/2, ty - 4);
+    }
+  }
+}
+
+// ═══════ TIPPING SYSTEM ═══════
+
+function processTipCommand(text) {
+  // Parse "/tip [name] [amount]"
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 3) {
+    notify('Usage: /tip [name] [amount]');
+    return true;
+  }
+
+  const targetName = parts[1];
+  const amount = parseInt(parts[2]);
+
+  if (isNaN(amount) || amount < 1) {
+    notify('Tip amount must be a positive number.');
+    return true;
+  }
+  if (amount > 100) {
+    notify('Maximum tip is 100 coins per transaction.');
+    return true;
+  }
+  if (amount > G.coins) {
+    notify('Not enough coins to tip!');
+    return true;
+  }
+
+  // Find recipient in presence
+  let targetUid = null;
+  for (const [pid, p] of Object.entries(otherPlayers)) {
+    if (pid === uid) continue;
+    if (p.name && p.name.toLowerCase() === targetName.toLowerCase()) {
+      targetUid = pid;
+      break;
+    }
+  }
+
+  if (!targetUid) {
+    notify(`Player "${targetName}" is not online.`);
+    return true;
+  }
+
+  // Transfer coins
+  G.coins -= amount;
+
+  // Credit recipient via Firebase transaction
+  db.ref(`overworld/players/${targetUid}/coins`).transaction(current => {
+    return (current || 0) + amount;
+  });
+
+  // Post system message in chat
+  const guildPrefix = G.guild ? `[${G.guild.tag}] ` : '';
+  const senderDisplay = guildPrefix + G.name;
+
+  db.ref('overworld/chat').push({
+    sender: 'system',
+    text: `💰 ${senderDisplay} tipped ${targetName} ${amount} coin${amount > 1 ? 's' : ''}!`,
+    ts: firebase.database.ServerValue.TIMESTAMP,
+    isTip: true,
+  });
+
+  saveGame();
+  updateHUD();
+  notify(`Tipped ${targetName} ${amount} coins!`);
+  return true;
+}
+
+// ═══════ CRAFT LOCATION RULES ═══════
+
+let craftQuickMode = false; // true = quick craft (common only, anywhere)
+
+function openQuickCraft() {
+  if (G.essences.length < 1) {
+    notify('You need Spirit Essences to craft. Battle wild Spiritkin!');
+    return;
+  }
+  craftQuickMode = true;
+  const masteryType = SCHEMATICS[0].type;
+  const masteryXp = G.mastery[masteryType]?.xp || 0;
+  const masteryLvl = getMasteryLevel(masteryXp);
+  const baseExp = G.discipline === 'artificer' ? 3 : 1;
+  // Find first common schematic
+  const firstCommon = SCHEMATICS.find(s => s.tier === 'common') || SCHEMATICS[0];
+  craftState = { selectedEssences: [], schematic: firstCommon, experimentPoints: baseExp + masteryLvl };
+  renderCraftUI();
+  document.getElementById('craftOverlay').classList.add('active');
+}
+
 // ═══════ INIT ═══════
 
 async function init() {
@@ -6716,6 +7430,10 @@ async function init() {
   // Start world boss listener
   startWorldBossListener();
   checkWorldBoss();
+
+  // Load spirit traps
+  loadPlayerTraps();
+  loadAllTraps();
 
   // Check guild invites
   setTimeout(checkGuildInvites, 3000);
