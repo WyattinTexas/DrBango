@@ -1785,7 +1785,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.6.2';
+const VERSION = 'v3.6.3';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2378,7 +2378,7 @@ function triggerRoamingBattle(enemy) {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
     isAggressive: true,
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
@@ -4463,7 +4463,7 @@ function render() {
 
     // Draw monster sprite (or fallback circle)
     const monImg = getMonsterSprite(e);
-    const mFrame = (Math.floor(Date.now() / 300) % 2) * 2; // alternates 0 and 2 for clean 2-frame walk
+    const mFrame = (Math.floor(Date.now() / 300) % 2 === 0) ? 1 : 3; // alternates 0 and 2 for clean 2-frame walk
     // Direction based on movement angle
     const angle = e.patrolAngle || 0;
     const normAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -4987,6 +4987,42 @@ function getWildEncounter() {
 function rollDie() { return Math.floor(Math.random() * 6) + 1; }
 function rollDice(n) { return Array.from({length: n}, () => rollDie()).sort((a,b) => a-b); }
 
+// Weighted dice rolls for cinematic drama (from adventure engine)
+function weightedRoll(ghost, count) {
+  const dice = [];
+  for (let i = 0; i < count; i++) dice.push(rollDie());
+  if (!ghost) return dice.sort((a, b) => a - b);
+  // Penta nudge: 5+ dice = 10% all match
+  if (count >= 5 && Math.random() < 0.10) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    for (let i = 0; i < dice.length; i++) dice[i] = v;
+    return dice.sort((a, b) => a - b);
+  }
+  // 1 HP: 25% forced doubles; 2 HP: 15%
+  if (ghost.hp === 1 && Math.random() < 0.25) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  } else if (ghost.hp === 2 && Math.random() < 0.15) {
+    const v = Math.ceil(Math.random() * 4) + 2;
+    dice[0] = v; if (dice.length >= 2) dice[1] = v;
+  }
+  // Low HP quality boost
+  if (ghost.hp <= 2 && ghost.hp > 0 && dice.length >= 2) {
+    const minIdx = dice.indexOf(Math.min(...dice));
+    if (dice[minIdx] <= 2 && Math.random() < 0.30)
+      dice[minIdx] = Math.ceil(Math.random() * 3) + 3;
+  }
+  return dice.sort((a, b) => a - b);
+}
+
+// Helper: count a specific die value
+function countDieVal(dice, val) { return dice.filter(d => d === val).length; }
+
+// Helper: get sideline ghosts for player team
+function getSidelineGhosts() {
+  return G.team.filter((g, i) => i !== G.activeIdx && !g.ko && g.hp > 0);
+}
+
 function classify(dice) {
   if (!dice?.length) return { type: 'none', value: 0, damage: 0 };
   if (dice.length === 1) return { type: 'singles', value: dice[0], damage: 1 };
@@ -5054,7 +5090,7 @@ function triggerWildEncounter() {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
     zoneIdx: getCurrentZone(G.x, G.y),
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
@@ -5282,6 +5318,15 @@ function battleRoll() {
       B.log.push({ text: `${eg.name} (Slumber): First roll is 1-2-3...`, type: 'ability' });
       B.bourilActive = 'enemy';
     }
+    // Maximo (302): Nap — first roll is 1 die only
+    if (pg.id === 302) {
+      B.log.push({ text: `${pg.name} (Nap): First roll is 1 die only...`, type: 'ability' });
+      B.maximoActive = 'player';
+    }
+    if (eg.id === 302) {
+      B.log.push({ text: `${eg.name} (Nap): First roll is 1 die only...`, type: 'ability' });
+      B.maximoActive = 'enemy';
+    }
 
     // If someone KO'd from entry, stop here
     if (pg.ko || eg.ko) {
@@ -5332,6 +5377,16 @@ function battleRoll() {
     if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
   }
 
+  // Simon (24): Brew Time — when taking before-roll damage, gain 1 Sacred Fire
+  if (pg.id === 24 && (eg.id === 111 || eg.id === 304) && !pg.ko) {
+    B.resources.sacredFire += 1;
+    B.log.push({ text: `${pg.name} (Brew Time): Took pre-roll damage — +1 Sacred Fire! [Total: ${B.resources.sacredFire}]`, type: 'ability' });
+  }
+  if (eg.id === 24 && (pg.id === 111 || pg.id === 304) && !eg.ko) {
+    B.log.push({ text: `${eg.name} (Brew Time): Took pre-roll damage — gained 1 Sacred Fire.`, type: 'ability' });
+    B.enemyUsedResource = true;
+  }
+
   // Eloise (85): Change of Heart — spend 1 Ice Shard to swap HP with enemy before rolling
   if (pg.id === 85 && B.resources.iceShards >= 1 && !eg.ko) {
     B.resources.iceShards -= 1;
@@ -5358,6 +5413,15 @@ function battleRoll() {
   // Reset mods after applying
   B.nextRoundMods = { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 };
   B.damageTakenThisRound = 0;
+
+  // Maximo (302): Nap — first roll is 1 die only
+  if (B.maximoActive === 'player') {
+    pDiceCount = 1;
+    B.maximoActive = null;
+  } else if (B.maximoActive === 'enemy') {
+    eDiceCount = 1;
+    B.maximoActive = null;
+  }
 
   // Ghost Tracker skill: +1 die on first roll
   if (hasSkill('sr_2') && B.round === 1) {
@@ -5387,9 +5451,9 @@ function battleRoll() {
   if (rollBtn) rollBtn.disabled = true;
 
   setTimeout(() => {
-    // ── ACTUAL ROLL ──
-    let pDice = rollDice(pDiceCount);
-    let eDice = rollDice(eDiceCount);
+    // ── ACTUAL ROLL (weighted for low-HP drama) ──
+    let pDice = weightedRoll(pg, pDiceCount);
+    let eDice = weightedRoll(eg, eDiceCount);
 
     // Bouril (201): force first roll to 1-2-3
     if (B.bourilActive === 'player') {
@@ -5548,10 +5612,26 @@ function battleRoll() {
 
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
 
+      // ── SIDELINE BONUS DAMAGE (player team) ──
+      {
+        const sideWin = getSidelineGhosts();
+        for (const sg of sideWin) {
+          // Bandit Pete (93): sideline — if rolling 2 or fewer dice, +3 damage
+          if (sg.id === 93 && pDice.length <= 2) {
+            dmg += 3;
+            B.log.push({ text: `${sg.name} (sideline): +3 damage (${pDice.length} dice)!`, type: 'ability' });
+          }
+        }
+      }
+
       // Resource damage bonuses
       if (B.resources.iceShards > 0) {
-        dmg += B.resources.iceShards;
-        B.log.push({ text: `Ice Shards: +${B.resources.iceShards} damage!`, type: 'ability' });
+        // Skylar (104): Ice Shards deal 3x instead of 1x (active or sideline)
+        const hasSkylar = pg.id === 104 || getSidelineGhosts().some(g => g.id === 104);
+        const iceMultiplier = hasSkylar ? 3 : 1;
+        const iceDmg = B.resources.iceShards * iceMultiplier;
+        dmg += iceDmg;
+        B.log.push({ text: `Ice Shards: +${iceDmg} damage!${hasSkylar ? ' (Skylar: 3x!)' : ''}`, type: 'ability' });
         B.resources.iceShards = 0;
       }
       if (B.resources.sacredFire > 0) {
@@ -5631,7 +5711,8 @@ function battleRoll() {
 
       // Dart (209): win = gain 2 Surge
       if (pg.id === 209) {
-        B.log.push({ text: `${pg.name} (Surge): +2 Surge on win!`, type: 'ability' });
+        B.resources.surge = Math.min(5, (B.resources.surge || 0) + 2);
+        B.log.push({ text: `${pg.name} (Surge): +2 Surge on win! [Total: ${B.resources.surge}]`, type: 'ability' });
       }
       // Zain (206): win = gain 1 Ice Shard
       if (pg.id === 206) {
@@ -5647,6 +5728,27 @@ function battleRoll() {
         }
         // "Damage cannot be negated" — flag checked against Puff
         B.cameronActive = true;
+      }
+
+      // ── SIDELINE WIN ABILITIES (player team) ──
+      const pSideline = getSidelineGhosts();
+      for (const sg of pSideline) {
+        // Gary (92): sideline — each 1 rolled = +2 Ice Shards
+        if (sg.id === 92) {
+          const ones = countDieVal(pDice, 1);
+          if (ones > 0) {
+            B.resources.iceShards += ones * 2;
+            B.log.push({ text: `${sg.name} (sideline): +${ones * 2} Ice Shards from 1's! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+          }
+        }
+        // Farmer Jeff (314): sideline — each 6 = +1 Healing Seed
+        if (sg.id === 314) {
+          const sixes = countDieVal(pDice, 6);
+          if (sixes > 0) {
+            B.resources.healingSeeds += sixes;
+            B.log.push({ text: `${sg.name} (sideline): +${sixes} Healing Seed from 6's! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+          }
+        }
       }
 
       SFX.hit();
@@ -5689,12 +5791,27 @@ function battleRoll() {
         if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by counter!`, type: 'damage' }); }
       }
 
-      // Bogey (53): reflect damage once per game
+      // Bogey (53): reflect damage once per game (ENEMY)
       if (eg.id === 53 && !eg.usedOncePerGame && !pg.ko) {
         eg.usedOncePerGame = true;
         pg.hp = Math.max(0, pg.hp - dmg);
         eg.hp = Math.min(eg.maxHp, eg.hp + dmg);
         B.log.push({ text: `${eg.name} (Reflector): Reflects ${dmg} damage back!`, type: 'ability' });
+        if (pg.hp <= 0) pg.ko = true;
+      }
+      // Bogey (53): reflect damage once per game (PLAYER)
+      if (pg.id === 53 && !pg.usedOncePerGame && !pg.ko && dmg > 0) {
+        pg.usedOncePerGame = true;
+        eg.hp = Math.max(0, eg.hp - dmg);
+        pg.hp = Math.min(pg.maxHp, pg.hp + dmg);
+        B.log.push({ text: `${pg.name} (Bogus): Damage reflected! ${dmg} back at ${eg.name}!`, type: 'ability' });
+        if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by reflection!`, type: 'damage' }); }
+      }
+
+      // Pudge (311): loss on doubles = self-damage
+      if (pg.id === 311 && eRoll.type === 'doubles' && !pg.ko) {
+        pg.hp = Math.max(0, pg.hp - 1);
+        B.log.push({ text: `${pg.name} (Belly Flop): Self-damage from loss!`, type: 'damage' });
         if (pg.hp <= 0) pg.ko = true;
       }
 
@@ -5789,6 +5906,9 @@ function fleeBattle() {
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
   G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
   G.luckyStones = B.resources?.luckyStones || G.luckyStones;
+  G.surge = B.resources?.surge || G.surge;
+  G.moonstone = B.resources?.moonstone || G.moonstone;
+  G.firefly = B.resources?.firefly || G.firefly;
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -5804,6 +5924,9 @@ function endBattle(won) {
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
   G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
   G.luckyStones = B.resources?.luckyStones || G.luckyStones;
+  G.surge = B.resources?.surge || G.surge;
+  G.moonstone = B.resources?.moonstone || G.moonstone;
+  G.firefly = B.resources?.firefly || G.firefly;
 
   // Handle world boss battle end
   if (B.isWorldBoss) {
@@ -8549,11 +8672,11 @@ function updateSpriteAnimation() {
     // 2-frame walk cycle: alternate between frame 0 and frame 2
     // This gives a clean left-foot/right-foot step instead of 4-frame wobble
     if (now - lastSpriteFrameTime > 250) {
-      G.frame = G.frame === 0 ? 2 : 0;
+      G.frame = G.frame === 1 ? 3 : 1; // step-left(1) <-> step-right(3)
       lastSpriteFrameTime = now;
     }
   } else {
-    G.frame = 0; // idle = frame 0 (standing)
+    G.frame = 0; // idle = col 0 (standing pose)
     lastSpriteFrameTime = now;
   }
 }
@@ -9087,7 +9210,7 @@ function engageWorldBoss() {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
     zoneIdx: worldBossState.zoneIdx,
     isWorldBoss: true,
     bossStartHp: engagementHp,
