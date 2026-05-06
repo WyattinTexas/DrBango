@@ -885,7 +885,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ═══════ SPRITE SELECTOR ═══════ */
 .sprite-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px;
 }
 .sprite-option {
   background: #0f0f24; border: 2px solid #334; border-radius: 8px;
@@ -1741,7 +1741,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.8.0';
+const VERSION = 'v2.9.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -4420,38 +4420,43 @@ function render() {
     ctx.ellipse(ex + TILE/2, ey + TILE, 12, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Draw monster sprite (or fallback circle)
+    const monImg = getMonsterSprite(e);
+    const mFrame = Math.floor(Date.now() / 200) % 4;
+    const mDir = 0; // down-facing
+
     if (e.state === 'chase') {
-      // ── CHASING: pulsing red, larger, angry ──
-      // Danger glow ring
+      // ── CHASING: danger glow ring ──
       const pulseR = 20 + Math.sin(time * 8) * 4;
       ctx.strokeStyle = `rgba(255, 40, 20, ${0.4 + Math.sin(time * 6) * 0.2})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(ex + TILE/2, ey + TILE/2 + bob, pulseR, 0, Math.PI * 2);
       ctx.stroke();
-      // Body — angry red
-      ctx.fillStyle = rarityColor;
-      ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 15, 0, Math.PI * 2);
-      ctx.fill();
-      // Angry eyes — bright white/red
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(ex + TILE/2 - 7, ey + TILE/2 + bob - 4, 4, 4);
-      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 4, 4, 4);
-      ctx.fillStyle = '#ff0000';
-      ctx.fillRect(ex + TILE/2 - 6, ey + TILE/2 + bob - 3, 3, 3);
-      ctx.fillRect(ex + TILE/2 + 4, ey + TILE/2 + bob - 3, 3, 3);
+      // Monster body sprite
+      if (monImg && monImg.complete) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
+        ctx.imageSmoothingEnabled = true;
+      } else {
+        ctx.fillStyle = rarityColor;
+        ctx.beginPath();
+        ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 15, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
     } else if (e.state === 'alert') {
-      // ── ALERT: noticed you, exclamation mark ──
-      ctx.fillStyle = rarityColor;
-      ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 13, 0, Math.PI * 2);
-      ctx.fill();
-      // Eyes — wide
-      ctx.fillStyle = '#ffcc00';
-      ctx.fillRect(ex + TILE/2 - 6, ey + TILE/2 + bob - 3, 4, 3);
-      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 3, 4, 3);
+      // ── ALERT: noticed you ──
+      if (monImg && monImg.complete) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
+        ctx.imageSmoothingEnabled = true;
+      } else {
+        ctx.fillStyle = rarityColor;
+        ctx.beginPath();
+        ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 13, 0, Math.PI * 2);
+        ctx.fill();
+      }
       // "!" above head
       ctx.fillStyle = '#ffdd00';
       ctx.font = 'bold 18px sans-serif';
@@ -4459,17 +4464,21 @@ function render() {
       ctx.fillText('!', ex + TILE/2, ey - 6 + bob);
 
     } else {
-      // ── PATROL / RETURNING: calm, drifting ──
-      ctx.fillStyle = rarityColor;
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath();
-      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 11, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      // Dim eyes
-      ctx.fillStyle = 'rgba(255,200,100,0.6)';
-      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 3, 3);
-      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 2, 3, 3);
+      // ── PATROL / RETURNING: calm ──
+      if (monImg && monImg.complete) {
+        ctx.globalAlpha = 0.7;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = rarityColor;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
 
     // Name label (only when close or chasing)
@@ -4490,9 +4499,9 @@ function render() {
     if (opx < -50 || opx > W + 50 || opy < -50 || opy > H + 50) continue;
 
     // Draw sprite for other players
-    const otherSpriteScale = 2.0;
+    const otherSpriteScale = 2.5;
     const otherSpriteX = opx + TILE/2 - 8 * otherSpriteScale;
-    const otherSpriteY = opy + TILE - 24 * otherSpriteScale;
+    const otherSpriteY = opy + TILE - 16 * otherSpriteScale;
     drawSprite(ctx, p.sprite || 1, otherSpriteX, otherSpriteY, otherSpriteScale, p.direction || 'down', 0);
 
     // Name (with guild tag)
@@ -4515,10 +4524,10 @@ function render() {
   const playerSX = G.x * TILE - camX;
   const playerSY = G.y * TILE - camY;
 
-  // Draw procedural sprite instead of circle
-  const spriteScale = 2.2;
+  // Draw sprite sheet character
+  const spriteScale = 2.5;
   const spriteOffX = playerSX + TILE/2 - 8 * spriteScale;
-  const spriteOffY = playerSY + TILE - 24 * spriteScale;
+  const spriteOffY = playerSY + TILE - 16 * spriteScale;
   drawSprite(ctx, G.sprite || 1, spriteOffX, spriteOffY, spriteScale, G.direction || 'down', G.frame || 0);
 
   // Player glow ring
@@ -7687,13 +7696,27 @@ function initCharCreate() {
     </div>
   `).join('');
 
-  // Draw each sprite preview
+  // Draw each sprite preview from sprite sheet
   setTimeout(() => {
     SPRITE_DEFS.forEach(s => {
       const c = document.getElementById(`spritePreview_${s.id}`);
       if (!c) return;
       const sctx = c.getContext('2d');
-      drawSprite(sctx, s.id, 8, 12, 2, 'down', 0);
+      const img = spriteImages[s.id];
+      if (img && img.complete) {
+        sctx.imageSmoothingEnabled = false;
+        sctx.drawImage(img, 0, 0, 16, 16, 4, 2, 32, 32);
+      } else {
+        // Fallback if image not yet loaded — retry on load
+        drawSprite(sctx, s.id, 8, 12, 2, 'down', 0);
+        if (img) {
+          img.onload = () => {
+            sctx.clearRect(0, 0, c.width, c.height);
+            sctx.imageSmoothingEnabled = false;
+            sctx.drawImage(img, 0, 0, 16, 16, 4, 2, 32, 32);
+          };
+        }
+      }
     });
   }, 50);
 
@@ -8140,135 +8163,85 @@ function resize() {
 // ═══════ SPRITE SYSTEM ═══════
 
 const SPRITE_DEFS = [
-  { id: 1, name: 'Wanderer', desc: 'Hooded cloak', colors: { cloak: '#4a6a9a', hood: '#3a5080', skin: '#e8c8a0', trim: '#6a8aba' } },
-  { id: 2, name: 'Knight', desc: 'Armored warrior', colors: { cloak: '#8a8a9a', hood: '#6a6a7a', skin: '#e8c8a0', trim: '#aaaacc' } },
-  { id: 3, name: 'Mage', desc: 'Robed with staff', colors: { cloak: '#7a3a9a', hood: '#5a2a7a', skin: '#e8c8a0', trim: '#daa520' } },
-  { id: 4, name: 'Scout', desc: 'Light armor', colors: { cloak: '#4a7a3a', hood: '#3a5a2a', skin: '#e8c8a0', trim: '#8a6a3a' } },
-  { id: 5, name: 'Merchant', desc: 'Fancy coat', colors: { cloak: '#8a6a2a', hood: '#6a4a1a', skin: '#e8c8a0', trim: '#daa520' } },
-  { id: 6, name: 'Shadow', desc: 'Dark and mysterious', colors: { cloak: '#2a2a3a', hood: '#1a1a2a', skin: '#3a3a5a', trim: '#4a4a6a' } },
+  { id: 1, name: 'Adventurer', desc: 'Ready for anything', sheet: 'assets/characters/Boy_walk.png' },
+  { id: 2, name: 'Warrior', desc: 'Born to fight', sheet: 'assets/characters/FighterRed_walk.png' },
+  { id: 3, name: 'Explorer', desc: 'Curious wanderer', sheet: 'assets/characters/Eskimo_walk.png' },
+  { id: 4, name: 'Flame Walker', desc: 'Volcanic spirit', sheet: 'assets/characters/Flam_walk.png' },
+  { id: 5, name: 'Villager', desc: 'Simple life', sheet: 'assets/characters/Cavegirl_walk.png' },
+  { id: 6, name: 'Guardian', desc: 'Protects the weak', sheet: 'assets/characters/FighterWhite_walk.png' },
+  { id: 7, name: 'Ranger', desc: 'One with nature', sheet: 'assets/characters/Caveman_walk.png' },
+  { id: 8, name: 'Mystic', desc: 'Arcane scholar', sheet: 'assets/characters/Girl_walk.png' },
 ];
 
-function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
-  const def = SPRITE_DEFS.find(s => s.id === spriteId) || SPRITE_DEFS[0];
-  const c = def.colors;
-  const s = scale || 1;
-  const f = frame || 0;
+// ═══════ SPRITE IMAGE PRELOADER ═══════
 
-  // All sprites are 16x24 base, drawn at scale
-  const px = (w, h, offX, offY, color) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(x + offX * s, y + offY * s, w * s, h * s);
+const spriteImages = {};
+function preloadSprites() {
+  for (const def of SPRITE_DEFS) {
+    const img = new Image();
+    img.src = def.sheet;
+    spriteImages[def.id] = img;
+  }
+  // Monster sprites for roaming enemies
+  const monsterSheets = {
+    spirit: 'assets/monsters/Spirit.png',
+    spirit2: 'assets/monsters/Spirit2.png',
+    slime: 'assets/monsters/Slime.png',
+    axolot: 'assets/monsters/Axolot.png',
+    mushroom: 'assets/monsters/Mushroom.png',
+    skull: 'assets/monsters/Skull.png',
+    eye: 'assets/monsters/Eye.png',
+    dragon: 'assets/monsters/Dragon.png',
   };
+  for (const [id, src] of Object.entries(monsterSheets)) {
+    const img = new Image();
+    img.src = src;
+    spriteImages['monster_' + id] = img;
+  }
+  // Friendly animal sprites
+  const animalSheetSrcs = {
+    cat: 'assets/animals/Cat.png',
+    catOrange: 'assets/animals/CatOrange.png',
+    dog: 'assets/animals/Dog.png',
+  };
+  for (const [id, src] of Object.entries(animalSheetSrcs)) {
+    const img = new Image();
+    img.src = src;
+    spriteImages['animal_' + id] = img;
+  }
+}
 
-  // Facing direction affects eye/detail placement
-  const facingLeft = direction === 'left';
-  const facingRight = direction === 'right';
-  const facingUp = direction === 'up';
-
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.beginPath();
-  ctx.ellipse(x + 8 * s, y + 23 * s, 5 * s, 2 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Body / cloak
-  px(10, 10, 3, 10, c.cloak);
-
-  // Hood / head
-  px(10, 6, 3, 3, c.hood);
-
-  // Face (not drawn if facing up)
-  if (!facingUp) {
-    if (facingLeft) {
-      px(4, 4, 3, 5, c.skin);
-    } else if (facingRight) {
-      px(4, 4, 9, 5, c.skin);
-    } else {
-      px(6, 4, 5, 5, c.skin);
-    }
-
-    // Eyes
-    if (spriteId === 6) {
-      // Shadow: glowing eyes
-      if (facingLeft) {
-        px(1, 1, 4, 6, '#ff4444');
-        px(1, 1, 6, 6, '#ff4444');
-      } else if (facingRight) {
-        px(1, 1, 10, 6, '#ff4444');
-        px(1, 1, 12, 6, '#ff4444');
-      } else {
-        px(1, 1, 6, 6, '#ff4444');
-        px(1, 1, 9, 6, '#ff4444');
-      }
-    } else {
-      if (facingLeft) {
-        px(1, 1, 4, 6, '#222');
-        px(1, 1, 6, 6, '#222');
-      } else if (facingRight) {
-        px(1, 1, 10, 6, '#222');
-        px(1, 1, 12, 6, '#222');
-      } else {
-        px(1, 1, 6, 6, '#222');
-        px(1, 1, 9, 6, '#222');
-      }
-    }
+function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
+  const img = spriteImages[spriteId];
+  if (!img || !img.complete) {
+    // Fallback: draw a colored circle if image not loaded
+    ctx.fillStyle = '#4af';
+    ctx.beginPath();
+    ctx.arc(x + 8 * scale, y + 12 * scale, 6 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    return;
   }
 
-  // Hood top peak
-  px(6, 2, 5, 2, c.hood);
-  px(4, 1, 6, 1, c.hood);
+  // Sprite sheet layout: 4 columns x 4 rows, each frame 16x16
+  // Row 0 = down, Row 1 = up, Row 2 = left, Row 3 = right
+  const frameW = 16, frameH = 16;
+  const dirRow = { down: 0, up: 1, left: 2, right: 3 }[direction] || 0;
+  const col = (frame || 0) % 4;
 
-  // Trim / belt
-  px(10, 1, 3, 14, c.trim);
+  const sx = col * frameW;
+  const sy = dirRow * frameH;
+  const dw = frameW * scale;
+  const dh = frameH * scale;
 
-  // Legs with walk animation
-  if (f === 0 || direction === 'down' && f === 0) {
-    px(3, 4, 4, 19, c.cloak);
-    px(3, 4, 9, 19, c.cloak);
-    // Boots
-    px(3, 1, 4, 22, '#3a2a1a');
-    px(3, 1, 9, 22, '#3a2a1a');
-  } else {
-    // Walk frame: offset legs
-    px(3, 5, 3, 19, c.cloak);
-    px(3, 3, 10, 19, c.cloak);
-    px(3, 1, 3, 23, '#3a2a1a');
-    px(3, 1, 10, 21, '#3a2a1a');
-  }
+  ctx.imageSmoothingEnabled = false; // pixel-perfect scaling
+  ctx.drawImage(img, sx, sy, frameW, frameH, x, y, dw, dh);
+  ctx.imageSmoothingEnabled = true;
+}
 
-  // Arms
-  if (facingLeft) {
-    px(2, 6, 1, 11, c.cloak);
-    px(2, 6, 13, 11, c.cloak);
-  } else if (facingRight) {
-    px(2, 6, 1, 11, c.cloak);
-    px(2, 6, 13, 11, c.cloak);
-  } else {
-    px(2, 6, 1, 11, c.cloak);
-    px(2, 6, 13, 11, c.cloak);
-  }
-
-  // Staff for mage
-  if (spriteId === 3) {
-    if (facingLeft) {
-      px(1, 12, 0, 6, '#8a6a2a');
-      px(2, 2, 0, 5, '#daa520');
-    } else {
-      px(1, 12, 15, 6, '#8a6a2a');
-      px(2, 2, 14, 5, '#daa520');
-    }
-  }
-
-  // Knight helmet visor
-  if (spriteId === 2 && !facingUp) {
-    px(8, 1, 4, 4, '#6a6a7a');
-  }
-
-  // Merchant hat brim
-  if (spriteId === 5) {
-    px(12, 1, 2, 3, c.trim);
-    px(8, 2, 4, 1, c.trim);
-  }
+function getMonsterSprite(enemy) {
+  const monsterKeys = ['spirit', 'spirit2', 'slime', 'axolot', 'mushroom', 'skull', 'eye', 'dragon'];
+  const idx = (enemy.card.id * 7) % monsterKeys.length;
+  return spriteImages['monster_' + monsterKeys[idx]];
 }
 
 // Animation timer for sprite walk cycle
@@ -8282,8 +8255,8 @@ setInterval(() => {
   if (isMoving) {
     lastMoveTime = now;
     spriteAnimTimer++;
-    if (spriteAnimTimer % 6 === 0) {
-      G.frame = G.frame === 0 ? 1 : 0;
+    if (spriteAnimTimer % 5 === 0) { // slightly faster for 4-frame animation
+      G.frame = ((G.frame || 0) + 1) % 4;
     }
   } else {
     G.frame = 0;
@@ -9785,6 +9758,9 @@ async function init() {
 
   resize();
   window.addEventListener('resize', resize);
+
+  // Preload all sprite sheet images
+  preloadSprites();
 
   // Loading animation
   const fill = document.getElementById('loadingFill');
