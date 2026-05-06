@@ -1355,12 +1355,6 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <h2>Create Your Warden</h2>
     <input class="name-input" id="nameInput" placeholder="Enter your name..." maxlength="16" autocomplete="off">
 
-    <h3>Choose Your Starter Spiritkin</h3>
-    <div class="starter-grid" id="starterGrid"></div>
-
-    <h3>Choose Your Discipline</h3>
-    <div class="discipline-grid" id="disciplineGrid"></div>
-
     <h3>Choose Your Look</h3>
     <div class="sprite-grid" id="spriteGrid"></div>
 
@@ -1636,7 +1630,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.0.0';
+const VERSION = 'v2.1.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -2374,14 +2368,7 @@ const ALL_CARDS = [
   {id:336,name:"Humar",rarity:"legendary",maxHp:5,ability:"Meteor",desc:"Win: opponent takes 2 damage before their next roll.",set:"Volcanic Isles",art:"../testroom/art/humar.jpg"},
 ];
 
-// ═══════ STARTERS ═══════
-const STARTERS = [
-  { id: 30, reason: "Balanced fighter with explosive potential" },
-  { id: 25, reason: "Aggressive powerhouse, hard to stop" },
-  { id: 29, reason: "Defensive specialist, outlasts opponents" },
-];
-
-// ═══════ DISCIPLINES ═══════
+// Legacy — used for internal reference, not player-selectable
 const DISCIPLINES = [
   { id: 'hunter', name: 'Hunter', icon: '&#127993;', desc: 'Combat bonuses, better wild encounter rates', color: '#c44' },
   { id: 'artificer', name: 'Artificer', icon: '&#128295;', desc: 'Crafting bonuses, extra experimentation', color: '#4ac' },
@@ -6531,7 +6518,7 @@ function tryInteract() {
 
 function updateHUD() {
   document.getElementById('hudName').textContent = G.name;
-  document.getElementById('hudDiscipline').textContent = DISCIPLINES.find(d => d.id === G.discipline)?.name || '';
+  document.getElementById('hudDiscipline').textContent = 'Warden';
   document.getElementById('hudLevel').textContent = `Lv.${G.level}`;
   document.getElementById('hudCoins').textContent = G.coins;
   const xpNeeded = G.level * 3;
@@ -6637,29 +6624,6 @@ function notify(text) {
 // ═══════ CHARACTER CREATION ═══════
 
 function initCharCreate() {
-  const grid = document.getElementById('starterGrid');
-  grid.innerHTML = STARTERS.map(s => {
-    const card = getCard(s.id);
-    if (!card) return '';
-    const rarityColor = { common: '#8b95a5', uncommon: '#2ecc71', rare: '#3498db', 'ghost-rare': '#9b59b6', legendary: '#f39c12' }[card.rarity] || '#888';
-    return `<div class="starter-card" data-id="${card.id}" onclick="selectStarter(${card.id})">
-      <img src="${card.art}" alt="${card.name}" onerror="this.style.display='none'">
-      <div class="name">${card.name}</div>
-      <div class="rarity" style="color:${rarityColor};">${card.rarity}</div>
-      <div class="hp">HP: ${card.maxHp}</div>
-      <div class="ability">${card.ability}: ${card.desc}</div>
-      <div style="font-size:10px;color:#666;margin-top:4px;">${s.reason}</div>
-    </div>`;
-  }).join('');
-
-  const discGrid = document.getElementById('disciplineGrid');
-  discGrid.innerHTML = DISCIPLINES.map(d => `
-    <div class="discipline-option" data-id="${d.id}" onclick="selectDiscipline('${d.id}')">
-      <div class="disc-name">${d.icon} ${d.name}</div>
-      <div class="disc-desc">${d.desc}</div>
-    </div>
-  `).join('');
-
   // Sprite selector
   const spriteGrid = document.getElementById('spriteGrid');
   spriteGrid.innerHTML = SPRITE_DEFS.map(s => `
@@ -6683,25 +6647,7 @@ function initCharCreate() {
   document.getElementById('nameInput').addEventListener('input', checkCreateReady);
 }
 
-let selectedStarter = null;
-let selectedDiscipline = null;
 let selectedSprite = 1;
-
-function selectStarter(id) {
-  selectedStarter = id;
-  document.querySelectorAll('.starter-card').forEach(el => {
-    el.classList.toggle('selected', +el.dataset.id === id);
-  });
-  checkCreateReady();
-}
-
-function selectDiscipline(id) {
-  selectedDiscipline = id;
-  document.querySelectorAll('.discipline-option').forEach(el => {
-    el.classList.toggle('selected', el.dataset.id === id);
-  });
-  checkCreateReady();
-}
 
 function selectSprite(id) {
   selectedSprite = id;
@@ -6712,26 +6658,16 @@ function selectSprite(id) {
 
 function checkCreateReady() {
   const name = document.getElementById('nameInput').value.trim();
-  document.getElementById('btnCreate').disabled = !(name && selectedStarter && selectedDiscipline);
+  document.getElementById('btnCreate').disabled = !(name.length > 0 && selectedSprite);
 }
 
 function createCharacter() {
   const name = document.getElementById('nameInput').value.trim();
-  if (!name || !selectedStarter || !selectedDiscipline) return;
+  if (!name) return;
 
-  const starterCard = getCard(selectedStarter);
   G.name = name;
-  G.discipline = selectedDiscipline;
-  G.team = [{
-    id: starterCard.id,
-    name: starterCard.name,
-    hp: starterCard.maxHp,
-    maxHp: starterCard.maxHp,
-    ko: false,
-    ability: starterCard.ability,
-    abilityDesc: starterCard.desc,
-    rarity: starterCard.rarity,
-  }];
+  G.discipline = 'warden'; // generic starting class — no bonuses
+  G.team = [{ id:30, name:'Tommy Salami', hp:6, maxHp:6, ko:false, ability:'Regulator', abilityDesc:'When you roll a 6, gain +1 die and roll it immediately.', rarity:'common' }];
   G.activeIdx = 0;
   G.x = 16; G.y = 9; // Hub town spawn
   G.coins = 10;
@@ -6749,6 +6685,9 @@ function createCharacter() {
   G.guild = null;
   G.direction = 'down';
   G.frame = 0;
+  G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
+  G.professionSkills = {};  // unlocked skill box IDs -> true
+  G.skillPointsUsed = 0;
 
   // Close modal
   document.getElementById('charCreateOverlay').classList.remove('active');
@@ -6764,6 +6703,11 @@ function createCharacter() {
 
   notify(`Welcome to Frost Valley, ${name}!`);
   addChatMessage('system', `${name} has entered the Overworld.`);
+
+  // Schedule Elder Frost welcome after a short delay
+  setTimeout(() => {
+    notify('Elder Frost: "Welcome to Polaris, young warden. Here — take this Spiritkin. Tommy Salami will keep you safe out there."');
+  }, 2000);
 
   // Start onboarding for new players
   G.onboarding = { step: 0, hintsShown: {} };
@@ -6808,6 +6752,9 @@ async function initFirebase() {
       G.sprite = data.sprite || 1;
       G.guild = data.guild || null;
       G.onboarding = data.onboarding || { step: 0, hintsShown: {} };
+      G.professionXP = data.professionXP || { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
+      G.professionSkills = data.professionSkills || {};
+      G.skillPointsUsed = data.skillPointsUsed || 0;
       G.direction = 'down';
       G.frame = 0;
       if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -6871,6 +6818,9 @@ function saveGame() {
     sprite: G.sprite || 1,
     guild: G.guild || null,
     onboarding: G.onboarding || { step: 0, hintsShown: {} },
+    professionXP: G.professionXP,
+    professionSkills: G.professionSkills,
+    skillPointsUsed: G.skillPointsUsed,
     lastSeen: firebase.database.ServerValue.TIMESTAMP,
     version: VERSION,
   });
