@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>BOO! Overworld Online</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+/* ═══════ CANVAS ═══════ */
+#gameCanvas { display: block; cursor: crosshair; image-rendering: pixelated; }
+
+/* ═══════ HUD ═══════ */
+#hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; background: rgba(0,0,0,0.7);
+  border-bottom: 1px solid #334; z-index: 100; font-size: 13px;
+}
+#hud .hud-left { display: flex; gap: 16px; align-items: center; }
+#hud .hud-right { display: flex; gap: 12px; align-items: center; }
+.hud-stat { display: flex; align-items: center; gap: 4px; }
+.hud-stat .icon { font-size: 16px; }
+.hud-btn {
+  background: rgba(255,255,255,0.1); border: 1px solid #556;
+  color: #ccc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.hud-btn:hover { background: rgba(255,255,255,0.2); }
+.discipline-badge {
+  background: rgba(100,200,255,0.15); border: 1px solid rgba(100,200,255,0.3);
+  padding: 2px 8px; border-radius: 10px; font-size: 11px; color: #8cf;
+}
+
+/* ═══════ MODALS ═══════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; opacity: 0; transition: opacity 0.3s;
+}
+.modal-overlay.active { opacity: 1; }
+.modal {
+  background: #1a1a2e; border: 1px solid #334; border-radius: 12px;
+  padding: 32px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;
+}
+.modal h2 { color: #8cf; margin-bottom: 16px; text-align: center; font-size: 22px; }
+.modal h3 { color: #aaa; margin: 12px 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ═══════ CHARACTER CREATION ═══════ */
+#charCreate .name-input {
+  width: 100%; padding: 10px; background: #0a0a1a; border: 1px solid #445;
+  border-radius: 6px; color: #fff; font-size: 16px; text-align: center; margin-bottom: 20px;
+}
+#charCreate .starter-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+}
+.starter-card {
+  background: #0f0f24; border: 2px solid #334; border-radius: 8px;
+  padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.starter-card:hover { border-color: #8cf; transform: translateY(-2px); }
+.starter-card.selected { border-color: #4af; background: #151540; box-shadow: 0 0 15px rgba(68,170,255,0.3); }
+.starter-card .name { font-weight: bold; color: #fff; margin-bottom: 4px; }
+.starter-card .rarity { font-size: 11px; text-transform: uppercase; }
+.starter-card .ability { font-size: 12px; color: #aaa; margin-top: 4px; }
+.starter-card .hp { font-size: 11px; color: #6a6; margin-top: 2px; }
+.starter-card img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 6px; }
+
+.discipline-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px;
+}
+.discipline-option {
+  background: #0f0f24; border: 2px solid #334; border-radius: 8px;
+  padding: 10px; cursor: pointer; transition: all 0.2s;
+}
+.discipline-option:hover { border-color: #8cf; }
+.discipline-option.selected { border-color: #4af; background: #151540; }
+.discipline-option .disc-name { font-weight: bold; color: #fff; font-size: 14px; }
+.discipline-option .disc-desc { font-size: 11px; color: #888; margin-top: 2px; }
+
+.btn-primary {
+  width: 100%; padding: 12px; background: linear-gradient(135deg, #2a5caa, #1a3c7a);
+  border: 1px solid #4a7cd4; border-radius: 8px; color: #fff; font-size: 16px;
+  cursor: pointer; font-weight: bold; transition: all 0.2s;
+}
+.btn-primary:hover { background: linear-gradient(135deg, #3a6cba, #2a4c8a); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+
+/* ═══════ BATTLE OVERLAY ═══════ */
+#battleOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 900;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+#battleOverlay.active { display: flex; }
+.battle-arena {
+  width: 90%; max-width: 700px; background: #111128; border: 1px solid #334;
+  border-radius: 12px; padding: 24px; position: relative;
+}
+.battle-header { text-align: center; margin-bottom: 16px; }
+.battle-header h3 { color: #f84; font-size: 18px; }
+.battle-header .round { color: #888; font-size: 13px; }
+
+.battle-fighters {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 16px;
+}
+.fighter-card {
+  flex: 1; background: #0a0a1e; border: 2px solid #334; border-radius: 8px;
+  padding: 16px; text-align: center;
+}
+.fighter-card.player { border-color: #2a5caa; }
+.fighter-card.enemy { border-color: #8a2a2a; }
+.fighter-card .f-name { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+.fighter-card .f-ability { font-size: 11px; color: #888; margin-bottom: 8px; }
+.fighter-card img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #334; }
+.hp-bar-outer { background: #1a1a1a; border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 4px; }
+.hp-bar-inner { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.hp-bar-inner.green { background: linear-gradient(90deg, #2a8a2a, #4aba4a); }
+.hp-bar-inner.yellow { background: linear-gradient(90deg, #8a8a2a, #baba4a); }
+.hp-bar-inner.red { background: linear-gradient(90deg, #8a2a2a, #ba4a4a); }
+.hp-text { font-size: 11px; color: #888; }
+
+.vs-badge {
+  font-size: 24px; font-weight: bold; color: #f84;
+  text-shadow: 0 0 10px rgba(255,136,68,0.5);
+}
+
+.dice-display {
+  display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; min-height: 40px;
+}
+.die {
+  width: 36px; height: 36px; background: #1a1a3e; border: 1px solid #556;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: bold; transition: all 0.3s;
+}
+.die.player { color: #4af; border-color: #2a5caa; }
+.die.enemy { color: #f66; border-color: #8a2a2a; }
+
+.battle-log {
+  background: #0a0a18; border: 1px solid #223; border-radius: 6px;
+  padding: 10px; max-height: 120px; overflow-y: auto; margin-bottom: 12px;
+  font-size: 12px; line-height: 1.6;
+}
+.battle-log .event { color: #aaa; }
+.battle-log .event.damage { color: #f84; }
+.battle-log .event.heal { color: #4a8; }
+.battle-log .event.ability { color: #8cf; }
+
+.battle-actions { display: flex; gap: 8px; justify-content: center; }
+.battle-btn {
+  padding: 8px 24px; border-radius: 6px; border: 1px solid #445;
+  cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.2s;
+}
+.btn-roll { background: #2a5caa; color: #fff; border-color: #4a7cd4; }
+.btn-roll:hover { background: #3a6cba; }
+.btn-flee { background: #3a1a1a; color: #f88; border-color: #6a3a3a; }
+.btn-flee:hover { background: #4a2a2a; }
+
+/* ═══════ INVENTORY PANEL ═══════ */
+#inventoryPanel {
+  position: fixed; right: -320px; top: 40px; bottom: 0; width: 320px;
+  background: #111128; border-left: 1px solid #334; z-index: 200;
+  transition: right 0.3s; overflow-y: auto; padding: 16px;
+}
+#inventoryPanel.open { right: 0; }
+#inventoryPanel h3 { color: #8cf; margin-bottom: 12px; font-size: 14px; text-transform: uppercase; }
+
+.essence-item {
+  background: #0a0a1e; border: 1px solid #223; border-radius: 6px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.essence-item .ess-name { font-weight: bold; color: #fff; }
+.essence-item .ess-region { font-size: 10px; color: #666; }
+.essence-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 8px; margin-top: 4px; }
+.ess-stat { font-size: 10px; }
+.ess-stat .label { color: #888; }
+.ess-stat .value { color: #ccc; font-weight: bold; }
+.ess-stat .value.high { color: #4a8; }
+.ess-stat .value.mid { color: #aa8; }
+.ess-stat .value.low { color: #a66; }
+
+.crafted-item {
+  background: #0f1a0f; border: 1px solid #2a4a2a; border-radius: 6px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.crafted-item .item-name { font-weight: bold; color: #4a8; }
+.crafted-item .item-crafter { font-size: 10px; color: #666; font-style: italic; }
+
+/* ═══════ CRAFTING MODAL ═══════ */
+.craft-slot {
+  background: #0a0a1e; border: 2px dashed #334; border-radius: 8px;
+  padding: 12px; min-height: 60px; margin-bottom: 8px; cursor: pointer;
+  text-align: center; color: #555; font-size: 12px; transition: all 0.2s;
+}
+.craft-slot:hover { border-color: #556; }
+.craft-slot.filled { border-style: solid; border-color: #4a7cd4; color: #ccc; }
+.craft-result {
+  background: #0f1a0f; border: 1px solid #2a4a2a; border-radius: 8px;
+  padding: 16px; text-align: center; margin: 12px 0;
+}
+.experiment-bar {
+  background: #1a1a1a; border-radius: 4px; height: 12px; overflow: hidden; margin: 8px 0;
+}
+.experiment-fill { height: 100%; background: linear-gradient(90deg, #2a5caa, #8cf); border-radius: 4px; transition: width 0.5s; }
+
+/* ═══════ PLAYER SPRITES ═══════ */
+.other-player-label {
+  position: absolute; font-size: 10px; color: #8cf; text-align: center;
+  pointer-events: none; text-shadow: 0 0 3px rgba(0,0,0,0.8);
+}
+
+/* ═══════ INSPECT MODAL ═══════ */
+.inspect-team { display: flex; gap: 8px; margin: 8px 0; }
+.inspect-ghost {
+  flex: 1; background: #0a0a1e; border: 1px solid #334; border-radius: 6px;
+  padding: 8px; text-align: center; font-size: 11px;
+}
+.inspect-ghost img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+
+/* ═══════ NOTIFICATIONS ═══════ */
+#notifContainer {
+  position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
+  z-index: 500; display: flex; flex-direction: column; gap: 6px; align-items: center;
+}
+.notif {
+  background: rgba(20,20,40,0.95); border: 1px solid #445; border-radius: 8px;
+  padding: 8px 20px; font-size: 13px; animation: notifIn 0.3s ease, notifOut 0.3s ease 2.7s forwards;
+}
+@keyframes notifIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes notifOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+/* ═══════ LOADING ═══════ */
+#loadingScreen {
+  position: fixed; inset: 0; background: #0a0a1a; z-index: 2000;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+#loadingScreen h1 { color: #8cf; font-size: 28px; margin-bottom: 8px; }
+#loadingScreen p { color: #666; font-size: 14px; }
+.loading-bar { width: 200px; height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 16px; overflow: hidden; }
+.loading-fill { height: 100%; width: 0%; background: #4a7cd4; border-radius: 2px; transition: width 0.3s; }
+
+/* ═══════ MINIMAP ═══════ */
+#minimap {
+  position: fixed; bottom: 12px; right: 12px; width: 140px; height: 140px;
+  background: rgba(0,0,0,0.6); border: 1px solid #334; border-radius: 8px;
+  z-index: 100; overflow: hidden;
+}
+
+/* ═══════ CHAT ═══════ */
+#chatBox {
+  position: fixed; bottom: 12px; left: 12px; width: 300px;
+  z-index: 100;
+}
+#chatMessages {
+  background: rgba(0,0,0,0.5); border: 1px solid #223; border-radius: 8px 8px 0 0;
+  padding: 8px; height: 120px; overflow-y: auto; font-size: 11px; line-height: 1.5;
+}
+#chatInput {
+  width: 100%; padding: 6px 10px; background: rgba(0,0,0,0.7); border: 1px solid #334;
+  border-top: none; border-radius: 0 0 8px 8px; color: #fff; font-size: 12px;
+}
+.chat-msg .sender { color: #8cf; font-weight: bold; }
+.chat-msg .text { color: #ccc; }
+.chat-system { color: #666; font-style: italic; }
+
+/* ═══════ ENCOUNTER ZONE GLOW ═══════ */
+.encounter-pulse {
+  animation: encounterPulse 2s ease-in-out infinite;
+}
+@keyframes encounterPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <h1>BOO! Overworld Online</h1>
+  <p>Entering the Spirit World...</p>
+  <div class="loading-bar"><div class="loading-fill" id="loadingFill"></div></div>
+</div>
+
+<!-- HUD -->
+<div id="hud" style="display:none;">
+  <div class="hud-left">
+    <span id="hudName" style="font-weight:bold;color:#fff;"></span>
+    <span class="discipline-badge" id="hudDiscipline"></span>
+    <div class="hud-stat"><span class="icon">⚔️</span><span id="hudLevel">Lv.1</span></div>
+    <div class="hud-stat"><span class="icon">💰</span><span id="hudCoins">0</span></div>
+    <div class="hud-stat"><span class="icon">🌟</span><span id="hudXP">0 XP</span></div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-stat" id="hudTeamPreview"></div>
+    <button class="hud-btn" onclick="toggleInventory()">📦 Inventory</button>
+    <button class="hud-btn" onclick="openCrafting()">🔨 Craft</button>
+    <div class="hud-stat"><span class="icon">👥</span><span id="hudPlayers">1</span></div>
+  </div>
+</div>
+
+<!-- GAME CANVAS -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- NOTIFICATIONS -->
+<div id="notifContainer"></div>
+
+<!-- CHARACTER CREATION -->
+<div class="modal-overlay" id="charCreateOverlay">
+  <div class="modal" id="charCreate">
+    <h2>Create Your Warden</h2>
+    <input class="name-input" id="nameInput" placeholder="Enter your name..." maxlength="16" autocomplete="off">
+
+    <h3>Choose Your Starter Spiritkin</h3>
+    <div class="starter-grid" id="starterGrid"></div>
+
+    <h3>Choose Your Discipline</h3>
+    <div class="discipline-grid" id="disciplineGrid"></div>
+
+    <button class="btn-primary" id="btnCreate" onclick="createCharacter()" disabled>Enter the Overworld</button>
+  </div>
+</div>
+
+<!-- BATTLE OVERLAY -->
+<div id="battleOverlay">
+  <div class="battle-arena">
+    <div class="battle-header">
+      <h3 id="battleTitle">Wild Encounter!</h3>
+      <div class="round" id="battleRound">Round 1</div>
+    </div>
+    <div class="battle-fighters">
+      <div class="fighter-card player">
+        <img id="pFighterArt" src="" alt="">
+        <div class="f-name" id="pFighterName">—</div>
+        <div class="f-ability" id="pFighterAbility">—</div>
+        <div class="hp-bar-outer"><div class="hp-bar-inner green" id="pHpBar" style="width:100%"></div></div>
+        <div class="hp-text" id="pHpText">? / ?</div>
+        <div class="dice-display" id="pDice"></div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="fighter-card enemy">
+        <img id="eFighterArt" src="" alt="">
+        <div class="f-name" id="eFighterName">—</div>
+        <div class="f-ability" id="eFighterAbility">—</div>
+        <div class="hp-bar-outer"><div class="hp-bar-inner green" id="eHpBar" style="width:100%"></div></div>
+        <div class="hp-text" id="eHpText">? / ?</div>
+        <div class="dice-display" id="eDice"></div>
+      </div>
+    </div>
+    <div class="battle-log" id="battleLog"></div>
+    <div class="battle-actions" id="battleActions">
+      <button class="battle-btn btn-roll" id="btnRoll" onclick="battleRoll()">⚔️ Roll Dice</button>
+      <button class="battle-btn btn-flee" onclick="fleeBattle()">🏃 Flee</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVENTORY PANEL -->
+<div id="inventoryPanel">
+  <h3>🎒 Spirit Essences</h3>
+  <div id="essenceList"></div>
+  <h3 style="margin-top:16px;">⚔️ Crafted Gear</h3>
+  <div id="gearList"></div>
+  <h3 style="margin-top:16px;">👻 Team</h3>
+  <div id="teamList"></div>
+</div>
+
+<!-- CRAFTING MODAL -->
+<div class="modal-overlay" id="craftOverlay">
+  <div class="modal">
+    <h2>🔨 Artificer's Workshop</h2>
+    <h3>Select Essences to Craft</h3>
+    <div id="craftSlots"></div>
+    <div id="craftPreview" style="display:none;">
+      <h3>Experimentation</h3>
+      <div class="experiment-bar"><div class="experiment-fill" id="expFill" style="width:0%"></div></div>
+      <p style="font-size:12px;color:#888;text-align:center;" id="expText">Click to experiment...</p>
+    </div>
+    <div id="craftResult" style="display:none;"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn-primary" id="btnCraft" onclick="doCraft()" disabled>Craft Item</button>
+      <button class="btn-primary" style="background:#2a1a1a;border-color:#6a3a3a;" onclick="closeCrafting()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- INSPECT MODAL -->
+<div class="modal-overlay" id="inspectOverlay">
+  <div class="modal" style="max-width:400px;">
+    <h2 id="inspectName">Player</h2>
+    <p style="text-align:center;margin-bottom:12px;">
+      <span class="discipline-badge" id="inspectDiscipline"></span>
+      <span style="color:#888;font-size:13px;margin-left:8px;" id="inspectLevel">Lv. 1</span>
+    </p>
+    <h3>Team</h3>
+    <div class="inspect-team" id="inspectTeam"></div>
+    <h3>Crafted Gear</h3>
+    <div id="inspectGear" style="font-size:12px;color:#888;">None yet</div>
+    <button class="btn-primary" style="margin-top:16px;" onclick="closeInspect()">Close</button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="chatBox" style="display:none;">
+  <div id="chatMessages"></div>
+  <input id="chatInput" placeholder="Press Enter to chat..." onkeydown="if(event.key==='Enter')sendChat()">
+</div>
+
+<!-- MINIMAP -->
+<canvas id="minimap" style="display:none;"></canvas>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- FIREBASE SDK -->
+<!-- ═══════════════════════════════════════════ -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// BOO! OVERWORLD ONLINE — MVP
+// Browser MMO-lite: explore, battle, craft, trade
+// ═══════════════════════════════════════════════════════════════
+
+const VERSION = 'v0.1.0';
+
+// ═══════ FIREBASE ═══════
+const firebaseConfig = {
+  apiKey: "AIzaSyDzYoQqXoOu4uj2wzTwSn6d_gAlo6e8WSI",
+  authDomain: "testroom-75200.firebaseapp.com",
+  databaseURL: "https://testroom-75200-default-rtdb.firebaseio.com",
+  projectId: "testroom-75200",
+  storageBucket: "testroom-75200.firebasestorage.app",
+  messagingSenderId: "711812846396",
+  appId: "1:711812846396:web:08e2375f257205483f8439"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let uid = null;
+
+// ═══════ CARD DATA (subset for MVP — Frost Valley starters + wild encounters) ═══════
+const ALL_CARDS = [
+  // Frost Valley commons
+  {id:23,name:"Powder",rarity:"common",maxHp:5,ability:"Final Gift",desc:"When defeated, gain 3 Ice Shards.",set:"Frost Valley",art:"../testroom/art/powder.webp"},
+  {id:24,name:"Simon",rarity:"common",maxHp:7,ability:"Brew Time",desc:"When you take damage from a before-the-roll effect, gain 1 Sacred Fire.",set:"Frost Valley",art:"../testroom/art/simon.webp"},
+  {id:25,name:"Cameron",rarity:"common",maxHp:6,ability:"Unstoppable Force",desc:"If the opponent uses a special, gain +1 die. Damage cannot be negated.",set:"Frost Valley",art:"../testroom/art/cameron.webp"},
+  {id:26,name:"Logey",rarity:"common",maxHp:6,ability:"Heinous",desc:"Opponent's 5+ dice are unavailable next roll.",set:"Frost Valley",art:"../testroom/art/logey.webp"},
+  {id:27,name:"Fredrick",rarity:"common",maxHp:5,ability:"Careful",desc:"Opponent may only roll up to 3 dice.",set:"Frost Valley",art:"../testroom/art/fredrick.webp"},
+  {id:28,name:"Dream Cat",rarity:"common",maxHp:4,ability:"Jinx",desc:"Both roll doubles: gain +2 dice next turn.",set:"Frost Valley",art:"../testroom/art/dream_cat.webp"},
+  {id:29,name:"Sad Sal",rarity:"common",maxHp:5,ability:"Tough Job",desc:"Lose a roll: gain 1 Ice Shard.",set:"Frost Valley",art:"../testroom/art/sad_sal.webp"},
+  {id:30,name:"Tommy Salami",rarity:"common",maxHp:6,ability:"Regulator",desc:"When you roll a 6, gain +1 die and roll it immediately.",set:"Frost Valley",art:"../testroom/art/tommy_salami.webp"},
+  {id:56,name:"Chad",rarity:"common",maxHp:6,ability:"Sploop!",desc:"On entry, gain 2 Ice Shards.",set:"Frost Valley",art:"../testroom/art/chad.webp"},
+  {id:33,name:"Sandwiches",rarity:"common",maxHp:6,ability:"Dependable",desc:"While on sideline, if opponent gains a Special, you gain it too.",set:"Frost Valley",art:"../testroom/art/sandwiches.webp"},
+  // Frost Valley uncommons
+  {id:53,name:"Bogey",rarity:"uncommon",maxHp:5,ability:"Bogus",desc:"Reflect damage back at attacker. Once per game.",set:"Frost Valley",art:"../testroom/art/bogey.webp"},
+  {id:55,name:"Masked Hero",rarity:"uncommon",maxHp:5,ability:"Underdog",desc:"When enemy uses before-rolling effect: deal 3 damage before it happens.",set:"Frost Valley",art:"../testroom/art/masked_hero.webp"},
+  {id:57,name:"Marcus",rarity:"uncommon",maxHp:7,ability:"Glacial Pounding",desc:"Take 3+ damage: gain 4 extra dice next roll.",set:"Frost Valley",art:"../testroom/art/marcus.webp"},
+  {id:60,name:"Dallas",rarity:"uncommon",maxHp:4,ability:"Quick Draw",desc:"When entering from sideline, steal 1 opponent die for 2 rolls.",set:"Frost Valley",art:"../testroom/art/dallas.webp"},
+  {id:82,name:"Antoinette",rarity:"uncommon",maxHp:6,ability:"Grace",desc:"Roll as many dice as your opponent.",set:"Frost Valley",art:"../testroom/art/antoinette.webp"},
+  {id:93,name:"Bandit Pete",rarity:"uncommon",maxHp:5,ability:"Bandit",desc:"Sideline: if either player rolls only 2 dice, +3 damage.",set:"Frost Valley",art:"../testroom/art/bandit_pete.webp"},
+  // Frost Valley rares
+  {id:81,name:"Spockles",rarity:"rare",maxHp:6,ability:"Valley Magic",desc:"Win a roll: gain 2 Ice Shards.",set:"Frost Valley",art:"../testroom/art/spockles.webp"},
+  {id:85,name:"Eloise",rarity:"rare",maxHp:5,ability:"Change of Heart",desc:"Spend 1 Ice Shard to swap HP with enemy before rolling.",set:"Frost Valley",art:"../testroom/art/eloise.webp"},
+  {id:86,name:"Pelter",rarity:"rare",maxHp:5,ability:"Snowball",desc:"Doubles gain +2 damage.",set:"Frost Valley",art:"../testroom/art/pelter.webp"},
+  {id:90,name:"Jeanie",rarity:"rare",maxHp:4,ability:"Hidden Treasure",desc:"Force opponent to reroll all dice. Once per game.",set:"Frost Valley",art:"../testroom/art/jeanie.webp"},
+  {id:92,name:"Gary",rarity:"rare",maxHp:6,ability:"Lucky Novice",desc:"Gain +2 Ice Shards for each 1 you roll.",set:"Frost Valley",art:"../testroom/art/gary.webp"},
+  // Ghost-rares
+  {id:103,name:"Night Master",rarity:"ghost-rare",maxHp:5,ability:"Bullseye",desc:"Win with doubles: destroy an enemy sideline ghost <4 HP.",set:"Frost Valley",art:"../testroom/art/night_master.webp"},
+  {id:104,name:"Skylar",rarity:"ghost-rare",maxHp:7,ability:"Winter Barrage",desc:"Ice Shards deal +2 damage instead of +1.",set:"Frost Valley",art:"../testroom/art/skylar.webp"},
+  {id:106,name:"King Jay",rarity:"ghost-rare",maxHp:7,ability:"Reflection",desc:"Lose roll & dice total = 7: reflect all damage.",set:"Frost Valley",art:"../testroom/art/king_jay.webp"},
+  // Legendaries
+  {id:113,name:"Prince Balatron",rarity:"legendary",maxHp:6,ability:"Party Time",desc:"Lose a roll & survive: roll 1 counter die for damage.",set:"Frost Valley",art:"../testroom/art/prince_balatron.webp"},
+  {id:114,name:"Romy",rarity:"legendary",maxHp:8,ability:"Valley Guardian",desc:"Predict a die number. If any die matches: +3 damage.",set:"Frost Valley",art:"../testroom/art/romy.webp"},
+  // Set 1 commons (appear everywhere)
+  {id:1,name:"Kodako",rarity:"common",maxHp:6,ability:"Swift",desc:"Roll 1-2-3: negate damage and deal 4.",set:"Set 1",art:"../testroom/art/kodako.webp"},
+  {id:5,name:"Puff",rarity:"common",maxHp:6,ability:"Cute",desc:"Enemy doubles/triples do -1 damage.",set:"Set 1",art:"../testroom/art/puff.webp"},
+  {id:12,name:"Dupy",rarity:"common",maxHp:4,ability:"Frolic",desc:"Tie = instant KO.",set:"Set 1",art:"../testroom/art/dupy.webp"},
+  {id:17,name:"Boo Brothers",rarity:"common",maxHp:5,ability:"Teamwork",desc:"Remove 1 die to gain 1 HP and +1 damage.",set:"Set 1",art:"../testroom/art/boo_brothers.webp"},
+  {id:34,name:"Grawr",rarity:"uncommon",maxHp:7,ability:"Menace",desc:"Entry: deal 1 damage.",set:"Set 1",art:"../testroom/art/grawr.webp"},
+  {id:42,name:"Doc",rarity:"uncommon",maxHp:2,ability:"Savage",desc:"+5 damage on doubles.",set:"Set 1",art:"../testroom/art/doc.webp"},
+  {id:43,name:"Outlaw",rarity:"uncommon",maxHp:5,ability:"Thief",desc:"Roll doubles: remove 1 opponent die next turn.",set:"Set 1",art:"../testroom/art/outlaw.webp"},
+  {id:48,name:"Opa",rarity:"uncommon",maxHp:5,ability:"Rest",desc:"Win or tie: gain +1 HP.",set:"Set 1",art:"../testroom/art/opa.webp"},
+  {id:64,name:"Sparky",rarity:"rare",maxHp:4,ability:"Tinder",desc:"1's add +3 damage each.",set:"Set 1",art:"../testroom/art/sparky.webp"},
+  {id:66,name:"Munch",rarity:"rare",maxHp:6,ability:"Scraps",desc:"Defeating a ghost: gain 4 HP.",set:"Set 1",art:"../testroom/art/munch.webp"},
+  {id:75,name:"Flora",rarity:"rare",maxHp:4,ability:"Restore",desc:"Roll doubles: +2 HP.",set:"Set 1",art:"../testroom/art/flora.webp"},
+  {id:111,name:"Shade",rarity:"legendary",maxHp:5,ability:"Haunt",desc:"Before each roll, opponent takes 1 damage.",set:"Set 1",art:"../testroom/art/shade.webp"},
+];
+
+// ═══════ STARTERS ═══════
+const STARTERS = [
+  { id: 30, reason: "Balanced fighter with explosive potential" },
+  { id: 25, reason: "Aggressive powerhouse, hard to stop" },
+  { id: 29, reason: "Defensive specialist, outlasts opponents" },
+];
+
+// ═══════ DISCIPLINES ═══════
+const DISCIPLINES = [
+  { id: 'hunter', name: 'Hunter', icon: '🏹', desc: 'Combat bonuses, better wild encounter rates', color: '#c44' },
+  { id: 'artificer', name: 'Artificer', icon: '🔧', desc: 'Crafting bonuses, extra experimentation', color: '#4ac' },
+  { id: 'merchant', name: 'Merchant', icon: '💎', desc: 'Better trades, larger shop inventory', color: '#ca4' },
+  { id: 'scout', name: 'Scout', icon: '🗺️', desc: 'Finds rarer resources, reveals hidden zones', color: '#4a4' },
+];
+
+// ═══════ CRAFTING SCHEMATICS ═══════
+const SCHEMATICS = [
+  { id: 'frost_blaster', name: 'Frost Blaster', type: 'weapon', essencesNeeded: 2, desc: 'Spiritkin gear: +1 damage on winning rolls', basePower: 3 },
+  { id: 'ice_shield', name: 'Ice Shield', type: 'armor', essencesNeeded: 2, desc: 'Spiritkin gear: -1 damage taken from doubles', basePower: 2 },
+  { id: 'spirit_lens', name: 'Spirit Lens', type: 'accessory', essencesNeeded: 1, desc: 'Reveals enemy stats before battle', basePower: 1 },
+];
+
+// ═══════ GAME STATE ═══════
+let G = {
+  // Character
+  name: '',
+  discipline: '',
+  level: 1,
+  xp: 0,
+  coins: 10,
+  // Team (array of ghost state objects)
+  team: [],
+  // Position in world
+  x: 400, y: 300,
+  // Inventory
+  essences: [],
+  gear: [],
+  // Battle
+  inBattle: false,
+  // Presence
+  lastSeen: 0,
+};
+
+// Other players
+let otherPlayers = {};
+
+// Canvas
+let canvas, ctx;
+let camX = 0, camY = 0;
+let keys = {};
+const TILE = 32;
+const WORLD_W = 60; // tiles
+const WORLD_H = 45;
+const MOVE_SPEED = 2.5;
+
+// ═══════ TILE MAP (Frost Valley) ═══════
+// 0=snow, 1=tree, 2=path, 3=water, 4=ice, 5=building, 6=encounter_zone, 7=mountain, 8=craft_building
+let worldMap = [];
+
+function generateWorld() {
+  worldMap = [];
+  for (let y = 0; y < WORLD_H; y++) {
+    worldMap[y] = [];
+    for (let x = 0; x < WORLD_W; x++) {
+      worldMap[y][x] = 0; // snow
+    }
+  }
+
+  // Border mountains
+  for (let x = 0; x < WORLD_W; x++) { worldMap[0][x] = 7; worldMap[1][x] = 7; worldMap[WORLD_H-1][x] = 7; worldMap[WORLD_H-2][x] = 7; }
+  for (let y = 0; y < WORLD_H; y++) { worldMap[y][0] = 7; worldMap[y][1] = 7; worldMap[y][WORLD_W-1] = 7; worldMap[y][WORLD_W-2] = 7; }
+
+  // Water (frozen lake)
+  for (let y = 18; y < 24; y++) for (let x = 35; x < 45; x++) worldMap[y][x] = 4; // ice
+  for (let y = 19; y < 23; y++) for (let x = 36; x < 44; x++) worldMap[y][x] = 3; // water center
+
+  // Trees scattered
+  const treePositions = [];
+  for (let i = 0; i < 120; i++) {
+    const tx = 3 + Math.floor(Math.random() * (WORLD_W - 6));
+    const ty = 3 + Math.floor(Math.random() * (WORLD_H - 6));
+    if (worldMap[ty][tx] === 0) { worldMap[ty][tx] = 1; treePositions.push({x: tx, y: ty}); }
+  }
+
+  // Main path (horizontal through center)
+  for (let x = 2; x < WORLD_W - 2; x++) {
+    const py = 22 + Math.floor(Math.sin(x * 0.3) * 2);
+    if (py >= 2 && py < WORLD_H - 2) { worldMap[py][x] = 2; if (py+1 < WORLD_H-2) worldMap[py+1][x] = 2; }
+  }
+  // Vertical path to hub
+  for (let y = 8; y < 25; y++) { worldMap[y][15] = 2; worldMap[y][16] = 2; }
+
+  // Hub Town (cluster of buildings)
+  const hubX = 13, hubY = 6;
+  for (let y = hubY; y < hubY + 5; y++) for (let x = hubX; x < hubX + 8; x++) worldMap[y][x] = 2; // clear area
+  worldMap[hubY+1][hubX+1] = 5; worldMap[hubY+1][hubX+2] = 5; // shop
+  worldMap[hubY+1][hubX+5] = 5; worldMap[hubY+1][hubX+6] = 5; // arena
+  worldMap[hubY+3][hubX+1] = 8; worldMap[hubY+3][hubX+2] = 8; // workshop
+  worldMap[hubY+3][hubX+5] = 5; worldMap[hubY+3][hubX+6] = 5; // inn
+
+  // Encounter zones (spirit energy fields)
+  const encounterZones = [
+    {x: 25, y: 12, w: 8, h: 6},
+    {x: 8, y: 28, w: 7, h: 5},
+    {x: 40, y: 8, w: 7, h: 5},
+    {x: 30, y: 32, w: 9, h: 5},
+    {x: 48, y: 28, w: 6, h: 6},
+  ];
+  for (const zone of encounterZones) {
+    for (let y = zone.y; y < zone.y + zone.h && y < WORLD_H - 2; y++) {
+      for (let x = zone.x; x < zone.x + zone.w && x < WORLD_W - 2; x++) {
+        if (worldMap[y][x] === 0) worldMap[y][x] = 6;
+      }
+    }
+  }
+
+  // Clear trees from paths and buildings
+  for (let y = 0; y < WORLD_H; y++) for (let x = 0; x < WORLD_W; x++) {
+    if (worldMap[y][x] === 2 || worldMap[y][x] === 5 || worldMap[y][x] === 8) {
+      // Clear adjacent trees for breathing room
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const ny = y+dy, nx = x+dx;
+        if (ny >= 0 && ny < WORLD_H && nx >= 0 && nx < WORLD_W && worldMap[ny][nx] === 1) worldMap[ny][nx] = 0;
+      }
+    }
+  }
+}
+
+// ═══════ TILE COLORS ═══════
+const TILE_COLORS = {
+  0: '#d8e8f0', // snow
+  1: '#2a5a3a', // tree
+  2: '#9a8a6a', // path
+  3: '#2a4a8a', // water
+  4: '#8ab8d8', // ice
+  5: '#6a5a4a', // building
+  6: '#3a3a5a', // encounter zone
+  7: '#4a4a5a', // mountain
+  8: '#5a4a3a', // workshop
+};
+
+// ═══════ RENDERING ═══════
+
+function render() {
+  if (!canvas) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Camera target: center on player
+  const targetCamX = G.x * TILE - W / 2;
+  const targetCamY = G.y * TILE - H / 2;
+  camX += (targetCamX - camX) * 0.1;
+  camY += (targetCamY - camY) * 0.1;
+
+  // Clamp camera
+  camX = Math.max(0, Math.min(WORLD_W * TILE - W, camX));
+  camY = Math.max(0, Math.min(WORLD_H * TILE - H, camY));
+
+  // Draw tiles
+  const startTX = Math.max(0, Math.floor(camX / TILE));
+  const startTY = Math.max(0, Math.floor(camY / TILE));
+  const endTX = Math.min(WORLD_W, Math.ceil((camX + W) / TILE) + 1);
+  const endTY = Math.min(WORLD_H, Math.ceil((camY + H) / TILE) + 1);
+
+  const time = Date.now() * 0.001;
+
+  for (let ty = startTY; ty < endTY; ty++) {
+    for (let tx = startTX; tx < endTX; tx++) {
+      const tile = worldMap[ty]?.[tx] ?? 7;
+      const sx = tx * TILE - camX;
+      const sy = ty * TILE - camY;
+
+      // Base tile
+      ctx.fillStyle = TILE_COLORS[tile] || '#333';
+      ctx.fillRect(sx, sy, TILE, TILE);
+
+      // Tile details
+      if (tile === 1) { // Tree
+        ctx.fillStyle = '#1a3a2a';
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 4);
+        ctx.lineTo(sx + TILE - 4, sy + TILE - 4);
+        ctx.lineTo(sx + 4, sy + TILE - 4);
+        ctx.fill();
+        ctx.fillStyle = '#5a3a1a';
+        ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 8);
+      } else if (tile === 7) { // Mountain
+        ctx.fillStyle = '#5a5a6a';
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 2);
+        ctx.lineTo(sx + TILE - 2, sy + TILE);
+        ctx.lineTo(sx + 2, sy + TILE);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE/2, sy + 2);
+        ctx.lineTo(sx + TILE/2 + 5, sy + 10);
+        ctx.lineTo(sx + TILE/2 - 5, sy + 10);
+        ctx.fill();
+      } else if (tile === 5) { // Building
+        ctx.fillStyle = '#8a7a5a';
+        ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
+        ctx.fillStyle = '#a05030';
+        ctx.beginPath();
+        ctx.moveTo(sx + 1, sy + 6);
+        ctx.lineTo(sx + TILE/2, sy);
+        ctx.lineTo(sx + TILE - 1, sy + 6);
+        ctx.fill();
+        // Door
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(sx + TILE/2 - 3, sy + TILE - 10, 6, 10);
+      } else if (tile === 8) { // Workshop
+        ctx.fillStyle = '#7a6a4a';
+        ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
+        ctx.fillStyle = '#6a4a2a';
+        ctx.beginPath();
+        ctx.moveTo(sx + 1, sy + 6);
+        ctx.lineTo(sx + TILE/2, sy);
+        ctx.lineTo(sx + TILE - 1, sy + 6);
+        ctx.fill();
+        // Anvil icon
+        ctx.fillStyle = '#aaa';
+        ctx.fillRect(sx + TILE/2 - 4, sy + TILE - 12, 8, 4);
+        ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 6);
+      } else if (tile === 6) { // Encounter zone — glowing
+        const pulse = 0.15 + Math.sin(time * 2 + tx * 0.5 + ty * 0.3) * 0.1;
+        ctx.fillStyle = `rgba(100, 60, 200, ${pulse})`;
+        ctx.fillRect(sx, sy, TILE, TILE);
+        // Spirit particles
+        if (Math.random() < 0.02) {
+          ctx.fillStyle = `rgba(150, 120, 255, ${0.3 + Math.random() * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(sx + Math.random() * TILE, sy + Math.random() * TILE, 1 + Math.random() * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (tile === 3) { // Water
+        const wv = Math.sin(time * 1.5 + tx * 0.8) * 15;
+        ctx.fillStyle = `rgb(${42 + wv}, ${74 + wv}, ${138 + wv})`;
+        ctx.fillRect(sx, sy, TILE, TILE);
+      } else if (tile === 4) { // Ice
+        const iv = Math.sin(time * 0.5 + tx + ty) * 10;
+        ctx.fillStyle = `rgb(${138 + iv}, ${184 + iv}, ${216 + iv})`;
+        ctx.fillRect(sx, sy, TILE, TILE);
+      } else if (tile === 0) { // Snow detail
+        // Subtle snow texture
+        if ((tx + ty) % 3 === 0) {
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(sx + 8, sy + 8, 2, 2);
+        }
+      }
+
+      // Grid lines (subtle)
+      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+      ctx.strokeRect(sx, sy, TILE, TILE);
+    }
+  }
+
+  // Draw other players
+  for (const [pid, p] of Object.entries(otherPlayers)) {
+    if (pid === uid) continue;
+    const px = p.x * TILE - camX;
+    const py = p.y * TILE - camY;
+    if (px < -50 || px > W + 50 || py < -50 || py > H + 50) continue;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(px + TILE/2, py + TILE - 2, 8, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    const discColor = DISCIPLINES.find(d => d.id === p.discipline)?.color || '#888';
+    ctx.fillStyle = discColor;
+    ctx.beginPath();
+    ctx.arc(px + TILE/2, py + TILE/2, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Name
+    ctx.fillStyle = '#8cf';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name || '???', px + TILE/2, py - 4);
+  }
+
+  // Draw player sprite
+  const playerSX = G.x * TILE - camX;
+  const playerSY = G.y * TILE - camY;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(playerSX + TILE/2, playerSY + TILE - 2, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  const myDiscColor = DISCIPLINES.find(d => d.id === G.discipline)?.color || '#4af';
+  ctx.fillStyle = myDiscColor;
+  ctx.beginPath();
+  ctx.arc(playerSX + TILE/2, playerSY + TILE/2, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player glow
+  ctx.shadowColor = myDiscColor;
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(playerSX + TILE/2, playerSY + TILE/2, 12, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Name above
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(G.name, playerSX + TILE/2, playerSY - 6);
+
+  // Minimap
+  renderMinimap();
+
+  if (!G.inBattle) requestAnimationFrame(render);
+}
+
+function renderMinimap() {
+  const mm = document.getElementById('minimap');
+  if (!mm || mm.style.display === 'none') return;
+  const mctx = mm.getContext('2d');
+  const scale = mm.width / WORLD_W;
+
+  mctx.fillStyle = '#0a0a1a';
+  mctx.fillRect(0, 0, mm.width, mm.height);
+
+  for (let y = 0; y < WORLD_H; y++) {
+    for (let x = 0; x < WORLD_W; x++) {
+      const tile = worldMap[y]?.[x] ?? 7;
+      mctx.fillStyle = TILE_COLORS[tile] || '#333';
+      mctx.fillRect(x * scale, y * scale, scale + 0.5, scale + 0.5);
+    }
+  }
+
+  // Other players
+  for (const [pid, p] of Object.entries(otherPlayers)) {
+    if (pid === uid) continue;
+    mctx.fillStyle = '#8cf';
+    mctx.fillRect(p.x * scale - 1, p.y * scale - 1, 3, 3);
+  }
+
+  // Player dot
+  mctx.fillStyle = '#fff';
+  mctx.fillRect(G.x * scale - 1.5, G.y * scale - 1.5, 4, 4);
+}
+
+// ═══════ INPUT ═══════
+
+function setupInput() {
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === 'e' || e.key === 'E') tryInteract();
+    if (e.key === 'i' || e.key === 'I') toggleInventory();
+    if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) + camX;
+    const my = (e.clientY - rect.top) + camY;
+    const tileX = Math.floor(mx / TILE);
+    const tileY = Math.floor(my / TILE);
+
+    // Check if clicked on another player
+    for (const [pid, p] of Object.entries(otherPlayers)) {
+      if (pid === uid) continue;
+      if (Math.abs(p.x - tileX) < 2 && Math.abs(p.y - tileY) < 2) {
+        showInspect(p);
+        return;
+      }
+    }
+  });
+}
+
+function gameLoop() {
+  if (G.inBattle) return;
+
+  let dx = 0, dy = 0;
+  if (keys['w'] || keys['arrowup']) dy = -MOVE_SPEED;
+  if (keys['s'] || keys['arrowdown']) dy = MOVE_SPEED;
+  if (keys['a'] || keys['arrowleft']) dx = -MOVE_SPEED;
+  if (keys['d'] || keys['arrowright']) dx = MOVE_SPEED;
+
+  // Normalize diagonal
+  if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+
+  if (dx || dy) {
+    const newX = G.x + dx * 0.05;
+    const newY = G.y + dy * 0.05;
+    const tileAtNew = worldMap[Math.floor(newY)]?.[Math.floor(newX)] ?? 7;
+
+    // Collision check
+    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7) {
+      G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
+      G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
+
+      // Check encounter zone
+      if (tileAtNew === 6 && !G.inBattle && Math.random() < 0.008) {
+        triggerWildEncounter();
+      }
+
+      // Check workshop proximity
+      if (tileAtNew === 8) {
+        // Show craft hint
+      }
+    }
+  }
+
+  setTimeout(gameLoop, 16);
+}
+
+// ═══════ ENCOUNTER SYSTEM ═══════
+
+function getCard(id) { return ALL_CARDS.find(c => c.id === id); }
+
+function getWildEncounter() {
+  // Frost Valley encounter pool
+  const fvCards = ALL_CARDS.filter(c => (c.set === 'Frost Valley' || c.set === 'Set 1') && c.rarity !== 'legendary');
+  const weights = { common: 50, uncommon: 25, rare: 10, 'ghost-rare': 3 };
+
+  // Scout discipline finds rarer
+  if (G.discipline === 'scout') {
+    weights.rare = 20;
+    weights['ghost-rare'] = 8;
+  }
+
+  const weighted = [];
+  for (const c of fvCards) {
+    const w = weights[c.rarity] || 10;
+    for (let i = 0; i < w; i++) weighted.push(c);
+  }
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+
+// ═══════ DICE ENGINE ═══════
+
+function rollDie() { return Math.floor(Math.random() * 6) + 1; }
+function rollDice(n) { return Array.from({length: n}, () => rollDie()).sort((a,b) => a-b); }
+
+function classify(dice) {
+  if (!dice?.length) return { type: 'none', value: 0, damage: 0 };
+  if (dice.length === 1) return { type: 'singles', value: dice[0], damage: 1 };
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
+  const maxCount = Math.max(...Object.values(counts));
+  const vals = Object.entries(counts).filter(([,v]) => v === maxCount).map(([k]) => +k);
+  const maxVal = Math.max(...vals);
+  if (maxCount >= 5) return { type: 'penta', value: maxVal, damage: 5 };
+  if (maxCount >= 4) return { type: 'quads', value: maxVal, damage: 4 };
+  if (maxCount >= 3) return { type: 'triples', value: maxVal, damage: 3 };
+  if (maxCount >= 2) return { type: 'doubles', value: maxVal, damage: 2 };
+  return { type: 'singles', value: Math.max(...dice), damage: 1 };
+}
+
+function tierRank(type) {
+  return { none: 0, singles: 1, doubles: 2, triples: 3, quads: 4, penta: 5 }[type] || 0;
+}
+
+function compareRolls(a, b) {
+  if (tierRank(a.type) > tierRank(b.type)) return 'a';
+  if (tierRank(a.type) < tierRank(b.type)) return 'b';
+  if (a.value > b.value) return 'a';
+  if (a.value < b.value) return 'b';
+  return 'tie';
+}
+
+// ═══════ BATTLE SYSTEM ═══════
+
+let B = null; // Battle state
+
+function triggerWildEncounter() {
+  if (G.inBattle || G.team.length === 0) return;
+
+  const wildCard = getWildEncounter();
+  if (!wildCard) return;
+
+  G.inBattle = true;
+
+  // Create battle state
+  const playerGhost = G.team.find(g => !g.ko) || G.team[0];
+  B = {
+    round: 1,
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    enemyCard: wildCard,
+    enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity },
+    log: [],
+    phase: 'ready', // ready, rolling, resolved
+    playerDice: [],
+    enemyDice: [],
+  };
+
+  // Show battle overlay
+  const overlay = document.getElementById('battleOverlay');
+  overlay.classList.add('active');
+  document.getElementById('battleTitle').textContent = `Wild ${wildCard.name} appeared!`;
+
+  renderBattle();
+  notify(`⚔️ Wild ${wildCard.name} appeared!`);
+}
+
+function renderBattle() {
+  if (!B) return;
+
+  document.getElementById('battleRound').textContent = `Round ${B.round}`;
+
+  // Player fighter
+  const pg = B.playerGhost;
+  const pCard = getCard(pg.id);
+  document.getElementById('pFighterName').textContent = pg.name;
+  document.getElementById('pFighterAbility').textContent = `${pg.ability}: ${pg.abilityDesc || ''}`;
+  document.getElementById('pFighterArt').src = pCard?.art || '';
+  document.getElementById('pFighterArt').onerror = function() { this.style.display = 'none'; };
+  const pPct = Math.max(0, pg.hp / pg.maxHp * 100);
+  const pBar = document.getElementById('pHpBar');
+  pBar.style.width = pPct + '%';
+  pBar.className = 'hp-bar-inner ' + (pPct > 50 ? 'green' : pPct > 25 ? 'yellow' : 'red');
+  document.getElementById('pHpText').textContent = `${Math.max(0,pg.hp)} / ${pg.maxHp}`;
+
+  // Enemy fighter
+  const eg = B.enemyGhost;
+  const eCard = getCard(eg.id) || B.enemyCard;
+  document.getElementById('eFighterName').textContent = eg.name;
+  document.getElementById('eFighterAbility').textContent = `${eg.ability}: ${eg.abilityDesc || ''}`;
+  document.getElementById('eFighterArt').src = eCard?.art || '';
+  document.getElementById('eFighterArt').onerror = function() { this.style.display = 'none'; };
+  const ePct = Math.max(0, eg.hp / eg.maxHp * 100);
+  const eBar = document.getElementById('eHpBar');
+  eBar.style.width = ePct + '%';
+  eBar.className = 'hp-bar-inner ' + (ePct > 50 ? 'green' : ePct > 25 ? 'yellow' : 'red');
+  document.getElementById('eHpText').textContent = `${Math.max(0,eg.hp)} / ${eg.maxHp}`;
+
+  // Dice
+  const pDiceEl = document.getElementById('pDice');
+  const eDiceEl = document.getElementById('eDice');
+  pDiceEl.innerHTML = B.playerDice.map(d => `<div class="die player">${d}</div>`).join('');
+  eDiceEl.innerHTML = B.enemyDice.map(d => `<div class="die enemy">${d}</div>`).join('');
+
+  // Log
+  const logEl = document.getElementById('battleLog');
+  logEl.innerHTML = B.log.map(l => `<div class="event ${l.type || ''}">${l.text}</div>`).join('');
+  logEl.scrollTop = logEl.scrollHeight;
+
+  // Actions
+  const actionsEl = document.getElementById('battleActions');
+  if (B.playerGhost.ko || B.enemyGhost.ko) {
+    const won = B.enemyGhost.ko;
+    actionsEl.innerHTML = `<button class="battle-btn btn-roll" onclick="endBattle(${won})">${won ? '🎉 Victory!' : '💀 Defeated...'}</button>`;
+  }
+}
+
+function battleRoll() {
+  if (!B || B.phase === 'rolling') return;
+  B.phase = 'rolling';
+
+  const pDiceCount = 3; // base
+  const eDiceCount = 3;
+
+  const pDice = rollDice(pDiceCount);
+  const eDice = rollDice(eDiceCount);
+  B.playerDice = pDice;
+  B.enemyDice = eDice;
+
+  const pRoll = classify(pDice);
+  const eRoll = classify(eDice);
+  const winner = compareRolls(pRoll, eRoll);
+
+  const pg = B.playerGhost;
+  const eg = B.enemyGhost;
+
+  B.log.push({ text: `Round ${B.round}: You rolled [${pDice.join(', ')}] — ${pRoll.type} (${pRoll.value}'s)`, type: 'ability' });
+  B.log.push({ text: `${eg.name} rolled [${eDice.join(', ')}] — ${eRoll.type} (${eRoll.value}'s)`, type: 'ability' });
+
+  if (winner === 'a') {
+    let dmg = pRoll.damage;
+    // Hunter bonus
+    if (G.discipline === 'hunter') dmg += (Math.random() < 0.2 ? 1 : 0);
+    eg.hp = Math.max(0, eg.hp - dmg);
+    if (eg.hp <= 0) eg.ko = true;
+    B.log.push({ text: `You deal ${dmg} damage!`, type: 'damage' });
+    if (eg.ko) B.log.push({ text: `${eg.name} is defeated!`, type: 'damage' });
+  } else if (winner === 'b') {
+    let dmg = eRoll.damage;
+    pg.hp = Math.max(0, pg.hp - dmg);
+    if (pg.hp <= 0) pg.ko = true;
+    B.log.push({ text: `${eg.name} deals ${dmg} damage to you!`, type: 'damage' });
+    if (pg.ko) B.log.push({ text: `${pg.name} is defeated...`, type: 'damage' });
+  } else {
+    B.log.push({ text: 'Tie! Re-roll.', type: '' });
+  }
+
+  B.round++;
+  B.phase = 'ready';
+  renderBattle();
+}
+
+function fleeBattle() {
+  if (!B) return;
+  B.log.push({ text: 'You fled the battle!', type: '' });
+  G.inBattle = false;
+  B = null;
+  document.getElementById('battleOverlay').classList.remove('active');
+  requestAnimationFrame(render);
+  gameLoop();
+}
+
+function endBattle(won) {
+  if (!B) return;
+
+  if (won) {
+    // XP reward
+    const xpGain = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 }[B.enemyCard.rarity] || 1;
+    G.xp += xpGain;
+
+    // Level up check
+    const xpNeeded = G.level * 3;
+    if (G.xp >= xpNeeded) {
+      G.level++;
+      G.xp -= xpNeeded;
+      notify(`🌟 Level Up! You are now level ${G.level}!`);
+      // Heal team on level up
+      G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+    }
+
+    // Coin reward
+    const coinGain = 1 + Math.floor(Math.random() * 3);
+    G.coins += coinGain;
+
+    // Spirit Essence drop!
+    const essence = generateEssence(B.enemyCard);
+    G.essences.push(essence);
+
+    notify(`✨ +${xpGain} XP, +${coinGain} coins, +1 ${essence.name}`);
+
+    // Update team HP from battle
+    const teamGhost = G.team.find(g => g.id === B.playerGhost.id);
+    if (teamGhost) {
+      teamGhost.hp = B.playerGhost.hp;
+      teamGhost.ko = B.playerGhost.ko;
+    }
+  } else {
+    // Respawn at hub
+    G.x = 16; G.y = 9;
+    // Heal team
+    G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.5)); g.ko = false; });
+    notify('💀 Defeated... Respawning at hub.');
+  }
+
+  G.inBattle = false;
+  B = null;
+  document.getElementById('battleOverlay').classList.remove('active');
+
+  updateHUD();
+  saveGame();
+  requestAnimationFrame(render);
+  gameLoop();
+}
+
+// ═══════ SPIRIT ESSENCE (Resource Quality System) ═══════
+
+function generateEssence(card) {
+  // Quality influenced by rarity + discipline
+  const rarityBonus = { common: 0, uncommon: 100, rare: 200, 'ghost-rare': 350, legendary: 500 }[card.rarity] || 0;
+  const scoutBonus = G.discipline === 'scout' ? 100 : 0;
+
+  function stat() {
+    return Math.min(1000, Math.max(1, Math.floor(Math.random() * 600) + rarityBonus + scoutBonus + Math.floor(Math.random() * 200)));
+  }
+
+  return {
+    id: Date.now() + Math.random(),
+    name: `${card.name} Essence`,
+    fromCard: card.id,
+    fromName: card.name,
+    region: 'Frost Valley',
+    rarity: card.rarity,
+    potency: stat(),
+    stability: stat(),
+    resonance: stat(),
+    purity: stat(),
+    timestamp: Date.now(),
+  };
+}
+
+// ═══════ CRAFTING SYSTEM ═══════
+
+let craftState = { selectedEssences: [], schematic: SCHEMATICS[0], experimentPoints: 0 };
+
+function openCrafting() {
+  // Check if near workshop
+  const tileX = Math.floor(G.x);
+  const tileY = Math.floor(G.y);
+  let nearWorkshop = false;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    if (worldMap[tileY+dy]?.[tileX+dx] === 8) nearWorkshop = true;
+  }
+  if (!nearWorkshop) {
+    notify('🔨 Find a workshop in the hub town to craft!');
+    return;
+  }
+  if (G.essences.length < 1) {
+    notify('📦 You need Spirit Essences to craft. Battle wild Spiritkin!');
+    return;
+  }
+
+  craftState = { selectedEssences: [], schematic: SCHEMATICS[0], experimentPoints: G.discipline === 'artificer' ? 3 : 1 };
+  renderCraftUI();
+  document.getElementById('craftOverlay').classList.add('active');
+}
+
+function renderCraftUI() {
+  const slotsEl = document.getElementById('craftSlots');
+  const needed = craftState.schematic.essencesNeeded;
+
+  // Schematic selector
+  let html = '<div style="margin-bottom:12px;">';
+  for (const s of SCHEMATICS) {
+    const sel = s.id === craftState.schematic.id;
+    html += `<button class="hud-btn" style="${sel ? 'background:rgba(68,170,255,0.2);border-color:#4af;' : ''}" onclick="selectSchematic('${s.id}')">${s.name}</button> `;
+  }
+  html += '</div>';
+
+  // Essence slots
+  for (let i = 0; i < needed; i++) {
+    const ess = craftState.selectedEssences[i];
+    if (ess) {
+      html += `<div class="craft-slot filled" onclick="removeCraftEssence(${i})">
+        <strong>${ess.name}</strong><br>
+        <span style="font-size:10px;">P:${ess.potency} S:${ess.stability} R:${ess.resonance} U:${ess.purity}</span>
+      </div>`;
+    } else {
+      html += `<div class="craft-slot" onclick="showEssencePicker(${i})">Click to add essence (slot ${i+1})</div>`;
+    }
+  }
+
+  // Available essences
+  if (G.essences.length > 0) {
+    html += '<h3 style="margin-top:12px;">Available Essences</h3>';
+    for (const ess of G.essences) {
+      if (craftState.selectedEssences.includes(ess)) continue;
+      html += `<div class="essence-item" style="cursor:pointer;" onclick="addCraftEssence('${ess.id}')">
+        <span class="ess-name">${ess.name}</span>
+        <div class="essence-stats">
+          <div class="ess-stat"><span class="label">POT:</span> <span class="value ${ess.potency > 700 ? 'high' : ess.potency > 400 ? 'mid' : 'low'}">${ess.potency}</span></div>
+          <div class="ess-stat"><span class="label">STB:</span> <span class="value ${ess.stability > 700 ? 'high' : ess.stability > 400 ? 'mid' : 'low'}">${ess.stability}</span></div>
+          <div class="ess-stat"><span class="label">RES:</span> <span class="value ${ess.resonance > 700 ? 'high' : ess.resonance > 400 ? 'mid' : 'low'}">${ess.resonance}</span></div>
+          <div class="ess-stat"><span class="label">PUR:</span> <span class="value ${ess.purity > 700 ? 'high' : ess.purity > 400 ? 'mid' : 'low'}">${ess.purity}</span></div>
+        </div>
+      </div>`;
+    }
+  }
+
+  slotsEl.innerHTML = html;
+
+  // Enable craft button
+  document.getElementById('btnCraft').disabled = craftState.selectedEssences.length < needed;
+
+  // Experiment preview
+  const previewEl = document.getElementById('craftPreview');
+  if (craftState.selectedEssences.length >= needed) {
+    previewEl.style.display = 'block';
+    document.getElementById('expFill').style.width = (craftState.experimentPoints * 20) + '%';
+    document.getElementById('expText').textContent = `Experiment Points: ${craftState.experimentPoints} (click Craft to use)`;
+  } else {
+    previewEl.style.display = 'none';
+  }
+  document.getElementById('craftResult').style.display = 'none';
+}
+
+function selectSchematic(id) {
+  craftState.schematic = SCHEMATICS.find(s => s.id === id) || SCHEMATICS[0];
+  craftState.selectedEssences = [];
+  renderCraftUI();
+}
+
+function addCraftEssence(essId) {
+  const ess = G.essences.find(e => String(e.id) === String(essId));
+  if (!ess || craftState.selectedEssences.length >= craftState.schematic.essencesNeeded) return;
+  craftState.selectedEssences.push(ess);
+  renderCraftUI();
+}
+
+function removeCraftEssence(idx) {
+  craftState.selectedEssences.splice(idx, 1);
+  renderCraftUI();
+}
+
+function showEssencePicker(slot) {
+  // Handled by clicking available essences below
+}
+
+function doCraft() {
+  const essences = craftState.selectedEssences;
+  const schem = craftState.schematic;
+  if (essences.length < schem.essencesNeeded) return;
+
+  // Calculate base stats from essences
+  const avgPotency = essences.reduce((s, e) => s + e.potency, 0) / essences.length;
+  const avgStability = essences.reduce((s, e) => s + e.stability, 0) / essences.length;
+  const avgResonance = essences.reduce((s, e) => s + e.resonance, 0) / essences.length;
+  const avgPurity = essences.reduce((s, e) => s + e.purity, 0) / essences.length;
+
+  // Experimentation bonus (random improvement based on experiment points)
+  let expBonus = 0;
+  for (let i = 0; i < craftState.experimentPoints; i++) {
+    if (Math.random() < (avgPurity / 1000)) {
+      expBonus += Math.floor(Math.random() * 150) + 50;
+    }
+  }
+
+  // Final item quality
+  const quality = Math.floor((avgPotency + avgStability + avgResonance + expBonus) / 3);
+  const qualityTier = quality > 600 ? 'Mastercraft' : quality > 400 ? 'Superior' : quality > 200 ? 'Standard' : 'Basic';
+
+  // Create gear
+  const gear = {
+    id: Date.now(),
+    name: `${qualityTier} ${schem.name}`,
+    schematic: schem.id,
+    type: schem.type,
+    quality,
+    qualityTier,
+    bonusDamage: schem.type === 'weapon' ? Math.floor(quality / 300) + 1 : 0,
+    damageReduction: schem.type === 'armor' ? Math.floor(quality / 400) + 1 : 0,
+    craftedBy: G.name,
+    craftedAt: Date.now(),
+    essenceNames: essences.map(e => e.fromName),
+    stats: { potency: Math.floor(avgPotency), stability: Math.floor(avgStability), resonance: Math.floor(avgResonance), purity: Math.floor(avgPurity) },
+  };
+
+  G.gear.push(gear);
+
+  // Remove used essences
+  for (const ess of essences) {
+    const idx = G.essences.findIndex(e => e.id === ess.id);
+    if (idx >= 0) G.essences.splice(idx, 1);
+  }
+
+  // Show result
+  const resultEl = document.getElementById('craftResult');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `<div class="craft-result">
+    <h3 style="color:#4a8;margin:0 0 8px;">${gear.name}</h3>
+    <p style="font-size:12px;color:#888;">${schem.desc}</p>
+    <p style="font-size:13px;color:#ccc;margin-top:8px;">
+      Quality: <strong style="color:${quality > 600 ? '#4a8' : quality > 400 ? '#aa8' : '#a66'}">${quality}</strong>
+      ${gear.bonusDamage ? ` | +${gear.bonusDamage} Damage` : ''}
+      ${gear.damageReduction ? ` | -${gear.damageReduction} Damage Taken` : ''}
+    </p>
+    <p style="font-size:10px;color:#556;margin-top:4px;">Crafted by ${gear.craftedBy}</p>
+  </div>`;
+
+  notify(`🔨 Crafted: ${gear.name} (Quality ${quality})!`);
+  craftState.selectedEssences = [];
+  saveGame();
+  renderCraftUI();
+}
+
+function closeCrafting() {
+  document.getElementById('craftOverlay').classList.remove('active');
+}
+
+// ═══════ INVENTORY ═══════
+
+function toggleInventory() {
+  const panel = document.getElementById('inventoryPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) renderInventory();
+}
+
+function renderInventory() {
+  // Essences
+  const essEl = document.getElementById('essenceList');
+  if (G.essences.length === 0) {
+    essEl.innerHTML = '<p style="color:#555;font-size:12px;">No essences yet. Battle wild Spiritkin!</p>';
+  } else {
+    essEl.innerHTML = G.essences.map(e => `
+      <div class="essence-item">
+        <span class="ess-name">${e.name}</span>
+        <span class="ess-region">${e.region}</span>
+        <div class="essence-stats">
+          <div class="ess-stat"><span class="label">POT:</span> <span class="value ${e.potency > 700 ? 'high' : e.potency > 400 ? 'mid' : 'low'}">${e.potency}</span></div>
+          <div class="ess-stat"><span class="label">STB:</span> <span class="value ${e.stability > 700 ? 'high' : e.stability > 400 ? 'mid' : 'low'}">${e.stability}</span></div>
+          <div class="ess-stat"><span class="label">RES:</span> <span class="value ${e.resonance > 700 ? 'high' : e.resonance > 400 ? 'mid' : 'low'}">${e.resonance}</span></div>
+          <div class="ess-stat"><span class="label">PUR:</span> <span class="value ${e.purity > 700 ? 'high' : e.purity > 400 ? 'mid' : 'low'}">${e.purity}</span></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Gear
+  const gearEl = document.getElementById('gearList');
+  if (G.gear.length === 0) {
+    gearEl.innerHTML = '<p style="color:#555;font-size:12px;">No gear yet. Visit the workshop to craft!</p>';
+  } else {
+    gearEl.innerHTML = G.gear.map(g => `
+      <div class="crafted-item">
+        <span class="item-name">${g.name}</span>
+        <span style="font-size:10px;color:#888;"> Quality ${g.quality}</span>
+        ${g.bonusDamage ? `<br><span style="font-size:10px;color:#4a8;">+${g.bonusDamage} Damage</span>` : ''}
+        ${g.damageReduction ? `<br><span style="font-size:10px;color:#48a;">-${g.damageReduction} Damage Taken</span>` : ''}
+        <br><span class="item-crafter">Crafted by ${g.craftedBy}</span>
+      </div>
+    `).join('');
+  }
+
+  // Team
+  const teamEl = document.getElementById('teamList');
+  teamEl.innerHTML = G.team.map(g => {
+    const card = getCard(g.id);
+    const pct = Math.max(0, g.hp / g.maxHp * 100);
+    return `<div class="essence-item">
+      <span class="ess-name">${g.name}</span>
+      <span style="font-size:10px;color:#888;"> ${g.ability}</span>
+      <div class="hp-bar-outer" style="margin-top:4px;"><div class="hp-bar-inner ${pct > 50 ? 'green' : pct > 25 ? 'yellow' : 'red'}" style="width:${pct}%"></div></div>
+      <span style="font-size:10px;color:#666;">${g.hp}/${g.maxHp} HP${g.ko ? ' (KO)' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════ PLAYER INSPECT ═══════
+
+function showInspect(player) {
+  document.getElementById('inspectName').textContent = player.name || '???';
+  document.getElementById('inspectDiscipline').textContent = (DISCIPLINES.find(d => d.id === player.discipline)?.name || 'Unknown');
+  document.getElementById('inspectLevel').textContent = `Lv. ${player.level || 1}`;
+
+  const teamEl = document.getElementById('inspectTeam');
+  if (player.team?.length) {
+    teamEl.innerHTML = player.team.map(g => {
+      const card = getCard(g.id);
+      return `<div class="inspect-ghost">
+        <div style="font-weight:bold;color:#fff;">${g.name || card?.name || '?'}</div>
+        <div style="color:#888;">${card?.ability || ''}</div>
+      </div>`;
+    }).join('');
+  } else {
+    teamEl.innerHTML = '<p style="color:#555;">Team hidden</p>';
+  }
+
+  const gearEl = document.getElementById('inspectGear');
+  if (player.gear?.length) {
+    gearEl.innerHTML = player.gear.map(g => `<div class="crafted-item"><span class="item-name">${g.name}</span> <span class="item-crafter">by ${g.craftedBy}</span></div>`).join('');
+  } else {
+    gearEl.textContent = 'None yet';
+  }
+
+  document.getElementById('inspectOverlay').classList.add('active');
+}
+
+function closeInspect() {
+  document.getElementById('inspectOverlay').classList.remove('active');
+}
+
+// ═══════ INTERACTION ═══════
+
+function tryInteract() {
+  const tileX = Math.floor(G.x);
+  const tileY = Math.floor(G.y);
+
+  // Check for workshop nearby
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    if (worldMap[tileY+dy]?.[tileX+dx] === 8) {
+      openCrafting();
+      return;
+    }
+  }
+
+  // Check for buildings (shop, etc)
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    if (worldMap[tileY+dy]?.[tileX+dx] === 5) {
+      // Heal at inn
+      G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+      notify('🏨 Rested at the inn. Team fully healed!');
+      saveGame();
+      updateHUD();
+      return;
+    }
+  }
+}
+
+// ═══════ HUD ═══════
+
+function updateHUD() {
+  document.getElementById('hudName').textContent = G.name;
+  document.getElementById('hudDiscipline').textContent = DISCIPLINES.find(d => d.id === G.discipline)?.name || '';
+  document.getElementById('hudLevel').textContent = `Lv.${G.level}`;
+  document.getElementById('hudCoins').textContent = G.coins;
+  document.getElementById('hudXP').textContent = `${G.xp}/${G.level * 3} XP`;
+
+  // Team preview
+  const teamPrev = document.getElementById('hudTeamPreview');
+  teamPrev.innerHTML = G.team.map(g => {
+    const pct = Math.max(0, g.hp / g.maxHp * 100);
+    const color = pct > 50 ? '#4a4' : pct > 25 ? '#aa4' : '#a44';
+    return `<span style="color:${color};font-size:12px;" title="${g.name}: ${g.hp}/${g.maxHp}">${g.ko ? '💀' : '👻'}</span>`;
+  }).join(' ');
+
+  document.getElementById('hudPlayers').textContent = Object.keys(otherPlayers).length;
+}
+
+// ═══════ NOTIFICATIONS ═══════
+
+function notify(text) {
+  const container = document.getElementById('notifContainer');
+  const el = document.createElement('div');
+  el.className = 'notif';
+  el.textContent = text;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ═══════ CHARACTER CREATION ═══════
+
+function initCharCreate() {
+  const grid = document.getElementById('starterGrid');
+  grid.innerHTML = STARTERS.map(s => {
+    const card = getCard(s.id);
+    if (!card) return '';
+    const rarityColor = { common: '#8b95a5', uncommon: '#2ecc71', rare: '#3498db', 'ghost-rare': '#9b59b6', legendary: '#f39c12' }[card.rarity] || '#888';
+    return `<div class="starter-card" data-id="${card.id}" onclick="selectStarter(${card.id})">
+      <img src="${card.art}" alt="${card.name}" onerror="this.style.display='none'">
+      <div class="name">${card.name}</div>
+      <div class="rarity" style="color:${rarityColor};">${card.rarity}</div>
+      <div class="hp">HP: ${card.maxHp}</div>
+      <div class="ability">${card.ability}: ${card.desc}</div>
+      <div style="font-size:10px;color:#666;margin-top:4px;">${s.reason}</div>
+    </div>`;
+  }).join('');
+
+  const discGrid = document.getElementById('disciplineGrid');
+  discGrid.innerHTML = DISCIPLINES.map(d => `
+    <div class="discipline-option" data-id="${d.id}" onclick="selectDiscipline('${d.id}')">
+      <div class="disc-name">${d.icon} ${d.name}</div>
+      <div class="disc-desc">${d.desc}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('nameInput').addEventListener('input', checkCreateReady);
+}
+
+let selectedStarter = null;
+let selectedDiscipline = null;
+
+function selectStarter(id) {
+  selectedStarter = id;
+  document.querySelectorAll('.starter-card').forEach(el => {
+    el.classList.toggle('selected', +el.dataset.id === id);
+  });
+  checkCreateReady();
+}
+
+function selectDiscipline(id) {
+  selectedDiscipline = id;
+  document.querySelectorAll('.discipline-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === id);
+  });
+  checkCreateReady();
+}
+
+function checkCreateReady() {
+  const name = document.getElementById('nameInput').value.trim();
+  document.getElementById('btnCreate').disabled = !(name && selectedStarter && selectedDiscipline);
+}
+
+function createCharacter() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name || !selectedStarter || !selectedDiscipline) return;
+
+  const starterCard = getCard(selectedStarter);
+  G.name = name;
+  G.discipline = selectedDiscipline;
+  G.team = [{
+    id: starterCard.id,
+    name: starterCard.name,
+    hp: starterCard.maxHp,
+    maxHp: starterCard.maxHp,
+    ko: false,
+    ability: starterCard.ability,
+    abilityDesc: starterCard.desc,
+    rarity: starterCard.rarity,
+  }];
+  G.x = 16; G.y = 9; // Hub town spawn
+  G.coins = 10;
+  G.essences = [];
+  G.gear = [];
+  G.level = 1;
+  G.xp = 0;
+
+  // Close modal
+  document.getElementById('charCreateOverlay').classList.remove('active');
+
+  // Show game
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('minimap').style.display = 'block';
+  document.getElementById('chatBox').style.display = 'block';
+
+  updateHUD();
+  saveGame();
+  startPresence();
+
+  notify(`Welcome to Frost Valley, ${name}!`);
+  addChatMessage('system', `${name} has entered the Overworld.`);
+
+  requestAnimationFrame(render);
+  gameLoop();
+}
+
+// ═══════ FIREBASE PERSISTENCE ═══════
+
+async function initFirebase() {
+  try {
+    const result = await firebase.auth().signInAnonymously();
+    uid = result.user.uid;
+
+    // Check for existing save
+    const snap = await db.ref(`overworld/players/${uid}`).once('value');
+    const data = snap.val();
+
+    if (data && data.name) {
+      // Restore character
+      G.name = data.name;
+      G.discipline = data.discipline;
+      G.level = data.level || 1;
+      G.xp = data.xp || 0;
+      G.coins = data.coins || 0;
+      G.x = data.x || 16;
+      G.y = data.y || 9;
+      G.team = data.team || [];
+      G.essences = data.essences || [];
+      G.gear = data.gear || [];
+
+      // Skip character creation
+      document.getElementById('charCreateOverlay').classList.remove('active');
+      document.getElementById('hud').style.display = 'flex';
+      document.getElementById('minimap').style.display = 'block';
+      document.getElementById('chatBox').style.display = 'block';
+
+      updateHUD();
+      startPresence();
+
+      notify(`Welcome back, ${G.name}!`);
+
+      requestAnimationFrame(render);
+      gameLoop();
+    } else {
+      // Show character creation
+      document.getElementById('charCreateOverlay').classList.add('active');
+      initCharCreate();
+    }
+  } catch (err) {
+    console.error('Firebase auth error:', err);
+    // Offline mode — show character creation
+    uid = 'offline_' + Date.now();
+    document.getElementById('charCreateOverlay').classList.add('active');
+    initCharCreate();
+  }
+}
+
+function saveGame() {
+  if (!uid) return;
+  db.ref(`overworld/players/${uid}`).update({
+    name: G.name,
+    discipline: G.discipline,
+    level: G.level,
+    xp: G.xp,
+    coins: G.coins,
+    x: Math.round(G.x * 10) / 10,
+    y: Math.round(G.y * 10) / 10,
+    team: G.team,
+    essences: G.essences.slice(-50), // cap at 50
+    gear: G.gear.slice(-20), // cap at 20
+    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+    version: VERSION,
+  });
+}
+
+// ═══════ MULTIPLAYER PRESENCE ═══════
+
+function startPresence() {
+  if (!uid) return;
+
+  // Write presence
+  const presRef = db.ref(`overworld/presence/${uid}`);
+  presRef.set({
+    name: G.name,
+    discipline: G.discipline,
+    level: G.level,
+    x: G.x,
+    y: G.y,
+    team: G.team.map(g => ({ id: g.id, name: g.name })),
+    gear: G.gear.map(g => ({ name: g.name, craftedBy: g.craftedBy })),
+  });
+
+  // Disconnect cleanup
+  presRef.onDisconnect().remove();
+
+  // Update position periodically
+  setInterval(() => {
+    if (!uid || G.inBattle) return;
+    presRef.update({
+      x: Math.round(G.x * 10) / 10,
+      y: Math.round(G.y * 10) / 10,
+      level: G.level,
+    });
+  }, 500);
+
+  // Auto-save every 30s
+  setInterval(saveGame, 30000);
+
+  // Listen for other players
+  db.ref('overworld/presence').on('value', snap => {
+    const data = snap.val() || {};
+    otherPlayers = data;
+    document.getElementById('hudPlayers').textContent = Object.keys(data).length;
+  });
+
+  // Listen for chat
+  db.ref('overworld/chat').orderByChild('ts').limitToLast(20).on('child_added', snap => {
+    const msg = snap.val();
+    if (msg && msg.ts > Date.now() - 60000) {
+      addChatMessage(msg.sender, msg.text);
+    }
+  });
+}
+
+// ═══════ CHAT ═══════
+
+function addChatMessage(sender, text) {
+  const el = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  if (sender === 'system') {
+    div.className = 'chat-system';
+    div.textContent = text;
+  } else {
+    div.className = 'chat-msg';
+    div.innerHTML = `<span class="sender">${sender}:</span> <span class="text">${text}</span>`;
+  }
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+
+  // Cap messages
+  while (el.children.length > 50) el.removeChild(el.firstChild);
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  db.ref('overworld/chat').push({
+    sender: G.name,
+    text: text.slice(0, 200),
+    ts: firebase.database.ServerValue.TIMESTAMP,
+  });
+
+  input.value = '';
+}
+
+// ═══════ RESIZE ═══════
+
+function resize() {
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+// ═══════ INIT ═══════
+
+async function init() {
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Loading animation
+  const fill = document.getElementById('loadingFill');
+  fill.style.width = '30%';
+
+  generateWorld();
+  fill.style.width = '60%';
+
+  setupInput();
+  fill.style.width = '80%';
+
+  await initFirebase();
+  fill.style.width = '100%';
+
+  // Hide loading
+  setTimeout(() => {
+    document.getElementById('loadingScreen').style.display = 'none';
+  }, 500);
+}
+
+init();
+</script>
+</body>
+</html>
