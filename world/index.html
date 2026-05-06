@@ -1981,7 +1981,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.1.0';
+const VERSION = 'v4.2.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2240,6 +2240,7 @@ setInterval(spawnSpiritWisps, WISP_SPAWN_INTERVAL);
 function collectWisp(wisp) {
   // Add material to inventory
   if (!G.materials) G.materials = {};
+  G.hasBoat = true; // testing: start with boat for water crossing
   G.materials[wisp.type.id] = (G.materials[wisp.type.id] || 0) + 1;
 
   // Sound + notification
@@ -3562,6 +3563,8 @@ let G = {
   onboarding: { step: 0, hintsShown: {} },
   // Lore
   loreCollected: [],
+  // Mask of Destiny quest
+  maskQuest: { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 },
 };
 
 // ═══════ PLAYER HOUSING ═══════
@@ -5671,6 +5674,11 @@ function setupInput() {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     keys[e.key.toLowerCase()] = true;
+    // Track last direction key pressed (for sprite facing)
+    const lk = e.key.toLowerCase();
+    if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(lk)) {
+      G._lastDirKey = lk;
+    }
     if (e.key === 'e' || e.key === 'E') {
       if (typeof cantinaActive !== 'undefined' && cantinaActive) {
         if (typeof cantinaDialogueActive !== 'undefined' && cantinaDialogueActive) closeCantinaDialogue();
@@ -5740,6 +5748,8 @@ function setupInput() {
     }
     if (e.key === 'm' || e.key === 'M') toggleMute();
   });
+  // Clear all keys on tab/window blur (prevents stuck keys)
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
   window.addEventListener('keyup', e => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -5849,10 +5859,12 @@ function gameLoop() {
 
   // NUCLEAR DIRECTION FIX — read keys directly, ignore dx/dy
   // Whichever direction key is pressed, that's the direction. Period.
-  if (keys['d'] || keys['arrowright']) G.direction = 'right';
-  else if (keys['a'] || keys['arrowleft']) G.direction = 'left';
-  else if (keys['s'] || keys['arrowdown']) G.direction = 'down';
-  else if (keys['w'] || keys['arrowup']) G.direction = 'up';
+  // DIRECTION: use last key pressed (no priority chain, no stuck key issues)
+    const _dirMap = { d:'right', arrowright:'right', a:'left', arrowleft:'left',
+                      w:'up', arrowup:'up', s:'down', arrowdown:'down' };
+    if (G._lastDirKey && _dirMap[G._lastDirKey] && keys[G._lastDirKey]) {
+      G.direction = _dirMap[G._lastDirKey];
+    }
 
   if (dx || dy) {
 
@@ -5862,7 +5874,7 @@ function gameLoop() {
     const tileAtNew = worldMap[Math.floor(newY)]?.[Math.floor(newX)] ?? 7;
 
     // Collision check (block: trees, water, mountains, warm trees, lava, obsidian, palm trees, dark walls, dark trees)
-    if (tileAtNew !== 1 && tileAtNew !== 3 && tileAtNew !== 7 && tileAtNew !== 13 && tileAtNew !== 15 && tileAtNew !== 16 && tileAtNew !== 21 && tileAtNew !== 23 && tileAtNew !== 25) {
+    if (tileAtNew !== 1 && (tileAtNew !== 3 || G.hasBoat) && tileAtNew !== 7 && tileAtNew !== 13 && tileAtNew !== 15 && tileAtNew !== 16 && tileAtNew !== 21 && tileAtNew !== 23 && tileAtNew !== 25) {
       G.x = Math.max(2, Math.min(WORLD_W - 3, newX));
       G.y = Math.max(2, Math.min(WORLD_H - 3, newY));
 
@@ -9640,6 +9652,7 @@ async function initFirebase() {
     G.skillPointsUsed = data.skillPointsUsed || 0;
     G.visitedTiles = new Set(data.visitedTiles || []);
     G.materials = data.materials || {};
+      G.hasBoat = data.hasBoat || false;
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
     G.direction = 'down';
@@ -9732,6 +9745,7 @@ function saveGame() {
     skillPointsUsed: G.skillPointsUsed,
     visitedTiles: [...(G.visitedTiles || [])].slice(-500),
     materials: G.materials || {},
+    hasBoat: G.hasBoat || false,
     loreCollected: G.loreCollected || [],
     house: G.house || null,
     version: VERSION,
@@ -10519,7 +10533,7 @@ let worldBossListener = null;
 let lastBossSpawnCycle = -1;
 
 function getWorldBossCycle() {
-  return Math.floor(Date.now() / (1000 * 60 * 30));
+  return Math.floor(Date.now() / (1000 * 60 * 300));
 }
 
 function getBossForCycle(cycle) {
@@ -10893,7 +10907,7 @@ function renderWorldBoss(ctx, camX, camY, time) {
 }
 
 // Check boss every 10 seconds
-setInterval(checkWorldBoss, 10000);
+setInterval(checkWorldBoss, 60000) // check every 60s instead of 10s;
 
 // Update boss bar timer every second
 setInterval(updateWorldBossBar, 1000);
