@@ -1554,6 +1554,21 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <!-- VERSION BADGE (always visible) -->
 <div id="versionBadge" style="position:fixed;bottom:4px;left:4px;font-size:9px;color:rgba(255,255,255,0.2);z-index:9998;pointer-events:none;font-family:monospace;"></div>
 
+<!-- MASK OF DESTINY QUEST TRACKER -->
+<div id="maskQuestTracker" style="display:none;position:fixed;top:50px;left:16px;background:rgba(20,10,30,0.85);border:1px solid rgba(212,164,74,0.27);border-radius:6px;padding:8px 14px;font-size:12px;color:#d4a44a;z-index:99;">
+  <div style="font-weight:bold;">&#127917; The Mask of Destiny</div>
+  <div id="maskQuestStatus" style="color:#9a8b7b;margin-top:4px;"></div>
+</div>
+
+<!-- MASK OF DESTINY DIALOGUE OVERLAY -->
+<div id="maskDialogueOverlay" style="display:none;opacity:0;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;transition:opacity 0.3s;">
+  <div style="background:#1a1020;border:1px solid rgba(212,164,74,0.3);border-radius:12px;padding:32px;max-width:500px;width:90%;text-align:center;">
+    <div style="font-size:14px;color:#d4a44a;font-weight:bold;margin-bottom:4px;letter-spacing:2px;">THE MASK OF DESTINY</div>
+    <div id="maskDialogueText" style="color:#c4b49a;font-size:16px;line-height:1.6;margin:20px 0;min-height:60px;font-style:italic;"></div>
+    <button id="maskDialogueBtn" onclick="advanceMaskDialogue()" style="background:rgba(212,164,74,0.15);border:1px solid rgba(212,164,74,0.4);color:#d4a44a;padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;letter-spacing:1px;">Continue &#9654;</button>
+  </div>
+</div>
+
 <!-- LOADING -->
 <div id="loadingScreen">
   <h1>BOO! Overworld Online</h1>
@@ -3455,6 +3470,323 @@ const NPC_DIALOGUE_MAP = {
   'Keeper Zara': { getLine: getKeeperZaraDialogue, portrait: '&#9876;&#65039;', portraitBg: '#2a2a1a' },
 };
 
+// ═══════ MASK OF DESTINY — DAILY HIDDEN QUEST ═══════
+
+const MASK_QUEST = {
+  name: 'The Mask of Destiny',
+  phases: [
+    {
+      id: 1, name: 'The Discovery', hours: [6, 10], region: 'frost',
+      marker: { x: HUB.x + 4, y: HUB.y + 6, name: 'Maren' },
+      markerColor: '#d4a44a',
+      dialogue: [
+        "You look like someone who doesn't give up easily.",
+        "My Leon... Valkin cursed him. Turned him into a wandering spirit.",
+        "I've waited so long. Will you help me find him?",
+        "Take his bandana. It still smells like the hills where he grew up.",
+      ],
+      anchor: { id: 'bandana', name: "Leon's Bandana", icon: '\uD83C\uDF97\uFE0F' },
+      prompt: '[E] Talk to Maren',
+    },
+    {
+      id: 2, name: 'The Trail', hours: [10, 14], region: 'hills',
+      marker: { x: 30, y: 52, name: "Leon's Camp" },
+      markerColor: '#8ad46e',
+      dialogue: [
+        "These are Leon's things. His fire pit. His bedroll.",
+        "A letter... 'Maren, if you find this, know that I tried to come back.'",
+        "A ghostly figure flickers at the edge of the camp... Leon!",
+        "He's moving toward the Dark Castle. The curse pulls him there.",
+      ],
+      anchor: { id: 'vow', name: "The Vow", icon: '\uD83D\uDCDC' },
+      prompt: '[E] Search the camp',
+    },
+    {
+      id: 3, name: 'The Gathering', hours: [14, 18], region: 'dark_castle',
+      marker: { x: 99, y: 12, name: "Curse Fragment" },
+      markerColor: '#b488e0',
+      dialogue: [
+        "The fragment pulses with dark energy. This is a piece of Valkin's curse.",
+        "Valkin's voice echoes: 'You think love can break what I've made?'",
+        "The fragment burns cold in your hands. You need fire to destroy it.",
+        "The curse was born in cold. It can only die in fire.",
+      ],
+      anchor: { id: 'fragment', name: "The Fragment", icon: '\uD83D\uDC8E' },
+      prompt: '[E] Take the Fragment',
+    },
+    {
+      id: 4, name: 'The Reckoning', hours: [18, 24], region: 'volcanic',
+      marker: { x: 74, y: 30, name: "Ritual Circle" },
+      markerColor: '#ff8844',
+      dialogue: [
+        "The lava's heat reacts to the three anchors. They begin to glow.",
+        "Leon's form materializes from the fire. Solid. Real. Alive.",
+        "Leon: 'Is she... is Maren still waiting?'",
+        "Take Leon back to the Frozen Mug. Maren is waiting.",
+      ],
+      anchor: null,
+      prompt: '[E] Begin the ritual',
+      completion: {
+        returnTo: { x: HUB.x + 4, y: HUB.y + 6 },
+        finalDialogue: [
+          "Maren: 'Leon...? LEON!'",
+          "Leon: 'I'm here. I'm really here.'",
+          "Maren: 'You found him. You actually found him.'",
+          "The curse is broken. Love won.",
+          "You receive: THE MASK OF DESTINY",
+        ],
+        reward: { coins: 200, title: 'Curse Breaker' },
+      },
+    },
+  ],
+};
+
+function getMaskQuestPhase() {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour < 10) return 1;
+  if (hour >= 10 && hour < 14) return 2;
+  if (hour >= 14 && hour < 18) return 3;
+  if (hour >= 18 && hour < 24) return 4;
+  return 0;
+}
+
+function getMaskQuestDaySeed() {
+  return Math.floor(Date.now() / 86400000);
+}
+
+function initMaskQuest() {
+  if (!G.maskQuest) G.maskQuest = { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
+  const today = getMaskQuestDaySeed();
+  if (G.maskQuest.lastCompleted === today && G.maskQuest.phase === 5) return;
+  if (G.maskQuest.phase > 0 && G.maskQuest.phase < 5) {
+    const realPhase = getMaskQuestPhase();
+    if (realPhase > 0 && realPhase > G.maskQuest.phase) {
+      G.maskQuest.phase = 0;
+      G.maskQuest.anchors = [];
+    }
+  }
+}
+
+function getMaskQuestActivePhaseData() {
+  const realPhase = getMaskQuestPhase();
+  if (realPhase === 0) return null;
+  const mq = G.maskQuest;
+  if (!mq) return null;
+  if (mq.lastCompleted === getMaskQuestDaySeed() && mq.phase === 5) return null;
+  if (realPhase === 1 && mq.phase === 0) return MASK_QUEST.phases[0];
+  if (realPhase >= 2 && mq.phase === realPhase - 1) return MASK_QUEST.phases[realPhase - 1];
+  if (mq.phase === 4 && realPhase === 4) return MASK_QUEST.phases[3];
+  return null;
+}
+
+function tryMaskQuestInteract() {
+  const phaseData = getMaskQuestActivePhaseData();
+  if (!phaseData) return false;
+
+  const mx = phaseData.marker.x;
+  const my = phaseData.marker.y;
+  const dist = Math.sqrt((G.x - mx) ** 2 + (G.y - my) ** 2);
+
+  if (dist > 2.5) {
+    if (phaseData.id === 4 && G.maskQuest.phase === 4 && G.maskQuest.anchors.length === 3) {
+      const rt = phaseData.completion.returnTo;
+      const rtDist = Math.sqrt((G.x - rt.x) ** 2 + (G.y - rt.y) ** 2);
+      if (rtDist < 2.5) {
+        showMaskQuestDialogue(phaseData.completion.finalDialogue, function() {
+          G.maskQuest.phase = 5;
+          G.maskQuest.completedDays++;
+          G.maskQuest.lastCompleted = getMaskQuestDaySeed();
+          G.coins += phaseData.completion.reward.coins;
+          if (!G.titles.includes(phaseData.completion.reward.title)) {
+            G.titles.push(phaseData.completion.reward.title);
+          }
+          notify('Quest complete! +200 coins. Title earned: Curse Breaker');
+          SFX.notify();
+          updateHUD();
+          updateMaskQuestTracker();
+          saveGame();
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if (phaseData.id === 1 && G.maskQuest.phase > 0) return false;
+  if (phaseData.id === 2 && !G.maskQuest.anchors.includes('bandana')) return false;
+  if (phaseData.id === 3 && !G.maskQuest.anchors.includes('vow')) return false;
+  if (phaseData.id === 4 && G.maskQuest.anchors.length < 3) return false;
+
+  showMaskQuestDialogue(phaseData.dialogue, function() {
+    if (phaseData.anchor && !G.maskQuest.anchors.includes(phaseData.anchor.id)) {
+      G.maskQuest.anchors.push(phaseData.anchor.id);
+      notify('Received: ' + phaseData.anchor.icon + ' ' + phaseData.anchor.name);
+      SFX.notify();
+    }
+    G.maskQuest.phase = phaseData.id;
+    if (phaseData.id === 4) {
+      notify('Take Leon back to Maren at the cantina in Frost Valley.');
+    }
+    updateMaskQuestTracker();
+    updateHUD();
+    saveGame();
+  });
+  return true;
+}
+
+let maskDialogueIdx = 0;
+let maskDialogueLines = [];
+let maskDialogueCallback = null;
+
+function showMaskQuestDialogue(lines, onComplete) {
+  maskDialogueLines = lines;
+  maskDialogueIdx = 0;
+  maskDialogueCallback = onComplete;
+  const overlay = document.getElementById('maskDialogueOverlay');
+  overlay.style.display = 'flex';
+  setTimeout(() => overlay.style.opacity = '1', 10);
+  renderMaskDialogueLine();
+}
+
+function renderMaskDialogueLine() {
+  document.getElementById('maskDialogueText').textContent = maskDialogueLines[maskDialogueIdx];
+  document.getElementById('maskDialogueBtn').textContent =
+    maskDialogueIdx >= maskDialogueLines.length - 1 ? 'Close' : 'Continue \u25B6';
+}
+
+function advanceMaskDialogue() {
+  maskDialogueIdx++;
+  if (maskDialogueIdx >= maskDialogueLines.length) {
+    closeMaskDialogue();
+    if (maskDialogueCallback) maskDialogueCallback();
+    maskDialogueCallback = null;
+  } else {
+    renderMaskDialogueLine();
+  }
+}
+
+function closeMaskDialogue() {
+  const overlay = document.getElementById('maskDialogueOverlay');
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.style.display = 'none', 300);
+}
+
+function updateMaskQuestTracker() {
+  const tracker = document.getElementById('maskQuestTracker');
+  if (!tracker) return;
+  const mq = G.maskQuest;
+  if (!mq) { tracker.style.display = 'none'; return; }
+
+  const realPhase = getMaskQuestPhase();
+  const today = getMaskQuestDaySeed();
+
+  if (mq.phase === 0 && realPhase === 0) { tracker.style.display = 'none'; return; }
+  if (mq.phase === 5 && mq.lastCompleted === today) { tracker.style.display = 'none'; return; }
+  if (mq.phase === 0 && realPhase > 0) {
+    tracker.style.display = 'block';
+    document.getElementById('maskQuestStatus').innerHTML =
+      'Phase 1 available<br><span style="color:#6a5a4a;font-size:10px;">Find Maren near the cantina</span>';
+    return;
+  }
+
+  tracker.style.display = 'block';
+  const anchorsText = mq.anchors.map(a => {
+    const phase = MASK_QUEST.phases.find(p => p.anchor && p.anchor.id === a);
+    return phase ? phase.anchor.icon : '';
+  }).join(' ');
+
+  let statusText = '';
+  if (mq.phase < 4) {
+    const nextPhase = MASK_QUEST.phases[mq.phase];
+    if (nextPhase) {
+      statusText = nextPhase.name + ' (' + nextPhase.hours[0] + ':00-' + nextPhase.hours[1] + ':00)';
+    }
+  } else if (mq.phase === 4 && mq.anchors.length === 3) {
+    statusText = 'Return Leon to Maren';
+  }
+
+  document.getElementById('maskQuestStatus').innerHTML =
+    (anchorsText ? anchorsText + '<br>' : '') +
+    '<span style="color:#9a8b7b;">' + statusText + '</span>';
+}
+
+function renderMaskQuestMarkers(ctx, camX, camY, time) {
+  const phaseData = getMaskQuestActivePhaseData();
+  if (!phaseData) return;
+
+  const mx = phaseData.marker.x;
+  const my = phaseData.marker.y;
+  const sx = mx * TILE - camX;
+  const sy = my * TILE - camY;
+
+  if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 60) return;
+
+  const pulse = 0.6 + Math.sin(time * 2.5) * 0.4;
+  const color = phaseData.markerColor;
+
+  ctx.save();
+  ctx.globalAlpha = pulse * 0.3;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(sx + TILE/2, sy + TILE/2, 20, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(sx + TILE/2, sy + TILE/2, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(phaseData.marker.name, sx + TILE/2, sy - 10);
+
+  const dist = Math.sqrt((G.x - mx) ** 2 + (G.y - my) ** 2);
+  if (dist < 2.5) {
+    const promptAlpha = 0.5 + Math.sin(time * 3) * 0.3;
+    ctx.fillStyle = 'rgba(212,164,74,' + promptAlpha + ')';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(phaseData.prompt, sx + TILE/2, sy - 22);
+  }
+  ctx.restore();
+
+  // Phase 4 return marker (Maren in Frost Valley)
+  if (phaseData.id === 4 && G.maskQuest.phase === 4 && G.maskQuest.anchors.length === 3) {
+    const rt = phaseData.completion.returnTo;
+    const rtsx = rt.x * TILE - camX;
+    const rtsy = rt.y * TILE - camY;
+    if (rtsx > -60 && rtsx < canvas.width + 60 && rtsy > -60 && rtsy < canvas.height + 60) {
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#d4a44a';
+      ctx.beginPath();
+      ctx.arc(rtsx + TILE/2, rtsy + TILE/2, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#d4a44a';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Maren', rtsx + TILE/2, rtsy - 10);
+      const rtDist = Math.sqrt((G.x - rt.x) ** 2 + (G.y - rt.y) ** 2);
+      if (rtDist < 2.5) {
+        const pa = 0.5 + Math.sin(time * 3) * 0.3;
+        ctx.fillStyle = 'rgba(212,164,74,' + pa + ')';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('[E] Reunite', rtsx + TILE/2, rtsy - 22);
+      }
+      ctx.restore();
+    }
+  }
+}
+
 // ═══════ LORE ITEMS ═══════
 const LORE_ITEMS = [
   // Frost Valley
@@ -4958,6 +5290,9 @@ function render() {
       ctx.fillText('[E] Talk', nx + TILE/2, ny - 18);
     }
   }
+
+  // ═══════ MASK OF DESTINY QUEST MARKERS ═══════
+  renderMaskQuestMarkers(ctx, camX, camY, time);
 
   // ═══════ AURORA BOREALIS ═══════
   // Only draw aurora in the sky area (top of viewport)
@@ -8889,6 +9224,9 @@ function closeInspect() {
 // ═══════ INTERACTION ═══════
 
 function tryInteract() {
+  // Mask of Destiny quest interaction (highest priority)
+  if (tryMaskQuestInteract()) return;
+
   const tileX = Math.floor(G.x);
   const tileY = Math.floor(G.y);
 
@@ -9571,6 +9909,10 @@ function createCharacter() {
   G.onboarding = { step: 0, hintsShown: {} };
   startOnboardingTimers();
 
+  // Initialize Mask of Destiny quest
+  initMaskQuest();
+  updateMaskQuestTracker();
+
   requestAnimationFrame(render);
   gameLoop();
 }
@@ -9655,6 +9997,7 @@ async function initFirebase() {
       G.hasBoat = data.hasBoat || false;
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
+    G.maskQuest = data.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
     G.direction = 'down';
     G.frame = 0;
     if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -9687,6 +10030,10 @@ async function initFirebase() {
     }
 
     notify(`Welcome back, ${G.name}!` + (useLocalStorage ? ' (Offline Mode)' : ''));
+
+    // Initialize Mask of Destiny quest
+    initMaskQuest();
+    updateMaskQuestTracker();
 
     requestAnimationFrame(render);
     gameLoop();
@@ -9748,6 +10095,7 @@ function saveGame() {
     hasBoat: G.hasBoat || false,
     loreCollected: G.loreCollected || [],
     house: G.house || null,
+    maskQuest: G.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 },
     version: VERSION,
   };
 
