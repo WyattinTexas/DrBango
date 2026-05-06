@@ -6064,8 +6064,15 @@ function buyMarketItem(sellerId, listingIdx) {
   db.ref(`overworld/market/${sellerId}/listings`).set(sellerData.listings);
   marketListings[sellerId] = sellerData;
 
-  // Credit coins to seller (we just remove the listing — coin credit would need server-side logic for real fairness)
-  // For MVP, the coins just go to the buyer's savings (seller doesn't get real-time credit, but their listing is removed)
+  // Credit coins to seller via Firebase transaction
+  db.ref(`overworld/players/${sellerId}/coins`).transaction(current => {
+    return (current || 0) + listing.price;
+  });
+  // Notify in chat
+  addChatMessage('system', `${G.name} bought ${listing.item.name} from ${sellerData.name} for ${listing.price} coins!`);
+
+  // Track seller reputation
+  if (G.rep) { G.rep.itemsSold = (G.rep.itemsSold || 0); } // buyer side — seller tracks on their next load
 
   saveGame();
   updateHUD();
