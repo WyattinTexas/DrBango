@@ -2004,7 +2004,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.8.0';
+const VERSION = 'v4.9.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2642,6 +2642,15 @@ function triggerRoamingBattle(enemy) {
     enemyUsedResource: false,
     damageTakenThisRound: 0,
   };
+
+  // Scale enemy HP based on player level for balance
+  if (G.level <= 3) {
+    B.enemyGhost.maxHp = Math.max(2, B.enemyGhost.maxHp - 1);
+    B.enemyGhost.hp = B.enemyGhost.maxHp;
+  } else if (G.level >= 7) {
+    B.enemyGhost.maxHp += 1;
+    B.enemyGhost.hp = B.enemyGhost.maxHp;
+  }
 
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = warnings[Math.floor(Math.random() * warnings.length)];
@@ -6320,6 +6329,11 @@ function renderMinimap() {
   for (const bm of buildingMarkers) {
     mctx.fillStyle = bm.color;
     mctx.fillRect(bm.x * scale - 1.5, bm.y * scale - 1.5, 4, 4);
+    // Single-letter label next to dot
+    const letter = bm.label[0]; // S=Shop, A=Arena, W=Workshop, I=Inn, C=Cantina
+    mctx.font = '7px sans-serif';
+    mctx.fillStyle = '#fff';
+    mctx.fillText(letter, bm.x * scale + 3, bm.y * scale + 2);
   }
 }
 
@@ -6839,6 +6853,15 @@ function triggerWildEncounter() {
     enemyUsedResource: false,
     damageTakenThisRound: 0,
   };
+
+  // Scale enemy HP based on player level for balance
+  if (G.level <= 3) {
+    B.enemyGhost.maxHp = Math.max(2, B.enemyGhost.maxHp - 1);
+    B.enemyGhost.hp = B.enemyGhost.maxHp;
+  } else if (G.level >= 7) {
+    B.enemyGhost.maxHp += 1;
+    B.enemyGhost.hp = B.enemyGhost.maxHp;
+  }
 
   // Show battle overlay
   showBattleOverlay();
@@ -8005,6 +8028,17 @@ function endBattle(won) {
     SFX.victory();
     notify(`+${xpGain} XP, +${coinGain} coins, +1 ${essence.name}`);
 
+    // First battle tutorial
+    if (G.rep.battlesWon === 1) {
+      setTimeout(() => notify('🎓 You earned a Spirit Essence! Essences have quality stats — find better ones in different zones.'), 1500);
+      setTimeout(() => notify('🎓 Visit the Workshop (blue dot on minimap) to craft gear from your essences!'), 4500);
+    }
+
+    // First essence quality hint
+    if (G.essences.length === 1) {
+      setTimeout(() => notify('💡 Essence stats: Potency (damage), Stability (defense), Resonance (specials), Purity (experiments)'), 2500);
+    }
+
     // Quest progress: battle won + essence collected
     checkQuestProgress('battle_won', { rarity: B.enemyCard.rarity });
     checkQuestProgress('essence_collected', essence);
@@ -8050,15 +8084,30 @@ function endBattle(won) {
 
     SFX.defeat();
     Music.playJingle('defeat');
-    // Respawn at hub
-    G.x = 16; G.y = 9;
-    // Heal team
-    G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.5)); g.ko = false; });
-    notify('Defeated... Respawning at hub.');
+    notify('💀 All Spiritkin defeated! Retreating to safety...');
 
     // Profession XP: combat + exploration (loss — still earns some)
     addProfessionXP('combat', 5);
     addProfessionXP('exploration', 2); // battles also feed exploration
+
+    // Delay before respawn so player can read the message
+    setTimeout(() => {
+      // Respawn at hub
+      G.x = 16; G.y = 9;
+      // Heal team to 75% (gentler for new players)
+      G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.75)); g.ko = false; });
+      notify('Respawned at hub. Your team has been partially healed.');
+
+      G.inBattle = false;
+      B = null;
+      document.getElementById('battleOverlay').classList.remove('active', 'visible');
+
+      updateHUD();
+      saveGame();
+      requestAnimationFrame(render);
+      gameLoop();
+    }, 2000);
+    return;
   }
 
   G.inBattle = false;
