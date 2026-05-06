@@ -1272,6 +1272,101 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #helpPanel .help-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
 #helpPanel .help-key { color: #fff; font-weight: bold; min-width: 60px; }
 #helpPanel .help-desc { color: #999; }
+
+/* ═══════ PROFESSION TREE MODAL ═══════ */
+#profTreeOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 1100; display: none; align-items: center; justify-content: center;
+}
+#profTreeOverlay.active { display: flex; }
+.prof-tree-modal {
+  background: #0c0c1a; border: 2px solid #334; border-radius: 12px;
+  width: 95%; max-width: 1000px; max-height: 92vh; overflow-y: auto;
+  padding: 0;
+}
+.prof-tree-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 24px; border-bottom: 1px solid #223;
+  background: linear-gradient(180deg, #141428, #0c0c1a);
+  position: sticky; top: 0; z-index: 5;
+}
+.prof-tree-header h2 { color: #daa520; font-size: 20px; margin: 0; }
+.prof-tree-header .pt-points {
+  font-size: 14px; color: #888;
+}
+.prof-tree-header .pt-points strong { color: #fff; }
+.prof-tree-close {
+  background: none; border: 1px solid #445; color: #888; width: 32px; height: 32px;
+  border-radius: 6px; cursor: pointer; font-size: 16px;
+}
+.prof-tree-close:hover { color: #fff; border-color: #888; }
+
+.prof-tree-body { padding: 16px 24px; }
+
+/* XP summary bar */
+.pt-xp-row {
+  display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.pt-xp-item {
+  flex: 1; min-width: 120px; background: #0a0a18; border: 1px solid #1a1a2a;
+  border-radius: 8px; padding: 8px 12px;
+}
+.pt-xp-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+.pt-xp-val { font-size: 16px; font-weight: bold; color: #fff; margin-top: 2px; }
+.pt-xp-bar { height: 3px; background: #1a1a2a; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.pt-xp-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+/* Profession sections */
+.pt-section {
+  margin-bottom: 16px; border: 1px solid #1a1a2a; border-radius: 8px;
+  overflow: hidden;
+}
+.pt-section-header {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: #0f0f20; cursor: pointer; user-select: none;
+}
+.pt-section-header:hover { background: #141430; }
+.pt-section-icon { font-size: 20px; }
+.pt-section-name { font-weight: bold; color: #fff; font-size: 14px; }
+.pt-section-tier { font-size: 10px; color: #666; text-transform: uppercase; }
+.pt-section-xp { font-size: 11px; color: #888; margin-left: auto; }
+.pt-section-locked { opacity: 0.4; }
+
+/* Skill boxes */
+.pt-boxes {
+  display: flex; gap: 6px; padding: 10px 14px; background: #080812;
+  flex-wrap: wrap;
+}
+.pt-box {
+  flex: 1; min-width: 140px; background: #0a0a1a; border: 2px solid #223;
+  border-radius: 6px; padding: 10px; text-align: center; transition: all 0.2s;
+}
+.pt-box.unlocked {
+  border-color: #4a8; background: #0a1a0a;
+}
+.pt-box.available {
+  border-color: #daa520; background: #1a1608; cursor: pointer;
+  animation: boxGlow 2s ease-in-out infinite;
+}
+@keyframes boxGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(218,165,32,0.2); }
+  50% { box-shadow: 0 0 15px rgba(218,165,32,0.4); }
+}
+.pt-box.locked { opacity: 0.4; }
+.pt-box .box-name { font-weight: bold; font-size: 12px; color: #fff; margin-bottom: 2px; }
+.pt-box .box-desc { font-size: 10px; color: #888; }
+.pt-box .box-cost { font-size: 9px; color: #666; margin-top: 4px; }
+.pt-box .box-cost .pts { color: #daa520; }
+.pt-box.unlocked .box-name { color: #4a8; }
+.pt-box.available .box-name { color: #daa520; }
+.pt-box.available:hover { transform: translateY(-2px); }
+
+@media (max-width: 768px) {
+  .pt-xp-row { gap: 6px; }
+  .pt-xp-item { min-width: 80px; padding: 6px 8px; }
+  .pt-boxes { flex-direction: column; }
+  .pt-box { min-width: 0; }
+}
 </style>
 </head>
 <body>
@@ -1311,6 +1406,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <button class="hud-btn" id="hudGuildBtn" onclick="toggleGuildPanel()">&#9876;&#65039; Guild</button>
     <div class="hud-stat"><span class="icon">&#128101;</span><span id="hudPlayers">1</span></div>
     <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">&#128270; Survey</button>
+    <button class="hud-btn" onclick="openProfTree()">&#127775; Skills</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
     <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
   </div>
@@ -1323,6 +1419,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <div class="help-row"><span class="help-key">E</span><span class="help-desc">Interact (NPCs, buildings)</span></div>
   <div class="help-row"><span class="help-key">Q</span><span class="help-desc">Survey (in encounter zones)</span></div>
   <div class="help-row"><span class="help-key">I</span><span class="help-desc">Inventory</span></div>
+  <div class="help-row"><span class="help-key">K</span><span class="help-desc">Profession Skills</span></div>
   <div class="help-row"><span class="help-key">M</span><span class="help-desc">Mute / Unmute</span></div>
   <div class="help-row"><span class="help-key">Enter</span><span class="help-desc">Chat</span></div>
   <div class="help-row"><span class="help-key">Escape</span><span class="help-desc">Close menus</span></div>
@@ -1616,6 +1713,18 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <div class="survey-status" id="surveyStatus">Analyzing spirit energy...</div>
 </div>
 
+<!-- PROFESSION TREE -->
+<div id="profTreeOverlay">
+  <div class="prof-tree-modal">
+    <div class="prof-tree-header">
+      <h2>Profession Skills</h2>
+      <span class="pt-points">Points: <strong id="ptPointsUsed">0</strong> / <strong id="ptPointsCap">80</strong></span>
+      <button class="prof-tree-close" onclick="closeProfTree()">X</button>
+    </div>
+    <div class="prof-tree-body" id="profTreeBody"></div>
+  </div>
+</div>
+
 <!-- TOUCH HINT (mobile only) -->
 <div id="touchHint">Drag to move &bull; Double-tap to interact</div>
 
@@ -1632,7 +1741,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.7.0';
+const VERSION = 'v2.8.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -4553,11 +4662,12 @@ function setupInput() {
     if (e.key === 'e' || e.key === 'E') tryInteract();
     if (e.key === 'q' || e.key === 'Q') startSurvey();
     if (e.key === 'i' || e.key === 'I') toggleInventory();
+    if (e.key === 'k' || e.key === 'K') openProfTree();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
     if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
     if (e.key === 'Escape') {
       // Close any open overlay
-      document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active, #guildCreateOverlay.active')
+      document.querySelectorAll('.modal-overlay.active, #cantinaOverlay.active, #arenaOverlay.active, #dialogueOverlay.active, #resourceReportOverlay.active, #experimentOverlay.active, #marketOverlay.active, #guildCreateOverlay.active, #profTreeOverlay.active')
         .forEach(el => el.classList.remove('active'));
       document.getElementById('inventoryPanel')?.classList.remove('open');
       document.getElementById('guildPanel')?.classList.remove('open');
@@ -5862,6 +5972,97 @@ function isNearWorkshop() {
     if (worldMap[tileY+dy]?.[tileX+dx] === 8) return true;
   }
   return false;
+}
+
+// ═══════ PROFESSION TREE UI ═══════
+function openProfTree() {
+  document.getElementById('profTreeOverlay').classList.add('active');
+  renderProfTree();
+}
+
+function closeProfTree() {
+  document.getElementById('profTreeOverlay').classList.remove('active');
+}
+
+function renderProfTree() {
+  const body = document.getElementById('profTreeBody');
+  document.getElementById('ptPointsUsed').textContent = G.skillPointsUsed || 0;
+  document.getElementById('ptPointsCap').textContent = SKILL_POINT_CAP;
+
+  // XP summary row
+  const xpTypes = [
+    { id: 'combat', name: 'Combat', color: '#c44', icon: '⚔️' },
+    { id: 'exploration', name: 'Exploration', color: '#4a4', icon: '🗺️' },
+    { id: 'crafting', name: 'Crafting', color: '#4ac', icon: '🔧' },
+    { id: 'trade', name: 'Trade', color: '#ca4', icon: '💰' },
+    { id: 'charisma', name: 'Charisma', color: '#c8a', icon: '🎉' },
+  ];
+
+  let html = '<div class="pt-xp-row">';
+  for (const xp of xpTypes) {
+    const val = G.professionXP?.[xp.id] || 0;
+    html += `<div class="pt-xp-item">
+      <div class="pt-xp-label">${xp.icon} ${xp.name}</div>
+      <div class="pt-xp-val" style="color:${xp.color}">${val}</div>
+      <div class="pt-xp-bar"><div class="pt-xp-fill" style="width:${Math.min(100, val/20)}%;background:${xp.color};"></div></div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Group professions by path
+  const paths = [
+    { name: 'Combat', profs: ['hunter', 'spiritHunter'] },
+    { name: 'Exploration', profs: ['scout', 'ranger'] },
+    { name: 'Crafting — Base', profs: ['tinkerer'] },
+    { name: 'Crafting — Specializations', profs: ['blacksmith', 'armorer', 'swordsmith', 'blasterEng', 'frostMagic', 'flameMagic', 'maskMaker', 'charmCrafting'] },
+    { name: 'Trade', profs: ['merchant', 'tycoon'] },
+    { name: 'Social', profs: ['socialite', 'governor'] },
+  ];
+
+  for (const path of paths) {
+    html += `<h3 style="color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;margin:16px 0 8px;border-bottom:1px solid #1a1a2a;padding-bottom:4px;">${path.name}</h3>`;
+
+    for (const profId of path.profs) {
+      const prof = PROFESSION_TREE[profId];
+      if (!prof) continue;
+
+      const xpVal = G.professionXP?.[prof.xpType] || 0;
+      const isLocked = prof.requires && !hasSkill(prof.requires);
+      const unlockedCount = prof.boxes.filter(b => hasSkill(b.id)).length;
+
+      html += `<div class="pt-section ${isLocked ? 'pt-section-locked' : ''}">
+        <div class="pt-section-header">
+          <span class="pt-section-icon">${prof.icon}</span>
+          <span class="pt-section-name">${prof.name}</span>
+          <span class="pt-section-tier">Tier ${prof.tier}</span>
+          <span class="pt-section-xp">${unlockedCount}/${prof.boxes.length} boxes${isLocked ? ' 🔒' : ''}</span>
+        </div>
+        <div class="pt-boxes">`;
+
+      for (const box of prof.boxes) {
+        const unlocked = hasSkill(box.id);
+        const available = !unlocked && canUnlockBox(box.id);
+        const cls = unlocked ? 'unlocked' : available ? 'available' : 'locked';
+
+        html += `<div class="pt-box ${cls}" ${available ? `onclick="clickUnlockBox('${box.id}')"` : ''}>
+          <div class="box-name">${unlocked ? '✓ ' : ''}${box.name}</div>
+          <div class="box-desc">${box.desc}</div>
+          <div class="box-cost">${unlocked ? 'Unlocked' : `<span class="pts">${box.cost} pts</span> · ${box.xpReq} ${prof.xpType} XP`}</div>
+        </div>`;
+      }
+
+      html += '</div></div>';
+    }
+  }
+
+  body.innerHTML = html;
+}
+
+function clickUnlockBox(boxId) {
+  if (unlockSkillBox(boxId)) {
+    renderProfTree();
+    updateHUD();
+  }
 }
 
 function openCrafting() {
