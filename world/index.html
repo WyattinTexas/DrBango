@@ -1981,7 +1981,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.0.0';
+const VERSION = 'v4.1.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2504,6 +2504,10 @@ function updateRoamingEnemies() {
         const ptile = worldMap[Math.floor(pny)]?.[Math.floor(pnx)];
         if (ptile !== undefined && ptile !== 1 && ptile !== 3 && ptile !== 7 && ptile !== 15 && ptile !== 16 && ptile !== 13 && ptile !== 21 && ptile !== 23 && ptile !== 25) {
           e.x = pnx; e.y = pny;
+          // Stable direction: only update when angle changes significantly
+          const na = ((e.patrolAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+          const newDir = na > 5.5 || na < 0.8 ? 'right' : na < 2.4 ? 'down' : na < 3.9 ? 'left' : 'up';
+          if (e.dir !== newDir) e.dir = newDir;
         } else {
           e.patrolAngle += Math.PI * 0.5; // turn on collision
         }
@@ -2533,6 +2537,10 @@ function updateRoamingEnemies() {
         const ctile = worldMap[Math.floor(cny)]?.[Math.floor(cnx)];
         if (ctile !== undefined && ctile !== 1 && ctile !== 3 && ctile !== 7 && ctile !== 15 && ctile !== 16 && ctile !== 13 && ctile !== 21 && ctile !== 23 && ctile !== 25) {
           e.x = cnx; e.y = cny;
+          // Stable chase direction
+          const ca = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+          const chaseDir = ca > 5.5 || ca < 0.8 ? 'right' : ca < 2.4 ? 'down' : ca < 3.9 ? 'left' : 'up';
+          if (e.dir !== chaseDir) e.dir = chaseDir;
         }
         // Catch player — trigger battle!
         if (distToPlayer < 1.2) {
@@ -2555,6 +2563,10 @@ function updateRoamingEnemies() {
         const rAngle = Math.atan2(e.homeY - e.y, e.homeX - e.x);
         e.x += Math.cos(rAngle) * e.speed;
         e.y += Math.sin(rAngle) * e.speed;
+        // Stable return direction
+        const ra = ((rAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const retDir = ra > 5.5 || ra < 0.8 ? 'right' : ra < 2.4 ? 'down' : ra < 3.9 ? 'left' : 'up';
+        if (e.dir !== retDir) e.dir = retDir;
         if (distToHome < 2) {
           e.state = 'patrol';
           e.patrolAngle = Math.random() * Math.PI * 2;
@@ -4235,62 +4247,99 @@ function render() {
         ctx.lineTo(sx + TILE/2 + 5, sy + 10);
         ctx.lineTo(sx + TILE/2 - 5, sy + 10);
         ctx.fill();
-      } else if (tile === 5 ) { // Building (fallback only)
-        // Walls
+      } else if (tile === 5 ) { // Building — 1.8x scale for visual presence
+        const bScale = 1.8;
+        const bw = TILE * bScale;
+        const bh = TILE * bScale;
+        const bx = sx + TILE/2 - bw/2;
+        const by = sy + TILE - bh;
+        // Wall body
         ctx.fillStyle = '#8a7a5a';
-        ctx.fillRect(sx + 2, sy + 10, TILE - 4, TILE - 10);
+        ctx.fillRect(bx + 4, by + bh * 0.35, bw - 8, bh * 0.65);
         // Wall highlight
         ctx.fillStyle = '#9a8a6a';
-        ctx.fillRect(sx + 3, sy + 11, TILE - 6, 2);
-        // Roof
+        ctx.fillRect(bx + 5, by + bh * 0.36, bw - 10, 2);
+        // Roof (triangle)
         ctx.fillStyle = '#a05030';
         ctx.beginPath();
-        ctx.moveTo(sx, sy + 10);
-        ctx.lineTo(sx + TILE/2, sy);
-        ctx.lineTo(sx + TILE, sy + 10);
+        ctx.moveTo(bx, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by);
+        ctx.lineTo(bx + bw, by + bh * 0.35);
         ctx.fill();
-        // Roof ridge
-        ctx.strokeStyle = '#804020';
+        // Ridge line
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(sx + TILE/2, sy);
-        ctx.lineTo(sx + TILE/2, sy + 10);
-        ctx.stroke();
-        // Windows
-        ctx.fillStyle = 'rgba(200,220,255,0.7)';
-        ctx.fillRect(sx + 6, sy + 16, 8, 8);
-        ctx.fillRect(sx + TILE - 14, sy + 16, 8, 8);
-        // Window frames
-        ctx.strokeStyle = '#5a4a3a';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(sx + 6, sy + 16, 8, 8);
-        ctx.strokeRect(sx + TILE - 14, sy + 16, 8, 8);
-        // Window cross
-        ctx.beginPath();
-        ctx.moveTo(sx + 10, sy + 16); ctx.lineTo(sx + 10, sy + 24);
-        ctx.moveTo(sx + 6, sy + 20); ctx.lineTo(sx + 14, sy + 20);
-        ctx.moveTo(sx + TILE - 10, sy + 16); ctx.lineTo(sx + TILE - 10, sy + 24);
-        ctx.moveTo(sx + TILE - 14, sy + 20); ctx.lineTo(sx + TILE - 6, sy + 20);
+        ctx.moveTo(bx + bw * 0.2, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by + 4);
+        ctx.lineTo(bx + bw * 0.8, by + bh * 0.35);
         ctx.stroke();
         // Door
         ctx.fillStyle = '#3a2a1a';
-        ctx.fillRect(sx + TILE/2 - 5, sy + TILE - 14, 10, 14);
-        // Doorknob
-        ctx.fillStyle = '#daa520';
-        ctx.fillRect(sx + TILE/2 + 2, sy + TILE - 8, 2, 2);
-      } else if (tile === 8) { // Workshop
+        ctx.fillRect(bx + bw/2 - 8, by + bh - 18, 16, 18);
+        // Door knob
+        ctx.fillStyle = '#c8a848';
+        ctx.beginPath();
+        ctx.arc(bx + bw/2 + 4, by + bh - 8, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Windows (2)
+        ctx.fillStyle = '#ffdd88';
+        ctx.fillRect(bx + 14, by + bh * 0.45, 12, 12);
+        ctx.fillRect(bx + bw - 26, by + bh * 0.45, 12, 12);
+        // Window panes (cross)
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        [bx + 14, bx + bw - 26].forEach(wx => {
+          ctx.moveTo(wx + 6, by + bh * 0.45); ctx.lineTo(wx + 6, by + bh * 0.45 + 12);
+          ctx.moveTo(wx, by + bh * 0.45 + 6); ctx.lineTo(wx + 12, by + bh * 0.45 + 6);
+        });
+        ctx.stroke();
+      } else if (tile === 8) { // Workshop — 1.8x scale
+        const bScale = 1.8;
+        const bw = TILE * bScale;
+        const bh = TILE * bScale;
+        const bx = sx + TILE/2 - bw/2;
+        const by = sy + TILE - bh;
+        // Wall body
         ctx.fillStyle = '#7a6a4a';
-        ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
+        ctx.fillRect(bx + 4, by + bh * 0.35, bw - 8, bh * 0.65);
+        // Roof (triangle)
         ctx.fillStyle = '#6a4a2a';
         ctx.beginPath();
-        ctx.moveTo(sx + 1, sy + 6);
-        ctx.lineTo(sx + TILE/2, sy);
-        ctx.lineTo(sx + TILE - 1, sy + 6);
+        ctx.moveTo(bx, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by);
+        ctx.lineTo(bx + bw, by + bh * 0.35);
         ctx.fill();
-        // Anvil icon
+        // Ridge line
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bx + bw * 0.2, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by + 4);
+        ctx.lineTo(bx + bw * 0.8, by + bh * 0.35);
+        ctx.stroke();
+        // Door
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(bx + bw/2 - 8, by + bh - 18, 16, 18);
+        // Door knob
+        ctx.fillStyle = '#c8a848';
+        ctx.beginPath();
+        ctx.arc(bx + bw/2 + 4, by + bh - 8, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Anvil icon (workshop signature)
         ctx.fillStyle = '#aaa';
-        ctx.fillRect(sx + TILE/2 - 4, sy + TILE - 12, 8, 4);
-        ctx.fillRect(sx + TILE/2 - 2, sy + TILE - 8, 4, 6);
+        ctx.fillRect(bx + 14, by + bh * 0.5, 14, 6);
+        ctx.fillRect(bx + 17, by + bh * 0.5 + 6, 8, 10);
+        // Window
+        ctx.fillStyle = '#ffcc66';
+        ctx.fillRect(bx + bw - 26, by + bh * 0.45, 12, 12);
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bx + bw - 20, by + bh * 0.45); ctx.lineTo(bx + bw - 20, by + bh * 0.45 + 12);
+        ctx.moveTo(bx + bw - 26, by + bh * 0.45 + 6); ctx.lineTo(bx + bw - 14, by + bh * 0.45 + 6);
+        ctx.stroke();
       } else if (tile === 6) { // Encounter zone — glowing
         const pulse = 0.15 + Math.sin(time * 2 + tx * 0.5 + ty * 0.3) * 0.1;
         ctx.fillStyle = `rgba(100, 60, 200, ${pulse})`;
@@ -4349,22 +4398,51 @@ function render() {
         ctx.beginPath();
         ctx.ellipse(sx + TILE/2, sy + TILE - 8, TILE/3, 5, 0, Math.PI, 0);
         ctx.fill();
-      } else if (tile === 12) { // Cantina
-        ctx.fillStyle = '#8a6a2a';
-        ctx.fillRect(sx + 2, sy + 6, TILE - 4, TILE - 6);
-        ctx.fillStyle = '#b08030';
+      } else if (tile === 12) { // Cantina — 1.8x scale
+        const bScale = 1.8;
+        const bw = TILE * bScale;
+        const bh = TILE * bScale;
+        const bx = sx + TILE/2 - bw/2;
+        const by = sy + TILE - bh;
+        // Wall body
+        ctx.fillStyle = '#6a4a3a';
+        ctx.fillRect(bx + 4, by + bh * 0.35, bw - 8, bh * 0.65);
+        // Roof (triangle)
+        ctx.fillStyle = '#8a3a2a';
         ctx.beginPath();
-        ctx.moveTo(sx + 1, sy + 6);
-        ctx.lineTo(sx + TILE/2, sy);
-        ctx.lineTo(sx + TILE - 1, sy + 6);
+        ctx.moveTo(bx, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by);
+        ctx.lineTo(bx + bw, by + bh * 0.35);
         ctx.fill();
+        // Ridge line
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bx + bw * 0.2, by + bh * 0.35);
+        ctx.lineTo(bx + bw/2, by + 4);
+        ctx.lineTo(bx + bw * 0.8, by + bh * 0.35);
+        ctx.stroke();
         // Door
         ctx.fillStyle = '#3a2a0a';
-        ctx.fillRect(sx + TILE/2 - 3, sy + TILE - 10, 6, 10);
-        // Warm window glow
-        ctx.fillStyle = 'rgba(255,200,80,0.6)';
-        ctx.fillRect(sx + 6, sy + 12, 5, 5);
-        ctx.fillRect(sx + TILE - 11, sy + 12, 5, 5);
+        ctx.fillRect(bx + bw/2 - 8, by + bh - 18, 16, 18);
+        // Door knob
+        ctx.fillStyle = '#c8a848';
+        ctx.beginPath();
+        ctx.arc(bx + bw/2 + 4, by + bh - 8, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Warm glowing windows (cantina signature)
+        ctx.fillStyle = 'rgba(255,200,80,0.7)';
+        ctx.fillRect(bx + 14, by + bh * 0.45, 12, 12);
+        ctx.fillRect(bx + bw - 26, by + bh * 0.45, 12, 12);
+        // Window panes
+        ctx.strokeStyle = '#5a3a2a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        [bx + 14, bx + bw - 26].forEach(wx => {
+          ctx.moveTo(wx + 6, by + bh * 0.45); ctx.lineTo(wx + 6, by + bh * 0.45 + 12);
+          ctx.moveTo(wx, by + bh * 0.45 + 6); ctx.lineTo(wx + 12, by + bh * 0.45 + 6);
+        });
+        ctx.stroke();
       } else if (tile === 13) { // Warm tree (Rolling Hills) — varied
         const warmVar = (tx * 11 + ty * 3) % 3;
         ctx.fillStyle = '#5a3a1a';
@@ -4588,25 +4666,40 @@ function render() {
         ctx.moveTo(sx + TILE/2, sy + 10);
         ctx.lineTo(sx + TILE - 10, sy + 14);
         ctx.stroke();
-      } else if (tile === 26) { // Castle floor — darker stone with tile pattern
+      } else if (tile === 26) { // Castle floor — 1.8x scale dark stone structure
+        const bScale = 1.8;
+        const bw = TILE * bScale;
+        const bh = TILE * bScale;
+        const bx = sx + TILE/2 - bw/2;
+        const by = sy + TILE - bh;
+        // Stone wall body
         ctx.fillStyle = '#3a2a3a';
-        ctx.fillRect(sx, sy, TILE, TILE);
-        // Tile pattern
-        ctx.strokeStyle = 'rgba(60,45,60,0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(sx + 1, sy + 1, TILE - 2, TILE - 2);
-        ctx.beginPath();
-        ctx.moveTo(sx + TILE/2, sy); ctx.lineTo(sx + TILE/2, sy + TILE);
-        ctx.moveTo(sx, sy + TILE/2); ctx.lineTo(sx + TILE, sy + TILE/2);
-        ctx.stroke();
-        // Occasional decorative accent
-        if ((tx + ty) % 5 === 0) {
-          const pulse = 0.2 + Math.sin(time * 1.5 + tx * 0.7 + ty * 0.5) * 0.1;
-          ctx.fillStyle = `rgba(140,40,80,${pulse})`;
-          ctx.beginPath();
-          ctx.arc(sx + TILE/2, sy + TILE/2, 3, 0, Math.PI * 2);
-          ctx.fill();
+        ctx.fillRect(bx + 4, by + bh * 0.3, bw - 8, bh * 0.7);
+        // Battlements (castle crenellations)
+        ctx.fillStyle = '#4a3a4a';
+        const crenW = bw / 5;
+        for (let ci = 0; ci < 5; ci += 2) {
+          ctx.fillRect(bx + 4 + ci * crenW, by + bh * 0.2, crenW - 2, bh * 0.12);
         }
+        // Flat roof line
+        ctx.fillStyle = '#2a1a2a';
+        ctx.fillRect(bx + 2, by + bh * 0.3, bw - 4, 3);
+        // Arched door
+        ctx.fillStyle = '#1a0a1a';
+        ctx.fillRect(bx + bw/2 - 9, by + bh - 22, 18, 22);
+        ctx.beginPath();
+        ctx.arc(bx + bw/2, by + bh - 22, 9, Math.PI, 0);
+        ctx.fill();
+        // Torch glow windows
+        const pulse = 0.5 + Math.sin(time * 2 + tx * 0.7) * 0.2;
+        ctx.fillStyle = `rgba(200,120,60,${pulse})`;
+        ctx.fillRect(bx + 12, by + bh * 0.42, 10, 14);
+        ctx.fillRect(bx + bw - 22, by + bh * 0.42, 10, 14);
+        // Window arch tops
+        ctx.beginPath();
+        ctx.arc(bx + 17, by + bh * 0.42, 5, Math.PI, 0);
+        ctx.arc(bx + bw - 17, by + bh * 0.42, 5, Math.PI, 0);
+        ctx.fill();
       } else if (tile === 0 ) { // Snow detail (fallback only)
         // Subtle snow texture
         if ((tx + ty) % 3 === 0) {
@@ -5148,14 +5241,9 @@ function render() {
     // Draw monster sprite (or fallback circle)
     const monImg = getMonsterSprite(e);
     const mFrame = (Math.floor(Date.now() / 300) % 2 === 0) ? 1 : 3;
-    // Direction based on movement angle
-    const angle = e.patrolAngle || 0;
-    const normAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    let mDir;
-    if (normAngle > Math.PI * 0.25 && normAngle < Math.PI * 0.75) mDir = 0; // down
-    else if (normAngle > Math.PI * 1.25 && normAngle < Math.PI * 1.75) mDir = 1; // up
-    else if (normAngle > Math.PI * 0.75 && normAngle < Math.PI * 1.25) mDir = 2; // left
-    else mDir = 3; // right
+    // Direction based on stable e.dir (updated in updateRoamingEnemies)
+    const dirLookup = { down: 0, up: 1, left: 2, right: 3 };
+    const mDir = dirLookup[e.dir || 'down'] || 0;
 
     if (e.state === 'chase') {
       // ── CHASING: danger glow ring ──
@@ -5759,20 +5847,14 @@ function gameLoop() {
   // Normalize diagonal
   if (dx && dy) { dx *= 0.707; dy *= 0.707; }
 
+  // NUCLEAR DIRECTION FIX — read keys directly, ignore dx/dy
+  // Whichever direction key is pressed, that's the direction. Period.
+  if (keys['d'] || keys['arrowright']) G.direction = 'right';
+  else if (keys['a'] || keys['arrowleft']) G.direction = 'left';
+  else if (keys['s'] || keys['arrowdown']) G.direction = 'down';
+  else if (keys['w'] || keys['arrowup']) G.direction = 'up';
+
   if (dx || dy) {
-    // Update facing direction — simple and direct
-    // Single axis: force that direction. Diagonal: keep last direction.
-    const onlyHoriz = (keys['a'] || keys['d'] || keys['arrowleft'] || keys['arrowright']) && 
-                      !(keys['w'] || keys['s'] || keys['arrowup'] || keys['arrowdown']);
-    const onlyVert = (keys['w'] || keys['s'] || keys['arrowup'] || keys['arrowdown']) && 
-                     !(keys['a'] || keys['d'] || keys['arrowleft'] || keys['arrowright']);
-    if (onlyHoriz) {
-      G.direction = dx > 0 ? 'right' : 'left';
-    } else if (onlyVert) {
-      G.direction = dy > 0 ? 'down' : 'up';
-    }
-    // Diagonal: keep current direction (no change = no flicker)
-    // If roughly equal (diagonal), keep current direction — no flicker
 
     const speedMult = hasSkill('rng_1') ? 1.1 : 1.0;
     const newX = G.x + dx * 0.05 * speedMult;
