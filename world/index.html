@@ -887,6 +887,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 .sprite-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px;
 }
+.sprite-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; }
 .sprite-option {
   background: #0f0f24; border: 2px solid #334; border-radius: 8px;
   padding: 10px; text-align: center; cursor: pointer; transition: all 0.2s;
@@ -1470,10 +1471,10 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <!-- CHARACTER CREATION -->
 <div class="modal-overlay" id="charCreateOverlay">
   <div class="modal" id="charCreate">
-    <h2>Create Your Warden</h2>
+    <h2>Create Your Adventurer</h2>
     <input class="name-input" id="nameInput" placeholder="Enter your name..." maxlength="16" autocomplete="off">
 
-    <h3>Choose Your Look</h3>
+    <h3>Pick Your Look</h3>
     <div class="sprite-grid" id="spriteGrid"></div>
 
     <button class="btn-primary" id="btnCreate" onclick="createCharacter()" disabled>Enter the Overworld</button>
@@ -4450,7 +4451,7 @@ function render() {
       ctx.arc(ex + TILE/2, ey + TILE/2 + bob, pulseR, 0, Math.PI * 2);
       ctx.stroke();
       // Monster body sprite
-      if (monImg && monImg.complete) {
+      if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
         ctx.imageSmoothingEnabled = true;
@@ -4463,7 +4464,7 @@ function render() {
 
     } else if (e.state === 'alert') {
       // ── ALERT: noticed you ──
-      if (monImg && monImg.complete) {
+      if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
         ctx.imageSmoothingEnabled = true;
@@ -4481,7 +4482,7 @@ function render() {
 
     } else {
       // ── PATROL / RETURNING: calm ──
-      if (monImg && monImg.complete) {
+      if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.globalAlpha = 0.7;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, ex, ey + bob, TILE, TILE);
@@ -7755,9 +7756,7 @@ function initCharCreate() {
   const spriteGrid = document.getElementById('spriteGrid');
   spriteGrid.innerHTML = SPRITE_DEFS.map(s => `
     <div class="sprite-option${s.id === 1 ? ' selected' : ''}" data-sprite="${s.id}" onclick="selectSprite(${s.id})">
-      <canvas width="48" height="72" id="spritePreview_${s.id}"></canvas>
-      <div class="sprite-name">${s.name}</div>
-      <div class="sprite-desc">${s.desc}</div>
+      <canvas width="64" height="64" id="spritePreview_${s.id}"></canvas>
     </div>
   `).join('');
 
@@ -7768,19 +7767,27 @@ function initCharCreate() {
       if (!c) return;
       const sctx = c.getContext('2d');
       const img = spriteImages[s.id];
-      if (img && img.complete) {
+      if (img && img.complete && img.naturalWidth) {
         sctx.imageSmoothingEnabled = false;
-        sctx.drawImage(img, 0, 0, 16, 16, 4, 2, 32, 32);
-      } else {
-        // Fallback if image not yet loaded — retry on load
-        drawSprite(sctx, s.id, 8, 12, 2, 'down', 0);
-        if (img) {
-          img.onload = () => {
+        sctx.drawImage(img, 0, 0, 16, 16, 8, 8, 48, 48);
+      } else if (img) {
+        // Image not loaded yet — draw fallback and retry on load
+        sctx.fillStyle = '#4af';
+        sctx.beginPath();
+        sctx.arc(32, 32, 16, 0, Math.PI * 2);
+        sctx.fill();
+        img.onload = () => {
+          if (img.naturalWidth) {
             sctx.clearRect(0, 0, c.width, c.height);
             sctx.imageSmoothingEnabled = false;
-            sctx.drawImage(img, 0, 0, 16, 16, 4, 2, 32, 32);
-          };
-        }
+            sctx.drawImage(img, 0, 0, 16, 16, 8, 8, 48, 48);
+          }
+        };
+      } else {
+        sctx.fillStyle = '#4af';
+        sctx.beginPath();
+        sctx.arc(32, 32, 16, 0, Math.PI * 2);
+        sctx.fill();
       }
     });
   }, 50);
@@ -8278,7 +8285,7 @@ function preloadSprites() {
 
 function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
   const img = spriteImages[spriteId];
-  if (!img || !img.complete) {
+  if (!img || !img.complete || !img.naturalWidth) {
     // Fallback: draw a colored circle if image not loaded
     ctx.fillStyle = '#4af';
     ctx.beginPath();
