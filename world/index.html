@@ -1884,7 +1884,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.10.0';
+const VERSION = 'v3.11.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2458,6 +2458,7 @@ function triggerRoamingBattle(enemy) {
 
   G.inBattle = true;
   SFX.encounterStart();
+  Music.play('battle');
 
   const activeGhost = G.team[G.activeIdx];
   let playerGhost = (activeGhost && !activeGhost.ko && activeGhost.hp > 0) ? activeGhost : G.team.find(g => !g.ko && g.hp > 0);
@@ -2745,6 +2746,88 @@ const SFX = {
   },
 };
 
+// ═══════ MUSIC SYSTEM ═══════
+const Music = {
+  current: null,      // currently playing Audio element
+  currentTrack: null,  // track name
+  volume: 0.3,
+  muted: false,
+  tracks: {},
+
+  init() {
+    const trackList = {
+      overworld: 'assets/audio/overworld.ogg',
+      hub: 'assets/audio/hub.ogg',
+      frost_valley: 'assets/audio/frost_valley.ogg',
+      rolling_hills: 'assets/audio/rolling_hills.ogg',
+      volcanic: 'assets/audio/volcanic.ogg',
+      battle: 'assets/audio/battle.ogg',
+      cantina: 'assets/audio/cantina.ogg',
+    };
+    for (const [name, src] of Object.entries(trackList)) {
+      const audio = new Audio(src);
+      audio.loop = true;
+      audio.volume = this.volume;
+      audio.preload = 'none'; // don't load until needed
+      this.tracks[name] = audio;
+    }
+    // Jingles (play once, don't loop)
+    this.jingles = {
+      levelup: new Audio('assets/audio/levelup.wav'),
+      defeat: new Audio('assets/audio/defeat.wav'),
+      lore: new Audio('assets/audio/lore_found.wav'),
+    };
+    for (const j of Object.values(this.jingles)) {
+      j.volume = 0.4;
+    }
+  },
+
+  play(trackName) {
+    if (this.muted || this.currentTrack === trackName) return;
+    // Fade out current
+    if (this.current) {
+      const old = this.current;
+      const fadeOut = setInterval(() => {
+        old.volume = Math.max(0, old.volume - 0.02);
+        if (old.volume <= 0) { old.pause(); old.currentTime = 0; clearInterval(fadeOut); }
+      }, 50);
+    }
+    // Start new track
+    const track = this.tracks[trackName];
+    if (!track) return;
+    this.current = track;
+    this.currentTrack = trackName;
+    track.volume = 0;
+    track.play().catch(() => {}); // browser may block autoplay
+    // Fade in
+    const fadeIn = setInterval(() => {
+      track.volume = Math.min(this.volume, track.volume + 0.02);
+      if (track.volume >= this.volume) clearInterval(fadeIn);
+    }, 50);
+  },
+
+  playJingle(name) {
+    const j = this.jingles[name];
+    if (!j || this.muted) return;
+    j.currentTime = 0;
+    j.play().catch(() => {});
+  },
+
+  stop() {
+    if (this.current) {
+      this.current.pause();
+      this.current.currentTime = 0;
+    }
+    this.currentTrack = null;
+  },
+
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.muted && this.current) this.current.pause();
+    else if (!this.muted && this.currentTrack) { this.currentTrack = null; }
+  },
+};
+
 // Initialize audio on first user interaction
 let sfxInitDone = false;
 function initSfxOnInteraction() {
@@ -2760,6 +2843,7 @@ function toggleMute() {
   const btn = document.getElementById('muteBtn');
   if (btn) btn.textContent = sfxMuted ? '\uD83D\uDD07 Muted' : '\uD83D\uDD0A Sound';
   if (SFX.windGain) SFX.windGain.gain.value = sfxMuted ? 0 : 0.04;
+  Music.toggleMute();
 }
 
 // ═══════ HUB TOWN GLOBAL ═══════
@@ -5381,6 +5465,28 @@ function gameLoop() {
   // Update roaming enemies
   updateRoamingEnemies();
 
+  // Music — switch based on location
+  if (!window._lastMusicCheck || Date.now() - window._lastMusicCheck > 2000) {
+    window._lastMusicCheck = Date.now();
+    if (G.inBattle) {
+      Music.play('battle');
+    } else if (typeof cantinaActive !== 'undefined' && cantinaActive) {
+      Music.play('cantina');
+    } else {
+      // Check proximity to hubs
+      const nearHub = Math.min(
+        Math.sqrt((G.x - (HUB.x+3))**2 + (G.y - (HUB.y+3))**2),
+        Math.sqrt((G.x - 25)**2 + (G.y - 59)**2),
+        Math.sqrt((G.x - 75)**2 + (G.y - 15)**2)
+      ) < 10;
+
+      if (nearHub) Music.play('hub');
+      else if (G.x > 60) Music.play('volcanic');
+      else if (G.y >= 45) Music.play('rolling_hills');
+      else Music.play('frost_valley');
+    }
+  }
+
   setTimeout(gameLoop, 16);
 }
 
@@ -5507,6 +5613,7 @@ function triggerWildEncounter() {
   SFX.encounterStart();
   battleFledThisSession = false;
   G.inBattle = true;
+  Music.play('battle');
 
   // Use active team member — ensure they have HP
   const activeGhost = G.team[G.activeIdx];
@@ -6417,6 +6524,7 @@ function endBattle(won) {
       G.level++;
       G.xp -= xpNeeded;
       SFX.levelUp();
+      Music.playJingle('levelup');
       notify(`Level Up! You are now level ${G.level}!`);
       // Heal team on level up
       G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
@@ -6485,6 +6593,7 @@ function endBattle(won) {
     }
 
     SFX.defeat();
+    Music.playJingle('defeat');
     // Respawn at hub
     G.x = 16; G.y = 9;
     // Heal team
@@ -8763,6 +8872,7 @@ function collectLore(lore) {
   if (G.loreCollected.includes(lore.id)) return;
   G.loreCollected.push(lore.id);
   SFX.notify();
+  Music.playJingle('lore');
   // Show lore modal
   document.getElementById('loreModalTitle').textContent = lore.title;
   const regionNames = { frost: 'Frost Valley', hills: 'Rolling Hills', volcanic: 'Volcanic Isles', passage: 'Border Passage' };
@@ -11027,6 +11137,7 @@ async function init() {
 
   // Preload all sprite sheet images
   preloadSprites();
+  Music.init();
 
   // Loading animation
   const fill = document.getElementById('loadingFill');
