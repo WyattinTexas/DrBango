@@ -1002,9 +1002,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   .sprite-grid { grid-template-columns: repeat(3, 1fr) !important; }
 }
 @media (max-width: 480px) {
-  #minimap { display: none !important; }
   #chatBox { width: 160px; bottom: 8px; left: 8px; }
-  #chatMessages { height: 60px; }
   .battle-sprite img { width: 60px; height: 60px; }
   .battle-dice-row { gap: 3px; }
   .die { width: 26px; height: 26px; font-size: 13px; }
@@ -1471,6 +1469,83 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   .sk-box { width: 100px; padding: 6px; }
   .sk-box .sk-box-name { font-size: 10px; }
 }
+
+/* ═══════ VIRTUAL JOYSTICK & MOBILE CONTROLS ═══════ */
+#mobileControls {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+  pointer-events: none; display: none;
+}
+#joystickArea {
+  position: fixed; bottom: 30px; left: 30px; width: 120px; height: 120px;
+  pointer-events: auto; touch-action: none;
+}
+#joystickBase {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2);
+}
+#joystickThumb {
+  position: absolute; width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(255,255,255,0.3); border: 2px solid rgba(255,255,255,0.4);
+  left: 35px; top: 35px; transition: none;
+}
+#mobileButtons {
+  position: fixed; bottom: 40px; right: 20px;
+  display: flex; gap: 10px; pointer-events: auto;
+}
+.mobile-btn {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3);
+  color: #fff; font-size: 18px; font-weight: bold;
+  cursor: pointer; touch-action: manipulation;
+}
+.mobile-btn:active { background: rgba(255,255,255,0.3); }
+
+/* ═══════ COLLAPSIBLE HUD (MOBILE) ═══════ */
+#hudHamburger {
+  display: none; background: rgba(255,255,255,0.1); border: 1px solid #556;
+  color: #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 16px; line-height: 1;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  #mobileControls { display: block !important; }
+}
+
+@media (max-width: 600px) {
+  #minimap { display: none !important; }
+  #chatBox { width: 180px; font-size: 10px; }
+  #chatMessages { height: 60px; }
+  .battle-arena { max-height: 100vh; }
+  .battle-sprite img { width: 100px; height: 100px; }
+  .battle-narrator { padding: 8px; min-height: 60px; }
+  .narrator-text { font-size: 13px; }
+  .battle-btn { padding: 10px 20px; font-size: 16px; }
+  .die { width: 34px; height: 34px; font-size: 16px; }
+
+  #hudHamburger { display: inline-block; }
+  #hud .hud-right .hud-btn,
+  #hud .hud-right .hud-stat,
+  #hud .hud-right .survey-btn,
+  #hud .hud-right #hudGuildBtn,
+  #hud .hud-right #muteBtn,
+  #hud .hud-right #helpBtn {
+    display: none;
+  }
+  #hud .hud-right.expanded .hud-btn,
+  #hud .hud-right.expanded .hud-stat,
+  #hud .hud-right.expanded .survey-btn,
+  #hud .hud-right.expanded #hudGuildBtn,
+  #hud .hud-right.expanded #muteBtn,
+  #hud .hud-right.expanded #helpBtn {
+    display: inline-block;
+  }
+  #hud .hud-right.expanded {
+    position: fixed; top: 36px; right: 0; left: 0;
+    background: rgba(0,0,0,0.9); padding: 8px 12px;
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    border-bottom: 1px solid #334; z-index: 101;
+  }
+}
 </style>
 </head>
 <body>
@@ -1502,6 +1577,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <div id="hudTitles"></div>
   </div>
   <div class="hud-right">
+    <button id="hudHamburger" onclick="toggleHudMenu()">&#9776;</button>
     <div class="hud-stat" id="hudTeamPreview"></div>
     <button class="hud-btn" onclick="toggleInventory()">&#128230; Inventory</button>
     <button class="hud-btn" onclick="openCrafting()">&#128296; Craft</button>
@@ -1514,6 +1590,18 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <button class="hud-btn" id="hudHomeBtn" onclick="panToHome()">&#127968; Home</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">&#128266; Sound</button>
     <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
+  </div>
+</div>
+
+<!-- MOBILE CONTROLS -->
+<div id="mobileControls">
+  <div id="joystickArea">
+    <div id="joystickBase"></div>
+    <div id="joystickThumb"></div>
+  </div>
+  <div id="mobileButtons">
+    <button id="mobileE" class="mobile-btn">E</button>
+    <button id="mobileQ" class="mobile-btn">Q</button>
   </div>
 </div>
 
@@ -1884,7 +1972,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.11.0';
+const VERSION = 'v3.12.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5246,42 +5334,66 @@ function setupInput() {
     if (e.key === 'Escape') { e.target.blur(); }
   });
 
-  // ═══ MOBILE TOUCH CONTROLS ═══
-  let touchStartX = 0, touchStartY = 0, touchActive = false;
-  canvas.addEventListener('touchstart', e => {
+  // ═══ VIRTUAL JOYSTICK (replaces old touch drag) ═══
+  const joystickArea = document.getElementById('joystickArea');
+  const joystickThumb = document.getElementById('joystickThumb');
+  let joystickActive = false;
+  let joystickCenterX = 0, joystickCenterY = 0;
+
+  if (joystickArea) {
+    joystickArea.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      joystickActive = true;
+      const rect = joystickArea.getBoundingClientRect();
+      joystickCenterX = rect.left + rect.width / 2;
+      joystickCenterY = rect.top + rect.height / 2;
+      if (!SFX.ctx) SFX.init();
+    }, { passive: false });
+
+    joystickArea.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!joystickActive) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - joystickCenterX;
+      const dy = touch.clientY - joystickCenterY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const maxDist = 45;
+      const clampedDist = Math.min(dist, maxDist);
+      const angle = Math.atan2(dy, dx);
+
+      // Move thumb visually
+      const thumbX = Math.cos(angle) * clampedDist;
+      const thumbY = Math.sin(angle) * clampedDist;
+      joystickThumb.style.left = (35 + thumbX) + 'px';
+      joystickThumb.style.top = (35 + thumbY) + 'px';
+
+      // Set movement keys based on joystick position
+      const deadzone = 15;
+      keys['a'] = dx < -deadzone;
+      keys['d'] = dx > deadzone;
+      keys['w'] = dy < -deadzone;
+      keys['s'] = dy > deadzone;
+      keys['arrowleft'] = keys['arrowright'] = keys['arrowup'] = keys['arrowdown'] = false;
+    }, { passive: false });
+
+    const resetJoystick = () => {
+      joystickActive = false;
+      joystickThumb.style.left = '35px';
+      joystickThumb.style.top = '35px';
+      keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+    };
+    joystickArea.addEventListener('touchend', resetJoystick);
+    joystickArea.addEventListener('touchcancel', resetJoystick);
+  }
+
+  // Mobile E and Q buttons
+  document.getElementById('mobileE')?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const t = e.touches[0];
-    touchStartX = t.clientX;
-    touchStartY = t.clientY;
-    touchActive = true;
-    // Init audio on first touch (browser policy)
-    if (!SFX.ctx) SFX.init();
-  }, { passive: false });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (!touchActive) return;
-    const t = e.touches[0];
-    const dx = t.clientX - touchStartX;
-    const dy = t.clientY - touchStartY;
-    const deadzone = 15;
-    // Set movement keys based on touch drag direction
-    keys['a'] = dx < -deadzone;
-    keys['d'] = dx > deadzone;
-    keys['w'] = dy < -deadzone;
-    keys['s'] = dy > deadzone;
-    keys['arrowleft'] = false; keys['arrowright'] = false;
-    keys['arrowup'] = false; keys['arrowdown'] = false;
-  }, { passive: false });
-  canvas.addEventListener('touchend', e => {
-    touchActive = false;
-    keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+    tryInteract();
   });
-  // Double-tap to interact
-  let lastTap = 0;
-  canvas.addEventListener('touchend', e => {
-    const now = Date.now();
-    if (now - lastTap < 300) tryInteract();
-    lastTap = now;
+  document.getElementById('mobileQ')?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (typeof startSurvey === 'function') startSurvey();
   });
 
   canvas.addEventListener('click', e => {
@@ -11168,6 +11280,21 @@ async function init() {
     document.getElementById('loadingScreen').style.display = 'none';
   }, 500);
 }
+
+// ═══ COLLAPSIBLE HUD (mobile) ═══
+function toggleHudMenu() {
+  const hudRight = document.querySelector('#hud .hud-right');
+  hudRight.classList.toggle('expanded');
+}
+// Auto-collapse HUD after clicking a button inside expanded menu
+document.querySelector('#hud .hud-right')?.addEventListener('click', (e) => {
+  if (e.target.classList.contains('hud-btn') || e.target.classList.contains('survey-btn')) {
+    const hudRight = document.querySelector('#hud .hud-right');
+    if (hudRight.classList.contains('expanded')) {
+      setTimeout(() => hudRight.classList.remove('expanded'), 150);
+    }
+  }
+});
 
 init();
 </script>
