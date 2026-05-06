@@ -1636,7 +1636,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.9.0';
+const VERSION = 'v2.0.0';
 
 // ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
 const roamingEnemies = [];
@@ -1800,7 +1800,7 @@ function triggerRoamingBattle(enemy) {
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
     enemyCard: card,
     enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity, usedOncePerGame: false },
     log: [],
@@ -1808,7 +1808,7 @@ function triggerRoamingBattle(enemy) {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
     isAggressive: true,
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
@@ -4145,7 +4145,7 @@ function triggerWildEncounter() {
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
     enemyCard: wildCard,
     enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity, usedOncePerGame: false },
     log: [],
@@ -4153,7 +4153,7 @@ function triggerWildEncounter() {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
     zoneIdx: getCurrentZone(G.x, G.y),
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
@@ -4406,6 +4406,25 @@ function battleRoll() {
     if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
   }
 
+  // Eloise (85): Change of Heart — spend 1 Ice Shard to swap HP with enemy before rolling
+  if (pg.id === 85 && B.resources.iceShards >= 1 && !eg.ko) {
+    B.resources.iceShards -= 1;
+    const tempHp = pg.hp;
+    pg.hp = eg.hp;
+    eg.hp = tempHp;
+    B.log.push({ text: `${pg.name} (Change of Heart): Spent 1 Ice Shard — swapped HP! [You: ${pg.hp} HP, Enemy: ${eg.hp} HP]`, type: 'ability' });
+    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
+  if (eg.id === 85 && !pg.ko) {
+    // Enemy AI always uses it if they can (simulate having 1 shard)
+    const tempHp = eg.hp;
+    eg.hp = pg.hp;
+    pg.hp = tempHp;
+    B.log.push({ text: `${eg.name} (Change of Heart): Swapped HP! [You: ${pg.hp} HP, Enemy: ${eg.hp} HP]`, type: 'ability' });
+    B.enemyUsedResource = true;
+    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+  }
+
   // ── DICE COUNTS (apply nextRoundMods) ──
   SFX.diceRoll();
   let pDiceCount = Math.min(3 + B.nextRoundMods.playerExtraDice, B.nextRoundMods.playerMaxDice);
@@ -4469,6 +4488,18 @@ function battleRoll() {
       }
     }
 
+    // Jeanie (90): Hidden Treasure — force opponent to reroll all dice, once per game
+    if (pg.id === 90 && !pg.usedOncePerGame) {
+      pg.usedOncePerGame = true;
+      eDice = rollDice(eDice.length);
+      B.log.push({ text: `${pg.name} (Hidden Treasure): Forced enemy to reroll! New: [${eDice.join(', ')}]`, type: 'ability' });
+    }
+    if (eg.id === 90 && !eg.usedOncePerGame) {
+      eg.usedOncePerGame = true;
+      pDice = rollDice(pDice.length);
+      B.log.push({ text: `${eg.name} (Hidden Treasure): Forced you to reroll! New: [${pDice.join(', ')}]`, type: 'ability' });
+    }
+
     B.playerDice = pDice;
     B.enemyDice = eDice;
 
@@ -4519,6 +4550,16 @@ function battleRoll() {
       B.log.push({ text: `${eg.name} (Dream Doubles): Both rolled doubles — enemy gains +2 dice next round!`, type: 'ability' });
     }
 
+    // Kaplan (308): Pollinate — when opponent rolls doubles, gain 1 Healing Seed
+    if (pg.id === 308 && eRoll.type === 'doubles') {
+      B.resources.healingSeeds += 1;
+      B.log.push({ text: `${pg.name} (Pollinate): Enemy rolled doubles — +1 Healing Seed! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+    }
+    if (eg.id === 308 && pRoll.type === 'doubles') {
+      B.log.push({ text: `${eg.name} (Pollinate): You rolled doubles — enemy gains 1 Healing Seed.`, type: 'ability' });
+      B.enemyUsedResource = true;
+    }
+
     if (winner === 'kodako') {
       // Kodako ability already applied damage, skip normal resolution
       B.round++;
@@ -4562,6 +4603,17 @@ function battleRoll() {
         dmg += 2;
         B.log.push({ text: `${pg.name} (Meteor): +2 damage!`, type: 'ability' });
       }
+      // Aunt Susan (309): Harvest Dance — discard 1 Healing Seed for +2 damage; win = +2 Healing Seeds
+      if (pg.id === 309) {
+        if (B.resources.healingSeeds >= 1) {
+          B.resources.healingSeeds -= 1;
+          dmg += 2;
+          B.log.push({ text: `${pg.name} (Harvest Dance): Spent 1 Healing Seed — +2 damage!`, type: 'ability' });
+        }
+        B.resources.healingSeeds += 2;
+        B.log.push({ text: `${pg.name} (Harvest Dance): Win — +2 Healing Seeds! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+      }
+
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
 
       // Resource damage bonuses
@@ -4612,6 +4664,17 @@ function battleRoll() {
         const healAmt = Math.min(1, pg.maxHp - pg.hp);
         pg.hp += healAmt;
         if (healAmt > 0) B.log.push({ text: `${pg.name} (Rest): +1 HP on win!`, type: 'heal' });
+      }
+
+      // Selene (305): Heart of the Hills — roll doubles on win: gain 2 Healing Seeds OR 3 Lucky Stones
+      if (pg.id === 305 && pRoll.type === 'doubles') {
+        // Auto-choose Healing Seeds (more broadly useful)
+        B.resources.healingSeeds += 2;
+        B.log.push({ text: `${pg.name} (Heart of the Hills): Doubles! Gained 2 Healing Seeds! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+      }
+      if (eg.id === 305 && eRoll.type === 'doubles') {
+        B.log.push({ text: `${eg.name} (Heart of the Hills): Doubles — enemy gains resources.`, type: 'ability' });
+        B.enemyUsedResource = true;
       }
 
       // Flora (75): doubles = +2 HP
@@ -4770,6 +4833,8 @@ function fleeBattle() {
   // Save resources back
   G.iceShards = B.resources?.iceShards || G.iceShards;
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
+  G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
+  G.luckyStones = B.resources?.luckyStones || G.luckyStones;
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active');
@@ -4783,6 +4848,8 @@ function endBattle(won) {
   // Save resources back
   G.iceShards = B.resources?.iceShards || G.iceShards;
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
+  G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
+  G.luckyStones = B.resources?.luckyStones || G.luckyStones;
 
   // Handle world boss battle end
   if (B.isWorldBoss) {
@@ -6888,6 +6955,14 @@ function sendChat() {
   const text = input.value.trim();
   if (!text) return;
 
+  // Check for /help command
+  if (text.toLowerCase() === '/help') {
+    input.value = '';
+    addChatMessage('system', 'Commands: /tip [name] [amount] — Send coins | /wave /cheer /craft /sit /dance — Emotes | /help — This message');
+    input.blur();
+    return;
+  }
+
   // Check for /tip command
   if (text.toLowerCase().startsWith('/tip')) {
     input.value = '';
@@ -7709,7 +7784,7 @@ function engageWorldBoss() {
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
     enemyCard: bossCard,
     enemyGhost: {
       id: bossCard.id, name: bossCard.name, hp: engagementHp, maxHp: engagementHp,
@@ -7720,7 +7795,7 @@ function engageWorldBoss() {
     playerDice: [],
     enemyDice: [],
     entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0 },
     zoneIdx: worldBossState.zoneIdx,
     isWorldBoss: true,
     bossStartHp: engagementHp,
