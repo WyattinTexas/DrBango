@@ -2004,7 +2004,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v4.7.0';
+const VERSION = 'v4.8.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -6308,6 +6308,19 @@ function renderMinimap() {
   // Player dot
   mctx.fillStyle = '#fff';
   mctx.fillRect(G.x * scale - 1.5, G.y * scale - 1.5, 4, 4);
+
+  // Building markers on minimap
+  const buildingMarkers = [
+    { x: HUB.x + 1, y: HUB.y + 1, color: '#ca4', label: 'Shop' },
+    { x: HUB.x + 5, y: HUB.y + 1, color: '#c44', label: 'Arena' },
+    { x: HUB.x + 1, y: HUB.y + 3, color: '#4ac', label: 'Workshop' },
+    { x: HUB.x + 5, y: HUB.y + 3, color: '#8a8', label: 'Inn' },
+    { x: HUB.x + 3, y: HUB.y + 5, color: '#c84', label: 'Cantina' },
+  ];
+  for (const bm of buildingMarkers) {
+    mctx.fillStyle = bm.color;
+    mctx.fillRect(bm.x * scale - 1.5, bm.y * scale - 1.5, 4, 4);
+  }
 }
 
 // ═══════ INPUT ═══════
@@ -7177,6 +7190,30 @@ function battleRoll() {
     B.log.push({ text: `${eg.name} (Heating Up): Spent 2 HP — +1 die!`, type: 'ability' });
   }
 
+  // Harrison (315): Ascend — discard Healing Seeds for +1 die each
+  if (pg.id === 315 && B.resources.healingSeeds > 0) {
+    const seedsSpent = B.resources.healingSeeds;
+    B.resources.healingSeeds = 0;
+    B.nextRoundMods.playerExtraDice += seedsSpent;
+    B.log.push({ text: `${pg.name} (Ascend): Discarded ${seedsSpent} Healing Seeds — +${seedsSpent} dice!`, type: 'ability' });
+  }
+  if (eg.id === 315) {
+    B.nextRoundMods.enemyExtraDice += 1; // simulate enemy having 1 seed
+    B.log.push({ text: `${eg.name} (Ascend): Discards seeds — +1 die!`, type: 'ability' });
+  }
+
+  // Zork (463): Smolder — discard Burn to gain +1 die per Burn
+  if (pg.id === 463 && (B.resources.burn || 0) > 0) {
+    const burnSpent = B.resources.burn;
+    B.resources.burn = 0;
+    B.nextRoundMods.playerExtraDice += burnSpent;
+    B.log.push({ text: `${pg.name} (Smolder): Discarded ${burnSpent} Burn — +${burnSpent} dice!`, type: 'ability' });
+  }
+  if (eg.id === 463) {
+    B.nextRoundMods.enemyExtraDice += 1;
+    B.log.push({ text: `${eg.name} (Smolder): Discards Burn — +1 die!`, type: 'ability' });
+  }
+
   // ── DICE COUNTS (apply nextRoundMods) ──
   SFX.diceRoll();
   let pDiceCount = Math.min(3 + B.nextRoundMods.playerExtraDice, B.nextRoundMods.playerMaxDice);
@@ -7444,6 +7481,79 @@ function battleRoll() {
         }
       }
 
+      // Twyla (417): Lucky Dance — each Lucky Stone adds +1 die and gains +1 Healing Seed
+      if (pg.id === 417 && (B.resources.luckyStones || 0) > 0) {
+        const stones = B.resources.luckyStones;
+        B.resources.healingSeeds = (B.resources.healingSeeds || 0) + stones;
+        B.log.push({ text: `${pg.name} (Lucky Dance): ${stones} Lucky Stones = +${stones} Healing Seeds! +${stones} dice next roll!`, type: 'ability' });
+        B.nextRoundMods.playerExtraDice += stones;
+      }
+      // Gordok (430): River Terror — win: steal 2 specials instead of damage, +1 die next roll
+      if (pg.id === 430) {
+        // Steal 2 specials (represented as gaining resources)
+        B.resources.iceShards += 1;
+        B.resources.sacredFire += 1;
+        B.nextRoundMods.playerExtraDice += 1;
+        B.log.push({ text: `${pg.name} (River Terror): Stole 2 specials! +1 die next roll!`, type: 'ability' });
+        // Negate normal damage for Gordok wins
+        dmg = 0;
+      }
+      // Mable Stadango (446): Hex — win: gain 1 Burn
+      if (pg.id === 446) {
+        B.resources.burn = (B.resources.burn || 0) + 1;
+        B.log.push({ text: `${pg.name} (Hex): Win — +1 Burn! [Total: ${B.resources.burn}]`, type: 'ability' });
+        // If placing Burn, remove 1 enemy die next roll
+        B.nextRoundMods.enemyExtraDice -= 1;
+        B.log.push({ text: `${pg.name} (Hex): Burn placed — enemy loses 1 die next roll!`, type: 'ability' });
+      }
+      // Roger (54): Tempest — roll 2 pairs of doubles (4+ dice): gain 3 Sacred Fires
+      if (pg.id === 54 && pDice.length >= 4) {
+        const freq = {};
+        pDice.forEach(d => { freq[d] = (freq[d] || 0) + 1; });
+        const pairsCount = Object.values(freq).filter(c => c >= 2).length;
+        if (pairsCount >= 2) {
+          B.resources.sacredFire += 3;
+          B.log.push({ text: `${pg.name} (Tempest): 2 pairs of doubles — +3 Sacred Fires! [Total: ${B.resources.sacredFire}]`, type: 'ability' });
+        }
+      }
+      // Rook (416): Charcoal — immune to Sacred Fire/Burn, win: +1 damage per Surge
+      if (pg.id === 416 && (B.resources.surge || 0) > 0) {
+        const surgeBonus = B.resources.surge;
+        dmg += surgeBonus;
+        B.log.push({ text: `${pg.name} (Charcoal): ${surgeBonus} Surge = +${surgeBonus} damage!`, type: 'ability' });
+      }
+      // Sylvia (313): Porpoise — Ice Shards cost nothing (already free in commit), handled in loss section
+      // Calvin & Anna (91): Toboggan — when you defeat a ghost, may switch to sideline ghost (auto in 1v1 = log only)
+      if (pg.id === 91 && eg.ko) {
+        B.log.push({ text: `${pg.name} (Toboggan): KO! May swap to sideline ghost.`, type: 'ability' });
+      }
+      // Valkin the Grand (432): Grand Spoils — on KO: gain all resource types
+      if (pg.id === 432 && eg.ko) {
+        B.resources.sacredFire += 1;
+        B.resources.iceShards += 2;
+        B.resources.luckyStones = Math.min(5, (B.resources.luckyStones || 0) + 1);
+        B.resources.moonstone = (B.resources.moonstone || 0) + 1;
+        B.resources.healingSeeds = (B.resources.healingSeeds || 0) + 2;
+        B.log.push({ text: `${pg.name} (Grand Spoils): KO! +1 Sacred Fire, +2 Ice Shards, +1 Lucky Stone, +1 Moonstone, +2 Healing Seeds!`, type: 'ability' });
+      }
+      // Bo (109): Miracle — on KO: return a defeated ghost to sideline, gain 3 Magic Fireflies
+      if (pg.id === 109 && eg.ko) {
+        const defeated = G.team.find(g => g.ko && g !== pg);
+        if (defeated) {
+          defeated.ko = false;
+          defeated.hp = 1;
+          B.log.push({ text: `${pg.name} (Miracle): ${defeated.name} returned to sideline with 1 HP!`, type: 'ability' });
+        }
+        B.resources.magicFireflies = Math.min(5, (B.resources.magicFireflies || 0) + 3);
+        B.log.push({ text: `${pg.name} (Miracle): +3 Magic Fireflies! [Total: ${B.resources.magicFireflies}]`, type: 'ability' });
+      }
+      // Pip (418): Toasted — triples or better: permanently remove 1 enemy die (once per game)
+      if (pg.id === 418 && !pg.usedOncePerGame && pRoll.type === 'triples') {
+        pg.usedOncePerGame = true;
+        B.nextRoundMods.enemyMaxDice -= 1;
+        B.log.push({ text: `${pg.name} (Toasted): Triples! Permanently removed 1 enemy die!`, type: 'ability' });
+      }
+
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
 
       // ── SIDELINE BONUS DAMAGE (player team) ──
@@ -7518,6 +7628,12 @@ function battleRoll() {
         const healAmt = Math.min(4, pg.maxHp - pg.hp);
         pg.hp += healAmt;
         if (healAmt > 0) { B.log.push({ text: `${pg.name} (Scraps): Healed ${healAmt} HP from KO!`, type: 'heal' }); showDmgFloat('player', healAmt, true); }
+      }
+
+      // Garrick (427): Watchfire — win: KO = gain 1 Sacred Fire
+      if (pg.id === 427 && eg.ko) {
+        B.resources.sacredFire += 1;
+        B.log.push({ text: `${pg.name} (Watchfire): KO! +1 Sacred Fire! [Total: ${B.resources.sacredFire}]`, type: 'ability' });
       }
 
       // Spockles (81): win = +2 Ice Shards
@@ -7632,10 +7748,20 @@ function battleRoll() {
         B.log.push({ text: `${pg.name} (Seven Years): Doubles reflected — ${dmg} damage back!`, type: 'ability' });
         if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by reflection!`, type: 'damage' }); }
       }
-      // Garrick (427): lose = take -1 damage
+      // Garrick (427): lose = take -1 damage; KO = gain 1 Sacred Fire
       if (pg.id === 427 && dmg > 0 && !pg.ko) {
         pg.hp = Math.min(pg.maxHp, pg.hp + 1); // undo 1 of the damage
         B.log.push({ text: `${pg.name} (Watchfire): Lose — reduced damage by 1!`, type: 'ability' });
+      }
+      // Sylvia (313): Porpoise — lose: roll 1 die, 5 or 6 negates all damage
+      if (pg.id === 313 && dmg > 0 && !pg.ko) {
+        const saveDie = rollDie();
+        if (saveDie >= 5) {
+          pg.hp = Math.min(pg.maxHp, pg.hp + dmg); // undo all damage
+          B.log.push({ text: `${pg.name} (Porpoise): Save roll [${saveDie}] — negated all damage!`, type: 'ability' });
+        } else {
+          B.log.push({ text: `${pg.name} (Porpoise): Save roll [${saveDie}] — no save.`, type: 'ability' });
+        }
       }
       // Sad Sal (29): lose = gain 1 Ice Shard
       if (pg.id === 29 && !pg.ko) {
