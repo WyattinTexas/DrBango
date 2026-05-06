@@ -1169,7 +1169,191 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.1.0';
+
+// ═══════ ROAMING ENEMIES — visible, patrol, detect, chase ═══════
+const roamingEnemies = [];
+const ROAM_SPAWN_INTERVAL = 8000; // check spawns every 8s
+const ROAM_MAX = 15; // max enemies on map at once
+const ROAM_DETECT_RANGE = 6; // tiles — how far they can "see" you
+const ROAM_CHASE_SPEED = 0.03; // tiles per frame — slightly slower than player
+const ROAM_LEASH_RANGE = 14; // tiles — give up chase after this distance from home
+const ROAM_SAFE_RADIUS = 8; // tiles from hub = no spawns
+
+function spawnRoamingEnemies() {
+  if (roamingEnemies.length >= ROAM_MAX) return;
+  // Spawn 1-3 enemies per cycle in valid locations
+  const spawns = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < spawns && roamingEnemies.length < ROAM_MAX; i++) {
+    // Pick a random position on walkable terrain, far from hubs
+    let attempts = 0;
+    while (attempts < 30) {
+      attempts++;
+      const sx = 4 + Math.floor(Math.random() * (WORLD_W - 8));
+      const sy = 4 + Math.floor(Math.random() * (WORLD_H - 8));
+      const tile = worldMap[sy]?.[sx];
+      // Must be walkable
+      if (tile === 1 || tile === 3 || tile === 7 || tile === 5 || tile === 8 || tile === 12 || tile === 15 || tile === 16 || tile === 13) continue;
+      // Must be far from hubs
+      const dFH = Math.sqrt((sx - (HUB.x+3))**2 + (sy - (HUB.y+3))**2);
+      const dRH = Math.sqrt((sx - 25)**2 + (sy - 59)**2);
+      const dVI = Math.sqrt((sx - 75)**2 + (sy - 15)**2);
+      if (Math.min(dFH, dRH, dVI) < ROAM_SAFE_RADIUS) continue;
+      // Must not be too close to player
+      const dPlayer = Math.sqrt((sx - G.x)**2 + (sy - G.y)**2);
+      if (dPlayer < 10) continue;
+
+      // Pick a card based on region
+      const inVI = sx > 60;
+      const inRH = sy >= 45;
+      const dangerFactor = Math.min(1, (Math.min(dFH, dRH, dVI) - ROAM_SAFE_RADIUS) / 17);
+      const pool = ALL_CARDS.filter(c => {
+        if (c.rarity === 'legendary') return dangerFactor > 0.8;
+        if (c.rarity === 'ghost-rare') return dangerFactor > 0.5;
+        if (c.rarity === 'rare') return dangerFactor > 0.3;
+        return true;
+      });
+      const card = pool[Math.floor(Math.random() * pool.length)];
+      if (!card) continue;
+
+      roamingEnemies.push({
+        id: Date.now() + Math.random(),
+        card,
+        x: sx, y: sy,
+        homeX: sx, homeY: sy,
+        state: 'patrol', // patrol, alert, chase, returning
+        patrolAngle: Math.random() * Math.PI * 2,
+        alertTimer: 0,
+        speed: 0.015 + Math.random() * 0.01, // patrol speed (slower)
+        chaseSpeed: ROAM_CHASE_SPEED + Math.random() * 0.01,
+      });
+      break;
+    }
+  }
+}
+
+function updateRoamingEnemies() {
+  if (G.inBattle) return;
+  const px = G.x, py = G.y;
+
+  for (let i = roamingEnemies.length - 1; i >= 0; i--) {
+    const e = roamingEnemies[i];
+    const distToPlayer = Math.sqrt((e.x - px)**2 + (e.y - py)**2);
+    const distToHome = Math.sqrt((e.x - e.homeX)**2 + (e.y - e.homeY)**2);
+
+    switch (e.state) {
+      case 'patrol':
+        // Wander slowly in a direction, occasionally turn
+        e.patrolAngle += (Math.random() - 0.5) * 0.15;
+        const pdx = Math.cos(e.patrolAngle) * e.speed;
+        const pdy = Math.sin(e.patrolAngle) * e.speed;
+        const pnx = e.x + pdx, pny = e.y + pdy;
+        const ptile = worldMap[Math.floor(pny)]?.[Math.floor(pnx)];
+        if (ptile !== undefined && ptile !== 1 && ptile !== 3 && ptile !== 7 && ptile !== 15 && ptile !== 16 && ptile !== 13) {
+          e.x = pnx; e.y = pny;
+        } else {
+          e.patrolAngle += Math.PI * 0.5; // turn on collision
+        }
+        // Stay near home
+        if (distToHome > 8) e.patrolAngle = Math.atan2(e.homeY - e.y, e.homeX - e.x);
+        // Detect player
+        if (distToPlayer < ROAM_DETECT_RANGE) {
+          e.state = 'alert';
+          e.alertTimer = 40; // ~0.6s pause before chase
+        }
+        break;
+
+      case 'alert':
+        // Brief pause — "noticed you" — then chase
+        e.alertTimer--;
+        if (e.alertTimer <= 0) {
+          e.state = 'chase';
+        }
+        break;
+
+      case 'chase':
+        // Move toward player
+        const angle = Math.atan2(py - e.y, px - e.x);
+        const cdx = Math.cos(angle) * e.chaseSpeed;
+        const cdy = Math.sin(angle) * e.chaseSpeed;
+        const cnx = e.x + cdx, cny = e.y + cdy;
+        const ctile = worldMap[Math.floor(cny)]?.[Math.floor(cnx)];
+        if (ctile !== undefined && ctile !== 1 && ctile !== 3 && ctile !== 7 && ctile !== 15 && ctile !== 16 && ctile !== 13) {
+          e.x = cnx; e.y = cny;
+        }
+        // Catch player — trigger battle!
+        if (distToPlayer < 1.2) {
+          triggerRoamingBattle(e);
+          roamingEnemies.splice(i, 1); // remove this enemy
+          return;
+        }
+        // Give up if too far from home
+        if (distToHome > ROAM_LEASH_RANGE) {
+          e.state = 'returning';
+        }
+        // Give up if player gets far
+        if (distToPlayer > ROAM_DETECT_RANGE * 2.5) {
+          e.state = 'returning';
+        }
+        break;
+
+      case 'returning':
+        // Walk back to home position
+        const rAngle = Math.atan2(e.homeY - e.y, e.homeX - e.x);
+        e.x += Math.cos(rAngle) * e.speed;
+        e.y += Math.sin(rAngle) * e.speed;
+        if (distToHome < 2) {
+          e.state = 'patrol';
+          e.patrolAngle = Math.random() * Math.PI * 2;
+        }
+        break;
+    }
+
+    // Despawn if very far from player (cleanup)
+    if (distToPlayer > 40) {
+      roamingEnemies.splice(i, 1);
+    }
+  }
+}
+
+function triggerRoamingBattle(enemy) {
+  if (G.inBattle || G.team.length === 0) return;
+  const card = enemy.card;
+  const warnings = [
+    `${card.name} caught up to you!`,
+    `${card.name} attacks!`,
+    `No escape — ${card.name} strikes!`,
+  ];
+
+  G.inBattle = true;
+  SFX.encounterStart();
+
+  const activeGhost = G.team[G.activeIdx];
+  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
+
+  B = {
+    round: 1,
+    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
+    enemyCard: card,
+    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity },
+    log: [],
+    phase: 'ready',
+    playerDice: [],
+    enemyDice: [],
+    entryFired: false,
+    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
+    isAggressive: true,
+  };
+
+  const overlay = document.getElementById('battleOverlay');
+  overlay.classList.add('active');
+  document.getElementById('battleTitle').textContent = warnings[Math.floor(Math.random() * warnings.length)];
+  renderBattle();
+  notify(`⚠️ ${card.name} attacks!`);
+}
+
+// Spawn timer
+setInterval(spawnRoamingEnemies, ROAM_SPAWN_INTERVAL);
 
 // ═══════ SOUND DESIGN (Web Audio API — procedural) ═══════
 let sfxMuted = false;
@@ -2624,37 +2808,83 @@ function render() {
     ctx.fill();
   }
 
-  // ── ROAMING DANGER WISPS (visual threat indicators) ──
-  // Show small red/orange wisps in dangerous areas away from hubs
-  if (!G.inBattle) {
-    const seed = Math.floor(time * 0.5); // change positions slowly
-    for (let i = 0; i < 12; i++) {
-      // Deterministic position from seed + index
-      const wx = ((seed * 7 + i * 31) % (WORLD_W - 10)) + 5;
-      const wy = ((seed * 13 + i * 47) % (WORLD_H - 10)) + 5;
-      // Only in dangerous areas (far from hubs)
-      const dFH = Math.sqrt(Math.pow(wx - (HUB.x+3), 2) + Math.pow(wy - (HUB.y+3), 2));
-      const dRH = Math.sqrt(Math.pow(wx - 25, 2) + Math.pow(wy - 59, 2));
-      const dVI = Math.sqrt(Math.pow(wx - 75, 2) + Math.pow(wy - 15, 2));
-      if (Math.min(dFH, dRH, dVI) < 10) continue; // skip near hubs
-      const tile = worldMap[wy]?.[wx];
-      if (tile === 7 || tile === 3 || tile === 1 || tile === 15 || tile === 16) continue; // skip impassable
+  // ── ROAMING ENEMIES (visible on map) ──
+  for (const e of roamingEnemies) {
+    const ex = e.x * TILE - camX;
+    const ey = e.y * TILE - camY;
+    if (ex < -40 || ex > W + 40 || ey < -40 || ey > H + 40) continue;
 
-      const wsx = wx * TILE - camX + TILE/2;
-      const wsy = wy * TILE - camY + TILE/2;
-      if (wsx < -20 || wsx > W + 20 || wsy < -20 || wsy > H + 20) continue;
+    const bob = Math.sin(time * 3 + e.id) * 2;
+    const rarityColor = {
+      common: '#aa4444', uncommon: '#cc5522', rare: '#dd3333',
+      'ghost-rare': '#aa22aa', legendary: '#ff4400'
+    }[e.card.rarity] || '#aa4444';
 
-      const bob = Math.sin(time * 2 + i * 1.5) * 4;
-      const alpha = 0.15 + Math.sin(time * 3 + i) * 0.1;
-      ctx.fillStyle = `rgba(200, 60, 60, ${alpha})`;
+    // Shadow
+    ctx.fillStyle = 'rgba(80,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(ex + TILE/2, ey + TILE, 8, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (e.state === 'chase') {
+      // ── CHASING: pulsing red, larger, angry ──
+      // Danger glow ring
+      const pulseR = 14 + Math.sin(time * 8) * 3;
+      ctx.strokeStyle = `rgba(255, 40, 20, ${0.4 + Math.sin(time * 6) * 0.2})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(wsx, wsy + bob, 3 + Math.sin(time + i) * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      // Tiny glow
-      ctx.fillStyle = `rgba(255, 80, 40, ${alpha * 0.3})`;
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, pulseR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Body — angry red
+      ctx.fillStyle = rarityColor;
       ctx.beginPath();
-      ctx.arc(wsx, wsy + bob, 8, 0, Math.PI * 2);
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 10, 0, Math.PI * 2);
       ctx.fill();
+      // Angry eyes — bright white/red
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(ex + TILE/2 - 5, ey + TILE/2 + bob - 3, 3, 3);
+      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 3, 3, 3);
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 2, 2);
+      ctx.fillRect(ex + TILE/2 + 3, ey + TILE/2 + bob - 2, 2, 2);
+
+    } else if (e.state === 'alert') {
+      // ── ALERT: noticed you, exclamation mark ──
+      ctx.fillStyle = rarityColor;
+      ctx.beginPath();
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 9, 0, Math.PI * 2);
+      ctx.fill();
+      // Eyes — wide
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(ex + TILE/2 - 4, ey + TILE/2 + bob - 2, 3, 2);
+      ctx.fillRect(ex + TILE/2 + 2, ey + TILE/2 + bob - 2, 3, 2);
+      // "!" above head
+      ctx.fillStyle = '#ffdd00';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('!', ex + TILE/2, ey - 2 + bob);
+
+    } else {
+      // ── PATROL / RETURNING: calm, drifting ──
+      ctx.fillStyle = rarityColor;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(ex + TILE/2, ey + TILE/2 + bob, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Dim eyes
+      ctx.fillStyle = 'rgba(255,200,100,0.6)';
+      ctx.fillRect(ex + TILE/2 - 3, ey + TILE/2 + bob - 1, 2, 2);
+      ctx.fillRect(ex + TILE/2 + 1, ey + TILE/2 + bob - 1, 2, 2);
+    }
+
+    // Name label (only when close or chasing)
+    const distToPlayer = Math.sqrt((e.x - G.x)**2 + (e.y - G.y)**2);
+    if (distToPlayer < 8 || e.state === 'chase') {
+      ctx.fillStyle = e.state === 'chase' ? '#ff4444' : '#aa6666';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.card.name, ex + TILE/2, ey - 6 + bob);
     }
   }
 
@@ -2792,6 +3022,12 @@ function renderMinimap() {
     mctx.fill();
   }
 
+  // Roaming enemy dots
+  mctx.fillStyle = '#cc3333';
+  for (const e of roamingEnemies) {
+    mctx.fillRect(e.x * scale - 0.5, e.y * scale - 0.5, 2, 2);
+  }
+
   // Player dot
   mctx.fillStyle = '#fff';
   mctx.fillRect(G.x * scale - 1.5, G.y * scale - 1.5, 4, 4);
@@ -2921,31 +3157,6 @@ function gameLoop() {
         triggerWildEncounter();
       }
 
-      // ── ROAMING AGGRESSIVE SPIRITKIN ──
-      // Outside encounter zones: the further from a hub, the more dangerous
-      // Safe zone: within 8 tiles of any hub building (tile 5 or 8)
-      // Paths (tile 2) are safer — 50% reduced rate
-      if (tileAtNew !== 6 && !G.inBattle) {
-        const px = Math.floor(G.x), py = Math.floor(G.y);
-        // Check distance to nearest hub
-        const distToFrostHub = Math.sqrt(Math.pow(px - (HUB.x + 3), 2) + Math.pow(py - (HUB.y + 3), 2));
-        const distToRHHub = Math.sqrt(Math.pow(px - 25, 2) + Math.pow(py - 59, 2));
-        const distToVIHub = Math.sqrt(Math.pow(px - 75, 2) + Math.pow(py - 15, 2));
-        const nearestHubDist = Math.min(distToFrostHub, distToRHHub, distToVIHub);
-
-        if (nearestHubDist > 8) { // outside safe zone
-          // Danger scales with distance: 0 at 8 tiles, max at 25+ tiles
-          const dangerFactor = Math.min(1, (nearestHubDist - 8) / 17);
-          const pathSafety = (tileAtNew === 2) ? 0.5 : 1.0; // paths are safer
-          const nightDanger = getEncounterRateMultiplier(); // higher at night
-          const aggroRate = 0.002 * dangerFactor * pathSafety * nightDanger;
-
-          if (Math.random() < aggroRate) {
-            triggerAggressiveEncounter(dangerFactor);
-          }
-        }
-      }
-
       // Check region banner
       checkRegionBanner();
 
@@ -2956,60 +3167,10 @@ function gameLoop() {
     }
   }
 
+  // Update roaming enemies
+  updateRoamingEnemies();
+
   setTimeout(gameLoop, 16);
-}
-
-// ═══════ AGGRESSIVE ENCOUNTER (roaming danger) ═══════
-
-function triggerAggressiveEncounter(dangerFactor) {
-  if (G.inBattle || G.team.length === 0) return;
-  // Aggressive encounters are tougher — higher rarity weighted by danger
-  const pool = ALL_CARDS.filter(c => {
-    if (c.rarity === 'legendary') return dangerFactor > 0.7;
-    if (c.rarity === 'ghost-rare') return dangerFactor > 0.5;
-    if (c.rarity === 'rare') return dangerFactor > 0.2;
-    return true;
-  });
-  if (!pool.length) return;
-
-  // Pick a random card, biased toward tougher ones at higher danger
-  const card = pool[Math.floor(Math.random() * pool.length)];
-
-  // Aggressive encounters get a warning flavor
-  const warnings = [
-    `A wild ${card.name} ambushes you!`,
-    `${card.name} emerges from the shadows!`,
-    `You've wandered too far... ${card.name} attacks!`,
-    `${card.name} blocks your path!`,
-    `Something stirs in the darkness... ${card.name}!`,
-  ];
-  const warning = warnings[Math.floor(Math.random() * warnings.length)];
-
-  G.inBattle = true;
-  SFX.encounterStart();
-
-  const activeGhost = G.team[G.activeIdx];
-  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
-
-  B = {
-    round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false },
-    enemyCard: card,
-    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity },
-    log: [],
-    phase: 'ready',
-    playerDice: [],
-    enemyDice: [],
-    entryFired: false,
-    resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0 },
-    isAggressive: true, // flag for different flee penalty
-  };
-
-  const overlay = document.getElementById('battleOverlay');
-  overlay.classList.add('active');
-  document.getElementById('battleTitle').textContent = warning;
-  renderBattle();
-  notify(`⚠️ ${warning}`);
 }
 
 // ═══════ ENCOUNTER SYSTEM ═══════
