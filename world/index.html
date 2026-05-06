@@ -1772,7 +1772,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v3.0.0';
+const VERSION = 'v3.1.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7870,86 +7870,134 @@ function createCharacter() {
 // ═══════ FIREBASE PERSISTENCE ═══════
 
 async function initFirebase() {
+  let useLocalStorage = false;
+
+  // Step 1: Authenticate
   try {
     const result = await firebase.auth().signInAnonymously();
     uid = result.user.uid;
-
-    // Check for existing save
-    const snap = await db.ref(`overworld/players/${uid}`).once('value');
-    const data = snap.val();
-
-    if (data && data.name) {
-      // Restore character
-      G.name = data.name;
-      G.discipline = data.discipline;
-      G.level = data.level || 1;
-      G.xp = data.xp || 0;
-      G.coins = data.coins || 0;
-      G.x = data.x || 16;
-      G.y = data.y || 9;
-      G.team = data.team || [];
-      G.essences = data.essences || [];
-      G.gear = data.gear || [];
-      G.activeIdx = data.activeIdx || 0;
-      G.iceShards = data.iceShards || 0;
-      G.sacredFire = data.sacredFire || 0;
-      G.mastery = data.mastery || { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
-      G.rep = data.rep || { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
-      G.titles = data.titles || [];
-      G.quests = data.quests || { active: [], completed: [] };
-      if (!G.quests.active) G.quests.active = [];
-      if (!G.quests.completed) G.quests.completed = [];
-      G.sprite = data.sprite || 1;
-      G.guild = data.guild || null;
-      G.onboarding = data.onboarding || { step: 0, hintsShown: {} };
-      G.professionXP = data.professionXP || { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
-      G.professionSkills = data.professionSkills || {};
-      G.skillPointsUsed = data.skillPointsUsed || 0;
-      G.visitedTiles = new Set(data.visitedTiles || []);
-      G.materials = data.materials || {};
-      G.direction = 'down';
-      G.frame = 0;
-      if (!G.rep.arenaWins) G.rep.arenaWins = 0;
-      if (!G.rep.arenaLosses) G.rep.arenaLosses = 0;
-
-      // Ensure mastery keys exist
-      if (!G.mastery.weapon) G.mastery.weapon = { xp: 0 };
-      if (!G.mastery.armor) G.mastery.armor = { xp: 0 };
-      if (!G.mastery.accessory) G.mastery.accessory = { xp: 0 };
-
-      // Clamp activeIdx
-      if (G.activeIdx >= G.team.length) G.activeIdx = 0;
-
-      // Skip character creation
-      document.getElementById('charCreateOverlay').classList.remove('active');
-      document.getElementById('hud').style.display = 'flex';
-      document.getElementById('minimap').style.display = 'block';
-      document.getElementById('chatBox').style.display = 'block';
-
-      updateHUD();
-      startPresence();
-
-      notify(`Welcome back, ${G.name}!`);
-
-      requestAnimationFrame(render);
-      gameLoop();
-    } else {
-      // Show character creation
-      document.getElementById('charCreateOverlay').classList.add('active');
-      initCharCreate();
-    }
   } catch (err) {
-    console.error('Firebase auth error:', err);
-    // Offline mode — show character creation
-    uid = 'offline_' + Date.now();
+    console.warn('Firebase auth failed, using localStorage:', err.message);
+    uid = localStorage.getItem('overworld_local_uid');
+    if (!uid) {
+      uid = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('overworld_local_uid', uid);
+    }
+    useLocalStorage = true;
+  }
+
+  // Store the mode globally
+  window._useLocalStorage = useLocalStorage;
+
+  // Step 2: Load save data
+  let data = null;
+  if (!useLocalStorage) {
+    try {
+      const snap = await db.ref(`overworld/players/${uid}`).once('value');
+      data = snap.val();
+    } catch (e) {
+      console.warn('Firebase read failed, falling back to localStorage');
+      useLocalStorage = true;
+      window._useLocalStorage = true;
+    }
+  }
+
+  if (useLocalStorage) {
+    const saved = localStorage.getItem('overworld_save');
+    if (saved) {
+      try { data = JSON.parse(saved); } catch(e) { data = null; }
+    }
+  }
+
+  // Step 3: Restore or create character
+  if (data && data.name) {
+    // Restore character
+    G.name = data.name;
+    G.discipline = data.discipline;
+    G.level = data.level || 1;
+    G.xp = data.xp || 0;
+    G.coins = data.coins || 0;
+    G.x = data.x || 16;
+    G.y = data.y || 9;
+    G.team = data.team || [];
+    G.essences = data.essences || [];
+    G.gear = data.gear || [];
+    G.activeIdx = data.activeIdx || 0;
+    G.iceShards = data.iceShards || 0;
+    G.sacredFire = data.sacredFire || 0;
+    G.mastery = data.mastery || { weapon: { xp: 0 }, armor: { xp: 0 }, accessory: { xp: 0 } };
+    G.rep = data.rep || { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
+    G.titles = data.titles || [];
+    G.quests = data.quests || { active: [], completed: [] };
+    if (!G.quests.active) G.quests.active = [];
+    if (!G.quests.completed) G.quests.completed = [];
+    G.sprite = data.sprite || 1;
+    G.guild = data.guild || null;
+    G.onboarding = data.onboarding || { step: 0, hintsShown: {} };
+    G.professionXP = data.professionXP || { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
+    G.professionSkills = data.professionSkills || {};
+    G.skillPointsUsed = data.skillPointsUsed || 0;
+    G.visitedTiles = new Set(data.visitedTiles || []);
+    G.materials = data.materials || {};
+    G.direction = 'down';
+    G.frame = 0;
+    if (!G.rep.arenaWins) G.rep.arenaWins = 0;
+    if (!G.rep.arenaLosses) G.rep.arenaLosses = 0;
+
+    // Ensure mastery keys exist
+    if (!G.mastery.weapon) G.mastery.weapon = { xp: 0 };
+    if (!G.mastery.armor) G.mastery.armor = { xp: 0 };
+    if (!G.mastery.accessory) G.mastery.accessory = { xp: 0 };
+
+    // Clamp activeIdx
+    if (G.activeIdx >= G.team.length) G.activeIdx = 0;
+
+    // Skip character creation
+    document.getElementById('charCreateOverlay').classList.remove('active');
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('minimap').style.display = 'block';
+    document.getElementById('chatBox').style.display = 'block';
+
+    updateHUD();
+    startPresence();
+
+    // Show offline indicator if using localStorage
+    if (window._useLocalStorage) {
+      const offlineBadge = document.createElement('span');
+      offlineBadge.style.cssText = 'font-size:10px;color:#a66;margin-left:8px;';
+      offlineBadge.textContent = '(Offline)';
+      document.querySelector('#hud .hud-left')?.appendChild(offlineBadge);
+    }
+
+    notify(`Welcome back, ${G.name}!` + (useLocalStorage ? ' (Offline Mode)' : ''));
+
+    requestAnimationFrame(render);
+    gameLoop();
+  } else {
+    // Show character creation
     document.getElementById('charCreateOverlay').classList.add('active');
     initCharCreate();
+
+    // Show offline indicator after char creation completes (deferred)
+    if (window._useLocalStorage) {
+      const _origStartGame = window.startGame;
+      if (typeof _origStartGame === 'function') {
+        window.startGame = function() {
+          _origStartGame.apply(this, arguments);
+          const offlineBadge = document.createElement('span');
+          offlineBadge.style.cssText = 'font-size:10px;color:#a66;margin-left:8px;';
+          offlineBadge.textContent = '(Offline)';
+          document.querySelector('#hud .hud-left')?.appendChild(offlineBadge);
+        };
+      }
+    }
   }
 }
 
 function saveGame() {
   if (!uid) return;
-  db.ref(`overworld/players/${uid}`).update({
+
+  const saveData = {
     name: G.name,
     discipline: G.discipline,
     level: G.level,
@@ -7975,15 +8023,28 @@ function saveGame() {
     skillPointsUsed: G.skillPointsUsed,
     visitedTiles: [...(G.visitedTiles || [])].slice(-500),
     materials: G.materials || {},
-    lastSeen: firebase.database.ServerValue.TIMESTAMP,
     version: VERSION,
-  });
+  };
+
+  // Always save to localStorage as backup
+  try {
+    localStorage.setItem('overworld_save', JSON.stringify(saveData));
+  } catch(e) {}
+
+  // Also save to Firebase if available
+  if (!window._useLocalStorage) {
+    try {
+      saveData.lastSeen = firebase.database.ServerValue.TIMESTAMP;
+      db.ref(`overworld/players/${uid}`).update(saveData);
+    } catch(e) {}
+  }
 }
 
 // ═══════ MULTIPLAYER PRESENCE ═══════
 
 function startPresence() {
   if (!uid) return;
+  if (window._useLocalStorage) return; // No multiplayer in offline mode
 
   // Write presence
   const presRef = db.ref(`overworld/presence/${uid}`);
@@ -8089,11 +8150,16 @@ function sendChat() {
   // Check if this is an emote command
   const isEmote = ['/wave','/cheer','/craft','/sit','/dance'].includes(text.toLowerCase());
 
-  db.ref('overworld/chat').push({
-    sender: senderName,
-    text: text.slice(0, 200),
-    ts: firebase.database.ServerValue.TIMESTAMP,
-  });
+  if (!window._useLocalStorage) {
+    db.ref('overworld/chat').push({
+      sender: senderName,
+      text: text.slice(0, 200),
+      ts: firebase.database.ServerValue.TIMESTAMP,
+    });
+  } else {
+    // Show locally in offline mode
+    addChatMessage(senderName, text.slice(0, 200));
+  }
 
   // Profession XP: charisma
   addProfessionXP('charisma', isEmote ? 3 : 1);
