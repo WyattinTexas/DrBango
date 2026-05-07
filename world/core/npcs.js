@@ -207,7 +207,12 @@ function triggerHostileNPCBattle(npc) {
   document.querySelectorAll('.modal-overlay.active, #npcDialogueBox').forEach(el => { if (el.id === 'npcDialogueBox') el.style.display='none'; else el.classList.remove('active'); });
 
 
-  notify(npc.challenge);
+  // Star Fox-style challenge comm
+  if (typeof showComm === 'function') {
+    showComm(npc.name, npc.challenge, { persist: false, speed: 25, duration: 2500 });
+  } else {
+    notify(npc.challenge);
+  }
   G.inBattle = true;
   SFX.encounterStart();
   Music.play('battle');
