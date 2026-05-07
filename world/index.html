@@ -2061,7 +2061,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.1.1';
+const VERSION = 'v6.2.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -10988,6 +10988,7 @@ function listMarketItem(gearIdx) {
 }
 
 function removeMarketItem(listingIdx) {
+  if (window._useLocalStorage) { notify('Market requires an online connection.'); return; }
   const myData = marketListings[uid];
   if (!myData || !myData.listings) return;
 
@@ -14061,7 +14062,7 @@ function disbandGuild() {
 }
 
 function checkGuildInvites() {
-  if (!uid || G.guild) return;
+  if (!uid || G.guild || window._useLocalStorage) return;
   db.ref(`overworld/guild_invites/${uid}`).once('value').then(snap => {
     const invites = snap.val();
     if (!invites) return;
@@ -14308,7 +14309,7 @@ function renderSurveyRing(ctx, camX, camY, time) {
 let playerTraps = []; // local cache of player's traps
 
 function loadPlayerTraps() {
-  if (!uid) return;
+  if (!uid || window._useLocalStorage) return;
   db.ref('overworld/traps').orderByChild('owner').equalTo(uid).on('value', snap => {
     const data = snap.val() || {};
     playerTraps = Object.entries(data).map(([id, t]) => ({ ...t, trapId: id }));
@@ -14317,6 +14318,7 @@ function loadPlayerTraps() {
 
 function placeSpiritTrap() {
   if (!uid) return;
+  if (window._useLocalStorage) { notify('Spirit traps require an online connection.'); return; }
 
   // Check if near encounter zone
   const zoneIdx = getCurrentZone(G.x, G.y);
@@ -14514,6 +14516,7 @@ function renderTrapsInInventory() {
 // Render other players' traps on minimap + main map
 let allTraps = []; // all traps (for rendering)
 function loadAllTraps() {
+  if (window._useLocalStorage) return;
   db.ref('overworld/traps').on('value', snap => {
     const data = snap.val() || {};
     allTraps = Object.entries(data).map(([id, t]) => ({ ...t, trapId: id }));
