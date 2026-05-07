@@ -88,15 +88,14 @@ function getMaskQuestDaySeed() {
 }
 
 function initMaskQuest() {
-  if (!G.maskQuest) G.maskQuest = { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
+  if (!G.maskQuest) G.maskQuest = { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0, startedDay: 0 };
   const today = getMaskQuestDaySeed();
+  // Already completed today — nothing to do
   if (G.maskQuest.lastCompleted === today && G.maskQuest.phase === 5) return;
-  if (G.maskQuest.phase > 0 && G.maskQuest.phase < 5) {
-    const realPhase = getMaskQuestPhase();
-    if (realPhase > 0 && realPhase > G.maskQuest.phase) {
-      G.maskQuest.phase = 0;
-      G.maskQuest.anchors = [];
-    }
+  // New day — reset incomplete progress so the quest is fresh each day
+  if (G.maskQuest.phase > 0 && G.maskQuest.phase < 5 && G.maskQuest.startedDay !== today) {
+    G.maskQuest.phase = 0;
+    G.maskQuest.anchors = [];
   }
 }
 
@@ -157,6 +156,7 @@ function tryMaskQuestInteract() {
       SFX.notify();
     }
     G.maskQuest.phase = phaseData.id;
+    if (phaseData.id === 1) G.maskQuest.startedDay = getMaskQuestDaySeed();
     if (phaseData.id === 4) {
       notify('Take Leon back to Maren at the cantina in Frost Valley.');
     }
@@ -217,8 +217,13 @@ function updateMaskQuestTracker() {
   if (mq.phase === 5 && mq.lastCompleted === today) { tracker.style.display = 'none'; return; }
   if (mq.phase === 0 && realPhase > 0) {
     tracker.style.display = 'block';
-    document.getElementById('maskQuestStatus').innerHTML =
-      'Phase 1 available<br><span style="color:#6a5a4a;font-size:10px;">Find Maren near the cantina</span>';
+    if (realPhase === 1) {
+      document.getElementById('maskQuestStatus').innerHTML =
+        'Phase 1 available<br><span style="color:#6a5a4a;font-size:10px;">Find Maren near the cantina</span>';
+    } else {
+      document.getElementById('maskQuestStatus').innerHTML =
+        'Quest begins at 6:00 AM<br><span style="color:#6a5a4a;font-size:10px;">Find Maren near the cantina during Phase 1</span>';
+    }
     return;
   }
 
