@@ -2308,6 +2308,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <script src="inn-module.js"></script>
 <script src="tradingpost-module.js"></script>
 <script src="castle-module.js"></script>
+<script src="house-module.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -2315,7 +2316,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v7.1.0';
+const VERSION = 'v7.2.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -3011,6 +3012,28 @@ const HOUSE_PLOTS = [
   { id: 'vi_2', x: 82, y: 12, region: 'volcanic', name: 'Lagoon Point' },
   // Dark Castle
   { id: 'dc_1', x: 94, y: 22, region: 'dark_castle', name: 'Shadow Gate' },
+
+  // Polaris (Frost Valley) — expanded
+  { id: 'fv_4', x: 10, y: 10, region: 'frost', name: 'Frozen Overlook' },
+  { id: 'fv_5', x: 20, y: 18, region: 'frost', name: 'Crystal Lane' },
+  { id: 'fv_6', x: 35, y: 8, region: 'frost', name: 'North Wind' },
+  { id: 'fv_7', x: 12, y: 25, region: 'frost', name: 'Snowdrift Hollow' },
+
+  // Meadowbrook (Rolling Hills) — expanded
+  { id: 'rh_3', x: 30, y: 50, region: 'hills', name: 'Hilltop Rise' },
+  { id: 'rh_4', x: 15, y: 58, region: 'hills', name: 'Flower Lane' },
+  { id: 'rh_5', x: 38, y: 65, region: 'hills', name: 'South Meadow' },
+
+  // Deep forest (remote, prestigious)
+  { id: 'rh_forest', x: 8, y: 48, region: 'hills', name: 'Deep Forest Retreat' },
+
+  // Volcanic Isles — expanded
+  { id: 'vi_3', x: 78, y: 10, region: 'volcanic', name: 'Lava View' },
+  { id: 'vi_4', x: 68, y: 32, region: 'volcanic', name: 'Palm Cove' },
+
+  // Dark Castle — expanded
+  { id: 'dc_2', x: 96, y: 25, region: 'dark_castle', name: 'Shadow Court' },
+  { id: 'dc_3', x: 100, y: 18, region: 'dark_castle', name: 'Dark Tower Base' },
 ];
 let housingData = {}; // plotId -> { owner, ownerName, houseName, built, claimedAt, trophies }
 let showHomeOnMinimap = false;
@@ -3573,6 +3596,7 @@ function render() {
   if (typeof innActive !== 'undefined' && innActive) { try { renderInn(ctx, W, H); } catch(e) { console.error('Inn render error:', e); innActive = false; } requestAnimationFrame(render); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { renderTradingPost(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof castleActive !== 'undefined' && castleActive) { renderCastle(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof houseActive !== 'undefined' && houseActive) { renderHouse(ctx, W, H); requestAnimationFrame(render); return; }
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, W, H);
 
@@ -5757,6 +5781,11 @@ function setupInput() {
         else if (typeof castleInteract === 'function') castleInteract();
         return;
       }
+      if (typeof houseActive !== 'undefined' && houseActive) {
+        if (typeof houseDialogueActive !== 'undefined' && houseDialogueActive) closeHouseDialogue();
+        else if (typeof houseInteract === 'function') houseInteract();
+        return;
+      }
       tryInteract();
     }
     if (e.key === 'q' || e.key === 'Q') startSurvey();
@@ -5795,6 +5824,11 @@ function setupInput() {
       if (typeof castleActive !== 'undefined' && castleActive) {
         if (typeof castleDialogueActive !== 'undefined' && castleDialogueActive) closeCastleDialogue();
         else if (typeof exitCastle === 'function') exitCastle();
+        return;
+      }
+      if (typeof houseActive !== 'undefined' && houseActive) {
+        if (typeof houseDialogueActive !== 'undefined' && houseDialogueActive) closeHouseDialogue();
+        else if (typeof exitHouse === 'function') exitHouse();
         return;
       }
       // Close any open overlay
@@ -5888,6 +5922,7 @@ function setupInput() {
     if (typeof innActive !== 'undefined' && innActive && innDialogueActive) { closeInnDialogue(); return; }
     if (typeof tradingPostActive !== 'undefined' && tradingPostActive && tradingPostDialogueActive) { closeTradingPostDialogue(); return; }
     if (typeof castleActive !== 'undefined' && castleActive && castleDialogueActive) { closeCastleDialogue(); return; }
+    if (typeof houseActive !== 'undefined' && houseActive && houseDialogueActive) { closeHouseDialogue(); return; }
 
     const rect = canvas.getBoundingClientRect();
     const mx = (e.clientX - rect.left) + camX;
@@ -5917,6 +5952,7 @@ function gameLoop() {
   if (typeof innActive !== 'undefined' && innActive) { try { updateInn(16, keys); } catch(e) { console.error('Inn update error:', e); innActive = false; } setTimeout(gameLoop, 16); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { updateTradingPost(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof castleActive !== 'undefined' && castleActive) { updateCastle(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof houseActive !== 'undefined' && houseActive) { updateHouse(16, keys); setTimeout(gameLoop, 16); return; }
 
   let dx = 0, dy = 0;
   if (keys['w'] || keys['arrowup']) dy = -MOVE_SPEED;
@@ -6107,6 +6143,8 @@ function gameLoop() {
       Music.play('cantina');
     } else if (typeof castleActive !== 'undefined' && castleActive) {
       Music.play('dark_castle');
+    } else if (typeof houseActive !== 'undefined' && houseActive) {
+      Music.play('hub');
     } else if ((typeof workshopActive !== 'undefined' && workshopActive) ||
                (typeof arenaActive !== 'undefined' && arenaActive) ||
                (typeof innActive !== 'undefined' && innActive) ||
@@ -6565,7 +6603,11 @@ function tryInteract() {
       const owner = housingData[plot.id];
       if (owner && owner.built) {
         if (owner.owner === uid) {
-          openMyHouse(plot);
+          if (typeof enterHouse === 'function') {
+            enterHouse();
+          } else {
+            openMyHouse(plot);
+          }
         } else {
           openOtherHouse(plot, owner);
         }
@@ -7166,6 +7208,7 @@ function createCharacter() {
   G.sprite = selectedSprite || 1;
   G.guild = null;
   G.house = null;
+  G.houseBuff = null;
   G.direction = 'down';
   G.frame = 0;
   G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
@@ -7322,6 +7365,7 @@ async function initFirebase() {
     G.hasBoat = true; // everyone gets a boat for now
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
+    G.houseBuff = data.houseBuff || null;
     G.maskQuest = data.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
     G.crystalsFound = data.crystalsFound || [];
     G.chestsOpened = data.chestsOpened || [];
@@ -7417,6 +7461,7 @@ function saveGame() {
     hasBoat: G.hasBoat || false,
     loreCollected: G.loreCollected || [],
     house: G.house || null,
+    houseBuff: G.houseBuff || null,
     maskQuest: G.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 },
     crystalsFound: G.crystalsFound || [],
     chestsOpened: G.chestsOpened || [],

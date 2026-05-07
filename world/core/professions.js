@@ -6,6 +6,12 @@
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
   if (!G.professionXP) G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
+
+  // House buff — +25% XP for 2 hours after visiting your house
+  if (G.houseBuff && Date.now() < G.houseBuff.until) {
+    amount = Math.ceil(amount * G.houseBuff.multiplier);
+  }
+
   const prev = G.professionXP[type] || 0;
   G.professionXP[type] = prev + amount;
 
