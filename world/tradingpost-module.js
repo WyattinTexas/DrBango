@@ -271,8 +271,15 @@ function tradingPostInteract() {
   for (const npc of TP_NPCS) {
     const dist = Math.sqrt((px - npc.x) ** 2 + (py - npc.y) ** 2);
     if (dist < 2.2) {
-      const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
-      showTradingPostDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      if (npc.id === 'merchant') {
+        // Merchant opens the market
+        showTradingPostDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name,
+          "Trade is the lifeblood of the Overworld. What are you buying? What are you selling?", npc.color);
+        if (typeof openMarket === 'function') openMarket();
+      } else {
+        const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
+        showTradingPostDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      }
       // Charisma XP for talking to trading post NPCs
       if (typeof addProfessionXP === 'function') addProfessionXP('charisma', 1);
       return;
@@ -289,16 +296,15 @@ function tradingPostInteract() {
 
         if (tile === TP.COUNTER) {
           // Main trade interaction — open the existing market modal
-          if (typeof openMarket === 'function') {
-            openMarket();
-          } else {
-            showTradingPostDialogue('Trade Counter', 'The polished wooden counter is lined with ledgers and coin trays. Business is always open.', '#b8860b');
-          }
+          showTradingPostDialogue('Trade Counter', 'Welcome to the Trading Post! Browse our wares or list your own.', '#b8860b');
+          if (typeof openMarket === 'function') openMarket();
           return;
         }
 
         if (tile === TP.SHELF) {
-          showTradingPostDialogue('Goods Display', 'Neatly arranged shelves hold potions, bundled herbs, rope, lantern oil, and travel provisions. Everything an adventurer could need.', '#8b7355');
+          // Goods Display — preview current market listings
+          showTradingPostDialogue('Goods Display', 'Neatly arranged shelves hold potions, bundled herbs, rope, lantern oil, and travel provisions. Browse the full catalog at the counter.', '#8b7355');
+          if (typeof openMarket === 'function') openMarket();
           return;
         }
 
@@ -318,7 +324,13 @@ function tradingPostInteract() {
         }
 
         if (tile === TP.NOTICE) {
-          showTradingPostDialogue('Notice Board', 'Pinned notes flutter in the draft: "Volcanic ore — premium prices!" ... "Seeking rare frost herbs" ... "Bulk discount on travel rations this week."', '#cd853f');
+          // Notice Board — show market stats if available
+          let statsText = '';
+          if (typeof G !== 'undefined' && G.marketListings !== undefined) {
+            const count = Array.isArray(G.marketListings) ? G.marketListings.length : 0;
+            statsText = `Current listings: ${count}. `;
+          }
+          showTradingPostDialogue('Notice Board', statsText + 'Pinned notes flutter in the draft: "Volcanic ore — premium prices!" ... "Seeking rare frost herbs" ... "Bulk discount on travel rations this week."', '#cd853f');
           return;
         }
 

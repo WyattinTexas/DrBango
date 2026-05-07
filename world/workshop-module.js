@@ -148,6 +148,7 @@ function enterWorkshop() {
 
   // Switch to workshop mode
   workshopActive = true;
+  window._inWorkshop = true;
   workshopPlayerX = 12;    // start at door
   workshopPlayerY = 14;
   workshopPlayerDir = 'up';
@@ -163,6 +164,7 @@ function enterWorkshop() {
 
 function exitWorkshop() {
   workshopActive = false;
+  window._inWorkshop = false;
 
   // Restore overworld position (nudge slightly away from building so we don't re-enter)
   G.x = workshopSavedOverworldX;
@@ -270,8 +272,14 @@ function workshopInteract() {
   for (const npc of WORKSHOP_NPCS) {
     const dist = Math.sqrt((px - npc.x) ** 2 + (py - npc.y) ** 2);
     if (dist < 2.2) {
-      const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
-      showWorkshopDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      if (npc.id === 'smith') {
+        // Smith mentions crafting bonus then opens crafting
+        showWorkshopDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name,
+          "Crafting at my forge gives you +10 to assembly rolls. Use it wisely.", npc.color);
+      } else {
+        const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
+        showWorkshopDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      }
       // Charisma XP for talking to workshop NPCs
       if (typeof addProfessionXP === 'function') addProfessionXP('charisma', 1);
       return;
@@ -294,7 +302,8 @@ function workshopInteract() {
         }
 
         if (tile === WT.FURNACE) {
-          showWorkshopDialogue('The Forge', 'Waves of heat ripple the air above the furnace. Molten metal glows white-hot within. The heartbeat of the workshop.', '#ff8844');
+          showWorkshopDialogue('The Forge', 'The forge is hot and ready. What would you like to craft?', '#ff8844');
+          if (typeof openCrafting === 'function') openCrafting();
           return;
         }
 
@@ -309,7 +318,8 @@ function workshopInteract() {
         }
 
         if (tile === WT.DRAFTING) {
-          showWorkshopDialogue('Schematic Table', 'Yellowed blueprints cover the table — diagrams of blades, shields, and stranger devices. Pencil notes in the margins read: "Increase the alloy ratio?" and "Ask about spirit-forged steel."', '#bbaa77');
+          showWorkshopDialogue('Schematic Table', 'Yellowed blueprints cover the table — diagrams of blades, shields, and stranger devices. Browse the available schematics and their requirements.', '#bbaa77');
+          if (typeof openCrafting === 'function') openCrafting();
           return;
         }
 

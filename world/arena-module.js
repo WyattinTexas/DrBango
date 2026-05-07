@@ -294,8 +294,19 @@ function arenaInteract() {
   for (const npc of ARENA_NPCS) {
     const dist = Math.sqrt((px - npc.x) ** 2 + (py - npc.y) ** 2);
     if (dist < 2.2) {
-      const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
-      showArenaDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      if (npc.id === 'arenamaster') {
+        // Arena Master opens PvP arena
+        showArenaDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name,
+          "Looking for a fight? I can set you up with a challenger!", npc.color);
+        if (typeof openArena === 'function') openArena();
+      } else if (npc.id === 'bookie') {
+        // Betting Corner — future feature teaser
+        showArenaDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name,
+          "Place your bets! 5 coins on the next match. ...Betting window opens soon. Stay tuned.", npc.color);
+      } else {
+        const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
+        showArenaDialogue(npc.title ? `${npc.name} the ${npc.title}` : npc.name, line, npc.color);
+      }
       // Charisma XP for talking to arena NPCs
       if (typeof addProfessionXP === 'function') addProfessionXP('charisma', 1);
       return;
@@ -314,6 +325,13 @@ function arenaInteract() {
           return;
         }
         if (ARENA_MAP[ty][tx] === AT.TROPHY) {
+          // Show player's arena record if available, then flavor text
+          let recordText = '';
+          if (typeof G !== 'undefined' && (G.arenaWins !== undefined || G.arenaLosses !== undefined)) {
+            const wins = G.arenaWins || 0;
+            const losses = G.arenaLosses || 0;
+            recordText = `Your Arena Record: ${wins}W - ${losses}L. `;
+          }
           const trophyLines = [
             "A gleaming golden chalice inscribed: 'Season I Champion — The Iron Gale.'",
             "A crystal orb pulses faintly. The plaque reads: 'Most Devastating KO — Round 7, Year 3.'",
@@ -321,7 +339,8 @@ function arenaInteract() {
             "A row of silver medals. Dozens of names etched in tiny script — legends, all of them.",
             "A massive sword mounted on velvet. 'Ceremonial — awarded to the Undefeated.'",
           ];
-          showArenaDialogue('Trophy Case', trophyLines[Math.floor(Math.random() * trophyLines.length)], '#daa520');
+          const flavorLine = trophyLines[Math.floor(Math.random() * trophyLines.length)];
+          showArenaDialogue('Trophy Hall', recordText + flavorLine, '#daa520');
           return;
         }
         if (ARENA_MAP[ty][tx] === AT.RACK) {
@@ -339,7 +358,7 @@ function arenaInteract() {
           return;
         }
         if (ARENA_MAP[ty][tx] === AT.DESK) {
-          showArenaDialogue('Betting Desk', "Scraps of parchment covered in odds, tallies, and crossed-out names. A sign reads: 'BETTING WINDOW — COMING SOON.'", '#aa9944');
+          showArenaDialogue('Betting Desk', "Place your bets! 5 coins on the next match. ...Scraps of parchment covered in odds, tallies, and crossed-out names. A sign reads: 'BETTING WINDOW — COMING SOON.'", '#aa9944');
           return;
         }
         if (ARENA_MAP[ty][tx] === AT.TORCH) {
@@ -358,9 +377,10 @@ function arenaInteract() {
     return;
   }
 
-  // Check sand (flavor)
+  // Check sand (step into the ring)
   if (tileUnder === AT.SAND) {
-    arenaNotification = { text: 'The sand crunches underfoot...', timer: 60 };
+    arenaNotification = { text: 'Step into the ring to challenge another player!', timer: 90 };
+    if (typeof openArena === 'function') openArena();
     return;
   }
 }
