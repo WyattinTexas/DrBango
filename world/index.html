@@ -2010,6 +2010,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 <script src="arena-module.js"></script>
 <script src="inn-module.js"></script>
 <script src="tradingpost-module.js"></script>
+<script src="castle-module.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -2017,7 +2018,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.3.0';
+const VERSION = 'v5.3.1';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -4666,6 +4667,7 @@ function render() {
   if (typeof arenaActive !== 'undefined' && arenaActive) { renderArena(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof innActive !== 'undefined' && innActive) { renderInn(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { renderTradingPost(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof castleActive !== 'undefined' && castleActive) { renderCastle(ctx, W, H); requestAnimationFrame(render); return; }
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, W, H);
 
@@ -6406,6 +6408,11 @@ function setupInput() {
         else if (typeof tradingPostInteract === 'function') tradingPostInteract();
         return;
       }
+      if (typeof castleActive !== 'undefined' && castleActive) {
+        if (typeof castleDialogueActive !== 'undefined' && castleDialogueActive) closeCastleDialogue();
+        else if (typeof castleInteract === 'function') castleInteract();
+        return;
+      }
       tryInteract();
     }
     if (e.key === 'q' || e.key === 'Q') startSurvey();
@@ -6438,6 +6445,11 @@ function setupInput() {
       if (typeof tradingPostActive !== 'undefined' && tradingPostActive) {
         if (typeof tradingPostDialogueActive !== 'undefined' && tradingPostDialogueActive) closeTradingPostDialogue();
         else if (typeof exitTradingPost === 'function') exitTradingPost();
+        return;
+      }
+      if (typeof castleActive !== 'undefined' && castleActive) {
+        if (typeof castleDialogueActive !== 'undefined' && castleDialogueActive) closeCastleDialogue();
+        else if (typeof exitCastle === 'function') exitCastle();
         return;
       }
       // Close any open overlay
@@ -6548,6 +6560,7 @@ function gameLoop() {
   if (typeof arenaActive !== 'undefined' && arenaActive) { updateArena(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof innActive !== 'undefined' && innActive) { updateInn(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { updateTradingPost(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof castleActive !== 'undefined' && castleActive) { updateCastle(16, keys); setTimeout(gameLoop, 16); return; }
 
   let dx = 0, dy = 0;
   if (keys['w'] || keys['arrowup']) dy = -MOVE_SPEED;
@@ -6711,6 +6724,8 @@ function gameLoop() {
       Music.play('battle');
     } else if (typeof cantinaActive !== 'undefined' && cantinaActive) {
       Music.play('cantina');
+    } else if (typeof castleActive !== 'undefined' && castleActive) {
+      Music.play('dark_castle');
     } else {
       // Check proximity to hubs
       const nearHub = Math.min(
@@ -7046,6 +7061,12 @@ function buildPlayerBattleTeam() {
 }
 
 function showBattleOverlay() {
+  // Clean up any previous battle result banners
+  const arena = document.getElementById('battleArena');
+  const oldBanner = arena?.querySelector('.battle-result-banner');
+  if (oldBanner) oldBanner.remove();
+  const oldCelebrate = document.querySelector('.sprite-celebrate');
+  if (oldCelebrate) oldCelebrate.classList.remove('sprite-celebrate');
   const overlay = document.getElementById('battleOverlay');
   overlay.classList.add('active');
   requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('visible')));
@@ -8323,6 +8344,10 @@ function endBattle(won) {
       G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.75)); g.ko = false; });
       notify('Respawned at hub. Your team has been partially healed.');
 
+      const arena2 = document.getElementById('battleArena');
+      const bannerEl2 = arena2?.querySelector('.battle-result-banner');
+      if (bannerEl2) bannerEl2.remove();
+      
       G.inBattle = false;
       B = null;
       document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -8334,6 +8359,11 @@ function endBattle(won) {
     return;
   }
 
+  // Clean up battle completely
+  const arena = document.getElementById('battleArena');
+  const bannerEl = arena?.querySelector('.battle-result-banner');
+  if (bannerEl) bannerEl.remove();
+  
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -10418,6 +10448,10 @@ function tryInteract() {
     }
     if (tile === 8) {
       if (typeof enterWorkshop === 'function') { enterWorkshop(); } else { openCrafting(); }
+      return;
+    }
+    if (tile === 26) {
+      if (typeof enterCastle === 'function') { enterCastle(); }
       return;
     }
   }
