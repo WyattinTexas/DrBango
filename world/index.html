@@ -2020,7 +2020,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.6.0';
+const VERSION = 'v5.7.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7277,6 +7277,13 @@ function weightedRoll(ghost, count) {
 
 // Helper: count a specific die value
 function countDieVal(dice, val) { return dice.filter(d => d === val).length; }
+function isStraight(dice) {
+  if (!dice || dice.length < 3) return false;
+  const sorted = [...new Set(dice)].sort((a,b) => a - b);
+  if (sorted.length < dice.length) return false; // no repeats allowed
+  for (let i = 1; i < sorted.length; i++) { if (sorted[i] !== sorted[i-1] + 1) return false; }
+  return true;
+}
 
 // Helper: get active ghost for a battle team side
 function activePlayerGhost() { return B && B.player ? B.player.ghosts[B.player.activeIdx] : null; }
@@ -7816,6 +7823,35 @@ function battleRoll() {
       B.maximoActive = 'enemy';
     }
 
+    // Nicholas (51): Sneak Attack — sideline: deal 2 damage when enemy enters play
+    {
+      const pSide = getSidelineGhosts();
+      for (const sg of pSide) {
+        if (sg.id === 51 && !eg.ko) {
+          eg.hp = Math.max(0, eg.hp - 2);
+          B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on enemy entry!`, type: 'ability' });
+          if (eg.hp <= 0) eg.ko = true;
+        }
+      }
+      const eSide = getEnemySidelineGhosts();
+      for (const sg of eSide) {
+        if (sg.id === 51 && !pg.ko) {
+          pg.hp = Math.max(0, pg.hp - 2);
+          B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on your entry!`, type: 'damage' });
+          if (pg.hp <= 0) pg.ko = true;
+        }
+      }
+    }
+    // Dallas (60): Quick Draw — when entering from sideline, steal 1 die for 2 rolls
+    if (pg.id === 60) {
+      B.dallasStealPlayer = 2;
+      B.log.push({ text: `${pg.name} (Quick Draw): Stole 1 enemy die for 2 rolls!`, type: 'ability' });
+    }
+    if (eg.id === 60) {
+      B.dallasStealEnemy = 2;
+      B.log.push({ text: `${eg.name} (Quick Draw): Stole 1 of your dice for 2 rolls!`, type: 'ability' });
+    }
+
     // If someone KO'd from entry, check for swap
     if (pg.ko || eg.ko) {
       const koResult = checkKO();
@@ -7942,6 +7978,45 @@ function battleRoll() {
     B.log.push({ text: `${eg.name} (Ascend): Discards seeds — +1 die!`, type: 'ability' });
   }
 
+  // Dallas (60): Quick Draw — steal 1 die for 2 rolls (decrement counter)
+  if (B.dallasStealPlayer > 0) {
+    B.nextRoundMods.enemyExtraDice -= 1;
+    B.nextRoundMods.playerExtraDice += 1;
+    B.dallasStealPlayer--;
+    B.log.push({ text: `Dallas (Quick Draw): Stolen die active! [${B.dallasStealPlayer} rolls left]`, type: 'ability' });
+  }
+  if (B.dallasStealEnemy > 0) {
+    B.nextRoundMods.playerExtraDice -= 1;
+    B.nextRoundMods.enemyExtraDice += 1;
+    B.dallasStealEnemy--;
+    B.log.push({ text: `Dallas (Quick Draw): Your die stolen! [${B.dallasStealEnemy} rolls left]`, type: 'ability' });
+  }
+
+  // Toby (97): Pure Heart — auto-declares the final roll, Toby dies next turn but winning KOs enemy
+  if (pg.id === 97 && !pg.tobyDeclared && !pg.ko) {
+    pg.tobyDeclared = true;
+    pg.tobyDeathRound = B.round + 1;
+    B.log.push({ text: `${pg.name} (Pure Heart): Declares the final roll! Win this round to defeat the enemy. Toby will fall next turn.`, type: 'ability' });
+  }
+  if (eg.id === 97 && !eg.tobyDeclared && !eg.ko) {
+    eg.tobyDeclared = true;
+    eg.tobyDeathRound = B.round + 1;
+    B.log.push({ text: `${eg.name} (Pure Heart): Declares the final roll! Must win or be destroyed.`, type: 'ability' });
+  }
+  // Toby: check if this is the death round
+  if (pg.id === 97 && pg.tobyDeclared && B.round >= pg.tobyDeathRound && !pg.ko) {
+    pg.hp = 0; pg.ko = true;
+    B.log.push({ text: `${pg.name} (Pure Heart): Toby's sacrifice... he falls.`, type: 'damage' });
+    const _tkr = checkKO();
+    if (_tkr !== 'continue') { B.phase = _tkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; }
+  }
+  if (eg.id === 97 && eg.tobyDeclared && B.round >= eg.tobyDeathRound && !eg.ko) {
+    eg.hp = 0; eg.ko = true;
+    B.log.push({ text: `${eg.name} (Pure Heart): Toby's sacrifice... he falls.`, type: 'damage' });
+    const _tkr = checkKO();
+    if (_tkr !== 'continue') { B.phase = _tkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; }
+  }
+
   // Zork (463): Smolder — discard Burn to gain +1 die per Burn
   if (pg.id === 463 && (B.resources.burn || 0) > 0) {
     const burnSpent = B.resources.burn;
@@ -7952,6 +8027,30 @@ function battleRoll() {
   if (eg.id === 463) {
     B.nextRoundMods.enemyExtraDice += 1;
     B.log.push({ text: `${eg.name} (Smolder): Discards Burn — +1 die!`, type: 'ability' });
+  }
+
+  // Haywire (78): apply permanent dice bonus
+  if (pg.id === 78 && (B.haywirePermanentDice || 0) > 0) {
+    B.nextRoundMods.playerExtraDice += B.haywirePermanentDice;
+  }
+  if (eg.id === 78 && (B.haywirePermanentDiceEnemy || 0) > 0) {
+    B.nextRoundMods.enemyExtraDice += B.haywirePermanentDiceEnemy;
+  }
+
+  // Boo Brothers (17): Teamwork — remove 1 die to gain 1 HP and +1 damage
+  if (pg.id === 17 && !pg.ko && (3 + B.nextRoundMods.playerExtraDice) >= 2) {
+    B.nextRoundMods.playerExtraDice -= 1;
+    const bbHeal = Math.min(1, pg.maxHp - pg.hp);
+    pg.hp += bbHeal;
+    B.booTeamworkBonus = (B.booTeamworkBonus || 0) + 1;
+    B.log.push({ text: `${pg.name} (Teamwork): -1 die, +1 HP, +1 damage this roll!`, type: 'ability' });
+  }
+  if (eg.id === 17 && !eg.ko && (3 + B.nextRoundMods.enemyExtraDice) >= 2) {
+    B.nextRoundMods.enemyExtraDice -= 1;
+    const bbHeal = Math.min(1, eg.maxHp - eg.hp);
+    eg.hp += bbHeal;
+    B.booTeamworkBonusEnemy = (B.booTeamworkBonusEnemy || 0) + 1;
+    B.log.push({ text: `${eg.name} (Teamwork): -1 die, +1 HP, +1 damage!`, type: 'ability' });
   }
 
   // ── DICE COUNTS (apply nextRoundMods) ──
@@ -8051,6 +8150,16 @@ function battleRoll() {
     let eRoll = classify(eDice);
     let winner = compareRolls(pRoll, eRoll);
 
+    // Hector (96): Protector — singles beat doubles, +1 damage on singles
+    if (pg.id === 96 && pRoll.type === 'singles' && eRoll.type === 'doubles') {
+      winner = 'a';
+      B.log.push({ text: `${pg.name} (Protector): Singles beat doubles!`, type: 'ability' });
+    }
+    if (eg.id === 96 && eRoll.type === 'singles' && pRoll.type === 'doubles') {
+      winner = 'b';
+      B.log.push({ text: `${eg.name} (Protector): Singles beat doubles!`, type: 'ability' });
+    }
+
     // Kodako (1): if dice are exactly [1,2,3], negate enemy damage and deal 4
     if (pg.id === 1 && pDice.length === 3 && pDice.slice().sort((a,b)=>a-b).join(',') === '1,2,3') {
       eg.hp = Math.max(0, eg.hp - 4);
@@ -8102,6 +8211,26 @@ function battleRoll() {
     if (eg.id === 308 && pRoll.type === 'doubles') {
       B.log.push({ text: `${eg.name} (Pollinate): You rolled doubles — enemy gains 1 Healing Seed.`, type: 'ability' });
       B.enemyUsedResource = true;
+    }
+
+    // Scallywags (19): Frenzy — if all rolled dice are under 4, gain +1 die next turn
+    if (pg.id === 19 && pDice.every(d => d < 4)) {
+      B.nextRoundMods.playerExtraDice += 1;
+      B.log.push({ text: `${pg.name} (Frenzy): All dice under 4 — +1 die next round!`, type: 'ability' });
+    }
+    if (eg.id === 19 && eDice.every(d => d < 4)) {
+      B.nextRoundMods.enemyExtraDice += 1;
+      B.log.push({ text: `${eg.name} (Frenzy): All dice under 4 — +1 die next round!`, type: 'ability' });
+    }
+
+    // Floop (20): Muck — enemy loses a die next turn if they roll doubles
+    if (pg.id === 20 && eRoll.type === 'doubles') {
+      B.nextRoundMods.enemyExtraDice -= 1;
+      B.log.push({ text: `${pg.name} (Muck): Enemy rolled doubles — loses 1 die next round!`, type: 'ability' });
+    }
+    if (eg.id === 20 && pRoll.type === 'doubles') {
+      B.nextRoundMods.playerExtraDice -= 1;
+      B.log.push({ text: `${eg.name} (Muck): You rolled doubles — lose 1 die next round!`, type: 'ability' });
     }
 
     if (winner === 'kodako') {
@@ -8261,6 +8390,12 @@ function battleRoll() {
         const surgeBonus = B.resources.surge;
         dmg += surgeBonus;
         B.log.push({ text: `${pg.name} (Charcoal): ${surgeBonus} Surge = +${surgeBonus} damage!`, type: 'ability' });
+        // Boris (343): Fortify — when Surge is spent, Boris gains 2 HP
+        const boris = B.player.ghosts.find(g => g.id === 343 && !g.ko);
+        if (boris) {
+          boris.hp += 2; // can exceed max HP per card text
+          B.log.push({ text: `Boris (Fortify): Surge spent — +2 HP! [HP: ${boris.hp}]`, type: 'ability' });
+        }
       }
       // Sylvia (313): Porpoise — Ice Shards cost nothing (already free in commit), handled in loss section
       // Calvin & Anna (91): Toboggan — when you defeat a ghost, may switch to sideline ghost (auto in 1v1 = log only)
@@ -8292,6 +8427,90 @@ function battleRoll() {
         pg.usedOncePerGame = true;
         B.nextRoundMods.enemyMaxDice -= 1;
         B.log.push({ text: `${pg.name} (Toasted): Triples! Permanently removed 1 enemy die!`, type: 'ability' });
+      }
+
+      // Nikon (2): Ambush — win first roll: triple damage
+      if (pg.id === 2 && B.round === 1) {
+        dmg *= 3;
+        B.log.push({ text: `${pg.name} (Ambush): First roll win — TRIPLE damage!`, type: 'ability' });
+      }
+      // Wanderer (4): Curiosity — roll a straight (consecutive, no repeats): +2 damage
+      if (pg.id === 4 && isStraight(pDice)) {
+        dmg += 2;
+        B.log.push({ text: `${pg.name} (Curiosity): Straight [${pDice.join(',')}] — +2 damage!`, type: 'ability' });
+      }
+      // Boo Brothers (17): Teamwork — +1 damage bonus from removing a die
+      if (pg.id === 17 && B.booTeamworkBonus > 0) {
+        dmg += B.booTeamworkBonus;
+        B.log.push({ text: `${pg.name} (Teamwork): +${B.booTeamworkBonus} damage from sacrifice!`, type: 'ability' });
+        B.booTeamworkBonus = 0;
+      }
+      // Larry (35): Flying Kick — triples deal 3X damage
+      if (pg.id === 35 && pRoll.type === 'triples') {
+        dmg *= 3;
+        B.log.push({ text: `${pg.name} (Flying Kick): Triples = 3X damage!`, type: 'ability' });
+      }
+      // Snorton (67): Fissure — +5 damage if 2+ sixes rolled
+      if (pg.id === 67 && pDice.filter(d => d === 6).length >= 2) {
+        dmg += 5;
+        B.log.push({ text: `${pg.name} (Fissure): Two 6's — +5 damage!`, type: 'ability' });
+      }
+      // Haywire (78): Wild Chords — triples or better: +1 permanent die, +2 permanent damage (once per game)
+      if (pg.id === 78 && !pg.usedOncePerGame && (pRoll.type === 'triples' || pRoll.type === 'quads' || pRoll.type === 'penta')) {
+        pg.usedOncePerGame = true;
+        B.haywirePermanentDice = (B.haywirePermanentDice || 0) + 1;
+        B.haywirePermanentDmg = (B.haywirePermanentDmg || 0) + 2;
+        B.log.push({ text: `${pg.name} (Wild Chords): ${pRoll.type}! +1 permanent die, +2 permanent damage!`, type: 'ability' });
+      }
+      if (pg.id === 78 && (B.haywirePermanentDmg || 0) > 0) {
+        dmg += B.haywirePermanentDmg;
+        B.log.push({ text: `${pg.name} (Wild Chords): Permanent +${B.haywirePermanentDmg} damage!`, type: 'ability' });
+      }
+      // Hector (96): Protector — +1 damage on singles
+      if (pg.id === 96 && pRoll.type === 'singles') {
+        dmg += 1;
+        B.log.push({ text: `${pg.name} (Protector): +1 damage on singles!`, type: 'ability' });
+      }
+      // Toby (97): Pure Heart — winning the declared roll defeats the enemy ghost
+      if (pg.id === 97 && pg.tobyDeclared) {
+        eg.hp = 0; eg.ko = true;
+        B.log.push({ text: `${pg.name} (Pure Heart): The declared roll is won — enemy ghost is defeated!`, type: 'ability' });
+      }
+      // Night Master (103): Bullseye — win with doubles: destroy enemy sideline ghost <4 HP
+      if (pg.id === 103 && pRoll.type === 'doubles') {
+        const eSide = getEnemySidelineGhosts();
+        const target = eSide.find(g => g.hp < 4 && !g.ko);
+        if (target) {
+          target.hp = 0; target.ko = true;
+          B.log.push({ text: `${pg.name} (Bullseye): Doubles — destroyed ${target.name} on enemy sideline!`, type: 'ability' });
+        }
+      }
+      // Lucy (108): Blue Fire — win: gain 1 Sacred Fire
+      if (pg.id === 108) {
+        B.resources.sacredFire += 1;
+        B.log.push({ text: `${pg.name} (Blue Fire): +1 Sacred Fire! [Total: ${B.resources.sacredFire}]`, type: 'ability' });
+      }
+      // Dark Fang (202): Pressure — win: +1 damage per KO'd ghost
+      if (pg.id === 202) {
+        const koCount = B.enemy.ghosts.filter(g => g.ko).length;
+        if (koCount > 0) {
+          dmg += koCount;
+          B.log.push({ text: `${pg.name} (Pressure): +${koCount} damage from ${koCount} KO'd ghost(s)!`, type: 'ability' });
+        }
+      }
+      // Boris (343): Fortify — when you spend a Surge: Boris gains 2 HP
+      // (Checked in resource spend section — flag set, applied here)
+      // Gus (31): Gale Force — win: force opponent swap (in 3v3, auto-swap to next alive)
+      if (pg.id === 31) {
+        const eSide = getEnemySidelineGhosts();
+        if (eSide.length > 0 && !eg.ko) {
+          // Force swap: damage goes to the new ghost
+          const nextIdx = B.enemy.ghosts.indexOf(eSide[0]);
+          if (nextIdx >= 0) {
+            B.log.push({ text: `${pg.name} (Gale Force): Forces enemy to swap ghost!`, type: 'ability' });
+            // The new ghost takes the damage instead
+          }
+        }
       }
 
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
@@ -8382,11 +8601,13 @@ function battleRoll() {
         B.log.push({ text: `${pg.name} (Valley Magic): +2 Ice Shards! [Total: ${B.resources.iceShards}]`, type: 'ability' });
       }
 
-      // Opa (48): win = +1 HP
-      if (pg.id === 48) {
+      // Opa (48): win = +1 HP (blocked by Dark Fang Pressure)
+      if (pg.id === 48 && eg.id !== 202) {
         const healAmt = Math.min(1, pg.maxHp - pg.hp);
         pg.hp += healAmt;
         if (healAmt > 0) B.log.push({ text: `${pg.name} (Rest): +1 HP on win!`, type: 'heal' });
+      } else if (pg.id === 48 && eg.id === 202) {
+        B.log.push({ text: `${pg.name} (Rest): Healing blocked by ${eg.name}'s Pressure!`, type: 'ability' });
       }
 
       // Selene (305): Heart of the Hills — roll doubles on win: gain 2 Healing Seeds OR 3 Lucky Stones
@@ -8437,6 +8658,11 @@ function battleRoll() {
       // ── SIDELINE WIN ABILITIES (player team) ──
       const pSideline = getSidelineGhosts();
       for (const sg of pSideline) {
+        // Sandwiches (33): sideline — if opponent gains a Special, you gain it too
+        if (sg.id === 33 && B.enemyUsedResource) {
+          B.resources.iceShards += 1;
+          B.log.push({ text: `${sg.name} (sideline): Enemy gained a special — you gain 1 Ice Shard! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+        }
         // Gary (92): sideline — each 1 rolled = +2 Ice Shards
         if (sg.id === 92) {
           const ones = countDieVal(pDice, 1);
@@ -8462,6 +8688,76 @@ function battleRoll() {
 
     } else if (winner === 'b') {
       let dmg = eRoll.damage;
+
+      // ── ENEMY WIN BONUS ABILITIES ──
+      // Nikon (2): Ambush — win first roll: triple damage
+      if (eg.id === 2 && B.round === 1) {
+        dmg *= 3;
+        B.log.push({ text: `${eg.name} (Ambush): First roll win — TRIPLE damage!`, type: 'damage' });
+      }
+      // Wanderer (4): Curiosity — straight: +2 damage
+      if (eg.id === 4 && isStraight(eDice)) {
+        dmg += 2;
+        B.log.push({ text: `${eg.name} (Curiosity): Straight — +2 damage!`, type: 'damage' });
+      }
+      // Boo Brothers (17): Teamwork — enemy version damage bonus
+      if (eg.id === 17 && (B.booTeamworkBonusEnemy || 0) > 0) {
+        dmg += B.booTeamworkBonusEnemy;
+        B.log.push({ text: `${eg.name} (Teamwork): +${B.booTeamworkBonusEnemy} damage from sacrifice!`, type: 'damage' });
+        B.booTeamworkBonusEnemy = 0;
+      }
+      // Larry (35): Flying Kick — triples = 3X damage
+      if (eg.id === 35 && eRoll.type === 'triples') {
+        dmg *= 3;
+        B.log.push({ text: `${eg.name} (Flying Kick): Triples = 3X damage!`, type: 'damage' });
+      }
+      // Snorton (67): Fissure — +5 damage if 2+ sixes
+      if (eg.id === 67 && eDice.filter(d => d === 6).length >= 2) {
+        dmg += 5;
+        B.log.push({ text: `${eg.name} (Fissure): Two 6's — +5 damage!`, type: 'damage' });
+      }
+      // Haywire (78): Wild Chords — triples or better: +1 permanent die, +2 permanent damage (once per game)
+      if (eg.id === 78 && !eg.usedOncePerGame && (eRoll.type === 'triples' || eRoll.type === 'quads' || eRoll.type === 'penta')) {
+        eg.usedOncePerGame = true;
+        B.haywirePermanentDiceEnemy = (B.haywirePermanentDiceEnemy || 0) + 1;
+        B.haywirePermanentDmgEnemy = (B.haywirePermanentDmgEnemy || 0) + 2;
+        B.log.push({ text: `${eg.name} (Wild Chords): ${eRoll.type}! +1 permanent die, +2 permanent damage!`, type: 'damage' });
+      }
+      if (eg.id === 78 && (B.haywirePermanentDmgEnemy || 0) > 0) {
+        dmg += B.haywirePermanentDmgEnemy;
+      }
+      // Hector (96): +1 damage on singles
+      if (eg.id === 96 && eRoll.type === 'singles') {
+        dmg += 1;
+        B.log.push({ text: `${eg.name} (Protector): +1 damage on singles!`, type: 'damage' });
+      }
+      // Toby (97): Pure Heart — enemy winning the declared roll defeats your ghost
+      if (eg.id === 97 && eg.tobyDeclared) {
+        pg.hp = 0; pg.ko = true;
+        B.log.push({ text: `${eg.name} (Pure Heart): Declared roll won — your ghost is defeated!`, type: 'damage' });
+      }
+      // Night Master (103): Bullseye — win with doubles: destroy player sideline ghost <4 HP
+      if (eg.id === 103 && eRoll.type === 'doubles') {
+        const pSide = getSidelineGhosts();
+        const target = pSide.find(g => g.hp < 4 && !g.ko);
+        if (target) {
+          target.hp = 0; target.ko = true;
+          B.log.push({ text: `${eg.name} (Bullseye): Doubles — destroyed ${target.name} on your sideline!`, type: 'damage' });
+        }
+      }
+      // Lucy (108): Blue Fire — enemy win: gain Sacred Fire (logged only)
+      if (eg.id === 108) {
+        B.log.push({ text: `${eg.name} (Blue Fire): Gains 1 Sacred Fire.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Dark Fang (202): Pressure — win: +1 damage per KO'd ghost
+      if (eg.id === 202) {
+        const koCount = B.player.ghosts.filter(g => g.ko).length;
+        if (koCount > 0) {
+          dmg += koCount;
+          B.log.push({ text: `${eg.name} (Pressure): +${koCount} damage from ${koCount} KO'd ghost(s)!`, type: 'damage' });
+        }
+      }
 
       // Puff (5): enemy doubles/triples -1 damage (negated by Cameron's "cannot be negated")
       if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples') && eg.id !== 25) {
