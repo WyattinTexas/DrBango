@@ -1158,24 +1158,65 @@ function battleRoll() {
     }
 
     // Nicholas (51): Sneak Attack — sideline: deal 2 damage when enemy enters play
+    // Cornelius (45): Antidote — negate enemy sideline effects
     {
-      const pSide = getSidelineGhosts();
-      for (const sg of pSide) {
-        if (sg.id === 51 && !eg.ko) {
-          eg.hp = Math.max(0, eg.hp - 2);
-          B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on enemy entry!`, type: 'ability' });
-          if (eg.hp <= 0) eg.ko = true;
+      const _pCornelius = getSidelineGhosts().some(g => g.id === 45);
+      const _eCornelius = getEnemySidelineGhosts().some(g => g.id === 45);
+      if (!_eCornelius) {
+        const pSide = getSidelineGhosts();
+        for (const sg of pSide) {
+          if (sg.id === 51 && !eg.ko) {
+            eg.hp = Math.max(0, eg.hp - 2);
+            B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on enemy entry!`, type: 'ability' });
+            if (eg.hp <= 0) eg.ko = true;
+          }
         }
       }
-      const eSide = getEnemySidelineGhosts();
-      for (const sg of eSide) {
-        if (sg.id === 51 && !pg.ko) {
-          pg.hp = Math.max(0, pg.hp - 2);
-          B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on your entry!`, type: 'damage' });
-          if (pg.hp <= 0) pg.ko = true;
+      if (!_pCornelius) {
+        const eSide = getEnemySidelineGhosts();
+        for (const sg of eSide) {
+          if (sg.id === 51 && !pg.ko) {
+            pg.hp = Math.max(0, pg.hp - 2);
+            B.log.push({ text: `${sg.name} (Sneak Attack): Sideline — deals 2 damage on your entry!`, type: 'damage' });
+            if (pg.hp <= 0) pg.ko = true;
+          }
         }
       }
     }
+    // Raditz (62): Hunt — on entry, force swap opponent's active ghost
+    if (pg.id === 62) {
+      const eSide = getEnemySidelineGhosts();
+      if (eSide.length > 0 && !eg.ko) {
+        const swapTarget = eSide[Math.floor(Math.random() * eSide.length)];
+        const swapIdx = B.enemy.ghosts.indexOf(swapTarget);
+        if (swapIdx >= 0) {
+          B.enemy.activeIdx = swapIdx;
+          B.log.push({ text: `${pg.name} (Hunt): Forces ${swapTarget.name} into battle!`, type: 'ability' });
+        }
+      }
+    }
+    if (eg.id === 62) {
+      const pSide = getSidelineGhosts();
+      if (pSide.length > 0 && !pg.ko) {
+        const swapTarget = pSide[Math.floor(Math.random() * pSide.length)];
+        const swapIdx = B.player.ghosts.indexOf(swapTarget);
+        if (swapIdx >= 0) {
+          B.player.activeIdx = swapIdx;
+          B.log.push({ text: `${eg.name} (Hunt): Forces ${swapTarget.name} into battle!`, type: 'damage' });
+        }
+      }
+    }
+
+    // Redd (98): entry — gain +2 dice this roll
+    if (pg.id === 98) {
+      B.nextRoundMods.playerExtraDice += 2;
+      B.log.push({ text: `${pg.name} (Notorious): Entry — +2 dice this roll!`, type: 'ability' });
+    }
+    if (eg.id === 98) {
+      B.nextRoundMods.enemyExtraDice += 2;
+      B.log.push({ text: `${eg.name} (Notorious): Entry — +2 dice this roll!`, type: 'ability' });
+    }
+
     // Dallas (60): Quick Draw — when entering from sideline, steal 1 die for 2 rolls
     if (pg.id === 60) {
       B.dallasStealPlayer = 2;
@@ -1195,6 +1236,19 @@ function battleRoll() {
         return;
       }
     }
+  }
+
+  // ── SPLINTER (101): Toxic Fumes — after winning a roll, deal 1 damage before every roll ──
+  if (B.splinterActivePlayer && !eg.ko) {
+    eg.hp = Math.max(0, eg.hp - 1);
+    B.log.push({ text: `Splinter (Toxic Fumes): 1 damage before the roll.`, type: 'ability' });
+    if (eg.hp <= 0) { eg.ko = true; const _kr = checkKO(); if (_kr !== 'continue') { B.phase = _kr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
+  }
+  if (B.splinterActiveEnemy && !pg.ko) {
+    pg.hp = Math.max(0, pg.hp - 1);
+    B.log.push({ text: `Splinter (Toxic Fumes): 1 damage before the roll.`, type: 'damage' });
+    flashHpBar('pHpBar');
+    if (pg.hp <= 0) { pg.ko = true; const _pkr = checkKO(); if (_pkr !== 'continue') { B.phase = _pkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
 
   // ── MASKED HERO (55): If enemy has pre-roll ability (Shade/Ember Force), deal 3 damage before it triggers ──
@@ -1540,6 +1594,48 @@ function battleRoll() {
     }
     B._smudgeNumberChosenEnemy = false;
     B._smudgeNumberEnemy = null;
+  }
+
+  // ── SONYA (69): Mesmerize — change one die to a 2 each roll ──
+  if (pg.id === 69) {
+    const minIdx = pDice.indexOf(Math.min(...pDice));
+    if (pDice[minIdx] !== 2) {
+      const old = pDice[minIdx];
+      pDice[minIdx] = 2;
+      pDice.sort((a, b) => a - b);
+      B.log.push({ text: `${pg.name} (Mesmerize): Changed ${old} → 2!`, type: 'ability' });
+    }
+  }
+  if (eg.id === 69) {
+    const minIdx = eDice.indexOf(Math.min(...eDice));
+    if (eDice[minIdx] !== 2) {
+      const old = eDice[minIdx];
+      eDice[minIdx] = 2;
+      eDice.sort((a, b) => a - b);
+      B.log.push({ text: `${eg.name} (Mesmerize): Changed ${old} → 2!`, type: 'ability' });
+    }
+  }
+
+  // ── LITTLE BOO (9): Mercy — enemy triples count as 1-2-3 roll instead ──
+  if (pg.id === 9 && eDice.length >= 3) {
+    const eCounts = {};
+    eDice.forEach(d => eCounts[d] = (eCounts[d] || 0) + 1);
+    const eMaxCount = Math.max(...Object.values(eCounts));
+    if (eMaxCount >= 3) {
+      eDice.length = 0;
+      eDice.push(1, 2, 3);
+      B.log.push({ text: `${pg.name} (Mercy): Enemy triples downgraded to 1-2-3!`, type: 'ability' });
+    }
+  }
+  if (eg.id === 9 && pDice.length >= 3) {
+    const pCounts = {};
+    pDice.forEach(d => pCounts[d] = (pCounts[d] || 0) + 1);
+    const pMaxCount = Math.max(...Object.values(pCounts));
+    if (pMaxCount >= 3) {
+      pDice.length = 0;
+      pDice.push(1, 2, 3);
+      B.log.push({ text: `${eg.name} (Mercy): Your triples downgraded to 1-2-3!`, type: 'damage' });
+    }
   }
 
   // ── STAGED DICE REVEAL ──
@@ -1918,6 +2014,12 @@ function battleRoll() {
         B.log.push({ text: `${pg.name} (Toasted): Triples! Permanently removed 1 enemy die!`, type: 'ability' });
       }
 
+      // Wim (65): Slash — +5 damage when all dice are odd
+      if (pg.id === 65 && pDice.every(d => d % 2 === 1)) {
+        dmg += 5;
+        B.log.push({ text: `${pg.name} (Slash): All dice odd — +5 damage!`, type: 'ability' });
+      }
+
       // Nikon (2): Ambush — win first roll: triple damage
       if (pg.id === 2 && B.round === 1) {
         dmg *= 3;
@@ -2004,10 +2106,35 @@ function battleRoll() {
 
       // Puff (5) on enemy: enemy doubles/triples -1 damage (only relevant if enemy wins, handled below)
 
+      // ── CORNELIUS (45): Antidote — negate enemy sideline effects ──
+      const _enemyHasCornelius = getEnemySidelineGhosts().some(g => g.id === 45);
+      const _playerHasCornelius = getSidelineGhosts().some(g => g.id === 45);
+      if (_enemyHasCornelius) {
+        B.log.push({ text: `Cornelius (Antidote): Your sideline effects negated!`, type: 'damage' });
+      }
+      if (_playerHasCornelius) {
+        B.log.push({ text: `Cornelius (Antidote): Enemy sideline effects negated!`, type: 'ability' });
+      }
+
       // ── SIDELINE BONUS DAMAGE (player team) ──
-      {
+      if (!_enemyHasCornelius) {
         const sideWin = getSidelineGhosts();
         for (const sg of sideWin) {
+          // Dark Jeff (74): sideline — +1 damage to all your rolls
+          if (sg.id === 74) {
+            dmg += 1;
+            B.log.push({ text: `${sg.name} (Cackle): Sideline — +1 damage!`, type: 'ability' });
+          }
+          // Bilbo (80): sideline — +2 damage on singles
+          if (sg.id === 80 && pRoll.type === 'singles') {
+            dmg += 2;
+            B.log.push({ text: `${sg.name} (Little Buddy): Sideline — singles +2 damage!`, type: 'ability' });
+          }
+          // Tabitha (95): sideline — +2 damage on doubles
+          if (sg.id === 95 && pRoll.type === 'doubles') {
+            dmg += 2;
+            B.log.push({ text: `${sg.name} (Rally): Sideline — doubles +2 damage!`, type: 'ability' });
+          }
           // Bandit Pete (93): sideline — if rolling 2 or fewer dice, +3 damage
           if (sg.id === 93 && pDice.length <= 2) {
             dmg += 3;
@@ -2017,7 +2144,7 @@ function battleRoll() {
       }
 
       // ── SIDELINE BONUS DAMAGE — Pale Nimbus (88): if roll total < 7, +2 damage ──
-      {
+      if (!_enemyHasCornelius) {
         const sideWin2 = getSidelineGhosts();
         for (const sg of sideWin2) {
           if (sg.id === 88) {
@@ -2063,6 +2190,27 @@ function battleRoll() {
         B.log.push({ text: `Spirit Breaker: +${bonusDmg} damage vs ${eg.rarity}!`, type: 'ability' });
       }
 
+      // Guardian Fairy (99) enemy: Wish — sideline: leap in to take the hit (once per game)
+      {
+        const egf = getEnemySidelineGhosts().find(g => g.id === 99 && !g.usedOncePerGame);
+        if (egf && dmg > 0) {
+          egf.usedOncePerGame = true;
+          egf.hp = 0;
+          egf.ko = true;
+          B.log.push({ text: `${egf.name} (Wish): Leaps in from sideline to take the hit! KO'd!`, type: 'ability' });
+          dmg = 0;
+        }
+      }
+
+      // Sky (72) enemy: Elusive — if incoming damage >2, negate and counter-roll 1 die
+      if (eg.id === 72 && dmg > 2 && !eg.ko) {
+        const counterDie = rollDie();
+        pg.hp = Math.max(0, pg.hp - counterDie);
+        B.log.push({ text: `${eg.name} (Elusive): Damage >2 negated! Counter-roll [${counterDie}] = ${counterDie} damage back!`, type: 'damage' });
+        if (pg.hp <= 0) { pg.ko = true; }
+        dmg = 0;
+      }
+
       // Puff (5) enemy: player doubles/triples -1 damage
       if (eg.id === 5 && (pRoll.type === 'doubles' || pRoll.type === 'triples') && pg.id !== 25) {
         dmg = Math.max(0, dmg - 1);
@@ -2081,6 +2229,12 @@ function battleRoll() {
       B.log.push({ text: `You deal <strong style="color:#2a2;">${dmg}</strong> damage!`, type: 'damage' });
       showDmgFloat('enemy', dmg, false);
       spriteHitReact('enemy');
+
+      // Splinter (101): Toxic Fumes — after winning, deal 1 damage before every roll
+      if (pg.id === 101 && !B.splinterActivePlayer) {
+        B.splinterActivePlayer = true;
+        B.log.push({ text: `${pg.name} (Toxic Fumes): Activated! 1 damage before every roll from now on.`, type: 'ability' });
+      }
 
       // Munch (66): heal 4 HP on KO
       if (pg.id === 66 && eg.ko) {
@@ -2134,6 +2288,27 @@ function battleRoll() {
         B.enemyUsedResource = true;
       }
 
+      // Winston (15): Scheme — win: swap opponent's ghost, +2 dice next roll
+      if (pg.id === 15 && !eg.ko) {
+        const eSide = getEnemySidelineGhosts();
+        if (eSide.length > 0) {
+          const swapTarget = eSide[Math.floor(Math.random() * eSide.length)];
+          const swapIdx = B.enemy.ghosts.indexOf(swapTarget);
+          if (swapIdx >= 0) {
+            B.enemy.activeIdx = swapIdx;
+            B.log.push({ text: `${pg.name} (Scheme): Swapped enemy to ${swapTarget.name}!`, type: 'ability' });
+          }
+        }
+        B.nextRoundMods.playerExtraDice += 2;
+        B.log.push({ text: `${pg.name} (Scheme): +2 dice next roll!`, type: 'ability' });
+      }
+
+      // Kairan (68): Let's Dance — roll doubles: +1 die next roll
+      if (pg.id === 68 && pRoll.type === 'doubles') {
+        B.nextRoundMods.playerExtraDice += 1;
+        B.log.push({ text: `${pg.name} (Let's Dance): Doubles — +1 die next roll!`, type: 'ability' });
+      }
+
       // Outlaw (43): roll doubles on win — remove 1 opponent die next turn
       if (pg.id === 43 && pRoll.type === 'doubles') {
         B.nextRoundMods.enemyExtraDice -= 1;
@@ -2169,27 +2344,34 @@ function battleRoll() {
       }
 
       // ── SIDELINE WIN ABILITIES (player team) ──
-      const pSideline = getSidelineGhosts();
-      for (const sg of pSideline) {
-        // Sandwiches (33): sideline — if opponent gains a Special, you gain it too
-        if (sg.id === 33 && B.enemyUsedResource) {
-          B.resources.iceShards += 1;
-          B.log.push({ text: `${sg.name} (sideline): Enemy gained a special — you gain 1 Ice Shard! [Total: ${B.resources.iceShards}]`, type: 'ability' });
-        }
-        // Gary (92): sideline — each 1 rolled = +2 Ice Shards
-        if (sg.id === 92) {
-          const ones = countDieVal(pDice, 1);
-          if (ones > 0) {
-            B.resources.iceShards += ones * 2;
-            B.log.push({ text: `${sg.name} (sideline): +${ones * 2} Ice Shards from 1's! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+      if (!_enemyHasCornelius) {
+        const pSideline = getSidelineGhosts();
+        for (const sg of pSideline) {
+          // Sandwiches (33): sideline — if opponent gains a Special, you gain it too
+          if (sg.id === 33 && B.enemyUsedResource) {
+            B.resources.iceShards += 1;
+            B.log.push({ text: `${sg.name} (sideline): Enemy gained a special — you gain 1 Ice Shard! [Total: ${B.resources.iceShards}]`, type: 'ability' });
           }
-        }
-        // Farmer Jeff (314): sideline — each 6 = +1 Healing Seed
-        if (sg.id === 314) {
-          const sixes = countDieVal(pDice, 6);
-          if (sixes > 0) {
-            B.resources.healingSeeds += sixes;
-            B.log.push({ text: `${sg.name} (sideline): +${sixes} Healing Seed from 6's! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+          // Gary (92): sideline — each 1 rolled = +2 Ice Shards
+          if (sg.id === 92) {
+            const ones = countDieVal(pDice, 1);
+            if (ones > 0) {
+              B.resources.iceShards += ones * 2;
+              B.log.push({ text: `${sg.name} (sideline): +${ones * 2} Ice Shards from 1's! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+            }
+          }
+          // Farmer Jeff (314): sideline — each 6 = +1 Healing Seed
+          if (sg.id === 314) {
+            const sixes = countDieVal(pDice, 6);
+            if (sixes > 0) {
+              B.resources.healingSeeds += sixes;
+              B.log.push({ text: `${sg.name} (sideline): +${sixes} Healing Seed from 6's! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+            }
+          }
+          // Villager (11): sideline — +1 HP on winning rolls
+          if (sg.id === 11 && !pg.ko && pg.hp < pg.maxHp) {
+            pg.hp = Math.min(pg.maxHp, pg.hp + 1);
+            B.log.push({ text: `${sg.name} (Hospitality): Sideline — +1 HP on win!`, type: 'heal' });
           }
         }
       }
@@ -2220,6 +2402,11 @@ function battleRoll() {
           B.log.push({ text: `${eg.name} (Reflection): Dice total = 7 — reflects ${dmg} damage!`, type: 'damage' });
           if (pg.hp <= 0) { pg.ko = true; }
         }
+      }
+      // Hugo (52) enemy: Wreckage — opponent loses 1 die when Hugo takes damage
+      if (eg.id === 52 && dmg > 0 && !eg.ko) {
+        B.nextRoundMods.playerExtraDice -= 1;
+        B.log.push({ text: `${eg.name} (Wreckage): Took damage — you lose 1 die next roll!`, type: 'ability' });
       }
       // Marcus (57) enemy: take 3+ damage — gain 4 extra dice next round
       if (eg.id === 57 && !eg.ko && dmg >= 3) {
@@ -2262,6 +2449,11 @@ function battleRoll() {
       let dmg = eRoll.damage;
 
       // ── ENEMY WIN BONUS ABILITIES ──
+      // Wim (65) enemy: Slash — +5 damage when all dice are odd
+      if (eg.id === 65 && eDice.every(d => d % 2 === 1)) {
+        dmg += 5;
+        B.log.push({ text: `${eg.name} (Slash): All dice odd — +5 damage!`, type: 'damage' });
+      }
       // Nikon (2): Ambush — win first roll: triple damage
       if (eg.id === 2 && B.round === 1) {
         dmg *= 3;
@@ -2510,6 +2702,20 @@ function battleRoll() {
           B.log.push({ text: `${eg.name} (Gale Force): Forces you to swap ghost!`, type: 'damage' });
         }
       }
+      // Winston (15) enemy: Scheme — win: swap your ghost, +2 dice next roll
+      if (eg.id === 15 && !pg.ko) {
+        const pSide = getSidelineGhosts();
+        if (pSide.length > 0) {
+          const swapTarget = pSide[Math.floor(Math.random() * pSide.length)];
+          const swapIdx = B.player.ghosts.indexOf(swapTarget);
+          if (swapIdx >= 0) {
+            B.player.activeIdx = swapIdx;
+            B.log.push({ text: `${eg.name} (Scheme): Swapped your ghost to ${swapTarget.name}!`, type: 'damage' });
+          }
+        }
+        B.nextRoundMods.enemyExtraDice += 2;
+        B.log.push({ text: `${eg.name} (Scheme): +2 dice next roll!`, type: 'damage' });
+      }
       // Cameron (25): Unstoppable Force — if player used resource, +1 die next round; damage cannot be negated
       if (eg.id === 25) {
         B.nextRoundMods.enemyExtraDice += 1;
@@ -2540,10 +2746,39 @@ function battleRoll() {
         B.enemyUsedResource = true;
       }
 
+      // Splinter (101) enemy: Toxic Fumes — after winning, deal 1 damage before every roll
+      if (eg.id === 101 && !B.splinterActiveEnemy) {
+        B.splinterActiveEnemy = true;
+        B.log.push({ text: `${eg.name} (Toxic Fumes): Activated! 1 damage before every roll from now on.`, type: 'damage' });
+      }
+
       // Puff (5): enemy doubles/triples -1 damage (negated by Cameron's "cannot be negated")
       if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples') && eg.id !== 25) {
         dmg = Math.max(0, dmg - 1);
         B.log.push({ text: `${pg.name} (Cute): Enemy doubles/triples do -1 damage!`, type: 'ability' });
+      }
+
+      // Guardian Fairy (99): Wish — sideline: leap in to take the hit instead (once per game)
+      {
+        const _pHasCorneliusHere = getSidelineGhosts().some(g => g.id === 45);
+        // Guardian Fairy is NOT blocked by enemy Cornelius — it protects your own ghost
+        const gf = getSidelineGhosts().find(g => g.id === 99 && !g.usedOncePerGame);
+        if (gf && dmg > 0) {
+          gf.usedOncePerGame = true;
+          gf.hp = 0;
+          gf.ko = true;
+          B.log.push({ text: `${gf.name} (Wish): Leaps in from sideline to take the hit! KO'd!`, type: 'ability' });
+          dmg = 0;
+        }
+      }
+
+      // Sky (72): Elusive — if incoming damage >2, negate and counter-roll 1 die
+      if (pg.id === 72 && dmg > 2 && !pg.ko) {
+        const counterDie = rollDie();
+        eg.hp = Math.max(0, eg.hp - counterDie);
+        B.log.push({ text: `${pg.name} (Elusive): Damage >2 negated! Counter-roll [${counterDie}] = ${counterDie} damage back!`, type: 'ability' });
+        if (eg.hp <= 0) { eg.ko = true; B.log.push({ text: `${eg.name} is defeated by counter!`, type: 'damage' }); }
+        dmg = 0;
       }
 
       // ── EQUIPPED GEAR: Armor damage reduction ──
@@ -2643,12 +2878,23 @@ function battleRoll() {
         }
       }
 
+      // Hugo (52): Wreckage — opponent loses 1 die when Hugo takes roll damage
+      if (pg.id === 52 && dmg > 0 && !pg.ko) {
+        B.nextRoundMods.enemyExtraDice -= 1;
+        B.log.push({ text: `${pg.name} (Wreckage): Took damage — enemy loses 1 die next roll!`, type: 'ability' });
+      }
+
       // Marcus (57): take 3+ damage — gain 4 extra dice next round
       if (pg.id === 57 && !pg.ko && B.damageTakenThisRound >= 3) {
         B.nextRoundMods.playerExtraDice += 4;
         B.log.push({ text: `${pg.name} (Rage): Took ${B.damageTakenThisRound} damage — +4 dice next round!`, type: 'ability' });
       }
 
+      // Kairan (68) enemy: Let's Dance — doubles: +1 die next roll
+      if (eg.id === 68 && eRoll.type === 'doubles') {
+        B.nextRoundMods.enemyExtraDice += 1;
+        B.log.push({ text: `${eg.name} (Let's Dance): Doubles — +1 die next roll!`, type: 'ability' });
+      }
       // Outlaw (43): enemy wins with doubles — remove 1 player die next turn
       if (eg.id === 43 && eRoll.type === 'doubles') {
         B.nextRoundMods.playerExtraDice -= 1;
@@ -2657,30 +2903,60 @@ function battleRoll() {
 
       // ── ENEMY SIDELINE WIN ABILITIES ──
       {
-        const eSideWin = getEnemySidelineGhosts();
-        for (const sg of eSideWin) {
-          // Bandit Pete (93): sideline — if rolling 2 or fewer dice, +3 damage (already applied to dmg above, log here)
-          if (sg.id === 93 && eDice.length <= 2) {
-            B.log.push({ text: `${sg.name} (sideline): Enemy rolled ${eDice.length} dice — boosted damage!`, type: 'ability' });
-          }
-          // Pale Nimbus (88): sideline — if roll total < 7, +2 damage
-          if (sg.id === 88) {
-            const rollTotal = eDice.reduce((a,b) => a + b, 0);
-            if (rollTotal < 7) B.log.push({ text: `${sg.name} (sideline): Roll total ${rollTotal} < 7 — boosted damage!`, type: 'ability' });
-          }
-          // Sandwiches (33): sideline — if player gains a Special, enemy gains it too
-          if (sg.id === 33 && (B.resources.iceShards > 0 || B.resources.sacredFire > 0)) {
-            B.log.push({ text: `${sg.name} (sideline): Mirrors your specials.`, type: 'ability' });
-          }
-          // Gary (92): sideline — each 1 rolled = gain Ice Shards
-          if (sg.id === 92) {
-            const ones = eDice.filter(d => d === 1).length;
-            if (ones > 0) B.log.push({ text: `${sg.name} (sideline): ${ones} one(s) — gains Ice Shards!`, type: 'ability' });
-          }
-          // Farmer Jeff (314): sideline — each 6 = gain Healing Seed
-          if (sg.id === 314) {
-            const sixes = eDice.filter(d => d === 6).length;
-            if (sixes > 0) B.log.push({ text: `${sg.name} (sideline): ${sixes} six(es) — gains Healing Seeds!`, type: 'ability' });
+        const _pHasCorneliusLoss = getSidelineGhosts().some(g => g.id === 45);
+        if (_pHasCorneliusLoss) {
+          B.log.push({ text: `Cornelius (Antidote): Enemy sideline effects negated!`, type: 'ability' });
+        }
+        if (!_pHasCorneliusLoss) {
+          const eSideWin = getEnemySidelineGhosts();
+          for (const sg of eSideWin) {
+            // Dark Jeff (74) enemy: sideline — +1 damage to all rolls
+            if (sg.id === 74) {
+              dmg += 1;
+              B.log.push({ text: `${sg.name} (Cackle): Sideline — +1 damage!`, type: 'damage' });
+            }
+            // Bilbo (80) enemy: sideline — +2 damage on singles
+            if (sg.id === 80 && eRoll.type === 'singles') {
+              dmg += 2;
+              B.log.push({ text: `${sg.name} (Little Buddy): Sideline — singles +2 damage!`, type: 'damage' });
+            }
+            // Tabitha (95) enemy: sideline — +2 damage on doubles
+            if (sg.id === 95 && eRoll.type === 'doubles') {
+              dmg += 2;
+              B.log.push({ text: `${sg.name} (Rally): Sideline — doubles +2 damage!`, type: 'damage' });
+            }
+            // Bandit Pete (93): sideline — if rolling 2 or fewer dice, +3 damage
+            if (sg.id === 93 && eDice.length <= 2) {
+              dmg += 3;
+              B.log.push({ text: `${sg.name} (sideline): Enemy rolled ${eDice.length} dice — +3 damage!`, type: 'damage' });
+            }
+            // Pale Nimbus (88): sideline — if roll total < 7, +2 damage
+            if (sg.id === 88) {
+              const rollTotal = eDice.reduce((a,b) => a + b, 0);
+              if (rollTotal < 7) {
+                dmg += 2;
+                B.log.push({ text: `${sg.name} (sideline): Roll total ${rollTotal} < 7 — +2 damage!`, type: 'damage' });
+              }
+            }
+            // Sandwiches (33): sideline — if player gains a Special, enemy gains it too
+            if (sg.id === 33 && (B.resources.iceShards > 0 || B.resources.sacredFire > 0)) {
+              B.log.push({ text: `${sg.name} (sideline): Mirrors your specials.`, type: 'ability' });
+            }
+            // Gary (92): sideline — each 1 rolled = gain Ice Shards
+            if (sg.id === 92) {
+              const ones = eDice.filter(d => d === 1).length;
+              if (ones > 0) B.log.push({ text: `${sg.name} (sideline): ${ones} one(s) — gains Ice Shards!`, type: 'ability' });
+            }
+            // Farmer Jeff (314): sideline — each 6 = gain Healing Seed
+            if (sg.id === 314) {
+              const sixes = eDice.filter(d => d === 6).length;
+              if (sixes > 0) B.log.push({ text: `${sg.name} (sideline): ${sixes} six(es) — gains Healing Seeds!`, type: 'ability' });
+            }
+            // Villager (11) enemy: sideline — +1 HP on winning rolls
+            if (sg.id === 11 && !eg.ko && eg.hp < eg.maxHp) {
+              eg.hp = Math.min(eg.maxHp, eg.hp + 1);
+              B.log.push({ text: `${sg.name} (Hospitality): Sideline — +1 HP on win!`, type: 'heal' });
+            }
           }
         }
       }
