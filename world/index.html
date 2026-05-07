@@ -248,6 +248,22 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   padding: 2px 12px; border-radius: 10px; z-index: 15; letter-spacing: 1px;
 }
 
+/* ── SIDELINE GHOSTS ── */
+.battle-sideline {
+  position: absolute; bottom: 8px; display: flex; gap: 4px; z-index: 10;
+}
+.battle-sideline.player { left: 16px; }
+.battle-sideline.enemy { right: 16px; }
+.sideline-ghost {
+  background: rgba(0,0,0,0.3); border: 1px solid #555; border-radius: 4px;
+  padding: 3px; text-align: center; width: 60px; font-size: 9px; color: #aaa;
+}
+.sideline-ghost .sl-hp { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 2px; }
+.sideline-ghost .sl-hp-fill { height: 100%; border-radius: 2px; }
+.sideline-ghost.ko { opacity: 0.3; }
+.sideline-ghost.swap-pick { border-color: #daa520; cursor: pointer; animation: swapPulse 1s ease-in-out infinite; }
+@keyframes swapPulse { 0%,100% { box-shadow: 0 0 4px rgba(218,165,32,0.3); } 50% { box-shadow: 0 0 12px rgba(218,165,32,0.7); } }
+
 /* ── FLOATING DAMAGE NUMBERS ── */
 .dmg-float {
   position: absolute; z-index: 50; font-size: 28px; font-weight: 900;
@@ -1654,19 +1670,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 </div>
 
 
-<!-- INTERIOR EXIT BUTTON (always visible when inside a building) -->
-<style>
-@keyframes exitPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(255,60,60,0.4), 0 0 20px rgba(255,60,60,0.2); transform: scale(1); }
-  50% { box-shadow: 0 0 16px rgba(255,60,60,0.7), 0 0 36px rgba(255,60,60,0.35); transform: scale(1.05); }
-}
-</style>
-<button id="interiorExitBtn" style="display:none;position:fixed;top:50px;right:20px;z-index:999;
-  background:rgba(220,40,40,0.95);color:#fff;border:3px solid #fff;border-radius:10px;
-  padding:14px 32px;font-size:20px;font-weight:bold;cursor:pointer;
-  text-shadow:0 2px 4px rgba(0,0,0,0.6);letter-spacing:1px;
-  animation: exitPulse 1.8s ease-in-out infinite;"
-  onclick="exitCurrentInterior()">EXIT BUILDING</button>
+
 
 <!-- GAME CANVAS -->
 <canvas id="gameCanvas"></canvas>
@@ -1729,6 +1733,10 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
         <div class="hp-bar-outer"><div class="hp-bar-inner green" id="pHpBar" style="width:100%"></div></div>
         <div class="f-ability" id="pFighterAbility">---</div>
       </div>
+
+      <!-- Sideline ghosts -->
+      <div class="battle-sideline player" id="pSideline"></div>
+      <div class="battle-sideline enemy" id="eSideline"></div>
     </div>
 
     <!-- NARRATOR BAR — bottom section -->
@@ -2009,7 +2017,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.0.1';
+const VERSION = 'v5.2.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -2629,19 +2637,35 @@ function triggerRoamingBattle(enemy) {
   SFX.encounterStart();
   Music.play('battle');
 
-  const activeGhost = G.team[G.activeIdx];
-  let playerGhost = (activeGhost && !activeGhost.ko && activeGhost.hp > 0) ? activeGhost : G.team.find(g => !g.ko && g.hp > 0);
-  if (!playerGhost) {
-    playerGhost = G.team[0];
-    playerGhost.hp = Math.max(1, playerGhost.hp);
-    playerGhost.ko = false;
+  // Build player team (up to 3)
+  const playerGhosts = buildPlayerBattleTeam();
+
+  // Enemy team — just the roaming enemy (1 ghost)
+  const enemyGhosts = [{
+    id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false,
+    ability: card.ability, abilityDesc: card.desc, rarity: card.rarity, usedOncePerGame: false, entryFired: false
+  }];
+
+  // Scale enemy HP
+  for (const eg of enemyGhosts) {
+    if (G.level <= 3) { eg.maxHp = Math.max(2, eg.maxHp - 1); eg.hp = eg.maxHp; }
+    else if (G.level >= 7) { eg.maxHp += 1; eg.hp = eg.maxHp; }
   }
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: Math.max(1, playerGhost.hp), maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
+    player: {
+      ghosts: playerGhosts,
+      activeIdx: 0,
+      resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
+    },
+    enemy: {
+      ghosts: enemyGhosts,
+      activeIdx: 0,
+      resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 },
+    },
     enemyCard: card,
-    enemyGhost: { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity, usedOncePerGame: false },
+    enemyCards: [card],
     log: [],
     phase: 'ready',
     playerDice: [],
@@ -2652,16 +2676,8 @@ function triggerRoamingBattle(enemy) {
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
     damageTakenThisRound: 0,
+    koSwapTeam: null,
   };
-
-  // Scale enemy HP based on player level for balance
-  if (G.level <= 3) {
-    B.enemyGhost.maxHp = Math.max(2, B.enemyGhost.maxHp - 1);
-    B.enemyGhost.hp = B.enemyGhost.maxHp;
-  } else if (G.level >= 7) {
-    B.enemyGhost.maxHp += 1;
-    B.enemyGhost.hp = B.enemyGhost.maxHp;
-  }
 
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = warnings[Math.floor(Math.random() * warnings.length)];
@@ -4120,9 +4136,9 @@ for (let i = 0; i < 60; i++) {
 // ═══════ NPC DATA ═══════
 const NPCS = [
   // Polaris (Frost Valley)
-  { name: 'Elder Frost', x: HUB.x + 1.5, y: HUB.y + 0.2, color: '#daa520', sprite: 'npc_elder' },
-  { name: 'Smith Ember', x: HUB.x + 1.5, y: HUB.y + 4.2, color: '#e07020', sprite: 'npc_smith' },
-  { name: 'Keeper Zara', x: HUB.x + 5.5, y: HUB.y + 0.2, color: '#c0a040', sprite: 'npc_zara' },
+  { name: 'Elder Frost', x: HUB.x + 2, y: HUB.y - 1, color: '#daa520', sprite: 'npc_elder' },
+  { name: 'Smith Ember', x: HUB.x + 0, y: HUB.y + 5, color: '#e07020', sprite: 'npc_smith' },
+  { name: 'Keeper Zara', x: HUB.x + 7, y: HUB.y + 1, color: '#c0a040', sprite: 'npc_zara' },
   // Meadowbrook (Rolling Hills)
   { name: 'Farmer Bea', x: 24, y: 58, color: '#6a8a4a', sprite: 'npc_elder' },
   { name: 'Herbalist Sage', x: 28, y: 60, color: '#4a8a6a', sprite: 'npc_smith' },
@@ -6788,9 +6804,119 @@ function weightedRoll(ghost, count) {
 // Helper: count a specific die value
 function countDieVal(dice, val) { return dice.filter(d => d === val).length; }
 
-// Helper: get sideline ghosts for player team
+// Helper: get active ghost for a battle team side
+function activePlayerGhost() { return B && B.player ? B.player.ghosts[B.player.activeIdx] : null; }
+function activeEnemyGhost() { return B && B.enemy ? B.enemy.ghosts[B.enemy.activeIdx] : null; }
+
+// Helper: get sideline ghosts for player team (from battle state)
 function getSidelineGhosts() {
-  return G.team.filter((g, i) => i !== G.activeIdx && !g.ko && g.hp > 0);
+  if (!B || !B.player) return [];
+  return B.player.ghosts.filter((g, i) => i !== B.player.activeIdx && !g.ko && g.hp > 0);
+}
+
+// Helper: get sideline ghosts for enemy team (from battle state)
+function getEnemySidelineGhosts() {
+  if (!B || !B.enemy) return [];
+  return B.enemy.ghosts.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0);
+}
+
+// Helper: check if team is fully defeated
+function isTeamDefeated(team) {
+  return team.ghosts.every(g => g.ko);
+}
+
+// KO swap check — returns 'continue', 'swapping', 'victory', or 'defeat'
+function checkKO() {
+  const pg = activePlayerGhost();
+  const eg = activeEnemyGhost();
+
+  // Check player active ghost KO
+  if (pg && pg.ko) {
+    const alive = B.player.ghosts.filter((g, i) => i !== B.player.activeIdx && !g.ko && g.hp > 0);
+    if (alive.length === 0) {
+      B.phase = 'over';
+      return 'defeat';
+    }
+    if (alive.length === 1) {
+      doKoSwap('player', B.player.ghosts.indexOf(alive[0]));
+      return 'continue';
+    }
+    // Player picks
+    B.phase = 'ko-swap';
+    B.koSwapTeam = 'player';
+    B.log.push({ text: 'Choose your next Spiritkin!', type: 'ability' });
+    renderBattle();
+    return 'swapping';
+  }
+
+  // Check enemy active ghost KO (auto-swap)
+  if (eg && eg.ko) {
+    const alive = B.enemy.ghosts.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0);
+    if (alive.length === 0) {
+      B.phase = 'over';
+      return 'victory';
+    }
+    const nextIdx = B.enemy.ghosts.indexOf(alive[0]);
+    doKoSwap('enemy', nextIdx);
+    return 'continue';
+  }
+
+  return 'continue';
+}
+
+// Perform KO swap
+function doKoSwap(teamKey, ghostIdx) {
+  const team = B[teamKey];
+  team.activeIdx = ghostIdx;
+  const newActive = team.ghosts[ghostIdx];
+  B.log.push({ text: `${newActive.name} enters the battle!`, type: 'ability' });
+
+  // Fire entry ability for newly swapped-in ghost
+  if (!newActive.entryFired) {
+    newActive.entryFired = true;
+    const enemyTeamKey = teamKey === 'player' ? 'enemy' : 'player';
+    const target = B[enemyTeamKey].ghosts[B[enemyTeamKey].activeIdx];
+
+    // Entry abilities
+    if (newActive.id === 34 && target) { // Grawr
+      target.hp = Math.max(0, target.hp - 1);
+      B.log.push({ text: `${newActive.name} (Menace): 1 damage on entry!`, type: 'ability' });
+      if (target.hp <= 0) target.ko = true;
+    }
+    if (newActive.id === 56) { // Chad
+      B.resources.iceShards = (B.resources.iceShards || 0) + 2;
+      B.log.push({ text: `${newActive.name} (Sploop!): +2 Ice Shards!`, type: 'ability' });
+    }
+    if (newActive.id === 94 && target) { // Jenkins
+      const jd = rollDice(4);
+      const jDmg = classify(jd).damage;
+      target.hp = Math.max(0, target.hp - jDmg);
+      B.log.push({ text: `${newActive.name} (Barrage): Entry roll [${jd.join(', ')}] = ${jDmg} damage!`, type: 'ability' });
+      if (target.hp <= 0) target.ko = true;
+    }
+    if (newActive.id === 306 && target) { // Nerina
+      target.hp = Math.max(0, target.hp - 3);
+      B.log.push({ text: `${newActive.name} (Leviathan): 3 damage on entry!`, type: 'ability' });
+      if (target.hp <= 0) target.ko = true;
+    }
+  }
+
+  B.phase = 'ready';
+  B.koSwapTeam = null;
+  renderBattle();
+
+  // After swap, check if the entry ability caused another KO
+  if (teamKey === 'player') {
+    const eg2 = activeEnemyGhost();
+    if (eg2 && eg2.ko) {
+      setTimeout(() => {
+        const result = checkKO();
+        if (result === 'victory') {
+          renderBattle();
+        }
+      }, 300);
+    }
+  }
 }
 
 function classify(dice) {
@@ -6841,23 +6967,43 @@ function triggerWildEncounter() {
   G.inBattle = true;
   Music.play('battle');
 
-  // Use active team member — ensure they have HP
-  const activeGhost = G.team[G.activeIdx];
-  let playerGhost = (activeGhost && !activeGhost.ko && activeGhost.hp > 0) ? activeGhost : G.team.find(g => !g.ko && g.hp > 0);
-  if (!playerGhost) {
-    // All team members KO'd or 0 HP — force heal first member to 1 HP
-    playerGhost = G.team[0];
-    playerGhost.hp = Math.max(1, playerGhost.hp);
-    playerGhost.ko = false;
+  // Build player team from G.team (up to 3)
+  const playerGhosts = buildPlayerBattleTeam();
+
+  // Build enemy team — scale count by player level
+  const enemyCount = Math.min(3, Math.max(1, Math.ceil(G.level / 3)));
+  const enemyCards = [wildCard];
+  for (let i = 1; i < enemyCount; i++) {
+    const extra = getWildEncounter();
+    if (extra) enemyCards.push(extra);
+  }
+  const enemyGhosts = enemyCards.map(c => ({
+    id: c.id, name: c.name, hp: c.maxHp, maxHp: c.maxHp, ko: false,
+    ability: c.ability, abilityDesc: c.desc, rarity: c.rarity, usedOncePerGame: false, entryFired: false
+  }));
+
+  // Scale enemy HP based on player level
+  for (const eg of enemyGhosts) {
+    if (G.level <= 3) { eg.maxHp = Math.max(2, eg.maxHp - 1); eg.hp = eg.maxHp; }
+    else if (G.level >= 7) { eg.maxHp += 1; eg.hp = eg.maxHp; }
   }
 
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: Math.max(1, playerGhost.hp), maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
+    player: {
+      ghosts: playerGhosts,
+      activeIdx: 0,
+      resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
+    },
+    enemy: {
+      ghosts: enemyGhosts,
+      activeIdx: 0,
+      resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 },
+    },
     enemyCard: wildCard,
-    enemyGhost: { id: wildCard.id, name: wildCard.name, hp: wildCard.maxHp, maxHp: wildCard.maxHp, ko: false, ability: wildCard.ability, abilityDesc: wildCard.desc, rarity: wildCard.rarity, usedOncePerGame: false },
+    enemyCards: enemyCards,
     log: [],
-    phase: 'ready', // ready, rolling, resolved
+    phase: 'ready',
     playerDice: [],
     enemyDice: [],
     entryFired: false,
@@ -6866,23 +7012,37 @@ function triggerWildEncounter() {
     nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     enemyUsedResource: false,
     damageTakenThisRound: 0,
+    koSwapTeam: null,
   };
 
-  // Scale enemy HP based on player level for balance
-  if (G.level <= 3) {
-    B.enemyGhost.maxHp = Math.max(2, B.enemyGhost.maxHp - 1);
-    B.enemyGhost.hp = B.enemyGhost.maxHp;
-  } else if (G.level >= 7) {
-    B.enemyGhost.maxHp += 1;
-    B.enemyGhost.hp = B.enemyGhost.maxHp;
-  }
-
-  // Show battle overlay
   showBattleOverlay();
-  document.getElementById('battleTitle').textContent = `Wild ${wildCard.name} appeared!`;
+  document.getElementById('battleTitle').textContent = enemyCount > 1
+    ? `Wild ${wildCard.name} and ${enemyCount - 1} more appeared!`
+    : `Wild ${wildCard.name} appeared!`;
 
   renderBattle();
   notify(`Wild ${wildCard.name} appeared!`);
+}
+
+// Build player battle team from G.team (up to 3 alive ghosts)
+function buildPlayerBattleTeam() {
+  // Find alive ghosts, prioritizing the active one
+  let alive = G.team.filter(g => !g.ko && g.hp > 0);
+  if (alive.length === 0) {
+    // Force heal first team member
+    G.team[0].hp = Math.max(1, G.team[0].hp);
+    G.team[0].ko = false;
+    alive = [G.team[0]];
+  }
+  // Put active ghost first
+  const activeG = G.team[G.activeIdx];
+  if (activeG && !activeG.ko && activeG.hp > 0) {
+    alive = [activeG, ...alive.filter(g => g !== activeG)];
+  }
+  return alive.slice(0, 3).map(g => ({
+    ...g, hp: Math.max(1, g.hp), ko: false, usedOncePerGame: false, entryFired: false,
+    _teamIdx: G.team.indexOf(g) // track which G.team slot this came from
+  }));
 }
 
 function showBattleOverlay() {
@@ -6897,7 +7057,8 @@ function renderBattle() {
   document.getElementById('battleRound').textContent = `Round ${B.round}`;
 
   // Player fighter
-  const pg = B.playerGhost;
+  const pg = activePlayerGhost();
+  if (!pg) return;
   const pCard = getCard(pg.id);
   document.getElementById('pFighterName').textContent = pg.name;
   document.getElementById('pFighterAbility').textContent = pg.ability;
@@ -6922,7 +7083,8 @@ function renderBattle() {
   document.getElementById('pHpText').textContent = `HP ${Math.max(0,pg.hp)}/${pg.maxHp}`;
 
   // Enemy fighter
-  const eg = B.enemyGhost;
+  const eg = activeEnemyGhost();
+  if (!eg) return;
   const eCard = getCard(eg.id) || B.enemyCard;
   document.getElementById('eFighterName').textContent = eg.name;
   document.getElementById('eFighterAbility').textContent = eg.ability;
@@ -6964,13 +7126,53 @@ function renderBattle() {
   const narratorEl = logEl.closest('.battle-narrator');
   if (narratorEl) narratorEl.scrollTop = narratorEl.scrollHeight;
 
+  // Render sideline ghosts
+  renderSideline('player', 'pSideline');
+  renderSideline('enemy', 'eSideline');
+
   // Actions
   const actionsEl = document.getElementById('battleActions');
-  if (B.playerGhost.ko || B.enemyGhost.ko) {
-    const won = B.enemyGhost.ko;
+  if (B.phase === 'ko-swap') {
+    actionsEl.innerHTML = '<span style="color:#daa520;font-weight:bold;">Click a sideline ghost to swap in!</span>';
+  } else if (B.phase === 'over') {
+    const playerDefeated = isTeamDefeated(B.player);
+    const enemyDefeated = isTeamDefeated(B.enemy);
+    const won = enemyDefeated;
     actionsEl.innerHTML = `<button class="battle-btn btn-roll" onclick="endBattle(${won})">${won ? '&#127881; Victory!' : '&#128128; Defeated...'}</button>`;
     if (!B._bannerShown) { B._bannerShown = true; showBattleResultBanner(won); }
+  } else if (pg.ko || eg.ko) {
+    // A ghost is KO'd but we haven't entered ko-swap or over phase yet — trigger checkKO
+    const koResult = checkKO();
+    if (koResult === 'victory') {
+      B.phase = 'over';
+      actionsEl.innerHTML = `<button class="battle-btn btn-roll" onclick="endBattle(true)">&#127881; Victory!</button>`;
+      if (!B._bannerShown) { B._bannerShown = true; showBattleResultBanner(true); }
+    } else if (koResult === 'defeat') {
+      B.phase = 'over';
+      actionsEl.innerHTML = `<button class="battle-btn btn-roll" onclick="endBattle(false)">&#128128; Defeated...</button>`;
+      if (!B._bannerShown) { B._bannerShown = true; showBattleResultBanner(false); }
+    }
+    // 'swapping' is handled by ko-swap above on re-render
   }
+}
+
+// Render sideline ghosts for a team
+function renderSideline(teamKey, elementId) {
+  const team = B[teamKey];
+  const el = document.getElementById(elementId);
+  if (!el || !team || team.ghosts.length <= 1) { if (el) el.innerHTML = ''; return; }
+  const sideline = team.ghosts.filter((g, i) => i !== team.activeIdx);
+  el.innerHTML = sideline.map(g => {
+    const pct = Math.max(0, g.hp / g.maxHp * 100);
+    const realIdx = team.ghosts.indexOf(g);
+    const isSwapPick = B.phase === 'ko-swap' && B.koSwapTeam === teamKey && !g.ko;
+    return `<div class="sideline-ghost ${g.ko ? 'ko' : ''} ${isSwapPick ? 'swap-pick' : ''}"
+      ${isSwapPick ? `onclick="doKoSwap('${teamKey}', ${realIdx})"` : ''}>
+      <div style="font-weight:bold;color:${g.ko ? '#666' : '#fff'};">${g.name}</div>
+      <div class="sl-hp"><div class="sl-hp-fill" style="width:${pct}%;background:${pct > 50 ? '#4a8' : pct > 25 ? '#aa8' : '#a44'};"></div></div>
+      <div style="color:#888;">${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════ BATTLE SCREEN SHAKE ═══════
@@ -7033,13 +7235,14 @@ function showBattleResultBanner(won) {
 // ═══════ ABILITY-AWARE BATTLE ROLL ═══════
 
 function battleRoll() {
-  if (!B || B.phase === 'rolling') return;
+  if (!B || B.phase === 'rolling' || B.phase === 'ko-swap' || B.phase === 'over') return;
   B.phase = 'rolling';
   B.enemyUsedResource = false;
   B.cameronActive = false;
 
-  const pg = B.playerGhost;
-  const eg = B.enemyGhost;
+  const pg = activePlayerGhost();
+  const eg = activeEnemyGhost();
+  if (!pg || !eg) return;
 
   // ── ENTRY ABILITIES (Round 1 only) ──
   if (!B.entryFired) {
@@ -7116,11 +7319,14 @@ function battleRoll() {
       B.maximoActive = 'enemy';
     }
 
-    // If someone KO'd from entry, stop here
+    // If someone KO'd from entry, check for swap
     if (pg.ko || eg.ko) {
-      B.phase = 'ready';
-      renderBattle();
-      return;
+      const koResult = checkKO();
+      if (koResult !== 'continue') {
+        B.phase = koResult === 'swapping' ? 'ko-swap' : 'over';
+        renderBattle();
+        return;
+      }
     }
   }
 
@@ -7128,13 +7334,13 @@ function battleRoll() {
   if (pg.id === 55 && (eg.id === 111 || eg.id === 304) && !eg.ko) {
     eg.hp = Math.max(0, eg.hp - 3);
     B.log.push({ text: `${pg.name} (Masked Hero): Intercepts enemy pre-roll ability — 3 damage!`, type: 'ability' });
-    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (eg.hp <= 0) { eg.ko = true; const _kr = checkKO(); if (_kr !== 'continue') { B.phase = _kr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
   if (eg.id === 55 && (pg.id === 111 || pg.id === 304) && !pg.ko) {
     pg.hp = Math.max(0, pg.hp - 3);
     B.log.push({ text: `${eg.name} (Masked Hero): Intercepts your pre-roll ability — 3 damage!`, type: 'damage' });
     flashHpBar('pHpBar');
-    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (pg.hp <= 0) { pg.ko = true; const _pkr = checkKO(); if (_pkr !== 'continue') { B.phase = _pkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
 
   // ── BEFORE-ROLL ABILITIES ──
@@ -7142,27 +7348,27 @@ function battleRoll() {
   if (pg.id === 111 && !eg.ko) {
     eg.hp = Math.max(0, eg.hp - 1);
     B.log.push({ text: `${pg.name} (Haunt): Opponent takes 1 damage before the roll.`, type: 'ability' });
-    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (eg.hp <= 0) { eg.ko = true; const _kr = checkKO(); if (_kr !== 'continue') { B.phase = _kr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
   if (eg.id === 111 && !pg.ko) {
     pg.hp = Math.max(0, pg.hp - 1);
     B.log.push({ text: `${eg.name} (Haunt): You take 1 damage before the roll.`, type: 'damage' });
     flashHpBar('pHpBar');
     B.enemyUsedResource = true;
-    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (pg.hp <= 0) { pg.ko = true; const _pkr = checkKO(); if (_pkr !== 'continue') { B.phase = _pkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
   // Ember Force (304): deal 1 damage before roll
   if (pg.id === 304 && !eg.ko) {
     eg.hp = Math.max(0, eg.hp - 1);
     B.log.push({ text: `${pg.name} (Ember Force): Opponent takes 1 damage before the roll.`, type: 'ability' });
-    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (eg.hp <= 0) { eg.ko = true; const _kr = checkKO(); if (_kr !== 'continue') { B.phase = _kr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
   if (eg.id === 304 && !pg.ko) {
     pg.hp = Math.max(0, pg.hp - 1);
     B.log.push({ text: `${eg.name} (Ember Force): You take 1 damage before the roll.`, type: 'damage' });
     flashHpBar('pHpBar');
     B.enemyUsedResource = true;
-    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (pg.hp <= 0) { pg.ko = true; const _pkr = checkKO(); if (_pkr !== 'continue') { B.phase = _pkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
 
   // Simon (24): Brew Time — when taking before-roll damage, gain 1 Sacred Fire
@@ -7182,7 +7388,7 @@ function battleRoll() {
     pg.hp = eg.hp;
     eg.hp = tempHp;
     B.log.push({ text: `${pg.name} (Change of Heart): Spent 1 Ice Shard — swapped HP! [You: ${pg.hp} HP, Enemy: ${eg.hp} HP]`, type: 'ability' });
-    if (eg.hp <= 0) { eg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (eg.hp <= 0) { eg.ko = true; const _kr = checkKO(); if (_kr !== 'continue') { B.phase = _kr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
   if (eg.id === 85 && !pg.ko) {
     // Enemy AI always uses it if they can (simulate having 1 shard)
@@ -7191,7 +7397,7 @@ function battleRoll() {
     pg.hp = tempHp;
     B.log.push({ text: `${eg.name} (Change of Heart): Swapped HP! [You: ${pg.hp} HP, Enemy: ${eg.hp} HP]`, type: 'ability' });
     B.enemyUsedResource = true;
-    if (pg.hp <= 0) { pg.ko = true; B.phase = 'ready'; renderBattle(); return; }
+    if (pg.hp <= 0) { pg.ko = true; const _pkr = checkKO(); if (_pkr !== 'continue') { B.phase = _pkr === 'swapping' ? 'ko-swap' : 'over'; renderBattle(); return; } }
   }
 
   // Timber (210): Howl — opponent loses 1 die this roll
@@ -7909,9 +8115,24 @@ function battleRoll() {
     }
 
     B.round++;
-    // Show damage result first, then enable next round after a brief pause
+    // Show damage result first, then check for KO swap
     renderBattle();
     setTimeout(() => {
+      if (!B) return;
+      // Check if any ghost was KO'd this round — handle swap
+      if (pg.ko || eg.ko) {
+        const koResult = checkKO();
+        if (koResult === 'victory' || koResult === 'defeat') {
+          B.phase = 'over';
+          renderBattle();
+          return;
+        }
+        if (koResult === 'swapping') {
+          // Phase is already ko-swap, renderBattle already called by checkKO
+          return;
+        }
+        // 'continue' — swap happened automatically, proceed
+      }
       B.phase = 'ready';
       if (rollBtn) rollBtn.disabled = false;
       renderBattle();
@@ -10202,26 +10423,15 @@ function tryInteract() {
     }
   }
 
-  // Check for NPC interaction first
-  for (const npc of NPCS) {
-    const dist = Math.sqrt((G.x - npc.x) ** 2 + (G.y - npc.y) ** 2);
-    if (dist < 2.5) {
-      showDialogue(npc.name);
-      return;
-    }
-  }
-
-  // Check for cantina nearby
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-    if (worldMap[tileY+dy]?.[tileX+dx] === 12) {
+  // Check for building entry FIRST (priority over NPCs)
+  // Use tight range (1 tile) so buildings are accessible even with nearby NPCs
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const tile = worldMap[tileY+dy]?.[tileX+dx];
+    if (tile === 12) {
       if (typeof enterCantina === 'function') { enterCantina(); } else { openCantina(); }
       return;
     }
-  }
-
-  // Check for workshop nearby
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-    if (worldMap[tileY+dy]?.[tileX+dx] === 8) {
+    if (tile === 8) {
       if (typeof enterWorkshop === 'function') { enterWorkshop(); } else { openCrafting(); }
       return;
     }
@@ -10229,7 +10439,7 @@ function tryInteract() {
 
   // Check for arena building (HUB.x+5/6, HUB.y+1)
   const arenaX1 = HUB.x + 5, arenaX2 = HUB.x + 6, arenaY1 = HUB.y + 1;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === arenaX1 || cx === arenaX2) && cy === arenaY1) {
       if (typeof enterArena === 'function') { enterArena(); } else { openArena(); }
@@ -10239,7 +10449,7 @@ function tryInteract() {
 
   // Check for inn (HUB.x+5/6, HUB.y+3)
   const innX1 = HUB.x + 5, innX2 = HUB.x + 6, innY1 = HUB.y + 3;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === innX1 || cx === innX2) && cy === innY1) {
       if (typeof enterInn === 'function') { enterInn(); } else {
@@ -10254,10 +10464,19 @@ function tryInteract() {
 
   // Check for trading post (HUB.x+1/2, HUB.y+1)
   const tpX1 = HUB.x + 1, tpX2 = HUB.x + 2, tpY1 = HUB.y + 1;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === tpX1 || cx === tpX2) && cy === tpY1) {
       if (typeof enterTradingPost === 'function') { enterTradingPost(); } else { openMarket(); }
+      return;
+    }
+  }
+
+  // Check for NPC interaction (after building checks)
+  for (const npc of NPCS) {
+    const dist = Math.sqrt((G.x - npc.x) ** 2 + (G.y - npc.y) ** 2);
+    if (dist < 2.5) {
+      showDialogue(npc.name);
       return;
     }
   }
@@ -11419,7 +11638,7 @@ function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
   if (!window._sDbg) window._sDbg = 0;
   if (window._sDbg++ < 1) {
     const vb = document.getElementById('versionBadge');
-    if (vb) vb.textContent = VERSION + ' d:' + direction + '(r' + dirRow + ') f:' + frame + '(c' + col + ') ' + sx + ',' + sy + ' ' + img.naturalWidth + 'x' + img.naturalHeight;
+    if (vb) vb.textContent = VERSION + ' d:' + direction + '(r' + dirCol + ') f:' + frame + '(r' + frameRow + ') ' + sx + ',' + sy + ' ' + img.naturalWidth + 'x' + img.naturalHeight;
   }
   requestAnimationFrame(() => { window._sDbg = 0; });
 
@@ -11968,9 +12187,8 @@ function engageWorldBoss() {
   SFX.encounterStart();
   G.inBattle = true;
 
-  // Use active team member
-  const activeGhost = G.team[G.activeIdx];
-  const playerGhost = (activeGhost && !activeGhost.ko) ? activeGhost : G.team.find(g => !g.ko) || G.team[0];
+  // Build player team (up to 3)
+  const playerGhosts = buildPlayerBattleTeam();
 
   // Boss card data — use the boss pool entry
   const bossEntry = WORLD_BOSS_POOL.find(b => b.id === worldBossState.bossId) || WORLD_BOSS_POOL[0];
@@ -11983,14 +12201,26 @@ function engageWorldBoss() {
   // Boss engagement HP = portion of shared pool (engagement factor)
   const engagementHp = Math.min(worldBossState.hp, Math.max(5, Math.ceil(worldBossState.maxHp / 3)));
 
+  const bossGhost = {
+    id: bossCard.id, name: bossCard.name, hp: engagementHp, maxHp: engagementHp,
+    ko: false, ability: bossCard.ability, abilityDesc: bossCard.desc, rarity: 'legendary',
+    usedOncePerGame: false, entryFired: false
+  };
+
   B = {
     round: 1,
-    playerGhost: { ...playerGhost, hp: playerGhost.hp, maxHp: playerGhost.maxHp, ko: false, usedOncePerGame: false },
-    enemyCard: bossCard,
-    enemyGhost: {
-      id: bossCard.id, name: bossCard.name, hp: engagementHp, maxHp: engagementHp,
-      ko: false, ability: bossCard.ability, abilityDesc: bossCard.desc, rarity: 'legendary'
+    player: {
+      ghosts: playerGhosts,
+      activeIdx: 0,
+      resources: { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 },
     },
+    enemy: {
+      ghosts: [bossGhost],
+      activeIdx: 0,
+      resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 },
+    },
+    enemyCard: bossCard,
+    enemyCards: [bossCard],
     log: [],
     phase: 'ready',
     playerDice: [],
@@ -12000,6 +12230,10 @@ function engageWorldBoss() {
     zoneIdx: worldBossState.zoneIdx,
     isWorldBoss: true,
     bossStartHp: engagementHp,
+    nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+    enemyUsedResource: false,
+    damageTakenThisRound: 0,
+    koSwapTeam: null,
   };
 
   showBattleOverlay();
@@ -12969,30 +13203,6 @@ function openQuickCraft() {
 // ═══════ INIT ═══════
 
 
-// ═══════ UNIVERSAL INTERIOR EXIT ═══════
-function exitCurrentInterior() {
-  if (typeof cantinaActive !== 'undefined' && cantinaActive && typeof exitCantina === 'function') { exitCantina(); }
-  else if (typeof workshopActive !== 'undefined' && workshopActive && typeof exitWorkshop === 'function') { exitWorkshop(); }
-  else if (typeof arenaActive !== 'undefined' && arenaActive && typeof exitArena === 'function') { exitArena(); }
-  else if (typeof innActive !== 'undefined' && innActive && typeof exitInn === 'function') { exitInn(); }
-  else if (typeof tradingPostActive !== 'undefined' && tradingPostActive && typeof exitTradingPost === 'function') { exitTradingPost(); }
-  updateExitButton();
-  // Delayed check in case exit function sets state asynchronously
-  setTimeout(updateExitButton, 100);
-}
-
-function updateExitButton() {
-  const btn = document.getElementById('interiorExitBtn');
-  if (!btn) return;
-  const inInterior = (typeof cantinaActive !== 'undefined' && cantinaActive) ||
-    (typeof workshopActive !== 'undefined' && workshopActive) ||
-    (typeof arenaActive !== 'undefined' && arenaActive) ||
-    (typeof innActive !== 'undefined' && innActive) ||
-    (typeof tradingPostActive !== 'undefined' && tradingPostActive);
-  btn.style.display = inInterior ? 'block' : 'none';
-}
-// Check exit button state every 500ms
-setInterval(updateExitButton, 500);
 
 async function init() {
   // Show version everywhere
