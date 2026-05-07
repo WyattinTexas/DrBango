@@ -2137,7 +2137,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.4.0';
+const VERSION = 'v6.5.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -2411,7 +2411,6 @@ setInterval(spawnSpiritWisps, WISP_SPAWN_INTERVAL);
 function collectWisp(wisp) {
   // Add material to inventory
   if (!G.materials) G.materials = {};
-  G.hasBoat = true; // testing: start with boat for water crossing
   G.materials[wisp.type.id] = (G.materials[wisp.type.id] || 0) + 1;
 
   // Sound + notification
@@ -4484,9 +4483,6 @@ let G = {
   sprite: 1,
   direction: 'down',
   frame: 0,
-  // Arena
-  arenaWins: 0,
-  arenaLosses: 0,
   // Guild
   guild: null, // { id, name, tag, role }
   // Housing
@@ -7602,8 +7598,42 @@ function checkKO() {
   const pg = activePlayerGhost();
   const eg = activeEnemyGhost();
 
+  const playerKO = pg && pg.ko;
+  const enemyKO = eg && eg.ko;
+
+  // Simultaneous KO: both active ghosts down at the same time
+  if (playerKO && enemyKO) {
+    const pAlive = B.player.ghosts.filter((g, i) => i !== B.player.activeIdx && !g.ko && g.hp > 0);
+    const eAlive = B.enemy.ghosts.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0);
+    if (pAlive.length === 0 && eAlive.length === 0) {
+      // Both teams wiped — player wins (attacker advantage)
+      B.phase = 'over';
+      return 'victory';
+    }
+    if (pAlive.length === 0) {
+      B.phase = 'over';
+      return 'defeat';
+    }
+    if (eAlive.length === 0) {
+      B.phase = 'over';
+      return 'victory';
+    }
+    // Both have reserves: auto-swap enemy, then player picks
+    const eNextIdx = B.enemy.ghosts.indexOf(eAlive[0]);
+    doKoSwap('enemy', eNextIdx);
+    if (pAlive.length === 1) {
+      doKoSwap('player', B.player.ghosts.indexOf(pAlive[0]));
+      return 'continue';
+    }
+    B.phase = 'ko-swap';
+    B.koSwapTeam = 'player';
+    B.log.push({ text: 'Choose your next Spiritkin!', type: 'ability' });
+    renderBattle();
+    return 'swapping';
+  }
+
   // Check player active ghost KO
-  if (pg && pg.ko) {
+  if (playerKO) {
     const alive = B.player.ghosts.filter((g, i) => i !== B.player.activeIdx && !g.ko && g.hp > 0);
     if (alive.length === 0) {
       B.phase = 'over';
@@ -7622,7 +7652,7 @@ function checkKO() {
   }
 
   // Check enemy active ghost KO (auto-swap)
-  if (eg && eg.ko) {
+  if (enemyKO) {
     const alive = B.enemy.ghosts.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0);
     if (alive.length === 0) {
       B.phase = 'over';
@@ -7656,8 +7686,12 @@ function doKoSwap(teamKey, ghostIdx) {
       if (target.hp <= 0) target.ko = true;
     }
     if (newActive.id === 56) { // Chad
-      B.resources.iceShards = (B.resources.iceShards || 0) + 2;
-      B.log.push({ text: `${newActive.name} (Sploop!): +2 Ice Shards!`, type: 'ability' });
+      if (teamKey === 'player') {
+        B.resources.iceShards = (B.resources.iceShards || 0) + 2;
+        B.log.push({ text: `${newActive.name} (Sploop!): +2 Ice Shards!`, type: 'ability' });
+      } else {
+        B.log.push({ text: `${newActive.name} (Sploop!): Enemy gained 2 Ice Shards.`, type: 'ability' });
+      }
     }
     if (newActive.id === 94 && target) { // Jenkins
       const jd = rollDice(4);
@@ -9602,15 +9636,15 @@ function fleeBattle() {
       if (q.type === 'win_no_flee' && !q.completed) q.progress = 0;
     });
   }
-  // Sync team HP and save resources back
+  // Sync team HP and save resources back (use ?? to preserve 0 values)
   syncBattleTeamToGameState();
-  G.iceShards = B.resources?.iceShards || G.iceShards;
-  G.sacredFire = B.resources?.sacredFire || G.sacredFire;
-  G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
-  G.luckyStones = B.resources?.luckyStones || G.luckyStones;
-  G.surge = B.resources?.surge || G.surge;
-  G.moonstone = B.resources?.moonstone || G.moonstone;
-  G.firefly = B.resources?.firefly || G.firefly;
+  G.iceShards = B.resources?.iceShards ?? G.iceShards;
+  G.sacredFire = B.resources?.sacredFire ?? G.sacredFire;
+  G.healingSeeds = B.resources?.healingSeeds ?? G.healingSeeds;
+  G.luckyStones = B.resources?.luckyStones ?? G.luckyStones;
+  G.surge = B.resources?.surge ?? G.surge;
+  G.moonstone = B.resources?.moonstone ?? G.moonstone;
+  G.firefly = B.resources?.firefly ?? G.firefly;
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -9633,14 +9667,14 @@ function syncBattleTeamToGameState() {
 function endBattle(won) {
   if (!B) return;
 
-  // Save resources back
-  G.iceShards = B.resources?.iceShards || G.iceShards;
-  G.sacredFire = B.resources?.sacredFire || G.sacredFire;
-  G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
-  G.luckyStones = B.resources?.luckyStones || G.luckyStones;
-  G.surge = B.resources?.surge || G.surge;
-  G.moonstone = B.resources?.moonstone || G.moonstone;
-  G.firefly = B.resources?.firefly || G.firefly;
+  // Save resources back (use ?? to preserve 0 values from spent resources)
+  G.iceShards = B.resources?.iceShards ?? G.iceShards;
+  G.sacredFire = B.resources?.sacredFire ?? G.sacredFire;
+  G.healingSeeds = B.resources?.healingSeeds ?? G.healingSeeds;
+  G.luckyStones = B.resources?.luckyStones ?? G.luckyStones;
+  G.surge = B.resources?.surge ?? G.surge;
+  G.moonstone = B.resources?.moonstone ?? G.moonstone;
+  G.firefly = B.resources?.firefly ?? G.firefly;
 
   // Sync ALL player team HP back to G.team
   syncBattleTeamToGameState();
@@ -12624,9 +12658,16 @@ function createCharacter() {
   G.skillPointsUsed = 0;
   G.visitedTiles = new Set();
   G.materials = {};
+  G.hasBoat = true; // everyone gets a boat for now
+  G.loreCollected = [];
+  G.maskQuest = { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
   G.crystalsFound = [];
   G.chestsOpened = [];
   G.viewpointsDiscovered = [];
+  G.weeklyChallenge = null;
+  G.activeWorldEvent = null;
+  G.gatheringQuests = {};
+  G.hostileNPCsDefeated = {};
 
   // Close modal
   document.getElementById('charCreateOverlay').classList.remove('active');
@@ -12763,7 +12804,7 @@ async function initFirebase() {
     G.skillPointsUsed = data.skillPointsUsed || 0;
     G.visitedTiles = new Set(data.visitedTiles || []);
     G.materials = data.materials || {};
-      G.hasBoat = true; // everyone gets a boat for now
+    G.hasBoat = true; // everyone gets a boat for now
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
     G.maskQuest = data.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
