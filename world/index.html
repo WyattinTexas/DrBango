@@ -2017,7 +2017,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.2.0';
+const VERSION = 'v5.3.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7781,7 +7781,7 @@ function battleRoll() {
       }
       // Bo (109): Miracle — on KO: return a defeated ghost to sideline, gain 3 Magic Fireflies
       if (pg.id === 109 && eg.ko) {
-        const defeated = G.team.find(g => g.ko && g !== pg);
+        const defeated = B.player.ghosts.find(g => g.ko && g !== pg);
         if (defeated) {
           defeated.ko = false;
           defeated.hp = 1;
@@ -7854,10 +7854,10 @@ function battleRoll() {
       }
 
       // Spirit Breaker skill: +15% damage to ghost-rare+
-      if (hasSkill('sr_3') && ['ghost-rare', 'legendary'].includes(B.enemyCard?.rarity)) {
+      if (hasSkill('sr_3') && ['ghost-rare', 'legendary'].includes(eg.rarity)) {
         const bonusDmg = Math.max(1, Math.floor(dmg * 0.15));
         dmg += bonusDmg;
-        B.log.push({ text: `Spirit Breaker: +${bonusDmg} damage vs ${B.enemyCard.rarity}!`, type: 'ability' });
+        B.log.push({ text: `Spirit Breaker: +${bonusDmg} damage vs ${eg.rarity}!`, type: 'ability' });
       }
 
       eg.hp = Math.max(0, eg.hp - dmg);
@@ -8168,7 +8168,8 @@ function fleeBattle() {
       if (q.type === 'win_no_flee' && !q.completed) q.progress = 0;
     });
   }
-  // Save resources back
+  // Sync team HP and save resources back
+  syncBattleTeamToGameState();
   G.iceShards = B.resources?.iceShards || G.iceShards;
   G.sacredFire = B.resources?.sacredFire || G.sacredFire;
   G.healingSeeds = B.resources?.healingSeeds || G.healingSeeds;
@@ -8183,6 +8184,18 @@ function fleeBattle() {
   gameLoop();
 }
 
+// Sync all battle team HP back to G.team
+function syncBattleTeamToGameState() {
+  if (!B || !B.player) return;
+  for (const bg of B.player.ghosts) {
+    const teamIdx = bg._teamIdx !== undefined ? bg._teamIdx : G.team.findIndex(g => g.id === bg.id);
+    if (teamIdx >= 0 && G.team[teamIdx]) {
+      G.team[teamIdx].hp = bg.hp;
+      G.team[teamIdx].ko = bg.ko;
+    }
+  }
+}
+
 function endBattle(won) {
   if (!B) return;
 
@@ -8195,23 +8208,18 @@ function endBattle(won) {
   G.moonstone = B.resources?.moonstone || G.moonstone;
   G.firefly = B.resources?.firefly || G.firefly;
 
+  // Sync ALL player team HP back to G.team
+  syncBattleTeamToGameState();
+
   // Handle world boss battle end
   if (B.isWorldBoss) {
-    const damageDealt = Math.max(0, B.bossStartHp - (B.enemyGhost.hp || 0));
+    const bossGhost = activeEnemyGhost();
+    const damageDealt = Math.max(0, B.bossStartHp - (bossGhost ? bossGhost.hp : 0));
     if (damageDealt > 0) {
       endWorldBossBattle(damageDealt);
     }
 
-    // Update team HP
-    const teamGhost = G.team.find(g => g.id === B.playerGhost.id);
-    if (teamGhost) {
-      teamGhost.hp = B.playerGhost.hp;
-      teamGhost.ko = B.playerGhost.ko;
-    }
-
-    // Reset battle title color
     document.getElementById('battleTitle').style.color = '';
-
     G.inBattle = false;
     B = null;
     document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -8223,16 +8231,18 @@ function endBattle(won) {
   }
 
   if (won) {
-    // Reputation tracking
     if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
     G.rep.battlesWon++;
     checkAndNotifyTitles();
 
-    // XP reward
-    const xpGain = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 }[B.enemyCard.rarity] || 1;
+    // XP reward — based on highest rarity enemy defeated
+    const bestRarity = B.enemy.ghosts.filter(g => g.ko).reduce((best, g) => {
+      const order = { common: 0, uncommon: 1, rare: 2, 'ghost-rare': 3, legendary: 4 };
+      return (order[g.rarity] || 0) > (order[best] || 0) ? g.rarity : best;
+    }, B.enemyCard?.rarity || 'common');
+    const xpGain = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 }[bestRarity] || 1;
     G.xp += xpGain;
 
-    // Level up check
     const xpNeeded = G.level * 3;
     if (G.xp >= xpNeeded) {
       G.level++;
@@ -8240,19 +8250,17 @@ function endBattle(won) {
       SFX.levelUp();
       Music.playJingle('levelup');
       notify(`Level Up! You are now level ${G.level}!`);
-      // Heal team on level up
       G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
     }
 
-    // Coin reward
-    const coinGain = 1 + Math.floor(Math.random() * 3);
+    // Coin reward — bonus for multi-enemy battles
+    const enemiesDefeated = B.enemy.ghosts.filter(g => g.ko).length;
+    const coinGain = 1 + Math.floor(Math.random() * 3) + (enemiesDefeated > 1 ? enemiesDefeated - 1 : 0);
     G.coins += coinGain;
 
-    // Spirit Essence drop! (with zone quality multiplier)
     const essence = generateEssence(B.enemyCard, B.zoneIdx);
     G.essences.push(essence);
 
-    // Reputation: essences collected + rares
     if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
     G.rep.essencesCollected++;
     if (['rare','ghost-rare','legendary'].includes(B.enemyCard.rarity)) {
@@ -8263,49 +8271,33 @@ function endBattle(won) {
     SFX.victory();
     notify(`+${xpGain} XP, +${coinGain} coins, +1 ${essence.name}`);
 
-    // First battle tutorial
     if (G.rep.battlesWon === 1) {
-      setTimeout(() => notify('🎓 You earned a Spirit Essence! Essences have quality stats — find better ones in different zones.'), 1500);
-      setTimeout(() => notify('🎓 Visit the Workshop (blue dot on minimap) to craft gear from your essences!'), 4500);
+      setTimeout(() => notify('You earned a Spirit Essence! Find better ones in different zones.'), 1500);
+      setTimeout(() => notify('Visit the Workshop (blue dot on minimap) to craft gear!'), 4500);
     }
-
-    // First essence quality hint
     if (G.essences.length === 1) {
-      setTimeout(() => notify('💡 Essence stats: Potency (damage), Stability (defense), Resonance (specials), Purity (experiments)'), 2500);
+      setTimeout(() => notify('Essence stats: Potency, Stability, Resonance, Purity'), 2500);
     }
 
-    // Quest progress: battle won + essence collected
     checkQuestProgress('battle_won', { rarity: B.enemyCard.rarity });
     checkQuestProgress('essence_collected', essence);
-    // Weekly challenge hooks
     advanceWeeklyChallenge('battle');
     advanceWeeklyChallenge('essence');
 
-    // Profession XP: combat + exploration (battles feed both — defeating Spiritkin counts as exploration)
     addProfessionXP('combat', 10);
-    addProfessionXP('exploration', 5); // battles also feed exploration
+    addProfessionXP('exploration', 5);
     if (B.enemyCard && ['rare','ghost-rare','legendary'].includes(B.enemyCard.rarity)) {
-      addProfessionXP('combat', 10); // bonus for rare+ kills
-      addProfessionXP('exploration', 5); // bonus exploration for rare+ kills
+      addProfessionXP('combat', 10);
+      addProfessionXP('exploration', 5);
     }
 
-    // Onboarding: after first battle win, show crafting hint
     advanceOnboarding(2);
     setTimeout(() => advanceOnboarding(3), 3000);
 
-    // Update team HP from battle
-    const teamGhost = G.team.find(g => g.id === B.playerGhost.id);
-    if (teamGhost) {
-      teamGhost.hp = B.playerGhost.hp;
-      teamGhost.ko = B.playerGhost.ko;
-    }
-
-    // ── RECRUITMENT CHECK ──
     let recruitChance = G.discipline === 'hunter' ? 0.6 : 0.4;
-    if (hasSkill('sr_2')) recruitChance += 0.1; // Ghost Tracker: +10% recruit chance
+    if (hasSkill('sr_2')) recruitChance += 0.1;
     if (Math.random() < recruitChance) {
       showRecruitModal(B.enemyCard);
-      // Don't close battle overlay yet, recruit modal sits on top
       G.inBattle = false;
       B = null;
       document.getElementById('battleOverlay').classList.remove('active', 'visible');
@@ -8314,7 +8306,6 @@ function endBattle(won) {
       return;
     }
   } else {
-    // Wilderness Master: auto-swap to next alive ghost on KO
     if (hasSkill('sr_4')) {
       const nextAlive = G.team.findIndex(g => !g.ko && g.hp > 0);
       if (nextAlive >= 0) G.activeIdx = nextAlive;
@@ -8322,24 +8313,19 @@ function endBattle(won) {
 
     SFX.defeat();
     Music.playJingle('defeat');
-    notify('💀 All Spiritkin defeated! Retreating to safety...');
+    notify('All Spiritkin defeated! Retreating to safety...');
 
-    // Profession XP: combat + exploration (loss — still earns some)
     addProfessionXP('combat', 5);
-    addProfessionXP('exploration', 2); // battles also feed exploration
+    addProfessionXP('exploration', 2);
 
-    // Delay before respawn so player can read the message
     setTimeout(() => {
-      // Respawn at hub
       G.x = 16; G.y = 9;
-      // Heal team to 75% (gentler for new players)
       G.team.forEach(g => { g.hp = Math.max(1, Math.floor(g.maxHp * 0.75)); g.ko = false; });
       notify('Respawned at hub. Your team has been partially healed.');
 
       G.inBattle = false;
       B = null;
       document.getElementById('battleOverlay').classList.remove('active', 'visible');
-
       updateHUD();
       saveGame();
       requestAnimationFrame(render);
@@ -8351,7 +8337,6 @@ function endBattle(won) {
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active', 'visible');
-
   updateHUD();
   saveGame();
   requestAnimationFrame(render);
