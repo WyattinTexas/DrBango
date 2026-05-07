@@ -341,10 +341,29 @@ function showSmudgeNumberPicker(callback) {
 // ═══════ BATTLE ITEMS (Equipped Gear) ═══════
 
 function getEquippedGear() {
-  if (!G || !G.gear) return { weapon: null, armor: null };
-  const weapon = G.gear.find(g => g.slot === 'weapon');
-  const armor = G.gear.find(g => g.slot === 'head');
-  return { weapon, armor };
+  return {
+    weapon: G.equipped?.weapon || null,
+    armor: G.equipped?.head || null,
+    accessory: G.equipped?.accessory || null,
+  };
+}
+
+// Apply equipped accessory start-of-battle effects to B.resources
+function applyAccessoryBattleEffects() {
+  if (!G.equipped || !G.equipped.accessory) return;
+  const schematic = G.equipped.accessory.schematic;
+  if (schematic === 'ember_stone') B.resources.sacredFire = (B.resources.sacredFire || 0) + 1;
+  if (schematic === 'healing_root') B.resources.healingSeeds = (B.resources.healingSeeds || 0) + 1;
+  if (schematic === 'lucky_charm') B.resources.luckyStones = (B.resources.luckyStones || 0) + 1;
+  if (schematic === 'frost_shard_charm') B.resources.iceShards = (B.resources.iceShards || 0) + 1;
+  if (schematic === 'surge_crystal') B.resources.surge = (B.resources.surge || 0) + 1;
+  if (schematic === 'moonstone_ring') B.resources.moonstone = (B.resources.moonstone || 0) + 1;
+  if (schematic === 'firefly_lantern') {
+    B.resources.firefly = (B.resources.firefly || 0) + 1;
+    // Take 2 damage
+    const pg = B.player.ghosts[B.player.activeIdx];
+    if (pg) pg.hp = Math.max(1, pg.hp - 2);
+  }
 }
 
 function renderGearIcons() {
@@ -750,6 +769,8 @@ function triggerWildEncounter() {
     koSwapTeam: null,
     committed: {},
   };
+
+  applyAccessoryBattleEffects();
 
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = enemyCount > 1

@@ -53,12 +53,55 @@ const BOSS_SCHEMATIC_DROPS = [
   'frostfire_blade', 'golden_dice', 'shades_cape', 'valkins_crystal', 'moonstone_ring'
 ];
 
-const WORLD_BOSS_POOL = [
-  { id: 432, name: 'Valkin the Grand', maxHp: 50, art: '../testroom/art/valkin.webp' },
-  { id: 106, name: 'King Jay', maxHp: 35, art: '../testroom/art/king_jay.webp' },
-  { id: 306, name: 'Nerina', maxHp: 40, art: '../testroom/art/nerina.webp' },
-  { id: 210, name: 'Timber', maxHp: 30, art: '../testroom/art/timber.webp' },
-];
+const WORLD_BOSS_POOL = {
+  rolling_hills: [
+    { cardId: 210, name: 'Timber', title: 'Dances with Wolves', hp: 18, players: '2-3', region: 'rolling_hills' },
+    { cardId: 202, name: 'Dark Fang', title: 'The Unseen Predator', hp: 9, players: '1-2', region: 'rolling_hills' },
+    { cardId: 428, name: 'Jasper', title: 'The Restless Flame', hp: 18, players: '2', region: 'rolling_hills' },
+  ],
+  frost_valley: [
+    { cardId: 106, name: 'King Jay', title: 'The Frozen Throne', hp: 14, players: '2', region: 'frost_valley' },
+    { cardId: 114, name: 'Romy', title: 'Seer of the Frozen Vale', hp: 14, players: '2-4', region: 'frost_valley', requires: 'Blue Flame' },
+    { cardId: 110, name: 'The Mountain King', title: 'The Immovable', hp: 30, players: '2-5', region: 'frost_valley' },
+  ],
+  volcanic_isles: [
+    { cardId: 418, name: 'Pip', title: 'The Living Ember', hp: 15, players: '3', region: 'volcanic_isles', requires: 'Ice Scepter' },
+    { cardId: 336, name: 'Humar', title: 'Herald of the Meteor', hp: 16, players: '3-5', region: 'volcanic_isles', requires: 'Ice Scepter' },
+    { cardId: 306, name: 'Nerina', title: 'Terror of the Depths', hp: 35, players: '2-5', region: 'volcanic_isles' },
+  ],
+  dark_castle: [
+    { cardId: 108, name: 'Lucy', title: 'Warden of the Blue Flame', hp: 16, players: '3', region: 'dark_castle', requires: 'Dark Castle Key' },
+    { cardId: 111, name: 'Shade', title: 'The Endless Whisper', hp: 12, players: '3', region: 'dark_castle', requires: 'Dark Castle Key' },
+    { cardId: 424, name: 'Bigsby', title: 'The Omen Bearer', hp: 16, players: '1-3', region: 'dark_castle' },
+  ],
+  dark_spire: [
+    { cardId: 432, name: 'Valkin the Grand', title: 'The Corruptor', hp: 25, players: '2-3', region: 'dark_spire', requires: 'Dark Spire Key' },
+  ],
+};
+
+// Flatten boss pool for lookups by cardId
+function getAllWorldBosses() {
+  const all = [];
+  for (const region of Object.keys(WORLD_BOSS_POOL)) {
+    for (const boss of WORLD_BOSS_POOL[region]) all.push(boss);
+  }
+  return all;
+}
+
+function getWorldBossByCardId(cardId) {
+  return getAllWorldBosses().find(b => b.cardId === cardId);
+}
+
+// Map encounter zones to regions (used for boss spawning)
+function getZoneRegion(zone) {
+  if (!zone || !zone.name) return 'rolling_hills';
+  const n = zone.name.toLowerCase();
+  if (n.includes('frost') || n.includes('ice') || n.includes('snow') || n.includes('frozen')) return 'frost_valley';
+  if (n.includes('volcan') || n.includes('lava') || n.includes('ember') || n.includes('fire') || n.includes('isle')) return 'volcanic_isles';
+  if (n.includes('dark castle') || n.includes('castle') || n.includes('shadow')) return 'dark_castle';
+  if (n.includes('spire') || n.includes('dark spire')) return 'dark_spire';
+  return 'rolling_hills';
+}
 
 let worldBossState = null; // cached local state
 let worldBossListener = null;
@@ -69,7 +112,12 @@ function getWorldBossCycle() {
 }
 
 function getBossForCycle(cycle) {
-  return WORLD_BOSS_POOL[cycle % WORLD_BOSS_POOL.length];
+  // Pick a random region, then a random boss from that region
+  const regions = Object.keys(WORLD_BOSS_POOL);
+  const region = regions[cycle % regions.length];
+  const bosses = WORLD_BOSS_POOL[region];
+  const boss = bosses[seededHash(cycle, 31337) % bosses.length];
+  return { ...boss, _region: region };
 }
 
 function checkWorldBoss() {
@@ -106,19 +154,31 @@ function checkWorldBoss() {
 
 function spawnWorldBoss(cycle) {
   const boss = getBossForCycle(cycle);
-  // Pick a random encounter zone
-  const zoneIdx = cycle % ENCOUNTER_ZONES.length;
-  const zone = ENCOUNTER_ZONES[zoneIdx];
+  const bossRegion = boss._region || 'rolling_hills';
+
+  // Pick an encounter zone that matches the boss's region
+  const regionZones = ENCOUNTER_ZONES
+    .map((z, i) => ({ zone: z, idx: i }))
+    .filter(({ zone }) => getZoneRegion(zone) === bossRegion);
+  // Fallback to any zone if no region match found
+  const candidates = regionZones.length > 0 ? regionZones : ENCOUNTER_ZONES.map((z, i) => ({ zone: z, idx: i }));
+  const pick = candidates[cycle % candidates.length];
+  const zone = pick.zone;
+  const zoneIdx = pick.idx;
+
   const bx = zone.x + Math.floor(zone.w / 2);
   const by = zone.y + Math.floor(zone.h / 2);
   const now = Date.now();
 
   const bossData = {
     active: true,
-    bossId: boss.id,
+    bossId: boss.cardId,
     bossName: boss.name,
-    maxHp: boss.maxHp,
-    hp: boss.maxHp,
+    bossTitle: boss.title,
+    bossPlayers: boss.players,
+    bossRegion: bossRegion,
+    maxHp: boss.hp,
+    hp: boss.hp,
     zoneIdx: zoneIdx,
     x: bx,
     y: by,
@@ -137,13 +197,13 @@ function spawnWorldBoss(cycle) {
   }).then(result => {
     if (result.committed) {
       worldBossState = bossData;
-      showBossSpawnNotification(boss.name, zone.name);
+      showBossSpawnNotification(boss.name, zone.name, boss.title, boss.players);
       updateWorldBossBar();
     }
   });
 }
 
-function showBossSpawnNotification(bossName, zoneName) {
+function showBossSpawnNotification(bossName, zoneName, bossTitle, bossPlayers) {
   return; // REMOVED — boss notifications were distracting
 }
 
@@ -155,13 +215,15 @@ function updateWorldBossBar() {
   }
 
   return; // BOSS UI REMOVED — bar.style.display = 'block'; clearTimeout(window._bossBarHide); window._bossBarHide = setTimeout(() => { bar.style.opacity = '0'; setTimeout(() => { if (bar.style.opacity === '0') bar.style.display = 'none'; }, 600); }, 6000);
-  document.getElementById('bossBarName').textContent = worldBossState.bossName;
+  const titleStr = worldBossState.bossTitle ? `${worldBossState.bossName} — ${worldBossState.bossTitle}` : worldBossState.bossName;
+  const playersStr = worldBossState.bossPlayers ? ` | Party: ${worldBossState.bossPlayers}` : '';
+  document.getElementById('bossBarName').textContent = titleStr;
 
   const hpPct = Math.max(0, (worldBossState.hp / worldBossState.maxHp) * 100);
   document.getElementById('bossBarHp').style.width = hpPct + '%';
 
   const contribCount = worldBossState.contributors ? Object.keys(worldBossState.contributors).length : 0;
-  document.getElementById('bossBarInfo').textContent = `HP: ${Math.max(0, worldBossState.hp)} / ${worldBossState.maxHp} | Contributors: ${contribCount}`;
+  document.getElementById('bossBarInfo').textContent = `HP: ${Math.max(0, worldBossState.hp)} / ${worldBossState.maxHp} | Contributors: ${contribCount}${playersStr}`;
 
   const remaining = Math.max(0, worldBossState.expiresAt - Date.now());
   const mins = Math.floor(remaining / 60000);
@@ -174,7 +236,8 @@ function focusWorldBoss() {
   if (!worldBossState) return;
   const zone = ENCOUNTER_ZONES[worldBossState.zoneIdx];
   if (zone) {
-    notify(`${worldBossState.bossName} is in ${zone.name}! Head there to fight!`);
+    const focusLabel = worldBossState.bossTitle ? `${worldBossState.bossName} — ${worldBossState.bossTitle}` : worldBossState.bossName;
+    notify(`${focusLabel} is in ${zone.name}! Head there to fight!`);
   }
 }
 
@@ -199,7 +262,7 @@ function startWorldBossListener() {
       // Show spawn notification if this is new to us
       if (wasNull) {
         const zone = ENCOUNTER_ZONES[data.zoneIdx];
-        showBossSpawnNotification(data.bossName, zone ? zone.name : 'the wilds');
+        showBossSpawnNotification(data.bossName, zone ? zone.name : 'the wilds', data.bossTitle, data.bossPlayers);
       }
 
       updateWorldBossBar();
@@ -227,16 +290,15 @@ function engageWorldBoss() {
   // Build player team (up to 3)
   const playerGhosts = buildPlayerBattleTeam();
 
-  // Boss card data — use the boss pool entry
-  const bossEntry = WORLD_BOSS_POOL.find(b => b.id === worldBossState.bossId) || WORLD_BOSS_POOL[0];
-  const bossCard = getCard(bossEntry.id) || {
-    id: bossEntry.id, name: bossEntry.name, rarity: 'legendary',
-    maxHp: bossEntry.maxHp, ability: 'World Boss', desc: 'A mighty spirit that requires many wardens to defeat.',
-    art: bossEntry.art
+  // Boss card data — use the new region-based roster
+  const bossEntry = getWorldBossByCardId(worldBossState.bossId) || getAllWorldBosses()[0];
+  const bossCard = getCard(bossEntry.cardId) || {
+    id: bossEntry.cardId, name: bossEntry.name, rarity: 'legendary',
+    maxHp: bossEntry.hp, ability: 'World Boss', desc: 'A mighty spirit that requires many wardens to defeat.',
   };
 
-  // Boss engagement HP = portion of shared pool (engagement factor)
-  const engagementHp = Math.min(worldBossState.hp, Math.max(5, Math.ceil(worldBossState.maxHp / 3)));
+  // Boss engagement HP = use the roster HP directly (matches raid mode)
+  const engagementHp = Math.min(worldBossState.hp, bossEntry.hp);
 
   const bossGhost = {
     id: bossCard.id, name: bossCard.name, hp: engagementHp, maxHp: engagementHp,
@@ -273,12 +335,16 @@ function engageWorldBoss() {
     koSwapTeam: null,
   };
 
+  applyAccessoryBattleEffects();
+
   showBattleOverlay();
-  document.getElementById('battleTitle').textContent = `WORLD BOSS: ${bossCard.name}!`;
+  const bossDisplayTitle = bossEntry.title ? `${bossCard.name} — ${bossEntry.title}` : bossCard.name;
+  document.getElementById('battleTitle').textContent = `WORLD BOSS: ${bossDisplayTitle}`;
   document.getElementById('battleTitle').style.color = '#ff4444';
 
   renderBattle();
-  notify(`Engaging World Boss: ${bossCard.name}!`);
+  const playersHint = bossEntry.players ? ` (Party: ${bossEntry.players})` : '';
+  notify(`Engaging World Boss: ${bossDisplayTitle}!${playersHint}`);
 }
 
 function endWorldBossBattle(damageDealt) {
@@ -338,9 +404,9 @@ function onWorldBossDefeated() {
     }
 
     // Rare essence drop
-    const bossEntry = WORLD_BOSS_POOL.find(b => b.id === worldBossState.bossId);
+    const bossEntry = getWorldBossByCardId(worldBossState.bossId);
     if (bossEntry) {
-      const bossCard = getCard(bossEntry.id) || { id: bossEntry.id, name: bossEntry.name, rarity: 'legendary' };
+      const bossCard = getCard(bossEntry.cardId) || { id: bossEntry.cardId, name: bossEntry.name, rarity: 'legendary' };
       const essence = generateEssence(bossCard, worldBossState.zoneIdx);
       G.essences.push(essence);
       notify(`World Boss defeated! +${coinReward} coins, +${xpReward} XP, +1 ${essence.name}`);
@@ -449,11 +515,12 @@ function renderWorldBoss(ctx, camX, camY, time) {
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Boss name above
+  // Boss name + title above
   ctx.fillStyle = '#ff6644';
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(worldBossState.bossName, bx + TILE/2, by - 28);
+  const bossLabel = worldBossState.bossTitle ? `${worldBossState.bossName} — ${worldBossState.bossTitle}` : worldBossState.bossName;
+  ctx.fillText(bossLabel, bx + TILE/2, by - 28);
 
   // HP bar above boss
   const hpPct = Math.max(0, worldBossState.hp / worldBossState.maxHp);

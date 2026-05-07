@@ -257,6 +257,8 @@ function triggerHostileNPCBattle(npc) {
     enemyUsedResource: false, damageTakenThisRound: 0, koSwapTeam: null,
   };
 
+  applyAccessoryBattleEffects();
+
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = `${npc.name} challenges you!`;
   renderBattle();
@@ -444,6 +446,8 @@ function triggerBlackRiderBattle(rider) {
     enemyUsedResource: false, damageTakenThisRound: 0, koSwapTeam: null,
   };
 
+  applyAccessoryBattleEffects();
+
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = 'A Black Rider attacks!';
   renderBattle();
@@ -460,20 +464,33 @@ function showDialogue(npcName) {
   const data = NPC_DIALOGUE_MAP[npcName];
   if (!data) return;
 
+  // Close any existing dialogue before showing new one (allows replacement without click)
+  clearTimeout(window._dialogueAutoClose);
+  const overlay = document.getElementById('dialogueOverlay');
+  if (overlay.classList.contains('active')) {
+    // Already showing — just replace content directly
+  }
+
   const line = data.getLine();
   document.getElementById('dialoguePortrait').innerHTML = data.portrait;
   document.getElementById('dialoguePortrait').style.background = data.portraitBg;
   document.getElementById('dialogueNpcName').textContent = npcName;
   document.getElementById('dialogueText').textContent = line;
   renderQuestAreaInDialogue(npcName);
-  document.getElementById('dialogueOverlay').classList.add('active');
+  overlay.classList.add('active');
 
   // Show speech bubble on the overworld NPC too
   const npc = NPCS.find(n => n.name === npcName);
   if (npc) showNPCSpeechBubble(npc, line);
+
+  // Auto-dismiss after 6 seconds
+  window._dialogueAutoClose = setTimeout(() => {
+    closeDialogue();
+  }, 6000);
 }
 
 function closeDialogue() {
+  clearTimeout(window._dialogueAutoClose);
   document.getElementById('dialogueOverlay').classList.remove('active');
 }
 
