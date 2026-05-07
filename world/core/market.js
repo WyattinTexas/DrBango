@@ -60,10 +60,12 @@ function renderMarket() {
         if (!listing || !listing.item) continue;
         hasListings = true;
         const isMine = sellerId === uid;
+        const arenaWins = listing.sellerArenaWins || 0;
+        const badge = arenaWins >= 5 ? '<span style="color:#daa520;font-size:9px;"> ⚔ Verified Fighter</span>' : '';
         html += `<div class="market-listing">
           <div class="ml-info">
             <div class="ml-name">${listing.item.icon ? listing.item.icon + ' ' : ''}${listing.item.name} <span style="color:${listing.item.qualityTier === 'Mastercraft' ? '#4fc878' : listing.item.qualityTier === 'Superior' ? '#c8b040' : listing.item.qualityTier === 'Standard' ? '#c89040' : '#c85040'};font-size:10px;">[${listing.item.qualityTier}]</span></div>
-            <div class="ml-seller">by ${data.name || 'Unknown'}</div>
+            <div class="ml-seller">by ${data.name || 'Unknown'}${badge}</div>
             <div class="ml-quality">Quality ${listing.item.quality} | ${listing.item.qualityTier}</div>
           </div>
           <div class="ml-price">${listing.price} coins</div>
@@ -146,7 +148,7 @@ function listMarketItem(gearIdx) {
   const maxListings = 3 + (hasSkill('mrc_1') ? 1 : 0); // Peddler: +1 slot
   if (listings.length >= maxListings) { notify(`Max ${maxListings} listings. Remove one first.`); return; }
 
-  listings.push({ item: { ...gear }, price, listedAt: Date.now() });
+  listings.push({ item: { ...gear }, price, listedAt: Date.now(), sellerArenaWins: G.rep?.arenaWins || 0 });
 
   // Save to Firebase
   db.ref(`overworld/market/${uid}`).set({ name: G.name, listings });
