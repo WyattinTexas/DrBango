@@ -297,6 +297,70 @@ function rarityGlowClass(rarity) {
   return 'rarity-glow-' + (rarity || 'common');
 }
 
+// ═══════ INTERACTIVE ABILITY MODALS ═══════
+
+function showAbilityChoice(title, options, callback) {
+  // Create a modal overlay in the battle arena
+  const modal = document.createElement('div');
+  modal.id = 'abilityChoiceModal';
+  modal.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:50;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:#1a1a2e;border:2px solid #daa520;border-radius:10px;padding:20px;text-align:center;max-width:300px;">
+    <div style="color:#daa520;font-weight:bold;font-size:14px;margin-bottom:12px;">${title}</div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      ${options.map((opt, i) => `<button style="padding:8px 16px;background:#2a3a5a;border:1px solid #4a6a8a;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;" onclick="resolveAbilityChoice(${i})">${opt.label}</button>`).join('')}
+    </div>
+  </div>`;
+  document.querySelector('.battle-arena')?.appendChild(modal);
+  window._abilityChoiceCallback = callback;
+}
+
+function resolveAbilityChoice(idx) {
+  document.getElementById('abilityChoiceModal')?.remove();
+  if (window._abilityChoiceCallback) {
+    window._abilityChoiceCallback(idx);
+    window._abilityChoiceCallback = null;
+  }
+}
+
+// Smudge/Blackout (403) — number picker for dice nullify
+function showSmudgeNumberPicker(callback) {
+  const modal = document.createElement('div');
+  modal.id = 'abilityChoiceModal';
+  modal.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:50;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:#1a1a2e;border:2px solid #8a3aaa;border-radius:10px;padding:20px;text-align:center;max-width:320px;">
+    <div style="color:#c77dff;font-weight:bold;font-size:14px;margin-bottom:12px;">SMUDGE — Name a number (1-6)</div>
+    <div style="color:#aaa;font-size:11px;margin-bottom:10px;">If the opponent rolls it, that die won't count.</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      ${[1,2,3,4,5,6].map(n => `<button style="width:40px;height:40px;background:#2a2a4a;border:2px solid #6a4a8a;color:#fff;border-radius:8px;cursor:pointer;font-size:18px;font-weight:bold;" onclick="resolveAbilityChoice(${n})">${n}</button>`).join('')}
+    </div>
+  </div>`;
+  document.querySelector('.battle-arena')?.appendChild(modal);
+  window._abilityChoiceCallback = callback;
+}
+
+// ═══════ BATTLE ITEMS (Equipped Gear) ═══════
+
+function getEquippedGear() {
+  if (!G || !G.gear) return { weapon: null, armor: null };
+  const weapon = G.gear.find(g => g.slot === 'weapon');
+  const armor = G.gear.find(g => g.slot === 'head');
+  return { weapon, armor };
+}
+
+function renderGearIcons() {
+  const { weapon, armor } = getEquippedGear();
+  if (!weapon && !armor) return '';
+  let html = '<div class="battle-gear-icons" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:4px;">';
+  if (weapon) {
+    html += `<span title="${weapon.name}: +${weapon.bonusDamage || 0} dmg" style="background:#2a3a5a;border:1px solid #4a6a8a;border-radius:4px;padding:2px 6px;font-size:11px;color:#6af;">${weapon.icon || '⚔️'} +${weapon.bonusDamage || 0}</span>`;
+  }
+  if (armor) {
+    html += `<span title="${armor.name}: -${armor.damageReduction || 0} dmg taken" style="background:#3a2a2a;border:1px solid #8a4a4a;border-radius:4px;padding:2px 6px;font-size:11px;color:#fa6;">${armor.icon || '🛡️'} -${armor.damageReduction || 0}</span>`;
+  }
+  html += '</div>';
+  return html;
+}
+
 // ═══════ 3D DICE PHYSICS ENGINE (ported from testroom) ═══════
 
 // Check if 3D dice should be used (screens > 600px)
@@ -894,7 +958,7 @@ function renderBattle() {
         }
       }
     }
-    actionsEl.innerHTML = commitHtml +
+    actionsEl.innerHTML = renderGearIcons() + commitHtml +
       '<button class="battle-btn btn-roll" id="btnRoll" onclick="battleRoll()">FIGHT</button>' +
       '<button class="battle-btn btn-flee" onclick="fleeBattle()">RUN</button>';
   }
@@ -986,13 +1050,33 @@ function showBattleResultBanner(won) {
 
 function battleRoll() {
   if (!B || B.phase === 'rolling' || B.phase === 'ko-swap' || B.phase === 'over') return;
-  B.phase = 'rolling';
-  B.enemyUsedResource = false;
-  B.cameronActive = false;
 
   const pg = activePlayerGhost();
   const eg = activeEnemyGhost();
   if (!pg || !eg) return;
+
+  // ── SMUDGE/BLACKOUT (403): Pre-roll number pick — must choose before dice fly ──
+  if (pg.id === 403 && !B._smudgeNumberChosen) {
+    B.phase = 'rolling'; // prevent double-click
+    showSmudgeNumberPicker((num) => {
+      B._smudgeNumber = num;
+      B._smudgeNumberChosen = true;
+      B.log.push({ text: `${pg.name} (Blackout): Named ${num}! Enemy dice showing ${num} won't count.`, type: 'ability' });
+      B.phase = 'ready'; // reset so battleRoll can proceed
+      battleRoll();
+    });
+    return;
+  }
+  // Enemy Smudge (403): AI picks a random number
+  if (eg.id === 403 && !B._smudgeNumberChosenEnemy) {
+    B._smudgeNumberEnemy = Math.ceil(Math.random() * 6);
+    B._smudgeNumberChosenEnemy = true;
+    B.log.push({ text: `${eg.name} (Blackout): Named ${B._smudgeNumberEnemy}! Your dice showing ${B._smudgeNumberEnemy} won't count.`, type: 'ability' });
+  }
+
+  B.phase = 'rolling';
+  B.enemyUsedResource = false;
+  B.cameronActive = false;
 
   // ── ENTRY ABILITIES (Round 1 only) ──
   if (!B.entryFired) {
@@ -1434,6 +1518,30 @@ function battleRoll() {
     pDice.sort((a, b) => a - b);
   }
 
+  // ── SMUDGE/BLACKOUT (403): Remove dice matching the named number ──
+  if (B._smudgeNumberChosen && B._smudgeNumber && pg.id === 403) {
+    const named = B._smudgeNumber;
+    const removed = eDice.filter(d => d === named).length;
+    if (removed > 0) {
+      eDice = eDice.filter(d => d !== named);
+      if (eDice.length === 0) eDice = [1]; // must have at least 1 die
+      B.log.push({ text: `${pg.name} (Blackout): Removed ${removed} enemy die(s) showing ${named}!`, type: 'ability' });
+    }
+    B._smudgeNumberChosen = false;
+    B._smudgeNumber = null;
+  }
+  if (B._smudgeNumberChosenEnemy && B._smudgeNumberEnemy && eg.id === 403) {
+    const named = B._smudgeNumberEnemy;
+    const removed = pDice.filter(d => d === named).length;
+    if (removed > 0) {
+      pDice = pDice.filter(d => d !== named);
+      if (pDice.length === 0) pDice = [1]; // must have at least 1 die
+      B.log.push({ text: `${eg.name} (Blackout): Removed ${removed} of your dice showing ${named}!`, type: 'damage' });
+    }
+    B._smudgeNumberChosenEnemy = false;
+    B._smudgeNumberEnemy = null;
+  }
+
   // ── STAGED DICE REVEAL ──
   // Animation timing: 3D uses longer physics (1500ms rolling + 750ms settle), flat uses flicker
   const _revealDelay = _using3d ? 2400 : 1200;
@@ -1709,14 +1817,43 @@ function battleRoll() {
         B.log.push({ text: `${pg.name} (Lucky Dance): ${stones} Lucky Stones = +${stones} Healing Seeds! +${stones} dice next roll!`, type: 'ability' });
         B.nextRoundMods.playerExtraDice += stones;
       }
-      // Gordok (430): River Terror — win: steal 2 specials instead of damage, +1 die next roll
+      // Gordok (430): River Terror — win: choose deal damage OR steal 2 specials, +1 die next roll
       if (pg.id === 430) {
-        // Steal 2 specials (represented as gaining resources)
-        B.resources.iceShards += 1;
-        B.resources.sacredFire += 1;
-        B.nextRoundMods.playerExtraDice += 1;
-        B.log.push({ text: `${pg.name} (River Terror): Stole 2 specials! +1 die next roll!`, type: 'ability' });
-        // Negate normal damage for Gordok wins
+        B._gordokChoicePending = true;
+        const gordokDmg = dmg;
+        showAbilityChoice(`${pg.name} — River Terror`, [
+          { label: `⚔️ Deal ${gordokDmg} Damage` },
+          { label: '💎 Steal 2 Resources' }
+        ], (idx) => {
+          if (idx === 0) {
+            // Deal normal damage
+            eg.hp = Math.max(0, eg.hp - gordokDmg);
+            if (eg.hp <= 0) eg.ko = true;
+            B.log.push({ text: `${pg.name} (River Terror): Chose damage — dealt ${gordokDmg}!`, type: 'damage' });
+            showDmgFloat('enemy', gordokDmg, false);
+            spriteHitReact('enemy');
+          } else {
+            // Steal 2 specials
+            B.resources.iceShards += 1;
+            B.resources.sacredFire += 1;
+            B.log.push({ text: `${pg.name} (River Terror): Stole 2 specials!`, type: 'ability' });
+          }
+          B.nextRoundMods.playerExtraDice += 1;
+          B.log.push({ text: `${pg.name} (River Terror): +1 die next roll!`, type: 'ability' });
+          B._gordokChoicePending = false;
+          renderBattle();
+          // Check KO after Gordok choice
+          if (eg.ko) {
+            setTimeout(() => {
+              const koResult = checkKO();
+              if (koResult === 'victory' || koResult === 'defeat') {
+                B.phase = 'over';
+                renderBattle();
+              }
+            }, 200);
+          }
+        });
+        // Negate normal damage for Gordok wins — handled inside the choice callback
         dmg = 0;
       }
       // Mable Stadango (446): Hex — win: gain 1 Burn
@@ -1932,6 +2069,13 @@ function battleRoll() {
         B.log.push({ text: `${eg.name} (Cute): Your doubles/triples do -1 damage!`, type: 'ability' });
       }
 
+      // ── EQUIPPED GEAR: Weapon bonus damage ──
+      const _wpn = getEquippedGear().weapon;
+      if (_wpn && _wpn.bonusDamage) {
+        dmg += _wpn.bonusDamage;
+        B.log.push({ text: `${_wpn.name}: +${_wpn.bonusDamage} damage!`, type: 'ability' });
+      }
+
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
       B.log.push({ text: `You deal <strong style="color:#2a2;">${dmg}</strong> damage!`, type: 'damage' });
@@ -1968,9 +2112,22 @@ function battleRoll() {
 
       // Selene (305): Heart of the Hills — roll doubles on win: gain 2 Healing Seeds OR 3 Lucky Stones
       if (pg.id === 305 && pRoll.type === 'doubles') {
-        // Auto-choose Healing Seeds (more broadly useful)
-        B.resources.healingSeeds += 2;
-        B.log.push({ text: `${pg.name} (Heart of the Hills): Doubles! Gained 2 Healing Seeds! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+        // Interactive choice modal — pause resolution until player picks
+        B._seleneChoicePending = true;
+        showAbilityChoice(`${pg.name} — Heart of the Hills`, [
+          { label: '🌿 2 Healing Seeds' },
+          { label: '🪨 3 Lucky Stones' }
+        ], (idx) => {
+          if (idx === 0) {
+            B.resources.healingSeeds = (B.resources.healingSeeds || 0) + 2;
+            B.log.push({ text: `${pg.name} (Heart of the Hills): Chose 2 Healing Seeds! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+          } else {
+            B.resources.luckyStones = Math.min(5, (B.resources.luckyStones || 0) + 3);
+            B.log.push({ text: `${pg.name} (Heart of the Hills): Chose 3 Lucky Stones! [Total: ${B.resources.luckyStones}]`, type: 'ability' });
+          }
+          B._seleneChoicePending = false;
+          renderBattle();
+        });
       }
       if (eg.id === 305 && eRoll.type === 'doubles') {
         B.log.push({ text: `${eg.name} (Heart of the Hills): Doubles — enemy gains resources.`, type: 'ability' });
@@ -2387,6 +2544,14 @@ function battleRoll() {
       if (pg.id === 5 && (eRoll.type === 'doubles' || eRoll.type === 'triples') && eg.id !== 25) {
         dmg = Math.max(0, dmg - 1);
         B.log.push({ text: `${pg.name} (Cute): Enemy doubles/triples do -1 damage!`, type: 'ability' });
+      }
+
+      // ── EQUIPPED GEAR: Armor damage reduction ──
+      const _armr = getEquippedGear().armor;
+      if (_armr && _armr.damageReduction) {
+        const reduced = Math.min(dmg, _armr.damageReduction);
+        dmg = Math.max(0, dmg - _armr.damageReduction);
+        if (reduced > 0) B.log.push({ text: `${_armr.name}: -${reduced} damage!`, type: 'ability' });
       }
 
       pg.hp = Math.max(0, pg.hp - dmg);
