@@ -2048,7 +2048,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.9.0';
+const VERSION = 'v6.0.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7822,6 +7822,10 @@ function battleRoll() {
       B.log.push({ text: `${pg.name} (Stampede): Entry — +3 Burn! [Total: ${B.resources.burn}]`, type: 'ability' });
     }
     // Enemy entry
+    if (eg.id === 437) { // Rascals — Stampede: gain 3 Burn on entry
+      B.log.push({ text: `${eg.name} (Stampede): Entry — gained 3 Burn!`, type: 'ability' });
+      B.enemyUsedResource = true;
+    }
     if (eg.id === 34) { // Grawr
       pg.hp = Math.max(0, pg.hp - 1);
       B.log.push({ text: `${eg.name} (Menace): Deals 1 damage on entry!`, type: 'damage' });
@@ -8622,6 +8626,12 @@ function battleRoll() {
         B.log.push({ text: `Spirit Breaker: +${bonusDmg} damage vs ${eg.rarity}!`, type: 'ability' });
       }
 
+      // Puff (5) enemy: player doubles/triples -1 damage
+      if (eg.id === 5 && (pRoll.type === 'doubles' || pRoll.type === 'triples') && pg.id !== 25) {
+        dmg = Math.max(0, dmg - 1);
+        B.log.push({ text: `${eg.name} (Cute): Your doubles/triples do -1 damage!`, type: 'ability' });
+      }
+
       eg.hp = Math.max(0, eg.hp - dmg);
       if (eg.hp <= 0) eg.ko = true;
       B.log.push({ text: `You deal <strong style="color:#2a2;">${dmg}</strong> damage!`, type: 'damage' });
@@ -8727,6 +8737,65 @@ function battleRoll() {
         }
       }
 
+      // ── ENEMY LOSS DEFENSIVE ABILITIES ──
+      // Garrick (427) enemy: lose = take -1 damage
+      if (eg.id === 427 && dmg > 0 && !eg.ko) {
+        eg.hp = Math.min(eg.maxHp, eg.hp + 1);
+        B.log.push({ text: `${eg.name} (Watchfire): Lose — reduced damage by 1!`, type: 'ability' });
+      }
+      // Sad Sal (29) enemy: lose = gain resources
+      if (eg.id === 29 && !eg.ko) {
+        B.log.push({ text: `${eg.name} (Tough Job): Gains 1 Ice Shard on loss.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Prince Balatron (113) enemy: lose & survive = counter die
+      if (eg.id === 113 && !eg.ko) {
+        const counterDie = rollDie();
+        pg.hp = Math.max(0, pg.hp - counterDie);
+        B.log.push({ text: `${eg.name} (Party Time): Counter die [${counterDie}] = ${counterDie} damage to you!`, type: 'damage' });
+        if (pg.hp <= 0) { pg.ko = true; }
+      }
+      // King Jay (106) enemy: lose & dice total = 7 — reflect damage
+      if (eg.id === 106 && !eg.ko) {
+        const eSum = eDice.reduce((a, b) => a + b, 0);
+        if (eSum === 7) {
+          pg.hp = Math.max(0, pg.hp - dmg);
+          B.log.push({ text: `${eg.name} (Reflection): Dice total = 7 — reflects ${dmg} damage!`, type: 'damage' });
+          if (pg.hp <= 0) { pg.ko = true; }
+        }
+      }
+      // Marcus (57) enemy: take 3+ damage — gain 4 extra dice next round
+      if (eg.id === 57 && !eg.ko && dmg >= 3) {
+        B.nextRoundMods.enemyExtraDice += 4;
+        B.log.push({ text: `${eg.name} (Glacial Pounding): Took ${dmg} damage — +4 dice next round!`, type: 'ability' });
+      }
+      // Mirror Matt (410) enemy: if player wins with doubles, reflect damage
+      if (eg.id === 410 && pRoll.type === 'doubles' && !eg.ko) {
+        eg.hp = Math.min(eg.maxHp, eg.hp + dmg);
+        pg.hp = Math.max(0, pg.hp - dmg);
+        B.log.push({ text: `${eg.name} (Seven Years): Doubles reflected — ${dmg} damage back at you!`, type: 'damage' });
+        if (pg.hp <= 0) { pg.ko = true; }
+      }
+      // Sylvia (313) enemy: lose: roll 1 die, 5 or 6 negates damage
+      if (eg.id === 313 && dmg > 0 && !eg.ko) {
+        const saveDie = rollDie();
+        if (saveDie >= 5) {
+          eg.hp = Math.min(eg.maxHp, eg.hp + dmg);
+          B.log.push({ text: `${eg.name} (Porpoise): Save roll [${saveDie}] — negated all damage!`, type: 'ability' });
+        } else {
+          B.log.push({ text: `${eg.name} (Porpoise): Save roll [${saveDie}] — no save.`, type: 'ability' });
+        }
+      }
+      // Powder (23) enemy: death trigger — this is enemy-side, no resource to give player (just log)
+      if (eg.id === 23 && eg.ko) {
+        B.log.push({ text: `${eg.name} (Final Gift): Defeated — releases Ice Shards into the wind.`, type: 'ability' });
+      }
+      // Troubling Haters (83) enemy: deal 4+ damage = gain +2 HP
+      if (eg.id === 83 && winner === 'b' && eRoll.damage >= 4 && !eg.ko) {
+        const heal83 = Math.min(2, eg.maxHp - eg.hp);
+        if (heal83 > 0) { eg.hp += heal83; B.log.push({ text: `${eg.name} (Growing Mob): Big hit — +${heal83} HP!`, type: 'heal' }); }
+      }
+
       SFX.hit();
       battleShake();
       flashHpBar('eHpBar');
@@ -8803,6 +8872,215 @@ function battleRoll() {
           dmg += koCount;
           B.log.push({ text: `${eg.name} (Pressure): +${koCount} damage from ${koCount} KO'd ghost(s)!`, type: 'damage' });
         }
+      }
+      // Doc (42): Savage — +5 damage on doubles
+      if (eg.id === 42 && eRoll.type === 'doubles') {
+        dmg += 5;
+        B.log.push({ text: `${eg.name} (Savage): +5 damage on doubles!`, type: 'damage' });
+      }
+      // Sparky (64): Tinder — 1's add +3 each
+      if (eg.id === 64) {
+        const ones = eDice.filter(d => d === 1).length;
+        if (ones > 0) { dmg += ones * 3; B.log.push({ text: `${eg.name} (Tinder): ${ones} one(s) = +${ones * 3} damage!`, type: 'damage' }); }
+      }
+      // Pelter (86): Snowball — doubles +2
+      if (eg.id === 86 && eRoll.type === 'doubles') {
+        dmg += 2;
+        B.log.push({ text: `${eg.name} (Snowball): +2 damage on doubles!`, type: 'damage' });
+      }
+      // Pudge (311): Belly Flop — doubles +2, take 1 self-damage
+      if (eg.id === 311 && eRoll.type === 'doubles') {
+        dmg += 2;
+        eg.hp = Math.max(1, eg.hp - 1);
+        B.log.push({ text: `${eg.name} (Belly Flop): Doubles +2 damage, takes 1 self-damage!`, type: 'damage' });
+      }
+      // Humar (336): Meteor — win: +2 damage
+      if (eg.id === 336) {
+        dmg += 2;
+        B.log.push({ text: `${eg.name} (Meteor): +2 damage!`, type: 'damage' });
+      }
+      // Timpleton (312): Big Target — win: +3 if player HP > Timpleton HP
+      if (eg.id === 312 && pg.hp > eg.hp) {
+        dmg += 3;
+        B.log.push({ text: `${eg.name} (Big Target): Your HP is higher — +3 damage!`, type: 'damage' });
+      }
+      // Jasper (428): Flame Dive — win: roll 1 bonus die for extra damage, take 1 self-damage
+      if (eg.id === 428) {
+        const bonusDie = rollDie();
+        dmg += bonusDie;
+        eg.hp = Math.max(1, eg.hp - 1);
+        B.log.push({ text: `${eg.name} (Flame Dive): Bonus die [${bonusDie}] = +${bonusDie} damage! Takes 1 self-damage.`, type: 'damage' });
+      }
+      // Red Hunter (345): Rumble — win: if opponent has specials, +3 damage
+      if (eg.id === 345 && (B.resources.iceShards > 0 || B.resources.sacredFire > 0 || (B.resources.surge || 0) > 0 || (B.resources.healingSeeds || 0) > 0)) {
+        dmg += 3;
+        B.log.push({ text: `${eg.name} (Rumble): You have specials — +3 damage!`, type: 'damage' });
+      }
+      // Ashley (58): Burning Soul — win: gain 1 Sacred Fire
+      if (eg.id === 58) {
+        B.log.push({ text: `${eg.name} (Burning Soul): Gains 1 Sacred Fire.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Ridley (462): Nimble — singles +1, doubles +2
+      if (eg.id === 462) {
+        if (eRoll.type === 'doubles') { dmg += 2; B.log.push({ text: `${eg.name} (Nimble): Doubles +2 damage!`, type: 'damage' }); }
+        else if (eRoll.type === 'singles') { dmg += 1; B.log.push({ text: `${eg.name} (Nimble): Singles +1 damage!`, type: 'damage' }); }
+      }
+      // Michael (445): Torrent — even doubles +2 damage
+      if (eg.id === 445 && eRoll.type === 'doubles' && eRoll.value % 2 === 0) {
+        dmg += 2;
+        B.log.push({ text: `${eg.name} (Torrent): Even doubles — +2 damage!`, type: 'damage' });
+      }
+      // The Mountain King (110): Beast Mode — doubles deal 2X damage
+      if (eg.id === 110 && eRoll.type === 'doubles') {
+        dmg *= 2;
+        B.log.push({ text: `${eg.name} (Beast Mode): Doubles = 2X damage!`, type: 'damage' });
+      }
+      // Bigsby (424): Omen — +1 damage on win
+      if (eg.id === 424) {
+        dmg += 1;
+        B.log.push({ text: `${eg.name} (Omen): +1 damage on win!`, type: 'damage' });
+      }
+      // Ronan (461): Mixup — doubles: gain +1 Ice Shard & +1 Burn
+      if (eg.id === 461 && eRoll.type === 'doubles') {
+        B.log.push({ text: `${eg.name} (Mixup): Doubles — gains resources.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Hank (207): Tremor — each 4 = +1 Lucky Stone (enemy gains resources)
+      if (eg.id === 207) {
+        const fours = eDice.filter(d => d === 4).length;
+        if (fours > 0) B.log.push({ text: `${eg.name} (Tremor): ${fours} four(s) — gains Lucky Stones.`, type: 'ability' });
+      }
+      // Gordok (430): River Terror — win: steal 2 specials, +1 die next roll, no normal damage
+      if (eg.id === 430) {
+        if (B.resources.iceShards > 0) B.resources.iceShards = Math.max(0, B.resources.iceShards - 1);
+        if (B.resources.sacredFire > 0) B.resources.sacredFire = Math.max(0, B.resources.sacredFire - 1);
+        B.nextRoundMods.enemyExtraDice += 1;
+        B.log.push({ text: `${eg.name} (River Terror): Stole 2 specials! +1 die next roll!`, type: 'damage' });
+        dmg = 0;
+      }
+      // Mable Stadango (446): Hex — win: gain 1 Burn, remove 1 player die
+      if (eg.id === 446) {
+        B.nextRoundMods.playerExtraDice -= 1;
+        B.log.push({ text: `${eg.name} (Hex): Burn placed — you lose 1 die next roll!`, type: 'damage' });
+      }
+      // Roger (54): Tempest — 2 pairs of doubles (4+ dice): gain 3 Sacred Fires
+      if (eg.id === 54 && eDice.length >= 4) {
+        const freq = {};
+        eDice.forEach(d => { freq[d] = (freq[d] || 0) + 1; });
+        const pairsCount = Object.values(freq).filter(c => c >= 2).length;
+        if (pairsCount >= 2) B.log.push({ text: `${eg.name} (Tempest): 2 pairs — gains 3 Sacred Fires!`, type: 'ability' });
+      }
+      // Rook (416): Charcoal — immune to Sacred Fire/Burn, win: +1 damage per Surge
+      if (eg.id === 416) {
+        dmg += 1; // simulate having 1 Surge
+        B.log.push({ text: `${eg.name} (Charcoal): Surge boost — +1 damage!`, type: 'damage' });
+      }
+      // Twyla (417): Lucky Dance — Lucky Stones add dice & Healing Seeds
+      if (eg.id === 417) {
+        B.nextRoundMods.enemyExtraDice += 1;
+        B.log.push({ text: `${eg.name} (Lucky Dance): Lucky Stone — +1 die next roll!`, type: 'ability' });
+      }
+      // Zippa (423): Glimmer — +1 damage per Healing Seed (simulate 1)
+      if (eg.id === 423) {
+        dmg += 1;
+        B.log.push({ text: `${eg.name} (Glimmer): Healing Seed boost — +1 damage!`, type: 'damage' });
+      }
+      // Pip (418): Toasted — triples: permanently remove 1 player die (once per game)
+      if (eg.id === 418 && !eg.usedOncePerGame && eRoll.type === 'triples') {
+        eg.usedOncePerGame = true;
+        B.nextRoundMods.playerMaxDice = (B.nextRoundMods.playerMaxDice || 99) - 1;
+        B.log.push({ text: `${eg.name} (Toasted): Triples! Permanently removed 1 of your dice!`, type: 'damage' });
+      }
+      // Romy (114): Foresight — predict a die number, if match +3 damage
+      if (eg.id === 114) {
+        const dieCounts = {};
+        eDice.forEach(d => { dieCounts[d] = (dieCounts[d] || 0) + 1; });
+        const predicted = parseInt(Object.entries(dieCounts).sort((a,b) => b[1] - a[1])[0][0]);
+        if (eDice.includes(predicted)) {
+          dmg += 3;
+          B.log.push({ text: `${eg.name} (Foresight): Predicted ${predicted} — match! +3 damage!`, type: 'damage' });
+        }
+      }
+      // Spockles (81): Valley Magic — win: gain 2 Ice Shards
+      if (eg.id === 81) {
+        B.log.push({ text: `${eg.name} (Valley Magic): Gains 2 Ice Shards.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Opa (48): Rest — win: gain +1 HP
+      if (eg.id === 48 && pg.id !== 202) {
+        const healAmt = Math.min(1, eg.maxHp - eg.hp);
+        eg.hp += healAmt;
+        if (healAmt > 0) B.log.push({ text: `${eg.name} (Rest): +1 HP on win!`, type: 'heal' });
+      }
+      // Munch (66): Scraps — defeating a ghost: gain 4 HP
+      if (eg.id === 66 && pg.ko) {
+        const healAmt = Math.min(4, eg.maxHp - eg.hp);
+        eg.hp += healAmt;
+        if (healAmt > 0) B.log.push({ text: `${eg.name} (Scraps): Healed ${healAmt} HP from KO!`, type: 'heal' });
+      }
+      // Flora (75): Restore — doubles: +2 HP
+      if (eg.id === 75 && eRoll.type === 'doubles') {
+        const healAmt = Math.min(2, eg.maxHp - eg.hp);
+        eg.hp += healAmt;
+        if (healAmt > 0) B.log.push({ text: `${eg.name} (Restore): +2 HP from doubles!`, type: 'heal' });
+      }
+      // Dart (209): Plunder — win: gain 2 Surge
+      if (eg.id === 209) {
+        B.log.push({ text: `${eg.name} (Plunder): Gains 2 Surge.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Zain (206): Ice Blade — win: gain 1 Ice Shard
+      if (eg.id === 206) {
+        B.log.push({ text: `${eg.name} (Ice Blade): Gains 1 Ice Shard.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Aunt Susan (309): Harvest Dance — win: +2 damage (simulated seed spend), gains seeds
+      if (eg.id === 309) {
+        dmg += 2;
+        B.log.push({ text: `${eg.name} (Harvest Dance): Spends seed — +2 damage! Gains 2 Healing Seeds.`, type: 'damage' });
+        B.enemyUsedResource = true;
+      }
+      // Garrick (427): Watchfire — win: KO = gain 1 Sacred Fire
+      if (eg.id === 427 && pg.ko) {
+        B.log.push({ text: `${eg.name} (Watchfire): KO! Gains 1 Sacred Fire.`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Gus (31): Gale Force — win: force opponent to swap ghost
+      if (eg.id === 31) {
+        const pSide = getSidelineGhosts();
+        if (pSide.length > 0 && !pg.ko) {
+          B.log.push({ text: `${eg.name} (Gale Force): Forces you to swap ghost!`, type: 'damage' });
+        }
+      }
+      // Cameron (25): Unstoppable Force — if player used resource, +1 die next round; damage cannot be negated
+      if (eg.id === 25) {
+        B.nextRoundMods.enemyExtraDice += 1;
+        B.log.push({ text: `${eg.name} (Unstoppable Force): +1 die next round!`, type: 'damage' });
+      }
+      // Valkin the Grand (432): Grand Spoils — on KO: gains all resources
+      if (eg.id === 432 && pg.ko) {
+        B.log.push({ text: `${eg.name} (Grand Spoils): KO! Gains a bounty of resources!`, type: 'ability' });
+        B.enemyUsedResource = true;
+      }
+      // Bo (109): Miracle — on KO: return a defeated ghost to sideline
+      if (eg.id === 109 && pg.ko) {
+        const defeated = B.enemy.ghosts.find(g => g.ko && g !== eg);
+        if (defeated) {
+          defeated.ko = false;
+          defeated.hp = 1;
+          B.log.push({ text: `${eg.name} (Miracle): ${defeated.name} returned to sideline with 1 HP!`, type: 'ability' });
+        }
+      }
+      // Calvin & Anna (91): Toboggan — on KO may swap
+      if (eg.id === 91 && pg.ko) {
+        B.log.push({ text: `${eg.name} (Toboggan): KO! May swap to sideline ghost.`, type: 'ability' });
+      }
+      // Selene (305): Heart of the Hills — doubles on win: gain resources (already has eg impl above)
+      // Champ (438): Thrill — +1 Surge when anyone rolls doubles
+      if (eg.id === 438 && (pRoll.type === 'doubles' || eRoll.type === 'doubles')) {
+        B.log.push({ text: `${eg.name} (Thrill): Doubles spotted — gains Surge.`, type: 'ability' });
+        B.enemyUsedResource = true;
       }
 
       // Puff (5): enemy doubles/triples -1 damage (negated by Cameron's "cannot be negated")
@@ -8912,6 +9190,36 @@ function battleRoll() {
         B.log.push({ text: `${eg.name} (Thief): Doubles! Stealing 1 of your dice next round!`, type: 'ability' });
       }
 
+      // ── ENEMY SIDELINE WIN ABILITIES ──
+      {
+        const eSideWin = getEnemySidelineGhosts();
+        for (const sg of eSideWin) {
+          // Bandit Pete (93): sideline — if rolling 2 or fewer dice, +3 damage (already applied to dmg above, log here)
+          if (sg.id === 93 && eDice.length <= 2) {
+            B.log.push({ text: `${sg.name} (sideline): Enemy rolled ${eDice.length} dice — boosted damage!`, type: 'ability' });
+          }
+          // Pale Nimbus (88): sideline — if roll total < 7, +2 damage
+          if (sg.id === 88) {
+            const rollTotal = eDice.reduce((a,b) => a + b, 0);
+            if (rollTotal < 7) B.log.push({ text: `${sg.name} (sideline): Roll total ${rollTotal} < 7 — boosted damage!`, type: 'ability' });
+          }
+          // Sandwiches (33): sideline — if player gains a Special, enemy gains it too
+          if (sg.id === 33 && (B.resources.iceShards > 0 || B.resources.sacredFire > 0)) {
+            B.log.push({ text: `${sg.name} (sideline): Mirrors your specials.`, type: 'ability' });
+          }
+          // Gary (92): sideline — each 1 rolled = gain Ice Shards
+          if (sg.id === 92) {
+            const ones = eDice.filter(d => d === 1).length;
+            if (ones > 0) B.log.push({ text: `${sg.name} (sideline): ${ones} one(s) — gains Ice Shards!`, type: 'ability' });
+          }
+          // Farmer Jeff (314): sideline — each 6 = gain Healing Seed
+          if (sg.id === 314) {
+            const sixes = eDice.filter(d => d === 6).length;
+            if (sixes > 0) B.log.push({ text: `${sg.name} (sideline): ${sixes} six(es) — gains Healing Seeds!`, type: 'ability' });
+          }
+        }
+      }
+
       if (pg.ko) B.log.push({ text: `${pg.name} is defeated...`, type: 'damage' });
 
     } else {
@@ -8933,6 +9241,12 @@ function battleRoll() {
         pg.hp += healAmt;
         if (healAmt > 0) B.log.push({ text: `${pg.name} (Rest): +1 HP on tie!`, type: 'heal' });
       }
+      // Opa (48) enemy: tie = +1 HP
+      if (eg.id === 48 && !eg.ko) {
+        const healAmt = Math.min(1, eg.maxHp - eg.hp);
+        eg.hp += healAmt;
+        if (healAmt > 0) B.log.push({ text: `${eg.name} (Rest): +1 HP on tie!`, type: 'heal' });
+      }
     }
 
     // ── END-OF-ROUND PASSIVES ──
@@ -8951,6 +9265,33 @@ function battleRoll() {
       B.resources.healingSeeds = Math.min(5, (B.resources.healingSeeds || 0) + 1);
       B.resources.luckyStones = Math.min(5, (B.resources.luckyStones || 0) + 1);
       B.log.push({ text: `${pg.name} (Nap): +1 Healing Seed, +1 Lucky Stone`, type: 'ability' });
+    }
+    // Maximo (302) enemy: gain resources each round
+    if (eg.id === 302 && !eg.ko) {
+      B.log.push({ text: `${eg.name} (Nap): Gains 1 Healing Seed + 1 Lucky Stone.`, type: 'ability' });
+      B.enemyUsedResource = true;
+    }
+    // Champ (438) enemy: gain Surge on doubles (end-of-round)
+    if (eg.id === 438 && (pRoll.type === 'doubles' || eRoll.type === 'doubles') && !eg.ko) {
+      B.log.push({ text: `${eg.name} (Thrill): Doubles spotted — gains Surge.`, type: 'ability' });
+      B.enemyUsedResource = true;
+    }
+    // Troubling Haters (83) enemy: deal 4+ damage = gain +2 HP
+    if (eg.id === 83 && winner === 'b' && eRoll.damage >= 4 && !eg.ko) {
+      const heal83e = Math.min(2, eg.maxHp - eg.hp);
+      if (heal83e > 0) { eg.hp += heal83e; B.log.push({ text: `${eg.name} (Growing Mob): Big hit — +${heal83e} HP!`, type: 'heal' }); }
+    }
+    // Boris (343) enemy: when Surge spent, gains 2 HP
+    if (eg.id === 343 && B.enemyUsedResource && !eg.ko) {
+      const heal343 = 2;
+      eg.hp += heal343;
+      B.log.push({ text: `${eg.name} (Fortify): Surge spent — +${heal343} HP! [HP: ${eg.hp}]`, type: 'heal' });
+    }
+    // Dark Fang (202) enemy: while active, player cannot heal
+    // (Handled by checking eg.id === 202 in player heal sections)
+    // Skylar (104) enemy: Ice Shards deal +2 (enemy resource boost, logged only)
+    if ((eg.id === 104 || getEnemySidelineGhosts().some(g => g.id === 104)) && winner === 'b') {
+      B.log.push({ text: `Skylar (Winter Barrage): Enemy Ice Shards deal boosted damage!`, type: 'ability' });
     }
 
     B.round++;
