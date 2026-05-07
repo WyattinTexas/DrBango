@@ -1400,6 +1400,38 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   from { opacity: 1; }
   to { opacity: 0; }
 }
+@keyframes essencePopIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes levelUpFlash {
+  0% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+@keyframes levelUpNumber {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+@keyframes craftRevealIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes craftSparkle {
+  0%,100% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* ═══════ INVENTORY COLLAPSIBLE SECTIONS ═══════ */
+.inv-section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; user-select: none; padding: 2px 0;
+}
+.inv-section-header:hover { color: #adf; }
+.inv-section-header .inv-toggle { font-size: 10px; color: #556; transition: transform 0.2s; }
+.inv-section-header.collapsed .inv-toggle { transform: rotate(-90deg); }
+.inv-section-content { overflow: hidden; transition: max-height 0.3s ease; }
+.inv-section-content.collapsed { max-height: 0 !important; overflow: hidden; }
 
 /* ═══════ HELP MODAL ═══════ */
 #helpBtn {
@@ -1879,26 +1911,35 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 <!-- INVENTORY PANEL -->
 <div id="inventoryPanel">
-  <h3>🧱 Materials</h3>
-  <div id="materialsList"></div>
-  <h3>Spirit Essences</h3>
-  <div id="essenceList"></div>
-  <h3 style="margin-top:16px;">Crafted Gear</h3>
-  <div id="gearList"></div>
-  <h3 style="margin-top:16px;">Craft Mastery</h3>
-  <div id="masteryList"></div>
-  <h3 style="margin-top:16px;">Weekly Challenge</h3>
-  <div id="weeklyChallengeArea"></div>
-  <h3 style="margin-top:16px;">Quests</h3>
-  <div id="questList"></div>
-  <h3 style="margin-top:16px;">&#129704; Spirit Traps</h3>
-  <div id="trapList"></div>
-  <h3 style="margin-top:16px;">Team</h3>
+  <h3>Team</h3>
   <div id="teamList"></div>
-  <h3 style="margin-top:16px;">Guild</h3>
-  <div id="inventoryGuildInfo"></div>
-  <h3 style="margin-top:16px;">Lore Tablets</h3>
-  <div id="loreList"></div>
+
+  <h3 class="inv-section-header" onclick="toggleInvSection(this)" style="margin-top:16px;">Spirit Essences <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content" id="essenceSectionContent"><div id="essenceList"></div></div>
+
+  <h3 class="inv-section-header" onclick="toggleInvSection(this)" style="margin-top:16px;">&#129521; Materials <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content" id="materialsSectionContent"><div id="materialsList"></div></div>
+
+  <h3 class="inv-section-header" onclick="toggleInvSection(this)" style="margin-top:16px;">Crafted Gear <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content" id="gearSectionContent"><div id="gearList"></div></div>
+
+  <h3 class="inv-section-header" onclick="toggleInvSection(this)" style="margin-top:16px;">Quests <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content" id="questSectionContent"><div id="questList"></div></div>
+
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">Lore Tablets <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="loreSectionContent"><div id="loreList"></div></div>
+
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">Craft Mastery <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="masterySectionContent"><div id="masteryList"></div></div>
+
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">Weekly Challenge <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="weeklySectionContent"><div id="weeklyChallengeArea"></div></div>
+
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">&#129704; Spirit Traps <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="trapsSectionContent"><div id="trapList"></div></div>
+
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">Guild <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="guildSectionContent"><div id="inventoryGuildInfo"></div></div>
 </div>
 
 <!-- LORE DISCOVERY MODAL -->
@@ -2137,7 +2178,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.5.1';
+const VERSION = 'v6.6.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -6744,6 +6785,30 @@ function render() {
   ctx.textAlign = 'center';
   ctx.fillText(getDisplayName(), playerSX + TILE/2, playerSY - 10);
 
+  // ═══════ ONBOARDING ARROW — point toward Crystal Glade ═══════
+  if (G.onboarding && G.onboarding.step < 3) {
+    const targetX = 28; // Crystal Glade center
+    const targetY = 14;
+    const angle = Math.atan2((targetY - G.y) * TILE, (targetX - G.x) * TILE);
+    const arrowDist = 80;
+    const ax = playerSX + TILE/2 + Math.cos(angle) * arrowDist;
+    const ay = playerSY + TILE/2 + Math.sin(angle) * arrowDist;
+    const pulse = 0.5 + Math.sin(Date.now() * 0.003) * 0.3;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#daa520';
+    ctx.beginPath();
+    ctx.moveTo(ax + Math.cos(angle) * 12, ay + Math.sin(angle) * 12);
+    ctx.lineTo(ax + Math.cos(angle + 2.5) * 8, ay + Math.sin(angle + 2.5) * 8);
+    ctx.lineTo(ax + Math.cos(angle - 2.5) * 8, ay + Math.sin(angle - 2.5) * 8);
+    ctx.fill();
+    // Label below arrow
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Crystal Glade', ax + Math.cos(angle) * 6, ay + Math.sin(angle) * 6 + 18);
+    ctx.restore();
+  }
+
   // ═══════ SURVEY RING EFFECT ═══════
   renderSurveyRing(ctx, camX, camY, time);
 
@@ -7858,9 +7923,25 @@ function showBattleOverlay() {
   if (oldBanner) oldBanner.remove();
   const oldCelebrate = document.querySelector('.sprite-celebrate');
   if (oldCelebrate) oldCelebrate.classList.remove('sprite-celebrate');
-  const overlay = document.getElementById('battleOverlay');
-  overlay.classList.add('active');
-  requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('visible')));
+
+  // Pre-battle zoom effect (300ms camera push)
+  window._viewpointZoom = 1.0;
+  const zoomStart = Date.now();
+  const zoomDuration = 300;
+  function zoomIn() {
+    const elapsed = Date.now() - zoomStart;
+    const t = Math.min(1, elapsed / zoomDuration);
+    window._viewpointZoom = 1.0 + t * 0.15; // zoom to 1.15x
+    if (t < 1) requestAnimationFrame(zoomIn);
+    else {
+      // Reset zoom and show battle overlay
+      window._viewpointZoom = 1;
+      const overlay = document.getElementById('battleOverlay');
+      overlay.classList.add('active');
+      requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('visible')));
+    }
+  }
+  zoomIn();
 }
 
 function renderBattle() {
@@ -9738,6 +9819,7 @@ function endBattle(won) {
       Music.playJingle('levelup');
       notify(`Level Up! You are now level ${G.level}!`);
       G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+      showLevelUpCelebration(G.level);
     }
 
     // Coin reward — bonus for multi-enemy battles
@@ -9756,7 +9838,10 @@ function endBattle(won) {
     checkAndNotifyTitles();
 
     SFX.victory();
-    notify(`+${xpGain} XP, +${coinGain} coins, +1 ${essence.name}`);
+    notify(`+${xpGain} XP, +${coinGain} coins`);
+
+    // Prominent essence reward popup
+    showEssenceReward(essence);
 
     if (G.rep.battlesWon === 1) {
       setTimeout(() => notify('You earned a Spirit Essence! Find better ones in different zones.'), 1500);
@@ -11023,17 +11108,22 @@ function finishExperiment() {
   const resultEl = document.getElementById('craftResult');
   resultEl.style.display = 'block';
   const assemblyLabel = expState.assemblyMod > 0 ? 'Amazing' : expState.assemblyMod === 0 ? 'Good' : expState.assemblyMod >= -0.1 ? 'Average' : 'Poor';
+  const qualColor = quality > 600 ? '#4a8' : quality > 400 ? '#daa520' : '#a66';
+  const qualLabel = quality > 600 ? 'Masterwork' : quality > 400 ? 'Fine' : 'Standard';
   resultEl.innerHTML = `<div class="craft-result">
     <h3 style="color:#4a8;margin:0 0 8px;">${gear.name}</h3>
     <p style="font-size:12px;color:#888;">${schem.desc}</p>
     <p style="font-size:13px;color:#ccc;margin-top:8px;">
-      Quality: <strong style="color:${quality > 600 ? '#4a8' : quality > 400 ? '#aa8' : '#a66'}">${quality}</strong>
+      Quality: <strong style="color:${qualColor}">${quality}</strong>
       ${gear.bonusDamage ? ` | +${gear.bonusDamage} Damage` : ''}
       ${gear.damageReduction ? ` | -${gear.damageReduction} Damage Taken` : ''}
       ${gear.specialBonus > 0 ? ` | Special +${gear.specialBonus}` : ''}
     </p>
     <p style="font-size:10px;color:#556;margin-top:4px;">Assembly: ${assemblyLabel} | Crafted by ${gear.craftedBy}</p>
   </div>`;
+
+  // Dramatic craft reveal overlay
+  showCraftReveal(gear.name, qualLabel, qualColor, gear.craftedBy);
 
   notify(`Crafted: ${gear.name} (Quality ${quality})!`);
 
@@ -11694,6 +11784,12 @@ function toggleInventory() {
   const panel = document.getElementById('inventoryPanel');
   panel.classList.toggle('open');
   if (panel.classList.contains('open')) renderInventory();
+}
+
+function toggleInvSection(header) {
+  header.classList.toggle('collapsed');
+  const content = header.nextElementSibling;
+  if (content) content.classList.toggle('collapsed');
 }
 
 function renderInventory() {
@@ -12507,6 +12603,74 @@ function notify(text) {
   el.className = 'notif';
   el.textContent = text;
   container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ═══════ CRAFT REVEAL ═══════
+function showCraftReveal(itemName, qualLabel, qualColor, crafterName) {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1200;
+    pointer-events:none;text-align:center;animation:craftRevealIn 0.5s cubic-bezier(0.22,1,0.36,1);`;
+  // Sparkle particles
+  let sparkles = '';
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const dist = 60 + Math.random() * 30;
+    const x = Math.cos(angle) * dist;
+    const y = Math.sin(angle) * dist;
+    const delay = Math.random() * 0.4;
+    sparkles += `<div style="position:absolute;left:50%;top:50%;width:6px;height:6px;background:${qualColor};border-radius:50%;
+      transform:translate(${x}px,${y}px);animation:craftSparkle 0.8s ${delay}s ease both;box-shadow:0 0 8px ${qualColor};"></div>`;
+  }
+  el.innerHTML = `${sparkles}
+    <div style="font-size:28px;font-weight:bold;color:#fff;text-shadow:0 0 20px rgba(74,168,128,0.6);margin-bottom:6px;">${itemName}</div>
+    <div style="font-size:16px;font-weight:bold;color:${qualColor};margin-bottom:4px;">${qualLabel}</div>
+    <div style="font-size:12px;color:#667;">Crafted by ${crafterName}</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity 0.5s'; el.style.opacity = '0'; }, 2000);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ═══════ LEVEL UP CELEBRATION ═══════
+function showLevelUpCelebration(level) {
+  // White screen flash
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.6);z-index:1300;pointer-events:none;animation:levelUpFlash 0.5s ease forwards;';
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 500);
+
+  // Big level number
+  const num = document.createElement('div');
+  num.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1301;pointer-events:none;text-align:center;animation:levelUpNumber 1.2s ease forwards;';
+  num.innerHTML = `<div style="font-size:14px;color:#8cf;text-transform:uppercase;letter-spacing:3px;">Level Up</div>
+    <div style="font-size:64px;font-weight:bold;color:#fff;text-shadow:0 0 30px rgba(100,180,255,0.8),0 0 60px rgba(100,180,255,0.4);">${level}</div>`;
+  document.body.appendChild(num);
+  setTimeout(() => num.remove(), 1200);
+}
+
+// ═══════ ESSENCE REWARD POPUP ═══════
+function showEssenceReward(essence) {
+  const avgStat = Math.round((essence.potency + essence.stability + essence.resonance + essence.purity) / 4);
+  const qualityLabel = avgStat > 600 ? 'Excellent' : avgStat > 400 ? 'Good' : 'Common';
+  const qualityColor = avgStat > 600 ? '#4a8' : avgStat > 400 ? '#daa520' : '#a66';
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1200;
+    background:rgba(10,10,30,0.95);border:2px solid ${qualityColor};border-radius:12px;
+    padding:24px 36px;text-align:center;pointer-events:none;
+    animation:essencePopIn 0.4s cubic-bezier(0.22,1,0.36,1);`;
+  el.innerHTML = `
+    <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Spirit Essence Captured</div>
+    <div style="font-size:22px;font-weight:bold;color:#fff;margin-bottom:4px;">${essence.name}</div>
+    <div style="font-size:14px;color:${qualityColor};font-weight:bold;margin-bottom:10px;">${qualityLabel} Quality</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px;font-size:12px;">
+      <div>POT: <strong style="color:${essence.potency>600?'#4a8':essence.potency>400?'#aa8':'#a66'}">${essence.potency}</strong></div>
+      <div>STB: <strong style="color:${essence.stability>600?'#4a8':essence.stability>400?'#aa8':'#a66'}">${essence.stability}</strong></div>
+      <div>RES: <strong style="color:${essence.resonance>600?'#4a8':essence.resonance>400?'#aa8':'#a66'}">${essence.resonance}</strong></div>
+      <div>PUR: <strong style="color:${essence.purity>600?'#4a8':essence.purity>400?'#aa8':'#a66'}">${essence.purity}</strong></div>
+    </div>
+    ${essence.region ? `<div style="font-size:10px;color:#556;margin-top:8px;">${essence.region}</div>` : ''}`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity 0.5s'; el.style.opacity = '0'; }, 2500);
   setTimeout(() => el.remove(), 3000);
 }
 
