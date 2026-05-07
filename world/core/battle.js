@@ -1470,6 +1470,16 @@ function battleRoll() {
     B.log.push({ text: 'Ghost Tracker: +1 die on first roll!', type: 'ability' });
   }
 
+  // Professor Hawking (447): +2 dice if holding a Moonstone
+  if (pg.id === 447 && (B.resources.moonstone || 0) > 0) {
+    pDiceCount += 2;
+    B.log.push({ text: `${pg.name} (Lunar Study): Holding Moonstone — +2 dice!`, type: 'ability' });
+  }
+  if (eg.id === 447) {
+    eDiceCount += 2;
+    B.log.push({ text: `${eg.name} (Lunar Study): Holding Moonstone — +2 dice!`, type: 'ability' });
+  }
+
   // Fredrick (27): opponent may only roll up to 3 dice
   if (pg.id === 27) { eDiceCount = Math.min(eDiceCount, 3); }
   if (eg.id === 27) { pDiceCount = Math.min(pDiceCount, 3); }
@@ -1557,6 +1567,24 @@ function battleRoll() {
       B.log.push({ text: `Lucky Stone: Rerolled ${oldVal} → ${pDice[minIdx]}!`, type: 'ability' });
     }
     pDice.sort((a, b) => a - b);
+  }
+
+  // Jackson (50): Trade 1 HP to reroll lowest die (auto)
+  if (pg.id === 50 && pg.hp > 1) {
+    pg.hp -= 1;
+    const minIdx = pDice.indexOf(Math.min(...pDice));
+    const oldVal = pDice[minIdx];
+    pDice[minIdx] = rollDie();
+    B.log.push({ text: `${pg.name} (Gambler): Traded 1 HP to reroll ${oldVal} → ${pDice[minIdx]}!`, type: 'ability' });
+    pDice.sort((a, b) => a - b);
+  }
+  if (eg.id === 50 && eg.hp > 1) {
+    eg.hp -= 1;
+    const minIdx = eDice.indexOf(Math.min(...eDice));
+    const oldVal = eDice[minIdx];
+    eDice[minIdx] = rollDie();
+    B.log.push({ text: `${eg.name} (Gambler): Traded 1 HP to reroll ${oldVal} → ${eDice[minIdx]}!`, type: 'ability' });
+    eDice.sort((a, b) => a - b);
   }
 
   // ── COMMITTED RESOURCES: Moonstone → set highest die to 6 ──
@@ -1848,6 +1876,11 @@ function battleRoll() {
         dmg += 3;
         B.log.push({ text: `${pg.name} (Big Target): Enemy has more HP — +3 damage!`, type: 'ability' });
       }
+      // Greg (49): x2 damage when HP advantage
+      if (pg.id === 49 && pg.hp > eg.hp) {
+        dmg *= 2;
+        B.log.push({ text: `${pg.name} (Bravado): HP advantage — 2X damage!`, type: 'ability' });
+      }
       // Jasper (428): Flame Dive — win: roll 1 bonus die for extra damage, take 1 self-damage
       if (pg.id === 428) {
         const bonusDie = rollDie();
@@ -1890,6 +1923,15 @@ function battleRoll() {
       if (pg.id === 424) {
         dmg += 1;
         B.log.push({ text: `${pg.name} (Omen): +1 damage on win!`, type: 'ability' });
+      }
+      // Chester (426): Win: +1 Healing Seed. Win with doubles: also +2 Burn
+      if (pg.id === 426) {
+        B.resources.healingSeeds = (B.resources.healingSeeds || 0) + 1;
+        B.log.push({ text: `${pg.name} (Harvest): Win — +1 Healing Seed! [Total: ${B.resources.healingSeeds}]`, type: 'ability' });
+        if (pRoll.type === 'doubles') {
+          B.resources.burn = (B.resources.burn || 0) + 2;
+          B.log.push({ text: `${pg.name} (Harvest): Doubles — +2 Burn! [Total: ${B.resources.burn}]`, type: 'ability' });
+        }
       }
       // Ronan (461): doubles: gain +1 Ice Shard & +1 Burn
       if (pg.id === 461 && pRoll.type === 'doubles') {
@@ -2025,10 +2067,21 @@ function battleRoll() {
         dmg *= 3;
         B.log.push({ text: `${pg.name} (Ambush): First roll win — TRIPLE damage!`, type: 'ability' });
       }
+      // Cave Dweller (46): 3X damage on first roll win
+      if (pg.id === 46 && B.round === 1) {
+        dmg *= 3;
+        B.log.push({ text: `${pg.name} (Cave Strike): First roll win — 3X damage!`, type: 'ability' });
+      }
       // Wanderer (4): Curiosity — roll a straight (consecutive, no repeats): +2 damage
       if (pg.id === 4 && isStraight(pDice)) {
         dmg += 2;
         B.log.push({ text: `${pg.name} (Curiosity): Straight [${pDice.join(',')}] — +2 damage!`, type: 'ability' });
+      }
+      // Dealer (37): Straight — +3 damage and negate incoming damage this round
+      if (pg.id === 37 && isStraight(pDice)) {
+        dmg += 3;
+        B._dealerNegatePlayer = true;
+        B.log.push({ text: `${pg.name} (Straight): [${pDice.join(',')}] — +3 damage & negate incoming!`, type: 'ability' });
       }
       // Boo Brothers (17): Teamwork — +1 damage bonus from removing a die
       if (pg.id === 17 && B.booTeamworkBonus > 0) {
@@ -2040,6 +2093,11 @@ function battleRoll() {
       if (pg.id === 35 && pRoll.type === 'triples') {
         dmg *= 3;
         B.log.push({ text: `${pg.name} (Flying Kick): Triples = 3X damage!`, type: 'ability' });
+      }
+      // Bill & Bob (36): Below 4 HP: 2X damage
+      if (pg.id === 36 && pg.hp < 4) {
+        dmg *= 2;
+        B.log.push({ text: `${pg.name} (Desperation): Below 4 HP — 2X damage!`, type: 'ability' });
       }
       // Snorton (67): Fissure — +5 damage if 2+ sixes rolled
       if (pg.id === 67 && pDice.filter(d => d === 6).length >= 2) {
@@ -2222,6 +2280,13 @@ function battleRoll() {
       if (_wpn && _wpn.bonusDamage) {
         dmg += _wpn.bonusDamage;
         B.log.push({ text: `${_wpn.name}: +${_wpn.bonusDamage} damage!`, type: 'ability' });
+      }
+
+      // Dealer (37): negate incoming damage if enemy rolled a straight
+      if (B._dealerNegateEnemy) {
+        B.log.push({ text: `${eg.name} (Straight): Incoming damage negated!`, type: 'ability' });
+        dmg = 0;
+        B._dealerNegateEnemy = false;
       }
 
       eg.hp = Math.max(0, eg.hp - dmg);
@@ -2471,10 +2536,21 @@ function battleRoll() {
         dmg *= 3;
         B.log.push({ text: `${eg.name} (Ambush): First roll win — TRIPLE damage!`, type: 'damage' });
       }
+      // Cave Dweller (46): 3X damage on first roll win
+      if (eg.id === 46 && B.round === 1) {
+        dmg *= 3;
+        B.log.push({ text: `${eg.name} (Cave Strike): First roll win — 3X damage!`, type: 'damage' });
+      }
       // Wanderer (4): Curiosity — straight: +2 damage
       if (eg.id === 4 && isStraight(eDice)) {
         dmg += 2;
         B.log.push({ text: `${eg.name} (Curiosity): Straight — +2 damage!`, type: 'damage' });
+      }
+      // Dealer (37): Straight — +3 damage and negate incoming damage
+      if (eg.id === 37 && isStraight(eDice)) {
+        dmg += 3;
+        B._dealerNegateEnemy = true;
+        B.log.push({ text: `${eg.name} (Straight): [${eDice.join(',')}] — +3 damage & negate incoming!`, type: 'damage' });
       }
       // Boo Brothers (17): Teamwork — enemy version damage bonus
       if (eg.id === 17 && (B.booTeamworkBonusEnemy || 0) > 0) {
@@ -2486,6 +2562,11 @@ function battleRoll() {
       if (eg.id === 35 && eRoll.type === 'triples') {
         dmg *= 3;
         B.log.push({ text: `${eg.name} (Flying Kick): Triples = 3X damage!`, type: 'damage' });
+      }
+      // Bill & Bob (36): Below 4 HP: 2X damage
+      if (eg.id === 36 && eg.hp < 4) {
+        dmg *= 2;
+        B.log.push({ text: `${eg.name} (Desperation): Below 4 HP — 2X damage!`, type: 'damage' });
       }
       // Snorton (67): Fissure — +5 damage if 2+ sixes
       if (eg.id === 67 && eDice.filter(d => d === 6).length >= 2) {
@@ -2565,6 +2646,11 @@ function battleRoll() {
         dmg += 3;
         B.log.push({ text: `${eg.name} (Big Target): Your HP is higher — +3 damage!`, type: 'damage' });
       }
+      // Greg (49): x2 damage when HP advantage
+      if (eg.id === 49 && eg.hp > pg.hp) {
+        dmg *= 2;
+        B.log.push({ text: `${eg.name} (Bravado): HP advantage — 2X damage!`, type: 'damage' });
+      }
       // Jasper (428): Flame Dive — win: roll 1 bonus die for extra damage, take 1 self-damage
       if (eg.id === 428) {
         const bonusDie = rollDie();
@@ -2601,6 +2687,14 @@ function battleRoll() {
       if (eg.id === 424) {
         dmg += 1;
         B.log.push({ text: `${eg.name} (Omen): +1 damage on win!`, type: 'damage' });
+      }
+      // Chester (426): Win: +1 Healing Seed. Win with doubles: also +2 Burn
+      if (eg.id === 426) {
+        B.log.push({ text: `${eg.name} (Harvest): Win — gains 1 Healing Seed.`, type: 'ability' });
+        B.enemyUsedResource = true;
+        if (eRoll.type === 'doubles') {
+          B.log.push({ text: `${eg.name} (Harvest): Doubles — gains 2 Burn.`, type: 'ability' });
+        }
       }
       // Ronan (461): Mixup — doubles: gain +1 Ice Shard & +1 Burn
       if (eg.id === 461 && eRoll.type === 'doubles') {
@@ -2801,6 +2895,13 @@ function battleRoll() {
         if (reduced > 0) B.log.push({ text: `${_armr.name}: -${reduced} damage!`, type: 'ability' });
       }
 
+      // Dealer (37): negate incoming damage if straight was rolled
+      if (B._dealerNegatePlayer) {
+        B.log.push({ text: `Dealer (Straight): Incoming damage negated!`, type: 'ability' });
+        dmg = 0;
+        B._dealerNegatePlayer = false;
+      }
+
       pg.hp = Math.max(0, pg.hp - dmg);
       B.damageTakenThisRound = dmg;
       if (pg.hp <= 0) pg.ko = true;
@@ -2878,6 +2979,43 @@ function battleRoll() {
       if (pg.id === 23 && pg.ko) {
         B.resources.iceShards += 3;
         B.log.push({ text: `${pg.name} (Frost Legacy): +3 Ice Shards on defeat! [Total: ${B.resources.iceShards}]`, type: 'ability' });
+      }
+
+      // Granny (310): Sideline — on teammate defeat: singles: +3 Lucky Stones, doubles: +1 Moonstone, triples: +3 Sacred Fire
+      if (pg.ko) {
+        const _pHasCorneliusGranny = getEnemySidelineGhosts().some(g => g.id === 45);
+        if (!_pHasCorneliusGranny) {
+          const grannyPlayer = getSidelineGhosts().find(g => g.id === 310 && !g.ko);
+          if (grannyPlayer) {
+            if (eRoll.type === 'triples') {
+              B.resources.sacredFire = (B.resources.sacredFire || 0) + 3;
+              B.log.push({ text: `${grannyPlayer.name} (Sideline): Teammate defeated on triples — +3 Sacred Fire! [Total: ${B.resources.sacredFire}]`, type: 'ability' });
+            } else if (eRoll.type === 'doubles') {
+              B.resources.moonstone = (B.resources.moonstone || 0) + 1;
+              B.log.push({ text: `${grannyPlayer.name} (Sideline): Teammate defeated on doubles — +1 Moonstone! [Total: ${B.resources.moonstone}]`, type: 'ability' });
+            } else {
+              B.resources.luckyStones = Math.min(5, (B.resources.luckyStones || 0) + 3);
+              B.log.push({ text: `${grannyPlayer.name} (Sideline): Teammate defeated on singles — +3 Lucky Stones! [Total: ${B.resources.luckyStones}]`, type: 'ability' });
+            }
+          }
+        }
+      }
+      // Granny (310) enemy: Sideline — on teammate defeat
+      if (eg.ko) {
+        const _eHasCorneliusGranny = getSidelineGhosts().some(g => g.id === 45);
+        if (!_eHasCorneliusGranny) {
+          const grannyEnemy = getEnemySidelineGhosts().find(g => g.id === 310 && !g.ko);
+          if (grannyEnemy) {
+            if (pRoll.type === 'triples') {
+              B.log.push({ text: `${grannyEnemy.name} (Sideline): Teammate defeated on triples — gains 3 Sacred Fire.`, type: 'ability' });
+            } else if (pRoll.type === 'doubles') {
+              B.log.push({ text: `${grannyEnemy.name} (Sideline): Teammate defeated on doubles — gains 1 Moonstone.`, type: 'ability' });
+            } else {
+              B.log.push({ text: `${grannyEnemy.name} (Sideline): Teammate defeated on singles — gains 3 Lucky Stones.`, type: 'ability' });
+            }
+            B.enemyUsedResource = true;
+          }
+        }
       }
 
       // King Jay (106): lose & dice total = 7 — reflect all damage

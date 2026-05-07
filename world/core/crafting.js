@@ -362,7 +362,11 @@ function updateCraftPreview() {
   const avgU = essences.reduce((s, e) => s + e.purity, 0) / essences.length;
 
   // Weighted quality
-  const quality = Math.floor(avgP * w.potency + avgS * w.stability + avgR * w.resonance + avgU * w.purity);
+  let quality = Math.floor(avgP * w.potency + avgS * w.stability + avgR * w.resonance + avgU * w.purity);
+
+  // Guild crafting bonus in preview
+  const previewGuildBonus = (typeof getGuildCraftBonus === 'function') ? getGuildCraftBonus() : 0;
+  quality += previewGuildBonus;
 
   // Individual stat contributions
   const contributions = [
@@ -412,6 +416,11 @@ function updateCraftPreview() {
     </div>
     <span class="preview-quality-value" style="color:${qualityColor}">${quality} ${qualityTier}</span>
   </div>`;
+
+  // Guild bonus display
+  if (previewGuildBonus > 0) {
+    html += `<div style="text-align:center;font-size:11px;color:#4fc878;margin-bottom:4px;">Guild Bonus: +${previewGuildBonus} Quality</div>`;
+  }
 
   // Best/worst match
   html += `<div class="preview-match-row">
@@ -484,7 +493,10 @@ function doCraft() {
   const masteryLvl = getMasteryLevel(masteryXp);
   const qualityFloor = masteryLvl * 50;
 
-  const baseQuality = Math.max(qualityFloor, weightedQuality);
+  // Guild crafting bonus
+  const guildBonus = (typeof getGuildCraftBonus === 'function') ? getGuildCraftBonus() : 0;
+
+  const baseQuality = Math.max(qualityFloor, weightedQuality) + guildBonus;
 
   // Set up experiment state
   expState = {
@@ -775,6 +787,10 @@ function finishExperiment() {
 
   // Create the gear with directed experiment results factored in
   let quality = Math.max(1, expState.baseQuality + expState.expQuality);
+
+  // Guild crafting bonus
+  const guildBonus = (typeof getGuildCraftBonus === 'function') ? getGuildCraftBonus() : 0;
+  quality += guildBonus;
 
   // Profession skill quality bonuses
   if (hasSkill('bs_1') && (schem.type === 'weapon' || schem.type === 'armor')) quality += 50; // Forge Hand

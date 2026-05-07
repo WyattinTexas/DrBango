@@ -2036,6 +2036,52 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 }
 #soundPrompt:hover { opacity: 1 !important; background: rgba(30,25,60,0.9); color: #8cf; }
 #soundPrompt.fading { opacity: 0; pointer-events: none; }
+
+/* ═══════ LOADOUT ═══════ */
+.loadout-modal {
+  background: linear-gradient(180deg, #0a0a14, #141420);
+  border: 2px solid #334; border-radius: 12px;
+  width: 95%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+  padding: 20px; text-align: center;
+}
+.loadout-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.loadout-close { background: none; border: 1px solid #445; color: #888; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; }
+
+.loadout-slots { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.loadout-center { display: flex; align-items: center; justify-content: center; gap: 16px; }
+
+.equip-slot {
+  width: 100px; height: 100px;
+  background: rgba(20,20,40,0.8); border: 2px dashed #334;
+  border-radius: 10px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.2s;
+}
+.equip-slot:hover { border-color: #daa520; }
+.equip-slot.equipped { border-style: solid; border-color: #4a8; background: rgba(20,40,20,0.8); }
+.slot-label { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1.5px; }
+.slot-icon { font-size: 24px; margin: 4px 0; }
+.slot-name { font-size: 11px; color: #aaa; }
+
+.loadout-portrait {
+  width: 120px; height: 120px;
+  background: rgba(30,20,40,0.6); border: 2px solid #334;
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+}
+.loadout-portrait img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; image-rendering: pixelated; }
+
+.loadout-player-name { color: #daa520; font-size: 14px; font-weight: bold; margin-top: 8px; }
+
+.loadout-inventory-label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 8px; }
+.loadout-inventory { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.loadout-item {
+  padding: 4px 12px; border-radius: 16px; font-size: 11px;
+  border: 1px solid #334; background: rgba(20,20,40,0.6);
+  cursor: pointer; transition: all 0.15s; color: #aaa;
+}
+.loadout-item:hover { border-color: #daa520; color: #fff; }
+.loadout-item.equipped { border-color: #4a8; color: #4a8; }
+.loadout-item .item-check { color: #4a8; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -2101,6 +2147,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">Survey</button>
     <button class="hud-btn" onclick="openProfTree()">Skills</button>
     <button class="hud-btn" onclick="openLineup()">Team</button>
+    <button class="hud-btn" onclick="openLoadout()">Loadout</button>
     <button class="hud-btn" id="hudHomeBtn" onclick="panToHome()">Home</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">Sound</button>
     <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
@@ -2426,6 +2473,47 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   </div>
 </div>
 
+<!-- LOADOUT OVERLAY -->
+<div id="loadoutOverlay" class="modal-overlay">
+  <div class="loadout-modal">
+    <div class="loadout-header">
+      <h2 style="font-family:'Cinzel',serif;letter-spacing:3px;color:#daa520;">LOADOUT</h2>
+      <button class="loadout-close" onclick="closeLoadout()">X</button>
+    </div>
+
+    <div class="loadout-slots">
+      <div class="equip-slot" id="slotHead" onclick="openSlotPicker('head')">
+        <div class="slot-label">HEAD</div>
+        <div class="slot-icon" id="slotHeadIcon">&mdash;</div>
+        <div class="slot-name" id="slotHeadName">Empty</div>
+      </div>
+
+      <div class="loadout-center">
+        <div class="equip-slot" id="slotWeapon" onclick="openSlotPicker('weapon')">
+          <div class="slot-label">WEAPON</div>
+          <div class="slot-icon" id="slotWeaponIcon">&mdash;</div>
+          <div class="slot-name" id="slotWeaponName">Empty</div>
+        </div>
+
+        <div class="loadout-portrait" id="loadoutPortrait">
+          <!-- Character sprite or name -->
+        </div>
+
+        <div class="equip-slot" id="slotAccessory" onclick="openSlotPicker('accessory')">
+          <div class="slot-label">ACCESSORY</div>
+          <div class="slot-icon" id="slotAccessoryIcon">&mdash;</div>
+          <div class="slot-name" id="slotAccessoryName">Empty</div>
+        </div>
+      </div>
+
+      <div class="loadout-player-name" id="loadoutPlayerName"></div>
+    </div>
+
+    <div class="loadout-inventory-label">INVENTORY</div>
+    <div class="loadout-inventory" id="loadoutInventory"></div>
+  </div>
+</div>
+
 <!-- REGION BANNER -->
 <div id="regionBanner" class="frost"></div>
 <!-- REGION TRANSITION OVERLAY -->
@@ -2546,6 +2634,7 @@ const MOVE_SPEED = 2.5;
 <script src="core/housing.js"></script>
 <script src="core/multiplayer.js"></script>
 <script src="core/world-events.js"></script>
+<script src="core/achievements.js"></script>
 <script src="cantina-module.js"></script>
 <script src="workshop-module.js"></script>
 <script src="arena-module.js"></script>
@@ -6181,6 +6270,7 @@ function setupInput() {
     if (e.key === 'i' || e.key === 'I') toggleInventory();
     if (e.key === 'k' || e.key === 'K') openProfTree();
     if (e.key === 't' || e.key === 'T') openLineup();
+    if (e.key === 'l' || e.key === 'L') openLoadout();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
     if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
     if (e.key === 'Escape') {
@@ -6573,6 +6663,93 @@ function openLineup() {
 
 function closeLineup() {
   document.getElementById('lineupOverlay').classList.remove('active');
+}
+
+// ═══════ LOADOUT ═══════
+
+function openLoadout() {
+  document.getElementById('loadoutOverlay').classList.add('active');
+  renderLoadout();
+}
+
+function closeLoadout() {
+  document.getElementById('loadoutOverlay').classList.remove('active');
+}
+
+function renderLoadout() {
+  if (!G.equipped) G.equipped = { head: null, weapon: null, accessory: null };
+
+  // Render each slot
+  ['head', 'weapon', 'accessory'].forEach(slot => {
+    const item = G.equipped[slot];
+    const capSlot = slot.charAt(0).toUpperCase() + slot.slice(1);
+    const iconEl = document.getElementById('slot' + capSlot + 'Icon');
+    const nameEl = document.getElementById('slot' + capSlot + 'Name');
+    const slotEl = document.getElementById('slot' + capSlot);
+
+    if (item) {
+      iconEl.textContent = item.icon || '\u2694';
+      nameEl.textContent = item.name;
+      slotEl.classList.add('equipped');
+    } else {
+      iconEl.innerHTML = '&mdash;';
+      nameEl.textContent = 'Empty';
+      slotEl.classList.remove('equipped');
+    }
+  });
+
+  // Player name + portrait
+  document.getElementById('loadoutPlayerName').textContent = G.name;
+  const portrait = document.getElementById('loadoutPortrait');
+  const activeGhost = G.team[G.activeIdx || 0];
+  if (activeGhost) {
+    const card = typeof getCard === 'function' ? getCard(activeGhost.id) : null;
+    portrait.innerHTML = card?.art
+      ? `<img src="${card.art}" alt="${activeGhost.name}" onerror="this.style.display='none'">`
+      : `<div style="color:#daa520;font-size:16px;">${G.name}</div>`;
+  } else {
+    portrait.innerHTML = `<div style="color:#daa520;font-size:16px;">${G.name}</div>`;
+  }
+
+  // Inventory - all gear items
+  const invEl = document.getElementById('loadoutInventory');
+  if (!G.gear || G.gear.length === 0) {
+    invEl.innerHTML = '<div style="color:#555;font-size:12px;">No gear crafted yet</div>';
+    return;
+  }
+  invEl.innerHTML = G.gear.map((g, i) => {
+    const isEquipped = Object.values(G.equipped).some(e => e && e.id === g.id);
+    return `<div class="loadout-item ${isEquipped ? 'equipped' : ''}" onclick="toggleEquip(${i})">
+      ${g.icon || ''} ${g.name}${isEquipped ? ' <span class="item-check">\u2713</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function openSlotPicker(slot) {
+  // For now, clicking a slot filters inventory to that slot type
+  // Could be expanded to a dedicated picker modal later
+  renderLoadout();
+}
+
+function toggleEquip(gearIdx) {
+  if (!G.equipped) G.equipped = { head: null, weapon: null, accessory: null };
+  const item = G.gear[gearIdx];
+  if (!item) return;
+
+  const slot = item.slot || item.type;
+  const validSlot = ['head', 'weapon', 'accessory'].includes(slot) ? slot : 'accessory';
+
+  // Toggle: if already equipped, unequip. Otherwise equip.
+  if (G.equipped[validSlot] && G.equipped[validSlot].id === item.id) {
+    G.equipped[validSlot] = null;
+    notify(`Unequipped: ${item.name}`);
+  } else {
+    G.equipped[validSlot] = item;
+    notify(`Equipped: ${item.name}`);
+  }
+
+  renderLoadout();
+  saveGame();
 }
 
 function renderLineup() {
@@ -7611,6 +7788,7 @@ function createCharacter() {
   G.coins = 10;
   G.essences = [];
   G.gear = [];
+  G.equipped = { head: null, weapon: null, accessory: null };
   G.level = 1;
   G.xp = 0;
   G.iceShards = 0;
@@ -7637,6 +7815,7 @@ function createCharacter() {
   G.materials = {};
   G.hasBoat = true; // everyone gets a boat for now
   G.loreCollected = [];
+  G.achievements = [];
   G.maskQuest = { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
   G.crystalsFound = [];
   G.chestsOpened = [];
@@ -7760,6 +7939,7 @@ async function initFirebase() {
     G.team = data.team || [];
     G.essences = data.essences || [];
     G.gear = data.gear || [];
+    G.equipped = data.equipped || { head: null, weapon: null, accessory: null };
     G.activeIdx = data.activeIdx || 0;
     G.iceShards = data.iceShards || 0;
     G.sacredFire = data.sacredFire || 0;
@@ -7794,6 +7974,7 @@ async function initFirebase() {
     G.activeWorldEvent = data.activeWorldEvent || null;
     G.gatheringQuests = data.gatheringQuests || {};
     G.hostileNPCsDefeated = data.hostileNPCsDefeated || {};
+    G.achievements = data.achievements || [];
     G.direction = 'down';
     G.frame = 0;
     if (!G.rep.arenaWins) G.rep.arenaWins = 0;
@@ -7859,6 +8040,7 @@ function saveGame() {
     team: G.team,
     essences: G.essences.slice(-50), // cap at 50
     gear: G.gear.slice(-20), // cap at 20
+    equipped: G.equipped || { head: null, weapon: null, accessory: null },
     activeIdx: G.activeIdx,
     iceShards: G.iceShards,
     sacredFire: G.sacredFire,
@@ -7891,6 +8073,7 @@ function saveGame() {
     activeWorldEvent: G.activeWorldEvent || null,
     gatheringQuests: G.gatheringQuests || {},
     hostileNPCsDefeated: G.hostileNPCsDefeated || {},
+    achievements: G.achievements || [],
     version: VERSION,
   };
 
