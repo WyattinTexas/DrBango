@@ -762,8 +762,8 @@ function drawCastleTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillRect(sx + T/2 - 3, sy + T/2 + 8, 6, 10);
       ctx.fillRect(sx + T/2 - 8, sy + T - 6, 16, 4);
       // BLUE FIRE!
-      const flicker1 = Math.sin(time * 8 + tx * 2.3) * 3;
-      const flicker2 = Math.cos(time * 6.5 + ty * 1.7) * 2;
+      const flicker1 = Math.sin(time * 2 + tx * 2.3) * 3;
+      const flicker2 = Math.cos(time * 1.5 + ty * 1.7) * 2;
       // Outer glow
       const bGlow = ctx.createRadialGradient(sx + T/2, sy + T/2 - 6, 2, sx + T/2, sy + T/2 - 6, 28 + flicker1);
       bGlow.addColorStop(0, 'rgba(40,120,255,0.7)');
@@ -1148,7 +1148,7 @@ function updateCastleParticles(dt) {
     }
   }
   // Replenish — more particles than cantina (bigger, moodier space)
-  while (castleAmbientParticles.length < 25) {
+  while (castleAmbientParticles.length < 14) {
     castleAmbientParticles.push(createCastleParticle());
   }
 }
@@ -1161,7 +1161,7 @@ function renderCastleParticles(ctx, camX, camY) {
 
     if (p.kind === 'spark') {
       // Blue flame sparks
-      ctx.fillStyle = `rgba(60,${140 + Math.random() * 60},255,${alpha})`;
+      ctx.fillStyle = `rgba(60,${140 + Math.floor(p.size * 30)},255,${alpha})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();

@@ -663,8 +663,8 @@ function drawCantinaTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.arc(sx + T/2, sy + T/2, T/2 - 4, 0, Math.PI * 2);
       ctx.fill();
       // Fire!
-      const fireFlicker = Math.sin(time * 8 + tx) * 3;
-      const fireFlicker2 = Math.cos(time * 6 + ty) * 2;
+      const fireFlicker = Math.sin(time * 2 + tx) * 3;
+      const fireFlicker2 = Math.cos(time * 1.5 + ty) * 2;
       // Outer glow
       const glowR = 20 + fireFlicker;
       const glow = ctx.createRadialGradient(sx + T/2, sy + T/2, 2, sx + T/2, sy + T/2, glowR);
@@ -916,7 +916,7 @@ function drawCantinaTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = '#6a5a30';
       ctx.fillRect(sx + T/2 - 5, sy + 4, 10, 8);
       // Lantern glow
-      const lFlicker = Math.sin(time * 5 + tx * 3) * 0.1;
+      const lFlicker = Math.sin(time * 1.5 + tx * 3) * 0.06;
       const lanternGlow = ctx.createRadialGradient(sx + T/2, sy + 8, 2, sx + T/2, sy + 8, 30);
       lanternGlow.addColorStop(0, `rgba(255,200,100,${0.4 + lFlicker})`);
       lanternGlow.addColorStop(1, 'rgba(255,200,100,0)');
@@ -1170,7 +1170,7 @@ function updateCantinaParticles(dt) {
     }
   }
   // Replenish
-  while (cantinaAmbientParticles.length < 15) {
+  while (cantinaAmbientParticles.length < 8) {
     cantinaAmbientParticles.push(createCantinaParticle());
   }
 }
@@ -1182,7 +1182,7 @@ function renderCantinaParticles(ctx, camX, camY) {
     const alpha = Math.min(1, p.life * 2) * 0.6;
 
     if (p.kind === 'spark') {
-      ctx.fillStyle = `rgba(255,${150 + Math.random() * 80},20,${alpha})`;
+      ctx.fillStyle = `rgba(255,${150 + Math.floor(p.size * 40)},20,${alpha})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();

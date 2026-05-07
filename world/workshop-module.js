@@ -673,9 +673,9 @@ function drawWorkshopTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.lineTo(sx + T/2 - T/3, sy + T - 4);
       ctx.fill();
       // Fire!
-      const fireFlicker = Math.sin(time * 8 + tx * 1.5) * 3;
-      const fireFlicker2 = Math.cos(time * 6.5 + ty * 2) * 2;
-      const fireFlicker3 = Math.sin(time * 10 + tx + ty) * 2;
+      const fireFlicker = Math.sin(time * 2 + tx * 1.5) * 3;
+      const fireFlicker2 = Math.cos(time * 1.5 + ty * 2) * 2;
+      const fireFlicker3 = Math.sin(time * 2.5 + tx + ty) * 2;
       // Outer glow — larger and more intense than cantina
       const glowR = 28 + fireFlicker;
       const glow = ctx.createRadialGradient(sx + T/2, sy + T/2, 3, sx + T/2, sy + T/2, glowR);
@@ -807,7 +807,7 @@ function drawWorkshopTile(ctx, tile, sx, sy, tx, ty, time) {
         ctx.arc(sx + T/2, sy + T/2 - 4, 5, 0, Math.PI * 2);
         ctx.stroke();
         // Inner glow
-        const shimmer = Math.sin(time * 3 + tx) * 0.3;
+        const shimmer = Math.sin(time * 1.2 + tx) * 0.15;
         ctx.fillStyle = `rgba(200,180,255,${0.3 + shimmer})`;
         ctx.beginPath();
         ctx.arc(sx + T/2, sy + T/2 - 4, 3, 0, Math.PI * 2);
@@ -1342,7 +1342,7 @@ function updateWorkshopParticles(dt) {
     }
   }
   // Replenish
-  while (workshopAmbientParticles.length < 18) {
+  while (workshopAmbientParticles.length < 10) {
     workshopAmbientParticles.push(createWorkshopParticle());
   }
 }
@@ -1354,7 +1354,7 @@ function renderWorkshopParticles(ctx, camX, camY) {
     const alpha = Math.min(1, p.life * 2) * 0.6;
 
     if (p.kind === 'spark') {
-      ctx.fillStyle = `rgba(255,${140 + Math.random() * 80},20,${alpha})`;
+      ctx.fillStyle = `rgba(255,${140 + Math.floor(p.size * 40)},20,${alpha})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();

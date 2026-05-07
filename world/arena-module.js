@@ -742,8 +742,8 @@ function drawArenaTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = '#555';
       ctx.fillRect(sx + T/2 - 3, sy + 8, 6, 6);
       // Fire!
-      const fireFlicker = Math.sin(time * 8 + tx * 5) * 3;
-      const fireFlicker2 = Math.cos(time * 6.5 + ty * 3) * 2;
+      const fireFlicker = Math.sin(time * 2 + tx * 5) * 3;
+      const fireFlicker2 = Math.cos(time * 1.5 + ty * 3) * 2;
       // Outer glow — warm torch light
       const glowR = 24 + fireFlicker;
       const glow = ctx.createRadialGradient(sx + T/2, sy + 6, 2, sx + T/2, sy + 6, glowR);
@@ -1116,7 +1116,7 @@ function drawArenaNPC(ctx, npc, camX, camY, time) {
     ctx.fill();
     ctx.fillRect(sx - 6, sy - 22 + headBob, 12, 5);
     // Shifty eye movement
-    const shifty = Math.sin(time * 3) * 1.5;
+    const shifty = Math.sin(time * 1.2) * 1.5;
     ctx.fillStyle = '#111';
     ctx.beginPath();
     ctx.arc(sx - 3 + shifty, sy - 13 + headBob + 1, 1.5, 0, Math.PI * 2);
@@ -1329,7 +1329,7 @@ function updateArenaParticles(dt) {
     }
   }
   // Replenish
-  while (arenaAmbientParticles.length < 18) {
+  while (arenaAmbientParticles.length < 10) {
     arenaAmbientParticles.push(createArenaParticle());
   }
 }
@@ -1341,7 +1341,7 @@ function renderArenaParticles(ctx, camX, camY) {
     const alpha = Math.min(1, p.life * 2) * 0.6;
 
     if (p.kind === 'spark') {
-      ctx.fillStyle = `rgba(255,${150 + Math.random() * 80},20,${alpha})`;
+      ctx.fillStyle = `rgba(255,${150 + Math.floor(p.size * 40)},20,${alpha})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();

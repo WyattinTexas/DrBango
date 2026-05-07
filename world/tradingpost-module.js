@@ -728,7 +728,7 @@ function drawTradingPostTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = 'rgba(140,200,220,0.15)';
       ctx.fillRect(sx + 5, sy + 5, T - 10, T - 10);
       // Glass reflection shimmer
-      const shimmer = Math.sin(time * 2 + tx * 1.5) * 0.08;
+      const shimmer = Math.sin(time * 0.8 + tx * 1.5) * 0.05;
       ctx.fillStyle = `rgba(200,230,255,${0.1 + shimmer})`;
       ctx.beginPath();
       ctx.moveTo(sx + 8, sy + 6);
@@ -848,8 +848,8 @@ function drawTradingPostTile(ctx, tile, sx, sy, tx, ty, time) {
         ctx.fill();
       }
       // Golden shimmer animation
-      const shimmerPhase = Math.sin(time * 3 + tx * 2 + ty) * 0.3;
-      const shimmerPhase2 = Math.cos(time * 2.5 + tx) * 0.2;
+      const shimmerPhase = Math.sin(time * 1.2 + tx * 2 + ty) * 0.15;
+      const shimmerPhase2 = Math.cos(time * 1 + tx) * 0.1;
       const coinGlow = ctx.createRadialGradient(
         sx + T/2 + shimmerPhase * 8, sy + T/2 - 4, 1,
         sx + T/2, sy + T/2, 18
@@ -860,7 +860,7 @@ function drawTradingPostTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = coinGlow;
       ctx.fillRect(sx - 6, sy - 6, T + 12, T + 12);
       // Sparkle points
-      const sparkle1 = (time * 4 + tx) % 6;
+      const sparkle1 = (time * 1.5 + tx) % 6;
       if (sparkle1 < 1) {
         const sa = 1 - sparkle1;
         ctx.fillStyle = `rgba(255,255,200,${sa * 0.8})`;
@@ -868,7 +868,7 @@ function drawTradingPostTile(ctx, tile, sx, sy, tx, ty, time) {
         ctx.arc(sx + T/2 + 6, sy + T/2 - 8, 1.5, 0, Math.PI * 2);
         ctx.fill();
       }
-      const sparkle2 = (time * 3 + ty + 2) % 5;
+      const sparkle2 = (time * 1.2 + ty + 2) % 5;
       if (sparkle2 < 1) {
         const sa = 1 - sparkle2;
         ctx.fillStyle = `rgba(255,255,220,${sa * 0.7})`;
@@ -948,7 +948,7 @@ function drawTradingPostTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = '#6a5a28';
       ctx.fillRect(sx + T/2 - 5, sy + 4, 10, 8);
       // Lantern glow — warm golden
-      const lFlicker = Math.sin(time * 5 + tx * 3) * 0.1;
+      const lFlicker = Math.sin(time * 1.5 + tx * 3) * 0.06;
       const lanternGlow = ctx.createRadialGradient(sx + T/2, sy + 8, 2, sx + T/2, sy + 8, 30);
       lanternGlow.addColorStop(0, `rgba(255,190,80,${0.4 + lFlicker})`);
       lanternGlow.addColorStop(1, 'rgba(255,190,80,0)');
@@ -1077,7 +1077,7 @@ function drawTradingPostDecor(ctx, type, sx, sy, time) {
       ctx.fill();
     }
     // Tiny shimmer
-    const sh = Math.sin((time || 0) * 4) * 0.3;
+    const sh = Math.sin((time || 0) * 1.2) * 0.15;
     ctx.fillStyle = `rgba(255,255,200,${0.3 + sh})`;
     ctx.beginPath();
     ctx.arc(sx + 7, sy + 1, 1, 0, Math.PI * 2);
@@ -1287,7 +1287,7 @@ function updateTradingPostParticles(dt) {
     }
   }
   // Replenish
-  while (tradingPostAmbientParticles.length < 15) {
+  while (tradingPostAmbientParticles.length < 8) {
     tradingPostAmbientParticles.push(createTradingPostParticle());
   }
 }
@@ -1299,7 +1299,7 @@ function renderTradingPostParticles(ctx, camX, camY) {
     const alpha = Math.min(1, p.life * 2) * 0.6;
 
     if (p.kind === 'coin_shimmer') {
-      ctx.fillStyle = `rgba(255,215,${50 + Math.random() * 50},${alpha * 0.8})`;
+      ctx.fillStyle = `rgba(255,215,${50 + Math.floor(p.size * 30)},${alpha * 0.8})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();

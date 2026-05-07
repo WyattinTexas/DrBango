@@ -288,7 +288,7 @@ function innInteract() {
 
       // Innkeeper heals the full team
       if (npc.heals && G && G.team) {
-        G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+        G.team.forEach(g => { if (g) { g.hp = g.maxHp; g.ko = false; } });
         innNotification = { text: 'Your team feels refreshed! Fully healed.', timer: 150 };
       }
 
@@ -672,9 +672,9 @@ function drawInnTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillRect(sx + 4, sy + 4, T - 8, T - 6);
 
       // Animated fire — large and warm
-      const fireFlicker = Math.sin(time * 7 + tx * 2) * 4;
-      const fireFlicker2 = Math.cos(time * 5.5 + ty) * 3;
-      const fireFlicker3 = Math.sin(time * 9 + tx + ty) * 2;
+      const fireFlicker = Math.sin(time * 1.8 + tx * 2) * 4;
+      const fireFlicker2 = Math.cos(time * 1.4 + ty) * 3;
+      const fireFlicker3 = Math.sin(time * 2.2 + tx + ty) * 2;
 
       // Outer warm glow — extends beyond tile
       const glowR = 30 + fireFlicker;
@@ -718,9 +718,9 @@ function drawInnTile(ctx, tile, sx, sy, tx, ty, time) {
 
       // Embers at base
       for (let i = 0; i < 3; i++) {
-        const ex = sx + 10 + i * 10 + Math.sin(time * 3 + i) * 2;
-        const ey = sy + T - 10 + Math.cos(time * 2 + i) * 1;
-        ctx.fillStyle = `rgba(255,${100 + Math.random() * 60},20,${0.4 + Math.sin(time * 4 + i) * 0.3})`;
+        const ex = sx + 10 + i * 10 + Math.sin(time * 1.2 + i) * 2;
+        const ey = sy + T - 10 + Math.cos(time * 0.8 + i) * 1;
+        ctx.fillStyle = `rgba(255,${120 + i * 20},20,${0.4 + Math.sin(time * 1.5 + i) * 0.15})`;
         ctx.beginPath();
         ctx.arc(ex, ey, 1.5, 0, Math.PI * 2);
         ctx.fill();
@@ -777,7 +777,7 @@ function drawInnTile(ctx, tile, sx, sy, tx, ty, time) {
       ctx.fillStyle = '#e8d8b0';
       ctx.fillRect(sx + T/2 - 2, sy + 2, 4, 6);
       // Tiny flame
-      const candleFlicker = Math.sin(time * 6 + tx + ty * 2) * 0.5;
+      const candleFlicker = Math.sin(time * 1.5 + tx + ty * 2) * 0.5;
       ctx.fillStyle = '#ffcc44';
       ctx.beginPath();
       ctx.arc(sx + T/2, sy + 1 + candleFlicker, 2, 0, Math.PI * 2);
@@ -853,7 +853,7 @@ function drawInnTile(ctx, tile, sx, sy, tx, ty, time) {
       // Floor under
       drawInnTile(ctx, IT.FLOOR, sx, sy, tx, ty, time);
       // Small fire underneath
-      const potFlicker = Math.sin(time * 6 + tx) * 2;
+      const potFlicker = Math.sin(time * 1.8 + tx) * 2;
       ctx.fillStyle = '#ff6610';
       ctx.beginPath();
       ctx.moveTo(sx + T/2 - 8, sy + T - 8);
@@ -1100,7 +1100,7 @@ function drawInnDecor(ctx, type, sx, sy, time) {
     ctx.fillStyle = '#e8d8b0';
     ctx.fillRect(sx + 2, sy + 2, 4, 8);
     // Flame
-    const flicker = Math.sin(time * 7 + sx) * 0.8;
+    const flicker = Math.sin(time * 1.5 + sx) * 0.5;
     ctx.fillStyle = '#ffcc44';
     ctx.beginPath();
     ctx.arc(sx + 4, sy + 1 + flicker, 2.5, 0, Math.PI * 2);
@@ -1308,7 +1308,7 @@ function updateInnParticles(dt) {
     }
   }
   // Replenish
-  while (innAmbientParticles.length < 18) {
+  while (innAmbientParticles.length < 10) {
     innAmbientParticles.push(createInnParticle());
   }
 }
@@ -1320,7 +1320,7 @@ function renderInnParticles(ctx, camX, camY) {
     const alpha = Math.min(1, p.life * 2) * 0.6;
 
     if (p.kind === 'spark') {
-      ctx.fillStyle = `rgba(255,${140 + Math.random() * 80},30,${alpha})`;
+      ctx.fillStyle = `rgba(255,${140 + Math.floor(p.size * 40)},30,${alpha})`;
       ctx.beginPath();
       ctx.arc(sx, sy, p.size, 0, Math.PI * 2);
       ctx.fill();
