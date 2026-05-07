@@ -119,7 +119,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #battleOverlay.visible { opacity: 1; }
 #battleOverlay.active { display: flex; }
 .battle-arena {
-  width: 100%; max-width: 720px; height: 100vh; max-height: 520px;
+  width: 100%; max-width: 850px; height: 100vh; max-height: 600px;
   background: linear-gradient(180deg, #c8d8e8 0%, #e8e8e0 40%, #d0c8b0 100%);
   border: 3px solid #444; border-radius: 8px; position: relative;
   display: flex; flex-direction: column; overflow: hidden;
@@ -166,7 +166,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 .hp-bar-inner.red { background: linear-gradient(90deg, #c83838, #e86868); }
 .hp-bar-inner.flash-red { background: #ff0000 !important; transition: none; }
 .hp-text { font-size: 10px; color: #666; text-align: right; }
-.f-ability { font-size: 10px; color: #888; margin-top: 2px; font-style: italic; }
+.f-ability { font-size: 10px; color: #888; margin-top: 2px; font-style: italic; max-height: 32px; overflow-y: auto; line-height: 1.3; }
 
 /* ── SPIRITKIN ART (center stage) ── */
 .battle-sprite {
@@ -250,13 +250,14 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ── SIDELINE GHOSTS ── */
 .battle-sideline {
-  position: absolute; bottom: 8px; display: flex; gap: 4px; z-index: 10;
+  position: absolute; bottom: 50%; transform: translateY(50%);
+  display: flex; flex-direction: column; gap: 4px; z-index: 10;
 }
-.battle-sideline.player { left: 16px; }
-.battle-sideline.enemy { right: 16px; }
+.battle-sideline.player { left: 8px; }
+.battle-sideline.enemy { right: 8px; }
 .sideline-ghost {
-  background: rgba(0,0,0,0.3); border: 1px solid #555; border-radius: 4px;
-  padding: 3px; text-align: center; width: 60px; font-size: 9px; color: #aaa;
+  background: rgba(0,0,0,0.4); border: 1px solid #445; border-radius: 4px;
+  padding: 4px 6px; text-align: center; width: 70px; font-size: 9px; color: #aaa;
 }
 .sideline-ghost .sl-hp { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 2px; }
 .sideline-ghost .sl-hp-fill { height: 100%; border-radius: 2px; }
@@ -1732,6 +1733,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
         <div class="f-name"><span id="pFighterName">---</span><span class="f-level" id="pHpText">HP ?/?</span></div>
         <div class="hp-bar-outer"><div class="hp-bar-inner green" id="pHpBar" style="width:100%"></div></div>
         <div class="f-ability" id="pFighterAbility">---</div>
+        <div id="pResources" style="font-size:10px;margin-top:4px;"></div>
       </div>
 
       <!-- Sideline ghosts -->
@@ -2018,7 +2020,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.5.1';
+const VERSION = 'v5.6.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7539,7 +7541,7 @@ function renderBattle() {
   if (!pg) return;
   const pCard = getCard(pg.id);
   document.getElementById('pFighterName').textContent = pg.name;
-  document.getElementById('pFighterAbility').textContent = pg.ability;
+  document.getElementById('pFighterAbility').textContent = pg.ability + (pg.abilityDesc ? ': ' + pg.abilityDesc : '');
   const pArt = document.getElementById('pFighterArt');
   pArt.parentElement.querySelector('.sprite-fallback')?.remove();
   pArt.src = pCard?.art || '';
@@ -7565,7 +7567,7 @@ function renderBattle() {
   if (!eg) return;
   const eCard = getCard(eg.id) || B.enemyCard;
   document.getElementById('eFighterName').textContent = eg.name;
-  document.getElementById('eFighterAbility').textContent = eg.ability;
+  document.getElementById('eFighterAbility').textContent = eg.ability + (eg.abilityDesc ? ': ' + eg.abilityDesc : '');
   const eArt = document.getElementById('eFighterArt');
   eArt.parentElement.querySelector('.sprite-fallback')?.remove();
   eArt.src = eCard?.art || '';
@@ -7608,6 +7610,22 @@ function renderBattle() {
   renderSideline('player', 'pSideline');
   renderSideline('enemy', 'eSideline');
 
+  // Resources display
+  const resEl = document.getElementById('pResources');
+  if (resEl && B.resources) {
+    const res = B.resources;
+    let resHtml = '';
+    if (res.iceShards > 0) resHtml += `<span style="color:#4af;">&#10052;${res.iceShards}</span> `;
+    if (res.sacredFire > 0) resHtml += `<span style="color:#f84;">&#128293;${res.sacredFire}</span> `;
+    if (res.healingSeeds > 0) resHtml += `<span style="color:#4a8;">&#127807;${res.healingSeeds}</span> `;
+    if (res.surge > 0) resHtml += `<span style="color:#ff4;">&#9889;${res.surge}</span> `;
+    if (res.luckyStones > 0) resHtml += `<span style="color:#ca4;">&#127808;${res.luckyStones}</span> `;
+    if (res.moonstone > 0) resHtml += `<span style="color:#c8f;">&#128142;${res.moonstone}</span> `;
+    if (res.firefly > 0) resHtml += `<span style="color:#ff8;">&#127982;${res.firefly}</span> `;
+    if ((res.burn || 0) > 0) resHtml += `<span style="color:#f44;">&#128165;${res.burn}</span> `;
+    resEl.innerHTML = resHtml || '<span style="color:#555;">No resources</span>';
+  }
+
   // Actions
   const actionsEl = document.getElementById('battleActions');
   if (B.phase === 'ko-swap') {
@@ -7646,9 +7664,10 @@ function renderSideline(teamKey, elementId) {
     const isSwapPick = B.phase === 'ko-swap' && B.koSwapTeam === teamKey && !g.ko;
     return `<div class="sideline-ghost ${g.ko ? 'ko' : ''} ${isSwapPick ? 'swap-pick' : ''}"
       ${isSwapPick ? `onclick="doKoSwap('${teamKey}', ${realIdx})"` : ''}>
-      <div style="font-weight:bold;color:${g.ko ? '#666' : '#fff'};">${g.name}</div>
+      <div style="font-weight:bold;color:${g.ko ? '#666' : '#fff'};font-size:10px;">${g.name}</div>
+      <div style="font-size:8px;color:${g.ko ? '#444' : '#8cf'};font-style:italic;">${g.ability || ''}</div>
       <div class="sl-hp"><div class="sl-hp-fill" style="width:${pct}%;background:${pct > 50 ? '#4a8' : pct > 25 ? '#aa8' : '#a44'};"></div></div>
-      <div style="color:#888;">${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</div>
+      <div style="color:#888;font-size:9px;">${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</div>
     </div>`;
   }).join('');
 }
