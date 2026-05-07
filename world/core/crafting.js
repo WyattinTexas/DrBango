@@ -386,7 +386,7 @@ function updateCraftPreview() {
 
   function matchClass(contrib) { return contrib > 200 ? 'good' : contrib > 100 ? 'okay' : 'poor'; }
 
-  let html = `<div class="preview-title">Projected Output</div>`;
+  let html = `<div class="preview-title">Projected Output <span style="font-size:9px;color:#444;">(click to collapse)</span></div>`;
 
   // Show derived combat stats
   if (damage > 0) html += `<div style="text-align:center;font-size:14px;color:#f44a4a;margin-bottom:6px;">Damage: +${damage}</div>`;

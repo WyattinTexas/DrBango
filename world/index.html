@@ -608,7 +608,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* Essence list */
 .cw-essence-list {
-  max-height: 200px; overflow-y: auto; margin-bottom: 12px;
+  max-height: 250px; overflow-y: auto; margin-bottom: 12px; min-height: 120px;
 }
 .cw-ess-item {
   background: #0a0a18; border: 1px solid #1a1a2a; border-radius: 6px;
@@ -1324,7 +1324,15 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 /* ═══════ CRAFT OUTPUT PREVIEW ═══════ */
 #cwOutputPreview {
   background: #0a0a18; border: 1px solid #2a2a4a; border-radius: 8px;
-  padding: 8px; margin: 6px 0; font-size: 11px; max-height: 120px; overflow-y: auto;
+  padding: 8px; margin: 6px 0; font-size: 11px; max-height: 160px; overflow-y: auto;
+  cursor: pointer; position: relative; transition: max-height 0.2s ease;
+}
+#cwOutputPreview.collapsed {
+  max-height: 28px; overflow: hidden;
+}
+#cwOutputPreview.collapsed::after {
+  content: '(click to expand)'; position: absolute; right: 8px; top: 6px;
+  font-size: 9px; color: #555;
 }
 #cwOutputPreview .preview-title {
   font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1.5px;
@@ -2103,9 +2111,9 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
         <div class="cw-selected-schematic" id="cwSelectedSchematic"></div>
         <div class="cw-section-label">Add Essences</div>
         <div id="cwEssenceSlots"></div>
+        <div id="cwOutputPreview" class="cw-output-collapsible" style="display:none;" onclick="this.classList.toggle('collapsed')"></div>
         <div class="cw-section-label" style="margin-top:8px;">Your Essences</div>
-        <div class="cw-essence-list" id="cwEssenceList" style="max-height:250px;overflow-y:auto;min-height:80px;flex-shrink:0;"></div>
-        <div id="cwOutputPreview" style="display:none;"></div>
+        <div class="cw-essence-list" id="cwEssenceList" style="max-height:250px;overflow-y:auto;min-height:120px;flex-shrink:0;"></div>
         <div id="craftPreview" style="display:none;">
           <div class="experiment-bar"><div class="experiment-fill" id="expFill" style="width:0%"></div></div>
           <p style="font-size:12px;color:#888;text-align:center;" id="expText">Click to experiment...</p>
@@ -2356,7 +2364,7 @@ const MOVE_SPEED = 2.5;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v7.3.0';
+const VERSION = 'v7.4.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -3628,8 +3636,8 @@ function render() {
   const W = canvas.width, H = canvas.height;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { renderCantina(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof workshopActive !== 'undefined' && workshopActive) { renderWorkshop(ctx, W, H); requestAnimationFrame(render); return; }
-  if (typeof arenaActive !== 'undefined' && arenaActive) { try { renderArena(ctx, W, H); } catch(e) { console.error('Arena render error:', e); arenaActive = false; } requestAnimationFrame(render); return; }
-  if (typeof innActive !== 'undefined' && innActive) { try { renderInn(ctx, W, H); } catch(e) { console.error('Inn render error:', e); innActive = false; } requestAnimationFrame(render); return; }
+  if (typeof arenaActive !== 'undefined' && arenaActive) { renderArena(ctx, W, H); requestAnimationFrame(render); return; }
+  if (typeof innActive !== 'undefined' && innActive) { renderInn(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { renderTradingPost(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof castleActive !== 'undefined' && castleActive) { renderCastle(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof houseActive !== 'undefined' && houseActive) { renderHouse(ctx, W, H); requestAnimationFrame(render); return; }
@@ -5998,8 +6006,8 @@ function gameLoop() {
   if (G.inBattle) return;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { updateCantina(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof workshopActive !== 'undefined' && workshopActive) { updateWorkshop(16, keys); setTimeout(gameLoop, 16); return; }
-  if (typeof arenaActive !== 'undefined' && arenaActive) { try { updateArena(16, keys); } catch(e) { console.error('Arena update error:', e); arenaActive = false; } setTimeout(gameLoop, 16); return; }
-  if (typeof innActive !== 'undefined' && innActive) { try { updateInn(16, keys); } catch(e) { console.error('Inn update error:', e); innActive = false; } setTimeout(gameLoop, 16); return; }
+  if (typeof arenaActive !== 'undefined' && arenaActive) { updateArena(16, keys); setTimeout(gameLoop, 16); return; }
+  if (typeof innActive !== 'undefined' && innActive) { updateInn(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof tradingPostActive !== 'undefined' && tradingPostActive) { updateTradingPost(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof castleActive !== 'undefined' && castleActive) { updateCastle(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof houseActive !== 'undefined' && houseActive) { updateHouse(16, keys); setTimeout(gameLoop, 16); return; }
@@ -6809,7 +6817,7 @@ function tryInteract() {
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === arenaX1 || cx === arenaX2) && cy === arenaY1) {
-      if (typeof enterArena === 'function') { try { enterArena(); } catch(e) { console.warn('Arena error:', e); notify('Arena temporarily unavailable.'); } } else { openArena(); }
+      if (typeof enterArena === 'function') { enterArena(); } else { openArena(); }
       return;
     }
   }
@@ -6819,8 +6827,8 @@ function tryInteract() {
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === innX1 || cx === innX2) && cy === innY1) {
-      if (typeof enterInn === 'function') { try { enterInn(); } catch(e) { console.warn('Inn error:', e); notify('Inn temporarily unavailable.'); } } else {
-        G.team.forEach(g => { g.hp = g.maxHp; g.ko = false; });
+      if (typeof enterInn === 'function') { enterInn(); } else {
+        G.team.forEach(g => { if (g) { g.hp = g.maxHp; g.ko = false; } });
         notify('Rested at the inn. Team fully healed!');
         saveGame();
         updateHUD();
