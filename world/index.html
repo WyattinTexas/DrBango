@@ -2228,7 +2228,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.7.1';
+const VERSION = 'v6.7.2';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -2851,6 +2851,9 @@ function updateRoamingEnemies() {
 
 function triggerRoamingBattle(enemy) {
   if (G.inBattle || G.team.length === 0) return;
+  // Close any open UI overlays before battle
+  document.querySelectorAll('.modal-overlay.active, #npcDialogueBox').forEach(el => { if (el.id === 'npcDialogueBox') el.style.display='none'; else el.classList.remove('active'); });
+
   const card = enemy.card;
   const warnings = [
     `${card.name} caught up to you!`,
@@ -3008,6 +3011,9 @@ function markHostileNPCDefeated(npcId) {
 
 function triggerHostileNPCBattle(npc) {
   if (G.inBattle || G.team.length === 0) return;
+  // Close any open UI overlays before battle
+  document.querySelectorAll('.modal-overlay.active, #npcDialogueBox').forEach(el => { if (el.id === 'npcDialogueBox') el.style.display='none'; else el.classList.remove('active'); });
+
 
   notify(npc.challenge);
   G.inBattle = true;
@@ -8037,6 +8043,9 @@ let B = null; // Battle state
 
 function triggerWildEncounter() {
   if (G.inBattle || G.team.length === 0) return;
+  // Close any open UI overlays before battle
+  document.querySelectorAll('.modal-overlay.active, #npcDialogueBox').forEach(el => { if (el.id === 'npcDialogueBox') el.style.display='none'; else el.classList.remove('active'); });
+
 
   const wildCard = getWildEncounter();
   if (!wildCard) return;
@@ -12393,7 +12402,7 @@ function tryInteract() {
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const cx = tileX + dx, cy = tileY + dy;
     if ((cx === arenaX1 || cx === arenaX2) && cy === arenaY1) {
-      if (typeof enterArena === 'function') { enterArena(); } else { openArena(); }
+      if (typeof enterArena === 'function') { try { enterArena(); } catch(e) { console.warn('Arena error:', e); notify('Arena temporarily unavailable.'); } } else { openArena(); }
       return;
     }
   }
@@ -14278,7 +14287,7 @@ function updateWorldBossBar() {
     return;
   }
 
-  bar.style.display = 'block'; bar.style.opacity = '1'; clearTimeout(window._bossBarHide); window._bossBarHide = setTimeout(() => { bar.style.opacity = '0'; setTimeout(() => { if (bar.style.opacity === '0') bar.style.display = 'none'; }, 600); }, 6000);
+  return; // BOSS UI REMOVED — bar.style.display = 'block'; clearTimeout(window._bossBarHide); window._bossBarHide = setTimeout(() => { bar.style.opacity = '0'; setTimeout(() => { if (bar.style.opacity === '0') bar.style.display = 'none'; }, 600); }, 6000);
   document.getElementById('bossBarName').textContent = worldBossState.bossName;
 
   const hpPct = Math.max(0, (worldBossState.hp / worldBossState.maxHp) * 100);
