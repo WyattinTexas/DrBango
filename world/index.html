@@ -16,8 +16,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #hud {
   position: fixed; top: 0; left: 0; right: 0;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 16px; background: rgba(0,0,0,0.7);
-  border-bottom: 1px solid #334; z-index: 100; font-size: 13px;
+  padding: 8px 16px; background: linear-gradient(180deg, rgba(0,0,0,0.75), rgba(0,0,0,0.6));
+  border-bottom: none; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 100; font-size: 13px;
 }
 #hud .hud-left { display: flex; gap: 16px; align-items: center; }
 #hud .hud-right { display: flex; gap: 12px; align-items: center; }
@@ -35,8 +35,8 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ═══════ XP BAR ═══════ */
 .xp-bar-wrap {
-  width: 60px; height: 6px; background: rgba(255,255,255,0.08);
-  border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06);
+  width: 60px; height: 8px; background: rgba(255,255,255,0.08);
+  border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06);
 }
 .xp-bar-fill {
   height: 100%; width: 0%;
@@ -669,6 +669,17 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 #loadingScreen p { color: #666; font-size: 14px; }
 .loading-bar { width: 200px; height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 16px; overflow: hidden; }
 .loading-fill { height: 100%; width: 0%; background: #4a7cd4; border-radius: 2px; transition: width 0.3s; }
+.loading-ghost {
+  width: 48px; height: 48px; margin-bottom: 16px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(100,160,255,0.25), rgba(100,160,255,0.05) 70%, transparent);
+  animation: loadingPulse 2s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(100,160,255,0.2);
+}
+@keyframes loadingPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; box-shadow: 0 0 20px rgba(100,160,255,0.15); }
+  50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 30px rgba(100,160,255,0.35); }
+}
+.loading-url { color: rgba(255,255,255,0.15); font-size: 10px; margin-top: 8px; font-family: monospace; letter-spacing: 1px; }
 
 /* ═══════ MINIMAP ═══════ */
 #minimap {
@@ -1620,10 +1631,12 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 <!-- LOADING -->
 <div id="loadingScreen">
+  <div class="loading-ghost"></div>
   <h1>BOO! Overworld Online</h1>
   <p>Entering the Spirit World...</p>
   <div class="loading-bar"><div class="loading-fill" id="loadingFill"></div></div>
-  <p style="margin-top:20px;font-size:11px;color:#444;" id="loadingVersion"></p>
+  <p style="margin-top:16px;font-size:12px;color:#556;font-weight:bold;" id="loadingVersion"></p>
+  <p class="loading-url">drbango.com/world</p>
 </div>
 
 <!-- HUD -->
@@ -2048,7 +2061,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.0.0';
+const VERSION = 'v6.1.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5090,6 +5103,23 @@ function render() {
           ctx.lineTo(sx + TILE/2 - 5, sy + 8);
           ctx.fill();
         }
+      } else if (tile === 2) { // Path — cobblestone detail
+        const pSeed = (tx * 7 + ty * 13) % 5;
+        ctx.fillStyle = 'rgba(130,115,85,0.4)';
+        ctx.beginPath(); ctx.roundRect(sx + 3 + (pSeed % 3), sy + 4, 14, 10, 3); ctx.fill();
+        ctx.fillStyle = 'rgba(110,95,70,0.35)';
+        ctx.beginPath(); ctx.roundRect(sx + 22 + (pSeed % 4), sy + 6, 16, 9, 3); ctx.fill();
+        ctx.fillStyle = 'rgba(120,105,80,0.3)';
+        ctx.beginPath(); ctx.roundRect(sx + 8, sy + 20 + (pSeed % 5), 18, 10, 3); ctx.fill();
+        ctx.fillStyle = 'rgba(140,125,95,0.35)';
+        ctx.beginPath(); ctx.roundRect(sx + 28 + (pSeed % 3), sy + 22, 12, 11, 3); ctx.fill();
+        // Subtle mortar lines
+        ctx.strokeStyle = 'rgba(80,70,50,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + TILE/3); ctx.lineTo(sx + TILE, sy + TILE/3);
+        ctx.moveTo(sx, sy + TILE*2/3); ctx.lineTo(sx + TILE, sy + TILE*2/3);
+        ctx.stroke();
       } else if (tile === 7 ) { // Mountain (fallback only)
         ctx.fillStyle = '#5a5a6a';
         ctx.beginPath();
@@ -5232,11 +5262,26 @@ function render() {
         ctx.fillStyle = `rgb(${138 + iv}, ${184 + iv}, ${216 + iv})`;
         ctx.fillRect(sx, sy, TILE, TILE);
       } else if (tile === 9 ) { // Grass (fallback only)
-        // Subtle grass texture
-        if ((tx + ty) % 2 === 0) {
-          ctx.fillStyle = 'rgba(80,140,50,0.3)';
-          ctx.fillRect(sx + 4, sy + 12, 2, 4);
-          ctx.fillRect(sx + 18, sy + 6, 2, 5);
+        // Grass blade strokes seeded by tile position
+        ctx.strokeStyle = 'rgba(60,120,35,0.5)';
+        ctx.lineWidth = 1;
+        const gSeed1 = ((tx * 7 + ty * 13) % 37);
+        const gSeed2 = ((tx * 11 + ty * 23) % 31);
+        const gSeed3 = ((tx * 19 + ty * 5) % 29);
+        ctx.beginPath();
+        ctx.moveTo(sx + (gSeed1 % 36) + 4, sy + TILE - 2);
+        ctx.lineTo(sx + (gSeed1 % 36) + 6, sy + TILE - 8 - (gSeed1 % 4));
+        ctx.moveTo(sx + (gSeed2 % 32) + 6, sy + TILE - 2);
+        ctx.lineTo(sx + (gSeed2 % 32) + 4, sy + TILE - 7 - (gSeed2 % 5));
+        ctx.moveTo(sx + (gSeed3 % 28) + 10, sy + TILE - 2);
+        ctx.lineTo(sx + (gSeed3 % 28) + 12, sy + TILE - 9 - (gSeed3 % 3));
+        ctx.stroke();
+        // Subtle lighter highlight patch
+        if ((tx + ty) % 3 === 0) {
+          ctx.fillStyle = 'rgba(120,180,70,0.12)';
+          ctx.beginPath();
+          ctx.arc(sx + TILE/2 + (gSeed1 % 10) - 5, sy + TILE/2, 6, 0, Math.PI * 2);
+          ctx.fill();
         }
       } else if (tile === 10) { // Flowers
         ctx.fillStyle = '#c27ba0';
@@ -5557,11 +5602,20 @@ function render() {
         ctx.arc(bx + bw - 17, by + bh * 0.42, 5, Math.PI, 0);
         ctx.fill();
       } else if (tile === 0 ) { // Snow detail (fallback only)
-        // Subtle snow texture
-        if ((tx + ty) % 3 === 0) {
-          ctx.fillStyle = 'rgba(255,255,255,0.1)';
-          ctx.fillRect(sx + 8, sy + 8, 2, 2);
+        // Snowflake dots seeded by position
+        const snowSeed = (tx * 17 + ty * 31) % 7;
+        if (snowSeed < 3) {
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.beginPath(); ctx.arc(sx + ((tx * 13) % 30) + 6, sy + ((ty * 19) % 28) + 6, 1.2, 0, Math.PI * 2); ctx.fill();
         }
+        if (snowSeed < 2) {
+          ctx.fillStyle = 'rgba(255,255,255,0.08)';
+          ctx.beginPath(); ctx.arc(sx + ((tx * 23) % 26) + 8, sy + ((ty * 11) % 24) + 12, 1, 0, Math.PI * 2); ctx.fill();
+        }
+        // Subtle tile-edge shadow for depth
+        ctx.fillStyle = 'rgba(0,0,0,0.03)';
+        ctx.fillRect(sx, sy + TILE - 2, TILE, 2);
+        ctx.fillRect(sx + TILE - 2, sy, 2, TILE);
       }
 
       // Grid lines (subtle)
