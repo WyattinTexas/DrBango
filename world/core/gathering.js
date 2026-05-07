@@ -728,3 +728,157 @@ function renderSurveyRing(ctx, camX, camY, time) {
   ctx.stroke();
 }
 
+// ═══════ GOO FEEDING ENCOUNTERS — peaceful creatures near encounter zones ═══════
+const GOOS = [];
+const GOO_MAX = 5;
+const GOO_FEED_RANGE = 1.5; // tiles
+
+const GOO_COLORS = ['#88ff88', '#88bbff', '#ffbb88', '#ff88ff'];
+const GOO_REWARDS = [
+  { id: 'frost_shard', name: 'Frost Shard' },
+  { id: 'ember_dust', name: 'Ember Dust' },
+  { id: 'spirit_thread', name: 'Spirit Thread' },
+  { id: 'mask_fragment', name: 'Mask Fragment' },
+];
+const GOO_RARE_REWARDS = [
+  { id: 'frozen_crystal', name: 'Frozen Crystal' },
+  { id: 'volcanic_glass', name: 'Volcanic Glass' },
+  { id: 'ancient_wood', name: 'Ancient Wood' },
+];
+
+function spawnGoos() {
+  if (GOOS.length >= GOO_MAX) return;
+  for (const zone of ENCOUNTER_ZONES) {
+    if (Math.random() < 0.1 && GOOS.length < GOO_MAX) {
+      GOOS.push({
+        x: zone.x + Math.random() * zone.w,
+        y: zone.y + Math.random() * zone.h,
+        color: GOO_COLORS[Math.floor(Math.random() * GOO_COLORS.length)],
+        hungry: true,
+        fedCount: 0,
+        spawnedAt: Date.now(),
+        bouncePhase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+}
+setInterval(spawnGoos, 20000);
+
+function feedNearbyGoo() {
+  if (G.inBattle) return;
+  const px = G.x, py = G.y;
+
+  for (let i = GOOS.length - 1; i >= 0; i--) {
+    const goo = GOOS[i];
+    const dist = Math.sqrt((goo.x - px) ** 2 + (goo.y - py) ** 2);
+    if (dist > GOO_FEED_RANGE) continue;
+    if (!goo.hungry) { notify('This Goo is already full!'); return; }
+
+    // Check if player has any essences to feed
+    if (!G.essences || G.essences.length === 0) {
+      notify('You need essences to feed a Goo!');
+      return;
+    }
+
+    // Consume one essence (remove the last one)
+    const fedEssence = G.essences.pop();
+    goo.fedCount++;
+    SFX.craftSuccess();
+
+    if (goo.fedCount >= 3) {
+      // Final feeding — rare reward and despawn
+      const rare = GOO_RARE_REWARDS[Math.floor(Math.random() * GOO_RARE_REWARDS.length)];
+      if (!G.materials) G.materials = {};
+      G.materials[rare.id] = (G.materials[rare.id] || 0) + 1;
+      notify(`Goo is overjoyed! It gifts you a rare ${rare.name} and fades away happily!`);
+      GOOS.splice(i, 1);
+    } else {
+      // Normal feeding — give a common material
+      const reward = GOO_REWARDS[Math.floor(Math.random() * GOO_REWARDS.length)];
+      if (!G.materials) G.materials = {};
+      G.materials[reward.id] = (G.materials[reward.id] || 0) + 1;
+      goo.hungry = false;
+      // Goo becomes hungry again after 10 seconds
+      setTimeout(() => { goo.hungry = true; }, 10000);
+      notify(`Goo happily munches! It gives you ${reward.name}! (${goo.fedCount}/3 feedings)`);
+    }
+
+    addProfessionXP('exploration', 4);
+    saveGame();
+    return;
+  }
+
+  notify('No Goo nearby to feed.');
+}
+
+function renderGoos(ctx, camX, camY, time) {
+  for (const goo of GOOS) {
+    const gx = goo.x * TILE - camX;
+    const gy = goo.y * TILE - camY;
+
+    // Skip if off screen
+    if (gx < -40 || gx > canvas.width + 40 || gy < -40 || gy > canvas.height + 40) continue;
+
+    // Bounce animation
+    const bounce = Math.sin(time * 3 + goo.bouncePhase) * 4;
+    const drawY = gy + bounce;
+
+    // Body — small blob
+    const bodyRadius = goo.hungry ? 8 : 10;
+    const grad = ctx.createRadialGradient(gx + TILE / 2, drawY + TILE / 2, 2, gx + TILE / 2, drawY + TILE / 2, bodyRadius);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(0.5, goo.color);
+    grad.addColorStop(1, goo.color + '88');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(gx + TILE / 2, drawY + TILE / 2, bodyRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    const eyeY = drawY + TILE / 2 - 2;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(gx + TILE / 2 - 3, eyeY, 2.5, 0, Math.PI * 2);
+    ctx.arc(gx + TILE / 2 + 3, eyeY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Pupils
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(gx + TILE / 2 - 3, eyeY, 1.2, 0, Math.PI * 2);
+    ctx.arc(gx + TILE / 2 + 3, eyeY, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Happy face when fed (not hungry)
+    if (!goo.hungry) {
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(gx + TILE / 2, drawY + TILE / 2 + 1, 3, 0, Math.PI);
+      ctx.stroke();
+    }
+
+    // Glow when nearby player
+    const dist = Math.sqrt((goo.x - G.x) ** 2 + (goo.y - G.y) ** 2);
+    if (dist < GOO_FEED_RANGE) {
+      ctx.strokeStyle = goo.color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.4 + Math.sin(time * 4) * 0.2;
+      ctx.beginPath();
+      ctx.arc(gx + TILE / 2, drawY + TILE / 2, bodyRadius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Prompt
+      ctx.fillStyle = goo.color;
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(goo.hungry ? '[E] Feed' : 'Full!', gx + TILE / 2, drawY - 4);
+    }
+  }
+
+  // Despawn old goos (5 minutes)
+  for (let i = GOOS.length - 1; i >= 0; i--) {
+    if (Date.now() - GOOS[i].spawnedAt > 300000) GOOS.splice(i, 1);
+  }
+}
+

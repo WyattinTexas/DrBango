@@ -1760,12 +1760,23 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   #minimap { display: none !important; }
   #chatBox { width: 180px; font-size: 10px; }
   #chatMessages { height: 60px; }
-  .battle-arena { max-height: 100vh; }
+  .battle-arena { padding: 8px; max-height: 100vh; }
   .battle-sprite img { width: 100px; height: 100px; }
   .battle-narrator { padding: 8px; min-height: 60px; }
   .narrator-text { font-size: 13px; }
-  .battle-btn { padding: 10px 20px; font-size: 16px; }
+  .battle-btn { padding: 10px 20px; font-size: 16px; min-height: 44px; }
   .die { width: 34px; height: 34px; font-size: 16px; }
+  .commit-btn { padding: 6px 10px; font-size: 11px; min-height: 36px; }
+  .sideline-ghost { width: 80px; }
+  .sideline-ghost .sl-art { width: 30px; height: 30px; }
+  .sideline-ghost .sl-ability-desc { display: none; }
+
+  /* 3D dice fallback to flat on small screens */
+  .die-physics { perspective: none !important; }
+  .die-cube { transform-style: flat !important; }
+  .die-face { backface-visibility: visible !important; }
+  .face-back, .face-right, .face-left, .face-top, .face-bottom { display: none !important; }
+  .face-front { transform: none !important; }
 
   #hudHamburger { display: inline-block; }
   #hud .hud-right .hud-btn,
@@ -5633,6 +5644,9 @@ function render() {
   // Draw world boss
   renderWorldBoss(ctx, camX, camY, time);
 
+  // Draw Goos
+  if (typeof renderGoos === 'function') renderGoos(ctx, camX, camY, time);
+
   // Draw party tethers (gold dashed lines between party members)
   if (typeof drawPartyTethers === 'function') {
     drawPartyTethers(ctx, camX, camY, TILE);
@@ -7063,6 +7077,17 @@ function tryInteract() {
       }, 80);
       saveGame();
       return;
+    }
+  }
+
+  // Check for nearby Goos to feed
+  if (typeof GOOS !== 'undefined' && GOOS.length > 0) {
+    for (const goo of GOOS) {
+      const dist = Math.sqrt((G.x - goo.x) ** 2 + (G.y - goo.y) ** 2);
+      if (dist < GOO_FEED_RANGE) {
+        feedNearbyGoo();
+        return;
+      }
     }
   }
 

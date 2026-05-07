@@ -2230,6 +2230,9 @@ function battleRoll() {
       showDmgFloat('enemy', dmg, false);
       spriteHitReact('enemy');
 
+      // Check Boss Phase 2 trigger
+      if (typeof checkBossPhase2 === 'function') checkBossPhase2();
+
       // Splinter (101): Toxic Fumes — after winning, deal 1 damage before every roll
       if (pg.id === 101 && !B.splinterActivePlayer) {
         B.splinterActivePlayer = true;
@@ -2447,6 +2450,15 @@ function battleRoll() {
 
     } else if (winner === 'b') {
       let dmg = eRoll.damage;
+
+      // Boss Phase 2: +1 damage to all enemy rolls
+      if (typeof getBossPhase2DamageBonus === 'function') {
+        const phase2Bonus = getBossPhase2DamageBonus();
+        if (phase2Bonus > 0) {
+          dmg += phase2Bonus;
+          B.log.push({ text: `Phase 2: +${phase2Bonus} damage!`, type: 'damage' });
+        }
+      }
 
       // ── ENEMY WIN BONUS ABILITIES ──
       // Wim (65) enemy: Slash — +5 damage when all dice are odd
@@ -3161,6 +3173,9 @@ function endBattle(won) {
     if (damageDealt > 0) {
       endWorldBossBattle(damageDealt);
     }
+
+    // Reset Boss Phase 2 state
+    if (typeof resetBossPhase2 === 'function') resetBossPhase2();
 
     document.getElementById('battleTitle').style.color = '';
     G.inBattle = false;

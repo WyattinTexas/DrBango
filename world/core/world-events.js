@@ -401,17 +401,30 @@ function renderWorldBoss(ctx, camX, camY, time) {
   // Skip if off screen
   if (bx < -100 || bx > canvas.width + 100 || by < -100 || by > canvas.height + 100) return;
 
-  // Pulsing aura (3x normal size)
-  const pulseSize = 40 + Math.sin(time * 2) * 8;
-  const auraAlpha = 0.15 + Math.sin(time * 3) * 0.1;
-  ctx.fillStyle = `rgba(255,40,40,${auraAlpha})`;
+  // Phase 2 visual: intense red glow aura
+  const isPhase2 = worldBossState.hp <= worldBossState.maxHp * 0.5;
+
+  // Pulsing aura (3x normal size, more intense in Phase 2)
+  const pulseSize = isPhase2 ? (50 + Math.sin(time * 4) * 12) : (40 + Math.sin(time * 2) * 8);
+  const auraAlpha = isPhase2 ? (0.3 + Math.sin(time * 5) * 0.15) : (0.15 + Math.sin(time * 3) * 0.1);
+  ctx.fillStyle = isPhase2 ? `rgba(255,0,0,${auraAlpha})` : `rgba(255,40,40,${auraAlpha})`;
   ctx.beginPath();
   ctx.arc(bx + TILE/2, by + TILE/2, pulseSize, 0, Math.PI * 2);
   ctx.fill();
 
+  // Phase 2 outer ring
+  if (isPhase2) {
+    const ringAlpha = 0.2 + Math.sin(time * 6) * 0.15;
+    ctx.strokeStyle = `rgba(255,0,0,${ringAlpha})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(bx + TILE/2, by + TILE/2, pulseSize + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   // Inner glow
-  const innerAlpha = 0.25 + Math.sin(time * 4) * 0.1;
-  ctx.fillStyle = `rgba(255,100,40,${innerAlpha})`;
+  const innerAlpha = isPhase2 ? (0.4 + Math.sin(time * 6) * 0.15) : (0.25 + Math.sin(time * 4) * 0.1);
+  ctx.fillStyle = isPhase2 ? `rgba(255,20,20,${innerAlpha})` : `rgba(255,100,40,${innerAlpha})`;
   ctx.beginPath();
   ctx.arc(bx + TILE/2, by + TILE/2, 24, 0, Math.PI * 2);
   ctx.fill();
@@ -464,6 +477,48 @@ function renderWorldBoss(ctx, camX, camY, time) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillText('[E] Fight Boss', bx + TILE/2, by - 40);
   }
+}
+
+// ═══════ BOSS PHASE 2 MECHANICS ═══════
+let bossPhase2Active = false;
+
+function checkBossPhase2() {
+  if (!B || !B.isWorldBoss) return;
+  if (bossPhase2Active) return; // already in Phase 2
+
+  const eg = typeof activeEnemyGhost === 'function' ? activeEnemyGhost() : null;
+  if (!eg) return;
+
+  // Trigger Phase 2 at 50% HP
+  if (eg.hp <= eg.maxHp * 0.5 && eg.hp > 0) {
+    bossPhase2Active = true;
+    B.bossPhase2 = true;
+
+    // Log the phase transition
+    if (B.log) {
+      B.log.push({ text: `${eg.name} enters Phase 2!`, type: 'damage' });
+    }
+    notify(`${eg.name} enters Phase 2! +1 damage, healing blocked!`);
+
+    if (typeof SFX !== 'undefined' && SFX.hit) SFX.hit();
+    if (typeof battleShake === 'function') battleShake();
+    if (typeof renderBattle === 'function') renderBattle();
+  }
+}
+
+// Apply Phase 2 damage bonus (+1 to all enemy rolls)
+function getBossPhase2DamageBonus() {
+  return (B && B.bossPhase2) ? 1 : 0;
+}
+
+// Check if boss healing should be blocked
+function isBossHealingBlocked() {
+  return !!(B && B.bossPhase2);
+}
+
+// Reset Phase 2 state when battle ends
+function resetBossPhase2() {
+  bossPhase2Active = false;
 }
 
 // Check boss every 10 seconds
