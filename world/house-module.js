@@ -411,8 +411,8 @@ function renderHouse(ctx, W, H) {
     ctx.fillText(houseNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (houseDialogueActive && houseDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (houseDialogueActive && houseDialogueData && typeof showComm !== 'function') {
     drawHouseDialogue(ctx, W, H);
   }
 

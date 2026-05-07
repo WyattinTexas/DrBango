@@ -26,8 +26,86 @@ const NPC_COMM_PORTRAITS = {
   'Maren':    { art: '../testroom/art/originals/Tabitha.png',  color: '#d4a44a' },
   'Leon':     { art: '../testroom/art/originals/FangOutside.png', color: '#cc5544' },
   'Valkin':   { art: '../testroom/art/originals/ValkinTheGrand.png', color: '#aa44ff' },
+  // Cantina NPCs
+  'Grix':             { art: '../testroom/art/originals/Greg.png',      color: '#daa520' },
+  'Grix the Bartender': { art: '../testroom/art/originals/Greg.png',    color: '#daa520' },
+  'Lyra':             { art: '../testroom/art/originals/Sonya.png',     color: '#c080e0' },
+  'Lyra the Bard':    { art: '../testroom/art/originals/Sonya.png',     color: '#c080e0' },
+  'Old Frost':        { art: '../testroom/art/originals/Hermit.png',    color: '#88bbdd' },
+  'Old Frost the Lorekeeper': { art: '../testroom/art/originals/Hermit.png', color: '#88bbdd' },
+  '???':              { art: '../testroom/art/originals/Shade.png',     color: '#4a4a6a' },
+  '??? the Hooded Figure': { art: '../testroom/art/originals/Shade.png', color: '#4a4a6a' },
+  'The Bar':          { art: '../testroom/art/originals/Greg.png',      color: '#daa520' },
+  'Dice Table':       { art: '../testroom/art/originals/Charlie.png',   color: '#90b060' },
+  'Locked Door':      { art: '../testroom/art/originals/DarkWing.png',  color: '#8a4a4a' },
+  'The Firepit':      { art: '../testroom/art/gary.png',                color: '#ff8844' },
+  // Inn NPCs
+  'Mara':             { art: '../testroom/art/originals/Tabitha.png',   color: '#d4956a' },
+  'Mara the Innkeeper': { art: '../testroom/art/originals/Tabitha.png', color: '#d4956a' },
+  'Bramble':          { art: '../testroom/art/originals/Chester.png',   color: '#8a6040' },
+  'Bramble the Cook': { art: '../testroom/art/originals/Chester.png',   color: '#8a6040' },
+  'Reception Desk':   { art: '../testroom/art/originals/Tabitha.png',   color: '#d4956a' },
+  'The Hearth':       { art: '../testroom/art/gary.png',                color: '#ff9944' },
+  'Cozy Bed':         { art: '../testroom/art/originals/LittleBoo.png', color: '#7a8aaa' },
+  'Old Book':         { art: '../testroom/art/originals/AncientLibrarian.png', color: '#8a7a5a' },
+  'Stew Pot':         { art: '../testroom/art/originals/Chester.png',   color: '#aa7744' },
+  'Kitchen Counter':  { art: '../testroom/art/originals/Chester.png',   color: '#8a6a3a' },
+  // Workshop NPCs
+  'Smith Ember the Master Smith': { art: '../testroom/art/gary.png', color: '#cc6633' },
+  'Pip the Apprentice':     { art: '../testroom/art/originals/Pip.png',       color: '#88bb55' },
+  'The Anvil':              { art: '../testroom/art/gary.png',                color: '#cc9944' },
+  'The Forge':              { art: '../testroom/art/gary.png',                color: '#ff8844' },
+  'Workbench':              { art: '../testroom/art/originals/Greg.png',      color: '#8a6a3a' },
+  'Quenching Trough':       { art: '../testroom/art/originals/Wim.png',       color: '#6688aa' },
+  'Schematic Table':        { art: '../testroom/art/originals/AncientLibrarian.png', color: '#bbaa77' },
+  'Display Case':           { art: '../testroom/art/originals/Sparky.png',    color: '#aaaacc' },
+  'Material Storage':       { art: '../testroom/art/originals/Chester.png',   color: '#bb8844' },
+  'Supply Crate':           { art: '../testroom/art/originals/Chester.png',   color: '#7a5a2a' },
+  'The Bellows':            { art: '../testroom/art/gary.png',                color: '#8a7040' },
+  'Tool Rack':              { art: '../testroom/art/gary.png',                color: '#777777' },
+  'Coal Bin':               { art: '../testroom/art/originals/DarkWing.png',  color: '#333333' },
+  // Arena NPCs
+  'Kael':                   { art: '../testroom/art/originals/Hugo.png',      color: '#cc4444' },
+  'Kael the Arena Master':  { art: '../testroom/art/originals/Hugo.png',      color: '#cc4444' },
+  'Vex':                    { art: '../testroom/art/originals/Wanderer.png',  color: '#88aacc' },
+  'Vex the Old Champion':   { art: '../testroom/art/originals/Wanderer.png',  color: '#88aacc' },
+  'Finn the Bookie':        { art: '../testroom/art/finn.png',                color: '#aa9944' },
+  'Trophy Case':            { art: '../testroom/art/originals/Hugo.png',      color: '#daa520' },
+  'Weapon Rack':            { art: '../testroom/art/originals/Hugo.png',      color: '#8899aa' },
+  "Challenger's Gate":      { art: '../testroom/art/originals/DarkWing.png',  color: '#667788' },
+  'Betting Desk':           { art: '../testroom/art/finn.png',                color: '#aa9944' },
+  'Torch Pillar':           { art: '../testroom/art/gary.png',                color: '#ff8844' },
+  // Castle NPCs
+  "Valkin's Echo":          { art: '../testroom/art/originals/ValkinTheGrand.png', color: '#8040c0' },
+  "Valkin's Echo the Phantom": { art: '../testroom/art/originals/ValkinTheGrand.png', color: '#8040c0' },
+  'Archivist Maren':        { art: '../testroom/art/originals/Tabitha.png',   color: '#7a8a6a' },
+  'Archivist Maren the Imprisoned Scholar': { art: '../testroom/art/originals/Tabitha.png', color: '#7a8a6a' },
+  'The Throne':             { art: '../testroom/art/originals/ValkinTheGrand.png', color: '#8040c0' },
+  'Ancient Tome':           { art: '../testroom/art/originals/AncientLibrarian.png', color: '#6a7a9a' },
+  'Treasure Chest':         { art: '../testroom/art/originals/Charlie.png',   color: '#daa520' },
+  'Dark Altar':             { art: '../testroom/art/originals/ValkinTheGrand.png', color: '#a040a0' },
+  'Prison Cell':            { art: '../testroom/art/originals/Shade.png',     color: '#6a6a7a' },
+  // House objects
+  'Your Bed':               { art: '../testroom/art/originals/LittleBoo.png', color: '#8899cc' },
+  'Trophy Chest':           { art: '../testroom/art/originals/Charlie.png',   color: '#daa520' },
+  'Fireplace':              { art: '../testroom/art/gary.png',                color: '#ff8844' },
+  'Table':                  { art: '../testroom/art/originals/Greg.png',      color: '#7a5a30' },
+  'Window':                 { art: '../testroom/art/originals/Sky.png',       color: '#aaccee' },
+  // Trading Post
+  'Trade Counter':          { art: '../testroom/art/originals/Greg.png',      color: '#b8860b' },
+  'Goods Display':          { art: '../testroom/art/originals/Chester.png',   color: '#8b7355' },
+  'Display Table':          { art: '../testroom/art/originals/Chester.png',   color: '#8b7355' },
+  // Adventure / Dialogue Sheet NPCs
+  'Toby':             { art: '../testroom/art/originals/Toby.png',      color: '#44aaff' },
+  'Ember':            { art: '../testroom/art/gary.png',                color: '#ff6633' },
+  'Frostweaver':      { art: '../testroom/art/originals/Wim.png',       color: '#88bbdd' },
+  'Slag':             { art: '../testroom/art/originals/Haywire.png',   color: '#ff8844' },
+  'The Whisper':      { art: '../testroom/art/originals/Shade.png',     color: '#6a4a8a' },
+  'Ancient Spirit':   { art: '../testroom/art/originals/AncientLibrarian.png', color: '#c0a040' },
+  'Hooded Figure':    { art: '../testroom/art/originals/DarkWing.png',  color: '#4a4a6a' },
+  'Narrator':         { art: '../testroom/art/originals/Toby.png',      color: '#88aacc' },
   // System / narrator
-  'System':   { art: '../testroom/art/originals/Toby.png', color: '#44aaff' },
+  'System':           { art: '../testroom/art/originals/Toby.png',      color: '#44aaff' },
 };
 
 // ═══════ COMM STATE ═══════
@@ -486,4 +564,64 @@ function showHostileNPCComm(hnpc) {
   const line = hnpc.dialogue[Math.floor(Math.random() * hnpc.dialogue.length)];
   showComm(hnpc.name, line, { persist: true });
   showNPCSpeechBubble(hnpc, line);
+}
+
+// ═══════ CANTINA & INN MODULE OVERRIDES ═══════
+
+// Override cantina dialogue to use Spirit Comms
+const _origShowCantinaDialogue = typeof showCantinaDialogue === 'function' ? showCantinaDialogue : null;
+function showCantinaDialogue(name, text, color) {
+  // Still set the state flags so the module knows dialogue is active
+  cantinaDialogueActive = true;
+  cantinaDialogueData = { name, text, color: color || '#daa520' };
+  // Route through Spirit Comms
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeCantinaDialogue(); } });
+}
+
+// Override inn dialogue to use Spirit Comms
+const _origShowInnDialogue = typeof showInnDialogue === 'function' ? showInnDialogue : null;
+function showInnDialogue(name, text, color) {
+  innDialogueActive = true;
+  innDialogueData = { name, text, color: color || '#d4956a' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeInnDialogue(); } });
+}
+
+// Override workshop dialogue
+const _origShowWorkshopDialogue = typeof showWorkshopDialogue === 'function' ? showWorkshopDialogue : null;
+function showWorkshopDialogue(name, text, color) {
+  workshopDialogueActive = true;
+  workshopDialogueData = { name, text, color: color || '#cc6633' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeWorkshopDialogue(); } });
+}
+
+// Override arena dialogue
+const _origShowArenaDialogue = typeof showArenaDialogue === 'function' ? showArenaDialogue : null;
+function showArenaDialogue(name, text, color) {
+  arenaDialogueActive = true;
+  arenaDialogueData = { name, text, color: color || '#cc4444' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeArenaDialogue(); } });
+}
+
+// Override castle dialogue
+const _origShowCastleDialogue = typeof showCastleDialogue === 'function' ? showCastleDialogue : null;
+function showCastleDialogue(name, text, color) {
+  castleDialogueActive = true;
+  castleDialogueData = { name, text, color: color || '#8040c0' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeCastleDialogue(); } });
+}
+
+// Override trading post dialogue
+const _origShowTradingPostDialogue = typeof showTradingPostDialogue === 'function' ? showTradingPostDialogue : null;
+function showTradingPostDialogue(name, text, color) {
+  tradingPostDialogueActive = true;
+  tradingPostDialogueData = { name, text, color: color || '#b8860b' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeTradingPostDialogue(); } });
+}
+
+// Override house dialogue
+const _origShowHouseDialogue = typeof showHouseDialogue === 'function' ? showHouseDialogue : null;
+function showHouseDialogue(name, text, color) {
+  houseDialogueActive = true;
+  houseDialogueData = { name, text, color: color || '#8899cc' };
+  showComm(name, text, { color: color, persist: true, onDismiss: () => { closeHouseDialogue(); } });
 }

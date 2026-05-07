@@ -546,8 +546,8 @@ function renderArena(ctx, W, H) {
     ctx.fillText(arenaNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (arenaDialogueActive && arenaDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (arenaDialogueActive && arenaDialogueData && typeof showComm !== 'function') {
     drawArenaDialogue(ctx, W, H);
   }
 

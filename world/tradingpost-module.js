@@ -527,8 +527,8 @@ function renderTradingPost(ctx, W, H) {
     ctx.fillText(tradingPostNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (tradingPostDialogueActive && tradingPostDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (tradingPostDialogueActive && tradingPostDialogueData && typeof showComm !== 'function') {
     drawTradingPostDialogue(ctx, W, H);
   }
 

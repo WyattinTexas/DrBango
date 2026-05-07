@@ -544,8 +544,8 @@ function renderWorkshop(ctx, W, H) {
     ctx.fillText(workshopNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (workshopDialogueActive && workshopDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (workshopDialogueActive && workshopDialogueData && typeof showComm !== 'function') {
     drawWorkshopDialogue(ctx, W, H);
   }
 

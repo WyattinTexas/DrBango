@@ -529,8 +529,8 @@ function renderCantina(ctx, W, H) {
     ctx.fillText(cantinaNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (cantinaDialogueActive && cantinaDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (cantinaDialogueActive && cantinaDialogueData && typeof showComm !== 'function') {
     drawCantinaDialogue(ctx, W, H);
   }
 

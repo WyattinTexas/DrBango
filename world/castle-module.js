@@ -548,8 +548,8 @@ function renderCastle(ctx, W, H) {
     ctx.fillText(castleNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (castleDialogueActive && castleDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (castleDialogueActive && castleDialogueData && typeof showComm !== 'function') {
     drawCastleDialogue(ctx, W, H);
   }
 

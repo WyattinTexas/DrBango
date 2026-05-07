@@ -531,8 +531,8 @@ function renderInn(ctx, W, H) {
     ctx.fillText(innNotification.text, W / 2, H - 40);
   }
 
-  // ─── Dialogue overlay ───
-  if (innDialogueActive && innDialogueData) {
+  // ─── Dialogue overlay (skip canvas draw if Spirit Comms is handling it) ───
+  if (innDialogueActive && innDialogueData && typeof showComm !== 'function') {
     drawInnDialogue(ctx, W, H);
   }
 
