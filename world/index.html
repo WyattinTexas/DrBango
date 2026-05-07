@@ -653,6 +653,34 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 @keyframes ambientIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes ambientOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px); } }
 
+/* ═══════ DISCOVERY NOTIFICATION (golden) ═══════ */
+.notif-discovery {
+  background: rgba(30,25,10,0.95); border: 1px solid rgba(218,165,32,0.6); border-radius: 8px;
+  padding: 10px 24px; font-size: 13px; color: #f0d860;
+  text-shadow: 0 0 8px rgba(218,165,32,0.4);
+  animation: discoveryIn 0.4s cubic-bezier(0.22,1,0.36,1), discoveryOut 0.4s ease 3.6s forwards;
+}
+@keyframes discoveryIn { from { opacity: 0; transform: translateY(-12px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes discoveryOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
+
+/* ═══════ REGION TRANSITION OVERLAY ═══════ */
+#regionTransitionOverlay {
+  position: fixed; inset: 0; z-index: 900; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s ease;
+}
+#regionTransitionOverlay.active { opacity: 1; }
+
+/* ═══════ SIGNPOST TOOLTIP ═══════ */
+#signpostTooltip {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(40,30,15,0.92); border: 1px solid rgba(160,130,70,0.5);
+  border-radius: 6px; padding: 6px 16px; font-size: 12px; color: #d4c8a0;
+  z-index: 200; pointer-events: none; white-space: nowrap;
+  opacity: 0; transition: opacity 0.3s;
+  font-family: 'Segoe UI', sans-serif; letter-spacing: 0.3px;
+}
+#signpostTooltip.visible { opacity: 1; }
+
 /* ═══════ LORE ITEM STYLING ═══════ */
 .lore-entry {
   background: rgba(218,165,32,0.08); border: 1px solid rgba(218,165,32,0.2); border-radius: 6px;
@@ -1938,6 +1966,9 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">&#129704; Spirit Traps <span class="inv-toggle">&#9660;</span></h3>
   <div class="inv-section-content collapsed" id="trapsSectionContent"><div id="trapList"></div></div>
 
+  <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">&#127758; Exploration <span class="inv-toggle">&#9660;</span></h3>
+  <div class="inv-section-content collapsed" id="explorationSectionContent"><div id="explorationStats"></div></div>
+
   <h3 class="inv-section-header collapsed" onclick="toggleInvSection(this)" style="margin-top:16px;">Guild <span class="inv-toggle">&#9660;</span></h3>
   <div class="inv-section-content collapsed" id="guildSectionContent"><div id="inventoryGuildInfo"></div></div>
 </div>
@@ -2070,6 +2101,10 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 <!-- REGION BANNER -->
 <div id="regionBanner" class="frost"></div>
+<!-- REGION TRANSITION OVERLAY -->
+<div id="regionTransitionOverlay"></div>
+<!-- SIGNPOST TOOLTIP -->
+<div id="signpostTooltip"></div>
 
 <!-- CANTINA OVERLAY -->
 <div id="cantinaOverlay">
@@ -2178,7 +2213,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.6.0';
+const VERSION = 'v6.7.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -3755,6 +3790,7 @@ function checkRegionBanner() {
     region = 'frost_valley';
   }
   if (region !== currentRegion) {
+    const prevRegion = currentRegion;
     currentRegion = region;
     advanceWeeklyChallenge('region', region);
     const banner = document.getElementById('regionBanner');
@@ -3773,6 +3809,19 @@ function checkRegionBanner() {
     }
     banner.classList.add('show');
     setTimeout(() => banner.classList.remove('show'), 3000);
+
+    // Region transition color wash
+    const overlay = document.getElementById('regionTransitionOverlay');
+    let transColor = null;
+    if (region === 'dark_castle') transColor = 'rgba(60,20,80,0.35)';
+    else if (region === 'volcanic_isles') transColor = 'rgba(200,100,20,0.25)';
+    else if (region === 'rolling_hills' && prevRegion === 'frost_valley') transColor = 'rgba(180,140,40,0.2)';
+    else if (region === 'frost_valley') transColor = 'rgba(100,160,255,0.2)';
+    if (transColor) {
+      overlay.style.background = transColor;
+      overlay.classList.add('active');
+      setTimeout(() => overlay.classList.remove('active'), 500);
+    }
   }
 }
 
@@ -4449,6 +4498,19 @@ const VIEWPOINTS = [
   { id: 'vp_3', x: 25, y: 67, name: 'Southern Meadow', desc: 'Flowers stretch as far as you can see.' },
   { id: 'vp_4', x: 105, y: 3, name: 'Dark Castle Tower', desc: 'The entire Overworld is visible from Valkin\'s tower. Everything he wanted to control.' },
 ];
+
+// ═══════ PATH SIGNS ═══════
+const PATH_SIGNS = [
+  { x: 16, y: 15, text: '\u2191 Polaris Hub  \u2193 Rolling Hills  \u2192 Crystal Glade' },
+  { x: 28, y: 43, text: '\u2191 Frost Valley  \u2193 Meadowbrook' },
+  { x: 58, y: 21, text: '\u2190 Frost Valley  \u2192 Volcanic Isles' },
+  { x: 88, y: 20, text: '\u2190 Volcanic Isles  \u2192 Dark Castle' },
+  { x: 25, y: 55, text: '\u2191 Frost Valley  Meadowbrook \u2192' },
+  { x: 72, y: 20, text: 'Volcanic Settlement \u2191' },
+];
+
+// ═══════ FOOTPRINT TRAIL ═══════
+const footprints = [];
 
 // ═══════ AMBIENT EVENTS ═══════
 const AMBIENT_EVENTS = [
@@ -6844,6 +6906,41 @@ function render() {
     }
   }
 
+  // ═══════ FOOTPRINT TRAIL ═══════
+  for (const fp of footprints) {
+    const fpx = fp.x * TILE - camX;
+    const fpy = fp.y * TILE - camY;
+    if (fpx < -20 || fpx > W + 20 || fpy < -20 || fpy > H + 20) continue;
+    const age = (Date.now() - fp.time) / 3000; // 0..1
+    const alpha = 0.25 * (1 - age);
+    if (alpha <= 0) continue;
+    ctx.fillStyle = `rgba(180,160,120,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(fpx + TILE / 2, fpy + TILE / 2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ═══════ PATH SIGNS ═══════
+  for (const sign of PATH_SIGNS) {
+    const spx = sign.x * TILE - camX;
+    const spy = sign.y * TILE - camY;
+    if (spx < -60 || spx > W + 60 || spy < -60 || spy > H + 60) continue;
+    const dist = Math.sqrt((G.x - sign.x) ** 2 + (G.y - sign.y) ** 2);
+    if (dist < 8) {
+      const cx = spx + TILE / 2;
+      const cy = spy + TILE / 2;
+      // Wooden post
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(cx - 2, cy - 8, 4, 18);
+      // Cross board
+      ctx.fillStyle = '#8a6a3a';
+      ctx.fillRect(cx - 12, cy - 8, 24, 6);
+      // Top cap
+      ctx.fillStyle = '#9a7a4a';
+      ctx.fillRect(cx - 1, cy - 10, 2, 3);
+    }
+  }
+
   // ═══════ REGION CRYSTALS ═══════
   for (const crystal of REGION_CRYSTALS) {
     if (G.crystalsFound && G.crystalsFound.includes(crystal.id)) continue;
@@ -7402,8 +7499,29 @@ function gameLoop() {
         addProfessionXP('exploration', 1);
       }
 
+      // Footprint trail (10% chance per frame when moving)
+      if (Math.random() < 0.1) {
+        footprints.push({ x: G.x, y: G.y, time: Date.now() });
+      }
+      // Clean old footprints (fade after 3s)
+      while (footprints.length > 0 && Date.now() - footprints[0].time > 3000) footprints.shift();
+
       // Footstep sound (throttled)
       SFX.footstep();
+
+      // Check signpost proximity
+      const signpostEl = document.getElementById('signpostTooltip');
+      let nearSign = false;
+      for (const sign of PATH_SIGNS) {
+        const sd = Math.sqrt((G.x - sign.x) ** 2 + (G.y - sign.y) ** 2);
+        if (sd < 3) {
+          signpostEl.textContent = sign.text;
+          signpostEl.classList.add('visible');
+          nearSign = true;
+          break;
+        }
+      }
+      if (!nearSign) signpostEl.classList.remove('visible');
 
       // Check encounter zone (higher rate inside zones)
       if (tileAtNew === 6 && !G.inBattle && Math.random() < 0.008 * getEncounterRateMultiplier()) {
@@ -11891,6 +12009,9 @@ function renderInventory() {
     gearEl2.innerHTML += `<button class="quick-craft-btn" onclick="openQuickCraft()">🔧 Quick Craft (Common)</button>`;
   }
 
+  // Exploration stats
+  renderExplorationStats();
+
   // Guild info
   renderInventoryGuildInfo();
 
@@ -12049,7 +12170,7 @@ function tryInteract() {
       if (!G.crystalsFound) G.crystalsFound = [];
       G.crystalsFound.push(crystal.id);
       addProfessionXP('exploration', 50);
-      notify(`💎 ${crystal.name} collected! (+50 Exploration XP) [${G.crystalsFound.length}/4]`);
+      notifyDiscovery(`💎 ${crystal.name} collected! (+50 Exploration XP) [${G.crystalsFound.length}/4]`);
       SFX.notify();
       saveGame();
       return;
@@ -12074,7 +12195,7 @@ function tryInteract() {
         rewardText += `, +1 mysterious essence`;
       }
       addProfessionXP('exploration', 20);
-      notify(`Treasure chest opened! ${rewardText}`);
+      notifyDiscovery(`Treasure chest opened! ${rewardText}`);
       SFX.notify();
       saveGame();
       return;
@@ -12089,7 +12210,7 @@ function tryInteract() {
       if (!G.viewpointsDiscovered) G.viewpointsDiscovered = [];
       G.viewpointsDiscovered.push(vp.id);
       addProfessionXP('exploration', 25);
-      notify(`🔭 You discovered: ${vp.name}! — "${vp.desc}" (+25 Exploration XP)`);
+      notifyDiscovery(`🔭 You discovered: ${vp.name}! — "${vp.desc}" (+25 Exploration XP)`);
       SFX.notify();
       // Brief camera zoom-out effect
       const origTile = TILE;
@@ -12606,6 +12727,17 @@ function notify(text) {
   setTimeout(() => el.remove(), 3000);
 }
 
+// ═══════ DISCOVERY NOTIFICATION (golden style) ═══════
+function notifyDiscovery(text) {
+  SFX.notify();
+  const container = document.getElementById('notifContainer');
+  const el = document.createElement('div');
+  el.className = 'notif-discovery';
+  el.textContent = text;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
 // ═══════ CRAFT REVEAL ═══════
 function showCraftReveal(itemName, qualLabel, qualColor, crafterName) {
   const el = document.createElement('div');
@@ -12705,6 +12837,51 @@ function collectLore(lore) {
 
 function closeLoreModal() {
   document.getElementById('loreModal').classList.remove('active');
+}
+
+function renderExplorationStats() {
+  const el = document.getElementById('explorationStats');
+  if (!el) return;
+
+  const tilesExplored = G.visitedTiles ? G.visitedTiles.size : 0;
+  const totalTiles = WORLD_W * WORLD_H;
+
+  // Count unique regions visited
+  const regionSet = new Set();
+  if (G.visitedTiles) {
+    for (const key of G.visitedTiles) {
+      const parts = key.split(',');
+      const px = parseInt(parts[0]);
+      const py = parseInt(parts[1]);
+      if (px > 88 && py < 42) regionSet.add('dark_castle');
+      else if (px > 60 && py < 43) regionSet.add('volcanic_isles');
+      else if (py >= 45) regionSet.add('rolling_hills');
+      else regionSet.add('frost_valley');
+    }
+  }
+
+  const loreFound = G.loreCollected ? G.loreCollected.length : 0;
+  const crystalsFound = G.crystalsFound ? G.crystalsFound.length : 0;
+  const chestsOpened = G.chestsOpened ? G.chestsOpened.length : 0;
+  const viewpoints = G.viewpointsDiscovered ? G.viewpointsDiscovered.length : 0;
+
+  const pct = totalTiles > 0 ? ((tilesExplored / totalTiles) * 100).toFixed(1) : '0.0';
+
+  const rows = [
+    { label: 'Tiles explored', value: `${tilesExplored.toLocaleString()} / ${totalTiles.toLocaleString()}`, sub: `${pct}%`, color: '#8cf' },
+    { label: 'Regions visited', value: `${regionSet.size} / 4`, color: regionSet.size >= 4 ? '#4a8' : '#ccc' },
+    { label: 'Lore found', value: `${loreFound} / ${LORE_ITEMS.length}`, color: loreFound >= LORE_ITEMS.length ? '#daa520' : '#ccc' },
+    { label: 'Crystals found', value: `${crystalsFound} / 4`, color: crystalsFound >= 4 ? '#88ccff' : '#ccc' },
+    { label: 'Chests opened', value: `${chestsOpened} / ${TREASURE_CHESTS.length}`, color: chestsOpened >= TREASURE_CHESTS.length ? '#daa520' : '#ccc' },
+    { label: 'Viewpoints discovered', value: `${viewpoints} / ${VIEWPOINTS.length}`, color: viewpoints >= VIEWPOINTS.length ? '#aadeff' : '#ccc' },
+  ];
+
+  el.innerHTML = rows.map(r =>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #1a1a2a;">
+      <span style="color:#999;">${r.label}</span>
+      <span style="color:${r.color};font-weight:bold;">${r.value}${r.sub ? ` <span style="font-size:10px;color:#666;">${r.sub}</span>` : ''}</span>
+    </div>`
+  ).join('');
 }
 
 function renderLoreInInventory() {
