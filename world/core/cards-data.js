@@ -119,6 +119,47 @@ const ALL_CARDS = [
   {id:437,name:"Rascals",rarity:"common",maxHp:3,ability:"Stampede",desc:"Entry: gain 3 Burn.",set:"Dark Castle",art:"../testroom/art/originals/Rascals.png"},
   {id:438,name:"Champ",rarity:"ghost-rare",maxHp:5,ability:"Thrill",desc:"Immune to damage from Specials. Gains +1 Surge when anyone rolls doubles.",set:"Dark Castle",art:"../testroom/art/originals/Champ.png"},
   {id:110,name:"The Mountain King",rarity:"legendary",maxHp:9,ability:"Beast Mode",desc:"Doubles deal 2X damage.",set:"Set 1",art:"../testroom/art/originals/mountain_king_leg.jpg"},
+  // ── Added v5.0.0 — 30 new Spiritkin for expanded 3v3 ──
+  // Set 1 commons
+  {id:6,name:"Fang Outside",rarity:"common",maxHp:2,ability:"Skillful Coward",desc:"When Fang wins a roll, you may switch with a ghost on your sideline after damage.",set:"Set 1",art:"../testroom/art/originals/FangOutside.png"},
+  {id:9,name:"Little Boo",rarity:"common",maxHp:2,ability:"Mercy",desc:"Enemy rolled triples count as a 1,2,3 roll instead.",set:"Set 1",art:"../testroom/art/originals/LittleBoo.png"},
+  {id:11,name:"Villager",rarity:"common",maxHp:4,ability:"Hospitality",desc:"While on the sideline, the ghost in battle gains +1 health every winning roll.",set:"Set 1",art:"../testroom/art/originals/Villager.png"},
+  {id:15,name:"Winston",rarity:"common",maxHp:5,ability:"Scheme",desc:"Win: you may swap your opponent's ghost with one from their sideline. Gain +2 dice next roll.",set:"Set 1",art:"../testroom/art/originals/Winston.png"},
+  // Dark Castle commons
+  {id:22,name:"Ancient One",rarity:"common",maxHp:7,ability:"Friend to All",desc:"While on the sideline, give your ghost in play +3 health upon ties.",set:"Dark Castle",art:"../testroom/art/originals/ancient_one.jpg"},
+  // Set 1 uncommons
+  {id:36,name:"Bill & Bob",rarity:"uncommon",maxHp:6,ability:"Bait n Switch",desc:"While below 4 health, deal 2X damage on winning rolls.",set:"Set 1",art:"../testroom/art/originals/Bill&Bob.png"},
+  {id:37,name:"Dealer",rarity:"uncommon",maxHp:5,ability:"House Rules",desc:"Roll a straight (consecutive sequence, no repeats): deal +3 damage and negate all incoming damage.",set:"Set 1",art:"../testroom/art/originals/Dealer.png"},
+  {id:45,name:"Cornelius",rarity:"uncommon",maxHp:2,ability:"Antidote",desc:"While on the sideline, negate all enemy sideline effects.",set:"Set 1",art:"../testroom/art/originals/Cornelius.png"},
+  {id:46,name:"Cave Dweller",rarity:"uncommon",maxHp:7,ability:"Lurk",desc:"Deal 3X damage on first roll win.",set:"Set 1",art:"../testroom/art/originals/CaveDweller.png"},
+  {id:49,name:"Greg",rarity:"uncommon",maxHp:5,ability:"Chase",desc:"If Greg has more health than the opposing ghost, Greg's rolls do x2 damage.",set:"Set 1",art:"../testroom/art/originals/Greg.png"},
+  {id:50,name:"Jackson",rarity:"uncommon",maxHp:6,ability:"Regrow",desc:"After your roll, you may remove 1 of Jackson's health to reroll 1 of the dice.",set:"Set 1",art:"../testroom/art/originals/Jackson.png"},
+  {id:52,name:"Hugo",rarity:"uncommon",maxHp:5,ability:"Wreckage",desc:"Your opponent loses 1 die their next roll when Hugo takes roll damage.",set:"Dark Castle",art:"../testroom/art/originals/Hugo.png"},
+  // Set 1 rares
+  {id:62,name:"Raditz",rarity:"rare",maxHp:6,ability:"Hunt",desc:"When Raditz enters the battle, you may switch the opposing ghost with a different ghost from their sideline.",set:"Set 1",art:"../testroom/art/originals/Raditz.png"},
+  {id:65,name:"Wim",rarity:"rare",maxHp:6,ability:"Slash",desc:"+5 damage when all dice are odd.",set:"Set 1",art:"../testroom/art/originals/Wim.png"},
+  {id:68,name:"Kairan",rarity:"rare",maxHp:4,ability:"Let's Dance",desc:"Roll doubles: +1 die next roll.",set:"Set 1",art:"../testroom/art/originals/Kairan.png"},
+  {id:69,name:"Sonya",rarity:"rare",maxHp:3,ability:"Mesmerize",desc:"You may change one of your dice results to a 2 each roll.",set:"Set 1",art:"../testroom/art/originals/Sonya.png"},
+  {id:72,name:"Sky",rarity:"rare",maxHp:4,ability:"Elusive",desc:"If incoming damage is greater than 2, the damage is negated and Sky rolls 1 die and deals the die result damage.",set:"Set 1",art:"../testroom/art/originals/Sky.png"},
+  {id:74,name:"Dark Jeff",rarity:"rare",maxHp:3,ability:"Cackle",desc:"While on the sideline, +1 damage to all your rolls.",set:"Set 1",art:"../testroom/art/originals/DarkJeff.png"},
+  {id:80,name:"Bilbo",rarity:"rare",maxHp:2,ability:"Little Buddy",desc:"While on the sideline, your ghost in play gains +2 damage if you roll singles.",set:"Dark Castle",art:"../testroom/art/originals/bilbo.jpg"},
+  // Ghost-rares
+  {id:95,name:"Tabitha",rarity:"ghost-rare",maxHp:1,ability:"Rally",desc:"While on the sideline, +2 damage to your doubles rolls.",set:"Set 1",art:"../testroom/art/originals/Tabitha.png"},
+  {id:98,name:"Redd",rarity:"ghost-rare",maxHp:7,ability:"Notorious",desc:"When Redd enters the battle, gain +2 dice this roll.",set:"Dark Castle",art:"../testroom/art/originals/Redd.png"},
+  {id:99,name:"Guardian Fairy",rarity:"ghost-rare",maxHp:3,ability:"Wish",desc:"Sideline: when your active ghost is about to take damage, Guardian Fairy can leap in and take the hit instead.",set:"Set 1",art:"../testroom/art/originals/GuardianFairy.png"},
+  {id:101,name:"Splinter",rarity:"ghost-rare",maxHp:4,ability:"Toxic Fumes",desc:"After winning a roll, deal 1 damage before every roll.",set:"Set 1",art:"../testroom/art/originals/Splinter.png"},
+  // Rolling Hills
+  {id:310,name:"Granny",rarity:"uncommon",maxHp:3,ability:"Bedtime Story",desc:"Sideline: when one of your ghosts is defeated — by singles: gain 3 Lucky Stones. By doubles: gain 1 Moonstone. By triples or better: gain 3 Sacred Fires.",set:"Rolling Hills",art:"../testroom/art/granny.jpg"},
+  // Volcanic Isles
+  {id:401,name:"Knight Terror",rarity:"rare",maxHp:7,ability:"Heavy Air",desc:"While active: after any opponent ability triggers and resolves, the enemy active ghost loses 2 HP.",set:"Volcanic Isles",art:"../testroom/art/knight_terror.webp"},
+  {id:403,name:"Smudge",rarity:"rare",maxHp:5,ability:"Blackout",desc:"Before rolling: name a number. If your opponent rolls it, that die doesn't count.",set:"Volcanic Isles",art:"../testroom/art/smudge.webp"},
+  // Rolling Hills uncommon
+  {id:426,name:"Chester",rarity:"uncommon",maxHp:5,ability:"Well Read",desc:"Win: gain 1 Healing Seed. Win with doubles or better: also gain 2 Burn.",set:"Rolling Hills",art:"../testroom/art/originals/Chester.png"},
+  // Dark Castle rares/ghost-rares
+  {id:435,name:"Willow",rarity:"ghost-rare",maxHp:4,ability:"Joy of Painting",desc:"Sideline & In Play: gain +1 die if you lost the last roll.",set:"Dark Castle",art:"../testroom/art/originals/Willow.png"},
+  {id:436,name:"Princess Shade",rarity:"rare",maxHp:4,ability:"Bounty",desc:"While in play or on sideline: when the enemy ghost takes damage before the roll, add +1 additional damage.",set:"Dark Castle",art:"../testroom/art/originals/PrincessShade.png"},
+  // Rolling Hills rare
+  {id:447,name:"Professor Hawking",rarity:"rare",maxHp:2,ability:"Wisdom",desc:"While in play: gain +2 dice if you are holding a Moonstone.",set:"Rolling Hills",art:"../testroom/art/originals/ProfessorHawking.png"},
 ];
 
 // Legacy — used for internal reference, not player-selectable
