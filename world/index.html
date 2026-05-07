@@ -2316,7 +2316,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v7.2.0';
+const VERSION = 'v7.2.1';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -3589,6 +3589,7 @@ const RH_HUB_LABELS = [
 
 function render() {
   if (!canvas) return;
+  try {
   const W = canvas.width, H = canvas.height;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { renderCantina(ctx, W, H); requestAnimationFrame(render); return; }
   if (typeof workshopActive !== 'undefined' && workshopActive) { renderWorkshop(ctx, W, H); requestAnimationFrame(render); return; }
@@ -3599,6 +3600,16 @@ function render() {
   if (typeof houseActive !== 'undefined' && houseActive) { renderHouse(ctx, W, H); requestAnimationFrame(render); return; }
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, W, H);
+
+  // Safety: if worldMap not generated, show loading text
+  if (!worldMap || !worldMap.length) {
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading world...', W/2, H/2);
+    requestAnimationFrame(render);
+    return;
+  }
 
   // Camera target: center on player
   const targetCamX = G.x * TILE - W / 2;
@@ -5593,6 +5604,10 @@ function render() {
   }
 
   if (!G.inBattle) requestAnimationFrame(render);
+  } catch(renderErr) {
+    console.error('Render error:', renderErr);
+    requestAnimationFrame(render); // keep trying
+  }
 }
 
 function updateZoneHud() {
