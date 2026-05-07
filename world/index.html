@@ -5498,7 +5498,8 @@ function render() {
     const otherGuild = p.guild;
     const otherDisplayName = otherGuild ? `[${otherGuild.tag}] ${p.name || '???'}` : (p.name || '???');
     const isMyGuildMember = G.guild && otherGuild && otherGuild.id === G.guild.id;
-    ctx.fillStyle = isMyGuildMember ? '#daa520' : '#8cf';
+    const nameColor = (typeof getPlayerNameColor === 'function') ? getPlayerNameColor(pid) : (isMyGuildMember ? '#daa520' : '#8cf');
+    ctx.fillStyle = nameColor;
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(otherDisplayName, opx + TILE/2, opy - 8);
@@ -5630,6 +5631,11 @@ function render() {
 
   // Draw world boss
   renderWorldBoss(ctx, camX, camY, time);
+
+  // Draw party tethers (gold dashed lines between party members)
+  if (typeof drawPartyTethers === 'function') {
+    drawPartyTethers(ctx, camX, camY, TILE);
+  }
 
   // Draw player sprite
   const playerSX = G.x * TILE - camX;
@@ -7239,6 +7245,13 @@ function updateHUD() {
   if (homeBtn) {
     homeBtn.classList.toggle('visible', !!G.house);
   }
+
+  if (typeof renderPartyIndicator === 'function') renderPartyIndicator();
+}
+
+function getGuildCraftBonus() {
+  if (G.guild && G.guild.id) return 25; // +25 quality floor for guild members
+  return 0;
 }
 
 // ═══════ HELP PANEL ═══════
