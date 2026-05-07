@@ -2014,9 +2014,27 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   0%,100% { transform: scale(1.25); filter: drop-shadow(0 0 30px rgba(255,200,60,0.9)) drop-shadow(0 0 60px rgba(255,175,35,0.6)); }
   50%     { transform: scale(1.35); filter: drop-shadow(0 0 40px rgba(255,210,80,1)) drop-shadow(0 0 80px rgba(255,185,50,0.8)); }
 }
+
+/* ═══════ SOUND PROMPT ═══════ */
+#soundPrompt {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,15,40,0.9); border: 1px solid rgba(100,160,255,0.4);
+  padding: 8px 20px; border-radius: 20px; font-size: 12px; color: #8cf;
+  z-index: 9999; cursor: pointer; pointer-events: auto;
+  animation: soundPromptPulse 2s ease-in-out infinite;
+  display: flex; align-items: center; gap: 8px;
+}
+#soundPrompt:hover { background: rgba(30,25,60,0.95); border-color: rgba(100,160,255,0.7); }
+@keyframes soundPromptPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
 </style>
 </head>
 <body>
+
+<!-- SOUND PROMPT -->
+<div id="soundPrompt">&#x1f50a; Click to enable sound</div>
 
 <!-- VERSION BADGE (always visible) -->
 <div id="versionBadge" style="position:fixed;bottom:4px;left:4px;font-size:9px;color:rgba(255,255,255,0.2);z-index:9998;pointer-events:none;font-family:monospace;"></div>
@@ -2534,7 +2552,7 @@ const MOVE_SPEED = 2.5;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v7.4.0';
+const VERSION = 'v7.6.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -2807,6 +2825,43 @@ const SFX = {
 };
 
 // ═══════ MUSIC SYSTEM ═══════
+let musicUnlocked = false;
+
+function getCurrentRegionTrack() {
+  if (typeof G === 'undefined' || !G) return 'hub';
+  if (G.inBattle) return 'battle';
+  if (typeof cantinaActive !== 'undefined' && cantinaActive) return 'cantina';
+  if (typeof castleActive !== 'undefined' && castleActive) return 'dark_castle';
+  if (typeof houseActive !== 'undefined' && houseActive) return 'hub';
+  if ((typeof workshopActive !== 'undefined' && workshopActive) ||
+      (typeof arenaActive !== 'undefined' && arenaActive) ||
+      (typeof innActive !== 'undefined' && innActive) ||
+      (typeof tradingPostActive !== 'undefined' && tradingPostActive)) return 'hub';
+  const nearHub = Math.min(
+    Math.sqrt((G.x - (HUB.x+3))**2 + (G.y - (HUB.y+3))**2),
+    Math.sqrt((G.x - 25)**2 + (G.y - 59)**2),
+    Math.sqrt((G.x - 75)**2 + (G.y - 15)**2)
+  ) < 10;
+  if (nearHub) return 'hub';
+  if (G.x > 60) return 'volcanic';
+  if (G.y >= 45) return 'rolling_hills';
+  return 'frost_valley';
+}
+
+function unlockMusic() {
+  if (musicUnlocked) return;
+  musicUnlocked = true;
+  // Resume audio context if needed
+  if (SFX.ctx && SFX.ctx.state === 'suspended') SFX.ctx.resume();
+  // Start region music
+  Music.play(getCurrentRegionTrack());
+  // Remove the prompt
+  document.getElementById('soundPrompt')?.remove();
+}
+document.addEventListener('click', unlockMusic, { once: true });
+document.addEventListener('keydown', unlockMusic, { once: true });
+document.addEventListener('touchstart', unlockMusic, { once: true });
+
 const Music = {
   current: null,      // currently playing Audio element
   currentTrack: null,  // track name
@@ -2843,7 +2898,7 @@ const Music = {
   },
 
   play(trackName) {
-    if (this.muted || this.currentTrack === trackName) return;
+    if (!musicUnlocked || this.muted || this.currentTrack === trackName) return;
     // Fade out current
     if (this.current) {
       const old = this.current;
@@ -4358,6 +4413,63 @@ function render() {
         ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 2, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(255,220,100,0.3)';
         ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 5, 0, Math.PI * 2); ctx.fill();
+
+        // ── Fountain (center 2x2 of plaza, drawn once on top-left tile) ──
+        const isPlazaCenter = (tx >= HUB.x + 3 && tx <= HUB.x + 4 && ty >= HUB.y + 3 && ty <= HUB.y + 4);
+        if (isPlazaCenter && tx === HUB.x + 3 && ty === HUB.y + 3) {
+          const fcx = sx + TILE, fcy = sy + TILE; // center of 2x2 block
+          // Stone basin
+          ctx.fillStyle = '#8a9aaa';
+          ctx.beginPath();
+          ctx.arc(fcx, fcy, TILE * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#6a7a8a';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          // Water pool
+          ctx.fillStyle = 'rgba(100, 160, 220, 0.55)';
+          ctx.beginPath();
+          ctx.arc(fcx, fcy, TILE * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+          // Water shimmer
+          ctx.fillStyle = `rgba(150,210,255,${0.15 + Math.sin(time * 2) * 0.1})`;
+          ctx.beginPath();
+          ctx.ellipse(fcx - 3, fcy - 2, TILE * 0.3, TILE * 0.15, 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          // Spray particles
+          for (let p = 0; p < 6; p++) {
+            const angle = (time * 0.5 + p * 1.05) % (Math.PI * 2);
+            const radius = 4 + Math.sin(time * 2 + p) * 3;
+            const py = -8 - Math.abs(Math.sin(time * 3 + p * 0.7)) * 14;
+            ctx.fillStyle = `rgba(150, 200, 255, ${0.3 + Math.sin(time + p) * 0.2})`;
+            ctx.beginPath();
+            ctx.arc(fcx + Math.cos(angle) * radius, fcy + py, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Central jet highlight
+          const jetH = 10 + Math.sin(time * 2.5) * 4;
+          ctx.fillStyle = 'rgba(200,230,255,0.4)';
+          ctx.fillRect(fcx - 1, fcy - jetH, 2, jetH);
+        }
+
+        // ── Wandering NPCs (3 generic villagers on plaza tiles) ──
+        const npcSeed = (tx * 7 + ty * 13) % 12;
+        if (npcSeed < 3 && !isPlazaCenter) {
+          const npcIdx = npcSeed;
+          const npcSpeed = [0.4, 0.6, 0.5][npcIdx];
+          const npcPhase = [0, 2.1, 4.2][npcIdx];
+          const npcColor = ['#6a88aa', '#aa7766', '#7a9a6a'][npcIdx];
+          const npcX = sx + TILE/2 + Math.sin(time * npcSpeed + npcPhase) * (TILE * 0.3);
+          const npcY = sy + TILE/2 + Math.cos(time * npcSpeed * 0.7 + npcPhase + 1) * (TILE * 0.3);
+          // Body
+          ctx.fillStyle = npcColor;
+          ctx.fillRect(npcX - 2, npcY - 1, 4, 5);
+          // Head
+          ctx.fillStyle = '#e8d0b0';
+          ctx.beginPath();
+          ctx.arc(npcX, npcY - 3, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (tile === 20 ) { // Sand (beach, fallback only)
         // Sand grain texture
         ctx.fillStyle = 'rgba(200,180,120,0.3)';
