@@ -250,20 +250,48 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ── SIDELINE GHOSTS ── */
 .battle-sideline {
-  position: absolute; bottom: 50%; transform: translateY(50%);
-  display: flex; flex-direction: column; gap: 4px; z-index: 10;
+  position: absolute; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 6px; z-index: 10;
 }
-.battle-sideline.player { left: 8px; }
-.battle-sideline.enemy { right: 8px; }
+.battle-sideline.player { left: 10px; }
+.battle-sideline.enemy { right: 10px; }
 .sideline-ghost {
-  background: rgba(0,0,0,0.4); border: 1px solid #445; border-radius: 4px;
-  padding: 4px 6px; text-align: center; width: 70px; font-size: 9px; color: #aaa;
+  background: rgba(10, 10, 30, 0.85); border: 2px solid #334;
+  border-radius: 6px; padding: 6px; width: 120px; text-align: center;
+  transition: all 0.2s;
 }
-.sideline-ghost .sl-hp { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 2px; }
+.sideline-ghost .sl-art {
+  width: 50px; height: 50px; border-radius: 4px; object-fit: cover;
+  margin: 0 auto 4px; border: 1px solid #445; display: block;
+}
+.sideline-ghost .sl-name {
+  font-weight: bold; font-size: 10px; color: #fff; margin-bottom: 2px;
+}
+.sideline-ghost .sl-ability-name {
+  font-size: 9px; color: #8cf; text-transform: uppercase;
+  letter-spacing: 0.5px; font-weight: bold; margin-bottom: 2px;
+}
+.sideline-ghost .sl-ability-desc {
+  font-size: 8px; color: #888; line-height: 1.3;
+  max-height: 28px; overflow: hidden;
+}
+.sideline-ghost .sl-hp { height: 4px; background: #1a1a2a; border-radius: 2px; margin-top: 4px; overflow: hidden; }
 .sideline-ghost .sl-hp-fill { height: 100%; border-radius: 2px; }
-.sideline-ghost.ko { opacity: 0.3; }
-.sideline-ghost.swap-pick { border-color: #daa520; cursor: pointer; animation: swapPulse 1s ease-in-out infinite; }
-@keyframes swapPulse { 0%,100% { box-shadow: 0 0 4px rgba(218,165,32,0.3); } 50% { box-shadow: 0 0 12px rgba(218,165,32,0.7); } }
+.sideline-ghost.ko { opacity: 0.3; border-color: #222; }
+.sideline-ghost.swap-pick {
+  border-color: #daa520; cursor: pointer;
+  box-shadow: 0 0 10px rgba(218, 165, 32, 0.3);
+  animation: swapGlow 1.5s ease-in-out infinite;
+}
+@keyframes swapGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(218,165,32,0.2); }
+  50% { box-shadow: 0 0 15px rgba(218,165,32,0.5); }
+}
+@media (max-width: 768px) {
+  .sideline-ghost { width: 90px; }
+  .sideline-ghost .sl-art { width: 35px; height: 35px; }
+  .sideline-ghost .sl-ability-desc { display: none; }
+}
 
 /* ── FLOATING DAMAGE NUMBERS ── */
 .dmg-float {
@@ -2020,7 +2048,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.7.0';
+const VERSION = 'v5.8.0';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -7667,14 +7695,19 @@ function renderSideline(teamKey, elementId) {
   const sideline = team.ghosts.filter((g, i) => i !== team.activeIdx);
   el.innerHTML = sideline.map(g => {
     const pct = Math.max(0, g.hp / g.maxHp * 100);
+    const hpColor = pct > 50 ? '#4a8' : pct > 25 ? '#aa8' : '#a44';
     const realIdx = team.ghosts.indexOf(g);
     const isSwapPick = B.phase === 'ko-swap' && B.koSwapTeam === teamKey && !g.ko;
+    const card = getCard(g.id);
+    const artSrc = card?.art || '';
     return `<div class="sideline-ghost ${g.ko ? 'ko' : ''} ${isSwapPick ? 'swap-pick' : ''}"
       ${isSwapPick ? `onclick="doKoSwap('${teamKey}', ${realIdx})"` : ''}>
-      <div style="font-weight:bold;color:${g.ko ? '#666' : '#fff'};font-size:10px;">${g.name}</div>
-      <div style="font-size:8px;color:${g.ko ? '#444' : '#8cf'};font-style:italic;">${g.ability || ''}</div>
-      <div class="sl-hp"><div class="sl-hp-fill" style="width:${pct}%;background:${pct > 50 ? '#4a8' : pct > 25 ? '#aa8' : '#a44'};"></div></div>
-      <div style="color:#888;font-size:9px;">${g.ko ? 'KO' : g.hp + '/' + g.maxHp}</div>
+      <img class="sl-art" src="${artSrc}" alt="${g.name}" onerror="this.style.display='none'">
+      <div class="sl-name">${g.name}</div>
+      <div class="sl-ability-name">${g.ability || ''}</div>
+      <div class="sl-ability-desc">${g.abilityDesc || card?.desc || ''}</div>
+      <div class="sl-hp"><div class="sl-hp-fill" style="width:${pct}%;background:${hpColor};"></div></div>
+      ${g.ko ? '<div style="font-size:8px;color:#a44;margin-top:2px;">KO</div>' : `<div style="font-size:8px;color:#888;margin-top:2px;">${g.hp}/${g.maxHp}</div>`}
     </div>`;
   }).join('');
 }
