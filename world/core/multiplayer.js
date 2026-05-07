@@ -29,6 +29,10 @@ function showOnlineStatus() {
     reconnBtn.className = 'hud-btn';
     reconnBtn.textContent = '\uD83D\uDD04 Reconnect';
     reconnBtn.onclick = async () => {
+      if (typeof firebase === 'undefined' || !firebase.auth) {
+        notify('Firebase SDK not loaded. Refresh the page to try again.');
+        return;
+      }
       notify('Attempting to reconnect...');
       try {
         const result = await firebase.auth().signInAnonymously();
@@ -49,9 +53,20 @@ function showOnlineStatus() {
 }
 
 
+let _presenceIntervalId = null;
+let _autoSaveIntervalId = null;
+
 function startPresence() {
   if (!uid) return;
   if (window._useLocalStorage) return; // No multiplayer in offline mode
+
+  // Clear any existing intervals from a previous connection to prevent duplicates
+  if (_presenceIntervalId) { clearInterval(_presenceIntervalId); _presenceIntervalId = null; }
+  if (_autoSaveIntervalId) { clearInterval(_autoSaveIntervalId); _autoSaveIntervalId = null; }
+
+  // Detach old listeners before re-attaching
+  db.ref('overworld/presence').off('value');
+  db.ref('overworld/chat').off('child_added');
 
   // Write presence
   const presRef = db.ref(`overworld/presence/${uid}`);
@@ -73,9 +88,9 @@ function startPresence() {
   // Disconnect cleanup
   presRef.onDisconnect().remove();
 
-  // Update position periodically
-  setInterval(() => {
-    if (!uid || G.inBattle) return;
+  // Update position periodically (2s instead of 500ms to reduce Firebase writes)
+  _presenceIntervalId = setInterval(() => {
+    if (!uid || G.inBattle || window._useLocalStorage) return;
     presRef.update({
       x: Math.round(G.x * 10) / 10,
       y: Math.round(G.y * 10) / 10,
@@ -83,10 +98,10 @@ function startPresence() {
       sprite: G.sprite || 1,
       direction: G.direction || 'down',
     });
-  }, 500);
+  }, 2000);
 
   // Auto-save every 30s
-  setInterval(saveGame, 30000);
+  _autoSaveIntervalId = setInterval(saveGame, 30000);
 
   // Listen for other players
   db.ref('overworld/presence').on('value', snap => {
@@ -121,7 +136,15 @@ function addChatMessage(sender, text) {
     // Guild members show in gold
     const isGuildMember = G.guild && sender.startsWith(`[${G.guild.tag}]`);
     const senderColor = isGuildMember ? 'color:#daa520;' : '';
-    div.innerHTML = `<span class="sender" style="${senderColor}">${sender}:</span> <span class="text">${text}</span>`;
+    const senderSpan = document.createElement('span');
+    senderSpan.className = 'sender';
+    if (senderColor) senderSpan.style.cssText = senderColor;
+    senderSpan.textContent = sender + ':';
+    const textSpan = document.createElement('span');
+    textSpan.className = 'text';
+    textSpan.textContent = ' ' + text;
+    div.appendChild(senderSpan);
+    div.appendChild(textSpan);
   }
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
@@ -214,6 +237,10 @@ function renderCantinaPatrons() {
 function loadCantinaChatHistory() {
   const chatEl = document.getElementById('cantinaChatMessages');
   chatEl.innerHTML = '';
+  if (window._useLocalStorage) {
+    chatEl.innerHTML = '<div class="chat-system" style="color:#555;">Cantina chat unavailable offline.</div>';
+    return;
+  }
   db.ref('overworld/cantina_chat').orderByChild('ts').limitToLast(30).once('value').then(snap => {
     const msgs = snap.val();
     if (!msgs) return;
@@ -238,7 +265,14 @@ function addCantinaChatMsg(sender, text, isEmote) {
     div.textContent = text;
   } else {
     div.className = 'chat-msg';
-    div.innerHTML = `<span class="sender">${sender}:</span> <span class="text">${text}</span>`;
+    const senderSpan = document.createElement('span');
+    senderSpan.className = 'sender';
+    senderSpan.textContent = sender + ':';
+    const textSpan = document.createElement('span');
+    textSpan.className = 'text';
+    textSpan.textContent = ' ' + text;
+    div.appendChild(senderSpan);
+    div.appendChild(textSpan);
   }
   chatEl.appendChild(div);
   chatEl.scrollTop = chatEl.scrollHeight;
@@ -254,6 +288,7 @@ const CANTINA_EMOTES = {
 };
 
 function sendCantinaChat() {
+  if (window._useLocalStorage) { notify('Cantina chat requires an online connection.'); return; }
   const input = document.getElementById('cantinaChatInput');
   const text = input.value.trim();
   if (!text) return;
@@ -303,6 +338,7 @@ let arenaTab = 'challenge';
 let arenaListeners = [];
 
 function openArena() {
+  if (window._useLocalStorage) { notify('Arena requires an online connection.'); return; }
   document.getElementById('arenaOverlay').classList.add('active');
   arenaTab = 'challenge';
   document.getElementById('arenaTabChallenge').classList.add('active');
@@ -534,10 +570,18 @@ function simulateArenaBattle(challengeId, challenger, defender, wager) {
     round++;
   }
 
-  // Determine winner
+  // Determine winner — total remaining HP breaks ties when alive counts are equal
   const cAlive = cTeam.filter(t => !t.ko).length;
   const dAlive = dTeam.filter(t => !t.ko).length;
-  const challengerWins = cAlive > dAlive;
+  let challengerWins;
+  if (cAlive !== dAlive) {
+    challengerWins = cAlive > dAlive;
+  } else {
+    // Tiebreaker: total remaining HP
+    const cHp = cTeam.filter(t => !t.ko).reduce((s, t) => s + t.hp, 0);
+    const dHp = dTeam.filter(t => !t.ko).reduce((s, t) => s + t.hp, 0);
+    challengerWins = cHp >= dHp; // challenger wins ties (slight advantage for aggressor)
+  }
   const winnerName = challengerWins ? challenger.name : defender.name;
   const loserName = challengerWins ? defender.name : challenger.name;
 
@@ -607,6 +651,7 @@ function simulateArenaBattle(challengeId, challenger, defender, wager) {
 
 // Clean up old arena challenges (older than 5 minutes)
 function cleanOldArenaChallenges() {
+  if (window._useLocalStorage) return;
   db.ref('overworld/arena').once('value').then(snap => {
     const challenges = snap.val() || {};
     const fiveMinAgo = Date.now() - 5 * 60 * 1000;
@@ -638,6 +683,17 @@ function renderGuildPanel() {
     content.innerHTML = `
       <p style="color:#888;font-size:12px;text-align:center;margin-bottom:16px;">You are not in a guild.</p>
       <button class="btn-primary" onclick="openGuildCreate()">Create Guild (50 coins)</button>
+    `;
+    return;
+  }
+
+  if (window._useLocalStorage) {
+    content.innerHTML = `
+      <div style="text-align:center;margin-bottom:12px;">
+        <span class="guild-tag">[${G.guild.tag}]</span>
+        <span style="font-size:16px;font-weight:bold;color:#fff;margin-left:4px;">${G.guild.name}</span>
+      </div>
+      <p style="color:#555;font-size:12px;text-align:center;">Guild details unavailable offline.</p>
     `;
     return;
   }
@@ -758,6 +814,7 @@ function confirmCreateGuild() {
 }
 
 function inviteToGuild(targetUid, targetName) {
+  if (window._useLocalStorage) { notify('Guild invites require an online connection.'); return; }
   if (!G.guild) { notify('You are not in a guild!'); return; }
 
   // Write invitation to Firebase
@@ -774,6 +831,7 @@ function inviteToGuild(targetUid, targetName) {
 }
 
 function acceptGuildInvite(guildId) {
+  if (window._useLocalStorage) { notify('Cannot accept guild invites while offline.'); return; }
   if (G.guild) { notify('Leave your current guild first!'); return; }
 
   db.ref(`overworld/guilds/${guildId}`).once('value').then(snap => {
@@ -801,6 +859,7 @@ function acceptGuildInvite(guildId) {
 
 function leaveGuild() {
   if (!G.guild) return;
+  if (window._useLocalStorage) { notify('Cannot leave guild while offline.'); return; }
 
   db.ref(`overworld/guilds/${G.guild.id}/members/${uid}`).remove();
   notify(`Left guild [${G.guild.tag}] ${G.guild.name}.`);
@@ -812,6 +871,7 @@ function leaveGuild() {
 
 function disbandGuild() {
   if (!G.guild || G.guild.role !== 'leader') return;
+  if (window._useLocalStorage) { notify('Cannot disband guild while offline.'); return; }
 
   db.ref(`overworld/guilds/${G.guild.id}`).remove();
   notify(`Guild [${G.guild.tag}] ${G.guild.name} disbanded.`);
