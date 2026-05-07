@@ -2061,7 +2061,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.1.0';
+const VERSION = 'v6.1.1';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5181,6 +5181,24 @@ function render() {
           ctx.moveTo(wx, by + bh * 0.45 + 6); ctx.lineTo(wx + 12, by + bh * 0.45 + 6);
         });
         ctx.stroke();
+        // Chimney
+        ctx.fillStyle = '#7a4a2a';
+        ctx.fillRect(bx + bw * 0.65, by + 2, 8, bh * 0.2);
+        ctx.fillStyle = '#6a3a1a';
+        ctx.fillRect(bx + bw * 0.65 - 1, by + 1, 10, 3);
+        // Smoke particles (animated)
+        for (let si = 0; si < 3; si++) {
+          const smokeY = by - 2 - si * 7 - Math.sin(time * 1.5 + si * 1.2 + tx) * 3;
+          const smokeX = bx + bw * 0.65 + 4 + Math.sin(time * 0.8 + si * 2) * 3;
+          const smokeA = 0.15 - si * 0.04;
+          ctx.fillStyle = `rgba(160,160,170,${smokeA})`;
+          ctx.beginPath(); ctx.arc(smokeX, smokeY, 2.5 + si * 0.8, 0, Math.PI * 2); ctx.fill();
+        }
+        // Sign board
+        ctx.fillStyle = '#5a3a1a';
+        ctx.fillRect(bx + bw/2 - 10, by + bh * 0.35 + 2, 20, 8);
+        ctx.fillStyle = '#c8a848';
+        ctx.fillRect(bx + bw/2 - 8, by + bh * 0.35 + 3, 16, 6);
       } else if (tile === 8) { // Workshop — 1.8x scale
         const bScale = 1.8;
         const bw = TILE * bScale;
@@ -5226,9 +5244,27 @@ function render() {
         ctx.moveTo(bx + bw - 20, by + bh * 0.45); ctx.lineTo(bx + bw - 20, by + bh * 0.45 + 12);
         ctx.moveTo(bx + bw - 26, by + bh * 0.45 + 6); ctx.lineTo(bx + bw - 14, by + bh * 0.45 + 6);
         ctx.stroke();
-      } else if (tile === 6) { // Encounter zone — glowing
-        const pulse = 0.15 + Math.sin(time * 2 + tx * 0.5 + ty * 0.3) * 0.1;
-        ctx.fillStyle = `rgba(100, 60, 200, ${pulse})`;
+        // Chimney
+        ctx.fillStyle = '#6a3a1a';
+        ctx.fillRect(bx + bw * 0.3, by + 2, 8, bh * 0.2);
+        ctx.fillStyle = '#5a2a0a';
+        ctx.fillRect(bx + bw * 0.3 - 1, by + 1, 10, 3);
+        // Forge smoke (thicker for workshop)
+        for (let si = 0; si < 3; si++) {
+          const smokeY = by - 2 - si * 8 - Math.sin(time * 1.2 + si * 1.5 + tx) * 4;
+          const smokeX = bx + bw * 0.3 + 4 + Math.sin(time * 0.7 + si * 1.8) * 4;
+          const smokeA = 0.2 - si * 0.05;
+          ctx.fillStyle = `rgba(140,140,150,${smokeA})`;
+          ctx.beginPath(); ctx.arc(smokeX, smokeY, 3 + si, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (tile === 6) { // Encounter zone — mystical overlay, terrain visible underneath
+        // Radial gradient: more opaque at center, transparent at edges
+        const pulse = 0.12 + Math.sin(time * 2 + tx * 0.5 + ty * 0.3) * 0.06;
+        const grad = ctx.createRadialGradient(sx + TILE/2, sy + TILE/2, 0, sx + TILE/2, sy + TILE/2, TILE * 0.7);
+        grad.addColorStop(0, `rgba(100, 60, 200, ${pulse + 0.06})`);
+        grad.addColorStop(0.6, `rgba(100, 60, 200, ${pulse})`);
+        grad.addColorStop(1, `rgba(100, 60, 200, ${pulse * 0.3})`);
+        ctx.fillStyle = grad;
         ctx.fillRect(sx, sy, TILE, TILE);
 
         // Zone boundary indicator — slightly brighter at edges
@@ -5246,17 +5282,43 @@ function render() {
           ctx.fillRect(sx, sy, TILE, TILE);
         }
 
-        // Spirit particles
-        if (Math.random() < 0.02) {
-          ctx.fillStyle = `rgba(150, 120, 255, ${0.3 + Math.random() * 0.4})`;
+        // Floating spirit particles that drift upward
+        const pSeed = (tx * 31 + ty * 17);
+        const pCount = (pSeed % 3); // 0-2 particles per tile
+        for (let pi = 0; pi < pCount; pi++) {
+          const px = sx + ((pSeed * (pi+1) * 7) % (TILE - 4)) + 2;
+          const pyBase = sy + ((pSeed * (pi+1) * 11) % TILE);
+          const pyDrift = (pyBase - (time * 8 * (0.5 + (pi * 0.3)))) % TILE;
+          const py = sy + ((pyDrift % TILE) + TILE) % TILE;
+          const pAlpha = 0.2 + Math.sin(time * 3 + pi * 2 + pSeed * 0.1) * 0.15;
+          const pColor = pi % 2 === 0 ? `rgba(180, 160, 255, ${pAlpha})` : `rgba(255, 255, 255, ${pAlpha * 0.7})`;
+          ctx.fillStyle = pColor;
           ctx.beginPath();
-          ctx.arc(sx + Math.random() * TILE, sy + Math.random() * TILE, 1 + Math.random() * 2, 0, Math.PI * 2);
+          ctx.arc(px, py, 1 + (pi % 2) * 0.5, 0, Math.PI * 2);
           ctx.fill();
         }
       } else if (tile === 3 ) { // Water (fallback only)
         const wv = Math.sin(time * 1.5 + tx * 0.8) * 15;
         ctx.fillStyle = `rgb(${42 + wv}, ${74 + wv}, ${138 + wv})`;
         ctx.fillRect(sx, sy, TILE, TILE);
+        // Foam/whitecap dots near land edges
+        let hasLandN = false;
+        for (let edy = -1; edy <= 1; edy++) {
+          for (let edx = -1; edx <= 1; edx++) {
+            if (edy === 0 && edx === 0) continue;
+            const nt = worldMap[ty+edy]?.[tx+edx];
+            if (nt !== undefined && nt !== 3 && nt !== 4) { hasLandN = true; break; }
+          }
+          if (hasLandN) break;
+        }
+        if (hasLandN) {
+          const foamA = 0.25 + Math.sin(time * 2 + tx * 1.2 + ty * 0.7) * 0.15;
+          ctx.fillStyle = `rgba(200,220,255,${foamA})`;
+          const fSeed = (tx * 13 + ty * 7) % 5;
+          ctx.beginPath(); ctx.arc(sx + 6 + fSeed * 3, sy + 4 + fSeed * 2, 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx + TILE - 10 - fSeed * 2, sy + TILE - 8 + fSeed, 1.2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx + TILE/2 + fSeed, sy + TILE/2 - fSeed, 1, 0, Math.PI * 2); ctx.fill();
+        }
       } else if (tile === 4) { // Ice
         const iv = Math.sin(time * 0.5 + tx + ty) * 10;
         ctx.fillStyle = `rgb(${138 + iv}, ${184 + iv}, ${216 + iv})`;
@@ -5344,6 +5406,23 @@ function render() {
           ctx.moveTo(wx, by + bh * 0.45 + 6); ctx.lineTo(wx + 12, by + bh * 0.45 + 6);
         });
         ctx.stroke();
+        // Chimney
+        ctx.fillStyle = '#6a3020';
+        ctx.fillRect(bx + bw * 0.7, by + 2, 7, bh * 0.18);
+        ctx.fillStyle = '#5a2010';
+        ctx.fillRect(bx + bw * 0.7 - 1, by + 1, 9, 3);
+        // Smoke
+        for (let si = 0; si < 2; si++) {
+          const smokeY = by - 1 - si * 7 - Math.sin(time * 1.3 + si + tx) * 3;
+          const smokeX = bx + bw * 0.7 + 3 + Math.sin(time * 0.9 + si * 2.2) * 3;
+          ctx.fillStyle = `rgba(150,140,140,${0.12 - si * 0.04})`;
+          ctx.beginPath(); ctx.arc(smokeX, smokeY, 2.5 + si * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+        // Sign board
+        ctx.fillStyle = '#4a2a0a';
+        ctx.fillRect(bx + bw/2 - 10, by + bh * 0.35 + 2, 20, 8);
+        ctx.fillStyle = '#daa520';
+        ctx.fillRect(bx + bw/2 - 8, by + bh * 0.35 + 3, 16, 6);
       } else if (tile === 13) { // Warm tree (Rolling Hills) — varied
         const warmVar = (tx * 11 + ty * 3) % 3;
         ctx.fillStyle = '#5a3a1a';
@@ -5461,7 +5540,7 @@ function render() {
         ctx.fillStyle = 'rgba(255,220,100,0.3)';
         ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 5, 0, Math.PI * 2); ctx.fill();
       } else if (tile === 20 ) { // Sand (beach, fallback only)
-        // Subtle dot pattern like beach sand
+        // Sand grain texture
         ctx.fillStyle = 'rgba(200,180,120,0.3)';
         if ((tx + ty) % 2 === 0) {
           ctx.fillRect(sx + 6, sy + 8, 1, 1);
@@ -5472,6 +5551,16 @@ function render() {
         ctx.fillStyle = 'rgba(220,200,140,0.2)';
         ctx.fillRect(sx + 24, sy + 20, 1, 1);
         ctx.fillRect(sx + 8, sy + 36, 1, 1);
+        // Shell / pebble dots
+        const sandSeed = (tx * 23 + ty * 11) % 9;
+        if (sandSeed < 3) {
+          ctx.fillStyle = 'rgba(180,160,130,0.45)';
+          ctx.beginPath(); ctx.arc(sx + 10 + sandSeed * 5, sy + 16 + sandSeed * 3, 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+        if (sandSeed >= 4 && sandSeed < 6) {
+          ctx.fillStyle = 'rgba(200,190,170,0.35)';
+          ctx.beginPath(); ctx.ellipse(sx + 28 + sandSeed, sy + 30, 2, 1.2, sandSeed * 0.5, 0, Math.PI * 2); ctx.fill();
+        }
       } else if (tile === 21) { // Palm tree
         // Sand/ground base
         ctx.fillStyle = '#e8d8a0';
@@ -5504,7 +5593,23 @@ function render() {
           ctx.lineTo(cx + Math.cos(angle) * 12, cy + Math.sin(angle) * 12);
           ctx.stroke();
         }
-      } else if (tile === 22) { // Dark stone — subtle bone/debris details
+      } else if (tile === 22) { // Dark stone — cracks + bone/debris details
+        // Crack patterns
+        const dsSeed = (tx * 11 + ty * 17) % 6;
+        ctx.strokeStyle = 'rgba(8,4,12,0.5)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        if (dsSeed < 3) {
+          ctx.moveTo(sx + 6 + dsSeed * 4, sy + 8);
+          ctx.lineTo(sx + 14 + dsSeed * 3, sy + 20);
+          ctx.lineTo(sx + 18 + dsSeed * 2, sy + 28);
+        }
+        if (dsSeed >= 2 && dsSeed < 5) {
+          ctx.moveTo(sx + TILE - 10, sy + 6 + dsSeed * 2);
+          ctx.lineTo(sx + TILE - 16, sy + 18 + dsSeed);
+        }
+        ctx.stroke();
+        // Bone/debris
         if ((tx + ty) % 3 === 0) {
           ctx.fillStyle = 'rgba(60,40,70,0.5)';
           ctx.fillRect(sx + 8, sy + 12, 3, 2);
@@ -7751,6 +7856,10 @@ function renderBattle() {
       if (!B._bannerShown) { B._bannerShown = true; showBattleResultBanner(false); }
     }
     // 'swapping' is handled by ko-swap above on re-render
+  } else {
+    // Normal ready state — show FIGHT/RUN buttons
+    actionsEl.innerHTML = '<button class="battle-btn btn-roll" id="btnRoll" onclick="battleRoll()">FIGHT</button>' +
+      '<button class="battle-btn btn-flee" onclick="fleeBattle()">RUN</button>';
   }
 }
 
@@ -10843,6 +10952,7 @@ function renderMarket() {
 }
 
 function listMarketItem(gearIdx) {
+  if (window._useLocalStorage) { notify('Market requires an online connection.'); return; }
   const gear = G.gear[gearIdx];
   if (!gear) return;
 
@@ -10898,6 +11008,7 @@ function removeMarketItem(listingIdx) {
 }
 
 function buyMarketItem(sellerId, listingIdx) {
+  if (window._useLocalStorage) { notify('Market requires an online connection.'); return; }
   const sellerData = marketListings[sellerId];
   if (!sellerData || !sellerData.listings) return;
 
@@ -12317,18 +12428,43 @@ function createCharacter() {
 async function initFirebase() {
   let useLocalStorage = false;
 
-  // Step 1: Authenticate
+  // Step 1: Authenticate — cascade through multiple methods
   try {
     const result = await firebase.auth().signInAnonymously();
     uid = result.user.uid;
-  } catch (err) {
-    console.warn('Firebase auth failed, using localStorage:', err.message);
-    uid = localStorage.getItem('overworld_local_uid');
-    if (!uid) {
-      uid = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    console.log('Firebase: anonymous auth succeeded');
+  } catch (err1) {
+    console.warn('Anonymous auth failed:', err1.message);
+
+    // Try persisted auth state
+    try {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        uid = user.uid;
+        console.log('Firebase: using persisted auth');
+      } else {
+        // Generate a stable local UID and test direct DB access
+        uid = localStorage.getItem('overworld_local_uid');
+        if (!uid) {
+          uid = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('overworld_local_uid', uid);
+        }
+
+        // Test if Firebase DB works without formal auth
+        try {
+          await db.ref('overworld/test').once('value');
+          console.log('Firebase: DB access works without auth');
+        } catch (dbErr) {
+          console.warn('Firebase DB access also failed:', dbErr.message);
+          useLocalStorage = true;
+        }
+      }
+    } catch (err2) {
+      console.warn('All Firebase auth failed:', err2.message);
+      uid = localStorage.getItem('overworld_local_uid') || ('local_' + Date.now());
       localStorage.setItem('overworld_local_uid', uid);
+      useLocalStorage = true;
     }
-    useLocalStorage = true;
   }
 
   // Store the mode globally
@@ -12423,15 +12559,10 @@ async function initFirebase() {
     startPresence();
     initHousingListener();
 
-    // Show offline indicator if using localStorage
-    if (window._useLocalStorage) {
-      const offlineBadge = document.createElement('span');
-      offlineBadge.style.cssText = 'font-size:10px;color:#a66;margin-left:8px;';
-      offlineBadge.textContent = '(Offline)';
-      document.querySelector('#hud .hud-left')?.appendChild(offlineBadge);
-    }
+    // Show online/offline status indicator
+    showOnlineStatus();
 
-    notify(`Welcome back, ${G.name}!` + (useLocalStorage ? ' (Offline Mode)' : ''));
+    notify(`Welcome back, ${G.name}!` + (useLocalStorage ? ' (Offline Mode — social features disabled)' : ''));
 
     // Initialize Mask of Destiny quest
     initMaskQuest();
@@ -12444,19 +12575,59 @@ async function initFirebase() {
     document.getElementById('charCreateOverlay').classList.add('active');
     initCharCreate();
 
-    // Show offline indicator after char creation completes (deferred)
-    if (window._useLocalStorage) {
-      const _origStartGame = window.startGame;
-      if (typeof _origStartGame === 'function') {
-        window.startGame = function() {
-          _origStartGame.apply(this, arguments);
-          const offlineBadge = document.createElement('span');
-          offlineBadge.style.cssText = 'font-size:10px;color:#a66;margin-left:8px;';
-          offlineBadge.textContent = '(Offline)';
-          document.querySelector('#hud .hud-left')?.appendChild(offlineBadge);
-        };
-      }
+    // Show online/offline status after char creation completes (deferred)
+    const _origStartGame = window.startGame;
+    if (typeof _origStartGame === 'function') {
+      window.startGame = function() {
+        _origStartGame.apply(this, arguments);
+        showOnlineStatus();
+      };
     }
+  }
+}
+
+function showOnlineStatus() {
+  // Remove any existing status indicator
+  const existing = document.getElementById('onlineStatus');
+  if (existing) existing.remove();
+  const existingBtn = document.getElementById('reconnectBtn');
+  if (existingBtn) existingBtn.remove();
+
+  const onlineEl = document.createElement('span');
+  onlineEl.id = 'onlineStatus';
+  onlineEl.style.cssText = 'font-size:10px;margin-left:8px;';
+  if (window._useLocalStorage) {
+    onlineEl.textContent = '\uD83D\uDD34 Offline';
+    onlineEl.style.color = '#a66';
+  } else {
+    onlineEl.textContent = '\uD83D\uDFE2 Online';
+    onlineEl.style.color = '#6a6';
+  }
+  document.querySelector('#hud .hud-left')?.appendChild(onlineEl);
+
+  // Add reconnect button when offline
+  if (window._useLocalStorage) {
+    const reconnBtn = document.createElement('button');
+    reconnBtn.id = 'reconnectBtn';
+    reconnBtn.className = 'hud-btn';
+    reconnBtn.textContent = '\uD83D\uDD04 Reconnect';
+    reconnBtn.onclick = async () => {
+      notify('Attempting to reconnect...');
+      try {
+        const result = await firebase.auth().signInAnonymously();
+        uid = result.user.uid;
+        window._useLocalStorage = false;
+        showOnlineStatus();
+        startPresence();
+        startWorldBossListener();
+        loadPlayerTraps();
+        loadAllTraps();
+        notify('Connected! Multiplayer features enabled.');
+      } catch(e) {
+        notify('Still offline. Check Firebase console — anonymous auth may be disabled.');
+      }
+    };
+    document.querySelector('#hud .hud-right')?.appendChild(reconnBtn);
   }
 }
 
@@ -13081,6 +13252,7 @@ function renderArena() {
 }
 
 function sendArenaChallenge(targetUid) {
+  if (window._useLocalStorage) { notify('Arena requires an online connection.'); return; }
   if (G.coins < 5) { notify('Need 5 coins to wager!'); return; }
   if (G.team.length === 0) { notify('You need a team first!'); return; }
 
@@ -13410,6 +13582,7 @@ function focusWorldBoss() {
 }
 
 function startWorldBossListener() {
+  if (window._useLocalStorage) return;
   if (worldBossListener) return;
   worldBossListener = db.ref('overworld/worldboss');
   worldBossListener.on('value', snap => {
@@ -13777,6 +13950,7 @@ function closeGuildCreate() {
 }
 
 function confirmCreateGuild() {
+  if (window._useLocalStorage) { notify('Guilds require an online connection.'); return; }
   const name = document.getElementById('guildNameInput').value.trim();
   const tag = document.getElementById('guildTagInput').value.trim().toUpperCase();
 
@@ -14377,6 +14551,7 @@ function renderTrapsOnMap(ctx, camX, camY) {
 // ═══════ TIPPING SYSTEM ═══════
 
 function processTipCommand(text) {
+  if (window._useLocalStorage) { notify('Tipping requires an online connection.'); return true; }
   // Parse "/tip [name] [amount]"
   const parts = text.trim().split(/\s+/);
   if (parts.length < 3) {
