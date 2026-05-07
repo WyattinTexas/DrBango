@@ -1,6 +1,6 @@
 // BATTLE
 // Battle system — encounters, dice engine, combat, UI
-// Extracted from index.html — v7.1.0
+// Extracted from index.html — v7.3.0
 // All functions and variables remain global.
 
 // ═══════ ENCOUNTER SYSTEM ═══════
@@ -100,6 +100,31 @@ function getSidelineGhosts() {
 function getEnemySidelineGhosts() {
   if (!B || !B.enemy) return [];
   return B.enemy.ghosts.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0);
+}
+
+// ═══════ RESOURCE COMMIT SYSTEM ═══════
+
+function commitResource(type) {
+  if (!B || B.phase !== 'ready') return;
+  if (!B.resources || !B.resources[type] || B.resources[type] <= 0) return;
+
+  if (!B.committed) B.committed = {};
+  B.committed[type] = (B.committed[type] || 0) + 1;
+  B.resources[type]--;
+
+  renderBattle();
+  if (typeof SFX !== 'undefined' && SFX.notify) SFX.notify();
+}
+
+function uncommitResource(type) {
+  if (!B || B.phase !== 'ready') return;
+  if (!B.committed || !B.committed[type] || B.committed[type] <= 0) return;
+
+  B.committed[type]--;
+  if (B.committed[type] <= 0) delete B.committed[type];
+  B.resources[type] = (B.resources[type] || 0) + 1;
+
+  renderBattle();
 }
 
 // Helper: check if team is fully defeated
@@ -337,6 +362,7 @@ function triggerWildEncounter() {
     enemyUsedResource: false,
     damageTakenThisRound: 0,
     koSwapTeam: null,
+    committed: {},
   };
 
   showBattleOverlay();
@@ -517,8 +543,37 @@ function renderBattle() {
     }
     // 'swapping' is handled by ko-swap above on re-render
   } else {
-    // Normal ready state — show FIGHT/RUN buttons
-    actionsEl.innerHTML = '<button class="battle-btn btn-roll" id="btnRoll" onclick="battleRoll()">FIGHT</button>' +
+    // Normal ready state — show commit bar + FIGHT/RUN buttons
+    let commitHtml = '';
+    if (B.phase === 'ready' && B.resources) {
+      const res = B.resources;
+      const com = B.committed || {};
+      const hasAny = res.iceShards > 0 || res.sacredFire > 0 || res.healingSeeds > 0 || res.surge > 0 || res.luckyStones > 0 || res.moonstone > 0;
+      const hasCommitted = Object.keys(com).length > 0;
+      if (hasAny || hasCommitted) {
+        commitHtml = '<div class="battle-commit-bar">';
+        if (res.iceShards > 0) commitHtml += `<button class="commit-btn" onclick="commitResource('iceShards')" title="Commit Ice Shard (+1 dmg on win)">ICE ${res.iceShards}</button>`;
+        if (res.sacredFire > 0) commitHtml += `<button class="commit-btn commit-fire" onclick="commitResource('sacredFire')" title="Commit Sacred Fire (+3 dmg on win)">FIRE ${res.sacredFire}</button>`;
+        if (res.healingSeeds > 0) commitHtml += `<button class="commit-btn commit-heal" onclick="commitResource('healingSeeds')" title="Heal 2 HP after roll">SEED ${res.healingSeeds}</button>`;
+        if (res.surge > 0) commitHtml += `<button class="commit-btn commit-surge" onclick="commitResource('surge')" title="+1 die this roll">SURGE ${res.surge}</button>`;
+        if (res.luckyStones > 0) commitHtml += `<button class="commit-btn commit-lucky" onclick="commitResource('luckyStones')" title="Reroll lowest die">LUCK ${res.luckyStones}</button>`;
+        if (res.moonstone > 0) commitHtml += `<button class="commit-btn commit-moon" onclick="commitResource('moonstone')" title="Set highest die to 6">MOON ${res.moonstone}</button>`;
+        commitHtml += '</div>';
+        // Show committed resources
+        if (hasCommitted) {
+          commitHtml += '<div class="battle-committed">';
+          for (const [k, v] of Object.entries(com)) {
+            if (v > 0) {
+              const label = {iceShards:'ICE',sacredFire:'FIRE',healingSeeds:'SEED',surge:'SURGE',luckyStones:'LUCK',moonstone:'MOON'}[k] || k;
+              commitHtml += `<span class="committed-tag" onclick="uncommitResource('${k}')" title="Click to uncommit">${label} x${v} ✓</span>`;
+            }
+          }
+          commitHtml += '</div>';
+        }
+      }
+    }
+    actionsEl.innerHTML = commitHtml +
+      '<button class="battle-btn btn-roll" id="btnRoll" onclick="battleRoll()">FIGHT</button>' +
       '<button class="battle-btn btn-flee" onclick="fleeBattle()">RUN</button>';
   }
 }
@@ -926,6 +981,12 @@ function battleRoll() {
     B.log.push({ text: `${eg.name} (Teamwork): -1 die, +1 HP, +1 damage!`, type: 'ability' });
   }
 
+  // ── COMMITTED RESOURCES: Surge → extra dice ──
+  if (B.committed && B.committed.surge) {
+    B.nextRoundMods.playerExtraDice += B.committed.surge;
+    B.log.push({ text: `Surge committed: +${B.committed.surge} dice!`, type: 'ability' });
+  }
+
   // ── DICE COUNTS (apply nextRoundMods) ──
   SFX.diceRoll();
   let pDiceCount = Math.min(3 + B.nextRoundMods.playerExtraDice, B.nextRoundMods.playerMaxDice);
@@ -970,51 +1031,114 @@ function battleRoll() {
   const rollBtn = document.getElementById('btnRoll');
   if (rollBtn) rollBtn.disabled = true;
 
+  // ── ACTUAL ROLL (weighted for low-HP drama) — roll now, reveal theatrically ──
+  let pDice = weightedRoll(pg, pDiceCount);
+  let eDice = weightedRoll(eg, eDiceCount);
+
+  // Bouril (201): force first roll to 1-2-3
+  if (B.bourilActive === 'player') {
+    pDice = [1, 2, 3];
+    B.bourilActive = null;
+  } else if (B.bourilActive === 'enemy') {
+    eDice = [1, 2, 3];
+    B.bourilActive = null;
+  }
+
+  // Tommy Salami (30): rolling a 6 gains +1 die
+  if (pg.id === 30) {
+    let sixes = pDice.filter(d => d === 6).length;
+    while (sixes > 0) {
+      const extraDie = rollDie();
+      pDice.push(extraDie);
+      B.log.push({ text: `${pg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
+      sixes = (extraDie === 6) ? 1 : 0;
+    }
+  }
+  if (eg.id === 30) {
+    let sixes = eDice.filter(d => d === 6).length;
+    while (sixes > 0) {
+      const extraDie = rollDie();
+      eDice.push(extraDie);
+      B.log.push({ text: `${eg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
+      sixes = (extraDie === 6) ? 1 : 0;
+    }
+  }
+
+  // Jeanie (90): Hidden Treasure — force opponent to reroll all dice, once per game
+  if (pg.id === 90 && !pg.usedOncePerGame) {
+    pg.usedOncePerGame = true;
+    eDice = rollDice(eDice.length);
+    B.log.push({ text: `${pg.name} (Hidden Treasure): Forced enemy to reroll! New: [${eDice.join(', ')}]`, type: 'ability' });
+  }
+  if (eg.id === 90 && !eg.usedOncePerGame) {
+    eg.usedOncePerGame = true;
+    pDice = rollDice(pDice.length);
+    B.log.push({ text: `${eg.name} (Hidden Treasure): Forced you to reroll! New: [${pDice.join(', ')}]`, type: 'ability' });
+  }
+
+  // ── COMMITTED RESOURCES: Lucky Stone → auto-reroll lowest die ──
+  if (B.committed && B.committed.luckyStones) {
+    for (let ls = 0; ls < B.committed.luckyStones; ls++) {
+      const minIdx = pDice.indexOf(Math.min(...pDice));
+      const oldVal = pDice[minIdx];
+      pDice[minIdx] = rollDie();
+      B.log.push({ text: `Lucky Stone: Rerolled ${oldVal} → ${pDice[minIdx]}!`, type: 'ability' });
+    }
+    pDice.sort((a, b) => a - b);
+  }
+
+  // ── COMMITTED RESOURCES: Moonstone → set highest die to 6 ──
+  if (B.committed && B.committed.moonstone) {
+    for (let ms = 0; ms < B.committed.moonstone; ms++) {
+      const maxIdx = pDice.length - 1 - ms;
+      if (maxIdx >= 0 && pDice[maxIdx] < 6) {
+        const oldVal = pDice[maxIdx];
+        pDice[maxIdx] = 6;
+        B.log.push({ text: `Moonstone: Set die ${oldVal} → 6!`, type: 'ability' });
+      }
+    }
+    pDice.sort((a, b) => a - b);
+  }
+
+  // ── STAGED DICE REVEAL ──
+  // Stage 1: rapid flicker (0–400ms)
+  let _flickerInterval = setInterval(() => {
+    pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+    eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+  }, 80);
+
+  // Stage 2: slow down, occasionally flash real values (400ms)
   setTimeout(() => {
-    // ── ACTUAL ROLL (weighted for low-HP drama) ──
-    let pDice = weightedRoll(pg, pDiceCount);
-    let eDice = weightedRoll(eg, eDiceCount);
+    clearInterval(_flickerInterval);
+    _flickerInterval = setInterval(() => {
+      pDiceEl.innerHTML = pDice.map((d) => `<div class="die player rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
+      eDiceEl.innerHTML = eDice.map((d) => `<div class="die enemy rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
+    }, 150);
+  }, 400);
 
-    // Bouril (201): force first roll to 1-2-3
-    if (B.bourilActive === 'player') {
-      pDice = [1, 2, 3];
-      B.bourilActive = null;
-    } else if (B.bourilActive === 'enemy') {
-      eDice = [1, 2, 3];
-      B.bourilActive = null;
-    }
+  // Stage 3: reveal one at a time, left to right (800ms)
+  setTimeout(() => {
+    clearInterval(_flickerInterval);
+    // Show all as rolling with random values first
+    pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+    eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+    // Reveal each die one at a time
+    pDice.forEach((d, i) => {
+      setTimeout(() => {
+        const dice = pDiceEl.querySelectorAll('.die');
+        if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
+      }, i * 120);
+    });
+    eDice.forEach((d, i) => {
+      setTimeout(() => {
+        const dice = eDiceEl.querySelectorAll('.die');
+        if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
+      }, i * 120);
+    });
+  }, 800);
 
-    // Tommy Salami (30): rolling a 6 gains +1 die
-    if (pg.id === 30) {
-      let sixes = pDice.filter(d => d === 6).length;
-      while (sixes > 0) {
-        const extraDie = rollDie();
-        pDice.push(extraDie);
-        B.log.push({ text: `${pg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
-        sixes = (extraDie === 6) ? 1 : 0;
-      }
-    }
-    if (eg.id === 30) {
-      let sixes = eDice.filter(d => d === 6).length;
-      while (sixes > 0) {
-        const extraDie = rollDie();
-        eDice.push(extraDie);
-        B.log.push({ text: `${eg.name} (Hot Streak): Rolled a 6 — bonus die [${extraDie}]!`, type: 'ability' });
-        sixes = (extraDie === 6) ? 1 : 0;
-      }
-    }
-
-    // Jeanie (90): Hidden Treasure — force opponent to reroll all dice, once per game
-    if (pg.id === 90 && !pg.usedOncePerGame) {
-      pg.usedOncePerGame = true;
-      eDice = rollDice(eDice.length);
-      B.log.push({ text: `${pg.name} (Hidden Treasure): Forced enemy to reroll! New: [${eDice.join(', ')}]`, type: 'ability' });
-    }
-    if (eg.id === 90 && !eg.usedOncePerGame) {
-      eg.usedOncePerGame = true;
-      pDice = rollDice(pDice.length);
-      B.log.push({ text: `${eg.name} (Hidden Treasure): Forced you to reroll! New: [${pDice.join(', ')}]`, type: 'ability' });
-    }
+  // Stage 4: all dice revealed — apply committed resources and resolve (1200ms)
+  setTimeout(() => {
 
     B.playerDice = pDice;
     B.enemyDice = eDice;
@@ -1414,21 +1538,19 @@ function battleRoll() {
         }
       }
 
-      // Resource damage bonuses
-      if (B.resources.iceShards > 0) {
+      // Resource damage bonuses — only committed resources are consumed
+      if (B.committed && B.committed.iceShards > 0) {
         // Skylar (104): Ice Shards deal 3x instead of 1x (active or sideline)
         const hasSkylar = pg.id === 104 || getSidelineGhosts().some(g => g.id === 104);
         const iceMultiplier = hasSkylar ? 3 : 1;
-        const iceDmg = B.resources.iceShards * iceMultiplier;
+        const iceDmg = B.committed.iceShards * iceMultiplier;
         dmg += iceDmg;
-        B.log.push({ text: `Ice Shards: +${iceDmg} damage!${hasSkylar ? ' (Skylar: 3x!)' : ''}`, type: 'ability' });
-        B.resources.iceShards = 0;
+        B.log.push({ text: `Ice Shards (${B.committed.iceShards}): +${iceDmg} damage!${hasSkylar ? ' (Skylar: 3x!)' : ''}`, type: 'ability' });
       }
-      if (B.resources.sacredFire > 0) {
-        const fireDmg = B.resources.sacredFire * 3;
+      if (B.committed && B.committed.sacredFire > 0) {
+        const fireDmg = B.committed.sacredFire * 3;
         dmg += fireDmg;
-        B.log.push({ text: `Sacred Fire: +${fireDmg} damage!`, type: 'ability' });
-        B.resources.sacredFire = 0;
+        B.log.push({ text: `Sacred Fire (${B.committed.sacredFire}): +${fireDmg} damage!`, type: 'ability' });
       }
 
       // Romy (114): predict a die number, if any die matches, +3 damage
@@ -2117,6 +2239,20 @@ function battleRoll() {
       B.log.push({ text: `Skylar (Winter Barrage): Enemy Ice Shards deal boosted damage!`, type: 'ability' });
     }
 
+    // ── COMMITTED RESOURCES: Healing Seed → heal active ghost 2 HP each ──
+    if (B.committed && B.committed.healingSeeds > 0 && !pg.ko) {
+      const healTotal = B.committed.healingSeeds * 2;
+      const actualHeal = Math.min(healTotal, pg.maxHp - pg.hp);
+      if (actualHeal > 0) {
+        pg.hp += actualHeal;
+        B.log.push({ text: `Healing Seed (${B.committed.healingSeeds}): Healed ${actualHeal} HP!`, type: 'heal' });
+        showDmgFloat('player', actualHeal, true);
+      }
+    }
+
+    // Clear committed resources after use
+    B.committed = {};
+
     B.round++;
     // Show damage result first, then check for KO swap
     renderBattle();
@@ -2140,7 +2276,7 @@ function battleRoll() {
       if (rollBtn) rollBtn.disabled = false;
       renderBattle();
     }, 200);
-  }, 400);
+  }, 1200);
 }
 
 function fleeBattle() {
