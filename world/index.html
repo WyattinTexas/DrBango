@@ -763,25 +763,39 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ═══════ DIALOGUE MODAL ═══════ */
 #dialogueOverlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1100; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: 90%; max-width: 600px;
+  background: rgba(10,10,30,0.95); border: 2px solid #445;
+  border-radius: 12px; padding: 16px 20px;
+  z-index: 1100; opacity: 0; pointer-events: none;
+  display: flex; gap: 16px; align-items: flex-start;
+  transition: opacity 0.25s, transform 0.3s;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
+  cursor: pointer;
 }
-#dialogueOverlay.active { opacity: 1; pointer-events: auto; }
+#dialogueOverlay.active {
+  opacity: 1; pointer-events: auto;
+  animation: dialogueSlideUp 0.3s ease forwards;
+}
+@keyframes dialogueSlideUp {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
 .dialogue-modal {
-  background: #1a1a2e; border: 1px solid #445; border-radius: 12px;
-  padding: 28px; max-width: 440px; width: 90%; text-align: center;
+  display: contents;
 }
 .dialogue-portrait {
-  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 12px;
+  width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 32px; border: 3px solid #556;
+  font-size: 24px; border: 2px solid #556;
 }
-.dialogue-npc-name { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
-.dialogue-text { font-size: 14px; color: #ccc; line-height: 1.6; margin-bottom: 20px; min-height: 50px; }
+.dialogue-npc-name { font-size: 14px; font-weight: bold; color: #daa520; margin-bottom: 4px; }
+.dialogue-text { font-size: 13px; color: #ccc; line-height: 1.5; }
+.dialogue-dismiss { color: #666; font-size: 10px; margin-top: 6px; }
 .dialogue-close {
   background: rgba(255,255,255,0.1); border: 1px solid #556; color: #ccc;
   padding: 8px 28px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  display: none;
 }
 .dialogue-close:hover { background: rgba(255,255,255,0.2); }
 
@@ -1114,6 +1128,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 
 /* ═══════ WORLD BOSS BAR ═══════ */
 #worldBossBar {
+  display: none !important; /* REMOVED: boss UI was distracting */
   position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
   transition: opacity 0.5s ease;
   background: linear-gradient(180deg, rgba(80,20,20,0.95), rgba(40,10,10,0.9));
@@ -2037,13 +2052,13 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 </div>
 
 <!-- NPC DIALOGUE MODAL -->
-<div id="dialogueOverlay">
-  <div class="dialogue-modal">
-    <div class="dialogue-portrait" id="dialoguePortrait"></div>
+<div id="dialogueOverlay" onclick="closeDialogue()">
+  <div class="dialogue-portrait" id="dialoguePortrait"></div>
+  <div style="flex:1;">
     <div class="dialogue-npc-name" id="dialogueNpcName">???</div>
     <div class="dialogue-text" id="dialogueText">...</div>
-    <div id="dialogueQuestArea" style="margin-bottom:12px;"></div>
-    <button class="dialogue-close" onclick="closeDialogue()">Close</button>
+    <div id="dialogueQuestArea" style="margin-top:8px;"></div>
+    <div class="dialogue-dismiss">Click to dismiss</div>
   </div>
 </div>
 
@@ -2213,7 +2228,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.7.0';
+const VERSION = 'v6.7.1';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -6122,7 +6137,10 @@ function render() {
     const ny = npc.y * TILE - camY;
     if (nx < -50 || nx > W + 50 || ny < -50 || ny > H + 50) continue;
 
-    // Shadow
+    // Idle bobbing
+    const npcBob = Math.sin(Date.now() * 0.0015 + npc.x * 7) * 2;
+
+    // Shadow (shadow stays grounded, no bob)
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
     ctx.ellipse(nx + TILE/2, ny + TILE - 2, 12, 5, 0, 0, Math.PI * 2);
@@ -6131,25 +6149,50 @@ function render() {
     // Body — use NPC sprite if available, fallback to circle
     const npcImg = npc.sprite ? spriteImages[npc.sprite] : null;
     if (npcImg && npcImg.complete && npcImg.naturalWidth) {
-      const npcFrame = Math.floor(Date.now() / 500) % Math.max(1, Math.floor(npcImg.naturalWidth / 16));
+      // Slow idle frame cycle (800ms per frame for a relaxed look-around feel)
+      const npcFrame = Math.floor(Date.now() / 800) % Math.max(1, Math.floor(npcImg.naturalWidth / 16));
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(npcImg, npcFrame * 16, 0, 16, 16, nx + TILE/2 - 24, ny + TILE/2 - 24, 48, 48);
+      ctx.drawImage(npcImg, npcFrame * 16, 0, 16, 16, nx + TILE/2 - 24, ny + TILE/2 - 24 + npcBob, 48, 48);
       ctx.imageSmoothingEnabled = true;
     } else {
       ctx.fillStyle = npc.color;
       ctx.beginPath();
-      ctx.arc(nx + TILE/2, ny + TILE/2 - 2, 14, 0, Math.PI * 2);
+      ctx.arc(nx + TILE/2, ny + TILE/2 - 2 + npcBob, 14, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
 
+    // Speech bubble (if active)
+    if (npc._speechBubble && Date.now() < npc._speechBubble.until) {
+      const bubbleText = npc._speechBubble.text;
+      ctx.font = '10px sans-serif';
+      const tw = ctx.measureText(bubbleText).width + 12;
+      const bx = nx + TILE/2 - tw/2;
+      const by = ny - 30 + npcBob;
+      // Bubble background
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by - 12, tw, 18, 6);
+      ctx.fill();
+      // Bubble tail
+      ctx.beginPath();
+      ctx.moveTo(nx + TILE/2 - 4, by + 6);
+      ctx.lineTo(nx + TILE/2, by + 12);
+      ctx.lineTo(nx + TILE/2 + 4, by + 6);
+      ctx.fill();
+      // Bubble text
+      ctx.fillStyle = '#1a1a2e';
+      ctx.textAlign = 'center';
+      ctx.fillText(bubbleText, nx + TILE/2, by + 2);
+    }
+
     // Name
     ctx.fillStyle = '#ffe0a0';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(npc.name, nx + TILE/2, ny - 6);
+    ctx.fillText(npc.name, nx + TILE/2, ny - 6 + npcBob);
 
     // Interaction indicator if player is near
     const dist = Math.sqrt((G.x - npc.x) ** 2 + (G.y - npc.y) ** 2);
@@ -6157,7 +6200,27 @@ function render() {
       const promptAlpha = 0.5 + Math.sin(time * 3) * 0.3;
       ctx.fillStyle = `rgba(255,224,160,${promptAlpha})`;
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('[E] Talk', nx + TILE/2, ny - 18);
+      ctx.fillText('[E] Talk', nx + TILE/2, ny - 18 + npcBob);
+    }
+
+    // NPC greeting on approach
+    if (dist < 4 && !npc._greeted) {
+      npc._greeted = true;
+      const greetings = {
+        'Elder Frost': 'Ah, a visitor!',
+        'Smith Ember': 'Need something forged?',
+        'Keeper Zara': 'Looking for a challenge?',
+        'Farmer Bea': 'Beautiful day for a harvest!',
+        'Herbalist Sage': 'I smell adventure on you...',
+        'Captain Flint': 'Ahoy, traveler!',
+        'Lava Tender': 'Watch your step, friend.',
+        'Shadow Warden': 'Stay alert in these halls...',
+        'Cursed Scholar': 'Knowledge has a price...',
+      };
+      const greeting = greetings[npc.name] || 'Hello there!';
+      showNPCSpeechBubble(npc, greeting);
+    } else if (dist > 6 && npc._greeted) {
+      npc._greeted = false; // Reset so greeting triggers again on next approach
     }
   }
 
@@ -6169,7 +6232,10 @@ function render() {
     const hdist = Math.sqrt((G.x - hnpc.x) ** 2 + (G.y - hnpc.y) ** 2);
     const defeated = isHostileNPCDefeatedToday(hnpc.id);
 
-    // Shadow
+    // Idle bobbing
+    const hnpcBob = Math.sin(Date.now() * 0.0015 + hnpc.x * 7) * 2;
+
+    // Shadow (stays grounded)
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
     ctx.ellipse(hx + TILE/2, hy + TILE - 2, 12, 5, 0, 0, Math.PI * 2);
@@ -6178,18 +6244,39 @@ function render() {
     // Body sprite
     const hnpcImg = hnpc.sprite ? spriteImages[hnpc.sprite] : null;
     if (hnpcImg && hnpcImg.complete && hnpcImg.naturalWidth) {
-      const hFrame = Math.floor(Date.now() / 500) % Math.max(1, Math.floor(hnpcImg.naturalWidth / 16));
+      const hFrame = Math.floor(Date.now() / 800) % Math.max(1, Math.floor(hnpcImg.naturalWidth / 16));
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(hnpcImg, hFrame * 16, 0, 16, 16, hx + TILE/2 - 24, hy + TILE/2 - 24, 48, 48);
+      ctx.drawImage(hnpcImg, hFrame * 16, 0, 16, 16, hx + TILE/2 - 24, hy + TILE/2 - 24 + hnpcBob, 48, 48);
       ctx.imageSmoothingEnabled = true;
     } else {
       ctx.fillStyle = hnpc.color;
       ctx.beginPath();
-      ctx.arc(hx + TILE/2, hy + TILE/2 - 2, 14, 0, Math.PI * 2);
+      ctx.arc(hx + TILE/2, hy + TILE/2 - 2 + hnpcBob, 14, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.stroke();
+    }
+
+    // Speech bubble (if active — hostile NPCs get these too when defeated & talked to)
+    if (hnpc._speechBubble && Date.now() < hnpc._speechBubble.until) {
+      const bubbleText = hnpc._speechBubble.text;
+      ctx.font = '10px sans-serif';
+      const tw = ctx.measureText(bubbleText).width + 12;
+      const bx = hx + TILE/2 - tw/2;
+      const by = hy - 30 + hnpcBob;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by - 12, tw, 18, 6);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(hx + TILE/2 - 4, by + 6);
+      ctx.lineTo(hx + TILE/2, by + 12);
+      ctx.lineTo(hx + TILE/2 + 4, by + 6);
+      ctx.fill();
+      ctx.fillStyle = '#1a1a2e';
+      ctx.textAlign = 'center';
+      ctx.fillText(bubbleText, hx + TILE/2, by + 2);
     }
 
     if (defeated) {
@@ -6197,19 +6284,19 @@ function render() {
       ctx.fillStyle = '#ffe0a0';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(hnpc.name, hx + TILE/2, hy - 6);
+      ctx.fillText(hnpc.name, hx + TILE/2, hy - 6 + hnpcBob);
       if (hdist < 2.5) {
         const pa = 0.5 + Math.sin(time * 3) * 0.3;
         ctx.fillStyle = `rgba(255,224,160,${pa})`;
         ctx.font = 'bold 11px sans-serif';
-        ctx.fillText('[E] Talk', hx + TILE/2, hy - 18);
+        ctx.fillText('[E] Talk', hx + TILE/2, hy - 18 + hnpcBob);
       }
     } else {
       // Hostile mode: red name + "!" exclamation
       ctx.fillStyle = '#ff4444';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(hnpc.name, hx + TILE/2, hy - 6);
+      ctx.fillText(hnpc.name, hx + TILE/2, hy - 6 + hnpcBob);
       // Red danger aura
       if (hdist < 6) {
         const pulseR = 20 + Math.sin(time * 5) * 3;
@@ -6225,7 +6312,7 @@ function render() {
         ctx.fillStyle = '#ff2222';
         ctx.font = 'bold 18px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('!', hx + TILE/2, hy - 22 + bob);
+        ctx.fillText('!', hx + TILE/2, hy - 22 + bob + hnpcBob);
       }
     }
   }
@@ -7453,6 +7540,9 @@ function setupInput() {
 }
 
 function gameLoop() {
+  if (window._gameLoopRunning) return;
+  window._gameLoopRunning = true;
+  setTimeout(() => { window._gameLoopRunning = false; }, 14);
   if (G.inBattle) return;
   if (typeof cantinaActive !== 'undefined' && cantinaActive) { updateCantina(16, keys); setTimeout(gameLoop, 16); return; }
   if (typeof workshopActive !== 'undefined' && workshopActive) { updateWorkshop(16, keys); setTimeout(gameLoop, 16); return; }
@@ -11286,16 +11376,26 @@ function closeResourceReport() {
 
 // ═══════ NPC DIALOGUE SYSTEM ═══════
 
+function showNPCSpeechBubble(npc, text) {
+  const shortText = text.length > 30 ? text.substring(0, 30) + '...' : text;
+  npc._speechBubble = { text: shortText, until: Date.now() + 3000 };
+}
+
 function showDialogue(npcName) {
   const data = NPC_DIALOGUE_MAP[npcName];
   if (!data) return;
 
+  const line = data.getLine();
   document.getElementById('dialoguePortrait').innerHTML = data.portrait;
   document.getElementById('dialoguePortrait').style.background = data.portraitBg;
   document.getElementById('dialogueNpcName').textContent = npcName;
-  document.getElementById('dialogueText').textContent = data.getLine();
+  document.getElementById('dialogueText').textContent = line;
   renderQuestAreaInDialogue(npcName);
   document.getElementById('dialogueOverlay').classList.add('active');
+
+  // Show speech bubble on the overworld NPC too
+  const npc = NPCS.find(n => n.name === npcName);
+  if (npc) showNPCSpeechBubble(npc, line);
 }
 
 function closeDialogue() {
@@ -12333,6 +12433,7 @@ function tryInteract() {
       document.getElementById('dialogueNpcName').textContent = hnpc.name;
       document.getElementById('dialogueText').textContent = line;
       document.getElementById('dialogueOverlay').classList.add('active');
+      showNPCSpeechBubble(hnpc, line);
       return;
     }
   }
