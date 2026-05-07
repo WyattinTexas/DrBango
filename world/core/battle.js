@@ -1,6 +1,6 @@
 // BATTLE
 // Battle system — encounters, dice engine, combat, UI
-// Extracted from index.html — v7.3.0
+// Extracted from index.html — v7.4.0
 // All functions and variables remain global.
 
 // ═══════ ENCOUNTER SYSTEM ═══════
@@ -295,6 +295,328 @@ function compareRolls(a, b) {
 
 function rarityGlowClass(rarity) {
   return 'rarity-glow-' + (rarity || 'common');
+}
+
+// ═══════ 3D DICE PHYSICS ENGINE (ported from testroom) ═══════
+
+// Check if 3D dice should be used (screens > 600px)
+function use3dDice() { return window.innerWidth > 600; }
+
+// Pip layout definitions
+const PIP_LAYOUTS = {
+  1: ['c'],
+  2: ['tl','br'],
+  3: ['tl','c','br'],
+  4: ['tl','tr','bl','br'],
+  5: ['tl','tr','c','bl','br'],
+  6: ['tl','tr','ml','mr','bl','br']
+};
+const PIP_STYLES = {
+  tl:'top:18%;left:18%', tr:'top:18%;right:18%',
+  ml:'top:50%;left:18%;transform:translateY(-50%)',
+  c:'top:50%;left:50%;transform:translate(-50%,-50%)',
+  mr:'top:50%;right:18%;transform:translateY(-50%)',
+  bl:'bottom:18%;left:18%', br:'bottom:18%;right:18%'
+};
+
+function pip3dHTML(val) {
+  return (PIP_LAYOUTS[val]||PIP_LAYOUTS[1]).map(p=>`<span class="pip3d" style="${PIP_STYLES[p]}"></span>`).join('');
+}
+
+function cube3dHTML(team) {
+  const c = 'face-' + team;
+  // front=1, right=2, top=3, bottom=4, left=5, back=6
+  return [
+    ['front',1],['back',6],['right',2],['left',5],['top',3],['bottom',4]
+  ].map(([f,v])=>`<div class="die-face ${c} face-${f}">${pip3dHTML(v)}</div>`).join('');
+}
+
+const FACE_TARGET = {
+  1:{rx:0,ry:0}, 2:{rx:0,ry:-90}, 3:{rx:90,ry:0},
+  4:{rx:-90,ry:0}, 5:{rx:0,ry:90}, 6:{rx:0,ry:180}
+};
+function nearestSnap(cur,tgt){const n=Math.round((cur-tgt)/360);return tgt+n*360;}
+
+let _dicePhysics = {};
+
+// Throw Profiles — choreographed dice paths
+const THROW_PROFILES = [
+  // THE BLOOM
+  (i, n) => { const t = n > 1 ? i / (n - 1) : 0.5; return { vx: 13 + t * 15, vy: -(25 - t * 20) }; },
+  // THE BANK SHOT
+  (i, n) => { const t = n > 1 ? i / (n - 1) : 0.5; return { vx: 10 + t * 14, vy: -(20 + t * 4) }; },
+  // THE CROSS-TABLE
+  (i, n) => { const t = n > 1 ? i / (n - 1) : 0.5; return { vx: 24 + t * 6, vy: -(8 + t * 10) }; },
+  // THE SPIRAL
+  (i, n) => { const t = n > 1 ? i / (n - 1) : 0.5; return { vx: 28 - t * 18, vy: -(10 + t * 12) }; },
+  // THE SCATTER
+  (i, n) => {
+    const angles = [0.15, 0.55, 0.85, 0.35, 0.7];
+    const a = angles[i % angles.length];
+    return { vx: 14 + a * 14, vy: -(6 + (1 - a) * 20) };
+  },
+  // THE GENTLE TOSS
+  (i, n) => { const t = n > 1 ? i / (n - 1) : 0.5; return { vx: 7 + t * 5, vy: -(9 + t * 3) }; },
+];
+
+function pickThrowProfile(count) {
+  const profile = THROW_PROFILES[Math.floor(Math.random() * THROW_PROFILES.length)];
+  const noise = () => 1 + (Math.random() - 0.5) * 0.25;
+  return Array.from({ length: count }, (_, i) => {
+    const v = profile(i, count);
+    return { vx: v.vx * noise() * 1.15, vy: v.vy * noise() * 1.15 };
+  });
+}
+
+function update3dDice(team, values) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice) return;
+  physics.values = values;
+  values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d || d.value === v) return;
+    d.value = v;
+    d.el.classList.remove('highlight-single', 'highlight-double', 'highlight-triple',
+      'die-win-singles-3d', 'die-win-doubles-3d', 'die-win-triples-3d', 'die-win-mega-3d',
+      'die-win-secondary-3d', 'die-loser-3d', 'triples-glow-3d');
+    const tgt = FACE_TARGET[v];
+    d.rx = nearestSnap(d.rx, tgt.rx);
+    d.ry = nearestSnap(d.ry, tgt.ry);
+    d.el.classList.add('value-update');
+    d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    setTimeout(() => d.el.classList.remove('value-update'), 450);
+  });
+}
+
+function flatDieHTML(val, team) {
+  if (val === '?' || val === 0 || !val) return `<div class="die ${team}">?</div>`;
+  return `<div class="die ${team}"><div style="position:relative;width:100%;height:100%;" class="face-${team}">${pip3dHTML(val)}</div></div>`;
+}
+
+// Show rolling animation — 3D physics dice bouncing across the battle field
+function showRolling3d(team, count) {
+  if (count === 0) return;
+
+  // Roll dice across the battle field
+  const board = document.querySelector('.battle-field');
+  if (!board) return;
+  const boardRect = board.getBoundingClientRect();
+  const W = boardRect.width;
+  const H = boardRect.height;
+  const dieSize = 38;
+  const half = dieSize / 2;
+  const pad = 12;
+  const minX = pad, maxX = W - pad - dieSize;
+  const minY = pad, maxY = H - pad - dieSize;
+
+  // Clean up previous physics for this team
+  if (_dicePhysics[team]) {
+    cancelAnimationFrame(_dicePhysics[team].raf);
+    _dicePhysics[team].els.forEach(e => e.remove());
+  }
+
+  const dice = [];
+  const els = [];
+  const isPlayer = team === 'player';
+  const handX = isPlayer ? minX + 10 : maxX - 10;
+  const handY = maxY - 5;
+  const throwVecs = pickThrowProfile(count);
+
+  for (let i = 0; i < count; i++) {
+    const die = document.createElement('div');
+    die.className = 'die-physics';
+    die.style.width = dieSize + 'px';
+    die.style.height = dieSize + 'px';
+    die.style.zIndex = '100';
+    die.style.setProperty('--dh', half + 'px');
+    die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
+    board.appendChild(die);
+    els.push(die);
+
+    const tv = throwVecs[i];
+    dice.push({
+      el: die, cube: die.querySelector('.die-cube'),
+      x: handX + (Math.random() - 0.5) * 6, y: handY + (Math.random() - 0.5) * 6,
+      vx: (isPlayer ? 1 : -1) * tv.vx,
+      vy: tv.vy,
+      rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
+      vrx: (Math.random() - 0.5) * 55,
+      vry: (Math.random() - 0.5) * 55,
+      vrz: (Math.random() - 0.5) * 40,
+      bounceCount: 0
+    });
+  }
+
+  function getBounceCoeff(d) {
+    return Math.max(0.3, 0.65 * Math.pow(0.8, d.bounceCount));
+  }
+  function getSurfaceFriction(speed) {
+    if (speed > 8) return 0.982;
+    if (speed > 3) return 0.965;
+    return 0.935;
+  }
+  function getRotFriction(speed) {
+    if (speed > 8) return 0.972;
+    if (speed > 3) return 0.950;
+    return 0.920;
+  }
+
+  function step() {
+    // Dice-to-dice repulsion
+    for (let a = 0; a < dice.length; a++) {
+      for (let b = a + 1; b < dice.length; b++) {
+        const da = dice[a], db = dice[b];
+        const dx = da.x - db.x, dy = da.y - db.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < dieSize && dist > 0.1) {
+          const push = (dieSize - dist) * 0.15;
+          const nx = dx / dist, ny = dy / dist;
+          da.vx += nx * push; da.vy += ny * push;
+          db.vx -= nx * push; db.vy -= ny * push;
+        }
+      }
+    }
+    dice.forEach(d => {
+      d.x += d.vx; d.y += d.vy;
+      d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
+      const speed = Math.abs(d.vx) + Math.abs(d.vy);
+
+      const bc = getBounceCoeff(d);
+      if (d.x < minX) {
+        d.x = minX; d.vx = Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.x > maxX) {
+        d.x = maxX; d.vx = -Math.abs(d.vx) * bc;
+        d.vry *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y < minY) {
+        d.y = minY; d.vy = Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+      if (d.y > maxY) {
+        d.y = maxY; d.vy = -Math.abs(d.vy) * bc;
+        d.vrx *= 1.4; d.vrz *= 1.3;
+        d.bounceCount++;
+      }
+
+      const fric = getSurfaceFriction(speed);
+      const rFric = getRotFriction(speed);
+      d.vx *= fric; d.vy *= fric;
+      d.vrx *= rFric; d.vry *= rFric; d.vrz *= rFric;
+
+      // Rotation homing — settle onto nearest face as dice slow
+      if (speed < 6) {
+        const strength = 0.08 * (1 - speed / 6);
+        d.rx += (Math.round(d.rx / 90) * 90 - d.rx) * strength;
+        d.ry += (Math.round(d.ry / 90) * 90 - d.ry) * strength;
+        d.rz += (Math.round(d.rz / 90) * 90 - d.rz) * strength;
+      }
+      d.el.style.left = d.x + 'px';
+      d.el.style.top = d.y + 'px';
+      d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    });
+    _dicePhysics[team].raf = requestAnimationFrame(step);
+  }
+
+  _dicePhysics[team] = { raf: requestAnimationFrame(step), dice, els };
+}
+
+// Settle 3D dice to their final positions in the dice tray
+function settleToSlot(team, values) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice.length) return;
+
+  cancelAnimationFrame(physics.raf);
+
+  // Calculate tray position within the battle field
+  const board = document.querySelector('.battle-field');
+  const boardRect = board.getBoundingClientRect();
+  const diceSetId = team === 'player' ? 'pDice' : 'eDice';
+  const trayEl = document.getElementById(diceSetId);
+  const trayRect = trayEl.getBoundingClientRect();
+  const offsetX = trayRect.left - boardRect.left;
+  const offsetY = trayRect.top - boardRect.top;
+  const trayW = trayRect.width;
+  const dieSize = 38;
+  const gap = 6;
+
+  const totalDiceW = values.length * dieSize + (values.length - 1) * gap;
+  const trayStartX = offsetX + (trayW - totalDiceW) / 2;
+  const trayMidY = offsetY + trayRect.height / 2 - dieSize / 2;
+
+  values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d) return;
+
+    const tx = trayStartX + i * (dieSize + gap);
+    const ty = trayMidY;
+
+    const tgt = FACE_TARGET[v];
+    const frx = nearestSnap(d.rx, tgt.rx);
+    const fry = nearestSnap(d.ry, tgt.ry);
+    const frz = nearestSnap(d.rz, 0);
+    d.rx = frx; d.ry = fry; d.rz = frz;
+    d.value = v;
+
+    setTimeout(() => {
+      d.el.classList.add('settling');
+      d.el.style.left = tx + 'px';
+      d.el.style.top = ty + 'px';
+      d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
+    }, i * 80);
+  });
+
+  // Mark as settled after animation completes
+  const settleDelay = values.length * 80 + 750;
+  setTimeout(() => {
+    physics.settled = true;
+    physics.values = values;
+    physics.els.forEach(e => e.style.zIndex = '10');
+  }, settleDelay);
+}
+
+// Clean up 3D dice for a team
+function cleanup3dDice(team) {
+  if (_dicePhysics[team]) {
+    cancelAnimationFrame(_dicePhysics[team].raf);
+    _dicePhysics[team].els.forEach(e => e.remove());
+    delete _dicePhysics[team];
+  }
+}
+
+// Highlight 3D dice based on roll result (winner/loser)
+function highlight3dDice(team, dice, roll, isWinner) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice) return;
+
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
+
+  physics.dice.forEach((d, i) => {
+    if (!d || !d.el) return;
+    // Clear previous highlights
+    d.el.classList.remove('highlight-single', 'highlight-double', 'highlight-triple',
+      'die-win-singles-3d', 'die-win-doubles-3d', 'die-win-triples-3d', 'die-win-mega-3d',
+      'die-win-secondary-3d', 'die-loser-3d', 'triples-glow-3d');
+
+    const v = dice[i];
+    const isMatchingDie = (v === roll.value && counts[v] >= 2);
+
+    if (isWinner) {
+      if (isMatchingDie || roll.type === 'singles') {
+        if (roll.type === 'penta' || roll.type === 'quads') d.el.classList.add('die-win-mega-3d');
+        else if (roll.type === 'triples') d.el.classList.add('die-win-triples-3d');
+        else if (roll.type === 'doubles') d.el.classList.add('die-win-doubles-3d');
+        else d.el.classList.add('die-win-singles-3d');
+      }
+    } else {
+      d.el.classList.add('die-loser-3d');
+    }
+  });
 }
 
 // ═══════ BATTLE SYSTEM ═══════
@@ -1024,8 +1346,20 @@ function battleRoll() {
 
   const pDiceEl = document.getElementById('pDice');
   const eDiceEl = document.getElementById('eDice');
+
+  // Clean up any lingering 3D dice from previous roll
+  cleanup3dDice('player');
+  cleanup3dDice('enemy');
+
   pDiceEl.innerHTML = Array.from({length: pDiceCount}, () => '<div class="die player rolling">?</div>').join('');
   eDiceEl.innerHTML = Array.from({length: eDiceCount}, () => '<div class="die enemy rolling">?</div>').join('');
+
+  // Launch 3D dice physics (screens > 600px only)
+  const _using3d = use3dDice();
+  if (_using3d) {
+    showRolling3d('player', pDiceCount);
+    showRolling3d('enemy', eDiceCount);
+  }
 
   // Disable roll button during animation
   const rollBtn = document.getElementById('btnRoll');
@@ -1101,43 +1435,56 @@ function battleRoll() {
   }
 
   // ── STAGED DICE REVEAL ──
-  // Stage 1: rapid flicker (0–400ms)
-  let _flickerInterval = setInterval(() => {
-    pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
-    eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
-  }, 80);
+  // Animation timing: 3D uses longer physics (1500ms rolling + 750ms settle), flat uses flicker
+  const _revealDelay = _using3d ? 2400 : 1200;
 
-  // Stage 2: slow down, occasionally flash real values (400ms)
-  setTimeout(() => {
-    clearInterval(_flickerInterval);
-    _flickerInterval = setInterval(() => {
-      pDiceEl.innerHTML = pDice.map((d) => `<div class="die player rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
-      eDiceEl.innerHTML = eDice.map((d) => `<div class="die enemy rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
-    }, 150);
-  }, 400);
+  if (_using3d) {
+    // 3D DICE PATH: physics roll for 1.5s, then settle to slots showing final values
+    setTimeout(() => {
+      settleToSlot('player', pDice);
+      settleToSlot('enemy', eDice);
+      // Also update flat dice underneath for consistency
+      pDiceEl.innerHTML = pDice.map(d => `<div class="die player">${d}</div>`).join('');
+      eDiceEl.innerHTML = eDice.map(d => `<div class="die enemy">${d}</div>`).join('');
+    }, 1500);
+  } else {
+    // FLAT DICE PATH: original flicker animation for mobile
+    // Stage 1: rapid flicker (0–400ms)
+    let _flickerInterval = setInterval(() => {
+      pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+      eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+    }, 80);
 
-  // Stage 3: reveal one at a time, left to right (800ms)
-  setTimeout(() => {
-    clearInterval(_flickerInterval);
-    // Show all as rolling with random values first
-    pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
-    eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
-    // Reveal each die one at a time
-    pDice.forEach((d, i) => {
-      setTimeout(() => {
-        const dice = pDiceEl.querySelectorAll('.die');
-        if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
-      }, i * 120);
-    });
-    eDice.forEach((d, i) => {
-      setTimeout(() => {
-        const dice = eDiceEl.querySelectorAll('.die');
-        if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
-      }, i * 120);
-    });
-  }, 800);
+    // Stage 2: slow down, occasionally flash real values (400ms)
+    setTimeout(() => {
+      clearInterval(_flickerInterval);
+      _flickerInterval = setInterval(() => {
+        pDiceEl.innerHTML = pDice.map((d) => `<div class="die player rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
+        eDiceEl.innerHTML = eDice.map((d) => `<div class="die enemy rolling">${Math.random() < 0.3 ? d : Math.ceil(Math.random()*6)}</div>`).join('');
+      }, 150);
+    }, 400);
 
-  // Stage 4: all dice revealed — apply committed resources and resolve (1200ms)
+    // Stage 3: reveal one at a time, left to right (800ms)
+    setTimeout(() => {
+      clearInterval(_flickerInterval);
+      pDiceEl.innerHTML = pDice.map(() => `<div class="die player rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+      eDiceEl.innerHTML = eDice.map(() => `<div class="die enemy rolling">${Math.ceil(Math.random()*6)}</div>`).join('');
+      pDice.forEach((d, i) => {
+        setTimeout(() => {
+          const dice = pDiceEl.querySelectorAll('.die');
+          if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
+        }, i * 120);
+      });
+      eDice.forEach((d, i) => {
+        setTimeout(() => {
+          const dice = eDiceEl.querySelectorAll('.die');
+          if (dice[i]) { dice[i].textContent = d; dice[i].classList.remove('rolling'); dice[i].classList.add('revealed'); }
+        }, i * 120);
+      });
+    }, 800);
+  }
+
+  // Stage 4: all dice revealed — apply committed resources and resolve
   setTimeout(() => {
 
     B.playerDice = pDice;
@@ -1173,6 +1520,14 @@ function battleRoll() {
 
     B.log.push({ text: `Round ${B.round}: You rolled [${pDice.join(', ')}] --- ${pRoll.type} (${pRoll.value}'s)`, type: 'ability' });
     B.log.push({ text: `${eg.name} rolled [${eDice.join(', ')}] --- ${eRoll.type} (${eRoll.value}'s)`, type: 'ability' });
+
+    // 3D dice highlighting
+    if (_using3d) {
+      const pWins = (winner === 'a');
+      const eWins = (winner === 'b');
+      highlight3dDice('player', pDice, pRoll, pWins);
+      highlight3dDice('enemy', eDice, eRoll, eWins);
+    }
 
     // Logey (26): opponent's 5+ dice are unavailable next roll — reduce their dice count
     if (pg.id === 26) {
@@ -2276,11 +2631,15 @@ function battleRoll() {
       if (rollBtn) rollBtn.disabled = false;
       renderBattle();
     }, 200);
-  }, 1200);
+  }, _revealDelay);
 }
 
 function fleeBattle() {
   if (!B) return;
+
+  // Clean up 3D dice
+  cleanup3dDice('player');
+  cleanup3dDice('enemy');
 
   // Aggressive encounters cost you for fleeing (Wilderness Master skips penalty)
   if (B.isAggressive && !hasSkill('sr_4')) {
@@ -2337,6 +2696,10 @@ function syncBattleTeamToGameState() {
 
 function endBattle(won) {
   if (!B) return;
+
+  // Clean up 3D dice
+  cleanup3dDice('player');
+  cleanup3dDice('enemy');
 
   // Save resources back (use ?? to preserve 0 values from spent resources)
   G.iceShards = B.resources?.iceShards ?? G.iceShards;
