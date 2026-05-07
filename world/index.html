@@ -1751,6 +1751,59 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     border-bottom: 1px solid #334; z-index: 101;
   }
 }
+
+/* ═══════ TEAM LINEUP SELECTOR ═══════ */
+.lineup-modal {
+  background: #0c0c1a; border: 2px solid #334; border-radius: 12px;
+  width: 95%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+  padding: 0;
+}
+.lineup-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 20px; border-bottom: 1px solid #223;
+  background: linear-gradient(180deg, #1a1a30, #0c0c1a);
+}
+.lineup-header h2 { color: #8cf; font-size: 18px; margin: 0; }
+.lineup-close { background: none; border: 1px solid #445; color: #888; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; }
+.lineup-label { font-size: 11px; color: #4a8aba; text-transform: uppercase; letter-spacing: 1.5px; padding: 10px 20px 6px; }
+.lineup-label span { color: #888; }
+
+.lineup-slots {
+  display: flex; gap: 10px; padding: 8px 20px; justify-content: center;
+}
+.lineup-slot {
+  width: 140px; background: #0a0a1e; border: 2px solid #334; border-radius: 8px;
+  padding: 8px; text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.lineup-slot.empty { border-style: dashed; color: #445; font-size: 12px; min-height: 120px; display: flex; align-items: center; justify-content: center; }
+.lineup-slot.active { border-color: #4a8; }
+.lineup-slot .slot-art { width: 70px; height: 70px; border-radius: 6px; object-fit: cover; margin: 0 auto 4px; display: block; }
+.lineup-slot .slot-name { font-weight: bold; color: #fff; font-size: 12px; }
+.lineup-slot .slot-ability { font-size: 9px; color: #8cf; text-transform: uppercase; }
+.lineup-slot .slot-hp { font-size: 10px; color: #888; margin-top: 2px; }
+.lineup-slot .slot-remove { font-size: 9px; color: #a44; margin-top: 4px; cursor: pointer; }
+
+.lineup-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px; padding: 8px 20px 20px; max-height: 300px; overflow-y: auto;
+}
+.lineup-card {
+  background: #0a0a1e; border: 1px solid #223; border-radius: 6px;
+  padding: 6px; text-align: center; cursor: pointer; transition: all 0.15s;
+}
+.lineup-card:hover { border-color: #4a8; transform: translateY(-2px); }
+.lineup-card.selected { border-color: #4a8; background: #0a1a0a; }
+.lineup-card .lc-art { width: 50px; height: 50px; border-radius: 4px; object-fit: cover; margin: 0 auto 3px; display: block; }
+.lineup-card .lc-name { font-size: 10px; color: #fff; font-weight: bold; }
+.lineup-card .lc-hp { font-size: 9px; color: #888; }
+
+.lineup-confirm {
+  display: block; width: calc(100% - 40px); margin: 0 20px 16px;
+  padding: 10px; background: linear-gradient(135deg, #2a5caa, #4a8cda);
+  border: 1px solid #4a7cd4; border-radius: 6px; color: #fff;
+  font-size: 14px; font-weight: bold; cursor: pointer;
+}
+.lineup-confirm:hover { background: linear-gradient(135deg, #3a6cba, #5a9cea); }
 </style>
 </head>
 <body>
@@ -1812,6 +1865,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <div class="hud-stat"><span id="hudPlayers" style="font-size:11px;color:#888;">1</span></div>
     <button class="hud-btn survey-btn" id="hudSurveyBtn" onclick="startSurvey()">Survey</button>
     <button class="hud-btn" onclick="openProfTree()">Skills</button>
+    <button class="hud-btn" onclick="openLineup()">Team</button>
     <button class="hud-btn" id="hudHomeBtn" onclick="panToHome()">Home</button>
     <button class="hud-btn" id="muteBtn" onclick="toggleMute()">Sound</button>
     <button id="helpBtn" onclick="toggleHelp()" title="Controls">?</button>
@@ -2114,6 +2168,28 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
   </div>
 </div>
 
+<!-- TEAM LINEUP SELECTOR -->
+<div id="lineupOverlay" class="modal-overlay">
+  <div class="lineup-modal">
+    <div class="lineup-header">
+      <h2>Team Lineup</h2>
+      <button class="lineup-close" onclick="closeLineup()">X</button>
+    </div>
+
+    <div class="lineup-active">
+      <div class="lineup-label">ACTIVE TEAM</div>
+      <div class="lineup-slots" id="lineupSlots"></div>
+    </div>
+
+    <div class="lineup-collection">
+      <div class="lineup-label">YOUR SPIRITKIN <span id="lineupCount">0/0</span></div>
+      <div class="lineup-grid" id="lineupGrid"></div>
+    </div>
+
+    <button class="lineup-confirm" onclick="confirmLineup()">CONFIRM LINEUP</button>
+  </div>
+</div>
+
 <!-- REGION BANNER -->
 <div id="regionBanner" class="frost"></div>
 <!-- REGION TRANSITION OVERLAY -->
@@ -2228,7 +2304,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v6.8.1';
+const VERSION = 'v7.0.0';
 
 // ═══════ GAME ICON HELPER ═══════
 function gameIcon(type) {
@@ -7402,6 +7478,7 @@ function setupInput() {
     if (e.key === 'q' || e.key === 'Q') startSurvey();
     if (e.key === 'i' || e.key === 'I') toggleInventory();
     if (e.key === 'k' || e.key === 'K') openProfTree();
+    if (e.key === 't' || e.key === 'T') openLineup();
     if (e.key === 'Tab') { e.preventDefault(); toggleInventory(); }
     if (e.key === 'Enter') { document.getElementById('chatInput')?.focus(); }
     if (e.key === 'Escape') {
@@ -8131,6 +8208,92 @@ function buildPlayerBattleTeam() {
     ...g, hp: Math.max(1, g.hp), ko: false, usedOncePerGame: false, entryFired: false,
     _teamIdx: G.team.indexOf(g) // track which G.team slot this came from
   }));
+}
+
+// ═══════ TEAM LINEUP SELECTOR ═══════
+let lineupSelection = []; // temp array of G.team indices while editing
+
+function openLineup() {
+  if (!G || !G.team || G.team.length === 0) { notify('No Spiritkin yet!'); return; }
+  // Pre-select current active fighters (first 3 alive)
+  lineupSelection = [];
+  for (let i = 0; i < G.team.length && lineupSelection.length < 3; i++) {
+    if (!G.team[i].ko && G.team[i].hp > 0) lineupSelection.push(i);
+  }
+  document.getElementById('lineupOverlay').classList.add('active');
+  renderLineup();
+}
+
+function closeLineup() {
+  document.getElementById('lineupOverlay').classList.remove('active');
+}
+
+function renderLineup() {
+  // Active slots (up to 3)
+  const slotsEl = document.getElementById('lineupSlots');
+  let slotsHtml = '';
+  for (let i = 0; i < 3; i++) {
+    const idx = lineupSelection[i];
+    const ghost = idx !== undefined ? G.team[idx] : null;
+    if (ghost) {
+      const card = getCard(ghost.id);
+      slotsHtml += `<div class="lineup-slot ${i === 0 ? 'active' : ''}" onclick="removeFromLineup(${i})">
+        <img class="slot-art" src="${card?.art || ''}" alt="${ghost.name}" onerror="this.style.display='none'">
+        <div class="slot-name">${ghost.name}</div>
+        <div class="slot-ability">${ghost.ability || ''}</div>
+        <div class="slot-hp">${ghost.hp}/${ghost.maxHp} HP</div>
+        <div class="slot-remove">Click to remove</div>
+      </div>`;
+    } else {
+      slotsHtml += `<div class="lineup-slot empty">Empty Slot</div>`;
+    }
+  }
+  slotsEl.innerHTML = slotsHtml;
+
+  // Collection grid
+  const gridEl = document.getElementById('lineupGrid');
+  document.getElementById('lineupCount').textContent = `${G.team.length}/97`;
+
+  gridEl.innerHTML = G.team.map((ghost, idx) => {
+    const card = getCard(ghost.id);
+    const isSelected = lineupSelection.includes(idx);
+    return `<div class="lineup-card ${isSelected ? 'selected' : ''}" onclick="toggleLineupCard(${idx})">
+      <img class="lc-art" src="${card?.art || ''}" alt="${ghost.name}" onerror="this.style.display='none'">
+      <div class="lc-name">${ghost.name}</div>
+      <div class="lc-hp">${ghost.hp}/${ghost.maxHp}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleLineupCard(teamIdx) {
+  const pos = lineupSelection.indexOf(teamIdx);
+  if (pos >= 0) {
+    lineupSelection.splice(pos, 1);
+  } else if (lineupSelection.length < 3) {
+    lineupSelection.push(teamIdx);
+  }
+  renderLineup();
+}
+
+function removeFromLineup(slotIdx) {
+  lineupSelection.splice(slotIdx, 1);
+  renderLineup();
+}
+
+function confirmLineup() {
+  if (lineupSelection.length === 0) {
+    notify('Select at least 1 Spiritkin!');
+    return;
+  }
+  // Reorder G.team so selected are first
+  const newTeam = lineupSelection.map(idx => G.team[idx]);
+  const rest = G.team.filter((g, i) => !lineupSelection.includes(i));
+  G.team = [...newTeam, ...rest];
+  G.activeIdx = 0;
+  updateHUD();
+  saveGame();
+  closeLineup();
+  notify('Lineup set!');
 }
 
 function showBattleOverlay() {
