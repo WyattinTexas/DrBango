@@ -772,6 +772,11 @@ function triggerWildEncounter() {
 
   applyAccessoryBattleEffects();
 
+  // Show dramatic splash text before battle overlay
+  if (typeof showWildAppearedSplash === 'function') {
+    showWildAppearedSplash(wildCard.name);
+  }
+
   showBattleOverlay();
   document.getElementById('battleTitle').textContent = enemyCount > 1
     ? `Wild ${wildCard.name} and ${enemyCount - 1} more appeared!`
@@ -3412,8 +3417,13 @@ function endBattle(won) {
     showEssenceReward(essence);
 
     if (G.rep.battlesWon === 1) {
-      setTimeout(() => notify('You earned a Spirit Essence! Find better ones in different zones.'), 1500);
-      setTimeout(() => notify('Visit the Workshop (blue dot on minimap) to craft gear!'), 4500);
+      // First victory — special celebration!
+      if (typeof showFirstVictoryPopup === 'function') {
+        setTimeout(() => showFirstVictoryPopup(), 800);
+      }
+      if (typeof spawnVictoryParticles === 'function') {
+        setTimeout(() => spawnVictoryParticles(), 200);
+      }
     }
     if (G.essences.length === 1) {
       setTimeout(() => notify('Essence stats: Potency, Stability, Resonance, Purity'), 2500);
@@ -3478,11 +3488,14 @@ function endBattle(won) {
     return;
   }
 
+  // Spawn victory particles on overworld
+  if (typeof spawnVictoryParticles === 'function') spawnVictoryParticles();
+
   // Clean up battle completely
   const arena = document.getElementById('battleArena');
   const bannerEl = arena?.querySelector('.battle-result-banner');
   if (bannerEl) bannerEl.remove();
-  
+
   G.inBattle = false;
   B = null;
   document.getElementById('battleOverlay').classList.remove('active', 'visible');
