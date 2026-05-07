@@ -4465,23 +4465,43 @@ function render() {
           ctx.fillRect(fcx - 1, fcy - jetH, 2, jetH);
         }
 
-        // ── Wandering NPCs (3 generic villagers on plaza tiles) ──
-        const npcSeed = (tx * 7 + ty * 13) % 12;
-        if (npcSeed < 3 && !isPlazaCenter) {
-          const npcIdx = npcSeed;
-          const npcSpeed = [0.4, 0.6, 0.5][npcIdx];
-          const npcPhase = [0, 2.1, 4.2][npcIdx];
-          const npcColor = ['#6a88aa', '#aa7766', '#7a9a6a'][npcIdx];
-          const npcX = sx + TILE/2 + Math.sin(time * npcSpeed + npcPhase) * (TILE * 0.3);
-          const npcY = sy + TILE/2 + Math.cos(time * npcSpeed * 0.7 + npcPhase + 1) * (TILE * 0.3);
-          // Body
-          ctx.fillStyle = npcColor;
-          ctx.fillRect(npcX - 2, npcY - 1, 4, 5);
-          // Head
-          ctx.fillStyle = '#e8d0b0';
-          ctx.beginPath();
-          ctx.arc(npcX, npcY - 3, 2.5, 0, Math.PI * 2);
-          ctx.fill();
+        // ── Wandering NPCs (3 named villagers walking circular paths around plaza) ──
+        // Only render once per frame (on the first plaza tile drawn)
+        if (!window._plazaNPCsDrawn || window._plazaNPCsDrawnTime !== time) {
+          window._plazaNPCsDrawn = true;
+          window._plazaNPCsDrawnTime = time;
+          const PLAZA_WANDERERS = [
+            { name: 'Traveler', color: '#8a8', baseX: HUB.x + 4, baseY: HUB.y + 2, radius: 3, speed: 0.3 },
+            { name: 'Merchant', color: '#ca8', baseX: HUB.x + 3, baseY: HUB.y + 5, radius: 2, speed: 0.2 },
+            { name: 'Child',    color: '#8ac', baseX: HUB.x + 5, baseY: HUB.y + 4, radius: 2, speed: 0.4 },
+          ];
+          for (const w of PLAZA_WANDERERS) {
+            // Circular path walking around base position
+            const angle = time * w.speed;
+            const walkX = (w.baseX + Math.cos(angle) * w.radius) * TILE - camX;
+            const walkY = (w.baseY + Math.sin(angle) * w.radius) * TILE - camY;
+            // Idle bobbing animation
+            const bob = Math.sin(time * 3 + w.speed * 10) * 1.5;
+            const drawX = walkX + TILE / 2;
+            const drawY = walkY + TILE / 2 + bob;
+            // Body
+            ctx.fillStyle = w.color;
+            ctx.fillRect(drawX - 2, drawY - 1, 4, 5);
+            // Head
+            ctx.fillStyle = '#e8d0b0';
+            ctx.beginPath();
+            ctx.arc(drawX, drawY - 3, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            // Name label above NPC
+            ctx.save();
+            ctx.font = '7px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx.fillText(w.name, drawX + 0.5, drawY - 8 + 0.5);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(w.name, drawX, drawY - 8);
+            ctx.restore();
+          }
         }
       } else if (tile === 20 ) { // Sand (beach, fallback only)
         // Sand grain texture

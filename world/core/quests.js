@@ -427,7 +427,7 @@ const QUEST_POOL = {
   'Smith Ember': [
     { id_prefix: 'se_001', title: 'Superior Work', desc: 'Craft a Superior or better item.', type: 'craft_quality', requirement: { minTier: 'Superior' }, reward: { coins: 15, title: null }, target: 1 },
     { id_prefix: 'se_002', title: 'Double Down', desc: 'Craft 2 items of any quality.', type: 'craft_count', requirement: { count: 2 }, reward: { coins: 10, title: null }, target: 2 },
-    { id_prefix: 'se_003', title: 'Masterwork', desc: 'Craft a Mastercraft item.', type: 'craft_quality', requirement: { minTier: 'Mastercraft' }, reward: { coins: 30, title: 'Forge Master' }, target: 1 },
+    { id_prefix: 'se_003', title: 'Masterwork', desc: 'Craft a Mastercraft item.', type: 'craft_quality', requirement: { minTier: 'Mastercraft' }, reward: { coins: 30, title: 'Forge Master', rewardItem: 'spirit_trap' }, target: 1 },
   ],
   'Keeper Zara': [
     { id_prefix: 'kz_001', title: 'Spirit Patrol', desc: 'Win 5 wild encounters.', type: 'win_battles', requirement: { count: 5 }, reward: { coins: 12, title: null }, target: 5 },
@@ -594,6 +594,21 @@ function completeQuest(quest) {
     notify(`Title earned: ${quest.reward.title}!`);
     if (!G.titles.includes(quest.reward.title)) G.titles.push(quest.reward.title);
   }
+  // Grant reward item (e.g. Spirit Trap deed from crafting quests)
+  if (quest.reward.rewardItem) {
+    G.gear.push({
+      id: Date.now(),
+      name: 'Quest Spirit Trap',
+      schematic: 'spirit_trap',
+      type: 'accessory',
+      slot: 'accessory',
+      quality: 300,
+      qualityTier: 'Superior',
+      craftedBy: 'Quest Reward',
+      craftedAt: Date.now(),
+    });
+    notify('Received: Quest Spirit Trap!');
+  }
   notify(`Quest complete: ${quest.title} (+${quest.reward.coins} coins)`);
   // Move to completed
   if (!G.quests.completed) G.quests.completed = [];
@@ -675,7 +690,7 @@ function renderQuestAreaInDialogue(npcName) {
       <span class="quest-title">${activeQuest.title}</span>
       <div class="quest-desc">${activeQuest.desc}</div>
       <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
-      <div class="quest-reward">Progress: ${activeQuest.progress}/${activeQuest.target} | Reward: ${activeQuest.reward.coins} coins${activeQuest.reward.title ? ' + "' + activeQuest.reward.title + '"' : ''}</div>
+      <div class="quest-reward">Progress: ${activeQuest.progress}/${activeQuest.target} | Reward: ${activeQuest.reward.coins} coins${activeQuest.reward.title ? ' + "' + activeQuest.reward.title + '"' : ''}${activeQuest.reward.rewardItem ? ' + Spirit Trap' : ''}</div>
     </div>`;
   } else if (completedToday) {
     html += `<div style="font-size:12px;color:#666;font-style:italic;margin-top:8px;">No more quests today. Come back tomorrow.</div>`;
@@ -685,7 +700,7 @@ function renderQuestAreaInDialogue(npcName) {
       html += `<div class="quest-item" style="text-align:left;">
         <span class="quest-title">Quest: ${quest.title}</span>
         <div class="quest-desc">${quest.desc}</div>
-        <div class="quest-reward">Reward: ${quest.reward.coins} coins${quest.reward.title ? ' + "' + quest.reward.title + '"' : ''}</div>
+        <div class="quest-reward">Reward: ${quest.reward.coins} coins${quest.reward.title ? ' + "' + quest.reward.title + '"' : ''}${quest.reward.rewardItem ? ' + Spirit Trap' : ''}</div>
         <button class="quest-accept-btn" onclick="acceptQuest('${npcName}')">Accept Quest</button>
       </div>`;
     }
