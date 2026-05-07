@@ -12,6 +12,11 @@ function addProfessionXP(type, amount) {
     amount = Math.ceil(amount * G.houseBuff.multiplier);
   }
 
+  // Party bonus — +50% XP when grouped with other players
+  if (typeof isInParty === 'function' && isInParty()) {
+    amount = Math.ceil(amount * 1.5);
+  }
+
   const prev = G.professionXP[type] || 0;
   G.professionXP[type] = prev + amount;
 

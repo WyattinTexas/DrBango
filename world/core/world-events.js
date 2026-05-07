@@ -49,6 +49,10 @@ setInterval(updateWorldEventBanner, 1000); // update countdown
 
 // ═══════ WORLD BOSS SYSTEM ═══════
 
+const BOSS_SCHEMATIC_DROPS = [
+  'frostfire_blade', 'golden_dice', 'shades_cape', 'valkins_crystal', 'moonstone_ring'
+];
+
 const WORLD_BOSS_POOL = [
   { id: 432, name: 'Valkin the Grand', maxHp: 50, art: '../testroom/art/valkin.webp' },
   { id: 106, name: 'King Jay', maxHp: 35, art: '../testroom/art/king_jay.webp' },
@@ -342,6 +346,23 @@ function onWorldBossDefeated() {
       notify(`World Boss defeated! +${coinReward} coins, +${xpReward} XP, +1 ${essence.name}`);
     } else {
       notify(`World Boss defeated! +${coinReward} coins, +${xpReward} XP`);
+    }
+
+    // Rare schematic drop chance — top contributor: 20%, others: 5%
+    const sortedContributors = Object.entries(contributors).sort((a,b) => b[1].damage - a[1].damage);
+    const isTopContributor = sortedContributors[0]?.[0] === uid;
+    const schematicDropChance = isTopContributor ? 0.20 : 0.05;
+    if (Math.random() < schematicDropChance) {
+      if (!G.learnedSchematics) G.learnedSchematics = [];
+      // Pick a random schematic the player hasn't learned yet
+      const unlearned = BOSS_SCHEMATIC_DROPS.filter(s => !G.learnedSchematics.includes(s));
+      if (unlearned.length > 0) {
+        const drop = unlearned[Math.floor(Math.random() * unlearned.length)];
+        G.learnedSchematics.push(drop);
+        const dropName = drop.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        notify(`RARE SCHEMATIC DROP: ${dropName}! Check your crafting menu.`);
+        addChatMessage('system', `${G.name} found a rare schematic: ${dropName}!`);
+      }
     }
 
     // Level up check

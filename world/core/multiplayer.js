@@ -40,6 +40,7 @@ function showOnlineStatus() {
         window._useLocalStorage = false;
         showOnlineStatus();
         startPresence();
+        initPartySystem();
         startWorldBossListener();
         loadPlayerTraps();
         loadAllTraps();
@@ -343,8 +344,52 @@ function openArena() {
   arenaTab = 'challenge';
   document.getElementById('arenaTabChallenge').classList.add('active');
   document.getElementById('arenaTabLeaderboard').classList.remove('active');
+  // Clean up stale challenges on open
+  cleanStaleArenaChallenges();
   renderArena();
   listenForChallenges();
+  // Start countdown timer refresh
+  if (window._arenaChallengeTimer) clearInterval(window._arenaChallengeTimer);
+  window._arenaChallengeTimer = setInterval(() => {
+    if (document.getElementById('arenaOverlay').classList.contains('active') && arenaTab === 'challenge') {
+      updateArenaChallengeCountdowns();
+    }
+  }, 1000);
+}
+
+function cleanStaleArenaChallenges() {
+  if (window._useLocalStorage) return;
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+  db.ref('overworld/arena').orderByChild('status').equalTo('pending').once('value').then(snap => {
+    const challenges = snap.val() || {};
+    for (const [cid, ch] of Object.entries(challenges)) {
+      if (ch.createdAt && ch.createdAt < fiveMinAgo) {
+        db.ref(`overworld/arena/${cid}`).update({ status: 'expired' });
+        // Clean up after marking expired
+        setTimeout(() => db.ref(`overworld/arena/${cid}`).remove(), 5000);
+      }
+    }
+  });
+}
+
+function updateArenaChallengeCountdowns() {
+  const countdownEls = document.querySelectorAll('[data-challenge-created]');
+  const now = Date.now();
+  countdownEls.forEach(el => {
+    const created = parseInt(el.dataset.challengeCreated);
+    const expiresAt = created + 5 * 60 * 1000;
+    const remaining = Math.max(0, expiresAt - now);
+    if (remaining <= 0) {
+      el.textContent = 'Expired';
+      el.style.color = '#f44';
+      // Auto-refresh arena to clear expired
+      renderArena();
+    } else {
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  });
 }
 
 function closeArena() {
@@ -352,6 +397,8 @@ function closeArena() {
   // Clean up listeners
   arenaListeners.forEach(ref => ref.off());
   arenaListeners = [];
+  // Clean up countdown timer
+  if (window._arenaChallengeTimer) { clearInterval(window._arenaChallengeTimer); window._arenaChallengeTimer = null; }
 }
 
 function switchArenaTab(tab) {
@@ -382,17 +429,40 @@ function renderArena() {
       const challenges = snap.val() || {};
       let pendingHtml = '';
       let hasPending = false;
+      const now = Date.now();
+      const fiveMin = 5 * 60 * 1000;
       for (const [cid, ch] of Object.entries(challenges)) {
+        // Auto-decline stale challenges
+        if (ch.createdAt && ch.createdAt < now - fiveMin) {
+          db.ref(`overworld/arena/${cid}`).remove();
+          continue;
+        }
         if (ch.defenderUid === uid) {
           hasPending = true;
           pendingHtml += `<div class="arena-pending">
             <div>
               <div class="ap-name">${ch.challenger.name} challenges you!</div>
               <div class="ap-detail">Wager: ${ch.wager} coins | Team: ${ch.challenger.team.map(t=>t.name).join(', ')}</div>
+              <div class="ap-detail" style="color:#daa520;">Expires in: <span data-challenge-created="${ch.createdAt || now}" style="color:#ff8;">--:--</span></div>
             </div>
             <div>
               <button class="arena-accept-btn" onclick="acceptArenaChallenge('${cid}')">Accept</button>
               <button class="arena-decline-btn" onclick="declineArenaChallenge('${cid}')">Decline</button>
+            </div>
+          </div>`;
+        }
+        // Show challenges sent BY me with cancel button
+        if (ch.challenger && ch.challenger.uid === uid) {
+          hasPending = true;
+          const targetName = otherPlayers[ch.defenderUid]?.name || 'Unknown';
+          pendingHtml += `<div class="arena-pending" style="border-color:#555;">
+            <div>
+              <div class="ap-name" style="color:#8cf;">Awaiting ${targetName}...</div>
+              <div class="ap-detail">Wager: ${ch.wager} coins</div>
+              <div class="ap-detail" style="color:#daa520;">Expires in: <span data-challenge-created="${ch.createdAt || now}" style="color:#ff8;">--:--</span></div>
+            </div>
+            <div>
+              <button class="arena-decline-btn" onclick="cancelArenaChallenge('${cid}')">Cancel</button>
             </div>
           </div>`;
         }
@@ -516,6 +586,12 @@ function acceptArenaChallenge(challengeId) {
 function declineArenaChallenge(challengeId) {
   db.ref(`overworld/arena/${challengeId}`).remove();
   notify('Challenge declined.');
+  renderArena();
+}
+
+function cancelArenaChallenge(challengeId) {
+  db.ref(`overworld/arena/${challengeId}`).remove();
+  notify('Challenge cancelled.');
   renderArena();
 }
 
@@ -903,5 +979,311 @@ function getDisplayName() {
   }
   return G.name;
 }
+
+// ═══════ PARTY SYSTEM ═══════
+
+// Initialize party state on G if not present
+function initParty() {
+  if (!G.party) {
+    G.party = { id: null, members: [], invites: [] };
+  }
+}
+
+function isInParty() {
+  return G.party && G.party.id && G.party.members && G.party.members.length > 1;
+}
+
+function sendPartyInvite(targetUid, targetName) {
+  if (window._useLocalStorage) { notify('Party system requires an online connection.'); return; }
+  if (!uid) return;
+  initParty();
+
+  // Create party if we don't have one
+  if (!G.party.id) {
+    G.party.id = uid;
+    G.party.members = [{ uid: uid, name: G.name }];
+    db.ref(`overworld/parties/${uid}`).set({
+      leader: uid,
+      members: { [uid]: { name: G.name, x: G.x, y: G.y } },
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+  }
+
+  // Max party size of 4
+  if (G.party.members.length >= 4) {
+    notify('Party is full! (max 4)');
+    return;
+  }
+
+  // Don't send duplicate invites
+  if (G.party.invites.includes(targetUid)) {
+    notify('Already invited ' + targetName + '!');
+    return;
+  }
+
+  // Write invite to Firebase
+  db.ref(`overworld/party_invites/${targetUid}/${uid}`).set({
+    name: G.name,
+    partyId: G.party.id,
+    timestamp: firebase.database.ServerValue.TIMESTAMP,
+  });
+
+  G.party.invites.push(targetUid);
+  notify('Party invite sent to ' + targetName + '!');
+}
+
+let _partyInviteListener = null;
+
+function startPartyInviteListener() {
+  if (window._useLocalStorage || !uid) return;
+  if (_partyInviteListener) return; // Already listening
+
+  _partyInviteListener = db.ref(`overworld/party_invites/${uid}`);
+  _partyInviteListener.on('child_added', snap => {
+    const invite = snap.val();
+    if (!invite) return;
+    const inviterUid = snap.key;
+    showPartyInviteNotification(inviterUid, invite.name, invite.partyId);
+  });
+}
+
+function stopPartyInviteListener() {
+  if (_partyInviteListener) {
+    _partyInviteListener.off();
+    _partyInviteListener = null;
+  }
+}
+
+function showPartyInviteNotification(inviterUid, inviterName, partyId) {
+  // Remove any existing party invite notification
+  const existing = document.getElementById('partyInviteNotif');
+  if (existing) existing.remove();
+
+  const notif = document.createElement('div');
+  notif.id = 'partyInviteNotif';
+  notif.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:2px solid #4a8a4a;border-radius:12px;padding:12px 20px;z-index:9999;text-align:center;min-width:240px;box-shadow:0 4px 20px rgba(0,0,0,0.6);';
+  notif.innerHTML = `
+    <div style="color:#ccc;font-size:13px;margin-bottom:8px;"><strong style="color:#fff;">${inviterName}</strong> invited you to a party!</div>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button style="padding:6px 16px;background:#2a6a2a;border:1px solid #4a8a4a;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;" onclick="acceptPartyInvite('${inviterUid}','${partyId}','${inviterName.replace(/'/g, "\\'")}')">Accept</button>
+      <button style="padding:6px 16px;background:#4a1a1a;border:1px solid #6a3a3a;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;" onclick="declinePartyInvite('${inviterUid}')">Decline</button>
+    </div>
+  `;
+  document.body.appendChild(notif);
+
+  // Auto-dismiss after 30 seconds
+  setTimeout(() => {
+    const el = document.getElementById('partyInviteNotif');
+    if (el) el.remove();
+  }, 30000);
+}
+
+function acceptPartyInvite(inviterUid, partyId, inviterName) {
+  if (window._useLocalStorage) { notify('Party system requires an online connection.'); return; }
+  initParty();
+
+  // Leave current party if in one
+  if (G.party.id) {
+    leaveParty(true); // silent leave
+  }
+
+  // Join the party in Firebase
+  db.ref(`overworld/parties/${partyId}/members/${uid}`).set({
+    name: G.name,
+    x: G.x,
+    y: G.y,
+  });
+
+  // Set local state
+  G.party.id = partyId;
+  G.party.members = [{ uid: uid, name: G.name }];
+  G.party.invites = [];
+
+  // Remove the invite from Firebase
+  db.ref(`overworld/party_invites/${uid}/${inviterUid}`).remove();
+
+  // Remove notification
+  const notif = document.getElementById('partyInviteNotif');
+  if (notif) notif.remove();
+
+  // Start listening to party changes
+  startPartyMemberListener();
+
+  notify('Joined ' + inviterName + "'s party!");
+  renderPartyIndicator();
+}
+
+function declinePartyInvite(inviterUid) {
+  if (!window._useLocalStorage && uid) {
+    db.ref(`overworld/party_invites/${uid}/${inviterUid}`).remove();
+  }
+  const notif = document.getElementById('partyInviteNotif');
+  if (notif) notif.remove();
+  notify('Party invite declined.');
+}
+
+let _partyMemberListener = null;
+
+function startPartyMemberListener() {
+  if (window._useLocalStorage || !G.party || !G.party.id) return;
+  stopPartyMemberListener();
+
+  _partyMemberListener = db.ref(`overworld/parties/${G.party.id}/members`);
+  _partyMemberListener.on('value', snap => {
+    const members = snap.val();
+    if (!members) {
+      // Party was disbanded
+      G.party = { id: null, members: [], invites: [] };
+      notify('Party disbanded.');
+      renderPartyIndicator();
+      return;
+    }
+    G.party.members = Object.entries(members).map(([mUid, m]) => ({
+      uid: mUid,
+      name: m.name,
+      x: m.x,
+      y: m.y,
+    }));
+    renderPartyIndicator();
+  });
+}
+
+function stopPartyMemberListener() {
+  if (_partyMemberListener) {
+    _partyMemberListener.off();
+    _partyMemberListener = null;
+  }
+}
+
+function leaveParty(silent) {
+  if (window._useLocalStorage) { if (!silent) notify('Cannot leave party while offline.'); return; }
+  initParty();
+  if (!G.party.id) { if (!silent) notify('You are not in a party.'); return; }
+
+  const wasLeader = G.party.id === uid;
+  const partyId = G.party.id;
+
+  // Remove self from Firebase party
+  db.ref(`overworld/parties/${partyId}/members/${uid}`).remove();
+
+  // If leader, disband the whole party
+  if (wasLeader) {
+    db.ref(`overworld/parties/${partyId}`).remove();
+  }
+
+  // Stop listening
+  stopPartyMemberListener();
+
+  // Clear local state
+  G.party = { id: null, members: [], invites: [] };
+
+  if (!silent) notify('Left the party.');
+  renderPartyIndicator();
+}
+
+function renderPartyIndicator() {
+  // Remove existing indicator
+  const existing = document.getElementById('partyIndicator');
+  if (existing) existing.remove();
+
+  initParty();
+  if (!G.party.id || !G.party.members || G.party.members.length <= 1) return;
+
+  const indicator = document.createElement('div');
+  indicator.id = 'partyIndicator';
+  indicator.style.cssText = 'position:fixed;top:48px;right:8px;background:rgba(26,26,46,0.9);border:1px solid #4a8a4a;border-radius:8px;padding:6px 10px;z-index:100;font-size:11px;color:#ccc;min-width:100px;';
+
+  let html = '<div style="color:#daa520;font-weight:bold;font-size:10px;text-transform:uppercase;margin-bottom:4px;">Party</div>';
+  for (const m of G.party.members) {
+    const isMe = m.uid === uid;
+    const isLeader = m.uid === G.party.id;
+    const color = isMe ? '#4f8' : '#daa520';
+    html += `<div style="color:${color};font-size:11px;">${isLeader ? '\u2605 ' : ''}${m.name}${isMe ? ' (you)' : ''}</div>`;
+  }
+  html += `<button style="margin-top:6px;padding:2px 8px;background:#4a1a1a;border:1px solid #6a3a3a;color:#ccc;border-radius:4px;cursor:pointer;font-size:10px;width:100%;" onclick="leaveParty()">Leave Party</button>`;
+
+  indicator.innerHTML = html;
+  document.body.appendChild(indicator);
+}
+
+// Update party member positions in Firebase periodically (piggybacks on presence interval)
+function updatePartyPosition() {
+  if (window._useLocalStorage || !G.party || !G.party.id || !uid) return;
+  db.ref(`overworld/parties/${G.party.id}/members/${uid}`).update({
+    x: Math.round(G.x * 10) / 10,
+    y: Math.round(G.y * 10) / 10,
+  });
+}
+
+// Draw party tethers on the overworld canvas between party members
+function drawPartyTethers(ctx, camX, camY, tileSize) {
+  initParty();
+  if (!G.party.id || !G.party.members || G.party.members.length <= 1) return;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(218,165,32,0.3)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+
+  const myScreenX = (G.x - camX) * tileSize + tileSize / 2;
+  const myScreenY = (G.y - camY) * tileSize + tileSize / 2;
+
+  for (const m of G.party.members) {
+    if (m.uid === uid) continue;
+    const ox = (m.x - camX) * tileSize + tileSize / 2;
+    const oy = (m.y - camY) * tileSize + tileSize / 2;
+    ctx.beginPath();
+    ctx.moveTo(myScreenX, myScreenY);
+    ctx.lineTo(ox, oy);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Override name label color for party members (call from render loop)
+function getPlayerNameColor(playerUid) {
+  initParty();
+  if (G.party && G.party.id && G.party.members) {
+    if (G.party.members.some(m => m.uid === playerUid)) {
+      return '#daa520'; // Gold for party members
+    }
+  }
+  return '#8cf'; // Default blue
+}
+
+// Initialize party system — call after auth and presence setup
+function initPartySystem() {
+  initParty();
+  startPartyInviteListener();
+  // If we were in a party before (saved state), reconnect the listener
+  if (G.party && G.party.id) {
+    startPartyMemberListener();
+    renderPartyIndicator();
+  }
+}
+
+// Update party position every 2s (same cadence as presence)
+setInterval(() => {
+  if (!window._useLocalStorage && G.party && G.party.id) {
+    updatePartyPosition();
+  }
+}, 2000);
+
+// Clean up stale party invites older than 5 minutes
+function cleanOldPartyInvites() {
+  if (window._useLocalStorage || !uid) return;
+  db.ref(`overworld/party_invites/${uid}`).once('value').then(snap => {
+    const invites = snap.val();
+    if (!invites) return;
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    for (const [inviterUid, invite] of Object.entries(invites)) {
+      if (invite.timestamp && invite.timestamp < fiveMinAgo) {
+        db.ref(`overworld/party_invites/${uid}/${inviterUid}`).remove();
+      }
+    }
+  });
+}
+setInterval(cleanOldPartyInvites, 60000);
 
 // ═══════ RESOURCE SURVEYING SYSTEM ═══════

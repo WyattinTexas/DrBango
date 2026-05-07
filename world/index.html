@@ -2329,6 +2329,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
     <h3>Mastery</h3>
     <div id="inspectMastery" style="font-size:12px;color:#888;">Unknown</div>
     <div id="inspectGuildInvite" style="text-align:center;margin-top:8px;"></div>
+    <div id="inspectPartyInvite" style="text-align:center;margin-top:8px;"></div>
     <button class="btn-primary" style="margin-top:16px;" onclick="closeInspect()">Close</button>
   </div>
 </div>
@@ -6920,6 +6921,24 @@ function showInspect(player) {
     }
   }
 
+  // Party invite button
+  const partyInviteEl = document.getElementById('inspectPartyInvite');
+  if (partyInviteEl) {
+    let targetUid = null;
+    for (const [pid, p] of Object.entries(otherPlayers)) {
+      if (p.name === player.name && pid !== uid) { targetUid = pid; break; }
+    }
+    // Show party invite if: we found the player, they're not already in our party
+    const alreadyInParty = G.party && G.party.members && G.party.members.some(m => m.uid === targetUid);
+    if (targetUid && !alreadyInParty) {
+      partyInviteEl.innerHTML = `<button style="width:44px;height:44px;border-radius:50%;background:#2a6a2a;border:2px solid #4a8a4a;color:#fff;font-size:24px;cursor:pointer;margin-top:4px;" onclick="sendPartyInvite('${targetUid}', '${(player.name || '').replace(/'/g, "\\'")}')">+</button><div style="font-size:10px;color:#6a6;margin-top:2px;">Invite to Party</div>`;
+    } else if (targetUid && alreadyInParty) {
+      partyInviteEl.innerHTML = `<div style="font-size:11px;color:#daa520;margin-top:4px;">In your party</div>`;
+    } else {
+      partyInviteEl.innerHTML = '';
+    }
+  }
+
   document.getElementById('inspectOverlay').classList.add('active');
 }
 
@@ -7578,6 +7597,7 @@ function createCharacter() {
   updateHUD();
   saveGame();
   startPresence();
+  initPartySystem();
   initHousingListener();
 
   notify(`Welcome to Frost Valley, ${name}!`);
@@ -7735,6 +7755,7 @@ async function initFirebase() {
 
     updateHUD();
     startPresence();
+    initPartySystem();
     initHousingListener();
 
     // Show online/offline status indicator
