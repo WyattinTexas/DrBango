@@ -2009,7 +2009,7 @@ body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
 // Browser MMO-lite: explore, battle, craft, trade
 // ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v5.0.0';
+const VERSION = 'v5.0.1';
 
 // ═══════ PASSIVE PROFESSION XP ═══════
 function addProfessionXP(type, amount) {
@@ -5779,7 +5779,7 @@ function render() {
       // Monster body sprite
       if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
+        ctx.drawImage(monImg, mDir * 16, mFrame * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
         ctx.imageSmoothingEnabled = true;
       } else {
         ctx.fillStyle = rarityColor;
@@ -5792,7 +5792,7 @@ function render() {
       // ── ALERT: noticed you ──
       if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
+        ctx.drawImage(monImg, mDir * 16, mFrame * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
         ctx.imageSmoothingEnabled = true;
       } else {
         ctx.fillStyle = rarityColor;
@@ -5811,7 +5811,7 @@ function render() {
       if (monImg && monImg.complete && monImg.naturalWidth) {
         ctx.globalAlpha = e.isLegendaryBoss ? 0.9 : (e.isElite ? 0.85 : 0.7);
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(monImg, mFrame * 16, mDir * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
+        ctx.drawImage(monImg, mDir * 16, mFrame * 16, 16, 16, drawOffX, drawOffY + bob, drawSize, drawSize);
         ctx.imageSmoothingEnabled = true;
         ctx.globalAlpha = 1;
       } else {
@@ -10905,7 +10905,7 @@ async function initFirebase() {
     G.skillPointsUsed = data.skillPointsUsed || 0;
     G.visitedTiles = new Set(data.visitedTiles || []);
     G.materials = data.materials || {};
-      G.hasBoat = data.hasBoat || false;
+      G.hasBoat = true; // everyone gets a boat for now
     G.loreCollected = data.loreCollected || [];
     G.house = data.house || null;
     G.maskQuest = data.maskQuest || { phase: 0, anchors: [], completedDays: 0, lastCompleted: 0 };
@@ -11402,15 +11402,16 @@ function drawSprite(ctx, spriteId, x, y, scale, direction, frame) {
   }
 
   // Sprite sheet: 4 cols x 4 rows, 16x16 per cell
-  // Ninja Adventure standard: Row 0=down, 1=left, 2=right, 3=up
-  // Cols: 0=idle, 1=step (only use 0 and 1 to avoid cross-direction frames)
+  // ACTUAL LAYOUT: Columns = directions, Rows = animation frames
+  // Col 0=down, Col 1=left, Col 2=right, Col 3=up
+  // Row 0=frame 0 (idle), Row 1=frame 1 (step), Row 2=frame 2, Row 3=frame 3
   const frameW = 16, frameH = 16;
   const dirMap = { down: 0, left: 1, right: 2, up: 3 };
-  const dirRow = dirMap[direction] !== undefined ? dirMap[direction] : 0;
-  const col = frame === 1 ? 1 : 0; // only idle(0) and step(1) — no col 3
+  const dirCol = dirMap[direction] !== undefined ? dirMap[direction] : 0;
+  const frameRow = frame === 1 ? 1 : 0; // idle(0) and step(1)
 
-  const sx = col * frameW;
-  const sy = dirRow * frameH;
+  const sx = dirCol * frameW;  // COLUMN = direction
+  const sy = frameRow * frameH; // ROW = animation frame
   const dw = frameW * scale;
   const dh = frameH * scale;
 
