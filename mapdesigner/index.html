@@ -133,6 +133,7 @@ canvas#mini { width:100%; height:100%; display:block; }
     <button class="tb" id="btn-export">Export JSON</button>
     <button class="tb" id="btn-import">Import JSON</button>
     <div class="sep"></div>
+    <button class="tb" id="btn-reset">Reset to Default</button>
     <button class="tb danger" id="btn-clear">Clear All</button>
     <div class="spacer"></div>
     <span class="tb-label" id="obj-count">0 objects</span>
@@ -701,6 +702,15 @@ document.getElementById('btn-import').onclick = () => {
   overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
 };
 
+document.getElementById('btn-reset').onclick = () => {
+  if (confirm('Reset to default game layout? Your changes will be lost.')) {
+    objects = DEFAULT_LAYOUT.objects.map(o => ({ id: nextId++, prefab: o.prefab, x: o.x, y: o.y||0, z: o.z, rotY: o.rotY||0 }));
+    localStorage.removeItem('mapdesigner_layout');
+    selectedObj = null; updateObjCount(); updateSelHud();
+    cam = { x: TC.x, z: TC.z, zoom: 4 };
+  }
+};
+
 document.getElementById('btn-clear').onclick = () => {
   if (objects.length && confirm(`Delete all ${objects.length} objects?`)) {
     objects = []; selectedObj = null; updateObjCount(); updateSelHud();
@@ -708,17 +718,78 @@ document.getElementById('btn-clear').onclick = () => {
 };
 
 // ═══════════════════════════════════════
-// INIT — load saved layout from localStorage
+// DEFAULT LAYOUT — current game state
+// Town center is at (-15, 0, 0) in world space
+// ═══════════════════════════════════════
+const TC = { x: -15, z: 0 }; // town center offset
+
+const DEFAULT_LAYOUT = {
+  version: 1,
+  objects: [
+    // ── Existing scene buildings (already in World.unity) ──
+    { prefab:"Player Spawn Point", x:-5.6, y:0, z:-6.2, rotY:0 },
+
+    // ── TownBuilder: Buildings (offsets + town center) ──
+    { prefab:"Town Hall",    x:TC.x+0,   y:0, z:TC.z+0,    rotY:0 },
+    { prefab:"Farm House",   x:TC.x-12,  y:0, z:TC.z-8,    rotY:15 },
+    { prefab:"Start House",  x:TC.x-6,   y:0, z:TC.z-10,   rotY:-10 },
+    { prefab:"Farm House",   x:TC.x+6,   y:0, z:TC.z-10,   rotY:5 },
+    { prefab:"Start House",  x:TC.x+12,  y:0, z:TC.z-8,    rotY:-15 },
+    { prefab:"Start House",  x:TC.x-10,  y:0, z:TC.z+10,   rotY:180 },
+    { prefab:"Farm House",   x:TC.x-3,   y:0, z:TC.z+12,   rotY:170 },
+    { prefab:"Start House",  x:TC.x+5,   y:0, z:TC.z+11,   rotY:190 },
+    { prefab:"Farm House",   x:TC.x+13,  y:0, z:TC.z+10,   rotY:175 },
+    { prefab:"Start House",  x:TC.x-16,  y:0, z:TC.z+2,    rotY:90 },
+    { prefab:"Farm House",   x:TC.x+16,  y:0, z:TC.z+2,    rotY:-90 },
+
+    // ── TownBuilder: Fences ──
+    { prefab:"Farm Fence",   x:TC.x-9,   y:0, z:TC.z-6,    rotY:0 },
+    { prefab:"Farm Fence",   x:TC.x-3,   y:0, z:TC.z-6,    rotY:0 },
+    { prefab:"Farm Fence",   x:TC.x+3,   y:0, z:TC.z-6,    rotY:0 },
+    { prefab:"Farm Fence",   x:TC.x+9,   y:0, z:TC.z-6,    rotY:0 },
+    { prefab:"Farm Fence",   x:TC.x-7,   y:0, z:TC.z+7,    rotY:180 },
+    { prefab:"Farm Fence",   x:TC.x+0,   y:0, z:TC.z+7,    rotY:180 },
+    { prefab:"Farm Fence",   x:TC.x+7,   y:0, z:TC.z+7,    rotY:180 },
+
+    // ── TownBuilder: Decorations ──
+    { prefab:"Orange Flower", x:TC.x-2,  y:0, z:TC.z-3,    rotY:0 },
+    { prefab:"Red Flower",    x:TC.x+2,  y:0, z:TC.z-3,    rotY:45 },
+    { prefab:"Yellow Flower", x:TC.x-4,  y:0, z:TC.z+4,    rotY:20 },
+    { prefab:"Orange Flower", x:TC.x+4,  y:0, z:TC.z+4,    rotY:60 },
+    { prefab:"Red Flower",    x:TC.x+0,  y:0, z:TC.z+5,    rotY:0 },
+    { prefab:"Scarecrow",     x:TC.x+18, y:0, z:TC.z-4,    rotY:-30 },
+
+    // ── NPCSpawner: Frost Valley NPCs (world coords) ──
+    { prefab:"Elder Frost",     x:-15, y:0, z:3,   rotY:0 },
+    { prefab:"Smith Ember",     x:-27, y:0, z:2,   rotY:0 },
+    { prefab:"Keeper Zara",     x:-5,  y:0, z:8,   rotY:0 },
+    { prefab:"Brawler Jax",     x:10,  y:0, z:-15, rotY:0 },
+    { prefab:"Ice Queen Vera",  x:30,  y:0, z:-25, rotY:0 },
+  ]
+};
+
+// ═══════════════════════════════════════
+// INIT — load from localStorage, fallback to default
 // ═══════════════════════════════════════
 try {
   const saved = localStorage.getItem('mapdesigner_layout');
   if (saved) {
     const data = JSON.parse(saved);
-    if (data.objects) {
+    if (data.objects && data.objects.length > 0) {
       objects = data.objects.map(o => ({ id: nextId++, prefab: o.prefab, x: o.x, y: o.y||0, z: o.z, rotY: o.rotY||0 }));
+    } else {
+      throw 'empty';
     }
+  } else {
+    throw 'no save';
   }
-} catch(e) {}
+} catch(e) {
+  // Load default layout
+  objects = DEFAULT_LAYOUT.objects.map(o => ({ id: nextId++, prefab: o.prefab, x: o.x, y: o.y||0, z: o.z, rotY: o.rotY||0 }));
+}
+
+// Start camera centered on the town
+cam = { x: TC.x, z: TC.z, zoom: 4 };
 
 // Autosave every 10s
 setInterval(() => {
