@@ -21,7 +21,12 @@ const WAIT_SECS = parseInt((process.argv.find(a => a.startsWith('--wait=')) || '
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        args: ['--no-sandbox', '--disable-gpu']
+        args: [
+            '--no-sandbox',
+            '--use-gl=swiftshader',       // Software WebGL for headless
+            '--use-angle=swiftshader-webgl',
+            '--enable-webgl',
+        ]
     });
 
     const page = await browser.newPage();
@@ -79,7 +84,8 @@ const WAIT_SECS = parseInt((process.argv.find(a => a.startsWith('--wait=')) || '
     const realErrors = errors.filter(e =>
         !e.includes('favicon.ico') &&
         !e.includes('Content-Encoding') &&
-        !e.includes('INVALID_ENUM: getInternalformatParameter')
+        !e.includes('INVALID_ENUM: getInternalformatParameter') &&
+        !e.includes('does not support WebGL')  // headless may lack GPU
     );
 
     console.log('═══════════════════════════════════════');
