@@ -3,1058 +3,731 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overworld Online — World Map Designer</title>
+<title>Overworld Online — Map Designer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
-
-*{margin:0;padding:0;box-sizing:border-box}
-
-:root{
-  --parchment:#1a1611;
-  --ink:#c4a872;
-  --ink-dim:#7a6844;
-  --gold:#d4a853;
-  --gold-bright:#f0c060;
-  --blood:#8b2020;
-  --frost:#a8d4e6;
-  --panel-bg:rgba(18,14,10,0.94);
-  --border:rgba(196,168,114,0.15);
+:root {
+  --bg: #0e1117;
+  --panel: #161b22;
+  --border: #21262d;
+  --border-lit: #30363d;
+  --text: #c9d1d9;
+  --text-dim: #484f58;
+  --text-bright: #e6edf3;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --orange: #db6d28;
+  --purple: #a371f7;
+  --blue-build: #58a6ff;
+  --green-tree: #3fb950;
+  --red-npc: #f47067;
+  --yellow-deco: #d29922;
+  --white-special: #e6edf3;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Outfit', sans-serif;
 }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:13px; }
+::selection { background:var(--accent-dim); color:#fff; }
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-lit); border-radius:3px; }
 
-html,body{height:100%;overflow:hidden;background:#080a10;color:var(--ink);font-family:'Crimson Pro',serif}
+#app { display:flex; height:100vh; }
 
-#app{display:flex;height:100vh;width:100vw}
+/* ═══ SIDEBAR ═══ */
+#sidebar { width:260px; min-width:260px; background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; }
+#sidebar-header { padding:14px 16px; border-bottom:1px solid var(--border); }
+#sidebar-header h1 { font-size:14px; font-weight:600; color:var(--text-bright); letter-spacing:-.2px; }
+#sidebar-header h1 span { color:var(--accent); }
+#sidebar-header .sub { font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px; letter-spacing:.5px; }
 
-/* ── SIDEBAR ── */
-#sidebar{
-  width:270px;min-width:270px;
-  background:var(--panel-bg);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;z-index:10;
-  backdrop-filter:blur(10px);
-}
-#sidebar-header{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
-#sidebar-header h1{font-family:'Cinzel Decorative',serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:3px;text-transform:uppercase}
-#sidebar-header .subtitle{font-size:10px;color:var(--ink-dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+#palette { flex:1; overflow-y:auto; padding:8px 0; }
+.cat { border-bottom:1px solid var(--border); }
+.cat-head { display:flex; align-items:center; gap:6px; padding:8px 16px; cursor:pointer; user-select:none; font-size:11px; font-weight:500; color:var(--text-dim); text-transform:uppercase; letter-spacing:.8px; transition:color .15s; }
+.cat-head:hover { color:var(--text); }
+.cat-head .dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+.cat-head .ct { margin-left:auto; font-family:var(--mono); font-size:10px; }
+.cat-head .arr { transition:transform .2s; font-size:9px; }
+.cat.closed .cat-items { display:none; }
+.cat.closed .arr { transform:rotate(-90deg); }
+.cat-items { padding:2px 10px 8px; }
 
-#tools{padding:12px 16px;border-bottom:1px solid var(--border)}
-#tools h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
-.tool-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
-.tool-btn{
-  padding:5px 9px;background:rgba(196,168,114,0.06);border:1px solid var(--border);
-  border-radius:3px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:12px;cursor:pointer;transition:all .2s;
-}
-.tool-btn:hover{background:rgba(196,168,114,0.12);border-color:rgba(196,168,114,0.3)}
-.tool-btn.active{background:rgba(212,168,83,0.15);border-color:var(--gold);color:var(--gold)}
+.prefab { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:4px; cursor:pointer; transition:background .1s; font-size:12px; }
+.prefab:hover { background:rgba(255,255,255,.04); }
+.prefab.selected { background:var(--accent-dim); color:#fff; }
+.prefab .ico { width:18px; height:18px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
+.prefab .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.toggle-wrap{display:flex;align-items:center;gap:8px;margin-top:5px}
-.toggle{width:30px;height:16px;border-radius:8px;background:rgba(196,168,114,0.12);border:1px solid var(--border);cursor:pointer;position:relative;transition:all .2s}
-.toggle.on{background:rgba(212,168,83,0.25);border-color:var(--gold)}
-.toggle::after{content:'';position:absolute;width:10px;height:10px;border-radius:50%;background:var(--ink-dim);top:2px;left:2px;transition:all .2s}
-.toggle.on::after{left:16px;background:var(--gold)}
-.toggle-label{font-size:11px;color:var(--ink-dim)}
+/* ═══ TOOLBAR ═══ */
+#toolbar { height:40px; background:var(--panel); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 12px; gap:6px; z-index:5; }
+.tb-group { display:flex; align-items:center; gap:2px; background:var(--bg); border-radius:6px; padding:2px; }
+.tb { padding:4px 10px; border-radius:4px; border:none; background:transparent; color:var(--text-dim); font-family:var(--sans); font-size:11px; font-weight:500; cursor:pointer; transition:all .12s; white-space:nowrap; }
+.tb:hover { color:var(--text); background:rgba(255,255,255,.05); }
+.tb.active { background:var(--accent-dim); color:#fff; }
+.tb.danger:hover { color:var(--red); }
+.sep { width:1px; height:20px; background:var(--border); margin:0 6px; }
+.tb-label { font-family:var(--mono); font-size:10px; color:var(--text-dim); padding:0 6px; letter-spacing:.5px; }
+#snap-toggle { display:flex; align-items:center; gap:5px; cursor:pointer; font-size:11px; color:var(--text-dim); user-select:none; }
+#snap-toggle input { accent-color:var(--accent); }
+.spacer { flex:1; }
 
-#legend{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
-#legend h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
-.legend-item{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;transition:opacity .2s}
-.legend-item:hover{opacity:0.85}
-.legend-item.selected{opacity:1}
-.legend-item:not(.selected){opacity:0.4}
-.legend-swatch{width:16px;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,0.08);flex-shrink:0}
-.legend-label{font-size:12px;color:var(--ink)}
-.legend-count{font-size:10px;color:var(--ink-dim);margin-left:auto}
+/* ═══ CANVAS ═══ */
+#canvas-wrap { flex:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+#canvas-area { flex:1; position:relative; overflow:hidden; }
+canvas#map { position:absolute; top:0; left:0; }
 
-#locations-panel{flex:1;overflow-y:auto;padding:12px 16px}
-#locations-panel h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
-.loc-item{display:flex;align-items:center;gap:7px;padding:5px 7px;margin-bottom:2px;border-radius:3px;cursor:pointer;transition:background .2s;font-size:12px}
-.loc-item:hover{background:rgba(196,168,114,0.08)}
-.loc-item .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.loc-item .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.loc-item .region-tag{font-size:9px;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-dim)}
-.loc-item .delete-btn{opacity:0;color:var(--blood);cursor:pointer;font-size:13px;transition:opacity .2s;padding:0 3px}
-.loc-item:hover .delete-btn{opacity:0.5}
-.loc-item .delete-btn:hover{opacity:1}
+/* ═══ HUD OVERLAYS ═══ */
+.hud { position:absolute; z-index:4; pointer-events:none; font-family:var(--mono); font-size:10px; color:var(--text-dim); background:rgba(14,17,23,.8); padding:3px 8px; border-radius:4px; border:1px solid var(--border); letter-spacing:.5px; }
+#hud-coords { top:8px; left:8px; }
+#hud-zoom { top:8px; right:8px; }
+#hud-tool { bottom:8px; left:8px; }
+#hud-sel { bottom:8px; right:8px; pointer-events:auto; }
+#hud-sel button { background:none; border:1px solid var(--border); color:var(--red); font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:3px; cursor:pointer; margin-left:8px; }
+#hud-sel button:hover { background:rgba(248,81,73,.1); }
 
-/* ── CANVAS ── */
-#canvas-wrap{flex:1;position:relative;overflow:hidden;background:#060810}
-canvas#map{position:absolute;top:0;left:0;cursor:grab}
-canvas#map.dragging-loc{cursor:grabbing}
-canvas#map.adding{cursor:crosshair}
+/* ═══ MINIMAP ═══ */
+#minimap { position:absolute; bottom:12px; right:12px; width:180px; height:130px; border:1px solid var(--border); border-radius:6px; background:rgba(14,17,23,.9); z-index:5; overflow:hidden; }
+canvas#mini { width:100%; height:100%; display:block; }
+#mvp { position:absolute; border:1px solid var(--accent); opacity:.4; pointer-events:none; border-radius:1px; }
 
-#topbar{position:absolute;top:0;left:0;right:0;height:36px;background:linear-gradient(180deg,rgba(6,8,16,0.85),transparent);display:flex;align-items:center;padding:0 14px;z-index:5;pointer-events:none}
-#topbar>*{pointer-events:auto}
-#coords{font-size:11px;color:var(--ink-dim);letter-spacing:1px;font-family:'Crimson Pro',serif}
-#zoom-display{margin-left:auto;font-size:11px;color:var(--ink-dim);letter-spacing:1px}
-
-#minimap-wrap{position:absolute;bottom:14px;right:14px;width:200px;height:160px;border:1px solid var(--border);border-radius:4px;background:var(--panel-bg);backdrop-filter:blur(8px);overflow:hidden;z-index:5}
-canvas#minimap{width:100%;height:100%;display:block}
-#minimap-viewport{position:absolute;border:1px solid var(--gold);pointer-events:none;opacity:0.5}
-
-/* ── CONTEXT MENU ── */
-#context-menu{display:none;position:absolute;z-index:100;background:var(--panel-bg);border:1px solid var(--border);border-radius:4px;backdrop-filter:blur(12px);min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,0.6)}
-#context-menu .ctx-item{padding:7px 12px;font-size:12px;cursor:pointer;transition:background .15s;font-family:'Crimson Pro',serif;color:var(--ink)}
-#context-menu .ctx-item:hover{background:rgba(196,168,114,0.1)}
-#context-menu .ctx-sep{height:1px;background:var(--border);margin:2px 0}
-
-/* ── MODAL ── */
-#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center}
-#modal-overlay.show{display:flex}
-#modal{background:var(--parchment);border:1px solid var(--border);border-radius:6px;padding:22px;width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
-#modal h2{font-family:'Cinzel',serif;font-size:15px;color:var(--gold);margin-bottom:14px;letter-spacing:1px}
-#modal label{display:block;font-size:11px;color:var(--ink-dim);margin-bottom:3px;letter-spacing:1px;text-transform:uppercase}
-#modal input,#modal select{width:100%;padding:7px 9px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:3px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:13px;margin-bottom:12px}
-#modal input:focus,#modal select:focus{outline:none;border-color:var(--gold)}
-#modal select option{background:var(--parchment);color:var(--ink)}
-.modal-btns{display:flex;gap:8px;justify-content:flex-end}
-.modal-btns button{padding:7px 14px;border-radius:3px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;cursor:pointer;border:1px solid var(--border);transition:all .2s}
-.modal-btn-cancel{background:transparent;color:var(--ink-dim)}
-.modal-btn-cancel:hover{background:rgba(196,168,114,0.08)}
-.modal-btn-add{background:rgba(212,168,83,0.15);border-color:var(--gold)!important;color:var(--gold)}
-.modal-btn-add:hover{background:rgba(212,168,83,0.25)}
-
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(196,168,114,0.12);border-radius:3px}
+/* ═══ MODALS ═══ */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.modal { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px; min-width:400px; max-width:600px; max-height:80vh; }
+.modal h2 { font-size:14px; font-weight:600; margin-bottom:12px; color:var(--text-bright); }
+.modal textarea { width:100%; height:300px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:11px; padding:10px; resize:vertical; }
+.modal .btns { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
+.modal .btn { padding:6px 16px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text); font-family:var(--sans); font-size:12px; cursor:pointer; }
+.modal .btn:hover { background:rgba(255,255,255,.05); }
+.modal .btn.primary { background:var(--accent-dim); border-color:var(--accent-dim); color:#fff; }
+.modal .btn.primary:hover { background:var(--accent); }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="sidebar">
-    <div id="sidebar-header">
-      <h1>Overworld</h1>
-      <div class="subtitle">World Map Designer</div>
-    </div>
-    <div id="tools">
-      <h3>Tools</h3>
-      <div class="tool-row">
-        <button class="tool-btn active" data-tool="select">Select</button>
-        <button class="tool-btn" data-tool="add">+ Location</button>
-        <button class="tool-btn" data-tool="path">Path</button>
-        <button class="tool-btn" data-tool="pan">Pan</button>
-      </div>
-      <div class="toggle-wrap"><div class="toggle on" id="toggle-paths"></div><span class="toggle-label">Paths</span></div>
-      <div class="toggle-wrap"><div class="toggle on" id="toggle-grid"></div><span class="toggle-label">Terrain grid</span></div>
-      <div class="toggle-wrap"><div class="toggle on" id="toggle-labels"></div><span class="toggle-label">Labels</span></div>
-      <div class="toggle-wrap"><div class="toggle on" id="toggle-terrain"></div><span class="toggle-label">Terrain tiles</span></div>
-    </div>
-    <div id="legend"><h3>Regions</h3><div id="legend-items"></div></div>
-    <div id="locations-panel"><h3>Locations</h3><div id="locations-list"></div></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>Overworld <span>Designer</span></h1>
+    <div class="sub">PREFAB PLACEMENT TOOL</div>
   </div>
-  <div id="canvas-wrap">
-    <div id="topbar"><span id="coords">0, 0</span><span id="zoom-display">100%</span></div>
+  <div id="palette"></div>
+</div>
+
+<!-- MAIN AREA -->
+<div id="canvas-wrap">
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <div class="tb-group">
+      <button class="tb active" data-tool="select" title="V">Select</button>
+      <button class="tb" data-tool="place" title="P">Place</button>
+      <button class="tb" data-tool="pan" title="Space">Pan</button>
+    </div>
+    <div class="sep"></div>
+    <label id="snap-toggle"><input type="checkbox" id="snap-cb" checked> Snap 2u</label>
+    <div class="sep"></div>
+    <button class="tb" id="btn-export">Export JSON</button>
+    <button class="tb" id="btn-import">Import JSON</button>
+    <div class="sep"></div>
+    <button class="tb danger" id="btn-clear">Clear All</button>
+    <div class="spacer"></div>
+    <span class="tb-label" id="obj-count">0 objects</span>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-area">
     <canvas id="map"></canvas>
-    <div id="minimap-wrap"><canvas id="minimap"></canvas><div id="minimap-viewport"></div></div>
+    <div class="hud" id="hud-coords">0, 0</div>
+    <div class="hud" id="hud-zoom">100%</div>
+    <div class="hud" id="hud-tool">SELECT</div>
+    <div class="hud" id="hud-sel" style="display:none"></div>
+    <div id="minimap"><canvas id="mini"></canvas><div id="mvp"></div></div>
   </div>
 </div>
-<div id="context-menu"></div>
-<div id="modal-overlay">
-  <div id="modal">
-    <h2>New Location</h2>
-    <label>Name</label><input type="text" id="modal-name" placeholder="e.g. Ember Forge">
-    <label>Region</label><select id="modal-region"></select>
-    <label>Type</label>
-    <select id="modal-type">
-      <option value="landmark">Landmark</option>
-      <option value="dungeon">Dungeon</option>
-      <option value="town">Town</option>
-      <option value="boss">Boss Arena</option>
-      <option value="npc">NPC Hub</option>
-      <option value="gather">Gathering Node</option>
-    </select>
-    <div class="modal-btns">
-      <button class="modal-btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="modal-btn-add" onclick="confirmAdd()">Add</button>
-    </div>
-  </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════
-// REAL UNITY WORLD DATA
+// PREFAB DEFINITIONS
 // ═══════════════════════════════════════
-// Unity coords: X = east/west, Z = north/south (positive Z = north in Unity)
-// Map: X → horizontal, Z → vertical (inverted so north is UP)
-// Scale factor: 1 Unity unit = 4 pixels on our map
-
-const SCALE = 4;
-// World bounds from terrain tiles: X: -188 to +197, Z: -84 to +81
-// With padding for new regions
-const WORLD_MIN_X = -220;
-const WORLD_MAX_X = 250;
-const WORLD_MIN_Z = -180; // extended south for volcanic isles ocean
-const WORLD_MAX_Z = 130;  // extended north for dark castle
-
-const MAP_W = (WORLD_MAX_X - WORLD_MIN_X) * SCALE; // 1880
-const MAP_H = (WORLD_MAX_Z - WORLD_MIN_Z) * SCALE; // 1240
-
-// Convert Unity (x,z) to map pixel coords
-function unityToMap(ux, uz) {
-  return {
-    x: (ux - WORLD_MIN_X) * SCALE,
-    y: (WORLD_MAX_Z - uz) * SCALE  // flip Z so north is up
-  };
-}
-function mapToUnity(mx, my) {
-  return {
-    x: mx / SCALE + WORLD_MIN_X,
-    z: WORLD_MAX_Z - my / SCALE
-  };
-}
-
-// ── REAL TERRAIN TILES (from World.unity) ──
-// Each tile is ~55x55 Unity units
-const TILE_SIZE = 55;
-const TERRAIN_TILES = [
-  {x:-188.26, z:25.89},  {x:-188.26, z:-29.11},
-  {x:-133.26, z:25.89},  {x:-133.26, z:-29.11},
-  {x:-78.26,  z:25.89},  {x:-78.26,  z:-29.11},
-  {x:-23.26,  z:25.89},  {x:-23.26,  z:-84.11},
-  {x:31.74,   z:25.89},  {x:31.74,   z:-29.11},
-  {x:31.74,   z:-84.11}, {x:86.74,   z:-84.11},
-  {x:141.74,  z:-84.11},
+const CATEGORIES = [
+  { name:'Buildings', color:'var(--blue-build)', hex:'#58a6ff', icon:'🏠', items:[
+    'Town Hall','Farm House','Start House','Snowy Keep','Mountain Hideaway','Ice Castle','Abandoned Mines','Ruins'
+  ]},
+  { name:'Trees', color:'var(--green-tree)', hex:'#3fb950', icon:'🌲', items:[
+    'Pine Tree 1','Pine Tree Snow 1','Bush 1','Tree Stump 1','Tree Stump Snow 1'
+  ]},
+  { name:'Decorations', color:'var(--yellow-deco)', hex:'#d29922', icon:'✦', items:[
+    'Farm Fence','Farm Fence Middle','Scarecrow','Orange Flower','Red Flower','Yellow Flower','Pumpkin','Pumpkin Vine','Grass 1'
+  ]},
+  { name:'NPCs', color:'var(--red-npc)', hex:'#f47067', icon:'👤', items:[
+    'Elder Frost','Smith Ember','Keeper Zara','Brawler Jax','Ice Queen Vera','Farmer Bea','Captain Rex'
+  ]},
+  { name:'Special', color:'var(--white-special)', hex:'#e6edf3', icon:'⬟', items:[
+    'Player Spawn Point'
+  ]},
 ];
 
-// ── REGIONS ──
-const REGIONS = {
-  rolling_hills: {
-    name: 'Rolling Hills', color: '#4a8c3f', colorLight: '#5aaa4a', colorDark: '#2d5a22',
-    desc: 'Starting area — meadows, farms, Toby\'s House'
-  },
-  frost_valley: {
-    name: 'Frost Valley', color: '#6aa0c0', colorLight: '#8ec4e0', colorDark: '#3a6a88',
-    desc: 'Snow, ice, frozen lakes, glaciers'
-  },
-  forest: {
-    name: 'Forest', color: '#2d6b3a', colorLight: '#3a8a4a', colorDark: '#1a3d22',
-    desc: 'Dense trees — Jeffrey\'s Estate, Abandoned Mine'
-  },
-  volcanic_isles: {
-    name: 'Volcanic Isles', color: '#c44a10', colorLight: '#e06020', colorDark: '#8b2a00',
-    desc: 'Deep ocean archipelago — volcanic peaks, lava rivers'
-  },
-  dark_castle: {
-    name: 'Dark Castle', color: '#6a3d8a', colorLight: '#8a55aa', colorDark: '#3d1f5a',
-    desc: 'Shadow town, demon castle, The Dark Spire'
-  }
+// Build lookup: prefab name → category info
+const PREFAB_CAT = {};
+CATEGORIES.forEach(cat => cat.items.forEach(item => PREFAB_CAT[item] = cat));
+
+// ═══════════════════════════════════════
+// TERRAIN DATA
+// ═══════════════════════════════════════
+const TILE = 55;
+const TILES = [
+  {x:-188.26,z:-29.11,r:'frost_valley'},{x:-188.26,z:25.89,r:'frost_valley'},
+  {x:-133.26,z:-29.11,r:'frost_valley'},{x:-133.26,z:25.89,r:'frost_valley'},
+  {x:-78.26,z:-29.11,r:'rolling_hills'},{x:-78.26,z:25.89,r:'rolling_hills'},
+  {x:-23.26,z:25.89,r:'rolling_hills'},{x:-23.26,z:-84.11,r:'forest'},
+  {x:31.74,z:25.89,r:'rolling_hills'},{x:31.74,z:-29.11,r:'rolling_hills'},
+  {x:31.74,z:-84.11,r:'forest'},{x:86.74,z:-84.11,r:'volcanic'},
+  {x:141.74,z:-84.11,r:'volcanic'},
+];
+const REG_COLORS = {
+  frost_valley:'#6aa0c0', rolling_hills:'#4a8c3f', forest:'#2d6b3a', volcanic:'#c44a10'
 };
 
-// Region zones — which terrain tiles belong to which region, plus expansion areas
-// Based on actual tile positions and location placements
-const REGION_ZONES = {
-  rolling_hills: {
-    // Center tiles around Toby's House, Jeffrey's, Grawr's
-    tiles: [
-      {x:-78.26, z:25.89}, {x:-78.26, z:-29.11},
-      {x:-23.26, z:25.89},
-      {x:31.74, z:25.89}, {x:31.74, z:-29.11},
-    ],
-    // Approximate boundary polygon (Unity coords)
-    poly: [
-      {x:-80,z:80}, {x:40,z:80}, {x:87,z:25},
-      {x:87,z:-30}, {x:30,z:-30}, {x:-25,z:-30},
-      {x:-80,z:-30}
-    ]
-  },
-  frost_valley: {
-    tiles: [
-      {x:-188.26, z:25.89}, {x:-188.26, z:-29.11},
-      {x:-133.26, z:25.89}, {x:-133.26, z:-29.11},
-    ],
-    poly: [
-      {x:-220,z:82}, {x:-80,z:82}, {x:-80,z:-30},
-      {x:-135,z:-30}, {x:-220,z:-30}
-    ]
-  },
-  forest: {
-    tiles: [
-      {x:-23.26, z:-84.11},
-      {x:31.74, z:-84.11},
-    ],
-    poly: [
-      {x:-25,z:-30}, {x:87,z:-30}, {x:87,z:-85},
-      {x:-25,z:-85}
-    ]
-  },
-  volcanic_isles: {
-    // Far southeast — existing tiles plus new ocean expansion
-    tiles: [
-      {x:86.74, z:-84.11},
-      {x:141.74, z:-84.11},
-    ],
-    // Big ocean area to the southeast
-    poly: [
-      {x:87,z:-30}, {x:250,z:-30}, {x:250,z:-180},
-      {x:87,z:-180}
-    ]
-  },
-  dark_castle: {
-    // North — above existing terrain, new region
-    tiles: [],
-    poly: [
-      {x:-80,z:130}, {x:87,z:130}, {x:87,z:80},
-      {x:-80,z:80}
-    ]
-  }
-};
-
-// ── REAL LOCATIONS (from World.unity extraction) ──
-let locations = [
-  // Rolling Hills / Starter
-  {id:1, name:"Toby's House",      region:'rolling_hills', type:'landmark', ux:-3.473,  uz:5.521,  start:true},
-  {id:2, name:"Jeffrey's Estate",  region:'rolling_hills', type:'town',     ux:0,       uz:0},
-  {id:3, name:"Grawr's Lair",      region:'rolling_hills', type:'dungeon',  ux:-45.845, uz:52.352},
-  {id:4, name:"Town Hall",         region:'rolling_hills', type:'town',     ux:-73.123, uz:-8.578},
-  // Forest
-  {id:5, name:"Hidden Grove",      region:'forest',        type:'landmark', ux:1.640,   uz:-50.770},
-  {id:6, name:"Abandoned Mine",    region:'forest',        type:'dungeon',  ux:46.430,  uz:-65.870},
-  // Frost Valley
-  {id:7, name:"Frostbite Cavern",  region:'frost_valley',  type:'dungeon',  ux:-102.430,uz:-21.192},
-  {id:8, name:"Glacier Keep",      region:'frost_valley',  type:'landmark', ux:-138.026,uz:0.273},
-  {id:9, name:"The Frozen Citadel",region:'frost_valley',  type:'boss',     ux:-162.340,uz:35.060},
-  // Volcanic Isles (NEW — placed on islands in the ocean)
-  {id:10,name:"Ember Shore",       region:'volcanic_isles',type:'landmark', ux:120,     uz:-110},
-  {id:11,name:"Caldera Peak",      region:'volcanic_isles',type:'boss',     ux:180,     uz:-130},
-  {id:12,name:"Obsidian Forge",    region:'volcanic_isles',type:'dungeon',  ux:210,     uz:-100},
-  // Dark Castle (NEW — north of existing terrain)
-  {id:13,name:"Shadow Town",       region:'dark_castle',   type:'town',     ux:-20,     uz:100},
-  {id:14,name:"The Dark Castle",   region:'dark_castle',   type:'dungeon',  ux:20,      uz:110},
-  {id:15,name:"The Dark Spire",    region:'dark_castle',   type:'boss',     ux:40,      uz:120},
-];
-
-// Convert Unity positions to map positions
-locations.forEach(loc => {
-  const m = unityToMap(loc.ux, loc.uz);
-  loc.x = m.x;
-  loc.y = m.y;
-});
-
-let paths = [
-  // Real connections (from scene analysis)
-  [1,2],[1,3],[1,4],  // Toby's leads to Jeffrey's, Grawr's, Town Hall
-  [4,7],              // Town Hall → Frostbite Cavern
-  [7,8],[8,9],        // Frost Valley chain
-  [2,5],              // Jeffrey's → Hidden Grove
-  [5,6],              // Hidden Grove → Abandoned Mine
-  [3,4],              // Grawr's → Town Hall
-  // New region connections
-  [6,10],             // Abandoned Mine → Ember Shore (bridge to volcanic)
-  [10,11],[11,12],    // Volcanic chain
-  [3,13],             // Grawr's → Shadow Town (bridge to dark castle)
-  [13,14],[14,15],    // Dark Castle chain
-];
-
-let nextId = 20;
-
-// ── VOLCANIC ISLES: Islands & Ocean ──
-const ISLANDS = [
-  {ux:110, uz:-100, r:18, name:'Ember Isle'},
-  {ux:145, uz:-120, r:14, name:'Cinder Rock'},
-  {ux:180, uz:-130, r:22, name:'Caldera Island'},
-  {ux:210, uz:-100, r:16, name:'Forge Island'},
-  {ux:160, uz:-155, r:12, name:'Sulfur Spit'},
-  {ux:200, uz:-160, r:10, name:'Ash Atoll'},
-  {ux:230, uz:-140, r:13, name:'Magma Reach'},
-  {ux:130, uz:-145, r:11, name:'Smoke Stack'},
-];
-
-const LAVA_RIVERS = [
-  [{ux:180,uz:-120},{ux:178,uz:-135},{ux:182,uz:-148},{ux:175,uz:-160}],
-  [{ux:210,uz:-90},{ux:215,uz:-105},{ux:208,uz:-118},{ux:212,uz:-130}],
-  [{ux:110,uz:-95},{ux:115,uz:-108},{ux:108,uz:-120}],
-];
+const WORLD = { minX:-200, maxX:210, minZ:-170, maxZ:100 };
 
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
+let objects = []; // {id, prefab, x, y(always 0), z, rotY}
+let nextId = 1;
+let selectedPrefab = null; // name from palette
+let selectedObj = null;    // placed object
+let hoveredObj = null;
 let tool = 'select';
-let showPaths = true, showGrid = true, showLabels = true, showTerrain = true;
-let selectedRegion = null;
-let cam, dragging = null, panning = null, pathStart = null, addPos = null;
-let hoveredLoc = null, selectedLoc = null, lastMouse = null;
-
-const canvas = document.getElementById('map');
-const ctx = canvas.getContext('2d');
-const miniCanvas = document.getElementById('minimap');
-const miniCtx = miniCanvas.getContext('2d');
-const wrap = document.getElementById('canvas-wrap');
-
-function initCam() {
-  // Center on Toby's House
-  const toby = unityToMap(-3.473, 5.521);
-  cam = {x: toby.x, y: toby.y, zoom: 0.65};
-}
-initCam();
+let snapGrid = true;
+let cam = { x:0, z:0, zoom:3 }; // zoom = pixels per world unit
+let dragging = null; // {obj, offX, offZ}
+let panning = null;
+let spaceHeld = false;
 
 // ═══════════════════════════════════════
-// PROCEDURAL TEXTURES
+// CANVAS SETUP
 // ═══════════════════════════════════════
-const textures = {};
-function genTexture(key) {
-  const sz = 200, c = document.createElement('canvas');
-  c.width = sz; c.height = sz;
-  const g = c.getContext('2d');
-  let s = key.length * 997 + 42;
-  const rng = () => { s=(s*16807)%2147483647; return(s-1)/2147483646; };
-
-  if (key === 'rolling_hills') {
-    for (let i=0;i<3500;i++){const x=rng()*sz,y=rng()*sz;g.fillStyle=`rgba(${30+rng()*30},${55+rng()*55},${15+rng()*20},${0.25+rng()*0.3})`;g.fillRect(x,y,1+rng()*2,1+rng()*3)}
-  } else if (key === 'frost_valley') {
-    g.fillStyle='rgba(180,210,230,0.08)';g.fillRect(0,0,sz,sz);
-    for(let i=0;i<2500;i++){const x=rng()*sz,y=rng()*sz,b=190+rng()*65;g.fillStyle=`rgba(${b},${b+5},${b+8},${0.12+rng()*0.18})`;g.beginPath();g.arc(x,y,.5+rng()*2,0,Math.PI*2);g.fill()}
-  } else if (key === 'forest') {
-    for(let i=0;i<3000;i++){const x=rng()*sz,y=rng()*sz;g.fillStyle=`rgba(${10+rng()*20},${35+rng()*50},${10+rng()*15},${0.3+rng()*0.3})`;g.beginPath();g.arc(x,y,1+rng()*3,0,Math.PI*2);g.fill()}
-  } else if (key === 'volcanic_isles') {
-    for(let i=0;i<2000;i++){const x=rng()*sz,y=rng()*sz;const e=rng()>.9;if(e){g.fillStyle=`rgba(${200+rng()*55},${40+rng()*50},0,${0.3+rng()*0.35})`}else{const v=15+rng()*25;g.fillStyle=`rgba(${v},${v-3},${v-8},${0.25+rng()*0.2})`}g.fillRect(x,y,1+rng()*2,1+rng()*2)}
-  } else if (key === 'dark_castle') {
-    for(let i=0;i<2200;i++){const x=rng()*sz,y=rng()*sz;const p=rng()>.85;if(p){g.fillStyle=`rgba(${70+rng()*40},${15+rng()*25},${90+rng()*50},${0.25+rng()*0.3})`}else{const v=10+rng()*18;g.fillStyle=`rgba(${v},${v},${v+4},${0.25+rng()*0.2})`}g.fillRect(x,y,1+rng()*2,1+rng()*2)}
-  }
-  return c;
-}
-Object.keys(REGIONS).forEach(k => textures[k] = genTexture(k));
-
-// ═══════════════════════════════════════
-// RENDERING
-// ═══════════════════════════════════════
+const cv = document.getElementById('map');
+const ctx = cv.getContext('2d');
+const mcv = document.getElementById('mini');
+const mctx = mcv.getContext('2d');
+const area = document.getElementById('canvas-area');
 
 function resize() {
-  const r = window.devicePixelRatio || 1;
-  canvas.width = wrap.clientWidth * r; canvas.height = wrap.clientHeight * r;
-  canvas.style.width = wrap.clientWidth+'px'; canvas.style.height = wrap.clientHeight+'px';
+  const r = devicePixelRatio || 1;
+  cv.width = area.clientWidth * r;
+  cv.height = area.clientHeight * r;
+  cv.style.width = area.clientWidth + 'px';
+  cv.style.height = area.clientHeight + 'px';
   ctx.setTransform(r,0,0,r,0,0);
-  miniCanvas.width = 200*r; miniCanvas.height = 160*r;
-  miniCtx.setTransform(r,0,0,r,0,0);
+  mcv.width = 180*r; mcv.height = 130*r;
+  mctx.setTransform(r,0,0,r,0,0);
+}
+addEventListener('resize', resize);
+resize();
+
+// World → Screen
+function w2s(wx, wz) {
+  const cx = area.clientWidth/2, cy = area.clientHeight/2;
+  return { x: cx + (wx - cam.x)*cam.zoom, y: cy - (wz - cam.z)*cam.zoom };
+}
+// Screen → World
+function s2w(sx, sy) {
+  const cx = area.clientWidth/2, cy = area.clientHeight/2;
+  return { x: cam.x + (sx - cx)/cam.zoom, z: cam.z - (sy - cy)/cam.zoom };
+}
+function snap(v) { return snapGrid ? Math.round(v/2)*2 : v; }
+
+// ═══════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════
+function draw() {
+  const W = area.clientWidth, H = area.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#080b10';
+  ctx.fillRect(0,0,W,H);
+
+  // Grid
+  drawGrid(W,H);
+  // Terrain tiles
+  drawTerrain();
+  // Placed objects
+  drawObjects();
+  // Ghost preview (when placing)
+  drawGhost();
+  // Minimap
+  drawMinimap();
+
+  requestAnimationFrame(draw);
 }
 
-function toScreen(mx, my) {
-  const cx = wrap.clientWidth/2, cy = wrap.clientHeight/2;
-  return { x: cx+(mx-cam.x)*cam.zoom, y: cy+(my-cam.y)*cam.zoom };
-}
-function toMap(sx, sy) {
-  const cx = wrap.clientWidth/2, cy = wrap.clientHeight/2;
-  return { x: cam.x+(sx-cx)/cam.zoom, y: cam.y+(sy-cy)/cam.zoom };
-}
+function drawGrid(W,H) {
+  const step = snapGrid ? 2 : 5;
+  const tl = s2w(0,0), br = s2w(W,H);
+  const minX = Math.floor(tl.x/step)*step, maxX = Math.ceil(br.x/step)*step;
+  const minZ = Math.floor(br.z/step)*step, maxZ = Math.ceil(tl.z/step)*step;
 
-function drawOcean() {
-  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (cam.zoom < 0.8) return; // too zoomed out for grid
 
-  // Deep ocean base
-  ctx.fillStyle = '#060d1a';
-  ctx.fillRect(0,0,w,h);
-
-  // Volcanic isles ocean zone — big deep blue water
-  const volZone = REGION_ZONES.volcanic_isles.poly;
+  ctx.strokeStyle = cam.zoom > 3 ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.015)';
+  ctx.lineWidth = 0.5;
   ctx.beginPath();
-  volZone.forEach((p,i) => {
-    const m = unityToMap(p.x, p.z);
-    const s = toScreen(m.x, m.y);
-    i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-  });
-  ctx.closePath();
-  const volCenter = unityToMap(170, -120);
-  const vc = toScreen(volCenter.x, volCenter.y);
-  const grad = ctx.createRadialGradient(vc.x, vc.y, 0, vc.x, vc.y, 300*cam.zoom);
-  grad.addColorStop(0, '#0a2040');
-  grad.addColorStop(0.4, '#061530');
-  grad.addColorStop(1, '#040c1a');
-  ctx.fillStyle = grad;
-  ctx.fill();
+  for (let x = minX; x <= maxX; x += step) {
+    const s = w2s(x,0);
+    ctx.moveTo(s.x, 0); ctx.lineTo(s.x, H);
+  }
+  for (let z = minZ; z <= maxZ; z += step) {
+    const s = w2s(0,z);
+    ctx.moveTo(0, s.y); ctx.lineTo(W, s.y);
+  }
+  ctx.stroke();
 
-  // Animated ocean waves in volcanic zone
-  const time = Date.now() / 4000;
-  ctx.save();
-  ctx.clip();
-  ctx.strokeStyle = 'rgba(30,70,120,0.15)';
-  ctx.lineWidth = 0.8;
-  for (let uz = -180; uz < -20; uz += 8) {
-    ctx.beginPath();
-    for (let ux = 85; ux < 255; ux += 3) {
-      const waveZ = uz + Math.sin(ux * 0.05 + time + uz * 0.03) * 3;
-      const m = unityToMap(ux, waveZ);
-      const s = toScreen(m.x, m.y);
-      ux === 85 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    }
-    ctx.stroke();
-  }
-  // Secondary wave layer
-  ctx.strokeStyle = 'rgba(20,50,90,0.1)';
-  for (let uz = -175; uz < -25; uz += 12) {
-    ctx.beginPath();
-    for (let ux = 85; ux < 255; ux += 3) {
-      const waveZ = uz + Math.sin(ux * 0.03 - time * 0.7 + uz * 0.02) * 4;
-      const m = unityToMap(ux, waveZ);
-      const s = toScreen(m.x, m.y);
-      ux === 85 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Coastal water along south and east edges of existing terrain
-  ctx.strokeStyle = 'rgba(20,50,90,0.06)';
-  ctx.lineWidth = 0.5;
-  for (let uz = -90; uz < -70; uz += 5) {
-    ctx.beginPath();
-    for (let ux = -30; ux < 90; ux += 3) {
-      const waveZ = uz + Math.sin(ux * 0.04 + time) * 2;
-      const m = unityToMap(ux, waveZ);
-      const s = toScreen(m.x, m.y);
-      ux === -30 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    }
-    ctx.stroke();
-  }
+  // Origin crosshair
+  const o = w2s(0,0);
+  ctx.strokeStyle = 'rgba(255,255,255,.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(o.x-12,o.y); ctx.lineTo(o.x+12,o.y);
+  ctx.moveTo(o.x,o.y-12); ctx.lineTo(o.x,o.y+12);
+  ctx.stroke();
 }
 
-function drawTerrainTiles() {
-  if (!showTerrain) return;
-  const tilePx = TILE_SIZE * SCALE;
+function drawTerrain() {
+  TILES.forEach(t => {
+    const tl = w2s(t.x, t.z + TILE);
+    const br = w2s(t.x + TILE, t.z);
+    const color = REG_COLORS[t.r] || '#555';
 
-  TERRAIN_TILES.forEach(tile => {
-    const m = unityToMap(tile.x, tile.z + TILE_SIZE); // top-left corner in map space
-    const s = toScreen(m.x, m.y);
-    const w = tilePx * cam.zoom;
-    const h = tilePx * cam.zoom;
-
-    // Tile fill — subtle
-    ctx.fillStyle = 'rgba(196,168,114,0.03)';
-    ctx.fillRect(s.x, s.y, w, h);
-
-    // Tile border
-    ctx.strokeStyle = 'rgba(196,168,114,0.08)';
+    ctx.fillStyle = color + '15';
+    ctx.fillRect(tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+    ctx.strokeStyle = color + '30';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(s.x, s.y, w, h);
+    ctx.strokeRect(tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+  });
+
+  // Coastline
+  const tileSet = new Set(TILES.map(t=>`${t.x},${t.z}`));
+  ctx.strokeStyle = 'rgba(100,160,180,.15)';
+  ctx.lineWidth = 1.5;
+  TILES.forEach(t => {
+    if(!tileSet.has(`${t.x},${t.z+TILE}`)){const a=w2s(t.x,t.z+TILE),b=w2s(t.x+TILE,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    if(!tileSet.has(`${t.x},${t.z-TILE}`)){const a=w2s(t.x,t.z),b=w2s(t.x+TILE,t.z);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    if(!tileSet.has(`${t.x+TILE},${t.z}`)){const a=w2s(t.x+TILE,t.z),b=w2s(t.x+TILE,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    if(!tileSet.has(`${t.x-TILE},${t.z}`)){const a=w2s(t.x,t.z),b=w2s(t.x,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
   });
 }
 
-function drawRegions() {
-  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
-    if (selectedRegion && key !== selectedRegion) return;
-    const region = REGIONS[key];
-    const poly = zone.poly;
-    if (!poly || poly.length < 3) return;
+function drawObjects() {
+  objects.forEach(obj => {
+    const cat = PREFAB_CAT[obj.prefab];
+    const s = w2s(obj.x, obj.z);
+    const sel = selectedObj === obj;
+    const hov = hoveredObj === obj;
+    const color = cat ? cat.hex : '#888';
 
-    // Skip fill for volcanic_isles — it's ocean, islands are drawn separately
-    if (key === 'volcanic_isles') return;
+    // Size based on category
+    let r = 5;
+    if (cat?.name === 'Buildings') r = 10;
+    else if (cat?.name === 'Trees') r = 6;
+    else if (cat?.name === 'NPCs') r = 7;
+    else if (cat?.name === 'Decorations') r = 4;
+    else if (cat?.name === 'Special') r = 8;
+    r *= cam.zoom / 3;
+    r = Math.max(r, 3);
 
-    ctx.beginPath();
-    poly.forEach((p, i) => {
-      const m = unityToMap(p.x, p.z);
-      const s = toScreen(m.x, m.y);
-      i === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y);
-    });
-    ctx.closePath();
-
-    // Region gradient fill
-    const bounds = poly.reduce((b,p) => ({
-      minX:Math.min(b.minX,p.x),maxX:Math.max(b.maxX,p.x),
-      minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)
-    }), {minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity});
-
-    const ctr = unityToMap((bounds.minX+bounds.maxX)/2, (bounds.minZ+bounds.maxZ)/2);
-    const sc = toScreen(ctr.x, ctr.y);
-    const rad = Math.max(bounds.maxX-bounds.minX, bounds.maxZ-bounds.minZ) / 2 * SCALE * cam.zoom;
-
-    const g = ctx.createRadialGradient(sc.x,sc.y,0,sc.x,sc.y,rad);
-    g.addColorStop(0, region.colorLight + '50');
-    g.addColorStop(0.6, region.color + '35');
-    g.addColorStop(1, region.colorDark + '20');
-    ctx.fillStyle = g;
-    ctx.fill();
-
-    // Texture overlay
-    ctx.save();
-    ctx.clip();
-    const tex = textures[key];
-    if (tex) {
-      const pat = ctx.createPattern(tex, 'repeat');
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = pat;
-      ctx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
-      ctx.globalAlpha = 1;
+    // Selection ring
+    if (sel) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r+4, 0, Math.PI*2); ctx.stroke();
     }
-    ctx.restore();
-
-    // Border
-    ctx.strokeStyle = region.color + '30';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8,5]);
-    ctx.beginPath();
-    poly.forEach((p,i) => {
-      const m = unityToMap(p.x, p.z);
-      const s = toScreen(m.x, m.y);
-      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    });
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-  });
-}
-
-function drawIslands() {
-  if (selectedRegion && selectedRegion !== 'volcanic_isles') return;
-
-  ISLANDS.forEach(island => {
-    const m = unityToMap(island.ux, island.uz);
-    const s = toScreen(m.x, m.y);
-    const r = island.r * SCALE * cam.zoom;
-
-    // Island shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(s.x+2, s.y+2, r*1.1, r*0.95, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // Island base — dark volcanic rock
-    const g = ctx.createRadialGradient(s.x, s.y-r*0.15, r*0.15, s.x, s.y, r);
-    g.addColorStop(0, '#5a4030');
-    g.addColorStop(0.4, '#3a2818');
-    g.addColorStop(0.8, '#2a1a10');
-    g.addColorStop(1, 'rgba(20,12,6,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(s.x, s.y, r, r*0.85, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // Volcanic glow at peak
-    const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r*0.4);
-    glow.addColorStop(0, 'rgba(255,100,10,0.35)');
-    glow.addColorStop(0.6, 'rgba(220,50,0,0.12)');
-    glow.addColorStop(1, 'rgba(150,30,0,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, r*0.4, 0, Math.PI*2);
-    ctx.fill();
-
-    // Island name (small, at zoom)
-    if (showLabels && cam.zoom > 0.5) {
-      ctx.font = "9px 'Crimson Pro',serif";
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(196,168,114,0.35)';
-      ctx.fillText(island.name, s.x, s.y + r + 12);
-    }
-  });
-}
-
-function drawLavaRivers() {
-  if (selectedRegion && selectedRegion !== 'volcanic_isles') return;
-  const time = Date.now() / 2000;
-
-  LAVA_RIVERS.forEach(river => {
-    // Outer glow
-    ctx.strokeStyle = `rgba(255,60,0,${0.12+Math.sin(time)*0.04})`;
-    ctx.lineWidth = 10 * cam.zoom;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath();
-    river.forEach((p,i) => {
-      const m = unityToMap(p.ux, p.uz);
-      const s = toScreen(m.x, m.y);
-      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    });
-    ctx.stroke();
-
-    // Core
-    ctx.strokeStyle = `rgba(255,180,30,${0.5+Math.sin(time*1.3)*0.15})`;
-    ctx.lineWidth = 3 * cam.zoom;
-    ctx.beginPath();
-    river.forEach((p,i) => {
-      const m = unityToMap(p.ux, p.uz);
-      const s = toScreen(m.x, m.y);
-      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
-    });
-    ctx.stroke();
-  });
-}
-
-function drawGrid() {
-  if (!showGrid) return;
-  // Light grid aligned to Unity units (every 50 units)
-  ctx.strokeStyle = 'rgba(196,168,114,0.025)';
-  ctx.lineWidth = 0.5;
-  for (let ux = -200; ux <= 250; ux += 50) {
-    const m1 = unityToMap(ux, WORLD_MAX_Z), m2 = unityToMap(ux, WORLD_MIN_Z);
-    const s1 = toScreen(m1.x,m1.y), s2 = toScreen(m2.x,m2.y);
-    ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(s2.x,s2.y); ctx.stroke();
-  }
-  for (let uz = -180; uz <= 130; uz += 50) {
-    const m1 = unityToMap(WORLD_MIN_X, uz), m2 = unityToMap(WORLD_MAX_X, uz);
-    const s1 = toScreen(m1.x,m1.y), s2 = toScreen(m2.x,m2.y);
-    ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(s2.x,s2.y); ctx.stroke();
-  }
-}
-
-function drawRegionLabels() {
-  if (cam.zoom < 0.2) return;
-  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
-    if (selectedRegion && key !== selectedRegion) return;
-    const region = REGIONS[key];
-    const poly = zone.poly;
-    const bounds = poly.reduce((b,p) => ({
-      minX:Math.min(b.minX,p.x),maxX:Math.max(b.maxX,p.x),
-      minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)
-    }), {minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity});
-    const ctr = unityToMap((bounds.minX+bounds.maxX)/2, (bounds.minZ+bounds.maxZ)/2);
-    const s = toScreen(ctr.x, ctr.y - 20);
-
-    ctx.font = "700 13px 'Cinzel',serif";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillText(region.name.toUpperCase(), s.x+1, s.y+1);
-    ctx.fillStyle = region.color + '50';
-    ctx.fillText(region.name.toUpperCase(), s.x, s.y);
-  });
-}
-
-function drawPaths() {
-  if (!showPaths) return;
-  paths.forEach(([idA, idB]) => {
-    const a = locations.find(l=>l.id===idA), b = locations.find(l=>l.id===idB);
-    if (!a||!b) return;
-    const sa = toScreen(a.x,a.y), sb = toScreen(b.x,b.y);
-
-    ctx.strokeStyle = 'rgba(196,168,114,0.06)';
-    ctx.lineWidth = 5*cam.zoom; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(sa.x,sa.y); ctx.lineTo(sb.x,sb.y); ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(196,168,114,0.18)';
-    ctx.lineWidth = 1.2; ctx.setLineDash([4,6]);
-    ctx.beginPath(); ctx.moveTo(sa.x,sa.y); ctx.lineTo(sb.x,sb.y); ctx.stroke();
-    ctx.setLineDash([]);
-  });
-}
-
-function drawLocations() {
-  locations.forEach(loc => {
-    if (selectedRegion && loc.region !== selectedRegion) return;
-    const s = toScreen(loc.x, loc.y);
-    const region = REGIONS[loc.region];
-    const hov = hoveredLoc === loc, sel = selectedLoc === loc;
-    const r = (hov||sel) ? 9 : 6;
-
-    // Boss/start glow
-    if (loc.start || loc.type === 'boss') {
-      const gc = loc.start ? 'rgba(212,168,83,0.12)' : 'rgba(200,30,30,0.12)';
-      const g = ctx.createRadialGradient(s.x,s.y,r,s.x,s.y,r*3.5);
-      g.addColorStop(0, gc); g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(s.x,s.y,r*3.5,0,Math.PI*2); ctx.fill();
+    if (hov && !sel) {
+      ctx.strokeStyle = color + '80';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r+3, 0, Math.PI*2); ctx.stroke();
     }
 
-    // Marker
-    ctx.fillStyle = sel ? '#fff' : (hov ? region.colorLight : region.color);
-    ctx.strokeStyle = sel ? '#d4a853' : 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = sel ? 2 : 1;
-    ctx.beginPath(); ctx.arc(s.x,s.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // Rotation indicator
+    if (obj.rotY !== 0 && r > 5) {
+      const rad = -obj.rotY * Math.PI / 180;
+      ctx.strokeStyle = color + '60';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x + Math.sin(rad)*(r+6), s.y - Math.cos(rad)*(r+6));
+      ctx.stroke();
+    }
 
-    if (loc.type==='boss') { ctx.fillStyle='#ff3030'; ctx.beginPath(); ctx.arc(s.x,s.y,r*.35,0,Math.PI*2); ctx.fill(); }
-    if (loc.start) { ctx.fillStyle='#f0c060'; ctx.beginPath(); ctx.arc(s.x,s.y,r*.35,0,Math.PI*2); ctx.fill(); }
+    // Main dot
+    ctx.fillStyle = color;
+    ctx.globalAlpha = (sel || hov) ? 1 : 0.8;
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
 
     // Label
-    if (showLabels && cam.zoom > 0.25) {
-      ctx.font = `${hov?'600 ':''}12px 'Crimson Pro',serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillText(loc.name, s.x+1, s.y+r+4+1);
-      ctx.fillStyle = hov ? '#fff' : 'rgba(196,168,114,0.75)';
-      ctx.fillText(loc.name, s.x, s.y+r+4);
-
-      if (hov||sel) {
-        ctx.font = "9px 'Crimson Pro',serif";
-        ctx.fillStyle = 'rgba(196,168,114,0.35)';
-        const u = mapToUnity(loc.x, loc.y);
-        ctx.fillText(`${loc.type.toUpperCase()} (${Math.round(u.x)}, ${Math.round(u.z)})`, s.x, s.y+r+19);
-      }
+    if (cam.zoom > 1.5 || sel || hov) {
+      ctx.font = `${sel?'600 ':''}${Math.max(9, 10 * cam.zoom/3)}px 'Outfit',sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillText(obj.prefab, s.x+1, s.y + r + 12 + 1);
+      ctx.fillStyle = (sel||hov) ? '#fff' : color + 'cc';
+      ctx.fillText(obj.prefab, s.x, s.y + r + 12);
     }
   });
 }
 
-function drawPathPreview() {
-  if (tool==='path' && pathStart && lastMouse) {
-    const s = toScreen(pathStart.x, pathStart.y);
-    ctx.strokeStyle = 'rgba(212,168,83,0.35)';
-    ctx.lineWidth = 2; ctx.setLineDash([6,4]);
-    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(lastMouse.x,lastMouse.y);
-    ctx.stroke(); ctx.setLineDash([]);
-  }
+function drawGhost() {
+  if ((tool !== 'place' || !selectedPrefab) && !spaceHeld) return;
+  if (!lastMouse || tool !== 'place') return;
+
+  const w = s2w(lastMouse.x, lastMouse.y);
+  const wx = snap(w.x), wz = snap(w.z);
+  const s = w2s(wx, wz);
+  const cat = PREFAB_CAT[selectedPrefab];
+  const color = cat ? cat.hex : '#888';
+
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.font = '10px Outfit,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = color + '80';
+  ctx.fillText(selectedPrefab, s.x, s.y + 18);
+  ctx.fillStyle = '#ffffff40';
+  ctx.fillText(`(${wx.toFixed(0)}, ${wz.toFixed(0)})`, s.x, s.y + 30);
 }
 
-function renderMinimap() {
-  const mw = 200, mh = 160;
-  const sx = mw / MAP_W, sy = mh / MAP_H;
-  const s = Math.min(sx, sy) * 0.9;
-  const ox = (mw - MAP_W*s)/2, oy = (mh - MAP_H*s)/2;
+function drawMinimap() {
+  const mw=180, mh=130;
+  const worldW = WORLD.maxX - WORLD.minX;
+  const worldH = WORLD.maxZ - WORLD.minZ;
+  const sc = Math.min(mw/worldW, mh/worldH) * 0.9;
+  const ox = (mw - worldW*sc)/2;
+  const oy = (mh - worldH*sc)/2;
 
-  miniCtx.fillStyle = '#060d1a';
-  miniCtx.fillRect(0,0,mw,mh);
+  mctx.fillStyle = '#080b10';
+  mctx.fillRect(0,0,mw,mh);
 
-  // Region fills on minimap
-  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
-    const region = REGIONS[key];
-    miniCtx.fillStyle = key === 'volcanic_isles' ? '#0a2040' : region.color + '30';
-    miniCtx.beginPath();
-    zone.poly.forEach((p,i) => {
-      const m = unityToMap(p.x, p.z);
-      const mx = ox + m.x * s, my = oy + m.y * s;
-      i===0 ? miniCtx.moveTo(mx,my) : miniCtx.lineTo(mx,my);
-    });
-    miniCtx.closePath(); miniCtx.fill();
+  // Tiles
+  TILES.forEach(t => {
+    const x = ox + (t.x - WORLD.minX)*sc;
+    const y = oy + (WORLD.maxZ - t.z - TILE)*sc;
+    mctx.fillStyle = (REG_COLORS[t.r]||'#555') + '40';
+    mctx.fillRect(x, y, TILE*sc, TILE*sc);
   });
 
-  // Location dots
-  locations.forEach(loc => {
-    miniCtx.fillStyle = REGIONS[loc.region]?.color || '#888';
-    miniCtx.beginPath();
-    miniCtx.arc(ox+loc.x*s, oy+loc.y*s, 1.5, 0, Math.PI*2);
-    miniCtx.fill();
+  // Objects
+  objects.forEach(obj => {
+    const cat = PREFAB_CAT[obj.prefab];
+    mctx.fillStyle = cat ? cat.hex : '#888';
+    const mx = ox + (obj.x - WORLD.minX)*sc;
+    const my = oy + (WORLD.maxZ - obj.z)*sc;
+    mctx.beginPath(); mctx.arc(mx, my, 1.5, 0, Math.PI*2); mctx.fill();
   });
 
   // Viewport rect
-  const vw = wrap.clientWidth/cam.zoom, vh = wrap.clientHeight/cam.zoom;
-  const vx = ox + (cam.x - vw/2)*s, vy = oy + (cam.y - vh/2)*s;
-  const vp = document.getElementById('minimap-viewport');
-  vp.style.left = vx+'px'; vp.style.top = vy+'px';
-  vp.style.width = (vw*s)+'px'; vp.style.height = (vh*s)+'px';
+  const vw = area.clientWidth / cam.zoom;
+  const vh = area.clientHeight / cam.zoom;
+  const vp = document.getElementById('mvp');
+  vp.style.left = (ox + (cam.x - vw/2 - WORLD.minX)*sc) + 'px';
+  vp.style.top = (oy + (WORLD.maxZ - cam.z - vh/2)*sc) + 'px';
+  vp.style.width = (vw*sc) + 'px';
+  vp.style.height = (vh*sc) + 'px';
 }
 
-function render() {
-  ctx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
-  drawOcean();
-  drawGrid();
-  drawTerrainTiles();
-  drawRegions();
-  drawIslands();
-  drawLavaRivers();
-  drawRegionLabels();
-  drawPaths();
-  drawLocations();
-  drawPathPreview();
-  renderMinimap();
-  requestAnimationFrame(render);
+// ═══════════════════════════════════════
+// BUILD SIDEBAR
+// ═══════════════════════════════════════
+function buildPalette() {
+  const pal = document.getElementById('palette');
+  pal.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const div = document.createElement('div');
+    div.className = 'cat';
+    div.innerHTML = `<div class="cat-head">
+      <div class="dot" style="background:${cat.hex}"></div>
+      ${cat.name}
+      <span class="ct">${cat.items.length}</span>
+      <span class="arr">▼</span>
+    </div><div class="cat-items"></div>`;
+
+    const head = div.querySelector('.cat-head');
+    head.onclick = () => div.classList.toggle('closed');
+
+    const items = div.querySelector('.cat-items');
+    cat.items.forEach(name => {
+      const p = document.createElement('div');
+      p.className = 'prefab';
+      p.innerHTML = `<div class="ico" style="background:${cat.hex}22;color:${cat.hex}">${cat.icon}</div><span class="nm">${name}</span>`;
+      p.onclick = (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.prefab.selected').forEach(el => el.classList.remove('selected'));
+        p.classList.add('selected');
+        selectedPrefab = name;
+        setTool('place');
+      };
+      items.appendChild(p);
+    });
+    pal.appendChild(div);
+  });
 }
+buildPalette();
+
+// ═══════════════════════════════════════
+// TOOLS
+// ═══════════════════════════════════════
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('#toolbar .tb[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  document.getElementById('hud-tool').textContent = t.toUpperCase();
+  cv.style.cursor = t==='place'?'crosshair':t==='pan'?'grab':'default';
+}
+
+document.querySelectorAll('#toolbar .tb[data-tool]').forEach(b => {
+  b.onclick = () => setTool(b.dataset.tool);
+});
+
+document.getElementById('snap-cb').onchange = (e) => { snapGrid = e.target.checked; };
 
 // ═══════════════════════════════════════
 // INTERACTION
 // ═══════════════════════════════════════
-function findLocAt(mx, my, t) {
-  t = t || 18/cam.zoom;
-  let best=null, bestD=t;
-  locations.forEach(l => {
-    const dx=l.x-mx, dy=l.y-my, d=Math.sqrt(dx*dx+dy*dy);
-    if(d<bestD){bestD=d;best=l}
+let lastMouse = null;
+
+function findObj(wx, wz) {
+  const thresh = 8 / cam.zoom;
+  let best = null, bestD = thresh;
+  objects.forEach(obj => {
+    const d = Math.hypot(obj.x - wx, obj.z - wz);
+    if (d < bestD) { bestD = d; best = obj; }
   });
   return best;
 }
 
-canvas.addEventListener('mousedown', e => {
-  const rect = canvas.getBoundingClientRect();
-  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
-  const m = toMap(sx, sy);
-  lastMouse = {x:sx,y:sy};
+function updateObjCount() {
+  document.getElementById('obj-count').textContent = `${objects.length} object${objects.length===1?'':'s'}`;
+}
 
-  if (e.button===2) return;
+function updateSelHud() {
+  const h = document.getElementById('hud-sel');
+  if (!selectedObj) { h.style.display = 'none'; return; }
+  h.style.display = 'block';
+  h.innerHTML = `<b>${selectedObj.prefab}</b> (${selectedObj.x.toFixed(1)}, ${selectedObj.z.toFixed(1)}) rot:${selectedObj.rotY}° <button id="del-btn">✕ DEL</button>`;
+  document.getElementById('del-btn').onclick = () => deleteSelected();
+}
 
-  if (tool==='select') {
-    const loc = findLocAt(m.x, m.y);
-    if (loc) { dragging={loc,offX:loc.x-m.x,offY:loc.y-m.y}; selectedLoc=loc; canvas.classList.add('dragging-loc'); }
-    else { selectedLoc=null; panning={startX:e.clientX,startY:e.clientY,camX:cam.x,camY:cam.y}; }
-  } else if (tool==='pan') {
-    panning = {startX:e.clientX,startY:e.clientY,camX:cam.x,camY:cam.y};
-  } else if (tool==='add') {
-    addPos = m; openModal();
-  } else if (tool==='path') {
-    const loc = findLocAt(m.x, m.y);
-    if (loc) {
-      if (!pathStart) { pathStart=loc; }
-      else { if(pathStart.id!==loc.id){const ex=paths.some(([a,b])=>(a===pathStart.id&&b===loc.id)||(a===loc.id&&b===pathStart.id));if(!ex)paths.push([pathStart.id,loc.id])} pathStart=null; }
+function deleteSelected() {
+  if (!selectedObj) return;
+  objects = objects.filter(o => o !== selectedObj);
+  selectedObj = null;
+  updateSelHud(); updateObjCount();
+}
+
+cv.addEventListener('mousedown', e => {
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = s2w(sx, sy);
+
+  if (e.button === 1 || (e.button === 0 && spaceHeld)) {
+    panning = { sx: e.clientX, sy: e.clientY, cx: cam.x, cz: cam.z };
+    cv.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  if (tool === 'select') {
+    const obj = findObj(w.x, w.z);
+    if (obj) {
+      selectedObj = obj;
+      dragging = { obj, offX: obj.x - w.x, offZ: obj.z - w.z };
+      cv.style.cursor = 'grabbing';
+    } else {
+      selectedObj = null;
+      panning = { sx: e.clientX, sy: e.clientY, cx: cam.x, cz: cam.z };
     }
-  }
-  updateUI();
-});
-
-canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
-  const m = toMap(sx, sy);
-  const u = mapToUnity(m.x, m.y);
-  lastMouse = {x:sx,y:sy};
-
-  document.getElementById('coords').textContent = `Unity: ${Math.round(u.x)}, ${Math.round(u.z)}`;
-
-  if (dragging) { dragging.loc.x=m.x+dragging.offX; dragging.loc.y=m.y+dragging.offY; }
-  else if (panning) { cam.x=panning.camX-(e.clientX-panning.startX)/cam.zoom; cam.y=panning.camY-(e.clientY-panning.startY)/cam.zoom; }
-  else {
-    hoveredLoc = findLocAt(m.x, m.y);
-    canvas.style.cursor = hoveredLoc?'pointer':tool==='add'?'crosshair':tool==='pan'?'grab':'default';
+    updateSelHud();
+  } else if (tool === 'place' && selectedPrefab) {
+    const nx = snap(w.x), nz = snap(w.z);
+    const obj = { id: nextId++, prefab: selectedPrefab, x: nx, y: 0, z: nz, rotY: 0 };
+    objects.push(obj);
+    selectedObj = obj;
+    updateObjCount(); updateSelHud();
+  } else if (tool === 'pan') {
+    panning = { sx: e.clientX, sy: e.clientY, cx: cam.x, cz: cam.z };
+    cv.style.cursor = 'grabbing';
   }
 });
 
-canvas.addEventListener('mouseup', () => { if(dragging){canvas.classList.remove('dragging-loc');dragging=null} panning=null; });
-canvas.addEventListener('mouseleave', () => { hoveredLoc=null; panning=null; });
+cv.addEventListener('mousemove', e => {
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  lastMouse = { x: sx, y: sy };
+  const w = s2w(sx, sy);
 
-canvas.addEventListener('wheel', e => {
+  document.getElementById('hud-coords').textContent = `${w.x.toFixed(1)}, ${w.z.toFixed(1)}`;
+
+  if (dragging) {
+    dragging.obj.x = snap(w.x + dragging.offX);
+    dragging.obj.z = snap(w.z + dragging.offZ);
+    updateSelHud();
+  } else if (panning) {
+    cam.x = panning.cx - (e.clientX - panning.sx) / cam.zoom;
+    cam.z = panning.cz + (e.clientY - panning.sy) / cam.zoom;
+  } else {
+    hoveredObj = findObj(w.x, w.z);
+    if (tool === 'select') cv.style.cursor = hoveredObj ? 'pointer' : 'default';
+  }
+});
+
+cv.addEventListener('mouseup', () => {
+  dragging = null; panning = null;
+  if (tool === 'select') cv.style.cursor = hoveredObj ? 'pointer' : 'default';
+  else if (tool === 'pan') cv.style.cursor = 'grab';
+  else if (tool === 'place') cv.style.cursor = 'crosshair';
+});
+
+cv.addEventListener('wheel', e => {
   e.preventDefault();
-  const d = e.deltaY>0?0.9:1.1;
-  const nz = Math.max(0.1,Math.min(4,cam.zoom*d));
-  const rect = canvas.getBoundingClientRect();
-  const sx=e.clientX-rect.left, sy=e.clientY-rect.top;
-  const w1 = toMap(sx,sy);
-  cam.zoom = nz;
-  const w2 = toMap(sx,sy);
-  cam.x -= (w2.x-w1.x); cam.y -= (w2.y-w1.y);
-  document.getElementById('zoom-display').textContent = `${Math.round(cam.zoom*100)}%`;
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(0.3, Math.min(20, cam.zoom * factor));
+
+  // Zoom toward mouse
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w1 = s2w(sx, sy);
+  cam.zoom = newZoom;
+  const w2 = s2w(sx, sy);
+  cam.x -= (w2.x - w1.x);
+  cam.z -= (w2.z - w1.z);
+
+  document.getElementById('hud-zoom').textContent = `${Math.round(cam.zoom * 33)}%`;
 }, {passive:false});
 
-canvas.addEventListener('contextmenu', e => {
+cv.addEventListener('contextmenu', e => {
   e.preventDefault();
-  const rect=canvas.getBoundingClientRect();
-  const m=toMap(e.clientX-rect.left,e.clientY-rect.top);
-  const loc=findLocAt(m.x,m.y);
-  showContextMenu(e.clientX,e.clientY,loc,m);
+  if (selectedObj) {
+    selectedObj.rotY = (selectedObj.rotY + 15) % 360;
+    updateSelHud();
+  }
 });
-
-document.addEventListener('click', e => { if(!e.target.closest('#context-menu'))document.getElementById('context-menu').style.display='none'; });
 
 // Minimap click
-document.getElementById('minimap-wrap').addEventListener('click', e => {
-  const rect=miniCanvas.getBoundingClientRect();
-  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
-  const mw=200,mh=160;
-  const sx=mw/MAP_W,sy=mh/MAP_H;
-  const s=Math.min(sx,sy)*0.9;
-  const ox=(mw-MAP_W*s)/2, oy=(mh-MAP_H*s)/2;
-  cam.x = (mx-ox)/s; cam.y = (my-oy)/s;
+document.getElementById('minimap').addEventListener('click', e => {
+  const rect = mcv.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const mw=180, mh=130;
+  const worldW = WORLD.maxX - WORLD.minX;
+  const worldH = WORLD.maxZ - WORLD.minZ;
+  const sc = Math.min(mw/worldW, mh/worldH)*0.9;
+  const ox = (mw-worldW*sc)/2, oy = (mh-worldH*sc)/2;
+  cam.x = (mx-ox)/sc + WORLD.minX;
+  cam.z = WORLD.maxZ - (my-oy)/sc;
 });
 
 // ═══════════════════════════════════════
-// CONTEXT MENU & MODAL
+// KEYBOARD
 // ═══════════════════════════════════════
+addEventListener('keydown', e => {
+  if (e.key === ' ') { spaceHeld = true; e.preventDefault(); }
+  if (e.key === 'Escape') { selectedObj = null; selectedPrefab = null; document.querySelectorAll('.prefab.selected').forEach(el=>el.classList.remove('selected')); setTool('select'); updateSelHud(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); }
+  if (e.key === 'r' || e.key === 'R') { if(selectedObj){selectedObj.rotY=(selectedObj.rotY+15)%360;updateSelHud();} }
+  if (e.key === 'v' || e.key === 'V') setTool('select');
+  if (e.key === 'p' || e.key === 'P') setTool('place');
+});
+addEventListener('keyup', e => {
+  if (e.key === ' ') spaceHeld = false;
+});
 
-function showContextMenu(x,y,loc,mapPos) {
-  const menu = document.getElementById('context-menu');
-  if (loc) {
-    const u = mapToUnity(loc.x, loc.y);
-    menu.innerHTML = `
-      <div class="ctx-item" onclick="focusLoc(${loc.id})">Focus: ${loc.name}</div>
-      <div class="ctx-item" onclick="renameLoc(${loc.id})">Rename</div>
-      <div class="ctx-item" style="color:var(--ink-dim);font-size:10px;cursor:default">Unity pos: ${Math.round(u.x)}, ${Math.round(u.z)}</div>
-      <div class="ctx-sep"></div>
-      <div class="ctx-item" onclick="deleteLoc(${loc.id})" style="color:#8b2020">Delete</div>`;
-  } else {
-    menu.innerHTML = `
-      <div class="ctx-item" onclick="addLocAtMap(${mapPos.x},${mapPos.y})">Add Location Here</div>
-      <div class="ctx-sep"></div>
-      <div class="ctx-item" onclick="initCam();updateUI()">Reset View</div>`;
+// ═══════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════
+document.getElementById('btn-export').onclick = () => {
+  const data = {
+    version: 1,
+    objects: objects.map(o => ({ prefab: o.prefab, x: Math.round(o.x*10)/10, y: 0, z: Math.round(o.z*10)/10, rotY: o.rotY }))
+  };
+  const json = JSON.stringify(data, null, 2);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal">
+    <h2>Export Layout — ${objects.length} objects</h2>
+    <textarea readonly>${json}</textarea>
+    <div class="btns">
+      <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
+      <button class="btn primary" id="copy-btn">Copy to Clipboard</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#copy-btn').onclick = () => {
+    navigator.clipboard.writeText(json);
+    overlay.querySelector('#copy-btn').textContent = 'Copied!';
+  };
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+};
+
+document.getElementById('btn-import').onclick = () => {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal">
+    <h2>Import Layout JSON</h2>
+    <textarea id="import-ta" placeholder="Paste JSON here..."></textarea>
+    <div class="btns">
+      <button class="btn" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+      <button class="btn primary" id="do-import">Import</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#do-import').onclick = () => {
+    try {
+      const data = JSON.parse(overlay.querySelector('#import-ta').value);
+      if (data.objects) {
+        objects = data.objects.map(o => ({ id: nextId++, prefab: o.prefab, x: o.x, y: o.y||0, z: o.z, rotY: o.rotY||0 }));
+        updateObjCount(); updateSelHud();
+      }
+      overlay.remove();
+    } catch(err) { alert('Invalid JSON: ' + err.message); }
+  };
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+};
+
+document.getElementById('btn-clear').onclick = () => {
+  if (objects.length && confirm(`Delete all ${objects.length} objects?`)) {
+    objects = []; selectedObj = null; updateObjCount(); updateSelHud();
   }
-  menu.style.display='block'; menu.style.left=x+'px'; menu.style.top=y+'px';
-  const r=menu.getBoundingClientRect();
-  if(r.right>window.innerWidth)menu.style.left=(x-r.width)+'px';
-  if(r.bottom>window.innerHeight)menu.style.top=(y-r.height)+'px';
-}
+};
 
-function focusLoc(id) { const l=locations.find(a=>a.id===id); if(l){cam.x=l.x;cam.y=l.y;cam.zoom=1.2;selectedLoc=l} document.getElementById('context-menu').style.display='none'; }
-function renameLoc(id) { const l=locations.find(a=>a.id===id); if(!l)return; const n=prompt('Rename:',l.name); if(n&&n.trim()){l.name=n.trim();updateUI()} document.getElementById('context-menu').style.display='none'; }
-function deleteLoc(id) { locations=locations.filter(l=>l.id!==id); paths=paths.filter(([a,b])=>a!==id&&b!==id); if(selectedLoc&&selectedLoc.id===id)selectedLoc=null; updateUI(); document.getElementById('context-menu').style.display='none'; }
-function addLocAtMap(mx,my) { addPos={x:mx,y:my}; openModal(); document.getElementById('context-menu').style.display='none'; }
-
-function openModal() {
-  document.getElementById('modal-overlay').classList.add('show');
-  const sel = document.getElementById('modal-region');
-  sel.innerHTML = '';
-  Object.entries(REGIONS).forEach(([k,r]) => { const o=document.createElement('option'); o.value=k; o.textContent=r.name; sel.appendChild(o); });
-
-  // Guess region from position
-  if (addPos) {
-    const u = mapToUnity(addPos.x, addPos.y);
-    for (const [key, zone] of Object.entries(REGION_ZONES)) {
-      if (pointInPoly(u.x, u.z, zone.poly)) { sel.value=key; break; }
+// ═══════════════════════════════════════
+// INIT — load saved layout from localStorage
+// ═══════════════════════════════════════
+try {
+  const saved = localStorage.getItem('mapdesigner_layout');
+  if (saved) {
+    const data = JSON.parse(saved);
+    if (data.objects) {
+      objects = data.objects.map(o => ({ id: nextId++, prefab: o.prefab, x: o.x, y: o.y||0, z: o.z, rotY: o.rotY||0 }));
     }
   }
-  document.getElementById('modal-name').value = '';
-  setTimeout(() => document.getElementById('modal-name').focus(), 80);
-}
-function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); addPos=null; }
-function confirmAdd() {
-  const name=document.getElementById('modal-name').value.trim();
-  if(!name) return;
-  const region=document.getElementById('modal-region').value;
-  const type=document.getElementById('modal-type').value;
-  const loc = {id:nextId++, name, region, type, x:addPos.x, y:addPos.y};
-  const u = mapToUnity(addPos.x, addPos.y);
-  loc.ux=u.x; loc.uz=u.z;
-  locations.push(loc);
-  selectedLoc=loc;
-  closeModal(); updateUI();
-}
-function pointInPoly(x,z,poly) {
-  let inside=false;
-  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
-    const xi=poly[i].x,zi=poly[i].z,xj=poly[j].x,zj=poly[j].z;
-    if(((zi>z)!==(zj>z))&&(x<(xj-xi)*(z-zi)/(zj-zi)+xi))inside=!inside;
-  }
-  return inside;
-}
+} catch(e) {}
 
-document.getElementById('modal-name').addEventListener('keydown', e => { if(e.key==='Enter')confirmAdd(); if(e.key==='Escape')closeModal(); });
+// Autosave every 10s
+setInterval(() => {
+  const data = { version:1, objects: objects.map(o => ({ prefab:o.prefab, x:Math.round(o.x*10)/10, y:0, z:Math.round(o.z*10)/10, rotY:o.rotY })) };
+  localStorage.setItem('mapdesigner_layout', JSON.stringify(data));
+}, 10000);
 
-// ═══════════════════════════════════════
-// UI
-// ═══════════════════════════════════════
-
-function updateUI() {
-  const leg = document.getElementById('legend-items');
-  leg.innerHTML = '';
-  Object.entries(REGIONS).forEach(([k,r]) => {
-    const c = locations.filter(l=>l.region===k).length;
-    const el = document.createElement('div');
-    el.className = `legend-item${!selectedRegion||selectedRegion===k?' selected':''}`;
-    el.innerHTML = `<div class="legend-swatch" style="background:${r.color}"></div><span class="legend-label">${r.name}</span><span class="legend-count">${c}</span>`;
-    el.addEventListener('click', () => { selectedRegion = selectedRegion===k?null:k; updateUI(); });
-    leg.appendChild(el);
-  });
-
-  const list = document.getElementById('locations-list');
-  list.innerHTML = '';
-  ['rolling_hills','frost_valley','forest','volcanic_isles','dark_castle'].forEach(rk => {
-    const locs = locations.filter(l=>l.region===rk);
-    if(!locs.length) return;
-    if(selectedRegion&&selectedRegion!==rk) return;
-    locs.forEach(loc => {
-      const el = document.createElement('div');
-      el.className = 'loc-item';
-      el.innerHTML = `<div class="dot" style="background:${REGIONS[loc.region]?.color||'#888'}"></div><span class="name">${loc.name}</span><span class="region-tag">${loc.type}</span><span class="delete-btn" onclick="event.stopPropagation();deleteLoc(${loc.id})">x</span>`;
-      el.addEventListener('click', () => { cam.x=loc.x; cam.y=loc.y; selectedLoc=loc; });
-      list.appendChild(el);
-    });
-  });
-}
-
-document.querySelectorAll('.tool-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.tool-btn').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    tool=b.dataset.tool; pathStart=null;
-    canvas.className = tool==='add'?'adding':'';
-  });
-});
-
-document.getElementById('toggle-paths').addEventListener('click', function(){showPaths=!showPaths;this.classList.toggle('on',showPaths)});
-document.getElementById('toggle-grid').addEventListener('click', function(){showGrid=!showGrid;this.classList.toggle('on',showGrid)});
-document.getElementById('toggle-labels').addEventListener('click', function(){showLabels=!showLabels;this.classList.toggle('on',showLabels)});
-document.getElementById('toggle-terrain').addEventListener('click', function(){showTerrain=!showTerrain;this.classList.toggle('on',showTerrain)});
-
-document.addEventListener('keydown', e => {
-  if(document.getElementById('modal-overlay').classList.contains('show')) return;
-  if(e.key==='Escape'){selectedLoc=null;pathStart=null;document.getElementById('context-menu').style.display='none'}
-  if((e.key==='Delete'||e.key==='Backspace')&&selectedLoc&&!e.target.closest('input'))deleteLoc(selectedLoc.id);
-  if(e.key==='1')setTool('select'); if(e.key==='2')setTool('add'); if(e.key==='3')setTool('path'); if(e.key==='4')setTool('pan');
-  if(e.key==='r'&&!e.metaKey&&!e.ctrlKey){initCam();updateUI()}
-});
-function setTool(t){tool=t;pathStart=null;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));canvas.className=t==='add'?'adding':'';}
-
-// ═══════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════
-window.addEventListener('resize', resize);
-resize(); updateUI(); render();
-document.getElementById('zoom-display').textContent = `${Math.round(cam.zoom*100)}%`;
+updateObjCount();
+draw();
 </script>
 </body>
 </html>
