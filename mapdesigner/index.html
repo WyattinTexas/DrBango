@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overworld Online — World Map Designer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --parchment:#1a1611;
+  --ink:#c4a872;
+  --ink-dim:#7a6844;
+  --gold:#d4a853;
+  --gold-bright:#f0c060;
+  --blood:#8b2020;
+  --frost:#a8d4e6;
+  --panel-bg:rgba(18,14,10,0.94);
+  --border:rgba(196,168,114,0.15);
+}
+
+html,body{height:100%;overflow:hidden;background:#080a10;color:var(--ink);font-family:'Crimson Pro',serif}
+
+#app{display:flex;height:100vh;width:100vw}
+
+/* ── SIDEBAR ── */
+#sidebar{
+  width:270px;min-width:270px;
+  background:var(--panel-bg);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:10;
+  backdrop-filter:blur(10px);
+}
+#sidebar-header{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
+#sidebar-header h1{font-family:'Cinzel Decorative',serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:3px;text-transform:uppercase}
+#sidebar-header .subtitle{font-size:10px;color:var(--ink-dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+
+#tools{padding:12px 16px;border-bottom:1px solid var(--border)}
+#tools h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.tool-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.tool-btn{
+  padding:5px 9px;background:rgba(196,168,114,0.06);border:1px solid var(--border);
+  border-radius:3px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:12px;cursor:pointer;transition:all .2s;
+}
+.tool-btn:hover{background:rgba(196,168,114,0.12);border-color:rgba(196,168,114,0.3)}
+.tool-btn.active{background:rgba(212,168,83,0.15);border-color:var(--gold);color:var(--gold)}
+
+.toggle-wrap{display:flex;align-items:center;gap:8px;margin-top:5px}
+.toggle{width:30px;height:16px;border-radius:8px;background:rgba(196,168,114,0.12);border:1px solid var(--border);cursor:pointer;position:relative;transition:all .2s}
+.toggle.on{background:rgba(212,168,83,0.25);border-color:var(--gold)}
+.toggle::after{content:'';position:absolute;width:10px;height:10px;border-radius:50%;background:var(--ink-dim);top:2px;left:2px;transition:all .2s}
+.toggle.on::after{left:16px;background:var(--gold)}
+.toggle-label{font-size:11px;color:var(--ink-dim)}
+
+#legend{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+#legend h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.legend-item{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;transition:opacity .2s}
+.legend-item:hover{opacity:0.85}
+.legend-item.selected{opacity:1}
+.legend-item:not(.selected){opacity:0.4}
+.legend-swatch{width:16px;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,0.08);flex-shrink:0}
+.legend-label{font-size:12px;color:var(--ink)}
+.legend-count{font-size:10px;color:var(--ink-dim);margin-left:auto}
+
+#locations-panel{flex:1;overflow-y:auto;padding:12px 16px}
+#locations-panel h3{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.loc-item{display:flex;align-items:center;gap:7px;padding:5px 7px;margin-bottom:2px;border-radius:3px;cursor:pointer;transition:background .2s;font-size:12px}
+.loc-item:hover{background:rgba(196,168,114,0.08)}
+.loc-item .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.loc-item .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-item .region-tag{font-size:9px;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-dim)}
+.loc-item .delete-btn{opacity:0;color:var(--blood);cursor:pointer;font-size:13px;transition:opacity .2s;padding:0 3px}
+.loc-item:hover .delete-btn{opacity:0.5}
+.loc-item .delete-btn:hover{opacity:1}
+
+/* ── CANVAS ── */
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background:#060810}
+canvas#map{position:absolute;top:0;left:0;cursor:grab}
+canvas#map.dragging-loc{cursor:grabbing}
+canvas#map.adding{cursor:crosshair}
+
+#topbar{position:absolute;top:0;left:0;right:0;height:36px;background:linear-gradient(180deg,rgba(6,8,16,0.85),transparent);display:flex;align-items:center;padding:0 14px;z-index:5;pointer-events:none}
+#topbar>*{pointer-events:auto}
+#coords{font-size:11px;color:var(--ink-dim);letter-spacing:1px;font-family:'Crimson Pro',serif}
+#zoom-display{margin-left:auto;font-size:11px;color:var(--ink-dim);letter-spacing:1px}
+
+#minimap-wrap{position:absolute;bottom:14px;right:14px;width:200px;height:160px;border:1px solid var(--border);border-radius:4px;background:var(--panel-bg);backdrop-filter:blur(8px);overflow:hidden;z-index:5}
+canvas#minimap{width:100%;height:100%;display:block}
+#minimap-viewport{position:absolute;border:1px solid var(--gold);pointer-events:none;opacity:0.5}
+
+/* ── CONTEXT MENU ── */
+#context-menu{display:none;position:absolute;z-index:100;background:var(--panel-bg);border:1px solid var(--border);border-radius:4px;backdrop-filter:blur(12px);min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,0.6)}
+#context-menu .ctx-item{padding:7px 12px;font-size:12px;cursor:pointer;transition:background .15s;font-family:'Crimson Pro',serif;color:var(--ink)}
+#context-menu .ctx-item:hover{background:rgba(196,168,114,0.1)}
+#context-menu .ctx-sep{height:1px;background:var(--border);margin:2px 0}
+
+/* ── MODAL ── */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center}
+#modal-overlay.show{display:flex}
+#modal{background:var(--parchment);border:1px solid var(--border);border-radius:6px;padding:22px;width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+#modal h2{font-family:'Cinzel',serif;font-size:15px;color:var(--gold);margin-bottom:14px;letter-spacing:1px}
+#modal label{display:block;font-size:11px;color:var(--ink-dim);margin-bottom:3px;letter-spacing:1px;text-transform:uppercase}
+#modal input,#modal select{width:100%;padding:7px 9px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:3px;color:var(--ink);font-family:'Crimson Pro',serif;font-size:13px;margin-bottom:12px}
+#modal input:focus,#modal select:focus{outline:none;border-color:var(--gold)}
+#modal select option{background:var(--parchment);color:var(--ink)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.modal-btns button{padding:7px 14px;border-radius:3px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;cursor:pointer;border:1px solid var(--border);transition:all .2s}
+.modal-btn-cancel{background:transparent;color:var(--ink-dim)}
+.modal-btn-cancel:hover{background:rgba(196,168,114,0.08)}
+.modal-btn-add{background:rgba(212,168,83,0.15);border-color:var(--gold)!important;color:var(--gold)}
+.modal-btn-add:hover{background:rgba(212,168,83,0.25)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(196,168,114,0.12);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>Overworld</h1>
+      <div class="subtitle">World Map Designer</div>
+    </div>
+    <div id="tools">
+      <h3>Tools</h3>
+      <div class="tool-row">
+        <button class="tool-btn active" data-tool="select">Select</button>
+        <button class="tool-btn" data-tool="add">+ Location</button>
+        <button class="tool-btn" data-tool="path">Path</button>
+        <button class="tool-btn" data-tool="pan">Pan</button>
+      </div>
+      <div class="toggle-wrap"><div class="toggle on" id="toggle-paths"></div><span class="toggle-label">Paths</span></div>
+      <div class="toggle-wrap"><div class="toggle on" id="toggle-grid"></div><span class="toggle-label">Terrain grid</span></div>
+      <div class="toggle-wrap"><div class="toggle on" id="toggle-labels"></div><span class="toggle-label">Labels</span></div>
+      <div class="toggle-wrap"><div class="toggle on" id="toggle-terrain"></div><span class="toggle-label">Terrain tiles</span></div>
+    </div>
+    <div id="legend"><h3>Regions</h3><div id="legend-items"></div></div>
+    <div id="locations-panel"><h3>Locations</h3><div id="locations-list"></div></div>
+  </div>
+  <div id="canvas-wrap">
+    <div id="topbar"><span id="coords">0, 0</span><span id="zoom-display">100%</span></div>
+    <canvas id="map"></canvas>
+    <div id="minimap-wrap"><canvas id="minimap"></canvas><div id="minimap-viewport"></div></div>
+  </div>
+</div>
+<div id="context-menu"></div>
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>New Location</h2>
+    <label>Name</label><input type="text" id="modal-name" placeholder="e.g. Ember Forge">
+    <label>Region</label><select id="modal-region"></select>
+    <label>Type</label>
+    <select id="modal-type">
+      <option value="landmark">Landmark</option>
+      <option value="dungeon">Dungeon</option>
+      <option value="town">Town</option>
+      <option value="boss">Boss Arena</option>
+      <option value="npc">NPC Hub</option>
+      <option value="gather">Gathering Node</option>
+    </select>
+    <div class="modal-btns">
+      <button class="modal-btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn-add" onclick="confirmAdd()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// REAL UNITY WORLD DATA
+// ═══════════════════════════════════════
+// Unity coords: X = east/west, Z = north/south (positive Z = north in Unity)
+// Map: X → horizontal, Z → vertical (inverted so north is UP)
+// Scale factor: 1 Unity unit = 4 pixels on our map
+
+const SCALE = 4;
+// World bounds from terrain tiles: X: -188 to +197, Z: -84 to +81
+// With padding for new regions
+const WORLD_MIN_X = -220;
+const WORLD_MAX_X = 250;
+const WORLD_MIN_Z = -180; // extended south for volcanic isles ocean
+const WORLD_MAX_Z = 130;  // extended north for dark castle
+
+const MAP_W = (WORLD_MAX_X - WORLD_MIN_X) * SCALE; // 1880
+const MAP_H = (WORLD_MAX_Z - WORLD_MIN_Z) * SCALE; // 1240
+
+// Convert Unity (x,z) to map pixel coords
+function unityToMap(ux, uz) {
+  return {
+    x: (ux - WORLD_MIN_X) * SCALE,
+    y: (WORLD_MAX_Z - uz) * SCALE  // flip Z so north is up
+  };
+}
+function mapToUnity(mx, my) {
+  return {
+    x: mx / SCALE + WORLD_MIN_X,
+    z: WORLD_MAX_Z - my / SCALE
+  };
+}
+
+// ── REAL TERRAIN TILES (from World.unity) ──
+// Each tile is ~55x55 Unity units
+const TILE_SIZE = 55;
+const TERRAIN_TILES = [
+  {x:-188.26, z:25.89},  {x:-188.26, z:-29.11},
+  {x:-133.26, z:25.89},  {x:-133.26, z:-29.11},
+  {x:-78.26,  z:25.89},  {x:-78.26,  z:-29.11},
+  {x:-23.26,  z:25.89},  {x:-23.26,  z:-84.11},
+  {x:31.74,   z:25.89},  {x:31.74,   z:-29.11},
+  {x:31.74,   z:-84.11}, {x:86.74,   z:-84.11},
+  {x:141.74,  z:-84.11},
+];
+
+// ── REGIONS ──
+const REGIONS = {
+  rolling_hills: {
+    name: 'Rolling Hills', color: '#4a8c3f', colorLight: '#5aaa4a', colorDark: '#2d5a22',
+    desc: 'Starting area — meadows, farms, Toby\'s House'
+  },
+  frost_valley: {
+    name: 'Frost Valley', color: '#6aa0c0', colorLight: '#8ec4e0', colorDark: '#3a6a88',
+    desc: 'Snow, ice, frozen lakes, glaciers'
+  },
+  forest: {
+    name: 'Forest', color: '#2d6b3a', colorLight: '#3a8a4a', colorDark: '#1a3d22',
+    desc: 'Dense trees — Jeffrey\'s Estate, Abandoned Mine'
+  },
+  volcanic_isles: {
+    name: 'Volcanic Isles', color: '#c44a10', colorLight: '#e06020', colorDark: '#8b2a00',
+    desc: 'Deep ocean archipelago — volcanic peaks, lava rivers'
+  },
+  dark_castle: {
+    name: 'Dark Castle', color: '#6a3d8a', colorLight: '#8a55aa', colorDark: '#3d1f5a',
+    desc: 'Shadow town, demon castle, The Dark Spire'
+  }
+};
+
+// Region zones — which terrain tiles belong to which region, plus expansion areas
+// Based on actual tile positions and location placements
+const REGION_ZONES = {
+  rolling_hills: {
+    // Center tiles around Toby's House, Jeffrey's, Grawr's
+    tiles: [
+      {x:-78.26, z:25.89}, {x:-78.26, z:-29.11},
+      {x:-23.26, z:25.89},
+      {x:31.74, z:25.89}, {x:31.74, z:-29.11},
+    ],
+    // Approximate boundary polygon (Unity coords)
+    poly: [
+      {x:-80,z:80}, {x:40,z:80}, {x:87,z:25},
+      {x:87,z:-30}, {x:30,z:-30}, {x:-25,z:-30},
+      {x:-80,z:-30}
+    ]
+  },
+  frost_valley: {
+    tiles: [
+      {x:-188.26, z:25.89}, {x:-188.26, z:-29.11},
+      {x:-133.26, z:25.89}, {x:-133.26, z:-29.11},
+    ],
+    poly: [
+      {x:-220,z:82}, {x:-80,z:82}, {x:-80,z:-30},
+      {x:-135,z:-30}, {x:-220,z:-30}
+    ]
+  },
+  forest: {
+    tiles: [
+      {x:-23.26, z:-84.11},
+      {x:31.74, z:-84.11},
+    ],
+    poly: [
+      {x:-25,z:-30}, {x:87,z:-30}, {x:87,z:-85},
+      {x:-25,z:-85}
+    ]
+  },
+  volcanic_isles: {
+    // Far southeast — existing tiles plus new ocean expansion
+    tiles: [
+      {x:86.74, z:-84.11},
+      {x:141.74, z:-84.11},
+    ],
+    // Big ocean area to the southeast
+    poly: [
+      {x:87,z:-30}, {x:250,z:-30}, {x:250,z:-180},
+      {x:87,z:-180}
+    ]
+  },
+  dark_castle: {
+    // North — above existing terrain, new region
+    tiles: [],
+    poly: [
+      {x:-80,z:130}, {x:87,z:130}, {x:87,z:80},
+      {x:-80,z:80}
+    ]
+  }
+};
+
+// ── REAL LOCATIONS (from World.unity extraction) ──
+let locations = [
+  // Rolling Hills / Starter
+  {id:1, name:"Toby's House",      region:'rolling_hills', type:'landmark', ux:-3.473,  uz:5.521,  start:true},
+  {id:2, name:"Jeffrey's Estate",  region:'rolling_hills', type:'town',     ux:0,       uz:0},
+  {id:3, name:"Grawr's Lair",      region:'rolling_hills', type:'dungeon',  ux:-45.845, uz:52.352},
+  {id:4, name:"Town Hall",         region:'rolling_hills', type:'town',     ux:-73.123, uz:-8.578},
+  // Forest
+  {id:5, name:"Hidden Grove",      region:'forest',        type:'landmark', ux:1.640,   uz:-50.770},
+  {id:6, name:"Abandoned Mine",    region:'forest',        type:'dungeon',  ux:46.430,  uz:-65.870},
+  // Frost Valley
+  {id:7, name:"Frostbite Cavern",  region:'frost_valley',  type:'dungeon',  ux:-102.430,uz:-21.192},
+  {id:8, name:"Glacier Keep",      region:'frost_valley',  type:'landmark', ux:-138.026,uz:0.273},
+  {id:9, name:"The Frozen Citadel",region:'frost_valley',  type:'boss',     ux:-162.340,uz:35.060},
+  // Volcanic Isles (NEW — placed on islands in the ocean)
+  {id:10,name:"Ember Shore",       region:'volcanic_isles',type:'landmark', ux:120,     uz:-110},
+  {id:11,name:"Caldera Peak",      region:'volcanic_isles',type:'boss',     ux:180,     uz:-130},
+  {id:12,name:"Obsidian Forge",    region:'volcanic_isles',type:'dungeon',  ux:210,     uz:-100},
+  // Dark Castle (NEW — north of existing terrain)
+  {id:13,name:"Shadow Town",       region:'dark_castle',   type:'town',     ux:-20,     uz:100},
+  {id:14,name:"The Dark Castle",   region:'dark_castle',   type:'dungeon',  ux:20,      uz:110},
+  {id:15,name:"The Dark Spire",    region:'dark_castle',   type:'boss',     ux:40,      uz:120},
+];
+
+// Convert Unity positions to map positions
+locations.forEach(loc => {
+  const m = unityToMap(loc.ux, loc.uz);
+  loc.x = m.x;
+  loc.y = m.y;
+});
+
+let paths = [
+  // Real connections (from scene analysis)
+  [1,2],[1,3],[1,4],  // Toby's leads to Jeffrey's, Grawr's, Town Hall
+  [4,7],              // Town Hall → Frostbite Cavern
+  [7,8],[8,9],        // Frost Valley chain
+  [2,5],              // Jeffrey's → Hidden Grove
+  [5,6],              // Hidden Grove → Abandoned Mine
+  [3,4],              // Grawr's → Town Hall
+  // New region connections
+  [6,10],             // Abandoned Mine → Ember Shore (bridge to volcanic)
+  [10,11],[11,12],    // Volcanic chain
+  [3,13],             // Grawr's → Shadow Town (bridge to dark castle)
+  [13,14],[14,15],    // Dark Castle chain
+];
+
+let nextId = 20;
+
+// ── VOLCANIC ISLES: Islands & Ocean ──
+const ISLANDS = [
+  {ux:110, uz:-100, r:18, name:'Ember Isle'},
+  {ux:145, uz:-120, r:14, name:'Cinder Rock'},
+  {ux:180, uz:-130, r:22, name:'Caldera Island'},
+  {ux:210, uz:-100, r:16, name:'Forge Island'},
+  {ux:160, uz:-155, r:12, name:'Sulfur Spit'},
+  {ux:200, uz:-160, r:10, name:'Ash Atoll'},
+  {ux:230, uz:-140, r:13, name:'Magma Reach'},
+  {ux:130, uz:-145, r:11, name:'Smoke Stack'},
+];
+
+const LAVA_RIVERS = [
+  [{ux:180,uz:-120},{ux:178,uz:-135},{ux:182,uz:-148},{ux:175,uz:-160}],
+  [{ux:210,uz:-90},{ux:215,uz:-105},{ux:208,uz:-118},{ux:212,uz:-130}],
+  [{ux:110,uz:-95},{ux:115,uz:-108},{ux:108,uz:-120}],
+];
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let tool = 'select';
+let showPaths = true, showGrid = true, showLabels = true, showTerrain = true;
+let selectedRegion = null;
+let cam, dragging = null, panning = null, pathStart = null, addPos = null;
+let hoveredLoc = null, selectedLoc = null, lastMouse = null;
+
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const miniCanvas = document.getElementById('minimap');
+const miniCtx = miniCanvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+
+function initCam() {
+  // Center on Toby's House
+  const toby = unityToMap(-3.473, 5.521);
+  cam = {x: toby.x, y: toby.y, zoom: 0.65};
+}
+initCam();
+
+// ═══════════════════════════════════════
+// PROCEDURAL TEXTURES
+// ═══════════════════════════════════════
+const textures = {};
+function genTexture(key) {
+  const sz = 200, c = document.createElement('canvas');
+  c.width = sz; c.height = sz;
+  const g = c.getContext('2d');
+  let s = key.length * 997 + 42;
+  const rng = () => { s=(s*16807)%2147483647; return(s-1)/2147483646; };
+
+  if (key === 'rolling_hills') {
+    for (let i=0;i<3500;i++){const x=rng()*sz,y=rng()*sz;g.fillStyle=`rgba(${30+rng()*30},${55+rng()*55},${15+rng()*20},${0.25+rng()*0.3})`;g.fillRect(x,y,1+rng()*2,1+rng()*3)}
+  } else if (key === 'frost_valley') {
+    g.fillStyle='rgba(180,210,230,0.08)';g.fillRect(0,0,sz,sz);
+    for(let i=0;i<2500;i++){const x=rng()*sz,y=rng()*sz,b=190+rng()*65;g.fillStyle=`rgba(${b},${b+5},${b+8},${0.12+rng()*0.18})`;g.beginPath();g.arc(x,y,.5+rng()*2,0,Math.PI*2);g.fill()}
+  } else if (key === 'forest') {
+    for(let i=0;i<3000;i++){const x=rng()*sz,y=rng()*sz;g.fillStyle=`rgba(${10+rng()*20},${35+rng()*50},${10+rng()*15},${0.3+rng()*0.3})`;g.beginPath();g.arc(x,y,1+rng()*3,0,Math.PI*2);g.fill()}
+  } else if (key === 'volcanic_isles') {
+    for(let i=0;i<2000;i++){const x=rng()*sz,y=rng()*sz;const e=rng()>.9;if(e){g.fillStyle=`rgba(${200+rng()*55},${40+rng()*50},0,${0.3+rng()*0.35})`}else{const v=15+rng()*25;g.fillStyle=`rgba(${v},${v-3},${v-8},${0.25+rng()*0.2})`}g.fillRect(x,y,1+rng()*2,1+rng()*2)}
+  } else if (key === 'dark_castle') {
+    for(let i=0;i<2200;i++){const x=rng()*sz,y=rng()*sz;const p=rng()>.85;if(p){g.fillStyle=`rgba(${70+rng()*40},${15+rng()*25},${90+rng()*50},${0.25+rng()*0.3})`}else{const v=10+rng()*18;g.fillStyle=`rgba(${v},${v},${v+4},${0.25+rng()*0.2})`}g.fillRect(x,y,1+rng()*2,1+rng()*2)}
+  }
+  return c;
+}
+Object.keys(REGIONS).forEach(k => textures[k] = genTexture(k));
+
+// ═══════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════
+
+function resize() {
+  const r = window.devicePixelRatio || 1;
+  canvas.width = wrap.clientWidth * r; canvas.height = wrap.clientHeight * r;
+  canvas.style.width = wrap.clientWidth+'px'; canvas.style.height = wrap.clientHeight+'px';
+  ctx.setTransform(r,0,0,r,0,0);
+  miniCanvas.width = 200*r; miniCanvas.height = 160*r;
+  miniCtx.setTransform(r,0,0,r,0,0);
+}
+
+function toScreen(mx, my) {
+  const cx = wrap.clientWidth/2, cy = wrap.clientHeight/2;
+  return { x: cx+(mx-cam.x)*cam.zoom, y: cy+(my-cam.y)*cam.zoom };
+}
+function toMap(sx, sy) {
+  const cx = wrap.clientWidth/2, cy = wrap.clientHeight/2;
+  return { x: cam.x+(sx-cx)/cam.zoom, y: cam.y+(sy-cy)/cam.zoom };
+}
+
+function drawOcean() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+
+  // Deep ocean base
+  ctx.fillStyle = '#060d1a';
+  ctx.fillRect(0,0,w,h);
+
+  // Volcanic isles ocean zone — big deep blue water
+  const volZone = REGION_ZONES.volcanic_isles.poly;
+  ctx.beginPath();
+  volZone.forEach((p,i) => {
+    const m = unityToMap(p.x, p.z);
+    const s = toScreen(m.x, m.y);
+    i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+  });
+  ctx.closePath();
+  const volCenter = unityToMap(170, -120);
+  const vc = toScreen(volCenter.x, volCenter.y);
+  const grad = ctx.createRadialGradient(vc.x, vc.y, 0, vc.x, vc.y, 300*cam.zoom);
+  grad.addColorStop(0, '#0a2040');
+  grad.addColorStop(0.4, '#061530');
+  grad.addColorStop(1, '#040c1a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Animated ocean waves in volcanic zone
+  const time = Date.now() / 4000;
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(30,70,120,0.15)';
+  ctx.lineWidth = 0.8;
+  for (let uz = -180; uz < -20; uz += 8) {
+    ctx.beginPath();
+    for (let ux = 85; ux < 255; ux += 3) {
+      const waveZ = uz + Math.sin(ux * 0.05 + time + uz * 0.03) * 3;
+      const m = unityToMap(ux, waveZ);
+      const s = toScreen(m.x, m.y);
+      ux === 85 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    }
+    ctx.stroke();
+  }
+  // Secondary wave layer
+  ctx.strokeStyle = 'rgba(20,50,90,0.1)';
+  for (let uz = -175; uz < -25; uz += 12) {
+    ctx.beginPath();
+    for (let ux = 85; ux < 255; ux += 3) {
+      const waveZ = uz + Math.sin(ux * 0.03 - time * 0.7 + uz * 0.02) * 4;
+      const m = unityToMap(ux, waveZ);
+      const s = toScreen(m.x, m.y);
+      ux === 85 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Coastal water along south and east edges of existing terrain
+  ctx.strokeStyle = 'rgba(20,50,90,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let uz = -90; uz < -70; uz += 5) {
+    ctx.beginPath();
+    for (let ux = -30; ux < 90; ux += 3) {
+      const waveZ = uz + Math.sin(ux * 0.04 + time) * 2;
+      const m = unityToMap(ux, waveZ);
+      const s = toScreen(m.x, m.y);
+      ux === -30 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawTerrainTiles() {
+  if (!showTerrain) return;
+  const tilePx = TILE_SIZE * SCALE;
+
+  TERRAIN_TILES.forEach(tile => {
+    const m = unityToMap(tile.x, tile.z + TILE_SIZE); // top-left corner in map space
+    const s = toScreen(m.x, m.y);
+    const w = tilePx * cam.zoom;
+    const h = tilePx * cam.zoom;
+
+    // Tile fill — subtle
+    ctx.fillStyle = 'rgba(196,168,114,0.03)';
+    ctx.fillRect(s.x, s.y, w, h);
+
+    // Tile border
+    ctx.strokeStyle = 'rgba(196,168,114,0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(s.x, s.y, w, h);
+  });
+}
+
+function drawRegions() {
+  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
+    if (selectedRegion && key !== selectedRegion) return;
+    const region = REGIONS[key];
+    const poly = zone.poly;
+    if (!poly || poly.length < 3) return;
+
+    // Skip fill for volcanic_isles — it's ocean, islands are drawn separately
+    if (key === 'volcanic_isles') return;
+
+    ctx.beginPath();
+    poly.forEach((p, i) => {
+      const m = unityToMap(p.x, p.z);
+      const s = toScreen(m.x, m.y);
+      i === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y);
+    });
+    ctx.closePath();
+
+    // Region gradient fill
+    const bounds = poly.reduce((b,p) => ({
+      minX:Math.min(b.minX,p.x),maxX:Math.max(b.maxX,p.x),
+      minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)
+    }), {minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity});
+
+    const ctr = unityToMap((bounds.minX+bounds.maxX)/2, (bounds.minZ+bounds.maxZ)/2);
+    const sc = toScreen(ctr.x, ctr.y);
+    const rad = Math.max(bounds.maxX-bounds.minX, bounds.maxZ-bounds.minZ) / 2 * SCALE * cam.zoom;
+
+    const g = ctx.createRadialGradient(sc.x,sc.y,0,sc.x,sc.y,rad);
+    g.addColorStop(0, region.colorLight + '50');
+    g.addColorStop(0.6, region.color + '35');
+    g.addColorStop(1, region.colorDark + '20');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Texture overlay
+    ctx.save();
+    ctx.clip();
+    const tex = textures[key];
+    if (tex) {
+      const pat = ctx.createPattern(tex, 'repeat');
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = pat;
+      ctx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+
+    // Border
+    ctx.strokeStyle = region.color + '30';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8,5]);
+    ctx.beginPath();
+    poly.forEach((p,i) => {
+      const m = unityToMap(p.x, p.z);
+      const s = toScreen(m.x, m.y);
+      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+function drawIslands() {
+  if (selectedRegion && selectedRegion !== 'volcanic_isles') return;
+
+  ISLANDS.forEach(island => {
+    const m = unityToMap(island.ux, island.uz);
+    const s = toScreen(m.x, m.y);
+    const r = island.r * SCALE * cam.zoom;
+
+    // Island shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(s.x+2, s.y+2, r*1.1, r*0.95, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Island base — dark volcanic rock
+    const g = ctx.createRadialGradient(s.x, s.y-r*0.15, r*0.15, s.x, s.y, r);
+    g.addColorStop(0, '#5a4030');
+    g.addColorStop(0.4, '#3a2818');
+    g.addColorStop(0.8, '#2a1a10');
+    g.addColorStop(1, 'rgba(20,12,6,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y, r, r*0.85, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Volcanic glow at peak
+    const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r*0.4);
+    glow.addColorStop(0, 'rgba(255,100,10,0.35)');
+    glow.addColorStop(0.6, 'rgba(220,50,0,0.12)');
+    glow.addColorStop(1, 'rgba(150,30,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r*0.4, 0, Math.PI*2);
+    ctx.fill();
+
+    // Island name (small, at zoom)
+    if (showLabels && cam.zoom > 0.5) {
+      ctx.font = "9px 'Crimson Pro',serif";
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(196,168,114,0.35)';
+      ctx.fillText(island.name, s.x, s.y + r + 12);
+    }
+  });
+}
+
+function drawLavaRivers() {
+  if (selectedRegion && selectedRegion !== 'volcanic_isles') return;
+  const time = Date.now() / 2000;
+
+  LAVA_RIVERS.forEach(river => {
+    // Outer glow
+    ctx.strokeStyle = `rgba(255,60,0,${0.12+Math.sin(time)*0.04})`;
+    ctx.lineWidth = 10 * cam.zoom;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    river.forEach((p,i) => {
+      const m = unityToMap(p.ux, p.uz);
+      const s = toScreen(m.x, m.y);
+      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    });
+    ctx.stroke();
+
+    // Core
+    ctx.strokeStyle = `rgba(255,180,30,${0.5+Math.sin(time*1.3)*0.15})`;
+    ctx.lineWidth = 3 * cam.zoom;
+    ctx.beginPath();
+    river.forEach((p,i) => {
+      const m = unityToMap(p.ux, p.uz);
+      const s = toScreen(m.x, m.y);
+      i===0 ? ctx.moveTo(s.x,s.y) : ctx.lineTo(s.x,s.y);
+    });
+    ctx.stroke();
+  });
+}
+
+function drawGrid() {
+  if (!showGrid) return;
+  // Light grid aligned to Unity units (every 50 units)
+  ctx.strokeStyle = 'rgba(196,168,114,0.025)';
+  ctx.lineWidth = 0.5;
+  for (let ux = -200; ux <= 250; ux += 50) {
+    const m1 = unityToMap(ux, WORLD_MAX_Z), m2 = unityToMap(ux, WORLD_MIN_Z);
+    const s1 = toScreen(m1.x,m1.y), s2 = toScreen(m2.x,m2.y);
+    ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(s2.x,s2.y); ctx.stroke();
+  }
+  for (let uz = -180; uz <= 130; uz += 50) {
+    const m1 = unityToMap(WORLD_MIN_X, uz), m2 = unityToMap(WORLD_MAX_X, uz);
+    const s1 = toScreen(m1.x,m1.y), s2 = toScreen(m2.x,m2.y);
+    ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(s2.x,s2.y); ctx.stroke();
+  }
+}
+
+function drawRegionLabels() {
+  if (cam.zoom < 0.2) return;
+  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
+    if (selectedRegion && key !== selectedRegion) return;
+    const region = REGIONS[key];
+    const poly = zone.poly;
+    const bounds = poly.reduce((b,p) => ({
+      minX:Math.min(b.minX,p.x),maxX:Math.max(b.maxX,p.x),
+      minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)
+    }), {minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity});
+    const ctr = unityToMap((bounds.minX+bounds.maxX)/2, (bounds.minZ+bounds.maxZ)/2);
+    const s = toScreen(ctr.x, ctr.y - 20);
+
+    ctx.font = "700 13px 'Cinzel',serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillText(region.name.toUpperCase(), s.x+1, s.y+1);
+    ctx.fillStyle = region.color + '50';
+    ctx.fillText(region.name.toUpperCase(), s.x, s.y);
+  });
+}
+
+function drawPaths() {
+  if (!showPaths) return;
+  paths.forEach(([idA, idB]) => {
+    const a = locations.find(l=>l.id===idA), b = locations.find(l=>l.id===idB);
+    if (!a||!b) return;
+    const sa = toScreen(a.x,a.y), sb = toScreen(b.x,b.y);
+
+    ctx.strokeStyle = 'rgba(196,168,114,0.06)';
+    ctx.lineWidth = 5*cam.zoom; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(sa.x,sa.y); ctx.lineTo(sb.x,sb.y); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(196,168,114,0.18)';
+    ctx.lineWidth = 1.2; ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.moveTo(sa.x,sa.y); ctx.lineTo(sb.x,sb.y); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+function drawLocations() {
+  locations.forEach(loc => {
+    if (selectedRegion && loc.region !== selectedRegion) return;
+    const s = toScreen(loc.x, loc.y);
+    const region = REGIONS[loc.region];
+    const hov = hoveredLoc === loc, sel = selectedLoc === loc;
+    const r = (hov||sel) ? 9 : 6;
+
+    // Boss/start glow
+    if (loc.start || loc.type === 'boss') {
+      const gc = loc.start ? 'rgba(212,168,83,0.12)' : 'rgba(200,30,30,0.12)';
+      const g = ctx.createRadialGradient(s.x,s.y,r,s.x,s.y,r*3.5);
+      g.addColorStop(0, gc); g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(s.x,s.y,r*3.5,0,Math.PI*2); ctx.fill();
+    }
+
+    // Marker
+    ctx.fillStyle = sel ? '#fff' : (hov ? region.colorLight : region.color);
+    ctx.strokeStyle = sel ? '#d4a853' : 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.beginPath(); ctx.arc(s.x,s.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+
+    if (loc.type==='boss') { ctx.fillStyle='#ff3030'; ctx.beginPath(); ctx.arc(s.x,s.y,r*.35,0,Math.PI*2); ctx.fill(); }
+    if (loc.start) { ctx.fillStyle='#f0c060'; ctx.beginPath(); ctx.arc(s.x,s.y,r*.35,0,Math.PI*2); ctx.fill(); }
+
+    // Label
+    if (showLabels && cam.zoom > 0.25) {
+      ctx.font = `${hov?'600 ':''}12px 'Crimson Pro',serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText(loc.name, s.x+1, s.y+r+4+1);
+      ctx.fillStyle = hov ? '#fff' : 'rgba(196,168,114,0.75)';
+      ctx.fillText(loc.name, s.x, s.y+r+4);
+
+      if (hov||sel) {
+        ctx.font = "9px 'Crimson Pro',serif";
+        ctx.fillStyle = 'rgba(196,168,114,0.35)';
+        const u = mapToUnity(loc.x, loc.y);
+        ctx.fillText(`${loc.type.toUpperCase()} (${Math.round(u.x)}, ${Math.round(u.z)})`, s.x, s.y+r+19);
+      }
+    }
+  });
+}
+
+function drawPathPreview() {
+  if (tool==='path' && pathStart && lastMouse) {
+    const s = toScreen(pathStart.x, pathStart.y);
+    ctx.strokeStyle = 'rgba(212,168,83,0.35)';
+    ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(lastMouse.x,lastMouse.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function renderMinimap() {
+  const mw = 200, mh = 160;
+  const sx = mw / MAP_W, sy = mh / MAP_H;
+  const s = Math.min(sx, sy) * 0.9;
+  const ox = (mw - MAP_W*s)/2, oy = (mh - MAP_H*s)/2;
+
+  miniCtx.fillStyle = '#060d1a';
+  miniCtx.fillRect(0,0,mw,mh);
+
+  // Region fills on minimap
+  Object.entries(REGION_ZONES).forEach(([key, zone]) => {
+    const region = REGIONS[key];
+    miniCtx.fillStyle = key === 'volcanic_isles' ? '#0a2040' : region.color + '30';
+    miniCtx.beginPath();
+    zone.poly.forEach((p,i) => {
+      const m = unityToMap(p.x, p.z);
+      const mx = ox + m.x * s, my = oy + m.y * s;
+      i===0 ? miniCtx.moveTo(mx,my) : miniCtx.lineTo(mx,my);
+    });
+    miniCtx.closePath(); miniCtx.fill();
+  });
+
+  // Location dots
+  locations.forEach(loc => {
+    miniCtx.fillStyle = REGIONS[loc.region]?.color || '#888';
+    miniCtx.beginPath();
+    miniCtx.arc(ox+loc.x*s, oy+loc.y*s, 1.5, 0, Math.PI*2);
+    miniCtx.fill();
+  });
+
+  // Viewport rect
+  const vw = wrap.clientWidth/cam.zoom, vh = wrap.clientHeight/cam.zoom;
+  const vx = ox + (cam.x - vw/2)*s, vy = oy + (cam.y - vh/2)*s;
+  const vp = document.getElementById('minimap-viewport');
+  vp.style.left = vx+'px'; vp.style.top = vy+'px';
+  vp.style.width = (vw*s)+'px'; vp.style.height = (vh*s)+'px';
+}
+
+function render() {
+  ctx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
+  drawOcean();
+  drawGrid();
+  drawTerrainTiles();
+  drawRegions();
+  drawIslands();
+  drawLavaRivers();
+  drawRegionLabels();
+  drawPaths();
+  drawLocations();
+  drawPathPreview();
+  renderMinimap();
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════
+// INTERACTION
+// ═══════════════════════════════════════
+function findLocAt(mx, my, t) {
+  t = t || 18/cam.zoom;
+  let best=null, bestD=t;
+  locations.forEach(l => {
+    const dx=l.x-mx, dy=l.y-my, d=Math.sqrt(dx*dx+dy*dy);
+    if(d<bestD){bestD=d;best=l}
+  });
+  return best;
+}
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+  const m = toMap(sx, sy);
+  lastMouse = {x:sx,y:sy};
+
+  if (e.button===2) return;
+
+  if (tool==='select') {
+    const loc = findLocAt(m.x, m.y);
+    if (loc) { dragging={loc,offX:loc.x-m.x,offY:loc.y-m.y}; selectedLoc=loc; canvas.classList.add('dragging-loc'); }
+    else { selectedLoc=null; panning={startX:e.clientX,startY:e.clientY,camX:cam.x,camY:cam.y}; }
+  } else if (tool==='pan') {
+    panning = {startX:e.clientX,startY:e.clientY,camX:cam.x,camY:cam.y};
+  } else if (tool==='add') {
+    addPos = m; openModal();
+  } else if (tool==='path') {
+    const loc = findLocAt(m.x, m.y);
+    if (loc) {
+      if (!pathStart) { pathStart=loc; }
+      else { if(pathStart.id!==loc.id){const ex=paths.some(([a,b])=>(a===pathStart.id&&b===loc.id)||(a===loc.id&&b===pathStart.id));if(!ex)paths.push([pathStart.id,loc.id])} pathStart=null; }
+    }
+  }
+  updateUI();
+});
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+  const m = toMap(sx, sy);
+  const u = mapToUnity(m.x, m.y);
+  lastMouse = {x:sx,y:sy};
+
+  document.getElementById('coords').textContent = `Unity: ${Math.round(u.x)}, ${Math.round(u.z)}`;
+
+  if (dragging) { dragging.loc.x=m.x+dragging.offX; dragging.loc.y=m.y+dragging.offY; }
+  else if (panning) { cam.x=panning.camX-(e.clientX-panning.startX)/cam.zoom; cam.y=panning.camY-(e.clientY-panning.startY)/cam.zoom; }
+  else {
+    hoveredLoc = findLocAt(m.x, m.y);
+    canvas.style.cursor = hoveredLoc?'pointer':tool==='add'?'crosshair':tool==='pan'?'grab':'default';
+  }
+});
+
+canvas.addEventListener('mouseup', () => { if(dragging){canvas.classList.remove('dragging-loc');dragging=null} panning=null; });
+canvas.addEventListener('mouseleave', () => { hoveredLoc=null; panning=null; });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const d = e.deltaY>0?0.9:1.1;
+  const nz = Math.max(0.1,Math.min(4,cam.zoom*d));
+  const rect = canvas.getBoundingClientRect();
+  const sx=e.clientX-rect.left, sy=e.clientY-rect.top;
+  const w1 = toMap(sx,sy);
+  cam.zoom = nz;
+  const w2 = toMap(sx,sy);
+  cam.x -= (w2.x-w1.x); cam.y -= (w2.y-w1.y);
+  document.getElementById('zoom-display').textContent = `${Math.round(cam.zoom*100)}%`;
+}, {passive:false});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const m=toMap(e.clientX-rect.left,e.clientY-rect.top);
+  const loc=findLocAt(m.x,m.y);
+  showContextMenu(e.clientX,e.clientY,loc,m);
+});
+
+document.addEventListener('click', e => { if(!e.target.closest('#context-menu'))document.getElementById('context-menu').style.display='none'; });
+
+// Minimap click
+document.getElementById('minimap-wrap').addEventListener('click', e => {
+  const rect=miniCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const mw=200,mh=160;
+  const sx=mw/MAP_W,sy=mh/MAP_H;
+  const s=Math.min(sx,sy)*0.9;
+  const ox=(mw-MAP_W*s)/2, oy=(mh-MAP_H*s)/2;
+  cam.x = (mx-ox)/s; cam.y = (my-oy)/s;
+});
+
+// ═══════════════════════════════════════
+// CONTEXT MENU & MODAL
+// ═══════════════════════════════════════
+
+function showContextMenu(x,y,loc,mapPos) {
+  const menu = document.getElementById('context-menu');
+  if (loc) {
+    const u = mapToUnity(loc.x, loc.y);
+    menu.innerHTML = `
+      <div class="ctx-item" onclick="focusLoc(${loc.id})">Focus: ${loc.name}</div>
+      <div class="ctx-item" onclick="renameLoc(${loc.id})">Rename</div>
+      <div class="ctx-item" style="color:var(--ink-dim);font-size:10px;cursor:default">Unity pos: ${Math.round(u.x)}, ${Math.round(u.z)}</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" onclick="deleteLoc(${loc.id})" style="color:#8b2020">Delete</div>`;
+  } else {
+    menu.innerHTML = `
+      <div class="ctx-item" onclick="addLocAtMap(${mapPos.x},${mapPos.y})">Add Location Here</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item" onclick="initCam();updateUI()">Reset View</div>`;
+  }
+  menu.style.display='block'; menu.style.left=x+'px'; menu.style.top=y+'px';
+  const r=menu.getBoundingClientRect();
+  if(r.right>window.innerWidth)menu.style.left=(x-r.width)+'px';
+  if(r.bottom>window.innerHeight)menu.style.top=(y-r.height)+'px';
+}
+
+function focusLoc(id) { const l=locations.find(a=>a.id===id); if(l){cam.x=l.x;cam.y=l.y;cam.zoom=1.2;selectedLoc=l} document.getElementById('context-menu').style.display='none'; }
+function renameLoc(id) { const l=locations.find(a=>a.id===id); if(!l)return; const n=prompt('Rename:',l.name); if(n&&n.trim()){l.name=n.trim();updateUI()} document.getElementById('context-menu').style.display='none'; }
+function deleteLoc(id) { locations=locations.filter(l=>l.id!==id); paths=paths.filter(([a,b])=>a!==id&&b!==id); if(selectedLoc&&selectedLoc.id===id)selectedLoc=null; updateUI(); document.getElementById('context-menu').style.display='none'; }
+function addLocAtMap(mx,my) { addPos={x:mx,y:my}; openModal(); document.getElementById('context-menu').style.display='none'; }
+
+function openModal() {
+  document.getElementById('modal-overlay').classList.add('show');
+  const sel = document.getElementById('modal-region');
+  sel.innerHTML = '';
+  Object.entries(REGIONS).forEach(([k,r]) => { const o=document.createElement('option'); o.value=k; o.textContent=r.name; sel.appendChild(o); });
+
+  // Guess region from position
+  if (addPos) {
+    const u = mapToUnity(addPos.x, addPos.y);
+    for (const [key, zone] of Object.entries(REGION_ZONES)) {
+      if (pointInPoly(u.x, u.z, zone.poly)) { sel.value=key; break; }
+    }
+  }
+  document.getElementById('modal-name').value = '';
+  setTimeout(() => document.getElementById('modal-name').focus(), 80);
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); addPos=null; }
+function confirmAdd() {
+  const name=document.getElementById('modal-name').value.trim();
+  if(!name) return;
+  const region=document.getElementById('modal-region').value;
+  const type=document.getElementById('modal-type').value;
+  const loc = {id:nextId++, name, region, type, x:addPos.x, y:addPos.y};
+  const u = mapToUnity(addPos.x, addPos.y);
+  loc.ux=u.x; loc.uz=u.z;
+  locations.push(loc);
+  selectedLoc=loc;
+  closeModal(); updateUI();
+}
+function pointInPoly(x,z,poly) {
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x,zi=poly[i].z,xj=poly[j].x,zj=poly[j].z;
+    if(((zi>z)!==(zj>z))&&(x<(xj-xi)*(z-zi)/(zj-zi)+xi))inside=!inside;
+  }
+  return inside;
+}
+
+document.getElementById('modal-name').addEventListener('keydown', e => { if(e.key==='Enter')confirmAdd(); if(e.key==='Escape')closeModal(); });
+
+// ═══════════════════════════════════════
+// UI
+// ═══════════════════════════════════════
+
+function updateUI() {
+  const leg = document.getElementById('legend-items');
+  leg.innerHTML = '';
+  Object.entries(REGIONS).forEach(([k,r]) => {
+    const c = locations.filter(l=>l.region===k).length;
+    const el = document.createElement('div');
+    el.className = `legend-item${!selectedRegion||selectedRegion===k?' selected':''}`;
+    el.innerHTML = `<div class="legend-swatch" style="background:${r.color}"></div><span class="legend-label">${r.name}</span><span class="legend-count">${c}</span>`;
+    el.addEventListener('click', () => { selectedRegion = selectedRegion===k?null:k; updateUI(); });
+    leg.appendChild(el);
+  });
+
+  const list = document.getElementById('locations-list');
+  list.innerHTML = '';
+  ['rolling_hills','frost_valley','forest','volcanic_isles','dark_castle'].forEach(rk => {
+    const locs = locations.filter(l=>l.region===rk);
+    if(!locs.length) return;
+    if(selectedRegion&&selectedRegion!==rk) return;
+    locs.forEach(loc => {
+      const el = document.createElement('div');
+      el.className = 'loc-item';
+      el.innerHTML = `<div class="dot" style="background:${REGIONS[loc.region]?.color||'#888'}"></div><span class="name">${loc.name}</span><span class="region-tag">${loc.type}</span><span class="delete-btn" onclick="event.stopPropagation();deleteLoc(${loc.id})">x</span>`;
+      el.addEventListener('click', () => { cam.x=loc.x; cam.y=loc.y; selectedLoc=loc; });
+      list.appendChild(el);
+    });
+  });
+}
+
+document.querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    tool=b.dataset.tool; pathStart=null;
+    canvas.className = tool==='add'?'adding':'';
+  });
+});
+
+document.getElementById('toggle-paths').addEventListener('click', function(){showPaths=!showPaths;this.classList.toggle('on',showPaths)});
+document.getElementById('toggle-grid').addEventListener('click', function(){showGrid=!showGrid;this.classList.toggle('on',showGrid)});
+document.getElementById('toggle-labels').addEventListener('click', function(){showLabels=!showLabels;this.classList.toggle('on',showLabels)});
+document.getElementById('toggle-terrain').addEventListener('click', function(){showTerrain=!showTerrain;this.classList.toggle('on',showTerrain)});
+
+document.addEventListener('keydown', e => {
+  if(document.getElementById('modal-overlay').classList.contains('show')) return;
+  if(e.key==='Escape'){selectedLoc=null;pathStart=null;document.getElementById('context-menu').style.display='none'}
+  if((e.key==='Delete'||e.key==='Backspace')&&selectedLoc&&!e.target.closest('input'))deleteLoc(selectedLoc.id);
+  if(e.key==='1')setTool('select'); if(e.key==='2')setTool('add'); if(e.key==='3')setTool('path'); if(e.key==='4')setTool('pan');
+  if(e.key==='r'&&!e.metaKey&&!e.ctrlKey){initCam();updateUI()}
+});
+function setTool(t){tool=t;pathStart=null;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));canvas.className=t==='add'?'adding':'';}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+window.addEventListener('resize', resize);
+resize(); updateUI(); render();
+document.getElementById('zoom-display').textContent = `${Math.round(cam.zoom*100)}%`;
+</script>
+</body>
+</html>

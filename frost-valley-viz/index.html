@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Testroom Memory Map — Boo! Spirit Battles</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0f14;--surface:#12161e;--surface2:#181d28;--border:#1e2533;
+  --text:#c9cdd5;--text2:#8891a0;--text3:#545d6e;
+  --ice:#67e8f9;--ice2:#22d3ee;--fire:#f97316;--moon:#fbbf24;
+  --heal:#4ade80;--surge:#a78bfa;--red:#ef4444;--lucky:#22c55e;
+  --accent:#3b82f6;--node-bg:#141822;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Source Serif 4',serif;font-size:15px;line-height:1.7}
+.page{max-width:1200px;margin:0 auto;padding:40px 28px 100px}
+
+/* ─ Header ─ */
+.header{padding:60px 0 48px;border-bottom:1px solid var(--border)}
+.header h1{font-size:32px;font-weight:700;color:#fff;margin-bottom:4px}
+.header .sub{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text3);letter-spacing:.08em}
+.header p{margin-top:16px;font-size:16px;color:var(--text2);max-width:700px;font-weight:300}
+
+/* ─ Nav ─ */
+.nav{position:sticky;top:0;z-index:100;background:rgba(12,15,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:40px;overflow-x:auto;white-space:nowrap}
+.nav a{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);text-decoration:none;padding:6px 14px;border-radius:4px;transition:.2s;letter-spacing:.04em}
+.nav a:hover{color:var(--text);background:var(--surface)}
+
+/* ─ Section ─ */
+.section{margin-bottom:64px}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.section-head h2{font-size:22px;font-weight:600;color:#e2e5ea}
+.section-head .tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);background:var(--surface);padding:3px 8px;border-radius:3px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ─ Stats Row ─ */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:40px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+.stat .val{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:#fff}
+.stat .label{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* ─ Architecture ─ */
+.arch-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.arch-grid{grid-template-columns:1fr}}
+.arch-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+.arch-box h4{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--ice);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.arch-box p{font-size:14px;color:var(--text2);line-height:1.6}
+.arch-box code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:rgba(103,232,249,.06);padding:1px 5px;border-radius:3px;color:var(--ice)}
+
+/* ─ Timeline ─ */
+.timeline{position:relative;padding-left:28px}
+.timeline::before{content:'';position:absolute;left:6px;top:4px;bottom:4px;width:1px;background:var(--border)}
+.tl-entry{position:relative;margin-bottom:24px;padding-left:20px}
+.tl-entry::before{content:'';position:absolute;left:-24px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--surface2);border:2px solid var(--text3)}
+.tl-entry.major::before{background:var(--ice);border-color:var(--ice);box-shadow:0 0 8px rgba(103,232,249,.3)}
+.tl-version{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.04em}
+.tl-title{font-size:15px;font-weight:600;color:#e2e5ea;margin:2px 0}
+.tl-detail{font-size:13px;color:var(--text2);line-height:1.6}
+
+/* ─ Resource Table ─ */
+.res-table{width:100%;border-collapse:collapse;margin-top:8px}
+.res-table th{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}
+.res-table td{font-size:13px;padding:10px 12px;border-bottom:1px solid rgba(30,37,51,.5);color:var(--text2)}
+.res-table tr:hover td{background:rgba(103,232,249,.02)}
+.res-table .em{font-size:16px;width:30px;text-align:center}
+
+/* ─ Rules Grid ─ */
+.rules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.rule{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;transition:.2s}
+.rule:hover{border-color:rgba(103,232,249,.15)}
+.rule h4{font-size:13px;font-weight:600;color:#e2e5ea;margin-bottom:4px}
+.rule p{font-size:12px;color:var(--text3);line-height:1.5}
+
+/* ─ Card Table ─ */
+.card-tbl{width:100%;border-collapse:collapse}
+.card-tbl th{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:42px;background:var(--bg)}
+.card-tbl td{font-size:13px;padding:8px 10px;border-bottom:1px solid rgba(30,37,51,.4);color:var(--text2);vertical-align:top}
+.card-tbl tr:hover td{background:rgba(103,232,249,.02)}
+.card-tbl .name{font-weight:600;color:#e2e5ea;white-space:nowrap}
+.card-tbl .hp{font-family:'IBM Plex Mono',monospace;color:var(--red);font-size:12px}
+.card-tbl .ability{color:var(--ice);font-weight:500}
+.card-tbl .id{font-family:'IBM Plex Mono',monospace;color:var(--text3);font-size:11px}
+
+/* ─ Flow Diagram ─ */
+.flow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:8px;justify-content:center}
+.flow-node{background:var(--node-bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;text-align:center;min-width:100px}
+.flow-node .fn-label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:#e2e5ea}
+.flow-node .fn-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.flow-arrow{font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--text3);padding:0 4px}
+.flow-node.highlight{border-color:var(--moon);background:rgba(251,191,36,.05)}
+.flow-node.highlight .fn-label{color:var(--moon)}
+
+/* ─ Dice Math ─ */
+.dice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:500px}
+.dice-stat{text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+.dice-stat .pct{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:#fff}
+.dice-stat .dl{font-size:12px;color:var(--text3);margin-top:4px}
+
+/* ─ Teams ─ */
+.teams-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.team-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 14px;transition:.2s}
+.team-row:hover{border-color:rgba(103,232,249,.15)}
+.team-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);min-width:30px}
+.team-label{font-size:13px;font-weight:500;color:#e2e5ea;flex:1}
+.team-ghosts{font-size:11px;color:var(--text3)}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="header">
+  <h1>Testroom Memory Map</h1>
+  <div class="sub">BOO! SPIRIT BATTLES &middot; drbango.com/testroom &middot; v66 → v860</div>
+  <p>A complete reference of everything Claude knows about the testroom — architecture, design rules, balance findings, version history, and the systems that power the game engine.</p>
+</header>
+
+<nav class="nav">
+  <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#resources">Resources</a>
+  <a href="#design-rules">Design Rules</a>
+  <a href="#dice-math">Dice Math</a>
+  <a href="#frost-valley">Frost Valley</a>
+  <a href="#items">Items</a>
+  <a href="#multiplayer">Multiplayer</a>
+  <a href="#timeline">Version History</a>
+  <a href="#teams">Curated Teams</a>
+</nav>
+
+<!-- ═══ OVERVIEW ═══ -->
+<section class="section" id="overview">
+  <div class="section-head"><h2>Overview</h2><span class="tag">Current State</span></div>
+  <div class="stats">
+    <div class="stat"><div class="val">v860</div><div class="label">Current Version</div></div>
+    <div class="stat"><div class="val">13K+</div><div class="label">Lines of Code (single HTML)</div></div>
+    <div class="stat"><div class="val">113+</div><div class="label">Canonical Cards</div></div>
+    <div class="stat"><div class="val">109</div><div class="label">Curated Teams</div></div>
+    <div class="stat"><div class="val">8</div><div class="label">Resource Types</div></div>
+    <div class="stat"><div class="val">6</div><div class="label">Craftable Items</div></div>
+    <div class="stat"><div class="val">23M</div><div class="label">Monte Carlo Sims Run</div></div>
+    <div class="stat"><div class="val">23</div><div class="label">Sideline Abilities (Cornelius-audited)</div></div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<section class="section" id="architecture">
+  <div class="section-head"><h2>Architecture</h2><span class="tag">Engine</span></div>
+  <div class="arch-grid">
+    <div class="arch-box">
+      <h4>File Structure</h4>
+      <p>Single monolithic <code>index.html</code> (13,000+ lines). All game logic, UI, CSS, and card data in one file. Pre-commit hook validates JS syntax.</p>
+    </div>
+    <div class="arch-box">
+      <h4>Ability Queue</h4>
+      <p>Abilities fire via <code>queueAbility()</code> — sequential callout system with animations. Recovery net catches dropped state. Callouts drain with configurable speed slider (1x–100x).</p>
+    </div>
+    <div class="arch-box">
+      <h4>Versioning</h4>
+      <p>3 strings must sync on every push: <code>TESTROOM_VERSION</code>, <code>LOCAL_V</code> (line ~11), <code>cache-version.txt</code>. Browser auto-reloads on mismatch. Drift causes reload loops.</p>
+    </div>
+    <div class="arch-box">
+      <h4>Firebase</h4>
+      <p>Project <code>testroom-75200</code>. Realtime DB stores persistent standings (wins/losses per ghost). Wilson Score lower bound (WSR, z=1.96) for rankings — rewards game volume.</p>
+    </div>
+    <div class="arch-box">
+      <h4>Duel Phase</h4>
+      <p>Shipped v390. Previous round loser commits resources first; rolls stay simultaneous. Round 1: lower maxHP goes first. Creates sacrifice play (lose R1 on purpose for R2 initiative).</p>
+    </div>
+    <div class="arch-box">
+      <h4>Spiritkin Chat</h4>
+      <p>Click any gallery ghost to talk to it in character — Gary AI in disguise. Cloudflare Worker proxy at <code>gary-chat-proxy.drbango.workers.dev</code>. Doubles as art direction tool.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ RESOURCES ═══ -->
+<section class="section" id="resources">
+  <div class="section-head"><h2>Resource System</h2><span class="tag">8 Types</span></div>
+  <table class="res-table">
+    <tr><th class="em"></th><th>Resource</th><th>Role</th><th>Key</th></tr>
+    <tr><td class="em">🌙</td><td>Moonstone</td><td>Post-roll die change (pick any face). Moonstone Sickness: 1 dmg/turn if held.</td><td><code>moonstone</code></td></tr>
+    <tr><td class="em">❄️</td><td>Ice Shard</td><td>Frost Valley fuel. Eloise HP swap, Zain Ice Blade forge, Powder Blizzard, Skylar +2 boost.</td><td><code>ice</code></td></tr>
+    <tr><td class="em">🔥</td><td>Sacred Fire</td><td>Volcanic Isles fuel. Finn Flame Blade forge, Tyler doubles fire damage, Mallow heal.</td><td><code>fire</code></td></tr>
+    <tr><td class="em">⚡</td><td>Surge</td><td>Commit for +1 die. Dart/Boris/Chagrin generation. Carpenter transforms with Surge.</td><td><code>surge</code></td></tr>
+    <tr><td class="em">🌱</td><td>Healing Seed</td><td>Commit for +2 HP. Castle Gardener converts to 2 Sacred Fire. Boopies converts spend to Lucky Stone.</td><td><code>healingSeed</code></td></tr>
+    <tr><td class="em">🍀</td><td>Lucky Stone</td><td>Post-roll reroll (one die). Twyla spends for +dice/+seeds. 5-second timed window.</td><td><code>luckyStone</code></td></tr>
+    <tr><td class="em">💥</td><td>Burn</td><td>Place on enemy sideline. Entry: -1 HP + 1 dmg on first roll. Zork Smolders burn into dice.</td><td><code>burn</code></td></tr>
+    <tr><td class="em">❄️</td><td>Frostbite</td><td>Place on enemy sideline. Entry: -1 die per stack (one roll only). Can strip all dice to 0.</td><td><code>frostbite</code></td></tr>
+  </table>
+</section>
+
+<!-- ═══ DESIGN RULES ═══ -->
+<section class="section" id="design-rules">
+  <div class="section-head"><h2>Design Rules</h2><span class="tag">Feedback Memory</span></div>
+  <div class="rules-grid">
+    <div class="rule">
+      <h4>No Carryover Tracking</h4>
+      <p>No counters, tokens, or multi-turn tracking. Everything resolves within the round. Designed for kids and dads.</p>
+    </div>
+    <div class="rule">
+      <h4>Healing Cap: 2 HP/Turn</h4>
+      <p>Healing >2 HP/turn breaks the game. Keep healers rare. The game is about risk and aggression, not stalling.</p>
+    </div>
+    <div class="rule">
+      <h4>Healing Overclocks Past Max</h4>
+      <p>ALL healing overclocks past maxHP (hp += N, no cap). Only exceptions: Healing Seed resource use and Biscuit. Never write Math.min(maxHp, hp+N).</p>
+    </div>
+    <div class="rule">
+      <h4>Interactive Dice Reveals</h4>
+      <p>Player-rollable abilities need click-to-roll modals, never auto-resolve. The reveal IS the gameplay. Examples: Sylvia, Balatron.</p>
+    </div>
+    <div class="rule">
+      <h4>Cornelius Check</h4>
+      <p>Every new pre-roll sideline ability MUST check for Cornelius (45) Antidote. Add !hasSideline(enemy, 45) + ANTIDOTE callout.</p>
+    </div>
+    <div class="rule">
+      <h4>Steal = Transfer</h4>
+      <p>Steal abilities must TRANSFER dice to the thief, not just subtract from enemy. "Steal" = transfer; "strip" = subtract only.</p>
+    </div>
+    <div class="rule">
+      <h4>Use Existing Systems</h4>
+      <p>Always use existing resource systems (burn picker, LS window, MS picker) instead of reimplementing inline.</p>
+    </div>
+    <div class="rule">
+      <h4>Mechanic Collapse</h4>
+      <p>When a proposed mechanic needs cross-round state, compress it onto a single card's same-round ability. Drop the tracking layer.</p>
+    </div>
+    <div class="rule">
+      <h4>Version Bump</h4>
+      <p>ALWAYS bump TESTROOM_VERSION + LOCAL_V + cache-version.txt in the same commit. 3 strings must sync or reload loops.</p>
+    </div>
+    <div class="rule">
+      <h4>Audit Whole Family</h4>
+      <p>When one instance of a shared pattern breaks, audit the whole family of similar abilities — don't patch the symptom.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DICE MATH ═══ -->
+<section class="section" id="dice-math">
+  <div class="section-head"><h2>Dice Math</h2><span class="tag">23M Sim Findings</span></div>
+  <div class="dice-grid">
+    <div class="dice-stat"><div class="pct">55.6%</div><div class="dl">Singles (3v3)</div></div>
+    <div class="dice-stat"><div class="pct">41.7%</div><div class="dl">Doubles (3v3)</div></div>
+    <div class="dice-stat"><div class="pct">2.8%</div><div class="dl">Triples (3v3)</div></div>
+  </div>
+  <div class="arch-grid" style="margin-top:16px">
+    <div class="arch-box">
+      <h4>Key Findings</h4>
+      <p>HP is king — the single strongest stat. +1 damage is massive (33–100% increase depending on base). Defense/healing dominates the meta. Sideline support is critical to team composition.</p>
+    </div>
+    <div class="arch-box">
+      <h4>Design Principle</h4>
+      <p>Simple cards can be elite. Complexity ≠ power. The sim confirmed that straightforward stat advantages (HP, dice count, raw damage) outperform intricate conditional mechanics.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FROST VALLEY ═══ -->
+<section class="section" id="frost-valley">
+  <div class="section-head"><h2>Frost Valley Engine</h2><span class="tag">v852–v860</span></div>
+
+  <table class="card-tbl">
+    <tr><th>ID</th><th>Name</th><th>HP</th><th>Ability</th><th>Description</th></tr>
+    <tr><td class="id">23</td><td class="name">Powder</td><td class="hp">5</td><td class="ability">Blizzard</td><td>Discard 1 Ice Shard → 2 Frostbite on all enemy sideline</td></tr>
+    <tr><td class="id">86</td><td class="name">Pelter</td><td class="hp">5</td><td class="ability">Snowball Fight</td><td>Sideline & In Play: gain 1 Frostbite per 1 rolled</td></tr>
+    <tr><td class="id">91</td><td class="name">Calvin & Anna</td><td class="hp">7</td><td class="ability">Frost Surge</td><td>Win: +1 Frostbite. Win: +1 Ice Shard per Frostbite on enemy sideline</td></tr>
+    <tr><td class="id">25</td><td class="name">Cameron</td><td class="hp">6</td><td class="ability">Winter's Harvest</td><td>Roll Doubles (win or lose): +1 Frostbite + 1 Ice Shard</td></tr>
+    <tr><td class="id">24</td><td class="name">Simon</td><td class="hp">4</td><td class="ability">Brew Time</td><td>Sideline: before rolling, discard 3 Specials → 1 Moonstone</td></tr>
+    <tr><td class="id">77</td><td class="name">City Cyboo</td><td class="hp">1</td><td class="ability">Barrier</td><td>In Play & Sideline: if active has 1 HP, opponent loses 1 die</td></tr>
+    <tr><td class="id">27</td><td class="name">Fredrick</td><td class="hp">5</td><td class="ability">Unstoppable Force</td><td>+1 die from enemy specials, damage can't be negated</td></tr>
+  </table>
+
+  <h3 style="font-size:16px;color:#e2e5ea;margin:32px 0 12px">Ice Blade Pipeline</h3>
+  <div class="flow">
+    <div class="flow-node"><div class="fn-label">Calvin & Anna</div><div class="fn-sub">Win battles</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="fn-label">❄️ Frostbite</div><div class="fn-sub">+1 per win</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="fn-label">💎 Ice Shards</div><div class="fn-sub">+1 per enemy stack</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node"><div class="fn-label">🧪 Simon</div><div class="fn-sub">3 specials → Moon</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node highlight"><div class="fn-label">🗡️ Ice Blade</div><div class="fn-sub">1 Ice + 1 Moon</div></div>
+  </div>
+</section>
+
+<!-- ═══ ITEMS ═══ -->
+<section class="section" id="items">
+  <div class="section-head"><h2>Craftable Items</h2><span class="tag">6 Items</span></div>
+  <table class="res-table">
+    <tr><th>Item</th><th>Crafter</th><th>Cost</th><th>Effect</th></tr>
+    <tr><td>Ice Blade</td><td>Zain (206)</td><td>1 Ice + 1 Moonstone</td><td>+1 die and +2 damage on wins. One per game.</td></tr>
+    <tr><td>Flame Blade</td><td>Finn (204)</td><td>1 Seed + 1 Fire</td><td>+1 die and +2 damage on wins. One per game.</td></tr>
+    <tr><td>Mask of Day</td><td>Sophia (457)</td><td>KO trigger</td><td>Gain 1 Burn per 1 or 2 rolled.</td></tr>
+    <tr><td>Mask of Night</td><td>Sophia (457)</td><td>KO trigger</td><td>Mirror enemy dice count, +1 dmg.</td></tr>
+    <tr><td>Carpenter's Hammer</td><td>Carpenter (449)</td><td>Surge commit</td><td>Transforms Carpenter.</td></tr>
+    <tr><td>Welder's Torch</td><td>Welder (450)</td><td>Roll a 4</td><td>Transforms into Foreman.</td></tr>
+  </table>
+</section>
+
+<!-- ═══ MULTIPLAYER ═══ -->
+<section class="section" id="multiplayer">
+  <div class="section-head"><h2>Multiplayer</h2><span class="tag">BOO Battle Network</span></div>
+  <div class="arch-grid">
+    <div class="arch-box">
+      <h4>Architecture</h4>
+      <p>Red-authoritative model. Blue runs full local engine with Red's authoritative dice via Firebase sync. Async PvP (leaderboard + Elo), live PvP (challenge links). Daily rival system with champion-of-the-day.</p>
+    </div>
+    <div class="arch-box">
+      <h4>Features</h4>
+      <p>Trading system, special packs (EJ/Julian/Skylar custom cards), 25 daily games, card rewards, badge system. Skylar QA testing from NYC. Must sync <code>BBN_VERSION</code> on every PvP code change.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TIMELINE ═══ -->
+<section class="section" id="timeline">
+  <div class="section-head"><h2>Version History</h2><span class="tag">Key Sessions</span></div>
+  <div class="timeline">
+    <div class="tl-entry major">
+      <div class="tl-version">v852–v860 · Apr 29</div>
+      <div class="tl-title">Frost Valley Rework</div>
+      <div class="tl-detail">Frostbite mechanic, 7 card reworks, Nick & Knack button fix, 7 new curated teams, City Cyboo redesign.</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v789–v796 · Apr 22</div>
+      <div class="tl-title">Card Rework Session</div>
+      <div class="tl-detail">17+ cards redesigned. Volcanic Activity → Volcanic Isles rename. Dark Fang, Laura, Gus, Tyson reworks. New helpers: isStraight(), hasAlive(), guardedHeal().</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v787–v789 · Apr 21</div>
+      <div class="tl-title">Cornelius Audit</div>
+      <div class="tl-detail">All 23 sideline abilities verified for Antidote check. 4 missing checks fixed (Farmer Jeff, Granny, Lucy's Shadow, Nyx & Bessie).</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v780–v785 · Apr 21</div>
+      <div class="tl-title">Cameron Rework Session</div>
+      <div class="tl-detail">Cameron → Unstoppable Force (pierces all 11 negation abilities). Guardian Fairy Wish timed button. Callout overlap fix.</div>
+    </div>
+    <div class="tl-entry major">
+      <div class="tl-version">v720–v737 · Apr 16</div>
+      <div class="tl-title">Multiplayer Overhaul</div>
+      <div class="tl-detail">Blue parity, ready gates, burn sync, LS/MS broadcast. Trading system, special packs, How to Play page, balance caps (Moonstone 1 max).</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v700–v712 · Apr 13</div>
+      <div class="tl-title">Balance & UX Session</div>
+      <div class="tl-detail">15+ card balance changes. Hand Limit mode, Battle Speed slider (1x–100x), Skip button for LS/MS, Specials Timer. All settings persist via localStorage.</div>
+    </div>
+    <div class="tl-entry major">
+      <div class="tl-version">v699 · Apr 12</div>
+      <div class="tl-title">Wilson Score Rankings</div>
+      <div class="tl-detail">Standings switched from raw win% to Wilson Score lower bound (WSR, z=1.96). Rewards game volume — 8-1 ranks higher than 1-0.</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v641+ · Apr 10</div>
+      <div class="tl-title">Spiritkin Chat</div>
+      <div class="tl-detail">Click gallery ghosts to chat in character. Gary AI disguised per ghost. Cloudflare Worker proxy. Easter eggs for specific users.</div>
+    </div>
+    <div class="tl-entry major">
+      <div class="tl-version">v390 · Mar</div>
+      <div class="tl-title">Duel Phase</div>
+      <div class="tl-detail">Loser commits first. Lower maxHP goes first in R1. Creates sacrifice play — lose R1 on purpose for R2 initiative. 15+ handlers gated via isPreRollActive().</div>
+    </div>
+    <div class="tl-entry">
+      <div class="tl-version">v66–v106 · Apr 9</div>
+      <div class="tl-title">First Major Session</div>
+      <div class="tl-detail">Timber/Selene/Shade reworks. Weighted luck system. Smart AI simulator. Elimination tournament. Orchestrator ran 29 refiner cycles.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CURATED TEAMS ═══ -->
+<section class="section" id="teams">
+  <div class="section-head"><h2>Curated Teams</h2><span class="tag">Frost Valley #103–#109</span></div>
+  <div class="teams-list">
+    <div class="team-row"><div class="team-num">#103</div><div class="team-label">Frost Forge Pipeline</div><div class="team-ghosts">Calvin&Anna · Pelter · Zain</div></div>
+    <div class="team-row"><div class="team-num">#104</div><div class="team-label">Blizzard Engine</div><div class="team-ghosts">Calvin&Anna · Pelter · Powder</div></div>
+    <div class="team-row"><div class="team-num">#105</div><div class="team-label">Moonstone Brew Line</div><div class="team-ghosts">Gary · Pelter · Simon</div></div>
+    <div class="team-row"><div class="team-num">#106</div><div class="team-label">Cameron Doubles Forge</div><div class="team-ghosts">Cameron · Zain · Simon</div></div>
+    <div class="team-row"><div class="team-num">#107</div><div class="team-label">Full Frost Lockdown</div><div class="team-ghosts">Powder · Pelter · Cameron</div></div>
+    <div class="team-row"><div class="team-num">#108</div><div class="team-label">Speed Blade</div><div class="team-ghosts">Zain · Gary · Simon</div></div>
+    <div class="team-row"><div class="team-num">#109</div><div class="team-label">Mirror Theft</div><div class="team-ghosts">Mirror Matt · Nick&Knack · Balatron</div></div>
+  </div>
+</section>
+
+<footer style="text-align:center;padding-top:48px;border-top:1px solid var(--border)">
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.1em">TESTROOM MEMORY MAP &middot; CLAUDE &middot; v860 &middot; 2026-04-29</p>
+</footer>
+
+</div>
+</body>
+</html>

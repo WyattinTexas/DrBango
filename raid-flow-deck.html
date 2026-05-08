@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raid Battle Flow — BOO! Spirit Battles</title>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0612;--bg2:#14101e;--bg3:#1e1530;
+  --gold:#f0c040;--gold2:#d4a017;
+  --red:#e74c3c;--red2:#c0392b;
+  --blue:#5dade2;--blue2:#3498db;
+  --purple:#9b59b6;--purple2:#8e44ad;
+  --green:#2ecc71;--green2:#27ae60;
+  --text:#e8e2f0;--text2:#a89ec4;--text3:#6a5d7e;
+  --ghost-rare:linear-gradient(135deg,#9b59b6,#3498db);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
+
+/* Slide container */
+.deck{position:relative;width:100%;height:100%}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;opacity:0;pointer-events:none;transform:translateX(60px);transition:opacity .5s,transform .5s}
+.slide.active{opacity:1;pointer-events:all;transform:translateX(0)}
+.slide.exit{opacity:0;transform:translateX(-60px)}
+
+/* Header */
+.slide-header{text-align:center;margin-bottom:32px}
+.slide-num{font-family:'JetBrains Mono',monospace;color:var(--gold);font-size:.75rem;letter-spacing:4px;text-transform:uppercase;margin-bottom:8px}
+.slide-title{font-family:'Creepster',cursive;font-size:2.6rem;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),#fff8dc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
+.slide-sub{color:var(--text2);font-size:1rem;margin-top:6px;font-style:italic}
+
+/* Two-column layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;width:100%;max-width:1100px}
+.col{background:var(--bg2);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:24px;position:relative;overflow:hidden}
+.col::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0}
+.col.red::before{background:linear-gradient(90deg,var(--red),#e67e22)}
+.col.blue::before{background:linear-gradient(90deg,var(--blue),var(--purple))}
+.col.gold::before{background:linear-gradient(90deg,var(--gold),#e67e22)}
+.col-label{font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px}
+.col.red .col-label{color:var(--red)}
+.col.blue .col-label{color:var(--blue)}
+.col.gold .col-label{color:var(--gold)}
+
+/* Boss pool bar */
+.pool-bar{width:100%;max-width:600px;height:36px;background:var(--bg3);border-radius:18px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08);margin:0 auto 20px}
+.pool-fill{height:100%;border-radius:16px;transition:width 1s ease;background:var(--green)}
+.pool-fill.mid{background:var(--gold)}
+.pool-fill.low{background:var(--red)}
+.pool-fill.dead{background:var(--purple);width:0!important}
+.pool-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;letter-spacing:1px;text-shadow:0 1px 4px rgba(0,0,0,.7)}
+
+/* Ghost cards */
+.ghost-row{display:flex;gap:8px;margin:8px 0}
+.ghost{width:56px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;position:relative;border:2px solid rgba(255,255,255,.1)}
+.ghost.active{border-color:var(--gold);box-shadow:0 0 12px rgba(240,192,64,.3)}
+.ghost.ko{opacity:.35;filter:grayscale(1)}
+.ghost .hp{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:.55rem;font-family:'JetBrains Mono',monospace;background:var(--bg);padding:1px 5px;border-radius:8px;border:1px solid rgba(255,255,255,.1);white-space:nowrap}
+
+/* Dice */
+.dice-row{display:flex;gap:6px;margin:8px 0}
+.die{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;font-family:'JetBrains Mono',monospace}
+.die.red-die{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff}
+.die.blue-die{background:linear-gradient(135deg,#2980b9,#5dade2);color:#fff}
+
+/* Flow diagram */
+.flow{display:flex;flex-direction:column;gap:12px;width:100%;max-width:700px}
+.flow-step{display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--bg2);border-radius:12px;border-left:3px solid var(--text3);transition:all .3s}
+.flow-step.highlight{border-left-color:var(--gold);background:rgba(240,192,64,.06)}
+.flow-step.red-hl{border-left-color:var(--red);background:rgba(231,76,60,.06)}
+.flow-step.blue-hl{border-left-color:var(--blue);background:rgba(93,173,226,.06)}
+.flow-step.green-hl{border-left-color:var(--green);background:rgba(46,204,113,.06)}
+.flow-step.purple-hl{border-left-color:var(--purple);background:rgba(155,89,182,.06)}
+.flow-icon{font-size:1.5rem;min-width:32px;text-align:center}
+.flow-text{flex:1}
+.flow-text strong{color:var(--gold);font-weight:700}
+.flow-text .detail{color:var(--text2);font-size:.85rem;margin-top:2px}
+
+/* State diagram */
+.state-diagram{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;margin:16px 0}
+.state-box{padding:8px 16px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.state-box.lobby{background:rgba(155,89,182,.15);color:var(--purple);border:1px solid var(--purple)}
+.state-box.fighting{background:rgba(231,76,60,.15);color:var(--red);border:1px solid var(--red)}
+.state-box.spectating{background:rgba(93,173,226,.15);color:var(--blue);border:1px solid var(--blue)}
+.state-box.complete{background:rgba(46,204,113,.15);color:var(--green);border:1px solid var(--green)}
+.state-box.handoff{background:rgba(240,192,64,.15);color:var(--gold);border:1px solid var(--gold)}
+.arrow{color:var(--text3);font-size:1.2rem}
+
+/* Spectator vs Fighter comparison */
+.compare{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;max-width:900px;width:100%}
+.compare-divider{width:2px;background:linear-gradient(180deg,transparent,var(--text3),transparent);min-height:200px;align-self:stretch}
+.compare-label{font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;text-align:center}
+.compare-label.fighter{color:var(--red)}
+.compare-label.spectator{color:var(--blue)}
+
+/* Feature list */
+.feature-list{list-style:none;padding:0}
+.feature-list li{padding:6px 0;display:flex;align-items:center;gap:10px;font-size:.9rem}
+.feature-list .check{color:var(--green);font-size:1.1rem}
+.feature-list .cross{color:var(--red);font-size:1.1rem;opacity:.5}
+.feature-list .soon{color:var(--gold);font-size:.8rem;font-family:'JetBrains Mono',monospace}
+
+/* Wide single column */
+.wide{max-width:800px;width:100%}
+
+/* Navigation */
+.nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;z-index:100;background:rgba(10,6,18,.9);backdrop-filter:blur(12px);padding:10px 24px;border-radius:40px;border:1px solid rgba(255,255,255,.08)}
+.nav-btn{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:var(--text);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.nav-btn:hover{background:rgba(240,192,64,.15);border-color:var(--gold);color:var(--gold)}
+.nav-btn:disabled{opacity:.2;cursor:default}
+.nav-dots{display:flex;gap:6px}
+.nav-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);cursor:pointer;transition:all .2s}
+.nav-dot.active{background:var(--gold);transform:scale(1.3)}
+.nav-counter{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--text3);min-width:50px;text-align:center}
+
+/* Result card */
+.result-card{background:linear-gradient(135deg,rgba(46,204,113,.08),rgba(155,89,182,.08));border:1px solid rgba(46,204,113,.2);border-radius:16px;padding:24px 32px;text-align:center;max-width:500px}
+.result-card.defeat{background:linear-gradient(135deg,rgba(231,76,60,.08),rgba(155,89,182,.08));border-color:rgba(231,76,60,.2)}
+.result-title{font-family:'Creepster',cursive;font-size:2rem;letter-spacing:3px}
+.result-card .result-title{color:var(--green)}
+.result-card.defeat .result-title{color:var(--red)}
+
+/* Loot */
+.loot-item{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(240,192,64,.1);border:1px solid var(--gold2);border-radius:10px;margin:8px 4px}
+.loot-rarity{font-size:.65rem;font-family:'JetBrains Mono',monospace;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:4px}
+.loot-rarity.green{background:rgba(46,204,113,.2);color:var(--green)}
+.loot-rarity.blue{background:rgba(93,173,226,.2);color:var(--blue)}
+.loot-rarity.orange{background:rgba(230,126,34,.2);color:#e67e22}
+
+/* Callout box */
+.callout{padding:16px 20px;border-radius:12px;margin:12px 0;font-size:.9rem}
+.callout.warn{background:rgba(240,192,64,.08);border:1px solid rgba(240,192,64,.2);color:var(--gold)}
+.callout.info{background:rgba(93,173,226,.08);border:1px solid rgba(93,173,226,.2);color:var(--blue)}
+.callout.critical{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.2);color:var(--red)}
+
+/* Cycle diagram */
+.cycle{display:flex;align-items:center;justify-content:center;gap:4px;margin:16px 0;flex-wrap:wrap}
+.cycle-node{padding:10px 18px;border-radius:10px;font-weight:700;font-size:.85rem;position:relative}
+.cycle-node.p1{background:rgba(231,76,60,.12);border:1px solid var(--red);color:var(--red)}
+.cycle-node.p2{background:rgba(93,173,226,.12);border:1px solid var(--blue);color:var(--blue)}
+.cycle-node.boss{background:rgba(240,192,64,.12);border:1px solid var(--gold);color:var(--gold)}
+.cycle-arrow{font-size:1.4rem;color:var(--text3)}
+
+/* Key-value pairs */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.85rem}
+.kv dt{color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:.75rem;text-transform:uppercase;letter-spacing:1px}
+.kv dd{color:var(--text)}
+
+/* Watermark */
+.watermark{position:fixed;top:16px;right:24px;font-family:'Creepster',cursive;font-size:1rem;color:rgba(240,192,64,.15);letter-spacing:2px;z-index:50;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div class="watermark">BOO! SPIRIT BATTLES</div>
+
+<div class="deck" id="deck">
+
+<!-- SLIDE 1: Title -->
+<div class="slide active" data-slide="0">
+  <div class="slide-header">
+    <div class="slide-num">Raid System Flow</div>
+    <div class="slide-title">Co-Op Raid Battle</div>
+    <div class="slide-sub">2-Player walkthrough &mdash; how it should work</div>
+  </div>
+  <div class="wide">
+    <div class="state-diagram" style="margin:24px 0">
+      <div class="state-box lobby">Lobby</div><span class="arrow">&rarr;</span>
+      <div class="state-box fighting">Fighting</div><span class="arrow">&harr;</span>
+      <div class="state-box spectating">Spectating</div><span class="arrow">&rarr;</span>
+      <div class="state-box handoff">Handoff</div><span class="arrow">&rarr;</span>
+      <div class="state-box complete">Results</div>
+    </div>
+    <div class="callout info" style="text-align:center">
+      Players take turns fighting the boss. One fights while the other watches.<br>
+      The boss has a <strong>shared HP pool</strong> that carries across all turns.
+    </div>
+    <div style="text-align:center;margin-top:24px;color:var(--text3);font-size:.85rem">
+      Use arrow keys or buttons below to navigate &rarr;
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 2: Lobby -->
+<div class="slide" data-slide="1">
+  <div class="slide-header">
+    <div class="slide-num">Phase 1 of 9</div>
+    <div class="slide-title">Raid Lobby</div>
+    <div class="slide-sub">Both players select teams, equip items, and join</div>
+  </div>
+  <div class="two-col">
+    <div class="col red">
+      <div class="col-label">Player 1 &mdash; Dr Bango</div>
+      <div style="font-size:.85rem;color:var(--text2);margin-bottom:8px">Team:</div>
+      <div class="ghost-row">
+        <div class="ghost active" style="background:var(--bg3)">&#128123;<div class="hp">Miyoshi</div></div>
+        <div class="ghost" style="background:var(--bg3)">&#127912;<div class="hp">Willow</div></div>
+        <div class="ghost" style="background:var(--bg3)">&#127838;<div class="hp">Sandwiches</div></div>
+      </div>
+      <div style="font-size:.85rem;color:var(--text2);margin:12px 0 4px">Loadout:</div>
+      <div class="kv">
+        <dt>Head</dt><dd>Shade's Cape (+1 max HP)</dd>
+        <dt>Weapon</dt><dd>Golden Dice (+1 die first roll)</dd>
+        <dt>Accessory</dt><dd>Healing Root (1 Healing Seed)</dd>
+      </div>
+    </div>
+    <div class="col blue">
+      <div class="col-label">Player 2 &mdash; Wyatt Gable</div>
+      <div style="font-size:.85rem;color:var(--text2);margin-bottom:8px">Team:</div>
+      <div class="ghost-row">
+        <div class="ghost active" style="background:var(--bg3)">&#9876;<div class="hp">Romy</div></div>
+        <div class="ghost" style="background:var(--bg3)">&#128055;<div class="hp">Bilbo</div></div>
+        <div class="ghost" style="background:var(--bg3)">&#128065;<div class="hp">Shade</div></div>
+      </div>
+      <div style="font-size:.85rem;color:var(--text2);margin:12px 0 4px">Loadout:</div>
+      <div class="kv">
+        <dt>Head</dt><dd>Mask of Night</dd>
+        <dt>Weapon</dt><dd>&mdash;</dd>
+        <dt>Accessory</dt><dd>Healing Root (1 Healing Seed)</dd>
+      </div>
+    </div>
+  </div>
+  <div class="callout warn" style="max-width:600px;text-align:center;margin-top:16px">
+    Both press <strong>JOIN RAID</strong>. When enough players are in, the host clicks <strong>START</strong>.
+  </div>
+</div>
+
+<!-- SLIDE 3: Boss Intro -->
+<div class="slide" data-slide="2">
+  <div class="slide-header">
+    <div class="slide-num">Phase 2 of 9</div>
+    <div class="slide-title">The Boss Appears</div>
+    <div class="slide-sub">Jasper &mdash; The Restless Flame (Swarm type)</div>
+  </div>
+  <div class="wide" style="text-align:center">
+    <div style="font-size:4rem;margin-bottom:8px">&#128293;</div>
+    <div style="font-family:'Creepster',cursive;font-size:1.8rem;color:var(--gold);letter-spacing:2px">JASPER</div>
+    <div style="color:var(--text2);margin:4px 0 20px">Tier 1 &bull; 15 HP Pool &bull; 3 Ghosts (Boss + 2 Minions)</div>
+    <div class="pool-bar">
+      <div class="pool-fill" style="width:100%"></div>
+      <div class="pool-text">BOSS HP: 15 / 15</div>
+    </div>
+    <div class="ghost-row" style="justify-content:center;margin:16px 0">
+      <div class="ghost active" style="background:linear-gradient(135deg,#c0392b,#e67e22)">&#128293;<div class="hp">Jasper 10HP</div></div>
+      <div class="ghost" style="background:var(--bg3)">&#128028;<div class="hp">Drone 3HP</div></div>
+      <div class="ghost" style="background:var(--bg3)">&#9935;<div class="hp">Worker 4HP</div></div>
+    </div>
+    <div class="callout critical" style="max-width:550px;margin:16px auto;text-align:left">
+      <strong>Pool HP is shared.</strong> Every point of damage any player deals is subtracted from the 15 HP pool. The individual ghost HP is per-turn &mdash; ghosts reset each turn, but pool damage is permanent.
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 4: Player 1 Turn -->
+<div class="slide" data-slide="3">
+  <div class="slide-header">
+    <div class="slide-num">Phase 3 of 9</div>
+    <div class="slide-title">Player 1's Turn</div>
+    <div class="slide-sub">Dr Bango fights &mdash; Wyatt spectates</div>
+  </div>
+  <div class="two-col">
+    <div class="col red">
+      <div class="col-label">Fighter &mdash; Dr Bango</div>
+      <div class="flow" style="gap:8px">
+        <div class="flow-step highlight"><div class="flow-icon">&#127922;</div><div class="flow-text"><strong>ROLL button appears</strong><div class="detail">Click to commit &amp; roll dice</div></div></div>
+        <div class="flow-step red-hl"><div class="flow-icon">&#9876;</div><div class="flow-text"><strong>Pre-roll abilities fire</strong><div class="detail">Bonzai (-4HP, +5 dice), Healing Seed, etc.</div></div></div>
+        <div class="flow-step"><div class="flow-icon">&#127922;</div><div class="flow-text"><strong>3D dice tumble &amp; reveal</strong><div class="detail">Both red (player) and blue (boss) roll</div></div></div>
+        <div class="flow-step green-hl"><div class="flow-icon">&#128167;</div><div class="flow-text"><strong>Damage drains boss pool</strong><div class="detail">Win: your damage hits pool. Lose: boss damages your ghost.</div></div></div>
+      </div>
+    </div>
+    <div class="col blue">
+      <div class="col-label">Spectator &mdash; Wyatt</div>
+      <div style="color:var(--text2);font-size:.9rem;line-height:1.6">
+        <p>Wyatt watches Dr Bango's fight in real-time:</p>
+        <ul class="feature-list" style="margin-top:8px">
+          <li><span class="check">&#10003;</span> Ghost HP updates live</li>
+          <li><span class="check">&#10003;</span> Boss pool HP bar updates</li>
+          <li><span class="check">&#10003;</span> Dice results shown</li>
+          <li><span class="check">&#10003;</span> Damage numbers visible</li>
+          <li><span class="soon">SOON</span> 3D dice animation</li>
+          <li><span class="soon">SOON</span> Ability callout splashes</li>
+        </ul>
+        <div class="callout info" style="margin-top:12px;font-size:.8rem">
+          Spectator sees the fight unfold but cannot interact. No roll button.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: Turn Handoff -->
+<div class="slide" data-slide="4">
+  <div class="slide-header">
+    <div class="slide-num">Phase 4 of 9</div>
+    <div class="slide-title">Turn Handoff</div>
+    <div class="slide-sub">After 1 roll, the turn passes to the next player</div>
+  </div>
+  <div class="wide">
+    <div class="cycle">
+      <div class="cycle-node p1">Dr Bango rolls</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node boss">Resolve damage</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node" style="background:rgba(240,192,64,.12);border:1px solid var(--gold);color:var(--gold)">Save state</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node p2">Wyatt's turn</div>
+    </div>
+    <div class="flow" style="margin-top:20px">
+      <div class="flow-step highlight"><div class="flow-icon">&#128190;</div><div class="flow-text"><strong>Player state saved to Firebase</strong><div class="detail">Ghost HP, resources, KO flags, activeIdx, willowLostLast</div></div></div>
+      <div class="flow-step highlight"><div class="flow-icon">&#128190;</div><div class="flow-text"><strong>Boss state saved to Firebase</strong><div class="detail">Boss ghost HP/KO, pool HP (from drainBossHpPool)</div></div></div>
+      <div class="flow-step purple-hl"><div class="flow-icon">&#128260;</div><div class="flow-text"><strong>Firebase: currentFighterIdx advances</strong><div class="detail">Wraps around, skips eliminated/disconnected players</div></div></div>
+      <div class="flow-step blue-hl"><div class="flow-icon">&#128064;</div><div class="flow-text"><strong>Clients react to Firebase update</strong><div class="detail">New fighter calls _startMyFight(). Old fighter calls _startSpectating().</div></div></div>
+    </div>
+    <div class="callout warn" style="max-width:650px;margin:16px auto;text-align:center">
+      <strong>Key rule:</strong> Each player gets <strong>1 roll per turn</strong>. After the roll resolves, the turn hands off. The hook fires on <code>B.round > 1</code>.
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 6: Player 2 Turn -->
+<div class="slide" data-slide="5">
+  <div class="slide-header">
+    <div class="slide-num">Phase 5 of 9</div>
+    <div class="slide-title">Player 2's Turn</div>
+    <div class="slide-sub">Wyatt fights &mdash; Dr Bango spectates</div>
+  </div>
+  <div class="two-col">
+    <div class="col blue">
+      <div class="col-label">Fighter &mdash; Wyatt</div>
+      <div style="color:var(--text2);font-size:.9rem;line-height:1.6">
+        <p>Same flow as Player 1:</p>
+        <div class="flow" style="gap:6px;margin-top:8px">
+          <div class="flow-step"><div class="flow-icon">&#128260;</div><div class="flow-text">Boss ghosts restored from saved state</div></div>
+          <div class="flow-step"><div class="flow-icon">&#127922;</div><div class="flow-text">Wyatt's team restored (HP, resources)</div></div>
+          <div class="flow-step highlight"><div class="flow-icon">&#127922;</div><div class="flow-text"><strong>ROLL &rarr; resolve &rarr; pool drains</strong></div></div>
+          <div class="flow-step"><div class="flow-icon">&#128260;</div><div class="flow-text">Turn hands back to Dr Bango</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col red">
+      <div class="col-label">Spectator &mdash; Dr Bango</div>
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:3rem;margin-bottom:8px">&#128064;</div>
+        <div style="color:var(--text2);font-size:.9rem">Watching Wyatt fight...</div>
+        <div class="pool-bar" style="margin:16px auto;max-width:300px">
+          <div class="pool-fill mid" style="width:60%"></div>
+          <div class="pool-text">BOSS HP: 9 / 15</div>
+        </div>
+        <div style="color:var(--text3);font-size:.8rem">Pool damage carries between turns</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: Turn Rotation -->
+<div class="slide" data-slide="6">
+  <div class="slide-header">
+    <div class="slide-num">Phase 6 of 9</div>
+    <div class="slide-title">Turn Rotation</div>
+    <div class="slide-sub">The cycle repeats until the boss dies or all players are eliminated</div>
+  </div>
+  <div class="wide" style="text-align:center">
+    <div class="cycle" style="margin:20px 0">
+      <div class="cycle-node p1">P1 fights</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node p2">P2 fights</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node p1">P1 fights</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node p2">P2 fights</div>
+      <span class="cycle-arrow">&rarr;</span>
+      <div class="cycle-node" style="color:var(--text3);border:1px dashed var(--text3);padding:10px 18px;border-radius:10px">...</div>
+    </div>
+    <div class="pool-bar" style="margin:24px auto;max-width:500px">
+      <div class="pool-fill low" style="width:25%"></div>
+      <div class="pool-text">BOSS HP: 4 / 15</div>
+    </div>
+    <div class="callout info" style="max-width:600px;margin:0 auto;text-align:left">
+      <strong>State persists across turns:</strong>
+      <ul style="margin:8px 0 0 16px;color:var(--text2);line-height:1.8">
+        <li>Boss pool HP only goes down, never resets</li>
+        <li>Each player's ghost HP/KO status is saved between turns</li>
+        <li>Resources (Healing Seeds, etc.) persist</li>
+        <li>Battle log accumulates across all turns</li>
+        <li>Boss ghost HP resets each turn (they're fresh fights), but pool damage is permanent</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: Player Eliminated -->
+<div class="slide" data-slide="7">
+  <div class="slide-header">
+    <div class="slide-num">Phase 7 of 9</div>
+    <div class="slide-title">Player Eliminated</div>
+    <div class="slide-sub">When all 3 of a player's ghosts are KO'd</div>
+  </div>
+  <div class="two-col">
+    <div class="col red">
+      <div class="col-label">Eliminated &mdash; Dr Bango</div>
+      <div class="ghost-row">
+        <div class="ghost ko" style="background:var(--bg3)">&#128128;<div class="hp">KO</div></div>
+        <div class="ghost ko" style="background:var(--bg3)">&#128128;<div class="hp">KO</div></div>
+        <div class="ghost ko" style="background:var(--bg3)">&#128128;<div class="hp">KO</div></div>
+      </div>
+      <div style="margin-top:12px;color:var(--text2);font-size:.9rem">
+        <p style="color:var(--red);font-weight:700">All ghosts down!</p>
+        <p style="margin-top:6px">Dr Bango becomes a <strong>permanent spectator</strong>. He watches Wyatt continue fighting.</p>
+      </div>
+      <div class="callout warn" style="font-size:.8rem;margin-top:12px">
+        Status set to <code>'done'</code>. Turn rotation skips this player. Narrator: "Your team is out! Watching the raid continue..."
+      </div>
+    </div>
+    <div class="col blue">
+      <div class="col-label">Still Fighting &mdash; Wyatt</div>
+      <div class="ghost-row">
+        <div class="ghost active" style="background:var(--bg3)">&#9876;<div class="hp">Romy 5HP</div></div>
+        <div class="ghost" style="background:var(--bg3)">&#128055;<div class="hp">Bilbo 2HP</div></div>
+        <div class="ghost ko" style="background:var(--bg3)">&#128128;<div class="hp">KO</div></div>
+      </div>
+      <div style="margin-top:12px;color:var(--text2);font-size:.9rem">
+        <p>Wyatt keeps fighting solo. Turns no longer alternate &mdash; it's all Wyatt now.</p>
+        <p style="margin-top:6px">Dr Bango sees dice, HP updates, and damage live as a spectator.</p>
+      </div>
+      <div class="pool-bar" style="margin-top:16px">
+        <div class="pool-fill low" style="width:20%"></div>
+        <div class="pool-text">BOSS HP: 3 / 15</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Victory -->
+<div class="slide" data-slide="8">
+  <div class="slide-header">
+    <div class="slide-num">Phase 8 of 9</div>
+    <div class="slide-title">Victory!</div>
+    <div class="slide-sub">Boss pool reaches 0 &mdash; result screen appears</div>
+  </div>
+  <div class="wide" style="text-align:center">
+    <div class="pool-bar" style="margin-bottom:24px;max-width:400px">
+      <div class="pool-fill dead" style="width:0"></div>
+      <div class="pool-text">BOSS HP: 0 / 15 &mdash; DEFEATED</div>
+    </div>
+    <div class="result-card" style="margin:0 auto 20px">
+      <div class="result-title">RAID COMPLETE!</div>
+      <div style="color:var(--text2);margin:8px 0 16px">Jasper has been defeated!</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left;font-size:.85rem">
+        <div>
+          <div style="color:var(--red);font-weight:700;margin-bottom:4px">Dr Bango</div>
+          <div style="color:var(--text2)">8 dmg &bull; 3 ghosts lost</div>
+        </div>
+        <div>
+          <div style="color:var(--blue);font-weight:700;margin-bottom:4px">Wyatt Gable <span style="color:var(--gold);font-size:.7rem">MVP</span></div>
+          <div style="color:var(--text2)">12 dmg &bull; 1 ghost lost</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin:16px 0 8px;font-family:'Creepster',cursive;font-size:1.3rem;color:var(--gold);letter-spacing:2px">LOOT ROLL</div>
+    <div style="display:flex;justify-content:center;gap:12px;margin-bottom:12px">
+      <div class="loot-item"><span class="loot-rarity green">Common</span> Healing Root</div>
+      <div class="loot-item"><span class="loot-rarity blue">Rare</span> Shadow Cloak</div>
+    </div>
+    <div style="color:var(--text3);font-size:.8rem">Each player rolls for their own loot independently</div>
+  </div>
+</div>
+
+<!-- SLIDE 10: Defeat -->
+<div class="slide" data-slide="9">
+  <div class="slide-header">
+    <div class="slide-num">Phase 9 of 9</div>
+    <div class="slide-title">Defeat</div>
+    <div class="slide-sub">All players eliminated &mdash; boss wins</div>
+  </div>
+  <div class="wide" style="text-align:center">
+    <div class="pool-bar" style="margin-bottom:24px;max-width:400px">
+      <div class="pool-fill low" style="width:30%"></div>
+      <div class="pool-text">BOSS HP: 4 / 15 &mdash; SURVIVES</div>
+    </div>
+    <div class="result-card defeat" style="margin:0 auto 20px">
+      <div class="result-title">RAID FAILED</div>
+      <div style="color:var(--text2);margin:8px 0 16px">Jasper stands triumphant.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left;font-size:.85rem">
+        <div>
+          <div style="color:var(--red);font-weight:700;margin-bottom:4px">Dr Bango</div>
+          <div style="color:var(--text2)">5 dmg &bull; 3 ghosts lost</div>
+        </div>
+        <div>
+          <div style="color:var(--blue);font-weight:700;margin-bottom:4px">Wyatt Gable</div>
+          <div style="color:var(--text2)">6 dmg &bull; 3 ghosts lost</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout critical" style="max-width:500px;margin:0 auto;text-align:center">
+      <strong>No loot on defeat.</strong> Both players return to the raid lobby.<br>
+      Partial raid points awarded based on damage dealt.
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button class="nav-btn" id="prevBtn" onclick="go(-1)">&#8592;</button>
+  <div class="nav-dots" id="dots"></div>
+  <div class="nav-counter" id="counter">1 / 10</div>
+  <button class="nav-btn" id="nextBtn" onclick="go(1)">&#8594;</button>
+</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+const dots = document.getElementById('dots');
+const counter = document.getElementById('counter');
+let current = 0;
+
+// Build dots
+slides.forEach((_, i) => {
+  const d = document.createElement('div');
+  d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goTo(i);
+  dots.appendChild(d);
+});
+
+function goTo(idx) {
+  if (idx < 0 || idx >= slides.length || idx === current) return;
+  slides[current].classList.remove('active');
+  slides[current].classList.add('exit');
+  setTimeout(() => slides[current === idx ? current : current].classList.remove('exit'), 500);
+  const prev = current;
+  current = idx;
+  slides[current].classList.add('active');
+  setTimeout(() => slides[prev].classList.remove('exit'), 500);
+
+  document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === current));
+  counter.textContent = `${current + 1} / ${slides.length}`;
+  document.getElementById('prevBtn').disabled = current === 0;
+  document.getElementById('nextBtn').disabled = current === slides.length - 1;
+}
+
+function go(dir) { goTo(current + dir); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+});
+
+// Init
+document.getElementById('prevBtn').disabled = true;
+</script>
+</body>
+</html>

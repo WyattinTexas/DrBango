@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Director — Full Team Battle Simulator</title>
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#12121a; --surface2:#1a1a26; --surface3:#222233;
+  --border:#2a2a3a; --text:#e8e8f0; --text2:#8888a0; --text3:#555566;
+  --red:#ef4444; --orange:#f59e0b; --green:#22c55e; --blue:#3b82f6; --purple:#8b5cf6; --cyan:#06b6d4;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'SF Mono','Fira Code',monospace;background:var(--bg);color:var(--text);min-height:100vh;}
+.app{max-width:1800px;margin:0 auto;padding:20px;}
+.header{display:flex;align-items:baseline;gap:16px;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;}
+.header h1{font-size:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.header h1 span{color:var(--red);}
+.header .tag{font-size:11px;padding:3px 8px;border-radius:3px;background:var(--red);color:white;font-weight:700;}
+.header .stats{margin-left:auto;font-size:12px;color:var(--text2);display:flex;gap:16px;flex-wrap:wrap;}
+.header .stats .val{color:var(--text);font-weight:700;}
+
+.rules-bar{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:11px;color:var(--text2);line-height:1.8;}
+.rules-bar strong{color:var(--text);}
+
+.controls{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.controls select,.controls input,.controls button{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:6px 12px;border-radius:4px;font-size:11px;font-family:inherit;cursor:pointer;outline:none;
+}
+.controls button{background:var(--blue);border-color:var(--blue);color:white;font-weight:700;}
+.controls button:hover{opacity:0.9;}
+.controls button.secondary{background:var(--surface2);border-color:var(--border);color:var(--text);font-weight:400;}
+.controls .spacer{flex:1;}
+.progress{font-size:11px;color:var(--cyan);}
+
+.results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;}
+.result-card h3{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2);margin-bottom:6px;}
+.result-card .big-num{font-size:28px;font-weight:700;}
+.result-card .detail{font-size:10px;color:var(--text3);margin-top:4px;}
+
+.grid-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+th{background:var(--surface2);padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+th:hover{color:var(--blue);}
+td{padding:6px 10px;border-bottom:1px solid rgba(42,42,58,0.5);vertical-align:middle;}
+tr:hover td{background:rgba(59,130,246,0.04);}
+tr.selected td{background:rgba(59,130,246,0.1);border-left:2px solid var(--blue);}
+.rarity{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;}
+.r-common{background:#374151;color:#9ca3af;}.r-uncommon{background:#064e3b;color:#34d399;}
+.r-rare{background:#1e3a5f;color:#60a5fa;}.r-ghost-rare{background:#3b1f6e;color:#a78bfa;}
+.r-legendary{background:#713f12;color:#fbbf24;}
+.wr-bar{display:inline-flex;align-items:center;gap:6px;width:100%;}
+.wr-bar .bar{flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;min-width:60px;}
+.wr-bar .bar .fill{height:100%;border-radius:4px;}
+.wr-bar .pct{font-weight:700;min-width:42px;text-align:right;}
+.tier-label{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;min-width:28px;text-align:center;}
+.tier-S{background:rgba(124,58,237,0.2);color:var(--purple);}
+.tier-A{background:rgba(59,130,246,0.2);color:var(--blue);}
+.tier-B{background:rgba(5,150,105,0.2);color:var(--green);}
+.tier-C{background:rgba(217,119,6,0.2);color:var(--orange);}
+.tier-D{background:rgba(234,88,12,0.2);color:#ea580c;}
+.tier-F{background:rgba(220,38,38,0.2);color:var(--red);}
+::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><span>DIRECTOR</span> — Team Battle Simulator</h1>
+    <span class="tag">3v3 MONTE CARLO</span>
+    <div class="stats">
+      <span>Battles: <span class="val" id="totalBattles">0</span></span>
+      <span>Teams Tested: <span class="val" id="totalTeams">0</span></span>
+    </div>
+  </div>
+  <div class="rules-bar">
+    <strong>FULL 3v3 ENGINE:</strong> 1 Active + 2 Reserves (face-up) | Sideline abilities active |
+    Ghost KO → player picks next from sideline | Resources carry between ghosts |
+    Max 1 Legendary per team | Singles=1 Doubles=2 Triples=3 | Ice Shard +1 | Sacred Fire +3 |
+    Before-roll timing window | All 114 cards simulated
+  </div>
+
+  <div class="controls">
+    <select id="simCount">
+      <option value="500">500 teams/card (fast)</option>
+      <option value="1000" selected>1,000 teams/card</option>
+      <option value="2000">2,000 teams/card (thorough)</option>
+      <option value="5000">5,000 teams/card (slow)</option>
+    </select>
+    <button onclick="runFullSim()">RUN 3v3 SIMULATION</button>
+    <button class="secondary" onclick="exportCSV()">Export CSV</button>
+    <span class="spacer"></span>
+    <span class="progress" id="progressText">Ready</span>
+  </div>
+
+  <div class="results-grid" id="resultsGrid" style="display:none"></div>
+
+  <div class="grid-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="sortBy('rank')">#</th>
+        <th onclick="sortBy('name')">Name</th>
+        <th onclick="sortBy('rarity')">Rarity</th>
+        <th>HP</th>
+        <th onclick="sortBy('winRate')">Team Win Rate</th>
+        <th onclick="sortBy('tier')">Tier</th>
+        <th onclick="sortBy('appearances')">Games</th>
+        <th onclick="sortBy('avgDmgDealt')">Avg Dmg</th>
+        <th onclick="sortBy('avgSurvival')">Survival%</th>
+        <th>Category</th>
+        <th>Ability</th>
+      </tr></thead>
+      <tbody id="tableBody"><tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text3)">Click RUN 3v3 SIMULATION to generate data</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CARD DATABASE
+// =====================================================================
+const C = [
+  {id:1,n:'Kodako',r:'common',hp:6,cat:'Defense/Negation'},
+  {id:2,n:'Nikon',r:'common',hp:6,cat:'Damage Multiplier'},
+  {id:3,n:'Ancient Librarian',r:'common',hp:6,cat:'Damage Multiplier'},
+  {id:4,n:'Wanderer',r:'common',hp:8,cat:'Prediction/Reaction'},
+  {id:5,n:'Puff',r:'common',hp:6,cat:'Defense/Negation'},
+  {id:6,n:'Fang Outside',r:'common',hp:2,cat:'Prediction/Reaction'},
+  {id:7,n:'Fang Undercover',r:'common',hp:2,cat:'Defense/Negation'},
+  {id:8,n:'Buttons',r:'common',hp:1,cat:'Damage Multiplier'},
+  {id:9,n:'Little Boo',r:'common',hp:2,cat:'Defense/Negation'},
+  {id:10,n:'Patrick',r:'common',hp:3,cat:'Defense/Negation'},
+  {id:11,n:'Villager',r:'common',hp:4,cat:'HP Recovery'},
+  {id:12,n:'Dupy',r:'common',hp:4,cat:'Destruction/Instant Kill'},
+  {id:13,n:'Shoo',r:'common',hp:4,cat:'HP Recovery'},
+  {id:14,n:'Jeffery',r:'common',hp:5,cat:'HP Recovery'},
+  {id:15,n:'Winston',r:'common',hp:5,cat:'Prediction/Reaction'},
+  {id:16,n:'Chip',r:'common',hp:4,cat:'Damage Multiplier'},
+  {id:17,n:'Boo Brothers',r:'common',hp:5,cat:'HP Recovery'},
+  {id:18,n:'Charlie',r:'common',hp:4,cat:'Damage Multiplier'},
+  {id:19,n:'Scallywags',r:'common',hp:5,cat:'Dice Modifier'},
+  {id:20,n:'Floop',r:'common',hp:4,cat:'Debuff'},
+  {id:21,n:'Needle',r:'common',hp:7,cat:'Dice Modifier'},
+  {id:22,n:'Ancient One',r:'common',hp:7,cat:'HP Recovery'},
+  {id:23,n:'Powder',r:'common',hp:5,cat:'Resource Generation'},
+  {id:24,n:'Simon',r:'common',hp:6,cat:'Resource Generation'},
+  {id:25,n:'Cameron',r:'common',hp:6,cat:'Destruction/Instant Kill'},
+  {id:26,n:'Logey',r:'common',hp:6,cat:'Debuff'},
+  {id:27,n:'Fredrick',r:'common',hp:5,cat:'Debuff'},
+  {id:28,n:'Dream Cat',r:'common',hp:4,cat:'Dice Modifier'},
+  {id:29,n:'Sad Sal',r:'common',hp:5,cat:'Resource Generation'},
+  {id:30,n:'Tommy Salami',r:'common',hp:6,cat:'Debuff'},
+  {id:31,n:'Gus',r:'common',hp:7,cat:'Prediction/Reaction'},
+  {id:32,n:'Lou',r:'common',hp:7,cat:'Damage Multiplier'},
+  {id:33,n:'Sandwiches',r:'common',hp:6,cat:'Resource Generation'},
+  {id:34,n:'Grawr',r:'uncommon',hp:7,cat:'Damage Multiplier'},
+  {id:35,n:'Larry',r:'uncommon',hp:6,cat:'Damage Multiplier'},
+  {id:36,n:'Bill & Bob',r:'uncommon',hp:6,cat:'Damage Multiplier'},
+  {id:37,n:'Dealer',r:'uncommon',hp:5,cat:'Defense/Negation'},
+  {id:38,n:'Alucard',r:'uncommon',hp:4,cat:'Damage Multiplier'},
+  {id:39,n:'Castle Guards',r:'uncommon',hp:7,cat:'Damage Multiplier'},
+  {id:40,n:'Team Zippy',r:'uncommon',hp:7,cat:'Damage Multiplier'},
+  {id:41,n:'Guard Thomas',r:'uncommon',hp:6,cat:'Defense/Negation'},
+  {id:42,n:'Doc',r:'uncommon',hp:2,cat:'Damage Multiplier'},
+  {id:43,n:'Outlaw',r:'uncommon',hp:5,cat:'Debuff'},
+  {id:44,n:'Bubble Boys',r:'uncommon',hp:9,cat:'Defense/Negation'},
+  {id:45,n:'Cornelius',r:'uncommon',hp:2,cat:'Defense/Negation'},
+  {id:46,n:'Cave Dweller',r:'uncommon',hp:7,cat:'Damage Multiplier'},
+  {id:47,n:'Hermit',r:'uncommon',hp:3,cat:'HP Recovery'},
+  {id:48,n:'Opa',r:'uncommon',hp:5,cat:'HP Recovery'},
+  {id:49,n:'Greg',r:'uncommon',hp:5,cat:'Damage Multiplier'},
+  {id:50,n:'Jackson',r:'uncommon',hp:3,cat:'Dice Modifier'},
+  {id:51,n:'Nicholas',r:'uncommon',hp:1,cat:'Damage Multiplier'},
+  {id:52,n:'Hugo',r:'uncommon',hp:5,cat:'Debuff'},
+  {id:53,n:'Bogey',r:'uncommon',hp:5,cat:'Defense/Negation'},
+  {id:54,n:'Roger',r:'uncommon',hp:6,cat:'Resource Generation'},
+  {id:55,n:'Masked Hero',r:'uncommon',hp:5,cat:'Prediction/Reaction'},
+  {id:56,n:'Chad',r:'uncommon',hp:6,cat:'Resource Generation'},
+  {id:57,n:'Marcus',r:'uncommon',hp:7,cat:'Dice Modifier'},
+  {id:58,n:'Ashley',r:'uncommon',hp:3,cat:'Resource Generation'},
+  {id:59,n:'Mr Filbert',r:'uncommon',hp:6,cat:'Debuff'},
+  {id:60,n:'Dallas',r:'uncommon',hp:4,cat:'Dice Modifier'},
+  {id:61,n:'Suspicious Jeff',r:'uncommon',hp:4,cat:'Debuff'},
+  {id:62,n:'Raditz',r:'rare',hp:6,cat:'Prediction/Reaction'},
+  {id:63,n:'Doug',r:'rare',hp:3,cat:'Dice Modifier'},
+  {id:64,n:'Sparky',r:'rare',hp:4,cat:'Damage Multiplier'},
+  {id:65,n:'Wim',r:'rare',hp:6,cat:'Damage Multiplier'},
+  {id:66,n:'Munch',r:'rare',hp:6,cat:'HP Recovery'},
+  {id:67,n:'Snorton',r:'rare',hp:8,cat:'Damage Multiplier'},
+  {id:68,n:'Kairan',r:'rare',hp:3,cat:'Dice Modifier'},
+  {id:69,n:'Sonya',r:'rare',hp:3,cat:'Dice Modifier'},
+  {id:70,n:'Katrina',r:'rare',hp:5,cat:'HP Recovery'},
+  {id:71,n:'Admiral',r:'rare',hp:3,cat:'Damage Multiplier'},
+  {id:72,n:'Sky',r:'rare',hp:4,cat:'Defense/Negation'},
+  {id:73,n:'Stone Cold',r:'rare',hp:7,cat:'Damage Multiplier'},
+  {id:74,n:'Dark Jeff',r:'rare',hp:3,cat:'Damage Multiplier'},
+  {id:75,n:'Flora',r:'rare',hp:4,cat:'HP Recovery'},
+  {id:76,n:'Dark Wing',r:'rare',hp:2,cat:'Dice Modifier'},
+  {id:77,n:'City Cyboo',r:'rare',hp:1,cat:'Defense/Negation'},
+  {id:78,n:'Haywire',r:'rare',hp:7,cat:'Dice Modifier'},
+  {id:79,n:'Laura',r:'rare',hp:4,cat:'Damage Multiplier'},
+  {id:80,n:'Bilbo',r:'rare',hp:2,cat:'Damage Multiplier'},
+  {id:81,n:'Spockles',r:'rare',hp:6,cat:'Resource Generation'},
+  {id:82,n:'Antoinette',r:'rare',hp:6,cat:'Dice Modifier'},
+  {id:83,n:'Troubling Haters',r:'rare',hp:4,cat:'HP Recovery'},
+  {id:84,n:'Wandering Sue',r:'rare',hp:4,cat:'Destruction/Instant Kill'},
+  {id:85,n:'Eloise',r:'rare',hp:5,cat:'Prediction/Reaction'},
+  {id:86,n:'Pelter',r:'rare',hp:5,cat:'Damage Multiplier'},
+  {id:87,n:'Zach',r:'rare',hp:7,cat:'Damage Multiplier'},
+  {id:88,n:'Pale Nimbus',r:'rare',hp:4,cat:'Damage Multiplier'},
+  {id:89,n:'Mallow',r:'rare',hp:5,cat:'HP Recovery'},
+  {id:90,n:'Jeanie',r:'rare',hp:4,cat:'Dice Modifier'},
+  {id:91,n:'Calvin & Anna',r:'rare',hp:6,cat:'Prediction/Reaction'},
+  {id:92,n:'Gary',r:'rare',hp:6,cat:'Resource Generation'},
+  {id:93,n:'Bandit Pete',r:'rare',hp:5,cat:'Damage Multiplier'},
+  {id:94,n:'Jenkins',r:'ghost-rare',hp:5,cat:'Damage Multiplier'},
+  {id:95,n:'Tabitha',r:'ghost-rare',hp:1,cat:'Damage Multiplier'},
+  {id:96,n:'Hector',r:'ghost-rare',hp:6,cat:'Defense/Negation'},
+  {id:97,n:'Toby',r:'ghost-rare',hp:7,cat:'Destruction/Instant Kill'},
+  {id:98,n:'Redd',r:'ghost-rare',hp:7,cat:'Dice Modifier'},
+  {id:99,n:'Guardian Fairy',r:'ghost-rare',hp:3,cat:'Defense/Negation'},
+  {id:100,n:'Cyboo',r:'ghost-rare',hp:3,cat:'Dice Modifier'},
+  {id:101,n:'Splinter',r:'ghost-rare',hp:6,cat:'Debuff'},
+  {id:103,n:'Night Master',r:'ghost-rare',hp:5,cat:'Destruction/Instant Kill'},
+  {id:104,n:'Skylar',r:'ghost-rare',hp:7,cat:'Resource Generation'},
+  {id:105,n:'Tyler',r:'ghost-rare',hp:6,cat:'Dice Modifier'},
+  {id:106,n:'King Jay',r:'ghost-rare',hp:7,cat:'Defense/Negation'},
+  {id:107,n:'Piper',r:'ghost-rare',hp:6,cat:'Debuff'},
+  {id:108,n:'Lucy',r:'legendary',hp:8,cat:'Damage Multiplier'},
+  {id:109,n:'Bo',r:'legendary',hp:5,cat:'HP Recovery'},
+  {id:110,n:'The Mountain King',r:'legendary',hp:9,cat:'Damage Multiplier'},
+  {id:111,n:'Shade',r:'legendary',hp:5,cat:'Debuff'},
+  {id:112,n:'Doom',r:'legendary',hp:7,cat:'Damage Multiplier'},
+  {id:113,n:'Prince Balatron',r:'legendary',hp:6,cat:'Prediction/Reaction'},
+  {id:114,n:'Romy',r:'legendary',hp:8,cat:'Prediction/Reaction'},
+];
+
+// =====================================================================
+// DICE ENGINE
+// =====================================================================
+const r6 = () => (Math.random()*6|0)+1;
+function rollN(n) { const d=[]; for(let i=0;i<Math.max(1,n);i++) d.push(r6()); return d.sort((a,b)=>a-b); }
+
+function classify(dice) {
+  if(!dice.length) return {t:'none',dmg:0,d:dice,hi:0,pv:0,up:0};
+  const ct={}; dice.forEach(x=>ct[x]=(ct[x]||0)+1);
+  const mx=Math.max(...Object.values(ct));
+  if(mx>=3){const tv=+Object.keys(ct).find(k=>ct[k]>=3); return {t:'triples',dmg:3,d:dice,tv,hi:Math.max(...dice)};}
+  if(mx>=2){const pv=+Object.keys(ct).find(k=>ct[k]>=2); const up=dice.filter(x=>x!==pv); return {t:'doubles',dmg:2,d:dice,pv,up:up.length?Math.max(...up):0,hi:Math.max(...dice)};}
+  return {t:'singles',dmg:1,d:dice,hi:Math.max(...dice)};
+}
+
+function cmpRolls(a,b) {
+  const T={none:-1,singles:0,doubles:1,triples:2};
+  if(T[a.t]>T[b.t]) return 1;
+  if(T[a.t]<T[b.t]) return -1;
+  if(a.t==='singles') return a.hi>b.hi?1:a.hi<b.hi?-1:0;
+  if(a.t==='doubles') return a.up>b.up?1:a.up<b.up?-1:0;
+  return 0; // triples tie, singles tie
+}
+
+// =====================================================================
+// ABILITY SYSTEM — hooks per card
+// =====================================================================
+// Each ability returns an object with hooks:
+// active_* = when this ghost is the active fighter
+// side_* = when this ghost is on the sideline (face-up)
+// Hooks: beforeRoll(g), modDmgOut(g,dmg,roll), modDmgIn(g,dmg,eRoll), onWin(g), onLose(g),
+//        onTie(g), onEntry(g), onDefeat(g), startTurn(g), onRollDone(g,roll),
+//        side_passive(g), side_onWin(g), side_onLose(g), side_onTie(g), side_onDefeat(g)
+// g = full game state
+
+function A(name) {
+const ab = {
+// ---- COMMONS ----
+'Kodako': {
+  active_modResult(g,mr,er,w) {
+    if([1,2,3].every(v=>mr.d.includes(v)) && new Set(mr.d).size>=3) return {myDmg:0,eDmg:4};
+  }
+},
+'Nikon': {
+  active_modDmgOut(g,dmg,roll,w) { return g.turnNum===1&&w?dmg*3:dmg; }
+},
+'Ancient Librarian': {
+  active_modDmgOut(g,dmg,roll,w) {
+    if(!w) return dmg;
+    const t = roll.d.filter(x=>x===2).length + g.eRoll.d.filter(x=>x===2).length;
+    return dmg+t;
+  }
+},
+'Wanderer': {}, // sideline info — no combat effect simulated
+'Puff': {
+  active_modDmgIn(g,dmg,eRoll) {
+    return (eRoll.t==='doubles'||eRoll.t==='triples')?Math.max(0,dmg-1):dmg;
+  }
+},
+'Fang Outside': {}, // sideline swap — needs sideline targets, handled in team sim
+'Fang Undercover': {
+  active_modDmgIn(g,dmg) { // negate damage and swap — once, then ghost goes to sideline
+    if(!g._fangUsed&&dmg>0){g._fangUsed=true; return 0;} return dmg;
+  }
+},
+'Buttons': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='triples'&&roll.tv===6?dmg+15:dmg; }
+},
+'Little Boo': {
+  active_modEnemyRoll(g,er) { return er.t==='triples'?classify([1,2,3]):er; }
+},
+'Patrick': {
+  active_customRoll() { return {t:'none',dmg:0,d:[],hi:0}; },
+  active_modResult(g,mr,er) {
+    if(er.t==='singles') return {myDmg:0,eDmg:3};
+    if(er.t==='doubles'||er.t==='triples') return {myDmg:er.dmg,eDmg:0};
+  }
+},
+'Villager': {
+  side_onWin(g) { g.p1.active.hp+=1; } // +1 HP to active on winning roll
+},
+'Dupy': {
+  active_onTie(g) { return {killEnemy:true}; }
+},
+'Shoo': {
+  side_passive(g) {
+    const a=g.p1.active;
+    if(a.hp<4&&!g._shooUsed_[a.id]){g._shooUsed_[a.id]=true; a.hp+=2;}
+  }
+},
+'Jeffery': {
+  side_onDefeatEnemy(g) { g.p1.active.hp+=3; } // ghost KO = +3 HP (not roll win)
+},
+'Winston': {}, // swap enemy — sideline interaction, hard to sim meaningfully
+'Chip': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'&&roll.pv%2===0?dmg+3:dmg; }
+},
+'Boo Brothers': {
+  active_beforeRoll(g) { if(g.p1.active.hp<=3&&g.myDice>2){g.p1.active.hp+=1;g.myDice-=1;} }
+},
+'Charlie': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'&&roll.pv===2?7:dmg; }
+},
+'Scallywags': {
+  active_onRollDone(g,roll) { if(roll.d.every(x=>x<4)) g.myBonusNext+=1; }
+},
+'Floop': {
+  active_onRollDone(g) { if(g.eRoll.t==='doubles') g.ePenaltyNext+=1; }
+},
+'Needle': {
+  side_passive(g) { if(g.p1.active.n==='Buttons') g.myDice+=1; }
+},
+'Ancient One': {
+  side_onTie(g) { g.p1.active.hp+=3; }
+},
+'Powder': {
+  active_onDefeat(g) { g.p1.iceShards+=3; }
+},
+'Simon': {
+  active_onDmgTaken(g,dmg) { if(dmg>0) g.p1.sacredFires+=1; }
+},
+'Cameron': {
+  active_onDmgNegated(g) { return {killEnemy:true}; }
+},
+'Logey': {
+  active_onRollDone(g) { g._logeyActive=true; }
+},
+'Fredrick': {
+  active_passive(g) { g.eDice=Math.min(g.eDice,3); }
+},
+'Dream Cat': {
+  active_onRollDone(g,roll) { if(roll.t==='doubles'&&g.eRoll.t==='doubles') g.myBonusNext+=1; }
+},
+'Sad Sal': {
+  active_onLose(g) { g.p1.iceShards+=1; }
+},
+'Tommy Salami': {
+  active_modEnemyRoll(g,er) {
+    let re=0; const nd=er.d.map(x=>{if(x>=5){re++;return (Math.random()*3|0)+1;} return x;});
+    g._tommyRe=re; return classify(nd.sort((a,b)=>a-b));
+  },
+  active_modDmgOut(g,dmg,roll,w) { return w?dmg+(g._tommyRe||0):dmg; }
+},
+'Gus': {}, // win = force sideline swap instead of damage — complex to sim, skip
+'Lou': {
+  side_passive(g) {
+    if(g.p1.active.n==='Grawr') { g._louBuff=true; }
+  },
+  // Grawr gets +1 dmg +1 HP on win handled in Grawr
+},
+'Sandwiches': {
+  side_passive(g) {
+    // Mirror opponent resource gains — tracked via flag
+    g._sandwichMirror=true;
+  }
+},
+// ---- UNCOMMONS ----
+'Grawr': {
+  active_onEntry(g) { g.p2.active.hp-=1; },
+  active_modDmgOut(g,dmg,roll,w) { return g._louBuff&&w?dmg+1:dmg; },
+  active_onWin(g) { if(g._louBuff) g.p1.active.hp+=1; }
+},
+'Larry': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='triples'?dmg*3:dmg; }
+},
+'Bill & Bob': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&g.p1.active.hp<4?dmg*2:dmg; }
+},
+'Dealer': {
+  active_modDmgIn(g,dmg) {
+    const d=g.mRoll.d.sort((a,b)=>a-b);
+    for(let i=0;i<d.length-2;i++) if(d[i+1]===d[i]+1&&d[i+2]===d[i]+2) return 0;
+    return dmg;
+  }
+},
+'Alucard': {
+  active_modDmgOut(g,dmg,roll,w) {
+    if(w&&roll.t==='doubles'&&!g._alucardUsed){g._alucardUsed=true; return dmg+g.p1.sideline.length*2;}
+    return dmg;
+  }
+},
+'Castle Guards': {
+  active_modDmgOut(g,dmg,roll,w) {
+    if(!w) return dmg;
+    const threes=roll.d.filter(x=>x===3).length;
+    return dmg*Math.pow(2,threes);
+  }
+},
+'Team Zippy': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='singles'?dmg+2:dmg; }
+},
+'Guard Thomas': {
+  active_modDmgIn(g,dmg,eRoll) { return g.p1.active.hp<6&&eRoll.t==='singles'?0:dmg; }
+},
+'Doc': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'?dmg+5:dmg; }
+},
+'Outlaw': {
+  active_onRollDone(g,roll) { if(roll.t==='doubles') g.ePenaltyNext+=1; }
+},
+'Bubble Boys': {
+  active_modDmgIn(g,dmg,eRoll) { if(eRoll.t==='triples'){g.p1.active.hp=0;return 0;} return dmg; }
+},
+'Cornelius': {
+  side_passive(g) { g._corneliusActive=true; } // negates ALL enemy sideline effects
+},
+'Cave Dweller': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&g.turnNum===1?dmg*3:dmg; }
+},
+'Hermit': {
+  active_onEntry(g) { g.p1.active.hp+=g.totalDefeated*2; }
+},
+'Opa': {
+  active_onWin(g) { g.p1.active.hp+=1; },
+  active_onTie(g) { g.p1.active.hp+=1; }
+},
+'Greg': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&g.p1.active.hp>g.p2.active.hp?dmg*2:dmg; }
+},
+'Jackson': {
+  active_afterRoll(g) {
+    if(g.p1.active.hp>1&&g._winner===-1){
+      g.p1.active.hp-=1;
+      const d=[...g.mRoll.d]; d[0]=r6(); g.mRoll=classify(d.sort((a,b)=>a-b));
+      return true;
+    }
+    return false;
+  }
+},
+'Nicholas': {
+  side_onEnemyEntry(g) { g.p2.active.hp-=2; }
+},
+'Hugo': {
+  active_onDmgTaken(g,dmg) { if(dmg>0) g.ePenaltyNext+=1; }
+},
+'Bogey': {
+  active_modDmgIn(g,dmg) {
+    if(dmg>0&&!g._bogeyUsed){g._bogeyUsed=true;g.p2.active.hp-=dmg;return 0;} return dmg;
+  }
+},
+'Roger': {}, // needs 4+ dice + 2 pairs — very rare, skip
+'Masked Hero': {
+  active_onEnemyBeforeRoll(g) { if(g._enemyUsedBR) g.p2.active.hp-=3; }
+},
+'Chad': {
+  active_onEntry(g) { g.p1.iceShards+=2; }
+},
+'Marcus': {
+  active_onDmgTaken(g,dmg) { if(dmg>=3) g.myBonusNext+=4; }
+},
+'Ashley': {
+  active_onWin(g) { g.p1.sacredFires+=1; }
+},
+'Mr Filbert': {
+  side_passive(g) { g._filbertAntiHeal=true; } // enemy healing deals damage instead
+},
+'Dallas': {
+  active_onEntry(g) { g._dallasTurns=2; },
+  active_passive(g) { if(g._dallasTurns>0){g.myDice+=1;g.eDice=Math.max(1,g.eDice-1);g._dallasTurns--;} }
+},
+'Suspicious Jeff': {
+  side_onDefeatEnemy(g) { g.ePenaltyNext+=1; } // steal 1 die on ghost KO
+},
+// ---- RARES ----
+'Raditz': {}, // swap enemy on entry — hard to sim
+'Doug': {}, // swap self + bonus die — sideline interaction
+'Sparky': {
+  active_modDmgOut(g,dmg,roll,w) { return w?dmg+roll.d.filter(x=>x===1).length*3:dmg; }
+},
+'Wim': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.d.every(x=>x%2===1)?dmg+5:dmg; }
+},
+'Munch': {
+  active_onDefeatEnemy(g) { g.p1.active.hp+=4; }
+},
+'Snorton': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.d.filter(x=>x===6).length>=2?dmg+5:dmg; }
+},
+'Kairan': {
+  active_onRollDone(g,roll) { if(roll.t==='doubles') g.myBonusNext+=1; }
+},
+'Sonya': {
+  active_afterRollModify(g) {
+    const d=[...g.mRoll.d]; const ct={}; d.forEach(x=>ct[x]=(ct[x]||0)+1);
+    if(!Object.values(ct).some(c=>c>=2)){d[0]=2;g.mRoll=classify(d.sort((a,b)=>a-b));}
+  }
+},
+'Katrina': {
+  active_beforeRoll(g) { if(g.p1.active.hp<g.p2.active.hp) g.p1.active.hp+=1; }
+},
+'Admiral': {
+  side_passive(g) { g._admiralBuff=true; } // +2 on even doubles
+},
+'Sky': {
+  active_modDmgIn(g,dmg) { if(dmg>2){g._dmgNegated=true;return 0;} return dmg; }
+},
+'Stone Cold': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'&&roll.pv===1?dmg*3:dmg; }
+},
+'Dark Jeff': {
+  side_passive(g) { g._darkJeffBuff=true; } // +1 all damage
+},
+'Flora': {
+  active_onRollDone(g,roll) { if(roll.t==='doubles') g.p1.active.hp+=2; }
+},
+'Dark Wing': {
+  active_afterRollModify(g) { if(g.mRoll.t==='singles') g.mRoll=classify(rollN(g.myDice)); }
+},
+'City Cyboo': {
+  active_modDmgIn(g,dmg,eRoll) { return eRoll.t==='doubles'?0:dmg; }
+},
+'Haywire': {
+  active_onRollDone(g,roll) { if(roll.t==='triples'&&!g._haywireUsed){g._haywireUsed=true;g.myPermBonus+=1;} }
+},
+'Laura': {
+  side_passive(g) { g._lauraBuff=true; } // numeric order +3 damage
+},
+'Bilbo': {
+  side_passive(g) { g._bilboBuff=true; } // singles +2 damage
+},
+'Spockles': {
+  active_onWin(g) { g.p1.iceShards+=2; }
+},
+'Antoinette': {
+  active_passive(g) { g.myDice=Math.max(g.myDice,g.eDice); }
+},
+'Troubling Haters': {
+  active_onWin(g) { if(g._lastDmgDealt>=4) g.p1.active.hp+=2; }
+},
+'Wandering Sue': {
+  active_beforeRoll(g) { if(g.p2.active.hp>=12) g.p2.active.hp=0; }
+},
+'Eloise': {
+  active_beforeRoll(g) {
+    if(g.p1.iceShards>0&&g.p1.active.hp<g.p2.active.hp){
+      g.p1.iceShards--;const t=g.p1.active.hp;g.p1.active.hp=g.p2.active.hp;g.p2.active.hp=t;
+      g._usedBR=true;
+    }
+  }
+},
+'Pelter': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'?dmg+2:dmg; }
+},
+'Zach': {
+  side_passive(g) { if(g.p1.active.n==='Guard Thomas') g._zachBuff=true; } // GT +3 on doubles
+},
+'Pale Nimbus': {
+  side_passive(g) { g._paleNimbusBuff=true; } // +2 if roll total < 7
+},
+'Mallow': {
+  side_passive(g) {
+    if(g.p1.sacredFires>0&&g.p1.active.hp<=g.p1.active.maxHp-2){
+      g.p1.sacredFires--;g.p1.active.hp+=3;
+    }
+  }
+},
+'Jeanie': {
+  side_passive(g) {
+    if(!g._jeanieUsed){g._jeanieForceReroll=true;} // force enemy reroll once
+  }
+},
+'Calvin & Anna': {}, // swap after KO — complex
+'Gary': {
+  side_passive(g) { g._garyActive=true; } // +1 ice shard per 1 rolled
+},
+'Bandit Pete': {
+  side_passive(g) { g._banditPeteBuff=true; } // +3 if either rolls 2 dice
+},
+// ---- GHOST RARES ----
+'Jenkins': {
+  active_onEntry(g) { const d=rollN(4);const r=classify(d);g.p2.active.hp-=r.dmg; }
+},
+'Tabitha': {
+  side_passive(g) { g._tabithaBuff=true; } // +2 on doubles
+},
+'Hector': {
+  active_modResult(g,mr,er) {
+    if(mr.t==='singles'&&er.t==='doubles') return {myDmg:0,eDmg:2};
+  },
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='singles'?dmg+1:dmg; }
+},
+'Toby': {
+  active_beforeRoll(g) {
+    if(!g._tobyDeclared&&g.p2.active.hp<=5&&g.p1.active.hp>3){g._tobyDeclared=true;g._tobyFinal=true;}
+  },
+  active_modResult(g,mr,er) {
+    if(g._tobyFinal){g._tobyFinal=false;g._tobyDies=true;
+      const w=cmpRolls(mr,er);
+      if(w>0) return {myDmg:0,eDmg:g.p2.active.hp};
+    }
+  },
+  active_startTurn(g) { if(g._tobyDies) g.p1.active.hp=0; }
+},
+'Redd': {
+  active_onEntry(g) { g.myBonusNext+=2; }
+},
+'Guardian Fairy': {
+  side_passive(g) { g._guardianFairyActive=true; } // can swap in to absorb damage
+},
+'Cyboo': {
+  side_passive(g) { if(g.p1.active.hp<3) g.myDice+=1; }
+},
+'Splinter': {
+  active_onWin(g) { g._splinterDot=true; },
+  active_startTurn(g) { if(g._splinterDot) g.p2.active.hp-=1; }
+},
+'Night Master': {
+  active_onWin(g) {
+    if(g.mRoll.t==='doubles'){
+      const target=g.p2.sideline.find(s=>s.hp<4);
+      if(target) target.hp=0;
+    }
+  }
+},
+'Skylar': {
+  active_passive(g) { g._skylarBonus=true; } // ice shards +2 instead of +1
+},
+'Tyler': {
+  active_beforeRoll(g) {
+    if(g.p1.active.hp>3){g.p1.active.hp-=2;g.myDice+=1;}
+    g._tylerSFx2=true;
+  }
+},
+'King Jay': {
+  active_modDmgIn(g,dmg) {
+    const total=g.mRoll.d.reduce((s,x)=>s+x,0);
+    if(dmg>0&&total===7){g.p2.active.hp-=dmg;return 0;}
+    return dmg;
+  }
+},
+'Piper': {
+  active_passive(g) { g.eDice=Math.max(1,g.eDice-1); g._piperNegate=true; }
+},
+// ---- LEGENDARIES ----
+'Lucy': {
+  active_modDmgOut(g,dmg,roll,w) { return w?dmg+1:dmg; }
+},
+'Bo': {
+  active_onDefeatEnemy(g) {
+    if(g.p1.defeated.length>0){
+      const revived=g.p1.defeated.pop();
+      revived.hp=Math.ceil(revived.maxHp/2);
+      g.p1.sideline.push(revived);
+    }
+  }
+},
+'The Mountain King': {
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.t==='doubles'?dmg*2:dmg; }
+},
+'Shade': {
+  active_onRollDone(g) { if(g.turnNum>=1) g._shadeDot=true; },
+  active_startTurn(g) { if(g._shadeDot) g.p2.active.hp-=1; }
+},
+'Doom': {
+  active_modDmgOut(g,dmg,roll,w) { return w?dmg+2:dmg; }
+},
+'Prince Balatron': {
+  active_onLose(g) { if(g.p1.active.hp>0) g.p2.active.hp-=r6(); }
+},
+'Romy': {
+  active_beforeRoll(g) { g._romyPred=r6(); g._usedBR=true; },
+  active_modDmgOut(g,dmg,roll,w) { return w&&roll.d.includes(g._romyPred)?dmg+3:dmg; }
+},
+};
+return ab[name]||{};
+}
+
+// =====================================================================
+// 3v3 TEAM BATTLE ENGINE
+// =====================================================================
+function simTeamBattle(team1, team2) {
+  // Deep copy teams
+  const p1 = {
+    active: {...team1[0], maxHp:team1[0].hp, hp:team1[0].hp},
+    sideline: team1.slice(1).map(c=>({...c, maxHp:c.hp, hp:c.hp})),
+    defeated: [],
+    iceShards: 0, sacredFires: 0
+  };
+  const p2 = {
+    active: {...team2[0], maxHp:team2[0].hp, hp:team2[0].hp},
+    sideline: team2.slice(1).map(c=>({...c, maxHp:c.hp, hp:c.hp})),
+    defeated: [],
+    iceShards: 0, sacredFires: 0
+  };
+
+  const a1 = () => A(p1.active.n);
+  const a2 = () => A(p2.active.n);
+
+  // Track per-card stats
+  const stats = {};
+  [...team1,...team2].forEach(c => { stats[c.n] = {dmgDealt:0,survived:false}; });
+
+  // On-entry for starting ghosts
+  const g = makeState(p1,p2,0);
+  if(a1().active_onEntry) a1().active_onEntry(g);
+  syncState(g,p1,p2);
+  const g2 = makeState(p2,p1,0);
+  if(a2().active_onEntry) a2().active_onEntry(g2);
+  syncState(g2,p2,p1);
+
+  // Nicholas check — sideline on-entry effects
+  applySidelineEntry(p1, p2);
+  applySidelineEntry(p2, p1);
+
+  let maxRounds = 80;
+  let totalDefeated = 0;
+
+  while(p1.active.hp>0 && p2.active.hp>0 && maxRounds-->0) {
+    // --- BUILD GAME STATE ---
+    const g = makeState(p1,p2,totalDefeated);
+    g.turnNum = 80-maxRounds;
+
+    // Check cornelius — if enemy has Cornelius on sideline, disable our sideline effects
+    const p2HasCornelius = !p1.sideline.some(s=>s.n==='Cornelius') && p2.sideline.some(s=>s.n==='Cornelius');
+    const p1HasCornelius = !p2.sideline.some(s=>s.n==='Cornelius') && p1.sideline.some(s=>s.n==='Cornelius');
+
+    // --- SIDELINE PASSIVES ---
+    if(!p2HasCornelius) {
+      p1.sideline.forEach(s => {
+        const sa = A(s.n);
+        if(sa.side_passive) {
+          const gs = makeState(p1,p2,totalDefeated);
+          gs.turnNum = g.turnNum;
+          sa.side_passive(gs);
+          syncState(gs,p1,p2);
+          // Copy buff flags
+          Object.keys(gs).forEach(k=>{if(k.startsWith('_'))g[k]=gs[k];});
+        }
+      });
+    }
+    if(!p1HasCornelius) {
+      p2.sideline.forEach(s => {
+        const sa = A(s.n);
+        if(sa.side_passive) {
+          const gs = makeState(p2,p1,totalDefeated);
+          gs.turnNum = g.turnNum;
+          sa.side_passive(gs);
+          syncState(gs,p2,p1);
+        }
+      });
+    }
+
+    // --- START OF TURN ---
+    g.myDice = 3 + (g.myBonusNext||0) + (g.myPermBonus||0);
+    g.eDice = 3 + (g.eBonusNext||0) + (g.ePermBonus||0);
+    g.myDice = Math.max(1, g.myDice - (g.myPenaltyNext||0));
+    g.eDice = Math.max(1, g.eDice - (g.ePenaltyNext||0));
+    g.myBonusNext=0; g.eBonusNext=0; g.myPenaltyNext=0; g.ePenaltyNext=0;
+
+    if(a1().active_startTurn) a1().active_startTurn(g);
+    if(p1.active.hp<=0||p2.active.hp<=0) { syncState(g,p1,p2); break; }
+
+    const g2s = makeStateFlip(g);
+    if(a2().active_startTurn) a2().active_startTurn(g2s);
+    syncStateFlip(g,g2s);
+    if(p1.active.hp<=0||p2.active.hp<=0) { syncState(g,p1,p2); break; }
+
+    // --- PASSIVES ---
+    if(a1().active_passive) a1().active_passive(g);
+    const g2p = makeStateFlip(g);
+    if(a2().active_passive) a2().active_passive(g2p);
+    syncStateFlip(g,g2p);
+
+    // Apply sideline buff flags
+    if(g._darkJeffBuff) g._p1DmgBonus = (g._p1DmgBonus||0)+1;
+    if(g._bilboBuff) g._p1SinglesBonus = (g._p1SinglesBonus||0)+2;
+    if(g._tabithaBuff) g._p1DoublesBonus = (g._p1DoublesBonus||0)+2;
+    if(g._admiralBuff) g._p1EvenDoublesBonus = (g._p1EvenDoublesBonus||0)+2;
+    if(g._zachBuff&&p1.active.n==='Guard Thomas') g._p1DoublesBonus = (g._p1DoublesBonus||0)+3;
+    if(g._banditPeteBuff) g._banditPeteCheck=true;
+
+    // --- BEFORE ROLL ---
+    g._usedBR = false;
+    if(a1().active_beforeRoll) a1().active_beforeRoll(g);
+    syncState(g,p1,p2);
+    if(p2.active.hp<=0) break;
+
+    g._enemyUsedBR = false;
+    const g2b = makeStateFlip(g);
+    g2b._usedBR = false;
+    if(a2().active_beforeRoll) a2().active_beforeRoll(g2b);
+    syncStateFlip(g,g2b);
+    g._enemyUsedBR = g2b._usedBR;
+    if(p1.active.hp<=0) break;
+
+    // Masked Hero check
+    if(a1().active_onEnemyBeforeRoll&&g._enemyUsedBR) {a1().active_onEnemyBeforeRoll(g);syncState(g,p1,p2);}
+    if(p2.active.hp<=0) break;
+
+    // --- RESOURCE SPENDING ---
+    let myResDmg=0, eResDmg=0;
+    if(p1.iceShards>0){const s=Math.min(p1.iceShards,2);p1.iceShards-=s;myResDmg+=s*(g._skylarBonus?3:1);g._usedBR=true;}
+    if(p1.sacredFires>0){p1.sacredFires--;myResDmg+=(g._tylerSFx2?6:3);g._usedBR=true;}
+    if(p2.iceShards>0){const s=Math.min(p2.iceShards,2);p2.iceShards-=s;eResDmg+=s;g._enemyUsedBR=true;}
+    if(p2.sacredFires>0){p2.sacredFires--;eResDmg+=3;g._enemyUsedBR=true;}
+
+    // --- ROLL DICE ---
+    let mRoll = a1().active_customRoll ? a1().active_customRoll() : classify(rollN(g.myDice));
+    let eRoll = classify(rollN(g.eDice));
+
+    g.mRoll = mRoll;
+    g.eRoll = eRoll;
+
+    // Post-roll modifications
+    if(a1().active_afterRollModify) a1().active_afterRollModify(g);
+    mRoll = g.mRoll;
+
+    if(a1().active_modEnemyRoll) { eRoll=a1().active_modEnemyRoll(g,eRoll); g.eRoll=eRoll; }
+    // Logey effect
+    if(g._logeyActive){
+      const nd=eRoll.d.map(x=>x>=5?(Math.random()*4|0)+1:x);
+      eRoll=classify(nd.sort((a,b)=>a-b));g.eRoll=eRoll;g._logeyActive=false;
+    }
+    // Jeanie force reroll
+    if(g._jeanieForceReroll&&!g._jeanieUsed){g._jeanieUsed=true;eRoll=classify(rollN(g.eDice));g.eRoll=eRoll;}
+
+    // Little Boo enemy roll mod
+    const g2m = makeStateFlip(g);
+    if(a2().active_modEnemyRoll) { mRoll=a2().active_modEnemyRoll(g2m,mRoll); g.mRoll=mRoll; }
+
+    // --- RESOLVE ---
+    let customResult = null;
+    if(a1().active_modResult) customResult = a1().active_modResult(g,mRoll,eRoll);
+    // Hector from p2 side
+    if(!customResult) {
+      const g2r = makeStateFlip(g);
+      if(a2().active_modResult) {
+        const cr2 = a2().active_modResult(g2r,eRoll,mRoll);
+        if(cr2) customResult = {myDmg:cr2.eDmg||0, eDmg:cr2.myDmg||0};
+      }
+    }
+
+    // Jackson reroll
+    if(a1().active_afterRoll) {
+      g._winner = cmpRolls(mRoll,eRoll);
+      if(a1().active_afterRoll(g)) mRoll=g.mRoll;
+    }
+
+    if(customResult) {
+      const dmgToMe = customResult.myDmg||0;
+      let dmgToEnemy = (customResult.eDmg||0)+myResDmg;
+
+      // Apply sideline bonuses to outgoing
+      dmgToEnemy += applySidelineDmgBonuses(g, mRoll, dmgToEnemy>0);
+
+      if(dmgToMe>0){if(a1().active_onDmgTaken)a1().active_onDmgTaken(g,dmgToMe);p1.active.hp-=dmgToMe;}
+      if(dmgToEnemy>0){g._lastDmgDealt=dmgToEnemy;stats[p1.active.n].dmgDealt+=dmgToEnemy;p2.active.hp-=dmgToEnemy;}
+    } else {
+      const winner = cmpRolls(mRoll, eRoll);
+
+      if(winner===0) {
+        // TIE
+        let tieResult = {};
+        if(a1().active_onTie) tieResult = a1().active_onTie(g)||{};
+        if(a2().active_onTie) {const g2t=makeStateFlip(g);a2().active_onTie(g2t);syncStateFlip(g,g2t);}
+        if(tieResult.killEnemy) p2.active.hp=0;
+        // Sideline tie effects
+        if(!p2HasCornelius) p1.sideline.forEach(s=>{const sa=A(s.n);if(sa.side_onTie){const gs=makeState(p1,p2,totalDefeated);sa.side_onTie(gs);syncState(gs,p1,p2);}});
+      } else if(winner>0) {
+        // P1 WINS ROLL
+        let dmg = mRoll.dmg;
+        if(a1().active_modDmgOut) dmg=a1().active_modDmgOut(g,dmg,mRoll,true);
+        dmg += myResDmg;
+        dmg += applySidelineDmgBonuses(g, mRoll, true);
+
+        // P2 incoming modification
+        g._dmgNegated=false;
+        if(a2().active_modDmgIn) {const g2i=makeStateFlip(g);dmg=a2().active_modDmgIn(g2i,dmg,mRoll);syncStateFlip(g,g2i);}
+        // Guardian Fairy
+        if(g._guardianFairyActive&&dmg>0&&p2.sideline.length>0) {
+          const fairy=p2.sideline.findIndex(s=>s.n==='Guardian Fairy');
+          if(fairy>=0){const f=p2.sideline.splice(fairy,1)[0];f.hp-=dmg;if(f.hp<=0)p2.defeated.push(f);else{p2.sideline.push(p2.active);p2.active=f;}dmg=0;}
+        }
+
+        if(g._dmgNegated&&a1().active_onDmgNegated){const nr=a1().active_onDmgNegated(g);if(nr&&nr.killEnemy)p2.active.hp=0;}
+
+        g._lastDmgDealt=dmg;
+        stats[p1.active.n].dmgDealt+=dmg;
+        p2.active.hp-=dmg;
+        if(a2().active_onDmgTaken){const g2d=makeStateFlip(g);a2().active_onDmgTaken(g2d,dmg);syncStateFlip(g,g2d);}
+        if(a1().active_onWin) a1().active_onWin(g);
+        syncState(g,p1,p2);
+        // Sideline win effects
+        if(!p2HasCornelius) p1.sideline.forEach(s=>{const sa=A(s.n);if(sa.side_onWin){const gs=makeState(p1,p2,totalDefeated);sa.side_onWin(gs);syncState(gs,p1,p2);}});
+        // Gary: +1 ice shard per 1 rolled
+        if(g._garyActive) { p1.iceShards+=mRoll.d.filter(x=>x===1).length; }
+        // Sandwiches mirror
+        if(g._sandwichMirror&&eResDmg>0) { p1.iceShards+=1; }
+      } else {
+        // P2 WINS ROLL
+        let dmg = eRoll.dmg;
+        const g2w=makeStateFlip(g);
+        if(a2().active_modDmgOut) dmg=a2().active_modDmgOut(g2w,dmg,eRoll,true);
+        dmg += eResDmg;
+
+        g._dmgNegated=false;
+        if(a1().active_modDmgIn) dmg=a1().active_modDmgIn(g,dmg,eRoll);
+        if(g._dmgNegated&&a1().active_onDmgNegated){const nr=a1().active_onDmgNegated(g);if(nr&&nr.killEnemy)p2.active.hp=0;}
+
+        stats[p2.active.n].dmgDealt+=dmg;
+        if(a1().active_onDmgTaken) a1().active_onDmgTaken(g,dmg);
+        p1.active.hp-=dmg;
+        syncState(g,p1,p2);
+        if(a1().active_onLose) {const gs=makeState(p1,p2,totalDefeated);a1().active_onLose(gs);syncState(gs,p1,p2);}
+        if(a2().active_onWin) {const g2v=makeStateFlip(g);a2().active_onWin(g2v);syncStateFlip(g,g2v);}
+      }
+    }
+
+    // --- POST-ROLL ---
+    if(a1().active_onRollDone){const gs=makeState(p1,p2,totalDefeated);gs.mRoll=mRoll;gs.eRoll=eRoll;a1().active_onRollDone(gs,mRoll);syncState(gs,p1,p2);
+      if(gs.myBonusNext) p1._bonusNext=(p1._bonusNext||0)+gs.myBonusNext;
+      if(gs.ePenaltyNext) p2._penaltyNext=(p2._penaltyNext||0)+gs.ePenaltyNext;
+      if(gs.myPermBonus) p1._permBonus=(p1._permBonus||0)+gs.myPermBonus;
+    }
+    if(a2().active_onRollDone){const gs=makeState(p2,p1,totalDefeated);gs.mRoll=eRoll;gs.eRoll=mRoll;a2().active_onRollDone(gs,eRoll);syncState(gs,p2,p1);
+      if(gs.myBonusNext) p2._bonusNext=(p2._bonusNext||0)+gs.myBonusNext;
+      if(gs.ePenaltyNext) p1._penaltyNext=(p1._penaltyNext||0)+gs.ePenaltyNext;
+    }
+
+    // --- CHECK KOs ---
+    if(p2.active.hp<=0) {
+      totalDefeated++;
+      // On defeat enemy effects
+      if(a1().active_onDefeatEnemy) {const gs=makeState(p1,p2,totalDefeated);a1().active_onDefeatEnemy(gs);syncState(gs,p1,p2);}
+      // Sideline defeat enemy effects (Jeffery, Suspicious Jeff)
+      if(!p2HasCornelius) p1.sideline.forEach(s=>{const sa=A(s.n);if(sa.side_onDefeatEnemy){const gs=makeState(p1,p2,totalDefeated);sa.side_onDefeatEnemy(gs);syncState(gs,p1,p2);}});
+
+      p2.defeated.push(p2.active);
+      if(p2.sideline.length===0) break; // P1 WINS
+
+      // P2 picks best remaining ghost (highest HP)
+      p2.sideline.sort((a,b)=>b.hp-a.hp);
+      p2.active = p2.sideline.shift();
+      p2.active.maxHp = p2.active.hp;
+
+      // On entry effects for new ghost
+      const g3=makeState(p2,p1,totalDefeated);
+      if(A(p2.active.n).active_onEntry) A(p2.active.n).active_onEntry(g3);
+      syncState(g3,p2,p1);
+
+      // Nicholas sideline check
+      p1.sideline.forEach(s=>{const sa=A(s.n);if(sa.side_onEnemyEntry){const gs=makeState(p1,p2,totalDefeated);sa.side_onEnemyEntry(gs);syncState(gs,p1,p2);}});
+    }
+
+    if(p1.active.hp<=0) {
+      totalDefeated++;
+      if(a1().active_onDefeat) {const gs=makeState(p1,p2,totalDefeated);a1().active_onDefeat(gs);syncState(gs,p1,p2);}
+
+      p1.defeated.push(p1.active);
+      if(p1.sideline.length===0) break; // P2 WINS
+
+      p1.sideline.sort((a,b)=>b.hp-a.hp);
+      p1.active = p1.sideline.shift();
+      p1.active.maxHp = p1.active.hp;
+
+      const g4=makeState(p1,p2,totalDefeated);
+      if(A(p1.active.n).active_onEntry) A(p1.active.n).active_onEntry(g4);
+      syncState(g4,p1,p2);
+
+      p2.sideline.forEach(s=>{const sa=A(s.n);if(sa.side_onEnemyEntry){const gs=makeState(p2,p1,totalDefeated);sa.side_onEnemyEntry(gs);syncState(gs,p2,p1);}});
+    }
+
+    // Carry forward dice bonuses/penalties
+    g.myBonusNext = p1._bonusNext||0; p1._bonusNext=0;
+    g.eBonusNext = p2._bonusNext||0; p2._bonusNext=0;
+    g.myPenaltyNext = p1._penaltyNext||0; p1._penaltyNext=0;
+    g.ePenaltyNext = p2._penaltyNext||0; p2._penaltyNext=0;
+    g.myPermBonus = p1._permBonus||0;
+    g.ePermBonus = p2._permBonus||0;
+  }
+
+  // Determine winner
+  const p1alive = p1.active.hp > 0 ? 1 : 0;
+  const p2alive = p2.active.hp > 0 ? 1 : 0;
+  const winner = p1alive > p2alive ? 1 : p2alive > p1alive ? 2 : 0;
+
+  // Mark survivors
+  if(winner===1) { team1.forEach(c=>{if(p1.active.n===c.n||p1.sideline.some(s=>s.n===c.n)) stats[c.n].survived=true;}); }
+  if(winner===2) { team2.forEach(c=>{if(p2.active.n===c.n||p2.sideline.some(s=>s.n===c.n)) stats[c.n].survived=true;}); }
+
+  return { winner, stats };
+}
+
+function applySidelineDmgBonuses(g, roll, won) {
+  if(!won) return 0;
+  let bonus = 0;
+  if(g._p1DmgBonus) bonus += g._p1DmgBonus;
+  if(g._p1SinglesBonus && roll.t==='singles') bonus += g._p1SinglesBonus;
+  if(g._p1DoublesBonus && roll.t==='doubles') bonus += g._p1DoublesBonus;
+  if(g._p1EvenDoublesBonus && roll.t==='doubles' && roll.pv%2===0) bonus += g._p1EvenDoublesBonus;
+  if(g._paleNimbusBuff && roll.d.reduce((s,x)=>s+x,0)<7) bonus += 2;
+  if(g._lauraBuff) {
+    const d=roll.d.sort((a,b)=>a-b);
+    for(let i=0;i<d.length-2;i++) if(d[i+1]===d[i]+1&&d[i+2]===d[i]+2) { bonus+=3; break; }
+  }
+  if(g._banditPeteCheck && (g.myDice<=2||g.eDice<=2)) bonus += 3;
+  return bonus;
+}
+
+function applySidelineEntry(p1, p2) {
+  p1.sideline.forEach(s => {
+    const sa = A(s.n);
+    if(sa.side_onEnemyEntry) {
+      // This triggers when enemy enters — at game start, the enemy is already there
+    }
+  });
+}
+
+function makeState(p1,p2,td) {
+  return {
+    p1,p2,turnNum:0,totalDefeated:td||0,
+    myDice:3,eDice:3,myBonusNext:0,eBonusNext:0,myPenaltyNext:0,ePenaltyNext:0,
+    myPermBonus:0,ePermBonus:0,mRoll:null,eRoll:null,
+    _shooUsed_:{}
+  };
+}
+function syncState(g,p1,p2) {
+  // sync HP changes back
+  p1.active.hp = g.p1.active.hp;
+  p2.active.hp = g.p2.active.hp;
+  p1.iceShards = g.p1.iceShards;
+  p1.sacredFires = g.p1.sacredFires;
+  p2.iceShards = g.p2.iceShards;
+  p2.sacredFires = g.p2.sacredFires;
+}
+function makeStateFlip(g) {
+  return {p1:g.p2,p2:g.p1,turnNum:g.turnNum,totalDefeated:g.totalDefeated,
+    myDice:g.eDice,eDice:g.myDice,myBonusNext:g.eBonusNext,eBonusNext:g.myBonusNext,
+    myPenaltyNext:g.ePenaltyNext,ePenaltyNext:g.myPenaltyNext,
+    myPermBonus:g.ePermBonus,ePermBonus:g.myPermBonus,
+    mRoll:g.eRoll,eRoll:g.mRoll,_shooUsed_:{}};
+}
+function syncStateFlip(g,f) {
+  g.p2.active.hp=f.p1.active.hp;
+  g.p1.active.hp=f.p2.active.hp;
+  g.p2.iceShards=f.p1.iceShards;
+  g.p2.sacredFires=f.p1.sacredFires;
+  g.p1.iceShards=f.p2.iceShards;
+  g.p1.sacredFires=f.p2.sacredFires;
+}
+
+// =====================================================================
+// TEAM GENERATION & SIMULATION RUNNER
+// =====================================================================
+function randomTeam() {
+  // Pick 3 random cards, max 1 legendary
+  const shuffled = [...C].sort(()=>Math.random()-0.5);
+  const team = [];
+  let hasLeg = false;
+  for (const c of shuffled) {
+    if (team.length >= 3) break;
+    if (c.r === 'legendary') {
+      if (hasLeg) continue;
+      hasLeg = true;
+    }
+    team.push(c);
+  }
+  return team;
+}
+
+let results = [];
+let sortField = 'winRate';
+let sortDir = -1;
+
+async function runFullSim() {
+  const teamsPerCard = parseInt(document.getElementById('simCount').value);
+  const progress = document.getElementById('progressText');
+  const cardStats = {};
+  C.forEach(c => { cardStats[c.n] = {wins:0,losses:0,draws:0,appearances:0,dmgDealt:0,survived:0,card:c}; });
+
+  let totalBattles = 0;
+  const totalExpected = C.length * teamsPerCard;
+
+  for (let ci = 0; ci < C.length; ci++) {
+    const card = C[ci];
+
+    for (let t = 0; t < teamsPerCard; t++) {
+      // Build a team that includes this card
+      const teammates = [];
+      const pool = C.filter(x => x.n !== card.n);
+      let hasLeg = card.r === 'legendary';
+
+      while (teammates.length < 2) {
+        const pick = pool[Math.random()*pool.length|0];
+        if (teammates.some(x=>x.n===pick.n)) continue;
+        if (pick.r==='legendary' && hasLeg) continue;
+        if (pick.r==='legendary') hasLeg=true;
+        teammates.push(pick);
+      }
+
+      const team1 = [card, ...teammates];
+      const team2 = randomTeam();
+
+      const result = simTeamBattle(team1, team2);
+      totalBattles++;
+
+      // Update stats for ALL cards on team1
+      team1.forEach(c => {
+        cardStats[c.n].appearances++;
+        if (result.winner === 1) cardStats[c.n].wins++;
+        else if (result.winner === 2) cardStats[c.n].losses++;
+        else cardStats[c.n].draws++;
+        cardStats[c.n].dmgDealt += result.stats[c.n]?.dmgDealt || 0;
+        if (result.stats[c.n]?.survived) cardStats[c.n].survived++;
+      });
+    }
+
+    if (ci % 5 === 0) {
+      progress.textContent = `${ci+1}/${C.length} cards (${totalBattles.toLocaleString()} battles)`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // Build results
+  results = Object.values(cardStats).map(s => {
+    const total = s.wins + s.losses + s.draws;
+    return {
+      ...s.card,
+      name: s.card.n,
+      rarity: s.card.r,
+      maxHp: s.card.hp,
+      winRate: total > 0 ? (s.wins / total * 100) : 0,
+      appearances: total,
+      avgDmgDealt: total > 0 ? (s.dmgDealt / total).toFixed(1) : 0,
+      avgSurvival: total > 0 ? (s.survived / total * 100).toFixed(1) : 0,
+      wins: s.wins, losses: s.losses,
+    };
+  });
+
+  results.sort((a,b) => b.winRate - a.winRate);
+  const n = results.length;
+  results.forEach((r,i) => {
+    r.rank = i+1;
+    if(i<n*0.08) r.tier='S';
+    else if(i<n*0.25) r.tier='A';
+    else if(i<n*0.50) r.tier='B';
+    else if(i<n*0.75) r.tier='C';
+    else if(i<n*0.90) r.tier='D';
+    else r.tier='F';
+  });
+
+  document.getElementById('totalBattles').textContent = totalBattles.toLocaleString();
+  document.getElementById('totalTeams').textContent = (C.length * teamsPerCard).toLocaleString();
+  progress.textContent = `Done — ${totalBattles.toLocaleString()} battles`;
+
+  // Summary cards
+  document.getElementById('resultsGrid').style.display = 'grid';
+  document.getElementById('resultsGrid').innerHTML = `
+    <div class="result-card"><h3>#1 Strongest</h3><div class="big-num" style="color:var(--green)">${results[0].name}</div><div class="detail">${results[0].winRate.toFixed(1)}% win rate | ${results[0].rarity} | ${results[0].maxHp} HP</div></div>
+    <div class="result-card"><h3>#2</h3><div class="big-num" style="color:var(--green)">${results[1].name}</div><div class="detail">${results[1].winRate.toFixed(1)}%</div></div>
+    <div class="result-card"><h3>#3</h3><div class="big-num" style="color:var(--blue)">${results[2].name}</div><div class="detail">${results[2].winRate.toFixed(1)}%</div></div>
+    <div class="result-card"><h3>Weakest</h3><div class="big-num" style="color:var(--red)">${results[n-1].name}</div><div class="detail">${results[n-1].winRate.toFixed(1)}% win rate | ${results[n-1].rarity} | ${results[n-1].maxHp} HP</div></div>
+    <div class="result-card"><h3>Most Damage</h3><div class="big-num" style="color:var(--orange)">${[...results].sort((a,b)=>b.avgDmgDealt-a.avgDmgDealt)[0].name}</div><div class="detail">${[...results].sort((a,b)=>b.avgDmgDealt-a.avgDmgDealt)[0].avgDmgDealt} avg dmg</div></div>
+    <div class="result-card"><h3>Best Survivor</h3><div class="big-num" style="color:var(--cyan)">${[...results].sort((a,b)=>b.avgSurvival-a.avgSurvival)[0].name}</div><div class="detail">${[...results].sort((a,b)=>b.avgSurvival-a.avgSurvival)[0].avgSurvival}% survival</div></div>
+  `;
+
+  renderResults();
+}
+
+function sortBy(field) {
+  if(sortField===field) sortDir*=-1;
+  else{sortField=field;sortDir=field==='name'?1:-1;}
+  renderResults();
+}
+
+function renderResults() {
+  const sorted = [...results].sort((a,b) => {
+    let va,vb;
+    if(sortField==='name'){va=a.name;vb=b.name;}
+    else if(sortField==='rarity'){const o={common:0,uncommon:1,rare:2,'ghost-rare':3,legendary:4};va=o[a.rarity];vb=o[b.rarity];}
+    else{va=parseFloat(a[sortField])||0;vb=parseFloat(b[sortField])||0;}
+    if(typeof va==='string') return sortDir*va.localeCompare(vb);
+    return sortDir*(va-vb);
+  });
+
+  document.getElementById('tableBody').innerHTML = sorted.map(c => {
+    const wr=c.winRate;
+    const barColor = wr>=55?'var(--green)':wr>=50?'var(--blue)':wr>=45?'var(--orange)':'var(--red)';
+    return `<tr>
+      <td style="color:var(--text3)">${c.rank}</td>
+      <td><strong>${c.name}</strong></td>
+      <td><span class="rarity r-${c.rarity}">${c.rarity}</span></td>
+      <td>${c.maxHp}</td>
+      <td><div class="wr-bar"><span class="pct" style="color:${barColor}">${wr.toFixed(1)}%</span><div class="bar"><div class="fill" style="width:${Math.min(100,wr*1.5)}%;background:${barColor}"></div></div></div></td>
+      <td><span class="tier-label tier-${c.tier}">${c.tier}</span></td>
+      <td style="color:var(--text2)">${c.appearances}</td>
+      <td style="color:var(--text2)">${c.avgDmgDealt}</td>
+      <td style="color:var(--text2)">${c.avgSurvival}%</td>
+      <td style="color:var(--text3);font-size:10px">${c.cat}</td>
+      <td style="color:var(--text3);font-size:10px;max-width:200px">${C.find(x=>x.n===c.name)?.cat||''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportCSV() {
+  if(!results.length) return;
+  let csv='Rank,Name,Rarity,HP,WinRate,Tier,Games,AvgDmg,Survival,Category\n';
+  results.forEach(c=>{csv+=`${c.rank},"${c.name}",${c.rarity},${c.maxHp},${c.winRate.toFixed(1)}%,${c.tier},${c.appearances},${c.avgDmgDealt},${c.avgSurvival}%,${c.cat}\n`;});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='boo_3v3_results.csv';a.click();
+}
+</script>
+</body>
+</html>
