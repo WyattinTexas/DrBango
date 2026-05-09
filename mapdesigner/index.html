@@ -299,90 +299,90 @@ function drawGrid(W,H) {
   ctx.stroke();
 }
 
-// Procedural noise for terrain texture
-function hash(x,y) { let h=x*374761393+y*668265263;h=(h^(h>>13))*1274126177;return(h^(h>>16))&0xffff; }
-function noise(x,y) { const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;
-  const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
-  const a=hash(ix,iy)/65535,b=hash(ix+1,iy)/65535,c=hash(ix,iy+1)/65535,d=hash(ix+1,iy+1)/65535;
-  return a+(b-a)*sx+(c-a)*sy+(d-a-c+a+(a-b-c+d)*sx)*sy; }
-function fbm(x,y) { return noise(x,y)*.5+noise(x*2.1,y*2.1)*.25+noise(x*4.3,y*4.3)*.125; }
+// Simple noise for terrain texture
+function hash(x,y){let h=x*374761393+y*668265263;h=(h^(h>>13))*1274126177;return((h^(h>>16))&0xffff)/65535;}
 
-// Region color palettes (grass base, mountain, path)
-const REG_PAL = {
-  frost_valley:  { grass:[60,120,90], mt:[140,160,180], path:[120,100,80] },
-  rolling_hills: { grass:[50,110,45], mt:[90,130,70],   path:[130,105,75] },
-  forest:        { grass:[30,80,35],  mt:[50,100,55],   path:[110,90,65] },
-  volcanic:      { grass:[80,60,40],  mt:[100,50,30],   path:[90,70,50] },
+// Region fill colors — bright and readable
+const REG_FILL = {
+  frost_valley:  { base:'#2a5c4a', light:'#3a7a62', label:'FROST VALLEY' },
+  rolling_hills: { base:'#2d5a28', light:'#3d7a38', label:'ROLLING HILLS' },
+  forest:        { base:'#1a4020', light:'#2a5a30', label:'FOREST' },
+  volcanic:      { base:'#5a3820', light:'#7a4a28', label:'VOLCANIC ISLES' },
 };
 
-// Pre-render terrain tiles to an offscreen canvas (cached)
-let _terrainCache = null;
-let _terrainCacheKey = '';
-function getTerrainImage() {
-  const key = `${area.clientWidth}x${area.clientHeight}_${cam.x.toFixed(1)}_${cam.z.toFixed(1)}_${cam.zoom.toFixed(2)}`;
-  if (_terrainCache && _terrainCacheKey === key) return _terrainCache;
+// Pre-rendered terrain texture (offscreen canvas, regenerated on resize)
+let _terrainOC = null;
+let _terrainKey = '';
 
-  // Determine visible world bounds
-  const tl = s2w(0, 0), br = s2w(area.clientWidth, area.clientHeight);
+function prerenderTerrain() {
+  // Build at fixed resolution: 2px per world unit
+  const ppu = 2;
+  const minX = -200, maxX = 210, minZ = -100, maxZ = 90;
+  const w = (maxX - minX) * ppu, h = (maxZ - minZ) * ppu;
 
-  // Draw each visible terrain tile with procedural detail
-  const tileSet = new Set(TILES.map(t => `${t.x},${t.z}`));
-  const step = Math.max(1, Math.floor(3 / cam.zoom)); // fewer pixels when zoomed out
+  const key = `${w}x${h}`;
+  if (_terrainOC && _terrainKey === key) return _terrainOC;
 
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const octx = oc.getContext('2d');
+
+  // Ocean base
+  octx.fillStyle = '#0a1520';
+  octx.fillRect(0, 0, w, h);
+
+  // Draw each tile with noise texture
   TILES.forEach(t => {
-    // Skip tiles fully outside view
-    if (t.x + TILE < tl.x || t.x > br.x || t.z > tl.z || t.z + TILE < br.z) return;
+    const rf = REG_FILL[t.r] || REG_FILL.rolling_hills;
+    const tx = (t.x - minX) * ppu;
+    const ty = (maxZ - t.z - TILE) * ppu;
+    const tw = TILE * ppu;
+    const th = TILE * ppu;
 
-    const pal = REG_PAL[t.r] || REG_PAL.rolling_hills;
+    // Base fill
+    octx.fillStyle = rf.base;
+    octx.fillRect(tx, ty, tw, th);
 
-    for (let wx = t.x; wx < t.x + TILE; wx += step / cam.zoom) {
-      for (let wz = t.z; wz < t.z + TILE; wz += step / cam.zoom) {
-        const s = w2s(wx, wz);
-        const px = Math.round(s.x), py = Math.round(s.y);
-        if (px < -2 || px > area.clientWidth+2 || py < -2 || py > area.clientHeight+2) continue;
+    // Noise overlay for terrain variation
+    for (let px = 0; px < tw; px += 3) {
+      for (let py = 0; py < th; py += 3) {
+        const wx = t.x + px / ppu;
+        const wz = t.z + TILE - py / ppu;
+        const n = hash(Math.floor(wx * 3.7), Math.floor(wz * 3.7));
+        const n2 = hash(Math.floor(wx * 0.8), Math.floor(wz * 0.8));
 
-        // Procedural elevation
-        const elev = fbm(wx * 0.02, wz * 0.02);
-        const detail = noise(wx * 0.08, wz * 0.08);
-
-        // Color mixing: low = grass, high = mountain, with noise variation
-        let r, g, b;
-        if (elev > 0.55) {
-          // Mountain/snow
-          const mt = (elev - 0.55) * 4;
-          r = pal.grass[0] + (pal.mt[0] - pal.grass[0]) * mt;
-          g = pal.grass[1] + (pal.mt[1] - pal.grass[1]) * mt;
-          b = pal.grass[2] + (pal.mt[2] - pal.grass[2]) * mt;
-        } else {
-          // Grass with variation
-          r = pal.grass[0] + detail * 20 - 10;
-          g = pal.grass[1] + detail * 30 - 15;
-          b = pal.grass[2] + detail * 15 - 7;
+        // Elevation: lighter patches = hills/mountains
+        if (n2 > 0.6) {
+          octx.fillStyle = `rgba(255,255,255,${(n2 - 0.6) * 0.15})`;
+          octx.fillRect(tx + px, ty + py, 3, 3);
         }
-
-        // Darken edges near coastline
-        const dx = Math.min(wx - t.x, t.x + TILE - wx);
-        const dz = Math.min(wz - t.z, t.z + TILE - wz);
-        const edgeDist = Math.min(dx, dz);
-        // Only darken if this edge borders water (no neighbor tile)
-        let bordersFwater = false;
-        if (dx < 3 && !tileSet.has(`${dx === wx-t.x ? t.x-TILE : t.x+TILE},${t.z}`)) bordersFwater = true;
-        if (dz < 3 && !tileSet.has(`${t.x},${dz === wz-t.z ? t.z-TILE : t.z+TILE}`)) bordersFwater = true;
-        if (bordersFwater && edgeDist < 3) {
-          const shore = edgeDist / 3;
-          r = r * shore + 30 * (1-shore);
-          g = g * shore + 60 * (1-shore);
-          b = b * shore + 80 * (1-shore);
+        // Dark patches = valleys/shadows
+        if (n < 0.3) {
+          octx.fillStyle = `rgba(0,0,0,${(0.3 - n) * 0.2})`;
+          octx.fillRect(tx + px, ty + py, 3, 3);
         }
-
-        const sz = Math.max(1, Math.ceil(step / cam.zoom * cam.zoom));
-        ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
-        ctx.fillRect(px, py, sz, sz);
       }
     }
+
+    // Subtle inner border
+    octx.strokeStyle = 'rgba(255,255,255,.06)';
+    octx.lineWidth = 1;
+    octx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, th - 1);
   });
 
-  // Region labels
+  // Coastline
+  const tileSet = new Set(TILES.map(t => `${t.x},${t.z}`));
+  octx.strokeStyle = 'rgba(100,180,220,.35)';
+  octx.lineWidth = 2;
+  TILES.forEach(t => {
+    const tx = (t.x - minX) * ppu, ty = (maxZ - t.z - TILE) * ppu, tw = TILE*ppu, th = TILE*ppu;
+    if(!tileSet.has(`${t.x},${t.z+TILE}`)) { octx.beginPath(); octx.moveTo(tx,ty); octx.lineTo(tx+tw,ty); octx.stroke(); }
+    if(!tileSet.has(`${t.x},${t.z-TILE}`)) { octx.beginPath(); octx.moveTo(tx,ty+th); octx.lineTo(tx+tw,ty+th); octx.stroke(); }
+    if(!tileSet.has(`${t.x+TILE},${t.z}`)) { octx.beginPath(); octx.moveTo(tx+tw,ty); octx.lineTo(tx+tw,ty+th); octx.stroke(); }
+    if(!tileSet.has(`${t.x-TILE},${t.z}`)) { octx.beginPath(); octx.moveTo(tx,ty); octx.lineTo(tx,ty+th); octx.stroke(); }
+  });
+
+  // Region labels baked into texture
   const centers = {};
   TILES.forEach(t => {
     if (!centers[t.r]) centers[t.r] = {sx:0,sz:0,n:0};
@@ -390,30 +390,37 @@ function getTerrainImage() {
     centers[t.r].sz += t.z + TILE/2;
     centers[t.r].n++;
   });
-  const regionNames = { frost_valley:'FROST VALLEY', rolling_hills:'ROLLING HILLS', forest:'FOREST', volcanic:'VOLCANIC ISLES' };
+  octx.textAlign = 'center'; octx.textBaseline = 'middle';
   Object.entries(centers).forEach(([k, ct]) => {
-    const s = w2s(ct.sx/ct.n, ct.sz/ct.n);
-    const fontSize = Math.max(8, Math.min(16, 11 * cam.zoom / 3));
-    ctx.font = `600 ${fontSize}px 'Outfit',sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.fillText(regionNames[k] || k, s.x+1, s.y+1);
-    ctx.fillStyle = 'rgba(255,255,255,.15)';
-    ctx.fillText(regionNames[k] || k, s.x, s.y);
+    const rf = REG_FILL[k];
+    if (!rf) return;
+    const lx = (ct.sx/ct.n - minX) * ppu;
+    const ly = (maxZ - ct.sz/ct.n) * ppu;
+    octx.font = `600 ${ppu * 8}px 'Outfit',sans-serif`;
+    octx.fillStyle = 'rgba(0,0,0,.25)';
+    octx.fillText(rf.label, lx+1, ly+1);
+    octx.fillStyle = 'rgba(255,255,255,.12)';
+    octx.fillText(rf.label, lx, ly);
   });
 
-  // Coastline glow
-  ctx.strokeStyle = 'rgba(80,160,200,.25)';
-  ctx.lineWidth = 2;
-  ctx.shadowColor = 'rgba(80,160,200,.15)';
-  ctx.shadowBlur = 6;
-  TILES.forEach(t => {
-    if(!tileSet.has(`${t.x},${t.z+TILE}`)){const a=w2s(t.x,t.z+TILE),b=w2s(t.x+TILE,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-    if(!tileSet.has(`${t.x},${t.z-TILE}`)){const a=w2s(t.x,t.z),b=w2s(t.x+TILE,t.z);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-    if(!tileSet.has(`${t.x+TILE},${t.z}`)){const a=w2s(t.x+TILE,t.z),b=w2s(t.x+TILE,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-    if(!tileSet.has(`${t.x-TILE},${t.z}`)){const a=w2s(t.x,t.z),b=w2s(t.x,t.z+TILE);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-  });
-  ctx.shadowBlur = 0;
+  _terrainOC = oc;
+  _terrainKey = key;
+  _terrainOC._minX = minX; _terrainOC._maxZ = maxZ; _terrainOC._ppu = ppu;
+  return oc;
+}
+
+function getTerrainImage() {
+  const oc = prerenderTerrain();
+  // Map the prerendered canvas onto the main canvas using world coords
+  const ppu = oc._ppu, minX = oc._minX, maxZ = oc._maxZ;
+
+  // World corners of the prerendered image
+  const tlWorld = w2s(minX, maxZ);
+  const brWorld = w2s(minX + oc.width / ppu, maxZ - oc.height / ppu);
+  const dw = brWorld.x - tlWorld.x;
+  const dh = brWorld.y - tlWorld.y;
+
+  ctx.drawImage(oc, tlWorld.x, tlWorld.y, dw, dh);
 }
 
 function drawObjects() {
