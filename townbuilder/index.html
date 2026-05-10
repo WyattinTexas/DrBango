@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frost Valley Town Builder</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #0a0e1a;
+    color: #e0e6f0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+}
+
+/* ─── Sidebar ─── */
+#sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #111827;
+    border-right: 1px solid #1e293b;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    z-index: 10;
+}
+#sidebar h1 {
+    font-size: 16px;
+    padding: 14px 16px 8px;
+    color: #93c5fd;
+    letter-spacing: 0.5px;
+}
+#sidebar h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #64748b;
+    padding: 12px 16px 6px;
+}
+
+.palette-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: grab;
+    border-radius: 6px;
+    margin: 2px 8px;
+    transition: background 0.15s;
+    font-size: 13px;
+}
+.palette-item:hover { background: #1e293b; }
+.palette-item:active { cursor: grabbing; }
+.palette-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+/* ─── Canvas Area ─── */
+#canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+canvas {
+    display: block;
+    cursor: crosshair;
+}
+
+/* ─── Inspector Panel ─── */
+#inspector {
+    width: 280px;
+    min-width: 280px;
+    background: #111827;
+    border-left: 1px solid #1e293b;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100vh;
+    overflow-y: auto;
+}
+#inspector h2 {
+    font-size: 14px;
+    color: #93c5fd;
+    margin-bottom: 4px;
+}
+#inspector label {
+    font-size: 12px;
+    color: #94a3b8;
+    display: block;
+    margin-bottom: 4px;
+}
+#inspector input, #inspector select {
+    width: 100%;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e0e6f0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+}
+#inspector input:focus { border-color: #3b82f6; }
+
+.inspector-row {
+    display: flex;
+    gap: 8px;
+}
+.inspector-row > div { flex: 1; }
+
+/* ─── Toolbar ─── */
+#toolbar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: #1e293b;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 20;
+}
+.tb-btn {
+    background: #334155;
+    border: 1px solid #475569;
+    color: #e0e6f0;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.tb-btn:hover { background: #475569; }
+.tb-btn.primary { background: #2563eb; border-color: #3b82f6; }
+.tb-btn.primary:hover { background: #1d4ed8; }
+.tb-btn.danger { background: #991b1b; border-color: #dc2626; }
+.tb-btn.danger:hover { background: #b91c1c; }
+
+/* ─── Status Bar ─── */
+#statusbar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    font-size: 12px;
+    color: #94a3b8;
+    z-index: 20;
+    pointer-events: none;
+}
+
+/* ─── Export Modal ─── */
+#export-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+#export-modal.active { display: flex; }
+#export-content {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+#export-content h2 { color: #93c5fd; margin-bottom: 12px; }
+#export-content pre {
+    background: #0f172a;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    color: #d1d5db;
+    margin-bottom: 12px;
+}
+#export-content .tb-btn { margin-right: 8px; }
+
+/* ─── Grid Info ─── */
+.grid-label {
+    position: absolute;
+    font-size: 10px;
+    color: #475569;
+    pointer-events: none;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar: Palette -->
+<div id="sidebar">
+    <h1>Frost Valley Builder</h1>
+
+    <h2>Buildings</h2>
+    <div class="palette-item" draggable="true" data-type="Town Hall" data-category="building">
+        <div class="palette-swatch" style="background:#b45309;">🏛</div>
+        <span>Town Hall</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Farm House" data-category="building">
+        <div class="palette-swatch" style="background:#854d0e;">🏠</div>
+        <span>Farm House</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Start House" data-category="building">
+        <div class="palette-swatch" style="background:#78716c;">🏡</div>
+        <span>Start House</span>
+    </div>
+
+    <h2>Structures</h2>
+    <div class="palette-item" draggable="true" data-type="Ice Castle" data-category="building">
+        <div class="palette-swatch" style="background:#1e40af;">🏰</div>
+        <span>Ice Castle</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Mountain Hideaway" data-category="building">
+        <div class="palette-swatch" style="background:#374151;">⛰</div>
+        <span>Mountain Hideaway</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Snowy Keep" data-category="building">
+        <div class="palette-swatch" style="background:#475569;">🗼</div>
+        <span>Snowy Keep</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Ruins" data-category="building">
+        <div class="palette-swatch" style="background:#57534e;">🏚</div>
+        <span>Ruins</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Abandoned Mines" data-category="building">
+        <div class="palette-swatch" style="background:#44403c;">⛏</div>
+        <span>Abandoned Mines</span>
+    </div>
+
+    <h2>Decorations</h2>
+    <div class="palette-item" draggable="true" data-type="Farm Fence" data-category="decoration">
+        <div class="palette-swatch" style="background:#713f12;">━</div>
+        <span>Farm Fence</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Farm Fence Middle" data-category="decoration">
+        <div class="palette-swatch" style="background:#78350f;">┃</div>
+        <span>Farm Fence Middle</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Scarecrow" data-category="decoration">
+        <div class="palette-swatch" style="background:#92400e;">🧑‍🌾</div>
+        <span>Scarecrow</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Orange Flower" data-category="decoration">
+        <div class="palette-swatch" style="background:#ea580c;">🌼</div>
+        <span>Orange Flower</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Red Flower" data-category="decoration">
+        <div class="palette-swatch" style="background:#dc2626;">🌺</div>
+        <span>Red Flower</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="Yellow Flower" data-category="decoration">
+        <div class="palette-swatch" style="background:#ca8a04;">🌻</div>
+        <span>Yellow Flower</span>
+    </div>
+
+    <h2>NPCs</h2>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="elder_frost">
+        <div class="palette-swatch" style="background:#1e40af;">👤</div>
+        <span>Elder Frost</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="smith_ember">
+        <div class="palette-swatch" style="background:#1e40af;">👤</div>
+        <span>Smith Ember</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="keeper_zara">
+        <div class="palette-swatch" style="background:#1e40af;">👤</div>
+        <span>Keeper Zara</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="brawler_jax">
+        <div class="palette-swatch" style="background:#991b1b;">⚔</div>
+        <span>Brawler Jax</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="ice_queen_vera">
+        <div class="palette-swatch" style="background:#991b1b;">⚔</div>
+        <span>Ice Queen Vera</span>
+    </div>
+    <div class="palette-item" draggable="true" data-type="npc" data-category="npc" data-npc-id="custom_npc">
+        <div class="palette-swatch" style="background:#065f46;">+</div>
+        <span>Custom NPC...</span>
+    </div>
+
+    <div style="flex:1;"></div>
+    <div style="padding:12px 16px; font-size:11px; color:#475569; border-top:1px solid #1e293b;">
+        Drag items onto the canvas.<br>
+        Scroll to zoom. Middle-drag to pan.<br>
+        R to rotate selected. Del to remove.
+    </div>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-area">
+    <canvas id="map"></canvas>
+    <div id="statusbar">
+        <span id="status-text">Ready — drag items from sidebar to place</span>
+    </div>
+    <div id="toolbar">
+        <button class="tb-btn" onclick="resetView()">Reset View</button>
+        <button class="tb-btn" onclick="toggleGrid()">Toggle Grid</button>
+        <button class="tb-btn" onclick="toggleSnap()">Snap: <span id="snap-label">2u</span></button>
+        <button class="tb-btn" onclick="undoAction()">Undo</button>
+        <button class="tb-btn" onclick="redoAction()">Redo</button>
+        <button class="tb-btn primary" onclick="exportCode()">Export C#</button>
+        <button class="tb-btn primary" onclick="exportJSON()">Export JSON</button>
+        <button class="tb-btn" onclick="importJSON()">Import JSON</button>
+        <button class="tb-btn danger" onclick="clearAll()">Clear All</button>
+    </div>
+</div>
+
+<!-- Inspector -->
+<div id="inspector">
+    <h2>Inspector</h2>
+    <div id="inspector-empty" style="color:#64748b; font-size:13px;">Select an item to inspect</div>
+    <div id="inspector-fields" style="display:none;">
+        <div>
+            <label>Type</label>
+            <input id="inp-type" readonly>
+        </div>
+        <div class="inspector-row">
+            <div>
+                <label>X Offset</label>
+                <input id="inp-x" type="number" step="0.5">
+            </div>
+            <div>
+                <label>Z Offset</label>
+                <input id="inp-z" type="number" step="0.5">
+            </div>
+        </div>
+        <div>
+            <label>Rotation Y</label>
+            <input id="inp-rot" type="number" step="15">
+        </div>
+        <div id="npc-fields" style="display:none;">
+            <label>NPC ID</label>
+            <input id="inp-npc-id">
+            <label style="margin-top:8px;">NPC Display Name</label>
+            <input id="inp-npc-name">
+        </div>
+        <div style="margin-top:8px;">
+            <label>Category</label>
+            <input id="inp-category" readonly style="color:#64748b;">
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="tb-btn" onclick="duplicateSelected()">Duplicate</button>
+            <button class="tb-btn danger" onclick="deleteSelected()">Delete</button>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid #1e293b; padding-top:12px; margin-top: auto;">
+        <h2>Town Center</h2>
+        <div class="inspector-row">
+            <div>
+                <label>X</label>
+                <input id="tc-x" type="number" step="1" value="-15">
+            </div>
+            <div>
+                <label>Z</label>
+                <input id="tc-z" type="number" step="1" value="0">
+            </div>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:6px;">
+            Building offsets are relative to this point.<br>
+            NPC positions are in world coords.
+        </div>
+    </div>
+
+    <div style="border-top:1px solid #1e293b; padding-top:12px;">
+        <h2>Stats</h2>
+        <div id="stats" style="font-size:12px; color:#94a3b8; line-height:1.8;"></div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal">
+    <div id="export-content">
+        <h2 id="export-title">Export</h2>
+        <pre id="export-code"></pre>
+        <button class="tb-btn primary" onclick="copyExport()">Copy to Clipboard</button>
+        <button class="tb-btn" onclick="closeExport()">Close</button>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// FROST VALLEY TOWN BUILDER — HTML Edition
+// Exports directly to TownBuilder.cs + NPCSpawner.cs format
+// ══════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+
+// ── View state ──
+let viewX = 0, viewY = 0, viewScale = 8; // pixels per unit
+let showGrid = true;
+let snapSize = 2; // snap to 2-unit grid
+const SNAP_OPTIONS = [0, 1, 2, 5, 10];
+let snapIndex = 2;
+
+// ── Town center (matches Unity) ──
+let townCenter = { x: -15, z: 0 };
+
+// ── Placed items ──
+let items = [];
+let selectedId = null;
+let nextId = 1;
+
+// ── Undo/Redo ──
+let undoStack = [];
+let redoStack = [];
+
+// ── Drag state ──
+let isDragging = false;
+let isPanning = false;
+let dragItem = null;
+let dragOffsetX = 0, dragOffsetZ = 0;
+let panStartX = 0, panStartY = 0;
+let panStartVX = 0, panStartVZ = 0;
+
+// ── Palette drag ──
+let paletteDragType = null;
+let paletteDragCategory = null;
+let paletteDragNpcId = null;
+
+// ── Visual config for each type ──
+const VISUALS = {
+    'Town Hall':        { color: '#b45309', w: 10, h: 8, label: 'Town Hall' },
+    'Farm House':       { color: '#854d0e', w: 6, h: 5, label: 'Farm House' },
+    'Start House':      { color: '#78716c', w: 5, h: 5, label: 'Start House' },
+    'Ice Castle':       { color: '#1e40af', w: 12, h: 12, label: 'Ice Castle' },
+    'Mountain Hideaway':{ color: '#374151', w: 8, h: 6, label: 'Mtn Hideaway' },
+    'Snowy Keep':       { color: '#475569', w: 8, h: 8, label: 'Snowy Keep' },
+    'Ruins':            { color: '#57534e', w: 6, h: 6, label: 'Ruins' },
+    'Abandoned Mines':  { color: '#44403c', w: 7, h: 5, label: 'Mines' },
+    'Farm Fence':       { color: '#92400e', w: 5, h: 0.5, label: '' },
+    'Farm Fence Middle':{ color: '#78350f', w: 5, h: 0.5, label: '' },
+    'Scarecrow':        { color: '#d97706', w: 1.5, h: 1.5, label: 'S', shape: 'circle' },
+    'Orange Flower':    { color: '#ea580c', w: 1, h: 1, label: '', shape: 'circle' },
+    'Red Flower':       { color: '#dc2626', w: 1, h: 1, label: '', shape: 'circle' },
+    'Yellow Flower':    { color: '#eab308', w: 1, h: 1, label: '', shape: 'circle' },
+};
+
+const NPC_VISUALS = {
+    friendly: { color: '#3b82f6', radius: 1.5 },
+    trainer:  { color: '#ef4444', radius: 1.8 },
+};
+
+const TRAINERS = ['brawler_jax', 'ice_queen_vera'];
+
+// ══════════════════════════════════════════════════════════════
+// COORDINATE SYSTEM
+// Unity: X = right, Z = up (north)
+// Canvas: X = right, Y = down
+// So we flip Z -> -Y for display
+// ══════════════════════════════════════════════════════════════
+
+function worldToScreen(wx, wz) {
+    return {
+        x: (wx * viewScale) + viewX + canvas.width / 2,
+        y: (-wz * viewScale) + viewY + canvas.height / 2
+    };
+}
+
+function screenToWorld(sx, sy) {
+    return {
+        x: (sx - canvas.width / 2 - viewX) / viewScale,
+        z: -(sy - canvas.height / 2 - viewY) / viewScale
+    };
+}
+
+function snap(val) {
+    if (snapSize <= 0) return val;
+    return Math.round(val / snapSize) * snapSize;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDERING
+// ══════════════════════════════════════════════════════════════
+
+function resizeCanvas() {
+    const area = document.getElementById('canvas-area');
+    canvas.width = area.clientWidth;
+    canvas.height = area.clientHeight;
+    render();
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background
+    ctx.fillStyle = '#0f1729';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (showGrid) drawGrid();
+    drawTownCenter();
+    drawTreeClearRadius();
+
+    // Draw items (decorations first, then buildings, then NPCs, selected last)
+    const sorted = [...items].sort((a, b) => {
+        const order = { decoration: 0, building: 1, npc: 2 };
+        let oa = order[a.category] || 0, ob = order[b.category] || 0;
+        if (a.id === selectedId) oa = 10;
+        if (b.id === selectedId) ob = 10;
+        return oa - ob;
+    });
+
+    for (const item of sorted) {
+        if (item.category === 'npc') drawNPC(item);
+        else drawBuilding(item);
+    }
+
+    updateStats();
+}
+
+function drawGrid() {
+    const step = snapSize > 0 ? snapSize : 5;
+
+    // Figure out visible world bounds
+    const tl = screenToWorld(0, 0);
+    const br = screenToWorld(canvas.width, canvas.height);
+
+    const startX = Math.floor(tl.x / step) * step;
+    const endX = Math.ceil(br.x / step) * step;
+    const startZ = Math.floor(br.z / step) * step;
+    const endZ = Math.ceil(tl.z / step) * step;
+
+    ctx.strokeStyle = '#1a2540';
+    ctx.lineWidth = 0.5;
+
+    for (let x = startX; x <= endX; x += step) {
+        const s = worldToScreen(x, 0);
+        ctx.beginPath();
+        ctx.moveTo(s.x, 0);
+        ctx.lineTo(s.x, canvas.height);
+        ctx.stroke();
+    }
+    for (let z = startZ; z <= endZ; z += step) {
+        const s = worldToScreen(0, z);
+        ctx.beginPath();
+        ctx.moveTo(0, s.y);
+        ctx.lineTo(canvas.width, s.y);
+        ctx.stroke();
+    }
+
+    // Major gridlines every 10
+    ctx.strokeStyle = '#253050';
+    ctx.lineWidth = 1;
+    const majorStep = 10;
+    const mStartX = Math.floor(tl.x / majorStep) * majorStep;
+    const mEndX = Math.ceil(br.x / majorStep) * majorStep;
+    const mStartZ = Math.floor(br.z / majorStep) * majorStep;
+    const mEndZ = Math.ceil(tl.z / majorStep) * majorStep;
+
+    for (let x = mStartX; x <= mEndX; x += majorStep) {
+        const s = worldToScreen(x, 0);
+        ctx.beginPath();
+        ctx.moveTo(s.x, 0);
+        ctx.lineTo(s.x, canvas.height);
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = '#3b4f6e';
+        ctx.font = '10px monospace';
+        ctx.fillText(x.toString(), s.x + 3, canvas.height - 4);
+    }
+    for (let z = mStartZ; z <= mEndZ; z += majorStep) {
+        const s = worldToScreen(0, z);
+        ctx.beginPath();
+        ctx.moveTo(0, s.y);
+        ctx.lineTo(canvas.width, s.y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#3b4f6e';
+        ctx.font = '10px monospace';
+        ctx.fillText('z=' + z.toString(), 4, s.y - 3);
+    }
+
+    // Origin axes
+    const origin = worldToScreen(0, 0);
+    ctx.strokeStyle = '#dc262644';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, canvas.height); ctx.stroke();
+    ctx.strokeStyle = '#16a34a44';
+    ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(canvas.width, origin.y); ctx.stroke();
+}
+
+function drawTownCenter() {
+    const s = worldToScreen(townCenter.x, townCenter.z);
+    const r = 3 * viewScale;
+
+    // Crosshair
+    ctx.strokeStyle = '#f59e0b66';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y);
+    ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label
+    ctx.fillStyle = '#f59e0b88';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(`TC (${townCenter.x}, ${townCenter.z})`, s.x + 6, s.y - 6);
+}
+
+function drawTreeClearRadius() {
+    // Show tree clear radius around buildings (12 units)
+    const buildings = items.filter(i => i.category === 'building');
+    ctx.strokeStyle = '#22c55e11';
+    ctx.fillStyle = '#22c55e06';
+    ctx.lineWidth = 0.5;
+
+    for (const b of buildings) {
+        const worldX = townCenter.x + b.x;
+        const worldZ = townCenter.z + b.z;
+        const s = worldToScreen(worldX, worldZ);
+        const r = 12 * viewScale;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
+function drawBuilding(item) {
+    const vis = VISUALS[item.type] || { color: '#666', w: 4, h: 4, label: item.type };
+    const isSelected = item.id === selectedId;
+
+    // World position (buildings use offsets from town center)
+    let worldX, worldZ;
+    if (item.category === 'npc') {
+        worldX = item.x;
+        worldZ = item.z;
+    } else {
+        worldX = townCenter.x + item.x;
+        worldZ = townCenter.z + item.z;
+    }
+
+    const center = worldToScreen(worldX, worldZ);
+    const w = vis.w * viewScale;
+    const h = vis.h * viewScale;
+    const rot = (-item.rotation * Math.PI) / 180; // negate for screen coords
+
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.rotate(rot);
+
+    if (vis.shape === 'circle') {
+        const r = Math.max(w, h) / 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fillStyle = vis.color + (isSelected ? 'ee' : '99');
+        ctx.fill();
+        if (isSelected) {
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        if (vis.label) {
+            ctx.fillStyle = '#fff';
+            ctx.font = `${Math.max(10, r)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(vis.label, 0, 0);
+        }
+    } else {
+        // Rectangle
+        ctx.fillStyle = vis.color + (isSelected ? 'dd' : '88');
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+
+        // Border
+        ctx.strokeStyle = isSelected ? '#60a5fa' : vis.color;
+        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+        // Front-facing indicator (small triangle on the "front" = -Z in local space = bottom of rect)
+        ctx.fillStyle = '#ffffff44';
+        ctx.beginPath();
+        ctx.moveTo(-4, h / 2);
+        ctx.lineTo(4, h / 2);
+        ctx.lineTo(0, h / 2 - 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Label
+        if (vis.label && w > 30) {
+            ctx.fillStyle = '#ffffffcc';
+            ctx.font = `${Math.min(11, w / vis.label.length * 1.2)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(vis.label, 0, 0);
+        }
+    }
+
+    ctx.restore();
+
+    // Offset label below
+    if (isSelected && viewScale > 4) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`(${item.x}, ${item.z}) r=${item.rotation}`, center.x, center.y + Math.max(w, h) / 2 + 14);
+    }
+}
+
+function drawNPC(item) {
+    const isTrainer = TRAINERS.includes(item.npcId);
+    const vis = isTrainer ? NPC_VISUALS.trainer : NPC_VISUALS.friendly;
+    const isSelected = item.id === selectedId;
+
+    // NPCs use world coordinates
+    const s = worldToScreen(item.x, item.z);
+    const r = vis.radius * viewScale;
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = vis.color + (isSelected ? 'cc' : '66');
+    ctx.fill();
+    ctx.strokeStyle = isSelected ? '#60a5fa' : vis.color;
+    ctx.lineWidth = isSelected ? 2.5 : 1.5;
+    ctx.stroke();
+
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+
+    // Label
+    const displayName = item.npcName || item.npcId;
+    ctx.fillStyle = isSelected ? '#e0e6f0' : '#94a3b8';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(displayName, s.x, s.y - r - 6);
+
+    if (isSelected && viewScale > 4) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.fillText(`(${item.x}, ${item.z})`, s.x, s.y + r + 14);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ITEM MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+function addItem(type, category, x, z, rotation = 0, npcId = '', npcName = '') {
+    const item = {
+        id: nextId++,
+        type, category, x, z, rotation,
+        npcId: npcId || '',
+        npcName: npcName || ''
+    };
+    items.push(item);
+    pushUndo();
+    return item;
+}
+
+function removeItem(id) {
+    items = items.filter(i => i.id !== id);
+    if (selectedId === id) { selectedId = null; updateInspector(); }
+    pushUndo();
+    render();
+}
+
+function selectItem(id) {
+    selectedId = id;
+    updateInspector();
+    render();
+}
+
+function getItemAt(sx, sy) {
+    const world = screenToWorld(sx, sy);
+    // Check in reverse order (top items first)
+    for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        let wx, wz;
+        if (item.category === 'npc') {
+            wx = item.x; wz = item.z;
+        } else {
+            wx = townCenter.x + item.x;
+            wz = townCenter.z + item.z;
+        }
+
+        if (item.category === 'npc') {
+            const isTrainer = TRAINERS.includes(item.npcId);
+            const r = (isTrainer ? NPC_VISUALS.trainer : NPC_VISUALS.friendly).radius;
+            const dist = Math.sqrt((world.x - wx) ** 2 + (world.z - wz) ** 2);
+            if (dist <= r * 1.5) return item;
+        } else {
+            const vis = VISUALS[item.type] || { w: 4, h: 4 };
+            // Simple AABB hit test (ignoring rotation for simplicity)
+            const halfW = vis.w / 2 * 1.2;
+            const halfH = vis.h / 2 * 1.2;
+            const maxR = Math.max(halfW, halfH);
+            const dist = Math.sqrt((world.x - wx) ** 2 + (world.z - wz) ** 2);
+            if (dist <= maxR) return item;
+        }
+    }
+    return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UNDO / REDO
+// ══════════════════════════════════════════════════════════════
+
+function pushUndo() {
+    undoStack.push(JSON.stringify(items));
+    if (undoStack.length > 50) undoStack.shift();
+    redoStack = [];
+}
+
+function undoAction() {
+    if (undoStack.length < 2) return;
+    redoStack.push(undoStack.pop());
+    items = JSON.parse(undoStack[undoStack.length - 1]);
+    nextId = Math.max(...items.map(i => i.id), 0) + 1;
+    selectedId = null;
+    updateInspector();
+    render();
+}
+
+function redoAction() {
+    if (redoStack.length === 0) return;
+    const state = redoStack.pop();
+    undoStack.push(state);
+    items = JSON.parse(state);
+    nextId = Math.max(...items.map(i => i.id), 0) + 1;
+    selectedId = null;
+    updateInspector();
+    render();
+}
+
+// ══════════════════════════════════════════════════════════════
+// INSPECTOR
+// ══════════════════════════════════════════════════════════════
+
+function updateInspector() {
+    const empty = document.getElementById('inspector-empty');
+    const fields = document.getElementById('inspector-fields');
+    const npcFields = document.getElementById('npc-fields');
+
+    if (!selectedId) {
+        empty.style.display = 'block';
+        fields.style.display = 'none';
+        return;
+    }
+
+    const item = items.find(i => i.id === selectedId);
+    if (!item) { selectedId = null; empty.style.display = 'block'; fields.style.display = 'none'; return; }
+
+    empty.style.display = 'none';
+    fields.style.display = 'block';
+
+    document.getElementById('inp-type').value = item.category === 'npc' ? `NPC: ${item.npcId}` : item.type;
+    document.getElementById('inp-x').value = item.x;
+    document.getElementById('inp-z').value = item.z;
+    document.getElementById('inp-rot').value = item.rotation;
+    document.getElementById('inp-category').value = item.category;
+
+    if (item.category === 'npc') {
+        npcFields.style.display = 'block';
+        document.getElementById('inp-npc-id').value = item.npcId;
+        document.getElementById('inp-npc-name').value = item.npcName;
+    } else {
+        npcFields.style.display = 'none';
+    }
+}
+
+// Inspector input handlers
+['inp-x', 'inp-z', 'inp-rot'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+        if (!selectedId) return;
+        const item = items.find(i => i.id === selectedId);
+        if (!item) return;
+        if (id === 'inp-x') item.x = parseFloat(e.target.value) || 0;
+        if (id === 'inp-z') item.z = parseFloat(e.target.value) || 0;
+        if (id === 'inp-rot') item.rotation = parseFloat(e.target.value) || 0;
+        pushUndo();
+        render();
+    });
+});
+
+['inp-npc-id', 'inp-npc-name'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+        if (!selectedId) return;
+        const item = items.find(i => i.id === selectedId);
+        if (!item) return;
+        if (id === 'inp-npc-id') item.npcId = e.target.value;
+        if (id === 'inp-npc-name') item.npcName = e.target.value;
+        pushUndo();
+        render();
+    });
+});
+
+// Town center inputs
+['tc-x', 'tc-z'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+        if (id === 'tc-x') townCenter.x = parseFloat(e.target.value) || 0;
+        if (id === 'tc-z') townCenter.z = parseFloat(e.target.value) || 0;
+        render();
+    });
+});
+
+function updateStats() {
+    const buildings = items.filter(i => i.category === 'building').length;
+    const decorations = items.filter(i => i.category === 'decoration').length;
+    const npcs = items.filter(i => i.category === 'npc').length;
+    document.getElementById('stats').innerHTML =
+        `Buildings: ${buildings}<br>Decorations: ${decorations}<br>NPCs: ${npcs}<br>Total: ${items.length}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// MOUSE / INPUT HANDLING
+// ══════════════════════════════════════════════════════════════
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        // Middle click or Alt+click = pan
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartVX = viewX;
+        panStartVZ = viewY;
+        canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+        return;
+    }
+
+    if (e.button === 0) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const hit = getItemAt(sx, sy);
+
+        if (hit) {
+            selectItem(hit.id);
+            isDragging = true;
+            dragItem = hit;
+
+            let wx, wz;
+            if (hit.category === 'npc') {
+                wx = hit.x; wz = hit.z;
+            } else {
+                wx = townCenter.x + hit.x;
+                wz = townCenter.z + hit.z;
+            }
+            const world = screenToWorld(sx, sy);
+            dragOffsetX = wx - world.x;
+            dragOffsetZ = wz - world.z;
+            canvas.style.cursor = 'grabbing';
+        } else {
+            selectItem(null);
+        }
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const world = screenToWorld(sx, sy);
+
+    // Update status bar
+    document.getElementById('status-text').textContent =
+        `World: (${world.x.toFixed(1)}, ${world.z.toFixed(1)}) | Zoom: ${viewScale.toFixed(1)}x`;
+
+    if (isPanning) {
+        viewX = panStartVX + (e.clientX - panStartX);
+        viewY = panStartVZ + (e.clientY - panStartY);
+        render();
+        return;
+    }
+
+    if (isDragging && dragItem) {
+        let newX = world.x + dragOffsetX;
+        let newZ = world.z + dragOffsetZ;
+
+        if (dragItem.category === 'npc') {
+            dragItem.x = snap(newX);
+            dragItem.z = snap(newZ);
+        } else {
+            // Convert to offset from town center
+            dragItem.x = snap(newX - townCenter.x);
+            dragItem.z = snap(newZ - townCenter.z);
+        }
+        updateInspector();
+        render();
+    }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (isPanning) {
+        isPanning = false;
+        canvas.style.cursor = 'crosshair';
+        return;
+    }
+    if (isDragging) {
+        isDragging = false;
+        dragItem = null;
+        canvas.style.cursor = 'crosshair';
+        pushUndo();
+    }
+});
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const worldBefore = screenToWorld(mx, my);
+
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    viewScale = Math.max(1, Math.min(60, viewScale * factor));
+
+    const worldAfter = screenToWorld(mx, my);
+    viewX += (worldAfter.x - worldBefore.x) * viewScale;
+    viewY -= (worldAfter.z - worldBefore.z) * viewScale;
+
+    render();
+}, { passive: false });
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+
+    if (e.key === 'r' || e.key === 'R') {
+        if (selectedId) {
+            const item = items.find(i => i.id === selectedId);
+            if (item) {
+                item.rotation = (item.rotation + (e.shiftKey ? -15 : 15)) % 360;
+                pushUndo();
+                updateInspector();
+                render();
+            }
+        }
+    }
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId) { deleteSelected(); }
+    }
+
+    if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (e.shiftKey) redoAction();
+        else undoAction();
+    }
+
+    if (e.key === 'Escape') {
+        if (document.getElementById('export-modal').classList.contains('active')) {
+            closeExport();
+        } else {
+            selectItem(null);
+        }
+    }
+
+    // Duplicate
+    if ((e.key === 'd' || e.key === 'D') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        duplicateSelected();
+    }
+});
+
+// ── Palette drag & drop ──
+document.querySelectorAll('.palette-item').forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+        paletteDragType = el.dataset.type;
+        paletteDragCategory = el.dataset.category;
+        paletteDragNpcId = el.dataset.npcId || '';
+        e.dataTransfer.effectAllowed = 'copy';
+    });
+});
+
+canvas.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+
+canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!paletteDragType) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const world = screenToWorld(sx, sy);
+
+    let x, z;
+    if (paletteDragCategory === 'npc') {
+        x = snap(world.x);
+        z = snap(world.z);
+    } else {
+        x = snap(world.x - townCenter.x);
+        z = snap(world.z - townCenter.z);
+    }
+
+    let npcId = paletteDragNpcId;
+    let npcName = '';
+    if (paletteDragCategory === 'npc') {
+        if (npcId === 'custom_npc') {
+            npcId = prompt('NPC ID (e.g., merchant_luna):') || 'custom_npc';
+            npcName = prompt('Display Name (e.g., Luna):') || npcId;
+        } else {
+            npcName = npcId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+    }
+
+    const item = addItem(
+        paletteDragCategory === 'npc' ? 'npc' : paletteDragType,
+        paletteDragCategory,
+        x, z, 0,
+        npcId, npcName
+    );
+    selectItem(item.id);
+    render();
+
+    paletteDragType = null;
+    paletteDragCategory = null;
+    paletteDragNpcId = null;
+});
+
+// ══════════════════════════════════════════════════════════════
+// TOOLBAR ACTIONS
+// ══════════════════════════════════════════════════════════════
+
+function resetView() {
+    // Center on town center
+    viewX = -townCenter.x * viewScale;
+    viewY = townCenter.z * viewScale;
+    viewScale = 8;
+    viewX = -townCenter.x * viewScale;
+    viewY = townCenter.z * viewScale;
+    render();
+}
+
+function toggleGrid() { showGrid = !showGrid; render(); }
+
+function toggleSnap() {
+    snapIndex = (snapIndex + 1) % SNAP_OPTIONS.length;
+    snapSize = SNAP_OPTIONS[snapIndex];
+    document.getElementById('snap-label').textContent = snapSize > 0 ? `${snapSize}u` : 'Off';
+}
+
+function deleteSelected() {
+    if (selectedId) removeItem(selectedId);
+}
+
+function duplicateSelected() {
+    if (!selectedId) return;
+    const item = items.find(i => i.id === selectedId);
+    if (!item) return;
+    const dup = addItem(item.type, item.category, item.x + 2, item.z + 2, item.rotation, item.npcId, item.npcName);
+    selectItem(dup.id);
+    render();
+}
+
+function clearAll() {
+    if (!confirm('Clear all items? This cannot be undone.')) return;
+    items = [];
+    selectedId = null;
+    nextId = 1;
+    undoStack = [];
+    redoStack = [];
+    updateInspector();
+    render();
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORT — Generate C# code that pastes directly into Unity
+// ══════════════════════════════════════════════════════════════
+
+function exportCode() {
+    const buildings = items.filter(i => i.category === 'building');
+    const decorations = items.filter(i => i.category === 'decoration');
+    const npcs = items.filter(i => i.category === 'npc');
+
+    let code = `// ═══════════════════════════════════════════════════════════\n`;
+    code += `// AUTO-GENERATED by Frost Valley Town Builder (HTML)\n`;
+    code += `// Paste into TownBuilder.cs + NPCSpawner.cs\n`;
+    code += `// Generated: ${new Date().toISOString()}\n`;
+    code += `// ═══════════════════════════════════════════════════════════\n\n`;
+
+    // Town center
+    code += `static readonly Vector3 TOWN_CENTER = new Vector3(${townCenter.x}f, 0, ${townCenter.z}f);\n\n`;
+
+    // Buildings
+    code += `static readonly BuildingPlacement[] LAYOUT = new[]\n{\n`;
+    for (const b of buildings) {
+        code += `    new BuildingPlacement("${b.type}", ${fmtVec(b.x, b.z)}, ${fmtFloat(b.rotation)}),\n`;
+    }
+    code += `};\n\n`;
+
+    // Decorations
+    code += `static readonly BuildingPlacement[] DECORATIONS = new[]\n{\n`;
+    for (const d of decorations) {
+        code += `    new BuildingPlacement("${d.type}", ${fmtVec(d.x, d.z)}, ${fmtFloat(d.rotation)}),\n`;
+    }
+    code += `};\n\n`;
+
+    // NPCs
+    code += `// ── NPCSpawner.cs ──\n`;
+    code += `static readonly NPCSpawnPoint[] FROST_VALLEY_SPAWNS = new[]\n{\n`;
+    for (const n of npcs) {
+        const comment = n.npcName ? ` // ${n.npcName}` : '';
+        code += `    new NPCSpawnPoint("${n.npcId}", new Vector3(${fmtFloat(n.x)}, 0, ${fmtFloat(n.z)})),${comment}\n`;
+    }
+    code += `};\n`;
+
+    showExport('Export C# — TownBuilder.cs + NPCSpawner.cs', code);
+}
+
+function fmtFloat(v) {
+    if (v === 0) return '0f';
+    if (Number.isInteger(v)) return v + 'f';
+    return v + 'f';
+}
+
+function fmtVec(x, z) {
+    return `new Vector3(${fmtFloat(x)}, 0, ${fmtFloat(z)})`;
+}
+
+function exportJSON() {
+    const data = {
+        townCenter,
+        items: items.map(i => ({ ...i })),
+        version: 1,
+        exported: new Date().toISOString()
+    };
+    showExport('Export JSON', JSON.stringify(data, null, 2));
+}
+
+function importJSON() {
+    const input = prompt('Paste JSON data:');
+    if (!input) return;
+    try {
+        const data = JSON.parse(input);
+        if (data.townCenter) {
+            townCenter = data.townCenter;
+            document.getElementById('tc-x').value = townCenter.x;
+            document.getElementById('tc-z').value = townCenter.z;
+        }
+        if (data.items) {
+            items = data.items;
+            nextId = Math.max(...items.map(i => i.id), 0) + 1;
+        }
+        selectedId = null;
+        pushUndo();
+        updateInspector();
+        render();
+    } catch (e) {
+        alert('Invalid JSON: ' + e.message);
+    }
+}
+
+function showExport(title, code) {
+    document.getElementById('export-title').textContent = title;
+    document.getElementById('export-code').textContent = code;
+    document.getElementById('export-modal').classList.add('active');
+}
+
+function closeExport() {
+    document.getElementById('export-modal').classList.remove('active');
+}
+
+function copyExport() {
+    const code = document.getElementById('export-code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOAD DEFAULT LAYOUT (from TownBuilder.cs)
+// ══════════════════════════════════════════════════════════════
+
+function loadDefaultLayout() {
+    // Buildings from TownBuilder.cs LAYOUT array
+    const defaultBuildings = [
+        { type: 'Town Hall',   x: 0,   z: 8,   rot: 180 },
+        { type: 'Farm House',  x: -20, z: 18,  rot: 90 },
+        { type: 'Start House', x: -20, z: 0,   rot: 90 },
+        { type: 'Farm House',  x: -20, z: -18, rot: 90 },
+        { type: 'Start House', x: 20,  z: 18,  rot: -90 },
+        { type: 'Farm House',  x: 20,  z: 0,   rot: -90 },
+        { type: 'Start House', x: 20,  z: -18, rot: -90 },
+        { type: 'Farm House',  x: -14, z: -30, rot: 45 },
+        { type: 'Start House', x: 14,  z: -30, rot: -45 },
+        { type: 'Start House', x: -14, z: 28,  rot: 180 },
+        { type: 'Farm House',  x: 14,  z: 28,  rot: 180 },
+    ];
+
+    const defaultDecorations = [
+        { type: 'Farm Fence',    x: -8,  z: -8,  rot: 0 },
+        { type: 'Farm Fence',    x: -2,  z: -8,  rot: 0 },
+        { type: 'Farm Fence',    x: 4,   z: -8,  rot: 0 },
+        { type: 'Farm Fence',    x: -8,  z: 20,  rot: 0 },
+        { type: 'Farm Fence',    x: 4,   z: 20,  rot: 0 },
+        { type: 'Farm Fence',    x: -12, z: -4,  rot: 90 },
+        { type: 'Farm Fence',    x: -12, z: 4,   rot: 90 },
+        { type: 'Farm Fence',    x: -12, z: 12,  rot: 90 },
+        { type: 'Farm Fence',    x: 12,  z: -4,  rot: 90 },
+        { type: 'Farm Fence',    x: 12,  z: 4,   rot: 90 },
+        { type: 'Farm Fence',    x: 12,  z: 12,  rot: 90 },
+        { type: 'Orange Flower', x: -3,  z: 2,   rot: 0 },
+        { type: 'Red Flower',    x: 3,   z: 2,   rot: 30 },
+        { type: 'Yellow Flower', x: 0,   z: 5,   rot: 15 },
+        { type: 'Red Flower',    x: -5,  z: -2,  rot: 60 },
+        { type: 'Orange Flower', x: 5,   z: -2,  rot: 45 },
+        { type: 'Scarecrow',     x: 8,   z: -22, rot: -20 },
+        { type: 'Farm Fence',    x: -6,  z: -20, rot: 0 },
+        { type: 'Farm Fence',    x: 6,   z: -20, rot: 0 },
+    ];
+
+    const defaultNPCs = [
+        { id: 'elder_frost',    x: -15, z: 4,   name: 'Elder Frost' },
+        { id: 'smith_ember',    x: -33, z: 0,   name: 'Smith Ember' },
+        { id: 'keeper_zara',    x: 3,   z: 14,  name: 'Keeper Zara' },
+        { id: 'brawler_jax',    x: -8,  z: -6,  name: 'Brawler Jax' },
+        { id: 'ice_queen_vera', x: 5,   z: -10, name: 'Ice Queen Vera' },
+    ];
+
+    for (const b of defaultBuildings) {
+        addItem(b.type, 'building', b.x, b.z, b.rot);
+    }
+    for (const d of defaultDecorations) {
+        addItem(d.type, 'decoration', d.x, d.z, d.rot);
+    }
+    for (const n of defaultNPCs) {
+        addItem('npc', 'npc', n.x, n.z, 0, n.id, n.name);
+    }
+
+    // Clear undo stack (this is the initial state)
+    undoStack = [JSON.stringify(items)];
+    redoStack = [];
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+loadDefaultLayout();
+resetView();
+</script>
+</body>
+</html>
