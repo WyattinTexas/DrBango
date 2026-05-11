@@ -103,7 +103,7 @@ function getZoneRegion(zone) {
   return 'rolling_hills';
 }
 
-// worldBossState declared in globals.js (var)
+let worldBossState = null;
 let worldBossListener = null;
 let lastBossSpawnCycle = -1;
 
