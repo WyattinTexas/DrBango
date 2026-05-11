@@ -65,6 +65,17 @@ const ctx = canvas.getContext('2d');
 // ── Day seed for daily resets ──
 function getDaySeed() { return Math.floor(Date.now() / 86400000); }
 
+// ── Time of day cycle (10-minute loop) ──
+function getTimeOfDay() {
+  const cyclePos = (Date.now() / 1000 / 60) % 10;
+  let phase, progress, nightFactor;
+  if (cyclePos < 2) { phase = 'dawn'; progress = cyclePos / 2; nightFactor = 1 - progress; }
+  else if (cyclePos < 5) { phase = 'day'; progress = (cyclePos - 2) / 3; nightFactor = 0; }
+  else if (cyclePos < 7) { phase = 'dusk'; progress = (cyclePos - 5) / 2; nightFactor = progress; }
+  else { phase = 'night'; progress = (cyclePos - 7) / 3; nightFactor = 1; }
+  return { phase, progress, nightFactor };
+}
+
 // ── Skill system ──
 function hasSkill(skillId) {
   return G.unlockedSkills && G.unlockedSkills.includes(skillId);
