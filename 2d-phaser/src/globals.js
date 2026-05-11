@@ -59,12 +59,8 @@ for (let y = 0; y < WORLD_H; y++) {
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
-// Other missing globals
-var spiritWisps = [];
-var roamingEnemies = [];
-var resourceNodes = [];
-var friendlySpirits = [];
-var worldBossState = null; // var so world-events.js can redeclare
+// NOTE: spiritWisps, roamingEnemies, etc. are declared in their own
+// core modules (gathering.js, world-events.js). Do NOT redeclare here.
 
 // ── Day seed for daily resets ──
 function getDaySeed() { return Math.floor(Date.now() / 86400000); }
