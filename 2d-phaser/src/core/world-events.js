@@ -103,7 +103,7 @@ function getZoneRegion(zone) {
   return 'rolling_hills';
 }
 
-let worldBossState = null; // cached local state
+// worldBossState declared in globals.js (var)
 let worldBossListener = null;
 let lastBossSpawnCycle = -1;
 
@@ -209,8 +209,8 @@ function showBossSpawnNotification(bossName, zoneName, bossTitle, bossPlayers) {
 
 function updateWorldBossBar() {
   const bar = document.getElementById('worldBossBar');
-  if (!worldBossState || !worldBossState.active) {
-    bar.style.display = 'none';
+  if (!bar || !worldBossState || !worldBossState.active) {
+    if (bar) bar.style.display = 'none';
     return;
   }
 

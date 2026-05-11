@@ -4,6 +4,68 @@
 // Provides stubs and real implementations for the Phaser port.
 // ═══════════════════════════════════════════════════
 
+// ── Safe DOM stubs (core modules reference 274 DOM elements that don't exist in Phaser) ──
+const _realGetById = document.getElementById.bind(document);
+document.getElementById = function(id) {
+  const el = _realGetById(id);
+  if (el) return el;
+  // Return a safe stub element so .style, .textContent, .innerHTML don't crash
+  return {
+    style: new Proxy({}, { set: () => true, get: () => '' }),
+    textContent: '', innerHTML: '', innerText: '',
+    classList: { add: ()=>{}, remove: ()=>{}, toggle: ()=>{}, contains: ()=>false },
+    setAttribute: ()=>{}, getAttribute: ()=>null, removeAttribute: ()=>{},
+    addEventListener: ()=>{}, removeEventListener: ()=>{},
+    appendChild: ()=>{}, removeChild: ()=>{}, remove: ()=>{},
+    querySelectorAll: ()=>[], querySelector: ()=>null,
+    children: [], childNodes: [], parentElement: null,
+    getBoundingClientRect: ()=>({top:0,left:0,width:0,height:0,right:0,bottom:0}),
+    offsetWidth: 0, offsetHeight: 0,
+    dataset: {},
+    checked: false, value: '',
+    _stub: true
+  };
+};
+
+// Also stub querySelectorAll for bulk DOM queries
+const _realQSA = document.querySelectorAll.bind(document);
+document.querySelectorAll = function(sel) {
+  try { return _realQSA(sel); } catch(e) { return []; }
+};
+
+// ── Constants from index.html ──
+const TILE = 32;
+const WORLD_W = 100;
+const WORLD_H = 80;
+const HUB = { x: 15, y: 20 };
+const HUB_MEADOW = { x: 28, y: 52 };
+const HUB_VOLCANIC = { x: 68, y: 28 };
+const HUB_DARK = { x: 92, y: 15 };
+
+// World map stub (gathering.js references worldMap[y][x] for tile types)
+// Tile types: 0=grass, 1=path, 2=water, 6=encounter zone
+const worldMap = [];
+for (let y = 0; y < WORLD_H; y++) {
+  worldMap[y] = [];
+  for (let x = 0; x < WORLD_W; x++) {
+    // Default everything to encounter zone (6) so gathering works
+    worldMap[y][x] = 6;
+    // Water borders
+    if (x === 0 || y === 0 || x === WORLD_W - 1 || y === WORLD_H - 1) worldMap[y][x] = 2;
+  }
+}
+
+// Canvas stub (some modules reference a canvas context for rendering)
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+
+// Other missing globals
+var spiritWisps = [];
+var roamingEnemies = [];
+var resourceNodes = [];
+var friendlySpirits = [];
+var worldBossState = null; // var so world-events.js can redeclare
+
 // ── Day seed for daily resets ──
 function getDaySeed() { return Math.floor(Date.now() / 86400000); }
 
@@ -66,7 +128,7 @@ function showBattleOverlay() {}
 function hideBattleOverlay() {}
 function renderBattle() {}
 function showWildAppearedSplash(name) { console.log(`[Splash] Wild ${name} appeared!`); }
-let battleFledThisSession = false;
+var battleFledThisSession = false; // var so quests.js can redeclare
 
 // ── Accessory effects ──
 function applyAccessoryBattleEffects() {

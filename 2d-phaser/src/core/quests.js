@@ -752,5 +752,4 @@ function renderQuestsInInventory() {
   }).join('');
 }
 
-// Track flee count for "no flee" quest
-let battleFledThisSession = false;
+// Track flee count for "no flee" quest (declared in globals.js)
