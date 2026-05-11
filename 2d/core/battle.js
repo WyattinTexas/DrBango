@@ -724,8 +724,8 @@ function triggerWildEncounter() {
   // Build player team from G.team (up to 3)
   const playerGhosts = buildPlayerBattleTeam();
 
-  // Build enemy team — scale count by player level
-  const enemyCount = Math.min(3, Math.max(1, Math.ceil(G.level / 3)));
+  // Wild encounters are always 1v1
+  const enemyCount = 1;
   const enemyCards = [wildCard];
   for (let i = 1; i < enemyCount; i++) {
     const extra = getWildEncounter();
@@ -801,7 +801,10 @@ function buildPlayerBattleTeam() {
   if (activeG && !activeG.ko && activeG.hp > 0) {
     alive = [activeG, ...alive.filter(g => g !== activeG)];
   }
-  return alive.slice(0, 3).map(g => ({
+  // Sideline unlocks after 5 battle wins — before that, 1v1 only
+  const sidelineUnlocked = (G.rep?.battlesWon || 0) >= 5;
+  const maxTeamSize = sidelineUnlocked ? 3 : 1;
+  return alive.slice(0, maxTeamSize).map(g => ({
     ...g, hp: Math.max(1, g.hp), ko: false, usedOncePerGame: false, entryFired: false,
     _teamIdx: G.team.indexOf(g) // track which G.team slot this came from
   }));
@@ -3374,6 +3377,12 @@ function endBattle(won) {
   if (won) {
     if (!G.rep) G.rep = { battlesWon:0, craftsCompleted:0, itemsSold:0, essencesCollected:0, raresFound:0 };
     G.rep.battlesWon++;
+
+    // Sideline unlock notification at 5 wins
+    if (G.rep.battlesWon === 5) {
+      notify('Sideline slots unlocked! You can now bring a team of 3 into battle!');
+    }
+
     checkAndNotifyTitles();
 
     // XP reward — based on highest rarity enemy defeated

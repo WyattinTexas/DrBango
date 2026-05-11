@@ -218,7 +218,20 @@ function triggerHostileNPCBattle(npc) {
   Music.play('battle');
 
   const playerGhosts = buildPlayerBattleTeam();
-  const enemyGhosts = npc.team.map(id => {
+  // Scale trainer team size by region (early = fewer ghosts)
+  const trainerRegion =
+    npc.x > 88 ? 'dark_castle' :
+    npc.x > 60 && npc.y < 43 ? 'volcanic_isles' :
+    npc.y >= 45 ? 'rolling_hills' : 'frost_valley';
+  const trainerTeamSize = {
+    frost_valley: 1,
+    rolling_hills: 2,
+    volcanic_isles: 2,
+    dark_castle: 3,
+  }[trainerRegion] || 3;
+
+  const trainerCardIds = npc.team.slice(0, trainerTeamSize);
+  const enemyGhosts = trainerCardIds.map(id => {
     const card = getCard(id);
     if (!card) return null;
     return {
