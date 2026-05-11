@@ -78,14 +78,21 @@ class BootScene extends Phaser.Scene {
     btnBg.on('pointerdown', () => {
       // Grant starter Spiritkin if none
       if (G.team.length === 0) {
-        const starter = ALL_CARDS.find(c => c.id === 39); // Castle Guards
-        if (starter) {
-          G.team.push({
-            id: starter.id, name: starter.name, hp: starter.maxHp, maxHp: starter.maxHp,
-            ko: false, ability: starter.ability, rarity: starter.rarity,
-            usedOncePerGame: false, entryFired: false
-          });
+        // Try Castle Guards, Snorton, Gary
+        const starterIds = [39, 66, 91];
+        for (const id of starterIds) {
+          const card = ALL_CARDS.find(c => c.id === id);
+          if (card) {
+            G.team.push({
+              id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp,
+              ko: false, ability: card.ability, abilityDesc: card.desc,
+              rarity: card.rarity, usedOncePerGame: false, entryFired: false
+            });
+            notify(`${card.name} joins your team!`);
+            break;
+          }
         }
+        saveGame();
       }
 
       this.cameras.main.fadeOut(800, 0, 0, 0);

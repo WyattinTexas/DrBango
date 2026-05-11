@@ -251,12 +251,36 @@ class WorldScene extends Phaser.Scene {
   onEnemyContact(player, enemy) {
     if (G.inBattle || G.team.length === 0) return;
 
-    G.inBattle = true;
     const cardData = enemy.cardData;
 
-    // Remove the enemy
+    // Remove the enemy sprite
     if (enemy.label) enemy.label.destroy();
     enemy.destroy();
+
+    // Use the REAL battle engine to set up the fight
+    // triggerWildEncounter() from battle.js handles all the state setup
+    // But it also calls showBattleOverlay/renderBattle which are stubbed
+    // So we call it, then launch our Phaser battle scene
+    if (typeof triggerWildEncounter === 'function') {
+      triggerWildEncounter();
+    } else {
+      // Fallback: manually set up B state
+      G.inBattle = true;
+      const playerGhosts = buildPlayerBattleTeam();
+      const enemyGhosts = [{
+        id: cardData.id, name: cardData.name, hp: cardData.maxHp, maxHp: cardData.maxHp,
+        ko: false, ability: cardData.ability, abilityDesc: cardData.desc,
+        rarity: cardData.rarity, usedOncePerGame: false, entryFired: false
+      }];
+      B = {
+        round: 1,
+        player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
+        enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
+        enemyCard: cardData, phase: 'ready', log: [],
+        playerDice: [], enemyDice: [],
+        nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+      };
+    }
 
     // Switch to battle scene
     this.cameras.main.fadeOut(300, 0, 0, 0);
