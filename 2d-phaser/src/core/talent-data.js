@@ -315,15 +315,15 @@ const CLASS_TREES = {
     color: '#44dd66',
     branches: ['Training', 'Recruiting', 'Bonding'],
     talents: [
-      // Branch 0: Training — grow and level your spiritkin (TBD: separate instance system)
+      // Branch 0: Training — grow spiritkin at training grounds (separate instance, level-gated)
       { id: 'trn_trn_1', branch: 0, tier: 0, name: 'Basic Training',
-        desc: '[WIP] Train spiritkin at training grounds to gain XP', cost: 1, maxRank: 1, prereq: null },
+        desc: 'Access training grounds. Spiritkin can train to gain XP.', cost: 1, maxRank: 1, prereq: null },
       { id: 'trn_trn_2', branch: 0, tier: 1, name: 'Advanced Training',
-        desc: '[WIP] Spiritkin can gain +1 HP at training grounds (level-gated)', cost: 2, maxRank: 1, prereq: 'trn_trn_1' },
+        desc: 'Spiritkin can gain +1 HP at training grounds (level-gated, once per level)', cost: 2, maxRank: 1, prereq: 'trn_trn_1' },
       { id: 'trn_trn_3', branch: 0, tier: 2, name: 'Elite Training',
-        desc: '[WIP] Higher-level training unlocks for stronger spiritkin', cost: 3, maxRank: 1, prereq: 'trn_trn_2' },
+        desc: 'Unlocks higher-tier training for stronger spiritkin', cost: 3, maxRank: 1, prereq: 'trn_trn_2' },
       { id: 'trn_trn_4', branch: 0, tier: 3, name: 'Master Training',
-        desc: '[WIP] Max-level training — spiritkin reach their full potential', cost: 4, maxRank: 1, prereq: 'trn_trn_3' },
+        desc: 'Spiritkin can reach their full potential at training grounds', cost: 4, maxRank: 1, prereq: 'trn_trn_3' },
 
       // Branch 1: Recruiting — find and recruit spiritkin
       { id: 'trn_rec_1', branch: 1, tier: 0, name: 'Keen Eye',
