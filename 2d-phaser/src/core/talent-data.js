@@ -311,34 +311,39 @@ const CLASS_TREES = {
 
   trainer: {
     name: 'Trainer',
-    desc: 'Master spiritkin combat and collection. Mastery unlocks Beastmaster, Gladiator & Ranger.',
+    desc: 'Learn to recruit, bond with, and grow your spiritkin. Mastery unlocks Beastmaster, Gladiator & Ranger.',
     color: '#44dd66',
-    branches: ['Combat', 'Collection', 'Bonding'],
+    branches: ['Training', 'Recruiting', 'Bonding'],
     talents: [
-      { id: 'trn_com_1', branch: 0, tier: 0, name: 'Battle Instinct',
-        desc: '+5% combat XP per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'trn_com_2', branch: 0, tier: 1, name: 'Veteran Tactics',
-        desc: 'See enemy HP before battle starts', cost: 2, maxRank: 2, prereq: 'trn_com_1' },
-      { id: 'trn_com_3', branch: 0, tier: 2, name: 'Challenger',
-        desc: '+1 Spirit reward from trainer battles', cost: 3, maxRank: 1, prereq: 'trn_com_2' },
-      { id: 'trn_com_4', branch: 0, tier: 3, name: 'Champion',
-        desc: 'Defeating a trainer grants a chance at their rarest spiritkin', cost: 4, maxRank: 1, prereq: 'trn_com_3' },
-      { id: 'trn_col_1', branch: 1, tier: 0, name: 'Keen Eye',
-        desc: '+10% recruit chance per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'trn_col_2', branch: 1, tier: 1, name: 'Spiritkin Whisperer',
-        desc: 'Wild spiritkin are less aggressive', cost: 2, maxRank: 2, prereq: 'trn_col_1' },
-      { id: 'trn_col_3', branch: 1, tier: 2, name: 'Rare Seeker',
-        desc: 'Increased rare spiritkin spawn rate', cost: 3, maxRank: 1, prereq: 'trn_col_2' },
-      { id: 'trn_col_4', branch: 1, tier: 3, name: 'Legendary Tracker',
-        desc: 'Sense legendary spiritkin in your region', cost: 4, maxRank: 1, prereq: 'trn_col_3' },
+      // Branch 0: Training — grow and level your spiritkin (TBD: separate instance system)
+      { id: 'trn_trn_1', branch: 0, tier: 0, name: 'Basic Training',
+        desc: '[WIP] Train spiritkin at training grounds to gain XP', cost: 1, maxRank: 1, prereq: null },
+      { id: 'trn_trn_2', branch: 0, tier: 1, name: 'Advanced Training',
+        desc: '[WIP] Spiritkin can gain +1 HP at training grounds (level-gated)', cost: 2, maxRank: 1, prereq: 'trn_trn_1' },
+      { id: 'trn_trn_3', branch: 0, tier: 2, name: 'Elite Training',
+        desc: '[WIP] Higher-level training unlocks for stronger spiritkin', cost: 3, maxRank: 1, prereq: 'trn_trn_2' },
+      { id: 'trn_trn_4', branch: 0, tier: 3, name: 'Master Training',
+        desc: '[WIP] Max-level training — spiritkin reach their full potential', cost: 4, maxRank: 1, prereq: 'trn_trn_3' },
+
+      // Branch 1: Recruiting — find and recruit spiritkin
+      { id: 'trn_rec_1', branch: 1, tier: 0, name: 'Keen Eye',
+        desc: '+10% recruit chance when rolling to recruit', cost: 1, maxRank: 1, prereq: null },
+      { id: 'trn_rec_2', branch: 1, tier: 1, name: 'Spiritkin Whisperer',
+        desc: 'Wild spiritkin are less aggressive toward you', cost: 2, maxRank: 1, prereq: 'trn_rec_1' },
+      { id: 'trn_rec_3', branch: 1, tier: 2, name: 'Rare Seeker',
+        desc: '+5% rare spiritkin spawn rate', cost: 3, maxRank: 1, prereq: 'trn_rec_2' },
+      { id: 'trn_rec_4', branch: 1, tier: 3, name: 'Legendary Tracker',
+        desc: 'Get a flash indicator when a legendary spiritkin is nearby in your area', cost: 4, maxRank: 1, prereq: 'trn_rec_3' },
+
+      // Branch 2: Bonding — team management + SIDELINE SLOT UNLOCKS
       { id: 'trn_bnd_1', branch: 2, tier: 0, name: 'Kindred Spirit',
-        desc: 'Active spiritkin gains +1 max HP per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'trn_bnd_2', branch: 2, tier: 1, name: 'Spirit Sync',
-        desc: 'Spiritkin abilities have +10% potency', cost: 2, maxRank: 2, prereq: 'trn_bnd_1' },
+        desc: 'Your spiritkin trusts you', cost: 1, maxRank: 1, prereq: null },
+      { id: 'trn_bnd_2', branch: 2, tier: 1, name: 'Sideline Partner',
+        desc: 'UNLOCK YOUR 1ST SIDELINE SLOT — bring a partner into battle', cost: 2, maxRank: 1, prereq: 'trn_bnd_1' },
       { id: 'trn_bnd_3', branch: 2, tier: 2, name: 'Soul Bond',
-        desc: 'Bonded spiritkin heals 1 HP between battles', cost: 3, maxRank: 1, prereq: 'trn_bnd_2' },
-      { id: 'trn_bnd_4', branch: 2, tier: 3, name: 'True Partner',
-        desc: 'Your lead spiritkin gains a unique passive', cost: 4, maxRank: 1, prereq: 'trn_bnd_3' },
+        desc: 'Your spiritkin heals 1 HP between battles', cost: 3, maxRank: 1, prereq: 'trn_bnd_2' },
+      { id: 'trn_bnd_4', branch: 2, tier: 3, name: 'True Companion',
+        desc: 'Your spiritkin is your friend', cost: 4, maxRank: 1, prereq: 'trn_bnd_3' },
     ],
   },
 
@@ -1057,6 +1062,7 @@ const APPRENTICE_DESCRIPTIONS = {
   scholar: 'Party gains +10% XP while grouped with you. Requires Fortune XP to unlock.',
   enchanter: 'Gain ability to enhance crafting materials. All enhancements cost essences. Artisans need you.',
   elder: 'The Council recognizes your wisdom. No immediate ability — your power grows through the branches.',
+  trainer: 'You can roll to recruit wild spiritkin.',
 };
 
 function getApprenticeInfo(treeId) {
@@ -1073,6 +1079,7 @@ const MASTER_DESCRIPTIONS = {
   scholar: '+1 special slot (5 total), Scholar title visible to all, Preparation buff lasts 1 hour',
   enchanter: 'All enchantments cost 1 fewer essence (min 1). Enchanted items glow gold. Generate 1 random essence every 30 min. Unlocks "Enchanter" title.',
   elder: 'Access to Artifact Armor (Elder-exclusive gear). Unlocks "Elder" title. Elder Barrier cooldown reduced to 1 hour.',
+  trainer: 'UNLOCK 2ND SIDELINE PARTNER. Unlocks "Trainer" title.',
 };
 
 function getMasterInfo(treeId) {
