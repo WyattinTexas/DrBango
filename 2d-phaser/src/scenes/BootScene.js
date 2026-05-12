@@ -22,10 +22,13 @@ class BootScene extends Phaser.Scene {
     this.load.spritesheet('tiles_house', 'assets/tiles/TilesetHouse.png', { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('tiles_desert', 'assets/tiles/TilesetDesert.png', { frameWidth: 16, frameHeight: 16 });
 
-    // ── Card art (load the first batch for battles) ──
-    for (const card of ALL_CARDS.slice(0, 40)) {
+    // ── Card art (load ALL cards so every enemy has art) ──
+    for (const card of ALL_CARDS) {
       if (card.art) {
-        this.load.image(`card_${card.id}`, card.art);
+        // Fix relative paths — card art paths start with ../testroom/
+        let artPath = card.art;
+        if (artPath.startsWith('../')) artPath = artPath; // keep relative
+        this.load.image(`card_${card.id}`, artPath);
       }
     }
 
@@ -45,12 +48,15 @@ class BootScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // ── Player walk animations (4x4 grid: row0=down, row1=up, row2=left, row3=right) ──
-    // Each row has 4 frames. Frame index = row*4 + col
-    this.anims.create({ key: 'walk_down', frames: this.anims.generateFrameNumbers('player', { frames: [0, 1, 2, 3] }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_up', frames: this.anims.generateFrameNumbers('player', { frames: [4, 5, 6, 7] }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_left', frames: this.anims.generateFrameNumbers('player', { frames: [8, 9, 10, 11] }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_right', frames: this.anims.generateFrameNumbers('player', { frames: [12, 13, 14, 15] }), frameRate: 8, repeat: -1 });
+    // ── Player walk animations ──
+    // Spritesheet: 4 cols (directions) × 4 rows (frames), 16x16 each
+    // Col 0=DOWN, Col 1=UP, Col 2=LEFT, Col 3=RIGHT
+    // Row 0=idle, Row 1=step (only 2 used)
+    // Frame index = row * 4 + col
+    this.anims.create({ key: 'walk_down', frames: this.anims.generateFrameNumbers('player', { frames: [0, 4] }), frameRate: 4, repeat: -1 });
+    this.anims.create({ key: 'walk_up', frames: this.anims.generateFrameNumbers('player', { frames: [1, 5] }), frameRate: 4, repeat: -1 });
+    this.anims.create({ key: 'walk_left', frames: this.anims.generateFrameNumbers('player', { frames: [2, 6] }), frameRate: 4, repeat: -1 });
+    this.anims.create({ key: 'walk_right', frames: this.anims.generateFrameNumbers('player', { frames: [3, 7] }), frameRate: 4, repeat: -1 });
 
     // ── Title screen ──
     this.cameras.main.setBackgroundColor('#1a1a2e');

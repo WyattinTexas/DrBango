@@ -116,22 +116,24 @@ class WorldScene extends Phaser.Scene {
 
     const speed = 140;
     let vx = 0, vy = 0;
-    let dir = null;
 
-    if (this.cursors.left.isDown || this.wasd.A.isDown) { vx = -speed; dir = 'left'; }
-    else if (this.cursors.right.isDown || this.wasd.D.isDown) { vx = speed; dir = 'right'; }
-    if (this.cursors.up.isDown || this.wasd.W.isDown) { vy = -speed; dir = 'up'; }
-    else if (this.cursors.down.isDown || this.wasd.S.isDown) { vy = speed; dir = 'down'; }
+    if (this.cursors.left.isDown || this.wasd.A.isDown) { vx = -speed; this._lastDir = 'left'; }
+    else if (this.cursors.right.isDown || this.wasd.D.isDown) { vx = speed; this._lastDir = 'right'; }
+    if (this.cursors.up.isDown || this.wasd.W.isDown) { vy = -speed; this._lastDir = 'up'; }
+    else if (this.cursors.down.isDown || this.wasd.S.isDown) { vy = speed; this._lastDir = 'down'; }
 
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     this.player.setVelocity(vx, vy);
 
-    // Animate
+    // Animate walk or show idle frame
     if (vx !== 0 || vy !== 0) {
-      if (dir) this.player.play(`walk_${dir}`, true);
+      this.player.play(`walk_${this._lastDir}`, true);
     } else {
       this.player.stop();
+      // Idle: show frame 0 of last direction (col index: down=0, up=1, left=2, right=3)
+      const idleFrame = { down: 0, up: 1, left: 2, right: 3 }[this._lastDir || 'down'];
+      this.player.setFrame(idleFrame);
     }
 
     G.x = this.player.x / 32;

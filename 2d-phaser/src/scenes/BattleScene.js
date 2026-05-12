@@ -80,30 +80,53 @@ class BattleScene extends Phaser.Scene {
     this.playerHPBarBg = this.add.rectangle(pX, pY + 172, 180, 8, 0x333333);
     this.playerHPBar = this.add.rectangle(pX - 90, pY + 172, 180, 6, 0x44aa44).setOrigin(0, 0.5);
 
-    // Enemy HP — above card, with name
-    this.enemyHPText = this.add.text(eX + 110, eY - 145, `HP ${eg.hp}/${eg.maxHp}`, {
-      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222',
-    }).setOrigin(1, 0.5);
-
-    // Enemy name + ability label
-    this.add.text(eX - 100, eY - 145, eg.name, {
+    // Enemy name + HP text
+    this.add.text(eX - 100, eY - 150, eg.name, {
       fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#222',
     }).setOrigin(0, 0.5);
 
+    this.enemyHPText = this.add.text(eX + 100, eY - 150, `HP ${eg.hp}/${eg.maxHp}`, {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222',
+    }).setOrigin(1, 0.5);
+
+    // Enemy ability
     if (eCard?.ability) {
-      this.add.text(eX, eY - 128, eCard.ability, {
+      this.add.text(eX, eY - 132, eCard.ability, {
         fontSize: '11px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#666',
       }).setOrigin(0.5);
     }
 
-    // ═══════ DICE DISPLAY ═══════
-    this.playerDiceText = this.add.text(pX, H * 0.82, '', {
-      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#3366aa',
-    }).setOrigin(0.5);
+    // Enemy HP bar (same style as player)
+    this.enemyHPBarBg = this.add.rectangle(eX, eY - 118, 180, 8, 0x333333);
+    this.enemyHPBar = this.add.rectangle(eX - 90, eY - 118, 180, 6, 0x44aa44).setOrigin(0, 0.5);
 
-    this.enemyDiceText = this.add.text(eX, H * 0.82, '', {
-      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#aa3333',
-    }).setOrigin(0.5);
+    // ═══════ DICE DISPLAY (colored squares, not text) ═══════
+    this.playerDice = [];
+    this.enemyDice = [];
+    // Create 3 dice slots per side
+    for (let i = 0; i < 3; i++) {
+      // Player dice (blue)
+      const pdBg = this.add.rectangle(pX - 50 + i * 44, H * 0.82, 38, 38, 0x3378cc)
+        .setStrokeStyle(2, 0x2060a0);
+      const pdTxt = this.add.text(pX - 50 + i * 44, H * 0.82, '', {
+        fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold', color: '#fff',
+        shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true },
+      }).setOrigin(0.5);
+      this.playerDice.push({ bg: pdBg, txt: pdTxt });
+
+      // Enemy dice (red)
+      const edBg = this.add.rectangle(eX - 50 + i * 44, H * 0.82, 38, 38, 0xcc4444)
+        .setStrokeStyle(2, 0xa03030);
+      const edTxt = this.add.text(eX - 50 + i * 44, H * 0.82, '', {
+        fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold', color: '#fff',
+        shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true },
+      }).setOrigin(0.5);
+      this.enemyDice.push({ bg: edBg, txt: edTxt });
+    }
+
+    // Dice labels
+    this.add.text(pX, H * 0.76, 'PLAYER', { fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#3366aa' }).setOrigin(0.5);
+    this.add.text(eX, H * 0.76, 'ENEMY', { fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#aa3333' }).setOrigin(0.5);
 
     // ═══════ BATTLE LOG ═══════
     this.logText = this.add.text(W / 2, H * 0.88, 'Press FIGHT to roll the dice!', {
@@ -148,9 +171,18 @@ class BattleScene extends Phaser.Scene {
     const eRes = classify(eDice);
     const winner = compareRolls(pRes, eRes);
 
-    // Show dice with styling
-    this.playerDiceText.setText(pDice.map(d => `[${d}]`).join(' '));
-    this.enemyDiceText.setText(eDice.map(d => `[${d}]`).join(' '));
+    // Show dice in colored squares
+    for (let i = 0; i < 3; i++) {
+      if (this.playerDice[i]) {
+        this.playerDice[i].txt.setText(pDice[i] !== undefined ? pDice[i] : '');
+        // Pop animation
+        this.tweens.add({ targets: [this.playerDice[i].bg, this.playerDice[i].txt], scaleX: 1.3, scaleY: 1.3, duration: 80, yoyo: true });
+      }
+      if (this.enemyDice[i]) {
+        this.enemyDice[i].txt.setText(eDice[i] !== undefined ? eDice[i] : '');
+        this.tweens.add({ targets: [this.enemyDice[i].bg, this.enemyDice[i].txt], scaleX: 1.3, scaleY: 1.3, duration: 80, yoyo: true, delay: 100 });
+      }
+    }
 
     let log = `R${this.roundNum}: ${pRes.type} vs ${eRes.type}`;
 
@@ -197,6 +229,8 @@ class BattleScene extends Phaser.Scene {
     this.enemyHPText.setText(`HP ${this.eg.hp}/${this.eg.maxHp}`);
     const ePct = this.eg.hp / this.eg.maxHp;
     this.enemyHPText.setColor(ePct <= 0.33 ? '#cc2211' : '#222');
+    this.enemyHPBar.width = Math.max(0, 180 * ePct);
+    this.enemyHPBar.setFillStyle(ePct > 0.66 ? 0x44aa44 : ePct > 0.33 ? 0xddaa22 : 0xcc2211);
   }
 
   endBattle(won) {
