@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v1'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v2'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2835,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v1'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v2'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3013,9 +3013,25 @@ const WILLPOWER_CARDS = [
 function wpCardById(id) { return WILLPOWER_CARDS.find(c => c.id === id); }
 
 function buildWillpowerDeck(size) {
-  // Everyone gets 1 of each of the 12 willpower cards
-  const deck = WILLPOWER_CARDS.map(c => c.id);
-  // Shuffle (Fisher-Yates)
+  // Shuffle all 12 card types, then draw 'size' cards (matches ghost's maxHp)
+  const pool = WILLPOWER_CARDS.map(c => c.id);
+  // Shuffle pool
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  // Take up to 'size' cards; if size > 12, add random extras (max 2 each)
+  const deck = pool.slice(0, Math.min(size, 12));
+  const counts = {};
+  deck.forEach(id => counts[id] = (counts[id]||0) + 1);
+  while (deck.length < size) {
+    const available = WILLPOWER_CARDS.filter(c => (counts[c.id]||0) < 2);
+    if (available.length === 0) break;
+    const pick = available[Math.floor(Math.random() * available.length)];
+    deck.push(pick.id);
+    counts[pick.id] = (counts[pick.id]||0) + 1;
+  }
+  // Final shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
