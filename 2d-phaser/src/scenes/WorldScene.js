@@ -101,6 +101,35 @@ class WorldScene extends Phaser.Scene {
     // ── World bounds ──
     this.physics.world.setBounds(0, 0, MW * T, MH * T);
 
+    // ── Region labels on the map ──
+    const regionLabels = [
+      { text: 'FROST VALLEY', x: 25, y: 5, color: '#88bbff' },
+      { text: 'Polaris Hub', x: HUB.x + 3, y: HUB.y - 3, color: '#daa520' },
+      { text: 'ROLLING HILLS', x: 30, y: 47, color: '#88cc44' },
+      { text: 'Meadowbrook', x: 26, y: 56, color: '#6a8a4a' },
+      { text: 'VOLCANIC ISLES', x: 72, y: 7, color: '#ff8844' },
+      { text: 'DARK CASTLE', x: 98, y: 5, color: '#aa66cc' },
+    ];
+    for (const rl of regionLabels) {
+      this.add.text(rl.x * T, rl.y * T, rl.text, {
+        fontSize: '10px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: rl.color,
+        backgroundColor: '#00000066', padding: { x: 4, y: 2 },
+      }).setDepth(5);
+    }
+
+    // ── Encounter zone labels ──
+    for (const zone of ENCOUNTER_ZONES) {
+      this.add.text((zone.x + zone.w/2) * T, zone.y * T - 8, zone.name, {
+        fontSize: '8px', fontFamily: 'monospace', color: '#aa88dd',
+        backgroundColor: '#00000044', padding: { x: 2, y: 1 },
+      }).setOrigin(0.5).setDepth(5);
+    }
+
+    // ── Controls hint ──
+    this.add.text(10, this.scale.height - 20, 'WASD: Move | E: Interact | C: Craft | T: Team', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#888888',
+    }).setScrollFactor(0).setDepth(200);
+
     // ── Region text ──
     this.regionText = this.add.text(640, 40, '', {
       fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
