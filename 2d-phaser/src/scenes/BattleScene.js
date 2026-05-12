@@ -45,7 +45,7 @@ class BattleScene extends Phaser.Scene {
     // Card art
     const pArtKey = `card_${pg.id}`;
     if (this.textures.exists(pArtKey)) {
-      this.add.image(pX, pY, pArtKey).setDisplaySize(190, 270);
+      this.add.image(pX, pY, pArtKey).setDisplaySize(190, 270).setFlipX(true);
     } else {
       // Fallback: name text
       this.add.text(pX, pY, pg.name, { fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
@@ -187,13 +187,15 @@ class BattleScene extends Phaser.Scene {
     let log = `R${this.roundNum}: ${pRes.type} vs ${eRes.type}`;
 
     if (winner === 'a') {
-      const dmg = pRes.damage;
+      let dmg = pRes.damage;
+      if (G.equipped?.weapon?.bonus) dmg += G.equipped.weapon.bonus;
       this.eg.hp = Math.max(0, this.eg.hp - dmg);
       log += ` — ${dmg} dmg to ${this.eg.name}!`;
       this.cameras.main.shake(80, 0.004);
       this.showFloatingDmg(this.scale.width * 0.75, this.scale.height * 0.35, dmg, '#cc2211');
     } else if (winner === 'b') {
-      const dmg = eRes.damage;
+      let dmg = eRes.damage;
+      if (G.equipped?.head?.defense) dmg = Math.max(1, dmg - G.equipped.head.defense);
       this.pg.hp = Math.max(0, this.pg.hp - dmg);
       log += ` — ${dmg} dmg to ${this.pg.name}!`;
       this.cameras.main.shake(120, 0.006);
@@ -234,21 +236,50 @@ class BattleScene extends Phaser.Scene {
   }
 
   endBattle(won) {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    let leveledUp = false;
+    let xpGain = 0;
+
     if (won) {
       if (!G.rep) G.rep = { battlesWon: 0 };
       G.rep.battlesWon++;
       G.coins += 10;
-      G.xp += 1;
+
+      // XP scaled by enemy rarity
+      const rarityXP = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 };
+      xpGain = rarityXP[this.eg?.rarity] || 1;
+      G.xp += xpGain;
+
       if (G.rep.battlesWon === 5) notify('Sideline slots unlocked!');
+
+      // Level up check
       const xpNeeded = G.level * 3;
-      if (G.xp >= xpNeeded) { G.level++; G.xp -= xpNeeded; notify(`Level up! Now level ${G.level}!`); }
+      if (G.xp >= xpNeeded) {
+        G.level++;
+        G.xp -= xpNeeded;
+        leveledUp = true;
+        // Heal entire team on level up
+        for (const ghost of G.team) { ghost.hp = ghost.maxHp; ghost.ko = false; }
+      }
+
       checkAndNotifyTitles();
 
+      // Essence drops
+      if (typeof generateEssence === 'function' && B?.enemyCard) {
+        const zoneIdx = B.zoneIdx !== undefined ? B.zoneIdx : getCurrentZone();
+        const essence = generateEssence(B.enemyCard, zoneIdx);
+        if (essence) {
+          if (!G.essences) G.essences = [];
+          G.essences.push(essence);
+        }
+      }
+
       // Mark trainer defeated
-      if (B.isHostileNPC) markHostileNPCDefeated(B.isHostileNPC);
+      if (B?.isHostileNPC) markHostileNPCDefeated(B.isHostileNPC);
     }
 
-    // Sync HP
+    // Sync HP back to team
     if (B?.player) {
       for (const ghost of B.player.ghosts) {
         if (ghost._teamIdx !== undefined && G.team[ghost._teamIdx]) {
@@ -262,11 +293,37 @@ class BattleScene extends Phaser.Scene {
     B = null;
     saveGame();
 
-    this.cameras.main.fadeOut(400);
-    this.time.delayedCall(500, () => {
-      this.scene.stop();
-      this.scene.resume('WorldScene');
-      this.scene.get('WorldScene').cameras.main.fadeIn(300);
+    // ── Victory / Defeat banner ──
+    const bannerText = won ? 'VICTORY!' : 'DEFEAT';
+    const bannerColor = won ? '#44dd44' : '#dd4444';
+    const banner = this.add.text(W / 2, H / 2, bannerText, {
+      fontSize: '52px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: bannerColor,
+      shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true },
+    }).setOrigin(0.5).setDepth(500).setAlpha(0).setScale(0.3);
+
+    let subtitle = '';
+    if (won) {
+      subtitle = `+${xpGain} XP  +10 Gold`;
+      if (leveledUp) subtitle += `  LEVEL ${G.level}!`;
+    }
+    const subText = this.add.text(W / 2, H / 2 + 44, subtitle, {
+      fontSize: '16px', fontFamily: 'Georgia, serif', color: won ? '#ccddcc' : '#ccaaaa',
+      shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 4, fill: true },
+    }).setOrigin(0.5).setDepth(500).setAlpha(0);
+
+    this.tweens.add({ targets: banner, alpha: 1, scale: 1, duration: 400, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: subText, alpha: 1, duration: 300, delay: 300 });
+
+    // Transition out after banner
+    this.time.delayedCall(1600, () => {
+      this.cameras.main.fadeOut(400);
+      this.time.delayedCall(500, () => {
+        this.scene.stop();
+        this.scene.resume('WorldScene');
+        const ws = this.scene.get('WorldScene');
+        ws.cameras.main.fadeIn(300);
+        if (leveledUp) ws.showNotification(`Level up! Now level ${G.level}!`);
+      });
     });
   }
 }

@@ -70,7 +70,7 @@ class WorldScene extends Phaser.Scene {
     // ── Enemies ──
     this.enemies = this.physics.add.group();
     for (let i = 0; i < 8; i++) this.spawnEnemy();
-    this.time.addEvent({ delay: 4000, callback: this.spawnEnemy, callbackScope: this, loop: true });
+    this._spawnTimer = this.time.addEvent({ delay: 4000, callback: this.spawnEnemy, callbackScope: this, loop: true });
     this.physics.add.overlap(this.player, this.enemies, this.onEnemyContact, null, this);
 
     // ── Spirit Wisps (glowing collectible orbs) ──
@@ -85,6 +85,7 @@ class WorldScene extends Phaser.Scene {
     this.eKey = this.input.keyboard.addKey('E');
     this.cKey = this.input.keyboard.addKey('C');
     this.tKey = this.input.keyboard.addKey('T');
+    this.iKey = this.input.keyboard.addKey('I');
 
     // ── HUD ──
     this.buildHUD();
@@ -153,6 +154,7 @@ class WorldScene extends Phaser.Scene {
     const btnW = 80, btnH = 28, btnGap = 6;
     const buttons = [
       { label: 'TEAM (T)', key: 'T', action: () => this.showTeamLineup(), color: 0x445588 },
+      { label: 'ITEMS (I)', key: 'I', action: () => this.showInventory(), color: 0x885544 },
       { label: 'CRAFT (C)', key: 'C', action: () => { this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
       { label: 'MAP (M)', key: null, action: () => this.showNotification('Minimap is bottom-right!'), color: 0x448844 },
     ];
@@ -171,7 +173,7 @@ class WorldScene extends Phaser.Scene {
     });
 
     // ── Controls hint ──
-    this.add.text(10, this.scale.height - 20, 'WASD: Move | E: Interact', {
+    this.add.text(10, this.scale.height - 20, 'WASD: Move | E: Interact | I: Items | T: Team', {
       fontSize: '10px', fontFamily: 'monospace', color: '#666666',
     }).setScrollFactor(0).setDepth(200);
 
@@ -183,6 +185,9 @@ class WorldScene extends Phaser.Scene {
 
     // Notify callback for globals
     _notifyCallback = (text) => this.showNotification(text);
+
+    // Panel manager for inventory/team overlays
+    this.panels = new PanelManager(this);
 
     // Star Fox comm overlay
     this.comm = new CommOverlay(this);
@@ -242,6 +247,21 @@ class WorldScene extends Phaser.Scene {
     }
     if (Phaser.Input.Keyboard.JustDown(this.tKey)) {
       this.showTeamLineup();
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.iKey)) {
+      this.showInventory();
+    }
+
+    // Dynamic encounter rate — faster spawns inside encounter zones
+    const zoneIdx = getCurrentZone();
+    if (zoneIdx >= 0 && !this._inZone) {
+      this._inZone = true;
+      if (this._spawnTimer) this._spawnTimer.remove();
+      this._spawnTimer = this.time.addEvent({ delay: 2500, callback: this.spawnEnemy, callbackScope: this, loop: true });
+    } else if (zoneIdx < 0 && this._inZone) {
+      this._inZone = false;
+      if (this._spawnTimer) this._spawnTimer.remove();
+      this._spawnTimer = this.time.addEvent({ delay: 4000, callback: this.spawnEnemy, callbackScope: this, loop: true });
     }
 
     this.updateHUD();
@@ -366,14 +386,16 @@ class WorldScene extends Phaser.Scene {
     // Set up battle using real engine
     G.inBattle = true;
     const playerGhosts = buildPlayerBattleTeam();
-    const enemyGhosts = [{ id: cardData.id, name: cardData.name, hp: cardData.maxHp, maxHp: cardData.maxHp,
+    // Scale enemy HP with player level (+15% per level above 1)
+    const scaledMaxHp = Math.round(cardData.maxHp * (1 + (G.level - 1) * 0.15));
+    const enemyGhosts = [{ id: cardData.id, name: cardData.name, hp: scaledMaxHp, maxHp: scaledMaxHp,
       ko: false, ability: cardData.ability, abilityDesc: cardData.desc, rarity: cardData.rarity,
       usedOncePerGame: false, entryFired: false }];
 
     B = {
       round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
       enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
-      enemyCard: cardData, phase: 'ready', log: [], playerDice: [], enemyDice: [],
+      enemyCard: cardData, zoneIdx: getCurrentZone(), phase: 'ready', log: [], playerDice: [], enemyDice: [],
       nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     };
 
@@ -430,45 +452,209 @@ class WorldScene extends Phaser.Scene {
   // ═══════ TEAM LINEUP ═══════
 
   showTeamLineup() {
-    if (this._teamPanel) { this._teamPanel.destroy(); this._teamPanel = null; return; }
+    if (this.panels.isOpen()) { this.panels.close(); return; }
 
-    const W = this.scale.width;
-    this._teamPanel = this.add.container(0, 0).setDepth(400).setScrollFactor(0);
+    this.panels.open('TEAM LINEUP — Click to set active', (container, w, h) => {
+      if (G.team.length === 0) {
+        const empty = this.add.text(w / 2, 40, 'No Spiritkin!', {
+          fontSize: '16px', fontFamily: 'Georgia, serif', color: '#ff6644',
+        }).setOrigin(0.5).setScrollFactor(0);
+        container.add(empty);
+        return;
+      }
 
-    const bg = this.add.rectangle(W - 160, 200, 280, 300, 0x000000, 0.85)
-      .setStrokeStyle(2, 0x4444aa);
-    this._teamPanel.add(bg);
+      G.team.forEach((ghost, i) => {
+        const y = 12 + i * 56;
+        const isActive = i === G.activeIdx;
 
-    const title = this.add.text(W - 160, 65, 'TEAM LINEUP', {
-      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffdd44',
-    }).setOrigin(0.5);
-    this._teamPanel.add(title);
+        // Clickable row
+        const rowBg = this.add.rectangle(w / 2, y + 20, w - 20, 48, isActive ? 0x224422 : 0x222244, 0.6)
+          .setStrokeStyle(1, isActive ? 0x44aa44 : 0x334466)
+          .setInteractive({ useHandCursor: true }).setScrollFactor(0);
+        rowBg.on('pointerover', () => rowBg.setFillStyle(isActive ? 0x336633 : 0x333366));
+        rowBg.on('pointerout', () => rowBg.setFillStyle(isActive ? 0x224422 : 0x222244, 0.6));
+        rowBg.on('pointerdown', () => {
+          if (!ghost.ko && ghost.hp > 0) {
+            G.activeIdx = i;
+            this.panels.close();
+            this.showNotification(`${ghost.name} is now active!`);
+            saveGame();
+          } else {
+            this.showNotification(`${ghost.name} is KO'd!`);
+          }
+        });
 
-    G.team.forEach((ghost, i) => {
-      const y = 90 + i * 50;
-      const isActive = i === G.activeIdx;
-      const nameColor = isActive ? '#88ff88' : ghost.ko ? '#ff4444' : '#cccccc';
-      const txt = this.add.text(W - 280, y, `${isActive ? '► ' : '  '}${ghost.name}`, {
-        fontSize: '13px', fontFamily: 'monospace', fontStyle: isActive ? 'bold' : 'normal', color: nameColor,
+        const indicator = isActive ? '\u25b6 ' : '  ';
+        const nameColor = isActive ? '#88ff88' : ghost.ko ? '#ff4444' : '#cccccc';
+        const nameText = this.add.text(14, y + 8, `${indicator}${ghost.name}`, {
+          fontSize: '14px', fontFamily: 'monospace', fontStyle: isActive ? 'bold' : 'normal', color: nameColor,
+        }).setScrollFactor(0);
+
+        const hpText = this.add.text(w - 14, y + 8, `HP ${ghost.hp}/${ghost.maxHp}`, {
+          fontSize: '12px', fontFamily: 'monospace', color: ghost.hp <= 0 ? '#ff4444' : '#aaaaaa',
+        }).setOrigin(1, 0).setScrollFactor(0);
+
+        const abilityText = this.add.text(14, y + 28, `  ${ghost.ability || ''}`, {
+          fontSize: '11px', fontFamily: 'monospace', fontStyle: 'italic', color: '#888888',
+        }).setScrollFactor(0);
+
+        container.add([rowBg, nameText, hpText, abilityText]);
       });
-      const hp = this.add.text(W - 60, y, `HP ${ghost.hp}/${ghost.maxHp}`, {
-        fontSize: '11px', fontFamily: 'monospace', color: ghost.hp <= 0 ? '#ff4444' : '#aaaaaa',
-      }).setOrigin(1, 0);
-      const ability = this.add.text(W - 280, y + 16, `  ${ghost.ability}`, {
-        fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#888888',
+    }, { width: 320, height: Math.min(G.team.length * 56 + 50, 400) });
+  }
+
+  // ═══════ INVENTORY PANEL ═══════
+
+  showInventory() {
+    if (this.panels.isOpen()) { this.panels.close(); return; }
+    this._invTab = this._invTab || 'essences';
+
+    this.panels.open('INVENTORY', (container, w, h) => {
+      this._buildInventoryContent(container, w, h);
+    }, { width: 480, height: 380 });
+  }
+
+  _buildInventoryContent(container, w, h) {
+    const tabs = ['essences', 'gear', 'materials'];
+    const tabW = w / tabs.length;
+
+    // Tab bar
+    tabs.forEach((tab, i) => {
+      const isActive = tab === this._invTab;
+      const tabBg = this.add.rectangle(tabW * i + tabW / 2, 14, tabW - 4, 24, isActive ? 0x445588 : 0x222233)
+        .setStrokeStyle(1, isActive ? 0x6688cc : 0x333344)
+        .setInteractive({ useHandCursor: true }).setScrollFactor(0);
+      const tabText = this.add.text(tabW * i + tabW / 2, 14, tab.toUpperCase(), {
+        fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: isActive ? '#ffffff' : '#888888',
+      }).setOrigin(0.5).setScrollFactor(0);
+      tabBg.on('pointerdown', () => {
+        this._invTab = tab;
+        this.panels.close();
+        this.showInventory();
       });
-      this._teamPanel.add([txt, hp, ability]);
+      container.add([tabBg, tabText]);
     });
 
-    if (G.team.length === 0) {
-      const empty = this.add.text(W - 160, 120, 'No Spiritkin!', {
-        fontSize: '14px', fontFamily: 'Georgia, serif', color: '#ff6644',
-      }).setOrigin(0.5);
-      this._teamPanel.add(empty);
-    }
+    const cy = 36;
 
-    // Auto-close after 5s
-    this.time.delayedCall(5000, () => { if (this._teamPanel) { this._teamPanel.destroy(); this._teamPanel = null; } });
+    if (this._invTab === 'essences') {
+      const essences = G.essences || [];
+      if (essences.length === 0) {
+        container.add(this.add.text(w / 2, cy + 30, 'No essences yet.\nDefeat spirits to collect!', {
+          fontSize: '13px', fontFamily: 'Georgia, serif', color: '#666', align: 'center',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+      } else {
+        const shown = essences.slice(-8);
+        shown.forEach((ess, i) => {
+          const y = cy + 6 + i * 36;
+          const rColors = { common: '#aaa', uncommon: '#5599ff', rare: '#aa55ff', 'ghost-rare': '#ff55aa', legendary: '#ffaa22' };
+          container.add(this.add.text(14, y, ess.fromName || ess.name, {
+            fontSize: '13px', fontFamily: 'monospace', color: rColors[ess.rarity] || '#ccc',
+          }).setScrollFactor(0));
+          container.add(this.add.text(w - 14, y, `P:${ess.potency} S:${ess.stability} R:${ess.resonance}`, {
+            fontSize: '10px', fontFamily: 'monospace', color: '#888',
+          }).setOrigin(1, 0).setScrollFactor(0));
+          container.add(this.add.text(14, y + 16, `${ess.region || 'Unknown'} — ${ess.subtype || 'Essence'}`, {
+            fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#555',
+          }).setScrollFactor(0));
+        });
+        if (essences.length > 8) {
+          container.add(this.add.text(w / 2, cy + 8 * 36 + 8, `...and ${essences.length - 8} more`, {
+            fontSize: '11px', fontFamily: 'monospace', color: '#555',
+          }).setOrigin(0.5, 0).setScrollFactor(0));
+        }
+      }
+
+    } else if (this._invTab === 'gear') {
+      const equipped = G.equipped || {};
+      let y = cy + 6;
+
+      // Equipped section
+      container.add(this.add.text(14, y, 'EQUIPPED:', {
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffdd44',
+      }).setScrollFactor(0));
+      y += 20;
+
+      for (const [slot, item] of Object.entries(equipped)) {
+        const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1);
+        const itemName = item ? item.name : '(empty)';
+        container.add(this.add.text(14, y, `${slotLabel}:`, {
+          fontSize: '12px', fontFamily: 'monospace', color: '#aaa',
+        }).setScrollFactor(0));
+        container.add(this.add.text(100, y, itemName, {
+          fontSize: '12px', fontFamily: 'monospace', color: item ? '#88ff88' : '#555',
+        }).setScrollFactor(0));
+
+        if (item) {
+          const unBtn = this.add.text(w - 14, y, '[UNEQUIP]', {
+            fontSize: '10px', fontFamily: 'monospace', color: '#cc6644',
+          }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+          unBtn.on('pointerdown', () => {
+            G.gear.push(item);
+            G.equipped[slot] = null;
+            saveGame();
+            this.panels.close();
+            this.showInventory();
+          });
+          container.add(unBtn);
+        }
+        y += 20;
+      }
+
+      // Gear inventory
+      y += 10;
+      container.add(this.add.text(14, y, 'INVENTORY:', {
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffdd44',
+      }).setScrollFactor(0));
+      y += 20;
+
+      const gear = G.gear || [];
+      if (gear.length === 0) {
+        container.add(this.add.text(14, y, 'No gear. Craft some at the Workshop!', {
+          fontSize: '12px', fontFamily: 'Georgia, serif', color: '#666',
+        }).setScrollFactor(0));
+      } else {
+        gear.slice(0, 6).forEach((item, i) => {
+          const iy = y + i * 28;
+          container.add(this.add.text(14, iy, item.name, {
+            fontSize: '12px', fontFamily: 'monospace', color: '#ccc',
+          }).setScrollFactor(0));
+          const slot = item.slot || 'accessory';
+          const eqBtn = this.add.text(w - 14, iy, `[EQUIP \u2192 ${slot}]`, {
+            fontSize: '10px', fontFamily: 'monospace', color: '#44aa44',
+          }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+          eqBtn.on('pointerdown', () => {
+            if (G.equipped[slot]) G.gear.push(G.equipped[slot]);
+            G.equipped[slot] = item;
+            G.gear.splice(G.gear.indexOf(item), 1);
+            saveGame();
+            this.panels.close();
+            this.showInventory();
+          });
+          container.add(eqBtn);
+        });
+      }
+
+    } else if (this._invTab === 'materials') {
+      let y = cy + 6;
+      const mats = {
+        'Ice Shards': G.iceShards || 0,
+        'Sacred Fire': G.sacredFire || 0,
+        'Surge': G.surge || 0,
+        'Moonstone': G.moonstone || 0,
+      };
+      if (G.materials) {
+        for (const [k, v] of Object.entries(G.materials)) {
+          if (v > 0) mats[k] = v;
+        }
+      }
+      for (const [name, count] of Object.entries(mats)) {
+        container.add(this.add.text(14, y, `${name}: ${count}`, {
+          fontSize: '13px', fontFamily: 'monospace', color: count > 0 ? '#88ccff' : '#555',
+        }).setScrollFactor(0));
+        y += 22;
+      }
+    }
   }
 
   // ═══════ SPIRIT WISPS ═══════
@@ -619,7 +805,8 @@ class WorldScene extends Phaser.Scene {
     const wins = G.rep?.battlesWon || 0;
     const sideline = wins >= 5 ? 'UNLOCKED' : `${wins}/5 wins`;
 
-    this.hudPlayerText.setText(`${G.name} | LV ${G.level} | ${G.coins} Gold | Sideline: ${sideline}`);
+    const xpNeeded = G.level * 3;
+    this.hudPlayerText.setText(`${G.name} | LV ${G.level} (${G.xp}/${xpNeeded} XP) | ${G.coins} Gold`);
 
     const ghost = G.team[G.activeIdx];
     if (ghost) {

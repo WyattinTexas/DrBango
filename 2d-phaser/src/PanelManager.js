@@ -96,6 +96,11 @@ class PanelManager {
       this._escKey.on('down', () => this.close());
     }
 
+    // Pin all objects to camera (don't scroll with world)
+    for (const obj of this._objects) {
+      if (obj.setScrollFactor) obj.setScrollFactor(0);
+    }
+
     // ── Call content builder ──
     if (contentBuilder) {
       contentBuilder(container, contentW, contentH);
