@@ -90,7 +90,10 @@ class WorldScene extends Phaser.Scene {
         spawnPY - this.scale.height / 2
       );
     }
-    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    // Start with instant follow (lerp=1) so camera snaps to player on first frame.
+    // Reduced to smooth lerp after first update.
+    this.cameras.main.startFollow(this.player, true, 1, 1);
+    this._cameraSnapped = false;
 
     // ── UI Camera (unzoomed, for HUD elements) ──
     this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
@@ -409,6 +412,12 @@ class WorldScene extends Phaser.Scene {
     try {
     if (G.inBattle) return;
     if (!this._updateLogged) { this._updateLogged = true; console.log('[WorldScene] update() running, player:', this.player?.x, this.player?.y); }
+
+    // After first frame, reduce camera lerp to smooth follow
+    if (!this._cameraSnapped) {
+      this._cameraSnapped = true;
+      this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    }
 
     const speed = 140;
     let vx = 0, vy = 0;
