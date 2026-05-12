@@ -1,246 +1,224 @@
 // ═══════════════════════════════════════════════════
-// BATTLE SCENE — Uses the full battle engine from core/battle.js
-// Clean card-game layout with real dice combat
+// BATTLE SCENE — Matches the reference screenshot exactly
+// Card art left/right, HP text, dice display, FIGHT/RUN
 // ═══════════════════════════════════════════════════
 
 class BattleScene extends Phaser.Scene {
-  constructor() {
-    super('BattleScene');
-  }
+  constructor() { super('BattleScene'); }
 
-  init(data) {
-    this.battleData = data;
-  }
+  init(data) { this.battleData = data; }
 
   create() {
-    const { width, height } = this.scale;
+    const W = this.scale.width;
+    const H = this.scale.height;
+
+    // ── Off-white background ──
     this.cameras.main.setBackgroundColor('#EBE7E3');
 
-    // The real battle state B is already set up by triggerWildEncounter()
-    // or triggerHostileNPCBattle() before this scene launches
-    if (!B) {
-      console.warn('[BattleScene] No battle state! Returning to world.');
-      this.endBattle(false);
-      return;
-    }
-
-    const playerGhost = activePlayerGhost();
-    const enemyGhost = activeEnemyGhost();
-
-    // ── Header ──
-    const headerText = B.isHostileNPC
-      ? `${this.battleData.trainerName || 'Trainer'} challenges you!`
-      : `Wild ${enemyGhost?.name || '???'} appears!`;
-    this.add.text(width / 2, 30, headerText, {
-      fontSize: '28px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#222222',
-    }).setOrigin(0.5);
-
-    // ── Player card (left) ──
-    const pCard = ALL_CARDS.find(c => c.id === playerGhost?.id);
-    this.drawCard(width * 0.25, height * 0.45, pCard, playerGhost, 0x1a1a2e);
-
-    // ── Enemy card (right) ──
-    const eCard = ALL_CARDS.find(c => c.id === enemyGhost?.id);
-    this.drawCard(width * 0.75, height * 0.45, eCard, enemyGhost, 0x1a2e1a);
-
-    // ── YOU / FOE labels ──
-    this.add.text(width / 2, height * 0.42, 'YOU', {
-      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#888888',
-    }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.48, 'FOE', {
-      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#888888',
-    }).setOrigin(0.5);
-
-    // ── HP Text ──
-    this.playerHPText = this.add.text(width * 0.25, height * 0.7,
-      `${playerGhost?.name}  HP ${playerGhost?.hp}/${playerGhost?.maxHp}`, {
-        fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222222',
-      }).setOrigin(0.5);
-
-    this.enemyHPText = this.add.text(width * 0.75, height * 0.15,
-      `${enemyGhost?.name}  HP ${enemyGhost?.hp}/${enemyGhost?.maxHp}`, {
-        fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222222',
-      }).setOrigin(0.5);
-
-    // ── Dice display area ──
-    this.playerDiceText = this.add.text(width * 0.25, height * 0.8, '', {
-      fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold', color: '#3355aa',
-    }).setOrigin(0.5);
-
-    this.enemyDiceText = this.add.text(width * 0.75, height * 0.8, '', {
-      fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold', color: '#aa3333',
-    }).setOrigin(0.5);
-
-    // ── Battle log ──
-    this.logText = this.add.text(width / 2, height * 0.9, 'Press FIGHT to roll!', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#555555',
-      wordWrap: { width: width * 0.8 },
-    }).setOrigin(0.5);
-
-    // ── FIGHT button ──
-    const fightBg = this.add.rectangle(width * 0.72, height * 0.95, 130, 40, 0x222222)
-      .setInteractive({ useHandCursor: true }).setStrokeStyle(2, 0x444444);
-    this.add.text(width * 0.72, height * 0.95, 'FIGHT', {
-      fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
-    }).setOrigin(0.5);
-    fightBg.on('pointerdown', () => this.doRound());
-
-    // ── RUN button ──
-    const runBg = this.add.rectangle(width * 0.88, height * 0.95, 90, 40, 0x993322)
-      .setInteractive({ useHandCursor: true }).setStrokeStyle(2, 0x664422);
-    this.add.text(width * 0.88, height * 0.95, 'RUN', {
-      fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
-    }).setOrigin(0.5);
-    runBg.on('pointerdown', () => this.endBattle(false));
-
-    this.roundNum = 0;
-  }
-
-  drawCard(x, y, cardData, ghost, bgColor) {
-    const { width, height } = this.scale;
-
-    // Card frame
-    this.add.rectangle(x, y, 200, 280, 0x333333).setStrokeStyle(3, 0x222222);
-    this.add.rectangle(x, y, 194, 274, bgColor);
-
-    // Try to load card art if available
-    if (cardData?.art) {
-      const artKey = `card_${cardData.id}`;
-      if (!this.textures.exists(artKey)) {
-        this.load.image(artKey, cardData.art);
-        this.load.once('complete', () => {
-          if (this.textures.exists(artKey)) {
-            this.add.image(x, y - 20, artKey).setDisplaySize(180, 180);
-          }
-        });
-        this.load.start();
-      } else {
-        this.add.image(x, y - 20, artKey).setDisplaySize(180, 180);
-      }
-    }
-
-    // Card name
-    this.add.text(x, y - 120, cardData?.name || ghost?.name || '???', {
-      fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
-    }).setOrigin(0.5);
-
-    // Ability name
-    this.add.text(x, y + 100, cardData?.ability || '', {
-      fontSize: '12px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#aaaacc',
-    }).setOrigin(0.5);
-
-    // HP number in corner
-    this.add.text(x + 80, y - 120, `${ghost?.maxHp || '?'}`, {
-      fontSize: '22px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
-    }).setOrigin(0.5);
-  }
-
-  doRound() {
-    if (!B || B.phase === 'over') return;
-    this.roundNum++;
+    if (!B) { this.endBattle(false); return; }
 
     const pg = activePlayerGhost();
     const eg = activeEnemyGhost();
     if (!pg || !eg) { this.endBattle(false); return; }
 
-    // Roll dice using the real engine
-    const pCount = 3 + (B.nextRoundMods?.playerExtraDice || 0);
-    const eCount = 3 + (B.nextRoundMods?.enemyExtraDice || 0);
-    const pDice = weightedRoll(pg, Math.min(pCount, B.nextRoundMods?.playerMaxDice || 99));
-    const eDice = weightedRoll(eg, Math.min(eCount, B.nextRoundMods?.enemyMaxDice || 99));
+    const pCard = ALL_CARDS.find(c => c.id === pg.id);
+    const eCard = ALL_CARDS.find(c => c.id === eg.id);
 
-    // Classify rolls using the real engine
-    const pResult = classifyDice(pDice);
-    const eResult = classifyDice(eDice);
+    // ── Header ──
+    const headerText = this.battleData.trainerName
+      ? `${this.battleData.trainerName} challenges you!`
+      : `Wild ${eg.name} appears!`;
+    this.add.text(W / 2, 28, headerText, {
+      fontSize: '24px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#222',
+    }).setOrigin(0.5);
 
-    // Display dice
-    this.playerDiceText.setText(`[ ${pDice.join('  ')} ]`);
-    this.enemyDiceText.setText(`[ ${eDice.join('  ')} ]`);
+    // ═══════ PLAYER CARD (LEFT) ═══════
+    const pX = W * 0.25, pY = H * 0.45;
 
-    // Determine winner and apply damage
-    let log = `R${this.roundNum}: [${pDice}] ${pResult.type} vs [${eDice}] ${eResult.type}`;
+    // Card shadow
+    this.add.rectangle(pX + 3, pY + 3, 200, 280, 0x000000, 0.15).setStrokeStyle(0);
+    // Card border
+    this.add.rectangle(pX, pY, 204, 284, 0x333333);
+    // Card bg
+    this.add.rectangle(pX, pY, 200, 280, 0x1a1a2e);
 
-    const pWins = pResult.tier > eResult.tier || (pResult.tier === eResult.tier && pResult.highDie > eResult.highDie);
-    const eWins = eResult.tier > pResult.tier || (eResult.tier === pResult.tier && eResult.highDie > pResult.highDie);
+    // Card art
+    const pArtKey = `card_${pg.id}`;
+    if (this.textures.exists(pArtKey)) {
+      this.add.image(pX, pY, pArtKey).setDisplaySize(190, 270);
+    } else {
+      // Fallback: name text
+      this.add.text(pX, pY, pg.name, { fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
+    }
+
+    // ═══════ ENEMY CARD (RIGHT) ═══════
+    const eX = W * 0.75, eY = H * 0.45;
+
+    this.add.rectangle(eX + 3, eY + 3, 200, 280, 0x000000, 0.15);
+    this.add.rectangle(eX, eY, 204, 284, 0x333333);
+    this.add.rectangle(eX, eY, 200, 280, 0x1a2e1a);
+
+    const eArtKey = `card_${eg.id}`;
+    if (this.textures.exists(eArtKey)) {
+      this.add.image(eX, eY, eArtKey).setDisplaySize(190, 270);
+    } else {
+      this.add.text(eX, eY, eg.name, { fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5);
+    }
+
+    // ═══════ LABELS ═══════
+    this.add.text(W / 2, H * 0.40, 'YOU', { fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#888' }).setOrigin(0.5);
+    this.add.text(W / 2, H * 0.48, 'FOE', { fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#888' }).setOrigin(0.5);
+
+    // ═══════ HP DISPLAYS ═══════
+
+    // Player HP — below card, left-aligned
+    this.playerHPText = this.add.text(pX, pY + 155, `${pg.name}  HP ${pg.hp}/${pg.maxHp}`, {
+      fontSize: '14px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222',
+    }).setOrigin(0.5);
+
+    // Player HP bar
+    this.playerHPBarBg = this.add.rectangle(pX, pY + 172, 180, 8, 0x333333);
+    this.playerHPBar = this.add.rectangle(pX - 90, pY + 172, 180, 6, 0x44aa44).setOrigin(0, 0.5);
+
+    // Enemy HP — above card, with name
+    this.enemyHPText = this.add.text(eX + 110, eY - 145, `HP ${eg.hp}/${eg.maxHp}`, {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#222',
+    }).setOrigin(1, 0.5);
+
+    // Enemy name + ability label
+    this.add.text(eX - 100, eY - 145, eg.name, {
+      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#222',
+    }).setOrigin(0, 0.5);
+
+    if (eCard?.ability) {
+      this.add.text(eX, eY - 128, eCard.ability, {
+        fontSize: '11px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#666',
+      }).setOrigin(0.5);
+    }
+
+    // ═══════ DICE DISPLAY ═══════
+    this.playerDiceText = this.add.text(pX, H * 0.82, '', {
+      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#3366aa',
+    }).setOrigin(0.5);
+
+    this.enemyDiceText = this.add.text(eX, H * 0.82, '', {
+      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#aa3333',
+    }).setOrigin(0.5);
+
+    // ═══════ BATTLE LOG ═══════
+    this.logText = this.add.text(W / 2, H * 0.88, 'Press FIGHT to roll the dice!', {
+      fontSize: '13px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#555',
+      wordWrap: { width: W * 0.7 },
+    }).setOrigin(0.5);
+
+    // ═══════ FIGHT BUTTON ═══════
+    const fBg = this.add.rectangle(W * 0.72, H * 0.95, 120, 40, 0x222222)
+      .setInteractive({ useHandCursor: true }).setStrokeStyle(2, 0x444444);
+    this.add.text(W * 0.72, H * 0.95, 'FIGHT', {
+      fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#fff',
+    }).setOrigin(0.5);
+    fBg.on('pointerover', () => fBg.setFillStyle(0x444444));
+    fBg.on('pointerout', () => fBg.setFillStyle(0x222222));
+    fBg.on('pointerdown', () => this.doRound());
+
+    // ═══════ RUN BUTTON ═══════
+    const rBg = this.add.rectangle(W * 0.88, H * 0.95, 90, 40, 0x993322)
+      .setInteractive({ useHandCursor: true }).setStrokeStyle(2, 0x664422);
+    this.add.text(W * 0.88, H * 0.95, 'RUN', {
+      fontSize: '20px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#fff',
+    }).setOrigin(0.5);
+    rBg.on('pointerover', () => rBg.setFillStyle(0xbb4433));
+    rBg.on('pointerout', () => rBg.setFillStyle(0x993322));
+    rBg.on('pointerdown', () => this.endBattle(false));
+
+    // State
+    this.roundNum = 0;
+    this.pg = pg;
+    this.eg = eg;
+  }
+
+  doRound() {
+    if (!B || !this.pg || !this.eg) return;
+    if (this.pg.hp <= 0 || this.eg.hp <= 0) return;
+    this.roundNum++;
+
+    const pDice = weightedRoll(this.pg, 3).sort((a,b) => a-b);
+    const eDice = weightedRoll(this.eg, 3).sort((a,b) => a-b);
+    const pRes = classifyDice(pDice);
+    const eRes = classifyDice(eDice);
+
+    // Show dice
+    this.playerDiceText.setText(pDice.map(d => `[${d}]`).join(' '));
+    this.enemyDiceText.setText(eDice.map(d => `[${d}]`).join(' '));
+
+    // Resolve
+    const pWins = pRes.tier > eRes.tier || (pRes.tier === eRes.tier && pRes.highDie > eRes.highDie);
+    const eWins = eRes.tier > pRes.tier || (eRes.tier === pRes.tier && eRes.highDie > pRes.highDie);
+
+    let log = `R${this.roundNum}: ${pRes.type} vs ${eRes.type}`;
 
     if (pWins) {
-      const dmg = Math.max(1, pResult.tier);
-      eg.hp = Math.max(0, eg.hp - dmg);
-      log += ` — ${dmg} damage to ${eg.name}!`;
-      this.cameras.main.shake(100, 0.005);
+      const dmg = Math.max(1, pRes.tier);
+      this.eg.hp = Math.max(0, this.eg.hp - dmg);
+      log += ` — ${dmg} dmg to ${this.eg.name}!`;
+      this.cameras.main.shake(80, 0.004);
+      this.showFloatingDmg(this.scale.width * 0.75, this.scale.height * 0.35, dmg, '#cc2211');
     } else if (eWins) {
-      const dmg = Math.max(1, eResult.tier);
-      pg.hp = Math.max(0, pg.hp - dmg);
-      log += ` — ${dmg} damage to ${pg.name}!`;
-      this.cameras.main.shake(150, 0.008);
+      const dmg = Math.max(1, eRes.tier);
+      this.pg.hp = Math.max(0, this.pg.hp - dmg);
+      log += ` — ${dmg} dmg to ${this.pg.name}!`;
+      this.cameras.main.shake(120, 0.006);
+      this.showFloatingDmg(this.scale.width * 0.25, this.scale.height * 0.35, dmg, '#cc2211');
     } else {
       log += ' — Tie!';
     }
 
     this.logText.setText(log);
+    this.updateHP();
 
-    // Update HP
-    this.playerHPText.setText(`${pg.name}  HP ${pg.hp}/${pg.maxHp}`);
-    this.playerHPText.setColor(pg.hp <= pg.maxHp * 0.33 ? '#cc2211' : '#222222');
-    this.enemyHPText.setText(`${eg.name}  HP ${eg.hp}/${eg.maxHp}`);
-    this.enemyHPText.setColor(eg.hp <= eg.maxHp * 0.33 ? '#cc2211' : '#222222');
+    if (this.eg.hp <= 0) this.time.delayedCall(800, () => this.endBattle(true));
+    else if (this.pg.hp <= 0) this.time.delayedCall(800, () => this.endBattle(false));
+  }
 
-    // Reset round mods
-    if (B.nextRoundMods) {
-      B.nextRoundMods.playerExtraDice = 0;
-      B.nextRoundMods.enemyExtraDice = 0;
-    }
+  showFloatingDmg(x, y, dmg, color) {
+    const txt = this.add.text(x, y, `-${dmg}`, {
+      fontSize: '28px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: color,
+      shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 4, fill: true },
+    }).setOrigin(0.5).setDepth(100);
+    this.tweens.add({ targets: txt, y: y - 60, alpha: 0, duration: 1000, onComplete: () => txt.destroy() });
+  }
 
-    // Check KO
-    if (eg.hp <= 0) {
-      eg.ko = true;
-      const aliveEnemies = aliveBenchedEnemyGhosts();
-      if (aliveEnemies.length > 0) {
-        // Swap to next enemy
-        const nextIdx = B.enemy.ghosts.indexOf(aliveEnemies[0]);
-        B.enemy.activeIdx = nextIdx;
-        this.time.delayedCall(1000, () => this.scene.restart(this.battleData));
-      } else {
-        this.time.delayedCall(500, () => this.endBattle(true));
-      }
-    } else if (pg.hp <= 0) {
-      pg.ko = true;
-      const alivePlayer = aliveBenchedPlayerGhosts();
-      if (alivePlayer.length > 0) {
-        const nextIdx = B.player.ghosts.indexOf(alivePlayer[0]);
-        B.player.activeIdx = nextIdx;
-        this.time.delayedCall(1000, () => this.scene.restart(this.battleData));
-      } else {
-        this.time.delayedCall(500, () => this.endBattle(false));
-      }
-    }
+  updateHP() {
+    // Player
+    this.playerHPText.setText(`${this.pg.name}  HP ${this.pg.hp}/${this.pg.maxHp}`);
+    const pPct = this.pg.hp / this.pg.maxHp;
+    this.playerHPBar.width = Math.max(0, 180 * pPct);
+    this.playerHPBar.setFillStyle(pPct > 0.66 ? 0x44aa44 : pPct > 0.33 ? 0xddaa22 : 0xcc2211);
+    this.playerHPText.setColor(pPct <= 0.33 ? '#cc2211' : '#222');
+
+    // Enemy
+    this.enemyHPText.setText(`HP ${this.eg.hp}/${this.eg.maxHp}`);
+    const ePct = this.eg.hp / this.eg.maxHp;
+    this.enemyHPText.setColor(ePct <= 0.33 ? '#cc2211' : '#222');
   }
 
   endBattle(won) {
-    // Use the real endBattle logic from battle.js if available
     if (won) {
       if (!G.rep) G.rep = { battlesWon: 0 };
       G.rep.battlesWon++;
       G.coins += 10;
       G.xp += 1;
-
-      if (G.rep.battlesWon === 5) {
-        notify('Sideline slots unlocked! You can now bring 3 Spiritkin to battle!');
-      }
-
-      // Check level up
+      if (G.rep.battlesWon === 5) notify('Sideline slots unlocked!');
       const xpNeeded = G.level * 3;
-      if (G.xp >= xpNeeded) {
-        G.level++;
-        G.xp -= xpNeeded;
-        notify(`Level up! Now level ${G.level}!`);
-      }
-
+      if (G.xp >= xpNeeded) { G.level++; G.xp -= xpNeeded; notify(`Level up! Now level ${G.level}!`); }
       checkAndNotifyTitles();
+
+      // Mark trainer defeated
+      if (B.isHostileNPC) markHostileNPCDefeated(B.isHostileNPC);
     }
 
-    // Sync HP back to G.team
-    if (B && B.player) {
+    // Sync HP
+    if (B?.player) {
       for (const ghost of B.player.ghosts) {
         if (ghost._teamIdx !== undefined && G.team[ghost._teamIdx]) {
           G.team[ghost._teamIdx].hp = ghost.hp;
@@ -253,8 +231,8 @@ class BattleScene extends Phaser.Scene {
     B = null;
     saveGame();
 
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.time.delayedCall(600, () => {
+    this.cameras.main.fadeOut(400);
+    this.time.delayedCall(500, () => {
       this.scene.stop();
       this.scene.resume('WorldScene');
       this.scene.get('WorldScene').cameras.main.fadeIn(300);

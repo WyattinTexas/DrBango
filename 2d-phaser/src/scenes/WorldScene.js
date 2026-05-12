@@ -1,288 +1,275 @@
 // ═══════════════════════════════════════════════════
-// WORLD SCENE — Overworld exploration with tilemaps
+// WORLD SCENE — Full overworld with sprites, NPCs, enemies
 // ═══════════════════════════════════════════════════
 
 class WorldScene extends Phaser.Scene {
-  constructor() {
-    super('WorldScene');
-  }
+  constructor() { super('WorldScene'); }
 
   create() {
-    const TILE = 32;
-    const MAP_W = 60;
-    const MAP_H = 60;
+    const T = 32;
+    const MW = 80, MH = 60;
 
-    // ── Generate world map ──
-    this.map = this.generateMap(MAP_W, MAP_H);
+    this.cameras.main.fadeIn(600);
+    this.cameras.main.setBackgroundColor('#3a7d44');
 
-    // ── Render tiles ──
-    this.tileGroup = this.add.group();
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const tile = this.map[y][x];
-        const key = tile === 0 ? 'grass' : tile === 1 ? 'path' : tile === 2 ? 'water' : 'grass';
-        this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key);
+    // ── Generate tilemap ──
+    const map = this.make.tilemap({ tileWidth: T, tileHeight: T, width: MW, height: MH });
+    const natureTileset = map.addTilesetImage('tiles_nature', 'tiles_nature', 16, 16);
+    const waterTileset = map.addTilesetImage('tiles_water', 'tiles_water', 16, 16);
+
+    // Ground layer
+    const ground = map.createBlankLayer('ground', [natureTileset, waterTileset], 0, 0, MW, MH, T, T);
+
+    // Fill with grass
+    for (let y = 0; y < MH; y++) {
+      for (let x = 0; x < MW; x++) {
+        // Borders = water
+        if (x === 0 || y === 0 || x === MW-1 || y === MH-1) {
+          ground.putTileAt(0, x, y); // water tile
+        }
+        // Paths
+        else if (y === 30 || y === 31 || x === 40 || x === 41) {
+          ground.putTileAt(2, x, y); // path-ish tile
+        }
+        // Random variety
+        else {
+          ground.putTileAt(Phaser.Math.Between(0, 3), x, y);
+        }
       }
     }
 
-    // ── Trees (decorative, collidable) ──
+    // ── Trees (static physics group) ──
     this.trees = this.physics.add.staticGroup();
-    for (let i = 0; i < 120; i++) {
-      const tx = Phaser.Math.Between(2, MAP_W - 3);
-      const ty = Phaser.Math.Between(2, MAP_H - 3);
-      if (this.map[ty][tx] === 0) { // Only on grass
-        this.trees.create(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'tree');
-      }
+    for (let i = 0; i < 100; i++) {
+      const tx = Phaser.Math.Between(3, MW - 4) * T;
+      const ty = Phaser.Math.Between(3, MH - 4) * T;
+      // Don't place on paths
+      const tileX = Math.floor(tx / T), tileY = Math.floor(ty / T);
+      if (tileY === 30 || tileY === 31 || tileX === 40 || tileX === 41) continue;
+      const tree = this.trees.create(tx, ty, 'tiles_nature', 6); // tree tile from nature tileset
+      tree.setScale(2).refreshBody();
     }
 
     // ── Player ──
-    this.player = this.physics.add.sprite(G.x * TILE, G.y * TILE, 'player');
-    this.player.setCollideWorldBounds(true);
-    this.player.setScale(2);
+    this.player = this.physics.add.sprite(G.x * T, G.y * T, 'player', 0);
+    this.player.setScale(1.2);
     this.player.setDepth(10);
+    this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.trees);
 
-    // ── Camera follows player ──
+    // ── Camera ──
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-    this.cameras.main.setZoom(2);
-    this.cameras.main.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
-    this.cameras.main.fadeIn(800);
+    this.cameras.main.setZoom(1.8);
+    this.cameras.main.setBounds(0, 0, MW * T, MH * T);
 
     // ── NPCs ──
-    this.npcs = [];
-    this.spawnNPC('Elder Frost', 15, 20, 0x44cc44);
-    this.spawnNPC('Smith Ember', 22, 18, 0x44cc44);
-    this.spawnNPC('Brawler Jax', 30, 20, 0xcc4444);
+    this.npcSprites = [];
+    this.spawnNPC('Elder Frost', 17 * T, 19 * T, 'npc_elder', 0x44cc44);
+    this.spawnNPC('Smith Ember', 15 * T, 25 * T, 'npc_knight', 0xe07020);
+    this.spawnNPC('Keeper Zara', 22 * T, 21 * T, 'npc_hunter', 0xc0a040);
 
-    // ── Wild enemies ──
+    // Hostile NPCs
+    this.spawnNPC('Brawler Jax', 30 * T, 20 * T, 'enemy_sprite', 0xcc4444, true);
+    this.spawnNPC('Ice Queen Vera', 40 * T, 15 * T, 'npc_knight', 0x6688cc, true);
+
+    // ── Enemies ──
     this.enemies = this.physics.add.group();
-    this.spawnTimer = this.time.addEvent({
-      delay: 3000,
-      callback: this.spawnEnemy,
-      callbackScope: this,
-      loop: true,
-    });
-    // Spawn initial batch
-    for (let i = 0; i < 5; i++) this.spawnEnemy();
-
-    // ── Enemy collision → battle ──
+    for (let i = 0; i < 8; i++) this.spawnEnemy();
+    this.time.addEvent({ delay: 4000, callback: this.spawnEnemy, callbackScope: this, loop: true });
     this.physics.add.overlap(this.player, this.enemies, this.onEnemyContact, null, this);
 
     // ── Controls ──
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys('W,A,S,D');
+    this.eKey = this.input.keyboard.addKey('E');
 
     // ── HUD ──
-    this.buildHUD();
+    this.hudText = this.add.text(10, 10, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ffffff',
+      backgroundColor: '#000000aa', padding: { x: 8, y: 6 },
+    }).setScrollFactor(0).setDepth(200);
+
+    // ── Dialogue box ──
+    this.dialogueContainer = this.add.container(0, 0).setDepth(300).setScrollFactor(0);
+    this.dialogueBg = this.add.rectangle(640, 660, 1100, 80, 0x111128, 0.92)
+      .setStrokeStyle(2, 0x4444aa);
+    this.dialogueNameText = this.add.text(120, 630, '', {
+      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffdd44',
+    });
+    this.dialogueBodyText = this.add.text(120, 650, '', {
+      fontSize: '13px', fontFamily: 'Georgia, serif', color: '#ccccee',
+      wordWrap: { width: 900 },
+    });
+    this.dialogueContainer.add([this.dialogueBg, this.dialogueNameText, this.dialogueBodyText]);
+    this.dialogueContainer.setVisible(false);
 
     // ── World bounds ──
-    this.physics.world.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
+    this.physics.world.setBounds(0, 0, MW * T, MH * T);
+
+    // ── Region text ──
+    this.regionText = this.add.text(640, 40, '', {
+      fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
+      backgroundColor: '#00000066', padding: { x: 12, y: 4 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    // Notify callback for globals
+    _notifyCallback = (text) => this.showNotification(text);
   }
 
   update() {
     if (G.inBattle) return;
 
-    const speed = 120;
+    const speed = 140;
     let vx = 0, vy = 0;
+    let dir = null;
 
-    if (this.cursors.left.isDown || this.wasd.A.isDown) vx = -speed;
-    else if (this.cursors.right.isDown || this.wasd.D.isDown) vx = speed;
-    if (this.cursors.up.isDown || this.wasd.W.isDown) vy = -speed;
-    else if (this.cursors.down.isDown || this.wasd.S.isDown) vy = speed;
+    if (this.cursors.left.isDown || this.wasd.A.isDown) { vx = -speed; dir = 'left'; }
+    else if (this.cursors.right.isDown || this.wasd.D.isDown) { vx = speed; dir = 'right'; }
+    if (this.cursors.up.isDown || this.wasd.W.isDown) { vy = -speed; dir = 'up'; }
+    else if (this.cursors.down.isDown || this.wasd.S.isDown) { vy = speed; dir = 'down'; }
 
-    // Diagonal normalization
-    if (vx !== 0 && vy !== 0) {
-      vx *= 0.707;
-      vy *= 0.707;
-    }
+    if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
     this.player.setVelocity(vx, vy);
 
-    // Update global position
+    // Animate
+    if (vx !== 0 || vy !== 0) {
+      if (dir) this.player.play(`walk_${dir}`, true);
+    } else {
+      this.player.stop();
+    }
+
     G.x = this.player.x / 32;
     G.y = this.player.y / 32;
 
-    // NPC proximity check
-    this.checkNPCProximity();
+    // Region detection
+    const region = getCurrentZone(G.x, G.y);
+    const regionNames = { frost_valley: 'Frost Valley', rolling_hills: 'Rolling Hills', volcanic_isles: 'Volcanic Isles', dark_castle: 'Dark Castle' };
+    this.regionText.setText(regionNames[region] || '');
 
-    // Update HUD
+    // NPC proximity
+    this.checkNPCProximity();
     this.updateHUD();
   }
 
-  // ═══════ MAP GENERATION ═══════
+  // ═══════ NPCs ═══════
 
-  generateMap(w, h) {
-    const map = [];
-    for (let y = 0; y < h; y++) {
-      map[y] = [];
-      for (let x = 0; x < w; x++) {
-        // Default: grass
-        let tile = 0;
+  spawnNPC(name, x, y, spriteKey, tint, hostile = false) {
+    const npc = this.physics.add.staticSprite(x, y, spriteKey, 0).setScale(1.2);
+    if (tint) npc.setTint(tint);
 
-        // Paths (horizontal and vertical roads)
-        if (y === Math.floor(h / 2) || x === Math.floor(w / 2)) tile = 1;
-        if (y === Math.floor(h / 2) + 1 || x === Math.floor(w / 2) + 1) tile = 1;
-
-        // Water (lake in corner)
-        if (x > w - 10 && y > h - 10 && Math.random() < 0.6) tile = 2;
-
-        // Border water
-        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) tile = 2;
-
-        map[y][x] = tile;
-      }
-    }
-    return map;
-  }
-
-  // ═══════ NPCS ═══════
-
-  spawnNPC(name, tx, ty, color) {
-    const TILE = 32;
-    const npcGfx = this.make.graphics({ add: false });
-    npcGfx.fillStyle(color, 1);
-    npcGfx.fillRect(0, 0, 16, 16);
-    npcGfx.fillStyle(0xffffff, 1);
-    npcGfx.fillRect(4, 2, 8, 4);
-    const key = `npc_${name.replace(/\s/g, '')}`;
-    npcGfx.generateTexture(key, 16, 16);
-    npcGfx.destroy();
-
-    const npc = this.physics.add.staticSprite(tx * TILE, ty * TILE, key).setScale(2);
-
-    // Name label
-    const label = this.add.text(tx * TILE, ty * TILE - 20, name, {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ffffff',
+    const label = this.add.text(x, y - 40, name, {
+      fontSize: '10px', fontFamily: 'monospace', color: hostile ? '#ff8888' : '#88ff88',
       backgroundColor: '#00000088', padding: { x: 3, y: 1 },
     }).setOrigin(0.5).setDepth(11);
 
-    this.npcs.push({ sprite: npc, name, label, tx, ty });
+    // Exclamation mark for hostile
+    let marker = null;
+    if (hostile) {
+      marker = this.add.text(x, y - 52, '!', {
+        fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ff4444',
+      }).setOrigin(0.5).setDepth(11);
+      this.tweens.add({ targets: marker, y: y - 58, duration: 800, yoyo: true, repeat: -1 });
+    }
+
+    this.npcSprites.push({ sprite: npc, name, label, marker, hostile, x, y });
   }
 
   checkNPCProximity() {
-    const px = this.player.x;
-    const py = this.player.y;
+    for (const npc of this.npcSprites) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
 
-    for (const npc of this.npcs) {
-      const dist = Phaser.Math.Distance.Between(px, py, npc.sprite.x, npc.sprite.y);
-      if (dist < 48) {
-        npc.label.setColor('#ffdd44');
+      if (dist < 60) {
+        npc.label.setColor(npc.hostile ? '#ffaa44' : '#ffdd44');
 
-        // E to interact
-        if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('E'))) {
-          this.showDialogue(npc.name, 'Welcome, traveler. The spirit world has much to offer.');
+        if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+          if (npc.hostile) {
+            this.triggerTrainerBattle(npc);
+          } else {
+            this.showDialogue(npc.name, this.getNPCDialogue(npc.name));
+          }
         }
       } else {
-        npc.label.setColor('#ffffff');
+        npc.label.setColor(npc.hostile ? '#ff8888' : '#88ff88');
       }
     }
   }
 
-  showDialogue(name, text) {
-    if (this.dialogueBox) this.dialogueBox.destroy();
-    if (this.dialogueText) this.dialogueText.destroy();
-
-    const { width, height } = this.scale;
-    const cam = this.cameras.main;
-
-    this.dialogueBox = this.add.rectangle(
-      cam.scrollX + width / cam.zoom / 2,
-      cam.scrollY + height / cam.zoom - 40,
-      width / cam.zoom - 40, 60,
-      0x111122, 0.9
-    ).setDepth(100).setStrokeStyle(2, 0x4444aa);
-
-    this.dialogueText = this.add.text(
-      cam.scrollX + 30,
-      cam.scrollY + height / cam.zoom - 60,
-      `${name}: ${text}`,
-      { fontSize: '11px', fontFamily: 'monospace', color: '#ffffff', wordWrap: { width: width / cam.zoom - 60 } }
-    ).setDepth(101);
-
-    this.time.delayedCall(4000, () => {
-      if (this.dialogueBox) this.dialogueBox.destroy();
-      if (this.dialogueText) this.dialogueText.destroy();
-    });
+  getNPCDialogue(name) {
+    const lines = {
+      'Elder Frost': ['The spirits remember what men forget.', 'Frost Valley was the first land the Spiritkin claimed.'],
+      'Smith Ember': ['Iron sings when you heat it right.', 'Bring me ore and I will make you something worth carrying.'],
+      'Keeper Zara': ['Every Spiritkin has a story.', 'The battle is won before the dice are rolled.'],
+    };
+    const pool = lines[name] || ['...'];
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // ═══════ ENEMIES ═══════
+  showDialogue(name, text) {
+    this.dialogueNameText.setText(name);
+    this.dialogueBodyText.setText(text);
+    this.dialogueContainer.setVisible(true);
+    if (this._dialogueTimer) this._dialogueTimer.remove();
+    this._dialogueTimer = this.time.delayedCall(4000, () => this.dialogueContainer.setVisible(false));
+  }
+
+  showNotification(text) {
+    const notif = this.add.text(640, 80, text, {
+      fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
+      backgroundColor: '#000000aa', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+    this.tweens.add({ targets: notif, alpha: 0, y: 40, duration: 2000, delay: 1500, onComplete: () => notif.destroy() });
+  }
+
+  // ═══════ Enemies ═══════
 
   spawnEnemy() {
-    if (this.enemies.getLength() >= 10) return;
-
-    const TILE = 32;
-    const px = this.player ? this.player.x : G.x * TILE;
-    const py = this.player ? this.player.y : G.y * TILE;
-
+    if (!this.enemies || this.enemies.getLength() >= 12) return;
+    const px = this.player ? this.player.x : 800;
+    const py = this.player ? this.player.y : 800;
     const angle = Math.random() * Math.PI * 2;
-    const dist = Phaser.Math.Between(200, 400);
+    const dist = Phaser.Math.Between(250, 500);
     const ex = px + Math.cos(angle) * dist;
     const ey = py + Math.sin(angle) * dist;
 
-    // Pick a random card for the enemy
     const wildCard = ALL_CARDS[Math.floor(Math.random() * ALL_CARDS.length)];
-
-    const enemy = this.enemies.create(ex, ey, 'enemy').setScale(1.5);
+    const enemy = this.enemies.create(ex, ey, 'enemy_sprite', 0).setScale(0.9);
     enemy.cardData = wildCard;
     enemy.setDepth(9);
+    enemy.setTint(wildCard.rarity === 'rare' ? 0xaa55ff : wildCard.rarity === 'uncommon' ? 0x5599ff : 0xffffff);
 
-    // Name label
-    enemy.label = this.add.text(ex, ey - 16, wildCard.name, {
-      fontSize: '8px', fontFamily: 'monospace', color: '#ff8888',
+    enemy.label = this.add.text(ex, ey - 28, wildCard.name, {
+      fontSize: '9px', fontFamily: 'monospace', color: '#ffaaaa',
       backgroundColor: '#00000088', padding: { x: 2, y: 1 },
     }).setOrigin(0.5).setDepth(11);
 
-    // Simple patrol movement
     this.tweens.add({
-      targets: enemy,
-      x: ex + Phaser.Math.Between(-60, 60),
-      y: ey + Phaser.Math.Between(-60, 60),
-      duration: Phaser.Math.Between(2000, 4000),
-      yoyo: true,
-      repeat: -1,
-      onUpdate: () => {
-        if (enemy.label) {
-          enemy.label.setPosition(enemy.x, enemy.y - 16);
-        }
-      }
+      targets: enemy, x: ex + Phaser.Math.Between(-40, 40), y: ey + Phaser.Math.Between(-40, 40),
+      duration: Phaser.Math.Between(2000, 4000), yoyo: true, repeat: -1,
+      onUpdate: () => { if (enemy.label) enemy.label.setPosition(enemy.x, enemy.y - 28); }
     });
   }
 
   onEnemyContact(player, enemy) {
     if (G.inBattle || G.team.length === 0) return;
-
     const cardData = enemy.cardData;
-
-    // Remove the enemy sprite
     if (enemy.label) enemy.label.destroy();
     enemy.destroy();
 
-    // Use the REAL battle engine to set up the fight
-    // triggerWildEncounter() from battle.js handles all the state setup
-    // But it also calls showBattleOverlay/renderBattle which are stubbed
-    // So we call it, then launch our Phaser battle scene
-    if (typeof triggerWildEncounter === 'function') {
-      triggerWildEncounter();
-    } else {
-      // Fallback: manually set up B state
-      G.inBattle = true;
-      const playerGhosts = buildPlayerBattleTeam();
-      const enemyGhosts = [{
-        id: cardData.id, name: cardData.name, hp: cardData.maxHp, maxHp: cardData.maxHp,
-        ko: false, ability: cardData.ability, abilityDesc: cardData.desc,
-        rarity: cardData.rarity, usedOncePerGame: false, entryFired: false
-      }];
-      B = {
-        round: 1,
-        player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
-        enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
-        enemyCard: cardData, phase: 'ready', log: [],
-        playerDice: [], enemyDice: [],
-        nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
-      };
-    }
+    // Set up battle using real engine
+    G.inBattle = true;
+    const playerGhosts = buildPlayerBattleTeam();
+    const enemyGhosts = [{ id: cardData.id, name: cardData.name, hp: cardData.maxHp, maxHp: cardData.maxHp,
+      ko: false, ability: cardData.ability, abilityDesc: cardData.desc, rarity: cardData.rarity,
+      usedOncePerGame: false, entryFired: false }];
 
-    // Switch to battle scene
+    B = {
+      round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
+      enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
+      enemyCard: cardData, phase: 'ready', log: [], playerDice: [], enemyDice: [],
+      nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+    };
+
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.time.delayedCall(300, () => {
       this.scene.launch('BattleScene', { enemyCard: cardData });
@@ -290,24 +277,40 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
-  // ═══════ HUD ═══════
+  triggerTrainerBattle(npc) {
+    if (G.inBattle || G.team.length === 0) return;
+    const trainerData = HOSTILE_NPCS.find(h => h.name === npc.name);
+    if (!trainerData) return;
+    if (isHostileNPCDefeatedToday(trainerData.id)) {
+      this.showDialogue(npc.name, trainerData.dialogue?.[0] || 'Come back tomorrow.');
+      return;
+    }
 
-  buildHUD() {
-    const cam = this.cameras.main;
-    this.hudText = this.add.text(10, 10, '', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#ffffff',
-      backgroundColor: '#00000088', padding: { x: 6, y: 4 },
-    }).setScrollFactor(0).setDepth(200);
+    // Show challenge dialogue then battle
+    this.showDialogue(npc.name, trainerData.challenge);
+    this.time.delayedCall(2000, () => {
+      if (typeof triggerHostileNPCBattle === 'function') {
+        triggerHostileNPCBattle(trainerData);
+      }
+      this.cameras.main.fadeOut(300);
+      this.time.delayedCall(300, () => {
+        this.scene.launch('BattleScene', { enemyCard: getCard(trainerData.team[0]), trainerName: npc.name });
+        this.scene.pause();
+      });
+    });
   }
 
+  // ═══════ HUD ═══════
+
   updateHUD() {
-    if (!this.hudText) return;
     const teamName = G.team.length > 0 ? G.team[G.activeIdx]?.name || '---' : 'No Spiritkin';
+    const hp = G.team[G.activeIdx]?.hp || 0;
+    const maxHp = G.team[G.activeIdx]?.maxHp || 0;
     const wins = G.rep?.battlesWon || 0;
-    const sideline = wins >= 5 ? 'UNLOCKED' : `${wins}/5 wins`;
+    const sideline = wins >= 5 ? 'UNLOCKED' : `${wins}/5`;
     this.hudText.setText(
       `${G.name} | LV ${G.level} | ${G.coins} Gold\n` +
-      `Active: ${teamName} | Sideline: ${sideline}`
+      `${teamName} HP ${hp}/${maxHp} | Sideline: ${sideline}`
     );
   }
 }
