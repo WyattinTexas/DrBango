@@ -78,6 +78,8 @@ class WorldScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys('W,A,S,D');
     this.eKey = this.input.keyboard.addKey('E');
+    this.cKey = this.input.keyboard.addKey('C');
+    this.tKey = this.input.keyboard.addKey('T');
 
     // ── HUD ──
     this.buildHUD();
@@ -158,6 +160,16 @@ class WorldScene extends Phaser.Scene {
 
     // NPC proximity
     this.checkNPCProximity();
+
+    // Panel hotkeys
+    if (Phaser.Input.Keyboard.JustDown(this.cKey)) {
+      this.scene.launch('CraftScene');
+      this.scene.pause();
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.tKey)) {
+      this.showTeamLineup();
+    }
+
     this.updateHUD();
   }
 
@@ -309,6 +321,50 @@ class WorldScene extends Phaser.Scene {
         this.scene.pause();
       });
     });
+  }
+
+  // ═══════ TEAM LINEUP ═══════
+
+  showTeamLineup() {
+    if (this._teamPanel) { this._teamPanel.destroy(); this._teamPanel = null; return; }
+
+    const W = this.scale.width;
+    this._teamPanel = this.add.container(0, 0).setDepth(400).setScrollFactor(0);
+
+    const bg = this.add.rectangle(W - 160, 200, 280, 300, 0x000000, 0.85)
+      .setStrokeStyle(2, 0x4444aa);
+    this._teamPanel.add(bg);
+
+    const title = this.add.text(W - 160, 65, 'TEAM LINEUP', {
+      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffdd44',
+    }).setOrigin(0.5);
+    this._teamPanel.add(title);
+
+    G.team.forEach((ghost, i) => {
+      const y = 90 + i * 50;
+      const isActive = i === G.activeIdx;
+      const nameColor = isActive ? '#88ff88' : ghost.ko ? '#ff4444' : '#cccccc';
+      const txt = this.add.text(W - 280, y, `${isActive ? '► ' : '  '}${ghost.name}`, {
+        fontSize: '13px', fontFamily: 'monospace', fontStyle: isActive ? 'bold' : 'normal', color: nameColor,
+      });
+      const hp = this.add.text(W - 60, y, `HP ${ghost.hp}/${ghost.maxHp}`, {
+        fontSize: '11px', fontFamily: 'monospace', color: ghost.hp <= 0 ? '#ff4444' : '#aaaaaa',
+      }).setOrigin(1, 0);
+      const ability = this.add.text(W - 280, y + 16, `  ${ghost.ability}`, {
+        fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#888888',
+      });
+      this._teamPanel.add([txt, hp, ability]);
+    });
+
+    if (G.team.length === 0) {
+      const empty = this.add.text(W - 160, 120, 'No Spiritkin!', {
+        fontSize: '14px', fontFamily: 'Georgia, serif', color: '#ff6644',
+      }).setOrigin(0.5);
+      this._teamPanel.add(empty);
+    }
+
+    // Auto-close after 5s
+    this.time.delayedCall(5000, () => { if (this._teamPanel) { this._teamPanel.destroy(); this._teamPanel = null; } });
   }
 
   // ═══════ SPIRIT WISPS ═══════
