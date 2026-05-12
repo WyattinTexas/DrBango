@@ -433,7 +433,7 @@ class BattleScene extends Phaser.Scene {
 
       // Essence drops
       if (typeof generateEssence === 'function' && B?.enemyCard) {
-        const zoneIdx = B.zoneIdx !== undefined ? B.zoneIdx : getCurrentZone();
+        const zoneIdx = B.zoneIdx !== undefined ? B.zoneIdx : getCurrentZone(G.x, G.y);
         const essence = generateEssence(B.enemyCard, zoneIdx);
         if (essence) {
           if (!G.essences) G.essences = [];

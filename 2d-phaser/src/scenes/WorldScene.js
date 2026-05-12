@@ -16,35 +16,48 @@ class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(600);
     this.cameras.main.setBackgroundColor('#d8e8f0');
 
-    // ── Render the REAL world map from generateWorld() ──
-    // Impassable tiles for collision
-    this.collisionTiles = this.physics.add.staticGroup();
+    // ── Render the world map as a single RenderTexture (not 9350 rectangles) ──
+    // Build the impassable lookup set once
+    this._impassableSet = new Set([1, 3, 7, 13, 15, 16, 21, 23, 25]);
+    this._tileSize = T;
 
     // Convert hex color string to Phaser number
     function hexToNum(hex) { return parseInt(hex.replace('#', ''), 16); }
 
+    // Draw entire map as a single Graphics object — replaces 9350 individual rectangles
+    const mapGfx = this.add.graphics();
     for (let y = 0; y < MH; y++) {
       for (let x = 0; x < MW; x++) {
         const tileType = worldMap[y] ? worldMap[y][x] : 0;
         const colorHex = TILE_COLORS[tileType] || '#d8e8f0';
         const color = hexToNum(colorHex);
-        this.add.rectangle(x * T + T/2, y * T + T/2, T, T, color);
-
-        // Collision for mountains, walls, water, trees, buildings
-        const impassable = [1, 3, 7, 13, 15, 16, 21, 23, 25];
-        if (impassable.includes(tileType)) {
-          const block = this.collisionTiles.create(x * T + T/2, y * T + T/2, null);
-          block.setDisplaySize(T, T).setVisible(false).refreshBody();
-        }
+        mapGfx.fillStyle(color, 1);
+        mapGfx.fillRect(x * T, y * T, T, T);
       }
     }
 
+    // No physics static group — collision is handled by tile lookup in update()
+
     // ── Player ──
+    // If saved position is inside a blocked tile, reset to hub
+    const spawnTX = Math.floor(G.x);
+    const spawnTY = Math.floor(G.y);
+    if (spawnTX < 0 || spawnTY < 0 || spawnTX >= MW || spawnTY >= MH ||
+        this._impassableSet.has(worldMap[spawnTY]?.[spawnTX])) {
+      console.log('[WorldScene] Saved position blocked, resetting to hub');
+      G.x = HUB.x + 3;
+      G.y = HUB.y + 2;
+      saveGame();
+    }
+
     this.player = this.physics.add.sprite(G.x * T, G.y * T, 'player', 0);
     this.player.setScale(2);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
-    this.physics.add.collider(this.player, this.collisionTiles);
+
+    // Player marker circle (visible even if sprite texture fails)
+    this._playerMarker = this.add.circle(this.player.x, this.player.y, 12, 0x44aaff, 0.4).setDepth(9);
+    // No physics collider — tile collision handled manually in update()
 
     // ── Camera ──
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -214,7 +227,15 @@ class WorldScene extends Phaser.Scene {
     console.log('[WorldScene] create: COMPLETE');
   }
 
-  update() {
+  // ── Tile collision helper (replaces 2270 static physics bodies) ──
+  isTileBlocked(px, py) {
+    const tx = Math.floor(px / this._tileSize);
+    const ty = Math.floor(py / this._tileSize);
+    if (tx < 0 || ty < 0 || tx >= WORLD_W || ty >= WORLD_H) return true;
+    return this._impassableSet.has(worldMap[ty]?.[tx]);
+  }
+
+  update(time, delta) {
     try {
     if (G.inBattle) return;
     if (!this._updateLogged) { this._updateLogged = true; console.log('[WorldScene] update() running, player:', this.player?.x, this.player?.y); }
@@ -229,7 +250,62 @@ class WorldScene extends Phaser.Scene {
 
     if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
 
+    // Tile-based collision: check destination before applying velocity
+    const T = this._tileSize;
+    const halfBody = 10; // approximate half-width of player collision body
+    const px = this.player.x;
+    const py = this.player.y;
+    const dt = (delta || 16) / 1000;
+    const nextX = px + vx * dt;
+    const nextY = py + vy * dt;
+
+    // Check X movement
+    if (vx !== 0) {
+      const probeX = vx > 0 ? nextX + halfBody : nextX - halfBody;
+      if (this.isTileBlocked(probeX, py - halfBody) || this.isTileBlocked(probeX, py + halfBody)) {
+        vx = 0;
+      }
+    }
+    // Check Y movement
+    if (vy !== 0) {
+      const probeY = vy > 0 ? nextY + halfBody : nextY - halfBody;
+      if (this.isTileBlocked(px - halfBody, probeY) || this.isTileBlocked(px + halfBody, probeY)) {
+        vy = 0;
+      }
+    }
+
     this.player.setVelocity(vx, vy);
+
+    // Safety: if player is currently INSIDE a blocked tile, push them out
+    if (this.isTileBlocked(px, py)) {
+      const safeTX = Math.floor(px / T);
+      const safeTY = Math.floor(py / T);
+      let escaped = false;
+      for (let r = 1; r < 15 && !escaped; r++) {
+        for (let dy = -r; dy <= r && !escaped; dy++) {
+          for (let dx = -r; dx <= r && !escaped; dx++) {
+            if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+            const checkTX = safeTX + dx, checkTY = safeTY + dy;
+            if (checkTX >= 0 && checkTY >= 0 && checkTX < WORLD_W && checkTY < WORLD_H &&
+                !this._impassableSet.has(worldMap[checkTY]?.[checkTX])) {
+              this.player.setPosition(checkTX * T + T / 2, checkTY * T + T / 2);
+              this.player.setVelocity(0, 0);
+              escaped = true;
+            }
+          }
+        }
+      }
+      // If still stuck after 15-tile radius, warp to hub
+      if (!escaped) {
+        this.player.setPosition((HUB.x + 3) * T, (HUB.y + 2) * T);
+        this.player.setVelocity(0, 0);
+      }
+    }
+
+    // Track player marker
+    if (this._playerMarker) {
+      this._playerMarker.setPosition(this.player.x, this.player.y);
+    }
 
     // Animate walk or show idle frame
     if (vx !== 0 || vy !== 0) {
@@ -268,7 +344,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     // Dynamic encounter rate — faster spawns inside encounter zones
-    const zoneIdx = getCurrentZone();
+    const zoneIdx = getCurrentZone(G.x, G.y);
     if (zoneIdx >= 0 && !this._inZone) {
       this._inZone = true;
       if (this._spawnTimer) this._spawnTimer.remove();
@@ -411,7 +487,7 @@ class WorldScene extends Phaser.Scene {
     B = {
       round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
       enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
-      enemyCard: cardData, zoneIdx: getCurrentZone(), phase: 'ready', log: [], playerDice: [], enemyDice: [],
+      enemyCard: cardData, zoneIdx: getCurrentZone(G.x, G.y), phase: 'ready', log: [], playerDice: [], enemyDice: [],
       nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     };
 
