@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v6'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v7'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2057,10 +2057,6 @@ body.lite-mode .die.rolling { animation: none !important; }
             <h4>Pick a value</h4>
             <div class="ms-dice-options" id="msInlineOptions"></div>
           </div>
-          <div class="ms-inline-picker" id="pepoPicker" style="display:none;">
-            <h4>Pepo — Flick a die ±1</h4>
-            <div class="ms-dice-options" id="pepoOptions"></div>
-          </div>
         </div>
 
         <!-- BLUE Team — Right -->
@@ -2835,7 +2831,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v6'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v7'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -11606,21 +11602,20 @@ function doPostRollAndResolve(redDice, blueDice) {
     // ========================================
     B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
 
-  // Pepo flick check — before moonstones
+  // Pepo flick check — uses Charlie's physics-based flick system
   const pepoRed = B.wpPepo && B.wpPepo.red;
   const pepoBlue = B.wpPepo && B.wpPepo.blue;
   if (pepoRed || pepoBlue) {
     const pepoTeam = pepoRed ? 'red' : 'blue';
     B.wpPepo[pepoTeam] = false;
-    const pepoDice = pepoTeam === 'red' ? redDice : blueDice;
-    showPepoPicker(pepoTeam, pepoDice, () => {
-      renderDice(redDice, blueDice);
+    log(`<span class="log-ability">Pepo!</span> ${pepoTeam.toUpperCase()} — Flick a die!`);
+    showFlickPicker(pepoTeam, () => {
       // Check if other team also has Pepo
       if (B.wpPepo && ((pepoTeam === 'red' && B.wpPepo.blue) || (pepoTeam === 'blue' && B.wpPepo.red))) {
         const t2 = pepoTeam === 'red' ? 'blue' : 'red';
         B.wpPepo[t2] = false;
-        const d2 = t2 === 'red' ? redDice : blueDice;
-        showPepoPicker(t2, d2, () => { renderDice(redDice, blueDice); _afterPepo(); });
+        log(`<span class="log-ability">Pepo!</span> ${t2.toUpperCase()} — Flick a die!`);
+        showFlickPicker(t2, () => { _afterPepo(); });
       } else { _afterPepo(); }
     });
     return;
@@ -18960,51 +18955,6 @@ function applyWillpowerEffect(team, card) {
       t.resources.fire = (t.resources.fire || 0) + 1;
       break;
   }
-}
-
-// --- Pepo Flick Picker ---
-function showPepoPicker(team, dice, callback) {
-  // Auto-play: AI just bumps the lowest die up by 1
-  if (autoPlayRunning) {
-    const minIdx = dice.indexOf(Math.min(...dice));
-    if (dice[minIdx] < 6) dice[minIdx]++;
-    if (callback) callback();
-    return;
-  }
-
-  const picker = document.getElementById('pepoPicker');
-  const opts = document.getElementById('pepoOptions');
-  if (!picker || !opts) { if (callback) callback(); return; }
-
-  let html = `<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">Pick a die to change ±1</div>`;
-  dice.forEach((val, i) => {
-    const canUp = val < 6;
-    const canDown = val > 1;
-    html += `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin:4px;">`;
-    if (canUp) html += `<button class="ms-die-opt" onclick="pepoFlick(${i},1)" style="font-size:14px;padding:2px 8px;">▲</button>`;
-    else html += `<div style="height:24px;"></div>`;
-    html += `<div class="die" style="width:44px;height:44px;font-size:22px;display:flex;align-items:center;justify-content:center;">${val}</div>`;
-    if (canDown) html += `<button class="ms-die-opt" onclick="pepoFlick(${i},-1)" style="font-size:14px;padding:2px 8px;">▼</button>`;
-    else html += `<div style="height:24px;"></div>`;
-    html += `</div>`;
-  });
-  opts.innerHTML = html;
-  picker.style.display = '';
-  picker.classList.add('active');
-
-  window._pepoDice = dice;
-  window._pepoCallback = callback;
-}
-
-function pepoFlick(dieIndex, delta) {
-  const dice = window._pepoDice;
-  if (!dice) return;
-  dice[dieIndex] = Math.max(1, Math.min(6, dice[dieIndex] + delta));
-  const picker = document.getElementById('pepoPicker');
-  if (picker) { picker.style.display = 'none'; picker.classList.remove('active'); }
-  log(`<span class="log-ability">Pepo!</span> Flicked die ${dieIndex + 1} to <b>${dice[dieIndex]}</b>`);
-  narrate(`Pepo flicked a die to <b>${dice[dieIndex]}</b>!`);
-  if (window._pepoCallback) { window._pepoCallback(); window._pepoCallback = null; }
 }
 
 // Visual hit — shake the card + drain the HP bar for a team
