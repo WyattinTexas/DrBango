@@ -453,6 +453,9 @@ function ensurePlayerDefaults() {
   if (!G.playerId) G.playerId = Date.now().toString(36) + Math.random().toString(36).slice(2);
   if (G.tutorialStep === undefined) G.tutorialStep = 0;
   if (G.tutorialComplete === undefined) G.tutorialComplete = false;
+  // Wave 7: talent trees
+  if (!G.talents) G.talents = {};
+  if (G.darkRiderUnlocked === undefined) G.darkRiderUnlocked = false;
 }
 
 // ── Profession mastery levels (based on profession XP thresholds) ──

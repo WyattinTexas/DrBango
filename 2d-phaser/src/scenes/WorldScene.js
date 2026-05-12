@@ -133,6 +133,7 @@ class WorldScene extends Phaser.Scene {
     this.tKey = this.input.keyboard.addKey('T');
     this.iKey = this.input.keyboard.addKey('I');
     this.pKey = this.input.keyboard.addKey('P');
+    this.yKey = this.input.keyboard.addKey('Y');
 
     // ── HUD ──
     this.buildHUD();
@@ -249,6 +250,7 @@ class WorldScene extends Phaser.Scene {
       { label: 'ITEMS (I)', key: 'I', action: () => this.showInventory(), color: 0x885544 },
       { label: 'CRAFT (C)', key: 'C', action: () => { GameAudio.menuOpen(); this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
       { label: 'PROF (P)', key: 'P', action: () => this.showProfessionPanel(), color: 0x664488 },
+      { label: 'TALENT (Y)', key: 'Y', action: () => { GameAudio.menuOpen(); this.scene.launch('TalentScene'); this.scene.pause(); }, color: 0x884466 },
       { label: 'HELP (H)', key: 'H', action: () => this.showHelpPanel(), color: 0x448844 },
     ];
     const startX = this.scale.width / 2 - (buttons.length * (btnW + btnGap)) / 2;
@@ -524,6 +526,11 @@ class WorldScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.pKey)) {
       this.showProfessionPanel();
     }
+    if (Phaser.Input.Keyboard.JustDown(this.yKey)) {
+      GameAudio.menuOpen();
+      this.scene.launch('TalentScene');
+      this.scene.pause();
+    }
 
     // Wave 3: Signpost interactions (E key near signposts)
     this.checkSignpostProximity();
@@ -679,25 +686,23 @@ class WorldScene extends Phaser.Scene {
       if (dist > INTERACT_DIST) continue;
 
       this._eConsumed = true;
-      switch (bld.action) {
-        case 'tradingPost':
-          this.openTradingPost();
-          break;
-        case 'arena':
-          this.openArena();
-          break;
-        case 'workshop':
-          this.scene.launch('CraftScene');
+      if (bld.action === 'tradingPost') {
+        // Trading post is open-air — use panel directly
+        this.openTradingPost();
+      } else {
+        // Enter building interior
+        if (typeof GameAudio !== 'undefined') GameAudio.menuOpen();
+        this.cameras.main.fadeOut(300);
+        this.time.delayedCall(300, () => {
+          this.scene.launch('BuildingScene', {
+            building: bld.action,
+            returnX: this.player.x,
+            returnY: this.player.y,
+          });
           this.scene.pause();
-          break;
-        case 'inn':
-          this.interactInn();
-          break;
-        case 'cantina':
-          this.interactCantina();
-          break;
+        });
       }
-      return; // only interact with one building per press
+      return;
     }
   }
 
