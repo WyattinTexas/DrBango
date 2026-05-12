@@ -111,7 +111,7 @@ const CLASS_TREES = {
       { id: 'sch_pow_2', branch: 1, tier: 1, name: 'Mentor',
         desc: 'Teach a skill to a party member — they gain profession XP', cost: 2, maxRank: 1, prereq: 'sch_pow_1' },
       { id: 'sch_pow_3', branch: 1, tier: 2, name: 'Ancient Reader',
-        desc: 'Read lore tablets for bonus rewards (gold, essences, rare info)', cost: 3, maxRank: 1, prereq: 'sch_pow_2' },
+        desc: 'May decipher ancient lore tablets (other players see gibberish). Find all 4 to progress toward Elder.', cost: 3, maxRank: 1, prereq: 'sch_pow_2' },
       { id: 'sch_pow_4', branch: 1, tier: 3, name: 'Grand Tutor',
         desc: 'Party members gain +15% XP while grouped with you', cost: 4, maxRank: 1, prereq: 'sch_pow_3' },
 
@@ -129,35 +129,40 @@ const CLASS_TREES = {
 
   enchanter: {
     name: 'Enchanter',
-    desc: 'Weave fortune magic into items and spiritkin. Permanent enhancements.',
+    desc: 'Enhance everything: essences, gear, and crafted items. All enhancements cost essences. Artisans need you.',
     color: '#44ddaa',
     requiresTree: 'fortune_teller',
-    branches: ['Gear Enchants', 'Spirit Enchants', 'Cursework'],
+    branches: ['Essence Enhancement', 'Equipment Enhancement', 'Essence Craft'],
     talents: [
-      { id: 'enc_gear_1', branch: 0, tier: 0, name: 'Minor Enchant',
-        desc: 'Enchant gear with +1 stat per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'enc_gear_2', branch: 0, tier: 1, name: 'Fortune Blade',
-        desc: 'Enchant weapons with +10% crit chance', cost: 2, maxRank: 2, prereq: 'enc_gear_1' },
-      { id: 'enc_gear_3', branch: 0, tier: 2, name: 'Ward of Stars',
-        desc: 'Enchant armor to absorb 1 damage per battle', cost: 3, maxRank: 1, prereq: 'enc_gear_2' },
-      { id: 'enc_gear_4', branch: 0, tier: 3, name: 'Legendary Enchant',
-        desc: 'Apply a legendary enchant — gear gains a unique passive', cost: 4, maxRank: 1, prereq: 'enc_gear_3' },
-      { id: 'enc_spr_1', branch: 1, tier: 0, name: 'Spirit Mark',
-        desc: 'Mark a spiritkin to gain +1 XP per battle per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'enc_spr_2', branch: 1, tier: 1, name: 'Blessed Bond',
-        desc: 'Enchanted spiritkin heals 1 HP after each victory', cost: 2, maxRank: 2, prereq: 'enc_spr_1' },
-      { id: 'enc_spr_3', branch: 1, tier: 2, name: 'Soul Rune',
-        desc: 'Permanently add +1 die to a spiritkin (once per spiritkin)', cost: 3, maxRank: 1, prereq: 'enc_spr_2' },
-      { id: 'enc_spr_4', branch: 1, tier: 3, name: 'Awaken Potential',
-        desc: 'Unlock a hidden second ability on any spiritkin', cost: 4, maxRank: 1, prereq: 'enc_spr_3' },
-      { id: 'enc_crs_1', branch: 2, tier: 0, name: 'Hex',
-        desc: 'Curse an enemy spiritkin: -1 damage per rank for 1 battle', cost: 1, maxRank: 3, prereq: null },
-      { id: 'enc_crs_2', branch: 2, tier: 1, name: 'Jinx',
-        desc: 'Cursed enemies have 20% chance to miss per rank', cost: 2, maxRank: 2, prereq: 'enc_crs_1' },
-      { id: 'enc_crs_3', branch: 2, tier: 2, name: 'Doom Mark',
-        desc: 'Mark an enemy — they take +2 damage from all sources', cost: 3, maxRank: 1, prereq: 'enc_crs_2' },
-      { id: 'enc_crs_4', branch: 2, tier: 3, name: 'Shatter Curse',
-        desc: 'Destroy one piece of enemy equipment permanently', cost: 4, maxRank: 1, prereq: 'enc_crs_3' },
+      // Branch 0: Essence Enhancement — boost crafting essence stats
+      { id: 'enc_ess_1', branch: 0, tier: 0, name: 'Basic Infusion',
+        desc: 'Boost 1 stat on an essence by +100 (costs 1 essence to perform)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'enc_ess_2', branch: 0, tier: 1, name: 'Refined Infusion',
+        desc: 'Boost 1 stat on an essence by +200 instead (costs 2 essences)', cost: 2, maxRank: 1, prereq: 'enc_ess_1' },
+      { id: 'enc_ess_3', branch: 0, tier: 2, name: 'Dual Infusion',
+        desc: 'Boost 2 stats on an essence at once (costs 2 essences)', cost: 3, maxRank: 1, prereq: 'enc_ess_2' },
+      { id: 'enc_ess_4', branch: 0, tier: 3, name: 'Rarity Shift',
+        desc: 'Upgrade an essence\'s rarity tier entirely (costs 3 essences)', cost: 4, maxRank: 1, prereq: 'enc_ess_3' },
+
+      // Branch 1: Equipment Enhancement — enchant gear slots
+      { id: 'enc_eqp_1', branch: 1, tier: 0, name: 'Weapon Enchant',
+        desc: 'Enchant a weapon: +1 damage', cost: 1, maxRank: 1, prereq: null },
+      { id: 'enc_eqp_2', branch: 1, tier: 1, name: 'Helm Enchant',
+        desc: 'Enchant head slot: +1 damage reduction vs enemy triples or higher', cost: 2, maxRank: 1, prereq: 'enc_eqp_1' },
+      { id: 'enc_eqp_3', branch: 1, tier: 2, name: 'Accessory Enchant',
+        desc: 'Enchant accessories: +5% run speed', cost: 3, maxRank: 1, prereq: 'enc_eqp_2' },
+      { id: 'enc_eqp_4', branch: 1, tier: 3, name: 'Masterwork',
+        desc: 'Crafted battle items gain +1 to their main stat', cost: 4, maxRank: 1, prereq: 'enc_eqp_3' },
+
+      // Branch 2: Essence Craft — consume essences to create buffs
+      { id: 'enc_crf_1', branch: 2, tier: 0, name: 'Essence Spark',
+        desc: 'Consume 1 essence to create a buff: +5% XP for 10 min (any player)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'enc_crf_2', branch: 2, tier: 1, name: 'Lingering Spark',
+        desc: 'Essence Spark buff duration extended to 30 minutes', cost: 2, maxRank: 1, prereq: 'enc_crf_1' },
+      { id: 'enc_crf_3', branch: 2, tier: 2, name: 'Potent Spark',
+        desc: 'Consume 3 essences: XP buff scales with potency (avg 10-15%, up to 80%) for 30 min', cost: 3, maxRank: 1, prereq: 'enc_crf_2' },
+      { id: 'enc_crf_4', branch: 2, tier: 3, name: 'Artifact Attunement',
+        desc: 'Unlock Artifact weapons — extremely rare, powerful gear only Enchanters can wield', cost: 4, maxRank: 1, prereq: 'enc_crf_3' },
     ],
   },
 
@@ -1043,6 +1048,7 @@ const APPRENTICE_DESCRIPTIONS = {
   fortune_teller: 'Unlocks [F] Fortune: 50/50 Good (+1 Lucky Stone) or Bad (-1 die). 30s cooldown.',
   shaman: 'Unlocks Meditation: sit at gardens and spirit locations. Does nothing alone — abilities give meditation power.',
   scholar: 'Party gains +10% XP while grouped with you. Requires Fortune XP to unlock.',
+  enchanter: 'Gain ability to enhance crafting materials. All enhancements cost essences. Artisans need you.',
 };
 
 function getApprenticeInfo(treeId) {
@@ -1054,9 +1060,10 @@ function getApprenticeInfo(treeId) {
 
 // Master descriptions — custom effects per tree
 const MASTER_DESCRIPTIONS = {
-  fortune_teller: 'Pretty Darn Good: odds reset to 50/50, Good Fortunes deal +1 bonus damage, target runs 5% faster',
-  shaman: 'Elemental Skin blocks 1 extra damage (-2 total), meditation buffs enhanced, +1 damage, spirit pets gain +1 damage',
+  fortune_teller: 'Pretty Darn Good: odds reset to 50/50, +1 bonus damage, +5% speed. Unlocks "Fortune Teller" title.',
+  shaman: 'Elemental Skin -2 total, meditation enhanced, +1 damage, spirit pets +1 damage. Unlocks "Shaman" title.',
   scholar: '+1 special slot (5 total), Scholar title visible to all, Preparation buff lasts 1 hour',
+  enchanter: 'All enchantments cost 1 fewer essence (min 1). Enchanted items glow gold. Generate 1 random essence every 30 min. Unlocks "Enchanter" title.',
 };
 
 function getMasterInfo(treeId) {
