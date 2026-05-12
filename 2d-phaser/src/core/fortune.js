@@ -139,8 +139,13 @@ function giveFortune(targetName, isPlayer) {
       dicePenalty: dicePenalty, hexActive: hex,
     };
 
-    // Track bad fortunes for Dark Rider unlock
-    G.badFortunesGiven = (G.badFortunesGiven || 0) + 1;
+    // Master FT has restored balance — bad fortunes no longer count toward Dark Rider
+    const masterFT = (typeof isMaster === 'function' && isMaster('fortune_teller'));
+
+    // Only track bad fortunes for Dark Rider if NOT a master
+    if (!masterFT) {
+      G.badFortunesGiven = (G.badFortunesGiven || 0) + 1;
+    }
 
     // Dark Profit: gain 5 gold per bad fortune
     const darkProfit = (typeof getTalentRank === 'function' && getTalentRank('fortune_teller', 'ft_drk_4') >= 1);
@@ -150,9 +155,9 @@ function giveFortune(targetName, isPlayer) {
       fortune.desc = desc;
     }
 
-    // Check Dark Rider unlock (100 bad fortunes with dark talents active)
+    // Check Dark Rider unlock (100 bad fortunes with dark talents, before mastery)
     const hasDarkTalents = (typeof getTalentRank === 'function' && getTalentRank('fortune_teller', 'ft_drk_1') >= 1);
-    if (hasDarkTalents && G.badFortunesGiven >= 100 && !G.darkRiderUnlocked) {
+    if (!masterFT && hasDarkTalents && G.badFortunesGiven >= 100 && !G.darkRiderUnlocked) {
       G.darkRiderUnlocked = true;
       fortune.darkRiderUnlocked = true;
     }
