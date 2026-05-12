@@ -39,12 +39,15 @@ class WorldScene extends Phaser.Scene {
     // No physics static group — collision is handled by tile lookup in update()
 
     // ── Player ──
-    // If saved position is inside a blocked tile, reset to hub
+    // Reset to hub if saved position is problematic (blocked OR far from any hub)
     const spawnTX = Math.floor(G.x);
     const spawnTY = Math.floor(G.y);
+    const nearAnyHub = [HUB, HUB_MEADOW, HUB_VOLCANIC, HUB_DARK].some(
+      h => Math.abs(spawnTX - h.x) < 20 && Math.abs(spawnTY - h.y) < 20
+    );
     if (spawnTX < 0 || spawnTY < 0 || spawnTX >= MW || spawnTY >= MH ||
-        this._impassableSet.has(worldMap[spawnTY]?.[spawnTX])) {
-      console.log('[WorldScene] Saved position blocked, resetting to hub');
+        this._impassableSet.has(worldMap[spawnTY]?.[spawnTX]) || !nearAnyHub) {
+      console.log('[WorldScene] Resetting to Polaris Hub from', spawnTX, spawnTY);
       G.x = HUB.x + 3;
       G.y = HUB.y + 2;
       saveGame();
@@ -55,8 +58,10 @@ class WorldScene extends Phaser.Scene {
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
 
-    // Player marker circle (visible even if sprite texture fails)
-    this._playerMarker = this.add.circle(this.player.x, this.player.y, 12, 0x44aaff, 0.4).setDepth(9);
+    // Bright player indicator — large pulsing glow so you can always find yourself
+    this._playerMarker = this.add.circle(0, 0, 20, 0x44aaff, 0.5).setDepth(9);
+    this._playerMarkerRing = this.add.circle(0, 0, 26, 0x44aaff, 0).setDepth(9).setStrokeStyle(2, 0x44aaff, 0.7);
+    this.tweens.add({ targets: this._playerMarkerRing, scaleX: 1.4, scaleY: 1.4, alpha: 0, duration: 1000, yoyo: false, repeat: -1 });
     // No physics collider — tile collision handled manually in update()
 
     // ── Camera ──
@@ -78,11 +83,20 @@ class WorldScene extends Phaser.Scene {
     // Friendly — Rolling Hills
     this.spawnNPC('Farmer Bea', 24 * T, 58 * T, 'npc_elder', 0x6a8a4a);
     this.spawnNPC('Herbalist Sage', 28 * T, 60 * T, 'npc_knight', 0x4a8a6a);
+    // Friendly — Volcanic Isles
+    this.spawnNPC('Captain Flint', 74 * T, 16 * T, 'npc_hunter', 0xcc6644);
+    this.spawnNPC('Lava Tender', 76 * T, 14 * T, 'npc_knight', 0xff8844);
+    // Friendly — Dark Castle
+    this.spawnNPC('Shadow Warden', 93 * T, 20 * T, 'npc_hunter', 0x8a6aaa);
+    this.spawnNPC('Cursed Scholar', 95 * T, 22 * T, 'npc_elder', 0x6a4a8a);
 
     // Hostile NPCs (from HOSTILE_NPCS positions)
     this.spawnNPC('Brawler Jax', 30 * T, 20 * T, 'enemy_sprite', 0xcc4444, true);
     this.spawnNPC('Ice Queen Vera', 40 * T, 15 * T, 'npc_knight', 0x6688cc, true);
     this.spawnNPC('Bandit Marcus', 28 * T, 48 * T, 'enemy_sprite', 0xa88844, true);
+    this.spawnNPC('Lava Raider Kira', 68 * T, 25 * T, 'npc_hunter', 0xee8844, true);
+    this.spawnNPC('Shadow Knight Vex', 92 * T, 18 * T, 'npc_elder', 0x8866aa, true);
+    this.spawnNPC('The Exile', 55 * T, 35 * T, 'npc_knight', 0x666666, true);
 
     // ── Enemies ──
     this.enemies = this.physics.add.group();
@@ -303,9 +317,8 @@ class WorldScene extends Phaser.Scene {
     }
 
     // Track player marker
-    if (this._playerMarker) {
-      this._playerMarker.setPosition(this.player.x, this.player.y);
-    }
+    if (this._playerMarker) this._playerMarker.setPosition(this.player.x, this.player.y);
+    if (this._playerMarkerRing) this._playerMarkerRing.setPosition(this.player.x, this.player.y);
 
     // Animate walk or show idle frame
     if (vx !== 0 || vy !== 0) {
@@ -403,8 +416,11 @@ class WorldScene extends Phaser.Scene {
             this.comm.dismiss();
           } else if (npc.hostile) {
             this.triggerTrainerBattle(npc);
-          } else {
+          } else if (this.comm) {
             this.comm.show(npc.name, this.getNPCDialogue(npc.name), { color: '#88ff88' });
+          } else {
+            // Fallback if CommOverlay failed to initialize
+            this.showDialogue(npc.name, this.getNPCDialogue(npc.name));
           }
         }
       } else {
@@ -415,6 +431,11 @@ class WorldScene extends Phaser.Scene {
   }
 
   getNPCDialogue(name) {
+    // Use the rich NPC_DIALOGUE_MAP from npcs.js if available
+    if (typeof NPC_DIALOGUE_MAP !== 'undefined' && NPC_DIALOGUE_MAP[name] && NPC_DIALOGUE_MAP[name].getLine) {
+      return NPC_DIALOGUE_MAP[name].getLine();
+    }
+    // Fallback for any NPC not in the map
     const lines = {
       'Elder Frost': ['The spirits remember what men forget.', 'Frost Valley was the first land the Spiritkin claimed.'],
       'Smith Ember': ['Iron sings when you heat it right.', 'Bring me ore and I will make you something worth carrying.'],
@@ -765,6 +786,7 @@ class WorldScene extends Phaser.Scene {
       { name: 'Ember Dust', color: 0xff8844 },
       { name: 'Spirit Thread', color: 0xaa66ff },
       { name: 'Mask Fragment', color: 0xffffff },
+      { name: 'Healing Seed', color: 0x44aa44 },
     ];
     const type = WISP_TYPES[Math.floor(Math.random() * WISP_TYPES.length)];
 
@@ -800,7 +822,7 @@ class WorldScene extends Phaser.Scene {
     wisp.destroy();
 
     // Grant resource
-    const resourceMap = { 'Frost Shard': 'iceShards', 'Ember Dust': 'sacredFire', 'Spirit Thread': 'surge', 'Mask Fragment': 'moonstone' };
+    const resourceMap = { 'Frost Shard': 'iceShards', 'Ember Dust': 'sacredFire', 'Spirit Thread': 'surge', 'Mask Fragment': 'moonstone', 'Healing Seed': 'healingSeeds' };
     const key = resourceMap[type.name];
     if (key && G[key] !== undefined) G[key]++;
 

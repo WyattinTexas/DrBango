@@ -230,6 +230,14 @@ function ensurePlayerDefaults() {
   if (!G.professionSkills) G.professionSkills = {};
   if (G.skillPointsUsed === undefined) G.skillPointsUsed = 0;
   if (!G.achievements) G.achievements = [];
+  // Resources (must exist for wisp collection + battle resource bar)
+  if (G.iceShards === undefined) G.iceShards = 0;
+  if (G.sacredFire === undefined) G.sacredFire = 0;
+  if (G.healingSeeds === undefined) G.healingSeeds = 0;
+  if (G.luckyStones === undefined) G.luckyStones = 0;
+  if (G.surge === undefined) G.surge = 0;
+  if (G.moonstone === undefined) G.moonstone = 0;
+  if (G.firefly === undefined) G.firefly = 0;
 }
 
 // ═══════════════════════════════════════════════════
