@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v2'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v3'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2835,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v2'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v3'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3012,26 +3012,19 @@ const WILLPOWER_CARDS = [
 
 function wpCardById(id) { return WILLPOWER_CARDS.find(c => c.id === id); }
 
-function buildWillpowerDeck(size) {
-  // Shuffle all 12 card types, then draw 'size' cards (matches ghost's maxHp)
-  const pool = WILLPOWER_CARDS.map(c => c.id);
-  // Shuffle pool
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  // Take up to 'size' cards; if size > 12, add random extras (max 2 each)
-  const deck = pool.slice(0, Math.min(size, 12));
+function buildTeamWillpowerDeck() {
+  // Team deck: all 12 types + 3 random repeats = 15 cards
+  const deck = WILLPOWER_CARDS.map(c => c.id);
   const counts = {};
   deck.forEach(id => counts[id] = (counts[id]||0) + 1);
-  while (deck.length < size) {
+  while (deck.length < 15) {
     const available = WILLPOWER_CARDS.filter(c => (counts[c.id]||0) < 2);
     if (available.length === 0) break;
     const pick = available[Math.floor(Math.random() * available.length)];
     deck.push(pick.id);
     counts[pick.id] = (counts[pick.id]||0) + 1;
   }
-  // Final shuffle
+  // Shuffle (Fisher-Yates)
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -3039,36 +3032,68 @@ function buildWillpowerDeck(size) {
   return deck;
 }
 
+// Draw willpower cards from team deck for a ghost entering play
+function wpDrawFromTeam(team, ghost) {
+  const g = ghostData(ghost.id);
+  const need = g.maxHp;
+  ghost.willpower = [];
+  ghost.willpowerUsedThisTurn = false;
+  ghost.willpowerTopLocked = false;
+  ghost.shellActive = false;
+
+  for (let i = 0; i < need; i++) {
+    // If team deck is empty, reshuffle team discard into deck
+    if (team.wpDeck.length === 0 && team.wpDiscard.length > 0) {
+      team.wpDeck = [...team.wpDiscard];
+      team.wpDiscard = [];
+      for (let j = team.wpDeck.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [team.wpDeck[j], team.wpDeck[k]] = [team.wpDeck[k], team.wpDeck[j]];
+      }
+      log(`<span class="log-ability">Willpower deck reshuffled!</span>`);
+    }
+    if (team.wpDeck.length > 0) {
+      ghost.willpower.push(team.wpDeck.shift());
+    }
+  }
+  ghost.hp = ghost.willpower.length;
+  ghost.maxHp = ghost.willpower.length;
+}
+
 // --- Willpower helpers ---
+// Find the team object that owns this ghost
+function wpTeamOf(ghost) {
+  if (!B) return null;
+  if (B.red.ghosts.includes(ghost)) return B.red;
+  if (B.blue.ghosts.includes(ghost)) return B.blue;
+  return null;
+}
+
 function wpDamage(ghost, amount) {
+  const team = wpTeamOf(ghost);
   for (let i = 0; i < amount && ghost.willpower.length > 0; i++) {
     const removed = ghost.willpower.shift();
-    ghost.willpowerDiscard.push(removed);
+    if (team) team.wpDiscard.push(removed);
   }
   ghost.hp = ghost.willpower.length;
   if (ghost.hp <= 0) ghost.ko = true;
 }
 
 function wpHeal(ghost, amount) {
+  const team = wpTeamOf(ghost);
+  if (!team) return;
   for (let i = 0; i < amount; i++) {
-    if (ghost.willpowerDiscard.length === 0) break;
-    const idx = Math.floor(Math.random() * ghost.willpowerDiscard.length);
-    const card = ghost.willpowerDiscard.splice(idx, 1)[0];
+    // Pull from team discard
+    if (team.wpDiscard.length === 0) break;
+    const idx = Math.floor(Math.random() * team.wpDiscard.length);
+    const card = team.wpDiscard.splice(idx, 1)[0];
     ghost.willpower.push(card);
   }
   ghost.hp = ghost.willpower.length;
 }
 
 function wpCheckReshuffle(ghost) {
-  if (ghost.willpower.length === 0 && ghost.willpowerDiscard.length > 0 && !ghost.ko) {
-    ghost.willpower = [...ghost.willpowerDiscard];
-    ghost.willpowerDiscard = [];
-    for (let i = ghost.willpower.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ghost.willpower[i], ghost.willpower[j]] = [ghost.willpower[j], ghost.willpower[i]];
-    }
-    ghost.hp = ghost.willpower.length;
-  }
+  // No longer needed per-ghost — reshuffling happens in wpDrawFromTeam
 }
 
 const GHOSTS = [
@@ -4709,20 +4734,25 @@ function pickRandomBoth() {
 function ghostData(id) { return GHOSTS.find(g=>g.id===id); }
 
 function makeTeam(ids) {
-  return {
+  const teamDeck = buildTeamWillpowerDeck();
+  const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      const wpDeck = buildWillpowerDeck(g.maxHp);
-      return { id, name:g.name, hp:wpDeck.length, maxHp:wpDeck.length, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
+      return { id, name:g.name, hp:0, maxHp:0, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false,
-        willpower: wpDeck, willpowerDiscard: [], willpowerUsedThisTurn:false, willpowerTopLocked:false, shellActive:false };
+        willpower: [], willpowerUsedThisTurn:false, willpowerTopLocked:false, shellActive:false };
     }),
     activeIdx: 0,
+    wpDeck: teamDeck,    // shared willpower draw pile
+    wpDiscard: [],       // shared willpower discard pile
     resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
-    moonstoneSickness: 0,       // Mode A: permanent stacking counter
-    moonstoneSicknessCount: 0,  // Mode B: escalating counter
-    moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
+    moonstoneSickness: 0,
+    moonstoneSicknessCount: 0,
+    moonstoneSicknessPending: 0
   };
+  // Draw willpower for the starting active ghost
+  wpDrawFromTeam(team, team.ghosts[0]);
+  return team;
 }
 
 function active(t) { return t.ghosts[t.activeIdx]; }
@@ -5966,8 +5996,8 @@ function doPressureSwap(attackerTeam, targetIdx) {
   // Entry effects always fire for the incoming ghost regardless of who was forced out.
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
-  // Returning from sideline = full HP
-  if (newGhost.hp < newGhost.maxHp) wpHeal(newGhost, newGhost.maxHp - newGhost.hp);
+  // Draw willpower from team deck for the entering ghost
+  wpDrawFromTeam(enemy, newGhost);
   // Narrate the swap so there's textual context in the narrator div for BOTH the auto-pick path
   // (single sideline ghost — no modal, no prior narration) and the manual-pick path (modal closes
   // silently).  Without this, the player just sees the PRESSURE! splash with zero narrator context.
@@ -7532,9 +7562,9 @@ function doEloiseChoice(choice) {
     // Swap willpower stacks (and HP values derived from them)
     const myOldHp = f.hp;
     const oppOldHp = oppF.hp;
-    const myWp = [...f.willpower]; const myWpDiscard = [...f.willpowerDiscard];
-    f.willpower = [...oppF.willpower]; f.willpowerDiscard = [...oppF.willpowerDiscard];
-    oppF.willpower = myWp; oppF.willpowerDiscard = myWpDiscard;
+    const myWp = [...f.willpower];
+    f.willpower = [...oppF.willpower];
+    oppF.willpower = myWp;
     f.hp = f.willpower.length; oppF.hp = oppF.willpower.length;
     showAbilityCallout('CHANGE OF HEART!', 'var(--rare)', `${f.name} — HP swap! (${myOldHp} → ${f.hp}) vs enemy (${oppOldHp} → ${oppF.hp})`, team);
     log(`<span class="log-ability">${f.name}</span> — Change of Heart! Spent 1 Ice Shard. Swapped HP: ${myOldHp} → ${f.hp}, enemy ${oppOldHp} → ${oppF.hp}.`);
@@ -7808,14 +7838,14 @@ function doRaditzHuntSwap(attackerTeam, targetIdx) {
   const oldGhost = active(enemy);
   const oldName = oldGhost.name;
 
-  // Perform the swap — incoming ghost returns at full HP
+  // Perform the swap — incoming ghost draws willpower from team deck
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
-  newGhost.hp = newGhost.maxHp;
+  wpDrawFromTeam(enemy, newGhost);
   renderBattle();
 
   const attackerCls = attackerTeam === 'red' ? 'red-text' : 'blue-text';
-  narrate(`<b class="${attackerCls}">${raditzG.name}</b> — Hunt! <b>${oldName}</b> to the sideline — <b>${newGhost.name}</b> enters at full HP!`);
+  narrate(`<b class="${attackerCls}">${raditzG.name}</b> — Hunt! <b>${oldName}</b> to the sideline — <b>${newGhost.name}</b> enters with ${newGhost.hp} willpower!`);
   showAbilityCallout('HUNT!', 'var(--rare)', `${oldName} forced out — ${newGhost.name} enters!`, attackerTeam);
   log(`<span class="log-ability">${raditzG.name}</span> — Hunt! ${oldName} sent to sideline, ${newGhost.name} enters at full HP.`);
 
@@ -8379,12 +8409,12 @@ function doTobogganChoice(idx) {
   const newGhost = winTeam.ghosts[idx];
 
   winTeam.activeIdx = idx;
-  // Incoming ghost heals to full HP when entering from sideline
-  newGhost.hp = newGhost.maxHp;
+  // Draw willpower from team deck for the entering ghost
+  wpDrawFromTeam(winTeam, newGhost);
   renderBattle();
 
   const teamColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
-  narrate(`<b class="${teamColor}">${oldName}</b> — Toboggan! Slides to sideline — <b>${newGhost.name}</b> enters the fight!`);
+  narrate(`<b class="${teamColor}">${oldName}</b> — Toboggan! Slides to sideline — <b>${newGhost.name}</b> enters with ${newGhost.hp} willpower!`);
   showAbilityCallout('TOBOGGAN!', 'var(--rare)', `${oldName} slides out — ${newGhost.name} enters!`, winTeamName);
   log(`<span class="log-ability">Calvin & Anna</span> — Toboggan! ${oldName} slides to sideline, ${newGhost.name} enters.`);
 
@@ -18083,10 +18113,10 @@ function doKoSwap(team, idx) {
   const skipEntry = false;
   t.activeIdx = idx;
   const f = active(t);
-  // Returning from sideline = full HP
-  f.hp = f.maxHp;
+  // Draw willpower from team deck for the entering ghost
+  wpDrawFromTeam(t, f);
 
-  log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters at full HP!</span>`);
+  log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters with ${f.hp} willpower!</span>`);
   const entryCalloutCount = triggerEntry(t, skipEntry);
 
   renderBattle();
@@ -18336,10 +18366,10 @@ function doSwap(team, idx) {
   const skipEntry = (oldGhost.id === 365); // Tyson — Hop: no entry effects
   t.activeIdx = idx;
   const f = active(t);
-  // Returning from sideline = full HP
-  f.hp = f.maxHp;
+  // Draw willpower from team deck for the entering ghost
+  wpDrawFromTeam(t, f);
 
-  log(`<span class="log-ability">${oldName} swaps out — ${f.name} enters at full HP!</span>`);
+  log(`<span class="log-ability">${oldName} swaps out — ${f.name} enters with ${f.hp} willpower!</span>`);
   if (skipEntry) {
     log(`<span class="log-ability">Tyson</span> — Hop! No entry effects triggered.`);
   }
@@ -18808,6 +18838,9 @@ function renderWillpower(team) {
     pipHtml += `<div class="wp-pip wp-pip-${pipCard ? pipCard.color : ''}"></div>`;
   }
 
+  const deckLeft = t.wpDeck ? t.wpDeck.length : 0;
+  const discardCount = t.wpDiscard ? t.wpDiscard.length : 0;
+
   el.innerHTML = `
     <div class="wp-top-card wp-${card.color} ${lockedClass}" ${clickAttr}
          title="${card.name}: ${card.desc}${locked ? ' (used this turn)' : canUse ? ' (click to activate)' : ''}">
@@ -18819,6 +18852,7 @@ function renderWillpower(team) {
       <div class="wp-stack-count">${f.willpower.length}</div>
       <div class="wp-stack-label">willpower</div>
       ${pipHtml ? `<div class="wp-stack-pips">${pipHtml}</div>` : ''}
+      <div style="font-size:8px;color:var(--text2);margin-top:2px;">deck ${deckLeft} · discard ${discardCount}</div>
     </div>
   `;
 }
@@ -18841,9 +18875,9 @@ function activateWillpower(team) {
     return;
   }
 
-  // Remove top card (the 1 HP base cost)
+  // Remove top card (the 1 HP base cost) — goes to team discard
   f.willpower.shift();
-  f.willpowerDiscard.push(topId);
+  t.wpDiscard.push(topId);
   f.willpowerUsedThisTurn = true;
   f.willpowerTopLocked = true;
   f.hp = f.willpower.length;
