@@ -53,7 +53,10 @@ class WorldScene extends Phaser.Scene {
       saveGame();
     }
 
-    this.player = this.physics.add.sprite(G.x * T, G.y * T, 'player', 0);
+    // Wave 6: Use selected character sprite (G.spriteKey), fall back to 'player'
+    const playerTexture = (G.spriteKey && G.spriteKey !== 'player' && this.textures.exists(G.spriteKey)) ? G.spriteKey : 'player';
+    this._playerTexture = playerTexture;
+    this.player = this.physics.add.sprite(G.x * T, G.y * T, playerTexture, 0);
     this.player.setScale(2);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
@@ -339,6 +342,31 @@ class WorldScene extends Phaser.Scene {
       this.comm = null;
     }
 
+    // ── Wave 6: Onboarding Tutorial ──
+    this._isNewGame = (G.rep.battlesWon === 0 && !G.tutorialComplete);
+    this._tutorialArrow = null;
+    if (this._isNewGame && G.tutorialStep === 0) {
+      // Delay slightly so the scene fully renders before showing the first message
+      this.time.delayedCall(1500, () => this.startTutorial());
+    }
+
+    // ── Wave 6: Multiplayer Presence ──
+    this._otherPlayerSprites = {};
+    this.initMultiplayerPresence();
+
+    // ── Wave 6: Periodic save + multiplayer presence update (every 30s) ──
+    this._presenceTimer = this.time.addEvent({
+      delay: 30000,
+      callback: () => {
+        saveGame();
+        MultiplayerPresence.updatePresence({
+          name: G.name, x: G.x, y: G.y, spriteKey: G.spriteKey,
+        });
+      },
+      callbackScope: this,
+      loop: true,
+    });
+
     // ── Music ──
     try {
       this._currentMusic = 'frost';
@@ -429,8 +457,10 @@ class WorldScene extends Phaser.Scene {
     if (this._playerMarkerRing) this._playerMarkerRing.setPosition(this.player.x, this.player.y);
 
     // Animate walk or show idle frame
+    // Wave 6: Use correct animation prefix for selected character sprite
+    const animPrefix = (this._playerTexture && this._playerTexture !== 'player') ? this._playerTexture + '_' : '';
     if (vx !== 0 || vy !== 0) {
-      this.player.play(`walk_${this._lastDir}`, true);
+      this.player.play(`${animPrefix}walk_${this._lastDir}`, true);
     } else {
       this.player.stop();
       // Idle: show frame 0 of last direction (col index: down=0, up=1, left=2, right=3)
@@ -505,6 +535,9 @@ class WorldScene extends Phaser.Scene {
 
     // Wave 5: Daily challenge check
     this.updateDailyChallenge();
+
+    // Wave 6: Tutorial progression checks
+    this.updateTutorial(vx, vy);
 
     this.updateHUD();
     } catch (e) { console.error('[WorldScene] update error:', e); }
@@ -2341,5 +2374,246 @@ class WorldScene extends Phaser.Scene {
       this.showNotification('Daily Challenge Complete! +25 gold!');
       GameAudio.victory();
     }
+  }
+
+  // ═══════ WAVE 6: ONBOARDING TUTORIAL ═══════
+
+  startTutorial() {
+    if (G.tutorialComplete || G.tutorialStep > 0) return;
+    G.tutorialStep = 1;
+    this.showTutorialStep(1);
+  }
+
+  showTutorialStep(step) {
+    if (!this.comm) return;
+
+    // Clean up previous tutorial arrow
+    if (this._tutorialArrow) {
+      this._tutorialArrow.destroy();
+      this._tutorialArrow = null;
+    }
+
+    switch (step) {
+      case 1:
+        this.comm.show('Guide', 'Welcome to the Spirit World! Use WASD or arrow keys to move around.', { color: '#44ccff' });
+        break;
+
+      case 2: {
+        this.comm.show('Guide', 'See those glowing orbs? Walk into one to collect resources!', { color: '#44ccff' });
+        // Point an arrow toward the nearest wisp
+        const nearestWisp = this.findNearestWisp();
+        if (nearestWisp) {
+          this.showTutorialArrow(nearestWisp.x, nearestWisp.y);
+        }
+        break;
+      }
+
+      case 3: {
+        this.comm.show('Guide', 'Now find a wild spirit and touch it to start a battle!', { color: '#44ccff' });
+        // Point arrow toward nearest enemy
+        const nearestEnemy = this.findNearestEnemy();
+        if (nearestEnemy) {
+          this.showTutorialArrow(nearestEnemy.x, nearestEnemy.y);
+        }
+        break;
+      }
+
+      case 4:
+        this.comm.show('Guide', 'Great job! Press T to manage your team, I for inventory, C to craft. Good luck, adventurer!', { color: '#44ccff', duration: 6000 });
+        // Tutorial complete after this message auto-dismisses
+        this.time.delayedCall(6500, () => {
+          G.tutorialComplete = true;
+          G.tutorialStep = 4;
+          saveGame();
+        });
+        break;
+    }
+  }
+
+  updateTutorial(vx, vy) {
+    if (G.tutorialComplete || !this._isNewGame) return;
+
+    switch (G.tutorialStep) {
+      case 1:
+        // Wait for player to move
+        if (vx !== 0 || vy !== 0) {
+          if (!this._tutorialMoveCount) this._tutorialMoveCount = 0;
+          this._tutorialMoveCount++;
+          // Require a few frames of movement to confirm intentional input
+          if (this._tutorialMoveCount > 30) {
+            G.tutorialStep = 2;
+            this._tutorialMoveCount = 0;
+            this.time.delayedCall(500, () => this.showTutorialStep(2));
+          }
+        }
+        break;
+
+      case 2:
+        // Wait for a wisp collection (battlesWon still 0, check resource gain)
+        // Track if any resource changed since tutorial started
+        if (!this._tutorialResourceSnapshot) {
+          this._tutorialResourceSnapshot = (G.iceShards || 0) + (G.sacredFire || 0) + (G.healingSeeds || 0) + (G.luckyStones || 0) + (G.surge || 0) + (G.moonstone || 0) + (G.firefly || 0);
+        }
+        const currentResources = (G.iceShards || 0) + (G.sacredFire || 0) + (G.healingSeeds || 0) + (G.luckyStones || 0) + (G.surge || 0) + (G.moonstone || 0) + (G.firefly || 0);
+        if (currentResources > this._tutorialResourceSnapshot) {
+          G.tutorialStep = 3;
+          this._tutorialResourceSnapshot = null;
+          this.time.delayedCall(1000, () => this.showTutorialStep(3));
+        }
+        break;
+
+      case 3:
+        // Wait for player to win (or enter) a battle
+        if (G.rep.battlesWon > 0) {
+          G.tutorialStep = 4;
+          this.time.delayedCall(1500, () => this.showTutorialStep(4));
+        }
+        break;
+
+      // Step 4 auto-completes after the message plays
+    }
+  }
+
+  findNearestWisp() {
+    if (!this.wisps || !this.player) return null;
+    let nearest = null;
+    let minDist = Infinity;
+    this.wisps.children.each(w => {
+      if (!w.active) return;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, w.x, w.y);
+      if (d < minDist) { minDist = d; nearest = w; }
+    });
+    return nearest;
+  }
+
+  findNearestEnemy() {
+    if (!this.enemies || !this.player) return null;
+    let nearest = null;
+    let minDist = Infinity;
+    this.enemies.children.each(e => {
+      if (!e.active || e._isBlackRider) return;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+      if (d < minDist) { minDist = d; nearest = e; }
+    });
+    return nearest;
+  }
+
+  showTutorialArrow(targetX, targetY) {
+    if (this._tutorialArrow) this._tutorialArrow.destroy();
+
+    // Create a pulsing arrow indicator pointing toward the target
+    const arrow = this.add.text(targetX, targetY - 40, '\u25BC', {
+      fontSize: '24px', color: '#44ccff',
+    }).setOrigin(0.5).setDepth(15);
+
+    this.tweens.add({
+      targets: arrow,
+      y: targetY - 30,
+      alpha: { from: 1, to: 0.3 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this._tutorialArrow = arrow;
+
+    // Auto-remove after 10 seconds (target may move)
+    this.time.delayedCall(10000, () => {
+      if (arrow && arrow.active) arrow.destroy();
+      if (this._tutorialArrow === arrow) this._tutorialArrow = null;
+    });
+  }
+
+  // ═══════ WAVE 6: MULTIPLAYER PRESENCE ═══════
+
+  initMultiplayerPresence() {
+    // Initialize the presence system
+    MultiplayerPresence.init();
+
+    // Start listening for other players
+    MultiplayerPresence.startListening(
+      // onPlayerUpdate
+      (pid, data) => {
+        this.updateOtherPlayer(pid, data);
+      },
+      // onPlayerRemove
+      (pid) => {
+        this.removeOtherPlayer(pid);
+      }
+    );
+
+    // Set up disconnect cleanup
+    MultiplayerPresence.setupDisconnect();
+
+    // Write initial presence
+    MultiplayerPresence.updatePresence({
+      name: G.name, x: G.x, y: G.y, spriteKey: G.spriteKey,
+    });
+
+    console.log('[WorldScene] Multiplayer presence initialized');
+  }
+
+  updateOtherPlayer(pid, data) {
+    const T = this._tileSize;
+
+    if (this._otherPlayerSprites[pid]) {
+      // Update existing player sprite position
+      const entry = this._otherPlayerSprites[pid];
+      const targetX = (data.x || 0) * T;
+      const targetY = (data.y || 0) * T;
+
+      // Smooth movement
+      if (entry.sprite && entry.sprite.active) {
+        this.tweens.add({
+          targets: entry.sprite,
+          x: targetX, y: targetY,
+          duration: 800, ease: 'Linear',
+        });
+        // Update label position too
+        if (entry.label && entry.label.active) {
+          this.tweens.add({
+            targets: entry.label,
+            x: targetX, y: targetY - 36,
+            duration: 800, ease: 'Linear',
+          });
+        }
+      }
+      entry.lastSeen = Date.now();
+    } else {
+      // Create new player sprite (semi-transparent ghost appearance)
+      const px = (data.x || 0) * T;
+      const py = (data.y || 0) * T;
+
+      // Use the other player's sprite key if available, otherwise default
+      const textureKey = (data.spriteKey && this.textures.exists(data.spriteKey)) ? data.spriteKey : 'player';
+      const sprite = this.add.sprite(px, py, textureKey, 0)
+        .setScale(2).setAlpha(0.4).setDepth(8).setTint(0x8888ff);
+
+      // Name label
+      const displayName = data.name || 'Unknown';
+      const label = this.add.text(px, py - 36, displayName, {
+        fontSize: '9px', fontFamily: 'monospace', color: '#8888ff',
+        backgroundColor: '#00000066', padding: { x: 2, y: 1 },
+      }).setOrigin(0.5).setDepth(11).setAlpha(0.6);
+
+      // Level badge
+      if (data.level && data.level > 1) {
+        label.setText(`${displayName} (Lv${data.level})`);
+      }
+
+      this._otherPlayerSprites[pid] = {
+        sprite: sprite,
+        label: label,
+        lastSeen: Date.now(),
+      };
+    }
+  }
+
+  removeOtherPlayer(pid) {
+    const entry = this._otherPlayerSprites[pid];
+    if (!entry) return;
+    if (entry.sprite && entry.sprite.active) entry.sprite.destroy();
+    if (entry.label && entry.label.active) entry.label.destroy();
+    delete this._otherPlayerSprites[pid];
   }
 }

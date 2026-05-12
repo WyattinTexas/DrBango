@@ -36,6 +36,11 @@ const G = {
   rep: { battlesWon: 0, craftsCompleted: 0, itemsSold: 0, essencesCollected: 0, raresFound: 0 },
   hostileNPCsDefeated: {},
   titles: [],
+  // Wave 6: onboarding + multiplayer
+  spriteKey: 'player',       // character sprite choice (default = Boy_walk)
+  playerId: null,            // unique multiplayer ID (generated on first run)
+  tutorialStep: 0,           // 0-4, tutorial progression
+  tutorialComplete: false,   // true after tutorial finishes
   essences: [],
   gear: [],
   equipped: { weapon: null, head: null, accessory: null },

@@ -448,6 +448,11 @@ function ensurePlayerDefaults() {
   // Wave 5: world bosses defeated + daily challenge
   if (G.worldBossesDefeated === undefined) G.worldBossesDefeated = 0;
   if (!G.dailyChallenge) G.dailyChallenge = null;
+  // Wave 6: onboarding + multiplayer
+  if (!G.spriteKey) G.spriteKey = 'player';
+  if (!G.playerId) G.playerId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  if (G.tutorialStep === undefined) G.tutorialStep = 0;
+  if (G.tutorialComplete === undefined) G.tutorialComplete = false;
 }
 
 // ── Profession mastery levels (based on profession XP thresholds) ──
@@ -568,6 +573,7 @@ var firebase = {
 };
 
 var db = {
+  _stub: true, // Wave 6: flag so MultiplayerPresence can detect offline mode
   ref: function(path) {
     return {
       set: function(val) { return Promise.resolve(); },
@@ -589,6 +595,89 @@ var otherPlayers = {};
 var marketListings = {};
 var housingData = {};
 var showHomeOnMinimap = false;
+
+// ── Wave 6: Multiplayer Presence (Firebase-ready, graceful offline) ──
+const MultiplayerPresence = {
+  _isStub: true,  // true until real Firebase is connected
+  _listeners: {},
+
+  init() {
+    // Check if db is a real Firebase reference (not our stub)
+    try {
+      const testRef = db.ref('_presence_test');
+      // Our stub returns a resolved Promise for .once() — real Firebase returns a thenable
+      // Check by seeing if the stub flag exists
+      if (testRef && testRef.set && typeof testRef.on === 'function') {
+        // Could be real or stub — try to detect stub by checking if .once returns immediately
+        this._isStub = (db._stub === true);
+      }
+    } catch(e) {
+      this._isStub = true;
+    }
+    console.log('[MultiplayerPresence] init, stub:', this._isStub);
+  },
+
+  // Write this player's presence data
+  updatePresence(playerData) {
+    if (this._isStub || !G.playerId) return;
+    try {
+      db.ref('presence/' + G.playerId).set({
+        name: playerData.name || G.name,
+        x: playerData.x || G.x,
+        y: playerData.y || G.y,
+        spriteKey: playerData.spriteKey || G.spriteKey,
+        level: G.level || 1,
+        region: getCurrentRegion(G.x, G.y),
+        lastSeen: firebase.database.ServerValue.TIMESTAMP,
+      });
+    } catch(e) {
+      console.warn('[MultiplayerPresence] updatePresence error:', e);
+    }
+  },
+
+  // Listen for other players' presence changes
+  startListening(onPlayerUpdate, onPlayerRemove) {
+    if (this._isStub) return;
+    try {
+      const ref = db.ref('presence');
+      ref.on('child_added', snap => {
+        const data = snap.val();
+        const pid = snap.key || '';
+        if (pid === G.playerId) return; // skip self
+        if (data && onPlayerUpdate) onPlayerUpdate(pid, data);
+      });
+      ref.on('child_changed', snap => {
+        const data = snap.val();
+        const pid = snap.key || '';
+        if (pid === G.playerId) return;
+        if (data && onPlayerUpdate) onPlayerUpdate(pid, data);
+      });
+      ref.on('child_removed', snap => {
+        const pid = snap.key || '';
+        if (onPlayerRemove) onPlayerRemove(pid);
+      });
+      this._listeners.presence = ref;
+    } catch(e) {
+      console.warn('[MultiplayerPresence] startListening error:', e);
+    }
+  },
+
+  // Clean up on disconnect
+  setupDisconnect() {
+    if (this._isStub || !G.playerId) return;
+    try {
+      db.ref('presence/' + G.playerId).onDisconnect?.()?.remove?.();
+    } catch(e) { /* optional, may not exist on stub */ }
+  },
+
+  // Stop listening
+  stopListening() {
+    if (this._listeners.presence) {
+      try { this._listeners.presence.off(); } catch(e) {}
+      this._listeners.presence = null;
+    }
+  },
+};
 
 // ── Chat stub ──
 function addChatMessage(sender, text) {
