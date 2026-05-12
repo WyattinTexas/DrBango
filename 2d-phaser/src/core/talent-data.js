@@ -8,12 +8,12 @@
 const CLASS_TREES = {
 
   // ═══════════════════════════════════════════════════════
-  //  FORTUNE TELLER (base) → Oracle, Mystic, Enchanter
+  //  FORTUNE TELLER (base) → Shaman, Scholar, Enchanter
   // ═══════════════════════════════════════════════════════
 
   fortune_teller: {
     name: 'Fortune Teller',
-    desc: 'Bestow fortunes upon other players. Mastery unlocks Oracle, Mystic & Enchanter.',
+    desc: 'Bestow fortunes upon other players. Mastery unlocks Shaman, Scholar & Enchanter.',
     color: '#44bbff',
     branches: ['Bright Fortune', 'Fate\'s Balance', 'Dark Fortune'],
     talents: [
@@ -49,71 +49,81 @@ const CLASS_TREES = {
     ],
   },
 
-  oracle: {
-    name: 'Oracle',
-    desc: 'See what others cannot. Predict events, find hidden treasures, reveal secrets.',
-    color: '#66ccff',
+  shaman: {
+    name: 'Shaman',
+    desc: 'Channel nature\'s power through Cultivator gardens and spirit pets. Buff allies, fight alongside, or empower yourself.',
+    color: '#66cc88',
     requiresTree: 'fortune_teller',
-    branches: ['Foresight', 'Divination', 'Prophecy'],
+    branches: ['Garden Rites', 'Battle Spirit', 'Self-Attunement'],
     talents: [
-      { id: 'orc_for_1', branch: 0, tier: 0, name: 'Premonition',
-        desc: 'See the next wild encounter\'s spiritkin before it spawns', cost: 1, maxRank: 3, prereq: null },
-      { id: 'orc_for_2', branch: 0, tier: 1, name: 'Battle Vision',
-        desc: 'Preview enemy dice rolls 1 turn ahead', cost: 2, maxRank: 2, prereq: 'orc_for_1' },
-      { id: 'orc_for_3', branch: 0, tier: 2, name: 'Fate Weaver',
-        desc: 'Reroll one die per battle', cost: 3, maxRank: 1, prereq: 'orc_for_2' },
-      { id: 'orc_for_4', branch: 0, tier: 3, name: 'Omniscience',
-        desc: 'See all hidden objects and spiritkin in your region', cost: 4, maxRank: 1, prereq: 'orc_for_3' },
-      { id: 'orc_div_1', branch: 1, tier: 0, name: 'Treasure Sense',
-        desc: 'Detect hidden loot within a larger radius per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'orc_div_2', branch: 1, tier: 1, name: 'Omen Reader',
-        desc: 'Collect omens from spiritkin — trade for rare items', cost: 2, maxRank: 2, prereq: 'orc_div_1' },
-      { id: 'orc_div_3', branch: 1, tier: 2, name: 'Spirit Compass',
-        desc: 'Reveals the path to the nearest legendary spiritkin', cost: 3, maxRank: 1, prereq: 'orc_div_2' },
-      { id: 'orc_div_4', branch: 1, tier: 3, name: 'The All-Seeing Eye',
-        desc: 'See every player and their active spiritkin on the map', cost: 4, maxRank: 1, prereq: 'orc_div_3' },
-      { id: 'orc_pro_1', branch: 2, tier: 0, name: 'Lucky Star',
-        desc: '+5% crit chance for yourself per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'orc_pro_2', branch: 2, tier: 1, name: 'Destiny\'s Favor',
-        desc: 'Once per day, auto-succeed a failed recruit attempt', cost: 2, maxRank: 2, prereq: 'orc_pro_1' },
-      { id: 'orc_pro_3', branch: 2, tier: 2, name: 'Twist of Fate',
-        desc: 'Once per battle, swap your roll with the enemy\'s', cost: 3, maxRank: 1, prereq: 'orc_pro_2' },
-      { id: 'orc_pro_4', branch: 2, tier: 3, name: 'Written in the Stars',
-        desc: 'Choose your dice outcome once per day (any battle)', cost: 4, maxRank: 1, prereq: 'orc_pro_3' },
+      // Branch 0: Garden Rites — use Cultivator gardens for powerful buffs
+      { id: 'shm_grd_1', branch: 0, tier: 0, name: 'Garden Communion',
+        desc: 'Meditate at a garden to gain a nature buff (+1 die for 10 min)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'shm_grd_2', branch: 0, tier: 1, name: 'Spirit Harvest',
+        desc: 'Harvest spirit essence from gardens — gives Cultivator owner bonus yield', cost: 2, maxRank: 1, prereq: 'shm_grd_1' },
+      { id: 'shm_grd_3', branch: 0, tier: 2, name: 'Bloom Ritual',
+        desc: 'Perform a ritual at a garden to attract a rare spirit for all nearby players', cost: 3, maxRank: 1, prereq: 'shm_grd_2' },
+      { id: 'shm_grd_4', branch: 0, tier: 3, name: 'Sacred Grove Link',
+        desc: 'Permanently bond to a garden — gain its buffs anywhere in the region', cost: 4, maxRank: 1, prereq: 'shm_grd_3' },
+
+      // Branch 1: Battle Spirit — fight alongside allies using spirit pets
+      { id: 'shm_bat_1', branch: 1, tier: 0, name: 'Spirit Companion',
+        desc: 'A spirit pet fights beside you in battle (+1 damage per round)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'shm_bat_2', branch: 1, tier: 1, name: 'War Chant',
+        desc: 'Buff a party member\'s spiritkin with +2 damage for one battle', cost: 2, maxRank: 1, prereq: 'shm_bat_1' },
+      { id: 'shm_bat_3', branch: 1, tier: 2, name: 'Totemic Shield',
+        desc: 'Place a totem that absorbs 3 damage for your party in battle', cost: 3, maxRank: 1, prereq: 'shm_bat_2' },
+      { id: 'shm_bat_4', branch: 1, tier: 3, name: 'Spirit Army',
+        desc: 'Summon 3 spirit pets to fight alongside you (each deals 1 damage/round)', cost: 4, maxRank: 1, prereq: 'shm_bat_3' },
+
+      // Branch 2: Self-Attunement — power up yourself through nature
+      { id: 'shm_slf_1', branch: 2, tier: 0, name: 'Nature\'s Pulse',
+        desc: 'Passively heal 1 HP every 2 minutes while near any garden', cost: 1, maxRank: 1, prereq: null },
+      { id: 'shm_slf_2', branch: 2, tier: 1, name: 'Elemental Skin',
+        desc: 'Take 1 less damage from the first hit of every battle', cost: 2, maxRank: 1, prereq: 'shm_slf_1' },
+      { id: 'shm_slf_3', branch: 2, tier: 2, name: 'Spirit Merge',
+        desc: 'Fuse with your spirit pet — gain its ability as your own for one battle', cost: 3, maxRank: 1, prereq: 'shm_slf_2' },
+      { id: 'shm_slf_4', branch: 2, tier: 3, name: 'Avatar of Nature',
+        desc: 'Once per day, transform: +3 HP, +2 damage, +1 die for one full battle', cost: 4, maxRank: 1, prereq: 'shm_slf_3' },
     ],
   },
 
-  mystic: {
-    name: 'Mystic',
-    desc: 'Turn your fortunes inward. Meditate for power, enhance yourself, transcend limits.',
+  scholar: {
+    name: 'Scholar',
+    desc: 'Study the ancient arts. Knowledge is power — see deeper, plan better, transcend limits.',
     color: '#8888ff',
     requiresTree: 'fortune_teller',
-    branches: ['Meditation', 'Inner Fire', 'Transcendence'],
+    branches: ['Insight', 'Inner Power', 'Transcendence'],
     talents: [
-      { id: 'mys_med_1', branch: 0, tier: 0, name: 'Focus',
-        desc: '+1 to your own dice rolls for 5 min after meditating per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'mys_med_2', branch: 0, tier: 1, name: 'Deep Trance',
-        desc: 'Meditation heals your active spiritkin 2 HP', cost: 2, maxRank: 2, prereq: 'mys_med_1' },
-      { id: 'mys_med_3', branch: 0, tier: 2, name: 'Spirit Walk',
-        desc: 'Meditate to astral project — explore without triggering battles', cost: 3, maxRank: 1, prereq: 'mys_med_2' },
-      { id: 'mys_med_4', branch: 0, tier: 3, name: 'Zen Master',
-        desc: 'Meditation buffs last 30 minutes and stack', cost: 4, maxRank: 1, prereq: 'mys_med_3' },
-      { id: 'mys_fir_1', branch: 1, tier: 0, name: 'Inner Flame',
-        desc: '+1 base damage to your spiritkin per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'mys_fir_2', branch: 1, tier: 1, name: 'Spirit Surge',
-        desc: 'Your spiritkin\'s ability triggers twice (once per battle)', cost: 2, maxRank: 2, prereq: 'mys_fir_1' },
-      { id: 'mys_fir_3', branch: 1, tier: 2, name: 'Overcharge',
-        desc: 'Sacrifice 2 HP to add +3 damage on your next roll', cost: 3, maxRank: 1, prereq: 'mys_fir_2' },
-      { id: 'mys_fir_4', branch: 1, tier: 3, name: 'Avatar State',
-        desc: 'Once per day, your spiritkin deals double damage for one full battle', cost: 4, maxRank: 1, prereq: 'mys_fir_3' },
-      { id: 'mys_trn_1', branch: 2, tier: 0, name: 'Third Eye',
-        desc: 'See enemy abilities before battle begins per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'mys_trn_2', branch: 2, tier: 1, name: 'Phase Shift',
-        desc: 'Dodge the first attack in every battle', cost: 2, maxRank: 2, prereq: 'mys_trn_1' },
-      { id: 'mys_trn_3', branch: 2, tier: 2, name: 'Soul Mirror',
-        desc: 'Copy the enemy spiritkin\'s ability for one battle', cost: 3, maxRank: 1, prereq: 'mys_trn_2' },
-      { id: 'mys_trn_4', branch: 2, tier: 3, name: 'Ascension',
-        desc: 'Your spiritkin temporarily evolves during battle (+3 HP, +2 damage)', cost: 4, maxRank: 1, prereq: 'mys_trn_3' },
+      // Branch 0: Insight — knowledge and vision
+      { id: 'sch_ins_1', branch: 0, tier: 0, name: 'Keen Study',
+        desc: 'See enemy spiritkin abilities before battle begins', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_ins_2', branch: 0, tier: 1, name: 'Omen Reader',
+        desc: 'Predict the next wild encounter\'s spiritkin type', cost: 2, maxRank: 1, prereq: 'sch_ins_1' },
+      { id: 'sch_ins_3', branch: 0, tier: 2, name: 'Spirit Compass',
+        desc: 'Reveals the path to the nearest legendary spiritkin', cost: 3, maxRank: 1, prereq: 'sch_ins_2' },
+      { id: 'sch_ins_4', branch: 0, tier: 3, name: 'The All-Seeing Eye',
+        desc: 'See every player and their active spiritkin on the map', cost: 4, maxRank: 1, prereq: 'sch_ins_3' },
+
+      // Branch 1: Inner Power — self-enhancement through study
+      { id: 'sch_pow_1', branch: 1, tier: 0, name: 'Focus',
+        desc: '+1 to your own dice rolls for 10 min after meditating', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_pow_2', branch: 1, tier: 1, name: 'Spirit Surge',
+        desc: 'Your spiritkin\'s ability triggers twice (once per battle)', cost: 2, maxRank: 1, prereq: 'sch_pow_1' },
+      { id: 'sch_pow_3', branch: 1, tier: 2, name: 'Overcharge',
+        desc: 'Sacrifice 2 HP to add +3 damage on your next roll', cost: 3, maxRank: 1, prereq: 'sch_pow_2' },
+      { id: 'sch_pow_4', branch: 1, tier: 3, name: 'Avatar State',
+        desc: 'Once per day, your spiritkin deals double damage for one full battle', cost: 4, maxRank: 1, prereq: 'sch_pow_3' },
+
+      // Branch 2: Transcendence — bend the rules of battle
+      { id: 'sch_trn_1', branch: 2, tier: 0, name: 'Fate Weaver',
+        desc: 'Reroll one die per battle', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_trn_2', branch: 2, tier: 1, name: 'Phase Shift',
+        desc: 'Dodge the first attack in every battle', cost: 2, maxRank: 1, prereq: 'sch_trn_1' },
+      { id: 'sch_trn_3', branch: 2, tier: 2, name: 'Twist of Fate',
+        desc: 'Once per battle, swap your roll with the enemy\'s', cost: 3, maxRank: 1, prereq: 'sch_trn_2' },
+      { id: 'sch_trn_4', branch: 2, tier: 3, name: 'Written in the Stars',
+        desc: 'Choose your dice outcome once per day (any battle)', cost: 4, maxRank: 1, prereq: 'sch_trn_3' },
     ],
   },
 
