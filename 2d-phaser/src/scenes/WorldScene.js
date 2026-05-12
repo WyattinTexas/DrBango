@@ -7,42 +7,32 @@ class WorldScene extends Phaser.Scene {
 
   create() {
     const T = 32;
-    const MW = 80, MH = 60;
+    const MW = WORLD_W, MH = WORLD_H; // 110x85 from world-gen.js
 
     this.cameras.main.fadeIn(600);
-    this.cameras.main.setBackgroundColor('#3a7d44');
+    this.cameras.main.setBackgroundColor('#d8e8f0');
 
-    // ── Generate world with colored rectangles (clean, no tileset issues) ──
-    const grassColors = [0x3a7d44, 0x3e8248, 0x368040, 0x42864c];
-    const pathColor = 0x8b7355;
-    const waterColor = 0x2255aa;
+    // ── Render the REAL world map from generateWorld() ──
+    // Impassable tiles for collision
+    this.collisionTiles = this.physics.add.staticGroup();
+
+    // Convert hex color string to Phaser number
+    function hexToNum(hex) { return parseInt(hex.replace('#', ''), 16); }
 
     for (let y = 0; y < MH; y++) {
       for (let x = 0; x < MW; x++) {
-        let color;
-        if (x === 0 || y === 0 || x === MW-1 || y === MH-1) {
-          color = waterColor;
-        } else if (y === 30 || y === 31 || x === 40 || x === 41) {
-          color = pathColor;
-        } else {
-          color = grassColors[(x * 7 + y * 13) % grassColors.length];
-        }
+        const tileType = worldMap[y] ? worldMap[y][x] : 0;
+        const colorHex = TILE_COLORS[tileType] || '#d8e8f0';
+        const color = hexToNum(colorHex);
         this.add.rectangle(x * T + T/2, y * T + T/2, T, T, color);
-      }
-    }
 
-    // ── Trees using tileset spritesheet (16x16 tiles from nature tileset) ──
-    // Nature tileset: 384x336, 16px tiles = 24 cols x 21 rows
-    // Tree tiles are around index 48-72 area (row 2-3)
-    this.trees = this.physics.add.staticGroup();
-    for (let i = 0; i < 80; i++) {
-      const tx = Phaser.Math.Between(3, MW - 4) * T;
-      const ty = Phaser.Math.Between(3, MH - 4) * T;
-      const tileX = Math.floor(tx / T), tileY = Math.floor(ty / T);
-      if (tileY === 30 || tileY === 31 || tileX === 40 || tileX === 41) continue;
-      // Use nature tileset frame for trees (frame 48 = a tree-like tile)
-      const tree = this.trees.create(tx, ty, 'tiles_nature', Phaser.Math.Between(48, 55));
-      tree.setScale(2).refreshBody();
+        // Collision for mountains, walls, water, trees, buildings
+        const impassable = [1, 3, 7, 13, 15, 16, 21, 23, 25];
+        if (impassable.includes(tileType)) {
+          const block = this.collisionTiles.create(x * T + T/2, y * T + T/2, null);
+          block.setDisplaySize(T, T).setVisible(false).refreshBody();
+        }
+      }
     }
 
     // ── Player ──
@@ -50,22 +40,27 @@ class WorldScene extends Phaser.Scene {
     this.player.setScale(2);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
-    this.physics.add.collider(this.player, this.trees);
+    this.physics.add.collider(this.player, this.collisionTiles);
 
     // ── Camera ──
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setZoom(1.8);
     this.cameras.main.setBounds(0, 0, MW * T, MH * T);
 
-    // ── NPCs ──
+    // ── NPCs (positions from npcs.js NPCS + HOSTILE_NPCS data) ──
     this.npcSprites = [];
-    this.spawnNPC('Elder Frost', 17 * T, 19 * T, 'npc_elder', 0x44cc44);
-    this.spawnNPC('Smith Ember', 15 * T, 25 * T, 'npc_knight', 0xe07020);
-    this.spawnNPC('Keeper Zara', 22 * T, 21 * T, 'npc_hunter', 0xc0a040);
+    // Friendly — Frost Valley hub
+    this.spawnNPC('Elder Frost', (HUB.x + 2) * T, (HUB.y - 1) * T, 'npc_elder', 0xdaa520);
+    this.spawnNPC('Smith Ember', HUB.x * T, (HUB.y + 5) * T, 'npc_knight', 0xe07020);
+    this.spawnNPC('Keeper Zara', (HUB.x + 7) * T, (HUB.y + 1) * T, 'npc_hunter', 0xc0a040);
+    // Friendly — Rolling Hills
+    this.spawnNPC('Farmer Bea', 24 * T, 58 * T, 'npc_elder', 0x6a8a4a);
+    this.spawnNPC('Herbalist Sage', 28 * T, 60 * T, 'npc_knight', 0x4a8a6a);
 
-    // Hostile NPCs
+    // Hostile NPCs (from HOSTILE_NPCS positions)
     this.spawnNPC('Brawler Jax', 30 * T, 20 * T, 'enemy_sprite', 0xcc4444, true);
     this.spawnNPC('Ice Queen Vera', 40 * T, 15 * T, 'npc_knight', 0x6688cc, true);
+    this.spawnNPC('Bandit Marcus', 28 * T, 48 * T, 'enemy_sprite', 0xa88844, true);
 
     // ── Enemies ──
     this.enemies = this.physics.add.group();

@@ -35,25 +35,14 @@ document.querySelectorAll = function(sel) {
 
 // ── Constants from index.html ──
 const TILE = 32;
-const WORLD_W = 100;
-const WORLD_H = 80;
+const WORLD_W = 110;
+const WORLD_H = 85; // Match 2D version exactly
 const HUB = { x: 15, y: 20 };
 const HUB_MEADOW = { x: 28, y: 52 };
 const HUB_VOLCANIC = { x: 68, y: 28 };
 const HUB_DARK = { x: 92, y: 15 };
 
-// World map stub (gathering.js references worldMap[y][x] for tile types)
-// Tile types: 0=grass, 1=path, 2=water, 6=encounter zone
-const worldMap = [];
-for (let y = 0; y < WORLD_H; y++) {
-  worldMap[y] = [];
-  for (let x = 0; x < WORLD_W; x++) {
-    // Default everything to encounter zone (6) so gathering works
-    worldMap[y][x] = 6;
-    // Water borders
-    if (x === 0 || y === 0 || x === WORLD_W - 1 || y === WORLD_H - 1) worldMap[y][x] = 2;
-  }
-}
+// worldMap declared + populated by world-gen.js (generateWorld function)
 
 // Canvas stub (some modules reference a canvas context for rendering)
 const canvas = document.createElement('canvas');
