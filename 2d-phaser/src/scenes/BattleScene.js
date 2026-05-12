@@ -144,27 +144,24 @@ class BattleScene extends Phaser.Scene {
 
     const pDice = weightedRoll(this.pg, 3).sort((a,b) => a-b);
     const eDice = weightedRoll(this.eg, 3).sort((a,b) => a-b);
-    const pRes = classifyDice(pDice);
-    const eRes = classifyDice(eDice);
+    const pRes = classify(pDice);
+    const eRes = classify(eDice);
+    const winner = compareRolls(pRes, eRes);
 
-    // Show dice
+    // Show dice with styling
     this.playerDiceText.setText(pDice.map(d => `[${d}]`).join(' '));
     this.enemyDiceText.setText(eDice.map(d => `[${d}]`).join(' '));
 
-    // Resolve
-    const pWins = pRes.tier > eRes.tier || (pRes.tier === eRes.tier && pRes.highDie > eRes.highDie);
-    const eWins = eRes.tier > pRes.tier || (eRes.tier === pRes.tier && eRes.highDie > pRes.highDie);
-
     let log = `R${this.roundNum}: ${pRes.type} vs ${eRes.type}`;
 
-    if (pWins) {
-      const dmg = Math.max(1, pRes.tier);
+    if (winner === 'a') {
+      const dmg = pRes.damage;
       this.eg.hp = Math.max(0, this.eg.hp - dmg);
       log += ` — ${dmg} dmg to ${this.eg.name}!`;
       this.cameras.main.shake(80, 0.004);
       this.showFloatingDmg(this.scale.width * 0.75, this.scale.height * 0.35, dmg, '#cc2211');
-    } else if (eWins) {
-      const dmg = Math.max(1, eRes.tier);
+    } else if (winner === 'b') {
+      const dmg = eRes.damage;
       this.pg.hp = Math.max(0, this.pg.hp - dmg);
       log += ` — ${dmg} dmg to ${this.pg.name}!`;
       this.cameras.main.shake(120, 0.006);

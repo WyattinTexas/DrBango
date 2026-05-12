@@ -135,7 +135,9 @@ function showBattleOverlay() {}
 function hideBattleOverlay() {}
 function renderBattle() {}
 function showWildAppearedSplash(name) { console.log(`[Splash] Wild ${name} appeared!`); }
-var battleFledThisSession = false; // var so quests.js can redeclare
+var battleFledThisSession = false;
+var uid = 'local_' + Math.random().toString(36).substr(2, 9);
+var ENCOUNTER_ZONES = []; // stub — gathering.js needs this
 
 // ── Accessory effects ──
 function applyAccessoryBattleEffects() {
