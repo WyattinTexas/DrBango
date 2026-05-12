@@ -74,10 +74,7 @@ class WorldScene extends Phaser.Scene {
     this.eKey = this.input.keyboard.addKey('E');
 
     // ── HUD ──
-    this.hudText = this.add.text(10, 10, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#ffffff',
-      backgroundColor: '#000000aa', padding: { x: 8, y: 6 },
-    }).setScrollFactor(0).setDepth(200);
+    this.buildHUD();
 
     // ── Dialogue box ──
     this.dialogueContainer = this.add.container(0, 0).setDepth(300).setScrollFactor(0);
@@ -324,15 +321,100 @@ class WorldScene extends Phaser.Scene {
 
   // ═══════ HUD ═══════
 
+  buildHUD() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+
+    // Top-left: player info
+    this.hudPlayerText = this.add.text(10, 8, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ffffff',
+      backgroundColor: '#000000aa', padding: { x: 8, y: 4 },
+    }).setScrollFactor(0).setDepth(200);
+
+    // Top-left below: active ghost + HP
+    this.hudTeamText = this.add.text(10, 36, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#88ff88',
+      backgroundColor: '#000000aa', padding: { x: 8, y: 3 },
+    }).setScrollFactor(0).setDepth(200);
+
+    // Top-right: time of day
+    this.hudTimeText = this.add.text(W - 10, 8, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#aaaacc',
+      backgroundColor: '#000000aa', padding: { x: 6, y: 3 },
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(200);
+
+    // ── Minimap (bottom-right) ──
+    const mmW = 160, mmH = 120;
+    this.minimapBg = this.add.rectangle(W - mmW/2 - 8, H - mmH/2 - 8, mmW + 4, mmH + 4, 0x000000, 0.7)
+      .setStrokeStyle(1, 0x444466).setScrollFactor(0).setDepth(200);
+
+    // Minimap graphics
+    this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(201);
+
+    // Player dot on minimap
+    this.minimapDot = this.add.circle(0, 0, 3, 0x44aaff)
+      .setScrollFactor(0).setDepth(202);
+
+    this.drawMinimap();
+  }
+
+  drawMinimap() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const mmW = 160, mmH = 120;
+    const mmX = W - mmW - 8;
+    const mmY = H - mmH - 8;
+    const scaleX = mmW / WORLD_W;
+    const scaleY = mmH / WORLD_H;
+
+    this.minimapGfx.clear();
+
+    // Draw tiles at minimap scale
+    for (let y = 0; y < WORLD_H; y += 2) {
+      for (let x = 0; x < WORLD_W; x += 2) {
+        const tile = worldMap[y]?.[x] || 0;
+        const colorHex = TILE_COLORS[tile] || '#888888';
+        const color = parseInt(colorHex.replace('#', ''), 16);
+        this.minimapGfx.fillStyle(color, 1);
+        this.minimapGfx.fillRect(mmX + x * scaleX, mmY + y * scaleY, scaleX * 2, scaleY * 2);
+      }
+    }
+
+    // Encounter zone outlines
+    for (const zone of ENCOUNTER_ZONES) {
+      this.minimapGfx.lineStyle(1, 0x8866dd, 0.5);
+      this.minimapGfx.strokeRect(
+        mmX + zone.x * scaleX, mmY + zone.y * scaleY,
+        zone.w * scaleX, zone.h * scaleY
+      );
+    }
+  }
+
   updateHUD() {
-    const teamName = G.team.length > 0 ? G.team[G.activeIdx]?.name || '---' : 'No Spiritkin';
-    const hp = G.team[G.activeIdx]?.hp || 0;
-    const maxHp = G.team[G.activeIdx]?.maxHp || 0;
     const wins = G.rep?.battlesWon || 0;
-    const sideline = wins >= 5 ? 'UNLOCKED' : `${wins}/5`;
-    this.hudText.setText(
-      `${G.name} | LV ${G.level} | ${G.coins} Gold\n` +
-      `${teamName} HP ${hp}/${maxHp} | Sideline: ${sideline}`
-    );
+    const sideline = wins >= 5 ? 'UNLOCKED' : `${wins}/5 wins`;
+
+    this.hudPlayerText.setText(`${G.name} | LV ${G.level} | ${G.coins} Gold | Sideline: ${sideline}`);
+
+    const ghost = G.team[G.activeIdx];
+    if (ghost) {
+      this.hudTeamText.setText(`${ghost.name} HP ${ghost.hp}/${ghost.maxHp} | ${ghost.ability}`);
+      this.hudTeamText.setColor(ghost.hp <= ghost.maxHp * 0.33 ? '#ff6644' : '#88ff88');
+    } else {
+      this.hudTeamText.setText('No Spiritkin!');
+    }
+
+    // Time of day
+    const tod = getTimeOfDay();
+    const icons = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
+    this.hudTimeText.setText(`${icons[tod.phase] || ''} ${tod.phase}`);
+
+    // Minimap player dot
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const mmW = 160, mmH = 120;
+    const mmX = W - mmW - 8;
+    const mmY = H - mmH - 8;
+    this.minimapDot.setPosition(mmX + G.x * (mmW / WORLD_W), mmY + G.y * (mmH / WORLD_H));
   }
 }
