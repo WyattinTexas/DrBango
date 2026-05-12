@@ -525,6 +525,21 @@ class WorldScene extends Phaser.Scene {
       this.hudTeamText.setText('No Spiritkin!');
     }
 
+    // Quest tracker
+    const wins = G.rep?.battlesWon || 0;
+    let questText = '';
+    if (wins < 1) questText = 'Quest: Defeat your first wild Spiritkin!';
+    else if (wins < 5) questText = `Quest: Win ${5 - wins} more battles to unlock sideline`;
+    else if (wins < 10) questText = `Quest: Defeat ${10 - wins} more for Veteran title`;
+    else questText = `Battles won: ${wins}`;
+    if (!this.hudQuestText) {
+      this.hudQuestText = this.add.text(10, 58, '', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#ffcc44',
+        backgroundColor: '#000000aa', padding: { x: 6, y: 2 },
+      }).setScrollFactor(0).setDepth(200);
+    }
+    this.hudQuestText.setText(questText);
+
     // Time of day
     const tod = getTimeOfDay();
     const icons = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
