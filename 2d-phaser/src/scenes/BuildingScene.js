@@ -227,7 +227,7 @@ class BuildingScene extends Phaser.Scene {
     if (type === 'inn') {
       this.interactInn();
     } else if (type === 'workshop') {
-      this.scene.launch('CraftScene');
+      this.scene.launch('CraftScene', { returnScene: 'BuildingScene' });
       this.scene.pause();
     } else if (type === 'arena') {
       this.interactArena();
@@ -282,7 +282,7 @@ class BuildingScene extends Phaser.Scene {
       nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
     };
     this._arenaWinsBefore = G.rep?.battlesWon || 0;
-    this.scene.launch('BattleScene', { trainerName: 'Arena Champion' });
+    this.scene.launch('BattleScene', { trainerName: 'Arena Champion', returnScene: 'BuildingScene' });
     this.scene.pause();
     // Listen for resume (battle ended)
     this.events.once('resume', () => {

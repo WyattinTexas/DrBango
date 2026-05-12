@@ -6,6 +6,8 @@
 class CraftScene extends Phaser.Scene {
   constructor() { super('CraftScene'); }
 
+  init(data) { this._returnScene = data?.returnScene || 'WorldScene'; }
+
   create() {
     const W = this.scale.width;
     const H = this.scale.height;
@@ -297,6 +299,6 @@ class CraftScene extends Phaser.Scene {
 
   closeCraft() {
     this.scene.stop();
-    this.scene.resume('WorldScene');
+    this.scene.resume(this._returnScene || 'WorldScene');
   }
 }

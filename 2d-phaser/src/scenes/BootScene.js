@@ -102,7 +102,7 @@ class BootScene extends Phaser.Scene {
       fontSize: '18px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#aaaacc',
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, height * 0.34, 'v1.0.43 — Phaser Edition', {
+    this.add.text(width / 2, height * 0.34, 'v1.0.44 — Phaser Edition', {
       fontSize: '11px', fontFamily: 'monospace', color: '#555577',
     }).setOrigin(0.5);
 
