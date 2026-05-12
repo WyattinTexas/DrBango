@@ -632,7 +632,7 @@ class BattleScene extends Phaser.Scene {
       this.scene.resume(returnTo);
       const rs = this.scene.get(returnTo);
       if (rs?.cameras?.main) rs.cameras.main.fadeIn(300);
-      if (leveledUp) ws.showNotification(`Level up! Now level ${G.level}!`);
+      if (leveledUp && rs?.showNotification) rs.showNotification(`Level up! Now level ${G.level}!`);
     });
   }
 }
