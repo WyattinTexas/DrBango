@@ -468,6 +468,9 @@ class BattleScene extends Phaser.Scene {
 
       const rarityXP = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 };
       xpGain = rarityXP[this.eg?.rarity] || 1;
+      // Bonus XP for special battles
+      if (this.battleData.blackRider) xpGain += 5;
+      if (this.battleData.worldBoss) { xpGain += 10; coinChange += 100; }
       G.xp += xpGain;
 
       if (G.rep.battlesWon === 5) notify('Sideline slots unlocked!');
@@ -502,6 +505,17 @@ class BattleScene extends Phaser.Scene {
       }
 
       if (B?.isHostileNPC) markHostileNPCDefeated(B.isHostileNPC);
+
+      // Track special battle wins
+      if (this.battleData.worldBoss) {
+        G.worldBossesDefeated = (G.worldBossesDefeated || 0) + 1;
+      }
+
+      // Daily challenge progress
+      if (G.dailyChallenge && !G.dailyChallenge.claimed) {
+        if (G.dailyChallenge.type === 'battles') G.dailyChallenge.progress++;
+        if (G.dailyChallenge.type === 'trainers' && this.battleData.trainerName) G.dailyChallenge.progress++;
+      }
     } else {
       // Flee penalty — match 2D engine: 2-4 coins
       const penalty = Math.min(G.coins, 2 + Math.floor(Math.random() * 3));

@@ -445,6 +445,9 @@ function ensurePlayerDefaults() {
   // Wave 4: region visit tracking + arena wins
   if (!G.regionsVisited) G.regionsVisited = [];
   if (G.arenaWins === undefined) G.arenaWins = 0;
+  // Wave 5: world bosses defeated + daily challenge
+  if (G.worldBossesDefeated === undefined) G.worldBossesDefeated = 0;
+  if (!G.dailyChallenge) G.dailyChallenge = null;
 }
 
 // ── Profession mastery levels (based on profession XP thresholds) ──
