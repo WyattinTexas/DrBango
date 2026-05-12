@@ -90,40 +90,40 @@ const CLASS_TREES = {
 
   scholar: {
     name: 'Scholar',
-    desc: 'Study the ancient arts. Knowledge is power — see deeper, plan better, transcend limits.',
+    desc: 'Study the ancient arts. Prepare allies, trade wisely, and unlock the secrets of DNA. Path to Elder.',
     color: '#8888ff',
     requiresTree: 'fortune_teller',
     branches: ['Insight', 'Inner Power', 'Transcendence'],
     talents: [
-      // Branch 0: Insight — knowledge and vision
-      { id: 'sch_ins_1', branch: 0, tier: 0, name: 'Keen Study',
-        desc: 'See enemy spiritkin abilities before battle begins', cost: 1, maxRank: 1, prereq: null },
-      { id: 'sch_ins_2', branch: 0, tier: 1, name: 'Omen Reader',
-        desc: 'Predict the next wild encounter\'s spiritkin type', cost: 2, maxRank: 1, prereq: 'sch_ins_1' },
-      { id: 'sch_ins_3', branch: 0, tier: 2, name: 'Spirit Compass',
-        desc: 'Reveals the path to the nearest legendary spiritkin', cost: 3, maxRank: 1, prereq: 'sch_ins_2' },
-      { id: 'sch_ins_4', branch: 0, tier: 3, name: 'The All-Seeing Eye',
-        desc: 'See every player and their active spiritkin on the map', cost: 4, maxRank: 1, prereq: 'sch_ins_3' },
+      // Branch 0: Insight — Preparation buff + trading + vision
+      { id: 'sch_ins_1', branch: 0, tier: 0, name: 'Preparation',
+        desc: 'New buff: give anyone +1 die on first roll (10 min). Must be in a tavern to cast.', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_ins_2', branch: 0, tier: 1, name: 'Shrewd Trader',
+        desc: '20% discount on all items at the trading post', cost: 2, maxRank: 1, prereq: 'sch_ins_1' },
+      { id: 'sch_ins_3', branch: 0, tier: 2, name: 'Deep Study',
+        desc: 'Preparation buff duration extended to 30 minutes', cost: 3, maxRank: 1, prereq: 'sch_ins_2' },
+      { id: 'sch_ins_4', branch: 0, tier: 3, name: 'Spirit Compass',
+        desc: 'Reveals the path to the nearest legendary spiritkin', cost: 4, maxRank: 1, prereq: 'sch_ins_3' },
 
-      // Branch 1: Inner Power — self-enhancement through study
-      { id: 'sch_pow_1', branch: 1, tier: 0, name: 'Focus',
-        desc: '+1 to your own dice rolls for 10 min after meditating', cost: 1, maxRank: 1, prereq: null },
-      { id: 'sch_pow_2', branch: 1, tier: 1, name: 'Spirit Surge',
-        desc: 'Your spiritkin\'s ability triggers twice (once per battle)', cost: 2, maxRank: 1, prereq: 'sch_pow_1' },
-      { id: 'sch_pow_3', branch: 1, tier: 2, name: 'Overcharge',
-        desc: 'Sacrifice 2 HP to add +3 damage on your next roll', cost: 3, maxRank: 1, prereq: 'sch_pow_2' },
-      { id: 'sch_pow_4', branch: 1, tier: 3, name: 'Avatar State',
-        desc: 'Once per day, your spiritkin deals double damage for one full battle', cost: 4, maxRank: 1, prereq: 'sch_pow_3' },
+      // Branch 1: Inner Power — XP, teaching, lore
+      { id: 'sch_pow_1', branch: 1, tier: 0, name: 'Quick Learner',
+        desc: '+10% XP from all sources', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_pow_2', branch: 1, tier: 1, name: 'Mentor',
+        desc: 'Teach a skill to a party member — they gain profession XP', cost: 2, maxRank: 1, prereq: 'sch_pow_1' },
+      { id: 'sch_pow_3', branch: 1, tier: 2, name: 'Ancient Reader',
+        desc: 'Read lore tablets for bonus rewards (gold, essences, rare info)', cost: 3, maxRank: 1, prereq: 'sch_pow_2' },
+      { id: 'sch_pow_4', branch: 1, tier: 3, name: 'Grand Tutor',
+        desc: 'Party members gain +15% XP while grouped with you', cost: 4, maxRank: 1, prereq: 'sch_pow_3' },
 
-      // Branch 2: Transcendence — bend the rules of battle
-      { id: 'sch_trn_1', branch: 2, tier: 0, name: 'Fate Weaver',
-        desc: 'Reroll one die per battle', cost: 1, maxRank: 1, prereq: null },
-      { id: 'sch_trn_2', branch: 2, tier: 1, name: 'Phase Shift',
-        desc: 'Dodge the first attack in every battle', cost: 2, maxRank: 1, prereq: 'sch_trn_1' },
-      { id: 'sch_trn_3', branch: 2, tier: 2, name: 'Twist of Fate',
-        desc: 'Once per battle, swap your roll with the enemy\'s', cost: 3, maxRank: 1, prereq: 'sch_trn_2' },
-      { id: 'sch_trn_4', branch: 2, tier: 3, name: 'Written in the Stars',
-        desc: 'Choose your dice outcome once per day (any battle)', cost: 4, maxRank: 1, prereq: 'sch_trn_3' },
+      // Branch 2: Transcendence — Scientist synergy, DNA knowledge
+      { id: 'sch_trn_1', branch: 2, tier: 0, name: 'DNA Insight',
+        desc: '+1 damage against spiritkin you have the DNA of', cost: 1, maxRank: 1, prereq: null },
+      { id: 'sch_trn_2', branch: 2, tier: 1, name: 'Refined Analysis',
+        desc: 'DNA you extract has +1 quality tier (better samples)', cost: 2, maxRank: 1, prereq: 'sch_trn_1' },
+      { id: 'sch_trn_3', branch: 2, tier: 2, name: 'Deep Knowledge',
+        desc: '+2 damage against spiritkin you have DNA of (stacks with DNA Insight)', cost: 3, maxRank: 1, prereq: 'sch_trn_2' },
+      { id: 'sch_trn_4', branch: 2, tier: 3, name: 'Residual Collection',
+        desc: '5% chance to auto-collect DNA from any spiritkin you defeat', cost: 4, maxRank: 1, prereq: 'sch_trn_3' },
     ],
   },
 
@@ -1042,6 +1042,7 @@ const MASTER_COST = 5;
 const APPRENTICE_DESCRIPTIONS = {
   fortune_teller: 'Unlocks [F] Fortune: 50/50 Good (+1 Lucky Stone) or Bad (-1 die). 30s cooldown.',
   shaman: 'Unlocks Meditation: sit at gardens and spirit locations. Does nothing alone — abilities give meditation power.',
+  scholar: 'Party gains +10% XP while grouped with you. Requires Fortune XP to unlock.',
 };
 
 function getApprenticeInfo(treeId) {
@@ -1055,6 +1056,7 @@ function getApprenticeInfo(treeId) {
 const MASTER_DESCRIPTIONS = {
   fortune_teller: 'Pretty Darn Good: odds reset to 50/50, Good Fortunes deal +1 bonus damage, target runs 5% faster',
   shaman: 'Elemental Skin blocks 1 extra damage (-2 total), meditation buffs enhanced, +1 damage, spirit pets gain +1 damage',
+  scholar: '+1 special slot (5 total), Scholar title visible to all, Preparation buff lasts 1 hour',
 };
 
 function getMasterInfo(treeId) {
