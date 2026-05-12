@@ -51,40 +51,40 @@ const CLASS_TREES = {
 
   shaman: {
     name: 'Shaman',
-    desc: 'Channel nature\'s power through Cultivator gardens and spirit pets. Buff allies, fight alongside, or empower yourself.',
+    desc: 'Channel nature\'s power through Cultivator gardens and spirit pets. Meditate for buffs, fight with spirits, empower your party.',
     color: '#66cc88',
     requiresTree: 'fortune_teller',
     branches: ['Garden Rites', 'Battle Spirit', 'Self-Attunement'],
     talents: [
-      // Branch 0: Garden Rites — use Cultivator gardens for powerful buffs
+      // Branch 0: Garden Rites — meditate at gardens for escalating effects
       { id: 'shm_grd_1', branch: 0, tier: 0, name: 'Garden Communion',
-        desc: 'Meditate at a garden to gain a nature buff (+1 die for 10 min)', cost: 1, maxRank: 1, prereq: null },
-      { id: 'shm_grd_2', branch: 0, tier: 1, name: 'Spirit Harvest',
-        desc: 'Harvest spirit essence from gardens — gives Cultivator owner bonus yield', cost: 2, maxRank: 1, prereq: 'shm_grd_1' },
-      { id: 'shm_grd_3', branch: 0, tier: 2, name: 'Bloom Ritual',
-        desc: 'Perform a ritual at a garden to attract a rare spirit for all nearby players', cost: 3, maxRank: 1, prereq: 'shm_grd_2' },
-      { id: 'shm_grd_4', branch: 0, tier: 3, name: 'Sacred Grove Link',
-        desc: 'Permanently bond to a garden — gain its buffs anywhere in the region', cost: 4, maxRank: 1, prereq: 'shm_grd_3' },
+        desc: 'Meditate at a garden: +1 die self-buff for 10 min (separate from Fortune)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'shm_grd_2', branch: 0, tier: 1, name: 'Bloom Ritual',
+        desc: 'Meditating at a garden spawns rare spirits nearby', cost: 2, maxRank: 1, prereq: 'shm_grd_1' },
+      { id: 'shm_grd_3', branch: 0, tier: 2, name: 'Deep Communion',
+        desc: 'Garden meditation +1 die buff extended to 30 minutes', cost: 3, maxRank: 1, prereq: 'shm_grd_2' },
+      { id: 'shm_grd_4', branch: 0, tier: 3, name: 'Sacred Grove',
+        desc: 'Meditating at a garden gives the Cultivator owner cultivation XP', cost: 4, maxRank: 1, prereq: 'shm_grd_3' },
 
-      // Branch 1: Battle Spirit — fight alongside allies using spirit pets
+      // Branch 1: Battle Spirit — spirit pets + party combat support
       { id: 'shm_bat_1', branch: 1, tier: 0, name: 'Spirit Companion',
-        desc: 'A spirit pet fights beside you in battle (+1 damage per round)', cost: 1, maxRank: 1, prereq: null },
+        desc: 'Your spirit pet adds +1 damage to all your attacks', cost: 1, maxRank: 1, prereq: null },
       { id: 'shm_bat_2', branch: 1, tier: 1, name: 'War Chant',
-        desc: 'Buff a party member\'s spiritkin with +2 damage for one battle', cost: 2, maxRank: 1, prereq: 'shm_bat_1' },
+        desc: 'Buff the next player who rolls in group battle: their spiritkin gets +2 damage', cost: 2, maxRank: 1, prereq: 'shm_bat_1' },
       { id: 'shm_bat_3', branch: 1, tier: 2, name: 'Totemic Shield',
-        desc: 'Place a totem that absorbs 3 damage for your party in battle', cost: 3, maxRank: 1, prereq: 'shm_bat_2' },
-      { id: 'shm_bat_4', branch: 1, tier: 3, name: 'Spirit Army',
-        desc: 'Summon 3 spirit pets to fight alongside you (each deals 1 damage/round)', cost: 4, maxRank: 1, prereq: 'shm_bat_3' },
+        desc: 'Pop once per battle: absorb 3 damage for a party member', cost: 3, maxRank: 1, prereq: 'shm_bat_2' },
+      { id: 'shm_bat_4', branch: 1, tier: 3, name: 'Spirit\'s Luck',
+        desc: 'Your spirit pet gains +1 Lucky Stone per round', cost: 4, maxRank: 1, prereq: 'shm_bat_3' },
 
-      // Branch 2: Self-Attunement — power up yourself through nature
+      // Branch 2: Self-Attunement — personal power + party meditation sharing
       { id: 'shm_slf_1', branch: 2, tier: 0, name: 'Nature\'s Pulse',
         desc: 'Passively heal 1 HP every 2 minutes while near any garden', cost: 1, maxRank: 1, prereq: null },
       { id: 'shm_slf_2', branch: 2, tier: 1, name: 'Elemental Skin',
         desc: 'Take 1 less damage from the first hit of every battle', cost: 2, maxRank: 1, prereq: 'shm_slf_1' },
       { id: 'shm_slf_3', branch: 2, tier: 2, name: 'Spirit Merge',
-        desc: 'Fuse with your spirit pet — gain its ability as your own for one battle', cost: 3, maxRank: 1, prereq: 'shm_slf_2' },
-      { id: 'shm_slf_4', branch: 2, tier: 3, name: 'Avatar of Nature',
-        desc: 'Once per day, transform: +3 HP, +2 damage, +1 die for one full battle', cost: 4, maxRank: 1, prereq: 'shm_slf_3' },
+        desc: 'Control your spirit pet as yourself — display as pet, interact with quests, cross terrain', cost: 3, maxRank: 1, prereq: 'shm_slf_2' },
+      { id: 'shm_slf_4', branch: 2, tier: 3, name: 'Shared Meditation',
+        desc: 'When you meditate, all party members nearby receive your meditation buffs too', cost: 4, maxRank: 1, prereq: 'shm_slf_3' },
     ],
   },
 
@@ -1039,17 +1039,29 @@ const ELDER_AMENDMENTS = [
 const APPRENTICE_COST = 2;
 const MASTER_COST = 5;
 
+const APPRENTICE_DESCRIPTIONS = {
+  fortune_teller: 'Unlocks [F] Fortune: 50/50 Good (+1 Lucky Stone) or Bad (-1 die). 30s cooldown.',
+  shaman: 'Unlocks Meditation: sit at gardens and spirit locations. Does nothing alone — abilities give meditation power.',
+};
+
 function getApprenticeInfo(treeId) {
   const tree = CLASS_TREES[treeId];
   if (!tree) return null;
-  const realName = tree.hidden ? tree.name : tree.name;
-  return { id: '_app', name: 'Apprentice ' + realName, cost: APPRENTICE_COST, maxRank: 1 };
+  const desc = APPRENTICE_DESCRIPTIONS[treeId] || 'Begin your journey as a ' + tree.name + '.';
+  return { id: '_app', name: 'Apprentice ' + tree.name, desc: desc, cost: APPRENTICE_COST, maxRank: 1 };
 }
+
+// Master descriptions — custom effects per tree
+const MASTER_DESCRIPTIONS = {
+  fortune_teller: 'Pretty Darn Good: odds reset to 50/50, Good Fortunes deal +1 bonus damage, target runs 5% faster',
+  shaman: 'Elemental Skin blocks 1 extra damage (-2 total), meditation buffs enhanced, +1 damage, spirit pets gain +1 damage',
+};
 
 function getMasterInfo(treeId) {
   const tree = CLASS_TREES[treeId];
   if (!tree) return null;
-  return { id: '_mas', name: 'Master ' + tree.name, cost: MASTER_COST, maxRank: 1 };
+  const desc = MASTER_DESCRIPTIONS[treeId] || 'Mastery achieved. Unlocks advanced sub-trees.';
+  return { id: '_mas', name: 'Master ' + tree.name, desc: desc, cost: MASTER_COST, maxRank: 1 };
 }
 
 function isApprentice(treeId) { return getTalentRank(treeId, '_app') >= 1; }
