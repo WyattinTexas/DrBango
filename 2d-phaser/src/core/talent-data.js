@@ -13,37 +13,39 @@ const CLASS_TREES = {
 
   fortune_teller: {
     name: 'Fortune Teller',
-    desc: 'Bestow fortunes upon other players and yourself. Mastery unlocks Oracle, Mystic & Enchanter.',
+    desc: 'Bestow fortunes upon other players. Mastery unlocks Oracle, Mystic & Enchanter.',
     color: '#44bbff',
-    branches: ['Duration', 'Power', 'Resonance'],
+    branches: ['Bright Fortune', 'Fate\'s Balance', 'Dark Fortune'],
     talents: [
-      // Branch 0: Duration
-      { id: 'ft_dur_1', branch: 0, tier: 0, name: 'Extended Fortune',
-        desc: '+5 min fortune duration per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'ft_dur_2', branch: 0, tier: 1, name: 'Enduring Aura',
-        desc: 'Fortunes persist through one KO', cost: 2, maxRank: 2, prereq: 'ft_dur_1' },
-      { id: 'ft_dur_3', branch: 0, tier: 2, name: 'Persistent Ward',
-        desc: 'Fortunes refresh 50% duration on battle win', cost: 3, maxRank: 1, prereq: 'ft_dur_2' },
-      { id: 'ft_dur_4', branch: 0, tier: 3, name: 'Eternal Fortune',
-        desc: 'Fortunes last 1 hour', cost: 4, maxRank: 1, prereq: 'ft_dur_3' },
-      // Branch 1: Power
-      { id: 'ft_pow_1', branch: 1, tier: 0, name: 'Potent Fortune',
-        desc: '+1 Lucky Stone on fortune per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'ft_pow_2', branch: 1, tier: 1, name: 'Battle Surge',
-        desc: 'Fortune grants +1 damage for all rolls after the first', cost: 2, maxRank: 2, prereq: 'ft_pow_1' },
-      { id: 'ft_pow_3', branch: 1, tier: 2, name: 'Sacrifice Roll',
-        desc: 'Fortune removes 1 die from first roll but +2 damage rest of battle', cost: 3, maxRank: 1, prereq: 'ft_pow_2' },
-      { id: 'ft_pow_4', branch: 1, tier: 3, name: 'Warcry',
-        desc: 'Fortune grants +1 to all dice rolls for the entire battle', cost: 4, maxRank: 1, prereq: 'ft_pow_3' },
-      // Branch 2: Resonance
-      { id: 'ft_res_1', branch: 2, tier: 0, name: 'Spirit Link',
-        desc: '+10% Fortune XP per unique player blessed per rank', cost: 1, maxRank: 3, prereq: null },
-      { id: 'ft_res_2', branch: 2, tier: 1, name: 'Aura Cascade',
-        desc: 'Blessing a player also fortunes their active spiritkin', cost: 2, maxRank: 2, prereq: 'ft_res_1' },
-      { id: 'ft_res_3', branch: 2, tier: 2, name: 'Group Blessing',
-        desc: 'Fortune hits 2 nearby players at once', cost: 3, maxRank: 1, prereq: 'ft_res_2' },
-      { id: 'ft_res_4', branch: 2, tier: 3, name: 'Resonance Field',
-        desc: 'All players in your region get a minor fortune passively', cost: 4, maxRank: 1, prereq: 'ft_res_3' },
+      // Branch 0: Bright Fortune (amplify good fortunes)
+      { id: 'ft_brt_1', branch: 0, tier: 0, name: 'Potent Fortune',
+        desc: 'Good Fortune gives +2 Lucky Stones instead of 1', cost: 1, maxRank: 1, prereq: null },
+      { id: 'ft_brt_2', branch: 0, tier: 1, name: 'Blessed Touch',
+        desc: 'Good Fortune also heals target 3 HP', cost: 2, maxRank: 1, prereq: 'ft_brt_1' },
+      { id: 'ft_brt_3', branch: 0, tier: 2, name: 'Fortune\'s Favor',
+        desc: 'Good Fortune also gives +5% walk speed', cost: 3, maxRank: 1, prereq: 'ft_brt_2' },
+      { id: 'ft_brt_4', branch: 0, tier: 3, name: 'Radiant Blessing',
+        desc: 'Good Fortune gives +2 Lucky Stones AND +1 damage on first roll', cost: 4, maxRank: 1, prereq: 'ft_brt_3' },
+
+      // Branch 1: Fate's Balance (duration / timing)
+      { id: 'ft_bal_1', branch: 1, tier: 0, name: 'Extended Fortune',
+        desc: 'Fortune lasts 5 minutes instead of 1 battle', cost: 1, maxRank: 1, prereq: null },
+      { id: 'ft_bal_2', branch: 1, tier: 1, name: 'Enduring Aura',
+        desc: 'Fortune duration increased to 20 minutes', cost: 2, maxRank: 1, prereq: 'ft_bal_1' },
+      { id: 'ft_bal_3', branch: 1, tier: 2, name: 'Persistent Ward',
+        desc: 'Fortune duration increased to 1 hour (max duration)', cost: 3, maxRank: 1, prereq: 'ft_bal_2' },
+      { id: 'ft_bal_4', branch: 1, tier: 3, name: 'Timeless Fortune',
+        desc: 'Fortune persists through KO — does not expire on death', cost: 4, maxRank: 1, prereq: 'ft_bal_3' },
+
+      // Branch 2: Dark Fortune (amplify bad fortunes — path to Dark Rider)
+      { id: 'ft_drk_1', branch: 2, tier: 0, name: 'Cruel Fortune',
+        desc: 'Bad Fortune takes -2 dice instead of -1', cost: 1, maxRank: 1, prereq: null },
+      { id: 'ft_drk_2', branch: 2, tier: 1, name: 'Misfortune Mastery',
+        desc: 'Odds shift to 35/65 Good/Bad — more bad fortunes', cost: 2, maxRank: 1, prereq: 'ft_drk_1' },
+      { id: 'ft_drk_3', branch: 2, tier: 2, name: 'Hex',
+        desc: 'Dark Riders are 20% more attracted to targets with Bad Fortune', cost: 3, maxRank: 1, prereq: 'ft_drk_2' },
+      { id: 'ft_drk_4', branch: 2, tier: 3, name: 'Dark Profit',
+        desc: 'Gain 5 gold each time you give someone a Bad Fortune', cost: 4, maxRank: 1, prereq: 'ft_drk_3' },
     ],
   },
 

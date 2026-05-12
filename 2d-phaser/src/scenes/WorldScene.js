@@ -602,7 +602,7 @@ class WorldScene extends Phaser.Scene {
           }).setOrigin(0.5).setDepth(12);
         }
 
-        // Fortune hint (show [F] when Fortune Teller apprentice + off cooldown)
+        // Fortune hint (show [F] when Fortune Teller apprentice)
         if (typeof canGiveFortune === 'function' && canGiveFortune()) {
           if (!npc._fortuneHint) {
             npc._fortuneHint = this.add.text(npc.x, npc.y + 38, '', {
@@ -611,14 +611,22 @@ class WorldScene extends Phaser.Scene {
             }).setOrigin(0.5).setDepth(12);
           }
           const ready = isFortuneReady();
-          npc._fortuneHint.setText(ready ? '[F] Fortune' : '[F] ' + getFortuneCooldownSec() + 's');
-          npc._fortuneHint.setColor(ready ? '#44bbff' : '#666688');
+          const alreadyBlessed = (typeof hasActiveFortune === 'function' && hasActiveFortune());
+          if (alreadyBlessed) {
+            npc._fortuneHint.setText('[F] Has Fortune');
+            npc._fortuneHint.setColor('#666644');
+          } else if (!ready) {
+            npc._fortuneHint.setText('[F] ' + getFortuneCooldownSec() + 's');
+            npc._fortuneHint.setColor('#666688');
+          } else {
+            npc._fortuneHint.setText('[F] Fortune');
+            npc._fortuneHint.setColor('#44bbff');
+          }
 
           // F key: give fortune to this NPC
-          if (ready && Phaser.Input.Keyboard.JustDown(this.fKey)) {
+          if (ready && !alreadyBlessed && Phaser.Input.Keyboard.JustDown(this.fKey)) {
             const result = giveFortune(npc.name, false); // false = NPC, 1/10th XP
             if (result) {
-              // Show fortune result as floating text
               const color = result.type === 'good' ? '#88ff44' : '#ff6666';
               const icon = result.type === 'good' ? '★' : '☆';
               const floatText = this.add.text(npc.x, npc.y - 16, icon + ' ' + result.name + ' ' + icon, {
@@ -629,7 +637,6 @@ class WorldScene extends Phaser.Scene {
                 targets: floatText, y: npc.y - 60, alpha: 0, duration: 2000,
                 ease: 'Power2', onComplete: () => floatText.destroy(),
               });
-              // Show description below
               const descText = this.add.text(npc.x, npc.y, result.desc, {
                 fontSize: '9px', fontFamily: 'monospace', color: '#aaaacc',
                 backgroundColor: '#000000aa', padding: { x: 4, y: 2 },
@@ -639,8 +646,40 @@ class WorldScene extends Phaser.Scene {
                 ease: 'Power2', onComplete: () => descText.destroy(),
               });
               GameAudio.collect();
-              // Check for talent auto-unlocks
-              if (typeof checkFortuneUnlocks === 'function') checkFortuneUnlocks();
+
+              // Dark Rider unlock cinematic
+              if (result.darkRiderUnlocked) {
+                this.time.delayedCall(1500, () => {
+                  const drText = this.add.text(this.scale.width / 2, this.scale.height / 2,
+                    'The darkness you\'ve sown has taken root within you...', {
+                    fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#cc2244',
+                    backgroundColor: '#000000dd', padding: { x: 20, y: 12 },
+                  }).setOrigin(0.5).setScrollFactor(0).setDepth(500);
+                  this.tweens.add({
+                    targets: drText, alpha: 0, duration: 5000, delay: 3000,
+                    onComplete: () => drText.destroy(),
+                  });
+                  const drSub = this.add.text(this.scale.width / 2, this.scale.height / 2 + 30,
+                    '??? DARK RIDER UNLOCKED', {
+                    fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ff4466',
+                    backgroundColor: '#000000dd', padding: { x: 14, y: 8 },
+                  }).setOrigin(0.5).setScrollFactor(0).setDepth(500);
+                  this.tweens.add({
+                    targets: drSub, alpha: 0, duration: 5000, delay: 4000,
+                    onComplete: () => drSub.destroy(),
+                  });
+                });
+              }
+
+              // Show Fortune XP progress
+              const xpText = this.add.text(npc.x, npc.y + 14, '+' + (false ? '10' : '1') + ' Fortune XP', {
+                fontSize: '8px', fontFamily: 'monospace', color: '#44bbff',
+                backgroundColor: '#000000aa', padding: { x: 3, y: 1 },
+              }).setOrigin(0.5).setDepth(100);
+              this.tweens.add({
+                targets: xpText, y: npc.y - 10, alpha: 0, duration: 1500, delay: 800,
+                onComplete: () => xpText.destroy(),
+              });
             }
           }
         }
