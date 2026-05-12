@@ -206,7 +206,9 @@ class WorldScene extends Phaser.Scene {
   }
 
   update() {
+    try {
     if (G.inBattle) return;
+    if (!this._updateLogged) { this._updateLogged = true; console.log('[WorldScene] update() running, player:', this.player?.x, this.player?.y); }
 
     const speed = 140;
     let vx = 0, vy = 0;
@@ -269,6 +271,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     this.updateHUD();
+    } catch (e) { console.error('[WorldScene] update error:', e); }
   }
 
   // ═══════ NPCs ═══════
