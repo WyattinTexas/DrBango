@@ -79,10 +79,12 @@ class WorldScene extends Phaser.Scene {
     // CRITICAL: Snap camera to player position FIRST, then start smooth follow.
     // Without this, the camera starts at (0,0) and the slow lerp takes many
     // frames to reach the player — making the character invisible on load.
-    this.cameras.main.setBounds(0, 0, MW * T, MH * T);
-    this.cameras.main.setZoom(1.5);
-    // Manual camera centering — startFollow is unreliable at low FPS.
-    // Camera position is set directly in update() every frame.
+    const cam = this.cameras.main;
+    cam.setBounds(0, 0, MW * T, MH * T);
+    cam.setZoom(1.5);
+    // Initial snap then instant follow — startFollow handles viewport math internally
+    cam.setScroll(spawnPX - cam.width / (2 * cam.zoom), spawnPY - cam.height / (2 * cam.zoom));
+    cam.startFollow(this.player, true, 1, 1);
 
     // ── UI Camera (unzoomed, for HUD elements) ──
     this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
@@ -485,18 +487,6 @@ class WorldScene extends Phaser.Scene {
 
     G.x = this.player.x / 32;
     G.y = this.player.y / 32;
-
-    // ── Camera: always center on player (replaces unreliable startFollow) ──
-    const cam = this.cameras.main;
-    const targetX = this.player.x - this.scale.width / (2 * cam.zoom);
-    const targetY = this.player.y - this.scale.height / (2 * cam.zoom);
-    // Clamp to world bounds
-    const maxX = WORLD_W * 32 - this.scale.width / cam.zoom;
-    const maxY = WORLD_H * 32 - this.scale.height / cam.zoom;
-    cam.setScroll(
-      Math.max(0, Math.min(maxX, targetX)),
-      Math.max(0, Math.min(maxY, targetY))
-    );
 
     // Day/night cycle
     this.updateDayNight();
