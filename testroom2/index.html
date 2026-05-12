@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v11'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v12'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2835,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v11'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v12'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -4033,6 +4033,7 @@ function autoPlayNext() {
     // Willpower combat flags (reset each round)
     wpBonanza: { red:0, blue:0 }, wpSpark: { red:0, blue:0 },
     wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
+    wpUsedThisTurn: { red:false, blue:false },
     activeBurn: { red:0, blue:0 },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
@@ -4839,6 +4840,7 @@ function startBattle() {
     // Willpower combat flags (reset each round)
     wpBonanza: { red:0, blue:0 }, wpSpark: { red:0, blue:0 },
     wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
+    wpUsedThisTurn: { red:false, blue:false },
     activeBurn: { red:0, blue:0 },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
@@ -9836,6 +9838,7 @@ function _doStartNextRound() {
   B.wpSpark = { red:0, blue:0 };
   B.wpPow = { red:false, blue:false };
   B.wpPepo = { red:false, blue:false };
+  B.wpUsedThisTurn = { red:false, blue:false };
 
   // Apply Ignite burn (from willpower) to active ghosts
   ['red','blue'].forEach(side => {
@@ -18871,7 +18874,8 @@ function renderWillpower(team) {
     return;
   }
 
-  const locked = f.willpowerTopLocked || f.willpowerUsedThisTurn;
+  const teamUsed = B.wpUsedThisTurn && B.wpUsedThisTurn[team];
+  const locked = f.willpowerTopLocked || teamUsed;
   const canUse = isPreRollActive(team) && !locked && !f.ko;
   const clickAttr = canUse ? `onclick="activateWillpower('${team}')"` : '';
   const lockedClass = locked ? 'wp-locked' : '';
@@ -18929,7 +18933,7 @@ function activateWillpower(team) {
   const t = B[team];
   const f = active(t);
   if (f.ko || !f.willpower || f.willpower.length === 0) return;
-  if (f.willpowerUsedThisTurn) return;
+  if (B.wpUsedThisTurn && B.wpUsedThisTurn[team]) return;
 
   const topId = f.willpower[0];
   const card = wpCardById(topId);
@@ -18944,7 +18948,8 @@ function activateWillpower(team) {
   // Remove top card (the 1 HP base cost) — goes to team discard
   f.willpower.shift();
   t.wpDiscard.push(topId);
-  f.willpowerUsedThisTurn = true;
+  if (!B.wpUsedThisTurn) B.wpUsedThisTurn = { red:false, blue:false };
+  B.wpUsedThisTurn[team] = true;
   f.willpowerTopLocked = true;
   f.hp = f.willpower.length;
 
