@@ -504,7 +504,9 @@ class WorldScene extends Phaser.Scene {
     const regionNames = { frost_valley: 'Frost Valley', rolling_hills: 'Rolling Hills', volcanic_isles: 'Volcanic Isles', dark_castle: 'Dark Castle' };
     this.regionText.setText(regionNames[region] || '');
 
-    // NPC proximity
+    // Building + NPC interactions (buildings first — they're inside NPC range)
+    this._eConsumed = false;
+    this.checkBuildingProximity();
     this.checkNPCProximity();
 
     // Panel hotkeys
@@ -522,9 +524,6 @@ class WorldScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.pKey)) {
       this.showProfessionPanel();
     }
-
-    // Wave 3: Building interactions (E key near buildings)
-    this.checkBuildingProximity();
 
     // Wave 3: Signpost interactions (E key near signposts)
     this.checkSignpostProximity();
@@ -592,8 +591,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   checkNPCProximity() {
+    if (this._eConsumed) return; // building already handled E this frame
     const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
-    this._eConsumed = false; // reset each frame
 
     for (const npc of this.npcSprites) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
@@ -662,7 +661,6 @@ class WorldScene extends Phaser.Scene {
   // ═══════ WAVE 3: BUILDING INTERACTIONS ═══════
 
   checkBuildingProximity() {
-    if (this._eConsumed) return; // NPC already handled E this frame
     const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
     if (!ePressed) return;
     // Don't interact if a panel, comm overlay, or dialogue is active
