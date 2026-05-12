@@ -554,8 +554,7 @@ class WorldScene extends Phaser.Scene {
       this.hudTeamText.setText('No Spiritkin!');
     }
 
-    // Quest tracker
-    const wins = G.rep?.battlesWon || 0;
+    // Quest tracker (uses wins from above)
     let questText = '';
     if (wins < 1) questText = 'Quest: Defeat your first wild Spiritkin!';
     else if (wins < 5) questText = `Quest: Win ${5 - wins} more battles to unlock sideline`;
