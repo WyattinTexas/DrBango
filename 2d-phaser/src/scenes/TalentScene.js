@@ -100,8 +100,19 @@ class TalentScene extends Phaser.Scene {
       const isHidden = !!tree.hidden;
       const indent = isSubTree ? 16 : 0;
 
+      // Hide sub-trees of hidden parents until the parent is unlocked
+      // (e.g. Shadow Knight stays hidden until Dark Rider is unlocked)
+      if (isSubTree && isHidden) {
+        const parentTree = CLASS_TREES[tree.requiresTree];
+        const parentUnlocked = parentTree && !parentTree.hidden ? true :
+          (parentTree && parentTree.hidden === 'darkRider' && G.darkRiderUnlocked) ||
+          (parentTree && parentTree.hidden === 'elder' && G.elderUnlocked);
+        if (!parentUnlocked) continue; // skip entirely
+      }
+
       let displayName, displayColor;
-      if (isHidden && !visible) {
+      if (isHidden && !visible && !isSubTree) {
+        // Only base hidden trees show as ???
         displayName = '???';
         displayColor = '#555555';
       } else if (isSubTree && !visible) {
