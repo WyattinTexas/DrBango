@@ -1016,7 +1016,50 @@ const ELDER_AMENDMENTS = [
 //  Cap: 120 = master 2 trees (84) + 85% of a 3rd (36/42)
 // ══════════════════════════════════════════════════════════
 
-const TALENT_POINT_CAP = 120;
+// ══════════════════════════════════════════════════════════
+//  APPRENTICE / MASTER SYSTEM
+//  Every tree has an Apprentice (entry gate) and Master (capstone)
+//  Apprentice: cost 2, must buy before any branch talent
+//  Master: cost 5, requires all 12 branch talents maxed, unlocks sub-trees
+//  Stored in G.talents[treeId] as '_app' and '_mas' keys
+// ══════════════════════════════════════════════════════════
+
+const APPRENTICE_COST = 2;
+const MASTER_COST = 5;
+
+function getApprenticeInfo(treeId) {
+  const tree = CLASS_TREES[treeId];
+  if (!tree) return null;
+  const realName = tree.hidden ? tree.name : tree.name;
+  return { id: '_app', name: 'Apprentice ' + realName, cost: APPRENTICE_COST, maxRank: 1 };
+}
+
+function getMasterInfo(treeId) {
+  const tree = CLASS_TREES[treeId];
+  if (!tree) return null;
+  return { id: '_mas', name: 'Master ' + tree.name, cost: MASTER_COST, maxRank: 1 };
+}
+
+function isApprentice(treeId) { return getTalentRank(treeId, '_app') >= 1; }
+function isMaster(treeId) { return getTalentRank(treeId, '_mas') >= 1; }
+
+function _allBranchTalentsMaxed(treeId) {
+  const tree = CLASS_TREES[treeId];
+  if (!tree) return false;
+  for (const t of tree.talents) {
+    if (getTalentRank(treeId, t.id) < t.maxRank) return false;
+  }
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════
+//  TALENT POINT CALCULATIONS & ALLOCATION LOGIC
+//  Scaling: T0=1, T1=2, T2=3, T3=4 per rank
+//  Per tree: (3×1+2×2+1×3+1×4)×3 + 2(app) + 5(mas) = 49 to fully master
+//  Cap: 135 = master 2 trees (98) + ~85% of a 3rd
+// ══════════════════════════════════════════════════════════
+
+const TALENT_POINT_CAP = 135;
 
 function getTalentPointsTotal() {
   const fromLevel = (G.level || 1) * 3;
@@ -1034,6 +1077,8 @@ function getTalentPointsSpent() {
     if (!tree) continue;
     for (const talentId in G.talents[treeId]) {
       const ranks = G.talents[treeId][talentId] || 0;
+      if (talentId === '_app') { spent += ranks * APPRENTICE_COST; continue; }
+      if (talentId === '_mas') { spent += ranks * MASTER_COST; continue; }
       const talent = tree.talents.find(t => t.id === talentId);
       const costPerRank = talent ? talent.cost : 1;
       spent += ranks * costPerRank;
@@ -1054,23 +1099,38 @@ function getTalentRank(treeId, talentId) {
 function _findTalent(treeId, talentId) {
   const tree = CLASS_TREES[treeId];
   if (!tree) return null;
+  if (talentId === '_app') return getApprenticeInfo(treeId);
+  if (talentId === '_mas') return getMasterInfo(treeId);
   return tree.talents.find(t => t.id === talentId) || null;
 }
 
 function _isTreeFullyMaxed(treeId) {
-  const tree = CLASS_TREES[treeId];
-  if (!tree) return false;
-  for (const t of tree.talents) {
-    if (getTalentRank(treeId, t.id) < t.maxRank) return false;
-  }
-  return true;
+  return isMaster(treeId);
 }
 
 function canAllocateTalent(treeId, talentId) {
+  // Special: apprentice
+  if (talentId === '_app') {
+    if (getTalentRank(treeId, '_app') >= 1) return false;
+    if (getTalentPointsRemaining() < APPRENTICE_COST) return false;
+    if (!isTreeVisible(treeId)) return false;
+    return true;
+  }
+  // Special: master
+  if (talentId === '_mas') {
+    if (getTalentRank(treeId, '_mas') >= 1) return false;
+    if (getTalentPointsRemaining() < MASTER_COST) return false;
+    if (!_allBranchTalentsMaxed(treeId)) return false;
+    if (!isTreeVisible(treeId)) return false;
+    return true;
+  }
   const talent = _findTalent(treeId, talentId);
   if (!talent) return false;
   if (getTalentRank(treeId, talentId) >= talent.maxRank) return false;
   if (getTalentPointsRemaining() < talent.cost) return false;
+  // Must be apprentice first
+  if (!isApprentice(treeId)) return false;
+  // Prereq satisfied?
   if (talent.prereq) {
     const prereqTalent = _findTalent(treeId, talent.prereq);
     if (!prereqTalent) return false;
@@ -1092,10 +1152,28 @@ function allocateTalent(treeId, talentId) {
 function canDeallocateTalent(treeId, talentId) {
   const rank = getTalentRank(treeId, talentId);
   if (rank <= 0) return false;
+  // Can't remove apprentice if any branch talent has ranks
+  if (talentId === '_app') {
+    const tree = CLASS_TREES[treeId];
+    if (!tree) return false;
+    for (const t of tree.talents) {
+      if (getTalentRank(treeId, t.id) > 0) return false;
+    }
+    return true;
+  }
+  // Can't remove master if any sub-tree has points
+  if (talentId === '_mas') {
+    for (const childId in CLASS_TREES) {
+      if (CLASS_TREES[childId].requiresTree === treeId && getTreePointsSpent(childId) > 0) return false;
+    }
+    return true;
+  }
   const tree = CLASS_TREES[treeId];
   if (!tree) return false;
   const talent = _findTalent(treeId, talentId);
   if (!talent) return false;
+  // Can't remove if master is bought and this would un-max the tree
+  if (isMaster(treeId)) return false;
   for (const t of tree.talents) {
     if (t.prereq === talentId && getTalentRank(treeId, t.id) > 0) {
       if (rank - 1 < talent.maxRank) return false;
@@ -1129,6 +1207,8 @@ function getTreePointsSpent(treeId) {
   let spent = 0;
   for (const talentId in G.talents[treeId]) {
     const ranks = G.talents[treeId][talentId] || 0;
+    if (talentId === '_app') { spent += ranks * APPRENTICE_COST; continue; }
+    if (talentId === '_mas') { spent += ranks * MASTER_COST; continue; }
     const talent = tree.talents.find(t => t.id === talentId);
     const costPerRank = talent ? talent.cost : 1;
     spent += ranks * costPerRank;
@@ -1139,7 +1219,7 @@ function getTreePointsSpent(treeId) {
 function getTreeMaxPoints(treeId) {
   const tree = CLASS_TREES[treeId];
   if (!tree) return 0;
-  let total = 0;
+  let total = APPRENTICE_COST + MASTER_COST;
   for (const t of tree.talents) total += t.cost * t.maxRank;
   return total;
 }
@@ -1149,6 +1229,6 @@ function isTreeVisible(treeId) {
   if (!tree) return false;
   if (tree.hidden === 'darkRider' && !G.darkRiderUnlocked) return false;
   if (tree.hidden === 'elder' && !G.elderUnlocked) return false;
-  if (tree.requiresTree && !_isTreeFullyMaxed(tree.requiresTree)) return false;
+  if (tree.requiresTree && !isMaster(tree.requiresTree)) return false;
   return true;
 }
