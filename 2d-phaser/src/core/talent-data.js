@@ -134,15 +134,15 @@ const CLASS_TREES = {
     requiresTree: 'fortune_teller',
     branches: ['Essence Enhancement', 'Equipment Enhancement', 'Essence Craft'],
     talents: [
-      // Branch 0: Essence Enhancement — boost crafting essence stats
+      // Branch 0: Essence Enhancement — REVISIT LATER (needs balance with Cultivator + other classes)
       { id: 'enc_ess_1', branch: 0, tier: 0, name: 'Basic Infusion',
-        desc: 'Boost 1 stat on an essence by +100 (costs 1 essence to perform)', cost: 1, maxRank: 1, prereq: null },
+        desc: '[WIP] Boost 1 stat on an essence by +100 (costs 1 essence) — revisit after Cultivator', cost: 1, maxRank: 1, prereq: null },
       { id: 'enc_ess_2', branch: 0, tier: 1, name: 'Refined Infusion',
-        desc: 'Boost 1 stat on an essence by +200 instead (costs 2 essences)', cost: 2, maxRank: 1, prereq: 'enc_ess_1' },
+        desc: '[WIP] Boost 1 stat on an essence by +200 (costs 2 essences) — revisit after Cultivator', cost: 2, maxRank: 1, prereq: 'enc_ess_1' },
       { id: 'enc_ess_3', branch: 0, tier: 2, name: 'Dual Infusion',
-        desc: 'Boost 2 stats on an essence at once (costs 2 essences)', cost: 3, maxRank: 1, prereq: 'enc_ess_2' },
+        desc: '[WIP] Boost 2 stats on an essence at once (costs 2 essences) — revisit after Cultivator', cost: 3, maxRank: 1, prereq: 'enc_ess_2' },
       { id: 'enc_ess_4', branch: 0, tier: 3, name: 'Rarity Shift',
-        desc: 'Upgrade an essence\'s rarity tier entirely (costs 3 essences)', cost: 4, maxRank: 1, prereq: 'enc_ess_3' },
+        desc: '[WIP] Upgrade an essence rarity tier (costs 3 essences) — revisit after Cultivator', cost: 4, maxRank: 1, prereq: 'enc_ess_3' },
 
       // Branch 1: Equipment Enhancement — enchant gear slots
       { id: 'enc_eqp_1', branch: 1, tier: 0, name: 'Weapon Enchant',
@@ -628,30 +628,35 @@ const CLASS_TREES = {
     hidden: 'elder',
     branches: ['Protection', 'Prosperity', 'Council'],
     talents: [
-      { id: 'eld_pro_1', branch: 0, tier: 0, name: 'Elder Shield',
-        desc: 'Shield absorbs the first roll of damage in every battle', cost: 1, maxRank: 3, prereq: null },
-      { id: 'eld_pro_2', branch: 0, tier: 1, name: 'Spirit Barrier',
-        desc: 'Shield also protects your sideline spiritkin', cost: 2, maxRank: 2, prereq: 'eld_pro_1' },
-      { id: 'eld_pro_3', branch: 0, tier: 2, name: 'Sanctuary',
-        desc: 'Declare a safe zone — no battles in a small radius', cost: 3, maxRank: 1, prereq: 'eld_pro_2' },
-      { id: 'eld_pro_4', branch: 0, tier: 3, name: 'Aegis of the Elder',
-        desc: 'Shield absorbs the first TWO rolls of damage', cost: 4, maxRank: 1, prereq: 'eld_pro_3' },
+      // Branch 0: Protection — world structure & defense
+      { id: 'eld_pro_1', branch: 0, tier: 0, name: 'Elder Barrier',
+        desc: 'AoE ability: ward away all Dark Riders and defeat dark wights in range. 2-hour cooldown.', cost: 1, maxRank: 1, prereq: null },
+      { id: 'eld_pro_2', branch: 0, tier: 1, name: 'Elder Texts',
+        desc: 'May read Elder texts found in the world (unlocks hidden knowledge)', cost: 2, maxRank: 1, prereq: 'eld_pro_1' },
+      { id: 'eld_pro_3', branch: 0, tier: 2, name: 'Spirit Ward',
+        desc: 'Create one Spirit Ward: everything in the area is immune to all corruption', cost: 3, maxRank: 1, prereq: 'eld_pro_2' },
+      { id: 'eld_pro_4', branch: 0, tier: 3, name: 'Elder Shield',
+        desc: 'Absorb the first roll of damage in every battle', cost: 4, maxRank: 1, prereq: 'eld_pro_3' },
+
+      // Branch 1: Prosperity — gold, XP, Elder Sanctum
       { id: 'eld_prs_1', branch: 1, tier: 0, name: 'Golden Touch',
-        desc: 'Unique buff: +15% gold from victories per rank', cost: 1, maxRank: 3, prereq: null },
+        desc: '+15% gold from victories', cost: 1, maxRank: 1, prereq: null },
       { id: 'eld_prs_2', branch: 1, tier: 1, name: 'Elder Bond',
-        desc: 'Party members gain +10% XP while grouped with you', cost: 2, maxRank: 2, prereq: 'eld_prs_1' },
-      { id: 'eld_prs_3', branch: 1, tier: 2, name: 'Teamup Surge',
-        desc: 'Party battles grant bonus dice to all members', cost: 3, maxRank: 1, prereq: 'eld_prs_2' },
+        desc: 'Party members gain +10% XP while grouped with you', cost: 2, maxRank: 1, prereq: 'eld_prs_1' },
+      { id: 'eld_prs_3', branch: 1, tier: 2, name: 'Shared Prosperity',
+        desc: '+15% gold for your entire party while grouped', cost: 3, maxRank: 1, prereq: 'eld_prs_2' },
       { id: 'eld_prs_4', branch: 1, tier: 3, name: 'Elder Sanctum',
         desc: 'Unlocks the Elder Sanctum — a unique area only Elders can visit', cost: 4, maxRank: 1, prereq: 'eld_prs_3' },
+
+      // Branch 2: Council — governance, voting, amendments
       { id: 'eld_cou_1', branch: 2, tier: 0, name: 'Council Voice',
-        desc: 'Vote in the weekly Elder Council', cost: 1, maxRank: 3, prereq: null },
-      { id: 'eld_cou_2', branch: 2, tier: 1, name: 'Proposal Rights',
-        desc: 'Propose new amendments for the Council to vote on', cost: 2, maxRank: 2, prereq: 'eld_cou_1' },
-      { id: 'eld_cou_3', branch: 2, tier: 2, name: 'Filibuster',
-        desc: 'Your vote counts double in Council elections', cost: 3, maxRank: 1, prereq: 'eld_cou_2' },
-      { id: 'eld_cou_4', branch: 2, tier: 3, name: 'Grand Elder',
-        desc: 'Break ties in Council votes. Your word is final.', cost: 4, maxRank: 1, prereq: 'eld_cou_3' },
+        desc: 'Vote in the weekly Elder Council (1 vote)', cost: 1, maxRank: 1, prereq: null },
+      { id: 'eld_cou_2', branch: 2, tier: 1, name: 'Greater Voice',
+        desc: 'Your Council vote increases to 2 votes', cost: 2, maxRank: 1, prereq: 'eld_cou_1' },
+      { id: 'eld_cou_3', branch: 2, tier: 2, name: 'Elder Authority',
+        desc: 'Your Council vote increases to 3 votes', cost: 3, maxRank: 1, prereq: 'eld_cou_2' },
+      { id: 'eld_cou_4', branch: 2, tier: 3, name: 'Proposal Rights',
+        desc: 'May propose new amendments for the Council to vote on', cost: 4, maxRank: 1, prereq: 'eld_cou_3' },
     ],
   },
 
@@ -1023,6 +1028,8 @@ const ELDER_AMENDMENTS = [
     desc: 'Surveying results increased by 200%' },
   { id: 'amend_4', name: 'Amendment IV: Spirit Limit',
     desc: 'Bans the 3rd Spiritkin — max 2 in battle' },
+  { id: 'amend_5', name: 'Amendment V: Dark Rider Ban',
+    desc: 'Submit a player\'s name — if the vote passes, they lose Dark Rider status and all Dark Rider XP' },
 ];
 
 
@@ -1049,6 +1056,7 @@ const APPRENTICE_DESCRIPTIONS = {
   shaman: 'Unlocks Meditation: sit at gardens and spirit locations. Does nothing alone — abilities give meditation power.',
   scholar: 'Party gains +10% XP while grouped with you. Requires Fortune XP to unlock.',
   enchanter: 'Gain ability to enhance crafting materials. All enhancements cost essences. Artisans need you.',
+  elder: 'The Council recognizes your wisdom. No immediate ability — your power grows through the branches.',
 };
 
 function getApprenticeInfo(treeId) {
@@ -1064,6 +1072,7 @@ const MASTER_DESCRIPTIONS = {
   shaman: 'Elemental Skin -2 total, meditation enhanced, +1 damage, spirit pets +1 damage. Unlocks "Shaman" title.',
   scholar: '+1 special slot (5 total), Scholar title visible to all, Preparation buff lasts 1 hour',
   enchanter: 'All enchantments cost 1 fewer essence (min 1). Enchanted items glow gold. Generate 1 random essence every 30 min. Unlocks "Enchanter" title.',
+  elder: 'Access to Artifact Armor (Elder-exclusive gear). Unlocks "Elder" title. Elder Barrier cooldown reduced to 1 hour.',
 };
 
 function getMasterInfo(treeId) {
