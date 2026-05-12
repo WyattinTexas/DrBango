@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v882'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v900'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -542,29 +542,47 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
 .status-tag.overclock { background:rgba(126,232,250,0.12); color:var(--moonstone); border:1px solid rgba(126,232,250,0.35); animation:overclockTagPulse 1.4s ease-in-out infinite; }
 @keyframes overclockTagPulse { 0%,100%{box-shadow:0 0 4px rgba(126,232,250,0.25);} 50%{box-shadow:0 0 10px rgba(126,232,250,0.6);} }
 
-/* HP Bars (boobattles style) */
-.hp-bar-wrap {
-  width:100%; height:10px; background:rgba(255,255,255,0.06); border-radius:5px;
-  overflow:hidden; border:1px solid rgba(255,255,255,0.06); position:relative;
+/* Willpower Card Stack */
+.willpower-stack {
+  display:flex; align-items:center; gap:8px; width:100%; justify-content:center; margin:4px 0;
 }
-.hp-bar {
-  height:100%; border-radius:4px; transition:width 0.6s ease-out, background 0.4s;
-  position:relative; width:100%;
+.wp-top-card {
+  width:72px; height:90px; border-radius:10px; position:relative;
+  background:linear-gradient(180deg, rgba(28,22,38,0.95), rgba(14,10,22,0.95));
+  border:2px solid rgba(212,160,64,0.4);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;
+  text-align:center; padding:4px; user-select:none;
 }
-.hp-bar::after {
-  content:''; position:absolute; top:0; left:0; right:0; height:50%;
-  background:linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%);
-  border-radius:4px 4px 0 0;
+.wp-top-card:hover:not(.wp-locked) { transform:scale(1.08); box-shadow:0 0 20px rgba(255,255,255,0.15); }
+.wp-top-card.wp-locked { opacity:0.35; cursor:default; filter:grayscale(0.7); }
+.wp-top-card.wp-red { border-color:rgba(239,68,68,0.7); box-shadow:0 0 12px rgba(239,68,68,0.3); }
+.wp-top-card.wp-blue { border-color:rgba(59,130,246,0.7); box-shadow:0 0 12px rgba(59,130,246,0.3); }
+.wp-top-card.wp-green { border-color:rgba(34,197,94,0.7); box-shadow:0 0 12px rgba(34,197,94,0.3); }
+.wp-top-card.wp-orange { border-color:rgba(245,158,11,0.7); box-shadow:0 0 12px rgba(245,158,11,0.3); }
+.wp-card-emoji { font-size:26px; line-height:1; }
+.wp-card-name { font-size:8px; font-weight:700; color:var(--text); margin-top:3px; letter-spacing:0.3px; text-transform:uppercase; }
+.wp-card-desc { font-size:7px; color:var(--text2); margin-top:1px; line-height:1.2; }
+.wp-stack-info {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.hp-bar.team-red { background:linear-gradient(90deg, #dc2626, #f87171); box-shadow:0 0 8px rgba(248,113,113,0.4); }
-.hp-bar.team-blue { background:linear-gradient(90deg, #0891b2, #67e8f9); box-shadow:0 0 8px rgba(103,232,249,0.4); }
-.hp-bar.hp-low { background:linear-gradient(90deg, #d97706, #fbbf24) !important; box-shadow:0 0 10px rgba(251,191,36,0.5) !important; }
-.hp-bar.hp-critical { background:linear-gradient(90deg, #b91c1c, #ef4444) !important; box-shadow:0 0 12px rgba(239,68,68,0.6) !important; animation:hpPulse 0.8s ease-in-out infinite; }
-.hp-bar.hp-overclock { background:linear-gradient(90deg, var(--moonstone-deep), var(--moonstone)) !important; box-shadow:0 0 14px rgba(126,232,250,0.6) !important; animation:overclockPulse 1.2s ease-in-out infinite; }
-@keyframes hpPulse { 0%, 100% { opacity:1; } 50% { opacity:0.65; } }
-@keyframes overclockPulse { 0%, 100% { box-shadow:0 0 10px rgba(126,232,250,0.4); } 50% { box-shadow:0 0 22px rgba(126,232,250,0.8), 0 0 40px rgba(126,232,250,0.3); } }
-.hp-text { display:flex; justify-content:space-between; font-size:0.6rem; font-weight:700; color:#666; margin-top:3px; }
-.hp-text .hp-num { color:#aaa; }
+.wp-stack-count { font-size:13px; font-weight:800; color:var(--text); }
+.wp-stack-label { font-size:8px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
+.wp-stack-pips {
+  display:flex; gap:2px; flex-wrap:wrap; max-width:40px; justify-content:center;
+}
+.wp-pip { width:5px; height:7px; border-radius:2px; background:rgba(255,255,255,0.18); }
+.wp-pip.wp-pip-red { background:rgba(239,68,68,0.5); }
+.wp-pip.wp-pip-blue { background:rgba(59,130,246,0.5); }
+.wp-pip.wp-pip-green { background:rgba(34,197,94,0.5); }
+.wp-pip.wp-pip-orange { background:rgba(245,158,11,0.5); }
+.wp-depleted { font-size:11px; font-weight:800; color:var(--hp-red); text-transform:uppercase; letter-spacing:1px; }
+@keyframes wpActivate {
+  0% { transform:scale(1); } 50% { transform:scale(1.15); } 100% { transform:scale(0.9); opacity:0; }
+}
+/* Keep old HP bar classes for backwards compat but hidden */
+.hp-bar-wrap { display:none; }
+.hp-text { display:none; }
 
 /* Resources — Théâtre gilt tiles */
 .resources { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
@@ -1572,6 +1590,12 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   box-shadow:0 0 8px rgba(96,165,250,0.7); pointer-events:none;
   display:flex; align-items:center; gap:2px;
 }
+.wp-sl-badge {
+  position:absolute; bottom:4px; right:4px; z-index:5;
+  background:linear-gradient(135deg,#7c3aed,#a78bfa); color:#fff;
+  font-size:10px; font-weight:800; padding:2px 5px; border-radius:6px;
+  box-shadow:0 0 6px rgba(167,139,250,0.5); pointer-events:none;
+}
 .sideline-slot.frostbite-pick {
   cursor:pointer !important;
   border-color:#60a5fa !important;
@@ -1801,7 +1825,7 @@ header .sub { font-family:'Inter', sans-serif; color:var(--text-warm); font-size
   .dice-row { gap:2px; }
   .team-roll { padding:6px 10px; font-size:11px; }
   .ability-btn { padding:3px 6px; font-size:10px; }
-  .hp-bar-wrap { max-width:160px; }
+  .hp-bar-wrap { display:none !important; }
   .res-tile { width:30px; height:36px; }
   .res-tile .res-main { font-size:13px; }
   .res-tile .res-main img { width:16px; height:16px; }
@@ -1858,7 +1882,8 @@ body.lite-mode .die.rolling { animation: none !important; }
   <div class="tabs" style="display:flex; align-items:center;">
     <div class="tab active" onclick="switchTab('browse')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchTab('browse')}">Spiritkin Gallery</div>
     <div class="tab" onclick="switchTab('battle')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchTab('battle')}">Arena</div>
-    <button class="standings-btn" onclick="openStandings()" style="margin-left:auto;">&#x1F3C6; Standings</button>
+    <button class="standings-btn" onclick="openWillpowerGallery()" style="margin-left:auto;">&#x2764; Willpower</button>
+    <button class="standings-btn" onclick="openStandings()">&#x1F3C6; Standings</button>
     <button class="gary-btn" onclick="Gary && Gary.open && Gary.open()" title="Talk to Gary">
       <img src="art/gary.png" alt="Gary">
       <span class="gary-btn-label">Gary</span>
@@ -2009,8 +2034,7 @@ body.lite-mode .die.rolling { animation: none !important; }
             <div id="red-fighter" class="arena-card fighter-slot"></div>
           </div>
           <div class="team-info">
-            <div class="hp-bar-wrap"><div class="hp-bar team-red" id="red-hpBar"></div></div>
-            <div class="hp-text"><span class="hp-num" id="red-hpText"></span></div>
+            <div class="willpower-stack" id="red-willpower"></div>
             <div class="resources" id="red-resources"></div>
           </div>
           <div id="red-ability-buttons" class="ability-buttons"></div>
@@ -2033,6 +2057,10 @@ body.lite-mode .die.rolling { animation: none !important; }
             <h4>Pick a value</h4>
             <div class="ms-dice-options" id="msInlineOptions"></div>
           </div>
+          <div class="ms-inline-picker" id="pepoPicker" style="display:none;">
+            <h4>Pepo — Flick a die ±1</h4>
+            <div class="ms-dice-options" id="pepoOptions"></div>
+          </div>
         </div>
 
         <!-- BLUE Team — Right -->
@@ -2045,8 +2073,7 @@ body.lite-mode .die.rolling { animation: none !important; }
             </div>
           </div>
           <div class="team-info">
-            <div class="hp-bar-wrap"><div class="hp-bar team-blue" id="blue-hpBar"></div></div>
-            <div class="hp-text"><span class="hp-num" id="blue-hpText"></span></div>
+            <div class="willpower-stack" id="blue-willpower"></div>
             <div class="resources" id="blue-resources"></div>
           </div>
           <div id="blue-ability-buttons" class="ability-buttons"></div>
@@ -2128,6 +2155,17 @@ body.lite-mode .die.rolling { animation: none !important; }
 </div>
 
 <!-- Standings -->
+<div class="standings-overlay" id="willpowerGalleryOverlay">
+  <div class="standings-box" style="max-width:700px;">
+    <div class="standings-header">
+      <h2>WILLPOWER CARDS</h2>
+      <button class="standings-close" onclick="closeWillpowerGallery()">Close</button>
+    </div>
+    <p style="color:var(--text2);font-size:12px;margin:8px 0 16px;">Each player starts with 1 of each. Discard the top card before rolling to activate its effect. Max 1 per turn. Damage removes cards from the top.</p>
+    <div id="wpGalleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+  </div>
+</div>
+
 <div class="standings-overlay" id="standingsOverlay">
   <div class="standings-box">
     <div class="standings-header">
@@ -2797,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v882'; // fix: handleKOs timeout matches callout speed, raid game-over disables roll buttons
+const TESTROOM_VERSION = 'v900'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -2953,6 +2991,69 @@ const SHELVED_IDS = new Set([
   339, 341, 347, 349, 351, 353, 355, 357, 359,        // Slag Heap-Volcanic Heart
   361, 363, 367                                        // Ash Phoenix-Dragonclaw
 ]);
+
+// ============================================================
+// WILLPOWER CARD SYSTEM
+// ============================================================
+const WILLPOWER_CARDS = [
+  { id:1,  name:'Bonanza',          color:'red',    emoji:'💥', effect:'bonanza',        desc:'+2 damage to wins' },
+  { id:2,  name:'Spark',            color:'red',    emoji:'⚡', effect:'spark',          desc:'+1 damage to your roll result' },
+  { id:3,  name:'Ignite',           color:'red',    emoji:'🔥', effect:'ignite',         desc:'Apply 1 Burn to opponent\'s active' },
+  { id:4,  name:'Pow',              color:'red',    emoji:'💢', effect:'pow',            desc:'+2 damage for each 2 you roll' },
+  { id:5,  name:'Gain Moonstone',   color:'blue',   emoji:'💎', effect:'gainMoonstone',  desc:'Gain 1 Moon Stone' },
+  { id:6,  name:'Gain Lucky Stone', color:'blue',   emoji:'🍀', effect:'gainLucky',      desc:'Gain 1 Lucky Stone' },
+  { id:7,  name:'Pepo',             color:'blue',   emoji:'👻', effect:'pepo',           desc:'Flick a die to alter results' },
+  { id:8,  name:'Gain Frostbite',   color:'blue',   emoji:'❄️', effect:'gainFrostbite',  desc:'Freeze 1 opponent die' },
+  { id:9,  name:'Gain Shell',       color:'green',  emoji:'🛡️', effect:'gainShell',      desc:'Block 1 damage this round' },
+  { id:10, name:'Gain Scorch',      color:'green',  emoji:'☄️', effect:'gainScorch',     desc:'Burn ALL sideline chars (both teams)' },
+  { id:11, name:'Gain Firefly',     color:'orange', emoji:'✨', effect:'gainFirefly',    desc:'Wild card — costs 4 HP', hpCost:4 },
+  { id:12, name:'Gain Sacred Fire', color:'orange', emoji:'🔥', effect:'gainSacredFire', desc:'Gain Sacred Fire — costs 3 HP', hpCost:3 },
+];
+
+function wpCardById(id) { return WILLPOWER_CARDS.find(c => c.id === id); }
+
+function buildWillpowerDeck(size) {
+  // Everyone gets 1 of each of the 12 willpower cards
+  const deck = WILLPOWER_CARDS.map(c => c.id);
+  // Shuffle (Fisher-Yates)
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+// --- Willpower helpers ---
+function wpDamage(ghost, amount) {
+  for (let i = 0; i < amount && ghost.willpower.length > 0; i++) {
+    const removed = ghost.willpower.shift();
+    ghost.willpowerDiscard.push(removed);
+  }
+  ghost.hp = ghost.willpower.length;
+  if (ghost.hp <= 0) ghost.ko = true;
+}
+
+function wpHeal(ghost, amount) {
+  for (let i = 0; i < amount; i++) {
+    if (ghost.willpowerDiscard.length === 0) break;
+    const idx = Math.floor(Math.random() * ghost.willpowerDiscard.length);
+    const card = ghost.willpowerDiscard.splice(idx, 1)[0];
+    ghost.willpower.push(card);
+  }
+  ghost.hp = ghost.willpower.length;
+}
+
+function wpCheckReshuffle(ghost) {
+  if (ghost.willpower.length === 0 && ghost.willpowerDiscard.length > 0 && !ghost.ko) {
+    ghost.willpower = [...ghost.willpowerDiscard];
+    ghost.willpowerDiscard = [];
+    for (let i = ghost.willpower.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ghost.willpower[i], ghost.willpower[j]] = [ghost.willpower[j], ghost.willpower[i]];
+    }
+    ghost.hp = ghost.willpower.length;
+  }
+}
 
 const GHOSTS = [
   {
@@ -3389,7 +3490,7 @@ initStandings();
 // Load standings from Firebase on startup
 function loadStandingsFromFirebase() {
   if (!firebaseReady) return;
-  db.ref('testroom/standings').once('value').then(snap => {
+  db.ref('testroom2/standings').once('value').then(snap => {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
@@ -3401,7 +3502,7 @@ function loadStandingsFromFirebase() {
   }).catch(e => console.warn('[Standings] Firebase load failed:', e));
 
   // Live sync — update in real-time when other players record results
-  db.ref('testroom/standings').on('value', snap => {
+  db.ref('testroom2/standings').on('value', snap => {
     const data = snap.val();
     if (data) {
       Object.keys(data).forEach(id => {
@@ -3422,7 +3523,7 @@ function saveStandingsToFirebase() {
       toSave[id] = { wins: s.wins, losses: s.losses, kos: s.kos || 0, kills: s.kills || 0, mvp: s.mvp || 0 };
     }
   });
-  db.ref('testroom/standings').update(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
+  db.ref('testroom2/standings').update(toSave).catch(e => console.warn('[Standings] Firebase save failed:', e));
 }
 
 function recordWin(ghostId) {
@@ -3712,6 +3813,25 @@ function renderStandingsTable() {
   }).join('');
 }
 
+// --- Willpower Gallery ---
+function openWillpowerGallery() {
+  const grid = document.getElementById('wpGalleryGrid');
+  const colorBg = { red:'rgba(239,68,68,0.12)', blue:'rgba(59,130,246,0.12)', green:'rgba(34,197,94,0.12)', orange:'rgba(245,158,11,0.12)' };
+  const colorBorder = { red:'rgba(239,68,68,0.5)', blue:'rgba(59,130,246,0.5)', green:'rgba(34,197,94,0.5)', orange:'rgba(245,158,11,0.5)' };
+  grid.innerHTML = WILLPOWER_CARDS.map(c => `
+    <div style="background:${colorBg[c.color]};border:2px solid ${colorBorder[c.color]};border-radius:12px;padding:14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;">
+      <div style="font-size:32px;">${c.emoji}</div>
+      <div style="font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.5px;">${c.name}</div>
+      <div style="font-size:10px;color:var(--text2);line-height:1.3;">${c.desc}</div>
+      <div style="font-size:9px;font-weight:700;color:${colorBorder[c.color]};text-transform:uppercase;margin-top:auto;">${c.color}${c.hpCost ? ' · ' + c.hpCost + ' HP' : ' · 1 HP'}</div>
+    </div>
+  `).join('');
+  document.getElementById('willpowerGalleryOverlay').classList.add('active');
+}
+function closeWillpowerGallery() {
+  document.getElementById('willpowerGalleryOverlay').classList.remove('active');
+}
+
 function openStandings() {
   document.getElementById('standingsVersion').textContent = TESTROOM_VERSION;
   renderStandingsTable();
@@ -3811,9 +3931,13 @@ function autoPlayNext() {
     // === DUEL PHASE ===
     // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
     duelPhaseMode: true,
-    duelPriority: null,     // 'red' | 'blue' | null — who goes first THIS round's Duel Phase (null = simultaneous)
-    duelActiveTeam: null,   // who is currently acting during Duel Phase (gates clicks)
-    duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
+    duelPriority: null,
+    duelActiveTeam: null,
+    duelLastLoser: null,
+    // Willpower combat flags (reset each round)
+    wpBonanza: { red:0, blue:0 }, wpSpark: { red:0, blue:0 },
+    wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
+    activeBurn: { red:0, blue:0 },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     cameronBonusDice: { red: 0, blue: 0 },
@@ -3988,8 +4112,8 @@ function autoSimRounds(gameNum) {
     // v842: wire key win-path damage abilities into autoSim (was ability-blind)
     // Zippa (423) — Glimmer: +1 damage per Healing Seed held (passive, matches index.html resolver)
     if (wF.id === 423 && !wF.ko) dmg += (wTeam.resources.healingSeed || 0);
-    lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    wpDamage(lF, dmg);
+    if (lF.ko) { lF.killedBy = (wF.originalId || wF.id); }
     // Laura (79) — Catchy Tune auto-play: check for straight activation + auto-lock highest die + +1 die
     const winDiceAP = winner === 'red' ? redDice : blueDice;
     const loseDiceAP = winner === 'red' ? blueDice : redDice;
@@ -4572,8 +4696,10 @@ function makeTeam(ids) {
   return {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
-        hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
+      const wpDeck = buildWillpowerDeck(g.maxHp);
+      return { id, name:g.name, hp:wpDeck.length, maxHp:wpDeck.length, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
+        hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false,
+        willpower: wpDeck, willpowerDiscard: [], willpowerUsedThisTurn:false, willpowerTopLocked:false, shellActive:false };
     }),
     activeIdx: 0,
     resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
@@ -4605,11 +4731,14 @@ function startBattle() {
     HAND_LIMIT: parseInt(document.getElementById('handLimitSlider')?.value) || 3,
     handLimitPending: null,
     // === DUEL PHASE ===
-    // Lower-HP loser goes first in the pre-roll commit phase. Toggle off to revert to simultaneous.
     duelPhaseMode: true,
-    duelPriority: null,     // 'red' | 'blue' | null — who goes first THIS round's Duel Phase (null = simultaneous)
-    duelActiveTeam: null,   // who is currently acting during Duel Phase (gates clicks)
-    duelLastLoser: null,    // team that lost the previous roll (null on tie or round 1)
+    duelPriority: null,
+    duelActiveTeam: null,
+    duelLastLoser: null,
+    // Willpower combat flags (reset each round)
+    wpBonanza: { red:0, blue:0 }, wpSpark: { red:0, blue:0 },
+    wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
+    activeBurn: { red:0, blue:0 },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     cameronBonusDice: { red: 0, blue: 0 },
@@ -4802,10 +4931,9 @@ function triggerEntry(team, skipEntryEffects) {
       const welderBurnBonus = (active(B[oppTeamName]).id === 450 && !active(B[oppTeamName]).ko) || (B.welderTorch && B.welderTorch[oppTeamName]) ? burnCount : 0;
       const totalBurnDmg = burnCount + welderBurnBonus;
       const burnPre = f.hp;
-      f.hp = Math.max(0, f.hp - totalBurnDmg);
+      wpDamage(f, totalBurnDmg);
       // Credit the Spiritkin who placed the most burn on this ghost
-      if (f.hp <= 0) {
-        f.ko = true;
+      if (f.ko) {
         let topBurner = -2;
         const sources = B.burnSource && B.burnSource[entryTeamName] && B.burnSource[entryTeamName][activeIdx];
         if (sources) {
@@ -4896,8 +5024,8 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 306) {
     const ef = active(enemy);
     if (!ef.ko) {
-      ef.hp = Math.max(0, ef.hp - 3);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
+      wpDamage(ef, 3);
+      if (ef.ko) { ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       entryCallouts.push(['LEVIATHAN!', 'var(--legendary)', `${f.name} — 3 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Leviathan! <span class="log-dmg">3 entry damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
@@ -4955,8 +5083,8 @@ function triggerEntry(team, skipEntryEffects) {
   if (f.id === 34) {
     const ef = active(enemy);
     if (!ef.ko) {
-      ef.hp = Math.max(0, ef.hp - 1);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
+      wpDamage(ef, 1);
+      if (ef.ko) { ef.killedBy = (f.originalId || f.id); }
       const enemyName = enemy === B.red ? 'red' : 'blue';
       entryCallouts.push(['MENACE!', 'var(--uncommon)', `${f.name} — 1 entry damage to ${ef.name}!`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Menace! <span class="log-dmg">1 entry damage to ${ef.name}!</span> ${ef.ko ? '<span class="log-ko">KO!</span>' : ef.hp + ' HP left'}`);
@@ -4972,7 +5100,7 @@ function triggerEntry(team, skipEntryEffects) {
     if (koCount > 0) {
       const gain = koCount * 2;
       const before = f.hp;
-      f.hp += gain; // allow overclock — late-game scaling tank
+      wpHeal(f, gain); // allow overclock — late-game scaling tank
       entryCallouts.push(['SOLITUDE!', 'var(--uncommon)', `${f.name} — +${gain} HP from ${koCount} fallen ghost${koCount > 1 ? 's' : ''}! (${before}→${f.hp} HP)`, entryTeamName]);
       log(`<span class="log-ability">${f.name}</span> — Solitude! +${gain} HP from ${koCount} fallen ghosts. (${before}→${f.hp} HP)`);
     } else {
@@ -5042,8 +5170,8 @@ function triggerEntry(team, skipEntryEffects) {
   // B.battleStarted is set to true after the initial entry sequence completes.
   if (hasSideline(enemy, 51) && !f.ko && B.battleStarted) {
     const nicholasGhost = getSidelineGhost(enemy, 51);
-    f.hp = Math.max(0, f.hp - 2);
-    if (f.hp <= 0) { f.ko = true; f.killedBy = 51; }
+    wpDamage(f, 2);
+    if (f.ko) { f.killedBy = 51; }
     const enteringTeamName = team === B.red ? 'red' : 'blue';
     const nicholasTeamName = enteringTeamName === 'red' ? 'blue' : 'red';
     entryCallouts.push(['SNEAK ATTACK!', 'var(--uncommon)',
@@ -5179,7 +5307,7 @@ function guardedHeal(ghost, amount, teamName) {
     log(`<span class="log-ability">Dark Fang</span> — Pressure! ${ghost.name}'s healing blocked!`);
     return false;
   }
-  ghost.hp += amount;
+  wpHeal(ghost, amount);
   return true;
 }
 
@@ -5259,7 +5387,7 @@ function triggerBorisHook(team) {
   team.ghosts.forEach(g => {
     if (g.id === 343 && !g.ko) {
       const before = g.hp;
-      g.hp += 2; // overclocks — no cap
+      wpHeal(g, 2); // overclocks — no cap
       log(`<span class="log-heal">${g.name}</span> — Fortify! Surge spent → +2 HP (${before}→${g.hp}/${g.maxHp}${g.hp > g.maxHp ? ' · overclocked!' : ''}).`);
     }
   });
@@ -5395,7 +5523,7 @@ function spendHealingSeed(team) {
     return;
   }
   t.resources.healingSeed--;
-  f.hp = Math.min(f.maxHp, f.hp + 1);
+  wpHeal(f, 1);
   playSfx('sfxSpecial', 0.4);
   log(`<span class="log-heal">${f.name}</span> used a Healing Seed! Healed to ${f.hp} HP.`);
 
@@ -5438,7 +5566,7 @@ function sacrificeHappyCrystal(team) {
   const t = B[team];
   const f = active(t);
   if (f.id !== 208 || f.ko) return;
-  f.hp = 0; f.ko = true; f.killedBy = -1; // self-sacrifice
+  wpDamage(f, f.willpower.length); f.killedBy = -1; // self-sacrifice
   t.resources.moonstone++;
   showAbilityCallout('SPARK STRIKE!', 'var(--moonstone)', `${f.name} sacrificed for 1 Moonstone!`, team);
   log(`<span class="log-ability">${f.name}</span> sacrifices itself! Gained <span class="log-ms">1 Moonstone</span>!`);
@@ -5547,7 +5675,7 @@ function carpenterTransform(team) {
   // Transform into Welder
   const welderData = ghostData(450);
   g.id = 450; g.name = welderData.name; g.maxHp = welderData.maxHp;
-  g.hp = welderData.maxHp; // Full heal on evolution
+  if (g.hp < welderData.maxHp) wpHeal(g, welderData.maxHp - g.hp); // Full heal on evolution
   g.ability = welderData.ability; g.abilityDesc = welderData.abilityDesc;
   g.art = welderData.art; g.rarity = welderData.rarity;
   // Leave behind Carpenter's Hammer
@@ -5575,7 +5703,7 @@ function welderTransform(team) {
   // Transform into Foreman
   const foremanData = ghostData(451);
   g.id = 451; g.name = foremanData.name; g.maxHp = foremanData.maxHp;
-  g.hp = foremanData.maxHp; // Full heal on evolution
+  if (g.hp < foremanData.maxHp) wpHeal(g, foremanData.maxHp - g.hp); // Full heal on evolution
   g.ability = foremanData.ability; g.abilityDesc = foremanData.abilityDesc;
   g.art = foremanData.art; g.rarity = foremanData.rarity;
   // Leave behind Welder's Torch
@@ -5678,8 +5806,8 @@ function checkKnightEffects(abilityTeamName, abilityGhostName, sidelineGhost, de
         // Deferred mode: store the hit, apply only if Knight Terror survives the round
         deferredHeavyAir.push({ target, targetName: target.name, oppTeamName });
       } else {
-        target.hp = Math.max(0, target.hp - 2);
-        if (target.hp <= 0) { target.ko = true; target.killedBy = 401; }
+        wpDamage(target, 2);
+        if (target.ko) { target.killedBy = 401; }
         const targetName = target.name;
         if (abilityQueueMode) {
           queueAbility('HEAVY AIR!', 'var(--rare)', `Knight Terror — ${targetName} loses 2 HP!`, null, oppTeamName);
@@ -5823,7 +5951,7 @@ function doPressureSwap(attackerTeam, targetIdx) {
   enemy.activeIdx = targetIdx;
   const newGhost = active(enemy);
   // Returning from sideline = full HP
-  newGhost.hp = newGhost.maxHp;
+  if (newGhost.hp < newGhost.maxHp) wpHeal(newGhost, newGhost.maxHp - newGhost.hp);
   // Narrate the swap so there's textual context in the narrator div for BOTH the auto-pick path
   // (single sideline ghost — no modal, no prior narration) and the manual-pick path (modal closes
   // silently).  Without this, the player just sees the PRESSURE! splash with zero narrator context.
@@ -5929,8 +6057,8 @@ function doWiseAlChoice(choice) {
     queueAbility('SQUALL!', 'var(--rare)', `${wp.wF.name} — +4 ❄️ Ice Shards instead of dealing damage!`, () => { renderBattle(); }, wp.winTeamName);
   } else {
     // Deal the stashed damage
-    wp.lF.hp = Math.max(0, wp.lF.hp - wp.dmg);
-    if (wp.lF.hp <= 0) { wp.lF.ko = true; wp.lF.killedBy = (wp.wF.originalId || wp.wF.id); }
+    wpDamage(wp.lF, wp.dmg);
+    if (wp.lF.ko) { wp.lF.killedBy = (wp.wF.originalId || wp.wF.id); }
     log(`<span class="log-dmg">${wp.wF.name} deals ${wp.dmg} to ${wp.lF.name}!</span> ${wp.lF.ko?'<span class="log-ko">KO!</span>':wp.lF.hp+' HP left'}`);
     renderBattle();
   }
@@ -5962,8 +6090,8 @@ function doSophiaChoice(choice) {
     queueAbility('MASQUERADE!', 'var(--rare)', `${sp.wF.name} — ${maskName}! ${maskDesc}`, () => { renderBattle(); }, sp.winTeamName);
   } else {
     // Deal the stashed damage
-    sp.lF.hp = Math.max(0, sp.lF.hp - sp.dmg);
-    if (sp.lF.hp <= 0) { sp.lF.ko = true; sp.lF.killedBy = (sp.wF.originalId || sp.wF.id); }
+    wpDamage(sp.lF, sp.dmg);
+    if (sp.lF.ko) { sp.lF.killedBy = (sp.wF.originalId || sp.wF.id); }
     log(`<span class="log-dmg">${sp.wF.name} deals ${sp.dmg} to ${sp.lF.name}!</span> ${sp.lF.ko?'<span class="log-ko">KO!</span>':sp.lF.hp+' HP left'}`);
     renderBattle();
   }
@@ -6014,8 +6142,8 @@ function doGordokChoice(choice) {
     queueAbility('RIVER TERROR!', 'var(--rare)', `${gp.wF.name} — stole resources instead of dealing damage! +1 Moonstone!`, () => { renderBattle(); }, gp.winTeamName);
   } else {
     // Deal the stashed damage
-    gp.lF.hp = Math.max(0, gp.lF.hp - gp.dmg);
-    if (gp.lF.hp <= 0) { gp.lF.ko = true; gp.lF.killedBy = (gp.wF.originalId || gp.wF.id); }
+    wpDamage(gp.lF, gp.dmg);
+    if (gp.lF.ko) { gp.lF.killedBy = (gp.wF.originalId || gp.wF.id); }
     log(`<span class="log-dmg">${gp.wF.name} deals ${gp.dmg} to ${gp.lF.name}!</span> ${gp.lF.ko?'<span class="log-ko">KO!</span>':gp.lF.hp+' HP left'}`);
     renderBattle();
   }
@@ -6125,15 +6253,15 @@ function doRiderChoice(choice) {
     // Opponent takes 1 damage
     const oppGhost = active(tp.team);
     if (oppGhost && !oppGhost.ko) {
-      oppGhost.hp = Math.max(0, oppGhost.hp - 1);
-      if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 456; }
+      wpDamage(oppGhost, 1);
+      if (oppGhost.ko) { oppGhost.killedBy = 456; }
       subtitle = `${oppLabel}'s ${oppGhost.name} takes 1 damage! (${oppGhost.hp}/${oppGhost.maxHp} HP)`;
       log(`<span class="log-ability">${oppLabel}</span> chose to take 1 damage from Ryder's Toll! ${oppGhost.name} → ${oppGhost.hp}/${oppGhost.maxHp} HP.`);
       // Simon (24) — Brew Time: REMOVED (now sideline moonstone converter)
       // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius 45)
       if (!oppGhost.ko && hasAlive(B[tp.riderTeam], 436) && !hasSideline(tp.team, 45)) {
-        oppGhost.hp = Math.max(0, oppGhost.hp - 1);
-        if (oppGhost.hp <= 0) { oppGhost.hp = 0; oppGhost.ko = true; oppGhost.killedBy = 436; }
+        wpDamage(oppGhost, 1);
+        if (oppGhost.ko) { oppGhost.killedBy = 436; }
         queueAbility('BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${oppGhost.name}!`, tp.riderTeam);
         log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${oppGhost.name}!</span> ${oppGhost.ko?'<span class="log-ko">KO!</span>':oppGhost.hp+' HP left'}`);
         popSidelineCard(B[tp.riderTeam], 436);
@@ -6329,7 +6457,7 @@ function finishBalatronRoll() {
     const wTeamObj = B[wTeamName];
     const wF = wTeamObj ? active(wTeamObj) : null;
     if (wF && wF.name === bp.wFName) {
-      wF.hp = bp.hpAfter;
+      wpDamage(wF, bp.counterDie);
     }
     log(`<span class="log-ability">${bp.lFName}</span> — Party Time! Counter die: <b>${bp.counterDie}</b> damage to ${bp.wFName}! ${bp.wasKo?'<span class="log-ko">KO!</span>':bp.hpAfter+' HP left'}`);
     // Jeffery (14) — Chuckle: if Balatron's counter die KO'd the winner, Jeffery on Balatron's team heals Balatron +3 HP
@@ -6345,7 +6473,7 @@ function finishBalatronRoll() {
           const jeffNewHp = lF.hp + 3;
           const jeffOver = jeffNewHp > lF.maxHp;
           const jeffGhost = lF;
-          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${bp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { jeffGhost.hp += 3; renderBattle(); }, bp.loseTeamName);
+          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${bp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { wpHeal(jeffGhost, 3); renderBattle(); }, bp.loseTeamName);
           log(`<span class="log-ability">${lF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
         }
       }
@@ -6402,7 +6530,7 @@ function doTylerChoice(choice) {
   const f = active(B[team]);
   if (choice === 'yes' && f && !f.ko && f.hp >= 3) {
     const prevHp = f.hp;
-    f.hp -= 2;
+    wpDamage(f, 2);
     // +1 die: bump the pre-roll count already stored by doPreRollSetup
     if (B.preRoll && B.preRoll[team]) {
       B.preRoll[team].count = Math.min(6, B.preRoll[team].count + 1);
@@ -6434,9 +6562,9 @@ function doGuardianFairyReactive(choice) {
   if (choice === 'yes') {
     // Guardian Fairy takes the damage instead — heal to full first (entering from sideline)
     const gfIdx = loseTeam.ghosts.indexOf(gfGhost);
-    gfGhost.hp = gfGhost.maxHp; // heal to full on entry
-    gfGhost.hp = Math.max(0, gfGhost.hp - dmg);
-    if (gfGhost.hp <= 0) { gfGhost.ko = true; gfGhost.killedBy = -1; }
+    if (gfGhost.hp < gfGhost.maxHp) wpHeal(gfGhost, gfGhost.maxHp - gfGhost.hp); // heal to full on entry
+    wpDamage(gfGhost, dmg);
+    if (gfGhost.ko) { gfGhost.killedBy = -1; }
     // Swap GF to active, original ghost to sideline at current HP
     if (gfIdx !== -1) loseTeam.activeIdx = gfIdx;
     const gfName = gfGhost.name || 'Guardian Fairy';
@@ -6446,8 +6574,8 @@ function doGuardianFairyReactive(choice) {
     if (resume) setTimeout(resume, spd(1500));
   } else {
     // Damage applies to the original ghost
-    lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = gfp.wFId; }
+    wpDamage(lF, dmg);
+    if (lF.ko) { lF.killedBy = gfp.wFId; }
     log(`<span class="log-dmg">${gfp.wFName} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
     renderBattle();
     if (resume) setTimeout(resume, 200);
@@ -6647,8 +6775,8 @@ function useBonzaiButton(team) {
   if (!f || f.id !== 454 || f.ko || f.hp <= 4) return;
   if (B.bonzaiDecided[team]) return;
   const preHp = f.hp;
-  f.hp -= 4;
-  if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+  wpDamage(f, 4);
+  if (f.ko) { f.killedBy = -1; }
   B.bonzaiDecided[team] = true;
   // Store the dice bonus for consumption during roll setup
   if (!B.bonzaiBtnDice) B.bonzaiBtnDice = { red: 0, blue: 0 };
@@ -6670,8 +6798,8 @@ function doBonzaiChoice(choice) {
   const f = active(B[team]);
   if (choice === 'yes' && f && f.id === 454 && !f.ko && f.hp > 4) {
     const preHp = f.hp;
-    f.hp -= 4;
-    if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+    wpDamage(f, 4);
+    if (f.ko) { f.killedBy = -1; }
     // Add dice directly to preRoll count so they apply to THIS roll, not next
     if (B.preRoll && B.preRoll[team]) {
       B.preRoll[team].count = Math.min(10, B.preRoll[team].count + 5);
@@ -6804,7 +6932,7 @@ function doNickKnackSteal(team, resKey) {
     const resLabel = resKey === 'luckyStone' ? 'Lucky Stone' : resKey === 'moonstone' ? 'Moonstone' : resKey === 'healingSeed' ? 'Healing Seed' : resKey === 'ice' ? 'Ice Shard' : resKey === 'fire' ? 'Sacred Fire' : resKey === 'burn' ? 'Burn' : resKey === 'frostbite' ? 'Frostbite' : 'Surge';
     const f = active(B[team]);
     // Nick & Knack gains +1 HP + 2 Burn on steal
-    f.hp += 1;
+    wpHeal(f, 1);
     // Grant 2 Burn as resource (player places via burn picker during pre-roll)
     if (!B[team].resources.burn) B[team].resources.burn = 0;
     B[team].resources.burn += 2;
@@ -7168,12 +7296,12 @@ function finishJasperRoll() {
     const wF = wTeamObj ? active(wTeamObj) : null;
     const lF = lTeamObj ? active(lTeamObj) : null;
     if (lF && lF.name === jp.lFName) {
-      lF.hp = Math.max(0, lF.hp - jp.bonusDie);
-      if (lF.hp <= 0 && !lF.ko) { lF.ko = true; lF.killedBy = 428; }
+      wpDamage(lF, jp.bonusDie);
+      if (lF.ko) { lF.killedBy = 428; }
     }
     if (wF && wF.name === jp.wFName) {
-      wF.hp = Math.max(0, wF.hp - 1);
-      if (wF.hp <= 0) { wF.ko = true; wF.killedBy = -1; }
+      wpDamage(wF, 1);
+      if (wF.ko) { wF.killedBy = -1; }
     }
     log(`<span class="log-ability">${jp.wFName}</span> — Flame Dive! Bonus die: <span class="log-dmg">${jp.bonusDie} extra damage</span> to ${jp.lFName}! Self-damage: <span class="log-dmg">1 HP</span>.`);
     renderBattle();
@@ -7235,8 +7363,8 @@ function finishSkyElusive() {
     const wTeamObj = B[wTeamName];
     const wF = wTeamObj ? active(wTeamObj) : null;
     if (wF && wF.name === sp.wFName) {
-      wF.hp = Math.max(0, wF.hp - sp.counterDie);
-      if (wF.hp <= 0 && !wF.ko) { wF.ko = true; wF.killedBy = 72; }
+      wpDamage(wF, sp.counterDie);
+      if (wF.ko) { wF.killedBy = 72; }
     }
     log(`<span class="log-ability">${sp.lFName}</span> — Elusive! Counter die: <span class="log-dmg">${sp.counterDie} damage</span> to ${sp.wFName}! ${wF && wF.ko ? '<span class="log-ko">KO!</span>' : (wF ? wF.hp + ' HP left' : '')}`);
     // Jeffery (14) — Chuckle: if Sky's counter die KO'd the winner, Jeffery on Sky's team heals +3 HP
@@ -7253,7 +7381,7 @@ function finishSkyElusive() {
           const jeffNewHp = lF.hp + 3;
           const jeffOver = jeffNewHp > lF.maxHp;
           const jeffGhost = lF;
-          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${sp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { jeffGhost.hp += 3; renderBattle(); }, loseTeamName);
+          queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${lF.name} defeats ${sp.wFName}! +3 HP from the sideline! (${lF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { wpHeal(jeffGhost, 3); renderBattle(); }, loseTeamName);
           log(`<span class="log-ability">${lF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
         }
       }
@@ -7345,8 +7473,8 @@ function finishJenkinsRoll() {
     const enemyTeam = B[jp.enemyTeam];
     const ef = enemyTeam ? active(enemyTeam) : null;
     if (ef && ef.name === jp.enemyName && !ef.ko) {
-      ef.hp = Math.max(0, ef.hp - jp.damage);
-      if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 94; }
+      wpDamage(ef, jp.damage);
+      if (ef.ko) { ef.killedBy = 94; }
     }
     const rollLabel = describeRoll(jp.roll);
     log(`<span class="log-ability">${jp.jenkinsName}</span> — Greeting! Rolled [${jp.dice.join(', ')}] — ${rollLabel} → <span class="log-dmg">${jp.damage} entry damage to ${jp.enemyName}!</span> ${ef && ef.ko ? '<span class="log-ko">KO!</span>' : (ef ? ef.hp + ' HP left' : '')}`);
@@ -7385,11 +7513,13 @@ function doEloiseChoice(choice) {
     // Spend 1 Ice Shard
     B[team].resources.ice -= 1;
     B.eloiseUsedThisRound[team] = true;
-    // Swap HP values
+    // Swap willpower stacks (and HP values derived from them)
     const myOldHp = f.hp;
     const oppOldHp = oppF.hp;
-    f.hp = oppOldHp;
-    oppF.hp = myOldHp;
+    const myWp = [...f.willpower]; const myWpDiscard = [...f.willpowerDiscard];
+    f.willpower = [...oppF.willpower]; f.willpowerDiscard = [...oppF.willpowerDiscard];
+    oppF.willpower = myWp; oppF.willpowerDiscard = myWpDiscard;
+    f.hp = f.willpower.length; oppF.hp = oppF.willpower.length;
     showAbilityCallout('CHANGE OF HEART!', 'var(--rare)', `${f.name} — HP swap! (${myOldHp} → ${f.hp}) vs enemy (${oppOldHp} → ${oppF.hp})`, team);
     log(`<span class="log-ability">${f.name}</span> — Change of Heart! Spent 1 Ice Shard. Swapped HP: ${myOldHp} → ${f.hp}, enemy ${oppOldHp} → ${oppF.hp}.`);
     renderBattle();
@@ -7421,13 +7551,13 @@ function doMallowChoice(choice) {
     const enemyTeamObj = B[team === 'red' ? 'blue' : 'red'];
     const filbertCursesMallow = hasSideline(enemyTeamObj, 59);
     if (filbertCursesMallow) {
-      f.hp = Math.max(0, f.hp - 3);
-      if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; }
+      wpDamage(f, 3);
+      if (f.ko) { f.killedBy = 59; }
       showAbilityCallout('MASK MERCHANT!', 'var(--uncommon)',
         `Mr Filbert — Dozy Cozy cursed! ${f.name} takes 3 damage! (${hpBefore} → ${f.hp} HP)`, team === 'red' ? 'blue' : 'red');
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Dozy Cozy flipped to damage. ${f.name} ${hpBefore} → ${f.hp} HP.`);
     } else {
-      f.hp += 3;
+      wpHeal(f, 3);
       const overMallow = f.hp > f.maxHp;
       // Grant 1 Burn as a resource (player places it via burn picker during pre-roll)
       if (!B[team].resources.burn) B[team].resources.burn = 0;
@@ -7482,12 +7612,12 @@ function doBooChoice(choice) {
     const enemyTeamObj = B[team === 'red' ? 'blue' : 'red'];
     const filbertCursesTeamwork = hasSideline(enemyTeamObj, 59);
     if (filbertCursesTeamwork) {
-      f.hp = Math.max(0, f.hp - 1);
-      if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; }
+      wpDamage(f, 1);
+      if (f.ko) { f.killedBy = 59; }
       showAbilityCallout('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Teamwork cursed! ${f.name} takes 1 damage! (${prevHp} → ${f.hp} HP)`, team === 'red' ? 'blue' : 'red');
       log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Teamwork flipped to damage. ${f.name} ${prevHp} → ${f.hp} HP.`);
     } else {
-      f.hp += 1;
+      wpHeal(f, 1);
       const overTeam = f.hp > f.maxHp;
       showAbilityCallout('TEAMWORK!', 'var(--common)', `${f.name} — trade 1 die for +1 HP! (${prevCount} → ${B.preRoll[team].count} dice | ${prevHp} → ${f.hp} HP${overTeam ? ' · overclocked!' : ''})`, team);
       log(`<span class="log-ability">${f.name}</span> — Teamwork! Traded 1 die for +1 HP (${prevCount} → ${B.preRoll[team].count} dice, ${prevHp} → ${f.hp} HP${overTeam ? ' · overclocked!' : ''}).`);
@@ -7538,8 +7668,8 @@ function doGusGaleReactive(choice) {
   } else {
     // Player declined — damage applies to the current opponent now
     B._gusGaleAccepted = false;
-    lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    wpDamage(lF, dmg);
+    if (lF.ko) { lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
     playDamageSfx(dmg);
     hitDamage(loseTeamName);
@@ -7803,7 +7933,7 @@ function pickJacksonDie(idx) {
 
   // Spend 1 HP
   const prevHp = f.hp;
-  f.hp -= 1;
+  wpDamage(f, 1);
   // Mutate the preRoll dice array IN-PLACE so postRollDone's closure sees the change.
   // (Same pattern as Sonya v284 / Jeanie v285 / Dark Wing v285)
   // Creating a new array via [...B.redDice] does NOT work: postRollDone() closes over
@@ -8597,8 +8727,8 @@ function doGaleForcePickerChoice(idx) {
 
   // Apply stashed damage to the NEW ghost
   if (dmg > 0) {
-    newGhost.hp = Math.max(0, newGhost.hp - dmg);
-    if (newGhost.hp <= 0) { newGhost.hp = 0; newGhost.ko = true; newGhost.killedBy = 31; }
+    wpDamage(newGhost, dmg);
+    if (newGhost.ko) { newGhost.killedBy = 31; }
     playDamageSfx(dmg);
   }
   renderBattle();
@@ -9593,6 +9723,33 @@ function _startNextRoundAfterSelene() {
 }
 function _doStartNextRound() {
   if (!B) return;
+  // Reset willpower per-round flags
+  ['red','blue'].forEach(side => {
+    B[side].ghosts.forEach(g => {
+      g.willpowerUsedThisTurn = false;
+      g.willpowerTopLocked = false;
+      g.shellActive = false;
+    });
+  });
+  B.wpBonanza = { red:0, blue:0 };
+  B.wpSpark = { red:0, blue:0 };
+  B.wpPow = { red:false, blue:false };
+  B.wpPepo = { red:false, blue:false };
+
+  // Apply Ignite burn (from willpower) to active ghosts
+  ['red','blue'].forEach(side => {
+    if (B.activeBurn && B.activeBurn[side] > 0) {
+      const f = active(B[side]);
+      if (f && !f.ko) {
+        const burnAmt = B.activeBurn[side];
+        wpDamage(f, burnAmt);
+        log(`<span class="log-dmg">Ignite!</span> ${f.name} takes ${burnAmt} burn damage!`);
+        if (f.ko) { f.killedBy = -3; }
+      }
+      B.activeBurn[side] = 0;
+    }
+  });
+
   // Reset per-round Bonzai state for the new round
   B.bonzaiDecided = { red: false, blue: false };
   B.bonzaiBtnDice = { red: 0, blue: 0 };
@@ -9789,8 +9946,8 @@ function doPreRollSetup() {
       if (msDmg > 0) {
         const f = active(t);
         if (f && !f.ko) {
-          f.hp = Math.max(0, f.hp - msDmg);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = -1; }
+          wpDamage(f, msDmg);
+          if (f.ko) { f.killedBy = -1; }
           log(`<span class="log-dmg">Moonstone Sickness!</span> ${f.name} takes ${msDmg} damage! ${f.ko ? '<span class="log-ko">KO!</span>' : f.hp + ' HP left'}`);
           narrate(`<b style="color:var(--moonstone)">Moonstone Sickness!</b> <b class="${teamKey}-text">${f.name}</b> takes ${msDmg} damage!${f.ko ? ' <b>KO!</b>' : ''}`);
           preRollCallouts.push(['MOONSTONE SICKNESS!', 'var(--moonstone)', `${f.name} takes ${msDmg} damage!`, teamKey]);
@@ -9828,8 +9985,8 @@ function doPreRollSetup() {
           log(`<span class="log-ability">${ef.name}</span> — Underdog! Immune to ${f.name}'s Swarm!`);
           return;
         }
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = (f.originalId || f.id); }
+        wpDamage(ef, 1);
+        if (ef.ko) { ef.killedBy = (f.originalId || f.id); }
         preRollCallouts.push(['SWARM!', 'var(--uncommon)', `${f.name} — 1 damage to ${ef.name}!`, tNamePre]);
         log(`<span class="log-ability">${f.name}</span> — Swarm! <span class="log-dmg">1 damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
         playDamageSfx(1);
@@ -9846,8 +10003,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNamePre], 436) && !hasSideline(B[enemyName], 45)) {
           const psPreHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          wpDamage(ef, 1);
+          if (ef.ko) { ef.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNamePre]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
@@ -9883,8 +10040,8 @@ function doPreRollSetup() {
           return;
         }
         const preHp = ef.hp;
-        ef.hp = Math.max(0, ef.hp - 1);
-        if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 205; }
+        wpDamage(ef, 1);
+        if (ef.ko) { ef.killedBy = 205; }
         const enemyName = enemy === B.red ? 'red' : 'blue';
         const meltMsg = ef.ko
           ? `Shade's Shadow finishes ${ef.name}! (${preHp} HP → KO!)`
@@ -9907,8 +10064,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!ef.ko && hasAlive(B[tNameShade], 436) && !hasSideline(enemy, 45)) {
           const psPreHp2 = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+          wpDamage(ef, 1);
+          if (ef.ko) { ef.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameShade]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
           playDamageSfx(1);
@@ -9953,8 +10110,8 @@ function doPreRollSetup() {
             return;
           }
           const preHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 111; }
+          wpDamage(ef, 1);
+          if (ef.ko) { ef.killedBy = 111; }
           const hauntMsg = ef.ko
             ? `Shade haunts ${ef.name}! (${preHp} HP → KO!)`
             : `Shade haunts ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -9974,8 +10131,8 @@ function doPreRollSetup() {
           // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameHaunt], 436) && !hasSideline(enemy, 45)) {
             const psPreHp3 = ef.hp;
-            ef.hp = Math.max(0, ef.hp - 1);
-            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            wpDamage(ef, 1);
+            if (ef.ko) { ef.killedBy = 436; }
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameHaunt]);
             log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
@@ -10018,8 +10175,8 @@ function doPreRollSetup() {
           const lucyAttacker = active(B[tNameLucyActor]);
           if (lucyAttacker && !lucyAttacker.ko) {
             const undPreL = lucyAttacker.hp;
-            lucyAttacker.hp = Math.max(0, lucyAttacker.hp - 3);
-            if (lucyAttacker.hp <= 0) { lucyAttacker.ko = true; lucyAttacker.killedBy = 55; }
+            wpDamage(lucyAttacker, 3);
+            if (lucyAttacker.ko) { lucyAttacker.killedBy = 55; }
             const undMsgL = lucyAttacker.ko
               ? `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} HP → KO!)`
               : `${f.name} counters! 3 damage to ${lucyAttacker.name}! (${undPreL} → ${lucyAttacker.hp} HP)`;
@@ -10034,8 +10191,8 @@ function doPreRollSetup() {
           }
         }
         const preHp = f.hp;
-        f.hp = Math.max(0, f.hp - pendingDmg);
-        if (f.hp <= 0) { f.ko = true; f.killedBy = isHumar ? 336 : 108; }
+        wpDamage(f, pendingDmg);
+        if (f.ko) { f.killedBy = isHumar ? 336 : 108; }
         const lucyMsg = f.ko
           ? `${abilityLabel} burns ${f.name}! (${preHp} HP → KO!)`
           : `${abilityLabel} burns ${f.name}! (${preHp} → ${f.hp} HP)`;
@@ -10047,8 +10204,8 @@ function doPreRollSetup() {
         // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
         if (!f.ko && hasAlive(B[tNameLucyActor], 436) && !hasSideline(B[tNameLucyTarget], 45)) {
           const psPreHpL = f.hp;
-          f.hp = Math.max(0, f.hp - 1);
-          if (f.hp <= 0) { f.ko = true; f.killedBy = 436; }
+          wpDamage(f, 1);
+          if (f.ko) { f.killedBy = 436; }
           preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${f.name}!`, tNameLucyActor]);
           log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${f.name}!</span> ${f.ko?'<span class="log-ko">KO!</span>':f.hp+' HP left'}`);
           playDamageSfx(1);
@@ -10098,8 +10255,8 @@ function doPreRollSetup() {
             return;
           }
           const preHp = ef.hp;
-          ef.hp = Math.max(0, ef.hp - 1);
-          if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 101; }
+          wpDamage(ef, 1);
+          if (ef.ko) { ef.killedBy = 101; }
           const fumesMsg = ef.ko
             ? `Toxic Fumes choke ${ef.name}! (${preHp} HP → KO!)`
             : `Toxic Fumes choke ${ef.name}! (${preHp} → ${ef.hp} HP)`;
@@ -10118,8 +10275,8 @@ function doPreRollSetup() {
           // Princess Shade (436) — Bounty: +1 additional damage on pre-roll chip, works from sideline OR active (blocked by Cornelius)
           if (!ef.ko && hasAlive(B[tNameSplinter], 436) && !hasSideline(enemy, 45)) {
             const psPreHp4 = ef.hp;
-            ef.hp = Math.max(0, ef.hp - 1);
-            if (ef.hp <= 0) { ef.ko = true; ef.killedBy = 436; }
+            wpDamage(ef, 1);
+            if (ef.ko) { ef.killedBy = 436; }
             preRollCallouts.push(['BOUNTY!', 'var(--rare)', `Princess Shade — +1 additional damage to ${ef.name}!`, tNameSplinter]);
             log(`<span class="log-ability">Princess Shade</span> — Bounty! <span class="log-dmg">+1 additional damage to ${ef.name}!</span> ${ef.ko?'<span class="log-ko">KO!</span>':ef.hp+' HP left'}`);
             playDamageSfx(1);
@@ -10498,12 +10655,12 @@ function doPreRollSetup() {
         f.shooAlpineUsed = true;
         // Mr Filbert (59) — Mask Merchant: flip heal to damage when Filbert is on the enemy sideline
         if (hasSideline(enemyTeamObj, 59)) {
-          f.hp = Math.max(0, f.hp - 2);
-          if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; }
+          wpDamage(f, 2);
+          if (f.ko) { f.killedBy = 59; }
           preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Alpine Air cursed! ${f.name} takes 2 damage! (${shooHpBefore}→${f.hp} HP)`, team === B.red ? 'blue' : 'red']);
           log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Alpine Air flipped to damage. ${f.name} ${shooHpBefore} → ${f.hp} HP.`);
         } else {
-          f.hp += 2;
+          wpHeal(f, 2);
           const overShoo = f.hp > f.maxHp;
           preRollCallouts.push(['ALPINE AIR!', 'var(--common)', `${shooGhost ? shooGhost.name : 'Shoo'} (sideline) — ${f.name} below 4 HP! +2 HP! (${shooHpBefore}→${f.hp}/${f.maxHp}${overShoo ? ' · overclocked!' : ''})`, team === B.red ? 'red' : 'blue']);
           log(`<span class="log-ability">Shoo</span> (sideline) — Alpine Air! ${f.name} at ${shooHpBefore} HP → +2 HP (${f.hp}/${f.maxHp}${overShoo ? ' overclocked!' : ''}). Used!`);
@@ -10551,10 +10708,10 @@ function doPreRollSetup() {
       if (dylanNegates(enemyTeam)) {
         // Negate: refund HP and cancel dice
         if (f && f.id === 454 && !f.ko) {
-          f.hp += 4;
+          wpHeal(f, 4);
         } else if (f && f.id === 454 && f.ko && f.killedBy === -1) {
           // Bonzai self-KO — revive
-          f.ko = false; f.killedBy = null; f.hp = 4;
+          f.ko = false; f.killedBy = null; wpHeal(f, 4);
         }
         const enemyTName = tName === 'red' ? 'blue' : 'red';
         preRollCallouts.push(['BLOCKED!', 'var(--text2)', `${enemyTName.charAt(0).toUpperCase() + enemyTName.slice(1)} — Scarecrow/Slick Coat negates Bonzai!`, enemyTName]);
@@ -10836,8 +10993,8 @@ function doPreRollSetup() {
       const borisRedPre = borisRedG.hp;
       if (hasSideline(B.blue, 59)) {
         // Mr Filbert (59) — Mask Merchant: flip Boris Fortify heal to damage
-        borisRedG.hp = Math.max(0, borisRedG.hp - 2);
-        if (borisRedG.hp <= 0) { borisRedG.hp = 0; borisRedG.ko = true; borisRedG.killedBy = 59; }
+        wpDamage(borisRedG, 2);
+        if (borisRedG.ko) { borisRedG.killedBy = 59; }
         preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Fortify cursed! ${borisRedG.name} takes 2 damage! (${borisRedPre}→${borisRedG.hp} HP)`, 'blue']);
         log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Boris Fortify flipped to damage. ${borisRedG.name} ${borisRedPre} → ${borisRedG.hp} HP.`);
       } else {
@@ -10855,8 +11012,8 @@ function doPreRollSetup() {
       const borisBlueRePre = borisBlueG.hp;
       if (hasSideline(B.red, 59)) {
         // Mr Filbert (59) — Mask Merchant: flip Boris Fortify heal to damage
-        borisBlueG.hp = Math.max(0, borisBlueG.hp - 2);
-        if (borisBlueG.hp <= 0) { borisBlueG.hp = 0; borisBlueG.ko = true; borisBlueG.killedBy = 59; }
+        wpDamage(borisBlueG, 2);
+        if (borisBlueG.ko) { borisBlueG.killedBy = 59; }
         preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Fortify cursed! ${borisBlueG.name} takes 2 damage! (${borisBlueRePre}→${borisBlueG.hp} HP)`, 'red']);
         log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Boris Fortify flipped to damage. ${borisBlueG.name} ${borisBlueRePre} → ${borisBlueG.hp} HP.`);
       } else {
@@ -10893,12 +11050,12 @@ function doPreRollSetup() {
         const seekerHpBefore = f.hp;
         const enemyTeamObj = team === B.red ? B.blue : B.red;
         if (hasSideline(enemyTeamObj, 59)) {
-          f.hp = Math.max(0, f.hp - 1);
-          if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; }
+          wpDamage(f, 1);
+          if (f.ko) { f.killedBy = 59; }
           preRollCallouts.push(['MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Seeker cursed! ${f.name} takes 1 damage! (${seekerHpBefore}→${f.hp} HP)`, team === B.red ? 'blue' : 'red']);
           log(`<span class="log-ability">Mr Filbert</span> — Mask Merchant! Seeker flipped to damage. ${f.name} ${seekerHpBefore} → ${f.hp} HP.`);
         } else {
-          f.hp += 1;
+          wpHeal(f, 1);
           const seekerOver = f.hp > f.maxHp;
           preRollCallouts.push(['SEEKER!', 'var(--rare)', `${f.name} — HP below enemy! +1 HP (${seekerHpBefore}→${f.hp}/${f.maxHp}${seekerOver ? ' · overclocked!' : ''})`, team === B.red ? 'red' : 'blue']);
           log(`<span class="log-ability">${f.name}</span> — Seeker! HP below enemy → +1 HP (${f.hp}/${f.maxHp}${seekerOver ? ' overclocked!' : ''})`);
@@ -11402,6 +11559,28 @@ function doPostRollAndResolve(redDice, blueDice) {
     // ========================================
     B.pendingResolve = { redDice, blueDice, redUsedMs:false, blueUsedMs:false };
 
+  // Pepo flick check — before moonstones
+  const pepoRed = B.wpPepo && B.wpPepo.red;
+  const pepoBlue = B.wpPepo && B.wpPepo.blue;
+  if (pepoRed || pepoBlue) {
+    const pepoTeam = pepoRed ? 'red' : 'blue';
+    B.wpPepo[pepoTeam] = false;
+    const pepoDice = pepoTeam === 'red' ? redDice : blueDice;
+    showPepoPicker(pepoTeam, pepoDice, () => {
+      renderDice(redDice, blueDice);
+      // Check if other team also has Pepo
+      if (B.wpPepo && ((pepoTeam === 'red' && B.wpPepo.blue) || (pepoTeam === 'blue' && B.wpPepo.red))) {
+        const t2 = pepoTeam === 'red' ? 'blue' : 'red';
+        B.wpPepo[t2] = false;
+        const d2 = t2 === 'red' ? redDice : blueDice;
+        showPepoPicker(t2, d2, () => { renderDice(redDice, blueDice); _afterPepo(); });
+      } else { _afterPepo(); }
+    });
+    return;
+  }
+  _afterPepo();
+  function _afterPepo() {
+
   // Only offer moonstones that existed BEFORE this round (not gained during roll)
   const redMsAvail = B.msAvailable ? B.msAvailable.red : 0;
   const blueMsAvail = B.msAvailable ? B.msAvailable.blue : 0;
@@ -11494,7 +11673,8 @@ function doPostRollAndResolve(redDice, blueDice) {
   }
 
     checkLuckyStones();
-  };
+  } // end _afterPepo
+  }; // end postRollDone
 
   // Drain post-roll ability callouts, then check for KOs (Shade's Shadow can KO during queue),
   // then continue to moonstone/lucky stones
@@ -11632,8 +11812,8 @@ function showMoonstoneChoice(team, dice) {
       const oppTeam = team === 'red' ? 'blue' : 'red';
       const oppF = active(B[oppTeam]);
       if (oppF && !oppF.ko) {
-        oppF.hp = Math.max(0, oppF.hp - roll);
-        if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+        wpDamage(oppF, roll);
+        if (oppF.ko) { oppF.killedBy = -1; }
         log(`<span class="log-ms">Moonstone Blast!</span> Blue rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
         narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> <b class="blue-text">Blue</b> rolled <b class="gold">${roll}</b> — <b class="red-text">${oppF.name}</b> takes ${roll} damage!`);
         playDamageSfx(roll);
@@ -11742,8 +11922,8 @@ function showMoonstoneChoice(team, dice) {
         const oppTeam = team === 'red' ? 'blue' : 'red';
         const oppF = active(B[oppTeam]);
         if (oppF && !oppF.ko) {
-          oppF.hp = Math.max(0, oppF.hp - roll);
-          if (oppF.hp <= 0) { oppF.ko = true; oppF.killedBy = -1; }
+          wpDamage(oppF, roll);
+          if (oppF.ko) { oppF.killedBy = -1; }
           showAbilityCallout('MOONSTONE BLAST!', 'var(--moonstone)', `Rolled a ${roll} — ${oppF.name} takes ${roll} damage!`, team);
           log(`<span class="log-ms">Moonstone Blast!</span> Rolled <b>${roll}</b> — ${oppF.name} takes <span class="log-dmg">${roll} damage!</span>${oppF.ko ? ' <span class="log-ko">KO!</span>' : ' ' + oppF.hp + ' HP left'}`);
           narrate(`<b style="color:var(--moonstone)">Moonstone Blast!</b> Rolled <b class="gold">${roll}</b> — <b class="${oppTeam}-text">${oppF.name}</b> takes ${roll} damage!${oppF.ko ? ' <b>KO!</b>' : ''}`);
@@ -14349,7 +14529,7 @@ function _resolveRoundImpl() {
               if (!t.resources.firefly) t.resources.firefly = 0;
               t.resources.firefly += 1;
             });
-            goobActiveGhost.hp += 5;
+            wpHeal(goobActiveGhost, 5);
             log(`<span class="log-ability">${goobName}</span> — Dance Party! Both teams gain <span class="log-ms">+1 Magic Firefly!</span> <span class="log-heal">${goobActiveGhost.name} +5 HP!</span>`);
             renderBattle();
           }, tNameGoob);
@@ -14531,13 +14711,13 @@ function _resolveRoundImpl() {
         log(`<span class="log-ability">Cornelius</span> (sideline) — Antidote! Friend to All blocked for ${f.name}.`);
       } else if (hasSideline(aoEnemy, 59)) {
         const aoFlipped = Math.max(0, f.hp - 3);
-        queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Friend to All cursed! ${f.name} takes 3 damage! (${f.hp}→${aoFlipped} HP)`, () => { f.hp = Math.max(0, f.hp - 3); if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; } renderBattle(); }, tNameAO);
+        queueAbility('MASK MERCHANT!', 'var(--uncommon)', `Mr Filbert — Friend to All cursed! ${f.name} takes 3 damage! (${f.hp}→${aoFlipped} HP)`, () => { wpDamage(f, 3); if (f.ko) { f.killedBy = 59; } renderBattle(); }, tNameAO);
         checkKnightEffects(tNameAO, 'Mr Filbert');
         log(`<span class="log-ability">${f.name}</span> — Friend to All! Mr Filbert curses → -3 HP (${aoFlipped} HP).`);
       } else {
         const aoNewHp = f.hp + 3;
         const aoOver = aoNewHp > f.maxHp;
-        queueAbility('FRIEND TO ALL!', 'var(--common)', `Ancient One — Tie! ${f.name} gains +3 HP! (${f.hp}→${aoNewHp} HP${aoOver ? ' · overclocked!' : ''})`, () => { f.hp += 3; renderBattle(); }, tNameAO);
+        queueAbility('FRIEND TO ALL!', 'var(--common)', `Ancient One — Tie! ${f.name} gains +3 HP! (${f.hp}→${aoNewHp} HP${aoOver ? ' · overclocked!' : ''})`, () => { wpHeal(f, 3); renderBattle(); }, tNameAO);
         checkKnightEffects(tNameAO, 'Ancient One');
         log(`<span class="log-ability">${f.name}</span> — Friend to All! Tie → +3 HP (${aoNewHp} HP${aoOver ? ' overclocked!' : ''}).`);
       }
@@ -14698,6 +14878,17 @@ function _resolveRoundImpl() {
   }
 
   let dmg = wR.damage;
+
+  // Willpower: Pow (+2 damage for each 2 rolled by winner)
+  if (B.wpPow && B.wpPow[winTeamName]) {
+    const twosCount = winDice.filter(d => d === 2).length;
+    if (twosCount > 0) {
+      const powDmg = twosCount * 2;
+      dmg += powDmg;
+      log(`<span class="log-ability">Pow!</span> ${twosCount}× 2s rolled → +${powDmg} damage!`);
+    }
+    B.wpPow[winTeamName] = false;
+  }
 
   // Antoinette (82) — Grace: +1 damage on doubles
   if (wF.id === 82 && !wF.ko && wR.type === 'doubles') {
@@ -15795,8 +15986,8 @@ function _resolveRoundImpl() {
   let mirrorMattReflectDmg = 0;
   if (lF.id === 410 && !lF.ko && dmg > 0 && wR.type === 'doubles') {
     mirrorMattReflectDmg = dmg;
-    wF.hp = Math.max(0, wF.hp - dmg);
-    if (wF.hp <= 0) { wF.ko = true; wF.killedBy = 410; }
+    wpDamage(wF, dmg);
+    if (wF.ko) { wF.killedBy = 410; }
     dmg = 0; // Mirror Matt takes nothing
     mirrorMattReflected = true;
     collectKC(loseTeamName, lF.name);
@@ -15888,9 +16079,27 @@ function _resolveRoundImpl() {
   // --- APPLY DAMAGE (game state updates immediately) ---
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
+  // Willpower: Bonanza (+2 damage on wins)
+  if (B.wpBonanza && B.wpBonanza[winTeamName] > 0) {
+    dmg += B.wpBonanza[winTeamName];
+    log(`<span class="log-ability">Bonanza!</span> +${B.wpBonanza[winTeamName]} damage`);
+    B.wpBonanza[winTeamName] = 0;
+  }
+  // Willpower: Spark (+1 flat damage)
+  if (B.wpSpark && B.wpSpark[winTeamName] > 0) {
+    dmg += B.wpSpark[winTeamName];
+    log(`<span class="log-ability">Spark!</span> +${B.wpSpark[winTeamName]} damage`);
+    B.wpSpark[winTeamName] = 0;
+  }
+  // Willpower: Shell (block 1 damage)
+  if (lF.shellActive && dmg > 0) {
+    dmg = Math.max(0, dmg - 1);
+    lF.shellActive = false;
+    log(`<span class="log-ability">Shell!</span> blocked 1 damage`);
+  }
   if (dmg > 0) {
-    lF.hp = Math.max(0, lF.hp - dmg);
-    if (lF.hp <= 0) { lF.ko = true; lF.killedBy = (wF.originalId || wF.id); }
+    wpDamage(lF, dmg);
+    if (lF.ko) { lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
 
   // Resolve deferred Heavy Air hits — only if Knight Terror survived this round's damage
@@ -15904,8 +16113,8 @@ function _resolveRoundImpl() {
       // Knight Terror survived — apply all deferred Heavy Air damage
       for (const hit of pendingHeavyAirHits) {
         if (!hit.target.ko) {
-          hit.target.hp = Math.max(0, hit.target.hp - 2);
-          if (hit.target.hp <= 0) { hit.target.ko = true; hit.target.killedBy = 401; }
+          wpDamage(hit.target, 2);
+          if (hit.target.ko) { hit.target.killedBy = 401; }
           log(`<span class="log-ability">Knight Terror</span> — Heavy Air! <span class="log-dmg">${hit.targetName} loses 2 HP!</span> ${hit.target.ko ? '<span class="log-ko">KO!</span>' : hit.target.hp + ' HP left'}`);
         }
       }
@@ -16346,12 +16555,12 @@ function _resolveRoundImpl() {
         if (filbertFlipped) {
           queueAbility('MASK MERCHANT!', 'var(--uncommon)',
             `Mr Filbert — Harvest Dance cursed! ${f.name} takes ${healAmt} damage! (${before}→${after} HP)`,
-            () => { f.hp = Math.max(0, f.hp - healAmt); if (f.hp <= 0) { f.hp = 0; f.ko = true; f.killedBy = 59; } renderBattle(); }, tn);
+            () => { wpDamage(f, healAmt); if (f.ko) { f.killedBy = 59; } renderBattle(); }, tn);
         } else {
           const hpDelta = `${before}→${after} HP${overclocked ? ' · overclocked!' : ''}`;
           queueAbility('HARVEST DANCE!', 'var(--rare)',
             `${f.name} — ${cnt} seed${cnt>1?'s':''} → +${cnt*2} HP! ${hpDelta}`,
-            () => { f.hp += healAmt; renderBattle(); }, tn);
+            () => { wpHeal(f, healAmt); renderBattle(); }, tn);
         }
       }
     }
@@ -16906,7 +17115,7 @@ function _resolveRoundImpl() {
     } else {
       const jeffNewHp = wF.hp + 3;
       const jeffOver = jeffNewHp > wF.maxHp;
-      queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${wF.name} wins! +3 HP from the sideline! (${wF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { wF.hp += 3; renderBattle(); }, winTeamName);
+      queueAbility('CHUCKLE!', 'var(--common)', `Jeffery — ${wF.name} wins! +3 HP from the sideline! (${wF.hp}→${jeffNewHp} HP${jeffOver ? ' · overclocked!' : ''})`, () => { wpHeal(wF, 3); renderBattle(); }, winTeamName);
       log(`<span class="log-ability">${wF.name}</span> — Chuckle! Jeffery sideline → +3 HP (${jeffNewHp} HP${jeffOver ? ' overclocked!' : ''}).`);
     }
   }
@@ -17093,9 +17302,8 @@ function _resolveRoundImpl() {
       queueAbility('HARVEST MOON!', 'var(--ghost-rare)', `${wF.name} — Win with ${fives} five${fives > 1 ? 's' : ''}! +${harveyDmg} damage + 1 Moonstone!`, () => {
         const lF = active(loseTeam);
         if (lF && !lF.ko) {
-          lF.hp = Math.max(0, lF.hp - harveyDmg);
+          wpDamage(lF, harveyDmg);
           log(`<span class="log-ability">${wF.name}</span> — Harvest Moon! ${fives} five${fives > 1 ? 's' : ''} → <span class="log-dmg">${harveyDmg} bonus damage</span> + <span class="log-ms">1 Moonstone</span>!`);
-          if (lF.hp <= 0) { lF.ko = true; }
         }
         winTeam.resources.moonstone = Math.min((winTeam.resources.moonstone || 0) + 1, 1);
         renderBattle();
@@ -17177,7 +17385,7 @@ function _resolveRoundImpl() {
       log(`<span class="log-ability">Bo</span> — Miracle! <span class="log-heal">${bt.name} revived at 1 HP!</span> <span class="log-ms">+1 Magic Firefly!</span>`);
       if (lucasActive) {
         // Lucas (433) — Kindling: revived ghost enters play at 4 HP, Bo to sideline, +1 die next roll
-        bt.hp += 3; // 1 + 3 = 4 HP total
+        wpHeal(bt, 3); // 1 + 3 = 4 HP total
         const revivedIdx = winTeam.ghosts.indexOf(bt);
         if (revivedIdx !== -1) winTeam.activeIdx = revivedIdx; // swap revived ghost to active
         if (!B.lucasKindlingBonus) B.lucasKindlingBonus = { red: 0, blue: 0 };
@@ -17599,8 +17807,8 @@ function _resolveRoundImpl() {
           if (_barnabyGF && _barnabyGF.id === 326 && !_barnabyGF.ko) {
             queueAbility('STUBBORN!', 'var(--uncommon)', `${_barnabyGF.name} — Stubborn! Gus's Gale Force is blocked!`, () => {
               log(`<span class="log-ability">Barnaby</span> — Stubborn! Gale Force blocked — ${_barnabyGF.name} takes ${galeForceDmg} damage directly.`);
-              _barnabyGF.hp = Math.max(0, _barnabyGF.hp - galeForceDmg);
-              if (_barnabyGF.hp <= 0) { _barnabyGF.ko = true; _barnabyGF.killedBy = 31; }
+              wpDamage(_barnabyGF, galeForceDmg);
+              if (_barnabyGF.ko) { _barnabyGF.killedBy = 31; }
               renderBattle();
               afterFangUndercover();
             }, loseTeamName);
@@ -17616,8 +17824,8 @@ function _resolveRoundImpl() {
             const autoTarget = gfAlive[0];
             loseTeam.activeIdx = loseTeam.ghosts.indexOf(autoTarget);
             if (galeForceDmg > 0) {
-              autoTarget.hp = Math.max(0, autoTarget.hp - galeForceDmg);
-              if (autoTarget.hp <= 0) { autoTarget.hp = 0; autoTarget.ko = true; autoTarget.killedBy = 31; }
+              wpDamage(autoTarget, galeForceDmg);
+              if (autoTarget.ko) { autoTarget.killedBy = 31; }
             }
             renderBattle();
             log(`<span class="log-ability">Gus</span> — Gale Force! ${autoTarget.name} was the only option — enters and takes <span class="log-dmg">${galeForceDmg} damage!</span>${autoTarget.ko ? ' <span class="log-ko">KO!</span>' : ' ' + autoTarget.hp + ' HP left'}`);
@@ -18544,7 +18752,7 @@ function renderCardSlot(ghost, isFighter) {
   return `
     <div class="card-name-banner rarity-${g.rarity}">${ghost.name}</div>
     <div class="card-rarity-badge rarity-${g.rarity}">${rarityLabel}</div>
-    <div class="card-hp-badge" style="color:${hpColor}">${ghost.hp}/${ghost.maxHp}</div>
+    <div class="card-hp-badge" style="color:${hpColor}">♥${ghost.hp}</div>
     ${artHtml}
     <div class="ability-banner">${g.ability}</div>
     <div class="card-info">
@@ -18554,17 +18762,193 @@ function renderCardSlot(ghost, isFighter) {
 }
 
 function updateHpBar(team, hp, maxHp) {
-  const pct = Math.max(0, hp / maxHp * 100);
-  const bar = document.getElementById(`${team}-hpBar`);
-  bar.style.width = Math.min(pct, 100) + '%';
-  const isOverclock = hp > maxHp;
-  bar.classList.toggle('hp-low', !isOverclock && pct <= 50 && pct > 25);
-  bar.classList.toggle('hp-critical', !isOverclock && pct <= 25);
-  bar.classList.toggle('hp-overclock', isOverclock);
-  const hpText = document.getElementById(`${team}-hpText`);
-  hpText.textContent = `${Math.max(0, hp)} / ${maxHp}`;
-  if (isOverclock) hpText.style.color = 'var(--moonstone)';
-  else hpText.style.color = '';
+  renderWillpower(team);
+}
+
+function renderWillpower(team) {
+  const el = document.getElementById(`${team}-willpower`);
+  if (!el || !B) return;
+  const t = B[team];
+  const f = active(t);
+  if (!f || !f.willpower) { el.innerHTML = ''; return; }
+
+  if (f.willpower.length === 0) {
+    el.innerHTML = `<div class="wp-depleted">DEPLETED</div>`;
+    return;
+  }
+
+  const topId = f.willpower[0];
+  const card = wpCardById(topId);
+  const locked = f.willpowerTopLocked || f.willpowerUsedThisTurn;
+  const canUse = isPreRollActive(team) && !locked && !f.ko;
+  const clickAttr = canUse ? `onclick="activateWillpower('${team}')"` : '';
+  const lockedClass = locked ? 'wp-locked' : '';
+
+  // Mini pips for remaining cards
+  const remaining = f.willpower.length - 1;
+  let pipHtml = '';
+  for (let i = 0; i < Math.min(remaining, 20); i++) {
+    const pipCard = wpCardById(f.willpower[i + 1]);
+    pipHtml += `<div class="wp-pip wp-pip-${pipCard ? pipCard.color : ''}"></div>`;
+  }
+
+  el.innerHTML = `
+    <div class="wp-top-card wp-${card.color} ${lockedClass}" ${clickAttr}
+         title="${card.name}: ${card.desc}${locked ? ' (used this turn)' : canUse ? ' (click to activate)' : ''}">
+      <span class="wp-card-emoji">${card.emoji}</span>
+      <div class="wp-card-name">${card.name}</div>
+      <div class="wp-card-desc">${card.desc}</div>
+    </div>
+    <div class="wp-stack-info">
+      <div class="wp-stack-count">${f.willpower.length}</div>
+      <div class="wp-stack-label">willpower</div>
+      ${pipHtml ? `<div class="wp-stack-pips">${pipHtml}</div>` : ''}
+    </div>
+  `;
+}
+
+// --- Willpower Activation ---
+function activateWillpower(team) {
+  if (!B || !isPreRollActive(team)) return;
+  const t = B[team];
+  const f = active(t);
+  if (f.ko || !f.willpower || f.willpower.length === 0) return;
+  if (f.willpowerUsedThisTurn) return;
+
+  const topId = f.willpower[0];
+  const card = wpCardById(topId);
+
+  // HP cost check for expensive cards
+  const cost = card.hpCost || 1;
+  if (f.willpower.length < cost) {
+    narrate(`Not enough willpower for ${card.name} (need ${cost})!`);
+    return;
+  }
+
+  // Remove top card (the 1 HP base cost)
+  f.willpower.shift();
+  f.willpowerDiscard.push(topId);
+  f.willpowerUsedThisTurn = true;
+  f.willpowerTopLocked = true;
+  f.hp = f.willpower.length;
+
+  // Apply the effect
+  applyWillpowerEffect(team, card);
+
+  log(`<span class="log-ability">${f.name}</span> activated <b>${card.name}</b> — ${card.desc}`);
+  narrate(`${f.name} used <b>${card.name}</b>!`);
+  renderBattle();
+}
+
+function applyWillpowerEffect(team, card) {
+  const t = B[team];
+  const f = active(t);
+  const oppTeam = team === 'red' ? 'blue' : 'red';
+
+  switch (card.effect) {
+    case 'bonanza':
+      if (!B.wpBonanza) B.wpBonanza = { red:0, blue:0 };
+      B.wpBonanza[team] = 2;
+      break;
+    case 'spark':
+      if (!B.wpSpark) B.wpSpark = { red:0, blue:0 };
+      B.wpSpark[team] = 1;
+      break;
+    case 'ignite': {
+      const oppF = active(B[oppTeam]);
+      if (oppF && !oppF.ko) {
+        if (!B.activeBurn) B.activeBurn = { red:0, blue:0 };
+        B.activeBurn[oppTeam] = (B.activeBurn[oppTeam] || 0) + 1;
+      }
+      break;
+    }
+    case 'pow':
+      if (!B.wpPow) B.wpPow = { red:false, blue:false };
+      B.wpPow[team] = true;
+      break;
+    case 'gainMoonstone':
+      t.resources.moonstone = Math.min(1, t.resources.moonstone + 1);
+      break;
+    case 'gainLucky':
+      t.resources.luckyStone = (t.resources.luckyStone || 0) + 1;
+      break;
+    case 'pepo':
+      if (!B.wpPepo) B.wpPepo = { red:false, blue:false };
+      B.wpPepo[team] = true;
+      break;
+    case 'gainFrostbite':
+      t.resources.frostbite = (t.resources.frostbite || 0) + 1;
+      break;
+    case 'gainShell':
+      f.shellActive = true;
+      break;
+    case 'gainScorch':
+      ['red','blue'].forEach(side => {
+        B[side].ghosts.forEach((g, idx) => {
+          if (idx !== B[side].activeIdx && !g.ko) {
+            if (!B.burn) B.burn = { red:{}, blue:{} };
+            if (!B.burn[side]) B.burn[side] = {};
+            B.burn[side][idx] = (B.burn[side][idx] || 0) + 1;
+          }
+        });
+      });
+      break;
+    case 'gainFirefly':
+      // Extra 3 HP cost (total 4: 1 base + 3 extra)
+      wpDamage(f, 3);
+      t.resources.firefly = Math.min(1, (t.resources.firefly || 0) + 1);
+      break;
+    case 'gainSacredFire':
+      // Extra 2 HP cost (total 3: 1 base + 2 extra)
+      wpDamage(f, 2);
+      t.resources.fire = (t.resources.fire || 0) + 1;
+      break;
+  }
+}
+
+// --- Pepo Flick Picker ---
+function showPepoPicker(team, dice, callback) {
+  // Auto-play: AI just bumps the lowest die up by 1
+  if (autoPlayRunning) {
+    const minIdx = dice.indexOf(Math.min(...dice));
+    if (dice[minIdx] < 6) dice[minIdx]++;
+    if (callback) callback();
+    return;
+  }
+
+  const picker = document.getElementById('pepoPicker');
+  const opts = document.getElementById('pepoOptions');
+  if (!picker || !opts) { if (callback) callback(); return; }
+
+  let html = `<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">Pick a die to change ±1</div>`;
+  dice.forEach((val, i) => {
+    const canUp = val < 6;
+    const canDown = val > 1;
+    html += `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin:4px;">`;
+    if (canUp) html += `<button class="ms-die-opt" onclick="pepoFlick(${i},1)" style="font-size:14px;padding:2px 8px;">▲</button>`;
+    else html += `<div style="height:24px;"></div>`;
+    html += `<div class="die" style="width:44px;height:44px;font-size:22px;display:flex;align-items:center;justify-content:center;">${val}</div>`;
+    if (canDown) html += `<button class="ms-die-opt" onclick="pepoFlick(${i},-1)" style="font-size:14px;padding:2px 8px;">▼</button>`;
+    else html += `<div style="height:24px;"></div>`;
+    html += `</div>`;
+  });
+  opts.innerHTML = html;
+  picker.style.display = '';
+  picker.classList.add('active');
+
+  window._pepoDice = dice;
+  window._pepoCallback = callback;
+}
+
+function pepoFlick(dieIndex, delta) {
+  const dice = window._pepoDice;
+  if (!dice) return;
+  dice[dieIndex] = Math.max(1, Math.min(6, dice[dieIndex] + delta));
+  const picker = document.getElementById('pepoPicker');
+  if (picker) { picker.style.display = 'none'; picker.classList.remove('active'); }
+  log(`<span class="log-ability">Pepo!</span> Flicked die ${dieIndex + 1} to <b>${dice[dieIndex]}</b>`);
+  narrate(`Pepo flicked a die to <b>${dice[dieIndex]}</b>!`);
+  if (window._pepoCallback) { window._pepoCallback(); window._pepoCallback = null; }
 }
 
 // Visual hit — shake the card + drain the HP bar for a team
@@ -18621,6 +19005,10 @@ function renderBattle() {
         if (B.frostbite && B.frostbite[team] && B.frostbite[team][realIdx]) {
           const fc = B.frostbite[team][realIdx];
           slCardHtml += `<div class="frostbite-badge">❄️${fc}</div>`;
+        }
+        // Willpower count badge on sideline
+        if (sl[i].willpower) {
+          slCardHtml += `<div class="wp-sl-badge" title="${sl[i].willpower.length} willpower cards">♥${sl[i].willpower.length}</div>`;
         }
         el.innerHTML = slCardHtml;
         el.onclick = isPick ? () => doKoSwap(team, realIdx) : null;
