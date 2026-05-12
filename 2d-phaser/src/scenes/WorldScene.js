@@ -68,6 +68,12 @@ class WorldScene extends Phaser.Scene {
     this.time.addEvent({ delay: 4000, callback: this.spawnEnemy, callbackScope: this, loop: true });
     this.physics.add.overlap(this.player, this.enemies, this.onEnemyContact, null, this);
 
+    // ── Spirit Wisps (glowing collectible orbs) ──
+    this.wisps = this.physics.add.group();
+    for (let i = 0; i < 5; i++) this.spawnWisp();
+    this.time.addEvent({ delay: 6000, callback: this.spawnWisp, callbackScope: this, loop: true });
+    this.physics.add.overlap(this.player, this.wisps, this.onWispCollect, null, this);
+
     // ── Controls ──
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys('W,A,S,D');
@@ -303,6 +309,65 @@ class WorldScene extends Phaser.Scene {
         this.scene.pause();
       });
     });
+  }
+
+  // ═══════ SPIRIT WISPS ═══════
+
+  spawnWisp() {
+    if (!this.wisps || this.wisps.getLength() >= 8) return;
+    const px = this.player ? this.player.x : 500;
+    const py = this.player ? this.player.y : 500;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Phaser.Math.Between(100, 300);
+    const wx = px + Math.cos(angle) * dist;
+    const wy = py + Math.sin(angle) * dist;
+
+    const WISP_TYPES = [
+      { name: 'Frost Shard', color: 0x88ccff },
+      { name: 'Ember Dust', color: 0xff8844 },
+      { name: 'Spirit Thread', color: 0xaa66ff },
+      { name: 'Mask Fragment', color: 0xffffff },
+    ];
+    const type = WISP_TYPES[Math.floor(Math.random() * WISP_TYPES.length)];
+
+    const wisp = this.wisps.create(wx, wy, null);
+    wisp.setDisplaySize(12, 12).setVisible(false);
+    wisp.wispType = type;
+
+    // Glowing circle visual
+    const glow = this.add.circle(wx, wy, 6, type.color, 0.8).setDepth(8);
+    const outerGlow = this.add.circle(wx, wy, 10, type.color, 0.2).setDepth(7);
+    wisp.glowCircle = glow;
+    wisp.outerGlow = outerGlow;
+
+    // Pulse animation
+    this.tweens.add({ targets: outerGlow, scaleX: 1.5, scaleY: 1.5, alpha: 0.05, duration: 1200, yoyo: true, repeat: -1 });
+    // Float animation
+    this.tweens.add({ targets: [glow, outerGlow, wisp], y: wy + Phaser.Math.Between(-15, 15), duration: 2000, yoyo: true, repeat: -1 });
+
+    // Auto-despawn after 12 seconds
+    this.time.delayedCall(12000, () => {
+      if (wisp.active) {
+        glow.destroy();
+        outerGlow.destroy();
+        wisp.destroy();
+      }
+    });
+  }
+
+  onWispCollect(player, wisp) {
+    const type = wisp.wispType;
+    if (wisp.glowCircle) wisp.glowCircle.destroy();
+    if (wisp.outerGlow) wisp.outerGlow.destroy();
+    wisp.destroy();
+
+    // Grant resource
+    const resourceMap = { 'Frost Shard': 'iceShards', 'Ember Dust': 'sacredFire', 'Spirit Thread': 'surge', 'Mask Fragment': 'moonstone' };
+    const key = resourceMap[type.name];
+    if (key && G[key] !== undefined) G[key]++;
+
+    this.showNotification(`Collected ${type.name}!`);
+    saveGame();
   }
 
   // ═══════ DAY/NIGHT CYCLE ═══════
