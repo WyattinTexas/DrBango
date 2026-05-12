@@ -189,12 +189,20 @@ class WorldScene extends Phaser.Scene {
 
     // Notify callback for globals
     _notifyCallback = (text) => this.showNotification(text);
+    console.log('[WorldScene] create: HUD + UI done');
 
     // Panel manager for inventory/team overlays
     this.panels = new PanelManager(this);
+    console.log('[WorldScene] create: PanelManager done');
 
     // Star Fox comm overlay
-    this.comm = new CommOverlay(this);
+    try {
+      this.comm = new CommOverlay(this);
+      console.log('[WorldScene] create: CommOverlay done');
+    } catch(e) {
+      console.error('[WorldScene] CommOverlay FAILED:', e);
+      this.comm = null;
+    }
 
     // ── Music ──
     try {
@@ -203,6 +211,7 @@ class WorldScene extends Phaser.Scene {
         this.sound.play('music_hub', { loop: true, volume: 0.3 });
       }
     } catch(e) { console.log('[Audio] Music skipped:', e.message); }
+    console.log('[WorldScene] create: COMPLETE');
   }
 
   update() {
