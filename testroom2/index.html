@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v4'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v5'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2835,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v4'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v5'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3037,6 +3037,7 @@ function wpDrawFromTeam(team, ghost) {
   const g = ghostData(ghost.id);
   const need = g.maxHp;
   ghost.willpower = [];
+  ghost.wpPending = false;
   ghost.willpowerUsedThisTurn = false;
   ghost.willpowerTopLocked = false;
   ghost.shellActive = false;
@@ -4738,9 +4739,9 @@ function makeTeam(ids) {
   const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      return { id, name:g.name, hp:0, maxHp:0, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
+      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false,
-        willpower: [], willpowerUsedThisTurn:false, willpowerTopLocked:false, shellActive:false };
+        willpower: [], wpPending:true, willpowerUsedThisTurn:false, willpowerTopLocked:false, shellActive:false };
     }),
     activeIdx: 0,
     wpDeck: teamDeck,    // shared willpower draw pile
@@ -19058,7 +19059,8 @@ function renderBattle() {
         }
         // Willpower count badge on sideline
         if (sl[i].willpower) {
-          slCardHtml += `<div class="wp-sl-badge" title="${sl[i].willpower.length} willpower cards">♥${sl[i].willpower.length}</div>`;
+          const wpCount = sl[i].wpPending ? sl[i].maxHp : sl[i].willpower.length;
+          slCardHtml += `<div class="wp-sl-badge" title="${wpCount} willpower cards">♥${wpCount}</div>`;
         }
         el.innerHTML = slCardHtml;
         el.onclick = isPick ? () => doKoSwap(team, realIdx) : null;
