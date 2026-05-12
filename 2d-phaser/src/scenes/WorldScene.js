@@ -53,24 +53,44 @@ class WorldScene extends Phaser.Scene {
       saveGame();
     }
 
+    // Snap to tile center to avoid sub-pixel spawn issues
+    const spawnPX = Math.floor(G.x) * T + T / 2;
+    const spawnPY = Math.floor(G.y) * T + T / 2;
+    console.log('[WorldScene] Spawning player at tile', Math.floor(G.x), Math.floor(G.y), '-> px', spawnPX, spawnPY);
+
     // Wave 6: Use selected character sprite (G.spriteKey), fall back to 'player'
     const playerTexture = (G.spriteKey && G.spriteKey !== 'player' && this.textures.exists(G.spriteKey)) ? G.spriteKey : 'player';
     this._playerTexture = playerTexture;
-    this.player = this.physics.add.sprite(G.x * T, G.y * T, playerTexture, 0);
+    this.player = this.physics.add.sprite(spawnPX, spawnPY, playerTexture, 0);
     this.player.setScale(2);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
 
+    // Fallback colored square behind the sprite — guarantees visibility even if texture fails
+    this._playerFallbackRect = this.add.rectangle(spawnPX, spawnPY, 24, 24, 0x44ff44, 0.6).setDepth(8);
+
     // Bright player indicator — large pulsing glow so you can always find yourself
-    this._playerMarker = this.add.circle(0, 0, 20, 0x44aaff, 0.5).setDepth(9);
-    this._playerMarkerRing = this.add.circle(0, 0, 26, 0x44aaff, 0).setDepth(9).setStrokeStyle(2, 0x44aaff, 0.7);
-    this.tweens.add({ targets: this._playerMarkerRing, scaleX: 1.4, scaleY: 1.4, alpha: 0, duration: 1000, yoyo: false, repeat: -1 });
+    this._playerMarker = this.add.circle(spawnPX, spawnPY, 28, 0x44aaff, 0.55).setDepth(9);
+    this._playerMarkerRing = this.add.circle(spawnPX, spawnPY, 34, 0x44aaff, 0).setDepth(9).setStrokeStyle(3, 0x44aaff, 0.8);
+    this.tweens.add({ targets: this._playerMarkerRing, scaleX: 1.5, scaleY: 1.5, alpha: 0, duration: 1000, yoyo: false, repeat: -1 });
     // No physics collider — tile collision handled manually in update()
 
     // ── Camera ──
-    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-    this.cameras.main.setZoom(1.5); // 1.5 instead of 1.8 — HUD stays readable
+    // CRITICAL: Snap camera to player position FIRST, then start smooth follow.
+    // Without this, the camera starts at (0,0) and the slow lerp takes many
+    // frames to reach the player — making the character invisible on load.
     this.cameras.main.setBounds(0, 0, MW * T, MH * T);
+    this.cameras.main.setZoom(1.5);
+    // Snap camera directly to player (centerOn or manual setScroll)
+    if (this.cameras.main.centerOn) {
+      this.cameras.main.centerOn(spawnPX, spawnPY);
+    } else {
+      this.cameras.main.setScroll(
+        spawnPX - this.scale.width / 2,
+        spawnPY - this.scale.height / 2
+      );
+    }
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
     // ── UI Camera (unzoomed, for HUD elements) ──
     this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
@@ -452,9 +472,10 @@ class WorldScene extends Phaser.Scene {
       }
     }
 
-    // Track player marker
+    // Track player marker + fallback rect
     if (this._playerMarker) this._playerMarker.setPosition(this.player.x, this.player.y);
     if (this._playerMarkerRing) this._playerMarkerRing.setPosition(this.player.x, this.player.y);
+    if (this._playerFallbackRect) this._playerFallbackRect.setPosition(this.player.x, this.player.y);
 
     // Animate walk or show idle frame
     // Wave 6: Use correct animation prefix for selected character sprite
