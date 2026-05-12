@@ -44,8 +44,13 @@ class WorldScene extends Phaser.Scene {
 
     // ── Camera ──
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-    this.cameras.main.setZoom(1.8);
+    this.cameras.main.setZoom(1.5); // 1.5 instead of 1.8 — HUD stays readable
     this.cameras.main.setBounds(0, 0, MW * T, MH * T);
+
+    // ── UI Camera (unzoomed, for HUD elements) ──
+    this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
+    this.uiCam.setScroll(0, 0);
+    // Main camera ignores UI elements (we'll tag them)
 
     // ── NPCs (positions from npcs.js NPCS + HOSTILE_NPCS data) ──
     this.npcSprites = [];
@@ -115,6 +120,24 @@ class WorldScene extends Phaser.Scene {
         fontSize: '10px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: rl.color,
         backgroundColor: '#00000066', padding: { x: 4, y: 2 },
       }).setDepth(5);
+    }
+
+    // ── Building labels in Polaris ──
+    const buildings = [
+      { name: 'Trading Post', x: HUB.x + 1, y: HUB.y + 1 },
+      { name: 'Arena', x: HUB.x + 5, y: HUB.y + 1 },
+      { name: 'Workshop', x: HUB.x + 1, y: HUB.y + 3 },
+      { name: 'Inn', x: HUB.x + 5, y: HUB.y + 3 },
+      { name: 'Cantina', x: HUB.x + 3, y: HUB.y + 5 },
+    ];
+    for (const b of buildings) {
+      // Building marker (slightly brighter square on top of tile)
+      this.add.rectangle(b.x * T + T/2, b.y * T + T/2, T - 2, T - 2, 0x8a7a5a)
+        .setStrokeStyle(1, 0xaaa888).setDepth(3);
+      this.add.text(b.x * T + T/2, b.y * T - 6, b.name, {
+        fontSize: '7px', fontFamily: 'monospace', color: '#eecc88',
+        backgroundColor: '#00000066', padding: { x: 2, y: 1 },
+      }).setOrigin(0.5).setDepth(6);
     }
 
     // ── Encounter zone labels ──
@@ -248,13 +271,22 @@ class WorldScene extends Phaser.Scene {
   }
 
   checkNPCProximity() {
+    const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
+
     for (const npc of this.npcSprites) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
 
-      if (dist < 60) {
+      if (dist < 80) {
         npc.label.setColor(npc.hostile ? '#ffaa44' : '#ffdd44');
+        // Show interaction hint
+        if (!npc._hint) {
+          npc._hint = this.add.text(npc.x, npc.y + 24, '[E]', {
+            fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff',
+            backgroundColor: '#000000aa', padding: { x: 3, y: 1 },
+          }).setOrigin(0.5).setDepth(12);
+        }
 
-        if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+        if (ePressed) {
           if (this.comm && this.comm.isActive) {
             this.comm.dismiss();
           } else if (npc.hostile) {
@@ -265,6 +297,7 @@ class WorldScene extends Phaser.Scene {
         }
       } else {
         npc.label.setColor(npc.hostile ? '#ff8888' : '#88ff88');
+        if (npc._hint) { npc._hint.destroy(); npc._hint = null; }
       }
     }
   }
