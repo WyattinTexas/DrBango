@@ -120,9 +120,12 @@ const Music = {
 };
 
 // ── Battle overlay stubs (Phaser BattleScene handles rendering) ──
-function showBattleOverlay() {}
+// These MUST be no-ops — the 2D battle.js + npcs.js call them but
+// in Phaser we use BattleScene instead. If these do anything, they
+// crash because the DOM elements don't exist.
+function showBattleOverlay() { console.log('[Stub] showBattleOverlay — Phaser handles this'); }
 function hideBattleOverlay() {}
-function renderBattle() {}
+function renderBattle() { console.log('[Stub] renderBattle — Phaser handles this'); }
 function showWildAppearedSplash(name) { console.log(`[Splash] Wild ${name} appeared!`); }
 var battleFledThisSession = false;
 var uid = 'local_' + Math.random().toString(36).substr(2, 9);

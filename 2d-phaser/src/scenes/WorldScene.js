@@ -125,9 +125,31 @@ class WorldScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(5);
     }
 
+    // ── Menu buttons bar (top-center) ──
+    const menuY = 8;
+    const btnW = 80, btnH = 28, btnGap = 6;
+    const buttons = [
+      { label: 'TEAM (T)', key: 'T', action: () => this.showTeamLineup(), color: 0x445588 },
+      { label: 'CRAFT (C)', key: 'C', action: () => { this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
+      { label: 'MAP (M)', key: null, action: () => this.showNotification('Minimap is bottom-right!'), color: 0x448844 },
+    ];
+    const startX = this.scale.width / 2 - (buttons.length * (btnW + btnGap)) / 2;
+    buttons.forEach((btn, i) => {
+      const x = startX + i * (btnW + btnGap) + btnW / 2;
+      const bg = this.add.rectangle(x, menuY + btnH/2, btnW, btnH, btn.color, 0.85)
+        .setScrollFactor(0).setDepth(200).setInteractive({ useHandCursor: true })
+        .setStrokeStyle(1, 0x666666);
+      this.add.text(x, menuY + btnH/2, btn.label, {
+        fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff',
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+      bg.on('pointerdown', btn.action);
+      bg.on('pointerover', () => bg.setAlpha(1));
+      bg.on('pointerout', () => bg.setAlpha(0.85));
+    });
+
     // ── Controls hint ──
-    this.add.text(10, this.scale.height - 20, 'WASD: Move | E: Interact | C: Craft | T: Team', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#888888',
+    this.add.text(10, this.scale.height - 20, 'WASD: Move | E: Interact', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#666666',
     }).setScrollFactor(0).setDepth(200);
 
     // ── Region text ──
@@ -339,11 +361,31 @@ class WorldScene extends Phaser.Scene {
     }
 
     // Show challenge dialogue then battle
-    this.showDialogue(npc.name, trainerData.challenge);
-    this.time.delayedCall(2000, () => {
-      if (typeof triggerHostileNPCBattle === 'function') {
-        triggerHostileNPCBattle(trainerData);
-      }
+    if (this.comm) this.comm.show(npc.name, trainerData.challenge, { color: '#ff6644' });
+    this.time.delayedCall(2500, () => {
+      // Set up battle state directly (DON'T call triggerHostileNPCBattle — it uses DOM)
+      G.inBattle = true;
+      const playerGhosts = buildPlayerBattleTeam();
+      const trainerTeamSize = { frost_valley: 1, rolling_hills: 2, volcanic_isles: 2, dark_castle: 3 }[getCurrentZone(G.x, G.y)] || 3;
+      const trainerCardIds = trainerData.team.slice(0, trainerTeamSize);
+      const enemyGhosts = trainerCardIds.map(id => {
+        const card = getCard(id);
+        if (!card) return null;
+        return { id: card.id, name: card.name, hp: card.maxHp, maxHp: card.maxHp, ko: false,
+          ability: card.ability, abilityDesc: card.desc, rarity: card.rarity,
+          usedOncePerGame: false, entryFired: false };
+      }).filter(Boolean);
+
+      if (enemyGhosts.length === 0) { G.inBattle = false; return; }
+
+      B = {
+        round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
+        enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
+        enemyCard: getCard(trainerData.team[0]), phase: 'ready', log: [],
+        playerDice: [], enemyDice: [], isHostileNPC: trainerData.id,
+        nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+      };
+
       this.cameras.main.fadeOut(300);
       this.time.delayedCall(300, () => {
         this.scene.launch('BattleScene', { enemyCard: getCard(trainerData.team[0]), trainerName: npc.name });
