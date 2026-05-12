@@ -456,6 +456,8 @@ function ensurePlayerDefaults() {
   // Wave 7: talent trees
   if (!G.talents) G.talents = {};
   if (G.darkRiderUnlocked === undefined) G.darkRiderUnlocked = false;
+  if (G.elderUnlocked === undefined) G.elderUnlocked = false;
+  if (G.activeAmendment === undefined) G.activeAmendment = null; // Elder Council amendment id
 }
 
 // ── Profession mastery levels (based on profession XP thresholds) ──
