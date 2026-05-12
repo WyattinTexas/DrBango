@@ -129,6 +129,8 @@ const SFX = {
   gatherComplete: () => {},
   diceRoll: () => {},
   commBlip: () => {},
+  victory: () => {},
+  defeat: () => {},
 };
 
 // ── Music stubs ──

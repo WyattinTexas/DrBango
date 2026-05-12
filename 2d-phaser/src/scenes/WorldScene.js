@@ -505,12 +505,19 @@ class WorldScene extends Phaser.Scene {
       ko: false, ability: cardData.ability, abilityDesc: cardData.desc, rarity: cardData.rarity,
       usedOncePerGame: false, entryFired: false }];
 
+    const _resources = { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 };
     B = {
-      round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
-      enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
+      round: 1,
+      player: { ghosts: playerGhosts, activeIdx: 0, resources: { ..._resources } },
+      enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 } },
       enemyCard: cardData, zoneIdx: getCurrentZone(G.x, G.y), phase: 'ready', log: [], playerDice: [], enemyDice: [],
       nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+      resources: { ..._resources },
+      entryFired: false, enemyUsedResource: false, damageTakenThisRound: 0,
+      koSwapTeam: null, committed: {},
     };
+
+    if (typeof applyAccessoryBattleEffects === 'function') applyAccessoryBattleEffects();
 
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.time.delayedCall(300, () => {
@@ -546,13 +553,20 @@ class WorldScene extends Phaser.Scene {
 
       if (enemyGhosts.length === 0) { G.inBattle = false; return; }
 
+      const _tRes = { iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0, healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0, surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0 };
       B = {
-        round: 1, player: { ghosts: playerGhosts, activeIdx: 0, resources: {} },
-        enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: {} },
+        round: 1,
+        player: { ghosts: playerGhosts, activeIdx: 0, resources: { ..._tRes } },
+        enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 } },
         enemyCard: getCard(trainerData.team[0]), phase: 'ready', log: [],
         playerDice: [], enemyDice: [], isHostileNPC: trainerData.id,
         nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+        resources: { ..._tRes },
+        entryFired: false, enemyUsedResource: false, damageTakenThisRound: 0,
+        koSwapTeam: null, committed: {},
       };
+
+      if (typeof applyAccessoryBattleEffects === 'function') applyAccessoryBattleEffects();
 
       this.cameras.main.fadeOut(300);
       this.time.delayedCall(300, () => {
@@ -821,10 +835,18 @@ class WorldScene extends Phaser.Scene {
     if (wisp.outerGlow) wisp.outerGlow.destroy();
     wisp.destroy();
 
-    // Grant resource
+    // Grant battle resource
     const resourceMap = { 'Frost Shard': 'iceShards', 'Ember Dust': 'sacredFire', 'Spirit Thread': 'surge', 'Mask Fragment': 'moonstone', 'Healing Seed': 'healingSeeds' };
     const key = resourceMap[type.name];
     if (key && G[key] !== undefined) G[key]++;
+
+    // Also store as crafting material (used by SCHEMATICS with requiresMaterial)
+    const materialMap = { 'Frost Shard': 'frost_shard', 'Ember Dust': 'ember_dust', 'Spirit Thread': 'spirit_thread', 'Mask Fragment': 'mask_fragment' };
+    const matKey = materialMap[type.name];
+    if (matKey) {
+      if (!G.materials) G.materials = {};
+      G.materials[matKey] = (G.materials[matKey] || 0) + 1;
+    }
 
     this.showNotification(`Collected ${type.name}!`);
     saveGame();

@@ -169,8 +169,8 @@ class CraftScene extends Phaser.Scene {
     const cx = this._px + this._pw / 2;
     let y = this._py + 75;
 
-    // Mastery
-    const masteryLvl = (typeof getMasteryLevel === 'function') ? getMasteryLevel(G.mastery?.crafting || 0) : 1;
+    // Mastery — look up XP for this schematic's type (weapon/armor/accessory)
+    const masteryLvl = (typeof getMasteryLevel === 'function') ? getMasteryLevel(G.mastery?.[s.type]?.xp || 0) : 1;
 
     // Assembly roll
     const roll = Math.floor(Math.random() * 100) + 1 + (masteryLvl * 5);
@@ -236,13 +236,14 @@ class CraftScene extends Phaser.Scene {
         bonusDamage: bonusDmg, bonus: bonusDmg,
         damageReduction: dmgRed, defense: dmgRed,
         craftedBy: G.name, craftedAt: Date.now(),
-        stats: { potency: Math.floor(aP), stability: Math.floor(aS), resonance: Math.floor(aR) },
+        stats: { potency: Math.floor(aP), stability: Math.floor(aS), resonance: Math.floor(aR), purity: Math.floor(aPu) },
       };
 
       if (!G.gear) G.gear = [];
       G.gear.push(item);
       if (!G.mastery) G.mastery = {};
-      G.mastery.crafting = (G.mastery.crafting || 0) + 1;
+      if (!G.mastery[s.type]) G.mastery[s.type] = { xp: 0 };
+      G.mastery[s.type].xp += 1;
       saveGame();
 
       // Result display

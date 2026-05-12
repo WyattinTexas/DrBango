@@ -153,14 +153,15 @@ class BattleScene extends Phaser.Scene {
       { key: 'moonstone', label: 'MOON', color: 0xaa66ff, tip: 'die=6' },
     ];
 
-    // Only show resources the player has
-    const available = defs.filter(d => (G[d.key] || 0) > 0);
+    // Read from B.resources (the battle state), not G
+    const res = B && B.resources ? B.resources : {};
+    const available = defs.filter(d => (res[d.key] || 0) > 0);
     if (available.length === 0) return;
 
     const startX = W / 2 - (available.length * 58) / 2;
     available.forEach((r, i) => {
       const x = startX + i * 58 + 29;
-      const count = G[r.key] || 0;
+      const count = res[r.key] || 0;
 
       const bg = this.add.rectangle(x, resY, 50, 28, r.color, 0.25)
         .setStrokeStyle(1, r.color).setInteractive({ useHandCursor: true });
@@ -170,19 +171,23 @@ class BattleScene extends Phaser.Scene {
 
       const state = { committed: false };
       bg.on('pointerdown', () => {
-        if (this._rolling) return;
-        if (!state.committed && (G[r.key] || 0) > 0) {
+        if (this._rolling || !B || !B.resources) return;
+        if (!state.committed && (B.resources[r.key] || 0) > 0) {
           state.committed = true;
+          // Write to B.committed so battle engine can see it
+          if (!B.committed) B.committed = {};
+          B.committed[r.key] = (B.committed[r.key] || 0) + 1;
           this._committed[r.key] = (this._committed[r.key] || 0) + 1;
-          G[r.key]--;
+          B.resources[r.key]--;
           bg.setFillStyle(r.color, 0.8).setStrokeStyle(2, 0xffffff);
           txt.setText(`${r.label}:\u2713`);
         } else if (state.committed) {
           state.committed = false;
+          if (B.committed) B.committed[r.key] = Math.max(0, (B.committed[r.key] || 0) - 1);
           this._committed[r.key] = Math.max(0, (this._committed[r.key] || 0) - 1);
-          G[r.key]++;
+          B.resources[r.key] = (B.resources[r.key] || 0) + 1;
           bg.setFillStyle(r.color, 0.25).setStrokeStyle(1, r.color);
-          txt.setText(`${r.label}:${G[r.key]}`);
+          txt.setText(`${r.label}:${B.resources[r.key]}`);
         }
       });
 
@@ -206,21 +211,25 @@ class BattleScene extends Phaser.Scene {
     this.roundNum++;
     this.fightBg.setFillStyle(0x111111);
 
-    // Pre-roll: healing seeds
-    if (this._committed.healingSeeds > 0) {
-      const heal = this._committed.healingSeeds * 2;
+    // Read committed from B (synced by resource bar clicks)
+    const committed = B && B.committed ? B.committed : this._committed;
+
+    // Pre-roll: healing seeds (heal BEFORE dice roll, not end-of-round)
+    if ((committed.healingSeeds || 0) > 0) {
+      const heal = committed.healingSeeds * 2;
       this.pg.hp = Math.min(this.pg.maxHp, this.pg.hp + heal);
       this.showFloatingText(this.scale.width * 0.25, this.scale.height * 0.35, `+${heal}`, '#44dd44');
       this.updateHP();
     }
 
-    // Roll dice (surge grants extra dice, take best 3)
-    const extraDice = this._committed.surge || 0;
-    const pDice = weightedRoll(this.pg, 3 + extraDice).sort((a, b) => a - b).slice(-(3));
+    // Roll dice (surge grants extra dice)
+    const extraDice = committed.surge || 0;
+    const pDiceCount = Math.max(1, 3 + extraDice);
+    const pDice = weightedRoll(this.pg, pDiceCount).sort((a, b) => a - b);
     const eDice = weightedRoll(this.eg, 3).sort((a, b) => a - b);
 
     // Moonstone: highest player die becomes 6
-    if (this._committed.moonstone > 0 && pDice.length > 0) {
+    if ((committed.moonstone || 0) > 0 && pDice.length > 0) {
       pDice[pDice.length - 1] = 6;
     }
 
@@ -259,13 +268,16 @@ class BattleScene extends Phaser.Scene {
 
     let log = `R${this.roundNum}: ${pRes.type} vs ${eRes.type}`;
 
+    // Read committed from B (synced by resource bar)
+    const committed = B && B.committed ? B.committed : this._committed;
+
     if (winner === 'a') {
       let dmg = pRes.damage;
       // Equipment + resource damage bonus
       const wpn = G.equipped?.weapon;
       if (wpn) dmg += (wpn.bonusDamage || wpn.bonus || 0);
-      dmg += (this._committed.iceShards || 0);
-      dmg += (this._committed.sacredFire || 0);
+      dmg += (committed.iceShards || 0);
+      dmg += (committed.sacredFire || 0) * 3;  // Sacred Fire = +3 dmg each
 
       this.eg.hp = Math.max(0, this.eg.hp - dmg);
       log += ` \u2014 ${dmg} dmg to ${this.eg.name}!`;
@@ -290,13 +302,26 @@ class BattleScene extends Phaser.Scene {
 
     // Reset resources for next round
     this._committed = {};
+    if (B) B.committed = {};
     this._rolling = false;
     this.fightBg.setFillStyle(0x222222);
     this.rebuildResourceBar();
 
-    // Check KO
+    // Check KO — handle both player and enemy KO swap
     if (this.eg.hp <= 0) {
-      this.time.delayedCall(600, () => this.endBattle(true));
+      this.eg.ko = true;
+      // Check if enemy has living reserves (multi-ghost battles)
+      const eLiving = B?.enemy?.ghosts?.filter((g, i) => i !== B.enemy.activeIdx && !g.ko && g.hp > 0) || [];
+      if (eLiving.length > 0) {
+        // Auto-swap enemy to next alive ghost
+        const nextIdx = B.enemy.ghosts.indexOf(eLiving[0]);
+        B.enemy.activeIdx = nextIdx;
+        this.eg = B.enemy.ghosts[nextIdx];
+        this.logText.setText(`${this.eg.name} enters the battle!`);
+        this.updateHP();
+      } else {
+        this.time.delayedCall(600, () => this.endBattle(true));
+      }
     } else if (this.pg.hp <= 0) {
       this.time.delayedCall(600, () => this.checkKOSwap());
     }
@@ -409,10 +434,22 @@ class BattleScene extends Phaser.Scene {
     let xpGain = 0;
     let coinChange = 0;
 
+    // Sync resources back from B.resources to G before clearing B
+    if (B && B.resources) {
+      G.iceShards = B.resources.iceShards ?? G.iceShards;
+      G.sacredFire = B.resources.sacredFire ?? G.sacredFire;
+      G.healingSeeds = B.resources.healingSeeds ?? G.healingSeeds;
+      G.luckyStones = B.resources.luckyStones ?? G.luckyStones;
+      G.surge = B.resources.surge ?? G.surge;
+      G.moonstone = B.resources.moonstone ?? G.moonstone;
+      G.firefly = B.resources.firefly ?? G.firefly;
+    }
+
     if (won) {
-      if (!G.rep) G.rep = { battlesWon: 0 };
+      if (!G.rep) G.rep = { battlesWon: 0, craftsCompleted: 0, itemsSold: 0, essencesCollected: 0, raresFound: 0 };
       G.rep.battlesWon++;
-      coinChange = 10;
+      // Coin reward — variable like the 2D engine
+      coinChange = 1 + Math.floor(Math.random() * 3);
       G.coins += coinChange;
 
       const rarityXP = { common: 1, uncommon: 2, rare: 3, 'ghost-rare': 4, legendary: 5 };
@@ -443,8 +480,8 @@ class BattleScene extends Phaser.Scene {
 
       if (B?.isHostileNPC) markHostileNPCDefeated(B.isHostileNPC);
     } else {
-      // Flee penalty
-      const penalty = Math.min(G.coins, 5);
+      // Flee penalty — match 2D engine: 2-4 coins
+      const penalty = Math.min(G.coins, 2 + Math.floor(Math.random() * 3));
       if (penalty > 0) {
         G.coins -= penalty;
         coinChange = -penalty;
@@ -528,7 +565,8 @@ class BattleScene extends Phaser.Scene {
       G.team.push({
         id: enemyCard.id, name: enemyCard.name,
         hp: enemyCard.maxHp, maxHp: enemyCard.maxHp, ko: false,
-        ability: enemyCard.ability, rarity: enemyCard.rarity,
+        ability: enemyCard.ability, abilityDesc: enemyCard.desc || '',
+        rarity: enemyCard.rarity,
       });
       saveGame();
       cleanup();
