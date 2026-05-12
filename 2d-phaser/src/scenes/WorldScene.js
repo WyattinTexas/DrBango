@@ -228,7 +228,7 @@ class WorldScene extends Phaser.Scene {
     this.updateDayNight();
 
     // Region detection
-    const region = getCurrentZone(G.x, G.y);
+    const region = getCurrentRegion(G.x, G.y);
     const regionNames = { frost_valley: 'Frost Valley', rolling_hills: 'Rolling Hills', volcanic_isles: 'Volcanic Isles', dark_castle: 'Dark Castle' };
     this.regionText.setText(regionNames[region] || '');
 
@@ -399,7 +399,7 @@ class WorldScene extends Phaser.Scene {
       // Set up battle state directly (DON'T call triggerHostileNPCBattle — it uses DOM)
       G.inBattle = true;
       const playerGhosts = buildPlayerBattleTeam();
-      const trainerTeamSize = { frost_valley: 1, rolling_hills: 2, volcanic_isles: 2, dark_castle: 3 }[getCurrentZone(G.x, G.y)] || 3;
+      const trainerTeamSize = { frost_valley: 1, rolling_hills: 2, volcanic_isles: 2, dark_castle: 3 }[getCurrentRegion(G.x, G.y)] || 3;
       const trainerCardIds = trainerData.team.slice(0, trainerTeamSize);
       const enemyGhosts = trainerCardIds.map(id => {
         const card = getCard(id);

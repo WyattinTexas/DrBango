@@ -52,6 +52,8 @@ const ctx = canvas.getContext('2d');
 // core modules (gathering.js, world-events.js). Do NOT redeclare here.
 
 // ── Day seed for daily resets ──
+// NOTE: getDaySeed() is also declared in quests.js (same logic). The quests.js
+// version will silently overwrite this one since both are function declarations.
 function getDaySeed() { return Math.floor(Date.now() / 86400000); }
 
 // ── Time of day cycle (10-minute loop) ──
@@ -66,12 +68,30 @@ function getTimeOfDay() {
 }
 
 // ── Skill system ──
+// NOTE: hasSkill() is also declared in professions.js with better logic.
+// The professions.js version will overwrite this one (function declarations hoist).
 function hasSkill(skillId) {
   return G.unlockedSkills && G.unlockedSkills.includes(skillId);
 }
 
-// ── Zone detection (based on tile coordinates) ──
+// ── Zone detection ──
+// getCurrentZone returns the ENCOUNTER_ZONES index (or -1 if not in any zone).
+// Used by gathering.js, crafting.js, world-events.js, battle.js.
 function getCurrentZone(px, py) {
+  const tileX = Math.floor(px);
+  const tileY = Math.floor(py);
+  for (let i = 0; i < ENCOUNTER_ZONES.length; i++) {
+    const z = ENCOUNTER_ZONES[i];
+    if (tileX >= z.x && tileX < z.x + z.w && tileY >= z.y && tileY < z.y + z.h) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// getCurrentRegion returns the region name string (frost_valley, rolling_hills, etc.).
+// Used by WorldScene.js for region display and music.
+function getCurrentRegion(px, py) {
   const x = Math.floor(px);
   const y = Math.floor(py);
   if (x > 88 && y < 42) return 'dark_castle';
@@ -204,4 +224,157 @@ function ensurePlayerDefaults() {
   if (G.xp === undefined) G.xp = 0;
   if (G.coins === undefined) G.coins = 100;
   if (G.activeIdx === undefined) G.activeIdx = 0;
+  if (!G.materials) G.materials = {};
+  if (!G.professionXP) G.professionXP = { combat: 0, exploration: 0, crafting: 0, trade: 0, charisma: 0 };
+  if (!G.professionSkills) G.professionSkills = {};
+  if (G.skillPointsUsed === undefined) G.skillPointsUsed = 0;
+  if (!G.achievements) G.achievements = [];
 }
+
+// ═══════════════════════════════════════════════════
+// PORTED FUNCTIONS FROM 2D index.html
+// ═══════════════════════════════════════════════════
+
+// ── Zone quality cycle (12-hour rotation) ──
+function getZoneCycleId() {
+  return Math.floor(Date.now() / (1000 * 60 * 60 * 12));
+}
+
+function seededHash(a, b) {
+  let h = ((a * 2654435761) ^ (b * 2246822519)) >>> 0;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  h = (h >> 16) ^ h;
+  return (h >>> 0) / 0xFFFFFFFF; // 0-1
+}
+
+function getZoneQuality(zoneIndex, cycleId) {
+  const raw = seededHash(zoneIndex * 7919, cycleId * 104729);
+  return 0.5 + raw * 1.0; // Map to 0.5 - 1.5
+}
+
+function getZoneQualityLabel(multiplier) {
+  if (multiplier >= 1.2) return 'High Quality';
+  if (multiplier >= 0.8) return 'Average';
+  return 'Low';
+}
+
+function getZoneQualityClass(multiplier) {
+  if (multiplier >= 1.2) return 'high';
+  if (multiplier >= 0.8) return 'average';
+  return 'low';
+}
+
+// ── Mastery system ──
+const MASTERY_LEVELS = [
+  { name: 'Novice', min: 0, cls: 'novice' },
+  { name: 'Apprentice', min: 3, cls: 'apprentice' },
+  { name: 'Journeyman', min: 6, cls: 'journeyman' },
+  { name: 'Expert', min: 10, cls: 'expert' },
+  { name: 'Master', min: 15, cls: 'master' },
+];
+
+function getMasteryInfo(xp) {
+  let result = MASTERY_LEVELS[0];
+  for (const lvl of MASTERY_LEVELS) {
+    if (xp >= lvl.min) result = lvl;
+  }
+  return result;
+}
+
+function getMasteryLevel(xp) {
+  if (xp >= 15) return 5;
+  if (xp >= 10) return 4;
+  if (xp >= 6) return 3;
+  if (xp >= 3) return 2;
+  return 1;
+}
+
+// ── Onboarding stub (no-op in Phaser) ──
+function advanceOnboarding(step) {
+  // No-op — onboarding is handled by Phaser scenes
+}
+
+// ── Craft reveal stub (no-op — Phaser CraftScene handles this) ──
+function showCraftReveal(itemName, qualLabel, qualColor, crafterName) {
+  console.log(`[CraftReveal] ${itemName} — ${qualLabel}`);
+}
+
+// ── HUD update stub (Phaser WorldScene handles HUD rendering) ──
+function updateHUD() {
+  console.log('[Stub] updateHUD — Phaser scene handles this');
+}
+
+// ── Show inventory stub ──
+function showInventory() {
+  console.log('[Stub] showInventory — Phaser scene handles this');
+}
+
+// ── Show team lineup stub ──
+function showTeamLineup() {
+  console.log('[Stub] showTeamLineup — Phaser scene handles this');
+}
+
+// ── Firebase / DB stubs (offline-first, real Firebase later) ──
+var firebase = {
+  database: {
+    ServerValue: { TIMESTAMP: Date.now() },
+  },
+};
+
+var db = {
+  ref: function(path) {
+    return {
+      set: function(val) { return Promise.resolve(); },
+      push: function(val) { return Promise.resolve(); },
+      once: function(eventType) { return Promise.resolve({ val: () => null }); },
+      on: function(eventType, cb) { cb({ val: () => null }); },
+      off: function() {},
+      remove: function() { return Promise.resolve(); },
+      transaction: function(updateFn) {
+        const result = updateFn(null);
+        return Promise.resolve({ committed: !!result, snapshot: { val: () => result } });
+      },
+    };
+  },
+};
+
+// ── Multiplayer stubs (offline-first) ──
+var otherPlayers = {};
+var marketListings = {};
+var housingData = {};
+var showHomeOnMinimap = false;
+
+// ── Chat stub ──
+function addChatMessage(sender, text) {
+  console.log(`[Chat] ${sender}: ${text}`);
+}
+
+// ── Housing data ──
+var HOUSE_PLOTS = [
+  { id: 'frost_1', name: 'Polaris Cottage', x: 12, y: 18, region: 'Frost Valley' },
+  { id: 'frost_2', name: 'Lakeside Cabin', x: 38, y: 18, region: 'Frost Valley' },
+  { id: 'hills_1', name: 'Meadowbrook House', x: 22, y: 55, region: 'Rolling Hills' },
+  { id: 'hills_2', name: 'Hilltop Villa', x: 38, y: 60, region: 'Rolling Hills' },
+  { id: 'volcanic_1', name: 'Beach Bungalow', x: 72, y: 35, region: 'Volcanic Isles' },
+  { id: 'volcanic_2', name: 'Island Retreat', x: 78, y: 10, region: 'Volcanic Isles' },
+];
+
+var TROPHY_DEFS = {
+  boss_slayer: { name: 'Boss Slayer', icon: '\u2694\uFE0F', desc: 'Defeated a world boss' },
+  mastercraft_weapon: { name: 'Master Weaponsmith', icon: '\u2692\uFE0F', desc: 'Mastered weapon crafting' },
+  mastercraft_armor: { name: 'Master Armorer', icon: '\uD83D\uDEE1\uFE0F', desc: 'Mastered armor crafting' },
+  master_combat: { name: 'War Hero', icon: '\uD83C\uDF96\uFE0F', desc: 'Combat XP milestone' },
+  master_exploration: { name: 'World Explorer', icon: '\uD83C\uDF0D', desc: 'Exploration XP milestone' },
+  collector_rare: { name: 'Rare Collector', icon: '\uD83D\uDC8E', desc: 'Found 10+ rare Spiritkin' },
+  arena_champion: { name: 'Arena Champion', icon: '\uD83C\uDFC6', desc: 'Won 20 arena battles' },
+  lore_frost: { name: 'Frost Scholar', icon: '\u2744\uFE0F', desc: 'All Frost Valley lore collected' },
+  lore_hills: { name: 'Meadow Scholar', icon: '\uD83C\uDF3F', desc: 'All Rolling Hills lore collected' },
+  lore_volcanic: { name: 'Volcanic Scholar', icon: '\uD83C\uDF0B', desc: 'All Volcanic lore collected' },
+};
+
+// ── Guild craft bonus stub ──
+function getGuildCraftBonus() { return 0; }
+
+// ── isInParty stub ──
+function isInParty() { return false; }
