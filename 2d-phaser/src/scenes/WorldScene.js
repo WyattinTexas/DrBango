@@ -86,10 +86,7 @@ class WorldScene extends Phaser.Scene {
     cam.setScroll(spawnPX - cam.width / (2 * cam.zoom), spawnPY - cam.height / (2 * cam.zoom));
     cam.startFollow(this.player, true, 1, 1);
 
-    // ── UI Camera (unzoomed, for HUD elements) ──
-    this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
-    this.uiCam.setScroll(0, 0);
-    // Main camera ignores UI elements (we'll tag them)
+    // UI elements use setScrollFactor(0) on the main camera — no separate UI camera needed
 
     // ── NPCs (positions from npcs.js NPCS + HOSTILE_NPCS data) ──
     this.npcSprites = [];
