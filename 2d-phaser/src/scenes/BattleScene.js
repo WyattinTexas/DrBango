@@ -210,6 +210,7 @@ class BattleScene extends Phaser.Scene {
     this._rolling = true;
     this.roundNum++;
     this.fightBg.setFillStyle(0x111111);
+    GameAudio.dice();
 
     // Read committed from B (synced by resource bar clicks)
     const committed = B && B.committed ? B.committed : this._committed;
@@ -220,6 +221,7 @@ class BattleScene extends Phaser.Scene {
       this.pg.hp = Math.min(this.pg.maxHp, this.pg.hp + heal);
       this.showFloatingText(this.scale.width * 0.25, this.scale.height * 0.35, `+${heal}`, '#44dd44');
       this.updateHP();
+      GameAudio.heal();
     }
 
     // Roll dice (surge grants extra dice)
@@ -283,6 +285,8 @@ class BattleScene extends Phaser.Scene {
       log += ` \u2014 ${dmg} dmg to ${this.eg.name}!`;
       this.cameras.main.shake(80, 0.004);
       this.showFloatingText(this.scale.width * 0.75, this.scale.height * 0.35, `-${dmg}`, '#cc2211');
+      GameAudio.hit();
+      if (dmg >= 4) this.flashScreen();
     } else if (winner === 'b') {
       let dmg = eRes.damage;
       // Equipment defense
@@ -293,6 +297,8 @@ class BattleScene extends Phaser.Scene {
       log += ` \u2014 ${dmg} dmg to ${this.pg.name}!`;
       this.cameras.main.shake(120, 0.006);
       this.showFloatingText(this.scale.width * 0.25, this.scale.height * 0.35, `-${dmg}`, '#cc2211');
+      GameAudio.hurt();
+      if (dmg >= 4) this.flashScreen();
     } else {
       log += ' \u2014 Tie!';
     }
@@ -411,6 +417,14 @@ class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: txt, y: y - 60, alpha: 0, duration: 1000, onComplete: () => txt.destroy() });
   }
 
+  // White flash overlay for critical hits (damage >= 4)
+  flashScreen() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0.6).setDepth(900);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 150, onComplete: () => flash.destroy() });
+  }
+
   updateHP() {
     this.playerHPText.setText(`${this.pg.name}  HP ${this.pg.hp}/${this.pg.maxHp}`);
     const pPct = this.pg.hp / this.pg.maxHp;
@@ -516,6 +530,12 @@ class BattleScene extends Phaser.Scene {
     // ── Banner ──
     const bannerText = won ? 'VICTORY!' : 'DEFEAT';
     const bannerColor = won ? '#44dd44' : '#dd4444';
+    if (won) {
+      GameAudio.victory();
+      if (leveledUp) this.time.delayedCall(400, () => GameAudio.levelUp());
+    } else {
+      GameAudio.defeat();
+    }
     const banner = this.add.text(W / 2, H / 2, bannerText, {
       fontSize: '52px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: bannerColor,
       shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true },

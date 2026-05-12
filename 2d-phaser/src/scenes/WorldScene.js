@@ -232,7 +232,7 @@ class WorldScene extends Phaser.Scene {
     const buttons = [
       { label: 'TEAM (T)', key: 'T', action: () => this.showTeamLineup(), color: 0x445588 },
       { label: 'ITEMS (I)', key: 'I', action: () => this.showInventory(), color: 0x885544 },
-      { label: 'CRAFT (C)', key: 'C', action: () => { this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
+      { label: 'CRAFT (C)', key: 'C', action: () => { GameAudio.menuOpen(); this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
       { label: 'PROF (P)', key: 'P', action: () => this.showProfessionPanel(), color: 0x664488 },
       { label: 'MAP (M)', key: null, action: () => this.showNotification('Minimap is bottom-right!'), color: 0x448844 },
     ];
@@ -268,6 +268,25 @@ class WorldScene extends Phaser.Scene {
     // Panel manager for inventory/team overlays
     this.panels = new PanelManager(this);
     console.log('[WorldScene] create: PanelManager done');
+
+    // Wave 4: Arena reward handler — when WorldScene resumes after battle,
+    // check if it was an arena battle and award bonus gold
+    this.events.on('resume', () => {
+      if (this._pendingArenaCheck) {
+        this._pendingArenaCheck = false;
+        // B is null after battle ends; check battlesWon delta to determine win
+        const winsNow = G.rep?.battlesWon || 0;
+        if (winsNow > (this._arenaWinsBefore || 0)) {
+          // Player won the arena battle
+          G.arenaWins = (G.arenaWins || 0) + 1;
+          G.coins += 50;
+          saveGame();
+          checkAndNotifyTitles();
+          this.showNotification('Arena Victory! +50 gold!');
+        }
+        this._arenaWinsBefore = null;
+      }
+    });
 
     // Star Fox comm overlay
     try {
@@ -393,6 +412,7 @@ class WorldScene extends Phaser.Scene {
 
     // Panel hotkeys
     if (Phaser.Input.Keyboard.JustDown(this.cKey)) {
+      GameAudio.menuOpen();
       this.scene.launch('CraftScene');
       this.scene.pause();
     }
@@ -549,10 +569,10 @@ class WorldScene extends Phaser.Scene {
       this._eConsumed = true;
       switch (bld.action) {
         case 'tradingPost':
-          this.showBuildingPanel('Trading Post', 'Coming in Wave 4 — Buy and sell Spiritkin essences, gear, and materials.');
+          this.openTradingPost();
           break;
         case 'arena':
-          this.showBuildingPanel('Arena', 'Coming in Wave 4 — Challenge ranked trainers and earn arena titles.');
+          this.openArena();
           break;
         case 'workshop':
           this.scene.launch('CraftScene');
@@ -700,6 +720,14 @@ class WorldScene extends Phaser.Scene {
     const isFirstSet = this._lastRegion === undefined;
     this._lastRegion = currentRegion;
 
+    // Wave 4: track visited regions for Explorer title
+    if (!G.regionsVisited) G.regionsVisited = [];
+    if (!G.regionsVisited.includes(currentRegion)) {
+      G.regionsVisited.push(currentRegion);
+      saveGame();
+      checkAndNotifyTitles();
+    }
+
     // Award exploration XP on region change (skip the initial set on scene load)
     if (!isFirstSet && typeof addProfessionXP === 'function') {
       addProfessionXP('exploration', 5);
@@ -713,6 +741,7 @@ class WorldScene extends Phaser.Scene {
     };
     const info = regionDisplay[currentRegion];
     if (!info) return;
+    if (!isFirstSet) GameAudio.levelUp();
 
     // Large banner text — fade in, hold, fade out
     const banner = this.add.text(640, 200, `Entering ${info.name}`, {
@@ -863,6 +892,9 @@ class WorldScene extends Phaser.Scene {
 
   showTeamLineup() {
     if (this.panels.isOpen()) { this.panels.close(); return; }
+    GameAudio.menuOpen();
+
+    const hasEssences = (G.essences?.length || 0) > 0;
 
     this.panels.open('TEAM LINEUP — Click to set active', (container, w, h) => {
       if (G.team.length === 0) {
@@ -873,9 +905,18 @@ class WorldScene extends Phaser.Scene {
         return;
       }
 
+      // Essence count header
+      if (hasEssences) {
+        const essLabel = this.add.text(w - 14, 0, `Essences: ${G.essences.length}`, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#aa88dd',
+        }).setOrigin(1, 0).setScrollFactor(0);
+        container.add(essLabel);
+      }
+
       G.team.forEach((ghost, i) => {
         const y = 12 + i * 56;
         const isActive = i === G.activeIdx;
+        const isDamaged = !ghost.ko && ghost.hp > 0 && ghost.hp < ghost.maxHp;
 
         // Clickable row
         const rowBg = this.add.rectangle(w / 2, y + 20, w - 20, 48, isActive ? 0x224422 : 0x222244, 0.6)
@@ -900,8 +941,35 @@ class WorldScene extends Phaser.Scene {
           fontSize: '14px', fontFamily: 'monospace', fontStyle: isActive ? 'bold' : 'normal', color: nameColor,
         }).setScrollFactor(0);
 
-        const hpText = this.add.text(w - 14, y + 8, `HP ${ghost.hp}/${ghost.maxHp}`, {
-          fontSize: '12px', fontFamily: 'monospace', color: ghost.hp <= 0 ? '#ff4444' : '#aaaaaa',
+        // FEED button — only show if ghost is damaged and player has essences
+        const feedBtnX = w - 80;
+        if (isDamaged && hasEssences) {
+          const feedBtn = this.add.text(feedBtnX, y + 8, '[FEED]', {
+            fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#44cc88',
+            backgroundColor: '#113322', padding: { x: 4, y: 2 },
+          }).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+          feedBtn.on('pointerover', () => feedBtn.setColor('#88ffbb'));
+          feedBtn.on('pointerout', () => feedBtn.setColor('#44cc88'));
+          feedBtn.on('pointerdown', () => {
+            if ((G.essences?.length || 0) === 0) {
+              this.showNotification('No essences to feed!');
+              return;
+            }
+            // Consume 1 essence and heal 3 HP
+            const consumed = G.essences.pop();
+            const healAmt = Math.min(3, ghost.maxHp - ghost.hp);
+            ghost.hp += healAmt;
+            saveGame();
+            this.showNotification(`Fed ${consumed.fromName || consumed.name || 'essence'} to ${ghost.name}! +${healAmt} HP`);
+            // Refresh panel
+            this.panels.close();
+            this.showTeamLineup();
+          });
+          container.add(feedBtn);
+        }
+
+        const hpText = this.add.text(isDamaged && hasEssences ? feedBtnX - 6 : w - 14, y + 8, `HP ${ghost.hp}/${ghost.maxHp}`, {
+          fontSize: '12px', fontFamily: 'monospace', color: ghost.hp <= 0 ? '#ff4444' : isDamaged ? '#ffaa44' : '#aaaaaa',
         }).setOrigin(1, 0).setScrollFactor(0);
 
         const abilityText = this.add.text(14, y + 28, `  ${ghost.ability || ''}`, {
@@ -910,13 +978,14 @@ class WorldScene extends Phaser.Scene {
 
         container.add([rowBg, nameText, hpText, abilityText]);
       });
-    }, { width: 320, height: Math.min(G.team.length * 56 + 50, 400) });
+    }, { width: 360, height: Math.min(G.team.length * 56 + 50, 420) });
   }
 
   // ═══════ INVENTORY PANEL ═══════
 
   showInventory() {
     if (this.panels.isOpen()) { this.panels.close(); return; }
+    GameAudio.menuOpen();
     this._invTab = this._invTab || 'essences';
 
     this.panels.open('INVENTORY', (container, w, h) => {
@@ -1071,6 +1140,7 @@ class WorldScene extends Phaser.Scene {
 
   showProfessionPanel() {
     if (this.panels.isOpen()) { this.panels.close(); return; }
+    GameAudio.menuOpen();
 
     this.panels.open('PROFESSIONS', (container, w, h) => {
       const categories = [
@@ -1164,6 +1234,331 @@ class WorldScene extends Phaser.Scene {
     }, { width: 420, height: 400 });
   }
 
+  // ═══════ WAVE 4: TRADING POST ═══════
+
+  openTradingPost() {
+    if (this.panels.isOpen()) { this.panels.close(); return; }
+    this._marketTab = this._marketTab || 'buy';
+
+    this.panels.open('TRADING POST', (container, w, h) => {
+      this._buildMarketContent(container, w, h);
+    }, { width: 420, height: 380 });
+  }
+
+  _buildMarketContent(container, w, h) {
+    const tabs = ['buy', 'sell'];
+    const tabW = w / tabs.length;
+
+    // Gold display
+    const goldText = this.add.text(w / 2, 2, `Gold: ${G.coins}`, {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffdd44',
+    }).setOrigin(0.5, 0).setScrollFactor(0);
+    container.add(goldText);
+
+    // Tab bar
+    tabs.forEach((tab, i) => {
+      const isActive = tab === this._marketTab;
+      const tabBg = this.add.rectangle(tabW * i + tabW / 2, 26, tabW - 4, 24, isActive ? 0x445566 : 0x222233)
+        .setStrokeStyle(1, isActive ? 0x6699aa : 0x333344)
+        .setInteractive({ useHandCursor: true }).setScrollFactor(0);
+      const tabText = this.add.text(tabW * i + tabW / 2, 26, tab.toUpperCase(), {
+        fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: isActive ? '#ffffff' : '#888888',
+      }).setOrigin(0.5).setScrollFactor(0);
+      tabBg.on('pointerdown', () => {
+        this._marketTab = tab;
+        this.panels.close();
+        this.openTradingPost();
+      });
+      container.add([tabBg, tabText]);
+    });
+
+    const cy = 46;
+
+    if (this._marketTab === 'buy') {
+      const shopItems = [
+        { name: 'Healing Potion', desc: 'Heals entire team to full HP', price: 10, icon: '\u2764\uFE0F' },
+        { name: 'Essence Detector', desc: 'Shows essence quality for 5 battles', price: 25, icon: '\uD83D\uDD2E' },
+        { name: 'Lucky Charm', desc: '+10% recruit chance next battle', price: 15, icon: '\uD83C\uDF40' },
+        { name: 'Escape Rope', desc: 'Guaranteed flee from next battle', price: 5, icon: '\uD83E\uDEA2' },
+        { name: 'Spirit Snack', desc: '+2 HP to active ghost', price: 8, icon: '\uD83C\uDF6A' },
+      ];
+
+      shopItems.forEach((item, i) => {
+        const y = cy + i * 54;
+        const canAfford = G.coins >= item.price;
+
+        // Row background
+        const rowBg = this.add.rectangle(w / 2, y + 20, w - 16, 46, 0x111122, 0.6)
+          .setStrokeStyle(1, canAfford ? 0x336644 : 0x333344).setScrollFactor(0);
+        container.add(rowBg);
+
+        // Item name + icon
+        container.add(this.add.text(14, y + 6, `${item.icon} ${item.name}`, {
+          fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: canAfford ? '#ccddcc' : '#666666',
+        }).setScrollFactor(0));
+
+        // Description
+        container.add(this.add.text(14, y + 24, item.desc, {
+          fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#888888',
+        }).setScrollFactor(0));
+
+        // Price + Buy button
+        const priceColor = canAfford ? '#ffdd44' : '#ff4444';
+        container.add(this.add.text(w - 80, y + 6, `${item.price}g`, {
+          fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold', color: priceColor,
+        }).setOrigin(1, 0).setScrollFactor(0));
+
+        if (canAfford) {
+          const buyBtn = this.add.text(w - 14, y + 14, '[BUY]', {
+            fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: '#44cc44',
+            backgroundColor: '#112211', padding: { x: 4, y: 2 },
+          }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+          buyBtn.on('pointerover', () => buyBtn.setColor('#88ff88'));
+          buyBtn.on('pointerout', () => buyBtn.setColor('#44cc44'));
+          buyBtn.on('pointerdown', () => {
+            this._buyShopItem(item);
+          });
+          container.add(buyBtn);
+        }
+      });
+
+    } else if (this._marketTab === 'sell') {
+      const gear = G.gear || [];
+      if (gear.length === 0) {
+        container.add(this.add.text(w / 2, cy + 30, 'No gear to sell.\nCraft items at the Workshop!', {
+          fontSize: '13px', fontFamily: 'Georgia, serif', color: '#666666', align: 'center',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+        return;
+      }
+
+      gear.slice(0, 6).forEach((item, i) => {
+        const y = cy + i * 42;
+        const sellPrice = Math.max(5, Math.floor((item.quality || 20) / 4));
+
+        const rowBg = this.add.rectangle(w / 2, y + 16, w - 16, 36, 0x111122, 0.6)
+          .setStrokeStyle(1, 0x334455).setScrollFactor(0);
+        container.add(rowBg);
+
+        container.add(this.add.text(14, y + 6, item.name, {
+          fontSize: '13px', fontFamily: 'monospace', color: '#cccccc',
+        }).setScrollFactor(0));
+
+        container.add(this.add.text(14, y + 22, `Q:${item.quality || '?'} | ${item.slot || 'gear'}`, {
+          fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#666666',
+        }).setScrollFactor(0));
+
+        container.add(this.add.text(w - 80, y + 8, `${sellPrice}g`, {
+          fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffdd44',
+        }).setOrigin(1, 0).setScrollFactor(0));
+
+        const sellBtn = this.add.text(w - 14, y + 10, '[SELL]', {
+          fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: '#cc8844',
+          backgroundColor: '#221111', padding: { x: 4, y: 2 },
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+        sellBtn.on('pointerover', () => sellBtn.setColor('#ffaa66'));
+        sellBtn.on('pointerout', () => sellBtn.setColor('#cc8844'));
+        sellBtn.on('pointerdown', () => {
+          G.coins += sellPrice;
+          G.gear.splice(G.gear.indexOf(item), 1);
+          if (!G.rep) G.rep = { battlesWon: 0, craftsCompleted: 0, itemsSold: 0, essencesCollected: 0, raresFound: 0 };
+          G.rep.itemsSold = (G.rep.itemsSold || 0) + 1;
+          if (typeof addProfessionXP === 'function') addProfessionXP('trade', 5);
+          saveGame();
+          this.showNotification(`Sold ${item.name} for ${sellPrice}g!`);
+          this.panels.close();
+          this.openTradingPost();
+        });
+        container.add(sellBtn);
+      });
+
+      if (gear.length > 6) {
+        container.add(this.add.text(w / 2, cy + 6 * 42 + 8, `...and ${gear.length - 6} more`, {
+          fontSize: '11px', fontFamily: 'monospace', color: '#555555',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+      }
+    }
+  }
+
+  _buyShopItem(item) {
+    if (G.coins < item.price) {
+      this.showNotification('Not enough gold!');
+      return;
+    }
+    G.coins -= item.price;
+
+    switch (item.name) {
+      case 'Healing Potion':
+        for (const ghost of G.team) {
+          ghost.hp = ghost.maxHp;
+          ghost.ko = false;
+        }
+        this.showNotification('Team fully healed!');
+        break;
+      case 'Essence Detector':
+        // Store a buff counter — BattleScene can check this
+        G._essenceDetectorBattles = (G._essenceDetectorBattles || 0) + 5;
+        this.showNotification('Essence Detector active for 5 battles!');
+        break;
+      case 'Lucky Charm':
+        G._luckyCharmActive = true;
+        this.showNotification('Lucky Charm active! +10% recruit chance next battle.');
+        break;
+      case 'Escape Rope':
+        G._escapeRopeCount = (G._escapeRopeCount || 0) + 1;
+        this.showNotification(`Escape Rope acquired! (${G._escapeRopeCount} total)`);
+        break;
+      case 'Spirit Snack':
+        const active = G.team[G.activeIdx];
+        if (active && !active.ko) {
+          const heal = Math.min(2, active.maxHp - active.hp);
+          active.hp += heal;
+          this.showNotification(`${active.name} ate a Spirit Snack! +${heal} HP`);
+        } else {
+          this.showNotification('No active ghost to feed!');
+          G.coins += item.price; // refund
+        }
+        break;
+    }
+
+    if (typeof addProfessionXP === 'function') addProfessionXP('trade', 3);
+    saveGame();
+    // Refresh panel
+    this.panels.close();
+    this.openTradingPost();
+  }
+
+  // ═══════ WAVE 4: ARENA CHALLENGE ═══════
+
+  openArena() {
+    if (this.panels.isOpen()) { this.panels.close(); return; }
+
+    this.panels.open('ARENA', (container, w, h) => {
+      // Header
+      const title = this.add.text(w / 2, 10, 'Battle Challenge', {
+        fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffcc44',
+      }).setOrigin(0.5, 0).setScrollFactor(0);
+      container.add(title);
+
+      // Stats
+      const wins = G.arenaWins || 0;
+      container.add(this.add.text(w / 2, 34, `Arena Wins: ${wins}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: '#aaaacc',
+      }).setOrigin(0.5, 0).setScrollFactor(0));
+
+      // Arena challenge description
+      const descLines = [
+        'Face the Arena Champions:',
+        'a team of 3 rare Spiritkin!',
+        '',
+        'Reward: 50 gold + Arena Victor title',
+      ];
+      descLines.forEach((line, i) => {
+        container.add(this.add.text(w / 2, 60 + i * 18, line, {
+          fontSize: '12px', fontFamily: 'Georgia, serif',
+          color: i === 3 ? '#ffdd44' : '#aaaaaa',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+      });
+
+      // Team preview — show the 3 arena ghosts
+      const arenaTeamIds = [202, 78, 67]; // Dark Fang, Haywire, Snorton (all rare)
+      const previewY = 140;
+      container.add(this.add.text(w / 2, previewY, 'OPPONENTS:', {
+        fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: '#cc6644',
+      }).setOrigin(0.5, 0).setScrollFactor(0));
+
+      arenaTeamIds.forEach((id, i) => {
+        const card = typeof getCard === 'function' ? getCard(id) : null;
+        if (!card) return;
+        const y = previewY + 18 + i * 22;
+        container.add(this.add.text(w / 2, y, `${card.name} (${card.rarity}) HP:${card.maxHp} — ${card.ability}`, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#aa55ff',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+      });
+
+      // Fight button
+      const canFight = G.team.length > 0 && G.team.some(g => !g.ko && g.hp > 0);
+      const fightY = previewY + 90;
+      const fightBg = this.add.rectangle(w / 2, fightY, 140, 36, canFight ? 0x443322 : 0x222222, 0.9)
+        .setStrokeStyle(2, canFight ? 0xcc6644 : 0x444444)
+        .setInteractive({ useHandCursor: canFight }).setScrollFactor(0);
+      const fightText = this.add.text(w / 2, fightY, canFight ? 'FIGHT!' : 'Team KO\'d', {
+        fontSize: '16px', fontFamily: 'Georgia, serif', fontStyle: 'bold',
+        color: canFight ? '#ff8844' : '#666666',
+      }).setOrigin(0.5).setScrollFactor(0);
+
+      if (canFight) {
+        fightBg.on('pointerover', () => fightBg.setFillStyle(0x664433));
+        fightBg.on('pointerout', () => fightBg.setFillStyle(0x443322, 0.9));
+        fightBg.on('pointerdown', () => {
+          this.panels.close();
+          this._startArenaBattle();
+        });
+      }
+
+      container.add([fightBg, fightText]);
+    }, { width: 380, height: 320 });
+  }
+
+  _startArenaBattle() {
+    if (G.inBattle || G.team.length === 0) return;
+    if (!G.team.some(g => !g.ko && g.hp > 0)) {
+      this.showNotification('Your team is KO\'d! Heal at the Inn first.');
+      return;
+    }
+
+    // Track wins before battle so we can detect victory on resume
+    this._pendingArenaCheck = true;
+    this._arenaWinsBefore = G.rep?.battlesWon || 0;
+
+    G.inBattle = true;
+    const playerGhosts = buildPlayerBattleTeam();
+
+    // Arena team: 3 rares
+    const arenaTeamIds = [202, 78, 67]; // Dark Fang, Haywire, Snorton
+    const enemyGhosts = arenaTeamIds.map(id => {
+      const card = typeof getCard === 'function' ? getCard(id) : null;
+      if (!card) return null;
+      // Scale HP slightly with player level
+      const scaledMaxHp = Math.round(card.maxHp * (1 + (G.level - 1) * 0.1));
+      return {
+        id: card.id, name: card.name, hp: scaledMaxHp, maxHp: scaledMaxHp,
+        ko: false, ability: card.ability, abilityDesc: card.desc, rarity: card.rarity,
+        usedOncePerGame: false, entryFired: false,
+      };
+    }).filter(Boolean);
+
+    if (enemyGhosts.length === 0) { G.inBattle = false; return; }
+
+    const _resources = {
+      iceShards: G.iceShards || 0, sacredFire: G.sacredFire || 0,
+      healingSeeds: G.healingSeeds || 0, luckyStones: G.luckyStones || 0,
+      surge: G.surge || 0, moonstone: G.moonstone || 0, firefly: G.firefly || 0,
+    };
+    B = {
+      round: 1,
+      player: { ghosts: playerGhosts, activeIdx: 0, resources: { ..._resources } },
+      enemy: { ghosts: enemyGhosts, activeIdx: 0, resources: { iceShards: 0, sacredFire: 0, healingSeeds: 0, luckyStones: 0, surge: 0, moonstone: 0, firefly: 0 } },
+      enemyCard: typeof getCard === 'function' ? getCard(arenaTeamIds[0]) : null,
+      phase: 'ready', log: [], playerDice: [], enemyDice: [],
+      isArena: true, // flag so BattleScene can award arena rewards on win
+      nextRoundMods: { playerExtraDice: 0, enemyExtraDice: 0, playerMaxDice: 99, enemyMaxDice: 99 },
+      resources: { ..._resources },
+      entryFired: false, enemyUsedResource: false, damageTakenThisRound: 0,
+      koSwapTeam: null, committed: {},
+    };
+
+    if (typeof applyAccessoryBattleEffects === 'function') applyAccessoryBattleEffects();
+
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(300, () => {
+      this.scene.launch('BattleScene', {
+        enemyCard: typeof getCard === 'function' ? getCard(arenaTeamIds[0]) : null,
+        trainerName: 'Arena Champion',
+      });
+      this.scene.pause();
+    });
+  }
+
   // ═══════ SPIRIT WISPS ═══════
 
   spawnWisp() {
@@ -1214,6 +1609,7 @@ class WorldScene extends Phaser.Scene {
     if (wisp.glowCircle) wisp.glowCircle.destroy();
     if (wisp.outerGlow) wisp.outerGlow.destroy();
     wisp.destroy();
+    GameAudio.collect();
 
     // Grant battle resource
     const resourceMap = { 'Frost Shard': 'iceShards', 'Ember Dust': 'sacredFire', 'Spirit Thread': 'surge', 'Mask Fragment': 'moonstone', 'Healing Seed': 'healingSeeds' };
@@ -1384,6 +1780,21 @@ class WorldScene extends Phaser.Scene {
     }
     const combatMastery = (typeof getMasteryInfo === 'function') ? getMasteryInfo(wins) : { name: 'Novice' };
     this.hudMasteryText.setText(`Combat: ${combatMastery.name} (${wins} XP)`);
+
+    // Wave 4: Title count display
+    if (!this.hudTitleText) {
+      this.hudTitleText = this.add.text(10, 118, '', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#ccaa44',
+        backgroundColor: '#000000aa', padding: { x: 6, y: 2 },
+      }).setScrollFactor(0).setDepth(200);
+    }
+    const titleCount = G.titles?.length || 0;
+    if (titleCount > 0) {
+      this.hudTitleText.setText(`Titles: ${titleCount}`);
+      this.hudTitleText.setVisible(true);
+    } else {
+      this.hudTitleText.setVisible(false);
+    }
 
     // Minimap player dot
     const W = this.scale.width;

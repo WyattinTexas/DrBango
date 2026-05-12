@@ -133,6 +133,180 @@ const SFX = {
   defeat: () => {},
 };
 
+// ── Procedural SFX via Web Audio API (no audio files needed) ──
+const GameAudio = (() => {
+  let ctx = null;
+
+  function getCtx() {
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { console.warn('[GameAudio] Web Audio not available'); }
+    }
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function play(fn) {
+    const ac = getCtx();
+    if (!ac) return;
+    try { fn(ac); } catch (e) { /* swallow */ }
+  }
+
+  return {
+    // Short harsh buzz — enemy takes damage
+    hit() {
+      play(ac => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'square';
+        o.frequency.setValueAtTime(200, ac.currentTime);
+        o.frequency.linearRampToValueAtTime(80, ac.currentTime + 0.08);
+        g.gain.setValueAtTime(0.25, ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+        o.connect(g).connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + 0.12);
+      });
+    },
+
+    // Lower descending tone — player takes damage
+    hurt() {
+      play(ac => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(300, ac.currentTime);
+        o.frequency.linearRampToValueAtTime(100, ac.currentTime + 0.2);
+        g.gain.setValueAtTime(0.2, ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.25);
+        o.connect(g).connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + 0.25);
+      });
+    },
+
+    // Ascending chime — healing
+    heal() {
+      play(ac => {
+        const notes = [523, 659, 784]; // C5, E5, G5
+        notes.forEach((freq, i) => {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, ac.currentTime + i * 0.06);
+          g.gain.setValueAtTime(0, ac.currentTime + i * 0.06);
+          g.gain.linearRampToValueAtTime(0.15, ac.currentTime + i * 0.06 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.06 + 0.2);
+          o.connect(g).connect(ac.destination);
+          o.start(ac.currentTime + i * 0.06);
+          o.stop(ac.currentTime + i * 0.06 + 0.2);
+        });
+      });
+    },
+
+    // Ascending arpeggio — level up celebration
+    levelUp() {
+      play(ac => {
+        const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+        notes.forEach((freq, i) => {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, ac.currentTime + i * 0.08);
+          g.gain.setValueAtTime(0, ac.currentTime + i * 0.08);
+          g.gain.linearRampToValueAtTime(0.18, ac.currentTime + i * 0.08 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.08 + 0.3);
+          o.connect(g).connect(ac.destination);
+          o.start(ac.currentTime + i * 0.08);
+          o.stop(ac.currentTime + i * 0.08 + 0.3);
+        });
+      });
+    },
+
+    // Quick bright pip — wisp/loot pickup
+    collect() {
+      play(ac => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(880, ac.currentTime);
+        o.frequency.linearRampToValueAtTime(1320, ac.currentTime + 0.08);
+        g.gain.setValueAtTime(0.15, ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+        o.connect(g).connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + 0.12);
+      });
+    },
+
+    // Soft click — menu open
+    menuOpen() {
+      play(ac => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(660, ac.currentTime);
+        g.gain.setValueAtTime(0.08, ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
+        o.connect(g).connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + 0.06);
+      });
+    },
+
+    // Major chord swell — victory
+    victory() {
+      play(ac => {
+        const chord = [523, 659, 784]; // C5, E5, G5 major triad
+        chord.forEach(freq => {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, ac.currentTime);
+          g.gain.setValueAtTime(0, ac.currentTime);
+          g.gain.linearRampToValueAtTime(0.12, ac.currentTime + 0.1);
+          g.gain.setValueAtTime(0.12, ac.currentTime + 0.4);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.8);
+          o.connect(g).connect(ac.destination);
+          o.start(); o.stop(ac.currentTime + 0.8);
+        });
+      });
+    },
+
+    // Minor chord descent — defeat
+    defeat() {
+      play(ac => {
+        const chord = [493, 587, 740]; // B4, D5, F#5 diminished feel
+        chord.forEach((freq, i) => {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(freq, ac.currentTime);
+          o.frequency.linearRampToValueAtTime(freq * 0.7, ac.currentTime + 0.6);
+          g.gain.setValueAtTime(0, ac.currentTime);
+          g.gain.linearRampToValueAtTime(0.1, ac.currentTime + 0.05);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.7);
+          o.connect(g).connect(ac.destination);
+          o.start(); o.stop(ac.currentTime + 0.7);
+        });
+      });
+    },
+
+    // Quick rattle — dice tumble
+    dice() {
+      play(ac => {
+        for (let i = 0; i < 4; i++) {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = 'square';
+          o.frequency.setValueAtTime(300 + Math.random() * 400, ac.currentTime + i * 0.035);
+          g.gain.setValueAtTime(0.06, ac.currentTime + i * 0.035);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.035 + 0.03);
+          o.connect(g).connect(ac.destination);
+          o.start(ac.currentTime + i * 0.035);
+          o.stop(ac.currentTime + i * 0.035 + 0.03);
+        }
+      });
+    },
+  };
+})();
+
 // ── Music stubs ──
 const Music = {
   current: null,
@@ -173,6 +347,31 @@ function checkAndNotifyTitles() {
   if (G.rep.battlesWon >= 50 && !G.titles.includes('Champion')) {
     G.titles.push('Champion');
     notify('Title earned: Champion!');
+  }
+  // Wave 4 titles
+  if ((G.essences?.length || 0) >= 10 && !G.titles.includes('Collector')) {
+    G.titles.push('Collector');
+    notify('Title earned: Collector! (10+ essences)');
+  }
+  if ((G.rep.craftsCompleted || 0) >= 3 && !G.titles.includes('Crafter')) {
+    G.titles.push('Crafter');
+    notify('Title earned: Crafter! (3+ crafts)');
+  }
+  if ((G.regionsVisited?.length || 0) >= 4 && !G.titles.includes('Explorer')) {
+    G.titles.push('Explorer');
+    notify('Title earned: Explorer! (all 4 regions)');
+  }
+  if ((G.team?.length || 0) >= 4 && !G.titles.includes('Team Builder')) {
+    G.titles.push('Team Builder');
+    notify('Title earned: Team Builder! (4+ team members)');
+  }
+  if ((G.loreCollected?.length || 0) >= 4 && !G.titles.includes('Lore Hunter')) {
+    G.titles.push('Lore Hunter');
+    notify('Title earned: Lore Hunter! (all lore tablets)');
+  }
+  if ((G.arenaWins || 0) >= 1 && !G.titles.includes('Arena Victor')) {
+    G.titles.push('Arena Victor');
+    notify('Title earned: Arena Victor!');
   }
 }
 
@@ -243,6 +442,9 @@ function ensurePlayerDefaults() {
   if (G.firefly === undefined) G.firefly = 0;
   // Wave 3: combat mastery (derived from battlesWon)
   if (!G.mastery.combat) G.mastery.combat = { xp: 0 };
+  // Wave 4: region visit tracking + arena wins
+  if (!G.regionsVisited) G.regionsVisited = [];
+  if (G.arenaWins === undefined) G.arenaWins = 0;
 }
 
 // ── Profession mastery levels (based on profession XP thresholds) ──
