@@ -16,6 +16,9 @@ class BattleScene extends Phaser.Scene {
 
     if (!B) { this.endBattle(false); return; }
 
+    // Apply Fortune Teller effects (Good Fortune = +1 LS, Bad Fortune = -1 die flag)
+    if (typeof applyFortuneToBattle === 'function') applyFortuneToBattle();
+
     const pg = activePlayerGhost();
     const eg = activeEnemyGhost();
     if (!pg || !eg) { this.endBattle(false); return; }
@@ -224,9 +227,10 @@ class BattleScene extends Phaser.Scene {
       GameAudio.heal();
     }
 
-    // Roll dice (surge grants extra dice)
+    // Roll dice (surge grants extra dice, bad fortune removes one on first roll)
     const extraDice = committed.surge || 0;
-    const pDiceCount = Math.max(1, 3 + extraDice);
+    const fortuneMod = (typeof consumeFortuneBadDice === 'function') ? consumeFortuneBadDice() : 0;
+    const pDiceCount = Math.max(1, 3 + extraDice + fortuneMod);
     const pDice = weightedRoll(this.pg, pDiceCount).sort((a, b) => a - b);
     const eDice = weightedRoll(this.eg, 3).sort((a, b) => a - b);
 

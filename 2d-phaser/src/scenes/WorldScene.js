@@ -133,6 +133,7 @@ class WorldScene extends Phaser.Scene {
     this.iKey = this.input.keyboard.addKey('I');
     this.pKey = this.input.keyboard.addKey('P');
     this.yKey = this.input.keyboard.addKey('Y');
+    this.fKey = this.input.keyboard.addKey('F');
 
     // ── HUD ──
     this.buildHUD();
@@ -601,6 +602,49 @@ class WorldScene extends Phaser.Scene {
           }).setOrigin(0.5).setDepth(12);
         }
 
+        // Fortune hint (show [F] when Fortune Teller apprentice + off cooldown)
+        if (typeof canGiveFortune === 'function' && canGiveFortune()) {
+          if (!npc._fortuneHint) {
+            npc._fortuneHint = this.add.text(npc.x, npc.y + 38, '', {
+              fontSize: '9px', fontFamily: 'monospace', fontStyle: 'bold', color: '#44bbff',
+              backgroundColor: '#000000aa', padding: { x: 3, y: 1 },
+            }).setOrigin(0.5).setDepth(12);
+          }
+          const ready = isFortuneReady();
+          npc._fortuneHint.setText(ready ? '[F] Fortune' : '[F] ' + getFortuneCooldownSec() + 's');
+          npc._fortuneHint.setColor(ready ? '#44bbff' : '#666688');
+
+          // F key: give fortune to this NPC
+          if (ready && Phaser.Input.Keyboard.JustDown(this.fKey)) {
+            const result = giveFortune(npc.name, false); // false = NPC, 1/10th XP
+            if (result) {
+              // Show fortune result as floating text
+              const color = result.type === 'good' ? '#88ff44' : '#ff6666';
+              const icon = result.type === 'good' ? '★' : '☆';
+              const floatText = this.add.text(npc.x, npc.y - 16, icon + ' ' + result.name + ' ' + icon, {
+                fontSize: '12px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: color,
+                backgroundColor: '#000000cc', padding: { x: 6, y: 3 },
+              }).setOrigin(0.5).setDepth(100);
+              this.tweens.add({
+                targets: floatText, y: npc.y - 60, alpha: 0, duration: 2000,
+                ease: 'Power2', onComplete: () => floatText.destroy(),
+              });
+              // Show description below
+              const descText = this.add.text(npc.x, npc.y, result.desc, {
+                fontSize: '9px', fontFamily: 'monospace', color: '#aaaacc',
+                backgroundColor: '#000000aa', padding: { x: 4, y: 2 },
+              }).setOrigin(0.5).setDepth(100);
+              this.tweens.add({
+                targets: descText, y: npc.y - 30, alpha: 0, duration: 2500, delay: 500,
+                ease: 'Power2', onComplete: () => descText.destroy(),
+              });
+              GameAudio.collect();
+              // Check for talent auto-unlocks
+              if (typeof checkFortuneUnlocks === 'function') checkFortuneUnlocks();
+            }
+          }
+        }
+
         if (ePressed) {
           this._eConsumed = true;
           if (this.comm && this.comm.isActive) {
@@ -617,6 +661,7 @@ class WorldScene extends Phaser.Scene {
       } else {
         npc.label.setColor(npc.hostile ? '#ff8888' : '#88ff88');
         if (npc._hint) { npc._hint.destroy(); npc._hint = null; }
+        if (npc._fortuneHint) { npc._fortuneHint.destroy(); npc._fortuneHint = null; }
       }
     }
   }
