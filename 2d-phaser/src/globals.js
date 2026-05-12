@@ -474,7 +474,7 @@ function getProfessionMasteryInfo(xp) {
 }
 
 // ── Discipline definitions (chosen at game start, bonuses referenced by other systems) ──
-const DISCIPLINES = {
+const PLAYER_DISCIPLINES = {
   fighter:  { name: 'Fighter',  icon: '\u2694\uFE0F', desc: '+10% combat XP gain', color: '#ff6644' },
   scout:    { name: 'Scout',    icon: '\uD83E\uDDED', desc: '+10% exploration XP, +20% recruit chance', color: '#44bbff' },
   artisan:  { name: 'Artisan',  icon: '\uD83D\uDD28', desc: '+10% crafting XP, +1 assembly roll bonus', color: '#ffaa22' },

@@ -1278,8 +1278,8 @@ class WorldScene extends Phaser.Scene {
 
       // Discipline badge
       let y = 6;
-      if (G.discipline && typeof DISCIPLINES !== 'undefined' && DISCIPLINES[G.discipline]) {
-        const disc = DISCIPLINES[G.discipline];
+      if (G.discipline && typeof PLAYER_DISCIPLINES !== 'undefined' && PLAYER_DISCIPLINES[G.discipline]) {
+        const disc = PLAYER_DISCIPLINES[G.discipline];
         container.add(this.add.text(w / 2, y, disc.icon + ' ' + disc.name + ' Discipline', {
           fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: disc.color,
         }).setOrigin(0.5, 0).setScrollFactor(0));
