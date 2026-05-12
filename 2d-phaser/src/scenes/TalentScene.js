@@ -185,10 +185,10 @@ class TalentScene extends Phaser.Scene {
     for (const tab of this._sidebarTabs) {
       const spent = getTreePointsSpent(tab.treeId);
       const tree = CLASS_TREES[tab.treeId];
-      const maxTotal = tree.talents.reduce((s, t) => s + t.maxRank, 0);
+      const maxTotal = getTreeMaxPoints(tab.treeId);
       if (tab.visible || (!tree.hidden && tree.requiresTree)) {
         if (spent > 0) {
-          const isMastered = spent >= maxTotal;
+          const isMastered = _isTreeFullyMaxed(tab.treeId);
           tab.pts.setText(isMastered ? 'MASTERED' : spent + '/' + maxTotal);
           tab.pts.setColor(isMastered ? '#88ff88' : '#666688');
         } else {
@@ -372,7 +372,8 @@ class TalentScene extends Phaser.Scene {
     this._tooltipName.setText(talent.name);
     this._tooltipDesc.setText(talent.desc);
     const maxed = rank >= talent.maxRank;
-    this._tooltipRank.setText(maxed ? 'MAXED' : 'Rank ' + rank + ' / ' + talent.maxRank + '  (Cost: ' + talent.cost + ')');
+    const costLabel = talent.cost > 1 ? talent.cost + ' pts/rank' : '1 pt/rank';
+    this._tooltipRank.setText(maxed ? 'MAXED' : 'Rank ' + rank + ' / ' + talent.maxRank + '  (' + costLabel + ')');
     this._tooltipRank.setColor(maxed ? '#88ff88' : '#aaddaa');
     if (talent.prereq) {
       const prereqTalent = _findTalent(treeId, talent.prereq);
