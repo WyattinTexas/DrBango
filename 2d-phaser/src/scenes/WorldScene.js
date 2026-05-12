@@ -104,6 +104,17 @@ class WorldScene extends Phaser.Scene {
 
     // Notify callback for globals
     _notifyCallback = (text) => this.showNotification(text);
+
+    // Star Fox comm overlay
+    this.comm = new CommOverlay(this);
+
+    // ── Music ──
+    try {
+      this._currentMusic = 'frost';
+      if (this.sound.get('music_hub')) {
+        this.sound.play('music_hub', { loop: true, volume: 0.3 });
+      }
+    } catch(e) { console.log('[Audio] Music skipped:', e.message); }
   }
 
   update() {
@@ -133,6 +144,9 @@ class WorldScene extends Phaser.Scene {
 
     G.x = this.player.x / 32;
     G.y = this.player.y / 32;
+
+    // Day/night cycle
+    this.updateDayNight();
 
     // Region detection
     const region = getCurrentZone(G.x, G.y);
@@ -175,10 +189,12 @@ class WorldScene extends Phaser.Scene {
         npc.label.setColor(npc.hostile ? '#ffaa44' : '#ffdd44');
 
         if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
-          if (npc.hostile) {
+          if (this.comm && this.comm.isActive) {
+            this.comm.dismiss();
+          } else if (npc.hostile) {
             this.triggerTrainerBattle(npc);
           } else {
-            this.showDialogue(npc.name, this.getNPCDialogue(npc.name));
+            this.comm.show(npc.name, this.getNPCDialogue(npc.name), { color: '#88ff88' });
           }
         }
       } else {
@@ -290,6 +306,20 @@ class WorldScene extends Phaser.Scene {
         this.scene.pause();
       });
     });
+  }
+
+  // ═══════ DAY/NIGHT CYCLE ═══════
+
+  updateDayNight() {
+    const tod = getTimeOfDay();
+    if (!this._nightOverlay) {
+      this._nightOverlay = this.add.rectangle(
+        this.scale.width / 2, this.scale.height / 2,
+        this.scale.width * 2, this.scale.height * 2,
+        0x000022
+      ).setScrollFactor(0).setDepth(150).setAlpha(0);
+    }
+    this._nightOverlay.setAlpha(tod.nightFactor * 0.5);
   }
 
   // ═══════ HUD ═══════
