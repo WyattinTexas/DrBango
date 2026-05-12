@@ -2508,11 +2508,12 @@ class WorldScene extends Phaser.Scene {
     if (!this.wisps || !this.player) return null;
     let nearest = null;
     let minDist = Infinity;
-    this.wisps.children.each(w => {
-      if (!w.active) return;
+    const children = this.wisps.getChildren ? this.wisps.getChildren() : [];
+    for (const w of children) {
+      if (!w.active) continue;
       const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, w.x, w.y);
       if (d < minDist) { minDist = d; nearest = w; }
-    });
+    }
     return nearest;
   }
 
@@ -2520,11 +2521,12 @@ class WorldScene extends Phaser.Scene {
     if (!this.enemies || !this.player) return null;
     let nearest = null;
     let minDist = Infinity;
-    this.enemies.children.each(e => {
-      if (!e.active || e._isBlackRider) return;
+    const children = this.enemies.getChildren ? this.enemies.getChildren() : [];
+    for (const e of children) {
+      if (!e.active || e._isBlackRider) continue;
       const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
       if (d < minDist) { minDist = d; nearest = e; }
-    });
+    }
     return nearest;
   }
 
