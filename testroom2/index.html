@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v7'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v8'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2152,13 +2152,17 @@ body.lite-mode .die.rolling { animation: none !important; }
 
 <!-- Standings -->
 <div class="standings-overlay" id="willpowerGalleryOverlay">
-  <div class="standings-box" style="max-width:700px;">
+  <div class="standings-box" style="max-width:720px;">
     <div class="standings-header">
-      <h2>WILLPOWER CARDS</h2>
+      <h2>WILLPOWER DECK BUILDER</h2>
       <button class="standings-close" onclick="closeWillpowerGallery()">Close</button>
     </div>
-    <p style="color:var(--text2);font-size:12px;margin:8px 0 16px;">Each player starts with 1 of each. Discard the top card before rolling to activate its effect. Max 1 per turn. Damage removes cards from the top.</p>
+    <p style="color:var(--text2);font-size:12px;margin:8px 0 12px;">Click cards to set count (0, 1, or 2). Deck must total exactly <b>15 cards</b>. Both players share the same deck.</p>
     <div id="wpGalleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+    <div id="wpDeckTotal" style="text-align:center;margin-top:16px;font-size:14px;font-weight:800;color:var(--text);"></div>
+    <div style="text-align:center;margin-top:10px;">
+      <button class="standings-close" id="wpSaveBtn" onclick="saveWillpowerDeck()" style="background:var(--accent);color:#fff;border-color:var(--accent);padding:8px 24px;font-size:13px;">Save Deck</button>
+    </div>
   </div>
 </div>
 
@@ -2831,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v7'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v8'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -3009,17 +3013,12 @@ const WILLPOWER_CARDS = [
 function wpCardById(id) { return WILLPOWER_CARDS.find(c => c.id === id); }
 
 function buildTeamWillpowerDeck() {
-  // Team deck: all 12 types + 3 random repeats = 15 cards
-  const deck = WILLPOWER_CARDS.map(c => c.id);
-  const counts = {};
-  deck.forEach(id => counts[id] = (counts[id]||0) + 1);
-  while (deck.length < 15) {
-    const available = WILLPOWER_CARDS.filter(c => (counts[c.id]||0) < 2);
-    if (available.length === 0) break;
-    const pick = available[Math.floor(Math.random() * available.length)];
-    deck.push(pick.id);
-    counts[pick.id] = (counts[pick.id]||0) + 1;
-  }
+  // Build deck from wpDeckConfig (set via deck builder UI)
+  const deck = [];
+  WILLPOWER_CARDS.forEach(c => {
+    const cnt = wpDeckConfig[c.id] || 0;
+    for (let i = 0; i < cnt; i++) deck.push(c.id);
+  });
   // Shuffle (Fisher-Yates)
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -3852,20 +3851,79 @@ function renderStandingsTable() {
 }
 
 // --- Willpower Gallery ---
+// --- Willpower Deck Builder ---
+// Persistent deck config: count per card ID (0, 1, or 2). Default: 1 each + 3 random = 15.
+let wpDeckConfig = {};
+function initWpDeckConfig() {
+  // Try loading from localStorage
+  try {
+    const saved = localStorage.getItem('wpDeckConfig');
+    if (saved) { wpDeckConfig = JSON.parse(saved); return; }
+  } catch(e) {}
+  // Default: 1 of each (12) + first 3 get a second copy = 15
+  WILLPOWER_CARDS.forEach((c, i) => { wpDeckConfig[c.id] = i < 3 ? 2 : 1; });
+}
+initWpDeckConfig();
+
+function wpDeckTotal() {
+  return Object.values(wpDeckConfig).reduce((s, v) => s + v, 0);
+}
+
 function openWillpowerGallery() {
+  renderWpGallery();
+  document.getElementById('willpowerGalleryOverlay').classList.add('active');
+}
+
+function renderWpGallery() {
   const grid = document.getElementById('wpGalleryGrid');
   const colorBg = { red:'rgba(239,68,68,0.12)', blue:'rgba(59,130,246,0.12)', green:'rgba(34,197,94,0.12)', orange:'rgba(245,158,11,0.12)' };
   const colorBorder = { red:'rgba(239,68,68,0.5)', blue:'rgba(59,130,246,0.5)', green:'rgba(34,197,94,0.5)', orange:'rgba(245,158,11,0.5)' };
-  grid.innerHTML = WILLPOWER_CARDS.map(c => `
-    <div style="background:${colorBg[c.color]};border:2px solid ${colorBorder[c.color]};border-radius:12px;padding:14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;">
+  const colorBorderBright = { red:'rgba(239,68,68,0.9)', blue:'rgba(59,130,246,0.9)', green:'rgba(34,197,94,0.9)', orange:'rgba(245,158,11,0.9)' };
+  grid.innerHTML = WILLPOWER_CARDS.map(c => {
+    const cnt = wpDeckConfig[c.id] || 0;
+    const dimmed = cnt === 0;
+    const border = dimmed ? 'rgba(255,255,255,0.1)' : colorBorderBright[c.color];
+    const bg = dimmed ? 'rgba(255,255,255,0.03)' : colorBg[c.color];
+    const opacity = dimmed ? 'opacity:0.35;' : '';
+    const countLabel = cnt === 0 ? '—' : `×${cnt}`;
+    const countColor = cnt === 2 ? '#fbbf24' : cnt === 1 ? 'var(--text)' : 'var(--text2)';
+    return `
+    <div onclick="cycleWpCard(${c.id})" style="background:${bg};border:2px solid ${border};border-radius:12px;padding:14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all 0.15s;${opacity}user-select:none;">
       <div style="font-size:32px;">${c.emoji}</div>
       <div style="font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.5px;">${c.name}</div>
       <div style="font-size:10px;color:var(--text2);line-height:1.3;">${c.desc}</div>
-      <div style="font-size:9px;font-weight:700;color:${colorBorder[c.color]};text-transform:uppercase;margin-top:auto;">${c.color}${c.hpCost ? ' · ' + c.hpCost + ' HP' : ' · 1 HP'}</div>
-    </div>
-  `).join('');
-  document.getElementById('willpowerGalleryOverlay').classList.add('active');
+      <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:auto;padding-top:6px;">
+        <span style="font-size:9px;font-weight:700;color:${colorBorder[c.color]};text-transform:uppercase;">${c.color}${c.hpCost ? ' · ' + c.hpCost + ' HP' : ' · 1 HP'}</span>
+        <span style="font-size:14px;font-weight:900;color:${countColor};">${countLabel}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const total = wpDeckTotal();
+  const totalEl = document.getElementById('wpDeckTotal');
+  const good = total === 15;
+  totalEl.innerHTML = `<span style="color:${good ? 'var(--win)' : 'var(--hp-red)'};">${total} / 15 cards</span>` +
+    (good ? ' ✓' : ` — need ${15 - total > 0 ? (15 - total) + ' more' : 'to remove ' + (total - 15)}`);
+  document.getElementById('wpSaveBtn').style.opacity = good ? '1' : '0.4';
 }
+
+function cycleWpCard(id) {
+  const cur = wpDeckConfig[id] || 0;
+  wpDeckConfig[id] = (cur + 1) % 3; // 0 → 1 → 2 → 0
+  renderWpGallery();
+}
+
+function saveWillpowerDeck() {
+  const total = wpDeckTotal();
+  if (total !== 15) {
+    narrate(`Deck must be exactly 15 cards! Currently ${total}.`);
+    return;
+  }
+  try { localStorage.setItem('wpDeckConfig', JSON.stringify(wpDeckConfig)); } catch(e) {}
+  closeWillpowerGallery();
+  narrate('Willpower deck saved!');
+}
+
 function closeWillpowerGallery() {
   document.getElementById('willpowerGalleryOverlay').classList.remove('active');
 }
