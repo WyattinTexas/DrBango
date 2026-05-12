@@ -12,47 +12,42 @@ class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(600);
     this.cameras.main.setBackgroundColor('#3a7d44');
 
-    // ── Generate tilemap ──
-    const map = this.make.tilemap({ tileWidth: T, tileHeight: T, width: MW, height: MH });
-    const natureTileset = map.addTilesetImage('tiles_nature', 'tiles_nature', 16, 16);
-    const waterTileset = map.addTilesetImage('tiles_water', 'tiles_water', 16, 16);
+    // ── Generate world with colored rectangles (clean, no tileset issues) ──
+    const grassColors = [0x3a7d44, 0x3e8248, 0x368040, 0x42864c];
+    const pathColor = 0x8b7355;
+    const waterColor = 0x2255aa;
 
-    // Ground layer
-    const ground = map.createBlankLayer('ground', [natureTileset, waterTileset], 0, 0, MW, MH, T, T);
-
-    // Fill with grass
     for (let y = 0; y < MH; y++) {
       for (let x = 0; x < MW; x++) {
-        // Borders = water
+        let color;
         if (x === 0 || y === 0 || x === MW-1 || y === MH-1) {
-          ground.putTileAt(0, x, y); // water tile
+          color = waterColor;
+        } else if (y === 30 || y === 31 || x === 40 || x === 41) {
+          color = pathColor;
+        } else {
+          color = grassColors[(x * 7 + y * 13) % grassColors.length];
         }
-        // Paths
-        else if (y === 30 || y === 31 || x === 40 || x === 41) {
-          ground.putTileAt(2, x, y); // path-ish tile
-        }
-        // Random variety
-        else {
-          ground.putTileAt(Phaser.Math.Between(0, 3), x, y);
-        }
+        this.add.rectangle(x * T + T/2, y * T + T/2, T, T, color);
       }
     }
 
-    // ── Trees (static physics group) ──
+    // ── Trees using tileset spritesheet (16x16 tiles from nature tileset) ──
+    // Nature tileset: 384x336, 16px tiles = 24 cols x 21 rows
+    // Tree tiles are around index 48-72 area (row 2-3)
     this.trees = this.physics.add.staticGroup();
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 80; i++) {
       const tx = Phaser.Math.Between(3, MW - 4) * T;
       const ty = Phaser.Math.Between(3, MH - 4) * T;
-      // Don't place on paths
       const tileX = Math.floor(tx / T), tileY = Math.floor(ty / T);
       if (tileY === 30 || tileY === 31 || tileX === 40 || tileX === 41) continue;
-      const tree = this.trees.create(tx, ty, 'tiles_nature', 6); // tree tile from nature tileset
+      // Use nature tileset frame for trees (frame 48 = a tree-like tile)
+      const tree = this.trees.create(tx, ty, 'tiles_nature', Phaser.Math.Between(48, 55));
       tree.setScale(2).refreshBody();
     }
 
     // ── Player ──
     this.player = this.physics.add.sprite(G.x * T, G.y * T, 'player', 0);
-    this.player.setScale(1.2);
+    this.player.setScale(2);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.trees);
@@ -155,7 +150,7 @@ class WorldScene extends Phaser.Scene {
   // ═══════ NPCs ═══════
 
   spawnNPC(name, x, y, spriteKey, tint, hostile = false) {
-    const npc = this.physics.add.staticSprite(x, y, spriteKey, 0).setScale(1.2);
+    const npc = this.physics.add.staticSprite(x, y, spriteKey, 0).setScale(2);
     if (tint) npc.setTint(tint);
 
     const label = this.add.text(x, y - 40, name, {
@@ -233,7 +228,7 @@ class WorldScene extends Phaser.Scene {
     const ey = py + Math.sin(angle) * dist;
 
     const wildCard = ALL_CARDS[Math.floor(Math.random() * ALL_CARDS.length)];
-    const enemy = this.enemies.create(ex, ey, 'enemy_sprite', 0).setScale(0.9);
+    const enemy = this.enemies.create(ex, ey, 'enemy_sprite', 0).setScale(1.8);
     enemy.cardData = wildCard;
     enemy.setDepth(9);
     enemy.setTint(wildCard.rarity === 'rare' ? 0xaa55ff : wildCard.rarity === 'uncommon' ? 0x5599ff : 0xffffff);

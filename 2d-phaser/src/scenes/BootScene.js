@@ -6,20 +6,21 @@ class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
   preload() {
-    // ── Character sprites ──
-    this.load.spritesheet('player', 'assets/characters/Boy_walk.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('npc_elder', 'assets/characters/NPC_ElderFrost.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('npc_knight', 'assets/characters/NPC_Knight_idle.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('npc_hunter', 'assets/characters/NPC_Hunter_idle.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('npc_child', 'assets/characters/NPC_Child.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('enemy_sprite', 'assets/characters/FighterRed_walk.png', { frameWidth: 64, frameHeight: 64 });
+    // ── Character sprites (16x16 per frame, 4 cols x 4 rows = 64x64 sheet) ──
+    this.load.spritesheet('player', 'assets/characters/Boy_walk.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('enemy_sprite', 'assets/characters/FighterRed_walk.png', { frameWidth: 16, frameHeight: 16 });
+    // NPC sprites (16x16 per frame, 4 cols x 1 row = 64x16 sheet)
+    this.load.spritesheet('npc_elder', 'assets/characters/NPC_ElderFrost.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('npc_knight', 'assets/characters/NPC_Knight_idle.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('npc_hunter', 'assets/characters/NPC_Hunter_idle.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('npc_child', 'assets/characters/NPC_Child.png', { frameWidth: 16, frameHeight: 16 });
 
-    // ── Tilesets ──
-    this.load.image('tiles_nature', 'assets/tiles/TilesetNature.png');
-    this.load.image('tiles_water', 'assets/tiles/TilesetWater.png');
-    this.load.image('tiles_field', 'assets/tiles/TilesetField.png');
-    this.load.image('tiles_house', 'assets/tiles/TilesetHouse.png');
-    this.load.image('tiles_desert', 'assets/tiles/TilesetDesert.png');
+    // ── Tilesets (spritesheet: 16x16 per tile) ──
+    this.load.spritesheet('tiles_nature', 'assets/tiles/TilesetNature.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('tiles_water', 'assets/tiles/TilesetWater.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('tiles_field', 'assets/tiles/TilesetField.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('tiles_house', 'assets/tiles/TilesetHouse.png', { frameWidth: 16, frameHeight: 16 });
+    this.load.spritesheet('tiles_desert', 'assets/tiles/TilesetDesert.png', { frameWidth: 16, frameHeight: 16 });
 
     // ── Card art (load the first batch for battles) ──
     for (const card of ALL_CARDS.slice(0, 40)) {
@@ -44,11 +45,12 @@ class BootScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // ── Player walk animations ──
-    this.anims.create({ key: 'walk_down', frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_up', frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_left', frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }), frameRate: 8, repeat: -1 });
-    this.anims.create({ key: 'walk_right', frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }), frameRate: 8, repeat: -1 });
+    // ── Player walk animations (4x4 grid: row0=down, row1=up, row2=left, row3=right) ──
+    // Each row has 4 frames. Frame index = row*4 + col
+    this.anims.create({ key: 'walk_down', frames: this.anims.generateFrameNumbers('player', { frames: [0, 1, 2, 3] }), frameRate: 8, repeat: -1 });
+    this.anims.create({ key: 'walk_up', frames: this.anims.generateFrameNumbers('player', { frames: [4, 5, 6, 7] }), frameRate: 8, repeat: -1 });
+    this.anims.create({ key: 'walk_left', frames: this.anims.generateFrameNumbers('player', { frames: [8, 9, 10, 11] }), frameRate: 8, repeat: -1 });
+    this.anims.create({ key: 'walk_right', frames: this.anims.generateFrameNumbers('player', { frames: [12, 13, 14, 15] }), frameRate: 8, repeat: -1 });
 
     // ── Title screen ──
     this.cameras.main.setBackgroundColor('#1a1a2e');
@@ -59,8 +61,8 @@ class BootScene extends Phaser.Scene {
       this.tweens.add({ targets: star, alpha: 0.1, duration: Phaser.Math.Between(1000, 3000), yoyo: true, repeat: -1 });
     }
 
-    // Player character preview
-    const preview = this.add.sprite(width / 2, height * 0.58, 'player', 0).setScale(3);
+    // Player character preview (single frame, scaled up for title screen)
+    const preview = this.add.sprite(width / 2, height * 0.55, 'player', 0).setScale(5);
 
     this.add.text(width / 2, height * 0.2, 'BATTLE OF ORIGINS', {
       fontSize: '52px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
