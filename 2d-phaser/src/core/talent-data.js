@@ -630,7 +630,7 @@ const CLASS_TREES = {
     talents: [
       // Branch 0: Protection — world structure & defense
       { id: 'eld_pro_1', branch: 0, tier: 0, name: 'Elder Barrier',
-        desc: 'AoE ability: ward away all Dark Riders and defeat dark wights in range. 2-hour cooldown.', cost: 1, maxRank: 1, prereq: null },
+        desc: 'AoE ability: ward away Dark Riders, defeat dark wights, and heal all nearby players to full HP. 2-hour cooldown.', cost: 1, maxRank: 1, prereq: null },
       { id: 'eld_pro_2', branch: 0, tier: 1, name: 'Elder Texts',
         desc: 'May read Elder texts found in the world (unlocks hidden knowledge)', cost: 2, maxRank: 1, prereq: 'eld_pro_1' },
       { id: 'eld_pro_3', branch: 0, tier: 2, name: 'Spirit Ward',
