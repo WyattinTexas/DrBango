@@ -224,6 +224,7 @@ function ensurePlayerDefaults() {
   if (G.xp === undefined) G.xp = 0;
   if (G.coins === undefined) G.coins = 100;
   if (G.activeIdx === undefined) G.activeIdx = 0;
+  G.inBattle = false; // never restore mid-battle state from save
   if (!G.materials) G.materials = {};
   if (!G.professionXP) G.professionXP = { combat: 0, exploration: 0, crafting: 0, trade: 0, charisma: 0 };
   if (!G.professionSkills) G.professionSkills = {};

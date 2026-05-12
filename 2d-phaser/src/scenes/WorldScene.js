@@ -6,6 +6,10 @@ class WorldScene extends Phaser.Scene {
   constructor() { super('WorldScene'); }
 
   create() {
+    // Safety: clear stale battle state from previous session
+    G.inBattle = false;
+    B = null;
+
     const T = 32;
     const MW = WORLD_W, MH = WORLD_H; // 110x85 from world-gen.js
 
