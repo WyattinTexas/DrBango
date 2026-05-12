@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v8'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v9'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2835,7 +2835,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v8'; // Testroom2: willpower card system replaces HP bars
+const TESTROOM_VERSION = 'v9'; // Testroom2: willpower card system replaces HP bars
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -2997,7 +2997,7 @@ const SHELVED_IDS = new Set([
 // ============================================================
 const WILLPOWER_CARDS = [
   { id:1,  name:'Bonanza',          color:'red',    emoji:'💥', effect:'bonanza',        desc:'+2 damage to wins' },
-  { id:2,  name:'Spark',            color:'red',    emoji:'⚡', effect:'spark',          desc:'+1 damage to your roll result' },
+  { id:2,  name:'Spark',            color:'red',    emoji:'⚡', effect:'spark',          desc:'Gain +1 Surge' },
   { id:3,  name:'Ignite',           color:'red',    emoji:'🔥', effect:'ignite',         desc:'Apply 1 Burn to opponent\'s active' },
   { id:4,  name:'Pow',              color:'red',    emoji:'💢', effect:'pow',            desc:'+2 damage for each 2 you roll' },
   { id:5,  name:'Gain Moonstone',   color:'blue',   emoji:'💎', effect:'gainMoonstone',  desc:'Gain 1 Moon Stone' },
@@ -16185,12 +16185,6 @@ function _resolveRoundImpl() {
     log(`<span class="log-ability">Bonanza!</span> +${B.wpBonanza[winTeamName]} damage`);
     B.wpBonanza[winTeamName] = 0;
   }
-  // Willpower: Spark (+1 flat damage)
-  if (B.wpSpark && B.wpSpark[winTeamName] > 0) {
-    dmg += B.wpSpark[winTeamName];
-    log(`<span class="log-ability">Spark!</span> +${B.wpSpark[winTeamName]} damage`);
-    B.wpSpark[winTeamName] = 0;
-  }
   // Willpower: Shell (block 1 damage)
   if (lF.shellActive && dmg > 0) {
     dmg = Math.max(0, dmg - 1);
@@ -18960,8 +18954,7 @@ function applyWillpowerEffect(team, card) {
       B.wpBonanza[team] = 2;
       break;
     case 'spark':
-      if (!B.wpSpark) B.wpSpark = { red:0, blue:0 };
-      B.wpSpark[team] = 1;
+      t.resources.surge = (t.resources.surge || 0) + 1;
       break;
     case 'ignite': {
       const oppF = active(B[oppTeam]);
