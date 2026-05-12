@@ -244,6 +244,7 @@ class CraftScene extends Phaser.Scene {
       if (!G.mastery) G.mastery = {};
       if (!G.mastery[s.type]) G.mastery[s.type] = { xp: 0 };
       G.mastery[s.type].xp += 1;
+      if (typeof addProfessionXP === 'function') addProfessionXP('crafting', 10);
       saveGame();
 
       // Result display

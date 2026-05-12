@@ -79,7 +79,7 @@ class BootScene extends Phaser.Scene {
       fontSize: '18px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#aaaacc',
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, height * 0.34, 'v1.0.29 — Phaser Edition', {
+    this.add.text(width / 2, height * 0.34, 'v1.0.30 — Phaser Edition', {
       fontSize: '11px', fontFamily: 'monospace', color: '#555577',
     }).setOrigin(0.5);
 
@@ -93,6 +93,7 @@ class BootScene extends Phaser.Scene {
     btnBg.on('pointerout', () => btnBg.setFillStyle(0xeeeeee, 0.9));
     btnBg.on('pointerdown', () => {
       if (G.team.length === 0) {
+        // New game — give starter ghost, then show discipline choice
         const starterIds = [39, 66, 91];
         for (const id of starterIds) {
           const card = ALL_CARDS.find(c => c.id === id);
@@ -105,9 +106,91 @@ class BootScene extends Phaser.Scene {
           }
         }
         saveGame();
+        // Show discipline choice before entering the world
+        this.showDisciplineChoice();
+        return; // don't transition yet — discipline choice handles it
       }
       this.cameras.main.fadeOut(600, 0, 0, 0);
       this.time.delayedCall(600, () => this.scene.start('WorldScene'));
+    });
+  }
+
+  // ═══════ DISCIPLINE CHOICE (new game only) ═══════
+  showDisciplineChoice() {
+    const { width, height } = this.scale;
+
+    // Dim the title screen
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75)
+      .setDepth(100);
+
+    // Header
+    this.add.text(width / 2, height * 0.12, 'CHOOSE YOUR DISCIPLINE', {
+      fontSize: '28px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
+      shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 4, fill: true },
+    }).setOrigin(0.5).setDepth(101);
+
+    this.add.text(width / 2, height * 0.19, 'This shapes your journey through the Spirit World', {
+      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#888899',
+    }).setOrigin(0.5).setDepth(101);
+
+    // Discipline cards
+    const disciplines = [
+      { key: 'fighter',  icon: '\u2694\uFE0F', name: 'Fighter',  desc: '+10% combat XP gain',                        color: 0x662222 },
+      { key: 'scout',    icon: '\uD83E\uDDED', name: 'Scout',    desc: '+10% exploration XP\n+20% recruit chance',    color: 0x223355 },
+      { key: 'artisan',  icon: '\uD83D\uDD28', name: 'Artisan',  desc: '+10% crafting XP\n+1 assembly roll bonus',    color: 0x554422 },
+      { key: 'merchant', icon: '\uD83D\uDCB0', name: 'Merchant', desc: 'Start with +50 gold\n+10% trade XP',         color: 0x225522 },
+    ];
+
+    const cardW = 200, cardH = 160, gap = 20;
+    const totalW = disciplines.length * cardW + (disciplines.length - 1) * gap;
+    const startX = (width - totalW) / 2 + cardW / 2;
+    const cardY = height * 0.48;
+
+    disciplines.forEach((d, i) => {
+      const cx = startX + i * (cardW + gap);
+
+      // Card background
+      const cardBg = this.add.rectangle(cx, cardY, cardW, cardH, d.color, 0.85)
+        .setStrokeStyle(2, 0x555566)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(102);
+
+      // Icon
+      this.add.text(cx, cardY - 45, d.icon, {
+        fontSize: '36px',
+      }).setOrigin(0.5).setDepth(103);
+
+      // Name
+      this.add.text(cx, cardY - 8, d.name, {
+        fontSize: '18px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(103);
+
+      // Description
+      this.add.text(cx, cardY + 28, d.desc, {
+        fontSize: '12px', fontFamily: 'monospace', color: '#bbbbcc', align: 'center',
+        lineSpacing: 4,
+      }).setOrigin(0.5, 0).setDepth(103);
+
+      // Hover effects
+      cardBg.on('pointerover', () => { cardBg.setStrokeStyle(3, 0xffffff); cardBg.setAlpha(1); });
+      cardBg.on('pointerout', () => { cardBg.setStrokeStyle(2, 0x555566); cardBg.setAlpha(0.85); });
+
+      // Click to choose
+      cardBg.on('pointerdown', () => {
+        G.discipline = d.key;
+
+        // Apply Merchant starting bonus
+        if (d.key === 'merchant') {
+          G.coins = (G.coins || 100) + 50;
+        }
+
+        notify(`Discipline chosen: ${d.name}!`);
+        saveGame();
+
+        // Transition to world
+        this.cameras.main.fadeOut(600, 0, 0, 0);
+        this.time.delayedCall(600, () => this.scene.start('WorldScene'));
+      });
     });
   }
 }

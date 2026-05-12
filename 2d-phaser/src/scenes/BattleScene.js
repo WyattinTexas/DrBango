@@ -468,6 +468,15 @@ class BattleScene extends Phaser.Scene {
 
       checkAndNotifyTitles();
 
+      // Profession XP for combat
+      if (typeof addProfessionXP === 'function') {
+        addProfessionXP('combat', 10);
+        if (this.eg?.rarity === 'rare' || this.eg?.rarity === 'ghost-rare' || this.eg?.rarity === 'legendary') {
+          addProfessionXP('combat', 5);
+          addProfessionXP('exploration', 5);
+        }
+      }
+
       // Essence drops
       if (typeof generateEssence === 'function' && B?.enemyCard) {
         const zoneIdx = B.zoneIdx !== undefined ? B.zoneIdx : getCurrentZone(G.x, G.y);

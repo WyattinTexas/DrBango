@@ -7,6 +7,12 @@
 function addProfessionXP(type, amount) {
   if (!G.professionXP) G.professionXP = { combat:0, exploration:0, crafting:0, trade:0, charisma:0 };
 
+  // Discipline bonus — +10% XP for matching discipline category
+  const disciplineXPBonus = { fighter:'combat', scout:'exploration', artisan:'crafting', merchant:'trade' };
+  if (G.discipline && disciplineXPBonus[G.discipline] === type) {
+    amount = Math.ceil(amount * 1.1);
+  }
+
   // House buff — +25% XP for 2 hours after visiting your house
   if (G.houseBuff && Date.now() < G.houseBuff.until) {
     amount = Math.ceil(amount * G.houseBuff.multiplier);
@@ -19,6 +25,16 @@ function addProfessionXP(type, amount) {
 
   const prev = G.professionXP[type] || 0;
   G.professionXP[type] = prev + amount;
+
+  // Check mastery level transition (using PROFESSION_MASTERY_LEVELS from globals.js)
+  if (typeof PROFESSION_MASTERY_LEVELS !== 'undefined') {
+    const prevMastery = getProfessionMasteryInfo(prev);
+    const newMastery = getProfessionMasteryInfo(G.professionXP[type]);
+    if (newMastery.name !== prevMastery.name) {
+      const typeNames = { combat:'Combat', exploration:'Exploration', crafting:'Crafting', trade:'Trade', charisma:'Charisma' };
+      notify(`${typeNames[type]}: ${newMastery.name} rank reached!`);
+    }
+  }
 
   // Milestone notifications (every 100 XP)
   const prevMilestone = Math.floor(prev / 100);

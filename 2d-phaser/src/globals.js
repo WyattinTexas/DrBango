@@ -232,6 +232,7 @@ function ensurePlayerDefaults() {
   if (!G.professionSkills) G.professionSkills = {};
   if (G.skillPointsUsed === undefined) G.skillPointsUsed = 0;
   if (!G.achievements) G.achievements = [];
+  if (!G.discipline) G.discipline = null; // Fighter, Scout, Artisan, Merchant — chosen at game start
   // Resources (must exist for wisp collection + battle resource bar)
   if (G.iceShards === undefined) G.iceShards = 0;
   if (G.sacredFire === undefined) G.sacredFire = 0;
@@ -240,7 +241,35 @@ function ensurePlayerDefaults() {
   if (G.surge === undefined) G.surge = 0;
   if (G.moonstone === undefined) G.moonstone = 0;
   if (G.firefly === undefined) G.firefly = 0;
+  // Wave 3: combat mastery (derived from battlesWon)
+  if (!G.mastery.combat) G.mastery.combat = { xp: 0 };
 }
+
+// ── Profession mastery levels (based on profession XP thresholds) ──
+const PROFESSION_MASTERY_LEVELS = [
+  { name: 'Novice',       min: 0,    cls: 'novice' },
+  { name: 'Apprentice',   min: 100,  cls: 'apprentice' },
+  { name: 'Journeyman',   min: 350,  cls: 'journeyman' },
+  { name: 'Expert',       min: 800,  cls: 'expert' },
+  { name: 'Master',       min: 1600, cls: 'master' },
+  { name: 'Grand Master', min: 3000, cls: 'grandmaster' },
+];
+
+function getProfessionMasteryInfo(xp) {
+  let result = PROFESSION_MASTERY_LEVELS[0];
+  for (const lvl of PROFESSION_MASTERY_LEVELS) {
+    if (xp >= lvl.min) result = lvl;
+  }
+  return result;
+}
+
+// ── Discipline definitions (chosen at game start, bonuses referenced by other systems) ──
+const DISCIPLINES = {
+  fighter:  { name: 'Fighter',  icon: '\u2694\uFE0F', desc: '+10% combat XP gain', color: '#ff6644' },
+  scout:    { name: 'Scout',    icon: '\uD83E\uDDED', desc: '+10% exploration XP, +20% recruit chance', color: '#44bbff' },
+  artisan:  { name: 'Artisan',  icon: '\uD83D\uDD28', desc: '+10% crafting XP, +1 assembly roll bonus', color: '#ffaa22' },
+  merchant: { name: 'Merchant', icon: '\uD83D\uDCB0', desc: 'Start with +50 gold, +10% trade XP', color: '#44dd44' },
+};
 
 // ═══════════════════════════════════════════════════
 // PORTED FUNCTIONS FROM 2D index.html

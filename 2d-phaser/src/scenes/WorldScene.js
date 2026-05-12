@@ -117,6 +117,7 @@ class WorldScene extends Phaser.Scene {
     this.cKey = this.input.keyboard.addKey('C');
     this.tKey = this.input.keyboard.addKey('T');
     this.iKey = this.input.keyboard.addKey('I');
+    this.pKey = this.input.keyboard.addKey('P');
 
     // ── HUD ──
     this.buildHUD();
@@ -172,6 +173,51 @@ class WorldScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(6);
     }
 
+    // ── Wave 3: Building Interactions ──
+    this._interactBuildings = [
+      { name: 'Trading Post', x: HUB.x + 1, y: HUB.y + 1, action: 'tradingPost' },
+      { name: 'Arena', x: HUB.x + 5, y: HUB.y + 1, action: 'arena' },
+      { name: 'Workshop', x: HUB.x + 1, y: HUB.y + 3, action: 'workshop' },
+      { name: 'Inn', x: HUB.x + 5, y: HUB.y + 3, action: 'inn' },
+      { name: 'Cantina', x: HUB.x + 3, y: HUB.y + 5, action: 'cantina' },
+    ];
+
+    // ── Wave 3: Signposts ──
+    this._signposts = [
+      { x: HUB.x + 3, y: HUB.y - 2, text: 'Welcome to Polaris Hub! North: Frost Valley zones. South: Rolling Hills.' },
+      { x: 28, y: 42, text: 'CAUTION: Mountain pass ahead. Rolling Hills region beyond.' },
+      { x: 58, y: 20, text: 'Volcanic Isles passage. Beware lava flows and strong Spiritkin.' },
+      { x: 90, y: 20, text: 'Dark Castle entrance. Only the brave pass this threshold.' },
+      { x: 26, y: 56, text: 'Meadowbrook — a peaceful settlement among the rolling green hills.' },
+      { x: 74, y: 13, text: 'Volcanic Settlement — built on sand and ash. Trade and rest here.' },
+    ];
+    for (const sp of this._signposts) {
+      this.add.text(sp.x * T + T/2, sp.y * T + T/2, '\u{1F4DC}', {
+        fontSize: '16px',
+      }).setOrigin(0.5).setDepth(6);
+    }
+
+    // ── Wave 3: Lore Tablets ──
+    this._loreTablets = [
+      { id: 'lore_polaris', x: 20, y: 16, text: 'The first settlers named this land after the Polaris star, a beacon visible even through spirit storms. Frost Valley was where Spiritkin and humans first learned to coexist.' },
+      { id: 'lore_lake', x: 40, y: 20, text: 'The Frozen Lake was once a sacred pool where Spiritkin emerged from the spirit world. When the Great Frost came, the lake sealed shut — trapping hundreds of spirits beneath the ice.' },
+      { id: 'lore_hills', x: 30, y: 55, text: 'Rolling Hills was farmland before the Spiritkin arrived. Farmer Bea says the flowers here bloom in colors that don\'t exist anywhere else — fed by spirit energy seeping up from below.' },
+      { id: 'lore_castle', x: 98, y: 12, text: 'The Dark Castle was built by the Valkin, ancient spirit wardens who believed darkness could be harnessed. When they vanished, the castle remained — and something still stirs inside.' },
+    ];
+    this._loreTabletSprites = [];
+    for (const lt of this._loreTablets) {
+      if (G.loreCollected.includes(lt.id)) continue; // already collected
+      const glow = this.add.rectangle(lt.x * T + T/2, lt.y * T + T/2, 14, 14, 0xffcc00, 0.85)
+        .setStrokeStyle(1, 0xffee44).setDepth(8);
+      const outerGlow = this.add.rectangle(lt.x * T + T/2, lt.y * T + T/2, 20, 20, 0xffcc00, 0.2)
+        .setDepth(7);
+      this.tweens.add({ targets: outerGlow, scaleX: 1.5, scaleY: 1.5, alpha: 0.05, duration: 1200, yoyo: true, repeat: -1 });
+      this._loreTabletSprites.push({ id: lt.id, x: lt.x, y: lt.y, text: lt.text, glow, outerGlow });
+    }
+
+    // ── Wave 3: Region transition tracking ──
+    this._lastRegion = getCurrentRegion(G.x, G.y);
+
     // ── Encounter zone labels ──
     for (const zone of ENCOUNTER_ZONES) {
       this.add.text((zone.x + zone.w/2) * T, zone.y * T - 8, zone.name, {
@@ -187,6 +233,7 @@ class WorldScene extends Phaser.Scene {
       { label: 'TEAM (T)', key: 'T', action: () => this.showTeamLineup(), color: 0x445588 },
       { label: 'ITEMS (I)', key: 'I', action: () => this.showInventory(), color: 0x885544 },
       { label: 'CRAFT (C)', key: 'C', action: () => { this.scene.launch('CraftScene'); this.scene.pause(); }, color: 0x665533 },
+      { label: 'PROF (P)', key: 'P', action: () => this.showProfessionPanel(), color: 0x664488 },
       { label: 'MAP (M)', key: null, action: () => this.showNotification('Minimap is bottom-right!'), color: 0x448844 },
     ];
     const startX = this.scale.width / 2 - (buttons.length * (btnW + btnGap)) / 2;
@@ -355,6 +402,21 @@ class WorldScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.iKey)) {
       this.showInventory();
     }
+    if (Phaser.Input.Keyboard.JustDown(this.pKey)) {
+      this.showProfessionPanel();
+    }
+
+    // Wave 3: Building interactions (E key near buildings)
+    this.checkBuildingProximity();
+
+    // Wave 3: Signpost interactions (E key near signposts)
+    this.checkSignpostProximity();
+
+    // Wave 3: Lore tablet collection (walk over)
+    this.checkLoreTablets();
+
+    // Wave 3: Region transition banners + exploration XP
+    this.checkRegionTransition(region);
 
     // Dynamic encounter rate — faster spawns inside encounter zones
     const zoneIdx = getCurrentZone(G.x, G.y);
@@ -397,6 +459,7 @@ class WorldScene extends Phaser.Scene {
 
   checkNPCProximity() {
     const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
+    this._eConsumed = false; // reset each frame
 
     for (const npc of this.npcSprites) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
@@ -412,6 +475,7 @@ class WorldScene extends Phaser.Scene {
         }
 
         if (ePressed) {
+          this._eConsumed = true;
           if (this.comm && this.comm.isActive) {
             this.comm.dismiss();
           } else if (npc.hostile) {
@@ -459,6 +523,225 @@ class WorldScene extends Phaser.Scene {
       backgroundColor: '#000000aa', padding: { x: 12, y: 6 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
     this.tweens.add({ targets: notif, alpha: 0, y: 40, duration: 2000, delay: 1500, onComplete: () => notif.destroy() });
+  }
+
+  // ═══════ WAVE 3: BUILDING INTERACTIONS ═══════
+
+  checkBuildingProximity() {
+    if (this._eConsumed) return; // NPC already handled E this frame
+    const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
+    if (!ePressed) return;
+    // Don't interact if a panel, comm overlay, or dialogue is active
+    if (this.panels.isOpen()) return;
+    if (this.comm && this.comm.isActive) return;
+
+    const px = this.player.x;
+    const py = this.player.y;
+    const T = this._tileSize;
+    const INTERACT_DIST = 60; // pixels
+
+    for (const bld of this._interactBuildings) {
+      const bx = bld.x * T + T / 2;
+      const by = bld.y * T + T / 2;
+      const dist = Phaser.Math.Distance.Between(px, py, bx, by);
+      if (dist > INTERACT_DIST) continue;
+
+      this._eConsumed = true;
+      switch (bld.action) {
+        case 'tradingPost':
+          this.showBuildingPanel('Trading Post', 'Coming in Wave 4 — Buy and sell Spiritkin essences, gear, and materials.');
+          break;
+        case 'arena':
+          this.showBuildingPanel('Arena', 'Coming in Wave 4 — Challenge ranked trainers and earn arena titles.');
+          break;
+        case 'workshop':
+          this.scene.launch('CraftScene');
+          this.scene.pause();
+          break;
+        case 'inn':
+          this.interactInn();
+          break;
+        case 'cantina':
+          this.interactCantina();
+          break;
+      }
+      return; // only interact with one building per press
+    }
+  }
+
+  showBuildingPanel(title, message) {
+    this.panels.open(title, (container, w, h) => {
+      const text = this.add.text(w / 2, h / 2 - 20, message, {
+        fontSize: '14px', fontFamily: 'Georgia, serif', color: '#aaaacc',
+        wordWrap: { width: w - 40 }, align: 'center',
+      }).setOrigin(0.5).setScrollFactor(0);
+      container.add(text);
+    }, { width: 360, height: 160 });
+  }
+
+  interactInn() {
+    const cost = 5;
+    if (G.coins < cost) {
+      this.showNotification('Not enough gold! Inn costs 5 gold.');
+      return;
+    }
+    // Check if any team member is hurt
+    const anyHurt = G.team.some(g => g.hp < g.maxHp || g.ko);
+    if (!anyHurt) {
+      this.showNotification('Your team is already at full health!');
+      return;
+    }
+    G.coins -= cost;
+    for (const ghost of G.team) {
+      ghost.hp = ghost.maxHp;
+      ghost.ko = false;
+    }
+    saveGame();
+    this.showNotification('Team fully healed at the Inn! (-5 gold)');
+  }
+
+  interactCantina() {
+    const tips = [
+      'Bartender says: "The elder knows which zones are running hot. Ask him."',
+      '"Heard a traveler found a lore tablet near the frozen lake. Golden, glowing thing."',
+      '"The Workshop crafts the best gear. Bring essences from encounter zones."',
+      '"Some say the Dark Castle holds ancient Spiritkin sealed away for centuries."',
+      '"If your team is hurt, the Inn can fix them up — just 5 gold."',
+      '"Encounter zones cycle quality every 12 hours. Patience pays off."',
+      '"The Rolling Hills are peaceful, but don\'t let that fool you — the Spiritkin there are crafty."',
+      '"Captain Flint at the Volcanic settlement used to be a pirate. Don\'t tell him I said that."',
+      '"Spirit Wisps carry resources. Collect them before they vanish!"',
+      '"They say a master crafter can forge legendary weapons. Get your mastery up."',
+    ];
+    const tip = tips[Math.floor(Math.random() * tips.length)];
+    if (this.comm) {
+      this.comm.show('The Frozen Mug', tip, { color: '#cc9944' });
+    } else {
+      this.showDialogue('The Frozen Mug', tip);
+    }
+  }
+
+  // ═══════ WAVE 3: SIGNPOST INTERACTIONS ═══════
+
+  checkSignpostProximity() {
+    if (this._eConsumed) return; // NPC or building already handled E this frame
+    const ePressed = Phaser.Input.Keyboard.JustDown(this.eKey);
+    if (!ePressed) return;
+    if (this.panels.isOpen()) return;
+    if (this.comm && this.comm.isActive) return;
+
+    const px = this.player.x;
+    const py = this.player.y;
+    const T = this._tileSize;
+    const INTERACT_DIST = 50;
+
+    for (const sp of this._signposts) {
+      const sx = sp.x * T + T / 2;
+      const sy = sp.y * T + T / 2;
+      const dist = Phaser.Math.Distance.Between(px, py, sx, sy);
+      if (dist > INTERACT_DIST) continue;
+
+      if (this.comm) {
+        this.comm.show('Signpost', sp.text, { color: '#ccbb88' });
+      } else {
+        this.showNotification(sp.text);
+      }
+      return;
+    }
+  }
+
+  // ═══════ WAVE 3: LORE TABLETS ═══════
+
+  checkLoreTablets() {
+    const px = this.player.x;
+    const py = this.player.y;
+    const T = this._tileSize;
+    const COLLECT_DIST = 30;
+
+    for (let i = this._loreTabletSprites.length - 1; i >= 0; i--) {
+      const lt = this._loreTabletSprites[i];
+      const lx = lt.x * T + T / 2;
+      const ly = lt.y * T + T / 2;
+      const dist = Phaser.Math.Distance.Between(px, py, lx, ly);
+      if (dist > COLLECT_DIST) continue;
+
+      // Collect this lore tablet
+      if (!G.loreCollected.includes(lt.id)) {
+        G.loreCollected.push(lt.id);
+        saveGame();
+      }
+
+      // Remove visuals
+      if (lt.glow) lt.glow.destroy();
+      if (lt.outerGlow) lt.outerGlow.destroy();
+      this._loreTabletSprites.splice(i, 1);
+
+      // Show lore text in a panel
+      this.panels.open('LORE DISCOVERED', (container, w, h) => {
+        const title = this.add.text(w / 2, 16, `Lore Tablet (${G.loreCollected.length}/4)`, {
+          fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffcc44',
+        }).setOrigin(0.5).setScrollFactor(0);
+        const body = this.add.text(w / 2, h / 2, lt.text, {
+          fontSize: '13px', fontFamily: 'Georgia, serif', color: '#ccccee',
+          wordWrap: { width: w - 40 }, align: 'center', lineSpacing: 4,
+        }).setOrigin(0.5).setScrollFactor(0);
+        container.add([title, body]);
+      }, { width: 420, height: 220 });
+
+      this.showNotification('Lore tablet discovered!');
+      return; // one at a time
+    }
+  }
+
+  // ═══════ WAVE 3: REGION TRANSITION BANNERS ═══════
+
+  checkRegionTransition(currentRegion) {
+    if (currentRegion === this._lastRegion) return;
+    const isFirstSet = this._lastRegion === undefined;
+    this._lastRegion = currentRegion;
+
+    // Award exploration XP on region change (skip the initial set on scene load)
+    if (!isFirstSet && typeof addProfessionXP === 'function') {
+      addProfessionXP('exploration', 5);
+    }
+
+    const regionDisplay = {
+      frost_valley: { name: 'Frost Valley', color: '#88bbff' },
+      rolling_hills: { name: 'Rolling Hills', color: '#88cc44' },
+      volcanic_isles: { name: 'Volcanic Isles', color: '#ff8844' },
+      dark_castle: { name: 'Dark Castle', color: '#aa66cc' },
+    };
+    const info = regionDisplay[currentRegion];
+    if (!info) return;
+
+    // Large banner text — fade in, hold, fade out
+    const banner = this.add.text(640, 200, `Entering ${info.name}`, {
+      fontSize: '28px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: info.color,
+      backgroundColor: '#000000aa', padding: { x: 24, y: 12 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(400).setAlpha(0);
+
+    // Subtitle with region flavor
+    const flavors = {
+      frost_valley: 'Land of ice and ancient spirits',
+      rolling_hills: 'Where green hills meet the sky',
+      volcanic_isles: 'Fire and paradise intertwined',
+      dark_castle: 'Shadows hold secrets',
+    };
+    const subtitle = this.add.text(640, 240, flavors[currentRegion] || '', {
+      fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#999999',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(400).setAlpha(0);
+
+    // Fade in
+    this.tweens.add({
+      targets: [banner, subtitle], alpha: 1, duration: 600,
+      onComplete: () => {
+        // Hold then fade out
+        this.tweens.add({
+          targets: [banner, subtitle], alpha: 0, y: '-=20', duration: 1200, delay: 2000,
+          onComplete: () => { banner.destroy(); subtitle.destroy(); }
+        });
+      }
+    });
   }
 
   // ═══════ Enemies ═══════
@@ -784,6 +1067,103 @@ class WorldScene extends Phaser.Scene {
     }
   }
 
+  // ═══════ PROFESSION PANEL ═══════
+
+  showProfessionPanel() {
+    if (this.panels.isOpen()) { this.panels.close(); return; }
+
+    this.panels.open('PROFESSIONS', (container, w, h) => {
+      const categories = [
+        { key: 'combat',      label: 'Combat',      icon: '\u2694\uFE0F', color: '#ff6644' },
+        { key: 'exploration', label: 'Exploration',  icon: '\uD83E\uDDED', color: '#44bbff' },
+        { key: 'crafting',    label: 'Crafting',     icon: '\uD83D\uDD28', color: '#ffaa22' },
+        { key: 'trade',       label: 'Trade',        icon: '\uD83D\uDCB0', color: '#44dd44' },
+        { key: 'charisma',    label: 'Charisma',     icon: '\uD83C\uDF89', color: '#cc88ff' },
+      ];
+
+      // Discipline badge
+      let y = 6;
+      if (G.discipline && typeof DISCIPLINES !== 'undefined' && DISCIPLINES[G.discipline]) {
+        const disc = DISCIPLINES[G.discipline];
+        container.add(this.add.text(w / 2, y, disc.icon + ' ' + disc.name + ' Discipline', {
+          fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: disc.color,
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+        y += 18;
+        container.add(this.add.text(w / 2, y, disc.desc, {
+          fontSize: '10px', fontFamily: 'monospace', fontStyle: 'italic', color: '#888899',
+        }).setOrigin(0.5, 0).setScrollFactor(0));
+        y += 20;
+      }
+
+      // Divider
+      container.add(this.add.rectangle(w / 2, y, w - 20, 1, 0x334466).setScrollFactor(0));
+      y += 8;
+
+      // Skill points summary
+      var totalMilestones = Object.values(G.professionXP || {}).reduce(function(sum, xp) { return sum + Math.floor(xp / 100); }, 0);
+      var available = Math.max(0, totalMilestones - (G.skillPointsUsed || 0));
+      var capVal = (typeof SKILL_POINT_CAP !== 'undefined') ? SKILL_POINT_CAP : 80;
+      container.add(this.add.text(w / 2, y, 'Skill Points: ' + available + ' available (' + (G.skillPointsUsed || 0) + ' / ' + capVal + ' used)', {
+        fontSize: '11px', fontFamily: 'monospace', color: available > 0 ? '#88ff88' : '#888888',
+      }).setOrigin(0.5, 0).setScrollFactor(0));
+      y += 22;
+
+      // Category rows
+      for (var ci = 0; ci < categories.length; ci++) {
+        var cat = categories[ci];
+        var xp = (G.professionXP && G.professionXP[cat.key]) || 0;
+        var mastery = (typeof getProfessionMasteryInfo === 'function') ? getProfessionMasteryInfo(xp) : { name: 'Novice', min: 0 };
+
+        // Row background
+        var rowBg = this.add.rectangle(w / 2, y + 24, w - 16, 52, 0x111122, 0.6)
+          .setStrokeStyle(1, 0x334466).setScrollFactor(0);
+        container.add(rowBg);
+
+        // Icon + label
+        container.add(this.add.text(14, y + 8, cat.icon + ' ' + cat.label, {
+          fontSize: '14px', fontFamily: 'Georgia, serif', fontStyle: 'bold', color: cat.color,
+        }).setScrollFactor(0));
+
+        // XP value
+        container.add(this.add.text(w - 14, y + 8, xp + ' XP', {
+          fontSize: '12px', fontFamily: 'monospace', color: '#aaaacc',
+        }).setOrigin(1, 0).setScrollFactor(0));
+
+        // Mastery rank
+        var rankColors = { Novice: '#666', Apprentice: '#88aacc', Journeyman: '#aaccee', Expert: '#ffcc44', Master: '#ff8844', 'Grand Master': '#ff44ff' };
+        container.add(this.add.text(14, y + 28, 'Rank: ' + mastery.name, {
+          fontSize: '11px', fontFamily: 'monospace', color: rankColors[mastery.name] || '#888',
+        }).setScrollFactor(0));
+
+        // XP progress bar
+        var nextLevel = null;
+        if (typeof PROFESSION_MASTERY_LEVELS !== 'undefined') {
+          for (var li = 0; li < PROFESSION_MASTERY_LEVELS.length; li++) {
+            if (PROFESSION_MASTERY_LEVELS[li].min > xp) { nextLevel = PROFESSION_MASTERY_LEVELS[li]; break; }
+          }
+        }
+        var barW = 160, barH = 8;
+        var barX = w - 14 - barW;
+        var barY = y + 32;
+        container.add(this.add.rectangle(barX + barW / 2, barY + barH / 2, barW, barH, 0x222233).setScrollFactor(0));
+        if (nextLevel) {
+          var prevMin = mastery.min;
+          var progress = Math.min(1, (xp - prevMin) / (nextLevel.min - prevMin));
+          if (progress > 0) {
+            var fillColor = parseInt(cat.color.replace('#', ''), 16);
+            container.add(this.add.rectangle(barX + (barW * progress) / 2, barY + barH / 2, barW * progress, barH - 2, fillColor, 0.7).setOrigin(0.5, 0.5).setScrollFactor(0));
+          }
+        } else {
+          // Max rank
+          var fillColorMax = parseInt(cat.color.replace('#', ''), 16);
+          container.add(this.add.rectangle(barX + barW / 2, barY + barH / 2, barW, barH - 2, fillColorMax, 0.7).setScrollFactor(0));
+        }
+
+        y += 58;
+      }
+    }, { width: 420, height: 400 });
+  }
+
   // ═══════ SPIRIT WISPS ═══════
 
   spawnWisp() {
@@ -970,6 +1350,40 @@ class WorldScene extends Phaser.Scene {
     const tod = getTimeOfDay();
     const icons = { dawn: '🌅', day: '☀️', dusk: '🌇', night: '🌙' };
     this.hudTimeText.setText(`${icons[tod.phase] || ''} ${tod.phase}`);
+
+    // Wave 3: Zone quality display
+    const zoneIdx = getCurrentZone(G.x, G.y);
+    if (!this.hudZoneText) {
+      this.hudZoneText = this.add.text(10, 78, '', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#aa88dd',
+        backgroundColor: '#000000aa', padding: { x: 6, y: 2 },
+      }).setScrollFactor(0).setDepth(200);
+    }
+    if (zoneIdx >= 0) {
+      const zone = ENCOUNTER_ZONES[zoneIdx];
+      const quality = getZoneQuality(zoneIdx, getZoneCycleId());
+      const qualLabel = getZoneQualityLabel(quality);
+      const qualColor = quality >= 1.2 ? '#44ff44' : quality >= 0.8 ? '#cccc44' : '#ff6644';
+      this.hudZoneText.setText(`Zone: ${zone.name} (${qualLabel})`);
+      this.hudZoneText.setColor(qualColor);
+      this.hudZoneText.setVisible(true);
+    } else {
+      this.hudZoneText.setVisible(false);
+    }
+
+    // Wave 3: Mastery display
+    if (!this.hudMasteryText) {
+      this.hudMasteryText = this.add.text(10, 98, '', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#cc9944',
+        backgroundColor: '#000000aa', padding: { x: 6, y: 2 },
+      }).setScrollFactor(0).setDepth(200);
+    }
+    // Sync combat mastery XP from battlesWon (read-only from BattleScene)
+    if (G.mastery && G.mastery.combat) {
+      G.mastery.combat.xp = wins;
+    }
+    const combatMastery = (typeof getMasteryInfo === 'function') ? getMasteryInfo(wins) : { name: 'Novice' };
+    this.hudMasteryText.setText(`Combat: ${combatMastery.name} (${wins} XP)`);
 
     // Minimap player dot
     const W = this.scale.width;
