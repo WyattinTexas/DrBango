@@ -4046,6 +4046,57 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   0%,100% { box-shadow:0 0 0 2px #60a5fa, 0 0 18px rgba(96,165,250,0.6); }
   50%      { box-shadow:0 0 0 3px #60a5fa, 0 0 32px rgba(96,165,250,0.95); }
 }
+
+/* ===== WILLPOWER SYSTEM ===== */
+.willpower-stack { display:flex; align-items:center; gap:8px; margin:4px 0; min-height:36px; }
+.wp-pile { position:relative; width:60px; height:42px; flex-shrink:0; }
+.wp-pile-card {
+  position:absolute; left:0; width:58px; height:36px; border-radius:6px;
+  background:var(--surface,#1a1a2e); border:2px solid #888;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:7px; color:rgba(255,255,255,0.7); padding:1px;
+  transition:transform 0.15s, opacity 0.15s;
+}
+.wp-pile-card .wp-card-emoji { font-size:14px; line-height:1; }
+.wp-pile-card .wp-card-name { font-size:6px; color:rgba(255,255,255,0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:54px; }
+.wp-pile-top { cursor:pointer; z-index:10 !important; }
+.wp-pile-top:hover { transform:scale(1.08) !important; box-shadow:0 0 10px rgba(168,85,247,0.4); }
+.wp-locked { opacity:0.35; filter:grayscale(0.7); cursor:default !important; }
+.wp-locked:hover { transform:none !important; box-shadow:none !important; }
+.wp-c-red { border-color:#ef4444 !important; }
+.wp-c-blue { border-color:#3b82f6 !important; }
+.wp-c-green { border-color:#22c55e !important; }
+.wp-c-orange { border-color:#f59e0b !important; }
+.wp-stack-info { display:flex; flex-direction:column; align-items:flex-start; gap:0; }
+.wp-count { font-size:16px; font-weight:bold; color:#a855f7; line-height:1.1; }
+.wp-label { font-size:8px; color:rgba(168,85,247,0.6); text-transform:uppercase; letter-spacing:1px; }
+.wp-deck-status { font-size:7px; color:rgba(255,255,255,0.3); }
+
+/* Willpower Gallery Cards */
+.wp-gallery-card {
+  border:2px solid #888; border-radius:10px; padding:10px 6px; text-align:center;
+  cursor:pointer; background:rgba(255,255,255,0.03); transition:all 0.15s;
+  position:relative;
+}
+.wp-gallery-card:hover { transform:scale(1.04); box-shadow:0 0 12px rgba(168,85,247,0.25); }
+.wp-gallery-card .wp-card-emoji { font-size:28px; }
+.wp-gallery-card .wp-card-name { font-size:0.75rem; font-weight:600; color:rgba(255,255,255,0.85); margin:4px 0 2px; }
+.wp-gallery-card .wp-card-desc { font-size:0.65rem; color:rgba(255,255,255,0.45); line-height:1.3; }
+.wp-gallery-card .wp-card-cost { font-size:0.6rem; color:#ef4444; font-weight:bold; margin-top:2px; }
+.wp-gallery-card .wp-card-count {
+  position:absolute; top:4px; right:6px; font-size:0.85rem; font-weight:bold;
+  color:#a855f7; min-width:20px; text-align:center;
+}
+.wp-dimmed { opacity:0.35; }
+.wp-dimmed:hover { opacity:0.7; }
+
+/* PvP Willpower Stack */
+.pvp-wp-stack {
+  display:inline-flex; align-items:center; gap:4px; margin-top:4px;
+  padding:3px 8px; border-radius:6px; border:1px solid rgba(168,85,247,0.2);
+  background:rgba(168,85,247,0.06); transition:all 0.15s;
+}
+.pvp-wp-stack:hover { border-color:#a855f7; box-shadow:0 0 12px rgba(168,85,247,0.3); }
 </style>
 </head>
 <body>
@@ -4151,7 +4202,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   <div class="equip-side-tab" id="equip-side-tab" onclick="showEquipOverlay()"><span class="equip-tab-icon">&#x1F6E1;</span>Equip</div>
 
   <!-- World Tab (right sidebar, below equip) -->
-  <div class="room-side-tab" id="room-side-tab" onclick="window.location.href='../world/'"><span class="room-tab-icon">&#x1F30D;</span>World</div>
+  <div class="room-side-tab" id="room-side-tab" onclick="window.location.href='https://battleoforigins.com/world/'"><span class="room-tab-icon">&#x1F30D;</span>World</div>
 
   <!-- Equip Overlay (full screen) -->
   <div id="equip-overlay" class="equip-overlay" style="display:none">
@@ -4214,6 +4265,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 
       <button id="battle-btn" disabled onclick="clickBattle()">Select an opponent from the leaderboard</button>
       <button id="challenge-btn" disabled onclick="createChallenge()">CHALLENGE A FRIEND</button>
+      <button onclick="openWillpowerGallery()" style="padding:10px 20px;font-family:Creepster,cursive;font-size:0.9rem;letter-spacing:1.5px;color:#a855f7;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:8px;cursor:pointer;transition:all 0.2s;" onmouseenter="this.style.borderColor='rgba(168,85,247,0.6)';this.style.boxShadow='0 0 12px rgba(168,85,247,0.2)'" onmouseleave="this.style.borderColor='rgba(168,85,247,0.25)';this.style.boxShadow='none'">⚡ Willpower Deck</button>
       <button onclick="openTradeInbox()" style="padding:10px 20px;font-family:Creepster,cursive;font-size:0.9rem;letter-spacing:1.5px;color:var(--text2);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;cursor:pointer;transition:all 0.2s;position:relative;" onmouseenter="this.style.borderColor='rgba(212,160,64,0.4)';this.style.color='#d4a040'" onmouseleave="this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='var(--text2)'">Trade Inbox <span id="trade-badge-main" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-family:Inter,sans-serif;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;">0</span></button>
       <div class="challenge-warning">The winner takes one of the loser's cards!</div>
     </div>
@@ -4317,6 +4369,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <div class="team-info">
         <div class="hp-bar-wrap"><div class="hp-bar team-red" id="red-hpBar"></div></div>
         <div class="hp-text"><span class="hp-num" id="red-hpText"></span></div>
+        <div class="willpower-stack" id="red-willpower"></div>
         <div class="resources" id="red-resources"></div>
       </div>
       <div id="red-ability-buttons" class="ability-buttons"></div>
@@ -4353,6 +4406,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <div class="team-info">
         <div class="hp-bar-wrap"><div class="hp-bar team-blue" id="blue-hpBar"></div></div>
         <div class="hp-text"><span class="hp-num" id="blue-hpText"></span></div>
+        <div class="willpower-stack" id="blue-willpower"></div>
         <div class="resources" id="blue-resources"></div>
       </div>
       <div id="blue-ability-buttons" class="ability-buttons"></div>
@@ -7167,13 +7221,25 @@ function buildInitialBattleState(redTeamIds, blueTeamIds, redName, blueName) {
         ko: false,
         rarity: g.rarity,
         ability: g.ability || '',
-        abilityDesc: g.abilityDesc || ''
+        abilityDesc: g.abilityDesc || '',
+        willpower: [],
+        wpPending: true,
+        willpowerUsedThisTurn: false,
+        willpowerTopLocked: false
       };
     });
   }
+  // Build willpower decks for each team
+  const redWpDeck = buildTeamWillpowerDeck();
+  const blueWpDeck = buildTeamWillpowerDeck();
+  const redTeam = { ghosts: makeGhosts(redTeamIds), activeIdx: 0, wpDeck: redWpDeck, wpDiscard: [] };
+  const blueTeam = { ghosts: makeGhosts(blueTeamIds), activeIdx: 0, wpDeck: blueWpDeck, wpDiscard: [] };
+  // Draw willpower for starting ghosts
+  if (redTeam.ghosts[0]) wpDrawFromTeam(redTeam, redTeam.ghosts[0]);
+  if (blueTeam.ghosts[0]) wpDrawFromTeam(blueTeam, blueTeam.ghosts[0]);
   return {
-    red: { ghosts: makeGhosts(redTeamIds), activeIdx: 0 },
-    blue: { ghosts: makeGhosts(blueTeamIds), activeIdx: 0 }
+    red: redTeam,
+    blue: blueTeam
   };
 }
 
@@ -7306,6 +7372,20 @@ function renderPvPSide(side, teamData, game) {
   const hpPct = Math.max(0, (ghost.hp / ghost.maxHp) * 100);
   const hpClass = hpPct > 60 ? 'healthy' : hpPct > 30 ? 'warning' : 'critical';
 
+  // Willpower stack for PvP
+  let wpHtml = '';
+  if (ghost.willpower && ghost.willpower.length > 0) {
+    const topCard = wpCardById(ghost.willpower[0]);
+    const isMyTurn = game.turn === side && game.status === 'active' && side === mySide;
+    const canActivate = isMyTurn && !ghost.willpowerTopLocked;
+    const activateAttr = canActivate ? `onclick="pvpActivateWillpower('${side}')" style="cursor:pointer;border-color:#a855f7;box-shadow:0 0 8px rgba(168,85,247,0.3);"` : 'style="opacity:0.5;"';
+    wpHtml = `<div class="pvp-wp-stack" ${activateAttr} title="${topCard ? topCard.name + ': ' + topCard.desc : ''}">
+      <span style="font-size:14px;">${topCard ? topCard.emoji : '⚡'}</span>
+      <span style="font-size:0.7rem;color:#a855f7;font-weight:bold;">${ghost.willpower.length}</span>
+      <span style="font-size:0.55rem;color:rgba(168,85,247,0.5);">WP</span>
+    </div>`;
+  }
+
   activeEl.innerHTML = `
     <img class="pvp-ghost-art" src="${ghostInfo?.art || ''}" alt="${ghost.name}"
          onerror="this.style.background='var(--surface3)'">
@@ -7316,6 +7396,7 @@ function renderPvPSide(side, teamData, game) {
         <div class="pvp-hp-bar-inner ${hpClass}" style="width:${hpPct}%"></div>
         <div class="pvp-hp-text">${ghost.hp} / ${ghost.maxHp}</div>
       </div>
+      ${wpHtml}
     </div>
   `;
 
@@ -7350,6 +7431,53 @@ function renderPvPSide(side, teamData, game) {
       </div>
     `;
   }).join('');
+}
+
+// ---------- PVP WILLPOWER ACTIVATION ----------
+async function pvpActivateWillpower(side) {
+  if (!pvpState || pvpState.turn !== side || pvpState.status !== 'active') return;
+  if (side !== mySide) return; // can only activate your own
+  const battle = pvpState.battle;
+  const team = battle[side];
+  const ghost = team.ghosts[team.activeIdx];
+  if (!ghost || !ghost.willpower || ghost.willpower.length === 0) return;
+  if (ghost.willpowerTopLocked) return;
+
+  const topId = ghost.willpower[0];
+  const card = wpCardById(topId);
+  if (!card) return;
+  const cost = card.hpCost || 1;
+  if (ghost.willpower.length < cost) return;
+
+  // Remove cards
+  const removed = ghost.willpower.splice(0, cost);
+  if (!team.wpDiscard) team.wpDiscard = [];
+  team.wpDiscard.push(...removed);
+  ghost.hp = ghost.willpower.length;
+  ghost.willpowerTopLocked = true;
+
+  // Apply resource effect locally
+  if (!team.resources) team.resources = {};
+  switch (card.effect) {
+    case 'spark': team.resources.surge = (team.resources.surge || 0) + 1; break;
+    case 'ignite': team.resources.burn = (team.resources.burn || 0) + 1; break;
+    case 'gainMoonstone': team.resources.moonstone = Math.min(1, (team.resources.moonstone || 0) + 1); break;
+    case 'gainLucky': team.resources.luckyStone = (team.resources.luckyStone || 0) + 1; break;
+    case 'gainFrostbite': team.resources.frostbite = (team.resources.frostbite || 0) + 1; break;
+    case 'gainFirefly': team.resources.firefly = Math.min(1, (team.resources.firefly || 0) + 1); break;
+    case 'gainSacredFire': team.resources.fire = (team.resources.fire || 0) + 1; break;
+  }
+
+  // Add to game log
+  if (!pvpState.log) pvpState.log = [];
+  pvpState.log.unshift(`${card.emoji} ${ghost.name} activates ${card.name}! ${card.desc}`);
+
+  // Write to Firebase
+  await currentGameRef.update({
+    battle: pvpState.battle,
+    log: pvpState.log
+  });
+  renderPvPBattle();
 }
 
 // ---------- ENABLE/DISABLE ROLL ----------
@@ -7412,6 +7540,12 @@ async function pvpRoll() {
     const loserTeam = battle[loserSide];
     const loserGhost = loserTeam.ghosts[loserTeam.activeIdx];
     loserGhost.hp = Math.max(0, loserGhost.hp - damage);
+    // Sync willpower after damage
+    if (loserGhost.willpower) {
+      const wpRemoved = loserGhost.willpower.splice(0, Math.min(damage, loserGhost.willpower.length));
+      if (!loserTeam.wpDiscard) loserTeam.wpDiscard = [];
+      loserTeam.wpDiscard.push(...wpRemoved);
+    }
 
     // Check KO
     if (loserGhost.hp <= 0) {
@@ -7466,6 +7600,16 @@ async function pvpRoll() {
   }
 
   logEntries.unshift(logMsg);
+
+  // Reset willpower locks for next round
+  ['red','blue'].forEach(s => {
+    if (battle[s] && battle[s].ghosts) {
+      battle[s].ghosts.forEach(g => {
+        g.willpowerTopLocked = false;
+        g.willpowerUsedThisTurn = false;
+      });
+    }
+  });
 
   // Determine next turn and whether we need a KO swap
   let nextTurn = oppSide; // normally alternate
@@ -7550,10 +7694,17 @@ async function doKOSwap(newIdx) {
   document.getElementById('pvp-ko-picker').classList.remove('active');
 
   const battle = pvpState.battle;
-  battle[mySide].activeIdx = newIdx;
+  const myTeam = battle[mySide];
+  myTeam.activeIdx = newIdx;
 
   const oppSide = mySide === 'red' ? 'blue' : 'red';
-  const swappedGhost = battle[mySide].ghosts[newIdx];
+  const swappedGhost = myTeam.ghosts[newIdx];
+  // Draw willpower for incoming ghost
+  if (swappedGhost.wpPending && myTeam.wpDeck) {
+    wpDrawFromTeam(myTeam, swappedGhost);
+  }
+  // Reset willpower lock for new round
+  swappedGhost.willpowerTopLocked = false;
   const logEntries = pvpState.log || [];
   const sideClass = mySide === 'red' ? 'red-text' : 'blue-text';
   logEntries.unshift(`<span class="${sideClass}">${swappedGhost.name}</span> swaps in!`);
@@ -9600,5 +9751,21 @@ firebase.auth().onAuthStateChanged(user => {
 
 
 </script>
+
+<!-- ===== WILLPOWER DECK BUILDER OVERLAY ===== -->
+<div id="willpowerGalleryOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;">
+  <div style="background:var(--surface,#1a1a2e);border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:24px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 0 40px rgba(168,85,247,0.2);">
+    <h3 style="color:#a855f7;font-family:Creepster,cursive;font-size:1.4rem;margin:0 0 4px;text-align:center;letter-spacing:2px;">⚡ Willpower Deck</h3>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.75rem;text-align:center;margin:0 0 16px;">Click cards to cycle count (0 → 1 → 2). Build exactly 15 cards.</p>
+    <div id="wpGalleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px;"></div>
+    <div style="text-align:center;margin-bottom:12px;">
+      <span id="wpDeckTotal" style="font-size:1.1rem;font-weight:bold;">0 / 15 cards</span>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button id="wpSaveBtn" onclick="saveWillpowerDeck()" disabled style="padding:10px 24px;font-family:Creepster,cursive;font-size:1rem;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;cursor:pointer;letter-spacing:1px;">Save Deck</button>
+      <button onclick="closeWillpowerGallery()" style="padding:10px 24px;font-family:Creepster,cursive;font-size:1rem;background:transparent;color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

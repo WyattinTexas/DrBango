@@ -587,24 +587,295 @@ function pickRandomBoth() {
 }
 
 // ============================================================
+// WILLPOWER SYSTEM — Shared team deck of tactical cards
+// ============================================================
+
+const WILLPOWER_CARDS = [
+  { id:1,  name:'Bonanza',          color:'red',    emoji:'💥', effect:'bonanza',        desc:'+2 damage to wins' },
+  { id:2,  name:'Spark',            color:'red',    emoji:'⚡', effect:'spark',          desc:'Gain +1 Surge' },
+  { id:3,  name:'Ignite',           color:'red',    emoji:'🔥', effect:'ignite',         desc:'Gain 1 Burn' },
+  { id:4,  name:'Pow',              color:'red',    emoji:'💢', effect:'pow',            desc:'+2 damage for each 2 you roll' },
+  { id:5,  name:'Gain Moonstone',   color:'blue',   emoji:'💎', effect:'gainMoonstone',  desc:'Gain 1 Moon Stone' },
+  { id:6,  name:'Gain Lucky Stone', color:'blue',   emoji:'🍀', effect:'gainLucky',      desc:'Gain 1 Lucky Stone' },
+  { id:7,  name:'Pepo',             color:'blue',   emoji:'👻', effect:'pepo',           desc:'Flick a die to alter results' },
+  { id:8,  name:'Gain Frostbite',   color:'blue',   emoji:'❄️', effect:'gainFrostbite',  desc:'Gain 1 Frostbite' },
+  { id:9,  name:'Gain Shell',       color:'green',  emoji:'🛡️', effect:'gainShell',      desc:'Block 1 damage this round' },
+  { id:10, name:'Gain Scorch',      color:'green',  emoji:'☄️', effect:'gainScorch',     desc:'Burn ALL sideline chars (both teams)' },
+  { id:11, name:'Gain Firefly',     color:'orange', emoji:'✨', effect:'gainFirefly',    desc:'Wild card — costs 4 HP', hpCost:4 },
+  { id:12, name:'Gain Sacred Fire', color:'orange', emoji:'🔥', effect:'gainSacredFire', desc:'Gain Sacred Fire — costs 3 HP', hpCost:3 },
+];
+
+function wpCardById(id) { return WILLPOWER_CARDS.find(c => c.id === id); }
+
+// Deck config — stored in localStorage, default 15 cards
+let wpDeckConfig = {};
+function initWpDeckConfig() {
+  try {
+    const saved = localStorage.getItem('wpDeckConfig');
+    if (saved) { wpDeckConfig = JSON.parse(saved); return; }
+  } catch(e) {}
+  // Default: first 3 cards get 2 copies, remaining 9 get 1 copy = 15 total
+  wpDeckConfig = {};
+  WILLPOWER_CARDS.forEach((c, i) => { wpDeckConfig[c.id] = i < 3 ? 2 : 1; });
+}
+function wpDeckTotal() {
+  return Object.values(wpDeckConfig).reduce((s, n) => s + n, 0);
+}
+initWpDeckConfig();
+
+// Build shuffled willpower deck from config
+function buildTeamWillpowerDeck() {
+  const deck = [];
+  for (const [id, count] of Object.entries(wpDeckConfig)) {
+    for (let i = 0; i < count; i++) deck.push(parseInt(id));
+  }
+  // Fisher-Yates shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+// Draw willpower cards from team deck into ghost's stack
+function wpDrawFromTeam(team, ghost) {
+  if (!team.wpDeck) return;
+  const needed = ghost.maxHp;
+  ghost.willpower = [];
+  for (let i = 0; i < needed; i++) {
+    if (team.wpDeck.length === 0 && team.wpDiscard.length > 0) {
+      // Reshuffle discard into deck
+      team.wpDeck = team.wpDiscard.slice();
+      team.wpDiscard = [];
+      for (let k = team.wpDeck.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [team.wpDeck[k], team.wpDeck[j]] = [team.wpDeck[j], team.wpDeck[k]];
+      }
+    }
+    if (team.wpDeck.length > 0) {
+      ghost.willpower.push(team.wpDeck.shift());
+    }
+  }
+  ghost.hp = ghost.willpower.length;
+  ghost.wpPending = false;
+}
+
+function wpTeamOf(ghost) {
+  if (!B) return null;
+  if (B.red.ghosts.includes(ghost)) return B.red;
+  if (B.blue.ghosts.includes(ghost)) return B.blue;
+  return null;
+}
+
+// Remove willpower cards (damage) — move to team discard
+function wpDamage(ghost, amount) {
+  if (!ghost.willpower || ghost.willpower.length === 0) return;
+  const team = wpTeamOf(ghost);
+  if (!team) return;
+  const removed = ghost.willpower.splice(0, Math.min(amount, ghost.willpower.length));
+  team.wpDiscard.push(...removed);
+  ghost.hp = ghost.willpower.length;
+  if (ghost.hp <= 0) ghost.ko = true;
+}
+
+// Add willpower cards back (healing) — pull from team discard
+function wpHeal(ghost, amount) {
+  const team = wpTeamOf(ghost);
+  if (!team || !team.wpDiscard || team.wpDiscard.length === 0) return;
+  const pulled = team.wpDiscard.splice(0, Math.min(amount, team.wpDiscard.length));
+  ghost.willpower.push(...pulled);
+  ghost.hp = ghost.willpower.length;
+}
+
+// Sync willpower array length to match current HP after external HP mutations.
+// Called in renderBattle() to keep willpower visuals in sync with HP changes
+// made by the 180+ ability functions that directly mutate .hp.
+function syncWillpower(team) {
+  if (!team || !team.wpDeck) return;
+  team.ghosts.forEach(ghost => {
+    if (!ghost.willpower) ghost.willpower = [];
+    if (ghost.ko) return; // skip KO'd ghosts
+    const diff = ghost.hp - ghost.willpower.length;
+    if (diff > 0) {
+      // HP increased (healing) — draw cards from discard/deck
+      for (let i = 0; i < diff; i++) {
+        if (team.wpDiscard.length > 0) {
+          ghost.willpower.push(team.wpDiscard.shift());
+        } else if (team.wpDeck.length > 0) {
+          ghost.willpower.push(team.wpDeck.shift());
+        } else {
+          // No cards left — generate a random one
+          ghost.willpower.push(WILLPOWER_CARDS[Math.floor(Math.random() * WILLPOWER_CARDS.length)].id);
+        }
+      }
+    } else if (diff < 0) {
+      // HP decreased (damage) — remove cards from front to discard
+      const removed = ghost.willpower.splice(0, -diff);
+      team.wpDiscard.push(...removed);
+    }
+  });
+}
+
+// Activate top willpower card (player action during pre-roll)
+function activateWillpower(teamKey) {
+  if (!B) return;
+  const team = B[teamKey];
+  const f = active(team);
+  if (!f || f.ko) return;
+  if (!f.willpower || f.willpower.length === 0) return;
+  if (!isPreRollActive(teamKey)) return;
+  if (B.wpUsedThisTurn && B.wpUsedThisTurn[teamKey]) return;
+  if (f.willpowerTopLocked) return;
+
+  const topId = f.willpower[0];
+  const card = wpCardById(topId);
+  if (!card) return;
+
+  const cost = card.hpCost || 1;
+  if (f.willpower.length < cost) return;
+
+  // Remove card(s) from willpower
+  const removed = f.willpower.splice(0, cost);
+  team.wpDiscard.push(...removed);
+  f.hp = f.willpower.length;
+
+  // Set flags
+  f.willpowerTopLocked = true;
+  if (!B.wpUsedThisTurn) B.wpUsedThisTurn = { red: false, blue: false };
+  B.wpUsedThisTurn[teamKey] = true;
+
+  // Apply effect
+  applyWillpowerEffect(teamKey, card);
+
+  log(`<span class="log-ability">${card.emoji} ${card.name}</span> — ${f.name} activates willpower! ${card.desc}`);
+  renderBattle();
+}
+
+function applyWillpowerEffect(teamKey, card) {
+  const team = B[teamKey];
+  const f = active(team);
+  switch (card.effect) {
+    case 'bonanza':
+      if (!B.wpBonanza) B.wpBonanza = { red:0, blue:0 };
+      B.wpBonanza[teamKey] = 2;
+      break;
+    case 'spark':
+      team.resources.surge = (team.resources.surge || 0) + 1;
+      break;
+    case 'ignite':
+      team.resources.burn = (team.resources.burn || 0) + 1;
+      break;
+    case 'pow':
+      if (!B.wpPow) B.wpPow = { red:false, blue:false };
+      B.wpPow[teamKey] = true;
+      break;
+    case 'gainMoonstone':
+      team.resources.moonstone = Math.min(1, (team.resources.moonstone || 0) + 1);
+      break;
+    case 'gainLucky':
+      team.resources.luckyStone = (team.resources.luckyStone || 0) + 1;
+      break;
+    case 'pepo':
+      if (!B.wpPepo) B.wpPepo = { red:false, blue:false };
+      B.wpPepo[teamKey] = true;
+      break;
+    case 'gainFrostbite':
+      team.resources.frostbite = (team.resources.frostbite || 0) + 1;
+      break;
+    case 'gainShell':
+      if (!B.wpShellActive) B.wpShellActive = { red:false, blue:false };
+      B.wpShellActive[teamKey] = true;
+      break;
+    case 'gainScorch':
+      // Burn all sideline ghosts on both teams
+      ['red','blue'].forEach(side => {
+        if (!B.burn) B.burn = { red:{}, blue:{} };
+        B[side].ghosts.forEach((g, idx) => {
+          if (idx !== B[side].activeIdx && !g.ko) {
+            B.burn[side][idx] = (B.burn[side][idx] || 0) + 1;
+          }
+        });
+      });
+      break;
+    case 'gainFirefly':
+      team.resources.firefly = Math.min(1, (team.resources.firefly || 0) + 1);
+      break;
+    case 'gainSacredFire':
+      team.resources.fire = (team.resources.fire || 0) + 1;
+      break;
+  }
+}
+
+// Deck builder UI functions (used by index.html overlay)
+function openWillpowerGallery() {
+  const overlay = document.getElementById('willpowerGalleryOverlay');
+  if (overlay) { overlay.style.display = 'flex'; renderWpGallery(); }
+}
+function closeWillpowerGallery() {
+  const overlay = document.getElementById('willpowerGalleryOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+function renderWpGallery() {
+  const grid = document.getElementById('wpGalleryGrid');
+  if (!grid) return;
+  grid.innerHTML = WILLPOWER_CARDS.map(c => {
+    const count = wpDeckConfig[c.id] || 0;
+    const colorMap = { red:'#ef4444', blue:'#3b82f6', green:'#22c55e', orange:'#f59e0b' };
+    const borderColor = colorMap[c.color] || '#888';
+    return `<div class="wp-gallery-card ${count===0?'wp-dimmed':''}" onclick="cycleWpCard(${c.id})" style="border-color:${borderColor};">
+      <div class="wp-card-emoji">${c.emoji}</div>
+      <div class="wp-card-name">${c.name}</div>
+      <div class="wp-card-desc">${c.desc}</div>
+      ${c.hpCost ? `<div class="wp-card-cost">-${c.hpCost} HP</div>` : ''}
+      <div class="wp-card-count">${count > 0 ? '×' + count : '—'}</div>
+    </div>`;
+  }).join('');
+  const total = wpDeckTotal();
+  const totalEl = document.getElementById('wpDeckTotal');
+  if (totalEl) {
+    totalEl.textContent = `${total} / 15 cards`;
+    totalEl.style.color = total === 15 ? '#22c55e' : total > 15 ? '#ef4444' : '#f59e0b';
+  }
+  const saveBtn = document.getElementById('wpSaveBtn');
+  if (saveBtn) saveBtn.disabled = total !== 15;
+}
+function cycleWpCard(id) {
+  const cur = wpDeckConfig[id] || 0;
+  wpDeckConfig[id] = (cur + 1) % 3;
+  renderWpGallery();
+}
+function saveWillpowerDeck() {
+  if (wpDeckTotal() !== 15) return;
+  localStorage.setItem('wpDeckConfig', JSON.stringify(wpDeckConfig));
+  closeWillpowerGallery();
+}
+
+// ============================================================
 // BATTLE ENGINE
 // ============================================================
 // ghostData(id) defined in header — uses getGhost() from cards.js
 
 
 function makeTeam(ids) {
-  return {
+  const teamDeck = buildTeamWillpowerDeck();
+  const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
       return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
-        hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
+        hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false,
+        willpower:[], wpPending:true, willpowerUsedThisTurn:false, willpowerTopLocked:false };
     }),
     activeIdx: 0,
     resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
     moonstoneSickness: 0,       // Mode A: permanent stacking counter
     moonstoneSicknessCount: 0,  // Mode B: escalating counter
-    moonstoneSicknessPending: 0 // Mode B & C: damage to apply next roll
+    moonstoneSicknessPending: 0, // Mode B & C: damage to apply next roll
+    wpDeck: teamDeck,
+    wpDiscard: []
   };
+  // Draw willpower for starting active ghost
+  wpDrawFromTeam(team, team.ghosts[0]);
+  return team;
 }
 
 function active(t) { return t.ghosts[t.activeIdx]; }
@@ -713,6 +984,12 @@ function startBattle() {
     carpenterDiceTrade: { red: 0, blue: 0 },
     sophiaMask: { red: null, blue: null },
     sophiaMaskActive: { red: false, blue: false },
+    // Willpower system flags
+    wpUsedThisTurn: { red: false, blue: false },
+    wpBonanza: { red: 0, blue: 0 },
+    wpPow: { red: false, blue: false },
+    wpPepo: { red: false, blue: false },
+    wpShellActive: { red: false, blue: false },
   };
   S.battle = B;
   if (typeof initMatchStats === 'function') initMatchStats();
@@ -5579,6 +5856,19 @@ function _doStartNextRound() {
   // Reset per-round Bonzai state for the new round
   B.bonzaiDecided = { red: false, blue: false };
   B.bonzaiBtnDice = { red: 0, blue: 0 };
+
+  // Reset willpower per-round flags
+  B.wpUsedThisTurn = { red: false, blue: false };
+  B.wpBonanza = { red: 0, blue: 0 };
+  B.wpPow = { red: false, blue: false };
+  B.wpPepo = { red: false, blue: false };
+  B.wpShellActive = { red: false, blue: false };
+  ['red','blue'].forEach(t => {
+    B[t].ghosts.forEach(g => {
+      g.willpowerUsedThisTurn = false;
+      g.willpowerTopLocked = false;
+    });
+  });
 
   // Live PvP state sync: Red is authoritative — broadcasts full state after each round.
   if (B.phase !== 'over') pvpBroadcastState({ event: 'roundEnd' });
@@ -11937,6 +12227,27 @@ function _resolveRoundImpl() {
     }
   }
 
+  // --- WILLPOWER BONUSES ---
+  // Bonanza: +2 damage to wins
+  if (B.wpBonanza && B.wpBonanza[winTeamName] > 0) {
+    dmg += B.wpBonanza[winTeamName];
+    log(`<span class="log-ability">💥 Bonanza!</span> +${B.wpBonanza[winTeamName]} willpower damage!`);
+  }
+  // Pow: +2 damage for each 2 rolled
+  if (B.wpPow && B.wpPow[winTeamName]) {
+    const twos = (winTeamName === 'red' ? B.redDice : B.blueDice || []).filter(d => d === 2).length;
+    if (twos > 0) {
+      dmg += twos * 2;
+      log(`<span class="log-ability">💢 Pow!</span> ${twos}× 2s rolled → +${twos * 2} damage!`);
+    }
+  }
+  // Shell: block all damage this round
+  if (B.wpShellActive && B.wpShellActive[loseTeamName]) {
+    log(`<span class="log-ability">🛡️ Shell!</span> ${lF.name} blocks ${dmg} damage!`);
+    dmg = 0;
+    B.wpShellActive[loseTeamName] = false;
+  }
+
   // --- APPLY DAMAGE (game state updates immediately) ---
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
@@ -13936,6 +14247,10 @@ function doKoSwap(team, idx) {
   const f = active(t);
   // Returning from sideline = full HP
   f.hp = f.maxHp;
+  // Draw willpower cards for entering ghost
+  if (f.wpPending && t.wpDeck) {
+    wpDrawFromTeam(t, f);
+  }
 
   log(`<span class="log-ko">${fallen.name} is down!</span> <span class="log-ability">${f.name} enters at full HP!</span>`);
   const entryCalloutCount = triggerEntry(t, skipEntry);
@@ -14661,6 +14976,10 @@ function renderBattle() {
     if ((B[s].resources.firefly || 0) > 1) B[s].resources.firefly = 1;
   });
 
+  // Sync willpower arrays to match current HP (handles external .hp mutations)
+  syncWillpower(B.red);
+  syncWillpower(B.blue);
+
   ['red','blue'].forEach(team => {
     const t = B[team];
     const f = active(t);
@@ -14674,6 +14993,35 @@ function renderBattle() {
 
     // HP Bar
     updateHpBar(team, f.hp, f.maxHp);
+
+    // Willpower Stack
+    const wpEl = document.getElementById(`${team}-willpower`);
+    if (wpEl && f.willpower && f.willpower.length >= 0) {
+      const wpCards = f.willpower.slice(0, 6); // Show up to 6 cards
+      const canActivate = isPreRollActive(team) && !f.ko && f.willpower.length > 0
+        && !(B.wpUsedThisTurn && B.wpUsedThisTurn[team]) && !f.willpowerTopLocked
+        && !(window.BOSS_MODE && team === 'blue');
+      let wpHtml = '<div class="wp-pile">';
+      wpCards.forEach((cardId, idx) => {
+        const card = wpCardById(cardId);
+        if (!card) return;
+        const colorMap = { red:'#ef4444', blue:'#3b82f6', green:'#22c55e', orange:'#f59e0b' };
+        const bc = colorMap[card.color] || '#888';
+        const isTop = idx === 0;
+        const locked = !isTop || !canActivate;
+        const clickAttr = isTop && canActivate ? `onclick="activateWillpower('${team}')"` : '';
+        const offset = idx * 3;
+        wpHtml += `<div class="wp-pile-card wp-c-${card.color} ${isTop?'wp-pile-top':''} ${locked?'wp-locked':''}" ${clickAttr} style="top:${offset}px;z-index:${10-idx};border-color:${bc};" title="${card.name}: ${card.desc}${card.hpCost?' (costs '+card.hpCost+' HP)':''}">
+          <div class="wp-card-emoji">${card.emoji}</div>
+          <div class="wp-card-name">${card.name}</div>
+        </div>`;
+      });
+      wpHtml += '</div>';
+      wpHtml += `<div class="wp-stack-info"><span class="wp-count">${f.willpower.length}</span><span class="wp-label">willpower</span>`;
+      wpHtml += `<span class="wp-deck-status">deck ${t.wpDeck?t.wpDeck.length:0} · discard ${t.wpDiscard?t.wpDiscard.length:0}</span>`;
+      wpHtml += '</div>';
+      wpEl.innerHTML = wpHtml;
+    }
 
     // Sideline
     const slLeft = document.getElementById(`${team}-sl-left`);
@@ -14845,6 +15193,14 @@ function renderBattle() {
     const enemy = opp(B[team]);
     let html = '';
     if (isPreRollActive(team)) {
+      // Willpower activation button
+      if (f.willpower && f.willpower.length > 0 && !(B.wpUsedThisTurn && B.wpUsedThisTurn[team]) && !f.willpowerTopLocked) {
+        const topCard = wpCardById(f.willpower[0]);
+        if (topCard) {
+          const costLabel = topCard.hpCost ? ` (${topCard.hpCost} HP)` : '';
+          html += `<button class="ability-btn pressure" onclick="activateWillpower('${team}')" style="border-color:#a855f7;color:#a855f7;" title="${topCard.desc}${costLabel}">${topCard.emoji} ${topCard.name}${costLabel}</button>`;
+        }
+      }
       // Dark Fang (202) — Pressure button (once per round)
       if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
