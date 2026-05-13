@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOO! Spirit Comms</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #0a0a12;
+    font-family: 'Press Start 2P', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Starfield background ── */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 40% 50%, #0d1030 0%, #060612 60%, #000 100%);
+  }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: #fff;
+    animation: twinkle var(--dur) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { 0%{opacity:.15} 100%{opacity:.9} }
+
+  /* ── Main layout ── */
+  #viewport {
+    position: relative; z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 24px;
+  }
+
+  /* ── Comm log (scrollable history) ── */
+  #comm-log {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+  #comm-log::-webkit-scrollbar { width: 6px; }
+  #comm-log::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+  /* ── Comm box (the Star Fox dialogue) ── */
+  .comm-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    max-width: 560px;
+    animation: commSlideIn .25s ease-out;
+    position: relative;
+  }
+  .comm-box.right {
+    align-self: flex-end;
+  }
+  .comm-box.right .portrait-frame { order: 2; }
+  .comm-box.right .comm-body { order: 1; }
+
+  @keyframes commSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Portrait frame */
+  .portrait-frame {
+    width: 80px; height: 80px;
+    min-width: 80px;
+    border: 3px solid #888;
+    background: #111;
+    position: relative;
+    overflow: hidden;
+    image-rendering: auto;
+  }
+  .portrait-frame img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: brightness(0.85) contrast(1.1);
+  }
+  /* Scanline overlay on portrait */
+  .portrait-frame::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,0,0,0.2) 2px,
+      rgba(0,0,0,0.2) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* Health bar */
+  .health-bar-wrap {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: calc(100% - 6px);
+    height: 8px;
+    display: flex;
+    gap: 1px;
+    z-index: 2;
+  }
+  .hb-segment {
+    flex: 1;
+    height: 100%;
+    border: 1px solid rgba(0,0,0,.5);
+  }
+  .hb-green { background: #3f3; }
+  .hb-yellow { background: #ff3; }
+  .hb-red { background: #f33; }
+  .hb-empty { background: #222; }
+
+  /* Comm body (text area) */
+  .comm-body {
+    background: rgba(10, 15, 40, 0.92);
+    border: 3px solid #888;
+    border-left: none;
+    padding: 8px 12px 10px 12px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    position: relative;
+    flex: 1;
+  }
+  .comm-box.right .comm-body {
+    border-left: 3px solid #888;
+    border-right: none;
+  }
+
+  /* Scanline on comm body */
+  .comm-body::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+  }
+
+  .comm-name {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    text-shadow: 1px 1px 0 #000, 0 0 8px var(--name-glow);
+  }
+
+  .comm-text {
+    font-size: 11px;
+    color: #e8e8e8;
+    line-height: 1.6;
+    text-shadow: 1px 1px 0 #000;
+    min-height: 36px;
+  }
+  .comm-text .cursor {
+    display: inline-block;
+    width: 8px; height: 12px;
+    background: #e8e8e8;
+    animation: blink .5s step-end infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Input area ── */
+  #input-area {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #222;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #speaker-select {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    background: #151525;
+    color: #aaa;
+    border: 2px solid #444;
+    padding: 8px 10px;
+    border-radius: 0;
+    cursor: pointer;
+    min-width: 140px;
+  }
+  #speaker-select:focus { border-color: #888; outline: none; }
+
+  #msg-input {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    background: #151525;
+    color: #e8e8e8;
+    border: 2px solid #444;
+    padding: 8px 12px;
+    border-radius: 0;
+    min-width: 200px;
+  }
+  #msg-input:focus { border-color: #888; outline: none; }
+  #msg-input::placeholder { color: #444; }
+
+  #send-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    background: #2a2a4a;
+    color: #8f8;
+    border: 2px solid #4a4;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  #send-btn:hover { background: #3a3a6a; border-color: #6f6; }
+
+  /* ── Quick-quote buttons ── */
+  #quick-quotes {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 6px;
+  }
+  .quick-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    background: #1a1a2e;
+    color: #888;
+    border: 1px solid #333;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .quick-btn:hover { color: #ddd; border-color: #666; }
+
+  /* ── Sound toggle ── */
+  #sound-toggle {
+    position: fixed;
+    top: 12px; right: 12px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    background: none;
+    color: #555;
+    border: 1px solid #333;
+    padding: 4px 8px;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #sound-toggle:hover { color: #888; }
+
+  /* ── CRT / scanline global overlay ── */
+  #crt-overlay {
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.04) 3px,
+      rgba(0,0,0,0.04) 6px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Vignette */
+  #vignette {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 99;
+  }
+</style>
+</head>
+<body>
+
+<div id="starfield"></div>
+<div id="crt-overlay"></div>
+<div id="vignette"></div>
+<button id="sound-toggle" onclick="toggleSound()">SFX: ON</button>
+
+<div id="viewport">
+  <div id="comm-log"></div>
+  <div id="input-area">
+    <select id="speaker-select"></select>
+    <input id="msg-input" type="text" placeholder="Type a message..." autocomplete="off">
+    <button id="send-btn" onclick="sendMessage()">SEND</button>
+    <div id="quick-quotes"></div>
+  </div>
+</div>
+
+<script>
+// ── Spiritkin roster ──
+const ROSTER = [
+  { name:"Gary", art:"../testroom/art/gary.png", color:"#ff6633", hp:6, maxHp:6, side:"left",
+    quotes:["You're good, but I'm better.","Don't get too cocky, Spirit Fox!","I'll burn you to cinders.","This flame never dies."] },
+  { name:"Toby", art:"../testroom/art/originals/Toby.png", color:"#44aaff", hp:5, maxHp:7, side:"right",
+    quotes:["Let's go! The Overworld awaits!","I won't let you down!","Not yet. The party's just begun!","We'll make it through together!"] },
+  { name:"Valkin", art:"../testroom/art/originals/ValkinTheGrand.png", color:"#aa44ff", hp:8, maxHp:8, side:"left",
+    quotes:["You dare challenge the Grand?","Kneel before true power.","Your resistance amuses me.","The BOO belongs to ME."] },
+  { name:"Jeffrey", art:"../testroom/art/originals/Jeffery.png", color:"#55dd55", hp:4, maxHp:5, side:"right",
+    quotes:["I've seen things you wouldn't believe.","The castle holds many secrets.","Watch your step around here.","Trust me on this one."] },
+  { name:"Flora", art:"../testroom/art/originals/Flora.png", color:"#ff77aa", hp:6, maxHp:6, side:"left",
+    quotes:["The garden remembers everything.","You can't outrun nature!","Roots run deep, friend.","I was here before any of you."] },
+  { name:"Doom", art:"../testroom/art/originals/Doom.png", color:"#cc2222", hp:7, maxHp:7, side:"left",
+    quotes:["There is no escape.","Your fate was sealed long ago.","Darkness... consumes all.","Too bad dad's not here to see ya FAIL!"] },
+  { name:"Shade", art:"../testroom/art/originals/Shade.png", color:"#8866cc", hp:3, maxHp:4, side:"right",
+    quotes:["Now you see me...","Catch me if you can!","Shadows don't play fair.","I was never really here."] },
+  { name:"Pip", art:"../testroom/art/originals/Pip.png", color:"#ffaa22", hp:7, maxHp:7, side:"right",
+    quotes:["*giggling intensifies*","WHEEEEE!","Fire is my FRIEND!","Hehe! Watch THIS!"] },
+  { name:"Cornelius", art:"../testroom/art/originals/Cornelius.png", color:"#66ccaa", hp:5, maxHp:6, side:"left",
+    quotes:["Patience is a virtue, child.","I've brewed the antidote.","The old ways are best.","Let me see what ails you."] },
+  { name:"Hugo", art:"../testroom/art/originals/Hugo.png", color:"#ddbb44", hp:6, maxHp:6, side:"right",
+    quotes:["Ready for round two?","I won't back down!","Let's see how you handle THIS!","Still standing!"] },
+  { name:"Dark Jeff", art:"../testroom/art/originals/DarkJeff.png", color:"#ff3366", hp:5, maxHp:5, side:"left",
+    quotes:["The shadows suit me just fine.","You can't trust anyone here.","I take what I want.","Nothing personal, kid."] },
+  { name:"Kodako", art:"../testroom/art/originals/Kodako.png", color:"#ff8844", hp:5, maxHp:6, side:"right",
+    quotes:["WRAAAAAA!","My tentacles reach everywhere!","The deep remembers!","You shouldn't have come here."] },
+  { name:"Bo", art:"../testroom/art/originals/Bo.png", color:"#44dddd", hp:4, maxHp:4, side:"right",
+    quotes:["Miracles happen for those who believe!","I believe in you!","Never give up!","The light always finds a way."] },
+  { name:"Mountain King", art:"../testroom/art/originals/TheMountainKing.png", color:"#8899aa", hp:8, maxHp:8, side:"left",
+    quotes:["The mountain does not move.","You climb MY domain.","Bow before the summit.","All paths lead to me."] },
+  { name:"Fang", art:"../testroom/art/originals/FangOutside.png", color:"#dd5544", hp:5, maxHp:5, side:"left",
+    quotes:["*snarls*","I hunt alone.","Smell that? That's fear.","The pack answers to no one."] },
+  { name:"Haywire", art:"../testroom/art/originals/Haywire.png", color:"#ff4400", hp:4, maxHp:4, side:"right",
+    quotes:["BZZT! SPARK! CRACKLE!","Can't stop won't stop!","ERROR: TOO MUCH FUN!","I'm literally on fire!"] },
+];
+
+// ── Audio context for SFX ──
+let audioCtx = null;
+let sfxEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playCommSound() {
+  if (!sfxEnabled) return;
+  initAudio();
+  // Classic Star Fox radio blip
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playTypeSound() {
+  if (!sfxEnabled) return;
+  initAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(220 + Math.random() * 80, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.04);
+}
+
+function toggleSound() {
+  sfxEnabled = !sfxEnabled;
+  document.getElementById('sound-toggle').textContent = 'SFX: ' + (sfxEnabled ? 'ON' : 'OFF');
+}
+
+// ── Build starfield ──
+(function(){
+  const sf = document.getElementById('starfield');
+  for (let i = 0; i < 120; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 1;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%; top:${Math.random()*100}%;
+      --dur:${1 + Math.random()*3}s;
+      animation-delay:${Math.random()*3}s;
+    `;
+    sf.appendChild(s);
+  }
+})();
+
+// ── Build speaker select & quick quotes ──
+const sel = document.getElementById('speaker-select');
+ROSTER.forEach((r,i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = r.name;
+  sel.appendChild(opt);
+});
+
+function updateQuickQuotes() {
+  const qq = document.getElementById('quick-quotes');
+  qq.innerHTML = '';
+  const r = ROSTER[sel.value];
+  r.quotes.forEach(q => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-btn';
+    btn.textContent = q.length > 30 ? q.slice(0,28)+'...' : q;
+    btn.onclick = () => { document.getElementById('msg-input').value = q; sendMessage(); };
+    qq.appendChild(btn);
+  });
+}
+sel.addEventListener('change', updateQuickQuotes);
+updateQuickQuotes();
+
+// ── Build health bar segments ──
+function buildHealthBar(hp, maxHp) {
+  const wrap = document.createElement('div');
+  wrap.className = 'health-bar-wrap';
+  const segments = 8;
+  const ratio = hp / maxHp;
+  const filled = Math.round(ratio * segments);
+  for (let i = 0; i < segments; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'hb-segment';
+    if (i < filled) {
+      if (ratio > 0.5) seg.classList.add('hb-green');
+      else if (ratio > 0.25) seg.classList.add('hb-yellow');
+      else seg.classList.add('hb-red');
+    } else {
+      seg.classList.add('hb-empty');
+    }
+    wrap.appendChild(seg);
+  }
+  return wrap;
+}
+
+// ── Send message ──
+let typing = false;
+const queue = [];
+
+function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const speaker = ROSTER[sel.value];
+  queue.push({ speaker, text });
+  if (!typing) processQueue();
+}
+
+async function processQueue() {
+  if (queue.length === 0) { typing = false; return; }
+  typing = true;
+  const { speaker, text } = queue.shift();
+
+  playCommSound();
+
+  const log = document.getElementById('comm-log');
+
+  // Build comm box
+  const box = document.createElement('div');
+  box.className = 'comm-box' + (speaker.side === 'right' ? ' right' : '');
+
+  // Portrait
+  const pf = document.createElement('div');
+  pf.className = 'portrait-frame';
+  const img = document.createElement('img');
+  img.src = speaker.art;
+  img.alt = speaker.name;
+  pf.appendChild(img);
+  pf.appendChild(buildHealthBar(speaker.hp, speaker.maxHp));
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'comm-body';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'comm-name';
+  nameEl.style.color = speaker.color;
+  nameEl.style.setProperty('--name-glow', speaker.color);
+  nameEl.textContent = speaker.name;
+
+  const textEl = document.createElement('div');
+  textEl.className = 'comm-text';
+
+  body.appendChild(nameEl);
+  body.appendChild(textEl);
+
+  box.appendChild(pf);
+  box.appendChild(body);
+  log.appendChild(box);
+  log.scrollTop = log.scrollHeight;
+
+  // Typewriter effect
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  textEl.appendChild(cursor);
+
+  for (let i = 0; i < text.length; i++) {
+    const span = document.createElement('span');
+    span.textContent = text[i];
+    textEl.insertBefore(span, cursor);
+    if (i % 2 === 0) playTypeSound();
+    log.scrollTop = log.scrollHeight;
+    await sleep(35);
+  }
+
+  // Remove cursor after typing
+  await sleep(300);
+  cursor.remove();
+
+  // Randomly damage speaker for fun
+  if (Math.random() < 0.3 && speaker.hp > 1) {
+    speaker.hp--;
+  }
+
+  processQueue();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Keyboard shortcut ──
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMessage();
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = document.getElementById('speaker-select');
+    s.selectedIndex = (s.selectedIndex + 1) % ROSTER.length;
+    updateQuickQuotes();
+  }
+});
+
+// Focus input on load
+document.getElementById('msg-input').focus();
+</script>
+</body>
+</html>
