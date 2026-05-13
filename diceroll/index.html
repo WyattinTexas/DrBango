@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dice Roll Demo — Battle of Origins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0612;
+  --surface: #14101c;
+  --surface2: #1c1828;
+  --border: #2a2230;
+  --text: #f4ecd8;
+  --text2: #a09686;
+  --gold: #d4a040;
+  --gold-bright: #f0c560;
+  --accent: #e94560;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 30px 0 6px;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold), #b8862c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+.subtitle {
+  color: var(--text2);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* ═══════ Arena Board ═══════ */
+.arena-board {
+  position: relative;
+  width: min(90vw, 700px);
+  height: min(70vw, 500px);
+  background: linear-gradient(145deg, #1a1228 0%, #14101c 50%, #0e0a18 100%);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* Felt texture overlay */
+.arena-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(rgba(255,255,255,0.008) 0% 25%, transparent 0% 50%) 0 0 / 4px 4px;
+  pointer-events: none;
+}
+
+/* ═══════ Results Tray ═══════ */
+.results-tray {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(20,16,28,0.85);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 20px;
+  min-height: 76px;
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+.results-tray .result-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+.results-tray .result-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gold-bright);
+  min-width: 120px;
+}
+.results-tray .result-dice {
+  display: flex;
+  gap: 8px;
+}
+.result-die {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  position: relative;
+}
+.result-die.face-red {
+  background: linear-gradient(165deg, #fce0d8 0%, #f4b8a8 35%, #d88878 70%, #a05050 100%);
+  border: 1px solid rgba(233,69,96,0.55);
+  color: #4a0e1a;
+}
+.result-die.face-blue {
+  background: linear-gradient(165deg, #dcf0fc 0%, #a8d8ee 35%, #78a0c4 70%, #406088 100%);
+  border: 1px solid rgba(76,201,240,0.55);
+  color: #0a3050;
+}
+.result-die.highlight {
+  transform: scale(1.15);
+  box-shadow: 0 0 14px rgba(251,191,36,0.6);
+  border-color: #fbbf24 !important;
+}
+
+/* ═══════ Controls ═══════ */
+.controls {
+  display: flex;
+  gap: 14px;
+  margin: 24px 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+.btn {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+.btn-red {
+  background: linear-gradient(135deg, #e94560, #c73650);
+  color: white;
+  box-shadow: 0 4px 16px rgba(233,69,96,0.3);
+}
+.btn-red:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(233,69,96,0.45); }
+.btn-blue {
+  background: linear-gradient(135deg, #4cc9f0, #3a9cc0);
+  color: white;
+  box-shadow: 0 4px 16px rgba(76,201,240,0.3);
+}
+.btn-blue:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(76,201,240,0.45); }
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color: #1a1228;
+  box-shadow: 0 4px 16px rgba(212,160,64,0.3);
+}
+.btn-gold:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(212,160,64,0.45); }
+
+.dice-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.dice-count input {
+  width: 50px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ═══════ Profile Name ═══════ */
+.profile-name {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(20,16,28,0.85);
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  z-index: 20;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.profile-name.visible { opacity: 1; }
+
+/* ═══════ 3D Dice Physics ═══════ */
+.die-physics {
+  position: absolute;
+  z-index: 10;
+  perspective: 350px;
+}
+.die-cube {
+  width: 100%; height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+}
+.die-face {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 11px;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  background: linear-gradient(165deg, #f4ecd8 0%, #e8dcb8 35%, #d8c894 70%, #b8a878 100%);
+  border: 1px solid rgba(120, 80, 30, 0.5);
+  box-shadow: inset 0 -2px 4px rgba(120, 80, 30, 0.25), inset 0 1px 2px rgba(255, 255, 240, 0.5);
+}
+.die-face.face-red {
+  border-color: rgba(233,69,96,0.55);
+  background: linear-gradient(165deg, #fce0d8 0%, #f4b8a8 35%, #d88878 70%, #a05050 100%);
+}
+.die-face.face-blue {
+  border-color: rgba(76,201,240,0.55);
+  background: linear-gradient(165deg, #dcf0fc 0%, #a8d8ee 35%, #78a0c4 70%, #406088 100%);
+}
+.face-front  { transform: translateZ(var(--dh, 28px)); }
+.face-back   { transform: rotateY(180deg) translateZ(var(--dh, 28px)); }
+.face-right  { transform: rotateY(90deg) translateZ(var(--dh, 28px)); }
+.face-left   { transform: rotateY(-90deg) translateZ(var(--dh, 28px)); }
+.face-top    { transform: rotateX(-90deg) translateZ(var(--dh, 28px)); }
+.face-bottom { transform: rotateX(90deg) translateZ(var(--dh, 28px)); }
+
+.pip3d {
+  position: absolute;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #3a1f08;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.3);
+}
+.face-red .pip3d { background: #4a0e1a; }
+.face-blue .pip3d { background: #0a3050; }
+
+.die-physics.settling .die-cube {
+  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.die-physics.settling {
+  transition: left 0.7s cubic-bezier(0.25, 1.1, 0.5, 1),
+              top 0.7s cubic-bezier(0.25, 1.1, 0.5, 1);
+}
+.die-physics::after {
+  content: '';
+  position: absolute;
+  bottom: -6px; left: 8%;
+  width: 84%; height: 10px;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.35), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ═══════ Highlights ═══════ */
+.die-physics.highlight-single {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 8px rgba(251,191,36,0.5));
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-single .die-face { border-color: rgba(251,191,36,0.6) !important; }
+.die-physics.highlight-double {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 14px rgba(251,191,36,0.7)) drop-shadow(0 0 28px rgba(255,175,35,0.35));
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-double .die-face { border-color: #fbbf24 !important; }
+.die-physics.highlight-triple {
+  transform: scale(1.25);
+  filter: drop-shadow(0 0 20px rgba(251,191,36,0.9)) drop-shadow(0 0 40px rgba(255,175,35,0.5));
+  transition: transform 0.3s, filter 0.3s !important;
+}
+.die-physics.highlight-triple .die-face { border-color: #fbbf24 !important; }
+
+/* ═══════ Info Section ═══════ */
+.info {
+  max-width: 700px;
+  margin: 30px auto 40px;
+  padding: 0 20px;
+  text-align: center;
+}
+.info h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 12px;
+}
+.info p {
+  color: var(--text2);
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+.info .profiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+  text-align: left;
+}
+.info .profile-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.info .profile-card h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  margin-bottom: 4px;
+}
+.info .profile-card p {
+  font-size: 12px;
+  color: var(--text2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  h1 { font-size: 22px; }
+  .arena-board { height: 65vw; }
+  .results-tray { padding: 8px 12px; gap: 8px; }
+  .result-die { width: 36px; height: 36px; font-size: 15px; }
+  .controls { gap: 10px; }
+  .btn { padding: 10px 20px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<h1>3D Dice Roll Demo</h1>
+<p class="subtitle">Fake 3D physics dice from Battle of Origins</p>
+
+<div class="arena-board" id="arena">
+  <div class="profile-name" id="profile-label"></div>
+  <div class="results-tray" id="results" style="opacity:0">
+    <div>
+      <div class="result-label">Result</div>
+      <div class="result-value" id="result-text">---</div>
+    </div>
+    <div class="result-dice" id="result-dice"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="dice-count">
+    <label for="count">Dice:</label>
+    <input type="number" id="count" value="3" min="1" max="6">
+  </div>
+  <button class="btn btn-red" onclick="rollTeam('red')">Roll Red</button>
+  <button class="btn btn-blue" onclick="rollTeam('blue')">Roll Blue</button>
+  <button class="btn btn-gold" onclick="rollBoth()">Roll Both!</button>
+</div>
+
+<div class="info">
+  <h2>How It Works</h2>
+  <p>Each die is a CSS cube with 6 faces using <code>perspective</code> + <code>transform-style: preserve-3d</code>.
+     No WebGL, no canvas — pure DOM elements with CSS 3D transforms animated via <code>requestAnimationFrame</code>.</p>
+  <p>Every throw randomly selects one of <strong>6 choreographed throw profiles</strong>, each with its own personality:</p>
+  <div class="profiles">
+    <div class="profile-card"><h3>The Bloom</h3><p>Steep arc, dice unfurl like petals</p></div>
+    <div class="profile-card"><h3>The Bank Shot</h3><p>All dice hit the top wall first</p></div>
+    <div class="profile-card"><h3>The Cross-Table</h3><p>Full send diagonal to the far wall</p></div>
+    <div class="profile-card"><h3>The Spiral</h3><p>Widest orbit to tightest drop</p></div>
+    <div class="profile-card"><h3>The Scatter</h3><p>Each die at a wildly different angle</p></div>
+    <div class="profile-card"><h3>The Gentle Toss</h3><p>Short lob, barely leaves the hand</p></div>
+  </div>
+  <p style="margin-top:16px">Physics includes wall bouncing with decaying coefficients, dice-to-dice repulsion,
+     speed-dependent friction (fast = ice, slow = felt), and rotation homing that magnetically settles dice flat.</p>
+</div>
+
+<script>
+/* ═══════ Pip Layouts ═══════ */
+const PIP_LAYOUTS = {
+  1: ['c'],
+  2: ['tr','bl'],
+  3: ['tr','c','bl'],
+  4: ['tl','tr','bl','br'],
+  5: ['tl','tr','c','bl','br'],
+  6: ['tl','ml','bl','tr','mr','br']
+};
+const PIP_STYLES = {
+  tl:'top:18%;left:18%', tr:'top:18%;right:18%',
+  ml:'top:50%;left:18%;transform:translateY(-50%)',
+  c:'top:50%;left:50%;transform:translate(-50%,-50%)',
+  mr:'top:50%;right:18%;transform:translateY(-50%)',
+  bl:'bottom:18%;left:18%', br:'bottom:18%;right:18%'
+};
+
+function pip3dHTML(val) {
+  return (PIP_LAYOUTS[val]||PIP_LAYOUTS[1]).map(p=>`<span class="pip3d" style="${PIP_STYLES[p]}"></span>`).join('');
+}
+
+function cube3dHTML(team) {
+  const c = 'face-' + team;
+  return [
+    ['front',1],['back',6],['right',2],['left',5],['top',3],['bottom',4]
+  ].map(([f,v])=>`<div class="die-face ${c} face-${f}">${pip3dHTML(v)}</div>`).join('');
+}
+
+const FACE_TARGET = {
+  1:{rx:0,ry:0}, 2:{rx:0,ry:-90}, 3:{rx:90,ry:0},
+  4:{rx:-90,ry:0}, 5:{rx:0,ry:90}, 6:{rx:0,ry:180}
+};
+
+function nearestSnap(cur, tgt) {
+  const n = Math.round((cur - tgt) / 360);
+  return tgt + n * 360;
+}
+
+let _dicePhysics = {};
+
+/* ═══════ Throw Profiles ═══════ */
+const THROW_PROFILES = [
+  // THE BLOOM
+  { name: 'The Bloom', fn: (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 13 + t * 15, vy: -(25 - t * 20) };
+  }},
+  // THE BANK SHOT
+  { name: 'The Bank Shot', fn: (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 10 + t * 14, vy: -(20 + t * 4) };
+  }},
+  // THE CROSS-TABLE
+  { name: 'The Cross-Table', fn: (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 24 + t * 6, vy: -(8 + t * 10) };
+  }},
+  // THE SPIRAL
+  { name: 'The Spiral', fn: (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 28 - t * 18, vy: -(10 + t * 12) };
+  }},
+  // THE SCATTER
+  { name: 'The Scatter', fn: (i, n) => {
+    const angles = [0.15, 0.55, 0.85, 0.35, 0.7];
+    const a = angles[i % angles.length];
+    return { vx: 14 + a * 14, vy: -(6 + (1 - a) * 20) };
+  }},
+  // THE GENTLE TOSS
+  { name: 'The Gentle Toss', fn: (i, n) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { vx: 7 + t * 5, vy: -(9 + t * 3) };
+  }},
+];
+
+let lastProfileName = '';
+
+function pickThrowProfile(count) {
+  const pick = THROW_PROFILES[Math.floor(Math.random() * THROW_PROFILES.length)];
+  lastProfileName = pick.name;
+  const noise = () => 1 + (Math.random() - 0.5) * 0.25;
+  return Array.from({ length: count }, (_, i) => {
+    const v = pick.fn(i, count);
+    return { vx: v.vx * noise() * 1.15, vy: v.vy * noise() * 1.15 };
+  });
+}
+
+/* ═══════ Classify Roll ═══════ */
+function classify(dice) {
+  const counts = {};
+  dice.forEach(v => counts[v] = (counts[v] || 0) + 1);
+  let best = { type: 'none', value: 0, count: 0 };
+  for (const [val, cnt] of Object.entries(counts)) {
+    if (cnt >= 3) best = { type: 'triples', value: +val, count: cnt };
+    else if (cnt >= 2 && best.type !== 'triples') best = { type: 'doubles', value: +val, count: cnt };
+  }
+  if (best.type === 'none') {
+    const high = Math.max(...dice);
+    best = { type: 'singles', value: high, count: 1 };
+  }
+  return best;
+}
+
+/* ═══════ Show Rolling ═══════ */
+function showRolling(team, count) {
+  if (count === 0) return;
+
+  const board = document.getElementById('arena');
+  const boardRect = board.getBoundingClientRect();
+  const W = boardRect.width;
+  const H = boardRect.height;
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const half = dieSize / 2;
+  const pad = 16;
+  const minX = pad, maxX = W - pad - dieSize;
+  const minY = pad, maxY = H - pad - dieSize;
+
+  // Clean up previous
+  if (_dicePhysics[team]) {
+    cancelAnimationFrame(_dicePhysics[team].raf);
+    _dicePhysics[team].els.forEach(e => e.remove());
+  }
+
+  const dice = [];
+  const els = [];
+  const isRed = team === 'red';
+  const handX = isRed ? minX + 10 : maxX - 10;
+  const handY = maxY - 5;
+  const throwVecs = pickThrowProfile(count);
+
+  // Show profile name
+  const label = document.getElementById('profile-label');
+  label.textContent = lastProfileName;
+  label.classList.add('visible');
+  setTimeout(() => label.classList.remove('visible'), 2500);
+
+  for (let i = 0; i < count; i++) {
+    const die = document.createElement('div');
+    die.className = 'die-physics';
+    die.style.width = dieSize + 'px';
+    die.style.height = dieSize + 'px';
+    die.style.zIndex = '100';
+    die.style.setProperty('--dh', half + 'px');
+    die.innerHTML = `<div class="die-cube">${cube3dHTML(team)}</div>`;
+    board.appendChild(die);
+    els.push(die);
+
+    const tv = throwVecs[i];
+    dice.push({
+      el: die, cube: die.querySelector('.die-cube'),
+      x: handX + (Math.random() - 0.5) * 6,
+      y: handY + (Math.random() - 0.5) * 6,
+      vx: (isRed ? 1 : -1) * tv.vx,
+      vy: tv.vy,
+      rx: Math.random() * 720, ry: Math.random() * 720, rz: Math.random() * 360,
+      vrx: (Math.random() - 0.5) * 55,
+      vry: (Math.random() - 0.5) * 55,
+      vrz: (Math.random() - 0.5) * 40,
+      bounceCount: 0
+    });
+  }
+
+  function getBounceCoeff(d) {
+    return Math.max(0.3, 0.65 * Math.pow(0.8, d.bounceCount));
+  }
+  function getSurfaceFriction(speed) {
+    if (speed > 8) return 0.982;
+    if (speed > 3) return 0.965;
+    return 0.935;
+  }
+  function getRotFriction(speed) {
+    if (speed > 8) return 0.972;
+    if (speed > 3) return 0.950;
+    return 0.920;
+  }
+
+  function step() {
+    for (let a = 0; a < dice.length; a++) {
+      for (let b = a + 1; b < dice.length; b++) {
+        const da = dice[a], db = dice[b];
+        const dx = da.x - db.x, dy = da.y - db.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < dieSize && dist > 0.1) {
+          const push = (dieSize - dist) * 0.15;
+          const nx = dx / dist, ny = dy / dist;
+          da.vx += nx * push; da.vy += ny * push;
+          db.vx -= nx * push; db.vy -= ny * push;
+        }
+      }
+    }
+    dice.forEach(d => {
+      d.x += d.vx; d.y += d.vy;
+      d.rx += d.vrx; d.ry += d.vry; d.rz += d.vrz;
+      const speed = Math.abs(d.vx) + Math.abs(d.vy);
+
+      const bc = getBounceCoeff(d);
+      if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx) * bc; d.vry *= 1.4; d.vrz *= 1.3; d.bounceCount++; }
+      if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx) * bc; d.vry *= 1.4; d.vrz *= 1.3; d.bounceCount++; }
+      if (d.y < minY) { d.y = minY; d.vy = Math.abs(d.vy) * bc; d.vrx *= 1.4; d.vrz *= 1.3; d.bounceCount++; }
+      if (d.y > maxY) { d.y = maxY; d.vy = -Math.abs(d.vy) * bc; d.vrx *= 1.4; d.vrz *= 1.3; d.bounceCount++; }
+
+      const fric = getSurfaceFriction(speed);
+      const rFric = getRotFriction(speed);
+      d.vx *= fric; d.vy *= fric;
+      d.vrx *= rFric; d.vry *= rFric; d.vrz *= rFric;
+
+      if (speed < 6) {
+        const strength = 0.08 * (1 - speed / 6);
+        d.rx += (Math.round(d.rx / 90) * 90 - d.rx) * strength;
+        d.ry += (Math.round(d.ry / 90) * 90 - d.ry) * strength;
+        d.rz += (Math.round(d.rz / 90) * 90 - d.rz) * strength;
+      }
+
+      d.el.style.left = d.x + 'px';
+      d.el.style.top = d.y + 'px';
+      d.cube.style.transform = `rotateX(${d.rx}deg) rotateY(${d.ry}deg) rotateZ(${d.rz}deg)`;
+    });
+    _dicePhysics[team].raf = requestAnimationFrame(step);
+  }
+
+  _dicePhysics[team] = { raf: requestAnimationFrame(step), dice, els };
+}
+
+/* ═══════ Reveal Dice ═══════ */
+function revealDice(team, values) {
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.dice.length) return;
+
+  cancelAnimationFrame(physics.raf);
+
+  const board = document.getElementById('arena');
+  const boardRect = board.getBoundingClientRect();
+  const dieSize = window.innerWidth <= 600 ? 42 : 56;
+  const gap = window.innerWidth <= 600 ? 10 : 20;
+
+  // Settle to center of the board
+  const totalW = values.length * dieSize + (values.length - 1) * gap;
+  const startX = (boardRect.width - totalW) / 2;
+  const centerY = boardRect.height / 2 - dieSize / 2 + (team === 'blue' ? dieSize + 12 : -12);
+
+  values.forEach((v, i) => {
+    const d = physics.dice[i];
+    if (!d) return;
+
+    const tx = startX + i * (dieSize + gap);
+    const tgt = FACE_TARGET[v];
+    const frx = nearestSnap(d.rx, tgt.rx);
+    const fry = nearestSnap(d.ry, tgt.ry);
+    const frz = nearestSnap(d.rz, 0);
+    d.rx = frx; d.ry = fry; d.rz = frz;
+    d.value = v;
+
+    setTimeout(() => {
+      d.el.classList.add('settling');
+      d.el.style.left = tx + 'px';
+      d.el.style.top = centerY + 'px';
+      d.cube.style.transform = `rotateX(${frx}deg) rotateY(${fry}deg) rotateZ(${frz}deg)`;
+    }, i * 80);
+  });
+
+  // Highlight after settling
+  const settleDelay = values.length * 80 + 750;
+  setTimeout(() => {
+    physics.settled = true;
+    physics.values = values;
+    highlightDice(team, values);
+    showResults(team, values);
+  }, settleDelay);
+}
+
+/* ═══════ Highlight Matched Dice ═══════ */
+function highlightDice(team, values) {
+  const roll = classify(values);
+  const physics = _dicePhysics[team];
+  if (!physics || !physics.settled) return;
+
+  const diceObjs = physics.dice;
+  if (roll.type === 'singles') {
+    let done = false;
+    [...diceObjs].reverse().forEach(d => {
+      if (!done && d.value === roll.value) {
+        d.el.classList.add('highlight-single');
+        done = true;
+      }
+    });
+  } else if (roll.type === 'doubles') {
+    let count = 0;
+    diceObjs.forEach(d => {
+      if (count < 2 && d.value === roll.value) {
+        d.el.classList.add('highlight-double');
+        count++;
+      }
+    });
+  } else {
+    diceObjs.forEach(d => {
+      if (d.value === roll.value) d.el.classList.add('highlight-triple');
+    });
+  }
+}
+
+/* ═══════ Show Results Tray ═══════ */
+function showResults(team, values) {
+  const roll = classify(values);
+  const results = document.getElementById('results');
+  const text = document.getElementById('result-text');
+  const diceEl = document.getElementById('result-dice');
+
+  const labels = { singles: 'Singles', doubles: 'Doubles!', triples: 'TRIPLES!!' };
+  const damage = { singles: roll.value, doubles: roll.value * 2, triples: roll.value * 3 };
+
+  text.textContent = `${labels[roll.type]} ${roll.value}'s = ${damage[roll.type]} DMG`;
+
+  const faceClass = team === 'red' ? 'face-red' : 'face-blue';
+  diceEl.innerHTML = values.map(v => {
+    const hl = v === roll.value ? ' highlight' : '';
+    return `<div class="result-die ${faceClass}${hl}">${v}</div>`;
+  }).join('');
+
+  results.style.opacity = '1';
+  results.style.transition = 'opacity 0.4s';
+}
+
+/* ═══════ Roll Functions ═══════ */
+function rollTeam(team) {
+  const count = parseInt(document.getElementById('count').value) || 3;
+
+  // Hide results
+  document.getElementById('results').style.opacity = '0';
+
+  // Clean up other team if present
+  const other = team === 'red' ? 'blue' : 'red';
+  if (_dicePhysics[other]) {
+    cancelAnimationFrame(_dicePhysics[other].raf);
+    _dicePhysics[other].els.forEach(e => e.remove());
+    delete _dicePhysics[other];
+  }
+
+  // Launch dice
+  showRolling(team, count);
+
+  // Generate random values and reveal after rolling
+  const values = Array.from({ length: count }, () => Math.floor(Math.random() * 6) + 1);
+  setTimeout(() => revealDice(team, values), 1800);
+}
+
+function rollBoth() {
+  const count = parseInt(document.getElementById('count').value) || 3;
+
+  document.getElementById('results').style.opacity = '0';
+
+  // Clean up
+  ['red', 'blue'].forEach(t => {
+    if (_dicePhysics[t]) {
+      cancelAnimationFrame(_dicePhysics[t].raf);
+      _dicePhysics[t].els.forEach(e => e.remove());
+      delete _dicePhysics[t];
+    }
+  });
+
+  // Launch both teams
+  showRolling('red', count);
+  setTimeout(() => showRolling('blue', count), 200);
+
+  // Reveal both
+  const redVals = Array.from({ length: count }, () => Math.floor(Math.random() * 6) + 1);
+  const blueVals = Array.from({ length: count }, () => Math.floor(Math.random() * 6) + 1);
+
+  setTimeout(() => revealDice('red', redVals), 1800);
+  setTimeout(() => {
+    revealDice('blue', blueVals);
+    // After blue settles, show combined result
+    setTimeout(() => {
+      const redRoll = classify(redVals);
+      const blueRoll = classify(blueVals);
+      const redDmg = redRoll.type === 'triples' ? redRoll.value * 3 : redRoll.type === 'doubles' ? redRoll.value * 2 : redRoll.value;
+      const blueDmg = blueRoll.type === 'triples' ? blueRoll.value * 3 : blueRoll.type === 'doubles' ? blueRoll.value * 2 : blueRoll.value;
+
+      const text = document.getElementById('result-text');
+      const diceEl = document.getElementById('result-dice');
+      const results = document.getElementById('results');
+
+      const winner = redDmg > blueDmg ? 'RED WINS' : blueDmg > redDmg ? 'BLUE WINS' : 'TIE';
+      text.textContent = `${winner}! (${redDmg} vs ${blueDmg})`;
+
+      diceEl.innerHTML =
+        redVals.map(v => `<div class="result-die face-red">${v}</div>`).join('') +
+        `<span style="color:var(--text2);font-weight:800;font-size:18px;margin:0 6px">vs</span>` +
+        blueVals.map(v => `<div class="result-die face-blue">${v}</div>`).join('');
+
+      results.style.opacity = '1';
+    }, count * 80 + 800);
+  }, 2000);
+}
+</script>
+</body>
+</html>
