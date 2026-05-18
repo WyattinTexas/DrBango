@@ -11,7 +11,7 @@
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 // If raid params exist, save them before reload so they survive the cache-bust
 (function(){
-  const LOCAL_V = 'v13'; // MUST match TESTROOM_VERSION — bump both together
+  const LOCAL_V = 'v14'; // MUST match TESTROOM_VERSION — bump both together
   // Preserve raid params across cache-bust reloads
   var params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'raid') {
@@ -2847,7 +2847,7 @@ const DEBUG = false;
 // ============================================================
 // FIREBASE — persistent shared standings
 // ============================================================
-const TESTROOM_VERSION = 'v13'; // Testroom2 v13: Willpower redesign — spent stays spent, face-down buffer, no-self-KO, new costs (Skylar 2026-05-18)
+const TESTROOM_VERSION = 'v14'; // Testroom2 v14: Fix — spent willpower cards LEAVE the ghost (to discard), HP drops by cost; buffer only fills via heals
 
 /* Mobile: lock body scroll when any modal overlay is active */
 (function() {
@@ -19058,23 +19058,29 @@ function activateWillpower(team) {
     return;
   }
 
-  // Flip the top 'cost' armed cards face-down → wpBuffer (they stay on the ghost as HP buffer)
+  // v14 fix: spent cards LEAVE the ghost (go to team discard). HP drops by 'cost'.
+  // wpBuffer only fills when heals pull cards back face-down from discard.
   for (let i = 0; i < cost; i++) {
-    const flipped = f.willpower.shift();
-    f.wpBuffer.push(flipped);
+    const spent = f.willpower.shift();
+    t.wpDiscard.push(spent);
   }
 
   if (!B.wpUsedThisTurn) B.wpUsedThisTurn = { red:false, blue:false };
   B.wpUsedThisTurn[team] = true;
   f.willpowerTopLocked = true;
-  f.hp = f.willpower.length + f.wpBuffer.length;
+  f.hp = f.willpower.length + (f.wpBuffer ? f.wpBuffer.length : 0);
 
-  // Apply the effect (no extra cost — handled above)
+  // Apply the effect (cost already paid above)
   applyWillpowerEffect(team, card);
 
   log(`<span class="log-ability">${f.name}</span> activated <b>${card.name}</b> (cost ${cost}) — ${card.desc}`);
   narrate(`${f.name} used <b>${card.name}</b>!`);
   renderBattle();
+
+  // If the ghost KO'd itself somehow (shouldn't happen with cost<HP rule), trigger KO swap
+  if (f.ko) {
+    handleKOs();
+  }
 }
 
 function applyWillpowerEffect(team, card) {
