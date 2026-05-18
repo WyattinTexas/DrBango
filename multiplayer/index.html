@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.00'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.01'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4194,7 +4194,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .social-panel { display: none; }
 .social-panel.active { display: block; }
 
-/* Hide old sidebars on all screens (Phase 4 will refine for desktop) */
+/* Hide old UI elements — replaced by new layout */
 #sidebar-leaderboard { display: none !important; }
 .raid-side-tab { display: none !important; }
 .equip-side-tab { display: none !important; }
@@ -4203,12 +4203,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .sidebar-toggle-btn { display: none !important; }
 .sidebar-backdrop { display: none !important; }
 .raid-header-btn { display: none !important; }
-
-/* Simplified top bar */
-.top-bar {
-  padding: 10px 16px !important;
-  justify-content: center !important;
-}
+.top-bar { display: none !important; }
 
 </style>
 </head>
@@ -5623,7 +5618,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.00';
+const BBN_VERSION = 'v2.01';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -5662,10 +5657,16 @@ function renderHomeScreen() {
   const nm = document.getElementById('home-name');
   if (nm) nm.textContent = userProfile.displayName || currentUser?.displayName || 'Player';
   const elo = document.getElementById('home-elo');
-  if (elo) elo.textContent = (userProfile.elo || 1000) + ' Elo';
+  if (elo) elo.textContent = (userProfile.stats?.elo || 1000) + ' Elo';
   const games = document.getElementById('home-games');
-  const gamesUsed = userProfile.gamesPlayedToday || 0;
-  if (games) games.textContent = gamesUsed + '/25';
+  const remaining = typeof getGamesRemaining === 'function' ? getGamesRemaining() : 25;
+  if (games) games.textContent = remaining + '/25';
+  // Update rival meta
+  const rivalMeta = document.getElementById('home-rival-meta');
+  if (rivalMeta && userProfile.dailyAttempts !== undefined) {
+    const attemptsLeft = Math.max(0, 5 - (userProfile.dailyAttempts || 0));
+    rivalMeta.textContent = attemptsLeft + ' attempts left';
+  }
 
   // Pack button state
   const homePack = document.getElementById('home-pack-btn');
@@ -5684,10 +5685,14 @@ function renderHomeLeaderboard(players) {
   const top3 = players.slice(0, 3);
   container.innerHTML = top3.map((p, i) => {
     const rankClass = i === 0 ? '' : i === 1 ? 'r2' : 'r3';
-    const avatarSrc = p.photoURL || '';
-    return `<div class="home-lb-row">
+    // Use lead ghost art as avatar
+    const teamIds = p.team || [];
+    const leadGhost = teamIds.length > 0 && typeof getGhost === 'function' ? getGhost(teamIds[0]) : null;
+    const avatarSrc = leadGhost ? leadGhost.art : '';
+    const isCurrent = currentUser && p.uid === currentUser.uid;
+    return `<div class="home-lb-row" ${!isCurrent ? `onclick="selectTarget('${p.uid}')"` : ''} style="${!isCurrent?'cursor:pointer':''}">
       <span class="home-lb-rank ${rankClass}">${i+1}</span>
-      <img class="home-lb-av" src="${avatarSrc}" alt="" onerror="this.style.background='var(--surface3)'">
+      ${avatarSrc ? `<img class="home-lb-av" src="${avatarSrc}" alt="" onerror="this.style.background='var(--surface3)'">` : `<div class="home-lb-av" style="background:var(--surface3)"></div>`}
       <span class="home-lb-name">${p.displayName || 'Player'}</span>
       <span class="home-lb-elo">${p.elo || 1000}</span>
     </div>`;
