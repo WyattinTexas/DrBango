@@ -14648,12 +14648,16 @@ function stopMusicHard() {
 // Unlock audio on first user interaction (browsers block autoplay)
 // v726: skip bgMusic entirely — startMusic() has its own retry-on-click handler.
 // unlockAudio's play().then(pause) pattern races with startMusic's retry and kills music.
+// Unlock audio on first user interaction (browsers block autoplay)
+// v2.05: mute during unlock to prevent audible SFX burst on first tap
 (function unlockAudio() {
   const unlock = () => {
     document.querySelectorAll('audio').forEach(a => {
       if (a.id === 'bgMusic') return; // handled by startMusic's own retry
       if (!a.paused) return;
-      a.play().then(() => a.pause()).catch(() => {});
+      const origVol = a.volume;
+      a.volume = 0;
+      a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = origVol; }).catch(() => { a.volume = origVol; });
     });
     document.removeEventListener('click', unlock);
     document.removeEventListener('touchstart', unlock);
