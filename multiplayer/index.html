@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.01'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.02'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4194,6 +4194,45 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .social-panel { display: none; }
 .social-panel.active { display: block; }
 
+/* Screen headers */
+.screen-header { text-align: center; padding: 8px 0 16px; }
+.screen-title {
+  font-family: 'Creepster', cursive; font-size: 1.6rem;
+  color: var(--gold-bright); letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(240,197,96,0.2);
+  margin: 0;
+}
+.screen-subtitle { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 1px; }
+
+/* Screen cards — reusable card component for menu items */
+.screen-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface2); border-radius: 14px;
+  padding: 16px; border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.screen-card:hover { border-color: rgba(212,160,64,0.3); }
+.screen-card:active { transform: scale(0.98); }
+.screen-card-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; font-weight: 700; color: #fff;
+  flex-shrink: 0; overflow: hidden;
+}
+.screen-card-info { flex: 1; }
+.screen-card-title {
+  font-family: 'Creepster', cursive; font-size: 1rem;
+  letter-spacing: 1px; color: var(--text);
+}
+.screen-card-desc {
+  font-size: 0.75rem; color: var(--text2); margin-top: 2px;
+}
+.screen-card-badge {
+  font-size: 0.7rem; font-weight: 700; color: var(--gold);
+  background: rgba(212,160,64,0.1); padding: 4px 10px;
+  border-radius: 8px; border: 1px solid rgba(212,160,64,0.2);
+}
+
 /* Hide old UI elements — replaced by new layout */
 #sidebar-leaderboard { display: none !important; }
 .raid-side-tab { display: none !important; }
@@ -4228,9 +4267,9 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 
 <!-- ===== MAIN APP ===== -->
 <div id="app">
-  <!-- Top Bar -->
-  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
-  <div class="top-bar">
+  <!-- Top Bar (hidden — replaced by home screen) -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()" style="display:none"></div>
+  <div class="top-bar" style="display:none !important">
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Leaderboard">&#9776;</button>
       <div class="user-info">
@@ -4453,17 +4492,39 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 
   <!-- ===== SCREEN: RAIDS ===== -->
   <div class="screen" id="screen-raids">
-    <div class="section-header"><h2>Raids</h2></div>
-    <div class="raid-nav-buttons">
-      <button class="raid-nav-btn" onclick="showRaidSection('lobby')">RAIDS</button>
-      <button class="raid-nav-btn" onclick="showRaidSection('shop')">SHOP</button>
-      <span class="raid-points-inline">&#x2B50; <span id="raid-points-display">0</span> pts</span>
+    <div class="screen-header">
+      <h2 class="screen-title">Raids</h2>
+      <span class="screen-subtitle">Co-op boss battles</span>
     </div>
-    <div id="raid-shop" class="raid-section" style="display:none"></div>
+    <div class="screen-card" onclick="showRaidSection('lobby')" style="cursor:pointer;">
+      <div class="screen-card-icon" style="background:linear-gradient(135deg,#b91c1c,#dc2626);">
+        <img src="../testroom/art/timber.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.textContent='R'">
+      </div>
+      <div class="screen-card-info">
+        <div class="screen-card-title">Enter Raid Lobby</div>
+        <div class="screen-card-desc">Team up with friends to defeat powerful bosses</div>
+      </div>
+    </div>
+    <div class="screen-card" onclick="showRaidSection('shop')" style="cursor:pointer;">
+      <div class="screen-card-icon" style="background:linear-gradient(135deg,var(--gold-deep),var(--gold));">
+        <span style="font-size:1.4rem;">S</span>
+      </div>
+      <div class="screen-card-info">
+        <div class="screen-card-title">Raid Shop</div>
+        <div class="screen-card-desc">Spend your raid points on rewards</div>
+      </div>
+      <span class="screen-card-badge" id="raid-points-display-2">0 pts</span>
+    </div>
+    <span id="raid-points-display" style="display:none;">0</span>
+    <div id="raid-shop" class="raid-section" style="display:none;margin-top:16px;"></div>
   </div>
 
   <!-- ===== SCREEN: SOCIAL ===== -->
   <div class="screen" id="screen-social">
+    <div class="screen-header">
+      <h2 class="screen-title">Social</h2>
+      <span class="screen-subtitle">Season One</span>
+    </div>
     <div class="social-tabs">
       <button class="social-tab active" onclick="switchSocialTab('leaderboard')">Leaderboard</button>
       <button class="social-tab" onclick="switchSocialTab('badges')">Badges</button>
@@ -4484,22 +4545,57 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </div>
     <div class="social-panel" id="social-badges">
       <div class="badges-section">
+        <div class="section-header"><h2>Badges</h2></div>
         <div class="badges-grid" id="badges-grid"></div>
       </div>
     </div>
     <div class="social-panel" id="social-trading">
-      <button onclick="openTradeInbox()" style="width:100%;padding:14px;font-family:Creepster,cursive;font-size:1rem;letter-spacing:1.5px;color:var(--gold);background:var(--surface2);border:1px solid var(--border);border-radius:12px;cursor:pointer;position:relative;">Trade Inbox <span id="trade-badge-main" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-family:Inter,sans-serif;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;">0</span></button>
+      <div class="screen-card" onclick="openTradeInbox()" style="cursor:pointer;">
+        <div class="screen-card-icon" style="background:linear-gradient(135deg,var(--ghost-rare),#7c3aed);">
+          <span style="font-size:1.4rem;">T</span>
+        </div>
+        <div class="screen-card-info">
+          <div class="screen-card-title">Trade Inbox</div>
+          <div class="screen-card-desc">View and manage card trades with other players</div>
+        </div>
+        <span id="trade-badge-main" style="display:none;background:var(--accent);color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;">0</span>
+      </div>
+      <div class="screen-card" onclick="if(typeof viewCollection==='function'&&selectedTarget) viewCollection(selectedTarget.uid, selectedTarget.name)" style="cursor:pointer;margin-top:8px;">
+        <div class="screen-card-icon" style="background:linear-gradient(135deg,#2563eb,#3b82f6);">
+          <span style="font-size:1.4rem;">O</span>
+        </div>
+        <div class="screen-card-info">
+          <div class="screen-card-title">Offer Trade</div>
+          <div class="screen-card-desc">Select a player from the leaderboard first</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- ===== SCREEN: SHOP ===== -->
   <div class="screen" id="screen-shop">
-    <div class="section-header"><h2>Shop</h2></div>
-    <button class="home-action-btn btn-play" style="margin-bottom:12px;" onclick="showEquipOverlay()">
-      <span class="action-icon">EQ</span>
-      <div>Loadout<br><span class="action-meta">Equip items to your Spiritkin</span></div>
-    </button>
-    <p style="color:var(--text-dim);font-size:0.85rem;text-align:center;margin-top:24px;">More coming soon...</p>
+    <div class="screen-header">
+      <h2 class="screen-title">Shop</h2>
+      <span class="screen-subtitle">Gear up your Spiritkin</span>
+    </div>
+    <div class="screen-card" onclick="showEquipOverlay()" style="cursor:pointer;">
+      <div class="screen-card-icon" style="background:linear-gradient(135deg,var(--gold-deep),var(--gold));">
+        <img src="../testroom/art/finn.png" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.textContent='E'">
+      </div>
+      <div class="screen-card-info">
+        <div class="screen-card-title">Loadout</div>
+        <div class="screen-card-desc">Equip items to power up your team</div>
+      </div>
+    </div>
+    <div class="screen-card" style="opacity:0.5;margin-top:8px;">
+      <div class="screen-card-icon" style="background:var(--surface3);">
+        <span style="font-size:1.4rem;">?</span>
+      </div>
+      <div class="screen-card-info">
+        <div class="screen-card-title">Cosmetics</div>
+        <div class="screen-card-desc">Coming soon...</div>
+      </div>
+    </div>
   </div>
 
   <!-- Bottom Navigation -->
@@ -5618,7 +5714,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.01';
+const BBN_VERSION = 'v2.02';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
