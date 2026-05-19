@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.15'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.16'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -1466,6 +1466,7 @@ body.shake { animation: screen-shake 0.5s ease-in-out; }
 /* ===== BADGES — visible inside Players screen, hidden elsewhere ===== */
 .content .badges-section { display: none !important; }
 #screen-social .badges-section { display: block !important; }
+@keyframes badgeFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
 /* ===== NO GAMES STATE ===== */
 .no-games-overlay {
@@ -6254,7 +6255,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.15';
+const BBN_VERSION = 'v2.16';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7383,27 +7384,97 @@ async function selectTarget(uid) {
 }
 
 // ============================================================
-// BADGES
+// BADGES — Shrine Layout with SVG Medallions
 // ============================================================
-function renderBadges() {
-  const earnedDaily = userProfile.dailyBadges || [];
 
-  const badgeHtml = DAILY_MATCHES.map(match => {
-    const isEarned = earnedDaily.includes(match.badge);
-    return `
-      <div class="daily-badge ${isEarned ? 'earned' : ''}" title="${isEarned ? match.name : '???'}" style="${isEarned ? `--badge-color:${match.color}` : ''}">
-        <div class="badge-shape shape-${match.shape}"></div>
-      </div>
-    `;
+// SVG geometry helpers
+function _hexPts(cx,cy,r){return Array.from({length:6},(_,i)=>{const a=Math.PI/6+i*Math.PI/3;return`${cx+r*Math.cos(a)},${cy-r*Math.sin(a)}`;}).join(' ');}
+function _starPts(cx,cy,oR,iR){return Array.from({length:10},(_,i)=>{const a=-Math.PI/2+i*Math.PI/5;const r=i%2===0?oR:iR;return`${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`;}).join(' ');}
+function _pentPts(cx,cy,r){return Array.from({length:5},(_,i)=>{const a=-Math.PI/2+i*2*Math.PI/5;return`${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`;}).join(' ');}
+function _octPts(cx,cy,r){return Array.from({length:8},(_,i)=>{const a=-Math.PI/8+i*Math.PI/4;return`${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`;}).join(' ');}
+function _lighten(hex,p){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16),f=p/100;return'#'+[r,g,b].map(c=>Math.min(255,Math.round(c+(255-c)*f)).toString(16).padStart(2,'0')).join('');}
+function _darken(hex,p){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16),f=1-p/100;return'#'+[r,g,b].map(c=>Math.round(c*f).toString(16).padStart(2,'0')).join('');}
+
+function badgeSVG(shape, color, earned, size) {
+  const w = size || 46;
+  if (!earned) return lockedBadgeSVG(shape, w);
+  const lc=_lighten(color,40), dc=_darken(color,30), mc=_lighten(color,15);
+  const gid='g'+Math.random().toString(36).substr(2,6), sid='s'+gid;
+  let bp='',sp='',ip='';
+  switch(shape){
+    case'circle':bp=`<circle cx="50" cy="50" r="46" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<circle cx="50" cy="50" r="42" fill="url(#${gid})"/>`;ip=`<circle cx="50" cy="50" r="34" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/><circle cx="50" cy="50" r="28" fill="none" stroke="${lc}" stroke-width="0.5" opacity="0.2"/><circle cx="50" cy="38" r="5" fill="${lc}" opacity="0.15"/>`;break;
+    case'hexagon':bp=`<polygon points="${_hexPts(50,50,46)}" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<polygon points="${_hexPts(50,50,44)}" fill="url(#${gid})"/>`;ip=`<polygon points="${_hexPts(50,50,36)}" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/><circle cx="50" cy="50" r="8" fill="${lc}" opacity="0.1"/>`;break;
+    case'diamond':bp=`<polygon points="50,4 96,50 50,96 4,50" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<polygon points="50,8 92,50 50,92 8,50" fill="url(#${gid})"/>`;ip=`<polygon points="50,20 80,50 50,80 20,50" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/>`;break;
+    case'shield':bp=`<path d="M50,4 L94,18 L94,55 L50,96 L6,55 L6,18 Z" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<path d="M50,8 L90,20 L90,53 L50,92 L10,53 L10,20 Z" fill="url(#${gid})"/>`;ip=`<path d="M50,22 L78,30 L78,50 L50,78 L22,50 L22,30 Z" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/>`;break;
+    case'star':bp=`<polygon points="${_starPts(50,50,46,22)}" fill="none" stroke="${mc}" stroke-width="2" opacity="0.6"/>`;sp=`<polygon points="${_starPts(50,50,44,20)}" fill="url(#${gid})"/>`;ip=`<polygon points="${_starPts(50,50,32,16)}" fill="none" stroke="${lc}" stroke-width="0.8" opacity="0.3"/><circle cx="50" cy="50" r="5" fill="${lc}" opacity="0.15"/>`;break;
+    case'triangle':bp=`<polygon points="50,4 96,92 4,92" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<polygon points="50,10 92,88 8,88" fill="url(#${gid})"/>`;ip=`<polygon points="50,28 76,78 24,78" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/>`;break;
+    case'pentagon':bp=`<polygon points="${_pentPts(50,52,46)}" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<polygon points="${_pentPts(50,52,44)}" fill="url(#${gid})"/>`;ip=`<polygon points="${_pentPts(50,52,34)}" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/>`;break;
+    case'octagon':bp=`<polygon points="${_octPts(50,50,46)}" fill="none" stroke="${mc}" stroke-width="2.5" opacity="0.6"/>`;sp=`<polygon points="${_octPts(50,50,44)}" fill="url(#${gid})"/>`;ip=`<polygon points="${_octPts(50,50,34)}" fill="none" stroke="${lc}" stroke-width="1" opacity="0.3"/><circle cx="50" cy="50" r="4" fill="${lc}" opacity="0.2"/>`;break;
+  }
+  return`<svg viewBox="0 0 100 100" width="${w}" height="${w}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${lc}"/><stop offset="35%" stop-color="${color}"/><stop offset="60%" stop-color="${dc}"/><stop offset="85%" stop-color="${color}"/><stop offset="100%" stop-color="${lc}"/></linearGradient><radialGradient id="${sid}" cx="35%" cy="30%" r="50%"><stop offset="0%" stop-color="white" stop-opacity="0.25"/><stop offset="100%" stop-color="white" stop-opacity="0"/></radialGradient></defs>${bp}${sp}${ip}${sp.replace(`fill="url(#${gid})"`,`fill="url(#${sid})"`)}</svg>`;
+}
+
+function lockedBadgeSVG(shape, w) {
+  const sc='#1a1722',sl='#252230',sb='#2a2640';
+  let bp='',sp='',ip='';
+  switch(shape){
+    case'circle':bp=`<circle cx="50" cy="50" r="46" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<circle cx="50" cy="50" r="42" fill="${sc}"/>`;ip=`<circle cx="50" cy="50" r="34" fill="none" stroke="${sl}" stroke-width="1" opacity="0.3"/>`;break;
+    case'hexagon':bp=`<polygon points="${_hexPts(50,50,46)}" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="${_hexPts(50,50,42)}" fill="${sc}"/>`;ip=`<polygon points="${_hexPts(50,50,34)}" fill="none" stroke="${sl}" stroke-width="1" opacity="0.3"/>`;break;
+    case'diamond':bp=`<polygon points="50,4 96,50 50,96 4,50" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="50,8 92,50 50,92 8,50" fill="${sc}"/>`;break;
+    case'shield':bp=`<path d="M50,4 L94,18 L94,55 L50,96 L6,55 L6,18 Z" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<path d="M50,8 L90,20 L90,53 L50,92 L10,53 L10,20 Z" fill="${sc}"/>`;break;
+    case'star':bp=`<polygon points="${_starPts(50,50,46,22)}" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="${_starPts(50,50,44,20)}" fill="${sc}"/>`;break;
+    case'triangle':bp=`<polygon points="50,4 96,92 4,92" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="50,10 92,88 8,88" fill="${sc}"/>`;break;
+    case'pentagon':bp=`<polygon points="${_pentPts(50,52,46)}" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="${_pentPts(50,52,44)}" fill="${sc}"/>`;break;
+    case'octagon':bp=`<polygon points="${_octPts(50,50,46)}" fill="none" stroke="${sb}" stroke-width="2"/>`;sp=`<polygon points="${_octPts(50,50,44)}" fill="${sc}"/>`;break;
+  }
+  const lock=`<rect x="40" y="48" width="20" height="16" rx="2" fill="#33304a" opacity="0.8"/><path d="M44,48 V42 a6,6 0 0 1 12,0 V48" fill="none" stroke="#33304a" stroke-width="2.5" opacity="0.8"/>`;
+  return`<svg viewBox="0 0 100 100" width="${w}" height="${w}" xmlns="http://www.w3.org/2000/svg">${bp}${sp}${ip||''}${lock}</svg>`;
+}
+
+function renderBadges() {
+  const earnedDaily = userProfile ? (userProfile.dailyBadges || []) : [];
+  const earnedCount = earnedDaily.length;
+  const total = DAILY_MATCHES.length;
+
+  // Sidebar (old, compact) — keep simple shapes
+  const row = document.getElementById('sidebar-badges-row');
+  if (row) row.innerHTML = DAILY_MATCHES.map(m => {
+    const e = earnedDaily.includes(m.badge);
+    return `<div class="daily-badge ${e?'earned':''}" title="${e?m.name:'???'}" style="${e?`--badge-color:${m.color}`:''}"><div class="badge-shape shape-${m.shape}"></div></div>`;
   }).join('');
 
-  // Render to sidebar (old, hidden)
-  const row = document.getElementById('sidebar-badges-row');
-  if (row) row.innerHTML = badgeHtml;
-
-  // Render to Players screen badges grid
+  // Players screen — shrine circle layout
   const grid = document.getElementById('badges-grid');
-  if (grid) grid.innerHTML = badgeHtml;
+  if (!grid) return;
+
+  const radius = 105;
+  const cx = 140, cy = 140;
+  let circleHtml = '';
+  DAILY_MATCHES.forEach((m, i) => {
+    const isEarned = earnedDaily.includes(m.badge);
+    const angle = -Math.PI/2 + (i * 2 * Math.PI / total);
+    const x = cx + radius * Math.cos(angle) - 23;
+    const y = cy + radius * Math.sin(angle) - 23;
+    const svg = badgeSVG(m.shape, m.color, isEarned, 46);
+    const glow = isEarned ? `box-shadow:0 0 12px ${m.color}44;` : '';
+    const anim = isEarned ? `animation:badgeFloat 3s ease-in-out ${i*0.3}s infinite;` : '';
+    circleHtml += `<div style="position:absolute;left:${x}px;top:${y}px;text-align:center;${glow}${anim}border-radius:50%;">
+      ${svg}
+      <div style="font-size:0.5rem;color:${isEarned?m.color:'var(--text-dim)'};margin-top:2px;width:50px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isEarned?m.name:'???'}</div>
+    </div>`;
+  });
+
+  // Progress ring
+  const pct = total > 0 ? earnedCount / total : 0;
+  const ringR = 28, ringC = 2 * Math.PI * ringR;
+  const progressRing = `<svg width="80" height="80" viewBox="0 0 80 80" style="position:absolute;left:${cx-40}px;top:${cy-40}px;">
+    <circle cx="40" cy="40" r="${ringR}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+    <circle cx="40" cy="40" r="${ringR}" fill="none" stroke="var(--gold)" stroke-width="4" stroke-dasharray="${ringC}" stroke-dashoffset="${ringC*(1-pct)}" transform="rotate(-90 40 40)" stroke-linecap="round"/>
+    <text x="40" y="36" text-anchor="middle" fill="var(--gold-bright)" font-family="Creepster,cursive" font-size="18">${earnedCount}</text>
+    <text x="40" y="50" text-anchor="middle" fill="var(--text-dim)" font-size="9">of ${total}</text>
+  </svg>`;
+
+  grid.innerHTML = `<div style="position:relative;width:280px;height:300px;margin:0 auto;">${progressRing}${circleHtml}</div>`;
 }
 
 async function checkBadges() {
