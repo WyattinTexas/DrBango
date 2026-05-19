@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.19'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.20'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4218,6 +4218,9 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .rival-card-attempts {
   font-size: 0.7rem; color: var(--text2);
 }
+.rival-card-badge-preview {
+  display: inline-block;
+}
 .rival-card-fight {
   font-family: 'Creepster', cursive; font-size: 0.8rem;
   letter-spacing: 1.5px; color: var(--ghost-rare);
@@ -4859,8 +4862,8 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <div class="home-games-badge" id="home-games">10 remain</div>
     </div>
 
-    <!-- Spirit of the Day — Featured Spiritkin Showcase -->
-    <div class="spirit-showcase">
+    <!-- Spiritkin of the Day — tappable showcase -->
+    <div class="spirit-showcase" onclick="showSpiritkinDetail()" style="cursor:pointer;">
       <div class="spirit-showcase-art">
         <img id="spirit-showcase-img" src="../testroom/art/originals/Haywire.png" alt="Haywire" onerror="this.style.display='none'">
         <div class="spirit-showcase-glow"></div>
@@ -4869,6 +4872,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         <div class="spirit-showcase-label">SPIRITKIN OF THE DAY</div>
         <div class="spirit-showcase-name" id="spirit-showcase-name">Haywire</div>
         <div class="spirit-showcase-ability" id="spirit-showcase-ability">Wild Chords — Triples: gain 1 permanent die</div>
+        <div style="font-size:0.5rem;color:var(--text-dim);margin-top:4px;letter-spacing:1px;">TAP TO VIEW</div>
       </div>
     </div>
 
@@ -4881,7 +4885,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     <!-- Challenge Friend -->
     <button class="home-challenge-btn" onclick="createChallenge()">
       <span class="hcb-label">Challenge a Friend</span>
-      <span class="hcb-sub">Send a battle link to a friend</span>
+      <span class="hcb-sub">Both players earn a bonus pack</span>
     </button>
 
     <!-- Today's Rival — full card with team -->
@@ -4894,6 +4898,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <div class="rival-card-name" id="home-rival-name"></div>
       <div class="rival-card-footer">
         <span class="rival-card-attempts" id="home-rival-meta">5 attempts</span>
+        <span class="rival-card-badge-preview" id="home-rival-badge"></span>
         <span class="rival-card-fight">FIGHT</span>
       </div>
     </div>
@@ -6258,7 +6263,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.19';
+const BBN_VERSION = 'v2.20';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6315,6 +6320,31 @@ document.addEventListener('visibilitychange', () => {
     document.querySelectorAll('audio').forEach(a => { if (a.dataset.wasPlaying === '1') { a.play().catch(()=>{}); delete a.dataset.wasPlaying; } });
   }
 });
+
+/* ===== Spiritkin of the Day — full screen view ===== */
+const SPIRITKIN_OF_THE_DAY_ID = 78; // Haywire
+function showSpiritkinDetail() {
+  const ghost = typeof getGhost === 'function' ? getGhost(SPIRITKIN_OF_THE_DAY_ID) : null;
+  if (!ghost) return;
+  let overlay = document.getElementById('spiritkin-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'spiritkin-detail-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(overlay);
+  }
+  overlay.onclick = () => overlay.remove();
+  const rarityColors = { common:'var(--common)', uncommon:'var(--uncommon)', rare:'var(--rare)', 'ghost-rare':'var(--ghost-rare)', legendary:'var(--legendary)' };
+  overlay.innerHTML = `<div style="background:var(--surface2,#1c1828);border:1px solid var(--border);border-radius:20px;padding:20px;max-width:300px;width:100%;text-align:center;" onclick="event.stopPropagation()">
+    <img src="${ghost.art}" style="width:180px;height:180px;object-fit:cover;border-radius:16px;border:2px solid ${rarityColors[ghost.rarity]||'var(--border)'};margin-bottom:12px;" onerror="this.style.background='var(--surface3)'">
+    <div style="font-family:Creepster,cursive;font-size:1.5rem;color:var(--gold-bright);letter-spacing:1.5px;">${ghost.name}</div>
+    <span style="font-size:0.65rem;font-weight:700;padding:3px 10px;border-radius:8px;background:${rarityColors[ghost.rarity]||'#888'}22;color:${rarityColors[ghost.rarity]||'#888'};display:inline-block;margin:6px 0;">${(ghost.rarity||'').replace('-',' ').toUpperCase()}</span>
+    <div style="font-size:0.85rem;color:var(--text);margin:8px 0 4px;">${ghost.maxHp} HP</div>
+    <div style="font-family:Creepster,cursive;font-size:1rem;color:var(--gold);margin:8px 0 4px;">${ghost.ability||''}</div>
+    <div style="font-size:0.75rem;color:var(--text2);line-height:1.5;padding:0 8px;">${ghost.abilityDesc||''}</div>
+    <button onclick="document.getElementById('spiritkin-detail-overlay').remove()" style="margin-top:16px;padding:10px 28px;background:var(--surface3);border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-size:0.85rem;">Close</button>
+  </div>`;
+}
 
 /* ===== Home Screen Rendering ===== */
 function renderHomeScreen() {
@@ -9162,6 +9192,16 @@ function renderDailyChallenge() {
   }
   const rivalDiff = document.getElementById('home-rival-difficulty');
   if (rivalDiff) rivalDiff.textContent = daily.difficulty || '';
+  // Show badge you'll earn
+  const rivalBadgeEl = document.getElementById('home-rival-badge');
+  if (rivalBadgeEl && typeof badgeSVG === 'function') {
+    const earnedDaily = userProfile ? (userProfile.dailyBadges || []) : [];
+    const alreadyEarned = earnedDaily.includes(daily.badge);
+    rivalBadgeEl.innerHTML = badgeSVG(daily.shape, daily.color, true, 24);
+    rivalBadgeEl.title = alreadyEarned ? 'Badge earned!' : 'Defeat to earn';
+    if (alreadyEarned) rivalBadgeEl.style.opacity = '0.4';
+    else rivalBadgeEl.style.opacity = '1';
+  }
 }
 
 async function clickDailyBattle() {
