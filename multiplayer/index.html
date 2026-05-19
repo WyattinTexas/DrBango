@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.16'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.17'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4496,7 +4496,9 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 #screen-collection .roster-panel .roster-info .card-ability,
 #screen-collection .roster-panel .roster-info .card-ability-desc,
 #screen-collection .roster-panel .roster-info .roster-rarity,
-#screen-collection .roster-panel .roster-info .roster-hp { display: none !important; }
+#screen-collection .roster-panel .roster-info .roster-hp,
+#screen-collection .roster-panel .roster-info .roster-ability-name,
+#screen-collection .roster-panel .roster-info .roster-ability-desc { display: none !important; }
 #screen-collection .roster-panel .roster-slot-num {
   font-size: 0.5rem !important;
 }
@@ -6255,7 +6257,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.16';
+const BBN_VERSION = 'v2.17';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -7458,7 +7460,7 @@ function renderBadges() {
     const svg = badgeSVG(m.shape, m.color, isEarned, 46);
     const glow = isEarned ? `box-shadow:0 0 12px ${m.color}44;` : '';
     const anim = isEarned ? `animation:badgeFloat 3s ease-in-out ${i*0.3}s infinite;` : '';
-    circleHtml += `<div style="position:absolute;left:${x}px;top:${y}px;text-align:center;${glow}${anim}border-radius:50%;">
+    circleHtml += `<div onclick="showBadgeDetail(${i})" style="position:absolute;left:${x}px;top:${y}px;text-align:center;${glow}${anim}border-radius:50%;cursor:pointer;">
       ${svg}
       <div style="font-size:0.5rem;color:${isEarned?m.color:'var(--text-dim)'};margin-top:2px;width:50px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isEarned?m.name:'???'}</div>
     </div>`;
@@ -7475,6 +7477,38 @@ function renderBadges() {
   </svg>`;
 
   grid.innerHTML = `<div style="position:relative;width:280px;height:300px;margin:0 auto;">${progressRing}${circleHtml}</div>`;
+}
+
+function showBadgeDetail(idx) {
+  const m = DAILY_MATCHES[idx];
+  if (!m) return;
+  const earnedDaily = userProfile ? (userProfile.dailyBadges || []) : [];
+  const isEarned = earnedDaily.includes(m.badge);
+  const svg = badgeSVG(m.shape, m.color, isEarned, 80);
+  const diffColors = { EASY:'#3b82f6', MEDIUM:'#f59e0b', HARD:'#ef4444', EXTREME:'#a855f7' };
+  const teamHtml = m.team.map(id => {
+    const g = typeof getGhost === 'function' ? getGhost(id) : null;
+    if (!g) return '';
+    return `<div style="text-align:center;"><img src="${g.art}" style="width:50px;height:50px;border-radius:10px;border:1.5px solid ${m.color}44;object-fit:cover;" onerror="this.style.background='var(--surface3)'"><div style="font-size:0.6rem;color:var(--text2);margin-top:3px;">${g.name}</div></div>`;
+  }).join('');
+
+  // Create overlay
+  let overlay = document.getElementById('badge-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'badge-detail-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(overlay);
+  }
+  overlay.onclick = () => overlay.remove();
+  overlay.innerHTML = `<div style="background:var(--surface2,#1c1828);border:1px solid ${m.color}33;border-radius:20px;padding:24px;max-width:300px;width:100%;text-align:center;" onclick="event.stopPropagation()">
+    <div style="margin-bottom:12px;">${svg}</div>
+    <div style="font-family:Creepster,cursive;font-size:1.3rem;color:${m.color};letter-spacing:1.5px;margin-bottom:4px;">${m.name}</div>
+    <span style="font-size:0.65rem;font-weight:700;padding:3px 10px;border-radius:8px;background:${diffColors[m.difficulty]||'#888'}22;color:${diffColors[m.difficulty]||'#888'};letter-spacing:1px;">${m.difficulty}</span>
+    <div style="font-size:0.75rem;color:var(--text2,#a09686);margin:12px 0 8px;">${isEarned ? 'Defeated this rival to earn the badge' : 'Defeat this rival to earn the badge'}</div>
+    <div style="display:flex;gap:12px;justify-content:center;margin:12px 0;">${teamHtml}</div>
+    <button onclick="document.getElementById('badge-detail-overlay').remove()" style="margin-top:12px;padding:8px 24px;background:var(--surface3,#25202e);border:1px solid var(--border,#2a2230);border-radius:10px;color:var(--text2);cursor:pointer;font-size:0.8rem;">Close</button>
+  </div>`;
 }
 
 async function checkBadges() {
