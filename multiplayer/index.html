@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.05'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.06'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4430,6 +4430,127 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   flex: 1;
 }
 
+/* ===== THE CAMPFIRE ===== */
+.campfire-divider {
+  height: 1px; margin: 20px 0 0;
+  background: linear-gradient(90deg, transparent, #f0b429, transparent);
+}
+.campfire-section {
+  padding: 16px 0 20px; text-align: center;
+}
+.campfire-header {
+  font-family: 'Creepster', cursive; font-size: 0.85rem;
+  color: #f0b429; letter-spacing: 2px; margin-bottom: 14px;
+}
+.campfire-fire {
+  width: 80px; height: 80px; margin: 0 auto 12px;
+  position: relative; border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,180,41,0.5) 0%, rgba(232,104,63,0.2) 40%, transparent 70%);
+  animation: campfireGlow 2s ease-in-out infinite alternate;
+}
+.campfire-flame {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%);
+  width: 24px; height: 32px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: linear-gradient(180deg, #ffd97d 0%, #f0b429 40%, #e8683f 100%);
+  animation: campfireFlicker 1.2s ease-in-out infinite alternate;
+}
+.campfire-flame.side {
+  width: 14px; height: 20px; left: 60%; top: 55%;
+  transform: translate(-50%, -50%) rotate(15deg);
+  opacity: 0.7; animation-delay: 0.3s;
+}
+@keyframes campfireGlow {
+  0% { box-shadow: 0 0 30px 15px rgba(240,180,41,0.1); }
+  100% { box-shadow: 0 0 50px 25px rgba(232,104,63,0.15); }
+}
+@keyframes campfireFlicker {
+  0% { transform: translate(-50%, -55%) scale(1); opacity: 0.85; }
+  50% { transform: translate(-48%, -58%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-52%, -54%) scale(0.95); opacity: 0.9; }
+}
+.campfire-toggle {
+  display: inline-block; padding: 10px 24px; border: 1px solid rgba(240,180,41,0.3);
+  border-radius: 24px; background: rgba(240,180,41,0.08); color: #f0b429;
+  font-family: 'Creepster', cursive; font-size: 0.9rem; letter-spacing: 1px;
+  cursor: pointer; transition: all 0.3s; margin-bottom: 10px;
+}
+.campfire-toggle.active {
+  background: linear-gradient(135deg, #e8683f, #f0b429);
+  color: var(--bg); border-color: transparent;
+  box-shadow: 0 0 20px rgba(240,180,41,0.4);
+}
+.campfire-count {
+  font-size: 0.75rem; color: var(--text-dim); margin-bottom: 14px;
+}
+.campfire-players {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  padding: 0 8px;
+}
+.campfire-player {
+  background: rgba(240,180,41,0.06); border: 1px solid rgba(240,180,41,0.15);
+  border-radius: 12px; padding: 10px 12px; display: flex; align-items: center;
+  gap: 10px; min-width: 140px; transition: all 0.2s;
+}
+.campfire-player-art {
+  width: 38px; height: 38px; border-radius: 10px; object-fit: cover;
+  border: 1.5px solid rgba(240,180,41,0.3);
+}
+.campfire-player-info { flex: 1; text-align: left; }
+.campfire-player-name { font-size: 0.8rem; font-weight: 700; }
+.campfire-player-elo { font-size: 0.65rem; color: var(--text-dim); }
+.campfire-recruit-btn {
+  font-family: 'Creepster', cursive; font-size: 0.6rem; letter-spacing: 0.5px;
+  color: #f0b429; background: rgba(240,180,41,0.1); border: 1px solid rgba(240,180,41,0.25);
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+}
+.campfire-recruit-btn:hover { background: rgba(240,180,41,0.2); }
+.campfire-ambient {
+  font-size: 0.7rem; color: var(--text-dim); font-style: italic;
+  margin-top: 16px;
+}
+
+/* Campfire Invite Sheet */
+.campfire-invite-sheet {
+  position: fixed; bottom: -300px; left: 0; right: 0;
+  background: linear-gradient(180deg, #1a1226, #120d1c);
+  border-top: 1px solid rgba(240,180,41,0.2);
+  border-radius: 24px 24px 0 0; padding: 16px 20px 32px;
+  z-index: 300; transition: bottom 0.4s ease;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+  text-align: center;
+}
+.campfire-invite-sheet.visible { bottom: 0; }
+.invite-sheet-handle {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.15); margin: 0 auto 12px;
+}
+.invite-sheet-label {
+  font-size: 0.9rem; color: #ffd97d; font-style: italic; margin-bottom: 12px;
+}
+.invite-sheet-info {
+  background: rgba(240,180,41,0.06); border: 1px solid rgba(240,180,41,0.15);
+  border-radius: 14px; padding: 14px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 12px; text-align: left;
+}
+.invite-sheet-info img {
+  width: 48px; height: 48px; border-radius: 12px; object-fit: cover;
+  border: 2px solid rgba(240,180,41,0.3);
+}
+.invite-sheet-actions { display: flex; gap: 10px; }
+.invite-sheet-btn {
+  flex: 1; padding: 14px; border: none; border-radius: 12px;
+  font-family: 'Creepster', cursive; font-size: 0.9rem; letter-spacing: 1px;
+  cursor: pointer; transition: all 0.2s;
+}
+.invite-sheet-btn.accept {
+  background: linear-gradient(135deg, #e8683f, #f0b429);
+  color: var(--bg);
+}
+.invite-sheet-btn.decline {
+  background: rgba(255,255,255,0.06); color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
 /* Hide old UI elements — replaced by new layout */
 #sidebar-leaderboard { display: none !important; }
 .raid-side-tab { display: none !important; }
@@ -4721,12 +4842,28 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </div>
     <span id="raid-points-display" style="display:none;">0</span>
     <div id="raid-shop" class="raid-section" style="display:none;margin-top:16px;"></div>
+
+    <!-- ===== THE CAMPFIRE ===== -->
+    <div class="campfire-divider"></div>
+    <div class="campfire-section" id="campfire-section">
+      <div class="campfire-header">THE CAMPFIRE</div>
+      <div class="campfire-fire" id="campfire-fire">
+        <div class="campfire-flame"></div>
+        <div class="campfire-flame side"></div>
+      </div>
+      <button class="campfire-toggle" id="campfire-toggle" onclick="toggleCampfire()">
+        Sit by the Fire
+      </button>
+      <div class="campfire-count" id="campfire-count"></div>
+      <div class="campfire-players" id="campfire-players"></div>
+      <div class="campfire-ambient">Rest here. Someone will find you.</div>
+    </div>
   </div>
 
   <!-- ===== SCREEN: SOCIAL ===== -->
   <div class="screen" id="screen-social">
     <div class="screen-header">
-      <h2 class="screen-title">Trading</h2>
+      <h2 class="screen-title">Players</h2>
       <span class="screen-subtitle">Season One</span>
     </div>
     <div class="social-tabs">
@@ -4832,7 +4969,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </button>
     <button class="bottom-nav-item" data-screen="social" onclick="switchScreen('social')">
       <svg class="bnav-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-      <span class="bnav-label">Trading</span>
+      <span class="bnav-label">Players</span>
     </button>
     <button class="bottom-nav-item" data-screen="shop" onclick="switchScreen('shop')">
       <svg class="bnav-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0020 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -5656,6 +5793,18 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <audio id="sfxSpecial" src="../boo/Special.mp3" preload="auto"></audio>
 <audio id="sfxShatter" src="../boo/Shatter.mp3" preload="auto"></audio>
 <audio id="sfxVictory" src="../boo/winningwhistle.mp3" preload="auto"></audio>
+<audio id="campfireMusic" src="campfire-theme.mp3" preload="auto"></audio>
+
+<!-- Campfire Invite Sheet -->
+<div class="campfire-invite-sheet" id="campfire-invite-sheet">
+  <div class="invite-sheet-handle"></div>
+  <div class="invite-sheet-label">A raid leader approaches...</div>
+  <div class="invite-sheet-info" id="invite-sheet-info"></div>
+  <div class="invite-sheet-actions">
+    <button class="invite-sheet-btn accept" onclick="acceptCampfireInvite()">Join the Adventure</button>
+    <button class="invite-sheet-btn decline" onclick="declineCampfireInvite()">Stay by the fire</button>
+  </div>
+</div>
 
 </div><!-- /raid-battle-container -->
 
@@ -5932,7 +6081,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.05';
+const BBN_VERSION = 'v2.06';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -10304,6 +10453,217 @@ firebase.auth().onAuthStateChanged(user => {
     }, 1000);
   }
 });
+
+// ============================================================
+// THE CAMPFIRE — LFG System
+// ============================================================
+let campfireSitting = false;
+let campfireHeartbeat = null;
+let campfireListener = null;
+let campfireInviteListener = null;
+let campfireMusicPlayed = false;
+let pendingCampfireInvite = null;
+
+function toggleCampfire() {
+  if (!currentUser || !userProfile) return;
+  if (campfireSitting) {
+    leaveCampfire();
+  } else {
+    joinCampfire();
+  }
+}
+
+function joinCampfire() {
+  if (!currentUser) return;
+  const filledTeam = team.filter(id => id !== null);
+  const ref = db.ref(`mp/campfire/${currentUser.uid}`);
+  ref.set({
+    displayName: userProfile.displayName || currentUser.displayName || 'Player',
+    uid: currentUser.uid,
+    team: filledTeam,
+    elo: userProfile.stats?.elo || 1000,
+    photoURL: currentUser.photoURL || '',
+    joinedAt: firebase.database.ServerValue.TIMESTAMP,
+    lastHeartbeat: firebase.database.ServerValue.TIMESTAMP
+  });
+  // Auto-remove on disconnect
+  ref.onDisconnect().remove();
+  // Start heartbeat
+  campfireHeartbeat = setInterval(() => {
+    ref.child('lastHeartbeat').set(firebase.database.ServerValue.TIMESTAMP);
+  }, 10000);
+  // Listen for other players
+  campfireListener = db.ref('mp/campfire');
+  campfireListener.on('value', renderCampfirePlayers);
+  // Listen for invites
+  startCampfireInviteListener();
+  // Update UI
+  campfireSitting = true;
+  const btn = document.getElementById('campfire-toggle');
+  if (btn) btn.classList.add('active');
+  // Play campfire music (once per session)
+  playCampfireMusic();
+}
+
+function leaveCampfire() {
+  if (!currentUser) return;
+  db.ref(`mp/campfire/${currentUser.uid}`).remove();
+  if (campfireHeartbeat) { clearInterval(campfireHeartbeat); campfireHeartbeat = null; }
+  if (campfireListener) { campfireListener.off(); campfireListener = null; }
+  if (campfireInviteListener) {
+    db.ref(`mp/campfire_invites/${currentUser.uid}`).off();
+    campfireInviteListener = null;
+  }
+  campfireSitting = false;
+  const btn = document.getElementById('campfire-toggle');
+  if (btn) btn.classList.remove('active');
+  const players = document.getElementById('campfire-players');
+  if (players) players.innerHTML = '';
+  const count = document.getElementById('campfire-count');
+  if (count) count.textContent = '';
+  stopCampfireMusic();
+}
+
+function renderCampfirePlayers(snapshot) {
+  const container = document.getElementById('campfire-players');
+  const countEl = document.getElementById('campfire-count');
+  if (!container) return;
+
+  const now = Date.now();
+  const players = [];
+  snapshot.forEach(child => {
+    const p = child.val();
+    if (!p || !p.uid) return;
+    // Skip stale entries (>5 min)
+    if (p.lastHeartbeat && (now - p.lastHeartbeat > 300000)) return;
+    // Skip self
+    if (currentUser && p.uid === currentUser.uid) return;
+    players.push(p);
+  });
+
+  if (countEl) {
+    const total = players.length + (campfireSitting ? 1 : 0);
+    countEl.textContent = total === 0 ? '' :
+      total === 1 ? '1 spirit resting' :
+      total + ' spirits resting by the fire';
+  }
+
+  if (players.length === 0) {
+    container.innerHTML = campfireSitting
+      ? '<div style="color:var(--text-dim);font-size:0.75rem;padding:8px;">Waiting for others to join...</div>'
+      : '';
+    return;
+  }
+
+  container.innerHTML = players.map(p => {
+    const leadGhostId = p.team && p.team.length > 0 ? p.team[0] : null;
+    const leadGhost = leadGhostId && typeof getGhost === 'function' ? getGhost(leadGhostId) : null;
+    const artSrc = leadGhost ? leadGhost.art : '';
+    return `<div class="campfire-player">
+      ${artSrc ? `<img class="campfire-player-art" src="${artSrc}" alt="" onerror="this.style.background='var(--surface3)'">` : '<div class="campfire-player-art" style="background:var(--surface3)"></div>'}
+      <div class="campfire-player-info">
+        <div class="campfire-player-name">${p.displayName || 'Player'}</div>
+        <div class="campfire-player-elo">${p.elo || 1000} Elo</div>
+      </div>
+      <button class="campfire-recruit-btn" onclick="recruitPlayer('${p.uid}','${(p.displayName||'Player').replace(/'/g,"\\'")}')">Recruit</button>
+    </div>`;
+  }).join('');
+}
+
+function recruitPlayer(targetUid, targetName) {
+  if (!currentUser) return;
+  db.ref(`mp/campfire_invites/${targetUid}`).set({
+    fromUid: currentUser.uid,
+    fromName: userProfile.displayName || currentUser.displayName || 'Player',
+    fromPhoto: currentUser.photoURL || '',
+    fromTeam: team.filter(id => id !== null),
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  });
+  showToast('Invite sent to ' + targetName + '!');
+}
+
+function startCampfireInviteListener() {
+  if (!currentUser) return;
+  const ref = db.ref(`mp/campfire_invites/${currentUser.uid}`);
+  campfireInviteListener = ref;
+  ref.on('value', snap => {
+    if (!snap.exists()) {
+      hideCampfireInvite();
+      return;
+    }
+    const invite = snap.val();
+    // Skip stale invites (>60s)
+    if (invite.timestamp && (Date.now() - invite.timestamp > 60000)) {
+      ref.remove();
+      return;
+    }
+    pendingCampfireInvite = invite;
+    showCampfireInvite(invite);
+  });
+}
+
+function showCampfireInvite(invite) {
+  const sheet = document.getElementById('campfire-invite-sheet');
+  const info = document.getElementById('invite-sheet-info');
+  if (!sheet || !info) return;
+
+  const leadGhostId = invite.fromTeam && invite.fromTeam.length > 0 ? invite.fromTeam[0] : null;
+  const leadGhost = leadGhostId && typeof getGhost === 'function' ? getGhost(leadGhostId) : null;
+  const artSrc = leadGhost ? leadGhost.art : '';
+
+  info.innerHTML = `
+    ${artSrc ? `<img src="${artSrc}" alt="" onerror="this.style.background='var(--surface3)'">` : ''}
+    <div>
+      <div style="font-weight:700;font-size:0.9rem;">${invite.fromName || 'A player'} wants you!</div>
+      <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">Join their team for battle</div>
+    </div>`;
+  sheet.classList.add('visible');
+}
+
+function hideCampfireInvite() {
+  const sheet = document.getElementById('campfire-invite-sheet');
+  if (sheet) sheet.classList.remove('visible');
+  pendingCampfireInvite = null;
+}
+
+function acceptCampfireInvite() {
+  if (!currentUser || !pendingCampfireInvite) return;
+  // Remove invite
+  db.ref(`mp/campfire_invites/${currentUser.uid}`).remove();
+  // Leave campfire
+  leaveCampfire();
+  hideCampfireInvite();
+  // Navigate to raid lobby
+  showRaidSection('lobby');
+  showToast('Joined! Head to the raid lobby.');
+}
+
+function declineCampfireInvite() {
+  if (!currentUser) return;
+  db.ref(`mp/campfire_invites/${currentUser.uid}`).remove();
+  hideCampfireInvite();
+}
+
+// Campfire music — plays once per session, does not loop
+function playCampfireMusic() {
+  if (campfireMusicPlayed) return;
+  const music = document.getElementById('campfireMusic');
+  if (!music) return;
+  music.volume = 0.15;
+  music.loop = false;
+  music.currentTime = 0;
+  music.play().catch(() => {});
+  campfireMusicPlayed = true;
+}
+
+function stopCampfireMusic() {
+  const music = document.getElementById('campfireMusic');
+  if (!music || music.paused) return;
+  const fade = setInterval(() => {
+    if (music.volume > 0.02) { music.volume -= 0.02; }
+    else { clearInterval(fade); music.pause(); }
+  }, 50);
+}
 
 
 </script>
