@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.07'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.08'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -6081,13 +6081,16 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.07';
+const BBN_VERSION = 'v2.08';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
 });
 
 /* ===== Screen Navigation ===== */
+/* Mobile layout param for testroom redirects */
+function getLayoutParam() { return window.innerWidth <= 768 ? '&layout=compact' : ''; }
+
 function switchScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById('screen-' + screenId);
@@ -7169,7 +7172,8 @@ async function clickBattle() {
     + '&blue=' + selectedTarget.team.join(',')
     + '&mode=mp'
     + '&oppName=' + encodeURIComponent(selectedTarget.name)
-    + '&oppElo=' + selectedTarget.elo;
+    + '&oppElo=' + selectedTarget.elo
+    + getLayoutParam();
 }
 
 // ============================================================
@@ -8804,7 +8808,7 @@ async function clickDailyBattle() {
   // Save team and redirect to testroom with daily match team
   await ref.child('currentTeam').set(filledTeam);
   const daily = getDailyTeam();
-  window.location.href = '../testroom/?red=' + filledTeam.join(',') + '&blue=' + daily.team.join(',') + '&mode=daily';
+  window.location.href = '../testroom/?red=' + filledTeam.join(',') + '&blue=' + daily.team.join(',') + '&mode=daily' + getLayoutParam();
 }
 
 // ============================================================
@@ -9126,7 +9130,7 @@ async function challengeChampion() {
     sessionStorage.setItem('mp_champion_challenge', 'true');
     window.location.href = '../testroom/?red=' + filledTeam.join(',')
       + '&blue=' + currentChampion.team.join(',')
-      + '&mode=champion';
+      + '&mode=champion' + getLayoutParam();
   } else {
     // Fight a player champion — async PvP style
     // Fetch their actual elo for proper calculation
@@ -9145,7 +9149,8 @@ async function challengeChampion() {
     window.location.href = '../testroom/?red=' + filledTeam.join(',')
       + '&blue=' + currentChampion.team.join(',')
       + '&mode=mp'
-      + '&oppName=' + encodeURIComponent(currentChampion.displayName);
+      + '&oppName=' + encodeURIComponent(currentChampion.displayName)
+      + getLayoutParam();
   }
 }
 
