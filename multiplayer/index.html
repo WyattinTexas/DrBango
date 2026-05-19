@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.22'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.23'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -6272,7 +6272,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.22';
+const BBN_VERSION = 'v2.23';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -8971,20 +8971,30 @@ async function handlePvPGameOver(game) {
   // Elo fly animation
   if (eloChange !== 0) showEloFly(eloChange);
 
-  // Challenge bonus pack — both players earn a pack
+  // Challenge bonus pack — both players earn a pack (max 3/day, 1 per opponent/day)
   if (currentUser && typeof generateDailyPack === 'function') {
-    const bonusPack = generateDailyPack();
     const myRef = db.ref(`mp/users/${currentUser.uid}`);
-    // Add cards to collection
     const mySnap = await myRef.once('value');
-    const myData = mySnap.val();
-    const myCollection = myData.collection || [];
-    bonusPack.forEach(g => myCollection.push(g.id));
-    await myRef.child('collection').set(myCollection);
-    // Show the pack after a short delay (let result screen display first)
-    setTimeout(() => {
-      showRewardCards(bonusPack, 'Challenge Bonus Pack!');
-    }, 2500);
+    const myData = mySnap.val() || {};
+    const today = new Date().toISOString().slice(0, 10);
+    const bonusLog = myData.bonusPackLog || {};
+    // Reset if from a previous day
+    const todayLog = bonusLog.date === today ? bonusLog : { date: today, count: 0, opponents: [] };
+    const opponentUid = game.winnerUid === currentUser.uid
+      ? (mySide === 'red' ? game.opponent : game.creator)
+      : (mySide === 'red' ? game.opponent : game.creator);
+    const alreadyPlayedOpponent = (todayLog.opponents || []).includes(opponentUid);
+    if (todayLog.count < 3 && !alreadyPlayedOpponent) {
+      todayLog.count++;
+      todayLog.opponents = [...(todayLog.opponents || []), opponentUid];
+      const bonusPack = generateDailyPack();
+      const myCollection = myData.collection || [];
+      bonusPack.forEach(g => myCollection.push(g.id));
+      await myRef.update({ collection: myCollection, bonusPackLog: todayLog });
+      setTimeout(() => {
+        showRewardCards(bonusPack, 'Challenge Bonus Pack!');
+      }, 2500);
+    }
   }
 
   // Track streaks
