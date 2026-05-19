@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.10'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.11'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4453,6 +4453,78 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   font-size: 0.6rem !important;
 }
 
+/* ===== CARD DETAIL PANEL ===== */
+.card-detail-panel {
+  position: fixed; bottom: -100%; left: 0; right: 0;
+  height: 60vh; z-index: 250;
+  transition: bottom 0.3s ease-out;
+  background: rgba(10,6,18,0.85);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.card-detail-panel.visible { bottom: 0; }
+.card-detail-inner {
+  background: var(--surface2);
+  border-top: 2px solid var(--gold);
+  border-radius: 18px 18px 0 0;
+  padding: 20px 24px 28px;
+  height: 100%; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative;
+}
+.card-detail-close {
+  position: absolute; top: 10px; right: 16px;
+  background: none; border: none; color: var(--text);
+  font-size: 1.6rem; cursor: pointer; opacity: 0.6;
+  line-height: 1;
+}
+.card-detail-close:hover { opacity: 1; }
+.card-detail-art {
+  max-width: 140px; max-height: 140px; border-radius: 12px;
+  object-fit: cover; margin-bottom: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.card-detail-name {
+  font-family: 'Creepster', cursive; font-size: 1.6rem;
+  color: var(--text); margin-bottom: 4px; text-align: center;
+}
+.card-detail-rarity {
+  display: inline-block; padding: 2px 12px; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.card-detail-rarity.r-common { background: var(--common); color: #fff; }
+.card-detail-rarity.r-uncommon { background: var(--uncommon); color: #fff; }
+.card-detail-rarity.r-rare { background: var(--rare); color: #fff; }
+.card-detail-rarity.r-ghost-rare { background: var(--ghost-rare); color: #fff; }
+.card-detail-rarity.r-legendary { background: var(--legendary); color: #fff; }
+.card-detail-hp {
+  font-family: 'Inter', sans-serif; font-size: 0.9rem;
+  color: var(--text); margin-bottom: 10px; font-weight: 600;
+}
+.card-detail-ability-name {
+  font-family: 'Creepster', cursive; font-size: 1.1rem;
+  color: var(--gold); margin-bottom: 4px; text-align: center;
+}
+.card-detail-ability-desc {
+  font-family: 'Inter', sans-serif; font-size: 0.8rem;
+  color: var(--text); opacity: 0.85; text-align: center;
+  line-height: 1.4; margin-bottom: 16px; max-width: 300px;
+}
+.card-detail-add {
+  width: 100%; max-width: 300px; padding: 14px;
+  background: linear-gradient(135deg, var(--gold), #b8860b);
+  color: #fff; border: none; border-radius: 12px;
+  font-family: 'Creepster', cursive; font-size: 1.2rem;
+  cursor: pointer; letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(212,160,64,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.card-detail-add:active { transform: scale(0.97); }
+.card-detail-add.remove-mode {
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  box-shadow: 0 4px 14px rgba(192,57,43,0.3);
+}
+
 /* ===== THE CAMPFIRE ===== */
 .campfire-divider {
   height: 1px; margin: 20px 0 0;
@@ -4823,6 +4895,20 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         <span class="count" id="collection-count">0/0 cards</span>
       </div>
       <div class="collection-grid" id="collection-grid"></div>
+    </div>
+
+    <!-- Card Detail Panel -->
+    <div class="card-detail-panel" id="card-detail-panel">
+      <div class="card-detail-inner">
+        <button class="card-detail-close" onclick="closeCardDetail()">&times;</button>
+        <img class="card-detail-art" id="card-detail-art" src="" alt="">
+        <div class="card-detail-name" id="card-detail-name"></div>
+        <div class="card-detail-rarity" id="card-detail-rarity"></div>
+        <div class="card-detail-hp" id="card-detail-hp"></div>
+        <div class="card-detail-ability-name" id="card-detail-ability-name"></div>
+        <div class="card-detail-ability-desc" id="card-detail-ability-desc"></div>
+        <button class="card-detail-add" id="card-detail-add">Add to Team</button>
+      </div>
     </div>
 
     <!-- Hidden elements needed by existing JS -->
@@ -6111,7 +6197,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.10';
+const BBN_VERSION = 'v2.11';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6910,9 +6996,51 @@ function renderCollection() {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = cardHTML.trim();
     const cell = wrapper.firstChild;
-    cell.addEventListener('click', () => addToTeam(ghost.id));
+    cell.addEventListener('click', () => showCardDetail(ghost.id));
     grid.appendChild(cell);
   });
+}
+
+// ============================================================
+// CARD DETAIL PANEL
+// ============================================================
+function showCardDetail(ghostId) {
+  const ghost = getGhost(ghostId);
+  if (!ghost) return;
+  document.getElementById('card-detail-art').src = ghost.art || '';
+  document.getElementById('card-detail-art').alt = ghost.name;
+  document.getElementById('card-detail-name').textContent = ghost.name;
+
+  const rarityEl = document.getElementById('card-detail-rarity');
+  const rarityLabel = (ghost.rarity || 'common').replace('-', ' ');
+  rarityEl.textContent = rarityLabel;
+  rarityEl.className = 'card-detail-rarity r-' + (ghost.rarity || 'common');
+
+  document.getElementById('card-detail-hp').textContent = (ghost.maxHp || ghost.hp || '?') + ' HP';
+  document.getElementById('card-detail-ability-name').textContent = ghost.ability || '';
+  document.getElementById('card-detail-ability-desc').textContent = ghost.abilityDesc || '';
+
+  const btn = document.getElementById('card-detail-add');
+  const inTeam = team.includes(ghostId);
+  if (inTeam) {
+    btn.textContent = 'Remove from Team';
+    btn.className = 'card-detail-add remove-mode';
+    btn.onclick = () => {
+      const idx = team.indexOf(ghostId);
+      if (idx !== -1) removeFromTeam(idx);
+      closeCardDetail();
+    };
+  } else {
+    btn.textContent = 'Add to Team';
+    btn.className = 'card-detail-add';
+    btn.onclick = () => { addToTeam(ghostId); closeCardDetail(); };
+  }
+
+  document.getElementById('card-detail-panel').classList.add('visible');
+}
+
+function closeCardDetail() {
+  document.getElementById('card-detail-panel').classList.remove('visible');
 }
 
 // ============================================================
