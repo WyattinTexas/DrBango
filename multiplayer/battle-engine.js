@@ -14646,19 +14646,19 @@ function stopMusicHard() {
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
-// v726: skip bgMusic entirely — startMusic() has its own retry-on-click handler.
-// unlockAudio's play().then(pause) pattern races with startMusic's retry and kills music.
-// Unlock audio on first user interaction (browsers block autoplay)
-// v2.05: mute during unlock to prevent audible SFX burst on first tap
+// v2.10: Use silent AudioContext buffer instead of play/pause on real elements
+// This avoids the audible SFX burst entirely
 (function unlockAudio() {
   const unlock = () => {
-    document.querySelectorAll('audio').forEach(a => {
-      if (a.id === 'bgMusic') return; // handled by startMusic's own retry
-      if (!a.paused) return;
-      const origVol = a.volume;
-      a.volume = 0;
-      a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = origVol; }).catch(() => { a.volume = origVol; });
-    });
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      ctx.resume().catch(() => {});
+    } catch(e) {}
     document.removeEventListener('click', unlock);
     document.removeEventListener('touchstart', unlock);
   };

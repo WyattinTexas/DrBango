@@ -18827,16 +18827,18 @@ function stopMusicHard() {
 }
 
 // Unlock audio on first user interaction (browsers block autoplay)
-// v2.08: mute during unlock to prevent audible SFX burst on first tap
+// v2.12: Use silent AudioContext buffer — no audible SFX burst
 (function unlockAudio() {
   const unlock = () => {
-    document.querySelectorAll('audio').forEach(a => {
-      if (a.id === 'bgMusic') return;
-      if (!a.paused) return;
-      const origVol = a.volume;
-      a.volume = 0;
-      a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = origVol; }).catch(() => { a.volume = origVol; });
-    });
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      ctx.resume().catch(() => {});
+    } catch(e) {}
     document.removeEventListener('click', unlock);
     document.removeEventListener('touchstart', unlock);
   };

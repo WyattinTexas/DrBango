@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.11'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.12'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4446,8 +4446,8 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
   line-height: 1.2;
 }
 .shop-product-price {
-  font-family: 'Creepster', cursive; font-size: 0.85rem;
-  color: var(--gold); padding: 2px 8px 8px;
+  font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 700;
+  color: var(--gold); padding: 4px 8px 8px;
 }
 
 /* Collection: 3-per-row grid override */
@@ -4466,35 +4466,39 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 #screen-collection .ghost-card .ghost-name {
   font-size: 0.65rem;
 }
-/* Team strip: 3 panels at top, compact and small */
+/* Team strip: 3 panels at top, compact but readable */
 #screen-collection .team-section {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 #screen-collection .roster-panels {
   display: flex; gap: 6px;
 }
 #screen-collection .roster-panel {
   flex: 1;
-  max-height: 80px !important;
-  min-height: 60px !important;
-  padding: 6px !important;
+  max-height: 100px !important;
+  min-height: 70px !important;
+  padding: 8px 6px !important;
   overflow: hidden;
 }
 #screen-collection .roster-panel .roster-art {
-  max-height: 40px !important;
+  max-height: 50px !important;
+  border-radius: 6px !important;
 }
-#screen-collection .roster-panel .roster-info {
-  display: none !important;
-}
+#screen-collection .roster-panel .roster-info .card-ability,
+#screen-collection .roster-panel .roster-info .card-ability-desc,
+#screen-collection .roster-panel .roster-info .roster-rarity { display: none !important; }
 #screen-collection .roster-panel .roster-slot-num {
   font-size: 0.5rem !important;
 }
 #screen-collection .roster-panel .card-name,
 #screen-collection .roster-panel .roster-name {
-  font-size: 0.6rem !important;
+  font-size: 0.65rem !important;
 }
 #screen-collection .roster-panel .slot-label {
-  font-size: 0.6rem !important;
+  font-size: 0.65rem !important;
+}
+#screen-collection .roster-panel .roster-remove {
+  font-size: 0.7rem !important; top: 2px !important; right: 4px !important;
 }
 
 /* ===== CARD DETAIL PANEL ===== */
@@ -5009,7 +5013,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       </button>
       <div class="campfire-count" id="campfire-count"></div>
       <div class="campfire-players" id="campfire-players"></div>
-      <div class="campfire-ambient">Rest here. Someone will find you.</div>
+      <div class="campfire-ambient">Rest here. Adventures always need a hand.</div>
     </div>
   </div>
 
@@ -6236,7 +6240,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.11';
+const BBN_VERSION = 'v2.12';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6253,7 +6257,7 @@ function switchScreen(screenId) {
   document.querySelectorAll('.bottom-nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.screen === screenId);
   });
-  // If switching to social/players, make sure leaderboard is rendered
+  // If switching to social/players, refresh leaderboard + badges
   if (screenId === 'social') {
     const lb = document.getElementById('leaderboard-body');
     if (lb) lb.style.display = 'block';
@@ -6263,14 +6267,16 @@ function switchScreen(screenId) {
         if (snap.exists() && typeof renderLeaderboard === 'function') renderLeaderboard(snap.val());
       });
     }
+    // Refresh badges
+    if (typeof renderBadges === 'function') renderBadges();
   }
-  // Play campfire music on first visit to raids tab
-  if (screenId === 'raids' && typeof playCampfireMusic === 'function') {
-    playCampfireMusic();
-  }
-  // Stop campfire music when leaving raids
-  if (screenId !== 'raids' && typeof stopCampfireMusic === 'function') {
+  // Stop campfire music when leaving raids (only if sitting)
+  if (screenId !== 'raids' && campfireSitting && typeof stopCampfireMusic === 'function') {
     stopCampfireMusic();
+  }
+  // Resume campfire music when returning to raids (if sitting)
+  if (screenId === 'raids' && campfireSitting && typeof playCampfireMusic === 'function') {
+    playCampfireMusic();
   }
 }
 
@@ -10777,6 +10783,8 @@ function joinCampfire() {
   campfireSitting = true;
   const btn = document.getElementById('campfire-toggle');
   if (btn) btn.classList.add('active');
+  // Play campfire music while sitting
+  playCampfireMusic();
 }
 
 function leaveCampfire() {
@@ -10818,8 +10826,8 @@ function renderCampfirePlayers(snapshot) {
   if (countEl) {
     const total = players.length + (campfireSitting ? 1 : 0);
     countEl.textContent = total === 0 ? '' :
-      total === 1 ? '1 spirit resting' :
-      total + ' spirits resting by the fire';
+      total === 1 ? '1 adventurer waiting' :
+      total + ' adventurers waiting by the fire';
   }
 
   if (players.length === 0) {
@@ -10918,16 +10926,14 @@ function declineCampfireInvite() {
   hideCampfireInvite();
 }
 
-// Campfire music — plays once per session, does not loop
+// Campfire music — plays while sitting by the fire, does not loop
 function playCampfireMusic() {
-  if (campfireMusicPlayed) return;
   const music = document.getElementById('campfireMusic');
-  if (!music) return;
+  if (!music || !music.paused) return;
   music.volume = 0.15;
   music.loop = false;
   music.currentTime = 0;
   music.play().catch(() => {});
-  campfireMusicPlayed = true;
 }
 
 function stopCampfireMusic() {
