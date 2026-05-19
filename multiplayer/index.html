@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.06'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.07'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -6081,7 +6081,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.06';
+const BBN_VERSION = 'v2.07';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6110,6 +6110,15 @@ function switchSocialTab(tabId) {
   if (tab) tab.classList.add('active');
   if (panel) panel.classList.add('active');
 }
+
+/* ===== Pause all audio when tab is minimized/hidden ===== */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    document.querySelectorAll('audio').forEach(a => { if (!a.paused) { a.dataset.wasPlaying = '1'; a.pause(); } });
+  } else {
+    document.querySelectorAll('audio').forEach(a => { if (a.dataset.wasPlaying === '1') { a.play().catch(()=>{}); delete a.dataset.wasPlaying; } });
+  }
+});
 
 /* ===== Home Screen Rendering ===== */
 function renderHomeScreen() {
