@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.20'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.21'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4106,6 +4106,16 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 .home-topbar-info { flex: 1; display: flex; align-items: baseline; gap: 8px; }
 .home-topbar-name { font-weight: 700; font-size: 0.9rem; }
 .home-topbar-elo { font-size: 0.75rem; color: var(--gold); }
+.home-currency {
+  font-size: 0.8rem; font-weight: 700; color: var(--gold-bright);
+  background: rgba(212,160,64,0.1); border: 1px solid rgba(212,160,64,0.2);
+  padding: 3px 10px; border-radius: 10px; white-space: nowrap;
+}
+.home-currency::before {
+  content: 'SP ';
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.5px;
+  color: var(--gold); opacity: 0.7;
+}
 
 /* Spirit of the Day Showcase */
 .spirit-showcase {
@@ -4859,6 +4869,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         <span class="home-topbar-name" id="home-name">Player</span>
         <span class="home-topbar-elo" id="home-elo">1000</span>
       </div>
+      <div class="home-currency" id="home-currency">0</div>
       <div class="home-games-badge" id="home-games">10 remain</div>
     </div>
 
@@ -4981,17 +4992,15 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       </div>
     </div>
 
-    <!-- Hidden elements needed by existing JS -->
-    <div style="display:none;">
-      <div class="target-preview" id="target-preview">
-        <div class="target-name" id="target-name"></div>
-        <div class="target-elo" id="target-elo"></div>
-        <div class="target-team" id="target-team"></div>
-        <button id="target-trade-btn" class="target-trade-btn"></button>
-      </div>
-      <button id="battle-btn" disabled onclick="clickBattle()"></button>
-      <button id="challenge-btn" disabled onclick="createChallenge()"></button>
+    <!-- Target Preview + Battle Button (visible when target selected) -->
+    <div class="target-preview" id="target-preview" style="display:none;">
+      <div class="target-name" id="target-name"></div>
+      <div class="target-elo" id="target-elo"></div>
+      <div class="target-team" id="target-team"></div>
+      <button id="target-trade-btn" class="target-trade-btn" style="display:none;"></button>
     </div>
+    <button id="battle-btn" class="home-play-btn" disabled onclick="clickBattle()" style="display:none;margin-top:8px;">BATTLE</button>
+    <button id="challenge-btn" style="display:none;" disabled onclick="createChallenge()"></button>
   </div>
 
   <!-- ===== SCREEN: RAIDS ===== -->
@@ -6263,7 +6272,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.20';
+const BBN_VERSION = 'v2.21';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6310,6 +6319,8 @@ function switchSocialTab(tabId) {
   const panel = document.getElementById('social-' + tabId);
   if (tab) tab.classList.add('active');
   if (panel) panel.classList.add('active');
+  // Refresh badges when switching to badges tab
+  if (tabId === 'badges' && typeof renderBadges === 'function') renderBadges();
 }
 
 /* ===== Pause all audio when tab is minimized/hidden ===== */
@@ -6359,6 +6370,12 @@ function renderHomeScreen() {
   const games = document.getElementById('home-games');
   const remaining = typeof getGamesRemaining === 'function' ? getGamesRemaining() : 25;
   if (games) games.textContent = remaining + ' remain';
+  // Currency (Spirit Points — same as raid points)
+  const currency = document.getElementById('home-currency');
+  if (currency) {
+    const pts = userProfile.raidPoints || userProfile.spiritPoints || 0;
+    currency.textContent = pts.toLocaleString();
+  }
   // Pack status
   const packStatus = document.getElementById('home-pack-status');
   const origPack2 = document.getElementById('open-pack-btn');
@@ -7403,15 +7420,15 @@ async function selectTarget(uid) {
     preview.style.display = 'block';
     updateBattleButton();
 
+    // Show battle button when target is selected
+    const battleBtn = document.getElementById('battle-btn');
+    if (battleBtn) battleBtn.style.display = 'block';
+
     // Switch to collection screen so player can see team + opponent
     switchScreen('collection');
 
     // Scroll the preview into view
     setTimeout(() => preview.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-
-    // Re-render leaderboard to show selected state
-    const lbSnap = await db.ref('mp/leaderboard').once('value');
-    renderLeaderboard(lbSnap.val());
 
   } catch (err) {
     console.error('Error selecting target:', err);
