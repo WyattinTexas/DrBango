@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.25'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.26'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -4497,6 +4497,16 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 #screen-collection .ghost-card .ghost-name {
   font-size: 0.65rem;
 }
+/* Starting 3 header */
+.starting-3-header {
+  font-family: 'Creepster', cursive;
+  font-size: 1.3rem;
+  letter-spacing: 3px;
+  color: var(--gold-bright);
+  text-align: center;
+  margin-bottom: 6px;
+  text-shadow: 0 0 12px rgba(212,160,64,0.3);
+}
 /* Team strip: 3 panels side-by-side at top, compact */
 #screen-collection .team-section {
   margin-bottom: 10px;
@@ -4797,7 +4807,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         &#x2694; RAIDS
       </button>
       <div class="games-remaining">
-        <span class="count" id="games-count">10</span><span>/10 games</span>
+        <span class="count" id="games-count">0</span><span>/10 Played</span>
       </div>
       <button onclick="restartFreshAccount()" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);padding:4px 10px;border-radius:6px;font-size:0.7rem;cursor:pointer;letter-spacing:0.5px;" title="Reset account to experience first-login flow again">RESTART</button>
     </div>
@@ -4886,7 +4896,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
         <span class="home-topbar-elo" id="home-elo">1000</span>
       </div>
       <div class="home-currency" id="home-currency">0</div>
-      <div class="home-games-badge" id="home-games">10 remain</div>
+      <div class="home-games-badge" id="home-games">0/10 Played</div>
     </div>
 
     <!-- Spiritkin of the Day — tappable showcase -->
@@ -4973,6 +4983,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 
     <!-- Team Strip (TOP — 3 slots side by side) -->
     <div class="team-section">
+      <div class="starting-3-header">STARTING 3</div>
       <div class="legendary-warning" id="legendary-warning">Only 1 legendary per team</div>
       <div class="roster-panels" id="team-strip">
         <div class="roster-panel" data-slot="0" onclick="removeFromTeam(0)">
@@ -6290,7 +6301,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.25';
+const BBN_VERSION = 'v2.26';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6386,8 +6397,8 @@ function renderHomeScreen() {
   const elo = document.getElementById('home-elo');
   if (elo) elo.textContent = (userProfile.stats?.elo || 1000) + ' Elo';
   const games = document.getElementById('home-games');
-  const remaining = typeof getGamesRemaining === 'function' ? getGamesRemaining() : 25;
-  if (games) games.textContent = remaining + ' remain';
+  const played = userProfile.gamesPlayedToday || 0;
+  if (games) games.textContent = played + '/' + MAX_GAMES + ' Played';
   // Currency (Spirit Points — same as raid points)
   const currency = document.getElementById('home-currency');
   if (currency) {
@@ -7636,17 +7647,25 @@ function showBadgeDetail(idx) {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'badge-detail-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
     document.body.appendChild(overlay);
   }
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
   overlay.onclick = () => overlay.remove();
-  overlay.innerHTML = `<div style="background:var(--surface2,#1c1828);border:1px solid ${m.color}33;border-radius:20px;padding:24px;max-width:300px;width:100%;text-align:center;" onclick="event.stopPropagation()">
+
+  // Challenge button for unearned badges
+  const challengeBtn = !isEarned
+    ? `<button onclick="event.stopPropagation();document.getElementById('badge-detail-overlay').remove();challengeDailyRival(${idx});" style="margin-top:12px;padding:10px 32px;background:linear-gradient(135deg,var(--gold,#d4a040),var(--gold-bright,#f0c850));border:none;border-radius:12px;color:#0e0a1a;font-family:Creepster,cursive;font-size:1.1rem;letter-spacing:2px;cursor:pointer;box-shadow:0 4px 16px rgba(212,160,64,0.3);">CHALLENGE</button>`
+    : `<div style="margin-top:8px;font-size:0.75rem;color:#22c55e;font-weight:700;">CONQUERED</div>`;
+
+  overlay.innerHTML = `<div style="background:var(--surface2,#1c1828);border:1px solid ${m.color}33;border-radius:20px;padding:24px;max-width:320px;width:100%;text-align:center;" onclick="event.stopPropagation()">
     <div style="margin-bottom:12px;">${svg}</div>
-    <div style="font-family:Creepster,cursive;font-size:1.3rem;color:${m.color};letter-spacing:1.5px;margin-bottom:4px;">${m.name}</div>
+    <div style="font-family:Creepster,cursive;font-size:1.4rem;color:${m.color};letter-spacing:2px;margin-bottom:6px;">${m.name}</div>
     <span style="font-size:0.65rem;font-weight:700;padding:3px 10px;border-radius:8px;background:${diffColors[m.difficulty]||'#888'}22;color:${diffColors[m.difficulty]||'#888'};letter-spacing:1px;">${m.difficulty}</span>
     <div style="font-size:0.75rem;color:var(--text2,#a09686);margin:12px 0 8px;">${isEarned ? 'Defeated this rival to earn the badge' : 'Defeat this rival to earn the badge'}</div>
-    <div style="display:flex;gap:12px;justify-content:center;margin:12px 0;">${teamHtml}</div>
-    <button onclick="document.getElementById('badge-detail-overlay').remove()" style="margin-top:12px;padding:8px 24px;background:var(--surface3,#25202e);border:1px solid var(--border,#2a2230);border-radius:10px;color:var(--text2);cursor:pointer;font-size:0.8rem;">Close</button>
+    <div style="font-family:Creepster,cursive;font-size:0.85rem;color:var(--text2,#a09686);letter-spacing:1px;margin-bottom:6px;">RIVAL ROSTER</div>
+    <div style="display:flex;gap:12px;justify-content:center;margin:8px 0 16px;">${teamHtml}</div>
+    ${challengeBtn}
+    <div style="margin-top:10px;"><button onclick="document.getElementById('badge-detail-overlay').remove()" style="padding:6px 20px;background:none;border:1px solid var(--border,#2a2230);border-radius:10px;color:var(--text2);cursor:pointer;font-size:0.75rem;">Close</button></div>
   </div>`;
 }
 
@@ -7769,7 +7788,7 @@ function updateUI() {
   if (!userProfile) return;
 
   document.getElementById('user-elo').textContent = `Elo: ${userProfile.stats?.elo || 1000}`;
-  document.getElementById('games-count').textContent = getGamesRemaining();
+  document.getElementById('games-count').textContent = userProfile.gamesPlayedToday || 0;
 
   // Check if user has < 3 unique cards
   const uniqueCards = userProfile.collection ? [...new Set(userProfile.collection)] : [];
@@ -9333,6 +9352,23 @@ function renderDailyChallenge() {
     if (alreadyEarned) rivalBadgeEl.style.opacity = '0.4';
     else rivalBadgeEl.style.opacity = '1';
   }
+}
+
+async function challengeDailyRival(idx) {
+  const m = DAILY_MATCHES[idx];
+  if (!m) return;
+  const filledTeam = team.filter(id => id !== null);
+  if (filledTeam.length < 3) {
+    showToast('Pick your 3-card team first!');
+    switchScreen('collection');
+    return;
+  }
+  if (getGamesRemaining() <= 0) {
+    showToast('No games remaining today!');
+    return;
+  }
+  await db.ref(`mp/users/${currentUser.uid}/currentTeam`).set(filledTeam);
+  window.location.href = '../testroom/?red=' + filledTeam.join(',') + '&blue=' + m.team.join(',') + '&mode=daily' + getLayoutParam();
 }
 
 async function clickDailyBattle() {
