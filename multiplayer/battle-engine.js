@@ -16063,6 +16063,7 @@ function updateRaidBossBar() {
 // - Auto-handles ability modals on blue's side
 let AI_ACTIVE = false;
 let aiCheckInterval = null;
+let aiBlueRollPending = false; // dedupe: one pending rollReady('blue') at a time
 
 function startBlueAI() {
   if (AI_ACTIVE || LIVE_PVP) return;
@@ -16077,6 +16078,7 @@ function startBlueAI() {
 
 function stopBlueAI() {
   AI_ACTIVE = false;
+  aiBlueRollPending = false;
   if (aiCheckInterval) { clearInterval(aiCheckInterval); aiCheckInterval = null; }
 }
 
@@ -16089,14 +16091,24 @@ function aiTick() {
     if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
       // v733: wait for Red to click READY before AI rolls Blue
       if (!pvpRedClickedRoll) return;
+      if (aiBlueRollPending) return; // already scheduled
       // Commit specials before rolling
       aiCommitSpecials('blue');
-      // v733: Red already committed — short delay for feel, then roll
-      pvpRedClickedRoll = false;
+      // v733: Red already committed — short delay for feel, then roll.
+      // Clear pvpRedClickedRoll ONLY after the roll actually fires. A phase
+      // change during the delay (modal, etc.) would otherwise skip rollReady
+      // while the flag is already false, leaving the AI stuck until red
+      // clicks again. Symptom: player rolls, boss doesn't, player rolls
+      // again and boss rolls.
+      aiBlueRollPending = true;
       setTimeout(() => {
+        aiBlueRollPending = false;
         if (B && (B.phase === 'ready' || B.phase === 'rolling')) {
+          pvpRedClickedRoll = false;
           rollReady('blue');
         }
+        // If the phase changed, leave pvpRedClickedRoll=true so the next
+        // aiTick (600ms later) retries once the phase is back to ready/rolling.
       }, 800 + Math.random() * 400);
       return;
     }
