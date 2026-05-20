@@ -16089,26 +16089,27 @@ function aiTick() {
   if (B.phase === 'ready' || B.phase === 'rolling') {
     const blueBtn = document.getElementById('rollBlueBtn');
     if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
-      // v733: wait for Red to click READY before AI rolls Blue
-      if (!pvpRedClickedRoll) return;
+      // v2.45: state-driven trigger. Roll blue when Red has triggered the
+      // pre-roll setup (B.preRoll exists) and blue hasn't rolled dice yet.
+      // The old pvpRedClickedRoll flag was fragile: it could be cleared
+      // before the delayed rollReady actually fired, leaving the AI stuck
+      // until Red clicked a second time. Reading the actual battle state
+      // is self-healing — every tick checks "does blue still need to roll?"
+      if (!B.preRoll || !B.preRoll.blue) return; // pre-roll setup hasn't run
+      if (B.preRoll.blue.dice) return; // blue already rolled this round
       if (aiBlueRollPending) return; // already scheduled
+      // Honor the legacy flag if it's been set true (Red clicked READY),
+      // but don't require it — the state check above is the source of truth.
       // Commit specials before rolling
       aiCommitSpecials('blue');
-      // v733: Red already committed — short delay for feel, then roll.
-      // Clear pvpRedClickedRoll ONLY after the roll actually fires. A phase
-      // change during the delay (modal, etc.) would otherwise skip rollReady
-      // while the flag is already false, leaving the AI stuck until red
-      // clicks again. Symptom: player rolls, boss doesn't, player rolls
-      // again and boss rolls.
       aiBlueRollPending = true;
       setTimeout(() => {
         aiBlueRollPending = false;
-        if (B && (B.phase === 'ready' || B.phase === 'rolling')) {
-          pvpRedClickedRoll = false;
-          rollReady('blue');
-        }
-        // If the phase changed, leave pvpRedClickedRoll=true so the next
-        // aiTick (600ms later) retries once the phase is back to ready/rolling.
+        if (!B) return;
+        if (B.phase !== 'ready' && B.phase !== 'rolling') return;
+        if (B.preRoll && B.preRoll.blue && B.preRoll.blue.dice) return; // raced — blue rolled
+        pvpRedClickedRoll = false;
+        rollReady('blue');
       }, 800 + Math.random() * 400);
       return;
     }
