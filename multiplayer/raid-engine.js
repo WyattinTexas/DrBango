@@ -691,6 +691,12 @@ function setupSpectatorView(data, currentIdx, players) {
   const bossConfig = RAID_BOSSES[data.raidId];
   if (!bossConfig) return;
 
+  // Hide any leftover game-over overlay (e.g., from this player having
+  // wiped — they should now spectate the remaining raiders, not stare at
+  // a "You lost" screen).
+  const gameOverEl = document.getElementById('gameOver');
+  if (gameOverEl) { gameOverEl.style.display = 'none'; gameOverEl.innerHTML = ''; gameOverEl.classList.remove('active'); }
+
   // Show the raid screen
   const raidScreen = document.getElementById('raid-screen');
   if (raidScreen) raidScreen.style.display = 'block';
@@ -743,7 +749,7 @@ function setupSpectatorView(data, currentIdx, players) {
 /**
  * Start the player's raid fight
  */
-function startMyRaidFight(raidData) {
+async function startMyRaidFight(raidData) {
   const user = firebase.auth().currentUser;
   const bossConfig = RAID_BOSSES[raidData.raidId];
   if (!bossConfig) return;
@@ -766,6 +772,18 @@ function startMyRaidFight(raidData) {
   const phase = getBossPhase(raidData.bossCurrentHp, raidData.bossMaxHp);
   const bossTeam = buildBossTeam(bossConfig, phase, raidData.enrageLevel || 0);
 
+  // Fetch the user's raid loot inventory so equipped items (head/weapon/
+  // accessory) apply to this fight. Without this the loadout UI is cosmetic.
+  let lootInventory = null;
+  if (user) {
+    try {
+      const invSnap = await db.ref(`mp/users/${user.uid}/raidRunInventory`).once('value');
+      lootInventory = invSnap.val() || null;
+    } catch (e) {
+      console.warn('[RAID] Failed to fetch loot inventory:', e);
+    }
+  }
+
   raidBattleState = {
     phase: 'fighting',
     raidData: raidData,
@@ -780,7 +798,8 @@ function startMyRaidFight(raidData) {
     ghostsLost: 0,
     hasWave: hasWave,
     waveDefeated: false,
-    currentSlot: currentIdx
+    currentSlot: currentIdx,
+    lootInventory: lootInventory
   };
 
   if (hasWave) {

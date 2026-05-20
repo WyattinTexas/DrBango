@@ -11,6 +11,43 @@ var _originalGhostData = {};
 // _currentRaidRole is declared in raid-engine.js: 'fighter' | 'spectator' | null
 
 /**
+ * Cycle from currentIdx forward and return the next slot whose player is
+ * still in the raid (not 'done' from wiping, not 'disconnected'). Returns
+ * -1 if no living player remains, meaning the raid is over.
+ */
+function _findNextLivingPlayer(currentIdx, players, playerCount) {
+  for (let step = 1; step <= playerCount; step++) {
+    const idx = (currentIdx + step) % playerCount;
+    const p = players[idx];
+    if (!p) continue;
+    if (p.status === 'done' || p.status === 'disconnected') continue;
+    return idx;
+  }
+  return -1;
+}
+
+/**
+ * Snapshot Boss-side persistent state that must survive turn handoffs:
+ * Humar's pendingLucyDmg, per-ghost burn stacks. Without this, abilities
+ * applied to the boss in one player's round vanish when the next player
+ * takes over.
+ */
+function _snapshotBossPersistentState() {
+  const s = { pendingLucyDmg: 0, burn: {} };
+  if (!B) return s;
+  if (B.pendingLucyDmg && typeof B.pendingLucyDmg.blue === 'number') {
+    s.pendingLucyDmg = B.pendingLucyDmg.blue || 0;
+  }
+  if (B.burn && B.burn.blue) {
+    for (const k of Object.keys(B.burn.blue)) {
+      const v = B.burn.blue[k];
+      if (typeof v === 'number' && v > 0) s.burn[k] = v;
+    }
+  }
+  return s;
+}
+
+/**
  * Update the spectator's arena from a Firebase battleState snapshot.
  * Called when the battleState listener fires on Player 2's client.
  * Updates the local B state and re-renders so Player 2 sees live dice/HP changes.
@@ -315,6 +352,36 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
+    // ── 7c. Restore boss persistent state (Humar pendingLucyDmg, burn) ──
+    // These effects target the boss and must survive turn handoffs.
+    const persist = raidData.bossPersistentState;
+    if (persist) {
+      if (typeof persist.pendingLucyDmg === 'number' && persist.pendingLucyDmg > 0) {
+        if (!B.pendingLucyDmg) B.pendingLucyDmg = { red: 0, blue: 0 };
+        B.pendingLucyDmg.blue = persist.pendingLucyDmg;
+      }
+      if (persist.burn && typeof persist.burn === 'object') {
+        if (!B.burn) B.burn = { red: {}, blue: {} };
+        if (!B.burn.blue) B.burn.blue = {};
+        for (const k of Object.keys(persist.burn)) {
+          const v = persist.burn[k];
+          if (typeof v === 'number' && v > 0) B.burn.blue[k] = v;
+        }
+      }
+    }
+
+    // ── 7d. Apply the fighter's equipped raid loadout (head/weapon/accessory) ──
+    // Inventory was fetched async in startMyRaidFight and stashed on
+    // raidBattleState.lootInventory. Only the fighter's own team gets loot.
+    if (isFighter && typeof raidBattleState !== 'undefined' && raidBattleState
+        && raidBattleState.lootInventory && typeof applyRaidLoot === 'function') {
+      try {
+        applyRaidLoot(B, 'red', raidBattleState.lootInventory);
+      } catch (e) {
+        console.warn('[RAID] applyRaidLoot failed:', e);
+      }
+    }
+
     // ── 7c. Clear dice from previous player's turn ──────────────
     B.redDice = null;
     B.blueDice = null;
@@ -590,8 +657,10 @@ function injectRaidReturnButton() {
         const players = currentRaid.players || {};
         const playerCount = Object.keys(players).length;
         const currentIdx = raidBattleState?.currentSlot || 0;
-        const nextIdx = currentIdx + 1;
         const ghostsLost = B ? B.red.ghosts.filter(g => g.ko).length : 0;
+        // Did this player wipe? (all ghosts KO'd). If so, mark them done;
+        // surviving players keep raiding instead of failing the whole raid.
+        const playerWiped = B && B.red && B.red.ghosts.every(g => g.ko);
         let totalDamage = 0;
         if (B && B.blue) {
           B.blue.ghosts.forEach(g => {
@@ -622,42 +691,59 @@ function injectRaidReturnButton() {
           });
         }
 
-        // Build atomic update
+        // Snapshot Boss-side persistent state (Humar pendingLucyDmg, burn)
+        const bossPersist = _snapshotBossPersistentState();
+
+        // Build atomic update.
+        // The current player is "done" ONLY if they wiped (no more ghosts).
+        // If THEY won and the boss lost (poolNow <= 0), they're still alive.
         const update = {
           bossCurrentHp: poolNow,
-          [`players/${currentIdx}/status`]: 'done',
+          bossPersistentState: bossPersist,
           [`players/${currentIdx}/damageDealt`]: totalDamage,
           [`players/${currentIdx}/ghostsLost`]: ghostsLost
         };
+        if (playerWiped) {
+          update[`players/${currentIdx}/status`] = 'done';
+        }
         if (user) {
           update[`playerGhostState/${user.uid}`] = savedPlayerState;
         }
 
-        // Check if boss is dead or all players done
+        // Check if boss is dead, then if living players remain
+        let nextIdxResolved = -1;
         if (poolNow <= 0) {
           update.status = 'complete';
           update.completedAt = firebase.database.ServerValue.TIMESTAMP;
           update.bossDefeatedBy = user?.uid || null;
           update.fightPhase = 'done';
-        } else if (nextIdx >= playerCount) {
-          // All players fought, boss survived
-          update.status = 'complete';
-          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
-          update.fightPhase = 'done';
         } else {
-          // Advance to next fighter
-          update.currentFighterIdx = nextIdx;
-          update.currentFighterUid = players[nextIdx]?.uid || null;
-          update.fightPhase = 'fighting';
-          update.enrageLevel = firebase.database.ServerValue.increment(1);
+          // Build a synthetic players map reflecting THIS write so the helper
+          // doesn't try to advance to the just-wiped current player.
+          const playersAfter = { ...players };
+          if (playerWiped) {
+            playersAfter[currentIdx] = { ...(playersAfter[currentIdx] || {}), status: 'done' };
+          }
+          nextIdxResolved = _findNextLivingPlayer(currentIdx, playersAfter, playerCount);
+          if (nextIdxResolved === -1) {
+            // All players are done — raid fails
+            update.status = 'complete';
+            update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+            update.fightPhase = 'done';
+          } else {
+            update.currentFighterIdx = nextIdxResolved;
+            update.currentFighterUid = players[nextIdxResolved]?.uid || null;
+            update.fightPhase = 'fighting';
+            update.enrageLevel = firebase.database.ServerValue.increment(1);
+          }
         }
 
         setTimeout(() => {
           db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
-            console.log('[RAID] Game over processed. Winner:', winner, '| Pool HP:', poolNow);
+            console.log('[RAID] Game over processed. Winner:', winner, '| Pool HP:', poolNow, '| Wiped:', playerWiped, '| Next:', nextIdxResolved);
             if (poolNow <= 0 && typeof distributeRaidRewards === 'function') {
               distributeRaidRewards(instanceId, true, user?.uid);
-            } else if (nextIdx >= playerCount && typeof distributeRaidRewards === 'function') {
+            } else if (update.status === 'complete' && typeof distributeRaidRewards === 'function') {
               distributeRaidRewards(instanceId, false, null);
             }
           }).catch(e => console.warn('[RAID] game-over update error:', e));
@@ -847,11 +933,15 @@ function injectRaidReturnButton() {
       });
     }
 
+    // Snapshot Boss-side state that must persist across handoffs (Humar's
+    // delayed damage, per-ghost burn stacks). Without this the boss
+    // "forgets" effects applied by the previous player's ghosts.
+    const bossPersist = _snapshotBossPersistentState();
+
     // Advance currentFighterIdx in Firebase after a brief delay
     setTimeout(() => {
       if (!currentRaid) return;
       const currentIdx = raidBattleState?.currentSlot || 0;
-      const nextIdx = (currentIdx + 1) % playerCount;
       const instanceId = currentRaid.instanceId;
       const user = firebase.auth().currentUser;
 
@@ -866,6 +956,7 @@ function injectRaidReturnButton() {
       const update = {
         bossCurrentHp: poolNow,
         bossGhostState: savedBossState,
+        bossPersistentState: bossPersist,
         turnCounter: prevTurnCounter + 1
       };
       if (user && savedPlayerState.ghosts.length > 0) {
@@ -873,9 +964,6 @@ function injectRaidReturnButton() {
       }
 
       // If the boss-ghost is dead, end the raid here instead of rotating.
-      // showGameOver only fires when ALL blue ghosts are KO'd, so if minions
-      // remain after the boss dies the round just ends — without this check
-      // the raid would keep rotating with a 0-HP pool.
       if (poolNow <= 0) {
         update.status = 'complete';
         update.completedAt = firebase.database.ServerValue.TIMESTAMP;
@@ -883,10 +971,23 @@ function injectRaidReturnButton() {
         update.fightPhase = 'done';
         update[`players/${currentIdx}/status`] = 'done';
       } else {
-        update.currentFighterIdx = nextIdx;
-        update.currentFighterUid = players[nextIdx]?.uid || null;
-        update.fightPhase = 'fighting';
+        // Find the next player who hasn't wiped/disconnected.
+        const nextIdx = _findNextLivingPlayer(currentIdx, players, playerCount);
+        if (nextIdx === -1) {
+          // All remaining players are done — raid is over with boss alive
+          update.status = 'complete';
+          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+          update.fightPhase = 'done';
+        } else {
+          update.currentFighterIdx = nextIdx;
+          update.currentFighterUid = players[nextIdx]?.uid || null;
+          update.fightPhase = 'fighting';
+        }
+        update._nextIdxResolved = nextIdx; // for the .then logging below
       }
+
+      const resolvedNextIdx = update._nextIdxResolved;
+      delete update._nextIdxResolved; // not a real Firebase field
 
       db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
         if (poolNow <= 0) {
@@ -894,8 +995,13 @@ function injectRaidReturnButton() {
           if (typeof distributeRaidRewards === 'function') {
             distributeRaidRewards(instanceId, true, user?.uid);
           }
+        } else if (update.status === 'complete') {
+          console.log('[RAID] All remaining players done — boss survives. Completing raid.');
+          if (typeof distributeRaidRewards === 'function') {
+            distributeRaidRewards(instanceId, false, null);
+          }
         } else {
-          console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
+          console.log('[RAID] Turn passed to player', resolvedNextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
           _currentRaidRole = 'spectator';
         }
       }).catch(e => console.error('[RAID] Turn handoff Firebase write FAILED:', e));

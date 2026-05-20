@@ -16093,28 +16093,28 @@ function aiTick() {
   if (!B || !AI_ACTIVE) return;
 
   // --- Auto-roll blue when button is ready ---
-  if (B.phase === 'ready' || B.phase === 'rolling') {
+  // v2.47: In multi-player raid mode, the direct rollReady('red') hook in
+  // raid-battle-bridge.js handles Blue's roll. Letting aiTick ALSO schedule
+  // a Blue roll caused double-roll races where dice got regenerated and
+  // resolution skipped, leaving the player to click ROLL again. Skip the
+  // aiTick blue-roll branch in that case.
+  const _raidSkipBlueRoll = window.RAID_MODE && window.currentRaid &&
+    Object.keys(window.currentRaid.players || {}).length > 1;
+  if (!_raidSkipBlueRoll && (B.phase === 'ready' || B.phase === 'rolling')) {
     const blueBtn = document.getElementById('rollBlueBtn');
     if (blueBtn && !blueBtn.disabled && !blueBtn.classList.contains('locked')) {
-      // v2.45: state-driven trigger. Roll blue when Red has triggered the
-      // pre-roll setup (B.preRoll exists) and blue hasn't rolled dice yet.
-      // The old pvpRedClickedRoll flag was fragile: it could be cleared
-      // before the delayed rollReady actually fired, leaving the AI stuck
-      // until Red clicked a second time. Reading the actual battle state
-      // is self-healing — every tick checks "does blue still need to roll?"
-      if (!B.preRoll || !B.preRoll.blue) return; // pre-roll setup hasn't run
-      if (B.preRoll.blue.dice) return; // blue already rolled this round
-      if (aiBlueRollPending) return; // already scheduled
-      // Honor the legacy flag if it's been set true (Red clicked READY),
-      // but don't require it — the state check above is the source of truth.
-      // Commit specials before rolling
+      // State-driven trigger: roll Blue when Red has triggered the pre-roll
+      // setup (B.preRoll exists) and Blue hasn't rolled dice yet. Self-healing.
+      if (!B.preRoll || !B.preRoll.blue) return;
+      if (B.preRoll.blue.dice) return;
+      if (aiBlueRollPending) return;
       aiCommitSpecials('blue');
       aiBlueRollPending = true;
       setTimeout(() => {
         aiBlueRollPending = false;
         if (!B) return;
         if (B.phase !== 'ready' && B.phase !== 'rolling') return;
-        if (B.preRoll && B.preRoll.blue && B.preRoll.blue.dice) return; // raced — blue rolled
+        if (B.preRoll && B.preRoll.blue && B.preRoll.blue.dice) return;
         pvpRedClickedRoll = false;
         rollReady('blue');
       }, 800 + Math.random() * 400);
