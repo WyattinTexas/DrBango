@@ -690,6 +690,68 @@ function injectRaidReturnButton() {
   };
 })();
 
+// ─── PATCH: Direct Red→Blue roll trigger in raid mode ───────────
+// In raid mode, when the player clicks READY (rollReady('red')), schedule
+// Blue's roll directly instead of relying on the polled aiTick. The poll
+// approach kept missing — pre-roll setup, phase transitions, or commit
+// modals could shift state between the tick and the delayed call.
+// This guarantees Blue rolls exactly once per Red roll.
+(function _hookRedRollFiresBlue() {
+  const _origRollReady = window.rollReady;
+  if (typeof _origRollReady !== 'function') return;
+
+  let _pendingBlueRoll = false;
+
+  window.rollReady = function (team) {
+    // Reset the pending flag at the start of a round so consecutive rounds work.
+    // doPreRollSetup is the gate: it only runs when phase is 'ready' (one per round).
+    const wasReady = (typeof B !== 'undefined' && B && B.phase === 'ready' && team === 'red');
+
+    const result = _origRollReady.call(this, team);
+
+    // Only hook Red clicks in raid mode (MP_MODE + RAID_MODE + multi-player)
+    if (!window.RAID_MODE || !window.MP_MODE || team !== 'red') return result;
+    if (!currentRaid) return result;
+    const players = currentRaid.players || {};
+    if (Object.keys(players).length <= 1) return result;
+    // Only the active fighter triggers Blue's roll
+    if (_currentRaidRole !== 'fighter') return result;
+    // First Red click of a round: arm Blue's roll
+    if (!wasReady) return result;
+    if (_pendingBlueRoll) return result;
+    _pendingBlueRoll = true;
+
+    // Wait long enough for pre-roll callouts to clear, then roll Blue.
+    // Uses B.preRollCalloutEndTime if set; otherwise a short delay.
+    const baseDelay = 900 + Math.random() * 300;
+    const calloutWait = (typeof B !== 'undefined' && B && B.preRollCalloutEndTime)
+      ? Math.max(0, B.preRollCalloutEndTime - Date.now()) : 0;
+    const delay = Math.max(baseDelay, calloutWait + 200);
+
+    setTimeout(() => {
+      _pendingBlueRoll = false;
+      if (!B) return;
+      if (B.phase !== 'ready' && B.phase !== 'rolling') return;
+      // Skip if Blue already rolled this round (AI tick may have fired)
+      if (B.preRoll && B.preRoll.blue && B.preRoll.blue.dice) return;
+      // Skip if a modal locked the Blue button (Timber, Ryder, etc.)
+      const blueBtn = document.getElementById('rollBlueBtn');
+      if (blueBtn && (blueBtn.disabled || blueBtn.classList.contains('locked'))) return;
+      // Commit Blue's specials, then roll
+      if (typeof aiCommitSpecials === 'function') aiCommitSpecials('blue');
+      _origRollReady.call(window, 'blue');
+    }, delay);
+
+    return result;
+  };
+
+  // Reset pending flag when a battle starts fresh (round 1, no Red roll yet).
+  // resetRollButtons fires at the start of each fresh raid battle in raid mode
+  // (B.round===1 falls through to _orig), so we hook the alt-turns wrapper
+  // below to clear our flag too — done inline since it's the same wrapper.
+  window._raidClearPendingBlueRoll = function () { _pendingBlueRoll = false; };
+})();
+
 // ─── PATCH: Alternating turns — swap players after each round ───
 // Intercepts resetRollButtons (called after a round fully resolves)
 // to swap to the next player instead of enabling roll buttons again.
@@ -715,6 +777,8 @@ function injectRaidReturnButton() {
     // Only intercept AFTER at least one round has been played (B.round > 1)
     if (!B || B.round <= 1) {
       _raidRoundsPlayed = 0;
+      // Fresh battle for a new fighter turn — clear our pending-blue-roll latch
+      if (typeof window._raidClearPendingBlueRoll === 'function') window._raidClearPendingBlueRoll();
       return _origResetRollButtons.call(this);
     }
 

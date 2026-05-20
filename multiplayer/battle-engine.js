@@ -2921,6 +2921,13 @@ function useBonzaiButton(team) {
   // Store the dice bonus for consumption during roll setup
   if (!B.bonzaiBtnDice) B.bonzaiBtnDice = { red: 0, blue: 0 };
   B.bonzaiBtnDice[team] = 5;
+  // If doPreRollSetup already ran for this round (MP_MODE/raid: Red clicks
+  // READY first, which sets B.preRoll), inject the +5 directly so it applies
+  // THIS roll. Otherwise doPreRollSetup will pick up bonzaiBtnDice when it
+  // runs. Without this, clicking Bonzai after READY silently drops the bonus.
+  if (B.preRoll && B.preRoll[team]) {
+    B.preRoll[team].count = Math.min(10, B.preRoll[team].count + 5);
+  }
   showAbilityCallout('BONZAI!', 'var(--rare)',
     `${f.name} — sacrificed 4 HP for +5 dice! (${preHp} → ${f.hp} HP)`, team);
   log(`<span class="log-ability">${f.name}</span> — BONZAI! Sacrificed 4 HP → +5 dice! (${preHp} → ${f.hp} HP)`);
