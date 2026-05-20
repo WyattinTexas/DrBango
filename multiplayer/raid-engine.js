@@ -1489,6 +1489,18 @@ async function distributeRaidRewards(instanceId, bossDefeated, killingBlowUid) {
     // Cleared when user clicks "Return to Lobby" on result screen.
   }
 
+  // Write status='complete' atomically with loot/badges/points so the
+  // instance listener fires once with all the data showRaidResult needs.
+  // Previously the bridge wrote status='complete' first and rewards arrived
+  // later — handleRaidComplete fired before lootItem was populated, so the
+  // result screen showed "No loot this time" even though loot was rolled.
+  updates[`mp/raids/instances/${instanceId}/status`] = 'complete';
+  updates[`mp/raids/instances/${instanceId}/completedAt`] = firebase.database.ServerValue.TIMESTAMP;
+  updates[`mp/raids/instances/${instanceId}/fightPhase`] = 'done';
+  if (bossDefeated && killingBlowUid) {
+    updates[`mp/raids/instances/${instanceId}/bossDefeatedBy`] = killingBlowUid;
+  }
+
   await db.ref().update(updates);
   // Await all badge grants so spectators reliably receive their badge
   if (badgePromises.length > 0) {

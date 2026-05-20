@@ -710,12 +710,15 @@ function injectRaidReturnButton() {
           update[`playerGhostState/${user.uid}`] = savedPlayerState;
         }
 
-        // Check if boss is dead, then if living players remain
+        // Check if boss is dead, then if living players remain.
+        // status='complete' is NOT written here — distributeRaidRewards writes
+        // it atomically with loot/badges so the result screen has loot data.
         let nextIdxResolved = -1;
+        let raidEnding = false;
+        let raidWon = false;
         if (poolNow <= 0) {
-          update.status = 'complete';
-          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
-          update.bossDefeatedBy = user?.uid || null;
+          raidEnding = true;
+          raidWon = true;
           update.fightPhase = 'done';
         } else {
           // Build a synthetic players map reflecting THIS write so the helper
@@ -727,8 +730,8 @@ function injectRaidReturnButton() {
           nextIdxResolved = _findNextLivingPlayer(currentIdx, playersAfter, playerCount);
           if (nextIdxResolved === -1) {
             // All players are done — raid fails
-            update.status = 'complete';
-            update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+            raidEnding = true;
+            raidWon = false;
             update.fightPhase = 'done';
           } else {
             update.currentFighterIdx = nextIdxResolved;
@@ -741,10 +744,8 @@ function injectRaidReturnButton() {
         setTimeout(() => {
           db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
             console.log('[RAID] Game over processed. Winner:', winner, '| Pool HP:', poolNow, '| Wiped:', playerWiped, '| Next:', nextIdxResolved);
-            if (poolNow <= 0 && typeof distributeRaidRewards === 'function') {
-              distributeRaidRewards(instanceId, true, user?.uid);
-            } else if (update.status === 'complete' && typeof distributeRaidRewards === 'function') {
-              distributeRaidRewards(instanceId, false, null);
+            if (raidEnding && typeof distributeRaidRewards === 'function') {
+              distributeRaidRewards(instanceId, raidWon, raidWon ? user?.uid : null);
             }
           }).catch(e => console.warn('[RAID] game-over update error:', e));
         }, 1500);
@@ -963,42 +964,39 @@ function injectRaidReturnButton() {
         update[`playerGhostState/${user.uid}`] = savedPlayerState;
       }
 
-      // If the boss-ghost is dead, end the raid here instead of rotating.
+      // Decide if the raid is ending here. status='complete' is NOT written
+      // in this update — distributeRaidRewards writes it atomically with
+      // loot/badges so the result screen has loot data populated.
+      let raidEnding = false;
+      let raidWon = false;
+      let resolvedNextIdx = -1;
       if (poolNow <= 0) {
-        update.status = 'complete';
-        update.completedAt = firebase.database.ServerValue.TIMESTAMP;
-        update.bossDefeatedBy = user?.uid || null;
+        raidEnding = true;
+        raidWon = true;
         update.fightPhase = 'done';
         update[`players/${currentIdx}/status`] = 'done';
       } else {
-        // Find the next player who hasn't wiped/disconnected.
-        const nextIdx = _findNextLivingPlayer(currentIdx, players, playerCount);
-        if (nextIdx === -1) {
-          // All remaining players are done — raid is over with boss alive
-          update.status = 'complete';
-          update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+        resolvedNextIdx = _findNextLivingPlayer(currentIdx, players, playerCount);
+        if (resolvedNextIdx === -1) {
+          raidEnding = true;
+          raidWon = false;
           update.fightPhase = 'done';
         } else {
-          update.currentFighterIdx = nextIdx;
-          update.currentFighterUid = players[nextIdx]?.uid || null;
+          update.currentFighterIdx = resolvedNextIdx;
+          update.currentFighterUid = players[resolvedNextIdx]?.uid || null;
           update.fightPhase = 'fighting';
         }
-        update._nextIdxResolved = nextIdx; // for the .then logging below
       }
 
-      const resolvedNextIdx = update._nextIdxResolved;
-      delete update._nextIdxResolved; // not a real Firebase field
-
       db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
-        if (poolNow <= 0) {
-          console.log('[RAID] Boss defeated mid-handoff (minions remained). Completing raid.');
-          if (typeof distributeRaidRewards === 'function') {
-            distributeRaidRewards(instanceId, true, user?.uid);
+        if (raidEnding) {
+          if (raidWon) {
+            console.log('[RAID] Boss defeated mid-handoff. Completing raid.');
+          } else {
+            console.log('[RAID] All remaining players done — boss survives. Completing raid.');
           }
-        } else if (update.status === 'complete') {
-          console.log('[RAID] All remaining players done — boss survives. Completing raid.');
           if (typeof distributeRaidRewards === 'function') {
-            distributeRaidRewards(instanceId, false, null);
+            distributeRaidRewards(instanceId, raidWon, raidWon ? user?.uid : null);
           }
         } else {
           console.log('[RAID] Turn passed to player', resolvedNextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
