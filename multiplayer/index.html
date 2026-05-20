@@ -7,7 +7,7 @@
 <script>
 // Auto-refresh stale cache: fetches a tiny version file and reloads if outdated
 (function(){
-  const LOCAL_V = 'v2.23'; // MUST match BBN_VERSION — bump both together
+  const LOCAL_V = 'v2.24'; // MUST match BBN_VERSION — bump both together
   fetch('cache-version.txt?t=' + Date.now()).then(r => r.text()).then(v => {
     if (v.trim() !== LOCAL_V && v.trim().startsWith('v')) location.reload(true);
   }).catch(() => {});
@@ -935,7 +935,7 @@ body {
 /* Battle button */
 #battle-btn {
   display: block;
-  margin: 0 auto 32px;
+  margin: 12px auto;
   padding: 16px 48px;
   font-family: 'Creepster', cursive;
   font-size: 1.6rem;
@@ -947,6 +947,23 @@ body {
   cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 4px 20px rgba(212, 160, 64, 0.3);
+  position: sticky;
+  bottom: 70px;
+  z-index: 60;
+  width: calc(100% - 40px);
+}
+
+/* Team guidance banner */
+.team-guidance-banner {
+  text-align: center;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, rgba(212,160,64,0.15), rgba(212,160,64,0.05));
+  border: 1px solid var(--gold-deep);
+  border-radius: 10px;
+  color: var(--gold-bright);
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 #battle-btn:hover {
   transform: translateY(-3px) scale(1.02);
@@ -4888,7 +4905,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     </div>
 
     <!-- Big PLAY Button -->
-    <button class="home-play-btn" onclick="switchScreen('collection')">
+    <button class="home-play-btn" onclick="playGame()">
       PLAY
       <span class="home-play-sub" id="home-games-meta">Pick your team and battle</span>
     </button>
@@ -4952,6 +4969,8 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
     <div class="offline-banner" id="offline-banner">Unable to connect. Check your internet connection.</div>
     <!-- Need More Cards Banner -->
     <div class="need-cards-banner" id="need-cards-banner">Need 3 cards to battle. Open more packs!</div>
+    <!-- Team Guidance Banner -->
+    <div class="team-guidance-banner" id="team-guidance-banner" style="display:none;"></div>
 
     <!-- Team Strip (TOP — 3 slots side by side) -->
     <div class="team-section">
@@ -4999,7 +5018,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
       <div class="target-team" id="target-team"></div>
       <button id="target-trade-btn" class="target-trade-btn" style="display:none;"></button>
     </div>
-    <button id="battle-btn" class="home-play-btn" disabled onclick="clickBattle()" style="display:none;margin-top:8px;">BATTLE</button>
+    <button id="battle-btn" class="home-play-btn" disabled onclick="quickBattle()" style="margin-top:8px;">READY TO BATTLE</button>
     <button id="challenge-btn" style="display:none;" disabled onclick="createChallenge()"></button>
   </div>
 
@@ -6272,7 +6291,7 @@ button, .card-cell, .ghost-card, .roster-panel, .pvp-sideline-ghost, .ko-option,
 <script src="raid-battle-bridge.js"></script>
 
 <script>
-const BBN_VERSION = 'v2.23';
+const BBN_VERSION = 'v2.24';
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('bbn-version');
   if (vEl) vEl.textContent = BBN_VERSION;
@@ -6961,6 +6980,7 @@ function addToTeam(ghostId) {
   renderTeamStrip();
   renderCollection();
   updateBattleButton();
+  document.getElementById('team-guidance-banner').style.display = 'none';
 
   // Auto-save team to Firebase for async matchmaking
   saveTeamToFirebase();
@@ -6972,9 +6992,81 @@ function removeFromTeam(slot) {
   renderTeamStrip();
   renderCollection();
   updateBattleButton();
+  document.getElementById('team-guidance-banner').style.display = 'none';
 
   // Auto-save team to Firebase for async matchmaking
   saveTeamToFirebase();
+}
+
+// ============================================================
+// PLAY GAME — SMART ROUTER
+// ============================================================
+function playGame() {
+  const filledTeam = team.filter(id => id !== null);
+
+  // Case A: Team is ready → go straight to matchmaking
+  if (filledTeam.length === 3) {
+    createChallenge();
+    return;
+  }
+
+  // Case B: Have enough cards but no full team → auto-fill and show collection
+  const collection = userProfile.collection || [];
+  const uniqueCards = [...new Set(collection)];
+
+  if (uniqueCards.length >= 3) {
+    const available = uniqueCards.filter(id => !team.includes(id));
+    // Shuffle
+    for (let i = available.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [available[i], available[j]] = [available[j], available[i]];
+    }
+    let filled = 0;
+    const slotsNeeded = 3 - filledTeam.length;
+    for (let s = 0; s < 3 && filled < slotsNeeded; s++) {
+      if (team[s] === null) {
+        team[s] = available[filled];
+        filled++;
+      }
+    }
+    renderTeamStrip();
+    renderCollection();
+    updateBattleButton();
+    saveTeamToFirebase();
+    switchScreen('collection');
+    showTeamReadyBanner();
+    return;
+  }
+
+  // Case C: Not enough cards → show collection with guidance
+  switchScreen('collection');
+  showPickTeamBanner();
+}
+
+function quickBattle() {
+  const filledTeam = team.filter(id => id !== null);
+  if (filledTeam.length < 3) {
+    showToast('Pick 3 spirits first!');
+    return;
+  }
+  if (getGamesRemaining() <= 0) {
+    showToast('No games remaining today!');
+    return;
+  }
+  createChallenge();
+}
+
+function showPickTeamBanner() {
+  const b = document.getElementById('team-guidance-banner');
+  b.textContent = 'Pick 3 Spiritkin to battle!';
+  b.style.display = 'block';
+}
+
+function showTeamReadyBanner() {
+  const b = document.getElementById('team-guidance-banner');
+  b.innerHTML = 'Team auto-filled! Tap cards to swap, or hit <strong>READY TO BATTLE</strong>';
+  b.style.display = 'block';
+  setTimeout(() => b.style.display = 'none', 8000);
 }
 
 function saveTeamToFirebase() {
@@ -7019,19 +7111,16 @@ function updateBattleButton() {
 
   if (uniqueCards.length < 3) {
     btn.disabled = true;
-    btn.textContent = 'Need 3 cards';
+    btn.textContent = 'Need 3 cards — Open packs!';
   } else if (remaining <= 0) {
     btn.disabled = true;
     btn.textContent = 'No games remaining';
   } else if (filledSlots < 3) {
     btn.disabled = true;
-    btn.textContent = 'Pick 3 spirits first';
-  } else if (!selectedTarget) {
-    btn.disabled = true;
-    btn.textContent = 'Select an opponent from the leaderboard';
+    btn.textContent = `Pick ${3 - filledSlots} more spirit${3 - filledSlots > 1 ? 's' : ''}`;
   } else {
     btn.disabled = false;
-    btn.textContent = `\u2694\uFE0F CHALLENGE ${selectedTarget.name.toUpperCase()}`;
+    btn.textContent = 'READY TO BATTLE';
   }
 }
 
