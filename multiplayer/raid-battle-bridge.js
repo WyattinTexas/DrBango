@@ -800,9 +800,6 @@ function injectRaidReturnButton() {
       // turnCounter increments each swap so the listener can distinguish repeated same-index turns
       const prevTurnCounter = currentRaid.turnCounter || 0;
       const update = {
-        currentFighterIdx: nextIdx,
-        currentFighterUid: players[nextIdx]?.uid || null,
-        fightPhase: 'fighting',
         bossCurrentHp: poolNow,
         bossGhostState: savedBossState,
         turnCounter: prevTurnCounter + 1
@@ -811,45 +808,42 @@ function injectRaidReturnButton() {
         update[`playerGhostState/${user.uid}`] = savedPlayerState;
       }
 
+      // If the boss-ghost is dead, end the raid here instead of rotating.
+      // showGameOver only fires when ALL blue ghosts are KO'd, so if minions
+      // remain after the boss dies the round just ends — without this check
+      // the raid would keep rotating with a 0-HP pool.
+      if (poolNow <= 0) {
+        update.status = 'complete';
+        update.completedAt = firebase.database.ServerValue.TIMESTAMP;
+        update.bossDefeatedBy = user?.uid || null;
+        update.fightPhase = 'done';
+        update[`players/${currentIdx}/status`] = 'done';
+      } else {
+        update.currentFighterIdx = nextIdx;
+        update.currentFighterUid = players[nextIdx]?.uid || null;
+        update.fightPhase = 'fighting';
+      }
+
       db.ref(`mp/raids/instances/${instanceId}`).update(update).then(() => {
-        console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
-        _currentRaidRole = 'spectator';
+        if (poolNow <= 0) {
+          console.log('[RAID] Boss defeated mid-handoff (minions remained). Completing raid.');
+          if (typeof distributeRaidRewards === 'function') {
+            distributeRaidRewards(instanceId, true, user?.uid);
+          }
+        } else {
+          console.log('[RAID] Turn passed to player', nextIdx, '| Boss pool HP:', poolNow, '/', poolMax);
+          _currentRaidRole = 'spectator';
+        }
       }).catch(e => console.error('[RAID] Turn handoff Firebase write FAILED:', e));
     }, 1500);
   };
 })();
 
-// ─── PATCH: Spectator detects game completion ──────────────────
-// Player 2 needs to see a result screen when the raid completes.
-// Listen for raid status changes even while spectating.
-(function _hookSpectatorGameOver() {
-  // Poll raid status while spectating
-  setInterval(() => {
-    if (_currentRaidRole !== 'spectator' || !currentRaid) return;
-    db.ref(`mp/raids/instances/${currentRaid.instanceId}/status`).once('value').then(snap => {
-      if (snap.val() === 'complete') {
-        // Raid is over — show return to lobby
-        const raidScreen = document.getElementById('raid-screen');
-        if (!raidScreen || raidScreen.style.display === 'none') return;
-        // Don't show if we already have a game-over overlay
-        const existing = document.getElementById('gameOver');
-        if (existing && existing.style.display !== 'none' && existing.innerHTML) return;
-
-        // Show a simple result overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
-        overlay.innerHTML = `
-          <h1 style="font-family:Creepster,cursive;font-size:2.5rem;color:#2ecc71;letter-spacing:4px;">RAID COMPLETE</h1>
-          <p style="color:var(--text2);font-size:1.1rem;">The raid has ended.</p>
-          <button style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;border:1px solid #c084fc;padding:12px 32px;font-size:1rem;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;"
-            onclick="this.parentElement.remove(); cleanupRaidBattle(); if(typeof showRaidLobby==='function') showRaidLobby();">
-            RETURN TO LOBBY
-          </button>`;
-        document.body.appendChild(overlay);
-      }
-    }).catch(() => {});
-  }, 2000);
-})();
+// (Removed: spectator-poll fallback overlay. The single instance listener
+//  in raid-engine.js handles status='complete' for both fighter and
+//  spectator via handleRaidComplete → showRaidResult. The polled overlay
+//  was rendered on document.body at z-9999 and obscured the proper result
+//  screen, leaving the player stuck on a "RAID COMPLETE" black screen.)
 
 // ─── SNAPSHOT SYNC: Poll battle state and write to Firebase ─────
 // Simple interval that writes B state to Firebase every 500ms while
