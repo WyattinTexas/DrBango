@@ -713,9 +713,17 @@ function setupSpectatorView(data, currentIdx, players) {
   // Flag stays set for 6s to cover async entry callbacks in startBattle().
   window._raidSkipEntry = true;
 
-  // Set up the full battle arena (ghosts, art, HP bars, layout)
+  // Set up the full battle arena (ghosts, art, HP bars, layout). If any
+  // setup step throws (e.g., a transient missing DOM element when the
+  // spectator's listener fires before the page is fully wired), don't
+  // leave the player staring at a blank screen — snapshot updates will
+  // still flow in and the next render will fill in the arena.
   if (typeof initRaidBattleInPage === 'function') {
-    initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
+    try {
+      initRaidBattleInPage(data, blueGhosts, currentPlayer.team, false);
+    } catch (e) {
+      console.error('[RAID] Spectator initRaidBattleInPage threw:', e);
+    }
   }
 
   // Immediately stop AI and snapshot sync — spectator is read-only

@@ -14554,6 +14554,12 @@ function startMusic() {
   if (_musicStarted) return;
   if (_muted) { _musicStarted = true; return; }
   const music = document.getElementById('bgMusic');
+  // The audio element can be missing when the page state is mid-transition
+  // (e.g., a raid spectator's listener fires before the DOM is fully wired
+  // through showRaidScreen). Crashing here aborted startBattle for the
+  // spectator and left them on a blank screen until reload — bail silently
+  // instead so the rest of startBattle can complete.
+  if (!music) { _musicStarted = true; return; }
   music.currentTime = 0;
   music.volume = 0.2;
   // Remove any stale retry handler from a previous battle cycle
@@ -15122,10 +15128,14 @@ function renderBattle() {
     }
   });
 
-  document.getElementById('turnIndicator').textContent = '';
-  const logWrap = document.getElementById('battleLog').parentElement;
-  document.getElementById('battleLog').innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
-  logWrap.scrollTop = 0;
+  const _turnInd = document.getElementById('turnIndicator');
+  if (_turnInd) _turnInd.textContent = '';
+  const _battleLog = document.getElementById('battleLog');
+  if (_battleLog) {
+    _battleLog.innerHTML = B.log.map(l=>`<div class="log-entry">${l}</div>`).join('');
+    const _logWrap = _battleLog.parentElement;
+    if (_logWrap) _logWrap.scrollTop = 0;
+  }
 
   // Ability buttons (pre-roll actions)
   ['red','blue'].forEach(team => {
