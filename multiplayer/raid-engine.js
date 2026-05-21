@@ -536,6 +536,17 @@ function startActiveRaidListener() {
       return;
     }
 
+    // If activeRaid changed from one instance to another WITHOUT going through
+    // null (e.g., user joined a new raid straight from the result screen),
+    // cleanupRaid never ran and stale state from the previous raid is still
+    // around — _currentFighterIdx, _lastTurnCounter, _raidWaitingRoomShown,
+    // the old instance listener. That's enough to keep the new raid from
+    // initializing and leave every player on a black screen.
+    if (currentRaid && currentRaid.instanceId !== instanceId) {
+      console.log('[RAID] Switching raids without cleanup gap — running cleanupRaid first');
+      cleanupRaid();
+    }
+
     currentRaid = { instanceId, ...instance };
     enterRaidScreen(instanceId);
   });
@@ -554,7 +565,14 @@ var _lastTurnCounter = -1;     // turn counter — distinguishes repeated same-i
 var _raidRoleTransitioning = false; // lock: prevents snapshot updates during role changes
 
 function enterRaidScreen(instanceId) {
-  _raidResultShown = false; // Reset for new raid
+  // Reset all per-raid latches so stale state from a previous raid can't
+  // block initialization of this one (belt-and-suspenders — the activeRaid
+  // listener now also calls cleanupRaid on instance switch, but if anything
+  // bypasses that path, these resets keep the new raid functional).
+  _raidResultShown = false;
+  _currentFighterIdx = -1;
+  _lastTurnCounter = -1;
+  window._raidWaitingRoomShown = false;
   const instRef = db.ref(`mp/raids/instances/${instanceId}`);
 
   // SINGLE listener — no more races between status/fighterIdx/battleState
