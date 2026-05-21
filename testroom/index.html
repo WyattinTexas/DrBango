@@ -5037,8 +5037,9 @@ function pickRandomBoth() {
 }
 
 // ============================================================
-// WILLPOWER SYSTEM — Shared team deck of tactical cards
+// WILLPOWER SYSTEM — DISABLED in testroom (testroom2 only)
 // ============================================================
+const WILLPOWER_ENABLED = false;
 const WILLPOWER_CARDS = [
   { id:1,  name:'Bonanza',          color:'red',    emoji:'💥', effect:'bonanza',        desc:'+2 damage to wins' },
   { id:2,  name:'Spark',            color:'red',    emoji:'⚡', effect:'spark',          desc:'Gain +1 Surge' },
@@ -5139,7 +5140,7 @@ function syncWillpower(team) {
 }
 
 function activateWillpower(teamKey) {
-  if (!B) return;
+  if (!WILLPOWER_ENABLED || !B) return;
   const team = B[teamKey];
   const f = active(team);
   if (!f || f.ko) return;
@@ -5224,7 +5225,7 @@ function saveWillpowerDeck() { if (wpDeckTotal() !== 15) return; localStorage.se
 function ghostData(id) { return GHOSTS.find(g=>g.id===id); }
 
 function makeTeam(ids) {
-  const teamDeck = buildTeamWillpowerDeck();
+  const teamDeck = WILLPOWER_ENABLED ? buildTeamWillpowerDeck() : [];
   const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
@@ -5240,7 +5241,7 @@ function makeTeam(ids) {
     wpDeck: teamDeck,
     wpDiscard: []
   };
-  wpDrawFromTeam(team, team.ghosts[0]);
+  if (WILLPOWER_ENABLED) wpDrawFromTeam(team, team.ghosts[0]);
   return team;
 }
 
@@ -19516,8 +19517,8 @@ function renderBattle() {
     const enemy = opp(B[team]);
     let html = '';
     if (isPreRollActive(team)) {
-      // Willpower activation button
-      if (f.willpower && f.willpower.length > 0 && !(B.wpUsedThisTurn && B.wpUsedThisTurn[team]) && !f.willpowerTopLocked) {
+      // Willpower activation button (testroom2 only)
+      if (WILLPOWER_ENABLED && f.willpower && f.willpower.length > 0 && !(B.wpUsedThisTurn && B.wpUsedThisTurn[team]) && !f.willpowerTopLocked) {
         const topCard = wpCardById(f.willpower[0]);
         if (topCard) {
           const costLabel = topCard.hpCost ? ` (${topCard.hpCost} HP)` : '';
