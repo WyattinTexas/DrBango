@@ -382,6 +382,20 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
+    // ── 7e. Capture turn-start boss damage as baseline for per-turn damage ──
+    // Each player's damageDealt should be ONLY what they did this turn, not
+    // the cumulative pool damage. End-of-turn handoff subtracts this baseline
+    // from end-of-turn damage to get this player's contribution.
+    if (isFighter) {
+      let turnStart = 0;
+      if (B && B.blue) {
+        B.blue.ghosts.forEach(g => {
+          if (g) turnStart += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
+        });
+      }
+      window._raidTurnStartDmg = turnStart;
+    }
+
     // ── 7c. Clear dice from previous player's turn ──────────────
     B.redDice = null;
     B.blueDice = null;
@@ -661,12 +675,16 @@ function injectRaidReturnButton() {
         // Did this player wipe? (all ghosts KO'd). If so, mark them done;
         // surviving players keep raiding instead of failing the whole raid.
         const playerWiped = B && B.red && B.red.ghosts.every(g => g.ko);
-        let totalDamage = 0;
+        // End-of-turn cumulative boss damage. Subtract the turn-start baseline
+        // to get THIS player's contribution; without the subtraction every
+        // player gets credited for damage carried over from prior turns.
+        let endOfTurnBossDmg = 0;
         if (B && B.blue) {
           B.blue.ghosts.forEach(g => {
-            if (g) totalDamage += Math.max(0, g.maxHp - (g.ko ? 0 : g.hp));
+            if (g) endOfTurnBossDmg += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
           });
         }
+        const turnDamage = Math.max(0, endOfTurnBossDmg - (window._raidTurnStartDmg || 0));
 
         // Save player ghost state (with identity for transforms)
         // IMPORTANT: Firebase rejects undefined — coerce every field
@@ -697,11 +715,14 @@ function injectRaidReturnButton() {
         // Build atomic update.
         // The current player is "done" ONLY if they wiped (no more ghosts).
         // If THEY won and the boss lost (poolNow <= 0), they're still alive.
+        // damageDealt/totalDamageDealt accumulate via increment so a player
+        // who takes multiple turns gets credited for each.
         const update = {
           bossCurrentHp: poolNow,
           bossPersistentState: bossPersist,
-          [`players/${currentIdx}/damageDealt`]: totalDamage,
-          [`players/${currentIdx}/ghostsLost`]: ghostsLost
+          [`players/${currentIdx}/damageDealt`]: firebase.database.ServerValue.increment(turnDamage),
+          [`players/${currentIdx}/ghostsLost`]: ghostsLost,
+          totalDamageDealt: firebase.database.ServerValue.increment(turnDamage)
         };
         if (playerWiped) {
           update[`players/${currentIdx}/status`] = 'done';
@@ -790,10 +811,6 @@ function injectRaidReturnButton() {
   let _pendingBlueRoll = false;
 
   window.rollReady = function (team) {
-    // Reset the pending flag at the start of a round so consecutive rounds work.
-    // doPreRollSetup is the gate: it only runs when phase is 'ready' (one per round).
-    const wasReady = (typeof B !== 'undefined' && B && B.phase === 'ready' && team === 'red');
-
     const result = _origRollReady.call(this, team);
 
     // Only hook Red clicks in raid mode (MP_MODE + RAID_MODE + multi-player)
@@ -801,17 +818,19 @@ function injectRaidReturnButton() {
     if (!currentRaid) return result;
     const players = currentRaid.players || {};
     if (Object.keys(players).length <= 1) return result;
-    // Only the active fighter triggers Blue's roll
     if (_currentRaidRole !== 'fighter') return result;
-    // First Red click of a round: arm Blue's roll
-    if (!wasReady) return result;
+    // STATE-DRIVEN: schedule Blue if pre-roll setup ran and Blue hasn't rolled
+    // yet. Dropping the previous "first click only" (wasReady) gate means a
+    // user's second click can also kick off Blue when the first schedule
+    // missed its window — full recovery instead of silently stuck.
+    if (!B || !B.preRoll || !B.preRoll.blue) return result;
+    if (B.preRoll.blue.dice) return result; // already rolled
     if (_pendingBlueRoll) return result;
     _pendingBlueRoll = true;
 
     // Wait long enough for pre-roll callouts to clear, then roll Blue.
-    // Uses B.preRollCalloutEndTime if set; otherwise a short delay.
     const baseDelay = 900 + Math.random() * 300;
-    const calloutWait = (typeof B !== 'undefined' && B && B.preRollCalloutEndTime)
+    const calloutWait = (B.preRollCalloutEndTime)
       ? Math.max(0, B.preRollCalloutEndTime - Date.now()) : 0;
     const delay = Math.max(baseDelay, calloutWait + 200);
 
@@ -819,12 +838,9 @@ function injectRaidReturnButton() {
       _pendingBlueRoll = false;
       if (!B) return;
       if (B.phase !== 'ready' && B.phase !== 'rolling') return;
-      // Skip if Blue already rolled this round (AI tick may have fired)
       if (B.preRoll && B.preRoll.blue && B.preRoll.blue.dice) return;
-      // Skip if a modal locked the Blue button (Timber, Ryder, etc.)
       const blueBtn = document.getElementById('rollBlueBtn');
       if (blueBtn && (blueBtn.disabled || blueBtn.classList.contains('locked'))) return;
-      // Commit Blue's specials, then roll
       if (typeof aiCommitSpecials === 'function') aiCommitSpecials('blue');
       _origRollReady.call(window, 'blue');
     }, delay);
@@ -939,6 +955,22 @@ function injectRaidReturnButton() {
     // "forgets" effects applied by the previous player's ghosts.
     const bossPersist = _snapshotBossPersistentState();
 
+    // Compute THIS PLAYER'S damage contribution this turn: end-of-turn boss
+    // damage minus the baseline captured at turn start. Without subtracting
+    // the baseline, every player would get credit for the cumulative pool
+    // damage from previous turns too.
+    let endOfTurnBossDmg = 0;
+    let ghostsLostThisRun = 0;
+    if (B && B.blue) {
+      B.blue.ghosts.forEach(g => {
+        if (g) endOfTurnBossDmg += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
+      });
+    }
+    if (B && B.red) {
+      ghostsLostThisRun = B.red.ghosts.filter(g => g.ko).length;
+    }
+    const turnDamage = Math.max(0, endOfTurnBossDmg - (window._raidTurnStartDmg || 0));
+
     // Advance currentFighterIdx in Firebase after a brief delay
     setTimeout(() => {
       if (!currentRaid) return;
@@ -958,7 +990,14 @@ function injectRaidReturnButton() {
         bossCurrentHp: poolNow,
         bossGhostState: savedBossState,
         bossPersistentState: bossPersist,
-        turnCounter: prevTurnCounter + 1
+        turnCounter: prevTurnCounter + 1,
+        // Per-player damage/ghosts-lost, accumulated via increment so a player
+        // who takes multiple turns gets credited for each. Initial value is 0
+        // from queue join, so first increment lands at the right total.
+        [`players/${currentIdx}/damageDealt`]: firebase.database.ServerValue.increment(turnDamage),
+        [`players/${currentIdx}/ghostsLost`]: ghostsLostThisRun,
+        // Instance-level total for the result screen's "Total Damage" stat.
+        totalDamageDealt: firebase.database.ServerValue.increment(turnDamage)
       };
       if (user && savedPlayerState.ghosts.length > 0) {
         update[`playerGhostState/${user.uid}`] = savedPlayerState;
