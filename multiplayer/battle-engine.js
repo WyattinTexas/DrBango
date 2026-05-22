@@ -872,8 +872,13 @@ function makeTeam(ids) {
   const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
-      return { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
+      const ghost = { id, name:g.name, hp:g.maxHp, maxHp:g.maxHp, ko:false, ability:g.ability, abilityDesc:g.abilityDesc, rarity:g.rarity,
         hankFirstRoll:false, maximoFirstRoll:false, usedMagicTouch:false };
+      // Raid boss ghosts carry baseId so their abilities route to player-card
+      // ability code via abilityIdOf(). Without this propagation, boss Timber
+      // (id 9201, baseId 210) wouldn't trigger the id-210 Howl ability code.
+      if (g.baseId != null) ghost.baseId = g.baseId;
+      return ghost;
     }),
     activeIdx: 0,
     resources: { moonstone:0, ice:0, fire:0, surge:0, healingSeed:0, luckyStone:0, firefly:0, frostbite:0 },
