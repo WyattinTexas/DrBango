@@ -373,10 +373,15 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
     // ── 7d. Apply the fighter's equipped raid loadout (head/weapon/accessory) ──
     // Inventory was fetched async in startMyRaidFight and stashed on
     // raidBattleState.lootInventory. Only the fighter's own team gets loot.
+    // isFirstTurn = no saved player state from a previous turn yet → grant
+    // one-time resource items (Lucky Stone, Healing Seed, etc.). On later
+    // turns, only re-apply per-fight flags (blades, masks, golden dice,
+    // Valkin's Crystal) since B is reinitialized at every handoff.
     if (isFighter && typeof raidBattleState !== 'undefined' && raidBattleState
         && raidBattleState.lootInventory && typeof applyRaidLoot === 'function') {
       try {
-        applyRaidLoot(B, 'red', raidBattleState.lootInventory);
+        const isFirstTurn = !savedState;
+        applyRaidLoot(B, 'red', raidBattleState.lootInventory, isFirstTurn);
       } catch (e) {
         console.warn('[RAID] applyRaidLoot failed:', e);
       }

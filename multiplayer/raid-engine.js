@@ -157,7 +157,7 @@ function rollBossLoot(tier) {
  * Only EQUIPPED items are applied (head, weapon, accessory slots).
  * Falls back to applying all items if no equipment data exists (backwards compat).
  */
-function applyRaidLoot(battleState, team, lootInventory) {
+function applyRaidLoot(battleState, team, lootInventory, isFirstTurn) {
   if (!lootInventory || !lootInventory.items) return;
   const t = battleState.teams?.[team] || battleState[team];
   if (!t) return;
@@ -168,12 +168,26 @@ function applyRaidLoot(battleState, team, lootInventory) {
     ? Object.values(equipped).filter(Boolean)   // only the 3 equipped slots
     : lootInventory.items;                       // legacy: apply everything
 
+  // Items split into two categories:
+  //   - ONE-TIME (resource grants + HP mods): fire ONLY on the player's first
+  //     turn of the raid; their effects persist via saved player state.
+  //     Applying these every turn would stack resources, repeatedly damage
+  //     the player (Firefly), and inflate maxHp (Shade's Cape).
+  //   - PER-FIGHT (B-level flags): the underlying B is reinitialized at every
+  //     turn handoff, so flags like Ice Blade forged / Mask of Night must be
+  //     re-applied each turn or the effect disappears mid-raid.
+  const ONE_TIME = new Set([
+    'lucky_charm', 'healing_root', 'ember_stone', 'frost_shard',
+    'surge_crystal', 'moonstone_ring', 'firefly_lantern', 'shades_cape'
+  ]);
+
   itemsToApply.forEach(item => {
     const def = RAID_ITEMS[item];
     if (!def) return;
+    if (ONE_TIME.has(item) && !isFirstTurn) return; // skip resource grants on subsequent turns
 
     switch (item) {
-      // Charms — grant starting resources
+      // Charms — grant starting resources (FIRST TURN ONLY)
       case 'lucky_charm':    if (t.resources) t.resources.luckyStone = (t.resources.luckyStone || 0) + 1; break;
       case 'healing_root':   if (t.resources) t.resources.healingSeed = (t.resources.healingSeed || 0) + 1; break;
       case 'ember_stone':    if (t.resources) t.resources.fire = (t.resources.fire || 0) + 1; break;
