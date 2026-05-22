@@ -7420,17 +7420,19 @@ function doPreRollSetup() {
     }
   });
 
-  // Golden Dice (raid item) — +1 die on the first roll of every fight.
-  // B.goldenDice[team] is set by applyRaidLoot at fight start; we consume the
-  // single-use bonus via B.goldenDiceUsed[team] so it only fires round 1.
+  // Golden Dice (raid item) — +1 die on EVERY roll for the whole fight.
+  // B.goldenDice[team] is set by applyRaidLoot at fight start and stays set
+  // for the duration. Callout only on round 1 so it doesn't get spammy; the
+  // bonus log fires every round.
   ['red', 'blue'].forEach(tName => {
-    if (B.goldenDice && B.goldenDice[tName] && B.goldenDiceUsed && !B.goldenDiceUsed[tName]) {
+    if (B.goldenDice && B.goldenDice[tName]) {
       if (tName === 'red') redCount += 1;
       else blueCount += 1;
-      B.goldenDiceUsed[tName] = true;
       const f = active(B[tName]);
-      preRollCallouts.push(['GOLDEN DICE!', 'var(--legendary)', `🎲 Golden Dice — ${f.name} rolls +1 die on the first roll!`, tName]);
-      log(`<span class="log-ability">Golden Dice</span> — 🎲 ${f.name} gets +1 die on the first roll!`);
+      if (B.round === 1) {
+        preRollCallouts.push(['GOLDEN DICE!', 'var(--legendary)', `🎲 Golden Dice — ${f.name} rolls +1 die every round this fight!`, tName]);
+      }
+      log(`<span class="log-ability">Golden Dice</span> — 🎲 +1 die for ${tName}!`);
     }
   });
 

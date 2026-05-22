@@ -64,7 +64,7 @@ const RAID_ITEMS = {
 
   // === LEGENDARY → weapon or head slot ===
   golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary', slot: 'weapon',
-                    desc: '+1 die on your first roll of every fight.' },
+                    desc: '+1 die on every roll for the whole fight.' },
   shades_cape:   { name: 'Shade\'s Cape',   icon: '👑', type: 'legendary', tier: 'legendary', slot: 'head',
                     desc: 'Your active ghost gains +1 max HP for this raid.' },
   valkins_crystal:   { name: "Valkin's Crystal",  icon: '💀', type: 'legendary', tier: 'legendary', slot: 'accessory',
@@ -212,8 +212,7 @@ function applyRaidLoot(battleState, team, lootInventory) {
       // Legendary
       case 'golden_dice':
         if (!battleState.goldenDice) battleState.goldenDice = { red: false, blue: false };
-        if (!battleState.goldenDiceUsed) battleState.goldenDiceUsed = { red: false, blue: false };
-        battleState.goldenDice[team] = true; // +1 die on first roll of the fight
+        battleState.goldenDice[team] = true; // +1 die on every roll of the fight
         break;
       case 'shades_cape':
         // +1 max HP to active ghost
