@@ -1691,11 +1691,15 @@ async function writeBattleSnapshot(snapshotData) {
       ko: !!g.ko, art: g.art || '', id: g.id || 0,
       ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
     })),
-    allBossGhosts: (snapshotData.allBossGhosts || []).map(g => ({
-      name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-      ko: !!g.ko, art: g.art || '', id: g.id || 0,
-      ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
-    })),
+    allBossGhosts: (snapshotData.allBossGhosts || []).map(g => {
+      const entry = {
+        name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+        ko: !!g.ko, art: g.art || '', id: g.id || 0,
+        ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
+      };
+      if (g.baseId != null) entry.baseId = g.baseId;
+      return entry;
+    }),
     playerActiveIdx: snapshotData.playerActiveIdx || 0,
     bossActiveIdx: snapshotData.bossActiveIdx || 0,
     playerSideline: (snapshotData.playerSideline || []).map(g => ({

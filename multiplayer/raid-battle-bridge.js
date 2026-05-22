@@ -101,6 +101,7 @@ function updateSpectatorFromSnapshot(snapshot) {
         if (sg.ability) B.blue.ghosts[i].ability = sg.ability;
         if (sg.abilityDesc) B.blue.ghosts[i].abilityDesc = sg.abilityDesc;
         if (sg.rarity) B.blue.ghosts[i].rarity = sg.rarity;
+        if (sg.baseId != null) B.blue.ghosts[i].baseId = sg.baseId;
       }
     });
     if (snapshot.bossActiveIdx != null) {
@@ -291,6 +292,10 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
             B.blue.ghosts[i].ability = gs.ability;
             B.blue.ghosts[i].abilityDesc = gs.abilityDesc;
             B.blue.ghosts[i].rarity = gs.rarity;
+            // Boss ghosts have their own ID in the 9200+ range; baseId routes
+            // ability triggers to the player-card equivalent. Must survive
+            // turn handoffs or the boss's ability stops firing on round 2+.
+            if (gs.baseId != null) B.blue.ghosts[i].baseId = gs.baseId;
           }
         }
       });
@@ -970,9 +975,12 @@ function injectRaidReturnButton() {
     if (B && B.blue) {
       savedBossState.activeIdx = B.blue.activeIdx || 0;
       B.blue.ghosts.forEach(g => {
-        savedBossState.ghosts.push({ hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
-                                     id: g.id || 0, name: g.name || '???', art: g.art || '',
-                                     ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common' });
+        const entry = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
+                        id: g.id || 0, name: g.name || '???', art: g.art || '',
+                        ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common' };
+        // Preserve baseId so ability triggers keep firing across turn handoffs
+        if (g.baseId != null) entry.baseId = g.baseId;
+        savedBossState.ghosts.push(entry);
       });
     }
 
@@ -1122,11 +1130,15 @@ function startSnapshotSync() {
       const _rawRes = B.red ? (B.red.resources || {}) : {};
       const playerResources = {};
       for (const k of Object.keys(_rawRes)) { if (_rawRes[k] !== undefined) playerResources[k] = _rawRes[k]; }
-      const allBossGhosts = B.blue ? B.blue.ghosts.map(g => ({
-        name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
-        ko: !!g.ko, art: g.art || '', id: g.id || 0,
-        ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
-      })) : [];
+      const allBossGhosts = B.blue ? B.blue.ghosts.map(g => {
+        const entry = {
+          name: g.name || '???', hp: g.hp || 0, maxHp: g.maxHp || 1,
+          ko: !!g.ko, art: g.art || '', id: g.id || 0,
+          ability: g.ability || '', abilityDesc: g.abilityDesc || '', rarity: g.rarity || 'common'
+        };
+        if (g.baseId != null) entry.baseId = g.baseId; // route ability triggers
+        return entry;
+      }) : [];
 
       writeBattleSnapshot({
         playerName: firebase.auth().currentUser?.displayName || 'Raider',

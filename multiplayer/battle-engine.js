@@ -888,6 +888,13 @@ function active(t) { return t.ghosts[t.activeIdx]; }
 function opp(team) { return team===B.red ? B.blue : B.red; }
 function teamName(team) { return team===B.red ? 'Red' : 'Blue'; }
 
+// Returns the ID that ability triggers should match against. For raid bosses
+// (id 9201+) we route to their `baseId` so abilities tied to the player-card
+// ID (e.g. Pack Tactics on id 210) still fire on the boss variant (id 9201,
+// baseId 210). For normal player cards baseId is undefined and we just return
+// the ghost's own id, so this is safe everywhere.
+function abilityIdOf(g) { return g ? (g.baseId != null ? g.baseId : g.id) : null; }
+
 let B = null; // battle state
 let prevResources = { red: {}, blue: {} }; // for resource-gained flash
 
@@ -1195,7 +1202,7 @@ function triggerEntry(team, skipEntryEffects) {
   // Zain (206) — Ice Blade: opt-in pre-roll forge button (see useZainForge), no entry effect
 
   // Nerina (306) — Leviathan: deal 3 damage to enemy active
-  if (f.id === 306) {
+  if (abilityIdOf(f) === 306) {
     const ef = active(enemy);
     if (!ef.ko) {
       ef.hp = Math.max(0, ef.hp - 3);
@@ -1469,7 +1476,7 @@ function deathHowlBlocksHealing(teamName) {
   if (!B) return false;
   const oppTeamName = teamName === 'red' ? 'blue' : 'red';
   const oppActive = active(B[oppTeamName]);
-  return oppActive && oppActive.id === 202 && !oppActive.ko;
+  return oppActive && abilityIdOf(oppActive) === 202 && !oppActive.ko;
 }
 // Masked Hero (55) — Underdog: immune to before-roll damage
 function maskedHeroImmune(ghost) {
@@ -5012,7 +5019,7 @@ function rollReady(team) {
     // by setting romyPrediction to -1 (sentinel; no die value equals -1 → +3 bonus never fires).
     {
       const romyCheckG = active(B[team]);
-      if (romyCheckG && romyCheckG.id === 114 && !romyCheckG.ko &&
+      if (romyCheckG && abilityIdOf(romyCheckG) === 114 && !romyCheckG.ko &&
           B.romyPrediction && B.romyPrediction[team] == null) {
         const piperOppName = team === 'red' ? 'blue' : 'red';
         const piperG = active(B[piperOppName]);
@@ -5027,7 +5034,7 @@ function rollReady(team) {
     // Romy (114) — Valley Guardian: show prediction modal before rolling
     // Only intercepts when Romy's OWN team clicks their roll button.
     const romyActive = active(B[team]);
-    if (romyActive && romyActive.id === 114 && !romyActive.ko &&
+    if (romyActive && abilityIdOf(romyActive) === 114 && !romyActive.ko &&
         B.romyPrediction && B.romyPrediction[team] == null) {
       // Lock only Romy's button — opponent can still roll independently
       btn.classList.add('locked');
@@ -5386,7 +5393,7 @@ function hasAnyDecision(team) {
 
   // — Modal primers —
   // Romy (114) — Valley Guardian
-  if (f.id === 114 && B.romyPrediction && B.romyPrediction[team] == null) return true;
+  if (abilityIdOf(f) === 114 && B.romyPrediction && B.romyPrediction[team] == null) return true;
   // Toby (97) — Pure Heart
   if (f.id === 97 && B.pureHeartDeclared && B.pureHeartDeclared[team] === null &&
       !(B.pureHeartScheduledKO && B.pureHeartScheduledKO[team])) return true;
@@ -5484,7 +5491,7 @@ function openDuelPhasePrimers(team) {
   const disableDone = () => { if (doneBtn) { doneBtn.disabled = true; doneBtn.classList.add('locked'); } };
 
   // — ROMY (114) — Valley Guardian: predict a die value before rolling
-  if (f.id === 114 && B.romyPrediction && B.romyPrediction[team] == null) {
+  if (abilityIdOf(f) === 114 && B.romyPrediction && B.romyPrediction[team] == null) {
     // Check Piper (107) — Slick Coat suppresses the prediction
     const piperOppG = active(B[oppTeamName]);
     if (piperOppG && piperOppG.id === 107 && !piperOppG.ko) {
@@ -6247,7 +6254,7 @@ function doPreRollSetup() {
     const f = active(team);
     const enemy = opp(team);
     const tNameHaunt = team === B.red ? 'red' : 'blue';
-    if (f.id === 111 && !f.ko && f._rolledOnce && !dylanNegates(enemy)) {
+    if (abilityIdOf(f) === 111 && !f.ko && f._rolledOnce && !dylanNegates(enemy)) {
       const ef = active(enemy);
       if (!ef.ko) {
         // Piper (107) — Slick Coat: negates Haunt
@@ -6308,7 +6315,7 @@ function doPreRollSetup() {
           }
         }
       }
-    } else if (f.id === 111 && !f.ko && dylanNegates(enemy)) {
+    } else if (abilityIdOf(f) === 111 && !f.ko && dylanNegates(enemy)) {
       log(`<span class="log-ability">Shade</span> — Haunt blocked by <span class="log-ability">Dylan's Scarecrow</span>!`);
       B.piperBlockedThisRound[tNameHaunt] = true; // v640: Slick Coat gate
     }
@@ -6705,7 +6712,7 @@ function doPreRollSetup() {
   B.timberDieReduction = { red: false, blue: false };
   [B.red, B.blue].forEach(team => {
     const f = active(team);
-    if (f.id === 210 && !f.ko) {
+    if (abilityIdOf(f) === 210 && !f.ko) {
       const oppTeamName = team === B.red ? 'blue' : 'red';
       const oppTeam = team === B.red ? B.blue : B.red;
       // Dylan (301) Scarecrow / Piper (107) Slick Coat: negate all enemy before-rolling effects
@@ -8394,7 +8401,7 @@ function pickMsValue(val) {
 
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used,
   // Bigsby MUST be sacrificed and replaced with Doom (id 112). Mandatory transformation.
-  if (f.id === 424 && !f.ko) {
+  if (abilityIdOf(f) === 424 && !f.ko) {
     const g = f; // mutate the ghost object in-place
     // Preserve original identity for MVP/results/resurrection/standings
     g.originalId = g.id;
@@ -9012,7 +9019,7 @@ function pickMsValueUnified(val) {
   }
 
   // Bigsby (424) — Omen: if Bigsby is the active ghost when a Moonstone is used
-  if (f.id === 424 && !f.ko) {
+  if (abilityIdOf(f) === 424 && !f.ko) {
     const g = f;
     g.originalId = g.id; g.originalName = g.name; g.originalArt = g.art;
     g.originalMaxHp = g.maxHp; g.originalAbility = g.ability;
@@ -10822,7 +10829,7 @@ function _resolveRoundImpl() {
       const f = active(team);
       const tNamePip = team === B.red ? 'red' : 'blue';
       const pipRoll = team === B.red ? rR : bR;
-      if (f.id === 418 && !f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[tNamePip]) {
+      if (abilityIdOf(f) === 418 && !f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[tNamePip]) {
         B.pipToastedUsed[tNamePip] = true;
         const oppName = tNamePip === 'red' ? 'blue' : 'red';
         B.pipDieRemoval[oppName] = (B.pipDieRemoval[oppName] || 0) + 1;
@@ -11125,7 +11132,7 @@ function _resolveRoundImpl() {
     // Lucy's Shadow (439) — Mentor: doubles Sacred Fire damage when Lucy (108) is active winner
     // Cornelius (45) Antidote blocks Lucy's Shadow sideline effect
     const corneliusBlocksLucyShadowDmg = hasSideline(loseTeam, 45);
-    const lucyShadowBoost = (wF.id === 108 && hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowDmg) ? 2 : 1;
+    const lucyShadowBoost = (abilityIdOf(wF) === 108 && hasSideline(winTeam, 439) && !corneliusBlocksLucyShadowDmg) ? 2 : 1;
     const fireDmg = B.committed[winTeamName].fire * perFire * lucyShadowBoost;
     dmg += fireDmg;
     if (tylerWins) {
@@ -11184,7 +11191,7 @@ function _resolveRoundImpl() {
   }
 
   // Bigsby (424) — Omen: Win: +1 damage
-  if (wF.id === 424 && !wF.ko) {
+  if (abilityIdOf(wF) === 424 && !wF.ko) {
     dmg += 1;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Omen! <span class="log-dmg">+1 damage!</span>`);
@@ -11210,7 +11217,7 @@ function _resolveRoundImpl() {
   // The Mountain King (110) — Beast Mode: doubles deal 2X damage
   let mountainKingTriggered = false;
   let mountainKingBaseDmg = 0;
-  if (wF.id === 110 && !wF.ko && wR.type === 'doubles') {
+  if (abilityIdOf(wF) === 110 && !wF.ko && wR.type === 'doubles') {
     mountainKingBaseDmg = dmg;
     dmg *= 2;
     mountainKingTriggered = true;
@@ -11288,7 +11295,7 @@ function _resolveRoundImpl() {
   // Lucy (108) — Blue Fire: Win → gain 1 Sacred Fire (REWORKED 2026-04-12, swapped with Humar)
   let lucyTriggered = false;
   let lucyShadowExtraFire = false;
-  if (wF.id === 108 && !wF.ko) {
+  if (abilityIdOf(wF) === 108 && !wF.ko) {
     lucyTriggered = true;
     collectKC(winTeamName, wF.name);
     log(`<span class="log-ability">${wF.name}</span> — Blue Fire! Gain <span class="log-ms">1 Sacred Fire</span>!`);
@@ -11314,7 +11321,7 @@ function _resolveRoundImpl() {
 
   // Humar (336) — Meteor: Win → opponent takes 2 damage before next roll + gain 1 Burn (was Lucy's old ability, buffed 1→2 dmg)
   let humarTriggered = false;
-  if (wF.id === 336 && !wF.ko) {
+  if (abilityIdOf(wF) === 336 && !wF.ko) {
     B.pendingLucyDmg[loseTeamName] = 2; // reuse pendingLucyDmg but with 2 damage
     if (!winTeam.resources.burn) winTeam.resources.burn = 0;
     winTeam.resources.burn += 1;
@@ -11506,7 +11513,7 @@ function _resolveRoundImpl() {
   if (B.romyPrediction) { B.romyPrediction.red = null; B.romyPrediction.blue = null; }
   const romyWinPred = winTeamName === 'red' ? romyPredRed : romyPredBlue;
   let romyTriggered = false;
-  if (wF.id === 114 && !wF.ko && romyWinPred != null && winDice && winDice.includes(romyWinPred)) {
+  if (abilityIdOf(wF) === 114 && !wF.ko && romyWinPred != null && winDice && winDice.includes(romyWinPred)) {
     dmg += 3;
     romyTriggered = true;
     collectKC(winTeamName, wF.name);
@@ -11889,7 +11896,7 @@ function _resolveRoundImpl() {
   // Dark Fang (202) — Pressure: Win: +1 damage per KO'd ghost this game (both teams)
   let deathHowlTriggered = false;
   let deathHowlKOs = 0;
-  if (wF.id === 202 && !wF.ko && dmg > 0) {
+  if (abilityIdOf(wF) === 202 && !wF.ko && dmg > 0) {
     deathHowlKOs = [...B.red.ghosts, ...B.blue.ghosts].filter(g => g.ko && !g.isPadded).length;
     if (deathHowlKOs > 0) {
       const dhBaseDmg = dmg;
@@ -12083,7 +12090,7 @@ function _resolveRoundImpl() {
   let kingJayReflected = false;
   let kingJayReflectDmg = 0;
   let kingJayHpAfter = 0;
-  if (lF.id === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7 && !cameronUnnegatable) {
+  if (abilityIdOf(lF) === 106 && !lF.ko && dmg > 0 && loseDice && loseDice.reduce((a, b) => a + b, 0) === 7 && !cameronUnnegatable) {
     kingJayReflectDmg = dmg;
     dmg = 0; // loser takes nothing — all damage goes back
     kingJayReflected = true;
@@ -12291,7 +12298,7 @@ function _resolveRoundImpl() {
   // see the correct alive/dead state immediately.
   let jasperTriggered = false;
   let jasperBonusDie = 0;
-  if (wF.id === 428 && !wF.ko) {
+  if (abilityIdOf(wF) === 428 && !wF.ko) {
     jasperBonusDie = Math.floor(Math.random() * 6) + 1;
     jasperTriggered = true;
     collectKC(winTeamName, wF.name);
@@ -12589,7 +12596,7 @@ function _resolveRoundImpl() {
   if (wF.id === 209 && !wF.ko) { collectKC(winTeamName, wF.name); }
   if (wF.id === 307 && !wF.ko) { collectKC(winTeamName, wF.name); }
   if (wF.id === 342 && !wF.ko) { collectKC(winTeamName, wF.name); }
-  if (wF.id === 336 && !wF.ko) { collectKC(winTeamName, wF.name); }
+  if (abilityIdOf(wF) === 336 && !wF.ko) { collectKC(winTeamName, wF.name); }
   if (wF.id === 309 && !wF.ko) { collectKC(winTeamName, wF.name); }
   if (wF.id === 81 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Spockles Valley Magic
   if (wF.id === 58 && !wF.ko) { collectKC(winTeamName, wF.name); }   // Ashley Burning Soul
@@ -13525,7 +13532,7 @@ function _resolveRoundImpl() {
   }
 
   // Valkin the Grand (432) — Grand Spoils: active Valkin KO → full resource suite (includes Frostbite)
-  if (wF.id === 432 && !wF.ko && lF.ko) {
+  if (abilityIdOf(wF) === 432 && !wF.ko && lF.ko) {
     queueAbility('GRAND SPOILS!', 'var(--legendary)', `${wF.name} — KO! Grand Spoils: +1 Fire, +2 Ice, +1 Frostbite, +1 Moon, +2 Seed!`, () => {
       winTeam.resources.fire += 1;
       winTeam.resources.ice += 2;
@@ -13650,7 +13657,7 @@ function _resolveRoundImpl() {
     const f = active(team);
     const tNamePip = team === B.red ? 'red' : 'blue';
     const pipRoll = team === B.red ? rR : bR;
-    if (f.id === 418 && !f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[tNamePip]) {
+    if (abilityIdOf(f) === 418 && !f.ko && isTripleOrBetter(pipRoll.type) && B.pipToastedUsed && !B.pipToastedUsed[tNamePip]) {
       B.pipToastedUsed[tNamePip] = true;
       const oppName = tNamePip === 'red' ? 'blue' : 'red';
       B.pipDieRemoval[oppName] = (B.pipDieRemoval[oppName] || 0) + 1;
@@ -14898,7 +14905,7 @@ function renderCardSlot(ghost, isFighter) {
       const thisTeamName = thisTeam === B.red ? 'red' : 'blue';
       const oppTeam = thisTeam === B.red ? B.blue : B.red;
       const oppActive = active(oppTeam);
-      if (oppActive && oppActive.id === 210 && !oppActive.ko) {
+      if (oppActive && abilityIdOf(oppActive) === 210 && !oppActive.ko) {
         statusHtml += `<span class="status-tag pressure" style="background:var(--surface3);">⚠️ Timber · Choose Each Roll</span>`;
       }
       // Retribution indicator — Knight Light (402) has pending bonus dice stored up
@@ -15171,7 +15178,7 @@ function renderBattle() {
     let html = '';
     if (isPreRollActive(team)) {
       // Dark Fang (202) — Pressure button (once per round)
-      if (f.id === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
+      if (abilityIdOf(f) === 202 && !f.ko && !dylanNegates(enemy) && !(B.pressureUsed && B.pressureUsed[team])) {
         const enemySideline = enemy.ghosts.filter((g,i) => i !== enemy.activeIdx && !g.ko);
         if (enemySideline.length > 0) {
           html += `<button class="ability-btn pressure" onclick="usePressure('${team}')">🔥 Pressure</button>`;
