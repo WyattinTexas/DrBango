@@ -7420,6 +7420,20 @@ function doPreRollSetup() {
     }
   });
 
+  // Golden Dice (raid item) — +1 die on the first roll of every fight.
+  // B.goldenDice[team] is set by applyRaidLoot at fight start; we consume the
+  // single-use bonus via B.goldenDiceUsed[team] so it only fires round 1.
+  ['red', 'blue'].forEach(tName => {
+    if (B.goldenDice && B.goldenDice[tName] && B.goldenDiceUsed && !B.goldenDiceUsed[tName]) {
+      if (tName === 'red') redCount += 1;
+      else blueCount += 1;
+      B.goldenDiceUsed[tName] = true;
+      const f = active(B[tName]);
+      preRollCallouts.push(['GOLDEN DICE!', 'var(--legendary)', `🎲 Golden Dice — ${f.name} rolls +1 die on the first roll!`, tName]);
+      log(`<span class="log-ability">Golden Dice</span> — 🎲 ${f.name} gets +1 die on the first roll!`);
+    }
+  });
+
   // Fredrick (27) — Careful: when Fredrick is active, opponent may only roll up to 3 dice (applied last so it overrides all bonuses)
   [B.red, B.blue].forEach(team => {
     const fredF = active(team);
@@ -11527,6 +11541,14 @@ function _resolveRoundImpl() {
     dmg += 1;
     maskOfNightDmgTriggered = true;
     log(`<span class="log-ability">Mask of Night</span> — 🌙 +1 damage!`);
+  }
+
+  // Valkin's Crystal (raid item) — doubles deal +1 bonus damage
+  let valkinShardTriggered = false;
+  if (B.valkinShard && B.valkinShard[winTeamName] && wR.type === 'doubles' && dmg > 0) {
+    dmg += 1;
+    valkinShardTriggered = true;
+    log(`<span class="log-ability">Valkin's Crystal</span> — 💀 Doubles → +1 damage!`);
   }
 
   // Flame Blade: +3 Burn on win when swinging

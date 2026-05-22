@@ -194,20 +194,26 @@ function applyRaidLoot(battleState, team, lootInventory) {
         if (battleState.flameBlade) battleState.flameBlade[team] = true;
         break;
 
-      // Masks — set flags
+      // Masks — reuse Sophia's mask system (already wired for post-roll Burn
+      // and dice-mirroring/+1-damage logic in battle-engine.js)
       case 'mask_of_day':
-        battleState.maskOfDay = battleState.maskOfDay || {};
-        battleState.maskOfDay[team] = true;
+        if (!battleState.sophiaMask) battleState.sophiaMask = { red: null, blue: null };
+        if (!battleState.sophiaMaskActive) battleState.sophiaMaskActive = { red: false, blue: false };
+        battleState.sophiaMask[team] = 'day';
+        battleState.sophiaMaskActive[team] = true;
         break;
       case 'mask_of_night':
-        battleState.maskOfNight = battleState.maskOfNight || {};
-        battleState.maskOfNight[team] = true;
+        if (!battleState.sophiaMask) battleState.sophiaMask = { red: null, blue: null };
+        if (!battleState.sophiaMaskActive) battleState.sophiaMaskActive = { red: false, blue: false };
+        battleState.sophiaMask[team] = 'night';
+        battleState.sophiaMaskActive[team] = true;
         break;
 
       // Legendary
       case 'golden_dice':
-        battleState.goldenDice = battleState.goldenDice || {};
-        battleState.goldenDice[team] = true; // +1 die on first roll
+        if (!battleState.goldenDice) battleState.goldenDice = { red: false, blue: false };
+        if (!battleState.goldenDiceUsed) battleState.goldenDiceUsed = { red: false, blue: false };
+        battleState.goldenDice[team] = true; // +1 die on first roll of the fight
         break;
       case 'shades_cape':
         // +1 max HP to active ghost
@@ -215,7 +221,7 @@ function applyRaidLoot(battleState, team, lootInventory) {
         if (t.ghosts && t.ghosts[0]) t.ghosts[0].hp = (t.ghosts[0].hp || 0) + 1;
         break;
       case 'valkins_crystal':
-        battleState.valkinShard = battleState.valkinShard || {};
+        if (!battleState.valkinShard) battleState.valkinShard = { red: false, blue: false };
         battleState.valkinShard[team] = true; // +1 damage on doubles
         break;
     }
