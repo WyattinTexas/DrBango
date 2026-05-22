@@ -66,7 +66,7 @@ const RAID_ITEMS = {
   golden_dice:    { name: 'Golden Dice',    icon: '🎲', type: 'legendary', tier: 'legendary', slot: 'weapon',
                     desc: '+1 die on every roll for the whole fight.' },
   shades_cape:   { name: 'Shade\'s Cape',   icon: '👑', type: 'legendary', tier: 'legendary', slot: 'head',
-                    desc: 'Your active ghost gains +1 max HP for this raid.' },
+                    desc: 'All your Spiritkin gain +1 max HP for this raid.' },
   valkins_crystal:   { name: "Valkin's Crystal",  icon: '💀', type: 'legendary', tier: 'legendary', slot: 'accessory',
                     desc: 'Doubles deal +1 bonus damage.' },
 };
@@ -229,9 +229,15 @@ function applyRaidLoot(battleState, team, lootInventory, isFirstTurn) {
         battleState.goldenDice[team] = true; // +1 die on every roll of the fight
         break;
       case 'shades_cape':
-        // +1 max HP to active ghost
-        if (t.ghosts && t.ghosts[0]) t.ghosts[0].maxHp = (t.ghosts[0].maxHp || 0) + 1;
-        if (t.ghosts && t.ghosts[0]) t.ghosts[0].hp = (t.ghosts[0].hp || 0) + 1;
+        // +1 max HP to ALL ghosts on the team (so sideline ghosts that swap
+        // in still have the bonus). Once-per-raid via the ONE_TIME gate.
+        if (t.ghosts) {
+          t.ghosts.forEach(g => {
+            if (!g) return;
+            g.maxHp = (g.maxHp || 0) + 1;
+            g.hp = (g.hp || 0) + 1;
+          });
+        }
         break;
       case 'valkins_crystal':
         if (!battleState.valkinShard) battleState.valkinShard = { red: false, blue: false };
