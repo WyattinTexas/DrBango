@@ -350,6 +350,16 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       if (savedState.resources) {
         B.red.resources = { ...B.red.resources, ...savedState.resources };
       }
+      // Restore Moonstone Sickness so it persists across turn handoffs
+      if (typeof savedState.moonstoneSickness === 'number') {
+        B.red.moonstoneSickness = savedState.moonstoneSickness;
+      }
+      if (typeof savedState.moonstoneSicknessCount === 'number') {
+        B.red.moonstoneSicknessCount = savedState.moonstoneSicknessCount;
+      }
+      if (typeof savedState.moonstoneSicknessPending === 'number') {
+        B.red.moonstoneSicknessPending = savedState.moonstoneSicknessPending;
+      }
     }
 
     // ── 7c. Restore boss persistent state (Humar pendingLucyDmg, burn) ──
@@ -700,6 +710,10 @@ function injectRaidReturnButton() {
           const cleanRes = {};
           for (const k of Object.keys(rawRes)) { if (rawRes[k] !== undefined) cleanRes[k] = rawRes[k]; }
           savedPlayerState.resources = cleanRes;
+          // Persist Moonstone Sickness so it follows the player across turns
+          savedPlayerState.moonstoneSickness = B.red.moonstoneSickness || 0;
+          savedPlayerState.moonstoneSicknessCount = B.red.moonstoneSicknessCount || 0;
+          savedPlayerState.moonstoneSicknessPending = B.red.moonstoneSicknessPending || 0;
           B.red.ghosts.forEach(g => {
             const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
                          id: g.id || 0, name: g.name || '???', art: g.art || '',
@@ -929,6 +943,13 @@ function injectRaidReturnButton() {
       const cleanRes = {};
       for (const k of Object.keys(rawRes)) { if (rawRes[k] !== undefined) cleanRes[k] = rawRes[k]; }
       savedPlayerState.resources = cleanRes;
+      // Persist Moonstone Sickness team-level state. Without this the sickness
+      // counters reset to 0 every turn handoff (B is reinitialized), so a
+      // player who used a Moonstone last turn would come back without the
+      // pre-roll damage debuff that's supposed to follow them.
+      savedPlayerState.moonstoneSickness = B.red.moonstoneSickness || 0;
+      savedPlayerState.moonstoneSicknessCount = B.red.moonstoneSicknessCount || 0;
+      savedPlayerState.moonstoneSicknessPending = B.red.moonstoneSicknessPending || 0;
       B.red.ghosts.forEach(g => {
         const gs = { hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko,
                      id: g.id || 0, name: g.name || '???', art: g.art || '',
