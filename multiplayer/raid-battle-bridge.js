@@ -402,18 +402,15 @@ function initRaidBattleInPage(raidData, enemyGhosts, playerTeam, isWave) {
       }
     }
 
-    // ── 7e. Capture turn-start boss damage as baseline for per-turn damage ──
-    // Each player's damageDealt should be ONLY what they did this turn, not
-    // the cumulative pool damage. End-of-turn handoff subtracts this baseline
-    // from end-of-turn damage to get this player's contribution.
+    // ── 7e. Capture turn-start POOL HP as baseline for per-turn damage ──
+    // Damage attribution must be in POOL units, not ghost units. The pool
+    // (e.g. 27 HP for 2-player Timber) is what players see drop; the boss
+    // ghost (e.g. 18 HP) is a scaled view of the pool. Earlier versions
+    // tracked ghost-unit damage, which undercounted by the pool/ghost ratio
+    // (1.5x for 2 players) — players saw a Total Damage that didn't match
+    // the pool drop.
     if (isFighter) {
-      let turnStart = 0;
-      if (B && B.blue) {
-        B.blue.ghosts.forEach(g => {
-          if (g) turnStart += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
-        });
-      }
-      window._raidTurnStartDmg = turnStart;
+      window._raidTurnStartPool = raidData.bossCurrentHp || 0;
     }
 
     // ── 7c. Clear dice from previous player's turn ──────────────
@@ -695,16 +692,10 @@ function injectRaidReturnButton() {
         // Did this player wipe? (all ghosts KO'd). If so, mark them done;
         // surviving players keep raiding instead of failing the whole raid.
         const playerWiped = B && B.red && B.red.ghosts.every(g => g.ko);
-        // End-of-turn cumulative boss damage. Subtract the turn-start baseline
-        // to get THIS player's contribution; without the subtraction every
-        // player gets credited for damage carried over from prior turns.
-        let endOfTurnBossDmg = 0;
-        if (B && B.blue) {
-          B.blue.ghosts.forEach(g => {
-            if (g) endOfTurnBossDmg += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
-          });
-        }
-        const turnDamage = Math.max(0, endOfTurnBossDmg - (window._raidTurnStartDmg || 0));
+        // This player's damage = pool drop during their turn (in pool units).
+        // baseline was captured in initRaidBattleInPage as the bossCurrentHp
+        // the player started with; poolNow was computed above.
+        const turnDamage = Math.max(0, (window._raidTurnStartPool || 0) - poolNow);
 
         // Save player ghost state (with identity for transforms)
         // IMPORTANT: Firebase rejects undefined — coerce every field
@@ -989,21 +980,15 @@ function injectRaidReturnButton() {
     // "forgets" effects applied by the previous player's ghosts.
     const bossPersist = _snapshotBossPersistentState();
 
-    // Compute THIS PLAYER'S damage contribution this turn: end-of-turn boss
-    // damage minus the baseline captured at turn start. Without subtracting
-    // the baseline, every player would get credit for the cumulative pool
-    // damage from previous turns too.
-    let endOfTurnBossDmg = 0;
+    // This player's damage = pool drop during their turn (in pool units).
+    // baseline was captured in initRaidBattleInPage as the bossCurrentHp
+    // the player started with.
     let ghostsLostThisRun = 0;
-    if (B && B.blue) {
-      B.blue.ghosts.forEach(g => {
-        if (g) endOfTurnBossDmg += Math.max(0, (g.maxHp || 0) - (g.ko ? 0 : (g.hp || 0)));
-      });
-    }
     if (B && B.red) {
       ghostsLostThisRun = B.red.ghosts.filter(g => g.ko).length;
     }
-    const turnDamage = Math.max(0, endOfTurnBossDmg - (window._raidTurnStartDmg || 0));
+    // poolNow is computed inside the setTimeout below; turnDamage is computed
+    // there too so we have the up-to-date pool value.
 
     // Advance currentFighterIdx in Firebase after a brief delay
     setTimeout(() => {
@@ -1015,6 +1000,8 @@ function injectRaidReturnButton() {
       // Calculate new boss pool HP from the boss ghost's current HP
       const poolMax = currentRaid.bossMaxHp || 15;
       const poolNow = Math.max(0, Math.round(poolMax * (bossHpNow / bossMaxGhostHpForTurn)));
+      // Per-turn damage in POOL units (matches what the player sees drop).
+      const turnDamage = Math.max(0, (window._raidTurnStartPool || 0) - poolNow);
 
       // ATOMIC write: player ghost state + fighter advance in ONE update
       // Prevents race where listener fires on index change before ghost state is saved
