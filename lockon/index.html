@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LOCKON Pickleball Simulator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+canvas { display: block; }
+
+#hud {
+  position: fixed; top: 20px; left: 20px; z-index: 10;
+  color: #fff; font-size: 14px;
+  background: rgba(0,0,0,0.5); padding: 12px 16px; border-radius: 8px;
+  pointer-events: none;
+}
+#hud .label { color: #0ff; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+#hud .value { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+
+#controls {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
+  display: flex; gap: 12px; align-items: center;
+}
+#controls button {
+  background: rgba(0,255,255,0.15); border: 1px solid #0ff; color: #0ff;
+  padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  transition: all 0.2s;
+}
+#controls button:hover { background: rgba(0,255,255,0.3); }
+#controls button.active { background: rgba(0,255,255,0.4); border-color: #fff; }
+
+#angle-display {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 10;
+  color: #0ff; font-size: 16px; text-align: center;
+  background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 6px;
+}
+
+#lock-prompt {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  color: #fff; font-size: 20px; text-align: center; z-index: 20;
+  background: rgba(0,0,0,0.7); padding: 20px 30px; border-radius: 10px;
+  pointer-events: none;
+}
+#lock-prompt.hidden { display: none; }
+
+#speed-label {
+  position: fixed; top: 20px; right: 20px; z-index: 10;
+  color: #fff; font-size: 13px;
+  background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 8px;
+}
+#speed-label input { width: 120px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="label">Rally Count</div>
+  <div class="value" id="rally-count">0</div>
+  <div class="label">Ball Speed</div>
+  <div class="value" id="ball-speed">0 mph</div>
+  <div class="label">Shot</div>
+  <div class="value" id="shot-type">--</div>
+</div>
+
+<div id="lock-prompt">Click to look around freely<br><small>ESC to release | R to reset rally</small></div>
+
+<div id="speed-label">
+  Rally Speed<br>
+  <input type="range" id="speed-slider" min="0.3" max="3" step="0.1" value="1">
+  <span id="speed-val">1.0x</span>
+</div>
+
+<div id="controls">
+  <button id="btn-pov" onclick="cyclePOV()">POV: Near Side</button>
+  <button id="btn-lockon" onclick="toggleLOCKON()">LOCKON: ON</button>
+</div>
+
+<canvas id="reticleCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:5;pointer-events:none;"></canvas>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// === CONSTANTS (real pickleball court in feet, 1 unit = 1 foot) ===
+const COURT_LENGTH = 44;      // 44 ft total
+const COURT_WIDTH = 20;       // 20 ft
+const KITCHEN_DEPTH = 7;      // 7 ft non-volley zone each side
+const SERVICE_DEPTH = 15;     // 15 ft service area
+const NET_HEIGHT_CENTER = 34 / 12;  // 34 inches → feet
+const NET_HEIGHT_SIDES = 36 / 12;   // 36 inches → feet
+const BALL_RADIUS = 0.122;    // ~1.46 inches diameter
+const PLAYER_HEIGHT = 5.5;    // eye height ~5'6"
+
+// === USAPA OFFICIAL DIMENSIONS ===
+// Court: 20ft x 44ft
+// Minimum playing surface: 30ft x 60ft (5ft side overrun, 8ft end overrun minimum)
+// Recommended playing surface: 34ft x 64ft (7ft side, 10ft end)
+// Fence setback: typically 4-6ft beyond playing surface
+const OVERRUN_SIDE = 7;      // 7ft each side (recommended)
+const OVERRUN_END = 10;      // 10ft each end (recommended)
+const TOTAL_WIDTH = COURT_WIDTH + OVERRUN_SIDE * 2;   // 34ft
+const TOTAL_LENGTH = COURT_LENGTH + OVERRUN_END * 2;  // 64ft
+const FENCE_SETBACK = 4;     // 4ft beyond playing surface to fence
+const FENCE_HEIGHT = 10;     // 10ft chain-link (standard)
+const NET_WIDTH = 22;        // 22ft wide (extends 1ft past each sideline)
+
+// === SETUP ===
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x78b8e0);
+scene.fog = new THREE.FogExp2(0x78b8e0, 0.004);
+
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 800);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
+
+// === LIGHTING (outdoor afternoon sun) ===
+const ambient = new THREE.AmbientLight(0xc4dff6, 0.5);
+scene.add(ambient);
+
+const hemi = new THREE.HemisphereLight(0x87ceeb, 0x3a7d44, 0.4);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff5e0, 1.2);
+sun.position.set(40, 60, -25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.camera.left = -50;
+sun.shadow.camera.right = 50;
+sun.shadow.camera.top = 50;
+sun.shadow.camera.bottom = -50;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 150;
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+// Fill light (subtle bounce from court)
+const fill = new THREE.DirectionalLight(0x8eb8ff, 0.2);
+fill.position.set(-20, 10, 15);
+scene.add(fill);
+
+// === GROUND — grass field ===
+const groundGeo = new THREE.PlaneGeometry(500, 500, 30, 30);
+// Add slight terrain undulation
+const gVerts = groundGeo.attributes.position;
+for (let i = 0; i < gVerts.count; i++) {
+  const x = gVerts.getX(i), y = gVerts.getY(i);
+  const dist = Math.sqrt(x*x + y*y);
+  if (dist > 60) gVerts.setZ(i, (Math.sin(x*0.05)*Math.cos(y*0.07)*0.5) * Math.min(1, (dist-60)/40));
+}
+groundGeo.computeVertexNormals();
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a8f3f, roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// === FULL PLAYING SURFACE (concrete/asphalt surround) ===
+const surfGeo = new THREE.PlaneGeometry(TOTAL_WIDTH + FENCE_SETBACK*2, TOTAL_LENGTH + FENCE_SETBACK*2);
+const surfMat = new THREE.MeshStandardMaterial({ color: 0x7a8a7a, roughness: 0.85 });
+const surface = new THREE.Mesh(surfGeo, surfMat);
+surface.rotation.x = -Math.PI / 2;
+surface.position.y = -0.02;
+surface.receiveShadow = true;
+scene.add(surface);
+
+// Overrun area (lighter green than court)
+const overrunGeo = new THREE.PlaneGeometry(TOTAL_WIDTH, TOTAL_LENGTH);
+const overrunMat = new THREE.MeshStandardMaterial({ color: 0x2d8f4e, roughness: 0.7 });
+const overrun = new THREE.Mesh(overrunGeo, overrunMat);
+overrun.rotation.x = -Math.PI / 2;
+overrun.position.y = -0.01;
+overrun.receiveShadow = true;
+scene.add(overrun);
+
+// === COURT SURFACE (blue with texture) ===
+const courtGeo = new THREE.PlaneGeometry(COURT_WIDTH, COURT_LENGTH);
+const courtMat = new THREE.MeshStandardMaterial({ color: 0x1e5cb3, roughness: 0.6 });
+const court = new THREE.Mesh(courtGeo, courtMat);
+court.rotation.x = -Math.PI / 2;
+court.position.set(0, 0.005, 0);
+court.receiveShadow = true;
+scene.add(court);
+
+// Kitchen zones (darker blue)
+const kitchenGeo = new THREE.PlaneGeometry(COURT_WIDTH, KITCHEN_DEPTH);
+const kitchenMat = new THREE.MeshStandardMaterial({ color: 0x163f7a, roughness: 0.6 });
+
+const kitchenNear = new THREE.Mesh(kitchenGeo, kitchenMat);
+kitchenNear.rotation.x = -Math.PI / 2;
+kitchenNear.position.set(0, 0.01, COURT_LENGTH / 2 - KITCHEN_DEPTH / 2);
+kitchenNear.receiveShadow = true;
+scene.add(kitchenNear);
+
+const kitchenFar = new THREE.Mesh(kitchenGeo, kitchenMat);
+kitchenFar.rotation.x = -Math.PI / 2;
+kitchenFar.position.set(0, 0.01, -(COURT_LENGTH / 2 - KITCHEN_DEPTH / 2));
+kitchenFar.receiveShadow = true;
+scene.add(kitchenFar);
+
+// === COURT LINES (2" wide per USAPA) ===
+const LINE_W = 2/12; // 2 inches in feet
+function makeCourtLine(x1, z1, x2, z2) {
+  const dx = x2-x1, dz = z2-z1;
+  const len = Math.sqrt(dx*dx + dz*dz);
+  const isHoriz = Math.abs(dx) > Math.abs(dz);
+  const w = isHoriz ? len : LINE_W;
+  const h = isHoriz ? LINE_W : len;
+  const geo = new THREE.PlaneGeometry(w, h);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set((x1+x2)/2, 0.015, (z1+z2)/2);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+// Baselines
+scene.add(makeCourtLine(-COURT_WIDTH/2, COURT_LENGTH/2, COURT_WIDTH/2, COURT_LENGTH/2));
+scene.add(makeCourtLine(-COURT_WIDTH/2, -COURT_LENGTH/2, COURT_WIDTH/2, -COURT_LENGTH/2));
+// Sidelines
+scene.add(makeCourtLine(-COURT_WIDTH/2, -COURT_LENGTH/2, -COURT_WIDTH/2, COURT_LENGTH/2));
+scene.add(makeCourtLine(COURT_WIDTH/2, -COURT_LENGTH/2, COURT_WIDTH/2, COURT_LENGTH/2));
+// Kitchen lines (NVZ)
+scene.add(makeCourtLine(-COURT_WIDTH/2, KITCHEN_DEPTH, COURT_WIDTH/2, KITCHEN_DEPTH));
+scene.add(makeCourtLine(-COURT_WIDTH/2, -KITCHEN_DEPTH, COURT_WIDTH/2, -KITCHEN_DEPTH));
+// Center service lines
+scene.add(makeCourtLine(0, KITCHEN_DEPTH, 0, COURT_LENGTH/2));
+scene.add(makeCourtLine(0, -KITCHEN_DEPTH, 0, -COURT_LENGTH/2));
+
+// === NET (22ft wide, 34" center, 36" posts) ===
+const netGroup = new THREE.Group();
+
+// Net mesh — slight droop in center
+const netShape = new THREE.PlaneGeometry(NET_WIDTH, NET_HEIGHT_SIDES, 20, 4);
+const nVerts = netShape.attributes.position;
+for (let i = 0; i < nVerts.count; i++) {
+  const x = nVerts.getX(i);
+  const normX = x / (NET_WIDTH/2); // -1 to 1
+  const droop = (1 - normX*normX) * (NET_HEIGHT_SIDES - NET_HEIGHT_CENTER);
+  const y = nVerts.getY(i);
+  if (y > 0) nVerts.setY(i, y - droop * (y / (NET_HEIGHT_SIDES/2)));
+}
+netShape.computeVertexNormals();
+const netMat = new THREE.MeshStandardMaterial({
+  color: 0x111111, transparent: true, opacity: 0.4, side: THREE.DoubleSide, wireframe: true
+});
+const netMesh = new THREE.Mesh(netShape, netMat);
+netMesh.position.set(0, NET_HEIGHT_SIDES / 2, 0);
+netGroup.add(netMesh);
+
+// Net posts (round steel, 3" diameter)
+const postGeo = new THREE.CylinderGeometry(0.125, 0.125, NET_HEIGHT_SIDES + 0.3, 8);
+const postMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.3 });
+const postL = new THREE.Mesh(postGeo, postMat);
+postL.position.set(-NET_WIDTH/2, (NET_HEIGHT_SIDES + 0.3) / 2, 0);
+postL.castShadow = true;
+netGroup.add(postL);
+const postR = postL.clone();
+postR.position.x = NET_WIDTH/2;
+netGroup.add(postR);
+
+// Net top cable (white)
+const cableGeo = new THREE.CylinderGeometry(0.015, 0.015, NET_WIDTH);
+const cableMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+const cable = new THREE.Mesh(cableGeo, cableMat);
+cable.rotation.z = Math.PI / 2;
+cable.position.set(0, NET_HEIGHT_SIDES, 0);
+netGroup.add(cable);
+
+// Net bottom band (white, 2" visible)
+const bandGeo = new THREE.PlaneGeometry(NET_WIDTH, 2/12);
+const bandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+const band = new THREE.Mesh(bandGeo, bandMat);
+band.position.set(0, 1/12, 0);
+netGroup.add(band);
+
+scene.add(netGroup);
+
+// === CHAIN-LINK FENCE (10ft, surrounds court) ===
+const fenceW = TOTAL_WIDTH + FENCE_SETBACK * 2;
+const fenceL = TOTAL_LENGTH + FENCE_SETBACK * 2;
+const fencePipeMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.5, roughness: 0.4 });
+const fenceMeshMat = new THREE.MeshStandardMaterial({ color: 0x444444, transparent: true, opacity: 0.25, side: THREE.DoubleSide, wireframe: true });
+
+function buildFenceSection(width, height, posX, posZ, rotY) {
+  const grp = new THREE.Group();
+  // Main mesh panel
+  const panelGeo = new THREE.PlaneGeometry(width, height, Math.floor(width/2), Math.floor(height/2));
+  const panel = new THREE.Mesh(panelGeo, fenceMeshMat);
+  panel.position.y = height / 2;
+  grp.add(panel);
+  // Top rail
+  const railGeo = new THREE.CylinderGeometry(0.08, 0.08, width, 6);
+  const rail = new THREE.Mesh(railGeo, fencePipeMat);
+  rail.rotation.z = Math.PI / 2;
+  rail.position.y = height;
+  grp.add(rail);
+  // Posts every 10ft
+  const numPosts = Math.floor(width / 10) + 1;
+  for (let i = 0; i < numPosts; i++) {
+    const pGeo = new THREE.CylinderGeometry(0.1, 0.1, height + 0.5, 6);
+    const post = new THREE.Mesh(pGeo, fencePipeMat);
+    post.position.set(-width/2 + i * (width/(numPosts-1)), (height + 0.5)/2, 0);
+    post.castShadow = true;
+    grp.add(post);
+  }
+  grp.position.set(posX, 0, posZ);
+  grp.rotation.y = rotY;
+  return grp;
+}
+
+// Back fences (behind baselines)
+scene.add(buildFenceSection(fenceW, FENCE_HEIGHT, 0, fenceL/2, 0));
+scene.add(buildFenceSection(fenceW, FENCE_HEIGHT, 0, -fenceL/2, 0));
+// Side fences
+scene.add(buildFenceSection(fenceL, FENCE_HEIGHT, fenceW/2, 0, Math.PI/2));
+scene.add(buildFenceSection(fenceL, FENCE_HEIGHT, -fenceW/2, 0, Math.PI/2));
+
+// === SURROUNDINGS — make it feel like a real park ===
+// Benches (2 along sideline)
+function makeBench(px, pz, ry) {
+  const grp = new THREE.Group();
+  const seatGeo = new THREE.BoxGeometry(5, 0.15, 1.2);
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.8 });
+  const seat = new THREE.Mesh(seatGeo, seatMat);
+  seat.position.y = 1.5; seat.castShadow = true;
+  grp.add(seat);
+  // Back
+  const backGeo = new THREE.BoxGeometry(5, 1.2, 0.12);
+  const back = new THREE.Mesh(backGeo, seatMat);
+  back.position.set(0, 2.1, -0.55); back.castShadow = true;
+  grp.add(back);
+  // Legs
+  const legGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  [-1.8, 1.8].forEach(lx => {
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.set(lx, 0.75, 0); grp.add(leg);
+  });
+  grp.position.set(px, 0, pz);
+  grp.rotation.y = ry;
+  return grp;
+}
+scene.add(makeBench(fenceW/2 + 4, -8, -Math.PI/2));
+scene.add(makeBench(fenceW/2 + 4, 8, -Math.PI/2));
+
+// Trees in background
+function makeTree(px, pz, scale) {
+  const grp = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.3*scale, 0.5*scale, 8*scale, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 4*scale; trunk.castShadow = true;
+  grp.add(trunk);
+  const foliageGeo = new THREE.SphereGeometry(4*scale, 8, 6);
+  const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d6b1e + Math.floor(Math.random()*0x1a1a1a), roughness: 0.8 });
+  const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+  foliage.position.y = 10*scale; foliage.castShadow = true;
+  grp.add(foliage);
+  grp.position.set(px, 0, pz);
+  return grp;
+}
+// Ring of trees around the facility
+for (let a = 0; a < Math.PI * 2; a += 0.4 + Math.random() * 0.3) {
+  const dist = 60 + Math.random() * 30;
+  const s = 0.7 + Math.random() * 0.6;
+  scene.add(makeTree(Math.cos(a)*dist, Math.sin(a)*dist, s));
+}
+
+// Water fountain near gate
+const fountainGeo = new THREE.CylinderGeometry(0.4, 0.5, 3, 8);
+const fountainMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.4 });
+const fountain = new THREE.Mesh(fountainGeo, fountainMat);
+fountain.position.set(-fenceW/2 - 3, 1.5, 0);
+fountain.castShadow = true;
+scene.add(fountain);
+
+// === BALL ===
+const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 16, 16);
+const ballMat = new THREE.MeshStandardMaterial({ color: 0xccff00 }); // neon yellow
+const ball = new THREE.Mesh(ballGeo, ballMat);
+ball.castShadow = true;
+scene.add(ball);
+
+// Ball shadow on ground
+const shadowGeo = new THREE.CircleGeometry(0.3, 16);
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+const ballShadow = new THREE.Mesh(shadowGeo, shadowMat);
+ballShadow.rotation.x = -Math.PI / 2;
+ballShadow.position.y = 0.04;
+scene.add(ballShadow);
+
+// Ball trail
+const trailPositions = [];
+const MAX_TRAIL = 30;
+const trailGeo = new THREE.BufferGeometry();
+const trailMat = new THREE.LineBasicMaterial({ color: 0xccff00, transparent: true, opacity: 0.5 });
+const trail = new THREE.Line(trailGeo, trailMat);
+scene.add(trail);
+
+// === PLAYER FIGURES (simple capsules) ===
+function createPlayer(color) {
+  const group = new THREE.Group();
+  // Body
+  const bodyGeo = new THREE.CapsuleGeometry(0.4, 2.5, 4, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 2.5;
+  body.castShadow = true;
+  group.add(body);
+  // Head
+  const headGeo = new THREE.SphereGeometry(0.35, 8, 8);
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.position.y = 4.2;
+  head.castShadow = true;
+  group.add(head);
+  // Paddle
+  const paddleGeo = new THREE.BoxGeometry(0.6, 0.8, 0.08);
+  const paddleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const paddle = new THREE.Mesh(paddleGeo, paddleMat);
+  paddle.position.set(0.8, 3.0, -0.5);
+  paddle.rotation.z = -0.3;
+  group.add(paddle);
+  group.paddle = paddle;
+  return group;
+}
+
+const playerNear = createPlayer(0xe74c3c);
+playerNear.position.set(0, 0, COURT_LENGTH / 2 - 3);
+scene.add(playerNear);
+
+const playerFar = createPlayer(0x3498db);
+playerFar.position.set(0, 0, -(COURT_LENGTH / 2 - 3));
+playerFar.rotation.y = Math.PI;
+scene.add(playerFar);
+
+// (Surroundings built above with realistic fence, benches, trees)
+
+// === BALL PHYSICS STATE ===
+let ballPos = new THREE.Vector3(0, 4, COURT_LENGTH / 2 - 5);
+let ballVel = new THREE.Vector3(0, 0, 0);
+let rallyCount = 0;
+let totalRallies = 0;
+let povMode = 0;
+const povNames = ['Near Side', 'Far Side', 'Sideline', 'Overhead'];
+let speedMultiplier = 1.0;
+
+let yaw = 0, pitch = 0;
+const MOUSE_SENSITIVITY = 0.002;
+let pointerLocked = false;
+let ballInPlay = false;
+let lastHitter = 'far';
+let shotLabel = '--';
+
+// Rally phase: serve → return → third_shot → transition → kitchen → speedup
+let rallyPhase = 'serve';
+let nearAtKitchen = false;
+let farAtKitchen = false;
+let nearTargetZ = COURT_LENGTH / 2 - 3;  // player position targets
+let farTargetZ = -(COURT_LENGTH / 2 - 3);
+let dinkCount = 0;
+
+const GRAVITY = -32.2;
+const BOUNCE_DAMPING = 0.45;
+const AIR_DRAG = 0.997;
+
+// === SMART BALL TRAJECTORY ===
+// Calculate velocity to send ball from start pos to a target landing spot
+// Uses projectile physics: given start height, target pos, desired apex height
+function launchBallTo(startPos, targetX, targetZ, apexHeight, hitHeight) {
+  const dx = targetX - startPos.x;
+  const dz = targetZ - startPos.z;
+  const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+
+  // Calculate required vertical velocity to reach apex
+  const dy = apexHeight - hitHeight;
+  const vy = Math.sqrt(Math.max(1, 2 * Math.abs(GRAVITY) * dy));
+
+  // Time to apex, then time from apex to ground
+  const tUp = vy / Math.abs(GRAVITY);
+  const tDown = Math.sqrt(2 * apexHeight / Math.abs(GRAVITY));
+  const totalTime = tUp + tDown;
+
+  // Horizontal velocity to cover distance in that time
+  const hSpeed = horizontalDist / Math.max(totalTime, 0.3);
+  const dirX = dx / Math.max(horizontalDist, 0.1);
+  const dirZ = dz / Math.max(horizontalDist, 0.1);
+
+  ballVel.set(dirX * hSpeed, vy, dirZ * hSpeed);
+  ballPos.copy(startPos);
+  ballPos.y = hitHeight;
+  ballInPlay = true;
+}
+
+function hitShot(shotType, hitterSide) {
+  const isNear = hitterSide === 'near';
+  const hitterZ = isNear ? playerNear.position.z : playerFar.position.z;
+  const hitterX = isNear ? playerNear.position.x : playerFar.position.x;
+  const sign = isNear ? -1 : 1; // direction toward opponent
+
+  shotLabel = shotType.charAt(0).toUpperCase() + shotType.slice(1);
+  document.getElementById('shot-type').textContent = shotLabel;
+
+  // Target position with slight randomness (good players aim well)
+  let targetX, targetZ, apex, hitH;
+  const xSpread = (Math.random() - 0.5) * 0.5; // small aim variance
+
+  switch(shotType) {
+    case 'serve':
+      // Deep serve to opponent's service box
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 4);
+      targetZ = sign * (COURT_LENGTH / 2 - 3 - Math.random() * 8);
+      apex = 8 + Math.random() * 3;
+      hitH = 5;
+      break;
+
+    case 'return':
+      // Deep return to keep server back
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 3);
+      targetZ = sign * (COURT_LENGTH / 2 - 2 - Math.random() * 6);
+      apex = 7 + Math.random() * 3;
+      hitH = 3.5;
+      break;
+
+    case 'third_shot_drop':
+      // Soft drop into opponent's kitchen — the signature shot
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 6) + xSpread * 2;
+      targetZ = sign * (KITCHEN_DEPTH - 2 - Math.random() * 3);
+      apex = 5.5 + Math.random() * 1.5;
+      hitH = 3;
+      shotLabel = '3rd Shot Drop';
+      break;
+
+    case 'third_shot_drive':
+      // Hard drive at opponent
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 4);
+      targetZ = sign * (KITCHEN_DEPTH + Math.random() * 4);
+      apex = 4.5 + Math.random();
+      hitH = 3.5;
+      shotLabel = '3rd Shot Drive';
+      break;
+
+    case 'dink':
+      // Soft dink just over the net into opponent's kitchen
+      // Cross-court dinks are more common and safer
+      const crossCourt = Math.random() > 0.35;
+      if (crossCourt) {
+        targetX = -hitterX * 0.6 + (Math.random() - 0.5) * 3;
+      } else {
+        targetX = hitterX * 0.8 + (Math.random() - 0.5) * 2;
+      }
+      targetX = Math.max(-COURT_WIDTH/2 + 1, Math.min(COURT_WIDTH/2 - 1, targetX));
+      targetZ = sign * (KITCHEN_DEPTH - 1 - Math.random() * 4);
+      apex = NET_HEIGHT_CENTER + 0.5 + Math.random() * 1.2; // just clears the net
+      hitH = 2.5 + Math.random() * 0.5;
+      break;
+
+    case 'speedup':
+      // Attack ball — fast and flat at opponent's body/feet
+      targetX = (isNear ? playerFar.position.x : playerNear.position.x) + (Math.random()-0.5) * 3;
+      targetZ = sign * (KITCHEN_DEPTH + 1 + Math.random() * 2);
+      apex = 4 + Math.random() * 0.8;
+      hitH = 3;
+      shotLabel = 'Speed Up!';
+      break;
+
+    case 'counter':
+      // Counter-attack — quick hands at kitchen
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 4);
+      targetZ = sign * (KITCHEN_DEPTH - 1 - Math.random() * 3);
+      apex = NET_HEIGHT_CENTER + 1 + Math.random();
+      hitH = 2.8;
+      shotLabel = 'Counter';
+      break;
+
+    case 'reset':
+      // Reset after a speedup — soft ball back to kitchen
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 5);
+      targetZ = sign * (KITCHEN_DEPTH - 2 - Math.random() * 3);
+      apex = NET_HEIGHT_CENTER + 1.5 + Math.random();
+      hitH = 2;
+      shotLabel = 'Reset';
+      break;
+
+    case 'lob':
+      // High lob over opponent's head
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 4);
+      targetZ = sign * (COURT_LENGTH / 2 - 2 - Math.random() * 4);
+      apex = 16 + Math.random() * 6;
+      hitH = 3;
+      break;
+
+    case 'overhead':
+      // Overhead smash — aggressive put-away
+      targetX = (Math.random() - 0.5) * (COURT_WIDTH - 3);
+      targetZ = sign * (KITCHEN_DEPTH + Math.random() * 6);
+      apex = 5 + Math.random();
+      hitH = 6;
+      shotLabel = 'Overhead!';
+      break;
+  }
+
+  const startPos = new THREE.Vector3(hitterX + (Math.random()-0.5)*0.5, hitH, hitterZ);
+  launchBallTo(startPos, targetX, targetZ, apex, hitH);
+  lastHitter = hitterSide;
+}
+
+// === POSITION-AWARE RALLY SYSTEM ===
+// Players move FIRST, then hit based on WHERE they are on court.
+// Kitchen = dink/speedup. Mid-court = drive/drop. Baseline = serve/return/lob defense.
+
+let waitingToHit = false;   // true while player is running to ball
+let pendingHitter = 'near';
+let hitDelay = 0;
+
+function getCourtZone(z) {
+  const absZ = Math.abs(z);
+  if (absZ <= KITCHEN_DEPTH + 2) return 'kitchen';
+  if (absZ <= COURT_LENGTH / 2 - 6) return 'mid';
+  return 'baseline';
+}
+
+function pickShotForPosition(hitter) {
+  const player = hitter === 'near' ? playerNear : playerFar;
+  const zone = getCourtZone(player.position.z);
+  const opponent = hitter === 'near' ? playerFar : playerNear;
+  const oppZone = getCourtZone(opponent.position.z);
+
+  // Context-aware shot selection
+  if (zone === 'kitchen') {
+    // At the kitchen — dink, speedup, lob, or counter
+    if (rallyPhase === 'firefight') {
+      const r = Math.random();
+      if (r < 0.4) return 'counter';
+      if (r < 0.6) return 'reset';
+      if (r < 0.8) return 'speedup';
+      return 'winner'; // end point
+    }
+
+    dinkCount++;
+    if (dinkCount > 3 + Math.floor(Math.random() * 10)) {
+      // Patient dinking done — time to attack
+      const r = Math.random();
+      if (r < 0.4) { rallyPhase = 'firefight'; return 'speedup'; }
+      if (r < 0.55 && oppZone === 'kitchen') return 'lob'; // lob over kitchen player
+      return 'dink'; // keep patient
+    }
+    return 'dink';
+
+  } else if (zone === 'mid') {
+    // Transitioning — drop or drive to earn kitchen position
+    const r = Math.random();
+    if (r < 0.55) return 'third_shot_drop';
+    if (r < 0.85) return 'third_shot_drive';
+    return 'dink'; // soft transitional dink if close enough
+
+  } else {
+    // Baseline — serve, return, or defensive
+    if (rallyPhase === 'serve') return 'serve';
+    if (rallyPhase === 'return') return 'return';
+    if (rallyPhase === 'lob_defense') return Math.random() < 0.55 ? 'overhead' : 'return';
+    return 'return'; // deep ball from baseline
+  }
+}
+
+function nextShot() {
+  rallyCount++;
+  document.getElementById('rally-count').textContent = rallyCount;
+
+  pendingHitter = lastHitter === 'near' ? 'far' : 'near';
+
+  // Determine what shot phase we're in
+  if (rallyPhase === 'serve') {
+    // Near player serves from baseline
+    nearTargetZ = COURT_LENGTH / 2 - 2;
+    farTargetZ = -(COURT_LENGTH / 2 - 3);
+    hitShot('serve', 'near');
+    rallyPhase = 'return';
+    // After serve, server starts moving up
+    nearTargetZ = COURT_LENGTH / 2 - 6;
+    return;
+  }
+
+  if (rallyPhase === 'return') {
+    hitShot('return', 'far');
+    rallyPhase = 'rally';
+    // Returner rushes kitchen, server stays back
+    farTargetZ = -(KITCHEN_DEPTH + 1);
+    nearTargetZ = COURT_LENGTH / 2 - 5; // server still back for 3rd shot
+    return;
+  }
+
+  // For all other shots — pick based on player's actual position
+  const shot = pickShotForPosition(pendingHitter);
+
+  if (shot === 'winner') {
+    endPoint();
+    return;
+  }
+
+  if (shot === 'lob') {
+    hitShot('lob', pendingHitter);
+    // Opponent needs to run BACK
+    if (pendingHitter === 'near') {
+      farTargetZ = -(COURT_LENGTH / 2 - 4);
+    } else {
+      nearTargetZ = COURT_LENGTH / 2 - 4;
+    }
+    rallyPhase = 'lob_defense';
+    return;
+  }
+
+  if (shot === 'overhead') {
+    hitShot('overhead', pendingHitter);
+    // After overhead, move back to kitchen
+    if (pendingHitter === 'near') nearTargetZ = KITCHEN_DEPTH + 1;
+    else farTargetZ = -(KITCHEN_DEPTH + 1);
+    rallyPhase = 'rally';
+    return;
+  }
+
+  hitShot(shot, pendingHitter);
+
+  // After hitting — update target positions
+  if (shot === 'third_shot_drop' || shot === 'third_shot_drive' || shot === 'return') {
+    // Move forward after these shots
+    if (pendingHitter === 'near') {
+      nearTargetZ = Math.min(nearTargetZ, KITCHEN_DEPTH + 1);
+    } else {
+      farTargetZ = Math.max(farTargetZ, -(KITCHEN_DEPTH + 1));
+    }
+  }
+
+  if (shot === 'dink' || shot === 'speedup' || shot === 'counter' || shot === 'reset') {
+    // Stay at kitchen
+    if (pendingHitter === 'near') nearTargetZ = KITCHEN_DEPTH + 1;
+    else farTargetZ = -(KITCHEN_DEPTH + 1);
+  }
+
+  // Keep rally phase as 'rally' (generic) — shot selection is position-based now
+  if (rallyPhase !== 'firefight') rallyPhase = 'rally';
+}
+
+function endPoint() {
+  totalRallies++;
+  ballInPlay = false;
+  const quality = rallyCount >= 12 ? 'Epic Rally!' : rallyCount >= 8 ? 'Great Rally!' : rallyCount >= 5 ? 'Good Point' : 'Point';
+  shotLabel = quality;
+  document.getElementById('shot-type').textContent = `${quality} (${rallyCount})`;
+
+  setTimeout(() => {
+    startRally();
+  }, 2000 / speedMultiplier);
+}
+
+function startRally() {
+  rallyCount = 0;
+  rallyPhase = 'serve';
+  dinkCount = 0;
+
+  // Players to starting positions
+  nearTargetZ = COURT_LENGTH / 2 - 2;   // server at baseline
+  farTargetZ = -(COURT_LENGTH / 2 - 3); // returner at baseline
+
+  ballPos.set((Math.random()-0.5) * 3, 5, COURT_LENGTH / 2 - 2);
+  lastHitter = 'far';
+  nextShot();
+}
+
+// === CAMERA — FREE MOUSE LOOK ===
+const camPositions = [
+  () => ({ x: playerNear.position.x, y: PLAYER_HEIGHT, z: playerNear.position.z - 0.5 }), // Near (at player head)
+  () => ({ x: playerFar.position.x, y: PLAYER_HEIGHT, z: playerFar.position.z + 0.5 }),   // Far
+  () => ({ x: COURT_WIDTH / 2 + 8, y: PLAYER_HEIGHT, z: 0 }),                              // Sideline
+  () => ({ x: 0, y: 35, z: 5 }),                                                            // Overhead
+];
+
+// Default yaw per POV so you start facing the court
+const defaultYaws = [Math.PI, 0, -Math.PI / 2, 0];
+const defaultPitches = [0, 0, 0, -Math.PI / 3];
+
+function updateCamera() {
+  const pos = camPositions[povMode]();
+  camera.position.set(pos.x, pos.y, pos.z);
+
+  // Apply free look rotation
+  const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(euler);
+}
+
+// Hide near player in first-person POVs
+function updatePlayerVisibility() {
+  playerNear.visible = (povMode !== 0);
+  playerFar.visible = (povMode !== 1);
+}
+
+// === POINTER LOCK + FREE LOOK ===
+const lockPrompt = document.getElementById('lock-prompt');
+
+renderer.domElement.addEventListener('click', () => {
+  renderer.domElement.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === renderer.domElement;
+  lockPrompt.classList.toggle('hidden', pointerLocked);
+});
+
+document.addEventListener('mousemove', e => {
+  if (!pointerLocked) return;
+  yaw -= e.movementX * MOUSE_SENSITIVITY;
+  pitch -= e.movementY * MOUSE_SENSITIVITY;
+  pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch));
+});
+
+// === INPUT ===
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyR') startRally();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// Speed slider
+const speedSlider = document.getElementById('speed-slider');
+speedSlider.addEventListener('input', () => {
+  speedMultiplier = parseFloat(speedSlider.value);
+  document.getElementById('speed-val').textContent = speedMultiplier.toFixed(1) + 'x';
+});
+
+// === MODE CONTROLS ===
+window.cyclePOV = function() {
+  povMode = (povMode + 1) % 4;
+  document.getElementById('btn-pov').textContent = 'POV: ' + povNames[povMode];
+  // Reset look direction to face the court from this POV
+  yaw = defaultYaws[povMode];
+  pitch = defaultPitches[povMode];
+  updatePlayerVisibility();
+};
+
+// === ANIMATION LOOP ===
+const clock = new THREE.Clock();
+let autoHitTimer = 0;
+
+// Original animate replaced by animateWithReticle below
+
+// === LOCKON RETICLE OVERLAY ===
+const rCanvas = document.getElementById('reticleCanvas');
+const rCtx = rCanvas.getContext('2d');
+let lockonEnabled = true;
+let lockonLockTime = 0;
+let lockonTrail = [];
+
+window.toggleLOCKON = function() {
+  lockonEnabled = !lockonEnabled;
+  document.getElementById('btn-lockon').textContent = 'LOCKON: ' + (lockonEnabled ? 'ON' : 'OFF');
+  document.getElementById('btn-lockon').classList.toggle('active', lockonEnabled);
+  if (!lockonEnabled) {
+    rCtx.clearRect(0, 0, rCanvas.width, rCanvas.height);
+    lockonLockTime = 0;
+    lockonTrail = [];
+  }
+};
+
+function resizeReticleCanvas() {
+  rCanvas.width = window.innerWidth;
+  rCanvas.height = window.innerHeight;
+}
+
+function projectBallToScreen() {
+  const v = ball.position.clone();
+  v.project(camera);
+  // Check if behind camera
+  if (v.z > 1) return null;
+  const x = (v.x * 0.5 + 0.5) * rCanvas.width;
+  const y = (-v.y * 0.5 + 0.5) * rCanvas.height;
+  // Check if on screen
+  if (x < -100 || x > rCanvas.width + 100 || y < -100 || y > rCanvas.height + 100) return null;
+
+  // Estimate apparent size based on distance
+  const dist = camera.position.distanceTo(ball.position);
+  const apparentSize = Math.max(12, Math.min(80, (600 / dist)));
+
+  return { x, y, size: apparentSize, dist };
+}
+
+function drawLOCKON(timestamp) {
+  rCtx.clearRect(0, 0, rCanvas.width, rCanvas.height);
+  if (!lockonEnabled) return;
+
+  const proj = projectBallToScreen();
+
+  if (proj) {
+    lockonLockTime = Math.min(lockonLockTime + 1, 20);
+    lockonTrail.push({ x: proj.x, y: proj.y, t: timestamp });
+    if (lockonTrail.length > 40) lockonTrail.shift();
+  } else {
+    lockonLockTime = Math.max(lockonLockTime - 2, 0);
+  }
+
+  // Draw trail
+  if (lockonTrail.length > 1) {
+    for (let i = 1; i < lockonTrail.length; i++) {
+      const p = lockonTrail[i];
+      const age = (timestamp - p.t) / 1000;
+      const alpha = Math.max(0, 0.35 - age * 0.7);
+      const sz = Math.max(1, 2.5 - age * 3);
+      rCtx.fillStyle = `rgba(255, 51, 51, ${alpha})`;
+      rCtx.beginPath();
+      rCtx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+      rCtx.fill();
+    }
+    rCtx.strokeStyle = 'rgba(255, 51, 51, 0.08)';
+    rCtx.lineWidth = 1;
+    rCtx.beginPath();
+    lockonTrail.forEach((p, i) => i === 0 ? rCtx.moveTo(p.x, p.y) : rCtx.lineTo(p.x, p.y));
+    rCtx.stroke();
+  }
+
+  if (!proj) {
+    // Scanning indicator
+    const cx = rCanvas.width / 2, cy = rCanvas.height / 2;
+    const t = timestamp / 1000;
+    rCtx.strokeStyle = 'rgba(0, 255, 136, 0.12)';
+    rCtx.lineWidth = 1;
+    rCtx.beginPath(); rCtx.arc(cx, cy, 80, t * 2, t * 2 + 0.5); rCtx.stroke();
+    rCtx.beginPath(); rCtx.arc(cx, cy, 80, t * 2 + Math.PI, t * 2 + Math.PI + 0.5); rCtx.stroke();
+    return;
+  }
+
+  const x = proj.x, y = proj.y, r = proj.size;
+  const ls = Math.min(lockonLockTime / 15, 1); // lock scale 0→1
+
+  // Targeting brackets
+  const bs = r * 2.5 * (2 - ls); // shrinks as it locks
+  const arm = bs * 0.35;
+
+  rCtx.strokeStyle = `rgba(255, 51, 51, ${0.5 + ls * 0.5})`;
+  rCtx.lineWidth = 2;
+
+  // TL
+  rCtx.beginPath();
+  rCtx.moveTo(x - bs + arm, y - bs); rCtx.lineTo(x - bs, y - bs); rCtx.lineTo(x - bs, y - bs + arm);
+  rCtx.stroke();
+  // TR
+  rCtx.beginPath();
+  rCtx.moveTo(x + bs - arm, y - bs); rCtx.lineTo(x + bs, y - bs); rCtx.lineTo(x + bs, y - bs + arm);
+  rCtx.stroke();
+  // BL
+  rCtx.beginPath();
+  rCtx.moveTo(x - bs + arm, y + bs); rCtx.lineTo(x - bs, y + bs); rCtx.lineTo(x - bs, y + bs - arm);
+  rCtx.stroke();
+  // BR
+  rCtx.beginPath();
+  rCtx.moveTo(x + bs - arm, y + bs); rCtx.lineTo(x + bs, y + bs); rCtx.lineTo(x + bs, y + bs - arm);
+  rCtx.stroke();
+
+  // Crosshairs
+  rCtx.strokeStyle = `rgba(255, 51, 51, ${0.25 * ls})`;
+  rCtx.lineWidth = 1;
+  rCtx.beginPath(); rCtx.moveTo(x - bs * 1.4, y); rCtx.lineTo(x - r * 0.7, y); rCtx.stroke();
+  rCtx.beginPath(); rCtx.moveTo(x + r * 0.7, y); rCtx.lineTo(x + bs * 1.4, y); rCtx.stroke();
+  rCtx.beginPath(); rCtx.moveTo(x, y - bs * 1.4); rCtx.lineTo(x, y - r * 0.7); rCtx.stroke();
+  rCtx.beginPath(); rCtx.moveTo(x, y + r * 0.7); rCtx.lineTo(x, y + bs * 1.4); rCtx.stroke();
+
+  // Dashed inner circle
+  rCtx.strokeStyle = `rgba(255, 51, 51, ${0.5 * ls})`;
+  rCtx.lineWidth = 1.5;
+  rCtx.setLineDash([3, 3]);
+  rCtx.beginPath(); rCtx.arc(x, y, r * 1.3, 0, Math.PI * 2); rCtx.stroke();
+  rCtx.setLineDash([]);
+
+  // Rotating arcs
+  const rot = (timestamp / 2500) * Math.PI * 2;
+  rCtx.strokeStyle = `rgba(255, 51, 51, ${0.2 * ls})`;
+  rCtx.lineWidth = 1;
+  rCtx.beginPath(); rCtx.arc(x, y, bs * 1.1, rot, rot + Math.PI * 0.3); rCtx.stroke();
+  rCtx.beginPath(); rCtx.arc(x, y, bs * 1.1, rot + Math.PI, rot + Math.PI * 1.3); rCtx.stroke();
+
+  // Center diamond
+  const d = 5 * ls;
+  rCtx.fillStyle = `rgba(255, 51, 51, ${0.8 * ls})`;
+  rCtx.save(); rCtx.translate(x, y); rCtx.rotate(Math.PI / 4);
+  rCtx.fillRect(-d/2, -d/2, d, d);
+  rCtx.restore();
+
+  // Data readout
+  if (ls > 0.4) {
+    rCtx.font = '10px Courier New';
+    rCtx.textAlign = 'left';
+    rCtx.fillStyle = `rgba(255, 51, 51, ${ls * 0.8})`;
+    rCtx.fillText('TGT LOCK', x + bs + 8, y - 12);
+    rCtx.fillStyle = `rgba(0, 255, 136, ${ls * 0.7})`;
+    rCtx.fillText(`${proj.dist.toFixed(0)}ft`, x + bs + 8, y + 2);
+    const spd = (ballVel.length() * 0.681818).toFixed(0);
+    rCtx.fillText(`${spd} mph`, x + bs + 8, y + 14);
+    rCtx.fillStyle = `rgba(0, 229, 255, ${ls * 0.5})`;
+    rCtx.fillText(shotLabel.toUpperCase(), x + bs + 8, y + 26);
+  }
+
+  // Corner HUD elements
+  rCtx.font = '10px Courier New';
+  rCtx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+  rCtx.textAlign = 'left';
+  rCtx.fillText('LOCKON // ACTIVE', 20, rCanvas.height - 20);
+  rCtx.textAlign = 'right';
+  rCtx.fillText(`RALLY ${rallyCount}`, rCanvas.width - 20, rCanvas.height - 20);
+
+  // Top corner brackets
+  const cb = 30;
+  rCtx.strokeStyle = 'rgba(0, 255, 136, 0.15)';
+  rCtx.lineWidth = 1;
+  // TL
+  rCtx.beginPath(); rCtx.moveTo(15, 12 + cb); rCtx.lineTo(15, 12); rCtx.lineTo(15 + cb, 12); rCtx.stroke();
+  // TR
+  rCtx.beginPath(); rCtx.moveTo(rCanvas.width - 15, 12 + cb); rCtx.lineTo(rCanvas.width - 15, 12); rCtx.lineTo(rCanvas.width - 15 - cb, 12); rCtx.stroke();
+  // BL
+  rCtx.beginPath(); rCtx.moveTo(15, rCanvas.height - 12 - cb); rCtx.lineTo(15, rCanvas.height - 12); rCtx.lineTo(15 + cb, rCanvas.height - 12); rCtx.stroke();
+  // BR
+  rCtx.beginPath(); rCtx.moveTo(rCanvas.width - 15, rCanvas.height - 12 - cb); rCtx.lineTo(rCanvas.width - 15, rCanvas.height - 12); rCtx.lineTo(rCanvas.width - 15 - cb, rCanvas.height - 12); rCtx.stroke();
+}
+
+// === RESIZE ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  resizeReticleCanvas();
+});
+
+// === START ===
+resizeReticleCanvas();
+yaw = defaultYaws[0];
+pitch = defaultPitches[0];
+updatePlayerVisibility();
+startRally();
+
+function animateWithReticle() {
+  requestAnimationFrame(animateWithReticle);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05) * speedMultiplier;
+
+  if (ballInPlay) {
+    ballVel.y += GRAVITY * dt;
+    ballVel.multiplyScalar(Math.pow(AIR_DRAG, dt * 60));
+    ballPos.x += ballVel.x * dt;
+    ballPos.y += ballVel.y * dt;
+    ballPos.z += ballVel.z * dt;
+
+    // Ground bounce
+    if (ballPos.y <= BALL_RADIUS) {
+      ballPos.y = BALL_RADIUS;
+      ballVel.y = Math.abs(ballVel.y) * BOUNCE_DAMPING;
+
+      // After first bounce, opponent "hits" the ball
+      if (ballVel.y < 2) {
+        autoHitTimer += dt;
+        if (autoHitTimer > 0.15) {
+          autoHitTimer = 0;
+          nextShot();
+        }
+      }
+    }
+
+    // Net collision — rare with smart trajectories but handle gracefully
+    if (Math.abs(ballPos.z) < 0.2 && ballPos.y < NET_HEIGHT_CENTER && Math.abs(ballPos.x) < NET_WIDTH/2) {
+      // Let — ball clips net cord, slight redirect
+      ballVel.y += 3;
+      ballPos.y = NET_HEIGHT_CENTER + 0.1;
+      shotLabel = 'Net Cord!';
+      document.getElementById('shot-type').textContent = shotLabel;
+    }
+
+    // Out of bounds — end point
+    if (Math.abs(ballPos.x) > COURT_WIDTH/2 + OVERRUN_SIDE + 5 ||
+        Math.abs(ballPos.z) > COURT_LENGTH/2 + OVERRUN_END + 5 ||
+        ballPos.y > 50) {
+      endPoint();
+    }
+  }
+
+  ball.position.copy(ballPos);
+  ballShadow.position.set(ballPos.x, 0.04, ballPos.z);
+  ballShadow.scale.setScalar(1 + ballPos.y * 0.1);
+  shadowMat.opacity = Math.max(0.05, 0.3 - ballPos.y * 0.02);
+
+  trailPositions.push(ballPos.clone());
+  if (trailPositions.length > MAX_TRAIL) trailPositions.shift();
+  trailGeo.setFromPoints(trailPositions);
+
+  const speedFtS = ballVel.length();
+  const speedMph = (speedFtS * 0.681818).toFixed(0);
+  document.getElementById('ball-speed').textContent = speedMph + ' mph';
+
+  // Player movement — hustle to position like real players
+  // X: track ball laterally, shade toward center
+  const nearTX = THREE.MathUtils.clamp(ballPos.x * 0.45 + (Math.random()-0.5)*0.02, -COURT_WIDTH/2 + 1, COURT_WIDTH/2 - 1);
+  const nearSpeed = 6 * rawDt; // ~6 ft/s lateral
+  playerNear.position.x += (nearTX - playerNear.position.x) * nearSpeed;
+  // Z: move to target position aggressively (players sprint forward/back)
+  const nearZDiff = nearTargetZ - playerNear.position.z;
+  const nearZSpeed = Math.min(Math.abs(nearZDiff), 12 * rawDt); // up to 12 ft/s
+  playerNear.position.z += Math.sign(nearZDiff) * nearZSpeed;
+
+  const farTX = THREE.MathUtils.clamp(ballPos.x * 0.4 + (Math.random()-0.5)*0.02, -COURT_WIDTH/2 + 1, COURT_WIDTH/2 - 1);
+  playerFar.position.x += (farTX - playerFar.position.x) * 6 * rawDt;
+  const farZDiff = farTargetZ - playerFar.position.z;
+  const farZSpeed = Math.min(Math.abs(farZDiff), 12 * rawDt);
+  playerFar.position.z += Math.sign(farZDiff) * farZSpeed;
+
+  updateCamera();
+  renderer.render(scene, camera);
+  drawLOCKON(performance.now());
+}
+
+animateWithReticle();
+</script>
+</body>
+</html>
