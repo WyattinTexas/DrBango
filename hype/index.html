@@ -628,39 +628,73 @@ class ArenaScene extends Phaser.Scene {
     bg.fillRect(0, H - 200, W, 200);
   }
 
+  // ── HEALTH BAR UI CONSTANTS ──
+  // Source image: 980x468. Key regions (in source px):
+  //   Portrait circle center: ~195, ~235 (radius ~145)
+  //   Name bar: x 370-910, y 85-195
+  //   HP bar (recessed): x 385-880, y 270-340
+  // Display scale factor for 320px wide plate:
+
   // ── ENEMY HUD ──
 
   createEnemyHUD() {
-    const cx = W/2;
-    // HP bar UI image (flipped for enemy, top-right)
-    this.enemyHpUi = this.add.image(W - 10, 90, 'hp_ui')
+    // Metallic plate — flipped, anchored top-right
+    // Display size: 320w x 153h
+    const plateW = 320, plateH = 153;
+    const plateX = W + 8;  // pushed slightly off right edge for dramatic overlap
+    const plateY = 85;
+    const sc = plateW / 980; // ~0.327
+
+    this.enemyHpUi = this.add.image(plateX, plateY, 'hp_ui')
       .setOrigin(1, 0.5)
-      .setDisplaySize(280, 134)
+      .setDisplaySize(plateW, plateH)
       .setFlipX(true)
       .setDepth(10);
 
-    // Enemy portrait (circular, positioned on right side of flipped bar)
-    const portraitX = W - 10 - 280 + 68; // Left edge + circle center offset (flipped)
-    // Actually for flipped: portrait circle is now on the RIGHT
-    const epX = W - 38, epY = 90;
+    // Portrait — when flipped, the circle is on the RIGHT
+    // Source circle center: 195, 235 → from right edge: 980-195=785
+    // Flipped display: portrait X = plateX - (785 * sc) = plateX - 257
+    // But since we originate from right: epX = plateX - (195 * sc)
+    const epX = plateX - (195 * sc);
+    const epY = plateY;
+    const portraitR = 145 * sc; // ~47px radius
+
     this.enemyPortrait = this.add.image(epX, epY, state.enemy.name)
-      .setDisplaySize(62, 62).setDepth(11);
+      .setDisplaySize(portraitR * 2 - 6, portraitR * 2 - 6).setDepth(12);
     const eMask = this.make.graphics({ add: false });
     eMask.fillStyle(0xffffff);
-    eMask.fillCircle(epX, epY, 28);
+    eMask.fillCircle(epX, epY, portraitR - 4);
     this.enemyPortrait.setMask(eMask.createGeometryMask());
 
-    // Enemy name
-    this.enemyNameText = this.add.text(W - 80, 62, state.enemy.name, {
-      fontSize: '14px', fontFamily: 'Bangers', color: '#fff', letterSpacing: 1,
-    }).setOrigin(1, 0.5).setDepth(12);
+    // Enemy name — inside the top metallic bar
+    // Source name bar: x 370-910, y ~120 center → flipped: from right edge
+    // Flipped: name region center X ≈ plateX - ((370+910)/2 * sc) = plateX - 209
+    const nameX = plateX - (640 * sc);
+    const nameY = plateY - (235 - 140) * sc; // up from center to name bar
+    this.enemyNameText = this.add.text(nameX, nameY, state.enemy.name, {
+      fontSize: '15px', fontFamily: 'Bangers', color: '#fff', letterSpacing: 2,
+      stroke: '#000', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(13);
 
-    // HP fill area — for flipped bar, fill goes RIGHT to LEFT
+    // HP fill — inside the recessed bar
+    // Source HP bar: x 385-880, y 270-340 → center y ~305
     this.enemyHpFill = this.add.graphics().setDepth(11);
-    // HP text
-    this.enemyHpText = this.add.text(W - 160, 100, '', {
-      fontSize: '11px', fontFamily: 'Bangers', color: '#fff',
-    }).setOrigin(0.5).setDepth(12);
+    // HP text overlaid on bar
+    const hpTextX = plateX - (632 * sc);
+    const hpTextY = plateY + (305 - 235) * sc;
+    this.enemyHpText = this.add.text(hpTextX, hpTextY, '', {
+      fontSize: '12px', fontFamily: 'Bangers', color: '#fff',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(13);
+
+    // Store layout constants for updateEnemyHp
+    this._eBar = {
+      // Flipped: bar runs right-to-left. Right edge = plateX - (385*sc), left edge = plateX - (880*sc)
+      right: plateX - (395 * sc),
+      left: plateX - (870 * sc),
+      top: plateY + (270 - 235) * sc,
+      bottom: plateY + (335 - 235) * sc,
+    };
   }
 
   updateEnemyHp() {
@@ -668,51 +702,79 @@ class ArenaScene extends Phaser.Scene {
     const max = state.enemy.maxHp;
     const pct = hp / max;
     const col = hpColor(hp, max);
+    const b = this._eBar;
+    const barW = b.right - b.left;
+    const barH = b.bottom - b.top;
+    const fillW = barW * pct;
 
     this.enemyHpFill.clear();
-    this.enemyHpFill.fillStyle(col, 0.9);
-    // Bar region (approximate within the flipped UI asset)
-    // Flipped: bar runs from right (~W-80) to left (~W-260)
-    const barRight = W - 82;
-    const barLeft = W - 252;
-    const barW = barRight - barLeft;
-    const barY = 97;
-    const barH = 14;
-    const fillW = barW * pct;
-    this.enemyHpFill.fillRoundedRect(barRight - fillW, barY, fillW, barH, 3);
+    // Dark bar background (slightly visible behind fill)
+    this.enemyHpFill.fillStyle(0x000000, 0.4);
+    this.enemyHpFill.fillRect(b.left, b.top, barW, barH);
+    // Colored HP fill — fills from LEFT to RIGHT
+    if (pct > 0) {
+      this.enemyHpFill.fillStyle(col, 0.9);
+      this.enemyHpFill.fillRect(b.left, b.top, fillW, barH);
+      // Shine highlight on top
+      this.enemyHpFill.fillStyle(0xffffff, 0.15);
+      this.enemyHpFill.fillRect(b.left, b.top, fillW, barH * 0.35);
+    }
 
-    this.enemyHpText.setText(`${hp}/${max}`);
+    this.enemyHpText.setText(`${hp} / ${max}`);
   }
 
   // ── PLAYER HUD ──
 
   createPlayerHUD() {
-    // HP bar UI image (normal orientation, bottom-left)
-    this.playerHpUi = this.add.image(10, 575, 'hp_ui')
+    // Metallic plate — normal orientation, anchored bottom-left
+    const plateW = 320, plateH = 153;
+    const plateX = -8;  // pushed slightly off left edge
+    const plateY = 570;
+    const sc = plateW / 980; // ~0.327
+
+    this.playerHpUi = this.add.image(plateX, plateY, 'hp_ui')
       .setOrigin(0, 0.5)
-      .setDisplaySize(280, 134)
+      .setDisplaySize(plateW, plateH)
       .setDepth(10);
 
-    // Player portrait
-    const ppX = 45, ppY = 575;
+    // Portrait — circle on the LEFT
+    // Source circle center: 195, 235
+    const ppX = plateX + (195 * sc);
+    const ppY = plateY;
+    const portraitR = 145 * sc;
+
     this.playerPortrait = this.add.image(ppX, ppY, state.player.name)
-      .setDisplaySize(62, 62).setDepth(11);
+      .setDisplaySize(portraitR * 2 - 6, portraitR * 2 - 6).setDepth(12);
     const pMask = this.make.graphics({ add: false });
     pMask.fillStyle(0xffffff);
-    pMask.fillCircle(ppX, ppY, 28);
+    pMask.fillCircle(ppX, ppY, portraitR - 4);
     this.playerPortrait.setMask(pMask.createGeometryMask());
 
-    // Player name
-    this.playerNameText = this.add.text(85, 548, state.player.name, {
-      fontSize: '14px', fontFamily: 'Bangers', color: '#fff', letterSpacing: 1,
-    }).setOrigin(0, 0.5).setDepth(12);
+    // Player name — inside top metallic bar
+    const nameX = plateX + (640 * sc);
+    const nameY = plateY - (235 - 140) * sc;
+    this.playerNameText = this.add.text(nameX, nameY, state.player.name, {
+      fontSize: '15px', fontFamily: 'Bangers', color: '#fff', letterSpacing: 2,
+      stroke: '#000', strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(13);
 
     // HP fill
     this.playerHpFill = this.add.graphics().setDepth(11);
     // HP text
-    this.playerHpText = this.add.text(170, 583, '', {
-      fontSize: '11px', fontFamily: 'Bangers', color: '#fff',
-    }).setOrigin(0.5).setDepth(12);
+    const hpTextX = plateX + (632 * sc);
+    const hpTextY = plateY + (305 - 235) * sc;
+    this.playerHpText = this.add.text(hpTextX, hpTextY, '', {
+      fontSize: '12px', fontFamily: 'Bangers', color: '#fff',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(13);
+
+    // Store layout constants for updatePlayerHp
+    this._pBar = {
+      left: plateX + (395 * sc),
+      right: plateX + (870 * sc),
+      top: plateY + (270 - 235) * sc,
+      bottom: plateY + (335 - 235) * sc,
+    };
   }
 
   updatePlayerHp() {
@@ -720,18 +782,25 @@ class ArenaScene extends Phaser.Scene {
     const max = state.player.maxHp;
     const pct = hp / max;
     const col = hpColor(hp, max);
+    const b = this._pBar;
+    const barW = b.right - b.left;
+    const barH = b.bottom - b.top;
+    const fillW = barW * pct;
 
     this.playerHpFill.clear();
-    this.playerHpFill.fillStyle(col, 0.9);
-    // Bar region within the UI asset (left-aligned)
-    const barLeft = 88;
-    const barW = 170;
-    const barY = 580;
-    const barH = 14;
-    const fillW = barW * pct;
-    this.playerHpFill.fillRoundedRect(barLeft, barY, fillW, barH, 3);
+    // Dark bar background
+    this.playerHpFill.fillStyle(0x000000, 0.4);
+    this.playerHpFill.fillRect(b.left, b.top, barW, barH);
+    // Colored HP fill
+    if (pct > 0) {
+      this.playerHpFill.fillStyle(col, 0.9);
+      this.playerHpFill.fillRect(b.left, b.top, fillW, barH);
+      // Shine highlight
+      this.playerHpFill.fillStyle(0xffffff, 0.15);
+      this.playerHpFill.fillRect(b.left, b.top, fillW, barH * 0.35);
+    }
 
-    this.playerHpText.setText(`${hp}/${max}`);
+    this.playerHpText.setText(`${hp} / ${max}`);
   }
 
   updateAllHp() {
