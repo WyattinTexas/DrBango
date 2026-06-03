@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Battle of Origins — Hype Ad</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --player:#4fc3f7;--enemy:#ef5350;--gold:#ffd54f;--dark:#0a0a14;
+  --purple:#7c3aed;--purple-dark:#4c1d95;--green:#22c55e;
+  --panel:rgba(10,10,20,0.85);--glow-player:rgba(79,195,247,0.5);--glow-enemy:rgba(239,83,80,0.5);
+}
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Press+Start+2P&display=swap');
+html,body{height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+.app{position:relative;width:100%;max-width:430px;height:100%;margin:0 auto;overflow:hidden;background:var(--dark);}
+
+/* ── SCREENS ── */
+.screen{position:absolute;inset:0;display:none;flex-direction:column;z-index:1;height:100%;}
+.screen.active{display:flex;}
+
+/* ══════════════════════════════════════════════
+   SPLASH SCREEN
+   ══════════════════════════════════════════════ */
+.splash{align-items:center;justify-content:center;text-align:center;overflow:hidden;}
+.splash-bg{position:absolute;inset:0;background:linear-gradient(180deg,#1a0a2e 0%,#0d1b0d 50%,#0a0a14 100%);z-index:0;}
+.splash-bg::before{content:'';position:absolute;top:10%;left:50%;transform:translateX(-50%);width:300px;height:300px;background:radial-gradient(circle,rgba(124,58,237,.2),transparent 70%);border-radius:50%;}
+.splash-content{position:relative;z-index:1;}
+.splash-logo{font-family:'Bangers',cursive;font-size:3rem;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(180deg,#fff 0%,var(--gold) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 8px rgba(255,213,79,.3));margin-bottom:4px;}
+.splash-sub{font-size:.75rem;color:rgba(255,255,255,.5);letter-spacing:6px;text-transform:uppercase;margin-bottom:48px;}
+.splash-play{
+  font-size:1.3rem;font-weight:700;padding:18px 56px;border:none;border-radius:50px;cursor:pointer;
+  background:linear-gradient(135deg,var(--purple),#9333ea);color:#fff;
+  box-shadow:0 0 40px rgba(124,58,237,.5),0 4px 15px rgba(0,0,0,.3);transition:all .2s;
+  letter-spacing:1px;
+}
+.splash-play:active{transform:scale(.95);}
+.splash-tagline{margin-top:32px;font-size:.65rem;color:rgba(255,255,255,.3);letter-spacing:2px;}
+.splash-cards{display:flex;gap:8px;margin-bottom:32px;justify-content:center;}
+.splash-card-preview{width:56px;height:76px;border-radius:8px;overflow:hidden;border:2px solid rgba(255,255,255,.15);transform:rotate(var(--rot));transition:all .3s;}
+.splash-card-preview img{width:100%;height:100%;object-fit:cover;}
+
+/* ══════════════════════════════════════════════
+   CHARACTER SELECT
+   ══════════════════════════════════════════════ */
+.select{padding:16px;background:linear-gradient(180deg,#1a0a2e,#0a0a14);}
+.select-title{text-align:center;font-family:'Bangers',cursive;font-size:1.4rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;text-shadow:0 2px 4px rgba(0,0,0,.5);}
+.select-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;flex:1;overflow-y:auto;padding-bottom:70px;}
+.select-card{
+  position:relative;border-radius:10px;overflow:hidden;cursor:pointer;
+  border:2px solid rgba(255,255,255,.08);transition:all .25s;aspect-ratio:3/4;
+}
+.select-card:active,.select-card.picked{border-color:var(--purple);box-shadow:0 0 25px rgba(124,58,237,.5);}
+.select-card img{width:100%;height:100%;object-fit:cover;}
+.select-card .card-label{display:none;} /* cards already have text on them */
+.select-confirm{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;
+  font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:2px;padding:14px 40px;border:none;border-radius:50px;cursor:pointer;
+  background:linear-gradient(135deg,var(--purple),#9333ea);color:#fff;
+  box-shadow:0 0 30px rgba(124,58,237,.5);opacity:0;pointer-events:none;transition:all .3s;
+  max-width:400px;width:calc(100% - 32px);
+}
+.select-confirm.visible{opacity:1;pointer-events:auto;}
+
+/* ══════════════════════════════════════════════
+   VS SPLASH OVERLAY
+   ══════════════════════════════════════════════ */
+.vs-splash{
+  position:absolute;inset:0;z-index:20;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(0,0,0,.92);
+}
+.vs-splash.active{display:flex;}
+.vs-splash-inner{text-align:center;animation:vsSlam .6s ease-out;}
+.vs-splash-names{display:flex;align-items:center;gap:20px;}
+.vs-splash-side{text-align:center;}
+.vs-splash-portrait{width:90px;height:90px;border-radius:50%;overflow:hidden;margin:0 auto 8px;}
+.vs-splash-portrait img{width:100%;height:100%;object-fit:cover;}
+.vs-splash-portrait.p{border:3px solid var(--player);box-shadow:0 0 25px var(--glow-player);}
+.vs-splash-portrait.e{border:3px solid var(--enemy);box-shadow:0 0 25px var(--glow-enemy);}
+.vs-splash-pname{color:var(--player);font-family:'Bangers',cursive;font-size:1.1rem;letter-spacing:1px;}
+.vs-splash-ename{color:var(--enemy);font-family:'Bangers',cursive;font-size:1.1rem;letter-spacing:1px;}
+.vs-splash-vs{font-family:'Bangers',cursive;font-size:3.5rem;color:var(--gold);text-shadow:0 0 30px rgba(255,213,79,.5);letter-spacing:2px;}
+@keyframes vsSlam{0%{transform:scale(3);opacity:0;}60%{transform:scale(.9);opacity:1;}100%{transform:scale(1);}}
+
+/* ══════════════════════════════════════════════
+   ARENA BATTLE SCREEN (MOCKUP LAYOUT)
+   ══════════════════════════════════════════════ */
+.arena{position:relative;overflow:hidden;background:#1a2a1a;}
+
+/* Full-bleed arena background */
+.arena-bg{
+  position:absolute;inset:0;z-index:0;
+  background:
+    linear-gradient(180deg,
+      #1a3a1a 0%,
+      #2a4a2a 15%,
+      #3a5a3a 30%,
+      #4a6a3a 45%,
+      #5a6a3a 55%,
+      #4a5a3a 70%,
+      #3a4a2a 85%,
+      #1a2a1a 100%
+    );
+}
+/* Arena floor */
+.arena-bg::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:55%;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(139,119,101,.6) 0%, transparent 60%),
+    linear-gradient(180deg, #5a6a4a 0%, #4a5a3a 30%, #3a4a2a 60%, #2a3a1a 100%);
+}
+/* Sky / mountains at top */
+.arena-bg::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:30%;
+  background:linear-gradient(180deg,#4a7aaa 0%,#6a9aba 30%,#8ab0c0 50%,transparent 100%);
+  opacity:.4;
+}
+/* Stone arena walls */
+.arena-walls{
+  position:absolute;left:0;right:0;top:25%;height:50%;z-index:1;
+  border:3px solid rgba(139,119,101,.3);
+  border-radius:50%;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.4), 0 0 20px rgba(0,0,0,.3);
+  pointer-events:none;
+}
+/* Vignette overlay */
+.arena-vignette{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0,0,0,.4) 100%);
+}
+
+.arena-content{position:relative;z-index:2;display:grid;grid-template-rows:auto 1fr auto;height:100%;padding:0;}
+
+/* ── TOP HUD ROW ── */
+.top-hud{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 12px 0;z-index:5;}
+
+/* Turn badge */
+.turn-badge{
+  background:var(--purple-dark);border:2px solid var(--purple);border-radius:10px;
+  padding:6px 10px;text-align:center;min-width:60px;
+}
+.turn-badge-label{font-size:.5rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.6);display:block;}
+.turn-badge-num{font-family:'Bangers',cursive;font-size:1.5rem;color:#fff;line-height:1;}
+
+/* Mystery icon */
+.mystery-icon{
+  font-size:2.2rem;color:var(--purple);filter:drop-shadow(0 0 8px rgba(124,58,237,.5));
+  animation:mysteryBob 2s ease-in-out infinite;margin-top:4px;
+}
+@keyframes mysteryBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+
+/* Enemy info (top right) */
+.enemy-hud{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.enemy-hud-name{font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:1px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);}
+.enemy-hud-hp-row{display:flex;align-items:center;gap:4px;}
+.enemy-hud-hp{
+  background:rgba(0,0,0,.6);border-radius:6px;padding:2px 8px;font-size:.6rem;font-weight:700;
+  color:var(--green);letter-spacing:1px;
+}
+.enemy-hp-bar-outer{width:80px;height:6px;background:rgba(0,0,0,.4);border-radius:3px;overflow:hidden;}
+.enemy-hp-bar-fill{height:100%;background:linear-gradient(90deg,var(--green),#4ade80);border-radius:3px;transition:width .5s ease;}
+.enemy-hud-portrait{
+  width:56px;height:56px;border-radius:50%;overflow:hidden;
+  border:2px solid var(--enemy);box-shadow:0 0 15px var(--glow-enemy);
+  margin-top:2px;
+}
+.enemy-hud-portrait img{width:100%;height:100%;object-fit:cover;}
+
+/* ── CENTER ARENA ── */
+.arena-center{
+  display:flex;align-items:center;justify-content:center;
+  position:relative;min-height:0;
+}
+
+/* Giant VS */
+.vs-giant{
+  font-family:'Bangers',cursive;font-size:7rem;color:#fff;
+  text-shadow:
+    0 0 20px rgba(255,255,255,.3),
+    0 4px 8px rgba(0,0,0,.5),
+    -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000;
+  letter-spacing:4px;z-index:3;position:relative;
+  line-height:1;
+}
+
+/* Dice floating around VS */
+.arena-dice-container{position:absolute;inset:0;z-index:2;pointer-events:none;}
+.arena-die{
+  position:absolute;width:42px;height:42px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;font-weight:900;
+  box-shadow:0 3px 10px rgba(0,0,0,.4);
+  transition:all .4s;
+}
+.arena-die.enemy-die{
+  background:linear-gradient(135deg,#8b0000,#b91c1c);border:2px solid #dc2626;color:#fca5a5;
+}
+.arena-die.player-die{
+  background:linear-gradient(135deg,#1e3a5f,#1d4ed8);border:2px solid #3b82f6;color:#93c5fd;
+}
+.arena-die.rolling{animation:dieFloat .4s ease-in-out;}
+.arena-die.winner-die{box-shadow:0 0 15px var(--gold);border-color:var(--gold);color:var(--gold);}
+/* Die positions - scattered around VS */
+.arena-die.e0{top:15%;left:55%;transform:rotate(-12deg);}
+.arena-die.e1{top:25%;right:12%;transform:rotate(8deg);}
+.arena-die.e2{top:10%;right:25%;transform:rotate(-5deg);}
+.arena-die.p0{bottom:20%;left:10%;transform:rotate(10deg);}
+.arena-die.p1{bottom:15%;left:40%;transform:rotate(-8deg);}
+.arena-die.p2{bottom:25%;right:15%;transform:rotate(15deg);}
+@keyframes dieFloat{
+  0%{transform:translateY(0) scale(1);}
+  25%{transform:translateY(-8px) scale(.9) rotate(90deg);}
+  50%{transform:translateY(-4px) scale(1.05) rotate(180deg);}
+  75%{transform:translateY(-6px) scale(.95) rotate(270deg);}
+  100%{transform:translateY(0) scale(1) rotate(360deg);}
+}
+
+/* Pip-style dice faces */
+.die-face{width:100%;height:100%;position:relative;}
+.pip{position:absolute;width:8px;height:8px;border-radius:50%;background:currentColor;}
+/* Pip positions */
+.pip.mc{top:50%;left:50%;transform:translate(-50%,-50%);}
+.pip.tl{top:6px;left:6px;}.pip.tr{top:6px;right:6px;}
+.pip.bl{bottom:6px;left:6px;}.pip.br{bottom:6px;right:6px;}
+.pip.ml{top:50%;left:6px;transform:translateY(-50%);}.pip.mr{top:50%;right:6px;transform:translateY(-50%);}
+
+/* ── BOTTOM AREA ── */
+.bottom-area{z-index:5;padding:0 10px 6px;background:linear-gradient(transparent,rgba(0,0,0,.5) 40%,rgba(0,0,0,.7));}
+
+/* Player HUD row */
+.player-hud-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.player-hud-portrait{
+  width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  border:2px solid var(--player);box-shadow:0 0 12px var(--glow-player);
+}
+.player-hud-portrait img{width:100%;height:100%;object-fit:cover;}
+.player-hud-info{flex:1;min-width:0;}
+.player-hud-name{font-family:'Bangers',cursive;font-size:1rem;letter-spacing:1px;color:#fff;}
+.player-hud-hp-wrap{display:flex;align-items:center;gap:6px;}
+.player-hud-hp-label{font-size:.55rem;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;flex-shrink:0;}
+.hp-bar-outer{flex:1;height:7px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;}
+.hp-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.hp-bar-fill.player{background:linear-gradient(90deg,var(--green),#4ade80);}
+.hp-bar-fill.enemy{background:linear-gradient(90deg,var(--green),#4ade80);}
+.hp-num{font-size:.55rem;font-weight:700;color:rgba(255,255,255,.6);flex-shrink:0;}
+
+/* Narrator */
+.narrator-bar{
+  background:rgba(0,0,0,.7);border-radius:8px;padding:6px 10px;margin-bottom:6px;
+  font-size:.65rem;color:#ccc;text-align:center;min-height:28px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(255,255,255,.05);backdrop-filter:blur(4px);
+}
+.narrator-bar b{color:var(--gold);padding:0 2px;}
+.narrator-bar .ability-tag{color:var(--player);font-weight:700;}
+
+/* Team cards row + roll button */
+.team-row{display:flex;align-items:flex-end;gap:6px;}
+.team-cards{display:flex;gap:5px;flex:1;}
+.team-card{
+  width:0;flex:1;aspect-ratio:2.5/3.5;border-radius:8px;overflow:hidden;
+  border:2px solid rgba(255,255,255,.12);position:relative;
+  transition:all .25s;box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.team-card.active{border-color:var(--player);box-shadow:0 0 15px var(--glow-player),0 2px 8px rgba(0,0,0,.3);}
+.team-card.dead{opacity:.3;filter:grayscale(1);}
+.team-card img{width:100%;height:100%;object-fit:cover;}
+
+/* Gems button (bottom left, overlaps team row) */
+.gems-btn{
+  width:40px;height:40px;border-radius:50%;border:2px solid var(--purple);
+  background:linear-gradient(135deg,var(--purple-dark),#6d28d9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;cursor:pointer;transition:all .2s;flex-shrink:0;
+  box-shadow:0 0 15px rgba(124,58,237,.4);
+}
+.gems-btn:active{transform:scale(.9);}
+
+/* Roll button (big circle, right side) */
+.roll-btn{
+  width:56px;height:56px;border-radius:50%;border:3px solid var(--purple);
+  background:linear-gradient(135deg,var(--purple-dark),#7c3aed);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 0 25px rgba(124,58,237,.5),0 4px 10px rgba(0,0,0,.3);
+  transition:all .2s;flex-shrink:0;
+}
+.roll-btn:active{transform:scale(.9);}
+.roll-btn:disabled{opacity:.3;pointer-events:none;box-shadow:none;}
+.roll-btn svg{width:28px;height:28px;fill:#fff;}
+
+/* Gems panel */
+.gems-panel{
+  position:absolute;bottom:100px;left:12px;z-index:10;
+  background:var(--panel);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+  padding:12px;min-width:160px;display:none;backdrop-filter:blur(8px);
+}
+.gems-panel.open{display:block;}
+.gem-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.7rem;}
+.gem-icon{font-size:1rem;}.gem-count{color:var(--gold);font-weight:700;}
+
+/* ══════════════════════════════════════════════
+   BOSS REVEAL
+   ══════════════════════════════════════════════ */
+.boss-reveal{
+  align-items:center;justify-content:center;text-align:center;
+  background:radial-gradient(ellipse at 50% 50%,#2a0a0a,#0a0a14);
+}
+.boss-portrait-wrap{
+  width:180px;height:180px;border-radius:50%;overflow:hidden;margin:0 auto 24px;
+  border:4px solid var(--enemy);box-shadow:0 0 60px var(--glow-enemy),0 0 120px rgba(239,83,80,.2);
+  animation:bossEntry 1s ease-out;background:#1a0a0a;
+}
+.boss-portrait-wrap img{width:100%;height:100%;object-fit:cover;object-position:center 25%;filter:brightness(1.3);}
+.boss-name{font-family:'Bangers',cursive;font-size:2rem;color:var(--enemy);letter-spacing:3px;margin-bottom:4px;}
+.boss-title{font-size:.65rem;color:var(--gold);letter-spacing:4px;text-transform:uppercase;margin-bottom:20px;}
+.boss-ability{font-size:.8rem;color:#ccc;max-width:280px;margin:0 auto 28px;}
+.boss-fight-btn{
+  font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:2px;padding:14px 48px;border:none;border-radius:50px;cursor:pointer;
+  background:linear-gradient(135deg,var(--enemy),#b71c1c);color:#fff;
+  box-shadow:0 0 30px var(--glow-enemy);transition:all .2s;
+}
+.boss-fight-btn:active{transform:scale(.95);}
+@keyframes bossEntry{0%{transform:scale(.3);opacity:0;}60%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+
+/* ══════════════════════════════════════════════
+   CTA / END SCREEN
+   ══════════════════════════════════════════════ */
+.cta-screen{align-items:center;justify-content:center;text-align:center;padding:32px;background:radial-gradient(ellipse at 50% 30%,#1a0a2e,var(--dark));}
+.cta-result{font-family:'Bangers',cursive;font-size:2.5rem;letter-spacing:3px;margin-bottom:8px;}
+.cta-result.win{color:var(--gold);text-shadow:0 0 20px rgba(255,213,79,.4);}
+.cta-result.lose{color:var(--enemy);text-shadow:0 0 20px var(--glow-enemy);}
+.cta-sub{font-size:.8rem;color:#aaa;margin-bottom:32px;max-width:280px;line-height:1.5;}
+.cta-btn{
+  font-family:'Bangers',cursive;font-size:1.2rem;letter-spacing:2px;padding:14px 40px;border:none;border-radius:50px;cursor:pointer;
+  background:linear-gradient(135deg,var(--gold),#ff8f00);color:#000;
+  box-shadow:0 0 30px rgba(255,213,79,.4);margin-bottom:12px;transition:all .2s;
+  text-decoration:none;display:inline-block;max-width:280px;
+}
+.cta-btn:active{transform:scale(.95);}
+.cta-replay{font-size:.8rem;color:var(--purple);cursor:pointer;background:none;border:none;text-decoration:underline;margin-top:12px;font-weight:600;}
+.cta-footer{font-size:.55rem;color:#444;margin-top:32px;letter-spacing:2px;text-transform:uppercase;}
+
+/* ══════════════════════════════════════════════
+   EFFECTS
+   ══════════════════════════════════════════════ */
+.damage-flash{
+  position:absolute;inset:0;z-index:15;pointer-events:none;opacity:0;transition:opacity .1s;
+}
+.damage-flash.hit{opacity:1;}
+.damage-flash.player-hit{background:radial-gradient(ellipse at 50% 80%,rgba(239,83,80,.35),transparent);}
+.damage-flash.enemy-hit{background:radial-gradient(ellipse at 50% 20%,rgba(79,195,247,.35),transparent);}
+
+.float-dmg{
+  position:absolute;z-index:16;font-family:'Bangers',cursive;font-size:2.5rem;
+  pointer-events:none;animation:floatUp .9s ease-out forwards;
+  text-shadow:0 2px 4px rgba(0,0,0,.5);
+}
+.float-dmg.player-dealt{color:var(--player);right:15%;top:20%;}
+.float-dmg.enemy-dealt{color:var(--enemy);left:15%;bottom:30%;}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1);}100%{opacity:0;transform:translateY(-50px) scale(1.4);}}
+
+.shake{animation:screenShake .3s ease-in-out;}
+@keyframes screenShake{
+  0%,100%{transform:translateX(0);}20%{transform:translateX(-6px);}
+  40%{transform:translateX(6px);}60%{transform:translateX(-4px);}80%{transform:translateX(4px);}
+}
+
+.ability-popup{
+  position:absolute;left:50%;top:35%;transform:translate(-50%,-50%);z-index:18;
+  background:rgba(0,0,0,.8);border:2px solid var(--gold);border-radius:12px;
+  padding:10px 24px;text-align:center;pointer-events:none;
+  animation:abilityPop .7s ease-out forwards;backdrop-filter:blur(4px);
+}
+.ability-popup .ab-name{font-family:'Bangers',cursive;font-size:1.1rem;color:var(--gold);letter-spacing:1px;}
+.ability-popup .ab-desc{font-size:.6rem;color:#ccc;margin-top:3px;}
+@keyframes abilityPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.5);}30%{opacity:1;transform:translate(-50%,-50%) scale(1.1);}60%{transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) translateY(-20px);}}
+
+/* Roll result badge */
+.roll-result-badge{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
+  font-family:'Bangers',cursive;font-size:1.1rem;letter-spacing:1px;
+  padding:4px 16px;border-radius:20px;pointer-events:none;
+  opacity:0;transition:opacity .3s;white-space:nowrap;
+}
+.roll-result-badge.visible{opacity:1;}
+.roll-result-badge.win{background:rgba(34,197,94,.2);color:var(--green);border:1px solid var(--green);}
+.roll-result-badge.lose{background:rgba(239,83,80,.2);color:var(--enemy);border:1px solid var(--enemy);}
+.roll-result-badge.tie{background:rgba(255,255,255,.1);color:#aaa;border:1px solid rgba(255,255,255,.2);}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ══ SPLASH ══ -->
+  <div class="screen splash active" id="splashScreen">
+    <div class="splash-bg"></div>
+    <div class="splash-content">
+      <div class="splash-cards" id="splashCards"></div>
+      <div class="splash-logo">Battle of Origins</div>
+      <div class="splash-sub">Spiritkin Arena</div>
+      <button class="splash-play" onclick="goToSelect()">PLAY NOW</button>
+      <div class="splash-tagline">A 60-second taste of the full game</div>
+    </div>
+  </div>
+
+  <!-- ══ CHARACTER SELECT ══ -->
+  <div class="screen select" id="selectScreen">
+    <div class="select-title">Choose Your Spiritkin</div>
+    <div class="select-grid" id="selectGrid"></div>
+    <button class="select-confirm" id="selectConfirm" onclick="confirmSelect()">ENTER THE ARENA</button>
+  </div>
+
+  <!-- ══ VS SPLASH ══ -->
+  <div class="vs-splash" id="vsSplash">
+    <div class="vs-splash-inner">
+      <div class="vs-splash-names">
+        <div class="vs-splash-side">
+          <div class="vs-splash-portrait p" id="vsPlayerPortrait"></div>
+          <div class="vs-splash-pname" id="vsPlayerName"></div>
+        </div>
+        <div class="vs-splash-vs">VS</div>
+        <div class="vs-splash-side">
+          <div class="vs-splash-portrait e" id="vsEnemyPortrait"></div>
+          <div class="vs-splash-ename" id="vsEnemyName"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ARENA / BATTLE ══ -->
+  <div class="screen arena" id="arenaScreen">
+    <div class="arena-bg"></div>
+    <div class="arena-walls"></div>
+    <div class="arena-vignette"></div>
+    <div class="damage-flash" id="damageFlash"></div>
+
+    <div class="arena-content">
+      <!-- Top HUD: Turn | ? | Enemy -->
+      <div class="top-hud">
+        <div class="turn-badge">
+          <span class="turn-badge-label">Turn</span>
+          <span class="turn-badge-num" id="turnNum">1</span>
+        </div>
+        <div class="mystery-icon">?</div>
+        <div class="enemy-hud">
+          <div class="enemy-hud-name" id="enemyName"></div>
+          <div class="enemy-hud-hp-row">
+            <div class="enemy-hp-bar-outer"><div class="enemy-hp-bar-fill" id="enemyHpBar" style="width:100%"></div></div>
+            <div class="enemy-hud-hp" id="enemyHpLabel">HP 6/6</div>
+          </div>
+          <div class="enemy-hud-portrait" id="enemyPortrait"></div>
+        </div>
+      </div>
+
+      <!-- Center: VS + Dice -->
+      <div class="arena-center">
+        <div class="vs-giant">VS</div>
+        <div class="arena-dice-container" id="diceContainer">
+          <div class="arena-die enemy-die e0" id="eDie0"><div class="die-face"></div></div>
+          <div class="arena-die enemy-die e1" id="eDie1"><div class="die-face"></div></div>
+          <div class="arena-die enemy-die e2" id="eDie2"><div class="die-face"></div></div>
+          <div class="arena-die player-die p0" id="pDie0"><div class="die-face"></div></div>
+          <div class="arena-die player-die p1" id="pDie1"><div class="die-face"></div></div>
+          <div class="arena-die player-die p2" id="pDie2"><div class="die-face"></div></div>
+        </div>
+        <div class="roll-result-badge" id="rollResult"></div>
+      </div>
+
+      <!-- Bottom: Player HUD + Narrator + Team + Roll -->
+      <div class="bottom-area">
+        <div class="player-hud-row">
+          <div class="player-hud-portrait" id="playerPortrait"></div>
+          <div class="player-hud-info">
+            <div class="player-hud-name" id="playerName"></div>
+            <div class="player-hud-hp-wrap">
+              <span class="player-hud-hp-label">HP</span>
+              <div class="hp-bar-outer"><div class="hp-bar-fill player" id="playerHpBar" style="width:100%"></div></div>
+              <span class="hp-num" id="playerHpText">7/7</span>
+            </div>
+          </div>
+        </div>
+        <div class="narrator-bar" id="narrator">Tap the <b>play</b> button to roll!</div>
+        <div class="team-row">
+          <div class="gems-btn" id="gemsBtn" onclick="toggleGems()">&#x1F48E;</div>
+          <div class="team-cards" id="teamCards"></div>
+          <button class="roll-btn" id="rollBtn" onclick="doRoll()">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="gems-panel" id="gemsPanel">
+      <div class="gem-row"><span class="gem-icon">&#x2744;&#xFE0F;</span> Ice Shards: <span class="gem-count" id="gemIce">0</span></div>
+      <div class="gem-row"><span class="gem-icon">&#x1F525;</span> Sacred Fires: <span class="gem-count" id="gemFire">0</span></div>
+    </div>
+  </div>
+
+  <!-- ══ BOSS REVEAL ══ -->
+  <div class="screen boss-reveal" id="bossScreen">
+    <div class="boss-portrait-wrap" id="bossPortrait"></div>
+    <div class="boss-name" id="bossName"></div>
+    <div class="boss-title">Legendary Spiritkin</div>
+    <div class="boss-ability" id="bossAbility"></div>
+    <button class="boss-fight-btn" onclick="startBossBattle()">CHALLENGE</button>
+  </div>
+
+  <!-- ══ CTA ══ -->
+  <div class="screen cta-screen" id="ctaScreen">
+    <div class="cta-result" id="ctaResult"></div>
+    <div class="cta-sub" id="ctaSub"></div>
+    <a class="cta-btn" href="https://www.battleoforigins.com" target="_blank">BACK ON KICKSTARTER</a>
+    <button class="cta-replay" onclick="restart()">Play Again</button>
+    <div class="cta-footer">Battle of Origins &middot; Coming September 2026</div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// HYPE AD — Battle of Origins Interactive Demo
+// ══════════════════════════════════════════════════════════════════
+
+const IMG = '../tierlist/cards/';
+const SFX_PATH = '../boo/';
+
+// ── AUDIO ──
+const sfx = {
+  roll:    new Audio(SFX_PATH + 'DiceRoll.mp3'),
+  dmg1:    new Audio(SFX_PATH + '1Damage.mp3'),
+  dmg2:    new Audio(SFX_PATH + '2Damage.mp3'),
+  dmg3:    new Audio(SFX_PATH + '3Damage.mp3'),
+  special: new Audio(SFX_PATH + 'Special.mp3'),
+  triples: new Audio(SFX_PATH + 'triples.mp3'),
+  win:     new Audio(SFX_PATH + 'winningwhistle.mp3'),
+};
+Object.values(sfx).forEach(a => { a.volume = 0.5; a.preload = 'auto'; });
+function playSound(key) { const s = sfx[key]; if (!s) return; s.currentTime = 0; s.play().catch(() => {}); }
+
+// ── SPIRITKIN DATABASE ──
+const ALL_GHOSTS = [
+  { name:"Gary", file:"gary.jpg", rarity:"common", maxHp:6, ability:"Swarm", abilityDesc:"Before rolling, enemy takes 1 damage." },
+  { name:"Hector", file:"hector.jpg", rarity:"ghost-rare", maxHp:6, ability:"Protector", abilityDesc:"Singles beat doubles. +1 damage on singles." },
+  { name:"Flora", file:"flora.jpg", rarity:"rare", maxHp:4, ability:"Restore", abilityDesc:"Roll doubles: +2 HP after damage." },
+  { name:"Stone Cold", file:"stone_cold.jpg", rarity:"rare", maxHp:7, ability:"One-two-one!", abilityDesc:"Roll double 1's: deal 3X damage." },
+  { name:"Pelter", file:"pelter.jpg", rarity:"rare", maxHp:5, ability:"Snowball", abilityDesc:"Doubles gain +2 damage." },
+  { name:"Patrick", file:"patrick.jpg", rarity:"common", maxHp:3, ability:"Stone Form", abilityDesc:"Don't roll. If opponent rolls singles: negate damage, deal 3." },
+  { name:"Wim", file:"wim.jpg", rarity:"rare", maxHp:6, ability:"Slash", abilityDesc:"+5 damage when all dice are odd." },
+  { name:"Nikon", file:"nikon.jpg", rarity:"common", maxHp:6, ability:"Ambush", abilityDesc:"Win first roll: deal triple damage." },
+  { name:"Kodako", file:"kodako.jpg", rarity:"common", maxHp:6, ability:"Swift", abilityDesc:"Roll 1-2-3: negate damage and deal 4." },
+  { name:"Guard Thomas", file:"guard_thomas.jpg", rarity:"uncommon", maxHp:6, ability:"Stoic", abilityDesc:"Below 6 HP: immune to singles damage." },
+  { name:"The Mountain King", file:"mountain_king_leg.jpg", rarity:"legendary", maxHp:9, ability:"Beast Mode", abilityDesc:"Doubles deal 2X damage." },
+  { name:"Lucy", file:"lucy.jpg", rarity:"legendary", maxHp:8, ability:"Blue Fire", abilityDesc:"Win a roll: +1 bonus damage." },
+];
+
+// Check if shoo.jpg exists, fallback
+const STARTERS = ALL_GHOSTS.filter(g => ["Gary","Hector","Flora","Stone Cold"].includes(g.name));
+const OPPONENTS = ALL_GHOSTS.filter(g => ["Wim","Nikon","Kodako","Guard Thomas"].includes(g.name));
+const BOSSES = ALL_GHOSTS.filter(g => g.rarity === 'legendary');
+
+// ── PIP PATTERNS ──
+const PIP_MAP = {
+  1: ['mc'], 2: ['tl','br'], 3: ['tl','mc','br'],
+  4: ['tl','tr','bl','br'], 5: ['tl','tr','mc','bl','br'],
+  6: ['tl','tr','ml','mr','bl','br']
+};
+
+function renderDieFace(el, value) {
+  const face = el.querySelector('.die-face');
+  if (!face) return;
+  const pips = PIP_MAP[value] || [];
+  face.innerHTML = pips.map(p => `<div class="pip ${p}"></div>`).join('');
+}
+
+// ── GAME STATE ──
+let state = {
+  player: null, enemy: null, boss: null,
+  playerHp: 0, enemyHp: 0, turn: 1, firstRoll: true,
+  iceShards: 0, sacredFires: 0,
+  phase: 'splash', rolling: false, team: [],
+};
+
+// ── DICE ENGINE ──
+function rollDice(count = 3) { return Array.from({length: count}, () => Math.floor(Math.random() * 6) + 1); }
+
+function analyzeRoll(dice) {
+  const sorted = [...dice].sort((a, b) => b - a);
+  const counts = {};
+  dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
+  const maxCount = Math.max(...Object.values(counts));
+  const matchVal = +Object.keys(counts).find(k => counts[k] === maxCount);
+  if (maxCount >= 6) return { type:'sixcity', value:matchVal, damage:6, dice:sorted, matchDie:matchVal };
+  if (maxCount === 5) return { type:'penta', value:matchVal, damage:5, dice:sorted, matchDie:matchVal };
+  if (maxCount === 4) return { type:'quads', value:matchVal, damage:4, dice:sorted, matchDie:matchVal };
+  if (maxCount === 3) return { type:'triples', value:matchVal, damage:3, dice:sorted, matchDie:matchVal };
+  if (maxCount === 2) {
+    const pairVal = +Object.keys(counts).find(k => counts[k] === 2);
+    const kicker = +Object.keys(counts).find(k => counts[k] === 1);
+    return { type:'doubles', value:pairVal, kicker, damage:2, dice:sorted, matchDie:pairVal };
+  }
+  return { type:'singles', value:sorted[0], damage:1, dice:sorted, matchDie:null };
+}
+
+function compareRolls(pRoll, eRoll) {
+  const rank = { singles:0, doubles:1, triples:2, quads:3, penta:4, sixcity:5 };
+  if (state.player?.ability === 'Protector' && pRoll.type === 'singles' && eRoll.type === 'doubles') return 1;
+  if (state.enemy?.ability === 'Protector' && eRoll.type === 'singles' && pRoll.type === 'doubles') return -1;
+  const pR = rank[pRoll.type] ?? 0, eR = rank[eRoll.type] ?? 0;
+  if (pR !== eR) return pR > eR ? 1 : -1;
+  if (['triples','quads','penta','sixcity'].includes(pRoll.type)) return pRoll.value > eRoll.value ? 1 : pRoll.value < eRoll.value ? -1 : 0;
+  if (pRoll.type === 'doubles') {
+    if (pRoll.value !== eRoll.value) return pRoll.value > eRoll.value ? 1 : -1;
+    return pRoll.kicker > eRoll.kicker ? 1 : pRoll.kicker < eRoll.kicker ? -1 : 0;
+  }
+  for (let i = 0; i < Math.max(pRoll.dice.length, eRoll.dice.length); i++) {
+    if ((pRoll.dice[i]||0) > (eRoll.dice[i]||0)) return 1;
+    if ((pRoll.dice[i]||0) < (eRoll.dice[i]||0)) return -1;
+  }
+  return 0;
+}
+
+function typeLabel(type) {
+  return { sixcity:'SIX CITY!!', penta:'PENTA!', quads:'QUADS!', triples:'TRIPLES!', doubles:'Doubles', singles:'Singles' }[type] || type;
+}
+
+// ── ABILITIES ──
+function applyAbilities(winner, loser, roll, baseDmg, isPlayer) {
+  let damage = baseDmg;
+  let effects = [];
+  switch (winner.ability) {
+    case 'Protector': if (roll.type === 'singles') { damage += 1; effects.push({name:'Protector',desc:'+1 damage on singles!'}); } break;
+    case 'One-two-one!': if (roll.type === 'doubles' && roll.value === 1) { damage *= 3; effects.push({name:'One-two-one!',desc:'Double 1\'s! 3X DAMAGE!'}); } break;
+    case 'Slash': if (roll.dice.every(d => d % 2 === 1)) { damage += 5; effects.push({name:'Slash',desc:'All odd! +5 damage!'}); } break;
+    case 'Ambush': if (state.firstRoll) { damage *= 3; effects.push({name:'Ambush',desc:'First strike! 3X damage!'}); } break;
+    case 'Swift':
+      if (roll.dice.length >= 3 && [1,2,3].every(n => roll.dice.includes(n))) { damage = 4; effects.push({name:'Swift',desc:'1-2-3! Deal 4!'}); }
+      break;
+    case 'Blue Fire': damage += 1; effects.push({name:'Blue Fire',desc:'+1 bonus damage!'}); break;
+    case 'Beast Mode': if (roll.type === 'doubles') { damage *= 2; effects.push({name:'Beast Mode',desc:'Doubles! 2X DAMAGE!'}); } break;
+    case 'Snowball': if (roll.type === 'doubles') { damage += 2; effects.push({name:'Snowball',desc:'Doubles +2 damage!'}); } break;
+    case 'Alpine Aura':
+      // Heal handled post-damage
+      break;
+  }
+  return { damage, effects };
+}
+
+function applyDefense(defender, damage, attackRoll) {
+  if (defender.ability === 'Stoic') {
+    const hp = state.player === defender ? state.playerHp : state.enemyHp;
+    if (hp < 6 && attackRoll.type === 'singles') return { damage: 0, blocked: true };
+  }
+  if (defender.ability === 'Stone Form') {
+    if (attackRoll.type === 'singles') return { damage: -3, blocked: false, counter: true };
+  }
+  return { damage, blocked: false };
+}
+
+// ── SCREEN MANAGEMENT ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── SPLASH ──
+function initSplash() {
+  const container = document.getElementById('splashCards');
+  const previewGhosts = ['gary','hector','flora','stone_cold','wim'];
+  const rotations = [-12, -6, 0, 6, 12];
+  container.innerHTML = previewGhosts.map((g, i) =>
+    `<div class="splash-card-preview" style="--rot:${rotations[i]}deg"><img src="${IMG}${g}.jpg"></div>`
+  ).join('');
+}
+initSplash();
+
+function goToSelect() {
+  showScreen('selectScreen');
+  buildSelectGrid();
+  state.phase = 'select';
+}
+
+function buildSelectGrid() {
+  const grid = document.getElementById('selectGrid');
+  grid.innerHTML = '';
+  STARTERS.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'select-card';
+    card.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}"><div class="card-label"></div>`;
+    card.onclick = () => selectStarter(g, card);
+    grid.appendChild(card);
+  });
+}
+
+let selectedStarter = null;
+function selectStarter(ghost, el) {
+  selectedStarter = ghost;
+  document.querySelectorAll('.select-card').forEach(c => c.classList.remove('picked'));
+  el.classList.add('picked');
+  document.getElementById('selectConfirm').classList.add('visible');
+}
+
+function confirmSelect() {
+  if (!selectedStarter) return;
+  state.player = { ...selectedStarter, hp: selectedStarter.maxHp };
+  state.playerHp = selectedStarter.maxHp;
+
+  // Build team: player + 2 random others from starters
+  const others = STARTERS.filter(g => g.name !== selectedStarter.name).sort(() => Math.random() - .5);
+  state.team = [state.player, ...others.slice(0, 2).map(g => ({...g, hp: g.maxHp}))];
+
+  state.enemy = pickOpponent();
+  state.enemyHp = state.enemy.maxHp;
+  state.turn = 1;
+  state.firstRoll = true;
+  state.iceShards = 0;
+  state.sacredFires = 0;
+  state.phase = 'battle';
+
+  showVsSplash(() => { showScreen('arenaScreen'); renderArena(); });
+}
+
+function pickOpponent() {
+  const pick = OPPONENTS[Math.floor(Math.random() * OPPONENTS.length)];
+  return { ...pick, hp: pick.maxHp };
+}
+
+// ── VS SPLASH ──
+function showVsSplash(callback) {
+  const splash = document.getElementById('vsSplash');
+  document.getElementById('vsPlayerPortrait').innerHTML = `<img src="${IMG}${state.player.file}">`;
+  document.getElementById('vsPlayerName').textContent = state.player.name;
+  document.getElementById('vsEnemyPortrait').innerHTML = `<img src="${IMG}${state.enemy.file}">`;
+  document.getElementById('vsEnemyName').textContent = state.enemy.name;
+  splash.classList.add('active');
+  setTimeout(() => { splash.classList.remove('active'); callback(); }, 1800);
+}
+
+// ── RENDER ARENA ──
+function renderArena() {
+  // Enemy
+  document.getElementById('enemyPortrait').innerHTML = `<img src="${IMG}${state.enemy.file}">`;
+  document.getElementById('enemyName').textContent = state.enemy.name;
+  updateEnemyHpLabel();
+
+  // Player
+  document.getElementById('playerPortrait').innerHTML = `<img src="${IMG}${state.player.file}">`;
+  document.getElementById('playerName').textContent = state.player.name;
+  updateHp();
+
+  // Turn
+  document.getElementById('turnNum').textContent = state.turn;
+
+  // Reset dice to "?"
+  for (let i = 0; i < 3; i++) {
+    const ed = document.getElementById('eDie' + i);
+    const pd = document.getElementById('pDie' + i);
+    ed.querySelector('.die-face').innerHTML = '<span style="font-size:1.2rem;opacity:.4">?</span>';
+    pd.querySelector('.die-face').innerHTML = '<span style="font-size:1.2rem;opacity:.4">?</span>';
+    ed.classList.remove('winner-die','rolling');
+    pd.classList.remove('winner-die','rolling');
+  }
+
+  // Team cards
+  renderTeamCards();
+
+  // Gems
+  updateGems();
+
+  // Narrator
+  setNarrator('Tap the <b>play</b> button to roll!');
+
+  // Roll result
+  const rr = document.getElementById('rollResult');
+  rr.className = 'roll-result-badge';
+  rr.textContent = '';
+
+  // Enable roll
+  document.getElementById('rollBtn').disabled = false;
+}
+
+function updateEnemyHpLabel() {
+  document.getElementById('enemyHpLabel').textContent = `HP ${Math.max(0,state.enemyHp)}/${state.enemy.maxHp}`;
+  const ep = Math.max(0, state.enemyHp / state.enemy.maxHp * 100);
+  document.getElementById('enemyHpBar').style.width = ep + '%';
+}
+
+function updateHp() {
+  const pp = Math.max(0, state.playerHp / state.player.maxHp * 100);
+  document.getElementById('playerHpBar').style.width = pp + '%';
+  document.getElementById('playerHpText').textContent = Math.max(0, state.playerHp) + '/' + state.player.maxHp;
+  updateEnemyHpLabel();
+}
+
+function renderTeamCards() {
+  const el = document.getElementById('teamCards');
+  el.innerHTML = '';
+  state.team.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'team-card' + (g.name === state.player.name ? ' active' : '') + (g.hp <= 0 ? ' dead' : '');
+    card.innerHTML = `<img src="${IMG}${g.file}" alt="${g.name}">`;
+    el.appendChild(card);
+  });
+}
+
+function updateGems() {
+  document.getElementById('gemIce').textContent = state.iceShards;
+  document.getElementById('gemFire').textContent = state.sacredFires;
+}
+
+function toggleGems() { document.getElementById('gemsPanel').classList.toggle('open'); }
+function setNarrator(html) { document.getElementById('narrator').innerHTML = html; }
+
+// ── ROLL ──
+async function doRoll() {
+  if (state.rolling) return;
+  state.rolling = true;
+  document.getElementById('rollBtn').disabled = true;
+  document.getElementById('gemsPanel').classList.remove('open');
+
+  // Pre-roll: Gary's Swarm
+  if (state.player.ability === 'Swarm') {
+    state.enemyHp -= 1;
+    updateHp();
+    setNarrator('<span class="ability-tag">Swarm!</span> Enemy takes 1 damage!');
+    showAbilityPopup('Swarm', 'Enemy takes 1 damage!');
+    playSound('special');
+    await wait(700);
+    if (state.enemyHp <= 0) { await handleKO(true); return; }
+  }
+  if (state.enemy.ability === 'Swarm') {
+    state.playerHp -= 1;
+    updateHp();
+    setNarrator('<span class="ability-tag">Swarm!</span> ' + state.enemy.name + ' deals 1 damage!');
+    await wait(700);
+    if (state.playerHp <= 0) { await handleKO(false); return; }
+  }
+
+  // Stone Form — player version
+  if (state.player.ability === 'Stone Form') {
+    // Don't roll player dice
+    const eDice = rollDice(3);
+    playSound('roll');
+    // Animate enemy dice
+    for (let frame = 0; frame < 6; frame++) {
+      const fake = rollDice(3);
+      for (let i = 0; i < 3; i++) {
+        const ed = document.getElementById('eDie' + i);
+        ed.classList.add('rolling');
+        renderDieFace(ed, fake[i]);
+      }
+      await wait(70);
+    }
+    for (let i = 0; i < 3; i++) {
+      const ed = document.getElementById('eDie' + i);
+      ed.classList.remove('rolling');
+      renderDieFace(ed, eDice[i]);
+    }
+    // Player doesn't roll
+    for (let i = 0; i < 3; i++) {
+      document.getElementById('pDie' + i).querySelector('.die-face').innerHTML = '<span style="font-size:.8rem;opacity:.5">&#x1F9CA;</span>';
+    }
+    await wait(400);
+    const eRoll = analyzeRoll(eDice);
+    if (eRoll.type === 'singles') {
+      // Counter!
+      state.enemyHp -= 3;
+      updateHp();
+      flashDamage('enemy-hit');
+      showFloatingDmg(3, 'player-dealt');
+      triggerShake();
+      playSound('dmg3');
+      showAbilityPopup('Stone Form', 'Negate + deal 3!');
+      setNarrator(`<b>Stone Form!</b> Negated singles, dealt <b>3 damage</b>!`);
+    } else {
+      // Takes damage
+      const dmg = eRoll.damage;
+      state.playerHp -= dmg;
+      updateHp();
+      flashDamage('player-hit');
+      showFloatingDmg(dmg, 'enemy-dealt');
+      triggerShake();
+      playSound(dmg >= 3 ? 'dmg3' : dmg >= 2 ? 'dmg2' : 'dmg1');
+      setNarrator(`<b>${state.enemy.name}</b> rolled ${typeLabel(eRoll.type).toLowerCase()} — <b>${dmg} damage</b>!`);
+    }
+    if (state.enemyHp <= 0) { await wait(600); await handleKO(true); return; }
+    if (state.playerHp <= 0) { await wait(600); await handleKO(false); return; }
+    state.turn++;
+    state.firstRoll = false;
+    document.getElementById('turnNum').textContent = state.turn;
+    syncTeamHp();
+    await wait(300);
+    state.rolling = false;
+    document.getElementById('rollBtn').disabled = false;
+    return;
+  }
+
+  // Normal roll
+  playSound('roll');
+  const pDice = rollDice(3);
+  const eDice = rollDice(3);
+
+  // Animate dice
+  for (let frame = 0; frame < 7; frame++) {
+    const fakeP = rollDice(3), fakeE = rollDice(3);
+    for (let i = 0; i < 3; i++) {
+      const pd = document.getElementById('pDie' + i);
+      const ed = document.getElementById('eDie' + i);
+      pd.classList.add('rolling'); ed.classList.add('rolling');
+      renderDieFace(pd, fakeP[i]);
+      renderDieFace(ed, fakeE[i]);
+    }
+    await wait(65);
+  }
+  // Final values
+  for (let i = 0; i < 3; i++) {
+    const pd = document.getElementById('pDie' + i);
+    const ed = document.getElementById('eDie' + i);
+    pd.classList.remove('rolling'); ed.classList.remove('rolling');
+    renderDieFace(pd, pDice[i]);
+    renderDieFace(ed, eDice[i]);
+  }
+
+  const pRoll = analyzeRoll(pDice);
+  const eRoll = analyzeRoll(eDice);
+  const result = compareRolls(pRoll, eRoll);
+
+  await wait(350);
+
+  const rrEl = document.getElementById('rollResult');
+
+  if (result > 0) {
+    // Player wins
+    rrEl.textContent = typeLabel(pRoll.type) + ' — YOU WIN!';
+    rrEl.className = 'roll-result-badge visible win';
+
+    const { damage, effects } = applyAbilities(state.player, state.enemy, pRoll, pRoll.damage, true);
+    const def = applyDefense(state.enemy, damage, pRoll);
+    let finalDmg = def.damage;
+
+    for (const eff of effects) {
+      showAbilityPopup(eff.name, eff.desc);
+      playSound('special');
+      await wait(500);
+    }
+
+    if (def.blocked) {
+      setNarrator(`<b>${state.enemy.name}</b> blocked the attack!`);
+      playSound('special');
+    } else if (def.counter) {
+      // Stone Form counter from enemy
+      state.playerHp += finalDmg; // finalDmg is negative (-3)
+      updateHp();
+      flashDamage('player-hit');
+      showFloatingDmg(3, 'enemy-dealt');
+      triggerShake();
+      playSound('dmg3');
+      showAbilityPopup('Stone Form', 'Counter! Deal 3!');
+      setNarrator(`<b>${state.enemy.name}'s Stone Form!</b> Counter <b>3 damage</b>!`);
+    } else if (finalDmg > 0) {
+      state.enemyHp -= finalDmg;
+      updateHp();
+      flashDamage('enemy-hit');
+      showFloatingDmg(finalDmg, 'player-dealt');
+      triggerShake();
+      playSound(finalDmg >= 3 ? 'dmg3' : finalDmg >= 2 ? 'dmg2' : 'dmg1');
+      if (pRoll.type === 'triples' || pRoll.type === 'quads') playSound('triples');
+      setNarrator(`<b>You</b> rolled ${typeLabel(pRoll.type).toLowerCase()} — <b>${finalDmg} damage</b>!`);
+    }
+
+    // Flora heal
+    if (state.player.ability === 'Restore' && pRoll.type === 'doubles') {
+      await wait(400);
+      state.playerHp = Math.min(state.player.maxHp, state.playerHp + 2);
+      updateHp(); showAbilityPopup('Restore', '+2 HP!'); playSound('special');
+    }
+    // Snowball bonus already handled in applyAbilities
+
+    if (state.enemyHp <= 0) { await wait(600); await handleKO(true); return; }
+
+  } else if (result < 0) {
+    // Enemy wins
+    rrEl.textContent = typeLabel(eRoll.type) + ' — ENEMY WINS!';
+    rrEl.className = 'roll-result-badge visible lose';
+
+    const { damage, effects } = applyAbilities(state.enemy, state.player, eRoll, eRoll.damage, false);
+    const def = applyDefense(state.player, damage, eRoll);
+    let finalDmg = def.damage;
+
+    for (const eff of effects) {
+      showAbilityPopup(eff.name, eff.desc); await wait(500);
+    }
+
+    if (def.blocked) {
+      setNarrator(`<b>${state.player.name}</b> blocked!`);
+      playSound('special');
+    } else if (def.counter) {
+      // Player Stone Form counter
+      state.enemyHp -= 3;
+      updateHp();
+      flashDamage('enemy-hit');
+      showFloatingDmg(3, 'player-dealt');
+      triggerShake();
+      playSound('dmg3');
+      showAbilityPopup('Stone Form', 'Counter! Deal 3!');
+      setNarrator(`<b>Stone Form!</b> Negated + dealt <b>3 damage</b>!`);
+      if (state.enemyHp <= 0) { await wait(600); await handleKO(true); return; }
+    } else if (finalDmg > 0) {
+      state.playerHp -= finalDmg;
+      updateHp();
+      flashDamage('player-hit');
+      showFloatingDmg(finalDmg, 'enemy-dealt');
+      triggerShake();
+      playSound(finalDmg >= 3 ? 'dmg3' : finalDmg >= 2 ? 'dmg2' : 'dmg1');
+      setNarrator(`<b>${state.enemy.name}</b> rolled ${typeLabel(eRoll.type).toLowerCase()} — <b>${finalDmg} damage</b>!`);
+    }
+
+    // Enemy Flora heal
+    if (state.enemy.ability === 'Restore' && eRoll.type === 'doubles') {
+      await wait(400);
+      state.enemyHp = Math.min(state.enemy.maxHp, state.enemyHp + 2);
+      updateHp();
+    }
+
+    if (state.playerHp <= 0) { await wait(600); await handleKO(false); return; }
+
+  } else {
+    rrEl.textContent = 'TIE — Roll again!';
+    rrEl.className = 'roll-result-badge visible tie';
+    setNarrator('Both rolled <b>' + typeLabel(pRoll.type).toLowerCase() + '</b> — tie!');
+  }
+
+  state.turn++;
+  state.firstRoll = false;
+  document.getElementById('turnNum').textContent = state.turn;
+  syncTeamHp();
+
+  await wait(400);
+  rrEl.classList.remove('visible');
+  state.rolling = false;
+  document.getElementById('rollBtn').disabled = false;
+}
+
+function syncTeamHp() {
+  const t = state.team.find(g => g.name === state.player.name);
+  if (t) t.hp = state.playerHp;
+  renderTeamCards();
+}
+
+async function handleKO(playerWon) {
+  state.rolling = false;
+  if (playerWon) {
+    setNarrator(`<b>${state.enemy.name}</b> is defeated!`);
+    playSound('triples');
+    await wait(1200);
+    if (state.phase === 'boss-battle') {
+      playSound('win');
+      showCTA(true);
+    } else {
+      showBossReveal();
+    }
+  } else {
+    setNarrator(`<b>${state.player.name}</b> has fallen!`);
+    await wait(1000);
+    const alive = state.team.filter(g => g.hp > 0 && g.name !== state.player.name);
+    if (alive.length > 0) {
+      state.player = alive[0];
+      state.playerHp = alive[0].hp;
+      state.firstRoll = true;
+      if (state.phase === 'boss-battle') {
+        showVsSplash(() => { showScreen('arenaScreen'); renderArena(); setNarrator(`<b>${state.player.name}</b> enters the fight!`); });
+      } else {
+        renderArena();
+        setNarrator(`<b>${state.player.name}</b> steps up!`);
+        state.rolling = false;
+        document.getElementById('rollBtn').disabled = false;
+      }
+    } else {
+      showCTA(false);
+    }
+  }
+}
+
+// ── BOSS REVEAL ──
+function showBossReveal() {
+  state.boss = BOSSES[Math.floor(Math.random() * BOSSES.length)];
+  document.getElementById('bossPortrait').innerHTML = `<img src="${IMG}${state.boss.file}">`;
+  document.getElementById('bossName').textContent = state.boss.name;
+  document.getElementById('bossAbility').innerHTML = `<b>${state.boss.ability}</b> — ${state.boss.abilityDesc}`;
+  showScreen('bossScreen');
+  state.phase = 'boss-reveal';
+  playSound('special');
+}
+
+function startBossBattle() {
+  state.enemy = { ...state.boss, hp: state.boss.maxHp };
+  state.enemyHp = state.boss.maxHp;
+  state.turn = 1;
+  state.firstRoll = true;
+  state.phase = 'boss-battle';
+  showVsSplash(() => { showScreen('arenaScreen'); renderArena(); setNarrator(`<b>${state.boss.name}</b> enters the arena!`); });
+}
+
+// ── CTA ──
+function showCTA(won) {
+  const r = document.getElementById('ctaResult');
+  const s = document.getElementById('ctaSub');
+  if (won) {
+    r.textContent = 'VICTORY!';
+    r.className = 'cta-result win';
+    s.textContent = 'You defeated ' + (state.boss?.name || 'the boss') + '! Think you can handle the full game? 100+ Spiritkin, epic battles, and a world to explore.';
+  } else {
+    r.textContent = 'DEFEATED!';
+    r.className = 'cta-result lose';
+    s.textContent = 'The arena claims another challenger. 100+ Spiritkin and countless strategies await — every rematch tells a different story.';
+  }
+  showScreen('ctaScreen');
+  state.phase = 'cta';
+}
+
+// ── EFFECTS ──
+function flashDamage(cls) {
+  const el = document.getElementById('damageFlash');
+  el.className = 'damage-flash hit ' + cls;
+  setTimeout(() => el.className = 'damage-flash', 200);
+}
+function showFloatingDmg(amount, cls) {
+  const el = document.createElement('div');
+  el.className = 'float-dmg ' + cls;
+  el.textContent = '-' + amount;
+  document.querySelector('.arena-content').appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+function triggerShake() {
+  const app = document.getElementById('app');
+  app.classList.add('shake');
+  setTimeout(() => app.classList.remove('shake'), 300);
+}
+function showAbilityPopup(name, desc) {
+  const el = document.createElement('div');
+  el.className = 'ability-popup';
+  el.innerHTML = `<div class="ab-name">${name}</div><div class="ab-desc">${desc}</div>`;
+  document.querySelector('.arena-content').appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function restart() {
+  selectedStarter = null;
+  state = { player:null, enemy:null, boss:null, playerHp:0, enemyHp:0, turn:1, firstRoll:true, iceShards:0, sacredFires:0, phase:'splash', rolling:false, team:[] };
+  showScreen('splashScreen');
+}
+</script>
+</body>
+</html>
