@@ -24,6 +24,7 @@ canvas{display:block;}
 
 // ── SECTION 1: CONSTANTS & DATA ──────────────────────────────────
 
+const S = window.devicePixelRatio || 1;
 const W = 430, H = 932;
 const IMG = '../tierlist/cards/';
 const SFX_PATH = '../boo/';
@@ -181,6 +182,7 @@ class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
   preload() {
+    this.cameras.main.setZoom(S);
     // Progress bar
     const cx = W/2, cy = H/2;
     const barW = 260, barH = 16;
@@ -228,7 +230,7 @@ class SplashScene extends Phaser.Scene {
   constructor() { super('SplashScene'); }
 
   create() {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2, cy = H/2;
 
     // Background gradient
@@ -339,7 +341,7 @@ class SelectScene extends Phaser.Scene {
   constructor() { super('SelectScene'); }
 
   create() {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2;
     this.selected = null;
     this.cardContainers = [];
@@ -487,7 +489,7 @@ class VSScene extends Phaser.Scene {
   constructor() { super('VSScene'); }
 
   create() {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2, cy = H/2;
 
     // Black bg
@@ -572,7 +574,7 @@ class ArenaScene extends Phaser.Scene {
   constructor() { super('ArenaScene'); }
 
   create() {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2;
     this.rolling = false;
 
@@ -1374,7 +1376,7 @@ class BossScene extends Phaser.Scene {
   constructor() { super('BossScene'); }
 
   create() {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2, cy = H/2;
 
     // Dark red background
@@ -1497,7 +1499,7 @@ class CTAScene extends Phaser.Scene {
   constructor() { super('CTAScene'); }
 
   create(data) {
-
+    this.cameras.main.setZoom(S);
     const cx = W/2, cy = H/2;
     const won = data && data.won;
 
@@ -1604,15 +1606,15 @@ class CTAScene extends Phaser.Scene {
 
 // Wait for Bangers font to load
 document.fonts.ready.then(() => {
+  // Native resolution canvas — no browser upscaling
   const config = {
     type: Phaser.WEBGL,
     parent: 'game-container',
-    width: W,
-    height: H,
+    width: Math.round(W * S),
+    height: Math.round(H * S),
     backgroundColor: '#0a0a14',
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      mode: Phaser.Scale.NONE,
     },
     render: {
       antialias: false,
@@ -1621,6 +1623,25 @@ document.fonts.ready.then(() => {
   };
 
   const game = new Phaser.Game(config);
+
+  // CSS-fit the canvas to the viewport (since Scale.NONE won't do it)
+  function fitCanvas() {
+    const canvas = game.canvas;
+    if (!canvas) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const aspect = W / H;
+    let cw, ch;
+    if (vw / vh < aspect) { cw = vw; ch = vw / aspect; }
+    else { ch = vh; cw = vh * aspect; }
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+    canvas.style.position = 'absolute';
+    canvas.style.left = ((vw - cw) / 2) + 'px';
+    canvas.style.top = ((vh - ch) / 2) + 'px';
+  }
+  game.events.once('ready', fitCanvas);
+  window.addEventListener('resize', fitCanvas);
 });
 </script>
 </body>
