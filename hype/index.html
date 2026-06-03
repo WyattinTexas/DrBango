@@ -165,21 +165,7 @@ function delay(scene, ms) {
   return new Promise(r => scene.time.delayedCall(ms, r));
 }
 
-// ── SECTION 7: HIDPI CAMERA SETUP ───────────────────────────────
-
-function setupHiDPI(scene) {
-  // Zoom camera so our 430×932 coordinates map to the DPR-scaled canvas
-  // Camera zoom centers on the viewport, which is W*DPR × H*DPR
-  // With zoom=DPR, visible area = (W*DPR/DPR) × (H*DPR/DPR) = W × H
-  scene.cameras.main.setZoom(DPR);
-  // Scroll so top-left is at (0,0) in game coords
-  scene.cameras.main.scrollX = 0;
-  scene.cameras.main.scrollY = 0;
-  // Center the camera on the middle of our logical viewport
-  scene.cameras.main.centerOn(W/2, H/2);
-}
-
-// ── SECTION 8: HP COLOR HELPER ──────────────────────────────────
+// ── SECTION 7: HP COLOR HELPER ──────────────────────────────────
 
 function hpColor(hp, maxHp) {
   const pct = hp / maxHp;
@@ -243,7 +229,7 @@ class SplashScene extends Phaser.Scene {
   constructor() { super('SplashScene'); }
 
   create() {
-    setupHiDPI(this);
+
     const cx = W/2, cy = H/2;
 
     // Background gradient
@@ -354,7 +340,7 @@ class SelectScene extends Phaser.Scene {
   constructor() { super('SelectScene'); }
 
   create() {
-    setupHiDPI(this);
+
     const cx = W/2;
     this.selected = null;
     this.cardContainers = [];
@@ -502,7 +488,7 @@ class VSScene extends Phaser.Scene {
   constructor() { super('VSScene'); }
 
   create() {
-    setupHiDPI(this);
+
     const cx = W/2, cy = H/2;
 
     // Black bg
@@ -587,7 +573,7 @@ class ArenaScene extends Phaser.Scene {
   constructor() { super('ArenaScene'); }
 
   create() {
-    setupHiDPI(this);
+
     const cx = W/2;
     this.rolling = false;
 
@@ -1389,7 +1375,7 @@ class BossScene extends Phaser.Scene {
   constructor() { super('BossScene'); }
 
   create() {
-    setupHiDPI(this);
+
     const cx = W/2, cy = H/2;
 
     // Dark red background
@@ -1512,7 +1498,7 @@ class CTAScene extends Phaser.Scene {
   constructor() { super('CTAScene'); }
 
   create(data) {
-    setupHiDPI(this);
+
     const cx = W/2, cy = H/2;
     const won = data && data.won;
 
@@ -1619,17 +1605,14 @@ class CTAScene extends Phaser.Scene {
 
 // Wait for Bangers font to load
 document.fonts.ready.then(() => {
-  // HiDPI fix: render at native device resolution for crisp images/text
-  const dpr = Math.min(window.devicePixelRatio || 1, 3); // cap at 3x
   const config = {
-    type: Phaser.CANVAS,  // Canvas2D gives crisper image scaling than WebGL
+    type: Phaser.CANVAS,
     parent: 'game-container',
-    width: W * dpr,
-    height: H * dpr,
+    width: W,
+    height: H,
     backgroundColor: '#0a0a14',
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      mode: Phaser.Scale.NONE,  // We handle sizing ourselves for HiDPI
     },
     render: {
       pixelArt: false,
@@ -1639,6 +1622,46 @@ document.fonts.ready.then(() => {
   };
 
   const game = new Phaser.Game(config);
+
+  // HiDPI: After Phaser creates the canvas, override buffer to DPR resolution
+  // and use CSS to fit it to the viewport while keeping the high-res buffer
+  game.events.on('ready', () => {
+    const canvas = game.canvas;
+    const dpr = DPR;
+
+    // Set the actual canvas buffer to DPR resolution
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+
+    // Scale the 2D context so our 430×932 draw calls fill the larger buffer
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // CSS: fit canvas to viewport while maintaining aspect ratio
+    function resizeCanvas() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const aspect = W / H;
+      let cw, ch;
+      if (vw / vh < aspect) {
+        cw = vw;
+        ch = vw / aspect;
+      } else {
+        ch = vh;
+        cw = vh * aspect;
+      }
+      canvas.style.width = cw + 'px';
+      canvas.style.height = ch + 'px';
+      canvas.style.position = 'absolute';
+      canvas.style.left = ((vw - cw) / 2) + 'px';
+      canvas.style.top = ((vh - ch) / 2) + 'px';
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Tell Phaser's input system about the actual display size
+    game.scale.resize(W, H);
+  });
 });
 </script>
 </body>
