@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Digital Ego</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #060606;
+    --surface: #0e0e0e;
+    --card: #111111;
+    --border: #1a1a1a;
+    --border-bright: #2a2a2a;
+    --text: #e4e4e4;
+    --text-dim: #6a6a6a;
+    --text-muted: #3a3a3a;
+    --red: #c0392b;
+    --red-glow: #e74c3c;
+    --red-dim: #8b1a1a;
+    --serif: 'Instrument Serif', Georgia, serif;
+    --sans: 'DM Sans', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background: var(--bg);
+    overflow-x: hidden;
+  }
+
+  body {
+    font-family: var(--sans);
+    color: var(--text);
+    background: var(--bg);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Noise overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Scroll-triggered fade ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-delay-1 { transition-delay: 0.12s; }
+  .reveal-delay-2 { transition-delay: 0.24s; }
+  .reveal-delay-3 { transition-delay: 0.36s; }
+  .reveal-delay-4 { transition-delay: 0.48s; }
+  .reveal-delay-5 { transition-delay: 0.6s; }
+
+  /* ── Section container ── */
+  section {
+    position: relative;
+    padding: 120px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 768px) {
+    section { padding: 80px 24px; }
+  }
+
+  /* ── Divider line ── */
+  .divider {
+    width: 60px;
+    height: 2px;
+    background: var(--red);
+    margin: 0 auto 60px;
+    box-shadow: 0 0 20px var(--red-dim);
+  }
+
+  /* ══════════════════════════════════
+     HERO
+  ══════════════════════════════════ */
+  .hero {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 60px 40px;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(192,57,43,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeUp 1s 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(56px, 10vw, 140px);
+    line-height: 0.95;
+    letter-spacing: -2px;
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeUp 1s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--red);
+  }
+
+  .hero-sub {
+    font-size: clamp(18px, 2.5vw, 26px);
+    font-weight: 300;
+    color: var(--text-dim);
+    max-width: 600px;
+    line-height: 1.5;
+    opacity: 0;
+    animation: fadeUp 1s 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    opacity: 0;
+    animation: fadeUp 1s 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .hero-scroll .arrow {
+    width: 1px; height: 40px;
+    background: linear-gradient(to bottom, var(--text-muted), transparent);
+    animation: pulse-down 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-down {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.3); }
+  }
+
+  /* ══════════════════════════════════
+     SECTION HEADERS
+  ══════════════════════════════════ */
+  .section-number {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--red);
+    letter-spacing: 3px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    font-family: var(--serif);
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 400;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    letter-spacing: -1px;
+  }
+
+  .section-subtitle {
+    font-size: 18px;
+    color: var(--text-dim);
+    font-weight: 300;
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 60px;
+  }
+
+  /* ══════════════════════════════════
+     HOW IT WORKS — STEPS
+  ══════════════════════════════════ */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.3s;
+  }
+  .step:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-2px);
+  }
+
+  .step::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--red), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .step:hover::before { opacity: 1; }
+
+  .step-num {
+    font-family: var(--serif);
+    font-size: 48px;
+    color: var(--red-dim);
+    line-height: 1;
+    margin-bottom: 20px;
+  }
+
+  .step h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+
+  .step p {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  /* ══════════════════════════════════
+     PERSONALITY LAYER — DNA STRANDS
+  ══════════════════════════════════ */
+  .dna-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2px;
+    margin-top: 40px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .dna-strand {
+    background: var(--card);
+    padding: 40px 32px;
+    position: relative;
+    cursor: default;
+    transition: background 0.4s;
+  }
+  .dna-strand:hover { background: #151515; }
+
+  .dna-strand .icon {
+    font-size: 28px;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(0.3);
+  }
+
+  .dna-strand h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dna-strand .tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--red);
+    background: rgba(192,57,43,0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .dna-strand p {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .dna-strand .sample {
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    border-left: 2px solid var(--red-dim);
+    line-height: 1.6;
+  }
+
+  /* ══════════════════════════════════
+     LIVE DEMO — CHAT MOCKUP
+  ══════════════════════════════════ */
+  .chat-device {
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+  }
+
+  .chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,10,0.8);
+    backdrop-filter: blur(20px);
+  }
+
+  .chat-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: #fff;
+    flex-shrink: 0;
+  }
+
+  .chat-header-info .chat-name { font-weight: 600; font-size: 15px; }
+  .chat-header-info .chat-status { font-size: 11px; color: var(--text-dim); }
+
+  .chat-messages {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 400px;
+  }
+
+  .chat-bubble {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 18px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+    animation: bubbleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .chat-bubble.user-bubble {
+    align-self: flex-end;
+    background: #1a3a5c;
+    color: #fff;
+    border-bottom-right-radius: 6px;
+  }
+
+  .chat-bubble.ego-bubble {
+    align-self: flex-start;
+    background: #1c1c1c;
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 6px;
+    color: var(--text);
+  }
+
+  .chat-gap { height: 10px; }
+
+  .chat-bubble:nth-child(1)  { animation-delay: 0.6s; }
+  .chat-bubble:nth-child(2)  { animation-delay: 1.4s; }
+  .chat-bubble:nth-child(3)  { animation-delay: 1.6s; }
+  .chat-bubble:nth-child(4)  { animation-delay: 2.8s; }
+  .chat-bubble:nth-child(5)  { animation-delay: 3.6s; }
+  .chat-bubble:nth-child(6)  { animation-delay: 3.8s; }
+  .chat-bubble:nth-child(7)  { animation-delay: 5.0s; }
+  .chat-bubble:nth-child(8)  { animation-delay: 5.8s; }
+  .chat-bubble:nth-child(9)  { animation-delay: 7.0s; }
+  .chat-bubble:nth-child(10) { animation-delay: 7.8s; }
+  .chat-bubble:nth-child(11) { animation-delay: 8.0s; }
+
+  @keyframes bubbleIn {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .chat-input-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: rgba(10,10,10,0.6);
+  }
+  .chat-input-bar .fake-input {
+    flex: 1;
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 10px 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .chat-input-bar .send-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #fff;
+  }
+
+  /* ══════════════════════════════════
+     ARCHITECTURE DIAGRAM
+  ══════════════════════════════════ */
+  .arch-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 60px auto 0;
+    max-width: 900px;
+    flex-wrap: wrap;
+  }
+
+  .arch-node {
+    text-align: center;
+    padding: 24px 20px;
+    min-width: 140px;
+    flex: 1;
+  }
+
+  .arch-node .arch-icon {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .arch-node .arch-label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .arch-node .arch-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  .arch-arrow {
+    color: var(--red-dim);
+    font-size: 22px;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+
+  @media (max-width: 600px) {
+    .arch-flow {
+      flex-direction: column;
+      gap: 0;
+    }
+    .arch-arrow {
+      transform: rotate(90deg);
+      padding: 4px 0;
+    }
+  }
+
+  /* Prompt structure visualization */
+  .prompt-anatomy {
+    max-width: 560px;
+    margin: 48px auto 0;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--card);
+  }
+
+  .prompt-anatomy .pa-header {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .prompt-anatomy .pa-header .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+
+  .pa-layer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .pa-layer:last-child { border-bottom: none; }
+  .pa-layer:hover { background: rgba(255,255,255,0.015); }
+
+  .pa-layer .pa-bar {
+    height: 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    background: var(--red-dim);
+    transition: background 0.3s;
+  }
+  .pa-layer:hover .pa-bar { background: var(--red); }
+
+  .pa-layer .pa-name {
+    font-weight: 500;
+    min-width: 160px;
+  }
+
+  .pa-layer .pa-tokens {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ══════════════════════════════════
+     IMPLICATIONS — CARDS
+  ══════════════════════════════════ */
+  .implications-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  .implication-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.4s, transform 0.3s;
+  }
+  .implication-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-3px);
+  }
+
+  .implication-card .ic-icon {
+    font-size: 32px;
+    margin-bottom: 20px;
+    display: block;
+  }
+
+  .implication-card h3 {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 10px;
+  }
+
+  .implication-card p {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  /* ══════════════════════════════════
+     CLOSING
+  ══════════════════════════════════ */
+  .closing {
+    text-align: center;
+    padding: 160px 40px;
+    position: relative;
+  }
+
+  .closing::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(192,57,43,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .closing h2 {
+    font-family: var(--serif);
+    font-size: clamp(40px, 6vw, 80px);
+    font-weight: 400;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    letter-spacing: -1px;
+  }
+  .closing h2 em { color: var(--red); font-style: italic; }
+
+  .closing p {
+    font-size: 18px;
+    color: var(--text-dim);
+    font-weight: 300;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .closing .cta {
+    display: inline-block;
+    margin-top: 40px;
+    padding: 14px 36px;
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: background 0.3s, color 0.3s;
+  }
+  .closing .cta:hover {
+    background: var(--red);
+    color: #fff;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 40px 20px 60px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+
+  /* ── Quote block ── */
+  .big-quote {
+    text-align: center;
+    padding: 100px 40px;
+    position: relative;
+  }
+  .big-quote blockquote {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(24px, 4vw, 42px);
+    line-height: 1.4;
+    max-width: 700px;
+    margin: 0 auto;
+    color: var(--text);
+  }
+  .big-quote .attribution {
+    margin-top: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HERO ═══════════ -->
+<section class="hero">
+  <div class="hero-tag">Corkscrew Games Presents</div>
+  <h1>Digital <em>Ego</em></h1>
+  <p class="hero-sub">What if you could talk to yourself?</p>
+  <div class="hero-scroll">
+    <span>Scroll</span>
+    <div class="arrow"></div>
+  </div>
+</section>
+
+<!-- ═══════════ PREMISE ═══════════ -->
+<section>
+  <div class="divider reveal"></div>
+  <div class="reveal">
+    <div class="section-number">01 &mdash; The Concept</div>
+    <h2 class="section-title">Your personality,<br>running as software.</h2>
+    <p class="section-subtitle">
+      A Digital Ego captures who you are &mdash; how you think, how you talk, what you know, what you value &mdash; and runs it as a conversational AI clone. Ask it anything. It answers as <em>you</em>.
+    </p>
+  </div>
+
+  <div class="steps">
+    <div class="step reveal reveal-delay-1">
+      <div class="step-num">1</div>
+      <h3>Map the personality</h3>
+      <p>We extract identity, communication patterns, values, decision-making frameworks, current life state, and deep knowledge domains into a structured personality profile.</p>
+    </div>
+    <div class="step reveal reveal-delay-2">
+      <div class="step-num">2</div>
+      <h3>Calibrate the voice</h3>
+      <p>Few-shot example exchanges train the AI on exactly how you'd respond &mdash; your sentence length, your humor, your pushback, your silence. Not what you'd say. How you'd say it.</p>
+    </div>
+    <div class="step reveal reveal-delay-3">
+      <div class="step-num">3</div>
+      <h3>Run it live</h3>
+      <p>A single HTML file. No server. No backend. The Claude API processes your personality DNA and responds in real time, streaming your voice back through the browser.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PERSONALITY LAYER ═══════════ -->
+<section>
+  <div class="divider reveal"></div>
+  <div class="reveal">
+    <div class="section-number">02 &mdash; The Personality Layer</div>
+    <h2 class="section-title">Six strands of DNA.</h2>
+    <p class="section-subtitle">
+      A digital ego isn't a chatbot wearing a mask. It's built from layers of real personality data &mdash; each one shaping how the AI thinks, speaks, and decides.
+    </p>
+  </div>
+
+  <div class="dna-grid">
+    <div class="dna-strand reveal reveal-delay-1">
+      <span class="icon">&#x1f9ec;</span>
+      <h3>Identity & Background <span class="tag">Core</span></h3>
+      <p>Who you are. Age, location, role, history. The facts that shape your perspective on everything else.</p>
+      <div class="sample">"35, Estero FL. Solo founder. Game designer since I was a kid. First card I ever made was called Crab."</div>
+    </div>
+    <div class="dna-strand reveal reveal-delay-2">
+      <span class="icon">&#x1f5e3;</span>
+      <h3>Communication Style <span class="tag">Voice</span></h3>
+      <p>How you talk. Sentence length. Humor type. What you'd never say. The texture of your language.</p>
+      <div class="sample">Short. Direct. Lead with the answer. No filler. No "well, I think..." &mdash; just the take.</div>
+    </div>
+    <div class="dna-strand reveal reveal-delay-3">
+      <span class="icon">&#x1f9ed;</span>
+      <h3>Values & Decision Framework <span class="tag">Compass</span></h3>
+      <p>Your principles. What you optimize for. How you make calls under pressure. The rules you live by.</p>
+      <div class="sample">"Disney World quality bar. Not 'does it work' &mdash; does it light up their eyes?"</div>
+    </div>
+    <div class="dna-strand reveal reveal-delay-4">
+      <span class="icon">&#x26a1;</span>
+      <h3>Current Life State <span class="tag">Live</span></h3>
+      <p>What you're working on right now. Active projects, deadlines, priorities. This decays fast &mdash; it's the most human layer.</p>
+      <div class="sample">"Polishing multiplayer on mobile for the booth Saturday. Then hard pivot to ad production."</div>
+    </div>
+    <div class="dna-strand reveal reveal-delay-5">
+      <span class="icon">&#x1f4da;</span>
+      <h3>Knowledge Domains <span class="tag">Brain</span></h3>
+      <p>What you know deeply. Card game balance theory. Manufacturing logistics. Dice math. Pickleball mechanics. Retro games.</p>
+      <div class="sample">"HP is king in a 1-3 damage system. Every HP point = 1-3 extra winning rolls to survive."</div>
+    </div>
+    <div class="dna-strand reveal">
+      <span class="icon">&#x1f6a7;</span>
+      <h3>Behavioral Rules <span class="tag">Guardrails</span></h3>
+      <p>Response constraints. What the ego must always do, and what it must never do. The fence that keeps the voice authentic.</p>
+      <div class="sample">Never hedge. Never use corporate speak. Never say "that's impossible." Have opinions. Share them.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ QUOTE BREAK ═══════════ -->
+<div class="big-quote reveal">
+  <blockquote>"We are going to try to bring love with what we do."</blockquote>
+  <div class="attribution">&mdash; Wyatt Gable, encoded into his Digital Ego</div>
+</div>
+
+<!-- ═══════════ LIVE DEMO ═══════════ -->
+<section>
+  <div class="divider reveal"></div>
+  <div class="reveal">
+    <div class="section-number">03 &mdash; Live Demo</div>
+    <h2 class="section-title">See it talk.</h2>
+    <p class="section-subtitle">
+      A real conversation with the Digital Ego. Every response generated from the personality profile &mdash; no scripts, no canned answers.
+    </p>
+  </div>
+
+  <div class="chat-device reveal" id="chatDemo">
+    <div class="chat-header">
+      <div class="chat-avatar">W</div>
+      <div class="chat-header-info">
+        <div class="chat-name">Wyatt</div>
+        <div class="chat-status">Digital Ego &middot; Active</div>
+      </div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-bubble user-bubble">What are you working on right now?</div>
+      <div class="chat-bubble ego-bubble">Polishing the multiplayer on mobile for the booth Saturday. After that, hard pivot to ad production. Kickstarter launches September 1 &mdash; we need about 100 video and static ads before then.</div>
+
+      <div class="chat-gap"></div>
+      <div class="chat-bubble user-bubble">I don't think we can get all those ads done in time.</div>
+      <div class="chat-bubble ego-bubble">Try it first. We'll build the tools as we go and let the patterns emerge. I've shipped more in less time with Claude than most teams do in a quarter.</div>
+
+      <div class="chat-gap"></div>
+      <div class="chat-bubble user-bubble">Any advice for someone launching their first product?</div>
+      <div class="chat-bubble ego-bubble">Ship the simplest version that works. Then make it feel like Disney World. Not "does it function" &mdash; does it light up their eyes? That's your bar. Everything else is noise.</div>
+
+      <div class="chat-gap"></div>
+      <div class="chat-bubble user-bubble">Tell me about your card game.</div>
+      <div class="chat-bubble ego-bubble">Boo! Spirit Battles. Dice combat with creatures called Spiritkin. You roll 3 dice &mdash; singles, doubles, triples. Only the winner deals damage. Simple to learn but the strategy runs deep. HP is king, every point matters. I made my first card as a kid. Called it Crab. A ghost holding a lantern with a kid in an orange raincoat. Nothing to do with crabs. That's how it started.</div>
+    </div>
+    <div class="chat-input-bar">
+      <div class="fake-input">Talk to Wyatt...</div>
+      <div class="send-dot">&uarr;</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ ARCHITECTURE ═══════════ -->
+<section>
+  <div class="divider reveal"></div>
+  <div class="reveal">
+    <div class="section-number">04 &mdash; The Tech</div>
+    <h2 class="section-title">One file. Zero servers.</h2>
+    <p class="section-subtitle">
+      The entire Digital Ego runs client-side in a single HTML file. No frameworks, no build step, no backend. Just a browser and the Claude API.
+    </p>
+  </div>
+
+  <div class="arch-flow reveal">
+    <div class="arch-node">
+      <div class="arch-icon">&#x1f464;</div>
+      <div class="arch-label">You</div>
+      <div class="arch-desc">type a message</div>
+    </div>
+    <div class="arch-arrow">&rarr;</div>
+    <div class="arch-node">
+      <div class="arch-icon">&#x1f310;</div>
+      <div class="arch-label">Browser</div>
+      <div class="arch-desc">single html file</div>
+    </div>
+    <div class="arch-arrow">&rarr;</div>
+    <div class="arch-node">
+      <div class="arch-icon" style="border-color: var(--red-dim);">&#x1f9e0;</div>
+      <div class="arch-label">Claude API</div>
+      <div class="arch-desc">sonnet 4.6</div>
+    </div>
+    <div class="arch-arrow">&rarr;</div>
+    <div class="arch-node">
+      <div class="arch-icon">&#x1f5e3;</div>
+      <div class="arch-label">Response</div>
+      <div class="arch-desc">streamed back live</div>
+    </div>
+  </div>
+
+  <div class="prompt-anatomy reveal" style="margin-top:60px;">
+    <div class="pa-header">
+      <span class="dot"></span>
+      system_prompt &mdash; personality DNA
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 80px;"></div>
+      <span class="pa-name">Identity</span>
+      <span class="pa-tokens">~400 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 60px;"></div>
+      <span class="pa-name">Communication Style</span>
+      <span class="pa-tokens">~300 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 70px;"></div>
+      <span class="pa-name">Values & Principles</span>
+      <span class="pa-tokens">~350 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 100px;"></div>
+      <span class="pa-name">Current Life State</span>
+      <span class="pa-tokens">~500 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 90px;"></div>
+      <span class="pa-name">Knowledge Domains</span>
+      <span class="pa-tokens">~450 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 110px;"></div>
+      <span class="pa-name">Few-Shot Examples</span>
+      <span class="pa-tokens">~600 tokens</span>
+    </div>
+    <div class="pa-layer">
+      <div class="pa-bar" style="width: 40px;"></div>
+      <span class="pa-name">Behavioral Rules</span>
+      <span class="pa-tokens">~200 tokens</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ IMPLICATIONS ═══════════ -->
+<section>
+  <div class="divider reveal"></div>
+  <div class="reveal">
+    <div class="section-number">05 &mdash; What This Means</div>
+    <h2 class="section-title">Beyond the demo.</h2>
+    <p class="section-subtitle">
+      A personality that runs as software opens doors that didn't exist before.
+    </p>
+  </div>
+
+  <div class="implications-grid">
+    <div class="implication-card reveal reveal-delay-1">
+      <span class="ic-icon">&#x1f4ac;</span>
+      <h3>Founder Clone</h3>
+      <p>Your team talks to your ego when you're unavailable. It knows your priorities, your decision framework, your taste. It answers like you would.</p>
+    </div>
+    <div class="implication-card reveal reveal-delay-2">
+      <span class="ic-icon">&#x1f9d1;&#x200d;&#x1f3a8;</span>
+      <h3>Creative Partner</h3>
+      <p>Bounce ideas off yourself. Pressure-test decisions against your own values. Hear your gut instinct articulated back to you.</p>
+    </div>
+    <div class="implication-card reveal reveal-delay-3">
+      <span class="ic-icon">&#x1f3af;</span>
+      <h3>Personal Advisor</h3>
+      <p>An AI that doesn't give generic advice &mdash; it gives <em>your</em> advice. Filtered through your experience, your principles, your pattern recognition.</p>
+    </div>
+    <div class="implication-card reveal reveal-delay-4">
+      <span class="ic-icon">&#x1f3db;</span>
+      <h3>Legacy System</h3>
+      <p>Preserve how someone thinks, not just what they wrote. A living conversation with a mind, not a static archive of documents.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ CLOSING ═══════════ -->
+<section class="closing reveal">
+  <h2>Talk to <em>yourself.</em></h2>
+  <p>Your personality is the most complex software you'll ever run. Now it has an API.</p>
+  <a href="index.html" class="cta">Try the Ego</a>
+</section>
+
+<footer>
+  Digital Ego &middot; Built by Corkscrew Games &middot; Powered by Claude
+</footer>
+
+<script>
+// ── Intersection Observer for scroll reveals ──
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, {
+  threshold: 0.12,
+  rootMargin: '0px 0px -40px 0px'
+});
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Replay chat animations when chat section is visible ──
+let chatAnimated = false;
+const chatObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && !chatAnimated) {
+      chatAnimated = true;
+      // Re-trigger bubble animations
+      const bubbles = entry.target.querySelectorAll('.chat-bubble');
+      bubbles.forEach(b => {
+        b.style.animation = 'none';
+        b.offsetHeight; // reflow
+        b.style.animation = '';
+      });
+    }
+  });
+}, { threshold: 0.3 });
+
+const chatDemo = document.getElementById('chatDemo');
+if (chatDemo) chatObserver.observe(chatDemo);
+</script>
+</body>
+</html>

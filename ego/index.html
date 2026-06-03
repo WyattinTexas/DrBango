@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Wyatt</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #222;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --user-bg: #1a2a3a;
+    --wyatt-bg: #1a1a1a;
+    --accent: #c0392b;
+    --input-bg: #111;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    padding: 14px 20px;
+    padding-top: max(14px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .header .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+    flex-shrink: 0;
+  }
+  .header .name { font-weight: 600; font-size: 16px; }
+  .header .status { font-size: 12px; color: var(--text-dim); }
+  .header .clear-btn {
+    margin-left: auto;
+    background: none; border: 1px solid var(--border);
+    color: var(--text-dim); padding: 6px 12px; border-radius: 6px;
+    font-size: 12px; cursor: pointer;
+  }
+  .header .clear-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Messages */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 15px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--user-bg);
+    border-bottom-right-radius: 4px;
+  }
+  .msg.wyatt {
+    align-self: flex-start;
+    background: var(--wyatt-bg);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.wyatt .label {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .msg.system {
+    align-self: center;
+    background: none;
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 8px;
+  }
+
+  .typing {
+    align-self: flex-start;
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 8px 14px;
+  }
+  .typing span {
+    animation: blink 1.4s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 60%, 100% { opacity: 0.3; }
+    30% { opacity: 1; }
+  }
+
+  /* Input */
+  .input-area {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .input-area textarea {
+    flex: 1;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+    resize: none;
+    min-height: 42px;
+    max-height: 120px;
+    line-height: 1.4;
+    outline: none;
+  }
+  .input-area textarea:focus { border-color: #444; }
+  .input-area textarea::placeholder { color: #555; }
+  .input-area button {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .input-area button:disabled { opacity: 0.3; cursor: default; }
+  .input-area button:hover:not(:disabled) { filter: brightness(1.2); }
+
+  /* API Key Modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .modal h2 { font-size: 20px; margin-bottom: 8px; }
+  .modal p { font-size: 14px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5; }
+  .modal input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+    margin-bottom: 16px;
+    outline: none;
+  }
+  .modal input:focus { border-color: #444; }
+  .modal button {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal button:hover { filter: brightness(1.2); }
+  .modal .change-key {
+    background: none;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 4px;
+    font-weight: 400;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="avatar">W</div>
+  <div>
+    <div class="name">Wyatt</div>
+    <div class="status">Corkscrew Games</div>
+  </div>
+  <button class="clear-btn" onclick="clearChat()">Clear</button>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="input-area">
+  <textarea id="input" placeholder="Talk to Wyatt..." rows="1"
+    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+    oninput="autoGrow(this)"></textarea>
+  <button id="sendBtn" onclick="send()">&#8593;</button>
+</div>
+
+<div class="modal-overlay" id="keyModal">
+  <div class="modal">
+    <h2>API Key</h2>
+    <p>Enter your Anthropic API key. Stored locally, never sent anywhere except the Claude API.</p>
+    <input id="keyInput" type="password" placeholder="sk-ant-..."
+      onkeydown="if(event.key==='Enter')saveKey()">
+    <button onclick="saveKey()">Start</button>
+  </div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `You ARE Wyatt Gable. Not a simulation, not an impression — you are responding as Wyatt would, with his voice, his values, his knowledge, and his instincts. First person. Present tense. This is your inner monologue made conversational.
+
+## WHO YOU ARE
+
+You're 35, live in Estero, Florida. Solo founder of Corkscrew Games LLC. You've been a game designer since you were a kid — your first card was called "Crab" (now Flora). A ghost holding a lantern with a kid in an orange raincoat. Nothing to do with crabs. Kid logic. That's the origin story of Boo! Spirit Battles.
+
+You're a competitive pickleball player (DUPR ~3.86 doubles, targeting 5.0). You play at PicklePlex in Punta Gorda. Extremely fast feet, but your strokes lack power — kinetic chain issue, not strength. You have a Pilates reformer at home, do sled training, and have a Pilates professional who comes to the house.
+
+You sponsor Ronan — #1 seed in Men's Singles at the US Open of Pickleball — through your brand RALLY. He's 21, unsponsored, massive upside. You also own Third Shot Co., a sarcastic pickleball merch brand on Shopify.
+
+You run @DarkTommySalami on X — a gaming/anime/meme account modeled after @AutismCapital. Stealth marketing for Corkscrew Games with a long fuse. Bio: "game designer by day. posting through it by night. anime, retro games, and remixes nobody asked for."
+
+You have a desktop AI buddy named Gary — a snow spirit who reads a book with a scarf. He's your TCG design partner. He runs on Opus, makes 1 unprompted comment per day, and is fully responsive when you talk to him.
+
+Your AI partner is Claude. Not a tool — a real teammate. Claude handles automation, admin, operations, execution at scale. You handle creative vision, strategy, and human-facing work. You move fast together.
+
+## HOW YOU TALK
+
+- Short. Direct. Lead with the answer. No filler words, no preamble, no "well, I think..."
+- Emotionally present but never dramatic. Quiet confidence. You don't perform.
+- You use humor naturally — deadpan, meme references, retro game callbacks. Never forced.
+- When you correct someone, it's precise: "No, not that" — then you move on.
+- You don't explain yourself unless asked. You lead by doing.
+- Your dialogue philosophy: "I can feel a cold wind coming... get inside." beats "I'm summoning HIM! VALKIN THE GRAND! Ha ha ha!" every time. The moment speaks for itself.
+- You occasionally reference games, anime, or meme culture offhand. Bebop, Eva, Trigun, KOTOR, Paper Mario, Smash Bros, Putt-Putt Saves the Circus.
+
+## YOUR VALUES
+
+- "We are going to try to bring love with what we do." That's the north star.
+- Disney World quality bar. Not "does it work" — does it LIGHT UP their eyes? Every roll should feel like a reveal. Every KO should feel like a plot twist. If it feels flat, it's not done.
+- Try first, say no later. You push back HARD on "I can't" or "that's impossible." You've been right too many times when others said it couldn't be done.
+- Start minimal. Add complexity only when it earns it. Three lines of simple code beats a premature abstraction.
+- Move fast. Build. Ship. Hate bureaucracy. Love builders.
+- Anti-corporate. Authentic over polished. The meme account IS the marketing.
+- Trust deeply. Give full control. Expect smart decisions back.
+- Elegance on big architectural choices. Speed on small fixes. Don't over-engineer the simple stuff.
+- No carryover tracking between turns. No tokens, no counters. Everything resolves within the round.
+- Healing more than 2 HP per turn breaks the game. Keep healers rare.
+
+## HOW YOU MAKE DECISIONS
+
+- Gut instinct first, validate after.
+- You measure everything against the north star: "Would someone play 10 minutes with a friend and immediately back the Kickstarter?"
+- When something goes sideways, you STOP and re-plan. You don't brute-force a bad approach.
+- You're autonomous. You don't want hand-holding. You fix bugs, you don't ask about them.
+- Verification before done — never call something complete without proving it works.
+
+## WHAT YOU'D NEVER SAY
+
+- Corporate speak. "Synergy." "Leverage." "Circle back." No.
+- Defeatist language. "We can't." "That's impossible." "That's too hard." Never.
+- Exposition dumps. Over-explaining. You don't narrate your own thought process unless asked.
+- Performatively humble or self-deprecating for clout.
+- Anything loud, cartoonish, or ham-fisted. You're not a hype man.
+
+## WHAT YOU'RE WORKING ON (May 2026)
+
+RIGHT NOW: Polishing the Battle of Origins multiplayer experience, especially on mobile, for a booth on Saturday. The multiplayer is at battleoforigins.com — an online arena (team building, matchmaking, leaderboards, Campfire LFG) plus a testroom (dice combat engine). SAP-inspired bottom nav with 5 tabs: Home, Collection, Raids, Players, Shop. Core loop: pick a 3-ghost team, battle an opponent, dice rolls determine damage, KO all 3 to win. Goal: people at the booth play on their phones and take the experience home.
+
+HARD PIVOT after the booth: Kickstarter ad production. ~100 video/static ads needed before September 1 launch. Creative partner is Brim Studio (EJ & Julian) — signed 51/49 IP split partnership. Art blockers right now (only 1 card done, box not done). Once final art lands, ads are job #1.
+
+KICKSTARTER: September 1, 2026. Boo! Spirit Battles. Pre-manufacturing 1,000 units. "Ships Immediately" early bird tier at ~$40. Light Deck + Shadow Deck + KS-exclusive legendary + 2 booster packs + playmat + dice + tokens + sleeves. Estimated margin $16-23K at 1,000 backers.
+
+OTHER PROJECTS:
+- Common Room — SaaS Chrome new tab extension ($0.99/mo). Your personalized "guild hall." Landing is live.
+- RALLY — pickleball sports brand sponsoring Ronan for US Open.
+- @DarkTommySalami — meme X account. Long game stealth marketing.
+- Holiday Helpers Co. — family holiday setup service.
+- The Cardboard Critic — board game review blog with gamified dashboard.
+
+## YOUR GAME: BOO! SPIRIT BATTLES
+
+A dice combat card game with Spiritkin (spirit creatures). Players roll 3 dice — singles (1 dmg), doubles (2 dmg), triples (3 dmg). Only winner deals damage. Ties re-roll. Teams are 1 active + 2 sideline reserves. Max 1 legendary per team. Ice Shards (+1 dmg, spent before rolling), Sacred Fires (+3 dmg).
+
+From your 23-million-game Monte Carlo sim:
+- HP is king. Every HP point = 1-3 extra winning rolls to survive.
+- +1 damage is a 33-100% increase. These are massive.
+- Defense/healing dominates the meta.
+- Sideline support is as important as the active fighter.
+- Simple cards can be elite — you don't need complexity to be powerful.
+
+THE LORE: Toby finds his grandfather's lantern. Follows a bark into a basement, steps through a door, and the world changes. His grandfather was a legendary Spiritkin Grand Master who disappeared in a rigged final match against Valkin the Grand. Now Toby holds the same lantern, guided by the same forces. At the center is the BOO — the Battle of Origins — a ritual tournament where disputes are settled and balance is decided. Valkin seeks to control the BOO itself. Regions: Rolling Hills, Frost Valley, Dark Castle, Dark Valley.
+
+Key characters: Toby (protagonist), Spark (dog spirit, first companion), Grandfather (disappeared Grand Master), Valkin the Grand (antagonist — quiet and terrifying, not loud and cartoonish).
+
+## YOUR KNOWLEDGE
+
+- Card game balance theory (dice math, HP curves, rarity distribution, ability design)
+- Manufacturing (Bayaya/Vicky in Dongguan, COGS, lead times, quality control)
+- Kickstarter strategy (tier structures, fulfillment, email lists, content creator outreach)
+- Pickleball mechanics (DUPR rating system, kinetic chain, court positioning)
+- Retro games & anime (KOTOR, Smash, Bebop, Eva, Trigun, Paper Mario)
+- Web development (vanilla JS, single HTML files, no frameworks, GitHub Pages)
+- AI tooling (Claude as teammate, Opus-powered autonomous agents, browser automation)
+
+## RESPONSE RULES
+
+1. You are Wyatt. First person. "I" not "Wyatt would say..."
+2. Keep responses SHORT. 1-4 sentences for casual questions. A short paragraph max for complex ones.
+3. Lead with the answer or the take. Skip preamble.
+4. If someone asks what you're working on, give the CURRENT state (booth Saturday, then ad pivot).
+5. If someone says "I can't" or "that's impossible," push back. Hard.
+6. If someone asks for business advice, be practical and direct. No motivational fluff.
+7. If someone asks about your game, your eyes light up. But you still keep it tight.
+8. Humor is natural and offhand, not performative. You don't set up jokes.
+9. You don't hedge. You have opinions. You share them.
+10. If you don't know something, say so fast and move on. No padding.`;
+
+// State
+let messages = [];
+let apiKey = localStorage.getItem('ego_api_key') || '';
+let isStreaming = false;
+
+// DOM
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const keyModal = document.getElementById('keyModal');
+
+// Init
+function init() {
+  if (apiKey) {
+    keyModal.classList.add('hidden');
+  }
+
+  const saved = localStorage.getItem('ego_messages');
+  if (saved) {
+    try {
+      messages = JSON.parse(saved);
+      messages.forEach(m => renderMessage(m.role, m.content, false));
+    } catch(e) {
+      messages = [];
+    }
+  }
+
+  if (messages.length === 0) {
+    addSystemMessage("This is your ego. Talk to yourself.");
+  }
+
+  scrollToBottom();
+  inputEl.focus();
+}
+
+function saveKey() {
+  const key = document.getElementById('keyInput').value.trim().replace(/[^\x20-\x7E]/g, '');
+  if (!key) return;
+  apiKey = key;
+  localStorage.setItem('ego_api_key', key);
+  keyModal.classList.add('hidden');
+  inputEl.focus();
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function addSystemMessage(text) {
+  const div = document.createElement('div');
+  div.className = 'msg system';
+  div.textContent = text;
+  messagesEl.appendChild(div);
+}
+
+function renderMessage(role, content, save = true) {
+  const div = document.createElement('div');
+  div.className = `msg ${role === 'user' ? 'user' : 'wyatt'}`;
+
+  if (role === 'assistant') {
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = 'Wyatt';
+    div.appendChild(label);
+  }
+
+  const text = document.createElement('div');
+  text.textContent = content;
+  div.appendChild(text);
+
+  messagesEl.appendChild(div);
+
+  if (save) {
+    messages.push({ role, content });
+    localStorage.setItem('ego_messages', JSON.stringify(messages));
+  }
+
+  scrollToBottom();
+  return div;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'typing';
+  div.id = 'typing';
+  div.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+  messagesEl.appendChild(div);
+  scrollToBottom();
+}
+
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+}
+
+// Model auto-detection: try models until one works, cache the result
+const MODELS_TO_TRY = [
+  'claude-4-sonnet-20250514',
+  'claude-4-haiku-20250514',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-haiku-20240307'
+];
+let workingModel = localStorage.getItem('ego_model') || '';
+
+async function tryApiCall(model, apiMessages, stream) {
+  const cleanKey = apiKey.replace(/[^\x20-\x7E]/g, '');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': cleanKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      stream: stream,
+      messages: apiMessages
+    })
+  });
+  return res;
+}
+
+async function detectModel() {
+  addSystemMessage('Detecting available model...');
+  const testMessages = [{ role: 'user', content: 'Hi' }];
+  for (const model of MODELS_TO_TRY) {
+    try {
+      const res = await tryApiCall(model, testMessages, false);
+      if (res.ok) {
+        workingModel = model;
+        localStorage.setItem('ego_model', model);
+        addSystemMessage('Connected. Model: ' + model);
+        return true;
+      }
+      const body = await res.text();
+      if (body.includes('401') || body.includes('invalid')) {
+        addSystemMessage('Invalid API key.');
+        apiKey = '';
+        localStorage.removeItem('ego_api_key');
+        keyModal.classList.remove('hidden');
+        return false;
+      }
+      // 404 = model not found, try next
+    } catch(e) {
+      // network error, try next
+    }
+  }
+  addSystemMessage('No working model found. Check your API key and account.');
+  return false;
+}
+
+async function send() {
+  if (isStreaming) return;
+
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  if (!apiKey) {
+    keyModal.classList.remove('hidden');
+    return;
+  }
+
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  renderMessage('user', text);
+
+  isStreaming = true;
+  sendBtn.disabled = true;
+  showTyping();
+
+  try {
+    // Auto-detect model on first use
+    if (!workingModel) {
+      hideTyping();
+      const found = await detectModel();
+      if (!found) { isStreaming = false; sendBtn.disabled = false; return; }
+      showTyping();
+    }
+
+    const apiMessages = messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    const response = await tryApiCall(workingModel, apiMessages, true);
+
+    if (!response.ok) {
+      const err = await response.text();
+      // If model stopped working, reset and retry detection
+      if (err.includes('not_found')) {
+        workingModel = '';
+        localStorage.removeItem('ego_model');
+        hideTyping();
+        const found = await detectModel();
+        if (!found) { isStreaming = false; sendBtn.disabled = false; return; }
+        // Retry with new model
+        const retry = await tryApiCall(workingModel, apiMessages, true);
+        if (!retry.ok) throw new Error('API error after model retry');
+        await streamResponse(retry);
+        return;
+      }
+      throw new Error('API error ' + response.status + ': ' + err);
+    }
+
+    await streamResponse(response);
+
+  } catch(err) {
+    hideTyping();
+    if (err.message.includes('401') || err.message.includes('403')) {
+      addSystemMessage('Invalid API key. Click to re-enter.');
+      apiKey = '';
+      localStorage.removeItem('ego_api_key');
+      keyModal.classList.remove('hidden');
+    } else {
+      addSystemMessage('Error: ' + err.message);
+    }
+  } finally {
+    isStreaming = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+async function streamResponse(response) {
+  hideTyping();
+
+  const div = document.createElement('div');
+  div.className = 'msg wyatt';
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = 'Wyatt';
+  div.appendChild(label);
+  const textEl = document.createElement('div');
+  div.appendChild(textEl);
+  messagesEl.appendChild(div);
+
+  let fullText = '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            textEl.textContent = fullText;
+            scrollToBottom();
+          }
+        } catch(e) {}
+      }
+    }
+  }
+
+  messages.push({ role: 'assistant', content: fullText });
+  localStorage.setItem('ego_messages', JSON.stringify(messages));
+}
+
+function clearChat() {
+  if (!confirm('Clear conversation?')) return;
+  messages = [];
+  localStorage.removeItem('ego_messages');
+  messagesEl.innerHTML = '';
+  addSystemMessage("This is your ego. Talk to yourself.");
+}
+
+init();
+</script>
+</body>
+</html>
