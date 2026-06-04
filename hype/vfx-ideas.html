@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 Ability VFX Ideas — Battle of Origins</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--cyan:#4fc3f7;--red:#ef5350;--gold:#ffd54f;--purple:#7c3aed;--dark:#0a0a14;--panel:#12121f;}
+body{background:var(--dark);color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow-x:hidden;}
+
+/* Header */
+.header{text-align:center;padding:40px 20px 20px;border-bottom:1px solid rgba(255,255,255,.06);}
+.header h1{font-size:28px;letter-spacing:2px;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+.header p{color:#666;font-size:13px;letter-spacing:1px;}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:1fr;gap:16px;padding:20px;max-width:800px;margin:0 auto;}
+@media(min-width:700px){.grid{grid-template-columns:1fr 1fr;}}
+
+/* Card */
+.card{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;
+  transition:border-color .3s,box-shadow .3s;cursor:pointer;position:relative;}
+.card:hover{border-color:rgba(124,58,237,.4);box-shadow:0 0 30px rgba(124,58,237,.15);}
+.card-num{position:absolute;top:12px;left:12px;font-size:11px;color:var(--purple);font-weight:700;
+  background:rgba(124,58,237,.15);padding:2px 8px;border-radius:10px;z-index:2;}
+.card-diff{position:absolute;top:12px;right:12px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;z-index:2;}
+.card-diff.easy{background:rgba(34,197,94,.15);color:#22c55e;}
+.card-diff.medium{background:rgba(234,179,8,.15);color:#eab308;}
+.card-diff.hard{background:rgba(239,83,80,.15);color:#ef5350;}
+
+/* Preview area */
+.preview{height:200px;position:relative;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,rgba(30,40,30,.5),rgba(10,10,20,.8));overflow:hidden;}
+.preview .arena-floor{position:absolute;bottom:0;left:0;right:0;height:40%;
+  background:linear-gradient(180deg,rgba(60,90,60,.3),rgba(30,50,30,.1));}
+
+/* Sprite placeholders */
+.sprite{width:40px;height:50px;border-radius:6px;position:absolute;}
+.sprite.player{background:linear-gradient(180deg,var(--cyan),#1e6090);bottom:30%;left:35%;
+  box-shadow:0 0 12px rgba(79,195,247,.3);}
+.sprite.enemy{background:linear-gradient(180deg,var(--red),#8b2020);top:20%;right:30%;
+  box-shadow:0 0 12px rgba(239,83,80,.3);}
+.sprite::after{content:'';position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  width:12px;height:12px;background:rgba(255,255,255,.4);border-radius:50%;}
+
+/* Card info */
+.card-info{padding:16px;}
+.card-info h3{font-size:16px;margin-bottom:4px;letter-spacing:.5px;}
+.card-info p{font-size:12px;color:#888;line-height:1.5;margin-bottom:8px;}
+.card-info .best-for{font-size:10px;color:var(--gold);letter-spacing:.5px;}
+.card-info .best-for span{color:#666;}
+
+/* Click to play label */
+.play-label{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:9px;
+  color:rgba(255,255,255,.3);letter-spacing:1px;text-transform:uppercase;transition:opacity .3s;}
+.card:hover .play-label{opacity:0;}
+.card.playing .play-label{opacity:0;}
+
+/* ════════════════════════════════════
+   EFFECT ANIMATIONS
+   ════════════════════════════════════ */
+
+/* 1. Sprite Flash & Shake */
+@keyframes spriteFlash{0%{filter:brightness(1)}10%{filter:brightness(3)}20%{filter:brightness(1)}30%{filter:brightness(2.5)}50%{filter:brightness(1)}}
+@keyframes spriteShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-4px)}30%{transform:translateX(4px)}45%{transform:translateX(-3px)}60%{transform:translateX(3px)}}
+.card.playing .fx-flash .enemy{animation:spriteFlash .5s ease-out,spriteShake .4s ease-out;}
+
+/* 2. Projectile Trail */
+.fx-projectile .orb{display:none;width:14px;height:14px;border-radius:50%;background:var(--cyan);
+  position:absolute;bottom:35%;left:38%;filter:blur(0);
+  box-shadow:0 0 15px var(--cyan),0 0 30px var(--cyan);}
+.fx-projectile .trail{display:none;position:absolute;width:60%;height:3px;bottom:38%;left:35%;
+  background:linear-gradient(90deg,transparent,var(--cyan));border-radius:2px;opacity:0;}
+@keyframes orbFly{0%{left:38%;bottom:35%;opacity:1;transform:scale(1)}
+  80%{left:62%;bottom:55%;opacity:1;transform:scale(1.3)}
+  100%{left:65%;bottom:55%;opacity:0;transform:scale(2)}}
+@keyframes trailFade{0%{opacity:0}20%{opacity:.6}80%{opacity:.4}100%{opacity:0}}
+.card.playing .fx-projectile .orb{display:block;animation:orbFly .6s ease-in forwards;}
+.card.playing .fx-projectile .trail{display:block;animation:trailFade .6s ease-out;}
+
+/* 3. Elemental Burst */
+.fx-burst .particle{display:none;position:absolute;width:6px;height:6px;border-radius:50%;
+  bottom:35%;left:38%;}
+@keyframes burstOut1{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-30px,-40px) scale(0)}}
+@keyframes burstOut2{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(20px,-50px) scale(0)}}
+@keyframes burstOut3{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-10px,-60px) scale(0)}}
+@keyframes burstOut4{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(35px,-30px) scale(0)}}
+@keyframes burstOut5{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-25px,15px) scale(0)}}
+@keyframes burstOut6{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(15px,20px) scale(0)}}
+.card.playing .fx-burst .particle{display:block;}
+.card.playing .fx-burst .p1{background:var(--cyan);animation:burstOut1 .5s ease-out forwards;}
+.card.playing .fx-burst .p2{background:#67e8f9;animation:burstOut2 .5s ease-out .05s forwards;}
+.card.playing .fx-burst .p3{background:var(--cyan);animation:burstOut3 .5s ease-out .1s forwards;}
+.card.playing .fx-burst .p4{background:#a5f3fc;animation:burstOut4 .5s ease-out .03s forwards;}
+.card.playing .fx-burst .p5{background:var(--cyan);animation:burstOut5 .5s ease-out .08s forwards;}
+.card.playing .fx-burst .p6{background:#67e8f9;animation:burstOut6 .5s ease-out .12s forwards;}
+
+/* 4. Full-Screen Splash */
+.fx-splash .splash-overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,.85);
+  z-index:10;align-items:center;justify-content:center;flex-direction:column;}
+.fx-splash .splash-name{font-size:22px;font-weight:900;letter-spacing:3px;color:var(--gold);
+  text-shadow:0 0 20px rgba(255,213,79,.5);transform:scale(3);opacity:0;}
+.fx-splash .splash-line{width:0;height:2px;background:var(--gold);margin-top:6px;}
+@keyframes splashSlam{0%{transform:scale(3);opacity:0}40%{transform:scale(.9);opacity:1}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+@keyframes splashLine{0%{width:0}100%{width:120px}}
+@keyframes splashFade{0%{opacity:1}100%{opacity:0}}
+.card.playing .fx-splash .splash-overlay{display:flex;animation:splashFade .3s ease-in 1s forwards;}
+.card.playing .fx-splash .splash-name{animation:splashSlam .4s cubic-bezier(.34,1.56,.64,1) forwards;}
+.card.playing .fx-splash .splash-line{animation:splashLine .3s ease-out .3s forwards;}
+
+/* 5. Character Zoom */
+@keyframes charZoom{0%{transform:scale(1);filter:blur(0)}30%{transform:scale(2.2);filter:blur(1px)}60%{transform:scale(2);filter:blur(0)}100%{transform:scale(1)}}
+.card.playing .fx-zoom .player{animation:charZoom .5s cubic-bezier(.34,1.56,.64,1);z-index:5;}
+
+/* 6. Ground Crack */
+.fx-crack .crack{display:none;position:absolute;top:55%;right:28%;width:60px;height:60px;z-index:3;}
+.fx-crack .crack-line{position:absolute;background:var(--gold);height:2px;transform-origin:left center;opacity:0;}
+@keyframes crackGrow{0%{width:0;opacity:1}60%{width:100%;opacity:1}100%{width:100%;opacity:0}}
+.card.playing .fx-crack .crack{display:block;}
+.card.playing .fx-crack .cl1{width:30px;top:50%;left:50%;transform:rotate(-20deg);animation:crackGrow .4s ease-out forwards;}
+.card.playing .fx-crack .cl2{width:25px;top:45%;left:55%;transform:rotate(40deg);animation:crackGrow .4s ease-out .1s forwards;}
+.card.playing .fx-crack .cl3{width:20px;top:55%;left:48%;transform:rotate(-60deg);animation:crackGrow .4s ease-out .15s forwards;}
+.card.playing .fx-crack .cl4{width:15px;top:42%;left:42%;transform:rotate(10deg);animation:crackGrow .4s ease-out .2s forwards;}
+
+/* 7. Screen Color Wash */
+.fx-wash .wash{display:none;position:absolute;inset:0;z-index:5;
+  background:radial-gradient(circle at 35% 65%,var(--cyan),transparent 70%);opacity:0;}
+@keyframes washPulse{0%{opacity:0;transform:scale(.5)}30%{opacity:.5;transform:scale(1)}100%{opacity:0;transform:scale(1.5)}}
+.card.playing .fx-wash .wash{display:block;animation:washPulse .6s ease-out forwards;}
+
+/* 8. Combo Counter */
+.fx-combo .combo-num{display:none;position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);
+  font-size:48px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,213,79,.6);z-index:5;opacity:0;}
+@keyframes comboSlam{0%{opacity:0;transform:translate(-50%,-50%) scale(3)}25%{opacity:1;transform:translate(-50%,-50%) scale(.9)}50%{transform:translate(-50%,-50%) scale(1.1)}75%{transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1) translateY(-20px)}}
+.card.playing .fx-combo .combo-num{display:block;}
+.card.playing .fx-combo .cn1{animation:comboSlam .5s ease-out forwards;}
+.card.playing .fx-combo .cn2{animation:comboSlam .5s ease-out .3s forwards;}
+.card.playing .fx-combo .cn3{animation:comboSlam .5s ease-out .6s forwards;}
+
+/* 9. Dice Explosion */
+.fx-dice-explode .mini-die{display:none;position:absolute;width:20px;height:20px;border-radius:4px;
+  background:var(--gold);border:1px solid #d79418;top:40%;left:45%;}
+.fx-dice-explode .spark{display:none;position:absolute;width:4px;height:4px;border-radius:50%;
+  background:var(--gold);top:42%;left:48%;}
+@keyframes dieExplode1{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(-30px,-40px) rotate(180deg) scale(0)}}
+@keyframes dieExplode2{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(25px,-35px) rotate(-200deg) scale(0)}}
+@keyframes dieExplode3{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(10px,30px) rotate(150deg) scale(0)}}
+@keyframes sparkFly1{0%{opacity:1}100%{opacity:0;transform:translate(-20px,-50px)}}
+@keyframes sparkFly2{0%{opacity:1}100%{opacity:0;transform:translate(30px,-40px)}}
+@keyframes sparkFly3{0%{opacity:1}100%{opacity:0;transform:translate(-15px,25px)}}
+@keyframes sparkFly4{0%{opacity:1}100%{opacity:0;transform:translate(25px,20px)}}
+.card.playing .fx-dice-explode .mini-die{display:block;}
+.card.playing .fx-dice-explode .spark{display:block;}
+.card.playing .fx-dice-explode .md1{animation:dieExplode1 .6s ease-out forwards;}
+.card.playing .fx-dice-explode .md2{animation:dieExplode2 .6s ease-out .05s forwards;}
+.card.playing .fx-dice-explode .md3{animation:dieExplode3 .6s ease-out .1s forwards;}
+.card.playing .fx-dice-explode .sk1{animation:sparkFly1 .4s ease-out forwards;}
+.card.playing .fx-dice-explode .sk2{animation:sparkFly2 .4s ease-out .05s forwards;}
+.card.playing .fx-dice-explode .sk3{animation:sparkFly3 .4s ease-out .1s forwards;}
+.card.playing .fx-dice-explode .sk4{animation:sparkFly4 .4s ease-out .15s forwards;}
+
+/* 10. Spirit Aura */
+.fx-aura .aura-ring{display:none;position:absolute;bottom:28%;left:32%;width:50px;height:50px;
+  border-radius:50%;border:2px solid var(--cyan);opacity:0;}
+@keyframes auraPulse{0%{transform:scale(.8);opacity:.8;box-shadow:0 0 10px var(--cyan)}
+  50%{transform:scale(1.4);opacity:.4;box-shadow:0 0 25px var(--cyan)}
+  100%{transform:scale(1.8);opacity:0;box-shadow:0 0 40px var(--cyan)}}
+@keyframes auraGlow{0%{box-shadow:0 0 8px var(--cyan)}50%{box-shadow:0 0 20px var(--cyan),0 0 40px rgba(79,195,247,.3)}100%{box-shadow:0 0 8px var(--cyan)}}
+.card.playing .fx-aura .aura-ring{display:block;}
+.card.playing .fx-aura .ar1{animation:auraPulse .8s ease-out forwards;}
+.card.playing .fx-aura .ar2{animation:auraPulse .8s ease-out .2s forwards;}
+.card.playing .fx-aura .ar3{animation:auraPulse .8s ease-out .4s forwards;}
+.card.playing .fx-aura .player{animation:auraGlow 1s ease-in-out;box-shadow:0 0 20px var(--cyan);}
+
+/* Footer */
+.footer{text-align:center;padding:30px;color:#444;font-size:11px;letter-spacing:1px;}
+
+/* Prompt output */
+.prompt-area{max-width:800px;margin:20px auto;padding:0 20px;}
+.prompt-box{background:#0d0d1a;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:16px;
+  position:relative;min-height:60px;}
+.prompt-box pre{font-family:monospace;font-size:12px;color:#0f0;white-space:pre-wrap;line-height:1.6;}
+.prompt-label{font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.copy-btn{position:absolute;top:12px;right:12px;background:var(--purple);color:#fff;border:none;
+  padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer;transition:all .2s;}
+.copy-btn:hover{background:#9333ea;}
+.copy-btn.copied{background:#22c55e;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>10 ABILITY VFX IDEAS</h1>
+  <p>Battle of Origins &mdash; Hype Playable Ad</p>
+</div>
+
+<div class="grid">
+
+  <!-- 1. Sprite Flash & Shake -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#1</span>
+    <span class="card-diff easy">Easy</span>
+    <div class="preview fx-flash">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Sprite Flash & Shake</h3>
+      <p>Hit sprite flashes white/red and shakes independently, like Pokemon damage. Simple but instantly readable as "you got hit."</p>
+      <div class="best-for"><span>Best for:</span> Swarm, Singles damage, any hit confirmation</div>
+    </div>
+  </div>
+
+  <!-- 2. Projectile Trail -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#2</span>
+    <span class="card-diff medium">Medium</span>
+    <div class="preview fx-projectile">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="orb"></div>
+      <div class="trail"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Projectile Trail</h3>
+      <p>A colored orb/streak flies from attacker to defender. Color matches the element. Creates a clear "I attacked you" visual line.</p>
+      <div class="best-for"><span>Best for:</span> Slash, Blue Fire, Swift, Snowball</div>
+    </div>
+  </div>
+
+  <!-- 3. Elemental Burst -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#3</span>
+    <span class="card-diff medium">Medium</span>
+    <div class="preview fx-burst">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="particle p1"></div><div class="particle p2"></div><div class="particle p3"></div>
+      <div class="particle p4"></div><div class="particle p5"></div><div class="particle p6"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Elemental Burst</h3>
+      <p>Particles explode from the attacker in their element color. Ice shards for Gary, fire sparks for flame types, poison wisps for Scallywags.</p>
+      <div class="best-for"><span>Best for:</span> Swarm, Plunder, any element-themed ability</div>
+    </div>
+  </div>
+
+  <!-- 4. Full-Screen Splash -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#4</span>
+    <span class="card-diff medium">Medium</span>
+    <div class="preview fx-splash">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="splash-overlay">
+        <div class="splash-name">SWIFT!</div>
+        <div class="splash-line"></div>
+      </div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Full-Screen Ability Splash</h3>
+      <p>Dramatic full-screen overlay with ability name that slams in big, like a fighting game super activation. Black bg with gold text.</p>
+      <div class="best-for"><span>Best for:</span> Swift (1-2-3), Beast Mode, One-two-one!, any showstopper</div>
+    </div>
+  </div>
+
+  <!-- 5. Character Zoom -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#5</span>
+    <span class="card-diff easy">Easy</span>
+    <div class="preview fx-zoom">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Character Zoom</h3>
+      <p>Attacker sprite quickly scales up 2x with motion blur, then snaps back. A focus moment that says "this character is doing something."</p>
+      <div class="best-for"><span>Best for:</span> Ambush (first strike), Protector activation</div>
+    </div>
+  </div>
+
+  <!-- 6. Ground Crack -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#6</span>
+    <span class="card-diff hard">Hard</span>
+    <div class="preview fx-crack">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="crack">
+        <div class="crack-line cl1"></div><div class="crack-line cl2"></div>
+        <div class="crack-line cl3"></div><div class="crack-line cl4"></div>
+      </div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Ground Crack / Impact</h3>
+      <p>Gold cracks radiate from the hit point when big damage lands. Reinforces weight and power of the hit. Great for triples.</p>
+      <div class="best-for"><span>Best for:</span> Triples damage, Beast Mode 2X, Stone Form counter</div>
+    </div>
+  </div>
+
+  <!-- 7. Screen Color Wash -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#7</span>
+    <span class="card-diff easy">Easy</span>
+    <div class="preview fx-wash">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="wash"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Screen Color Wash</h3>
+      <p>Entire arena briefly tints the attacker's element color with a radial pulse. Subtle but atmospheric. Stacks well with other effects.</p>
+      <div class="best-for"><span>Best for:</span> Any ability activation, pairs with other effects</div>
+    </div>
+  </div>
+
+  <!-- 8. Combo Counter -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#8</span>
+    <span class="card-diff medium">Medium</span>
+    <div class="preview fx-combo">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="combo-num cn1">1</div>
+      <div class="combo-num cn2">2</div>
+      <div class="combo-num cn3">3!</div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Combo Counter</h3>
+      <p>Big stylized numbers slam in one by one, counting up total damage. Each number triggers a hit sound. Adds rhythm and anticipation.</p>
+      <div class="best-for"><span>Best for:</span> Multi-hit abilities, One-two-one! (3X), high damage rolls</div>
+    </div>
+  </div>
+
+  <!-- 9. Dice Explosion -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#9</span>
+    <span class="card-diff medium">Medium</span>
+    <div class="preview fx-dice-explode">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="mini-die md1"></div><div class="mini-die md2"></div><div class="mini-die md3"></div>
+      <div class="spark sk1"></div><div class="spark sk2"></div><div class="spark sk3"></div><div class="spark sk4"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Dice Explosion</h3>
+      <p>Winning dice burst apart with golden sparks when the roll is particularly good. Fragments spin away. Celebrates the roll itself.</p>
+      <div class="best-for"><span>Best for:</span> TRIPLES!, doubles wins, any big roll moment</div>
+    </div>
+  </div>
+
+  <!-- 10. Spirit Aura -->
+  <div class="card" onclick="playEffect(this)">
+    <span class="card-num">#10</span>
+    <span class="card-diff easy">Easy</span>
+    <div class="preview fx-aura">
+      <div class="arena-floor"></div>
+      <div class="sprite player"></div>
+      <div class="sprite enemy"></div>
+      <div class="aura-ring ar1"></div><div class="aura-ring ar2"></div><div class="aura-ring ar3"></div>
+      <span class="play-label">Click to play</span>
+    </div>
+    <div class="card-info">
+      <h3>Spirit Aura Pulse</h3>
+      <p>Expanding rings of energy radiate from the active character. Color matches their element. A breathing, living presence on the field.</p>
+      <div class="best-for"><span>Best for:</span> Alpine Aura (Shoo), Restore (healing), any passive/buff</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Prompt Output -->
+<div class="prompt-area">
+  <div class="prompt-label">Selected Effects &mdash; Implementation Prompt</div>
+  <div class="prompt-box">
+    <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+    <pre id="promptOutput">Click on effects above to select them for implementation. Click again to deselect.</pre>
+  </div>
+</div>
+
+<div class="footer">Battle of Origins &mdash; Ability VFX Concepts &mdash; 2026</div>
+
+<script>
+const selected = new Set();
+
+function playEffect(card) {
+  // Toggle selection
+  const num = card.querySelector('.card-num').textContent;
+  const name = card.querySelector('h3').textContent;
+
+  if (selected.has(num)) {
+    selected.delete(num);
+    card.style.borderColor = '';
+  } else {
+    selected.add(num);
+    card.style.borderColor = 'var(--gold)';
+  }
+
+  // Play animation
+  card.classList.remove('playing');
+  void card.offsetWidth; // force reflow
+  card.classList.add('playing');
+
+  // Reset after animation completes
+  setTimeout(() => card.classList.remove('playing'), 1500);
+
+  updatePrompt();
+}
+
+function updatePrompt() {
+  const el = document.getElementById('promptOutput');
+  if (selected.size === 0) {
+    el.textContent = 'Click on effects above to select them for implementation. Click again to deselect.';
+    return;
+  }
+
+  const cards = document.querySelectorAll('.card');
+  const picks = [];
+  cards.forEach(card => {
+    const num = card.querySelector('.card-num').textContent;
+    if (selected.has(num)) {
+      const name = card.querySelector('h3').textContent;
+      const desc = card.querySelector('p').textContent;
+      const best = card.querySelector('.best-for').textContent;
+      picks.push(`${num} ${name}: ${desc} (${best})`);
+    }
+  });
+
+  el.textContent = `Implement these ${picks.length} ability VFX in the hype ad battle scene:\n\n${picks.join('\n\n')}\n\nIntegrate into the doRoll() combat loop. Each effect should trigger at the right moment — after dice settle for damage effects, during ability activation for character effects. Use CSS animations with JS class toggling. All effects should be reusable functions that take the target sprite element as a parameter.`;
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptOutput').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+</script>
+</body>
+</html>
