@@ -4102,7 +4102,10 @@ function initWpDeckConfig() {
         wpDeckConfigBlue = JSON.parse(savedBlue);
         Object.keys(wpDeckConfigBlue).forEach(k => { if (!validIds.has(Number(k))) delete wpDeckConfigBlue[k]; });
       }
-      if (savedRed && savedBlue) return;
+      // Only default the ones that weren't loaded
+      if (!savedRed) wpDeckConfigRed = { ...WP_DEFAULT_DECK };
+      if (!savedBlue) wpDeckConfigBlue = { ...WP_DEFAULT_DECK };
+      return;
     }
   } catch(e) {}
   // Default: both teams get same starting deck
@@ -4281,8 +4284,7 @@ function saveWillpowerDeck() {
       break;
     }
   }
-  wpActiveTeam = origTeam;
-  if (!allValid) return;
+  if (!allValid) return; // switchWpTeam already set the tab to the failing team
   try {
     localStorage.setItem('wpDeckConfigRed', JSON.stringify(wpDeckConfigRed));
     localStorage.setItem('wpDeckConfigBlue', JSON.stringify(wpDeckConfigBlue));
@@ -20199,7 +20201,8 @@ function promptHexNumber(team, callback) {
 
 // Wildcard ability picker: show all hot cards in deck, let player choose one
 function promptWildcardChoice(team, callback) {
-  const deckHotIds = Object.entries(wpDeckConfig).filter(([id, cnt]) => cnt > 0 && Number(id) !== 12).map(([id]) => Number(id));
+  const teamCfg = team === 'blue' ? wpDeckConfigBlue : wpDeckConfigRed;
+  const deckHotIds = Object.entries(teamCfg).filter(([id, cnt]) => cnt > 0 && Number(id) !== 12).map(([id]) => Number(id));
   const hotCards = deckHotIds.map(id => wpCardById(id)).filter(Boolean);
 
   if (hotCards.length === 0) {
