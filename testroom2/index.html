@@ -3174,14 +3174,14 @@ const WILLPOWER_CARDS = [
   { id:5,  name:'Final Strike',  color:'red',    emoji:'⚡', effect:'finalStrike',  desc:'Cost 0. No discard. Double damage on win if exactly 1 HP',          cost:0 },
 
   // BLUE — Disruption (3 cards)
-  { id:6,  name:'Boonanza',      color:'blue',   emoji:'🎯', effect:'boonanza',     desc:'After Roll Activation. Flick a die into others to alter results',   cost:1 },
-  { id:7,  name:'Second Chance', color:'blue',   emoji:'🍀', effect:'secondChance', desc:'After Roll Activation. If you lost, re-roll one die',               cost:1 },
+  { id:6,  name:'Boonanza',      color:'blue',   emoji:'🎯', effect:'boonanza',     desc:'After Roll Activation. Flick a die into others to alter results',   cost:1, afterRoll:true },
+  { id:7,  name:'Second Chance', color:'blue',   emoji:'🍀', effect:'secondChance', desc:'After Roll Activation. If you lost, re-roll one die',               cost:1, afterRoll:true },
   { id:8,  name:'Hex',           color:'blue',   emoji:'🔮', effect:'hex',          desc:'Choose a number (1-6). Opponent dice matching it become 1s',         cost:1 },
 
   // GREEN — Defense (3 cards)
   { id:9,  name:'Survivor',      color:'green',  emoji:'💪', effect:'survivor',     desc:'Survive KO with 1 HP. Token lost on swap',                          cost:1 },
-  { id:10, name:'Thorns',        color:'green',  emoji:'🌹', effect:'thorns',       desc:'After Roll Activation. After damage, deal 1 back to attacker',      cost:1 },
-  { id:11, name:'Quick Feet',    color:'green',  emoji:'👟', effect:'quickFeet',    desc:'After Roll Activation. Roll 1 die. 4+: dodge all damage, +1 die next roll', cost:1 },
+  { id:10, name:'Thorns',        color:'green',  emoji:'🌹', effect:'thorns',       desc:'After Roll Activation. After damage, deal 1 back to attacker',      cost:1, afterRoll:true },
+  { id:11, name:'Quick Feet',    color:'green',  emoji:'👟', effect:'quickFeet',    desc:'After Roll Activation. Roll 1 die. 4+: dodge all damage, +1 die next roll', cost:1, afterRoll:true },
 
   // ORANGE — Resources (2 cards)
   { id:12, name:'Wildcard',      color:'orange', emoji:'🃏', effect:'wildcard',     desc:'Wild — use as any other Willpower ability in your deck',             cost:1 },
@@ -12557,6 +12557,9 @@ function doPostRollAndResolve(redDice, blueDice) {
   _afterPepo();
   function _afterPepo() {
 
+  // After-Roll Willpower Window: give each team a chance to play after-roll WP cards
+  _startAfterRollWpWindow(() => {
+
   // Willpower V2: Second Chance — if team lost, re-roll one die
   // Determine winner/loser for after-roll effects
   const _scRedR = classify(B.pendingResolve.redDice);
@@ -12698,6 +12701,7 @@ function doPostRollAndResolve(redDice, blueDice) {
 
     checkLuckyStones();
   } // end _afterWpPostRoll
+  }); // end _startAfterRollWpWindow callback
   } // end _afterPepo
   }; // end postRollDone
 
@@ -19949,9 +19953,14 @@ function renderWillpower(team) {
   if (armedCount > 0) {
     topCard = wpCardById(f.willpower[0]);
     const cost = (topCard && topCard.cost) || 1;
+    const isAfterRoll = topCard && topCard.afterRoll;
+    const inPostRollWindow = B.phase && B.phase.startsWith('wp-afterroll');
     if (locked) { topReason = ' — used this turn'; }
     else if (f.ko) { topReason = ' — KO\'d'; }
-    else if (!isPreRollActive(team)) { topReason = ' — wait for your turn'; }
+    else if (isAfterRoll && !inPostRollWindow) { topReason = ' — after roll only'; }
+    else if (!isAfterRoll && inPostRollWindow) { topReason = ' — pre-roll only'; }
+    else if (!isAfterRoll && !isPreRollActive(team)) { topReason = ' — wait for your turn'; }
+    else if (isAfterRoll && inPostRollWindow && B.phase !== 'wp-afterroll-' + team) { topReason = ' — not your window'; }
     else if (armedCount < cost) { topReason = ` — need ${cost} armed cards`; }
     else if (cost >= totalHp) { topReason = ` — would KO! Need HP > ${cost}`; }
     else { canUseTop = true; topReason = ' — click to activate'; }
@@ -19980,6 +19989,7 @@ function renderWillpower(team) {
           <div class="wp-card-name">${card.name}</div>
           <div class="wp-card-desc">${card.desc}</div>
           <div style="position:absolute;top:2px;right:4px;font-size:9px;font-weight:800;color:#fbbf24;">${card.cost||1}</div>
+          ${card.afterRoll ? '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:900;color:#60a5fa;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">After Roll</div>' : ''}
         </div>`;
     } else {
       armedHtml += `<div class="wp-pile-card wp-c-${card.color}" style="top:${topPx}px;z-index:${zIdx};"></div>`;
@@ -20027,7 +20037,9 @@ function renderWillpower(team) {
 // They stay on the ghost as HP buffer (eaten first by damage). Healing returns face-down only.
 // No self-KO: cost must be strictly less than current HP (cost < currentHp).
 function activateWillpower(team) {
-  if (!B || !isPreRollActive(team)) return;
+  if (!B) return;
+  const inPostRollWindow = B.phase === 'wp-afterroll-' + team;
+  if (!inPostRollWindow && !isPreRollActive(team)) return;
   const t = B[team];
   const f = active(t);
   if (f.ko || !f.willpower || f.willpower.length === 0) return;
@@ -20035,6 +20047,17 @@ function activateWillpower(team) {
 
   const topId = f.willpower[0];
   const card = wpCardById(topId);
+
+  // Block after-roll cards from pre-roll and vice versa
+  if (card.afterRoll && !inPostRollWindow) {
+    narrate(`<b>${card.name}</b> is an <b>After Roll</b> card — can only be played after rolling!`);
+    return;
+  }
+  if (!card.afterRoll && inPostRollWindow) {
+    narrate(`<b>${card.name}</b> is a <b>Pre-Roll</b> card — can't be played after rolling!`);
+    return;
+  }
+
   // Cold Cards have no ability — can't activate
   if (card.cold) {
     narrate(`<b>${f.name}</b>'s top card is a <b>Cold Card</b> — no ability to use!`);
@@ -20198,6 +20221,109 @@ function applyWillpowerEffect(team, card) {
 // --- Willpower V2 UI Helpers ---
 
 // Hex number picker: modal 1-6 selector
+// --- After-Roll Willpower Window ---
+// Gives each team a timed window to play after-roll WP cards (Boonanza, Second Chance, Thorns, Quick Feet).
+// Sequential: Red gets a window first, then Blue. If neither has eligible after-roll cards, skip.
+function _startAfterRollWpWindow(finalCallback) {
+  // Check which teams have an after-roll card on top of their armed pile
+  function teamHasAfterRollCard(team) {
+    const t = B[team];
+    const f = active(t);
+    if (!f || f.ko || !f.willpower || f.willpower.length === 0) return false;
+    if (B.wpUsedThisTurn && B.wpUsedThisTurn[team]) return false;
+    const topCard = wpCardById(f.willpower[0]);
+    if (!topCard || topCard.cold) return false;
+    if (!topCard.afterRoll) return false;
+    // Check cost gate
+    const cost = topCard.cost || 1;
+    const totalHp = f.willpower.length + (f.wpBuffer ? f.wpBuffer.length : 0);
+    if (cost >= totalHp) return false;
+    if (f.willpower.length < cost) return false;
+    return true;
+  }
+
+  const redHas = teamHasAfterRollCard('red');
+  const blueHas = teamHasAfterRollCard('blue');
+
+  if (!redHas && !blueHas) {
+    finalCallback();
+    return;
+  }
+
+  // Show windows sequentially: Red first, then Blue
+  const teamsToShow = [];
+  if (redHas) teamsToShow.push('red');
+  if (blueHas) teamsToShow.push('blue');
+
+  function showNext() {
+    if (teamsToShow.length === 0) {
+      finalCallback();
+      return;
+    }
+    const team = teamsToShow.shift();
+    _showAfterRollWpWindowForTeam(team, showNext);
+  }
+  showNext();
+}
+
+function _showAfterRollWpWindowForTeam(team, callback) {
+  const t = B[team];
+  const f = active(t);
+  const topCard = wpCardById(f.willpower[0]);
+  const tLabel = team.charAt(0).toUpperCase() + team.slice(1);
+
+  B.phase = 'wp-afterroll-' + team;
+  renderBattle();
+
+  narrate(`<b class="${team}-text">${tLabel}</b> — <b>${topCard.name}</b> ready! Click willpower to activate or wait.`);
+
+  const timerSecs = getSpecialsTimerSecs();
+  let remaining = timerSecs;
+  let closed = false;
+
+  // Show countdown on the willpower panel
+  const wpEl = document.getElementById(team + '-willpower');
+  let cdEl = document.createElement('div');
+  cdEl.className = 'reroll-countdown wp-afterroll-cd';
+  cdEl.style.cssText = 'position:absolute;top:-8px;right:-8px;z-index:10;';
+  cdEl.textContent = remaining;
+  if (wpEl) { wpEl.style.position = 'relative'; wpEl.appendChild(cdEl); }
+
+  showSkipBtn(() => closeWindow());
+
+  const timer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0 || closed) {
+      clearInterval(timer);
+      if (!closed) closeWindow();
+    } else {
+      cdEl.textContent = remaining;
+    }
+  }, 1000);
+
+  // Listen for willpower activation — it sets wpUsedThisTurn, so we detect it
+  const checkUsed = setInterval(() => {
+    if (closed) { clearInterval(checkUsed); return; }
+    if (B.wpUsedThisTurn && B.wpUsedThisTurn[team]) {
+      clearInterval(checkUsed);
+      // Small delay so the activation narration plays
+      setTimeout(() => { if (!closed) closeWindow(); }, spd(600));
+    }
+  }, 100);
+
+  function closeWindow() {
+    if (closed) return;
+    closed = true;
+    hideSkipBtn();
+    clearInterval(timer);
+    clearInterval(checkUsed);
+    if (cdEl && cdEl.parentNode) cdEl.parentNode.removeChild(cdEl);
+    B.phase = 'post-roll';
+    renderBattle();
+    callback();
+  }
+}
+
 function promptHexNumber(team, callback) {
   const modal = document.createElement('div');
   modal.id = 'wpHexModal';
