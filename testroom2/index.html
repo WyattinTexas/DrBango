@@ -3036,21 +3036,38 @@ const SHELVED_IDS = new Set([
 // Played cards do NOT discard — they flip face-down on the ghost as HP buffer (spent)
 // Mid-life heals return cards face-down (wpBuffer); damage peels wpBuffer first then armed
 // No self-KO: cost < currentHP required to activate
-// Hot Cards — ability cards (max per color: red 2, blue 2, green 2, orange 1, purple 2)
+// Hot Cards — ability cards (max per color: red 3, blue 2, green 2, orange 1, purple 1)
 // Cold Card — no ability, just HP filler (16 mandatory in every 25-card deck)
 const COLD_CARD = { id:0, name:'Cold Card', color:'gray', emoji:'🧊', effect:null, desc:'No ability — marks health only.', cost:0, cold:true };
 const WILLPOWER_CARDS = [
-  { id:1,  name:'Kaboom',          color:'red',    emoji:'💥', effect:'kaboom',         desc:'Before rolling: +2 damage to wins, +1 damage',  cost:1 },
-  { id:2,  name:'Pow',             color:'red',    emoji:'💢', effect:'pow',            desc:'+2 damage for each 2 you roll',                 cost:1 },
-  { id:3,  name:'Boonanza',        color:'blue',   emoji:'🎯', effect:'boonanza',       desc:'Flick a die into others to alter results',      cost:1 },
-  { id:4,  name:'Blind',           color:'blue',   emoji:'🕶️', effect:'blind',          desc:'For 3 turns, flip a sideline character',        cost:1 },
-  { id:5,  name:'Gain Shell',      color:'green',  emoji:'🛡️', effect:'gainShell',      desc:'Block an attack',                               cost:1 },
-  { id:6,  name:'Firefly',         color:'orange', emoji:'✨', effect:'firefly',        desc:'Wild — use as any other Willpower ability',     cost:1 },
-  { id:7,  name:'Lucky Stone',     color:'purple', emoji:'🍀', effect:'luckyStone',     desc:'Re-roll one die',                               cost:1 },
+  // RED — Damage (5 cards)
+  { id:1,  name:'Kaboom',        color:'red',    emoji:'💥', effect:'kaboom',       desc:'+2 damage to wins, +1 damage',                                      cost:1 },
+  { id:2,  name:'Ancient Texts', color:'red',    emoji:'📜', effect:'ancientTexts', desc:'+2 damage for each 2 you roll',                                     cost:1 },
+  { id:3,  name:'Grudge',        color:'red',    emoji:'😤', effect:'grudge',       desc:'If you took damage last round, +3 damage this round',               cost:1 },
+  { id:4,  name:'Berserk',       color:'red',    emoji:'🔥', effect:'berserk',      desc:'+3 damage on win. If you lose, take +1 extra damage',               cost:1 },
+  { id:5,  name:'Final Strike',  color:'red',    emoji:'⚡', effect:'finalStrike',  desc:'Cost 0. No discard. Double damage on win if exactly 1 HP',          cost:0 },
+
+  // BLUE — Disruption (3 cards)
+  { id:6,  name:'Boonanza',      color:'blue',   emoji:'🎯', effect:'boonanza',     desc:'After Roll Activation. Flick a die into others to alter results',   cost:1 },
+  { id:7,  name:'Second Chance', color:'blue',   emoji:'🍀', effect:'secondChance', desc:'After Roll Activation. If you lost, re-roll one die',               cost:1 },
+  { id:8,  name:'Hex',           color:'blue',   emoji:'🔮', effect:'hex',          desc:'Choose a number (1-6). Opponent dice matching it become 1s',         cost:1 },
+
+  // GREEN — Defense (3 cards)
+  { id:9,  name:'Survivor',      color:'green',  emoji:'💪', effect:'survivor',     desc:'Survive KO with 1 HP. Token lost on swap',                          cost:1 },
+  { id:10, name:'Thorns',        color:'green',  emoji:'🌹', effect:'thorns',       desc:'After Roll Activation. After damage, deal 1 back to attacker',      cost:1 },
+  { id:11, name:'Quick Feet',    color:'green',  emoji:'👟', effect:'quickFeet',    desc:'After Roll Activation. Roll 1 die. 4+: dodge all damage, +1 die next roll', cost:1 },
+
+  // ORANGE — Resources (2 cards)
+  { id:12, name:'Wildcard',      color:'orange', emoji:'🃏', effect:'wildcard',     desc:'Wild — use as any other Willpower ability in your deck',             cost:1 },
+  { id:13, name:'Power Up',      color:'orange', emoji:'⬆️', effect:'powerUp',      desc:'Lock one die at 6 before rolling. Roll the rest normally',          cost:1 },
+
+  // PURPLE — Support (2 cards)
+  { id:14, name:'Master Plan',   color:'purple', emoji:'🧠', effect:'masterPlan',   desc:'When KO\'d this round, replacement gets +3 dice on first roll',     cost:1 },
+  { id:15, name:'Upset!',        color:'purple', emoji:'🔄', effect:'upset',        desc:'This round, loser deals damage and winner takes damage',            cost:1 },
 ];
-const WP_COLOR_MAX = { red:2, blue:2, green:2, orange:1, purple:2 };
+const WP_COLOR_MAX = { red:3, blue:2, green:2, orange:1, purple:1 };
 const WP_COLD_COUNT = 16;
-const WP_DECK_SIZE = 25;
+const WP_DECK_SIZE  = 25;  // 9 hot max + 16 cold
 
 function wpCardById(id) {
   if (id === 0) return COLD_CARD;
@@ -3915,23 +3932,41 @@ function renderStandingsTable() {
 // --- Willpower Gallery ---
 // --- Willpower Deck Builder ---
 // v15: 25-card deck = 16 mandatory Cold Cards + up to 9 Hot Cards
-// Color caps: red 2, blue 2, green 2, orange 1, purple 2 = 9 max hot
+// Color caps: red 3, blue 2, green 2, orange 1, purple 1 = 9 max hot
 let wpDeckConfig = {};
 function initWpDeckConfig() {
   try {
-    const saved = localStorage.getItem('wpDeckConfig');
-    if (saved) {
-      wpDeckConfig = JSON.parse(saved);
-      // Migration: clear old card IDs that no longer exist
-      const validIds = new Set(WILLPOWER_CARDS.map(c => c.id));
-      Object.keys(wpDeckConfig).forEach(k => {
-        if (!validIds.has(Number(k))) delete wpDeckConfig[k];
-      });
-      return;
+    const wpVersion = localStorage.getItem('wpDeckVersion');
+    // V2 migration: force reset if old version or no version
+    if (wpVersion !== 'v2') {
+      localStorage.removeItem('wpDeckConfig');
+      localStorage.setItem('wpDeckVersion', 'v2');
+      // Fall through to default
+    } else {
+      const saved = localStorage.getItem('wpDeckConfig');
+      if (saved) {
+        wpDeckConfig = JSON.parse(saved);
+        // Migration: clear old card IDs that no longer exist
+        const validIds = new Set(WILLPOWER_CARDS.map(c => c.id));
+        Object.keys(wpDeckConfig).forEach(k => {
+          if (!validIds.has(Number(k))) delete wpDeckConfig[k];
+        });
+        return;
+      }
     }
   } catch(e) {}
-  // Default: 1 of each hot card = 7 hot cards
-  WILLPOWER_CARDS.forEach(c => { wpDeckConfig[c.id] = 1; });
+  // Default V2: 9 hot cards + 16 cold = 25 total
+  wpDeckConfig = {
+    1: 1,   // Kaboom
+    2: 1,   // Ancient Texts
+    3: 1,   // Grudge
+    6: 1,   // Boonanza
+    7: 1,   // Second Chance
+    9: 1,   // Survivor
+    10: 1,  // Thorns
+    12: 1,  // Wildcard
+    14: 1,  // Master Plan
+  };
 }
 initWpDeckConfig();
 
@@ -4179,11 +4214,27 @@ function autoPlayNext() {
     duelPriority: null,
     duelActiveTeam: null,
     duelLastLoser: null,
-    // Willpower combat flags (reset each round)
-    wpBonanza: { red:0, blue:0 }, wpKaboom: { red:false, blue:false },
-    wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
-    wpLuckyStone: { red:false, blue:false },
-    wpUsedThisTurn: { red:false, blue:false },
+    // Willpower V2 combat flags (reset each round)
+    wpUsedThisTurn:  { red:false, blue:false },
+    wpKaboom:        { red:false, blue:false },
+    wpAncientTexts:  { red:false, blue:false },
+    wpGrudge:        { red:false, blue:false },
+    wpBerserk:       { red:false, blue:false },
+    wpFinalStrike:   { red:false, blue:false },
+    wpBoonanza:      { red:false, blue:false },
+    wpSecondChance:  { red:false, blue:false },
+    wpHex:           { red:0,     blue:0     },
+    wpThorns:        { red:false, blue:false },
+    wpQuickFeet:     { red:false, blue:false },
+    wpPowerUp:       { red:false, blue:false },
+    wpMasterPlan:    { red:false, blue:false },
+    wpUpset:         { red:false, blue:false },
+    // Willpower V2 persistent flags (NOT reset each round)
+    wpSurvivor:      {},
+    wpTookDmgLast:   { red:false, blue:false },
+    wpQuickFeetBonus:{ red:0,     blue:0     },
+    wpMasterPlanDice:{ red:0,     blue:0     },
+    wpPepo: { red:false, blue:false },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     cameronBonusDice: { red: 0, blue: 0 },
@@ -4986,11 +5037,27 @@ function startBattle() {
     duelPriority: null,
     duelActiveTeam: null,
     duelLastLoser: null,
-    // Willpower combat flags (reset each round)
-    wpBonanza: { red:0, blue:0 }, wpKaboom: { red:false, blue:false },
-    wpPow: { red:false, blue:false }, wpPepo: { red:false, blue:false },
-    wpLuckyStone: { red:false, blue:false },
-    wpUsedThisTurn: { red:false, blue:false },
+    // Willpower V2 combat flags (reset each round)
+    wpUsedThisTurn:  { red:false, blue:false },
+    wpKaboom:        { red:false, blue:false },
+    wpAncientTexts:  { red:false, blue:false },
+    wpGrudge:        { red:false, blue:false },
+    wpBerserk:       { red:false, blue:false },
+    wpFinalStrike:   { red:false, blue:false },
+    wpBoonanza:      { red:false, blue:false },
+    wpSecondChance:  { red:false, blue:false },
+    wpHex:           { red:0,     blue:0     },
+    wpThorns:        { red:false, blue:false },
+    wpQuickFeet:     { red:false, blue:false },
+    wpPowerUp:       { red:false, blue:false },
+    wpMasterPlan:    { red:false, blue:false },
+    wpUpset:         { red:false, blue:false },
+    // Willpower V2 persistent flags (NOT reset each round)
+    wpSurvivor:      {},
+    wpTookDmgLast:   { red:false, blue:false },
+    wpQuickFeetBonus:{ red:0,     blue:0     },
+    wpMasterPlanDice:{ red:0,     blue:0     },
+    wpPepo: { red:false, blue:false },
     committed: { red: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 }, blue: { ice:0, fire:0, surge:0, auntSusan:0, auntSusanHeal:0, harrison:0, zainBlade:0 } },
     retributionDice: { red: 0, blue: 0 },
     cameronBonusDice: { red: 0, blue: 0 },
@@ -9433,12 +9500,54 @@ function doTeamRoll(team, btn) {
   // Roll this team's dice (weighted for cinematic clutch moments)
   let diceCount = B.preRoll[team].count;
   const override = B.preRoll[team].override;
+
+  // Willpower V2: Quick Feet bonus dice from last round's dodge
+  if (B.wpQuickFeetBonus && B.wpQuickFeetBonus[team] > 0) {
+    diceCount += B.wpQuickFeetBonus[team];
+    log(`<span class="log-ability">Quick Feet!</span> +${B.wpQuickFeetBonus[team]} bonus die from last round's dodge!`);
+    B.wpQuickFeetBonus[team] = 0;
+  }
+
+  // Willpower V2: Master Plan dice from KO'd ghost
+  if (B.wpMasterPlanDice && B.wpMasterPlanDice[team] > 0) {
+    diceCount += B.wpMasterPlanDice[team];
+    log(`<span class="log-ability">Master Plan!</span> +${B.wpMasterPlanDice[team]} bonus dice from fallen ally!`);
+    B.wpMasterPlanDice[team] = 0;
+  }
+
   // Laura (79) — Catchy Tune: if unlocked, one die is locked from last roll
   const lockedDie = (B.catchyTuneUnlocked && B.catchyTuneUnlocked[team] && B.catchyTuneLockedDie && B.catchyTuneLockedDie[team] !== null && diceCount > 0) ? B.catchyTuneLockedDie[team] : null;
-  const rollCount = lockedDie !== null ? Math.max(0, diceCount - 1) : diceCount;
+
+  // Willpower V2: Power Up — lock one die at 6, roll the rest
+  const powerUpActive = B.wpPowerUp && B.wpPowerUp[team];
+  let powerUpLocked = false;
+  let adjustedCount = diceCount;
+  if (powerUpActive && !override && adjustedCount > 0) {
+    adjustedCount = Math.max(0, adjustedCount - 1);
+    powerUpLocked = true;
+  }
+
+  const rollCount = lockedDie !== null ? Math.max(0, adjustedCount - 1) : adjustedCount;
   const dice = override ? [1,2,3] : weightedRoll(team, rollCount);
   if (lockedDie !== null && !override) dice.push(lockedDie);
+  if (powerUpLocked) { dice.push(6); log(`<span class="log-ability">Power Up!</span> Locked one die at <b>6</b>!`); }
   dice.sort((a,b) => a-b);
+
+  // Willpower V2: Hex — opponent's dice matching hex'd number become 1s
+  const oppTeamWp = team === 'red' ? 'blue' : 'red';
+  if (B.wpHex && B.wpHex[oppTeamWp] > 0) {
+    const hexNum = B.wpHex[oppTeamWp];
+    let hexCount = 0;
+    for (let i = 0; i < dice.length; i++) {
+      if (dice[i] === hexNum) { dice[i] = 1; hexCount++; }
+    }
+    if (hexCount > 0) {
+      dice.sort((a,b) => a-b);
+      log(`<span class="log-ability">Hex!</span> ${hexCount} dice showing ${hexNum} became 1s!`);
+    }
+    B.wpHex[oppTeamWp] = 0; // consumed
+  }
+
   B.preRoll[team].dice = dice;
   B.lastRollDiceCount[team] = diceCount; // Frederick (27) — track for next round
   if (team === 'red') { B.redDice = dice; } else { B.blueDice = dice; }
@@ -9987,12 +10096,22 @@ function _doStartNextRound() {
       g.shellActive = false;
     });
   });
-  B.wpBonanza = { red:0, blue:0 };
-  B.wpKaboom = { red:false, blue:false };
-  B.wpPow = { red:false, blue:false };
-  B.wpPepo = { red:false, blue:false };
-  B.wpLuckyStone = { red:false, blue:false };
-  B.wpUsedThisTurn = { red:false, blue:false };
+  // Reset per-round willpower V2 flags
+  B.wpUsedThisTurn  = { red:false, blue:false };
+  B.wpKaboom        = { red:false, blue:false };
+  B.wpAncientTexts  = { red:false, blue:false };
+  B.wpGrudge        = { red:false, blue:false };
+  B.wpBerserk       = { red:false, blue:false };
+  B.wpFinalStrike   = { red:false, blue:false };
+  B.wpBoonanza      = { red:false, blue:false };
+  B.wpSecondChance  = { red:false, blue:false };
+  B.wpHex           = { red:0,     blue:0     };
+  B.wpThorns        = { red:false, blue:false };
+  B.wpQuickFeet     = { red:false, blue:false };
+  B.wpPowerUp       = { red:false, blue:false };
+  B.wpMasterPlan    = { red:false, blue:false };
+  B.wpUpset         = { red:false, blue:false };
+  B.wpPepo          = { red:false, blue:false };
 
   // Tick down Blind counters on all ghosts
   ['red','blue'].forEach(side => {
@@ -11837,6 +11956,54 @@ function doPostRollAndResolve(redDice, blueDice) {
   _afterPepo();
   function _afterPepo() {
 
+  // Willpower V2: Second Chance — if team lost, re-roll one die
+  // Determine winner/loser for after-roll effects
+  const _scRedR = classify(B.pendingResolve.redDice);
+  const _scBlueR = classify(B.pendingResolve.blueDice);
+  const _scTypeRank = {penta:5,quads:4,triples:3,doubles:2,singles:1,none:0};
+  function _scGr(t) { return _scTypeRank[t] !== undefined ? _scTypeRank[t] : (t.endsWith('-of-a-kind') ? parseInt(t) : 0); }
+  let _scWinner = null;
+  if (_scGr(_scRedR.type) > _scGr(_scBlueR.type)) _scWinner = 'red';
+  else if (_scGr(_scBlueR.type) > _scGr(_scRedR.type)) _scWinner = 'blue';
+  else if (_scRedR.value > _scBlueR.value) _scWinner = 'red';
+  else if (_scBlueR.value > _scRedR.value) _scWinner = 'blue';
+  const _scLoser = _scWinner === 'red' ? 'blue' : _scWinner === 'blue' ? 'red' : null;
+
+  // Chain: Second Chance → Quick Feet → moonstones
+  // Check Second Chance first
+  const _scRedHas = B.wpSecondChance && B.wpSecondChance.red && _scLoser === 'red';
+  const _scBlueHas = B.wpSecondChance && B.wpSecondChance.blue && _scLoser === 'blue';
+  if (_scRedHas || _scBlueHas) {
+    const scTeam = _scRedHas ? 'red' : 'blue';
+    const scDice = scTeam === 'red' ? B.pendingResolve.redDice : B.pendingResolve.blueDice;
+    doSecondChanceReroll(scTeam, scDice, () => {
+      _checkQuickFeet();
+    });
+    return;
+  }
+  _checkQuickFeet();
+
+  function _checkQuickFeet() {
+    // Quick Feet: if team lost, roll 1 die. 4+ dodges all damage + bonus die next roll
+    const _qfRedHas = B.wpQuickFeet && B.wpQuickFeet.red && _scLoser === 'red';
+    const _qfBlueHas = B.wpQuickFeet && B.wpQuickFeet.blue && _scLoser === 'blue';
+    if (_qfRedHas || _qfBlueHas) {
+      const qfTeam = _qfRedHas ? 'red' : 'blue';
+      doQuickFeetRoll(qfTeam, (dodged) => {
+        if (dodged) {
+          // Store dodge flag so damage resolution skips this team
+          B._wpQuickFeetDodged = B._wpQuickFeetDodged || {};
+          B._wpQuickFeetDodged[qfTeam] = true;
+        }
+        _afterWpPostRoll();
+      });
+      return;
+    }
+    _afterWpPostRoll();
+  }
+
+  function _afterWpPostRoll() {
+
   // Only offer moonstones that existed BEFORE this round (not gained during roll)
   const redMsAvail = B.msAvailable ? B.msAvailable.red : 0;
   const blueMsAvail = B.msAvailable ? B.msAvailable.blue : 0;
@@ -11929,6 +12096,7 @@ function doPostRollAndResolve(redDice, blueDice) {
   }
 
     checkLuckyStones();
+  } // end _afterWpPostRoll
   } // end _afterPepo
   }; // end postRollDone
 
@@ -15135,15 +15303,42 @@ function _resolveRoundImpl() {
 
   let dmg = wR.damage;
 
-  // Willpower: Pow (+2 damage for each 2 rolled by winner)
-  if (B.wpPow && B.wpPow[winTeamName]) {
+  // Willpower V2: Ancient Texts (+2 damage for each 2 rolled by winner)
+  if (B.wpAncientTexts && B.wpAncientTexts[winTeamName]) {
     const twosCount = winDice.filter(d => d === 2).length;
     if (twosCount > 0) {
-      const powDmg = twosCount * 2;
-      dmg += powDmg;
-      log(`<span class="log-ability">Pow!</span> ${twosCount}× 2s rolled → +${powDmg} damage!`);
+      const atDmg = twosCount * 2;
+      dmg += atDmg;
+      log(`<span class="log-ability">Ancient Texts!</span> ${twosCount}× 2s rolled → +${atDmg} damage!`);
     }
-    B.wpPow[winTeamName] = false;
+    B.wpAncientTexts[winTeamName] = false;
+  }
+
+  // Willpower V2: Kaboom (+2 damage to wins, +1 damage)
+  if (B.wpKaboom && B.wpKaboom[winTeamName]) {
+    dmg += 3; // +2 (win bonus) + +1 (base)
+    log(`<span class="log-ability">Kaboom!</span> +2 win bonus + +1 base → +3 damage!`);
+    B.wpKaboom[winTeamName] = false;
+  }
+
+  // Willpower V2: Grudge (+3 damage if took damage last round)
+  if (B.wpGrudge && B.wpGrudge[winTeamName] && B.wpTookDmgLast && B.wpTookDmgLast[winTeamName]) {
+    dmg += 3;
+    log(`<span class="log-ability">Grudge!</span> Revenge for last round's damage → +3!`);
+    B.wpGrudge[winTeamName] = false;
+  }
+
+  // Willpower V2: Berserk (+3 damage on win)
+  if (B.wpBerserk && B.wpBerserk[winTeamName]) {
+    dmg += 3;
+    log(`<span class="log-ability">Berserk!</span> +3 damage on win!`);
+  }
+
+  // Willpower V2: Final Strike (double damage on win if at 1 HP)
+  if (B.wpFinalStrike && B.wpFinalStrike[winTeamName]) {
+    dmg *= 2;
+    log(`<span class="log-ability">Final Strike!</span> DOUBLE DAMAGE! (${dmg/2} → ${dmg})`);
+    B.wpFinalStrike[winTeamName] = false;
   }
 
   // Antoinette (82) — Grace: +1 damage on doubles
@@ -16335,22 +16530,62 @@ function _resolveRoundImpl() {
   // --- APPLY DAMAGE (game state updates immediately) ---
   const winColor = winTeamName === 'red' ? 'red-text' : 'blue-text';
   const loseColor = winTeamName === 'red' ? 'blue-text' : 'red-text';
-  // Willpower: Bonanza (+2 damage on wins)
-  if (B.wpBonanza && B.wpBonanza[winTeamName] > 0) {
-    dmg += B.wpBonanza[winTeamName];
-    log(`<span class="log-ability">Bonanza!</span> +${B.wpBonanza[winTeamName]} damage`);
-    B.wpBonanza[winTeamName] = 0;
+  // Willpower V2: Upset! — reverse damage direction (loser deals damage, winner takes it)
+  let wpUpsetActive = false;
+  if (B.wpUpset) {
+    // Check if EITHER team activated Upset
+    if (B.wpUpset.red || B.wpUpset.blue) {
+      wpUpsetActive = true;
+      log(`<span class="log-ability">UPSET!</span> Damage is REVERSED — winner takes damage!`);
+      B.wpUpset = { red:false, blue:false };
+    }
   }
-  // Willpower: Shell (block 1 damage)
-  if (lF.shellActive && dmg > 0) {
-    dmg = Math.max(0, dmg - 1);
-    lF.shellActive = false;
-    log(`<span class="log-ability">Shell!</span> blocked 1 damage`);
+
+  // Willpower V2: Quick Feet dodge — if dodged, zero out damage
+  if (B._wpQuickFeetDodged && B._wpQuickFeetDodged[loseTeamName]) {
+    dmg = 0;
+    log(`<span class="log-ability">Quick Feet!</span> Dodged all damage!`);
+    delete B._wpQuickFeetDodged[loseTeamName];
   }
-  if (dmg > 0) {
+
+  // Willpower V2: Berserk penalty — if loser had Berserk active, take +1 extra damage
+  if (B.wpBerserk && B.wpBerserk[loseTeamName]) {
+    dmg += 1;
+    log(`<span class="log-ability">Berserk!</span> Lost → +1 extra damage taken!`);
+    B.wpBerserk[loseTeamName] = false;
+  }
+  // Clear winner's Berserk flag too
+  if (B.wpBerserk && B.wpBerserk[winTeamName]) B.wpBerserk[winTeamName] = false;
+
+  if (wpUpsetActive && dmg > 0) {
+    // UPSET: winner takes damage instead of loser
+    wpDamage(wF, dmg);
+    if (wF.ko) { wF.killedBy = (lF.originalId || lF.id); }
+    log(`<span class="log-dmg">UPSET! ${lF.name} deals ${dmg} to ${wF.name}!</span> ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
+
+    // Willpower V2: Thorns — after taking damage, deal 1 back
+    if (B.wpThorns && B.wpThorns[winTeamName] && dmg > 0) {
+      wpDamage(lF, 1);
+      log(`<span class="log-ability">Thorns!</span> ${wF.name} retaliates — 1 damage back to ${lF.name}! ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+      B.wpThorns[winTeamName] = false;
+    }
+
+    // Track damage for Grudge
+    if (B.wpTookDmgLast) { B.wpTookDmgLast[winTeamName] = true; B.wpTookDmgLast[loseTeamName] = false; }
+  } else if (dmg > 0) {
     wpDamage(lF, dmg);
     if (lF.ko) { lF.killedBy = (wF.originalId || wF.id); }
     log(`<span class="log-dmg">${wF.name} deals ${dmg} to ${lF.name}!</span> ${lF.ko?'<span class="log-ko">KO!</span>':lF.hp+' HP left'}`);
+
+    // Willpower V2: Thorns — after taking damage, deal 1 back to attacker
+    if (B.wpThorns && B.wpThorns[loseTeamName] && dmg > 0 && !lF.ko) {
+      wpDamage(wF, 1);
+      log(`<span class="log-ability">Thorns!</span> ${lF.name} retaliates — 1 damage back to ${wF.name}! ${wF.ko?'<span class="log-ko">KO!</span>':wF.hp+' HP left'}`);
+      B.wpThorns[loseTeamName] = false;
+    }
+
+    // Track damage for Grudge
+    if (B.wpTookDmgLast) { B.wpTookDmgLast[loseTeamName] = true; B.wpTookDmgLast[winTeamName] = false; }
 
   // Resolve deferred Heavy Air hits — only if Knight Terror survived this round's damage
   if (pendingHeavyAirHits.length > 0) {
@@ -18197,9 +18432,40 @@ function _resolveRoundImpl() {
 }
 
 function handleKOs() {
+  // Willpower V2: Survivor — survive KO with 1 HP (token consumed)
+  ['red','blue'].forEach(team => {
+    B[team].ghosts.forEach(g => {
+      if (g.hp <= 0 && !g.ko && B.wpSurvivor && B.wpSurvivor[g.id || g.name]) {
+        // Survivor token saves this ghost!
+        g.hp = 1;
+        // Restore 1 willpower card if possible
+        if (g.willpower && g.willpower.length === 0 && B[team].wpDiscard && B[team].wpDiscard.length > 0) {
+          g.willpower.push(B[team].wpDiscard.pop());
+        } else if (!g.willpower) {
+          g.willpower = [];
+        }
+        g.hp = g.willpower.length + (g.wpBuffer ? g.wpBuffer.length : 0);
+        if (g.hp < 1) g.hp = 1; // guaranteed 1 HP
+        delete B.wpSurvivor[g.id || g.name];
+        log(`<span class="log-ability">Survivor!</span> ${g.name} cheated death — survived at 1 HP!`);
+        narrate(`<b>${g.name}</b> <b>SURVIVED</b> with Survivor token!`);
+      }
+    });
+  });
+
   // Mark any ghost with hp <= 0 as KO (safety net for edge cases)
   ['red','blue'].forEach(team => {
     B[team].ghosts.forEach(g => { if (g.hp <= 0 && !g.ko) g.ko = true; });
+  });
+
+  // Willpower V2: Master Plan — if KO'd ghost had Master Plan active, grant +3 dice to replacement
+  ['red','blue'].forEach(team => {
+    const f = active(B[team]);
+    if (f && f.ko && B.wpMasterPlan && B.wpMasterPlan[team]) {
+      B.wpMasterPlanDice[team] = 3;
+      log(`<span class="log-ability">Master Plan!</span> ${f.name}'s strategy lives on — replacement gets +3 dice!`);
+      B.wpMasterPlan[team] = false;
+    }
   });
 
   // Check for game-over first
@@ -18567,6 +18833,11 @@ function doSwap(team, idx) {
   if (t.ghosts[idx].ko) return;
   const oldGhost = active(t);
   const oldName = oldGhost.name;
+  // Willpower V2: Survivor token lost on swap
+  if (B.wpSurvivor && B.wpSurvivor[oldGhost.id || oldGhost.name]) {
+    delete B.wpSurvivor[oldGhost.id || oldGhost.name];
+    log(`<span class="log-ability">Survivor</span> token lost — ${oldName} swapped out!`);
+  }
   const skipEntry = (oldGhost.id === 365); // Tyson — Hop: no entry effects
   t.activeIdx = idx;
   const f = active(t);
@@ -19132,9 +19403,27 @@ function activateWillpower(team) {
     narrate(`<b>${f.name}</b>'s top card is a <b>Cold Card</b> — no ability to use!`);
     return;
   }
-  const cost = card.cost || 1;
+
   if (!f.wpBuffer) f.wpBuffer = [];
   const currentHp = f.willpower.length + f.wpBuffer.length;
+
+  // Final Strike special: cost 0, no discard, but only works at exactly 1 HP
+  if (card.effect === 'finalStrike') {
+    if (currentHp !== 1) {
+      narrate(`<b>${f.name}</b> can't use <b>Final Strike</b> — must be at exactly 1 HP!`);
+      return;
+    }
+    // Don't discard anything — cost is 0
+    B.wpUsedThisTurn[team] = true;
+    f.willpowerTopLocked = true;
+    applyWillpowerEffect(team, card);
+    log(`<span class="log-ability">${f.name}</span> activated <b>Final Strike</b> at 1 HP!`);
+    narrate(`${f.name} used <b>Final Strike</b> — DOUBLE DAMAGE!`);
+    renderBattle();
+    return;
+  }
+
+  const cost = card.cost || 1;
 
   // No self-KO rule: cost must be strictly less than current HP
   if (cost >= currentHp) {
@@ -19179,57 +19468,237 @@ function applyWillpowerEffect(team, card) {
   const oppTeam = team === 'red' ? 'blue' : 'red';
 
   switch (card.effect) {
+
+    // ── RED — Damage ──
     case 'kaboom':
-      // Before rolling: +2 damage to wins, +1 base damage
-      if (!B.wpKaboom) B.wpKaboom = { red:false, blue:false };
       B.wpKaboom[team] = true;
-      if (!B.wpBonanza) B.wpBonanza = { red:0, blue:0 };
-      B.wpBonanza[team] = 2;
       break;
-    case 'pow':
-      if (!B.wpPow) B.wpPow = { red:false, blue:false };
-      B.wpPow[team] = true;
+
+    case 'ancientTexts':
+      B.wpAncientTexts[team] = true;
       break;
-    case 'boonanza':
-      // Flick a die into others to alter results (same as old Pepo)
-      if (!B.wpPepo) B.wpPepo = { red:false, blue:false };
-      B.wpPepo[team] = true;
-      break;
-    case 'blind':
-      // For 3 turns, flip (disable) a random sideline character on opposing team
-      if (!B.wpBlind) B.wpBlind = {};
-      const oppGhosts = B[oppTeam].ghosts;
-      const sidelined = oppGhosts.map((g, idx) => ({ g, idx }))
-        .filter(({ g, idx }) => idx !== B[oppTeam].activeIdx && !g.ko && !g.blinded);
-      if (sidelined.length > 0) {
-        const pick = sidelined[Math.floor(Math.random() * sidelined.length)];
-        pick.g.blinded = 3; // 3 turns
-        log(`<span class="log-ability">${pick.g.name}</span> was <b>Blinded</b> for 3 turns!`);
-        narrate(`${pick.g.name} is Blinded — flipped for 3 turns!`);
-      } else {
-        narrate('No sideline targets to Blind!');
+
+    case 'grudge':
+      if (!B.wpTookDmgLast[team]) {
+        narrate(`<b>${f.name}</b>'s <b>Grudge</b> fizzled — didn't take damage last round!`);
       }
+      B.wpGrudge[team] = true;
       break;
-    case 'gainMoonstone':
-      t.resources.moonstone = Math.min(1, t.resources.moonstone + 1);
+
+    case 'berserk':
+      B.wpBerserk[team] = true;
       break;
-    case 'spark':
-      t.resources.surge = (t.resources.surge || 0) + 1;
+
+    case 'finalStrike':
+      // Cost 0, no discard — handled in activateWillpower
+      B.wpFinalStrike[team] = true;
       break;
-    case 'gainShell':
-      f.shellActive = true;
+
+    // ── BLUE — Disruption ──
+    case 'boonanza':
+      B.wpBoonanza[team] = true;
+      B.wpPepo[team] = true; // hooks into existing flick system
       break;
-    case 'firefly':
-      // Wild card — use as any other Willpower ability
-      // For now, grant firefly resource; TODO: add choice UI for wild pick
-      t.resources.firefly = Math.min(1, (t.resources.firefly || 0) + 1);
+
+    case 'secondChance':
+      B.wpSecondChance[team] = true;
       break;
-    case 'luckyStone':
-      // Re-roll one die — set flag for roll phase
-      if (!B.wpLuckyStone) B.wpLuckyStone = { red:false, blue:false };
-      B.wpLuckyStone[team] = true;
+
+    case 'hex':
+      // Prompt player to choose a number 1-6
+      promptHexNumber(team, (hexNum) => {
+        B.wpHex[team] = hexNum;
+        narrate(`${f.name} hexed the number <b>${hexNum}</b>!`);
+        log(`<span class="log-ability">${f.name}</span> — Hex! Number <b>${hexNum}</b> cursed!`);
+        renderBattle();
+      });
+      break;
+
+    // ── GREEN — Defense ──
+    case 'survivor':
+      if (!B.wpSurvivor) B.wpSurvivor = {};
+      B.wpSurvivor[f.id || f.name] = true;
+      narrate(`${f.name} gained <b>Survivor</b> — will cheat death once!`);
+      break;
+
+    case 'thorns':
+      B.wpThorns[team] = true;
+      break;
+
+    case 'quickFeet':
+      B.wpQuickFeet[team] = true;
+      break;
+
+    // ── ORANGE — Resources ──
+    case 'wildcard':
+      // Show UI to pick any other willpower ability in their deck
+      promptWildcardChoice(team, (chosen) => {
+        if (chosen) {
+          narrate(`<b>Wildcard</b> → copying <b>${chosen.name}</b>!`);
+          applyWillpowerEffect(team, chosen);
+        }
+        renderBattle();
+      });
+      break;
+
+    case 'powerUp':
+      B.wpPowerUp[team] = true;
+      narrate(`${f.name} locked one die at <b>6</b>!`);
+      break;
+
+    // ── PURPLE — Support ──
+    case 'masterPlan':
+      B.wpMasterPlan[team] = true;
+      break;
+
+    case 'upset':
+      B.wpUpset[team] = true;
+      narrate(`<b>UPSET!</b> — damage is reversed this round!`);
       break;
   }
+}
+
+// --- Willpower V2 UI Helpers ---
+
+// Hex number picker: modal 1-6 selector
+function promptHexNumber(team, callback) {
+  const modal = document.createElement('div');
+  modal.id = 'wpHexModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;';
+  modal.innerHTML = `
+    <div style="color:#fff;font-size:18px;font-weight:900;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">🔮 Choose a Number to Hex</div>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:20px;">Opponent dice matching this number become 1s</div>
+    <div style="display:flex;gap:12px;">
+      ${[1,2,3,4,5,6].map(n => `<button class="wp-hex-btn" data-n="${n}" style="width:56px;height:56px;font-size:24px;font-weight:900;background:rgba(168,85,247,0.2);border:2px solid rgba(168,85,247,0.6);border-radius:12px;color:#fff;cursor:pointer;transition:all 0.15s;">${n}</button>`).join('')}
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('.wp-hex-btn').forEach(btn => {
+    btn.onmouseenter = () => { btn.style.background = 'rgba(168,85,247,0.5)'; btn.style.transform = 'scale(1.15)'; };
+    btn.onmouseleave = () => { btn.style.background = 'rgba(168,85,247,0.2)'; btn.style.transform = 'scale(1)'; };
+    btn.onclick = () => {
+      const n = parseInt(btn.dataset.n);
+      modal.remove();
+      callback(n);
+    };
+  });
+}
+
+// Wildcard ability picker: show all hot cards in deck, let player choose one
+function promptWildcardChoice(team, callback) {
+  const deckHotIds = Object.entries(wpDeckConfig).filter(([id, cnt]) => cnt > 0 && Number(id) !== 12).map(([id]) => Number(id));
+  const hotCards = deckHotIds.map(id => wpCardById(id)).filter(Boolean);
+
+  if (hotCards.length === 0) {
+    narrate(`<b>Wildcard</b> fizzled — no other hot cards in deck!`);
+    callback(null);
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'wpWildcardModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;overflow-y:auto;padding:20px;';
+  const colorBg = { red:'rgba(239,68,68,0.15)', blue:'rgba(59,130,246,0.15)', green:'rgba(34,197,94,0.15)', orange:'rgba(245,158,11,0.15)', purple:'rgba(168,85,247,0.15)' };
+  const colorBorder = { red:'rgba(239,68,68,0.6)', blue:'rgba(59,130,246,0.6)', green:'rgba(34,197,94,0.6)', orange:'rgba(245,158,11,0.6)', purple:'rgba(168,85,247,0.6)' };
+
+  modal.innerHTML = `
+    <div style="color:#fff;font-size:18px;font-weight:900;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px;">🃏 Wildcard — Pick an Ability</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;max-width:500px;width:100%;">
+      ${hotCards.map(c => `
+        <div class="wp-wild-pick" data-id="${c.id}" style="background:${colorBg[c.color]};border:2px solid ${colorBorder[c.color]};border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.15s;">
+          <div style="font-size:28px;">${c.emoji}</div>
+          <div style="font-size:11px;font-weight:800;color:#fff;margin:4px 0;">${c.name}</div>
+          <div style="font-size:9px;color:var(--text2);line-height:1.3;">${c.desc}</div>
+        </div>`).join('')}
+    </div>
+    <button onclick="this.parentElement.remove()" style="margin-top:16px;padding:8px 24px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:var(--text2);cursor:pointer;font-size:12px;">Cancel</button>`;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('.wp-wild-pick').forEach(el => {
+    el.onmouseenter = () => { el.style.transform = 'scale(1.05)'; };
+    el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
+    el.onclick = () => {
+      const id = parseInt(el.dataset.id);
+      const chosen = wpCardById(id);
+      modal.remove();
+      callback(chosen);
+    };
+  });
+}
+
+// Second Chance re-roll: click a die to re-roll it (after loss)
+function doSecondChanceReroll(team, dice, callback) {
+  B.wpSecondChance[team] = false;
+  const t = B[team];
+  narrate(`<b>Second Chance!</b> ${team.toUpperCase()} — click a die to re-roll!`);
+  log(`<span class="log-ability">Second Chance!</span> ${team.toUpperCase()} — re-roll one die!`);
+
+  const diceEl = document.getElementById(team + '-dice');
+  const dieDivs = diceEl.querySelectorAll('.die');
+  dieDivs.forEach((d, i) => {
+    d.style.cursor = 'pointer';
+    d.style.outline = '2px solid rgba(59,130,246,0.8)';
+    d.style.animation = 'pulse 0.8s infinite';
+    d.onclick = () => {
+      // Clean up all clickable states
+      dieDivs.forEach(dd => { dd.style.cursor = ''; dd.style.outline = ''; dd.style.animation = ''; dd.onclick = null; });
+      // Re-roll this die
+      const oldVal = dice[i];
+      const newVal = Math.floor(Math.random() * 6) + 1;
+      dice[i] = newVal;
+      dice.sort((a, b) => a - b);
+      if (team === 'red') B.pendingResolve.redDice = dice;
+      else B.pendingResolve.blueDice = dice;
+      B.redDice = B.pendingResolve.redDice;
+      B.blueDice = B.pendingResolve.blueDice;
+      log(`<span class="log-ability">Second Chance!</span> Re-rolled ${oldVal} → <b>${newVal}</b>`);
+      renderDice(B.pendingResolve.redDice, B.pendingResolve.blueDice);
+      callback();
+    };
+  });
+
+  // Auto-timeout after 8 seconds (AI or AFK)
+  setTimeout(() => {
+    const stillClickable = dieDivs[0] && dieDivs[0].style.cursor === 'pointer';
+    if (stillClickable) {
+      dieDivs.forEach(dd => { dd.style.cursor = ''; dd.style.outline = ''; dd.style.animation = ''; dd.onclick = null; });
+      // Auto re-roll lowest die
+      const lowestIdx = 0;
+      const oldVal = dice[lowestIdx];
+      const newVal = Math.floor(Math.random() * 6) + 1;
+      dice[lowestIdx] = newVal;
+      dice.sort((a, b) => a - b);
+      if (team === 'red') B.pendingResolve.redDice = dice;
+      else B.pendingResolve.blueDice = dice;
+      B.redDice = B.pendingResolve.redDice;
+      B.blueDice = B.pendingResolve.blueDice;
+      log(`<span class="log-ability">Second Chance!</span> Auto re-rolled ${oldVal} → <b>${newVal}</b>`);
+      renderDice(B.pendingResolve.redDice, B.pendingResolve.blueDice);
+      callback();
+    }
+  }, 8000);
+}
+
+// Quick Feet dodge roll: roll 1 die, 4+ dodges all damage and grants +1 die next roll
+function doQuickFeetRoll(team, callback) {
+  B.wpQuickFeet[team] = false;
+  const t = B[team];
+  const f = active(t);
+
+  narrate(`<b>Quick Feet!</b> ${f.name} rolls to dodge...`);
+  const dodgeRoll = Math.floor(Math.random() * 6) + 1;
+
+  // Brief dramatic pause
+  setTimeout(() => {
+    if (dodgeRoll >= 4) {
+      narrate(`<b>Quick Feet!</b> Rolled <b>${dodgeRoll}</b> — DODGE! +1 die next roll!`);
+      log(`<span class="log-ability">Quick Feet!</span> Rolled ${dodgeRoll} — Dodged all damage! +1 die next roll!`);
+      B.wpQuickFeetBonus[team] = 1;
+      callback(true); // dodged
+    } else {
+      narrate(`<b>Quick Feet!</b> Rolled <b>${dodgeRoll}</b> — not fast enough!`);
+      log(`<span class="log-ability">Quick Feet!</span> Rolled ${dodgeRoll} — failed to dodge.`);
+      callback(false); // didn't dodge
+    }
+  }, 600);
 }
 
 // Visual hit — shake the card + drain the HP bar for a team
