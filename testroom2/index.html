@@ -2270,7 +2270,12 @@ body.lite-mode .die.rolling { animation: none !important; }
       <h2>WILLPOWER DECK BUILDER</h2>
       <button class="standings-close" onclick="closeWillpowerGallery()">Close</button>
     </div>
-    <p style="color:var(--text2);font-size:12px;margin:8px 0 4px;">Click cards to set count (0, 1, or 2). Both players share the same <b>25-card</b> deck.</p>
+    <!-- Team Tabs -->
+    <div style="display:flex;gap:8px;margin:8px 0 12px;justify-content:center;">
+      <button class="wp-team-tab active" id="wpTabRed" onclick="switchWpTeam('red')" style="padding:6px 20px;border:2px solid var(--accent);border-radius:8px;background:rgba(233,69,96,0.15);color:var(--accent);font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:0.5px;">Red Deck</button>
+      <button class="wp-team-tab" id="wpTabBlue" onclick="switchWpTeam('blue')" style="padding:6px 20px;border:2px solid var(--border);border-radius:8px;background:transparent;color:var(--text2);font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:0.5px;">Blue Deck</button>
+    </div>
+    <p style="color:var(--text2);font-size:12px;margin:4px 0 4px;">Click cards to set count (0, 1, or 2). Each team has its own <b>25-card</b> deck.</p>
     <p style="color:var(--text2);font-size:11px;margin:0 0 12px;line-height:1.5;">
       <span style="color:#fbbf24;font-weight:700;">🔥 Hot Cards</span> give you abilities.
       <span style="color:#9ca3af;font-weight:700;">🧊 Cold Cards</span> are duds — only mark health. <b>16 Cold Cards</b> are always in the deck.
@@ -3195,11 +3200,12 @@ function wpCardById(id) {
   return WILLPOWER_CARDS.find(c => c.id === id);
 }
 
-function buildTeamWillpowerDeck() {
-  // Build deck from wpDeckConfig: Hot Cards chosen by player + mandatory Cold Cards
+function buildTeamWillpowerDeck(teamColor) {
+  // Build deck from per-team config: Hot Cards chosen by player + mandatory Cold Cards
+  const cfg = teamColor === 'blue' ? wpDeckConfigBlue : wpDeckConfigRed;
   const deck = [];
   WILLPOWER_CARDS.forEach(c => {
-    const cnt = wpDeckConfig[c.id] || 0;
+    const cnt = cfg[c.id] || 0;
     for (let i = 0; i < cnt; i++) deck.push(c.id);
   });
   // Fill remaining slots with Cold Cards (id 0)
@@ -4054,49 +4060,88 @@ function renderStandingsTable() {
 // --- Willpower Deck Builder ---
 // v15: 25-card deck = 16 mandatory Cold Cards + up to 9 Hot Cards
 // Color caps: red 3, blue 2, green 2, orange 1, purple 1 = 9 max hot
-let wpDeckConfig = {};
+// Per-team willpower configs — each team builds their own deck
+let wpDeckConfigRed = {};
+let wpDeckConfigBlue = {};
+let wpActiveTeam = 'red'; // which team's deck is being edited in the gallery
+// Legacy compat: wpDeckConfig points to active team's config
+function getWpDeckConfig() { return wpActiveTeam === 'blue' ? wpDeckConfigBlue : wpDeckConfigRed; }
+
+const WP_DEFAULT_DECK = {
+  1: 1,   // Kaboom
+  2: 1,   // Ancient Texts
+  3: 1,   // Grudge
+  6: 1,   // Boonanza
+  7: 1,   // Second Chance
+  9: 1,   // Survivor
+  10: 1,  // Thorns
+  12: 1,  // Wildcard
+  14: 1,  // Master Plan
+};
+
 function initWpDeckConfig() {
+  const validIds = new Set(WILLPOWER_CARDS.map(c => c.id));
   try {
     const wpVersion = localStorage.getItem('wpDeckVersion');
-    // V2 migration: force reset if old version or no version
-    if (wpVersion !== 'v2') {
+    if (wpVersion !== 'v3') {
+      // V3 migration: split into red/blue
       localStorage.removeItem('wpDeckConfig');
-      localStorage.setItem('wpDeckVersion', 'v2');
-      // Fall through to default
+      localStorage.removeItem('wpDeckConfigRed');
+      localStorage.removeItem('wpDeckConfigBlue');
+      localStorage.setItem('wpDeckVersion', 'v3');
     } else {
-      const saved = localStorage.getItem('wpDeckConfig');
-      if (saved) {
-        wpDeckConfig = JSON.parse(saved);
-        // Migration: clear old card IDs that no longer exist
-        const validIds = new Set(WILLPOWER_CARDS.map(c => c.id));
-        Object.keys(wpDeckConfig).forEach(k => {
-          if (!validIds.has(Number(k))) delete wpDeckConfig[k];
-        });
-        return;
+      // Load red
+      const savedRed = localStorage.getItem('wpDeckConfigRed');
+      if (savedRed) {
+        wpDeckConfigRed = JSON.parse(savedRed);
+        Object.keys(wpDeckConfigRed).forEach(k => { if (!validIds.has(Number(k))) delete wpDeckConfigRed[k]; });
       }
+      // Load blue
+      const savedBlue = localStorage.getItem('wpDeckConfigBlue');
+      if (savedBlue) {
+        wpDeckConfigBlue = JSON.parse(savedBlue);
+        Object.keys(wpDeckConfigBlue).forEach(k => { if (!validIds.has(Number(k))) delete wpDeckConfigBlue[k]; });
+      }
+      if (savedRed && savedBlue) return;
     }
   } catch(e) {}
-  // Default V2: 9 hot cards + 16 cold = 25 total
-  wpDeckConfig = {
-    1: 1,   // Kaboom
-    2: 1,   // Ancient Texts
-    3: 1,   // Grudge
-    6: 1,   // Boonanza
-    7: 1,   // Second Chance
-    9: 1,   // Survivor
-    10: 1,  // Thorns
-    12: 1,  // Wildcard
-    14: 1,  // Master Plan
-  };
+  // Default: both teams get same starting deck
+  wpDeckConfigRed = { ...WP_DEFAULT_DECK };
+  wpDeckConfigBlue = { ...WP_DEFAULT_DECK };
 }
 initWpDeckConfig();
 
+function switchWpTeam(team) {
+  wpActiveTeam = team;
+  // Update tab visuals
+  const redTab = document.getElementById('wpTabRed');
+  const blueTab = document.getElementById('wpTabBlue');
+  if (team === 'red') {
+    redTab.style.borderColor = 'var(--accent)';
+    redTab.style.background = 'rgba(233,69,96,0.15)';
+    redTab.style.color = 'var(--accent)';
+    blueTab.style.borderColor = 'var(--border)';
+    blueTab.style.background = 'transparent';
+    blueTab.style.color = 'var(--text2)';
+  } else {
+    blueTab.style.borderColor = 'var(--rare)';
+    blueTab.style.background = 'rgba(52,152,219,0.15)';
+    blueTab.style.color = 'var(--rare)';
+    redTab.style.borderColor = 'var(--border)';
+    redTab.style.background = 'transparent';
+    redTab.style.color = 'var(--text2)';
+  }
+  renderWpGallery();
+}
+
 function wpHotTotal() {
-  return Object.values(wpDeckConfig).reduce((s, v) => s + v, 0);
+  const cfg = getWpDeckConfig();
+  return Object.values(cfg).reduce((s, v) => s + v, 0);
 }
 function wpColorCount(color) {
+  const cfg = getWpDeckConfig();
   return WILLPOWER_CARDS.filter(c => c.color === color)
-    .reduce((s, c) => s + (wpDeckConfig[c.id] || 0), 0);
+    .reduce((s, c) => s + (cfg[c.id] || 0), 0);
 }
 
 function openWillpowerGallery() {
@@ -4115,6 +4160,7 @@ function renderWpGallery() {
   const rosterPicks = [...(S.redPicks || []), ...(S.bluePicks || [])];
   const rosterGhosts = rosterPicks.map(id => GHOSTS.find(g => g.id === id)).filter(Boolean);
 
+  const wpDeckConfig = getWpDeckConfig();
   grid.innerHTML = WILLPOWER_CARDS.map(c => {
     const cnt = wpDeckConfig[c.id] || 0;
     const colorCnt = wpColorCount(c.color);
@@ -4194,8 +4240,9 @@ function renderWpGallery() {
 }
 
 function cycleWpCard(id) {
+  const cfg = getWpDeckConfig();
   const card = wpCardById(id);
-  const cur = wpDeckConfig[id] || 0;
+  const cur = cfg[id] || 0;
   const next = (cur + 1) % 3; // 0 → 1 → 2 → 0
   // Enforce color cap: don't go up if already at cap
   if (next > cur) {
@@ -4203,30 +4250,47 @@ function cycleWpCard(id) {
     const colorMax = WP_COLOR_MAX[card.color] || 2;
     if (colorCnt >= colorMax) {
       // Skip to 0 (remove this card)
-      wpDeckConfig[id] = 0;
+      cfg[id] = 0;
       renderWpGallery();
       return;
     }
   }
-  wpDeckConfig[id] = next;
+  cfg[id] = next;
   renderWpGallery();
 }
 
 function saveWillpowerDeck() {
-  const hotTotal = wpHotTotal();
-  const hotMax = WP_DECK_SIZE - WP_COLD_COUNT;
-  if (hotTotal > hotMax) {
-    narrate(`Too many Hot Cards! Max ${hotMax}, currently ${hotTotal}.`);
-    return;
+  // Validate BOTH decks before saving
+  const origTeam = wpActiveTeam;
+  let allValid = true;
+  for (const team of ['red', 'blue']) {
+    wpActiveTeam = team;
+    const hotTotal = wpHotTotal();
+    const hotMax = WP_DECK_SIZE - WP_COLD_COUNT;
+    if (hotTotal > hotMax) {
+      narrate(`${team.charAt(0).toUpperCase() + team.slice(1)}: Too many Hot Cards! Max ${hotMax}, currently ${hotTotal}.`);
+      switchWpTeam(team);
+      allValid = false;
+      break;
+    }
+    const colorViolations = Object.entries(WP_COLOR_MAX).filter(([col, max]) => wpColorCount(col) > max);
+    if (colorViolations.length > 0) {
+      narrate(`${team.charAt(0).toUpperCase() + team.slice(1)}: Color cap exceeded: ${colorViolations.map(([c,m]) => `${c} (${wpColorCount(c)}/${m})`).join(', ')}`);
+      switchWpTeam(team);
+      allValid = false;
+      break;
+    }
   }
-  const colorViolations = Object.entries(WP_COLOR_MAX).filter(([col, max]) => wpColorCount(col) > max);
-  if (colorViolations.length > 0) {
-    narrate(`Color cap exceeded: ${colorViolations.map(([c,m]) => `${c} (${wpColorCount(c)}/${m})`).join(', ')}`);
-    return;
-  }
-  try { localStorage.setItem('wpDeckConfig', JSON.stringify(wpDeckConfig)); } catch(e) {}
+  wpActiveTeam = origTeam;
+  if (!allValid) return;
+  try {
+    localStorage.setItem('wpDeckConfigRed', JSON.stringify(wpDeckConfigRed));
+    localStorage.setItem('wpDeckConfigBlue', JSON.stringify(wpDeckConfigBlue));
+  } catch(e) {}
   closeWillpowerGallery();
-  narrate(`Willpower deck saved! ${hotTotal} Hot + ${WP_COLD_COUNT} Cold = ${WP_DECK_SIZE} cards.`);
+  const redHot = Object.values(wpDeckConfigRed).reduce((s,v) => s+v, 0);
+  const blueHot = Object.values(wpDeckConfigBlue).reduce((s,v) => s+v, 0);
+  narrate(`Willpower decks saved! Red: ${redHot} Hot | Blue: ${blueHot} Hot`);
 }
 
 function closeWillpowerGallery() {
@@ -4322,7 +4386,7 @@ function autoPlayNext() {
   prevResources = { red: {}, blue: {} };
   narrateQueue = []; narrateActive = false;
   B = {
-    red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
+    red: makeTeam(S.redPicks, 'red'), blue: makeTeam(S.bluePicks, 'blue'),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
     // === HAND LIMIT ===
@@ -5154,8 +5218,8 @@ function getRandomSeriesDeck(excludeIds = []) {
 // ============================================================
 function ghostData(id) { return GHOSTS.find(g=>g.id===id); }
 
-function makeTeam(ids) {
-  const teamDeck = buildTeamWillpowerDeck();
+function makeTeam(ids, teamColor) {
+  const teamDeck = buildTeamWillpowerDeck(teamColor);
   const team = {
     ghosts: ids.map(id => {
       const g = ghostData(id);
@@ -5539,7 +5603,7 @@ function startBattle() {
   prevResources = { red: {}, blue: {} };
   narrateQueue = []; narrateActive = false;
   B = {
-    red: makeTeam(S.redPicks), blue: makeTeam(S.bluePicks),
+    red: makeTeam(S.redPicks, 'red'), blue: makeTeam(S.bluePicks, 'blue'),
     round:1, log:[], phase:'ready',
     pendingMoonstone:null, pendingSteal:null,
     // === HAND LIMIT ===
