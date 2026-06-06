@@ -5317,7 +5317,7 @@ function seriesScoreHTML() {
 }
 
 function seriesShowDrawPhase() {
-  // Draw cards for both teams
+  // Draw cards for both teams up front (but only show one at a time)
   ['red', 'blue'].forEach(team => {
     const deck = SERIES[`${team}Deck`];
     shuffleArray(deck);
@@ -5326,89 +5326,94 @@ function seriesShowDrawPhase() {
     SERIES.drawPicks[team] = [];
   });
 
+  // Red picks first
+  SERIES.drawStep = 'red';
+
   const el = document.getElementById('seriesDrawPhase');
   document.getElementById('drawPhaseScore').innerHTML = seriesScoreHTML();
   document.getElementById('drawPhaseTitle').textContent = `Game ${SERIES.gameNumber} — Draw Phase`;
 
-  // Build cards for BOTH teams (red picks first, then blue)
   renderDrawPhaseCards();
   el.classList.add('active');
 }
 
 function renderDrawPhaseCards() {
   const container = document.getElementById('drawPhaseCards');
-  let html = '';
+  const team = SERIES.drawStep; // only show the active team
+  const hand = SERIES.drawHand[team];
+  const picks = SERIES.drawPicks[team];
+  const holdover = SERIES.holdover[team];
+  const needPicks = holdover ? SERIES_PICK_COUNT - 1 : SERIES_PICK_COUNT;
+  const teamLabel = team === 'red' ? 'Team Red' : 'Team Blue';
+  const teamColor = team === 'red' ? 'var(--accent)' : 'var(--rare)';
+  const deckLeft = SERIES[`${team}Deck`].length;
+  const graveCount = SERIES[`${team}Graveyard`].length;
 
-  ['red', 'blue'].forEach(team => {
-    const hand = SERIES.drawHand[team];
-    const picks = SERIES.drawPicks[team];
-    const holdover = SERIES.holdover[team];
-    const needPicks = holdover ? SERIES_PICK_COUNT - 1 : SERIES_PICK_COUNT;
-    const teamLabel = team === 'red' ? 'Team Red' : 'Team Blue';
-    const teamColor = team === 'red' ? 'var(--accent)' : 'var(--rare)';
-    const deckLeft = SERIES[`${team}Deck`].length;
-    const graveCount = SERIES[`${team}Graveyard`].length;
+  let html = `<div style="width:100%;margin:8px 0 4px;">
+    <div style="font-size:18px;font-weight:900;color:${teamColor};text-transform:uppercase;letter-spacing:2px;">${teamLabel}'s Turn to Draft</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">Deck: ${deckLeft} remaining | Graveyard: ${graveCount}</div>
+  </div>`;
 
-    html += `<div style="width:100%;margin:8px 0 4px;">
-      <div style="font-size:14px;font-weight:800;color:${teamColor};text-transform:uppercase;letter-spacing:1px;">${teamLabel}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px;">Deck: ${deckLeft} remaining | Graveyard: ${graveCount}</div>
+  // Show holdover card if exists
+  if (holdover) {
+    const g = ghostData(holdover);
+    const artHtml = g.art
+      ? `<img class="sdc-art" src="${g.art}" alt="${g.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'sdc-art-placeholder\\'>👻</div>'">`
+      : `<div class="sdc-art-placeholder">👻</div>`;
+    html += `<div class="series-draw-card locked">
+      <div class="sdc-badge" style="font-size:9px;width:auto;padding:0 6px;">HOLD</div>
+      ${artHtml}
+      <div class="sdc-name">${g.name}</div>
+      <div class="sdc-ability">${g.ability}</div>
+      <div class="sdc-hp">♥ ${g.maxHp}</div>
     </div>`;
+  }
 
-    // Show holdover card if exists
-    if (holdover) {
-      const g = ghostData(holdover);
-      const artHtml = g.art
-        ? `<img class="sdc-art" src="${g.art}" alt="${g.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'sdc-art-placeholder\\'>👻</div>'">`
-        : `<div class="sdc-art-placeholder">👻</div>`;
-      html += `<div class="series-draw-card locked">
-        <div class="sdc-badge" style="font-size:9px;width:auto;padding:0 6px;">HOLD</div>
-        ${artHtml}
-        <div class="sdc-name">${g.name}</div>
-        <div class="sdc-ability">${g.ability}</div>
-        <div class="sdc-hp">♥ ${g.maxHp}</div>
-      </div>`;
-    }
-
-    // Show drawn cards
-    hand.forEach((id, i) => {
-      const g = ghostData(id);
-      const pickIdx = picks.indexOf(id);
-      const isSelected = pickIdx >= 0;
-      const artHtml = g.art
-        ? `<img class="sdc-art" src="${g.art}" alt="${g.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'sdc-art-placeholder\\'>👻</div>'">`
-        : `<div class="sdc-art-placeholder">👻</div>`;
-      html += `<div class="series-draw-card ${isSelected ? 'selected' : ''}" onclick="seriesToggleDrawPick('${team}',${id})">
-        ${isSelected ? `<div class="sdc-badge">${pickIdx + 1}</div>` : ''}
-        ${artHtml}
-        <div class="sdc-name">${g.name}</div>
-        <div class="sdc-ability">${g.ability}</div>
-        <div class="sdc-hp">♥ ${g.maxHp}</div>
-      </div>`;
-    });
+  // Show drawn cards
+  hand.forEach((id, i) => {
+    const g = ghostData(id);
+    const pickIdx = picks.indexOf(id);
+    const isSelected = pickIdx >= 0;
+    const artHtml = g.art
+      ? `<img class="sdc-art" src="${g.art}" alt="${g.name}" loading="lazy" onerror="this.outerHTML='<div class=\\'sdc-art-placeholder\\'>👻</div>'">`
+      : `<div class="sdc-art-placeholder">👻</div>`;
+    html += `<div class="series-draw-card ${isSelected ? 'selected' : ''}" onclick="seriesToggleDrawPick('${team}',${id})">
+      ${isSelected ? `<div class="sdc-badge">${pickIdx + 1}</div>` : ''}
+      ${artHtml}
+      <div class="sdc-name">${g.name}</div>
+      <div class="sdc-ability">${g.ability}</div>
+      <div class="sdc-hp">♥ ${g.maxHp}</div>
+    </div>`;
   });
 
   container.innerHTML = html;
 
-  // Update sub text and button state
-  const redNeed = (SERIES.holdover.red ? SERIES_PICK_COUNT - 1 : SERIES_PICK_COUNT);
-  const blueNeed = (SERIES.holdover.blue ? SERIES_PICK_COUNT - 1 : SERIES_PICK_COUNT);
-  const redOk = SERIES.drawPicks.red.length === redNeed;
-  const blueOk = SERIES.drawPicks.blue.length === blueNeed;
-
+  // Update sub text and button
+  const remaining = needPicks - picks.length;
   const sub = document.getElementById('drawPhaseSub');
-  if (redOk && blueOk) {
-    sub.textContent = 'Both teams ready!';
-  } else {
-    const parts = [];
-    if (!redOk) parts.push(`Red: pick ${redNeed - SERIES.drawPicks.red.length} more`);
-    if (!blueOk) parts.push(`Blue: pick ${blueNeed - SERIES.drawPicks.blue.length} more`);
-    sub.textContent = parts.join(' | ');
-  }
+  const btn = document.getElementById('drawPhaseFightBtn');
 
-  document.getElementById('drawPhaseFightBtn').disabled = !(redOk && blueOk);
+  if (remaining > 0) {
+    sub.textContent = `Pick ${remaining} more Spiritkin`;
+    btn.disabled = true;
+    btn.textContent = `Pick ${remaining} more`;
+  } else if (team === 'red') {
+    // Red is done — button says "Lock In" to advance to Blue
+    sub.textContent = `${teamLabel} is ready!`;
+    btn.disabled = false;
+    btn.textContent = 'LOCK IN — Pass to Blue';
+  } else {
+    // Blue is done — button starts the fight
+    sub.textContent = `${teamLabel} is ready!`;
+    btn.disabled = false;
+    btn.textContent = 'FIGHT';
+  }
 }
 
 function seriesToggleDrawPick(team, id) {
+  // Only allow picks for the active step's team
+  if (team !== SERIES.drawStep) return;
+
   const picks = SERIES.drawPicks[team];
   const holdover = SERIES.holdover[team];
   const needPicks = holdover ? SERIES_PICK_COUNT - 1 : SERIES_PICK_COUNT;
@@ -5423,15 +5428,31 @@ function seriesToggleDrawPick(team, id) {
 }
 
 function seriesConfirmDraw() {
-  // Return unchosen cards to deck
-  ['red', 'blue'].forEach(team => {
-    const hand = SERIES.drawHand[team];
-    const picks = SERIES.drawPicks[team];
-    const returned = hand.filter(id => !picks.includes(id));
-    SERIES[`${team}Deck`].push(...returned);
-    shuffleArray(SERIES[`${team}Deck`]);
+  // If Red just locked in, advance to Blue's turn
+  if (SERIES.drawStep === 'red') {
+    // Return Red's unchosen cards to deck
+    const redHand = SERIES.drawHand.red;
+    const redPicks = SERIES.drawPicks.red;
+    const redReturned = redHand.filter(id => !redPicks.includes(id));
+    SERIES.redDeck.push(...redReturned);
+    shuffleArray(SERIES.redDeck);
 
-    // Build final picks: holdover first (if any), then drawn picks
+    // Advance to Blue
+    SERIES.drawStep = 'blue';
+    renderDrawPhaseCards();
+    return;
+  }
+
+  // Blue locked in — return unchosen, build final picks, start battle
+  const blueHand = SERIES.drawHand.blue;
+  const bluePicks = SERIES.drawPicks.blue;
+  const blueReturned = blueHand.filter(id => !bluePicks.includes(id));
+  SERIES.blueDeck.push(...blueReturned);
+  shuffleArray(SERIES.blueDeck);
+
+  // Build final picks for both teams
+  ['red', 'blue'].forEach(team => {
+    const picks = SERIES.drawPicks[team];
     const holdover = SERIES.holdover[team];
     if (holdover) {
       S[`${team}Picks`] = [holdover, ...picks];
