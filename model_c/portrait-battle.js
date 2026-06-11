@@ -15,6 +15,11 @@
 (function () {
   'use strict';
 
+  // battle-engine.js overrides document.getElementById to return a hidden
+  // dummy div for ANY missing id (multiplayer resilience). Truthiness checks
+  // are therefore unreliable — use querySelector, which is NOT overridden.
+  const $pb = (id) => document.querySelector('#' + id);
+
   const PB_ASSETS = 'assets/';
   // Placeholder sprites (Wyatt 2026-06-11: use these 4 until real art)
   const PLAYER_BACKS = [PB_ASSETS + 'Back_Gary.png', PB_ASSETS + 'Back_Shoo.png', PB_ASSETS + 'Back_Scallywags.png'];
@@ -113,7 +118,7 @@
 
   // ── DOM ──────────────────────────────────────────────────────────
   function buildDom() {
-    if (document.getElementById('portrait-battle')) return;
+    if ($pb('portrait-battle')) return;
     const style = document.createElement('style');
     style.id = 'pb-style';
     style.textContent = css;
@@ -168,9 +173,9 @@
 
   // ── RENDER ───────────────────────────────────────────────────────
   function setPlate(prefix, ghost) {
-    const fill = document.getElementById('pb-' + prefix + '-fill');
-    const name = document.getElementById('pb-' + prefix + '-name');
-    const hptext = document.getElementById('pb-' + prefix + '-hptext');
+    const fill = $pb('pb-' + prefix + '-fill');
+    const name = $pb('pb-' + prefix + '-name');
+    const hptext = $pb('pb-' + prefix + '-hptext');
     if (!ghost || !fill) return;
     const pct = Math.max(0, Math.min(100, (ghost.hp / (ghost.maxHp || 1)) * 100));
     fill.style.width = pct + '%';
@@ -180,7 +185,7 @@
   }
 
   function renderSprites() {
-    const field = document.getElementById('pb-field');
+    const field = $pb('pb-field');
     if (!field) return;
     field.innerHTML = '';
     const act = safeActive(B.red);
@@ -210,8 +215,8 @@
   }
 
   function renderDice() {
-    const redRow = document.getElementById('pb-dice-red');
-    const blueRow = document.getElementById('pb-dice-blue');
+    const redRow = $pb('pb-dice-red');
+    const blueRow = $pb('pb-dice-blue');
     if (!redRow) return;
     const pr = (B.preRoll || {});
     const draw = (row, dice, blue) => {
@@ -228,7 +233,7 @@
   }
 
   function renderCards() {
-    const wrap = document.getElementById('pb-cards');
+    const wrap = $pb('pb-cards');
     if (!wrap) return;
     const act = safeActive(B.red);
     wrap.innerHTML = '';
@@ -246,13 +251,13 @@
 
   function renderNarrator() {
     const src = document.querySelector('#battle-view .narrator-box') || document.querySelector('.narrator-box');
-    const dst = document.getElementById('pb-narrator');
+    const dst = $pb('pb-narrator');
     if (src && dst && dst.innerHTML !== src.innerHTML) dst.innerHTML = src.innerHTML;
   }
 
   function renderRollBtn() {
-    const real = document.getElementById('rollRedBtn');
-    const mine = document.getElementById('pb-roll');
+    const real = $pb('rollRedBtn');
+    const mine = $pb('pb-roll');
     if (!real || !mine) return;
     const visible = real.offsetParent !== null || (real.style.display !== 'none' && !real.hidden);
     mine.textContent = (real.textContent || 'ROLL').trim().toUpperCase() || 'ROLL';
@@ -272,7 +277,7 @@
 
   // ── PROXIES ──────────────────────────────────────────────────────
   window.pbRollClick = function () {
-    const real = document.getElementById('rollRedBtn');
+    const real = $pb('rollRedBtn');
     if (real && !real.disabled) real.click();
   };
   window.pbProxyCardClick = function (ghostName) {
@@ -283,16 +288,16 @@
     }
   };
   window.pbPeekLandscape = function () {
-    const bv = document.getElementById('battle-view');
+    const bv = $pb('battle-view');
     if (bv) bv.classList.toggle('pb-peek');
   };
 
   // ── ENTER / EXIT ─────────────────────────────────────────────────
   window.enterPortraitBattle = function () {
     buildDom();
-    const bv = document.getElementById('battle-view');
+    const bv = $pb('battle-view');
     if (bv) bv.classList.add('pb-offscreen');
-    document.getElementById('portrait-battle').classList.add('pb-show');
+    $pb('portrait-battle').classList.add('pb-show');
     pbActive = true;
     if (pbTimer) clearInterval(pbTimer);
     pbTimer = setInterval(renderPortrait, 400); // safety mirror; renderBattle wrap is primary
@@ -301,9 +306,9 @@
   window.exitPortraitBattle = function () {
     pbActive = false;
     if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
-    const bv = document.getElementById('battle-view');
+    const bv = $pb('battle-view');
     if (bv) bv.classList.remove('pb-offscreen', 'pb-peek');
-    const pb = document.getElementById('portrait-battle');
+    const pb = $pb('portrait-battle');
     if (pb) pb.classList.remove('pb-show');
   };
 
@@ -332,7 +337,7 @@
       window.renderBattle = wrapped;
     }
     // 3. Raid over → bridge hides #battle-view → exit portrait
-    const bv = document.getElementById('battle-view');
+    const bv = $pb('battle-view');
     if (bv && !bv._pbObserved) {
       bv._pbObserved = true;
       new MutationObserver(() => {
