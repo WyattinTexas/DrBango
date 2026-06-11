@@ -262,34 +262,101 @@
     hptext.textContent = Math.max(0, ghost.hp) + '/' + (ghost.maxHp || '?');
   }
 
+  // Multi-player slot positions (2-3 raiders side by side facing the boss)
+  const MULTI_POS = [{ x: 80, y: 420 }, { x: 180, y: 440 }, { x: 280, y: 420 }];
+
+  function raidPlayers() {
+    const R = window.currentRaid;
+    if (!R || !R.players) return null;
+    const slots = Object.keys(R.players).sort();
+    return slots.map(k => R.players[k]).filter(Boolean);
+  }
+
+  function addSprite(field, src, opts) {
+    const img = document.createElement('img');
+    img.className = 'pb-sprite' + (opts.active ? ' pb-active' : '') + (opts.dead ? ' pb-dead' : '') + (opts.boss ? ' pb-boss' : '');
+    img.src = src;
+    img.alt = opts.name || '';
+    img.style.left = opts.x + 'px';
+    img.style.top = opts.y + 'px';
+    field.appendChild(img);
+    if (opts.hp != null && opts.maxHp) {
+      const bar = document.createElement('div');
+      bar.className = 'pb-minihp';
+      bar.style.left = (opts.x + 14) + 'px';
+      bar.style.top = (opts.y - 10) + 'px';
+      bar.innerHTML = '<div style="width:' + Math.max(0, Math.min(100, opts.hp / opts.maxHp * 100)) + '%"></div>';
+      field.appendChild(bar);
+    }
+    return img;
+  }
+
   function renderSprites() {
     const field = $pb('pb-field');
     if (!field) return;
     field.innerHTML = '';
-    const act = safeActive(B.red);
-    // order team: active first then others (matches SOLO_POS slots)
-    const ordered = [act].concat(B.red.ghosts.filter(g => g !== act));
-    ordered.forEach((g, i) => {
-      if (!g || i > 2) return;
-      const img = document.createElement('img');
-      img.className = 'pb-sprite' + (g === act ? ' pb-active' : '') + (g.ko ? ' pb-dead' : '');
-      img.src = PLAYER_BACKS[i % PLAYER_BACKS.length];
-      img.alt = g.name;
-      const pos = SOLO_POS[i];
-      img.style.left = pos.x + 'px';
-      img.style.top = pos.y + 'px';
-      field.appendChild(img);
-    });
-    const boss = safeActive(B.blue);
-    if (boss) {
-      const img = document.createElement('img');
-      img.className = 'pb-sprite pb-boss' + (boss.ko ? ' pb-dead' : '');
-      img.src = BOSS_FRONT;
-      img.alt = boss.name;
-      img.style.left = BOSS_POS.x + 'px';
-      img.style.top = BOSS_POS.y + 'px';
-      field.appendChild(img);
+    const players = raidPlayers();
+    const myUid = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : null;
+    const fighterUid = window.currentRaid && window.currentRaid.currentFighterUid;
+
+    if (players && players.length > 1) {
+      // ── SHARED STAGE (2-3 players): one sprite per player's active spiritkin ──
+      players.slice(0, 3).forEach((pl, i) => {
+        const isFighter = pl.uid === fighterUid;
+        // live state for the fighter comes from B (snapshot-mirrored on spectators);
+        // benched players show their published fieldState, falling back to slot team
+        let g = null;
+        if (isFighter && battleReady()) g = safeActive(B.red);
+        else {
+          const fs = pl.fieldState;
+          const team = (fs && fs.ghosts) || (pl.team && (pl.team.ghosts || pl.team)) || [];
+          g = (Array.isArray(team) ? team : Object.values(team)).find(t => t && !t.ko) || null;
+        }
+        const pos = MULTI_POS[i];
+        addSprite(field, PLAYER_BACKS[i % PLAYER_BACKS.length], {
+          name: (pl.name || '') + (g ? ' — ' + g.name : ''),
+          active: isFighter, dead: !!(g && g.ko) || (pl.status === 'done'),
+          x: pos.x, y: pos.y,
+          hp: g ? g.hp : null, maxHp: g ? g.maxHp : null
+        });
+      });
+    } else if (battleReady()) {
+      // ── SOLO: full team of 3 on the field (model_a layout) ──
+      const act = safeActive(B.red);
+      const ordered = [act].concat(B.red.ghosts.filter(g => g !== act));
+      ordered.forEach((g, i) => {
+        if (!g || i > 2) return;
+        const pos = SOLO_POS[i];
+        addSprite(field, PLAYER_BACKS[i % PLAYER_BACKS.length], {
+          name: g.name, active: g === act, dead: !!g.ko, x: pos.x, y: pos.y
+        });
+      });
     }
+    if (battleReady()) {
+      const boss = safeActive(B.blue);
+      if (boss) addSprite(field, BOSS_FRONT, { name: boss.name, boss: true, dead: !!boss.ko, x: BOSS_POS.x, y: BOSS_POS.y });
+    }
+  }
+
+  // Publish my team's state to my raid slot when my turn ends, so benched
+  // sprites show real HP on everyone's screens. Skin-level write — namespaced
+  // raid tree only, no ported-file edits.
+  let _wasFighter = false;
+  function publishFieldState() {
+    try {
+      const R = window.currentRaid;
+      const myUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+      if (!R || !R.players || !myUid || !battleReady()) return;
+      const slots = Object.keys(R.players);
+      const myKey = slots.find(k => R.players[k] && R.players[k].uid === myUid);
+      const amFighter = R.currentFighterUid === myUid;
+      if (myKey != null && _wasFighter && !amFighter) {
+        const ghosts = B.red.ghosts.map(g => ({ name: g.name || '', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko }));
+        firebase.database().ref('mp_modelc/raids/instances/' + (R.instanceId || R.id) + '/players/' + myKey + '/fieldState')
+          .set({ ghosts: ghosts, at: Date.now() }).catch(() => {});
+      }
+      _wasFighter = amFighter;
+    } catch (e) {}
   }
 
   // ── 3D DICE (ported from model_a Dice3D, driven by engine state) ──
@@ -386,7 +453,7 @@
   function renderDice() {
     const pr = B.preRoll;
     ['red', 'blue'].forEach(team => {
-      const dice = pr && pr[team] && pr[team].dice;
+      const dice = (pr && pr[team] && pr[team].dice) || B[team + 'Dice'];
       const key = dice ? dice.join(',') : '';
       if (key && key !== _lastDice[team]) {
         _lastDice[team] = key;
@@ -444,6 +511,7 @@
     renderCards();
     renderNarrator();
     renderRollBtn();
+    publishFieldState();
   }
 
   // ── PROXIES ──────────────────────────────────────────────────────
