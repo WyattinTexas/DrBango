@@ -169,6 +169,14 @@
   background:rgba(180,40,40,.75);color:#fff;border:1px solid rgba(255,255,255,.25);cursor:pointer;
   font-family:'Bangers',cursive;letter-spacing:1px;}
 
+.pb-extras{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 12px;min-height:22px;}
+#pb-resources{display:flex;gap:8px;font-size:12px;color:#cfe8ff;text-shadow:0 1px 2px #000;}
+#pb-resources span{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:1px 7px;}
+#pb-abilities{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+#pb-abilities button{font-size:10px;padding:3px 9px;border-radius:10px;border:1px solid rgba(79,195,247,.5);
+  background:rgba(14,40,70,.85);color:#9adcff;cursor:pointer;font-family:'Bangers',cursive;letter-spacing:1px;}
+#pb-abilities button:active{transform:scale(.93);}
+
 /* dev toggle back to landscape */
 .pb-dev-toggle{position:absolute;top:6px;left:6px;z-index:60;font-size:10px;padding:3px 8px;border-radius:4px;
   background:rgba(124,58,237,.5);color:#fff;border:none;cursor:pointer;opacity:.5;}
@@ -230,6 +238,7 @@
         <div class="pb-hptext" id="pb-player-hptext"></div>
       </div>
       <div class="pb-narrator" id="pb-narrator">…</div>
+      <div class="pb-extras"><div id="pb-resources"></div><div id="pb-abilities"></div></div>
       <div class="pb-cards" id="pb-cards"></div>
       <div class="pb-roll-wrap"><button class="pb-roll" id="pb-roll" onclick="pbRollClick()">ROLL</button></div>
     </div>
@@ -489,6 +498,41 @@
     });
   }
 
+  const RES_ICONS = { fire: '\u{1F525}', ice: '\u2744\uFE0F', moonstone: '\u{1F319}', healingSeed: '\u{1F331}', burn: '\u{1F4A2}', frostbite: '\u{1F9CA}' };
+  function renderResources() {
+    const wrap = $pb('pb-resources');
+    if (!wrap || !B.red) return;
+    const res = B.red.resources || {};
+    let html = '';
+    Object.keys(RES_ICONS).forEach(k => {
+      const v = res[k] || 0;
+      if (v > 0) html += '<span>' + RES_ICONS[k] + v + '</span>';
+    });
+    if (wrap.innerHTML !== html) wrap.innerHTML = html;
+  }
+  let _lastAbilityHtml = '';
+  function renderAbilityButtons() {
+    const wrap = $pb('pb-abilities');
+    const realWrap = document.querySelector('#red-ability-buttons');
+    if (!wrap || !realWrap) return;
+    // mirror visible engine ability buttons (forge, lucky stone, etc.) as
+    // proxy pills — the real buttons live offscreen in #battle-view
+    const reals = Array.from(realWrap.querySelectorAll('button')).filter(b => {
+      const st = getComputedStyle(b);
+      return st.display !== 'none' && st.visibility !== 'hidden' && !b.disabled;
+    });
+    const html = reals.map(b => b.textContent.replace(/\s+/g, ' ').trim()).join('||');
+    if (html === _lastAbilityHtml) return;
+    _lastAbilityHtml = html;
+    wrap.innerHTML = '';
+    reals.forEach((b, i) => {
+      const btn = document.createElement('button');
+      btn.textContent = b.textContent.replace(/\s+/g, ' ').trim().slice(0, 22);
+      btn.onclick = function () { b.click(); };
+      wrap.appendChild(btn);
+    });
+  }
+
   function renderNarrator() {
     const src = document.querySelector('#battle-view .narrator-box') || document.querySelector('.narrator-box');
     const dst = $pb('pb-narrator');
@@ -513,6 +557,8 @@
     renderCards();
     renderNarrator();
     renderRollBtn();
+    renderResources();
+    renderAbilityButtons();
     publishFieldState();
   }
 
