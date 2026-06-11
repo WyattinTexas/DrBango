@@ -33,7 +33,7 @@
 
   // ── CSS ──────────────────────────────────────────────────────────
   const css = `
-#portrait-battle{position:fixed;inset:0;z-index:40;display:none;background:#000;}
+#portrait-battle{position:fixed;inset:0;z-index:9400;display:none;background:#000;}
 #portrait-battle.pb-show{display:block;}
 #portrait-battle *{margin:0;padding:0;box-sizing:border-box;}
 .pb-app{position:relative;width:100%;max-width:430px;height:100%;margin:0 auto;overflow:hidden;
@@ -105,6 +105,10 @@
 .pb-roll:active{transform:scale(.93);}
 @keyframes pbBtnPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 
+.pb-leave{position:absolute;top:6px;right:6px;z-index:60;font-size:10px;padding:4px 10px;border-radius:4px;
+  background:rgba(180,40,40,.75);color:#fff;border:1px solid rgba(255,255,255,.25);cursor:pointer;
+  font-family:'Bangers',cursive;letter-spacing:1px;}
+
 /* dev toggle back to landscape */
 .pb-dev-toggle{position:absolute;top:6px;left:6px;z-index:60;font-size:10px;padding:3px 8px;border-radius:4px;
   background:rgba(124,58,237,.5);color:#fff;border:none;cursor:pointer;opacity:.5;}
@@ -136,6 +140,7 @@
   <div class="pb-app">
     <div class="pb-arena-bg"></div>
     <button class="pb-dev-toggle" onclick="pbPeekLandscape()">dev: landscape</button>
+    <button class="pb-leave" onclick="pbLeaveRaid()">LEAVE RAID</button>
     <div class="pb-plate pb-enemy-plate">
       <img class="pb-plate-img" src="${PB_ASSETS}DarkGary_Health_UI.png" alt="">
       <div class="pb-name" id="pb-enemy-name"></div>
@@ -159,7 +164,10 @@
       <div class="pb-roll-wrap"><button class="pb-roll" id="pb-roll" onclick="pbRollClick()">ROLL</button></div>
     </div>
   </div>`;
-    document.body.appendChild(root);
+    // Mount INSIDE #raid-screen: it is a z=9000 stacking context holding the
+    // battle bg AND the ability modals (.selene-overlay, local z=9500). As a
+    // child at local z=9400 we cover the landscape HUD but stay under modals.
+    (document.querySelector('#raid-screen') || document.body).appendChild(root);
   }
 
   // ── STATE HELPERS (read-only views over engine state) ────────────
@@ -286,6 +294,11 @@
     for (const slot of slots) {
       if (slot.textContent.indexOf(ghostName) >= 0) { slot.click(); return; }
     }
+  };
+  window.pbLeaveRaid = function () {
+    if (typeof leaveRaid === 'function') { leaveRaid(); return; }
+    var b = document.querySelector('#raid-leave-btn') || document.querySelector('#leaveRaidBtn');
+    if (b) b.click();
   };
   window.pbPeekLandscape = function () {
     const bv = $pb('battle-view');
