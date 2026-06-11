@@ -24,9 +24,10 @@
   // Placeholder sprites (Wyatt 2026-06-11: use these 4 until real art)
   const PLAYER_BACKS = [PB_ASSETS + 'Back_Gary.png', PB_ASSETS + 'Back_Shoo.png', PB_ASSETS + 'Back_Scallywags.png'];
   const BOSS_FRONT = PB_ASSETS + 'Front_Kodako.png';
-  // Solo layout positions (model_a tuned values, 430px frame)
-  const SOLO_POS = [{ x: 172, y: 389 }, { x: 106, y: 454 }, { x: 273, y: 455 }]; // active, sl-left, sl-right
-  const BOSS_POS = { x: 176, y: 129 };
+  // Positions as % of .pb-field so they survive any frame height (the field
+  // is the flex middle between the boss plate and the bottom panel)
+  const SOLO_POS = [{ x: '40%', y: '52%' }, { x: '22%', y: '68%' }, { x: '60%', y: '68%' }]; // active, sl-left, sl-right
+  const BOSS_POS = { x: '41%', y: '6%' };
 
   let pbActive = false;
   let pbTimer = null;
@@ -263,7 +264,7 @@
   }
 
   // Multi-player slot positions (2-3 raiders side by side facing the boss)
-  const MULTI_POS = [{ x: 80, y: 420 }, { x: 180, y: 440 }, { x: 280, y: 420 }];
+  const MULTI_POS = [{ x: '15%', y: '58%' }, { x: '40%', y: '66%' }, { x: '65%', y: '58%' }];
 
   function raidPlayers() {
     const R = window.currentRaid;
@@ -277,14 +278,15 @@
     img.className = 'pb-sprite' + (opts.active ? ' pb-active' : '') + (opts.dead ? ' pb-dead' : '') + (opts.boss ? ' pb-boss' : '');
     img.src = src;
     img.alt = opts.name || '';
-    img.style.left = opts.x + 'px';
-    img.style.top = opts.y + 'px';
+    const px = (v) => typeof v === 'string' ? v : v + 'px';
+    img.style.left = px(opts.x);
+    img.style.top = px(opts.y);
     field.appendChild(img);
     if (opts.hp != null && opts.maxHp) {
       const bar = document.createElement('div');
       bar.className = 'pb-minihp';
-      bar.style.left = (opts.x + 14) + 'px';
-      bar.style.top = (opts.y - 10) + 'px';
+      bar.style.left = 'calc(' + px(opts.x) + ' + 14px)';
+      bar.style.top = 'calc(' + px(opts.y) + ' - 10px)';
       bar.innerHTML = '<div style="width:' + Math.max(0, Math.min(100, opts.hp / opts.maxHp * 100)) + '%"></div>';
       field.appendChild(bar);
     }
