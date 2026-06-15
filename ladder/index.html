@@ -38,6 +38,7 @@
     -webkit-touch-callout: none;
     user-select: none;
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body::before {
@@ -63,6 +64,13 @@
 
   .view { display: none; flex-direction: column; height: 100%; }
   .view.active { display: flex; }
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+  .scroll-area::-webkit-scrollbar { width: 0; }
 
   #app {
     position: relative;
@@ -228,44 +236,61 @@
     font-weight: 500;
   }
 
-  /* ── TIMER ── */
-  .timer-zone {
-    flex-shrink: 0;
+  /* ── TIMER COCKPIT (fixed to viewport) ── */
+  .timer-cockpit {
+    position: fixed;
+    left: 0; right: 0;
+    top: 0;
+    height: 56vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 0;
-    transition: all 0.3s ease;
+    justify-content: flex-end;
+    padding-bottom: 16px;
+    z-index: 10;
+    pointer-events: none;
+    background: var(--bg);
   }
+  .timer-cockpit > * { pointer-events: auto; }
   .timer-display {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(64px, 20vw, 100px);
+    font-size: clamp(64px, 22vw, 110px);
     letter-spacing: 2px;
     line-height: 1;
     color: var(--text);
-    transition: font-size 0.3s ease, color 0.15s;
-    position: relative;
+    transition: color 0.15s;
+    margin-bottom: 16px;
   }
   .timer-display .hundredths { font-size: 0.5em; opacity: 0.7; }
   .timer-display.running { color: var(--accent); }
   .go-btn {
-    width: 100%;
-    max-width: 360px;
-    padding: 20px;
-    border: none;
-    border-radius: var(--radius);
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    background: transparent;
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 30px;
-    letter-spacing: 6px;
+    font-size: 18px;
+    letter-spacing: 3px;
     cursor: pointer;
-    transition: transform 0.1s, background 0.15s;
-    margin-top: 6px;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .go-btn:active { transform: scale(0.97); }
-  .go-btn.ready { background: var(--accent); color: var(--accent-text); }
+  .go-btn:active { transform: scale(0.93); }
+  .go-btn.ready {
+    border-color: var(--accent);
+    background: transparent;
+    color: var(--accent);
+  }
   .go-btn.stop {
-    background: var(--danger); color: #fff;
+    border-color: var(--danger);
+    background: rgba(255, 59, 59, 0.15);
+    color: var(--danger);
   }
+  /* Spacer to push content below the fixed cockpit */
+  .timer-spacer { height: 56vh; flex-shrink: 0; }
 
   /* ── ZEN MODE (timer running) ── */
   .drill-gif {
@@ -283,23 +308,20 @@
   /* Session mode: has runs, hide top chrome, keep drill chips */
   body.in-session .header,
   body.in-session .group-bar,
-  body.in-session .pb-strip,
-  body.in-session .drill-gif { display: none !important; }
+  body.in-session .pb-strip { display: none !important; }
 
-  /* Running mode: hide everything except timer + button */
-  body.zen .header,
-  body.zen .group-bar,
-  body.zen .drill-picker,
-  body.zen .pb-strip,
-  body.zen .drill-gif,
-  body.zen .session-content { display: none !important; }
-  body.zen .timer-zone { padding-top: 30vh; }
+  /* Running mode: hide everything except timer cockpit */
+  body.zen .scroll-area { display: none !important; }
+  body.zen .timer-cockpit {
+    height: 100vh;
+    justify-content: center;
+    padding-bottom: 0;
+  }
 
   /* ── SESSION ── */
   .session-content {
-    flex: 1; min-height: 0;
     display: flex; flex-direction: column;
-    margin-top: 8px; overflow: hidden;
+    margin-top: 8px;
   }
   .chart-container { flex-shrink: 0; padding: 4px 0; position: relative; }
   .chart-container canvas { width: 100%; height: 120px; border-radius: 10px; }
@@ -328,9 +350,8 @@
   .undo-btn:active { background: rgba(255,59,59,0.25); }
   .undo-btn svg { width: 12px; height: 12px; }
   .run-list {
-    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px;
+    padding-bottom: 16px;
   }
-  .run-list::-webkit-scrollbar { width: 0; }
   .run-item {
     display: flex; align-items: center; padding: 10px 12px;
     background: var(--surface); border: 1px solid var(--border);
@@ -715,46 +736,52 @@
 
   <!-- MAIN -->
   <div id="mainView" class="view">
-    <div class="header">
-      <div class="logo" id="logoBtn">LADDER <span>DRILL TIMER</span></div>
-      <div class="header-actions">
-        <button class="header-btn" id="shopOpenBtn" title="Get the Mat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-        </button>
-        <button class="header-btn" id="themeOpenBtn" title="Theme">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        </button>
-        <button class="header-btn" id="chartToggleBtn" title="Toggle chart">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </button>
-        <button class="header-btn" id="lbOpenBtn" title="Leaderboard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="14" width="4" height="8"/><rect x="10" y="8" width="4" height="14"/><rect x="16" y="4" width="4" height="18"/></svg>
-        </button>
-      </div>
-    </div>
 
-    <div class="group-bar" id="groupBar" style="display:none">
-      <div class="group-icon">&#x1F465;</div>
-      <div class="group-name" id="groupNameDisplay"></div>
-      <button class="group-share-btn" id="shareBtn">INVITE</button>
-    </div>
-
-    <div class="drill-picker" id="drillPicker"></div>
-
-    <div class="pb-strip">
-      <div class="trophy">&#x1F3C6;</div>
-      <div class="pb-label">Best</div>
-      <div class="pb-time empty" id="pbDisplay">No runs</div>
-    </div>
-
-    <div class="drill-gif" id="drillGif" style="display:none">
-      <img id="drillGifImg" src="" alt="Drill demo">
-    </div>
-
-    <div class="timer-zone">
+    <!-- Fixed cockpit: timer + circle button, bolted to viewport, NEVER moves -->
+    <div class="timer-cockpit" id="timerCockpit">
       <div class="timer-display" id="timerDisplay">0<span class="hundredths">.00</span></div>
       <button class="go-btn ready" id="goBtn">START</button>
     </div>
+
+    <!-- Everything below the cockpit scrolls -->
+    <div class="scroll-area" id="scrollArea">
+      <div class="timer-spacer"></div>
+
+      <div class="header">
+        <div class="logo" id="logoBtn">LADDER <span>DRILL TIMER</span></div>
+        <div class="header-actions">
+          <button class="header-btn" id="shopOpenBtn" title="Get the Mat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </button>
+          <button class="header-btn" id="themeOpenBtn" title="Theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </button>
+          <button class="header-btn" id="chartToggleBtn" title="Toggle chart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </button>
+          <button class="header-btn" id="lbOpenBtn" title="Leaderboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="14" width="4" height="8"/><rect x="10" y="8" width="4" height="14"/><rect x="16" y="4" width="4" height="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="group-bar" id="groupBar" style="display:none">
+        <div class="group-icon">&#x1F465;</div>
+        <div class="group-name" id="groupNameDisplay"></div>
+        <button class="group-share-btn" id="shareBtn">INVITE</button>
+      </div>
+
+      <div class="drill-picker" id="drillPicker"></div>
+
+      <div class="pb-strip">
+        <div class="trophy">&#x1F3C6;</div>
+        <div class="pb-label">Best</div>
+        <div class="pb-time empty" id="pbDisplay">No runs</div>
+      </div>
+
+      <div class="drill-gif" id="drillGif" style="display:none">
+        <img id="drillGifImg" src="" alt="Drill demo">
+      </div>
 
     <div class="session-content">
       <div class="run-list-header">
@@ -793,6 +820,7 @@
         <div class="product-card-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
     </div>
+    </div><!-- /scroll-area -->
   </div>
 </div>
 
@@ -912,7 +940,6 @@
   let animFrame = null;
   let chartVisible = false;
   let lbPeriod = 'today';
-  let drillGifTimer = null;
 
   const DRILL_GIFS = {
     '2in2out': 'drills/2in2out.gif',
@@ -995,11 +1022,9 @@
 
   function showDrillGif(drillId) {
     const gif = DRILL_GIFS[drillId];
-    if (!gif) return;
+    if (!gif) { drillGif.style.display = 'none'; return; }
     drillGif.style.display = 'block';
     drillGifImg.src = gif;
-    clearTimeout(drillGifTimer);
-    drillGifTimer = setTimeout(() => { drillGif.style.display = 'none'; }, 4000);
   }
 
   // ── SETUP ──
@@ -1037,6 +1062,7 @@
       groupBar.style.display = 'none';
     }
     buildDrillPicker();
+    showDrillGif(currentDrill);
     render();
     // Auto-show shop drawer for new users with no recorded times
     if (!hasAnyTimes() && !localStorage.getItem('ladder_shop_dismissed')) {
@@ -1128,6 +1154,7 @@
       goBtn.textContent = 'STOP';
       goBtn.classList.remove('ready');
       goBtn.classList.add('stop');
+      timerDisplay.classList.add('running');
       document.body.classList.add('zen');
       document.body.classList.add('in-session');
       tick();
@@ -1136,6 +1163,7 @@
       cancelAnimationFrame(animFrame);
       const elapsed = performance.now() - startTime;
       document.body.classList.remove('zen');
+      timerDisplay.classList.remove('running');
       goBtn.textContent = 'START';
       goBtn.classList.remove('stop');
       goBtn.classList.add('ready');
@@ -1256,7 +1284,8 @@
       runList.querySelectorAll('.run-swipe-wrap').forEach(el => el.remove());
       emptyRuns.insertAdjacentHTML('beforebegin', html);
       attachSwipeHandlers();
-      runList.scrollTop = runList.scrollHeight;
+      const sa = document.getElementById('scrollArea');
+      if (sa) sa.scrollTop = sa.scrollHeight;
     }
     const pc = document.getElementById('productCard');
     if (pc) pc.style.display = runs.length === 0 ? 'flex' : 'none';
