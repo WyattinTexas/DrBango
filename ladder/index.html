@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>LADDER — Drill Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-2: #1c1c1c;
+    --border: #2a2a2a;
+    --text: #f0f0f0;
+    --text-dim: #888;
+    --accent: #c8ff00;
+    --accent-dim: rgba(200, 255, 0, 0.15);
+    --danger: #ff3b3b;
+    --danger-dim: rgba(255, 59, 59, 0.12);
+    --gold: #ffd700;
+    --radius: 14px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
+  /* ── NOISE TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── APP SHELL ── */
+  #app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 16px;
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 8px;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .logo span {
+    color: var(--text-dim);
+    font-size: 14px;
+    letter-spacing: 2px;
+    margin-left: 6px;
+  }
+
+  /* ── NAME INPUT ── */
+  .name-bar {
+    flex-shrink: 0;
+    padding: 6px 0 10px;
+  }
+
+  .name-bar input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .name-bar input::placeholder { color: var(--text-dim); }
+  .name-bar input:focus { border-color: var(--accent); }
+
+  /* ── PERSONAL BEST ── */
+  .pb-strip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+  }
+
+  .pb-strip .trophy {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .pb-strip .pb-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+  }
+
+  .pb-strip .pb-time {
+    margin-left: auto;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--gold);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .pb-strip .pb-time.empty {
+    color: var(--text-dim);
+    font-size: 14px;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 500;
+  }
+
+  /* ── TIMER ZONE ── */
+  .timer-zone {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+  }
+
+  .timer-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(72px, 22vw, 110px);
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+    transition: color 0.15s;
+    position: relative;
+  }
+
+  .timer-display.running {
+    color: var(--accent);
+  }
+
+  .timer-display .hundredths {
+    font-size: 0.5em;
+    opacity: 0.7;
+  }
+
+  /* pulse ring behind timer when running */
+  .pulse-ring {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    pointer-events: none;
+  }
+
+  .timer-display.running .pulse-ring {
+    animation: pulse 1.5s ease-out infinite;
+  }
+
+  @keyframes pulse {
+    0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.6); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
+  }
+
+  /* ── BIG BUTTON ── */
+  .go-btn {
+    width: 100%;
+    max-width: 360px;
+    padding: 22px;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 6px;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .go-btn:active {
+    transform: scale(0.97);
+  }
+
+  .go-btn.ready {
+    background: var(--accent);
+    color: #0a0a0a;
+  }
+
+  .go-btn.stop {
+    background: var(--danger);
+    color: #fff;
+    animation: btn-glow 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes btn-glow {
+    from { box-shadow: 0 0 20px rgba(255, 59, 59, 0.3); }
+    to { box-shadow: 0 0 40px rgba(255, 59, 59, 0.5); }
+  }
+
+  /* ── HISTORY SECTION ── */
+  .history-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-top: 16px;
+  }
+
+  .history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 8px;
+    flex-shrink: 0;
+  }
+
+  .history-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--text-dim);
+  }
+
+  .undo-btn {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    background: var(--danger-dim);
+    border: 1px solid rgba(255, 59, 59, 0.25);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--danger);
+    cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .undo-btn.visible { display: flex; }
+  .undo-btn:active { background: rgba(255, 59, 59, 0.25); }
+
+  .history-list {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 20px;
+  }
+
+  .history-list::-webkit-scrollbar { width: 0; }
+
+  .run-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 6px;
+    animation: slideIn 0.25s ease-out;
+  }
+
+  .run-item.best {
+    border-color: rgba(255, 215, 0, 0.3);
+    background: rgba(255, 215, 0, 0.05);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .run-rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dim);
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .run-rank.gold { color: var(--gold); }
+
+  .run-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .run-time {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .run-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .run-badge {
+    flex-shrink: 0;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255, 215, 0, 0.12);
+    color: var(--gold);
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+  }
+
+  .empty-state .ladder-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.15;
+  }
+
+  .empty-state p {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── LADDER SVG DECORATION ── */
+  .ladder-bg {
+    position: fixed;
+    right: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.025;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── CLEAR ALL ── */
+  .clear-all-btn {
+    display: none;
+    margin: 4px auto 12px;
+    background: none;
+    border: none;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px 12px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .clear-all-btn.visible { display: block; }
+  .clear-all-btn:active { color: var(--danger); }
+
+  /* ── RESPONSIVE ── */
+  @media (min-height: 750px) {
+    .timer-zone { padding: 32px 0; }
+  }
+
+  @media (min-height: 850px) {
+    .timer-zone { padding: 40px 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ladder background decoration -->
+<svg class="ladder-bg" width="120" height="600" viewBox="0 0 120 600" fill="none">
+  <rect x="10" y="0" width="8" height="600" rx="4" fill="white"/>
+  <rect x="102" y="0" width="8" height="600" rx="4" fill="white"/>
+  <rect x="10" y="40" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="100" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="160" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="220" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="280" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="340" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="400" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="460" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="520" width="100" height="6" rx="3" fill="white"/>
+  <rect x="10" y="580" width="100" height="6" rx="3" fill="white"/>
+</svg>
+
+<div id="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">LADDER <span>DRILL TIMER</span></div>
+  </header>
+
+  <!-- Name Input -->
+  <div class="name-bar">
+    <input type="text" id="nameInput" placeholder="Enter your name" maxlength="24" autocomplete="off" spellcheck="false">
+  </div>
+
+  <!-- Personal Best -->
+  <div class="pb-strip">
+    <div class="trophy">🏆</div>
+    <div class="pb-label">Personal Best</div>
+    <div class="pb-time empty" id="pbDisplay">No runs yet</div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-zone">
+    <div class="timer-display" id="timerDisplay">
+      0<span class="hundredths">.00</span>
+      <div class="pulse-ring"></div>
+    </div>
+    <button class="go-btn ready" id="goBtn">START</button>
+  </div>
+
+  <!-- History -->
+  <div class="history-section">
+    <div class="history-header">
+      <div class="history-title">Run History</div>
+      <button class="undo-btn" id="undoBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        UNDO LAST
+      </button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-state" id="emptyState">
+        <svg class="ladder-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="4" x2="12" y2="44"/>
+          <line x1="36" y1="4" x2="36" y2="44"/>
+          <line x1="12" y1="12" x2="36" y2="12"/>
+          <line x1="12" y1="22" x2="36" y2="22"/>
+          <line x1="12" y1="32" x2="36" y2="32"/>
+        </svg>
+        <p>Hit START and run the ladder.<br>Your times show up here.</p>
+      </div>
+    </div>
+    <button class="clear-all-btn" id="clearAllBtn">Clear all runs</button>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  // ── STATE ──
+  const STORAGE_KEY = 'ladder_runs';
+  const NAME_KEY = 'ladder_name';
+  let runs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  let isRunning = false;
+  let startTime = 0;
+  let animFrame = null;
+
+  // ── ELEMENTS ──
+  const timerDisplay = document.getElementById('timerDisplay');
+  const goBtn = document.getElementById('goBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const historyList = document.getElementById('historyList');
+  const emptyState = document.getElementById('emptyState');
+  const pbDisplay = document.getElementById('pbDisplay');
+  const nameInput = document.getElementById('nameInput');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+
+  // ── NAME ──
+  nameInput.value = localStorage.getItem(NAME_KEY) || '';
+  nameInput.addEventListener('input', () => {
+    localStorage.setItem(NAME_KEY, nameInput.value.trim());
+  });
+
+  // ── FORMAT TIME ──
+  function formatTime(ms) {
+    const secs = ms / 1000;
+    const whole = Math.floor(secs);
+    const frac = Math.floor((secs - whole) * 100).toString().padStart(2, '0');
+    return { whole: whole.toString(), frac };
+  }
+
+  function formatTimeString(ms) {
+    const t = formatTime(ms);
+    return `${t.whole}.${t.frac}`;
+  }
+
+  // ── UPDATE DISPLAY ──
+  function updateTimer(ms) {
+    const t = formatTime(ms);
+    timerDisplay.innerHTML = `${t.whole}<span class="hundredths">.${t.frac}</span><div class="pulse-ring"></div>`;
+  }
+
+  // ── ANIMATION LOOP ──
+  function tick() {
+    if (!isRunning) return;
+    const elapsed = performance.now() - startTime;
+    updateTimer(elapsed);
+    animFrame = requestAnimationFrame(tick);
+  }
+
+  // ── START / STOP ──
+  goBtn.addEventListener('click', () => {
+    if (!isRunning) {
+      // START
+      isRunning = true;
+      startTime = performance.now();
+      goBtn.textContent = 'STOP';
+      goBtn.classList.remove('ready');
+      goBtn.classList.add('stop');
+      timerDisplay.classList.add('running');
+      tick();
+    } else {
+      // STOP
+      isRunning = false;
+      cancelAnimationFrame(animFrame);
+      const elapsed = performance.now() - startTime;
+      timerDisplay.classList.remove('running');
+      goBtn.textContent = 'START';
+      goBtn.classList.remove('stop');
+      goBtn.classList.add('ready');
+      updateTimer(elapsed);
+      recordRun(elapsed);
+    }
+  });
+
+  // ── RECORD RUN ──
+  function recordRun(ms) {
+    const name = nameInput.value.trim() || 'Anonymous';
+    runs.unshift({
+      time: Math.round(ms),
+      name,
+      date: Date.now()
+    });
+    save();
+    render();
+  }
+
+  // ── UNDO LAST ──
+  undoBtn.addEventListener('click', () => {
+    if (runs.length === 0) return;
+    runs.shift();
+    save();
+    render();
+    updateTimer(0);
+  });
+
+  // ── CLEAR ALL ──
+  clearAllBtn.addEventListener('click', () => {
+    if (runs.length === 0) return;
+    runs = [];
+    save();
+    render();
+    updateTimer(0);
+  });
+
+  // ── SAVE ──
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(runs));
+  }
+
+  // ── RENDER ──
+  function render() {
+    // Personal best
+    if (runs.length === 0) {
+      pbDisplay.textContent = 'No runs yet';
+      pbDisplay.classList.add('empty');
+    } else {
+      const best = Math.min(...runs.map(r => r.time));
+      pbDisplay.textContent = formatTimeString(best) + 's';
+      pbDisplay.classList.remove('empty');
+    }
+
+    // Undo button
+    undoBtn.classList.toggle('visible', runs.length > 0);
+    clearAllBtn.classList.toggle('visible', runs.length > 2);
+
+    // Empty state
+    if (runs.length === 0) {
+      emptyState.style.display = 'flex';
+      // Clear run items
+      historyList.querySelectorAll('.run-item').forEach(el => el.remove());
+      return;
+    }
+
+    emptyState.style.display = 'none';
+
+    // Find best time
+    const bestTime = Math.min(...runs.map(r => r.time));
+
+    // Build list
+    let html = '';
+    runs.forEach((run, i) => {
+      const isBest = run.time === bestTime;
+      const t = formatTime(run.time);
+      const ago = timeAgo(run.date);
+
+      html += `
+        <div class="run-item${isBest ? ' best' : ''}">
+          <div class="run-rank${isBest ? ' gold' : ''}">#${i + 1}</div>
+          <div class="run-info">
+            <div class="run-time">${t.whole}<span class="hundredths" style="font-size:0.55em;opacity:0.6">.${t.frac}s</span></div>
+            <div class="run-meta">${run.name} · ${ago}</div>
+          </div>
+          ${isBest ? '<div class="run-badge">PR</div>' : ''}
+        </div>
+      `;
+    });
+
+    // Keep empty state element, replace the rest
+    historyList.querySelectorAll('.run-item').forEach(el => el.remove());
+    emptyState.insertAdjacentHTML('beforebegin', html);
+  }
+
+  // ── TIME AGO ──
+  function timeAgo(ts) {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  }
+
+  // ── KEYBOARD SHORTCUT (space bar on desktop) ──
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && document.activeElement !== nameInput) {
+      e.preventDefault();
+      goBtn.click();
+    }
+  });
+
+  // ── INIT ──
+  render();
+})();
+</script>
+</body>
+</html>
