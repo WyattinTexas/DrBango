@@ -247,21 +247,6 @@
   }
   .timer-display.running { color: var(--accent); }
   .timer-display .hundredths { font-size: 0.5em; opacity: 0.7; }
-  .pulse-ring {
-    position: absolute;
-    width: 180px; height: 180px;
-    border-radius: 50%;
-    border: 2px solid var(--accent);
-    opacity: 0;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.5);
-    pointer-events: none;
-  }
-  .timer-display.running .pulse-ring { animation: pulse 1.5s ease-out infinite; }
-  @keyframes pulse {
-    0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.6); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
-  }
   .go-btn {
     width: 100%;
     max-width: 360px;
@@ -352,6 +337,25 @@
   }
   .run-delta.faster { color: #4ade80; }
   .run-delta.slower { color: var(--danger); }
+  /* ── SWIPE TO DELETE ── */
+  .run-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    margin-bottom: 5px;
+  }
+  .run-swipe-wrap .run-item { margin-bottom: 0; transition: transform 0.2s ease; }
+  .run-swipe-wrap .run-delete-bg {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; width: 100%;
+    background: var(--danger);
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 20px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: 2px;
+    text-transform: uppercase; color: #fff;
+  }
+
   .empty-state {
     display: flex; flex-direction: column; align-items: center;
     justify-content: center; padding: 24px 20px; text-align: center;
@@ -759,7 +763,7 @@
     </div>
 
     <div class="timer-zone">
-      <div class="timer-display" id="timerDisplay">0<span class="hundredths">.00</span><div class="pulse-ring"></div></div>
+      <div class="timer-display" id="timerDisplay">0<span class="hundredths">.00</span></div>
       <button class="go-btn ready" id="goBtn">START</button>
     </div>
 
@@ -1125,7 +1129,7 @@
 
   function updateTimerEl(ms) {
     const t = formatTime(ms);
-    timerDisplay.innerHTML = `${t.whole}<span class="hundredths">.${t.frac}</span><div class="pulse-ring"></div>`;
+    timerDisplay.innerHTML = `${t.whole}<span class="hundredths">.${t.frac}</span>`;
   }
 
   function tick() {
@@ -1248,16 +1252,65 @@
             deltaHtml = `<div class="run-delta ${diff < 0 ? 'faster' : 'slower'}">${diff < 0 ? '-' : '+'}${formatStr(Math.abs(diff))}</div>`;
           }
         }
-        html += `<div class="run-item${isBest ? ' best' : ''}">
-          <div class="run-num${isBest ? ' gold' : ''}">${runs.length - i}</div>
-          <div class="run-info"><div class="run-time">${t.whole}<span class="frac">.${t.frac}s</span></div><div class="run-meta">${run.name}</div></div>
-          ${deltaHtml}${isBest ? '<div class="run-badge">PR</div>' : ''}
+        html += `<div class="run-swipe-wrap" data-index="${i}">
+          <div class="run-delete-bg">DELETE</div>
+          <div class="run-item${isBest ? ' best' : ''}">
+            <div class="run-num${isBest ? ' gold' : ''}">${runs.length - i}</div>
+            <div class="run-info"><div class="run-time">${t.whole}<span class="frac">.${t.frac}s</span></div><div class="run-meta">${run.name}</div></div>
+            ${deltaHtml}${isBest ? '<div class="run-badge">PR</div>' : ''}
+          </div>
         </div>`;
       });
-      runList.querySelectorAll('.run-item').forEach(el => el.remove());
+      runList.querySelectorAll('.run-swipe-wrap').forEach(el => el.remove());
       emptyRuns.insertAdjacentHTML('beforebegin', html);
+      attachSwipeHandlers();
     }
     renderChart(runs);
+  }
+
+  // ── SWIPE TO DELETE ──
+  function attachSwipeHandlers() {
+    runList.querySelectorAll('.run-swipe-wrap').forEach(wrap => {
+      const item = wrap.querySelector('.run-item');
+      let startX = 0, currentX = 0, swiping = false;
+      const threshold = 80;
+
+      wrap.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        currentX = startX;
+        swiping = true;
+        item.style.transition = 'none';
+      }, { passive: true });
+
+      wrap.addEventListener('touchmove', e => {
+        if (!swiping) return;
+        currentX = e.touches[0].clientX;
+        const dx = currentX - startX;
+        if (dx < 0) {
+          item.style.transform = `translateX(${dx}px)`;
+        }
+      }, { passive: true });
+
+      wrap.addEventListener('touchend', () => {
+        if (!swiping) return;
+        swiping = false;
+        const dx = currentX - startX;
+        item.style.transition = 'transform 0.2s ease';
+        if (dx < -threshold) {
+          // Swipe confirmed — delete
+          item.style.transform = `translateX(-100%)`;
+          setTimeout(() => {
+            const idx = parseInt(wrap.dataset.index);
+            const runs = getRuns();
+            runs.splice(idx, 1);
+            saveRuns(runs);
+            render();
+          }, 200);
+        } else {
+          item.style.transform = 'translateX(0)';
+        }
+      });
+    });
   }
 
   // ── CHART ──
