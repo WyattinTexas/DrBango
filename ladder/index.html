@@ -17,10 +17,14 @@
     --text: #f0f0f0;
     --text-dim: #888;
     --accent: #c8ff00;
-    --accent-dim: rgba(200, 255, 0, 0.15);
+    --accent-rgb: 200, 255, 0;
+    --accent-dim: rgba(var(--accent-rgb), 0.15);
+    --accent-text: #0a0a0a;
     --danger: #ff3b3b;
     --danger-dim: rgba(255, 59, 59, 0.12);
     --gold: #ffd700;
+    --chart-line: var(--accent);
+    --chart-area-top: rgba(var(--accent-rgb), 0.15);
     --radius: 14px;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -36,7 +40,6 @@
     overflow: hidden;
   }
 
-  /* noise */
   body::before {
     content: '';
     position: fixed;
@@ -58,7 +61,6 @@
     z-index: 0;
   }
 
-  /* ── VIEWS ── */
   .view { display: none; flex-direction: column; height: 100%; }
   .view.active { display: flex; }
 
@@ -80,7 +82,6 @@
     padding: 14px 0 6px;
     flex-shrink: 0;
   }
-
   .logo {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 24px;
@@ -95,12 +96,7 @@
     letter-spacing: 2px;
     margin-left: 5px;
   }
-
-  .header-actions {
-    display: flex;
-    gap: 6px;
-  }
-
+  .header-actions { display: flex; gap: 6px; }
   .header-btn {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -127,7 +123,7 @@
     gap: 8px;
     padding: 8px 12px;
     background: var(--accent-dim);
-    border: 1px solid rgba(200, 255, 0, 0.2);
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
     border-radius: 10px;
     margin-bottom: 8px;
   }
@@ -146,7 +142,7 @@
   }
   .group-bar .group-share-btn {
     background: var(--accent);
-    color: #0a0a0a;
+    color: var(--accent-text);
     border: none;
     border-radius: 6px;
     padding: 4px 10px;
@@ -169,7 +165,6 @@
     scrollbar-width: none;
   }
   .drill-picker::-webkit-scrollbar { display: none; }
-
   .drill-chip {
     flex-shrink: 0;
     padding: 8px 14px;
@@ -186,7 +181,7 @@
   }
   .drill-chip.active {
     background: var(--accent);
-    color: #0a0a0a;
+    color: var(--accent-text);
     border-color: var(--accent);
   }
   .drill-chip:active { transform: scale(0.96); }
@@ -227,7 +222,7 @@
     font-weight: 500;
   }
 
-  /* ── TIMER ZONE ── */
+  /* ── TIMER ── */
   .timer-zone {
     flex-shrink: 0;
     display: flex;
@@ -235,7 +230,6 @@
     align-items: center;
     padding: 12px 0;
   }
-
   .timer-display {
     font-family: 'Bebas Neue', sans-serif;
     font-size: clamp(64px, 20vw, 100px);
@@ -247,7 +241,6 @@
   }
   .timer-display.running { color: var(--accent); }
   .timer-display .hundredths { font-size: 0.5em; opacity: 0.7; }
-
   .pulse-ring {
     position: absolute;
     width: 180px; height: 180px;
@@ -258,14 +251,11 @@
     transform: translate(-50%, -50%) scale(0.5);
     pointer-events: none;
   }
-  .timer-display.running .pulse-ring {
-    animation: pulse 1.5s ease-out infinite;
-  }
+  .timer-display.running .pulse-ring { animation: pulse 1.5s ease-out infinite; }
   @keyframes pulse {
     0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.6); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
   }
-
   .go-btn {
     width: 100%;
     max-width: 360px;
@@ -280,7 +270,7 @@
     margin-top: 6px;
   }
   .go-btn:active { transform: scale(0.97); }
-  .go-btn.ready { background: var(--accent); color: #0a0a0a; }
+  .go-btn.ready { background: var(--accent); color: var(--accent-text); }
   .go-btn.stop {
     background: var(--danger); color: #fff;
     animation: btn-glow 1.2s ease-in-out infinite alternate;
@@ -290,421 +280,256 @@
     to { box-shadow: 0 0 40px rgba(255, 59, 59, 0.5); }
   }
 
-  /* ── SESSION CONTENT (always visible) ── */
+  /* ── SESSION ── */
   .session-content {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    margin-top: 8px;
-    overflow: hidden;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    margin-top: 8px; overflow: hidden;
   }
-
-  /* ── SESSION CHART ── */
-  .chart-container {
-    flex-shrink: 0;
-    padding: 4px 0;
-    position: relative;
-  }
-  .chart-container canvas {
-    width: 100%;
-    height: 120px;
-    border-radius: 10px;
-  }
+  .chart-container { flex-shrink: 0; padding: 4px 0; position: relative; }
+  .chart-container canvas { width: 100%; height: 120px; border-radius: 10px; }
   .chart-empty {
     height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-dim);
-    font-size: 13px;
-    background: var(--surface);
-    border-radius: 10px;
-    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 13px;
+    background: var(--surface); border-radius: 10px; border: 1px solid var(--border);
   }
-
-  /* ── RUN LIST ── */
   .run-list-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0 6px;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0 6px; flex-shrink: 0;
   }
   .run-list-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--text-dim);
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-dim);
   }
   .undo-btn {
-    display: none;
-    align-items: center;
-    gap: 4px;
-    background: var(--danger-dim);
-    border: 1px solid rgba(255, 59, 59, 0.25);
-    border-radius: 8px;
-    padding: 5px 10px;
-    font-family: 'Barlow', sans-serif;
-    font-weight: 600;
-    font-size: 11px;
-    color: var(--danger);
-    cursor: pointer;
-    letter-spacing: 0.5px;
+    display: none; align-items: center; gap: 4px;
+    background: var(--danger-dim); border: 1px solid rgba(255,59,59,0.25);
+    border-radius: 8px; padding: 5px 10px;
+    font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 11px;
+    color: var(--danger); cursor: pointer; letter-spacing: 0.5px;
   }
   .undo-btn.visible { display: flex; }
-  .undo-btn:active { background: rgba(255, 59, 59, 0.25); }
+  .undo-btn:active { background: rgba(255,59,59,0.25); }
   .undo-btn svg { width: 12px; height: 12px; }
-
   .run-list {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 16px;
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px;
   }
   .run-list::-webkit-scrollbar { width: 0; }
-
   .run-item {
-    display: flex;
-    align-items: center;
-    padding: 10px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 5px;
-    animation: slideIn 0.2s ease-out;
+    display: flex; align-items: center; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 5px; animation: slideIn 0.2s ease-out;
   }
-  .run-item.best {
-    border-color: rgba(255, 215, 0, 0.3);
-    background: rgba(255, 215, 0, 0.05);
-  }
+  .run-item.best { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.05); }
   @keyframes slideIn {
     from { opacity: 0; transform: translateY(-6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .run-num {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--text-dim);
-    width: 26px;
-    text-align: center;
-    flex-shrink: 0;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    color: var(--text-dim); width: 26px; text-align: center; flex-shrink: 0;
   }
   .run-num.gold { color: var(--gold); }
   .run-info { flex: 1; min-width: 0; }
-  .run-time {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    letter-spacing: 1px;
-    line-height: 1;
-  }
+  .run-time { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; line-height: 1; }
   .run-time .frac { font-size: 0.55em; opacity: 0.6; }
   .run-meta { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
   .run-badge {
-    flex-shrink: 0;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    padding: 3px 7px;
-    border-radius: 6px;
-    background: rgba(255, 215, 0, 0.12);
-    color: var(--gold);
+    flex-shrink: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px;
+    padding: 3px 7px; border-radius: 6px; background: rgba(255,215,0,0.12); color: var(--gold);
   }
   .run-delta {
-    flex-shrink: 0;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    margin-right: 6px;
+    flex-shrink: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.5px; margin-right: 6px;
   }
   .run-delta.faster { color: #4ade80; }
   .run-delta.slower { color: var(--danger); }
-
   .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 24px 20px;
-    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px 20px; text-align: center;
   }
   .empty-state p { color: var(--text-dim); font-size: 13px; line-height: 1.5; }
-
   .clear-btn {
-    display: none;
-    margin: 2px auto 8px;
-    background: none;
-    border: none;
-    font-family: 'Barlow', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    color: #555;
-    cursor: pointer;
-    padding: 4px 10px;
+    display: none; margin: 2px auto 8px; background: none; border: none;
+    font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 500;
+    color: #555; cursor: pointer; padding: 4px 10px;
   }
   .clear-btn.visible { display: block; }
   .clear-btn:active { color: var(--danger); }
 
-  /* ── LEADERBOARD DRAWER ── */
-  .lb-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 50;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s;
+  /* ── DRAWERS (shared) ── */
+  .drawer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.25s;
   }
-  .lb-overlay.open { opacity: 1; pointer-events: all; }
-
-  .lb-drawer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-width: 480px;
-    margin: 0 auto;
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    border-radius: 20px 20px 0 0;
-    z-index: 51;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-    max-height: 70vh;
-    display: flex;
-    flex-direction: column;
+  .drawer-overlay.open { opacity: 1; pointer-events: all; }
+  .drawer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-width: 480px; margin: 0 auto;
+    background: var(--bg); border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0; z-index: 51;
+    transform: translateY(100%); transition: transform 0.3s ease;
+    max-height: 75vh; display: flex; flex-direction: column;
     padding-bottom: var(--safe-bottom);
   }
-  .lb-drawer.open { transform: translateY(0); }
+  .drawer.open { transform: translateY(0); }
+  .drawer-handle {
+    width: 36px; height: 4px; background: #444;
+    border-radius: 2px; margin: 10px auto 6px; flex-shrink: 0;
+  }
+  .drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 20px 10px; flex-shrink: 0;
+  }
+  .drawer-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 22px;
+    letter-spacing: 2px; color: var(--text);
+  }
+  .drawer-close {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; padding: 4px;
+  }
+  .drawer-close svg { width: 20px; height: 20px; }
 
-  .lb-drawer-handle {
-    width: 36px;
-    height: 4px;
-    background: #444;
-    border-radius: 2px;
-    margin: 10px auto 6px;
-    flex-shrink: 0;
-  }
-
-  .lb-drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 20px 10px;
-    flex-shrink: 0;
-  }
-  .lb-drawer-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    letter-spacing: 2px;
-    color: var(--text);
-  }
-  .lb-close-btn {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    cursor: pointer;
-    padding: 4px;
-  }
-  .lb-close-btn svg { width: 20px; height: 20px; }
-
-  /* Period filter chips */
-  .lb-period-bar {
-    display: flex;
-    gap: 4px;
-    padding: 0 20px 10px;
-    flex-shrink: 0;
-  }
+  /* ── LEADERBOARD ── */
+  .lb-period-bar { display: flex; gap: 4px; padding: 0 20px 10px; flex-shrink: 0; }
   .lb-period-chip {
-    padding: 5px 12px;
-    border-radius: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    font-family: 'Barlow', sans-serif;
-    font-weight: 600;
-    font-size: 11px;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all 0.15s;
+    padding: 5px 12px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 11px;
+    color: var(--text-dim); cursor: pointer; transition: all 0.15s;
   }
   .lb-period-chip.active {
-    background: var(--accent);
-    color: #0a0a0a;
-    border-color: var(--accent);
+    background: var(--accent); color: var(--accent-text); border-color: var(--accent);
   }
-
   .lb-list {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 20px 20px;
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px 20px;
   }
   .lb-list::-webkit-scrollbar { width: 0; }
-
   .lb-item {
-    display: flex;
-    align-items: center;
-    padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 5px;
+    display: flex; align-items: center; padding: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 5px;
   }
-  .lb-item.you { border-color: rgba(200, 255, 0, 0.3); background: var(--accent-dim); }
+  .lb-item.you { border-color: rgba(var(--accent-rgb), 0.3); background: var(--accent-dim); }
   .lb-rank {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 24px;
-    width: 36px;
-    text-align: center;
-    flex-shrink: 0;
-    color: var(--text-dim);
+    font-family: 'Bebas Neue', sans-serif; font-size: 24px;
+    width: 36px; text-align: center; flex-shrink: 0; color: var(--text-dim);
   }
   .lb-rank.r1 { color: var(--gold); }
   .lb-rank.r2 { color: #c0c0c0; }
   .lb-rank.r3 { color: #cd7f32; }
   .lb-info { flex: 1; min-width: 0; }
-  .lb-name {
-    font-family: 'Barlow', sans-serif;
-    font-weight: 700;
-    font-size: 15px;
-    line-height: 1;
-  }
+  .lb-name { font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 15px; line-height: 1; }
   .lb-detail { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
   .lb-best {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 24px;
-    letter-spacing: 1px;
-    flex-shrink: 0;
+    font-family: 'Bebas Neue', sans-serif; font-size: 24px;
+    letter-spacing: 1px; flex-shrink: 0;
   }
   .lb-best .frac { font-size: 0.55em; opacity: 0.6; }
-
   .lb-empty-msg {
-    text-align: center;
-    padding: 30px 20px;
-    color: var(--text-dim);
-    font-size: 13px;
-    line-height: 1.5;
+    text-align: center; padding: 30px 20px; color: var(--text-dim);
+    font-size: 13px; line-height: 1.5;
   }
 
-  /* ── SETUP VIEW ── */
+  /* ── THEME PICKER ── */
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 0 20px 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .theme-grid::-webkit-scrollbar { width: 0; }
+  .theme-swatch {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .theme-swatch:active { transform: scale(0.93); }
+  .theme-swatch.active { border-color: var(--text); }
+  .theme-swatch .swatch-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 60%;
+  }
+  .theme-swatch .swatch-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40%;
+  }
+  .theme-swatch .swatch-check {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px; height: 20px;
+    display: none;
+  }
+  .theme-swatch.active .swatch-check { display: block; }
+
+  /* ── SETUP ── */
   .setup-view {
-    justify-content: center;
-    align-items: center;
-    padding: 0 24px;
-    text-align: center;
+    justify-content: center; align-items: center;
+    padding: 0 24px; text-align: center;
   }
   .setup-view .logo-big {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 48px;
-    letter-spacing: 6px;
-    color: var(--accent);
-    margin-bottom: 4px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 48px;
+    letter-spacing: 6px; color: var(--accent); margin-bottom: 4px;
   }
   .setup-view .tagline {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    color: var(--text-dim);
-    margin-bottom: 32px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+    font-size: 14px; text-transform: uppercase; letter-spacing: 3px;
+    color: var(--text-dim); margin-bottom: 32px;
   }
-  .setup-field {
-    width: 100%;
-    max-width: 320px;
-    margin-bottom: 12px;
-  }
+  .setup-field { width: 100%; max-width: 320px; margin-bottom: 12px; }
   .setup-field label {
-    display: block;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
-    text-align: left;
+    display: block; font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--text-dim); margin-bottom: 6px; text-align: left;
   }
   .setup-field input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-family: 'Barlow', sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; font-family: 'Barlow', sans-serif;
+    font-size: 16px; font-weight: 600; color: var(--text);
+    outline: none; transition: border-color 0.2s;
   }
   .setup-field input::placeholder { color: #555; }
   .setup-field input:focus { border-color: var(--accent); }
-
   .setup-go-btn {
-    width: 100%;
-    max-width: 320px;
-    padding: 18px;
-    margin-top: 8px;
-    border: none;
-    border-radius: var(--radius);
-    background: var(--accent);
-    color: #0a0a0a;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 26px;
-    letter-spacing: 5px;
-    cursor: pointer;
-    transition: transform 0.1s;
+    width: 100%; max-width: 320px; padding: 18px; margin-top: 8px;
+    border: none; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-text);
+    font-family: 'Bebas Neue', sans-serif; font-size: 26px;
+    letter-spacing: 5px; cursor: pointer; transition: transform 0.1s;
   }
   .setup-go-btn:active { transform: scale(0.97); }
-
-  .setup-or {
-    color: var(--text-dim);
-    font-size: 12px;
-    margin: 16px 0;
-  }
+  .setup-or { color: var(--text-dim); font-size: 12px; margin: 16px 0; }
   .setup-solo-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 24px;
-    font-family: 'Barlow', sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+    background: none; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 24px; font-family: 'Barlow', sans-serif;
+    font-weight: 600; font-size: 14px; color: var(--text-dim);
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
   }
   .setup-solo-btn:active { border-color: var(--text-dim); color: var(--text); }
 
   /* ── TOAST ── */
   .toast {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
+    position: fixed; bottom: 40px; left: 50%;
     transform: translateX(-50%) translateY(80px);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent);
-    z-index: 100;
-    opacity: 0;
-    transition: all 0.3s ease;
-    pointer-events: none;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 20px;
+    font-size: 13px; font-weight: 600; color: var(--accent);
+    z-index: 100; opacity: 0; transition: all 0.3s ease; pointer-events: none;
   }
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -725,34 +550,31 @@
 </svg>
 
 <div id="app">
-
-  <!-- ════ SETUP VIEW ════ -->
+  <!-- SETUP -->
   <div id="setupView" class="view setup-view">
     <div class="logo-big">LADDER</div>
     <div class="tagline">Agility Drill Timer</div>
-
     <div class="setup-field">
       <label>Your Name</label>
       <input type="text" id="setupName" placeholder="Enter your name" maxlength="24" autocomplete="off" spellcheck="false">
     </div>
-
     <div class="setup-field">
       <label>Group Code (optional)</label>
       <input type="text" id="setupGroup" placeholder="e.g. garage-crew" maxlength="30" autocomplete="off" spellcheck="false">
     </div>
-
     <button class="setup-go-btn" id="setupGoBtn">LET'S GO</button>
-
     <div class="setup-or">or</div>
     <button class="setup-solo-btn" id="setupSoloBtn">Train Solo</button>
   </div>
 
-  <!-- ════ MAIN VIEW ════ -->
+  <!-- MAIN -->
   <div id="mainView" class="view">
-
     <div class="header">
       <div class="logo" id="logoBtn">LADDER <span>DRILL TIMER</span></div>
       <div class="header-actions">
+        <button class="header-btn" id="themeOpenBtn" title="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
         <button class="header-btn" id="chartToggleBtn" title="Toggle chart">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </button>
@@ -762,39 +584,30 @@
       </div>
     </div>
 
-    <!-- Group bar -->
     <div class="group-bar" id="groupBar" style="display:none">
       <div class="group-icon">&#x1F465;</div>
       <div class="group-name" id="groupNameDisplay"></div>
       <button class="group-share-btn" id="shareBtn">INVITE</button>
     </div>
 
-    <!-- Drill Picker -->
     <div class="drill-picker" id="drillPicker"></div>
 
-    <!-- PB -->
     <div class="pb-strip">
       <div class="trophy">&#x1F3C6;</div>
       <div class="pb-label">Best</div>
       <div class="pb-time empty" id="pbDisplay">No runs</div>
     </div>
 
-    <!-- Timer -->
     <div class="timer-zone">
-      <div class="timer-display" id="timerDisplay">
-        0<span class="hundredths">.00</span>
-        <div class="pulse-ring"></div>
-      </div>
+      <div class="timer-display" id="timerDisplay">0<span class="hundredths">.00</span><div class="pulse-ring"></div></div>
       <button class="go-btn ready" id="goBtn">START</button>
     </div>
 
-    <!-- Session (always visible) -->
     <div class="session-content">
       <div class="chart-container" id="chartContainer">
         <div class="chart-empty" id="chartEmpty">Run a few drills to see your session chart</div>
         <canvas id="sessionChart" style="display:none"></canvas>
       </div>
-
       <div class="run-list-header">
         <div class="run-list-title">This Session</div>
         <button class="undo-btn" id="undoBtn">
@@ -802,7 +615,6 @@
           UNDO
         </button>
       </div>
-
       <div class="run-list" id="runList">
         <div class="empty-state" id="emptyRuns">
           <p>Hit START and run the ladder.<br>Your times show up here.</p>
@@ -810,21 +622,18 @@
       </div>
       <button class="clear-btn" id="clearBtn">Clear session</button>
     </div>
-
   </div>
 </div>
 
 <!-- Leaderboard Drawer -->
-<div class="lb-overlay" id="lbOverlay"></div>
-<div class="lb-drawer" id="lbDrawer">
-  <div class="lb-drawer-handle"></div>
-  <div class="lb-drawer-header">
-    <div class="lb-drawer-title">LEADERBOARD</div>
-    <button class="lb-close-btn" id="lbCloseBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
+<div class="drawer-overlay" id="lbOverlay"></div>
+<div class="drawer" id="lbDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div class="drawer-title">LEADERBOARD</div>
+    <button class="drawer-close" id="lbCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
-  <div class="lb-period-bar" id="lbPeriodBar">
+  <div class="lb-period-bar">
     <button class="lb-period-chip active" data-period="today">Today</button>
     <button class="lb-period-chip" data-period="week">Week</button>
     <button class="lb-period-chip" data-period="month">Month</button>
@@ -835,11 +644,57 @@
   </div>
 </div>
 
+<!-- Theme Drawer -->
+<div class="drawer-overlay" id="themeOverlay"></div>
+<div class="drawer" id="themeDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div class="drawer-title">CHOOSE YOUR COLORS</div>
+    <button class="drawer-close" id="themeCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="theme-grid" id="themeGrid"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 (function() {
-  // ── DRILLS (reordered) ──
+  // ══════════════════════════════════════
+  // THEMES — team-inspired, never named
+  // ══════════════════════════════════════
+  const THEMES = [
+    // Default
+    { id: 'neon',       accent: '#c8ff00', accentRgb: '200,255,0', bg: '#0a0a0a', surface: '#141414', border: '#2a2a2a', text: '#f0f0f0', textDim: '#888', accentText: '#0a0a0a' },
+    // College-inspired
+    { id: 'crimson',    accent: '#A32638', accentRgb: '163,38,56',  bg: '#0c0808', surface: '#161010', border: '#2e1a1a', text: '#f0e8e8', textDim: '#998888', accentText: '#ffffff' },  // Alabama
+    { id: 'orange-blue',accent: '#FA4616', accentRgb: '250,70,22',  bg: '#080a0e', surface: '#101420', border: '#1a2640', text: '#f0f0f0', textDim: '#8899aa', accentText: '#ffffff' },  // Florida
+    { id: 'cardinal',   accent: '#8C1515', accentRgb: '140,21,21',  bg: '#0a0808', surface: '#160e0e', border: '#2e1818', text: '#f0e8e8', textDim: '#998080', accentText: '#ffffff' },  // Stanford
+    { id: 'maize-blue', accent: '#FFCB05', accentRgb: '255,203,5',  bg: '#080a10', surface: '#00274C', border: '#0a3a6e', text: '#f0f0f0', textDim: '#8899bb', accentText: '#00274C' },  // Michigan
+    { id: 'green-gold', accent: '#FEE123', accentRgb: '254,225,35', bg: '#0a0e08', surface: '#154733', border: '#1a5e42', text: '#f0f0f0', textDim: '#88aa88', accentText: '#154733' },  // Oregon
+    { id: 'purple-gold',accent: '#FDD023', accentRgb: '253,208,35', bg: '#0e0a10', surface: '#461D7C', border: '#5a2a9e', text: '#f0f0f0', textDim: '#aa88cc', accentText: '#461D7C' },  // LSU
+    { id: 'burnt',      accent: '#BF5700', accentRgb: '191,87,0',   bg: '#0a0806', surface: '#161008', border: '#2e2010', text: '#f0ece4', textDim: '#99886e', accentText: '#ffffff' },  // Texas
+    { id: 'navy-gold',  accent: '#C99700', accentRgb: '201,151,0',  bg: '#080a0e', surface: '#0C2340', border: '#163060', text: '#f0f0f0', textDim: '#8899aa', accentText: '#0C2340' },  // Notre Dame
+    { id: 'tiger',      accent: '#F56600', accentRgb: '245,102,0',  bg: '#0e0810', surface: '#522D80', border: '#6a3aa0', text: '#f0f0f0', textDim: '#aa88cc', accentText: '#ffffff' },  // Clemson
+    { id: 'scarlet',    accent: '#BB0000', accentRgb: '187,0,0',    bg: '#0a0808', surface: '#161010', border: '#2e1818', text: '#e8e0e0', textDim: '#999090', accentText: '#ffffff' },  // Ohio State
+    { id: 'trojan',     accent: '#FFC72C', accentRgb: '255,199,44', bg: '#0e0808', surface: '#990000', border: '#bb1111', text: '#f0f0f0', textDim: '#cc8888', accentText: '#990000' },  // USC
+    { id: 'royal',      accent: '#0736A4', accentRgb: '7,54,164',   bg: '#060810', surface: '#0e1630', border: '#1a2850', text: '#f0f0f0', textDim: '#8888bb', accentText: '#ffffff' },  // Duke
+    { id: 'carolina',   accent: '#7BAFD4', accentRgb: '123,175,212',bg: '#080a0e', surface: '#101824', border: '#1a2840', text: '#f0f0f0', textDim: '#8899aa', accentText: '#0a0a0a' },  // UNC
+    { id: 'bulldog',    accent: '#DA291C', accentRgb: '218,41,28',  bg: '#0a0808', surface: '#141010', border: '#2a1818', text: '#f0e8e8', textDim: '#998888', accentText: '#ffffff' },  // Georgia
+    { id: 'nittany',    accent: '#FFFFFF', accentRgb: '255,255,255',bg: '#041E42', surface: '#0a2850', border: '#123466', text: '#f0f0f0', textDim: '#8899bb', accentText: '#041E42' },  // Penn State
+    // Pro-inspired
+    { id: 'showtime',   accent: '#FDB927', accentRgb: '253,185,39', bg: '#0e0810', surface: '#552583', border: '#6a30a0', text: '#f0f0f0', textDim: '#aa88cc', accentText: '#552583' },  // Lakers
+    { id: 'bay',        accent: '#FFC72C', accentRgb: '255,199,44', bg: '#080a10', surface: '#1D428A', border: '#2650aa', text: '#f0f0f0', textDim: '#8899bb', accentText: '#1D428A' },  // Warriors
+    { id: 'kingdom',    accent: '#E31837', accentRgb: '227,24,55',  bg: '#0a0808', surface: '#161010', border: '#2e1818', text: '#f0e8e8', textDim: '#998888', accentText: '#ffffff' },  // Chiefs
+    { id: 'star',       accent: '#FFFFFF', accentRgb: '255,255,255',bg: '#0a0c10', surface: '#002244', border: '#003366', text: '#e0e8f0', textDim: '#7788aa', accentText: '#002244' },  // Cowboys
+    { id: 'tundra',     accent: '#FFB612', accentRgb: '255,182,18', bg: '#080a08', surface: '#203731', border: '#2a4a40', text: '#f0f0f0', textDim: '#88aa88', accentText: '#203731' },  // Packers
+    { id: 'steel',      accent: '#FFB612', accentRgb: '255,182,18', bg: '#0a0a0a', surface: '#141414', border: '#2a2a2a', text: '#f0f0f0', textDim: '#888888', accentText: '#0a0a0a' },  // Steelers
+    { id: 'ice',        accent: '#00C2FF', accentRgb: '0,194,255',  bg: '#060a0e', surface: '#0e1620', border: '#1a2838', text: '#e0f0ff', textDim: '#6699bb', accentText: '#0a0a0a' },  // clean blue
+    { id: 'midnight',   accent: '#E8E8E8', accentRgb: '232,232,232',bg: '#08080a', surface: '#121218', border: '#222230', text: '#e0e0e8', textDim: '#666680', accentText: '#08080a' },  // minimal
+    { id: 'heat',       accent: '#F9423A', accentRgb: '249,66,58',  bg: '#0a0808', surface: '#141010', border: '#2a1818', text: '#f0e8e8', textDim: '#998888', accentText: '#ffffff' },  // Miami Heat
+    { id: 'forest',     accent: '#00843D', accentRgb: '0,132,61',   bg: '#060a08', surface: '#0e1810', border: '#1a2e1e', text: '#e8f0e8', textDim: '#668866', accentText: '#ffffff' },  // Celtics / green
+  ];
+
+  // ── DRILLS ──
   const DRILLS = [
     { id: '2in2out', name: '2-In 2-Out' },
     { id: 'icky', name: 'Icky Shuffle' },
@@ -852,18 +707,60 @@
   let userName = localStorage.getItem('ladder_name') || '';
   let groupId = '';
   let currentDrill = DRILLS[0].id;
+  let currentTheme = localStorage.getItem('ladder_theme') || 'neon';
   let isRunning = false;
   let startTime = 0;
   let animFrame = null;
   let chartVisible = true;
   let lbPeriod = 'today';
 
-  // Storage keys
-  function storageKey() {
-    const g = groupId || '_solo';
-    return `ladder_${g}_${currentDrill}`;
+  // ── THEME ENGINE ──
+  function applyTheme(id) {
+    const t = THEMES.find(x => x.id === id) || THEMES[0];
+    currentTheme = t.id;
+    localStorage.setItem('ladder_theme', t.id);
+    const r = document.documentElement.style;
+    r.setProperty('--accent', t.accent);
+    r.setProperty('--accent-rgb', t.accentRgb);
+    r.setProperty('--accent-dim', `rgba(${t.accentRgb}, 0.15)`);
+    r.setProperty('--accent-text', t.accentText);
+    r.setProperty('--bg', t.bg);
+    r.setProperty('--surface', t.surface);
+    r.setProperty('--border', t.border);
+    r.setProperty('--text', t.text);
+    r.setProperty('--text-dim', t.textDim);
+    // Re-render chart with new colors
+    const runs = getRuns();
+    if (runs.length >= 2) renderChart(runs);
+    // Update swatch active states
+    document.querySelectorAll('.theme-swatch').forEach(s => {
+      s.classList.toggle('active', s.dataset.theme === t.id);
+    });
   }
 
+  function buildThemeGrid() {
+    const grid = document.getElementById('themeGrid');
+    grid.innerHTML = '';
+    THEMES.forEach(t => {
+      const swatch = document.createElement('div');
+      swatch.className = 'theme-swatch' + (t.id === currentTheme ? ' active' : '');
+      swatch.dataset.theme = t.id;
+      swatch.innerHTML = `
+        <div class="swatch-top" style="background:${t.accent}"></div>
+        <div class="swatch-bottom" style="background:${t.surface}"></div>
+        <svg class="swatch-check" viewBox="0 0 24 24" fill="none" stroke="${t.accentText}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      `;
+      swatch.addEventListener('click', () => {
+        applyTheme(t.id);
+      });
+      grid.appendChild(swatch);
+    });
+  }
+
+  // Storage
+  function storageKey() {
+    return `ladder_${groupId || '_solo'}_${currentDrill}`;
+  }
   function getRuns() {
     return JSON.parse(localStorage.getItem(storageKey()) || '[]');
   }
@@ -899,6 +796,10 @@
   const lbCloseBtn = document.getElementById('lbCloseBtn');
   const lbList = document.getElementById('lbList');
   const lbEmpty = document.getElementById('lbEmpty');
+  const themeOpenBtn = document.getElementById('themeOpenBtn');
+  const themeOverlay = document.getElementById('themeOverlay');
+  const themeDrawer = document.getElementById('themeDrawer');
+  const themeCloseBtn = document.getElementById('themeCloseBtn');
   const logoBtn = document.getElementById('logoBtn');
   const toast = document.getElementById('toast');
 
@@ -906,11 +807,9 @@
   function checkAutoStart() {
     const hash = location.hash.slice(1);
     if (hash) setupGroup.value = hash;
-
     if (userName) {
       setupName.value = userName;
-      if (hash) { groupId = hash; }
-      else { groupId = localStorage.getItem('ladder_group') || ''; }
+      groupId = hash || localStorage.getItem('ladder_group') || '';
       enterMain();
       return;
     }
@@ -939,16 +838,13 @@
     groupId = setupGroup.value.trim().toLowerCase().replace(/[^a-z0-9\-]/g, '');
     enterMain();
   });
-
   setupSoloBtn.addEventListener('click', () => {
     userName = setupName.value.trim() || 'Me';
     groupId = '';
     enterMain();
   });
-
   setupName.addEventListener('keydown', e => { if (e.key === 'Enter') setupGoBtn.click(); });
   setupGroup.addEventListener('keydown', e => { if (e.key === 'Enter') setupGoBtn.click(); });
-
   logoBtn.addEventListener('click', () => {
     if (isRunning) return;
     mainView.classList.remove('active');
@@ -968,7 +864,7 @@
     }
   });
 
-  // ── DRILL PICKER ──
+  // ── DRILLS ──
   function buildDrillPicker() {
     drillPicker.innerHTML = '';
     DRILLS.forEach(d => {
@@ -993,10 +889,7 @@
     const frac = Math.floor((secs - whole) * 100).toString().padStart(2, '0');
     return { whole: whole.toString(), frac };
   }
-  function formatStr(ms) {
-    const t = formatTime(ms);
-    return t.whole + '.' + t.frac;
-  }
+  function formatStr(ms) { const t = formatTime(ms); return t.whole + '.' + t.frac; }
 
   function updateTimerEl(ms) {
     const t = formatTime(ms);
@@ -1027,35 +920,24 @@
       goBtn.classList.remove('stop');
       goBtn.classList.add('ready');
       updateTimerEl(elapsed);
-      recordRun(elapsed);
+      const runs = getRuns();
+      runs.unshift({ time: Math.round(elapsed), name: userName, date: Date.now() });
+      saveRuns(runs);
+      render();
     }
   });
 
-  function recordRun(ms) {
-    const runs = getRuns();
-    runs.unshift({
-      time: Math.round(ms),
-      name: userName,
-      date: Date.now()
-    });
-    saveRuns(runs);
-    render();
-  }
-
-  // ── UNDO ──
   undoBtn.addEventListener('click', () => {
     const runs = getRuns();
-    if (runs.length === 0) return;
+    if (!runs.length) return;
     runs.shift();
     saveRuns(runs);
     render();
     updateTimerEl(0);
   });
 
-  // ── CLEAR ──
   clearBtn.addEventListener('click', () => {
-    const runs = getRuns();
-    if (runs.length === 0) return;
+    if (!getRuns().length) return;
     saveRuns([]);
     render();
     updateTimerEl(0);
@@ -1068,19 +950,17 @@
     chartToggleBtn.style.color = chartVisible ? 'var(--accent)' : 'var(--text-dim)';
   });
 
-  // ── LEADERBOARD DRAWER ──
-  function openLb() {
-    lbOverlay.classList.add('open');
-    lbDrawer.classList.add('open');
-    renderLeaderboard();
-  }
-  function closeLb() {
-    lbOverlay.classList.remove('open');
-    lbDrawer.classList.remove('open');
-  }
-  lbOpenBtn.addEventListener('click', openLb);
-  lbCloseBtn.addEventListener('click', closeLb);
-  lbOverlay.addEventListener('click', closeLb);
+  // ── DRAWERS ──
+  function openDrawer(overlay, drawer) { overlay.classList.add('open'); drawer.classList.add('open'); }
+  function closeDrawer(overlay, drawer) { overlay.classList.remove('open'); drawer.classList.remove('open'); }
+
+  lbOpenBtn.addEventListener('click', () => { openDrawer(lbOverlay, lbDrawer); renderLeaderboard(); });
+  lbCloseBtn.addEventListener('click', () => closeDrawer(lbOverlay, lbDrawer));
+  lbOverlay.addEventListener('click', () => closeDrawer(lbOverlay, lbDrawer));
+
+  themeOpenBtn.addEventListener('click', () => openDrawer(themeOverlay, themeDrawer));
+  themeCloseBtn.addEventListener('click', () => closeDrawer(themeOverlay, themeDrawer));
+  themeOverlay.addEventListener('click', () => closeDrawer(themeOverlay, themeDrawer));
 
   // Period chips
   document.querySelectorAll('.lb-period-chip').forEach(chip => {
@@ -1092,71 +972,52 @@
     });
   });
 
-  // ── RENDER SESSION ──
+  // ── RENDER ──
   function render() {
     const runs = getRuns();
     const myRuns = runs.filter(r => r.name === userName);
 
-    // PB
     if (myRuns.length === 0) {
       pbDisplay.textContent = 'No runs';
       pbDisplay.classList.add('empty');
     } else {
-      const best = Math.min(...myRuns.map(r => r.time));
-      pbDisplay.textContent = formatStr(best) + 's';
+      pbDisplay.textContent = formatStr(Math.min(...myRuns.map(r => r.time))) + 's';
       pbDisplay.classList.remove('empty');
     }
 
-    // Undo
     undoBtn.classList.toggle('visible', runs.length > 0 && runs[0].name === userName);
     clearBtn.classList.toggle('visible', runs.length > 2);
 
-    // Run list
     if (runs.length === 0) {
       emptyRuns.style.display = 'flex';
       runList.querySelectorAll('.run-item').forEach(el => el.remove());
     } else {
       emptyRuns.style.display = 'none';
       const bestTime = Math.min(...runs.map(r => r.time));
-
       let html = '';
       runs.forEach((run, i) => {
         const isBest = run.time === bestTime;
         const t = formatTime(run.time);
-        const runIndex = runs.length - i;
-
         let deltaHtml = '';
         if (i < runs.length - 1) {
-          const prev = runs[i + 1];
-          const diff = run.time - prev.time;
+          const diff = run.time - runs[i + 1].time;
           if (Math.abs(diff) >= 10) {
-            const sign = diff < 0 ? '-' : '+';
-            const cls = diff < 0 ? 'faster' : 'slower';
-            deltaHtml = `<div class="run-delta ${cls}">${sign}${formatStr(Math.abs(diff))}</div>`;
+            deltaHtml = `<div class="run-delta ${diff < 0 ? 'faster' : 'slower'}">${diff < 0 ? '-' : '+'}${formatStr(Math.abs(diff))}</div>`;
           }
         }
-
-        html += `
-          <div class="run-item${isBest ? ' best' : ''}">
-            <div class="run-num${isBest ? ' gold' : ''}">${runIndex}</div>
-            <div class="run-info">
-              <div class="run-time">${t.whole}<span class="frac">.${t.frac}s</span></div>
-              <div class="run-meta">${run.name}</div>
-            </div>
-            ${deltaHtml}
-            ${isBest ? '<div class="run-badge">PR</div>' : ''}
-          </div>
-        `;
+        html += `<div class="run-item${isBest ? ' best' : ''}">
+          <div class="run-num${isBest ? ' gold' : ''}">${runs.length - i}</div>
+          <div class="run-info"><div class="run-time">${t.whole}<span class="frac">.${t.frac}s</span></div><div class="run-meta">${run.name}</div></div>
+          ${deltaHtml}${isBest ? '<div class="run-badge">PR</div>' : ''}
+        </div>`;
       });
-
       runList.querySelectorAll('.run-item').forEach(el => el.remove());
       emptyRuns.insertAdjacentHTML('beforebegin', html);
     }
-
     renderChart(runs);
   }
 
-  // ── SESSION CHART ──
+  // ── CHART ──
   function renderChart(runs) {
     if (runs.length < 2) {
       chartEmpty.style.display = 'flex';
@@ -1174,50 +1035,43 @@
     canvas.style.height = '120px';
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    const W = rect.width;
-    const H = 120;
+    const W = rect.width, H = 120;
 
     const data = [...runs].reverse().map(r => r.time / 1000);
-    const minVal = Math.min(...data);
-    const maxVal = Math.max(...data);
+    const minVal = Math.min(...data), maxVal = Math.max(...data);
     const range = maxVal - minVal || 1;
     const pad = { top: 18, bottom: 24, left: 8, right: 8 };
-    const plotW = W - pad.left - pad.right;
-    const plotH = H - pad.top - pad.bottom;
-
+    const plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     function x(i) { return pad.left + (i / (data.length - 1)) * plotW; }
     function y(v) { return pad.top + plotH - ((v - minVal) / range) * plotH; }
 
-    ctx.fillStyle = '#141414';
+    // Read current theme accent
+    const style = getComputedStyle(document.documentElement);
+    const accentColor = style.getPropertyValue('--accent').trim();
+    const accentRgb = style.getPropertyValue('--accent-rgb').trim();
+    const surfaceColor = style.getPropertyValue('--surface').trim();
+
+    ctx.fillStyle = surfaceColor;
     ctx.beginPath();
     ctx.roundRect(0, 0, W, H, 10);
     ctx.fill();
 
-    // Grid
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 0.5;
     for (let i = 0; i <= 4; i++) {
       const gy = pad.top + (plotH / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(pad.left, gy);
-      ctx.lineTo(W - pad.right, gy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(W - pad.right, gy); ctx.stroke();
     }
 
-    // Best line
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+    ctx.strokeStyle = 'rgba(255,215,0,0.3)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y(minVal));
-    ctx.lineTo(W - pad.right, y(minVal));
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad.left, y(minVal)); ctx.lineTo(W - pad.right, y(minVal)); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Area
     const gradient = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
-    gradient.addColorStop(0, 'rgba(200, 255, 0, 0.15)');
-    gradient.addColorStop(1, 'rgba(200, 255, 0, 0.0)');
+    gradient.addColorStop(0, `rgba(${accentRgb}, 0.15)`);
+    gradient.addColorStop(1, `rgba(${accentRgb}, 0.0)`);
     ctx.beginPath();
     ctx.moveTo(x(0), y(data[0]));
     for (let i = 1; i < data.length; i++) ctx.lineTo(x(i), y(data[i]));
@@ -1227,36 +1081,29 @@
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    // Line
     ctx.beginPath();
     ctx.moveTo(x(0), y(data[0]));
     for (let i = 1; i < data.length; i++) ctx.lineTo(x(i), y(data[i]));
-    ctx.strokeStyle = '#c8ff00';
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Dots
     data.forEach((v, i) => {
       const isBest = v === minVal;
       ctx.beginPath();
       ctx.arc(x(i), y(v), isBest ? 5 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = isBest ? '#ffd700' : '#c8ff00';
+      ctx.fillStyle = isBest ? '#ffd700' : accentColor;
       ctx.fill();
-      if (isBest) {
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
+      if (isBest) { ctx.strokeStyle = 'rgba(255,215,0,0.4)'; ctx.lineWidth = 2; ctx.stroke(); }
     });
 
-    // Labels
     ctx.font = '600 10px Barlow';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#888';
     ctx.fillText(data[0].toFixed(2) + 's', x(0), y(data[0]) - 8);
     if (data.length > 1) {
-      ctx.fillStyle = '#c8ff00';
+      ctx.fillStyle = accentColor;
       ctx.fillText(data[data.length - 1].toFixed(2) + 's', x(data.length - 1), y(data[data.length - 1]) - 8);
     }
     ctx.fillStyle = '#555';
@@ -1272,21 +1119,13 @@
 
   // ── LEADERBOARD ──
   function getPeriodCutoff(period) {
-    const now = Date.now();
     const d = new Date();
     switch (period) {
-      case 'today':
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      case 'week':
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-        return new Date(d.getFullYear(), d.getMonth(), diff).getTime();
-      case 'month':
-        return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-      case 'year':
-        return new Date(d.getFullYear(), 0, 1).getTime();
-      default:
-        return 0;
+      case 'today': return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      case 'week': const day = d.getDay(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + (day === 0 ? -6 : 1)).getTime();
+      case 'month': return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+      case 'year': return new Date(d.getFullYear(), 0, 1).getTime();
+      default: return 0;
     }
   }
 
@@ -1294,55 +1133,33 @@
     const runs = getRuns();
     const cutoff = getPeriodCutoff(lbPeriod);
     const filtered = runs.filter(r => r.date >= cutoff);
-
-    // Build best per user
     const byUser = {};
     filtered.forEach(r => {
-      if (!byUser[r.name]) {
-        byUser[r.name] = { time: r.time, count: 0 };
-      }
-      if (r.time < byUser[r.name].time) {
-        byUser[r.name].time = r.time;
-      }
+      if (!byUser[r.name]) byUser[r.name] = { time: r.time, count: 0 };
+      if (r.time < byUser[r.name].time) byUser[r.name].time = r.time;
       byUser[r.name].count++;
     });
-
-    const entries = Object.entries(byUser)
-      .map(([name, d]) => ({ name, time: d.time, count: d.count }))
-      .sort((a, b) => a.time - b.time);
+    const entries = Object.entries(byUser).map(([name, d]) => ({ name, ...d })).sort((a, b) => a.time - b.time);
 
     lbList.querySelectorAll('.lb-item').forEach(el => el.remove());
-
-    if (entries.length === 0) {
-      lbEmpty.style.display = 'block';
-      return;
-    }
-
+    if (!entries.length) { lbEmpty.style.display = 'block'; return; }
     lbEmpty.style.display = 'none';
+
     let html = '';
     entries.forEach((e, i) => {
       const rank = i + 1;
       const t = formatTime(e.time);
       const isYou = e.name === userName;
-      const rankCls = rank <= 3 ? ` r${rank}` : '';
-      const drillName = DRILLS.find(d => d.id === currentDrill)?.name || '';
-
-      html += `
-        <div class="lb-item${isYou ? ' you' : ''}">
-          <div class="lb-rank${rankCls}">${rank}</div>
-          <div class="lb-info">
-            <div class="lb-name">${e.name}${isYou ? ' (you)' : ''}</div>
-            <div class="lb-detail">${e.count} run${e.count !== 1 ? 's' : ''} &middot; ${drillName}</div>
-          </div>
-          <div class="lb-best">${t.whole}<span class="frac">.${t.frac}s</span></div>
-        </div>
-      `;
+      html += `<div class="lb-item${isYou ? ' you' : ''}">
+        <div class="lb-rank${rank <= 3 ? ' r' + rank : ''}">${rank}</div>
+        <div class="lb-info"><div class="lb-name">${e.name}${isYou ? ' (you)' : ''}</div>
+        <div class="lb-detail">${e.count} run${e.count !== 1 ? 's' : ''} &middot; ${DRILLS.find(d => d.id === currentDrill)?.name || ''}</div></div>
+        <div class="lb-best">${t.whole}<span class="frac">.${t.frac}s</span></div>
+      </div>`;
     });
-
     lbEmpty.insertAdjacentHTML('beforebegin', html);
   }
 
-  // ── TOAST ──
   function showToast(msg) {
     toast.textContent = msg;
     toast.classList.add('show');
@@ -1357,7 +1174,6 @@
     }
   });
 
-  // ── HASH CHANGE ──
   window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
     if (hash && hash !== groupId) {
@@ -1372,6 +1188,8 @@
   });
 
   // ── INIT ──
+  applyTheme(currentTheme);
+  buildThemeGrid();
   checkAutoStart();
 })();
 </script>
