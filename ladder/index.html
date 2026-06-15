@@ -185,6 +185,12 @@
     border-color: var(--accent);
   }
   .drill-chip:active { transform: scale(0.96); }
+  .drill-chip.mat-chip {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
+    color: var(--accent);
+    font-size: 12px;
+  }
 
   /* ── PB STRIP ── */
   .pb-strip {
@@ -1023,6 +1029,15 @@
     setupView.classList.add('active');
   }
 
+  function hasAnyTimes() {
+    for (const d of DRILLS) {
+      const key = `ladder_${groupId || '_solo'}_${d.id}`;
+      const runs = JSON.parse(localStorage.getItem(key) || '[]');
+      if (runs.length > 0) return true;
+    }
+    return false;
+  }
+
   function enterMain() {
     setupView.classList.remove('active');
     mainView.classList.add('active');
@@ -1037,6 +1052,10 @@
     }
     buildDrillPicker();
     render();
+    // Auto-show shop drawer for new users with no recorded times
+    if (!hasAnyTimes() && !localStorage.getItem('ladder_shop_dismissed')) {
+      setTimeout(() => openShop(), 400);
+    }
   }
 
   setupGoBtn.addEventListener('click', () => {
@@ -1087,6 +1106,12 @@
       });
       drillPicker.appendChild(chip);
     });
+    // "GET THE MAT" chip at end of drill picker
+    const matChip = document.createElement('button');
+    matChip.className = 'drill-chip mat-chip';
+    matChip.textContent = '🛒 GET THE MAT';
+    matChip.addEventListener('click', openShop);
+    drillPicker.appendChild(matChip);
   }
 
   // ── TIMER ──
@@ -1170,11 +1195,15 @@
   themeOverlay.addEventListener('click', () => closeDrawer(themeOverlay, themeDrawer));
 
   function openShop() { openDrawer(shopOverlay, shopDrawer); }
+  function closeShop() {
+    closeDrawer(shopOverlay, shopDrawer);
+    localStorage.setItem('ladder_shop_dismissed', '1');
+  }
   shopOpenBtn.addEventListener('click', openShop);
   productCard.addEventListener('click', openShop);
   setupMatBtn.addEventListener('click', openShop);
-  shopCloseBtn.addEventListener('click', () => closeDrawer(shopOverlay, shopDrawer));
-  shopOverlay.addEventListener('click', () => closeDrawer(shopOverlay, shopDrawer));
+  shopCloseBtn.addEventListener('click', closeShop);
+  shopOverlay.addEventListener('click', closeShop);
 
   // Period chips
   document.querySelectorAll('.lb-period-chip').forEach(chip => {
