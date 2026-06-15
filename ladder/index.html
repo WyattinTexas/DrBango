@@ -280,34 +280,20 @@
     border: 1px solid var(--border);
   }
 
+  /* Session mode: has runs, hide top chrome, keep drill chips */
+  body.in-session .header,
+  body.in-session .group-bar,
+  body.in-session .pb-strip,
+  body.in-session .drill-gif { display: none !important; }
+
+  /* Running mode: hide everything except timer + button */
   body.zen .header,
   body.zen .group-bar,
   body.zen .drill-picker,
   body.zen .pb-strip,
   body.zen .drill-gif,
   body.zen .session-content { display: none !important; }
-  body.zen .timer-zone {
-    flex: 1;
-    justify-content: center;
-    padding: 0;
-  }
-  body.zen .timer-display {
-    font-size: clamp(80px, 28vw, 140px);
-    color: var(--text);
-  }
-  body.zen .go-btn {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 320px;
-    width: calc(100% - 48px);
-    padding: 22px;
-    font-size: 28px;
-    border-radius: 50px;
-    z-index: 10;
-  }
-  body.zen .go-btn:active { transform: translateX(-50%) scale(0.97); }
+  body.zen .timer-zone { padding-top: 30vh; }
 
   /* ── SESSION ── */
   .session-content {
@@ -1143,6 +1129,7 @@
       goBtn.classList.remove('ready');
       goBtn.classList.add('stop');
       document.body.classList.add('zen');
+      document.body.classList.add('in-session');
       tick();
     } else {
       isRunning = false;
@@ -1172,6 +1159,7 @@
   clearBtn.addEventListener('click', () => {
     if (!getRuns().length) return;
     saveRuns([]);
+    document.body.classList.remove('in-session');
     render();
     updateTimerEl(0);
   });
@@ -1221,6 +1209,7 @@
   // ── RENDER ──
   function render() {
     const runs = getRuns();
+    document.body.classList.toggle('in-session', runs.length > 0);
     const myRuns = runs.filter(r => r.name === userName);
 
     if (myRuns.length === 0) {
@@ -1278,32 +1267,38 @@
   function attachSwipeHandlers() {
     runList.querySelectorAll('.run-swipe-wrap').forEach(wrap => {
       const item = wrap.querySelector('.run-item');
-      let startX = 0, currentX = 0, swiping = false;
-      const threshold = 80;
+      let startX = 0, startY = 0, currentX = 0, locked = null;
+      const threshold = 70;
 
       wrap.addEventListener('touchstart', e => {
         startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
         currentX = startX;
-        swiping = true;
+        locked = null;
         item.style.transition = 'none';
       }, { passive: true });
 
       wrap.addEventListener('touchmove', e => {
-        if (!swiping) return;
-        currentX = e.touches[0].clientX;
-        const dx = currentX - startX;
-        if (dx < 0) {
-          item.style.transform = `translateX(${dx}px)`;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if (locked === null) {
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+          }
+          return;
         }
-      }, { passive: true });
+        if (locked !== 'x') return;
+        e.preventDefault();
+        currentX = e.touches[0].clientX;
+        const offset = currentX - startX;
+        if (offset < 0) item.style.transform = `translateX(${offset}px)`;
+      }, { passive: false });
 
       wrap.addEventListener('touchend', () => {
-        if (!swiping) return;
-        swiping = false;
+        if (locked !== 'x') { item.style.transform = ''; return; }
         const dx = currentX - startX;
         item.style.transition = 'transform 0.2s ease';
         if (dx < -threshold) {
-          // Swipe confirmed — delete
           item.style.transform = `translateX(-100%)`;
           setTimeout(() => {
             const idx = parseInt(wrap.dataset.index);
