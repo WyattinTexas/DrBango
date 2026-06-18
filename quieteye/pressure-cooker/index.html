@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRESSURE COOKER — Quiet Eye Training</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0e1a;
+  --accent: #00e5ff;
+  --danger: #ff3d3d;
+  --gold: #ffd700;
+  --text: #e0e6f0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  cursor: none;
+  user-select: none;
+}
+
+/* Custom cursor */
+#cursor {
+  position: fixed;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10000;
+  transform: translate(-50%, -50%);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+#cursor::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+#cursor.locked {
+  border-color: #00ff88;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
+
+/* Arena */
+#arena {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Grid background */
+#grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+}
+
+/* Noise overlay */
+#noise-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 4px 4px;
+  animation: noiseShift 0.1s steps(3) infinite;
+}
+@keyframes noiseShift {
+  to { background-position: 4px 4px; }
+}
+
+/* Crowd edges */
+.crowd-shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+  filter: blur(8px);
+}
+
+/* Particle drift */
+.drift-particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Pressure gauge */
+#pressure-gauge {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 200px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  z-index: 100;
+  overflow: hidden;
+  display: none;
+}
+#pressure-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, #00aaff, #ff3d3d);
+  border-radius: 0 0 10px 10px;
+  transition: height 0.8s ease;
+}
+#pressure-label {
+  position: fixed;
+  right: 12px;
+  top: calc(50% + 115px);
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  z-index: 100;
+  display: none;
+  writing-mode: horizontal-tb;
+}
+
+/* HUD */
+#hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  display: none;
+}
+#hud-level {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+#hud-level-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 4px;
+  transition: color 0.5s;
+}
+#hud-targets {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 8px;
+}
+#hud-qe {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+/* Target */
+.target {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 50;
+  pointer-events: none;
+}
+.target-outer {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0.4;
+}
+.target-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40%;
+  height: 40%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--accent), transparent);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+.target-lock-ring {
+  position: absolute;
+  inset: -8px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  transition: border-color 0.2s;
+}
+.target-lock-ring.filling {
+  border-color: #00ff88;
+  animation: lockPulse 0.5s ease infinite;
+}
+@keyframes lockPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.target-lock-progress {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Decoy */
+.decoy {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 45;
+  pointer-events: none;
+  border: 2px solid rgba(255, 61, 61, 0.4);
+  background: radial-gradient(circle, rgba(255, 61, 61, 0.15), transparent);
+}
+
+/* Level transition */
+#level-transition {
+  position: fixed;
+  inset: 0;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 500;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(4px);
+  flex-direction: column;
+  gap: 12px;
+}
+#level-transition h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 24px;
+  font-weight: 700;
+}
+#level-transition .stats {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  color: rgba(255,255,255,0.6);
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* Title screen */
+#title-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  background: var(--bg);
+}
+#title-screen h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 52px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  background: linear-gradient(135deg, var(--accent), #ff6b35);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
+#title-screen .subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 8px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+#title-screen .instructions {
+  max-width: 500px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255,255,255,0.35);
+  line-height: 1.7;
+  margin-top: 40px;
+}
+#start-btn {
+  margin-top: 50px;
+  padding: 16px 60px;
+  font-family: 'Orbitron', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: transparent;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+}
+#start-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
+}
+
+/* Results screen */
+#results-screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  background: var(--bg);
+  overflow-y: auto;
+}
+#results-inner {
+  max-width: 700px;
+  width: 90%;
+  padding: 40px 0;
+}
+#results-inner h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 28px;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 8px;
+}
+#results-grade {
+  text-align: center;
+  font-family: 'Orbitron', monospace;
+  font-size: 72px;
+  font-weight: 900;
+  margin: 20px 0;
+}
+#results-drift {
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 30px;
+}
+#chart-container {
+  width: 100%;
+  height: 220px;
+  position: relative;
+  margin: 30px 0;
+  border-left: 1px solid rgba(255,255,255,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.chart-bar-group {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.chart-bar {
+  width: 28px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  transition: height 0.5s ease;
+}
+.chart-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+}
+.chart-value {
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 4px;
+  font-family: 'Orbitron', monospace;
+}
+.chart-bg-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  opacity: 0.06;
+}
+#level-breakdown {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin: 30px 0;
+}
+.level-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.level-card .lbl {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.level-card .val {
+  font-family: 'Orbitron', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+.level-card .drift {
+  font-size: 11px;
+  margin-top: 4px;
+  color: rgba(255,255,255,0.4);
+}
+#medals {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+.medal {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid;
+}
+.medal.gold { border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.08); }
+.medal.silver { border-color: #c0c0c0; color: #c0c0c0; background: rgba(192,192,192,0.08); }
+.medal.bronze { border-color: #cd7f32; color: #cd7f32; background: rgba(205,127,50,0.08); }
+#share-box {
+  margin-top: 24px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+#share-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 12px;
+}
+#share-copy-btn, #play-again-btn {
+  padding: 10px 30px;
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 0 6px;
+}
+#share-copy-btn:hover, #play-again-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+.baseline-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed rgba(0, 229, 255, 0.3);
+  z-index: 2;
+}
+.baseline-label {
+  position: absolute;
+  right: 4px;
+  top: -14px;
+  font-size: 9px;
+  color: rgba(0, 229, 255, 0.4);
+  font-family: 'Orbitron', monospace;
+}
+
+/* Screen shake */
+@keyframes shake1 { 0%,100%{transform:translate(0)} 25%{transform:translate(-2px,1px)} 50%{transform:translate(1px,-2px)} 75%{transform:translate(-1px,2px)} }
+@keyframes shake2 { 0%,100%{transform:translate(0)} 20%{transform:translate(3px,-2px)} 40%{transform:translate(-3px,3px)} 60%{transform:translate(2px,-1px)} 80%{transform:translate(-2px,1px)} }
+@keyframes shake3 { 0%,100%{transform:translate(0)} 10%{transform:translate(4px,-3px)} 30%{transform:translate(-5px,4px)} 50%{transform:translate(3px,-2px)} 70%{transform:translate(-3px,3px)} 90%{transform:translate(2px,-4px)} }
+.shake-light { animation: shake1 0.15s ease infinite; }
+.shake-medium { animation: shake2 0.12s ease infinite; }
+.shake-heavy { animation: shake3 0.1s ease infinite; }
+
+/* HUD jitter */
+@keyframes hudJitter {
+  0%,100% { transform: translate(0); }
+  25% { transform: translate(-1px, 0.5px); }
+  50% { transform: translate(0.5px, -1px); }
+  75% { transform: translate(-0.5px, 1px); }
+}
+.hud-jitter { animation: hudJitter 0.2s ease infinite; }
+
+/* Color inversion flash */
+@keyframes invertFlash {
+  0%, 100% { filter: none; }
+  50% { filter: invert(0.15) hue-rotate(30deg); }
+}
+
+/* Glitch text */
+@keyframes glitchText {
+  0%, 100% { transform: translate(0); opacity: 1; }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(1px, -1px); opacity: 0.8; }
+  60% { transform: translate(-1px, 0); }
+  80% { transform: translate(2px, 1px); opacity: 0.9; }
+}
+
+/* Strike flash */
+@keyframes strikeFlash {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(2.5); opacity: 0.5; }
+  100% { transform: scale(4); opacity: 0; }
+}
+.strike-ring {
+  position: absolute;
+  border: 2px solid #00ff88;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 60;
+  animation: strikeFlash 0.4s ease-out forwards;
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+
+<div id="arena">
+  <div id="grid-bg"></div>
+  <div id="noise-overlay"></div>
+  <div id="targets-container"></div>
+  <div id="decoys-container"></div>
+  <div id="particles-container"></div>
+  <div id="crowd-container"></div>
+</div>
+
+<div id="pressure-gauge"><div id="pressure-fill"></div></div>
+<div id="pressure-label">PRESSURE</div>
+
+<div id="hud">
+  <div id="hud-level">LEVEL 1</div>
+  <div id="hud-level-name">CALM</div>
+  <div id="hud-targets">Target 1 / 3</div>
+  <div id="hud-qe">QE: ---</div>
+</div>
+
+<div id="level-transition">
+  <h2 id="trans-title"></h2>
+  <div class="stats" id="trans-stats"></div>
+</div>
+
+<div id="title-screen">
+  <h1>PRESSURE COOKER</h1>
+  <div class="subtitle">Keep Your Cool</div>
+  <div class="instructions">
+    Your focus is about to be tested.<br><br>
+    Lock on. Strike. Stay calm as the pressure rises.<br>
+    Your quiet eye must not change.
+  </div>
+  <button id="start-btn">BEGIN</button>
+</div>
+
+<div id="results-screen">
+  <div id="results-inner">
+    <h1>PRESSURE PROFILE</h1>
+    <div id="results-grade"></div>
+    <div id="results-drift"></div>
+    <div id="chart-container"></div>
+    <div id="level-breakdown"></div>
+    <div id="medals"></div>
+    <div id="share-box">
+      <div id="share-text"></div>
+      <button id="share-copy-btn">COPY</button>
+      <button id="play-again-btn">AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Audio Engine ──
+const AudioEngine = (() => {
+  let ctx;
+  const init = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); };
+
+  const noise = (duration, volume, filterFreq) => {
+    if (!ctx) return;
+    const bufSize = ctx.sampleRate * duration;
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq || 400;
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + duration);
+  };
+
+  const tone = (freq, duration, volume, type = 'sine') => {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  };
+
+  const lockTick = (level) => {
+    const distortion = Math.min(level - 1, 3) * 0.1;
+    tone(880 + Math.random() * 40 * distortion, 0.06, 0.08 + distortion * 0.02, 'square');
+  };
+
+  const lockComplete = (level) => {
+    tone(1200, 0.1, 0.12, 'sine');
+    setTimeout(() => tone(1600, 0.08, 0.1, 'sine'), 60);
+  };
+
+  const strike = (level) => {
+    tone(600, 0.15, 0.15, 'sine');
+    tone(900, 0.1, 0.1, 'triangle');
+    if (level >= 4) noise(0.05, 0.03, 800);
+  };
+
+  let heartbeatInterval = null;
+  const startHeartbeat = (bpm) => {
+    stopHeartbeat();
+    const ms = 60000 / bpm;
+    const beat = () => {
+      tone(55, 0.12, 0.08, 'sine');
+      setTimeout(() => tone(45, 0.1, 0.06, 'sine'), 120);
+    };
+    beat();
+    heartbeatInterval = setInterval(beat, ms);
+  };
+  const stopHeartbeat = () => { if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; } };
+
+  let droneOsc = null, droneGain = null;
+  const startDrone = (vol) => {
+    if (!ctx) return;
+    stopDrone();
+    droneOsc = ctx.createOscillator();
+    droneGain = ctx.createGain();
+    droneOsc.type = 'sine';
+    droneOsc.frequency.value = 60;
+    droneGain.gain.value = vol;
+    droneOsc.connect(droneGain).connect(ctx.destination);
+    droneOsc.start();
+  };
+  const stopDrone = () => { if (droneOsc) { try { droneOsc.stop(); } catch(e) {} droneOsc = null; } };
+
+  const crowdBurst = (vol) => { noise(0.3, vol, 600); };
+
+  const tick = () => { tone(2000, 0.03, 0.04, 'square'); };
+
+  return { init, lockTick, lockComplete, strike, startHeartbeat, stopHeartbeat, startDrone, stopDrone, crowdBurst, noise, tick };
+})();
+
+// ── Game State ──
+const LEVELS = [
+  { name: 'CALM', color: '#0a1628', accent: '#00e5ff', targets: 3 },
+  { name: 'WARMING UP', color: '#12162a', accent: '#20c0ff', targets: 3 },
+  { name: 'HEATING UP', color: '#1a1428', accent: '#ffa040', targets: 3 },
+  { name: 'BOILING', color: '#1e0e1e', accent: '#ff6040', targets: 3 },
+  { name: 'MELTDOWN', color: '#1a0a0a', accent: '#ff3030', targets: 3 },
+];
+
+const LOCK_DURATION = 600; // ms to hold cursor on target
+const TARGET_RADIUS = 36;
+const LOCK_RADIUS = 52;
+
+let state = {
+  phase: 'title', // title | playing | transition | results
+  level: 0,
+  targetInLevel: 0,
+  results: [], // { level, qeDuration, lockStart, strikeTime }
+  currentTarget: null,
+  cursorX: 0,
+  cursorY: 0,
+  lockProgress: 0,
+  lockStartTime: 0,
+  isInLockZone: false,
+  qeStartTime: 0, // when cursor first entered lock zone
+  targetSpawnTime: 0,
+  decoys: [],
+  particles: [],
+  crowdShapes: [],
+  tickTimer: 0,
+  bgHueShift: 0,
+  colorInvertFlash: 0,
+};
+
+// ── DOM refs ──
+const cursor = document.getElementById('cursor');
+const arena = document.getElementById('arena');
+const gridBg = document.getElementById('grid-bg');
+const noiseOverlay = document.getElementById('noise-overlay');
+const targetsContainer = document.getElementById('targets-container');
+const decoysContainer = document.getElementById('decoys-container');
+const particlesContainer = document.getElementById('particles-container');
+const crowdContainer = document.getElementById('crowd-container');
+const pressureGauge = document.getElementById('pressure-gauge');
+const pressureFill = document.getElementById('pressure-fill');
+const pressureLabel = document.getElementById('pressure-label');
+const hud = document.getElementById('hud');
+const hudLevel = document.getElementById('hud-level');
+const hudLevelName = document.getElementById('hud-level-name');
+const hudTargets = document.getElementById('hud-targets');
+const hudQE = document.getElementById('hud-qe');
+const levelTransition = document.getElementById('level-transition');
+const transTitle = document.getElementById('trans-title');
+const transStats = document.getElementById('trans-stats');
+const titleScreen = document.getElementById('title-screen');
+const resultsScreen = document.getElementById('results-screen');
+
+// ── Cursor tracking ──
+document.addEventListener('mousemove', e => {
+  state.cursorX = e.clientX;
+  state.cursorY = e.clientY;
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+// ── Click handler ──
+document.addEventListener('click', e => {
+  if (state.phase === 'playing' && state.lockProgress >= 1) {
+    strikeTarget();
+  }
+});
+
+// ── Start button ──
+document.getElementById('start-btn').addEventListener('click', () => {
+  AudioEngine.init();
+  titleScreen.style.display = 'none';
+  startGame();
+});
+
+document.getElementById('play-again-btn').addEventListener('click', () => {
+  resultsScreen.style.display = 'none';
+  startGame();
+});
+
+document.getElementById('share-copy-btn').addEventListener('click', () => {
+  const text = document.getElementById('share-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('share-copy-btn').textContent = 'COPIED';
+    setTimeout(() => document.getElementById('share-copy-btn').textContent = 'COPY', 1500);
+  });
+});
+
+// ── Game Logic ──
+function startGame() {
+  state = {
+    ...state,
+    phase: 'playing',
+    level: 0,
+    targetInLevel: 0,
+    results: [],
+    currentTarget: null,
+    lockProgress: 0,
+    isInLockZone: false,
+    decoys: [],
+    particles: [],
+    crowdShapes: [],
+  };
+  hud.style.display = 'block';
+  pressureGauge.style.display = 'block';
+  pressureLabel.style.display = 'block';
+  clearEnvironment();
+  applyLevelEnvironment(0);
+  spawnTarget();
+}
+
+function spawnTarget() {
+  const lvl = state.level;
+  const padding = 120;
+  const x = padding + Math.random() * (window.innerWidth - padding * 2);
+  const y = padding + Math.random() * (window.innerHeight - padding * 2);
+
+  targetsContainer.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'target';
+  el.style.width = el.style.height = (TARGET_RADIUS * 2) + 'px';
+  el.style.left = (x - TARGET_RADIUS) + 'px';
+  el.style.top = (y - TARGET_RADIUS) + 'px';
+
+  const outer = document.createElement('div');
+  outer.className = 'target-outer';
+  const inner = document.createElement('div');
+  inner.className = 'target-inner';
+  const lockRing = document.createElement('div');
+  lockRing.className = 'target-lock-ring';
+  lockRing.id = 'lock-ring';
+  const lockSvg = createLockSVG();
+  lockSvg.id = 'lock-svg';
+
+  el.appendChild(outer);
+  el.appendChild(inner);
+  el.appendChild(lockRing);
+  el.appendChild(lockSvg);
+  targetsContainer.appendChild(el);
+
+  state.currentTarget = { x, y, el, jitterX: 0, jitterY: 0 };
+  state.lockProgress = 0;
+  state.lockStartTime = 0;
+  state.isInLockZone = false;
+  state.qeStartTime = 0;
+  state.targetSpawnTime = performance.now();
+
+  updateHUD();
+
+  // Spawn decoys for levels 3+
+  spawnDecoys();
+
+  // Level-specific audio
+  setupLevelAudio(lvl);
+}
+
+function createLockSVG() {
+  const size = (TARGET_RADIUS + 8) * 2;
+  const r = TARGET_RADIUS + 6;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.style.position = 'absolute';
+  svg.style.left = (-8) + 'px';
+  svg.style.top = (-8) + 'px';
+  svg.style.pointerEvents = 'none';
+
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circle.setAttribute('cx', size / 2);
+  circle.setAttribute('cy', size / 2);
+  circle.setAttribute('r', r);
+  circle.setAttribute('fill', 'none');
+  circle.setAttribute('stroke', '#00ff88');
+  circle.setAttribute('stroke-width', '3');
+  circle.setAttribute('stroke-dasharray', 2 * Math.PI * r);
+  circle.setAttribute('stroke-dashoffset', 2 * Math.PI * r);
+  circle.setAttribute('transform', `rotate(-90 ${size/2} ${size/2})`);
+  circle.id = 'lock-progress-circle';
+  svg.appendChild(circle);
+  return svg;
+}
+
+function spawnDecoys() {
+  decoysContainer.innerHTML = '';
+  state.decoys = [];
+  const lvl = state.level;
+  if (lvl < 2) return;
+
+  const count = lvl === 2 ? 1 : lvl === 3 ? 3 : 5;
+  for (let i = 0; i < count; i++) {
+    const size = 30 + Math.random() * 30;
+    const x = 80 + Math.random() * (window.innerWidth - 160);
+    const y = 80 + Math.random() * (window.innerHeight - 160);
+    const opacity = lvl === 2 ? 0.3 : lvl === 3 ? 0.4 + Math.random() * 0.2 : 0.3 + Math.random() * 0.4;
+    const lifetime = lvl >= 4 ? 800 + Math.random() * 1500 : 1200 + Math.random() * 2000;
+
+    const el = document.createElement('div');
+    el.className = 'decoy';
+    el.style.width = el.style.height = size + 'px';
+    el.style.left = (x - size/2) + 'px';
+    el.style.top = (y - size/2) + 'px';
+    el.style.opacity = opacity;
+    decoysContainer.appendChild(el);
+
+    state.decoys.push({ el, x, y, spawnTime: performance.now(), lifetime, opacity });
+  }
+}
+
+function strikeTarget() {
+  const now = performance.now();
+  const qeDuration = state.qeStartTime > 0 ? now - state.qeStartTime : LOCK_DURATION;
+
+  state.results.push({
+    level: state.level,
+    qeDuration: Math.round(qeDuration),
+    targetIndex: state.level * 3 + state.targetInLevel,
+  });
+
+  AudioEngine.strike(state.level + 1);
+
+  // Strike flash
+  const ring = document.createElement('div');
+  ring.className = 'strike-ring';
+  const sz = TARGET_RADIUS * 2;
+  ring.style.width = ring.style.height = sz + 'px';
+  ring.style.left = (state.currentTarget.x - TARGET_RADIUS) + 'px';
+  ring.style.top = (state.currentTarget.y - TARGET_RADIUS) + 'px';
+  arena.appendChild(ring);
+  setTimeout(() => ring.remove(), 500);
+
+  targetsContainer.innerHTML = '';
+  state.currentTarget = null;
+  state.lockProgress = 0;
+  cursor.classList.remove('locked');
+
+  state.targetInLevel++;
+  if (state.targetInLevel >= 3) {
+    // Level complete
+    state.targetInLevel = 0;
+    state.level++;
+    if (state.level >= 5) {
+      endGame();
+    } else {
+      showLevelTransition();
+    }
+  } else {
+    setTimeout(() => { if (state.phase === 'playing') spawnTarget(); }, 500);
+  }
+}
+
+function showLevelTransition() {
+  state.phase = 'transition';
+  AudioEngine.stopHeartbeat();
+  AudioEngine.stopDrone();
+
+  const prevLevel = state.level - 1;
+  const lvlResults = state.results.filter(r => r.level === prevLevel);
+  const avgQE = Math.round(lvlResults.reduce((s, r) => s + r.qeDuration, 0) / lvlResults.length);
+  const baseline = getBaseline();
+  const drift = baseline > 0 ? Math.round(Math.abs(avgQE - baseline) / baseline * 100) : 0;
+
+  transTitle.textContent = `Level ${prevLevel + 1} Complete — ${LEVELS[prevLevel].name}`;
+  transStats.innerHTML = `QE: ${avgQE}ms${baseline > 0 ? ` (baseline: ${baseline}ms)<br>Drift: ${drift}%` : ' — Baseline Set'}`;
+
+  levelTransition.style.display = 'flex';
+  decoysContainer.innerHTML = '';
+  arena.className = '';
+
+  setTimeout(() => {
+    levelTransition.style.display = 'none';
+    state.phase = 'playing';
+    clearEnvironment();
+    applyLevelEnvironment(state.level);
+    spawnTarget();
+  }, 3000);
+}
+
+function getBaseline() {
+  const l1 = state.results.filter(r => r.level === 0);
+  if (l1.length === 0) return 0;
+  return Math.round(l1.reduce((s, r) => s + r.qeDuration, 0) / l1.length);
+}
+
+function endGame() {
+  state.phase = 'results';
+  hud.style.display = 'none';
+  pressureGauge.style.display = 'none';
+  pressureLabel.style.display = 'none';
+  AudioEngine.stopHeartbeat();
+  AudioEngine.stopDrone();
+  clearEnvironment();
+  arena.className = '';
+  arena.style.filter = '';
+  document.body.style.background = '';
+  noiseOverlay.style.opacity = 0;
+  gridBg.style.background = '';
+  showResults();
+}
+
+function showResults() {
+  const baseline = getBaseline();
+  const levelAvgs = [];
+  for (let i = 0; i < 5; i++) {
+    const lr = state.results.filter(r => r.level === i);
+    levelAvgs.push(lr.length > 0 ? Math.round(lr.reduce((s, r) => s + r.qeDuration, 0) / lr.length) : 0);
+  }
+
+  // Overall drift (levels 2-5 compared to baseline)
+  const drifts = [];
+  for (let i = 1; i < 5; i++) {
+    if (levelAvgs[i] > 0 && baseline > 0) {
+      drifts.push(Math.abs(levelAvgs[i] - baseline) / baseline * 100);
+    }
+  }
+  const overallDrift = drifts.length > 0 ? Math.round(drifts.reduce((a, b) => a + b, 0) / drifts.length) : 0;
+
+  // Grade
+  let grade, gradeColor;
+  if (overallDrift < 5) { grade = 'S+'; gradeColor = '#ffd700'; }
+  else if (overallDrift < 10) { grade = 'S'; gradeColor = '#ffd700'; }
+  else if (overallDrift < 15) { grade = 'A'; gradeColor = '#00ff88'; }
+  else if (overallDrift < 25) { grade = 'B'; gradeColor = '#00e5ff'; }
+  else if (overallDrift < 40) { grade = 'C'; gradeColor = '#ffa040'; }
+  else { grade = 'D'; gradeColor = '#ff3d3d'; }
+
+  const resultsGrade = document.getElementById('results-grade');
+  resultsGrade.textContent = grade;
+  resultsGrade.style.color = gradeColor;
+  document.getElementById('results-drift').textContent = `QE Drift: ${overallDrift}% | Baseline: ${baseline}ms | Pressure Resilience Score`;
+
+  // Chart
+  const chartContainer = document.getElementById('chart-container');
+  chartContainer.innerHTML = '';
+  const maxQE = Math.max(...state.results.map(r => r.qeDuration), baseline) * 1.2;
+  const chartH = 200;
+  const zoneColors = ['#00aaff', '#40a0ff', '#ffa040', '#ff6040', '#ff3030'];
+
+  // Zone backgrounds
+  for (let i = 0; i < 5; i++) {
+    const zone = document.createElement('div');
+    zone.className = 'chart-bg-zone';
+    zone.style.left = (i * 20) + '%';
+    zone.style.width = '20%';
+    zone.style.background = zoneColors[i];
+    chartContainer.appendChild(zone);
+  }
+
+  // Baseline line
+  if (baseline > 0) {
+    const baseY = chartH - (baseline / maxQE * chartH);
+    const bline = document.createElement('div');
+    bline.className = 'baseline-line';
+    bline.style.top = baseY + 'px';
+    const blabel = document.createElement('div');
+    blabel.className = 'baseline-label';
+    blabel.textContent = `baseline ${baseline}ms`;
+    bline.appendChild(blabel);
+    chartContainer.appendChild(bline);
+  }
+
+  // Bars
+  state.results.forEach((r, i) => {
+    const barH = r.qeDuration / maxQE * chartH;
+    const group = document.createElement('div');
+    group.className = 'chart-bar-group';
+    group.style.left = ((i + 0.5) / 15 * 100) + '%';
+    group.style.transform = 'translateX(-50%)';
+
+    const val = document.createElement('div');
+    val.className = 'chart-value';
+    val.textContent = r.qeDuration + 'ms';
+
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    bar.style.height = '0px';
+    bar.style.background = zoneColors[r.level];
+    setTimeout(() => { bar.style.height = barH + 'px'; }, 100 + i * 80);
+
+    const label = document.createElement('div');
+    label.className = 'chart-label';
+    label.textContent = (i + 1);
+
+    group.appendChild(val);
+    group.appendChild(bar);
+    group.appendChild(label);
+    chartContainer.appendChild(group);
+  });
+
+  // Level breakdown cards
+  const breakdown = document.getElementById('level-breakdown');
+  breakdown.innerHTML = '';
+  for (let i = 0; i < 5; i++) {
+    const card = document.createElement('div');
+    card.className = 'level-card';
+    const drift = baseline > 0 && i > 0 ? Math.round(Math.abs(levelAvgs[i] - baseline) / baseline * 100) + '%' : (i === 0 ? 'BASE' : '--');
+    card.innerHTML = `
+      <div class="lbl">${LEVELS[i].name}</div>
+      <div class="val" style="color:${zoneColors[i]}">${levelAvgs[i]}ms</div>
+      <div class="drift">${drift}</div>
+    `;
+    breakdown.appendChild(card);
+  }
+
+  // Medals
+  const medals = document.getElementById('medals');
+  medals.innerHTML = '';
+  if (overallDrift < 5) medals.innerHTML += '<span class="medal gold">ICE COLD</span>';
+  if (overallDrift < 15) medals.innerHTML += '<span class="medal silver">STEADY HANDS</span>';
+  if (state.results.length === 15) medals.innerHTML += '<span class="medal bronze">CLUTCH PLAYER</span>';
+
+  // Share
+  const shareText = `PRESSURE COOKER QE Drift: ${overallDrift}% [${grade}] | Baseline: ${baseline}ms | battleoforigins.com/quieteye/pressure-cooker/`;
+  document.getElementById('share-text').textContent = shareText;
+
+  resultsScreen.style.display = 'flex';
+}
+
+// ── Environment ──
+function clearEnvironment() {
+  decoysContainer.innerHTML = '';
+  particlesContainer.innerHTML = '';
+  crowdContainer.innerHTML = '';
+  state.decoys = [];
+  state.particles = [];
+  state.crowdShapes = [];
+  arena.className = '';
+  arena.style.filter = '';
+  hud.className = '';
+  noiseOverlay.style.opacity = '0';
+}
+
+function applyLevelEnvironment(lvl) {
+  const level = LEVELS[lvl];
+
+  // Background color
+  document.body.style.background = level.color;
+
+  // Pressure gauge
+  pressureFill.style.height = ((lvl + 1) / 5 * 100) + '%';
+
+  // Grid intensity
+  const gridOp = 0.03 + lvl * 0.01;
+  gridBg.style.backgroundImage = `
+    linear-gradient(rgba(0,229,255,${gridOp}) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,${gridOp}) 1px, transparent 1px)`;
+
+  // Noise overlay
+  noiseOverlay.style.opacity = lvl >= 3 ? (lvl === 3 ? '0.15' : lvl === 4 ? '0.3' : '0') : '0';
+
+  // Particles for level 2+
+  if (lvl >= 1) spawnParticles(lvl);
+
+  // Crowd shapes for level 4+
+  if (lvl >= 3) spawnCrowdShapes(lvl);
+
+  // HUD styling
+  hudLevelName.style.color = level.accent;
+  if (lvl >= 3) hud.classList.add('hud-jitter');
+
+  // Update HUD text
+  hudLevel.textContent = `LEVEL ${lvl + 1}`;
+  hudLevelName.textContent = level.name;
+}
+
+function setupLevelAudio(lvl) {
+  AudioEngine.stopHeartbeat();
+  AudioEngine.stopDrone();
+  if (lvl >= 1) AudioEngine.startDrone(0.02 + lvl * 0.01);
+  if (lvl >= 2) AudioEngine.startHeartbeat(lvl === 2 ? 65 : lvl === 3 ? 85 : 110);
+}
+
+function spawnParticles(lvl) {
+  particlesContainer.innerHTML = '';
+  state.particles = [];
+  const count = 8 + lvl * 8;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'drift-particle';
+    const x = Math.random() * window.innerWidth;
+    const y = Math.random() * window.innerHeight;
+    const speed = 0.2 + Math.random() * (0.3 + lvl * 0.2);
+    const angle = Math.random() * Math.PI * 2;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.opacity = 0.1 + Math.random() * 0.15 * (lvl + 1);
+    if (lvl >= 4) el.style.width = el.style.height = (2 + Math.random() * 4) + 'px';
+    particlesContainer.appendChild(el);
+    state.particles.push({ el, x, y, speed, angle });
+  }
+}
+
+function spawnCrowdShapes(lvl) {
+  crowdContainer.innerHTML = '';
+  state.crowdShapes = [];
+  const count = lvl === 3 ? 6 : 12;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'crowd-shape';
+    const size = 40 + Math.random() * 80;
+    const edge = Math.floor(Math.random() * 4);
+    let x, y;
+    if (edge === 0) { x = Math.random() * window.innerWidth; y = -size/2; }
+    else if (edge === 1) { x = window.innerWidth + size/2; y = Math.random() * window.innerHeight; }
+    else if (edge === 2) { x = Math.random() * window.innerWidth; y = window.innerHeight + size/2; }
+    else { x = -size/2; y = Math.random() * window.innerHeight; }
+    el.style.width = el.style.height = size + 'px';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.background = `hsl(${Math.random() * 40 + 350}, 70%, 50%)`;
+    crowdContainer.appendChild(el);
+    state.crowdShapes.push({ el, x, y, size, phase: Math.random() * Math.PI * 2, speed: 1 + Math.random() * 2 });
+  }
+}
+
+function updateHUD() {
+  hudLevel.textContent = `LEVEL ${state.level + 1}`;
+  hudLevelName.textContent = LEVELS[state.level].name;
+  hudTargets.textContent = `Target ${state.targetInLevel + 1} / 3`;
+
+  const lastResult = state.results.length > 0 ? state.results[state.results.length - 1] : null;
+  if (lastResult) {
+    const baseline = getBaseline();
+    if (baseline > 0 && state.level > 0) {
+      const drift = Math.round(Math.abs(lastResult.qeDuration - baseline) / baseline * 100);
+      hudQE.textContent = `QE: ${lastResult.qeDuration}ms | Drift: ${drift}%`;
+    } else {
+      hudQE.textContent = `QE: ${lastResult.qeDuration}ms`;
+    }
+  } else {
+    hudQE.textContent = 'QE: ---';
+  }
+}
+
+// ── Main Loop ──
+let lastFrame = 0;
+function gameLoop(timestamp) {
+  const dt = timestamp - lastFrame;
+  lastFrame = timestamp;
+
+  if (state.phase === 'playing' && state.currentTarget) {
+    updateLock(dt, timestamp);
+    updateTargetJitter(timestamp);
+    updateDecoys(timestamp);
+    updateLevelEffects(timestamp, dt);
+  }
+
+  updateParticles(dt);
+  updateCrowdShapes(timestamp);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function updateLock(dt, now) {
+  const t = state.currentTarget;
+  const dx = state.cursorX - (t.x + t.jitterX);
+  const dy = state.cursorY - (t.y + t.jitterY);
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  const inZone = dist <= LOCK_RADIUS;
+
+  if (inZone && !state.isInLockZone) {
+    // Entered lock zone — start QE timer
+    state.isInLockZone = true;
+    state.qeStartTime = performance.now();
+    state.lockStartTime = performance.now();
+  } else if (!inZone && state.isInLockZone) {
+    // Left lock zone — reset
+    state.isInLockZone = false;
+    state.lockProgress = 0;
+    state.lockStartTime = 0;
+    state.qeStartTime = 0;
+  }
+
+  if (state.isInLockZone && state.lockStartTime > 0) {
+    const elapsed = performance.now() - state.lockStartTime;
+    state.lockProgress = Math.min(elapsed / LOCK_DURATION, 1);
+
+    // Lock tick sound
+    if (Math.random() < 0.08) AudioEngine.lockTick(state.level + 1);
+  }
+
+  // Update lock ring SVG
+  const circle = document.getElementById('lock-progress-circle');
+  const ring = document.getElementById('lock-ring');
+  if (circle) {
+    const r = TARGET_RADIUS + 6;
+    const circumference = 2 * Math.PI * r;
+    circle.setAttribute('stroke-dashoffset', circumference * (1 - state.lockProgress));
+  }
+  if (ring) {
+    if (state.lockProgress > 0 && state.lockProgress < 1) {
+      ring.classList.add('filling');
+    } else {
+      ring.classList.remove('filling');
+    }
+  }
+
+  // Cursor state
+  if (state.lockProgress >= 1) {
+    cursor.classList.add('locked');
+    if (!state._lockCompleteAudio) {
+      AudioEngine.lockComplete(state.level + 1);
+      state._lockCompleteAudio = true;
+    }
+  } else {
+    cursor.classList.remove('locked');
+    state._lockCompleteAudio = false;
+  }
+}
+
+function updateTargetJitter(now) {
+  const lvl = state.level;
+  if (lvl < 3 || !state.currentTarget) return;
+
+  const intensity = lvl === 3 ? 1.5 : lvl === 4 ? 3 : 5;
+  state.currentTarget.jitterX = Math.sin(now * 0.005) * intensity + Math.cos(now * 0.008) * intensity * 0.5;
+  state.currentTarget.jitterY = Math.cos(now * 0.006) * intensity + Math.sin(now * 0.009) * intensity * 0.5;
+
+  const el = state.currentTarget.el;
+  el.style.transform = `translate(${state.currentTarget.jitterX}px, ${state.currentTarget.jitterY}px)`;
+
+  // Level 5: target color shifts
+  if (lvl === 4) {
+    const hue = (now * 0.1) % 360;
+    const inner = el.querySelector('.target-inner');
+    const outer = el.querySelector('.target-outer');
+    if (inner) inner.style.background = `radial-gradient(circle, hsl(${hue}, 100%, 60%), transparent)`;
+    if (outer) outer.style.borderColor = `hsl(${hue}, 80%, 50%)`;
+  }
+}
+
+function updateDecoys(now) {
+  state.decoys = state.decoys.filter(d => {
+    const age = now - d.spawnTime;
+    if (age > d.lifetime) {
+      d.el.remove();
+      return false;
+    }
+    // Fade in/out
+    const fadeIn = Math.min(age / 200, 1);
+    const fadeOut = Math.min((d.lifetime - age) / 200, 1);
+    d.el.style.opacity = d.opacity * fadeIn * fadeOut;
+    return true;
+  });
+
+  // Respawn decoys for levels 3+
+  if (state.level >= 2 && state.decoys.length < (state.level === 2 ? 1 : state.level === 3 ? 2 : 4)) {
+    if (Math.random() < 0.02) {
+      const size = 25 + Math.random() * 35;
+      const x = 80 + Math.random() * (window.innerWidth - 160);
+      const y = 80 + Math.random() * (window.innerHeight - 160);
+      const opacity = 0.2 + Math.random() * 0.4;
+      const lifetime = 600 + Math.random() * 1500;
+
+      const el = document.createElement('div');
+      el.className = 'decoy';
+      el.style.width = el.style.height = size + 'px';
+      el.style.left = (x - size/2) + 'px';
+      el.style.top = (y - size/2) + 'px';
+      el.style.opacity = '0';
+      decoysContainer.appendChild(el);
+      state.decoys.push({ el, x, y, spawnTime: now, lifetime, opacity });
+    }
+  }
+}
+
+function updateLevelEffects(now, dt) {
+  const lvl = state.level;
+
+  // Level 3+: background color cycling
+  if (lvl >= 2) {
+    state.bgHueShift = (state.bgHueShift + dt * 0.02 * (lvl - 1)) % 360;
+    const base = LEVELS[lvl].color;
+    arena.style.filter = `hue-rotate(${state.bgHueShift * 0.3}deg)`;
+  }
+
+  // Level 3: ticking
+  if (lvl === 2) {
+    state.tickTimer = (state.tickTimer || 0) + dt;
+    if (state.tickTimer > 1000) {
+      AudioEngine.tick();
+      state.tickTimer = 0;
+    }
+  }
+
+  // Level 4: screen shake + color inversion flashes
+  if (lvl === 3) {
+    if (!arena.classList.contains('shake-light')) arena.classList.add('shake-light');
+    // Brief inversion flashes
+    if (Math.random() < 0.003) {
+      arena.style.filter = `invert(0.12) hue-rotate(${20 + Math.random() * 30}deg)`;
+      setTimeout(() => { if (state.level === 3) arena.style.filter = `hue-rotate(${state.bgHueShift * 0.3}deg)`; }, 80);
+    }
+    // Crowd noise bursts
+    if (Math.random() < 0.005) AudioEngine.crowdBurst(0.02);
+  }
+
+  // Level 5: FULL CHAOS
+  if (lvl === 4) {
+    arena.className = 'shake-medium';
+    // More intense but NOT epilepsy-triggering — slow hue shifts
+    const chaosHue = (now * 0.05) % 360;
+    arena.style.filter = `hue-rotate(${chaosHue * 0.15}deg) saturate(${1 + Math.sin(now * 0.003) * 0.3})`;
+
+    // Noise overlay pulses
+    noiseOverlay.style.opacity = 0.2 + Math.sin(now * 0.005) * 0.15;
+
+    // HUD distortion
+    if (!hud.classList.contains('hud-jitter')) hud.classList.add('hud-jitter');
+
+    // Occasional heavier shake
+    if (Math.random() < 0.01) {
+      arena.className = 'shake-heavy';
+      setTimeout(() => { if (state.level === 4) arena.className = 'shake-medium'; }, 200);
+    }
+
+    // Crowd noise
+    if (Math.random() < 0.01) AudioEngine.crowdBurst(0.04);
+  }
+}
+
+function updateParticles(dt) {
+  state.particles.forEach(p => {
+    p.x += Math.cos(p.angle) * p.speed;
+    p.y += Math.sin(p.angle) * p.speed;
+    if (p.x < -10) p.x = window.innerWidth + 10;
+    if (p.x > window.innerWidth + 10) p.x = -10;
+    if (p.y < -10) p.y = window.innerHeight + 10;
+    if (p.y > window.innerHeight + 10) p.y = -10;
+    p.el.style.left = p.x + 'px';
+    p.el.style.top = p.y + 'px';
+  });
+}
+
+function updateCrowdShapes(now) {
+  state.crowdShapes.forEach(c => {
+    const pulse = Math.sin(now * 0.003 * c.speed + c.phase) * 0.5 + 0.5;
+    c.el.style.opacity = pulse * (state.level >= 4 ? 0.12 : 0.06);
+    const scale = 0.8 + pulse * 0.4;
+    c.el.style.transform = `scale(${scale})`;
+  });
+}
+
+// ── Kick off ──
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
