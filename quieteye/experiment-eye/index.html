@@ -888,6 +888,7 @@ const SURPRISES = [
   { id: 'phantom',   name: 'PHANTOM',    desc: 'Fades away over time!', duration: 0 },
   { id: 'spin',      name: 'SPIN',       desc: 'Everything rotates!', duration: 0 },
   { id: 'shrink',    name: 'SHRINK',     desc: 'Target shrinks over time!', duration: 0 },
+  { id: 'strobe',    name: 'STROBE',     desc: 'Ring stutters in bursts!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -1520,6 +1521,7 @@ function spawnTarget() {
   if (surprise && surprise.id === 'decoy') showFeedback('DECOYS!', x, y - 40, '#ff5252');
   if (surprise && surprise.id === 'mirror') showFeedback('MIRROR!', x, y - 40, '#e040fb');
   if (surprise && surprise.id === 'blind') showFeedback('BLIND!', W / 2, H * 0.3, '#ffffff');
+  if (surprise && surprise.id === 'strobe') showFeedback('STROBE!', x, y - 40, '#ffeb3b');
 
   // FREEZE surprise — freeze approach ring at 40% then rush
   if (surprise && surprise.id === 'freeze') {
@@ -3486,7 +3488,9 @@ function drawGame(dt, timestamp) {
     }
 
     // Approach ring — with beat-synced bounce
-    const baseApproachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
+    // STROBE surprise: quantize progress into 6 discrete steps (stuttered ring)
+    const ringProgress = (t.surprise && t.surprise.id === 'strobe') ? Math.floor(progress * 6) / 6 : progress;
+    const baseApproachR = t.approachRadius - (t.approachRadius - effectiveRadius) * ringProgress;
     // Pulse on beat: check last beat pulse for timing
     let beatBounce = 0;
     if (beatPulses.length > 0) {
