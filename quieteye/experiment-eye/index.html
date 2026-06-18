@@ -2502,7 +2502,7 @@ function showResults() {
   localStorage.setItem('experiment-eye-history', JSON.stringify(history));
 
   // Update lifetime stats + daily streak
-  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score, medalsEarned, elapsedMs: Date.now() - gameStartTime });
+  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score, medalsEarned, elapsedMs: Date.now() - gameStartTime, grade });
   recordDailyPlay();
 
   const histEl = document.getElementById('history-list');
@@ -3981,6 +3981,11 @@ function updateLifetimeStats(runData) {
   stats.bestScoreEver = Math.max(stats.bestScoreEver || 0, runData.score || 0);
   stats.totalMedals = (stats.totalMedals || 0) + (runData.medalsEarned || 0);
   stats.totalTimeMs = (stats.totalTimeMs || 0) + (runData.elapsedMs || 0);
+  // Track best grade
+  const gradeRank = { 'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+  const currentGradeRank = gradeRank[runData.grade] || 0;
+  const bestGradeRank = gradeRank[stats.bestGrade] || 0;
+  if (currentGradeRank > bestGradeRank) stats.bestGrade = runData.grade;
   try { localStorage.setItem('experiment-eye-lifetime', JSON.stringify(stats)); } catch(e) {}
 }
 
@@ -3992,8 +3997,10 @@ function updateTitleStats() {
 
   // Personal best display
   const pbEl = document.getElementById('pb-display');
+  const lifetime = getLifetimeStats();
   if (pb > 0) {
-    pbEl.textContent = `BEST: ${pb} pts`;
+    const gradeStr = lifetime.bestGrade ? ` · ${lifetime.bestGrade}` : '';
+    pbEl.textContent = `BEST: ${pb} pts${gradeStr}`;
   } else {
     pbEl.textContent = '';
   }
@@ -4024,8 +4031,7 @@ function updateTitleStats() {
     streakEl.style.display = 'none';
   }
 
-  // Lifetime stats
-  const lifetime = getLifetimeStats();
+  // Lifetime stats (lifetime already fetched above)
   const lifetimeEl = document.getElementById('lifetime-display');
   if (lifetime.totalPlays > 0) {
     const parts = [`${lifetime.totalPlays} runs`];
