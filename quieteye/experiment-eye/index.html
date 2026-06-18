@@ -601,6 +601,11 @@ canvas {
       The world around you will shift, surprise you, and try to break your focus.<br>
       Stay locked. Stay calm. Get better.
     </div>
+    <div id="streak-display" style="display:none;margin-top:4px;text-align:center">
+      <span id="streak-icon" style="font-size:18px"></span>
+      <span id="streak-text" style="font-family:Orbitron;font-size:12px;font-weight:700;letter-spacing:3px"></span>
+    </div>
+    <div id="mmr-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-top:4px"></div>
     <div class="title-btn-row">
       <button class="title-btn" id="solo-btn">SOLO</button>
       <button class="title-btn match-btn" id="match-btn">MATCH</button>
@@ -1539,6 +1544,7 @@ function showTitle() {
   matchMode = false;
   titleScreen.style.display = 'flex';
   resultsScreen.style.display = 'none';
+  updateTitleStats();
   hudEl.style.display = 'none';
   matchHudEl.style.display = 'none';
   aiCursorEl.style.display = 'none';
@@ -2283,6 +2289,45 @@ function addMatchHistory(entry) {
   } catch(e) {}
 }
 
+function getWinStreak() {
+  try { return parseInt(localStorage.getItem('experiment-eye-streak')) || 0; } catch(e) { return 0; }
+}
+function setWinStreak(val) {
+  try { localStorage.setItem('experiment-eye-streak', val); } catch(e) {}
+}
+
+function updateTitleStats() {
+  const mmr = getPlayerMMR();
+  const rec = getPlayerRecord();
+  const streak = getWinStreak();
+
+  // MMR display
+  const mmrEl = document.getElementById('mmr-display');
+  if (rec.wins + rec.losses > 0) {
+    mmrEl.textContent = `MMR ${mmr} · ${rec.wins}W ${rec.losses}L`;
+  } else {
+    mmrEl.textContent = '';
+  }
+
+  // Streak display
+  const streakEl = document.getElementById('streak-display');
+  const streakIcon = document.getElementById('streak-icon');
+  const streakText = document.getElementById('streak-text');
+  if (streak >= 2) {
+    streakEl.style.display = 'block';
+    let color, icon;
+    if (streak >= 7) { color = '#ff3d3d'; icon = '\u{1F525}\u{1F525}\u{1F525}'; }
+    else if (streak >= 5) { color = '#ffd700'; icon = '\u{1F525}\u{1F525}'; }
+    else if (streak >= 3) { color = '#00e676'; icon = '\u{1F525}'; }
+    else { color = '#00e5ff'; icon = '\u{2728}'; }
+    streakIcon.textContent = icon;
+    streakText.textContent = `${streak} WIN STREAK`;
+    streakText.style.color = color;
+  } else {
+    streakEl.style.display = 'none';
+  }
+}
+
 // ─── AI Opponent ───
 let aiOpponent = null;
 let aiState = null;
@@ -2695,6 +2740,13 @@ function showMatchResults() {
   if (won) rec.wins++; else rec.losses++;
   setPlayerRecord(rec);
 
+  // Update win streak
+  if (won) {
+    setWinStreak(getWinStreak() + 1);
+  } else {
+    setWinStreak(0);
+  }
+
   // Save to match history
   addMatchHistory({
     date: new Date().toLocaleDateString(),
@@ -2761,7 +2813,12 @@ function showMatchResults() {
 
   // MMR change display
   const mmrEl = document.getElementById('mr-mmr-change');
-  mmrEl.textContent = (mmrDelta > 0 ? '+' : '') + mmrDelta + ' (' + newMMR + ')';
+  const currentStreak = getWinStreak();
+  let mmrText = (mmrDelta > 0 ? '+' : '') + mmrDelta + ' (' + newMMR + ')';
+  if (won && currentStreak >= 2) {
+    mmrText += '  \u{1F525} ' + currentStreak + ' streak';
+  }
+  mmrEl.textContent = mmrText;
   mmrEl.className = 'mr-mmr-change ' + (mmrDelta > 0 ? 'positive' : 'negative');
 
   // Leaderboard
@@ -2799,6 +2856,7 @@ document.getElementById('mr-menu-btn').addEventListener('click', () => {
 });
 
 // ─── Start ───
+updateTitleStats();
 requestAnimationFrame(gameLoop);
 </script>
 </body>
