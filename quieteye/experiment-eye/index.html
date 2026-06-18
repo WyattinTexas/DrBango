@@ -876,6 +876,7 @@ let envHue = 0;
 let envShake = 0;
 let impactShake = 0; // momentary hit shake, decays quickly
 let envBlackout = 0;
+let blackoutHeartTimer = 0;
 let envVignette = 0;
 let noiseOpacity = 0;
 
@@ -2423,6 +2424,17 @@ function updateGame(dt, timestamp) {
   const clutchTarget = inClutch ? 1 : 0;
   clutchTransition += (clutchTarget - clutchTransition) * dt * 4;
   if (Math.abs(clutchTransition - clutchTarget) < 0.01) clutchTransition = clutchTarget;
+
+  // Blackout heartbeat — slow, ominous
+  if (envBlackout > 0) {
+    blackoutHeartTimer += dt;
+    if (blackoutHeartTimer >= 1.2) { // slower than clutch heartbeat
+      blackoutHeartTimer = 0;
+      playClutchHeartbeat();
+    }
+  } else {
+    blackoutHeartTimer = 0;
+  }
 
   // Smooth vibe color lerp
   const lerpSpeed = dt * 4; // ~0.25s transition
