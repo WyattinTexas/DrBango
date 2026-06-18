@@ -639,6 +639,7 @@ canvas {
 <div id="ui">
   <div id="results-screen">
     <h2>EXPERIMENT COMPLETE</h2>
+    <div id="run-name" style="font-family:Inter;font-size:13px;color:rgba(255,255,255,0.3);font-style:italic;letter-spacing:1px;margin-bottom:4px"></div>
     <div id="results-grade"></div>
     <div id="results-score"></div>
     <div id="results-subtitle"></div>
@@ -1771,6 +1772,45 @@ function endGame() {
   showResults();
 }
 
+function generateRunName() {
+  const vibesUsed = [...new Set(vibeSequence.map(v => v.id))];
+  const hadBoss = vibesUsed.includes('boss');
+  const hadWhisper = vibesUsed.includes('whisper');
+  const hadRetro = vibesUsed.includes('retro');
+  const hadStorm = vibesUsed.includes('storm');
+  const hadBlackout = vibesUsed.includes('blackout');
+  const hadGift = vibesUsed.includes('gift');
+
+  // Adjective based on performance
+  const total = perfects + greats + goods + misses;
+  const perfRate = total > 0 ? perfects / total : 0;
+  const hitRate = total > 0 ? (perfects + greats) / total : 0;
+
+  const adjectives = [];
+  if (perfRate >= 0.6) adjectives.push('Flawless', 'Perfect', 'Pristine');
+  else if (hitRate >= 0.8) adjectives.push('Sharp', 'Focused', 'Precise');
+  else if (hitRate >= 0.5) adjectives.push('Steady', 'Brave', 'Gritty');
+  else adjectives.push('Wild', 'Chaotic', 'Reckless');
+
+  if (bestCombo >= 15) adjectives.push('Unstoppable', 'Relentless');
+  if (bossesSlain >= 1) adjectives.push('Fearless', 'Legendary');
+  if (misses === 0) adjectives.push('Untouchable');
+
+  // Noun based on dominant vibe
+  const nouns = [];
+  if (hadStorm) nouns.push('Storm', 'Tempest', 'Thunder');
+  if (hadBlackout) nouns.push('Shadow', 'Eclipse', 'Void');
+  if (hadWhisper) nouns.push('Whisper', 'Ghost', 'Silence');
+  if (hadRetro) nouns.push('Wave', 'Neon', 'Synth');
+  if (hadBoss) nouns.push('Battle', 'Trial', 'Clash');
+  if (hadGift) nouns.push('Fortune', 'Gift', 'Grace');
+  if (nouns.length === 0) nouns.push('Flow', 'Pulse', 'Focus', 'Run');
+
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  return `The ${adj} ${noun}`;
+}
+
 function showResults() {
   const total = perfects + greats + goods + misses;
   const onBeatPct = total > 0 ? Math.round((perfects + greats) / total * 100) : 0;
@@ -1798,6 +1838,10 @@ function showResults() {
   else if (gradeScore >= 0.60) { grade = 'B'; gradeColor = '#42a5f5'; }
   else if (gradeScore >= 0.45) { grade = 'C'; gradeColor = '#ff9100'; }
   else { grade = 'D'; gradeColor = '#ff5252'; }
+
+  // Run name
+  const runName = generateRunName();
+  document.getElementById('run-name').textContent = runName;
 
   document.getElementById('results-grade').textContent = grade;
   document.getElementById('results-grade').style.color = gradeColor;
@@ -1872,6 +1916,7 @@ function showResults() {
   // Save & render history
   const run = {
     date: new Date().toLocaleDateString(),
+    name: runName,
     score, grade, consistency, onBeatPct,
     vibes: new Set(vibeSequence.map(v => v.id)).size,
     id: Date.now(),
@@ -1885,9 +1930,8 @@ function showResults() {
   const histEl = document.getElementById('history-list');
   histEl.innerHTML = history.slice(0, 8).map((h, i) =>
     `<div class="history-row${h.id === run.id ? ' current' : ''}">
-      <span>${h.date}</span>
+      <span>${h.name || h.date}</span>
       <span>${h.score} pts</span>
-      <span>${h.consistency}%</span>
       <span>${h.grade}</span>
     </div>`
   ).join('');
