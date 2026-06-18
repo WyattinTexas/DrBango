@@ -961,6 +961,7 @@ let bgParticles = [];
 let touchRipples = []; // mobile tap feedback
 let accuracyRings = []; // accuracy feedback rings at click position
 let hitExplosions = []; // expanding fade-out circles on hit
+let zenRipples = []; // zen vibe water ripples — slow concentric rings
 let missMarkers = []; // red X markers at miss positions
 let cursorTrail = []; // recent cursor positions for trail effect
 
@@ -1968,6 +1969,14 @@ function processStrikeOnTarget(target) {
   // Hit explosion — expanding fade-out ring at target position
   hitExplosions.push({ x: target.x + target.driftX, y: target.y + target.driftY, radius: target.radius, color, age: 0, maxAge: 0.3 });
 
+  // Zen water ripples — 3 concentric rings expand slowly from hit point
+  if (currentVibe && currentVibe.id === 'zen') {
+    const rx = target.x + target.driftX, ry = target.y + target.driftY;
+    for (let r = 0; r < 3; r++) {
+      zenRipples.push({ x: rx, y: ry, age: -r * 0.25, maxAge: 1.8 }); // staggered start
+    }
+  }
+
   // Boss phase 3 complete — bonus celebration
   if (target.bossPhase >= target.bossMaxPhases) {
     bossesSlain++;
@@ -2311,7 +2320,7 @@ function startGame() {
   currentTarget = null;
   secondTarget = null;
   targetIndex = 0;
-  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = []; scorePopups = []; accuracyRings = []; hitExplosions = []; missMarkers = []; vibeFlash = 0;
+  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = []; scorePopups = []; accuracyRings = []; hitExplosions = []; zenRipples = []; missMarkers = []; vibeFlash = 0;
   scheduledBeats = [];
 
   // Set adaptive difficulty for solo
@@ -4304,6 +4313,21 @@ function drawHitExplosions(dt) {
     // Outer ring
     ctx.strokeStyle = `rgba(${cr},${cg},${cb},${alpha})`;
     ctx.lineWidth = 2 * (1 - progress);
+    ctx.stroke();
+  }
+  // Zen water ripples — slow concentric rings like a stone in still water
+  for (let i = zenRipples.length - 1; i >= 0; i--) {
+    const zr = zenRipples[i];
+    zr.age += dt;
+    if (zr.age >= zr.maxAge) { zenRipples.splice(i, 1); continue; }
+    if (zr.age < 0) continue; // staggered start — not yet active
+    const p = zr.age / zr.maxAge;
+    const rippleR = 10 + p * 160;
+    const rippleA = (1 - p * p) * 0.12;
+    ctx.beginPath();
+    ctx.arc(zr.x, zr.y, rippleR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0,229,255,${rippleA})`;
+    ctx.lineWidth = 1.5 * (1 - p);
     ctx.stroke();
   }
 }
