@@ -937,11 +937,13 @@ function playApproachTone(startTime, duration, freq) {
 function playHitSound(rating) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
+  // Combo pitch scaling: each combo step raises pitch ~3% (semitone = ~6%), capped at 2x
+  const pitchMult = Math.min(2.0, 1 + combo * 0.03);
   if (rating === 'perfect') {
     [1200, 1800, 2400].forEach((f, i) => {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = 'sine'; osc.frequency.value = f;
+      osc.type = 'sine'; osc.frequency.value = f * pitchMult;
       gain.gain.setValueAtTime(0.15, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15 + i * 0.03);
       osc.connect(gain); gain.connect(audioCtx.destination);
@@ -950,7 +952,7 @@ function playHitSound(rating) {
   } else if (rating === 'great') {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'triangle'; osc.frequency.value = 900;
+    osc.type = 'triangle'; osc.frequency.value = 900 * pitchMult;
     gain.gain.setValueAtTime(0.18, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
     osc.connect(gain); gain.connect(audioCtx.destination);
@@ -958,7 +960,7 @@ function playHitSound(rating) {
   } else if (rating === 'good') {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sine'; osc.frequency.value = 500;
+    osc.type = 'sine'; osc.frequency.value = 500 * pitchMult;
     gain.gain.setValueAtTime(0.1, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     osc.connect(gain); gain.connect(audioCtx.destination);
