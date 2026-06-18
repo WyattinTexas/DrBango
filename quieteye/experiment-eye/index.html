@@ -785,6 +785,7 @@ const SURPRISES = [
   { id: 'giant',     name: 'GIANT',      desc: 'Massive easy target', duration: 0 },
   { id: 'tiny',      name: 'TINY',       desc: 'Tiny precision target', duration: 0 },
   { id: 'heartbeat', name: 'HEARTBEAT',  desc: 'Target pulses with a heartbeat', duration: 0 },
+  { id: 'double',    name: 'DOUBLE',     desc: 'Two targets — hit both!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -803,6 +804,7 @@ let vibeSequence = [];
 let surpriseFlags = [];
 let knowledgeUnlocked = [];
 let currentTarget = null;
+let secondTarget = null; // DOUBLE surprise — second simultaneous target
 let targetIndex = 0;
 let feedbacks = [];
 let particles = [];
@@ -1232,6 +1234,27 @@ function spawnTarget() {
     pulsePhase: 0,
   };
 
+  // DOUBLE surprise — spawn a second target on the opposite side
+  secondTarget = null;
+  if (surprise && surprise.id === 'double') {
+    const x2 = W - x + (Math.random() - 0.5) * 80; // opposite side with jitter
+    const y2 = H - y + (Math.random() - 0.5) * 80;
+    secondTarget = {
+      x: Math.max(margin, Math.min(W - margin, x2)),
+      y: Math.max(margin, Math.min(H - margin, y2)),
+      radius: radius,
+      approachRadius: approachRadius,
+      spawnTime: nextBeatTime,
+      strikeTime: nextBeatTime + beatInterval,
+      holdSamples: 0, holdInside: 0,
+      hit: false, missed: false,
+      vibe, surprise: null,
+      driftX: 0, driftY: 0,
+      mirrorTriggered: false, pulsePhase: 0,
+    };
+    showFeedback('DOUBLE!', W / 2, H * 0.3, '#e040fb');
+  }
+
   // Schedule approach tone with vibe-specific frequency
   const toneFreq = vibe.id === 'boss' ? 100 : vibe.id === 'gift' ? 300 : vibe.id === 'whisper' ? 800 : 180;
   playApproachTone(nextBeatTime, beatInterval, toneFreq);
@@ -1280,30 +1303,51 @@ function getMultiplier() {
 }
 
 function processStrike() {
-  if (!currentTarget || currentTarget.hit || currentTarget.missed) return;
   if (gameState !== 'playing') return;
 
+  // DOUBLE: if main target is hit but second isn't, strike the second
+  if (secondTarget && !secondTarget.hit && !secondTarget.missed
+      && currentTarget && currentTarget.hit) {
+    processStrikeOnTarget(secondTarget);
+    return;
+  }
+  // DOUBLE: if both unhit, strike whichever is closer to cursor
+  if (secondTarget && !secondTarget.hit && !secondTarget.missed
+      && currentTarget && !currentTarget.hit && !currentTarget.missed) {
+    const d1 = Math.hypot(mouseX - (currentTarget.x + currentTarget.driftX), mouseY - (currentTarget.y + currentTarget.driftY));
+    const d2 = Math.hypot(mouseX - secondTarget.x, mouseY - secondTarget.y);
+    if (d2 < d1) {
+      processStrikeOnTarget(secondTarget);
+      return;
+    }
+  }
+
+  if (!currentTarget || currentTarget.hit || currentTarget.missed) return;
+  processStrikeOnTarget(currentTarget);
+}
+
+function processStrikeOnTarget(target) {
   const now = audioCtx.currentTime;
-  const diff = Math.abs(now - currentTarget.strikeTime) * 1000;
+  const diff = Math.abs(now - target.strikeTime) * 1000;
 
   // Hold accuracy
-  const holdAcc = currentTarget.holdSamples > 0
-    ? currentTarget.holdInside / currentTarget.holdSamples : 0;
+  const holdAcc = target.holdSamples > 0
+    ? target.holdInside / target.holdSamples : 0;
   holdAccuracies.push(holdAcc);
 
   // Hold duration for consistency
-  const holdDuration = (now - currentTarget.spawnTime) * 1000;
+  const holdDuration = (now - target.spawnTime) * 1000;
   holdDurations.push(holdDuration);
 
   const holdBonus = holdAcc >= 0.8 ? 50 : 0;
-  const vibeBonus = currentTarget.vibe.id === 'boss' ? 200 :
-                    currentTarget.vibe.id === 'gift' ? 25 : 0;
+  const vibeBonus = target.vibe.id === 'boss' ? 200 :
+                    target.vibe.id === 'gift' ? 25 : 0;
 
   let points = 0, rating = '', color = '', particleCount = 0;
   const mult = getMultiplier();
 
   // Gift targets are more forgiving
-  const giftBonus = currentTarget.vibe.id === 'gift' ? 30 : 0;
+  const giftBonus = target.vibe.id === 'gift' ? 30 : 0;
 
   if (diff <= 50 + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
@@ -1318,14 +1362,15 @@ function processStrike() {
     rating = 'miss'; color = '#ff5252'; points = 0; misses++;
     if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
     combo = 0; playMissSound();
-    currentTarget.missed = true;
-    showFeedback('MISS', currentTarget.x, currentTarget.y - 20, color);
+    target.missed = true;
+    showFeedback('MISS', target.x, target.y - 20, color);
     flashScreen(color, 0.15);
     if (matchMode) {
       processAIStrike();
       updateMatchHUD();
     }
-    advanceTarget();
+    // Only advance if both targets are resolved (or no second target)
+    if (!secondTarget || secondTarget.hit || secondTarget.missed) advanceTarget();
     return;
   }
 
@@ -1333,14 +1378,14 @@ function processStrike() {
   score += totalPoints;
   combo++;
   if (combo > bestCombo) bestCombo = combo;
-  currentTarget.hit = true;
+  target.hit = true;
 
   // Feedback
   let fbText = rating.toUpperCase();
   if (holdBonus > 0) fbText += ' +LOCK';
   if (vibeBonus > 0) fbText += ` +${vibeBonus}`;
-  showFeedback(fbText, currentTarget.x, currentTarget.y - 20, color);
-  spawnParticles(currentTarget.x, currentTarget.y, color, particleCount);
+  showFeedback(fbText, target.x, target.y - 20, color);
+  spawnParticles(target.x, target.y, color, particleCount);
   flashScreen(color, 0.08);
 
   // Combo milestones
@@ -1368,6 +1413,9 @@ function processStrike() {
   // Knowledge reward at milestones (solo only)
   if (!matchMode) checkKnowledgeReward();
 
+  // DOUBLE: don't advance until both targets are resolved
+  if (secondTarget && !secondTarget.hit && !secondTarget.missed) return;
+
   // Process AI strike when player advances in match mode
   if (matchMode) processAIStrike();
 
@@ -1376,6 +1424,7 @@ function processStrike() {
 
 function advanceTarget() {
   currentTarget = null;
+  secondTarget = null;
   decoys = [];
   stopDrone();
   targetIndex++;
@@ -1738,6 +1787,12 @@ function updateGame(dt, timestamp) {
       showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
       playMissSound();
       flashScreen('#ff5252', 0.12);
+      // Auto-miss second target too
+      if (secondTarget && !secondTarget.hit && !secondTarget.missed) {
+        secondTarget.missed = true;
+        misses++;
+        showFeedback('MISS', secondTarget.x, secondTarget.y - 20, '#ff5252');
+      }
       if (matchMode) {
         processAIStrike();
         updateMatchHUD();
@@ -2063,6 +2118,56 @@ function drawGame(dt, timestamp) {
       document.getElementById('hud-vibe').style.color = t.vibe.color;
     } else {
       document.getElementById('hud-vibe').textContent = '';
+    }
+  }
+
+  // Draw DOUBLE second target (simplified render — same vibe color, no surprises)
+  if (secondTarget && !secondTarget.hit && !secondTarget.missed) {
+    const s = secondTarget;
+    const sx = s.x, sy = s.y;
+    const elapsed2 = now - s.spawnTime;
+    const duration2 = s.strikeTime - s.spawnTime;
+    const prog2 = Math.min(elapsed2 / duration2, 1);
+    const aR2 = s.approachRadius - (s.approachRadius - s.radius) * prog2;
+
+    // Approach ring
+    ctx.beginPath(); ctx.arc(sx, sy, aR2, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 + prog2 * 0.75})`;
+    ctx.lineWidth = 2; ctx.stroke();
+
+    // Parse vibe color
+    const hex2 = s.vibe.color;
+    const cr2 = parseInt(hex2.slice(1, 3), 16);
+    const cg2 = parseInt(hex2.slice(3, 5), 16);
+    const cb2 = parseInt(hex2.slice(5, 7), 16);
+
+    // Glow
+    const d2 = Math.hypot(mouseX - sx, mouseY - sy);
+    const hov2 = d2 <= s.radius * 1.8;
+    const grad2 = ctx.createRadialGradient(sx, sy, 0, sx, sy, s.radius * 2.5);
+    grad2.addColorStop(0, `rgba(${cr2},${cg2},${cb2},${hov2 ? 0.5 : 0.2})`);
+    grad2.addColorStop(1, `rgba(${cr2},${cg2},${cb2},0)`);
+    ctx.beginPath(); ctx.arc(sx, sy, s.radius * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = grad2; ctx.fill();
+
+    // Core
+    ctx.beginPath(); ctx.arc(sx, sy, s.radius, 0, Math.PI * 2);
+    ctx.fillStyle = hov2 ? `rgba(${cr2},${cg2},${cb2},0.35)` : `rgba(${cr2},${cg2},${cb2},0.15)`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${cr2},${cg2},${cb2},${0.4 + prog2 * 0.6})`;
+    ctx.lineWidth = 2; ctx.stroke();
+
+    // Center dot
+    ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr2},${cg2},${cb2},1)`; ctx.fill();
+
+    // Connector line between targets (visual link)
+    if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
+      ctx.beginPath();
+      ctx.moveTo(currentTarget.x + currentTarget.driftX, currentTarget.y + currentTarget.driftY);
+      ctx.lineTo(sx, sy);
+      ctx.strokeStyle = `rgba(${cr2},${cg2},${cb2},0.08)`;
+      ctx.lineWidth = 1; ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
     }
   }
 
