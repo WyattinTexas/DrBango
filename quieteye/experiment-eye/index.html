@@ -675,6 +675,7 @@ canvas {
   <div id="hud-left">
     <div id="hud-score">0</div>
     <div id="hud-consistency"></div>
+    <div id="hud-momentum" style="font-size:10px;letter-spacing:2px;margin-top:2px;opacity:0;transition:opacity 0.3s,color 0.3s"></div>
   </div>
   <div id="hud-center">
     <div id="hud-combo">
@@ -2080,6 +2081,17 @@ function updateHUD() {
     comboEl.style.textShadow = 'none';
     comboEl.style.transform = 'scale(1)';
   }
+  // Momentum indicator — last 4 target trend
+  const momEl = document.getElementById('hud-momentum');
+  if (targetRatings.length >= 4) {
+    const last4 = targetRatings.slice(-4);
+    const ratingVal = { perfect: 3, great: 2, good: 1, miss: 0 };
+    const recent = last4.reduce((s, r) => s + (ratingVal[r] || 0), 0);
+    if (recent >= 10) { momEl.textContent = '\u25B2 HOT'; momEl.style.color = '#ffd700'; momEl.style.opacity = '0.5'; }
+    else if (recent >= 7) { momEl.textContent = '\u25B2 RISING'; momEl.style.color = '#00e676'; momEl.style.opacity = '0.4'; }
+    else if (recent <= 3) { momEl.textContent = '\u25BC COLD'; momEl.style.color = '#ff5252'; momEl.style.opacity = '0.4'; }
+    else { momEl.style.opacity = '0'; }
+  } else { momEl.style.opacity = '0'; }
   // Dynamic vibe color on HUD
   if (currentTarget) {
     const vc = currentTarget.vibe.color;
