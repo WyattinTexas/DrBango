@@ -883,6 +883,7 @@ const SURPRISES = [
   { id: 'freeze',    name: 'FREEZE',     desc: 'Ring freezes, then rushes!', duration: 0 },
   { id: 'blind',     name: 'BLIND',      desc: 'Invisible until you get close!', duration: 0 },
   { id: 'phantom',   name: 'PHANTOM',    desc: 'Fades away over time!', duration: 0 },
+  { id: 'spin',      name: 'SPIN',       desc: 'Everything rotates!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -3405,11 +3406,28 @@ function drawGame(dt, timestamp) {
     }
     const approachR = baseApproachR + beatBounce;
     const ringBrightness = (0.25 + progress * 0.75) * whisperDim;
-    ctx.beginPath();
-    ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
-    ctx.lineWidth = isWhisper ? 1 : 2;
-    ctx.stroke();
+    if (t.surprise && t.surprise.id === 'spin') {
+      // SPIN: dashed approach ring that rotates
+      const spinAngle = timestamp * 0.003;
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.rotate(spinAngle);
+      ctx.translate(-tx, -ty);
+      ctx.setLineDash([12, 8]);
+      ctx.beginPath();
+      ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
+      ctx.lineWidth = isWhisper ? 1 : 2;
+      ctx.stroke();
+    }
 
     // Check cursor proximity
     const dx = mouseX - tx;
