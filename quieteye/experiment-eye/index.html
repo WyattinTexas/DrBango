@@ -836,6 +836,7 @@ let score = 0;
 let combo = 0;
 let bestCombo = 0;
 let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
+let comboShield = false; // GIFT reward: protects combo from next miss
 let holdAccuracies = [];
 let holdDurations = [];
 let vibeSequence = [];
@@ -1413,11 +1414,19 @@ function processStrikeOnTarget(target) {
     goods++; playHitSound('good');
   } else {
     rating = 'miss'; color = '#ff5252'; points = 0; misses++;
-    if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
-    combo = 0; playMissSound();
     target.missed = true;
-    showFeedback('MISS', target.x, target.y - 20, color);
-    flashScreen(color, 0.15);
+    if (comboShield) {
+      // Shield absorbs the miss — combo preserved!
+      comboShield = false;
+      playHitSound('good');
+      showFeedback('SHIELDED!', target.x, target.y - 20, '#00ffcc');
+      flashScreen('#00ffcc', 0.1);
+    } else {
+      if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
+      combo = 0; playMissSound();
+      showFeedback('MISS', target.x, target.y - 20, color);
+      flashScreen(color, 0.15);
+    }
     if (matchMode) {
       processAIStrike();
       updateMatchHUD();
@@ -1494,6 +1503,12 @@ function processStrikeOnTarget(target) {
   if (combo === 5 || combo === 10 || combo === 15 || combo === 20) {
     playComboChord(combo / 5);
     showFeedback(`${combo}x COMBO!`, W / 2, H * 0.4, '#e040fb');
+  }
+
+  // GIFT reward: grant combo shield
+  if (target.vibe.id === 'gift' && !comboShield) {
+    comboShield = true;
+    showFeedback('SHIELD!', W / 2, H * 0.45, '#00ffcc');
   }
 
   // THE ZONE — enter flow state at 10 combo
@@ -1605,6 +1620,8 @@ function flashScreen(color, opacity) {
 function updateHUD() {
   document.getElementById('hud-score').textContent = score;
   document.getElementById('combo-num').textContent = `${combo}x`;
+  // Shield indicator on combo
+  document.getElementById('combo-num').style.textShadow = comboShield ? '0 0 12px #00ffcc' : 'none';
 
   // Consistency (based on hold duration variance after baseline)
   if (holdDurations.length > BASELINE_COUNT) {
@@ -1632,6 +1649,7 @@ document.getElementById('match-btn').addEventListener('click', () => {
 function startGame() {
   score = 0; combo = 0; bestCombo = 0;
   perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0;
+  comboShield = false;
   holdAccuracies = []; holdDurations = [];
   knowledgeUnlocked = [];
   currentTarget = null;
@@ -1896,13 +1914,20 @@ function updateGame(dt, timestamp) {
         && now >= currentTarget.strikeTime + 0.25) {
       currentTarget.missed = true;
       misses++;
-      if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
-      combo = 0;
       holdDurations.push((now - currentTarget.spawnTime) * 1000);
       holdAccuracies.push(0);
-      showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
-      playMissSound();
-      flashScreen('#ff5252', 0.12);
+      if (comboShield) {
+        comboShield = false;
+        playHitSound('good');
+        showFeedback('SHIELDED!', currentTarget.x, currentTarget.y - 20, '#00ffcc');
+        flashScreen('#00ffcc', 0.1);
+      } else {
+        if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
+        combo = 0;
+        showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
+        playMissSound();
+        flashScreen('#ff5252', 0.12);
+      }
       // Auto-miss second target too
       if (secondTarget && !secondTarget.hit && !secondTarget.missed) {
         secondTarget.missed = true;
