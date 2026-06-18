@@ -28,7 +28,7 @@
   // is the flex middle between the boss plate and the bottom panel)
   // Team sits in the LOWER band, below where the dice arena settles (~47%),
   // so dice never cover the sprites. active = front-center, sidelines flank.
-  const SOLO_POS = [{ x: '37%', y: '62%' }, { x: '9%', y: '56%' }, { x: '63%', y: '56%' }]; // active, sl-left, sl-right
+  const SOLO_POS = [{ x: '37%', y: '66%' }, { x: '9%', y: '60%' }, { x: '63%', y: '60%' }]; // active, sl-left, sl-right
   const BOSS_POS = { x: '41%', y: '5%' };
 
   let pbActive = false;
@@ -80,8 +80,8 @@
 
 /* 3D dice arena (ported from model_a) — sits in the boss→team gap (upper-middle)
    so dice settle ABOVE the team sprites and never cover them */
-#pb-dice3d{position:absolute;top:13%;left:5%;width:90%;height:34%;z-index:20;pointer-events:none;overflow:hidden;}
-#pb-dice3d-overlay{position:absolute;top:20%;left:0;width:100%;height:22%;z-index:1;
+#pb-dice3d{position:absolute;top:23%;left:5%;width:90%;height:30%;z-index:20;pointer-events:none;overflow:hidden;}
+#pb-dice3d-overlay{position:absolute;top:30%;left:0;width:100%;height:20%;z-index:1;
   background:rgba(0,0,0,.35);backdrop-filter:blur(2px);}
 #portrait-battle .die-physics{position:absolute;z-index:10;perspective:350px;pointer-events:none;}
 #portrait-battle .die-cube{width:100%;height:100%;position:relative;transform-style:preserve-3d;}
@@ -157,9 +157,11 @@
 /* Collapsible card tray — tucked by default; ▲ CARDS toggle slides it up */
 .pb-card-tray{max-height:0;overflow:hidden;transition:max-height .32s ease;}
 .pb-bottom.pb-cards-open .pb-card-tray{max-height:260px;}
-.pb-cards{display:flex;gap:6px;padding:8px 10px 4px;align-items:flex-end;}
+.pb-cards{display:flex;gap:6px;padding:14px 10px 4px;align-items:flex-end;}
 .pb-card-wrap{position:relative;width:0;flex:1;aspect-ratio:2.5/3.5;transition:transform .25s;cursor:pointer;}
 .pb-card-wrap.pb-active{transform:translateY(-10px);}
+/* sit flat while reading a description so the raised active card isn't clipped */
+.pb-card-wrap.pb-show-desc{transform:none;}
 .pb-card-img{display:block;width:100%;height:100%;border-radius:6px;overflow:hidden;border:2px solid rgba(255,255,255,.12);
   object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.3);}
 .pb-card-wrap.pb-active .pb-card-img{border-color:#4fc3f7;box-shadow:0 0 12px rgba(79,195,247,.3);}
@@ -299,7 +301,7 @@
   }
 
   // Multi-player slot positions (2-3 raiders side by side facing the boss)
-  const MULTI_POS = [{ x: '13%', y: '58%' }, { x: '40%', y: '66%' }, { x: '63%', y: '58%' }];
+  const MULTI_POS = [{ x: '13%', y: '60%' }, { x: '40%', y: '68%' }, { x: '63%', y: '60%' }];
 
   function raidPlayers() {
     const R = window.currentRaid;
