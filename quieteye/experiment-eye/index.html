@@ -846,6 +846,7 @@ let combo = 0;
 let bestCombo = 0;
 let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
 let comboShield = false; // GIFT reward: protects combo from next miss
+let giftDoubleNext = false; // GIFT reward: double points on next target
 let holdAccuracies = [];
 let holdDurations = [];
 let targetRatings = []; // per-target rating history for chart
@@ -1576,7 +1577,13 @@ function processStrikeOnTarget(target) {
   }
 
   targetRatings.push(rating);
-  const totalPoints = Math.round((points + holdBonus + vibeBonus) * mult);
+  let totalPoints = Math.round((points + holdBonus + vibeBonus) * mult);
+  // Gift double bonus
+  if (giftDoubleNext && target.vibe.id !== 'gift') {
+    totalPoints *= 2;
+    giftDoubleNext = false;
+    showFeedback('DOUBLED!', W / 2, H * 0.5, '#e040fb');
+  }
   score += totalPoints;
   combo++;
   if (combo > bestCombo) bestCombo = combo;
@@ -1648,10 +1655,19 @@ function processStrikeOnTarget(target) {
     showFeedback(`${combo}x COMBO!`, W / 2, H * 0.4, '#e040fb');
   }
 
-  // GIFT reward: grant combo shield
-  if (target.vibe.id === 'gift' && !comboShield) {
-    comboShield = true;
-    showFeedback('SHIELD!', W / 2, H * 0.45, '#00ffcc');
+  // GIFT reward: random gift from pool
+  if (target.vibe.id === 'gift') {
+    const giftRoll = Math.random();
+    if (giftRoll < 0.4 && !comboShield) {
+      comboShield = true;
+      showFeedback('SHIELD!', W / 2, H * 0.45, '#00ffcc');
+    } else if (giftRoll < 0.7) {
+      score += 200;
+      showFeedback('+200 BONUS!', W / 2, H * 0.45, '#ffd700');
+    } else {
+      giftDoubleNext = true;
+      showFeedback('2x NEXT!', W / 2, H * 0.45, '#e040fb');
+    }
   }
 
   // THE ZONE — enter flow state at 10 combo
@@ -1849,6 +1865,7 @@ function startGame() {
   score = 0; combo = 0; bestCombo = 0;
   perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0;
   comboShield = false;
+  giftDoubleNext = false;
   holdAccuracies = []; holdDurations = []; targetRatings = [];
   knowledgeUnlocked = [];
   currentTarget = null;
