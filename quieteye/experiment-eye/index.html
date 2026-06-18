@@ -853,6 +853,7 @@ let combo = 0;
 let bestCombo = 0;
 let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
 let perfectStreak = 0;
+let lastWasMiss = false;
 let comboShield = false; // GIFT reward: protects combo from next miss
 let giftDoubleNext = false; // GIFT reward: double points on next target
 let holdAccuracies = [];
@@ -1557,6 +1558,7 @@ function processStrikeOnTarget(target) {
   if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
     perfects++; perfectStreak++; playHitSound('perfect'); triggerImpactShake(3);
+    if (lastWasMiss) { showFeedback('COMEBACK!', W / 2, H * 0.35, '#00e5ff'); spawnParticles(W / 2, H / 2, '#00e5ff', 15); }
     if (perfectStreak === 3) showFeedback('PRECISION', W / 2, H * 0.3, '#ffd700');
     else if (perfectStreak === 5) { showFeedback('FLAWLESS', W / 2, H * 0.3, '#ffd700'); spawnParticles(W / 2, H / 2, '#ffd700', 20); }
     else if (perfectStreak >= 7 && perfectStreak % 2 === 1) { showFeedback('INHUMAN ' + perfectStreak + 'x', W / 2, H * 0.3, '#ffd700'); spawnParticles(W / 2, H / 2, '#ffd700', 30); triggerImpactShake(5); }
@@ -1594,12 +1596,15 @@ function processStrikeOnTarget(target) {
       updateMatchHUD();
     }
     targetRatings.push('miss');
+    lastWasMiss = true;
     // Only advance if both targets are resolved (or no second target)
     if (!secondTarget || secondTarget.hit || secondTarget.missed) advanceTarget();
     return;
   }
 
   targetRatings.push(rating);
+  const wasComeback = lastWasMiss;
+  lastWasMiss = false;
   let totalPoints = Math.round((points + holdBonus + vibeBonus) * mult);
   // Gift double bonus
   if (giftDoubleNext && target.vibe.id !== 'gift') {
@@ -1906,7 +1911,7 @@ document.getElementById('match-btn').addEventListener('click', () => {
 function startGame() {
   stopTipRotation();
   score = 0; displayScore = 0; combo = 0; bestCombo = 0;
-  perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0; perfectStreak = 0;
+  perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0; perfectStreak = 0; lastWasMiss = false;
   comboShield = false;
   giftDoubleNext = false;
   holdAccuracies = []; holdDurations = []; targetRatings = [];
