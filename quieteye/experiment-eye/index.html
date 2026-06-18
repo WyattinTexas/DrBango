@@ -662,6 +662,7 @@ canvas {
     <div id="pb-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,215,0,0.25);letter-spacing:2px;margin-top:4px"></div>
     <div id="mmr-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-top:4px"></div>
     <div id="lifetime-display" style="font-size:11px;color:rgba(255,255,255,0.12);letter-spacing:1px;margin-top:10px;font-family:Inter"></div>
+    <div id="daily-streak" style="display:none;font-family:Orbitron;font-size:11px;letter-spacing:2px;margin-top:6px"></div>
     <div id="title-tip" style="max-width:400px;font-size:12px;color:rgba(255,255,255,0.15);line-height:1.6;margin-top:16px;font-style:italic;transition:opacity 0.8s;min-height:36px"></div>
     <div class="title-btn-row">
       <button class="title-btn" id="solo-btn">SOLO</button>
@@ -2378,8 +2379,9 @@ function showResults() {
   history = history.slice(0, 15);
   localStorage.setItem('experiment-eye-history', JSON.stringify(history));
 
-  // Update lifetime stats
+  // Update lifetime stats + daily streak
   updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score, medalsEarned });
+  recordDailyPlay();
 
   const histEl = document.getElementById('history-list');
   histEl.innerHTML = history.slice(0, 8).map((h, i) =>
@@ -3751,6 +3753,44 @@ function updateTitleStats() {
   } else {
     lifetimeEl.textContent = '';
   }
+
+  // Daily play streak
+  const dailyEl = document.getElementById('daily-streak');
+  const daily = getDailyStreak();
+  if (daily.streak >= 2) {
+    const dayColor = daily.streak >= 7 ? '#ffd700' : daily.streak >= 3 ? '#00e676' : '#00e5ff';
+    dailyEl.style.display = 'block';
+    dailyEl.style.color = dayColor;
+    dailyEl.textContent = `\u{1F4C5} DAY ${daily.streak}` + (daily.best > daily.streak ? ` · BEST: ${daily.best}` : daily.streak === daily.best && daily.streak >= 3 ? ' \u2605' : '');
+  } else {
+    dailyEl.style.display = 'none';
+  }
+}
+
+// ─── Daily Play Streak ───
+function getDayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getDailyStreak() {
+  try { return JSON.parse(localStorage.getItem('experiment-eye-daily') || '{}'); } catch(e) { return {}; }
+}
+function recordDailyPlay() {
+  const today = getDayKey();
+  const data = getDailyStreak();
+  if (data.lastDay === today) return; // already recorded today
+  // Check if yesterday was played
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+  if (data.lastDay === yKey) {
+    data.streak = (data.streak || 0) + 1;
+  } else {
+    data.streak = 1;
+  }
+  data.lastDay = today;
+  data.best = Math.max(data.best || 0, data.streak);
+  try { localStorage.setItem('experiment-eye-daily', JSON.stringify(data)); } catch(e) {}
 }
 
 // ─── Title Tip Rotation ───
