@@ -856,6 +856,7 @@ let decoys = [];
 let beatPulses = [];
 let bgParticles = [];
 let touchRipples = []; // mobile tap feedback
+let cursorTrail = []; // recent cursor positions for trail effect
 
 // Audio
 let droneOsc = null, droneGain = null;
@@ -1741,7 +1742,7 @@ function startGame() {
   currentTarget = null;
   secondTarget = null;
   targetIndex = 0;
-  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = [];
+  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = [];
   scheduledBeats = [];
 
   // Set adaptive difficulty for solo
@@ -2246,6 +2247,14 @@ function updateGame(dt, timestamp) {
     impactShake *= Math.pow(0.001, dt); // ~10x decay per second
     if (impactShake < 0.1) impactShake = 0;
   }
+
+  // Record cursor trail
+  cursorTrail.push({ x: mouseX, y: mouseY, age: 0 });
+  if (cursorTrail.length > 20) cursorTrail.shift();
+  for (let i = cursorTrail.length - 1; i >= 0; i--) {
+    cursorTrail[i].age += dt;
+    if (cursorTrail[i].age > 0.3) { cursorTrail.splice(i, 1); }
+  }
 }
 
 function drawGame(dt, timestamp) {
@@ -2414,6 +2423,25 @@ function drawGame(dt, timestamp) {
       ctx.lineWidth = 1;
       ctx.stroke();
     });
+  }
+
+  // Cursor trail — fading line showing recent movement
+  if (cursorTrail.length > 1) {
+    const cr = Math.round(currentVibeColorR);
+    const cg = Math.round(currentVibeColorG);
+    const cb = Math.round(currentVibeColorB);
+    for (let i = 1; i < cursorTrail.length; i++) {
+      const p0 = cursorTrail[i - 1];
+      const p1 = cursorTrail[i];
+      const fade = 1 - p0.age / 0.3;
+      if (fade <= 0) continue;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${fade * 0.12})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 
   // Focus line — cursor to target connection
