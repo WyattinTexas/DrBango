@@ -804,6 +804,7 @@ const SURPRISES = [
   { id: 'heartbeat', name: 'HEARTBEAT',  desc: 'Target pulses with a heartbeat', duration: 0 },
   { id: 'double',    name: 'DOUBLE',     desc: 'Two targets — hit both!', duration: 0 },
   { id: 'trail',     name: 'TRAIL',      desc: 'Target leaves ghost afterimages', duration: 0 },
+  { id: 'freeze',    name: 'FREEZE',     desc: 'Ring freezes, then rushes!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -1336,7 +1337,18 @@ function spawnTarget() {
     bossMaxPhases: 3,
     trail: [], // ghost afterimage positions for TRAIL surprise
     trailTimer: 0,
+    freezeUntil: 0, // FREEZE surprise: progress pauses until this time
+    freezeProgress: 0, // progress value where it froze
   };
+
+  // FREEZE surprise — freeze approach ring at 40% then rush
+  if (surprise && surprise.id === 'freeze') {
+    const freezeAt = nextBeatTime + beatInterval * 0.4; // freeze at 40% progress
+    currentTarget.freezeUntil = freezeAt + 0.4; // hold for 0.4s
+    currentTarget.freezeProgress = 0.4;
+    currentTarget.strikeTime = nextBeatTime + beatInterval + 0.4; // extend total time
+    showFeedback('FREEZE!', x, y - 40, '#00e5ff');
+  }
 
   // DOUBLE surprise — spawn a second target on the opposite side
   secondTarget = null;
@@ -2567,7 +2579,11 @@ function drawGame(dt, timestamp) {
     const ty = t.y + t.driftY;
     const elapsed = now - t.spawnTime;
     const duration = t.strikeTime - t.spawnTime;
-    const progress = Math.min(elapsed / duration, 1);
+    let progress = Math.min(elapsed / duration, 1);
+    // FREEZE surprise: clamp progress while frozen
+    if (t.freezeUntil > 0 && now < t.freezeUntil) {
+      progress = t.freezeProgress;
+    }
 
     // Heartbeat pulse
     let pulseScale = 1;
