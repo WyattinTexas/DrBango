@@ -2582,8 +2582,16 @@ function drawGame(dt, timestamp) {
     const isWhisper = t.vibe.id === 'whisper';
     const whisperDim = isWhisper ? (0.15 + Math.sin(timestamp * 0.004) * 0.08) : 1;
 
-    // Approach ring
-    const approachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
+    // Approach ring — with beat-synced bounce
+    const baseApproachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
+    // Pulse on beat: check last beat pulse for timing
+    let beatBounce = 0;
+    if (beatPulses.length > 0) {
+      const latestBeat = beatPulses[beatPulses.length - 1];
+      const beatAge = now - latestBeat.time;
+      if (beatAge < 0.1) beatBounce = (1 - beatAge / 0.1) * 4; // 4px bounce
+    }
+    const approachR = baseApproachR + beatBounce;
     const ringBrightness = (0.25 + progress * 0.75) * whisperDim;
     ctx.beginPath();
     ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
