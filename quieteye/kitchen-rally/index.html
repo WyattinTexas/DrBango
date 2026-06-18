@@ -15,10 +15,16 @@
     width: 100vw;
     height: 100vh;
     user-select: none;
-    cursor: none;
+    cursor: default;
   }
   canvas {
     display: block;
+    cursor: default;
+  }
+  body.playing {
+    cursor: none;
+  }
+  body.playing canvas {
     cursor: none;
   }
 
@@ -122,7 +128,16 @@
     font-size: 1rem;
     color: #f55;
     letter-spacing: 0.08em;
+    margin-bottom: 0.5em;
+  }
+  .summary-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    color: #999;
     margin-bottom: 1.5em;
+    max-width: 400px;
+    text-align: center;
+    line-height: 1.5;
   }
   .best-rally-note {
     font-size: 0.8rem;
@@ -153,6 +168,7 @@
 <!-- Results Screen -->
 <div class="overlay hidden" id="resultsScreen">
   <div class="reason-text" id="reasonText">RUSHED</div>
+  <div class="summary-text" id="summaryText"></div>
   <div class="grade-label">FOCUS GRADE</div>
   <div class="focus-grade" id="focusGrade" style="color:#c8f540;">A+</div>
   <div class="results-grid" id="resultsGrid"></div>
@@ -258,7 +274,7 @@ let ballRadius = 8;
 let ballOnPlayerSide = false;
 let ballLanded = false;
 let ballLandTime = 0;
-let ballBounceTimeout = 2500; // ms before "LATE"
+let ballBounceTimeout = 4000; // ms before "LATE" — generous at start
 let ballActive = false;
 let ballSpeedMult = 1;
 
@@ -269,14 +285,14 @@ let currentQEStart = 0; // when lock tracking began
 let isLocked = false;
 let lockStartTime = 0;
 let lockDuration = 0;
-const QE_MIN = 400; // ms minimum lock
+const QE_MIN = 300; // ms minimum lock — forgiving start
 let lockComplete = false;
 
 // Tracking
-const TRACK_RADIUS = 50; // px — cursor must be within this of ball
+let TRACK_RADIUS = 60; // px — cursor must be within this of ball, starts generous
 let trackingBall = false;
 let trackLostTime = 0;
-const TRACK_LOST_TOLERANCE = 600; // ms before "LOST FOCUS"
+let TRACK_LOST_TOLERANCE = 900; // ms before "LOST FOCUS" — forgiving at start
 
 // Opponent paddle
 let oppPaddle = { x: 0, y: 0, targetX: 0 };
@@ -345,6 +361,7 @@ function startGame() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   document.getElementById('titleScreen').classList.add('hidden');
   document.getElementById('resultsScreen').classList.add('hidden');
+  document.body.classList.add('playing');
   gameState = STATE.PLAYING;
 
   rallyCount = 0;
@@ -356,7 +373,10 @@ function startGame() {
   trackLostTime = 0;
   speedUpsSurvived = 0;
   distractorsIgnored = 0;
-  ballSpeedMult = 1;
+  ballSpeedMult = 0.7;
+  TRACK_RADIUS = 60;
+  TRACK_LOST_TOLERANCE = 900;
+  ballBounceTimeout = 4000;
   distractors = [];
   ghostBall = null;
   bgFlash = 0;
@@ -379,20 +399,35 @@ function launchBallToPlayer() {
   lockDuration = 0;
   currentQEStart = 0;
 
-  // Determine where ball lands on player side
-  const spread = Math.min(0.35 + rallyCount * 0.012, 0.45);
+  // Determine where ball lands on player side — narrow at start, widens over time
+  const spread = Math.min(0.15 + rallyCount * 0.02, 0.45);
   const landX = courtCenterX + (Math.random() * 2 - 1) * courtW * spread;
   const landY = netY + courtH * 0.18 + Math.random() * courtH * 0.18;
 
-  // Speed increases every 5 rallies
-  const baseSpeed = 1.8;
-  ballSpeedMult = baseSpeed + Math.floor(rallyCount / 5) * 0.2;
+  // Speed starts very slow and ramps gradually after exchange 5
+  // Exchanges 0-4: leisurely warm-up pace (~0.8x)
+  // Exchanges 5-9: moderate pace (~1.0-1.2x)
+  // Exchanges 10+: picks up, caps around 1.6x
+  let baseSpeed;
+  if (rallyCount < 5) {
+    baseSpeed = 0.7 + rallyCount * 0.04; // 0.7 → 0.86
+  } else if (rallyCount < 10) {
+    baseSpeed = 0.9 + (rallyCount - 5) * 0.06; // 0.9 → 1.2
+  } else {
+    baseSpeed = 1.2 + Math.min((rallyCount - 10) * 0.04, 0.4); // 1.2 → 1.6 cap
+  }
+  ballSpeedMult = baseSpeed;
 
-  // Speed-up chance at 10+
+  // Tighten tracking radius and timeout as rally progresses
+  TRACK_RADIUS = Math.max(35, 60 - rallyCount * 1.5);
+  TRACK_LOST_TOLERANCE = Math.max(500, 900 - rallyCount * 30);
+  ballBounceTimeout = Math.max(2200, 4000 - rallyCount * 150);
+
+  // Speed-up chance at 12+ (was 10)
   isSpeedUp = false;
-  if (rallyCount >= 10 && Math.random() < 0.25) {
+  if (rallyCount >= 12 && Math.random() < 0.2) {
     isSpeedUp = true;
-    ballSpeedMult *= 1.5;
+    ballSpeedMult *= 1.35;
     playSpeedUp();
   }
 
@@ -401,7 +436,8 @@ function launchBallToPlayer() {
   const startY = oppPaddle.y;
 
   // Parabolic arc: compute vx, vy to land at target in ~travelTime
-  const travelTime = Math.max(40, 70 - rallyCount * 1.2) / ballSpeedMult;
+  // Much slower travel at start — base was 70 frames, now starts at 110
+  const travelTime = Math.max(50, 110 - rallyCount * 2.5) / ballSpeedMult;
   ball.x = startX;
   ball.y = startY;
   ball.z = 0;
@@ -415,9 +451,9 @@ function launchBallToPlayer() {
   ball.travelTime = travelTime;
   ball.frameCount = 0;
 
-  // Distractors at 15+
-  if (rallyCount >= 15) {
-    if (Math.random() < 0.35) spawnDistractor();
+  // Distractors at 18+ (give players more room to learn)
+  if (rallyCount >= 18) {
+    if (Math.random() < 0.3) spawnDistractor();
   }
 }
 
@@ -433,7 +469,7 @@ function launchBallToOpponent() {
   const landX = courtCenterX + (Math.random() * 2 - 1) * courtW * 0.2;
   const landY = netY - courtH * 0.12 - Math.random() * courtH * 0.1;
 
-  const travelTime = 50;
+  const travelTime = Math.max(45, 80 - rallyCount * 1.5) / ballSpeedMult;
   ball.x = startX;
   ball.y = startY;
   ball.z = 0;
@@ -528,6 +564,7 @@ function endRally() {
   ballActive = false;
   stopBgPulse();
   playMiss();
+  document.body.classList.remove('playing');
 
   // Update best
   const isNewBest = rallyCount > bestRally;
@@ -554,7 +591,21 @@ function endRally() {
   else if (rallyCount >= 1) { grade = 'D'; gradeColor = '#df8864'; }
   else { grade = 'F'; gradeColor = '#df6464'; }
 
+  // Build summary message
+  const avgQEDisplay = avgQE > 0 ? Math.round(avgQE) + 'ms' : 'N/A';
+  let summary = '';
+  if (endReason === 'RUSHED') {
+    summary = `You clicked before your lock completed after ${rallyCount} exchange${rallyCount !== 1 ? 's' : ''}. Hold steady on the ball until the ring fills.`;
+  } else if (endReason === 'LATE') {
+    summary = `You ran out of time after ${rallyCount} exchange${rallyCount !== 1 ? 's' : ''}. Lock on and click faster once the ring completes.`;
+  } else if (endReason === 'LOST FOCUS') {
+    summary = `You broke focus after ${rallyCount} exchange${rallyCount !== 1 ? 's' : ''}. Average QE: ${avgQEDisplay}. Keep your cursor on the ball.`;
+  } else {
+    summary = `Rally ended after ${rallyCount} exchange${rallyCount !== 1 ? 's' : ''}. Average QE: ${avgQEDisplay}.`;
+  }
+
   // Show results
+  document.getElementById('summaryText').textContent = summary;
   document.getElementById('reasonText').textContent = endReason;
   const fg = document.getElementById('focusGrade');
   fg.textContent = grade;
@@ -961,6 +1012,23 @@ function drawHUD() {
   ctx.font = `bold 0.85rem 'Orbitron', sans-serif`;
   ctx.fillStyle = '#888';
   ctx.fillText(bestRally > 0 ? bestRally.toString() : '—', sx, courtT + 180);
+
+  // "LOCK ON THE BALL" instruction during early exchanges
+  if (rallyCount < 5 && ballOnPlayerSide && ballLanded) {
+    const pulse = 0.6 + Math.sin(performance.now() / 400) * 0.4;
+    ctx.font = `bold 0.9rem 'Orbitron', sans-serif`;
+    ctx.textAlign = 'center';
+    if (!lockComplete) {
+      ctx.fillStyle = `rgba(128,192,255,${pulse})`;
+      ctx.fillText('LOCK ON THE BALL', W / 2, courtB + 30);
+      ctx.font = `0.7rem 'Inter', sans-serif`;
+      ctx.fillStyle = `rgba(150,150,150,${pulse * 0.8})`;
+      ctx.fillText('hover your paddle on the ball — wait for the ring', W / 2, courtB + 50);
+    } else {
+      ctx.fillStyle = `rgba(200,245,64,${pulse})`;
+      ctx.fillText('LOCKED! CLICK TO DINK', W / 2, courtB + 30);
+    }
+  }
 
   // Bounce timeout bar (right side, shows how much time left)
   if (ballOnPlayerSide && ballLanded) {
