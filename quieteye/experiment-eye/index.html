@@ -607,6 +607,7 @@ canvas {
     </div>
     <div id="pb-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,215,0,0.25);letter-spacing:2px;margin-top:4px"></div>
     <div id="mmr-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-top:4px"></div>
+    <div id="lifetime-display" style="font-size:11px;color:rgba(255,255,255,0.12);letter-spacing:1px;margin-top:10px;font-family:Inter"></div>
     <div class="title-btn-row">
       <button class="title-btn" id="solo-btn">SOLO</button>
       <button class="title-btn match-btn" id="match-btn">MATCH</button>
@@ -1989,6 +1990,9 @@ function showResults() {
   history = history.slice(0, 15);
   localStorage.setItem('experiment-eye-history', JSON.stringify(history));
 
+  // Update lifetime stats
+  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score });
+
   const histEl = document.getElementById('history-list');
   histEl.innerHTML = history.slice(0, 8).map((h, i) =>
     `<div class="history-row${h.id === run.id ? ' current' : ''}">
@@ -2837,6 +2841,24 @@ function setWinStreak(val) {
   try { localStorage.setItem('experiment-eye-streak', val); } catch(e) {}
 }
 
+// ─── Lifetime Stats ───
+function getLifetimeStats() {
+  try {
+    return JSON.parse(localStorage.getItem('experiment-eye-lifetime') || '{}');
+  } catch(e) { return {}; }
+}
+function updateLifetimeStats(runData) {
+  const stats = getLifetimeStats();
+  stats.totalPlays = (stats.totalPlays || 0) + 1;
+  stats.totalPerfects = (stats.totalPerfects || 0) + (runData.perfects || 0);
+  stats.totalGreats = (stats.totalGreats || 0) + (runData.greats || 0);
+  stats.totalBosses = (stats.totalBosses || 0) + (runData.bossesSlain || 0);
+  stats.totalScore = (stats.totalScore || 0) + (runData.score || 0);
+  stats.bestComboEver = Math.max(stats.bestComboEver || 0, runData.bestCombo || 0);
+  stats.bestScoreEver = Math.max(stats.bestScoreEver || 0, runData.score || 0);
+  try { localStorage.setItem('experiment-eye-lifetime', JSON.stringify(stats)); } catch(e) {}
+}
+
 function updateTitleStats() {
   const mmr = getPlayerMMR();
   const rec = getPlayerRecord();
@@ -2875,6 +2897,19 @@ function updateTitleStats() {
     streakText.style.color = color;
   } else {
     streakEl.style.display = 'none';
+  }
+
+  // Lifetime stats
+  const lifetime = getLifetimeStats();
+  const lifetimeEl = document.getElementById('lifetime-display');
+  if (lifetime.totalPlays > 0) {
+    const parts = [`${lifetime.totalPlays} runs`];
+    if (lifetime.totalPerfects > 0) parts.push(`${lifetime.totalPerfects} perfects`);
+    if (lifetime.totalBosses > 0) parts.push(`${lifetime.totalBosses} bosses`);
+    if (lifetime.bestComboEver > 0) parts.push(`${lifetime.bestComboEver}x best combo`);
+    lifetimeEl.textContent = parts.join(' · ');
+  } else {
+    lifetimeEl.textContent = '';
   }
 }
 
@@ -3306,6 +3341,9 @@ function showMatchResults() {
     newMMR, clutch: wasClutch,
     timestamp: Date.now(),
   });
+
+  // Update lifetime stats from match
+  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score });
 
   // Banner (clean up any previous clutch badge)
   const banner = document.getElementById('mr-banner');
