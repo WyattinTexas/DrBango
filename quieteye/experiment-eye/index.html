@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EXPERIMENT EYE</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0a0a14;
+  font-family: 'Inter', sans-serif;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+}
+canvas {
+  display: block;
+  width: 100%; height: 100%;
+  position: fixed; top: 0; left: 0;
+}
+
+/* UI overlay */
+#ui {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui > * { pointer-events: auto; }
+
+/* Title */
+#title-screen {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 16px;
+  text-align: center;
+  padding: 20px;
+}
+#title-screen h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(36px, 8vw, 64px);
+  font-weight: 900;
+  letter-spacing: 8px;
+  background: linear-gradient(135deg, #00e5ff 0%, #e040fb 50%, #ff9100 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#title-screen .tagline {
+  font-size: 14px; font-weight: 300;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+}
+#title-screen .desc {
+  max-width: 440px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.3);
+  line-height: 1.7;
+  margin-top: 10px;
+}
+#start-btn {
+  margin-top: 24px;
+  padding: 16px 60px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px; font-weight: 700;
+  letter-spacing: 4px;
+  background: transparent;
+  border: 2px solid #00e5ff;
+  color: #00e5ff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+#start-btn:hover {
+  background: rgba(0,229,255,0.15);
+  box-shadow: 0 0 40px rgba(0,229,255,0.2);
+  transform: translateY(-2px);
+}
+
+/* HUD */
+#hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: 16px 24px;
+  display: none;
+  z-index: 20;
+  pointer-events: none;
+}
+#hud-left {
+  position: absolute; top: 16px; left: 24px;
+}
+#hud-score {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px; font-weight: 700;
+}
+#hud-consistency {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 4px;
+  font-family: 'Inter', sans-serif;
+}
+#hud-center {
+  position: absolute; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+#hud-combo .combo-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 32px; font-weight: 900;
+  color: #00e5ff;
+}
+#hud-combo .combo-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 2px;
+}
+#hud-right {
+  position: absolute; top: 16px; right: 24px;
+  text-align: right;
+}
+#hud-count {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  color: rgba(255,255,255,0.5);
+}
+#hud-vibe {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  margin-top: 4px;
+  letter-spacing: 2px;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* Knowledge popup */
+#knowledge-popup {
+  position: fixed;
+  bottom: 60px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.85);
+  border: 1px solid rgba(0,229,255,0.3);
+  border-radius: 12px;
+  padding: 16px 28px;
+  max-width: 500px;
+  text-align: center;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+#knowledge-popup.show { opacity: 1; }
+#knowledge-popup .kp-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #00e5ff;
+  margin-bottom: 6px;
+}
+#knowledge-popup .kp-text {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.5;
+}
+
+/* Results */
+#results-screen {
+  display: none; flex-direction: column;
+  align-items: center; gap: 12px;
+  text-align: center;
+  max-width: 480px;
+  padding: 20px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+#results-screen h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 24px; font-weight: 700;
+}
+#results-grade {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 72px; font-weight: 900;
+  line-height: 1;
+}
+#results-score {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 32px; font-weight: 700;
+  color: #00e5ff;
+}
+#results-subtitle {
+  font-size: 15px;
+  color: rgba(255,255,255,0.5);
+}
+.results-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 20px;
+  font-size: 14px;
+  text-align: left;
+  width: 100%;
+}
+.results-stats .label { color: rgba(255,255,255,0.35); text-align: right; }
+.results-stats .value { font-weight: 600; }
+.results-stats .perfect { color: #ffd700; }
+.results-stats .great { color: #00e676; }
+.results-stats .good { color: #42a5f5; }
+.results-stats .miss { color: #ff5252; }
+
+#medals-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  justify-content: center; margin: 8px 0;
+}
+.medal {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  border: 1px solid;
+}
+.medal.gold { border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.08); }
+.medal.cyan { border-color: #00e5ff; color: #00e5ff; background: rgba(0,229,255,0.08); }
+.medal.purple { border-color: #e040fb; color: #e040fb; background: rgba(224,64,251,0.08); }
+
+#results-knowledge {
+  width: 100%;
+  text-align: left;
+  margin-top: 8px;
+}
+#results-knowledge h4 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.25);
+  margin-bottom: 8px;
+}
+.knowledge-item {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+#history-section {
+  width: 100%; margin-top: 12px;
+}
+#history-section h4 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px; letter-spacing: 2px;
+  color: rgba(255,255,255,0.2);
+  margin-bottom: 8px;
+}
+.history-row {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: rgba(255,255,255,0.3);
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.history-row.current { color: #00e5ff; }
+
+.btn-row { display: flex; gap: 12px; margin-top: 12px; }
+.action-btn {
+  padding: 12px 32px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 2px;
+  background: transparent;
+  border: 1px solid #00e5ff;
+  color: #00e5ff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.action-btn:hover {
+  background: rgba(0,229,255,0.15);
+  transform: translateY(-1px);
+}
+
+/* Custom cursor */
+#crosshair {
+  position: fixed;
+  width: 28px; height: 28px;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+}
+.gameplay-active { cursor: none !important; }
+.gameplay-active * { cursor: none !important; }
+
+/* Screen effects */
+#screen-flash {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+#vignette {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+</style>
+</head>
+<body oncontextmenu="return false">
+<canvas id="c"></canvas>
+
+<div id="screen-flash"></div>
+<div id="vignette"></div>
+
+<div id="crosshair">
+  <svg width="28" height="28" viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="4" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+    <circle cx="14" cy="14" r="10" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <line x1="14" y1="0" x2="14" y2="8" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <line x1="14" y1="20" x2="14" y2="28" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <line x1="0" y1="14" x2="8" y2="14" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <line x1="20" y1="14" x2="28" y2="14" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+  </svg>
+</div>
+
+<div id="ui">
+  <div id="title-screen">
+    <h1>EXPERIMENT EYE</h1>
+    <div class="tagline">Every Run is Different</div>
+    <div class="desc">
+      Targets appear on the beat. Hold steady, click on time.<br>
+      The world around you will shift, surprise you, and try to break your focus.<br>
+      Stay locked. Stay calm. Get better.
+    </div>
+    <button id="start-btn">BEGIN EXPERIMENT</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="hud-left">
+    <div id="hud-score">0</div>
+    <div id="hud-consistency"></div>
+  </div>
+  <div id="hud-center">
+    <div id="hud-combo">
+      <div class="combo-num" id="combo-num">0x</div>
+      <div class="combo-label">COMBO</div>
+    </div>
+  </div>
+  <div id="hud-right">
+    <div id="hud-count">0 / 25</div>
+    <div id="hud-vibe"></div>
+  </div>
+</div>
+
+<div id="knowledge-popup">
+  <div class="kp-label">QUIET EYE INSIGHT</div>
+  <div class="kp-text" id="kp-text"></div>
+</div>
+
+<div id="ui">
+  <div id="results-screen">
+    <h2>EXPERIMENT COMPLETE</h2>
+    <div id="results-grade"></div>
+    <div id="results-score"></div>
+    <div id="results-subtitle"></div>
+    <div class="results-stats" id="results-stats"></div>
+    <div id="medals-row"></div>
+    <div id="results-knowledge"></div>
+    <div id="history-section">
+      <h4>YOUR EXPERIMENTS</h4>
+      <div id="history-list"></div>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" onclick="showTitle()">AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Canvas & State ───
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const crosshair = document.getElementById('crosshair');
+const titleScreen = document.getElementById('title-screen');
+const resultsScreen = document.getElementById('results-screen');
+const hudEl = document.getElementById('hud');
+const screenFlash = document.getElementById('screen-flash');
+const vignetteEl = document.getElementById('vignette');
+const knowledgePopup = document.getElementById('knowledge-popup');
+
+let W, H, dpr;
+let audioCtx = null;
+let gameState = 'title';
+let mouseX = 0, mouseY = 0;
+let isTouch = false;
+
+// ─── VIBES: the soul of the experiment ───
+// Each target gets a random vibe that changes the world
+const VIBES = [
+  { id: 'zen',      name: 'ZEN',      weight: 15, color: '#00e5ff', bg: '#060a14', chaos: 0, bpmMult: 0.8 },
+  { id: 'flow',     name: 'FLOW',     weight: 25, color: '#00e676', bg: '#0a0e14', chaos: 0, bpmMult: 1.0 },
+  { id: 'pulse',    name: 'PULSE',    weight: 18, color: '#ffd700', bg: '#12100a', chaos: 1, bpmMult: 1.1 },
+  { id: 'surge',    name: 'SURGE',    weight: 15, color: '#ff9100', bg: '#140e0a', chaos: 2, bpmMult: 1.2 },
+  { id: 'storm',    name: 'STORM',    weight: 12, color: '#ff3d3d', bg: '#140a0a', chaos: 3, bpmMult: 1.3 },
+  { id: 'blackout', name: 'BLACKOUT', weight: 8,  color: '#e040fb', bg: '#020204', chaos: 2, bpmMult: 0.9 },
+  { id: 'gift',     name: 'GIFT',     weight: 4,  color: '#00ffcc', bg: '#0a1410', chaos: 0, bpmMult: 0.7 },
+  { id: 'boss',     name: 'BOSS',     weight: 3,  color: '#ff1744', bg: '#1a0a0a', chaos: 4, bpmMult: 1.4 },
+];
+
+// ─── KNOWLEDGE REWARDS ───
+const KNOWLEDGE = [
+  "Quiet Eye is the final fixation on a target before a motor action. Experts hold it 62% longer than novices.",
+  "In basketball free throws, elite shooters maintain a steady gaze for ~970ms before releasing.",
+  "Ben Johns reads the paddle face at contact — not the body, not the arm. Just the flat surface.",
+  "Your brain needs 200-300ms of stable visual input to accurately plan a motor response.",
+  "Quiet Eye training improves accuracy by 8% on average, even in high-pressure situations.",
+  "Elite golfers hold their gaze on the ball for 2-3 seconds before putting. That patience is power.",
+  "In pickleball, the best players track the ball to the paddle at contact — not where they think it's going.",
+  "Pressure doesn't change your muscles. It changes your gaze. Under stress, eyes scatter. Train them not to.",
+  "Joan Vickers discovered Quiet Eye in 1987. Every sport since has confirmed: longer gaze = better performance.",
+  "The dink game is won by whoever panics last. Quiet Eye is how you become the patient one.",
+  "Your consistency score measures how steady your hold rhythm stays under chaos. Elite is >90%.",
+  "In the 0.3 seconds after a serve, your eyes must find the ball's spin. QE trains this snap-focus.",
+];
+
+// ─── SURPRISE EVENTS ───
+// These can trigger between targets for spice
+const SURPRISES = [
+  { id: 'mirror',    name: 'MIRROR',     desc: 'Target teleports on approach', duration: 0 },
+  { id: 'decoy',     name: 'DECOY FLOOD', desc: 'Fake targets everywhere', duration: 0 },
+  { id: 'gravity',   name: 'GRAVITY',    desc: 'Target drifts slowly', duration: 0 },
+  { id: 'giant',     name: 'GIANT',      desc: 'Massive easy target', duration: 0 },
+  { id: 'tiny',      name: 'TINY',       desc: 'Tiny precision target', duration: 0 },
+  { id: 'heartbeat', name: 'HEARTBEAT',  desc: 'Target pulses with a heartbeat', duration: 0 },
+];
+
+// ─── Game Config ───
+const TOTAL_TARGETS = 25;
+const BASE_BPM = 110;
+const BASELINE_COUNT = 3;
+
+// ─── Game State ───
+let score = 0;
+let combo = 0;
+let bestCombo = 0;
+let perfects = 0, greats = 0, goods = 0, misses = 0;
+let holdAccuracies = [];
+let holdDurations = [];
+let vibeSequence = [];
+let surpriseFlags = [];
+let knowledgeUnlocked = [];
+let currentTarget = null;
+let targetIndex = 0;
+let feedbacks = [];
+let particles = [];
+let decoys = [];
+let beatPulses = [];
+let bgParticles = [];
+
+// Audio
+let droneOsc = null, droneGain = null;
+let beatInterval = 60 / BASE_BPM;
+let nextBeatTime = 0;
+let scheduledBeats = [];
+const SCHEDULE_AHEAD = 0.15;
+
+// Environment
+let envHue = 0;
+let envShake = 0;
+let envBlackout = 0;
+let envVignette = 0;
+let noiseOpacity = 0;
+
+// ─── Resize ───
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── Audio Engine ───
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playKick(time, intensity) {
+  if (!audioCtx) return;
+  const vol = 0.4 + (intensity || 0) * 0.1;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(70 + (intensity || 0) * 10, time);
+  osc.frequency.exponentialRampToValueAtTime(25, time + 0.14);
+  gain.gain.setValueAtTime(vol, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(time); osc.stop(time + 0.3);
+}
+
+function playApproachTone(startTime, duration, freq) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq || 180, startTime);
+  osc.frequency.linearRampToValueAtTime((freq || 180) * 3, startTime + duration);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.05, startTime + duration * 0.5);
+  gain.gain.linearRampToValueAtTime(0.1, startTime + duration * 0.9);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(startTime); osc.stop(startTime + duration + 0.05);
+}
+
+function playHitSound(rating) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  if (rating === 'perfect') {
+    [1200, 1800, 2400].forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15 + i * 0.03);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t + i * 0.02); osc.stop(t + 0.3);
+    });
+  } else if (rating === 'great') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.frequency.value = 900;
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (rating === 'good') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = 500;
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.12);
+  }
+}
+
+function playMissSound() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, t);
+  osc.frequency.exponentialRampToValueAtTime(50, t + 0.2);
+  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.3);
+}
+
+function playComboChord(level) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const base = 350 + level * 80;
+  [0, 4, 7].forEach((semi, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = base * Math.pow(2, semi / 12);
+    gain.gain.setValueAtTime(0.1, t + i * 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.05 + 0.35);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.05); osc.stop(t + 0.5);
+  });
+}
+
+function playGiftChime() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [800, 1000, 1200, 1600].forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.08, t + i * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.4);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.08); osc.stop(t + 0.6);
+  });
+}
+
+function playBossWarning() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.value = 100;
+    gain.gain.setValueAtTime(0.08, t + i * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 0.12);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.15); osc.stop(t + i * 0.15 + 0.15);
+  }
+}
+
+function playKnowledgeChime() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [523, 659, 784].forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.06, t + i * 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.5);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.12); osc.stop(t + 0.8);
+  });
+}
+
+function startDrone(freq, vol) {
+  stopDrone();
+  if (!audioCtx) return;
+  droneOsc = audioCtx.createOscillator();
+  droneGain = audioCtx.createGain();
+  droneOsc.type = 'sine';
+  droneOsc.frequency.value = freq || 55;
+  droneGain.gain.value = vol || 0.03;
+  droneOsc.connect(droneGain);
+  droneGain.connect(audioCtx.destination);
+  droneOsc.start();
+}
+
+function stopDrone() {
+  if (droneOsc) {
+    try {
+      droneGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+      droneOsc.stop(audioCtx.currentTime + 0.4);
+    } catch(e) {}
+    droneOsc = null; droneGain = null;
+  }
+}
+
+function playNoise(dur, vol) {
+  if (!audioCtx) return;
+  const bufSize = audioCtx.sampleRate * dur;
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  gain.gain.value = vol;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.value = 500;
+  src.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+  src.start(); src.stop(audioCtx.currentTime + dur);
+}
+
+// ─── Vibe Selection (weighted random) ───
+function pickVibe() {
+  const totalWeight = VIBES.reduce((s, v) => s + v.weight, 0);
+  let r = Math.random() * totalWeight;
+  for (const v of VIBES) {
+    r -= v.weight;
+    if (r <= 0) return v;
+  }
+  return VIBES[1]; // fallback to flow
+}
+
+function pickSurprise() {
+  if (Math.random() < 0.3) {
+    return SURPRISES[Math.floor(Math.random() * SURPRISES.length)];
+  }
+  return null;
+}
+
+// ─── Generate Experiment Sequence ───
+function generateSequence() {
+  vibeSequence = [];
+  surpriseFlags = [];
+
+  // First 3 targets are always FLOW (baseline)
+  for (let i = 0; i < BASELINE_COUNT; i++) {
+    vibeSequence.push(VIBES.find(v => v.id === 'flow'));
+    surpriseFlags.push(null);
+  }
+
+  // Rest are random with surprises
+  for (let i = BASELINE_COUNT; i < TOTAL_TARGETS; i++) {
+    vibeSequence.push(pickVibe());
+    surpriseFlags.push(pickSurprise());
+  }
+
+  // Guarantee at least one gift and one boss in the run
+  const hasGift = vibeSequence.some(v => v.id === 'gift');
+  const hasBoss = vibeSequence.some(v => v.id === 'boss');
+  if (!hasGift) {
+    const idx = BASELINE_COUNT + Math.floor(Math.random() * 5);
+    vibeSequence[idx] = VIBES.find(v => v.id === 'gift');
+  }
+  if (!hasBoss) {
+    const idx = TOTAL_TARGETS - 1 - Math.floor(Math.random() * 3);
+    vibeSequence[idx] = VIBES.find(v => v.id === 'boss');
+  }
+}
+
+// ─── Target Spawning ───
+function spawnTarget() {
+  const vibe = vibeSequence[targetIndex];
+  const surprise = surpriseFlags[targetIndex];
+
+  const margin = 90;
+  let x = margin + Math.random() * (W - margin * 2);
+  let y = margin + Math.random() * (H - margin * 2);
+  let radius = 28;
+  let approachRadius = 75;
+
+  // Surprise modifiers
+  if (surprise) {
+    if (surprise.id === 'giant') { radius = 55; approachRadius = 120; }
+    if (surprise.id === 'tiny') { radius = 14; approachRadius = 45; }
+  }
+
+  // Gift targets are bigger and easier
+  if (vibe.id === 'gift') {
+    radius = 44;
+    approachRadius = 100;
+    playGiftChime();
+  }
+
+  // Boss targets
+  if (vibe.id === 'boss') {
+    radius = 22;
+    approachRadius = 60;
+    playBossWarning();
+  }
+
+  // Set BPM for this target
+  beatInterval = 60 / (BASE_BPM * vibe.bpmMult);
+
+  // Set environment
+  applyVibe(vibe);
+
+  // Spawn decoys for chaotic vibes
+  decoys = [];
+  if (vibe.chaos >= 2 || (surprise && surprise.id === 'decoy')) {
+    const count = vibe.id === 'boss' ? 6 : (surprise && surprise.id === 'decoy') ? 8 : vibe.chaos;
+    for (let i = 0; i < count; i++) {
+      decoys.push({
+        x: margin + Math.random() * (W - margin * 2),
+        y: margin + Math.random() * (H - margin * 2),
+        radius: 15 + Math.random() * 20,
+        opacity: 0.15 + Math.random() * 0.25,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 1.5,
+      });
+    }
+  }
+
+  currentTarget = {
+    x, y, radius, approachRadius,
+    spawnTime: nextBeatTime,
+    strikeTime: nextBeatTime + beatInterval,
+    holdSamples: 0,
+    holdInside: 0,
+    hit: false,
+    missed: false,
+    vibe,
+    surprise,
+    driftX: 0, driftY: 0,
+    mirrorTriggered: false,
+    pulsePhase: 0,
+  };
+
+  // Schedule approach tone with vibe-specific frequency
+  const toneFreq = vibe.id === 'boss' ? 100 : vibe.id === 'gift' ? 300 : 180;
+  playApproachTone(nextBeatTime, beatInterval, toneFreq);
+
+  // Start drone for atmospheric vibes
+  if (vibe.chaos >= 1) {
+    startDrone(45 + vibe.chaos * 10, 0.02 + vibe.chaos * 0.01);
+  }
+}
+
+// ─── Apply Vibe Environment ───
+function applyVibe(vibe) {
+  envShake = vibe.chaos >= 3 ? vibe.chaos * 1.5 : 0;
+  envBlackout = vibe.id === 'blackout' ? 1 : 0;
+  envVignette = vibe.chaos >= 1 ? 0.3 + vibe.chaos * 0.15 : 0;
+  noiseOpacity = vibe.chaos >= 3 ? 0.1 + (vibe.chaos - 3) * 0.1 : 0;
+
+  vignetteEl.style.opacity = envVignette;
+
+  // Spawn bg particles
+  bgParticles = [];
+  const particleCount = 5 + vibe.chaos * 8;
+  for (let i = 0; i < particleCount; i++) {
+    bgParticles.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      speed: 0.3 + Math.random() * (0.5 + vibe.chaos * 0.4),
+      angle: Math.random() * Math.PI * 2,
+      size: 1 + Math.random() * (1 + vibe.chaos),
+      opacity: 0.05 + Math.random() * 0.1 * (vibe.chaos + 1),
+    });
+  }
+}
+
+// ─── Hit Detection ───
+function getMultiplier() {
+  if (combo >= 20) return 3;
+  if (combo >= 15) return 2.5;
+  if (combo >= 10) return 2;
+  if (combo >= 5) return 1.5;
+  return 1;
+}
+
+function processStrike() {
+  if (!currentTarget || currentTarget.hit || currentTarget.missed) return;
+  if (gameState !== 'playing') return;
+
+  const now = audioCtx.currentTime;
+  const diff = Math.abs(now - currentTarget.strikeTime) * 1000;
+
+  // Hold accuracy
+  const holdAcc = currentTarget.holdSamples > 0
+    ? currentTarget.holdInside / currentTarget.holdSamples : 0;
+  holdAccuracies.push(holdAcc);
+
+  // Hold duration for consistency
+  const holdDuration = (now - currentTarget.spawnTime) * 1000;
+  holdDurations.push(holdDuration);
+
+  const holdBonus = holdAcc >= 0.8 ? 50 : 0;
+  const vibeBonus = currentTarget.vibe.id === 'boss' ? 200 :
+                    currentTarget.vibe.id === 'gift' ? 25 : 0;
+
+  let points = 0, rating = '', color = '', particleCount = 0;
+  const mult = getMultiplier();
+
+  // Gift targets are more forgiving
+  const giftBonus = currentTarget.vibe.id === 'gift' ? 30 : 0;
+
+  if (diff <= 50 + giftBonus) {
+    rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
+    perfects++; playHitSound('perfect');
+  } else if (diff <= 120 + giftBonus) {
+    rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
+    greats++; playHitSound('great');
+  } else if (diff <= 200 + giftBonus) {
+    rating = 'good'; color = '#42a5f5'; points = 50; particleCount = 8;
+    goods++; playHitSound('good');
+  } else {
+    rating = 'miss'; color = '#ff5252'; points = 0; misses++;
+    combo = 0; playMissSound();
+    currentTarget.missed = true;
+    showFeedback('MISS', currentTarget.x, currentTarget.y - 20, color);
+    flashScreen(color, 0.15);
+    advanceTarget();
+    return;
+  }
+
+  const totalPoints = Math.round((points + holdBonus + vibeBonus) * mult);
+  score += totalPoints;
+  combo++;
+  if (combo > bestCombo) bestCombo = combo;
+  currentTarget.hit = true;
+
+  // Feedback
+  let fbText = rating.toUpperCase();
+  if (holdBonus > 0) fbText += ' +LOCK';
+  if (vibeBonus > 0) fbText += ` +${vibeBonus}`;
+  showFeedback(fbText, currentTarget.x, currentTarget.y - 20, color);
+  spawnParticles(currentTarget.x, currentTarget.y, color, particleCount);
+  flashScreen(color, 0.08);
+
+  // Combo milestones
+  if (combo === 5 || combo === 10 || combo === 15 || combo === 20) {
+    playComboChord(combo / 5);
+    showFeedback(`${combo}x COMBO!`, W / 2, H * 0.4, '#e040fb');
+  }
+
+  // Update HUD
+  updateHUD();
+
+  // Knowledge reward at milestones
+  checkKnowledgeReward();
+
+  advanceTarget();
+}
+
+function advanceTarget() {
+  currentTarget = null;
+  decoys = [];
+  stopDrone();
+  targetIndex++;
+
+  document.getElementById('hud-count').textContent = `${targetIndex} / ${TOTAL_TARGETS}`;
+
+  if (targetIndex >= TOTAL_TARGETS) {
+    setTimeout(() => endGame(), 400);
+  }
+}
+
+// ─── Knowledge System ───
+function checkKnowledgeReward() {
+  const milestones = [5, 10, 15, 20, 25];
+  if (milestones.includes(targetIndex + 1)) {
+    const available = KNOWLEDGE.filter(k => !knowledgeUnlocked.includes(k));
+    if (available.length > 0) {
+      const tip = available[Math.floor(Math.random() * available.length)];
+      knowledgeUnlocked.push(tip);
+      showKnowledge(tip);
+      playKnowledgeChime();
+    }
+  }
+}
+
+function showKnowledge(text) {
+  document.getElementById('kp-text').textContent = text;
+  knowledgePopup.classList.add('show');
+  setTimeout(() => knowledgePopup.classList.remove('show'), 4000);
+}
+
+// ─── Visual Effects ───
+function showFeedback(text, x, y, color) {
+  feedbacks.push({ text, x, y, color, life: 1.0, maxLife: 1.0 });
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 100 + Math.random() * 250;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.4 + Math.random() * 0.4,
+      maxLife: 0.4 + Math.random() * 0.4,
+      color, size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+function flashScreen(color, opacity) {
+  screenFlash.style.background = color;
+  screenFlash.style.opacity = opacity;
+  setTimeout(() => { screenFlash.style.opacity = 0; }, 100);
+}
+
+// ─── HUD ───
+function updateHUD() {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('combo-num').textContent = `${combo}x`;
+
+  // Consistency (based on hold duration variance after baseline)
+  if (holdDurations.length > BASELINE_COUNT) {
+    const baseline = holdDurations.slice(0, BASELINE_COUNT)
+      .reduce((s, d) => s + d, 0) / BASELINE_COUNT;
+    const post = holdDurations.slice(BASELINE_COUNT);
+    const avgDrift = post.reduce((s, d) => s + Math.abs(d - baseline) / baseline * 100, 0) / post.length;
+    const consistency = Math.max(0, Math.round(100 - avgDrift));
+    document.getElementById('hud-consistency').textContent = `${consistency}% consistent`;
+  }
+}
+
+// ─── Game Flow ───
+document.getElementById('start-btn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+
+function startGame() {
+  score = 0; combo = 0; bestCombo = 0;
+  perfects = 0; greats = 0; goods = 0; misses = 0;
+  holdAccuracies = []; holdDurations = [];
+  knowledgeUnlocked = [];
+  currentTarget = null;
+  targetIndex = 0;
+  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = [];
+  scheduledBeats = [];
+
+  generateSequence();
+
+  titleScreen.style.display = 'none';
+  resultsScreen.style.display = 'none';
+  hudEl.style.display = 'block';
+  document.getElementById('hud-score').textContent = '0';
+  document.getElementById('combo-num').textContent = '0x';
+  document.getElementById('hud-count').textContent = `0 / ${TOTAL_TARGETS}`;
+  document.getElementById('hud-consistency').textContent = '';
+  document.getElementById('hud-vibe').textContent = '';
+
+  if (!isTouch) {
+    crosshair.style.display = 'block';
+    document.body.classList.add('gameplay-active');
+  }
+
+  gameState = 'playing';
+  nextBeatTime = audioCtx.currentTime + 0.6;
+  beatInterval = 60 / BASE_BPM;
+}
+
+function showTitle() {
+  gameState = 'title';
+  titleScreen.style.display = 'flex';
+  resultsScreen.style.display = 'none';
+  hudEl.style.display = 'none';
+  crosshair.style.display = 'none';
+  document.body.classList.remove('gameplay-active');
+  currentTarget = null;
+  stopDrone();
+  vignetteEl.style.opacity = 0;
+}
+
+function endGame() {
+  gameState = 'results';
+  hudEl.style.display = 'none';
+  crosshair.style.display = 'none';
+  document.body.classList.remove('gameplay-active');
+  stopDrone();
+  vignetteEl.style.opacity = 0;
+  showResults();
+}
+
+function showResults() {
+  const total = perfects + greats + goods + misses;
+  const onBeatPct = total > 0 ? Math.round((perfects + greats) / total * 100) : 0;
+  const avgHold = holdAccuracies.length > 0
+    ? Math.round(holdAccuracies.reduce((a, b) => a + b, 0) / holdAccuracies.length * 100) : 0;
+
+  // Consistency
+  let consistency = 0;
+  if (holdDurations.length > BASELINE_COUNT) {
+    const baseline = holdDurations.slice(0, BASELINE_COUNT)
+      .reduce((s, d) => s + d, 0) / BASELINE_COUNT;
+    const post = holdDurations.slice(BASELINE_COUNT);
+    const avgDrift = post.reduce((s, d) => s + Math.abs(d - baseline) / baseline * 100, 0) / post.length;
+    consistency = Math.max(0, Math.round(100 - avgDrift));
+  }
+
+  // Grade
+  const hitRate = total > 0 ? (perfects + greats) / total : 0;
+  const perfectRate = total > 0 ? perfects / total : 0;
+  const gradeScore = hitRate * 0.5 + perfectRate * 0.2 + (avgHold / 100) * 0.1 + (consistency / 100) * 0.2;
+  let grade, gradeColor;
+  if (gradeScore >= 0.95) { grade = 'S+'; gradeColor = '#ffd700'; }
+  else if (gradeScore >= 0.85) { grade = 'S'; gradeColor = '#ffd700'; }
+  else if (gradeScore >= 0.75) { grade = 'A'; gradeColor = '#00e676'; }
+  else if (gradeScore >= 0.60) { grade = 'B'; gradeColor = '#42a5f5'; }
+  else if (gradeScore >= 0.45) { grade = 'C'; gradeColor = '#ff9100'; }
+  else { grade = 'D'; gradeColor = '#ff5252'; }
+
+  document.getElementById('results-grade').textContent = grade;
+  document.getElementById('results-grade').style.color = gradeColor;
+  document.getElementById('results-score').textContent = score + ' pts';
+  document.getElementById('results-subtitle').textContent =
+    `${consistency}% consistent | ${onBeatPct}% on-beat | ${avgHold}% hold`;
+
+  document.getElementById('results-stats').innerHTML = `
+    <span class="label">Perfects</span><span class="value perfect">${perfects}</span>
+    <span class="label">Greats</span><span class="value great">${greats}</span>
+    <span class="label">Goods</span><span class="value good">${goods}</span>
+    <span class="label">Misses</span><span class="value miss">${misses}</span>
+    <span class="label">Best Combo</span><span class="value">${bestCombo}x</span>
+    <span class="label">Vibes Survived</span><span class="value">${new Set(vibeSequence.map(v => v.id)).size}</span>
+  `;
+
+  // Medals
+  const medalsRow = document.getElementById('medals-row');
+  medalsRow.innerHTML = '';
+  if (consistency >= 90) medalsRow.innerHTML += '<span class="medal gold">UNSHAKEABLE</span>';
+  if (perfectRate >= 0.5) medalsRow.innerHTML += '<span class="medal gold">PRECISION</span>';
+  if (bestCombo >= 15) medalsRow.innerHTML += '<span class="medal cyan">LOCKED IN</span>';
+  if (misses === 0) medalsRow.innerHTML += '<span class="medal purple">PERFECT RUN</span>';
+  if (total === TOTAL_TARGETS) medalsRow.innerHTML += '<span class="medal cyan">FULL EXPERIMENT</span>';
+
+  // Knowledge earned
+  const knowledgeEl = document.getElementById('results-knowledge');
+  if (knowledgeUnlocked.length > 0) {
+    knowledgeEl.innerHTML = '<h4>INSIGHTS UNLOCKED</h4>' +
+      knowledgeUnlocked.map(k => `<div class="knowledge-item">${k}</div>`).join('');
+  } else {
+    knowledgeEl.innerHTML = '';
+  }
+
+  // Save & render history
+  const run = {
+    date: new Date().toLocaleDateString(),
+    score, grade, consistency, onBeatPct,
+    vibes: new Set(vibeSequence.map(v => v.id)).size,
+    id: Date.now(),
+  };
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('experiment-eye-history') || '[]'); } catch(e) {}
+  history.unshift(run);
+  history = history.slice(0, 15);
+  localStorage.setItem('experiment-eye-history', JSON.stringify(history));
+
+  const histEl = document.getElementById('history-list');
+  histEl.innerHTML = history.slice(0, 8).map((h, i) =>
+    `<div class="history-row${h.id === run.id ? ' current' : ''}">
+      <span>${h.date}</span>
+      <span>${h.score} pts</span>
+      <span>${h.consistency}%</span>
+      <span>${h.grade}</span>
+    </div>`
+  ).join('');
+
+  resultsScreen.style.display = 'flex';
+}
+
+// ─── Input ───
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  crosshair.style.transform = `translate(${mouseX - 14}px, ${mouseY - 14}px)`;
+});
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (gameState === 'playing') processStrike();
+});
+document.addEventListener('touchstart', (e) => {
+  isTouch = true;
+  crosshair.style.display = 'none';
+  if (gameState === 'playing') {
+    const t = e.touches[0];
+    mouseX = t.clientX; mouseY = t.clientY;
+    processStrike();
+  }
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  if (gameState === 'playing') {
+    const t = e.touches[0];
+    mouseX = t.clientX; mouseY = t.clientY;
+  }
+}, { passive: true });
+
+// ─── Main Game Loop ───
+let lastTime = 0;
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (gameState === 'playing') {
+    updateGame(dt, timestamp);
+    drawGame(dt, timestamp);
+  } else {
+    drawIdleBackground(dt, timestamp);
+  }
+
+  drawParticles(dt);
+  drawFeedbacks(dt);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function updateGame(dt, timestamp) {
+  const now = audioCtx.currentTime;
+
+  // Beat scheduling
+  while (nextBeatTime <= now + SCHEDULE_AHEAD) {
+    const vibe = targetIndex < TOTAL_TARGETS ? vibeSequence[targetIndex] : VIBES[1];
+    playKick(nextBeatTime, vibe.chaos);
+    scheduledBeats.push(nextBeatTime);
+    nextBeatTime += beatInterval;
+  }
+
+  // Process beats that have passed
+  while (scheduledBeats.length > 0 && scheduledBeats[0] <= now) {
+    const bt = scheduledBeats.shift();
+
+    // Beat pulse
+    beatPulses.push({ time: now, radius: 0, alpha: 0.2 });
+
+    // Miss check
+    if (currentTarget && !currentTarget.hit && !currentTarget.missed
+        && now >= currentTarget.strikeTime + 0.25) {
+      currentTarget.missed = true;
+      misses++;
+      combo = 0;
+      holdDurations.push((now - currentTarget.spawnTime) * 1000);
+      holdAccuracies.push(0);
+      showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
+      playMissSound();
+      flashScreen('#ff5252', 0.12);
+      advanceTarget();
+    }
+
+    // Spawn next target
+    if (!currentTarget && targetIndex < TOTAL_TARGETS) {
+      spawnTarget();
+    } else if (!currentTarget && targetIndex >= TOTAL_TARGETS) {
+      endGame();
+      return;
+    }
+  }
+
+  // Hold tracking
+  if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
+    const tx = currentTarget.x + currentTarget.driftX;
+    const ty = currentTarget.y + currentTarget.driftY;
+    const dx = mouseX - tx;
+    const dy = mouseY - ty;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    currentTarget.holdSamples++;
+    if (dist <= currentTarget.radius * 1.8) {
+      currentTarget.holdInside++;
+    }
+
+    // Surprise: mirror — target jumps when cursor gets close
+    if (currentTarget.surprise && currentTarget.surprise.id === 'mirror'
+        && !currentTarget.mirrorTriggered && dist < currentTarget.radius * 3) {
+      currentTarget.mirrorTriggered = true;
+      currentTarget.x = 90 + Math.random() * (W - 180);
+      currentTarget.y = 90 + Math.random() * (H - 180);
+      showFeedback('SHIFTED!', currentTarget.x, currentTarget.y - 30, '#e040fb');
+    }
+
+    // Surprise: gravity — target drifts
+    if (currentTarget.surprise && currentTarget.surprise.id === 'gravity') {
+      currentTarget.driftX += Math.sin(timestamp * 0.002) * 0.8;
+      currentTarget.driftY += Math.cos(timestamp * 0.0015) * 0.5;
+    }
+
+    // Vibe: storm/boss — target jitters
+    if (currentTarget.vibe.chaos >= 3) {
+      const jitter = currentTarget.vibe.chaos * 1.2;
+      currentTarget.driftX = Math.sin(timestamp * 0.005) * jitter;
+      currentTarget.driftY = Math.cos(timestamp * 0.006) * jitter;
+    }
+
+    // Surprise: heartbeat — target pulses
+    if (currentTarget.surprise && currentTarget.surprise.id === 'heartbeat') {
+      currentTarget.pulsePhase += dt * 8;
+    }
+  }
+
+  // Drone pitch shift based on vibe chaos
+  if (droneOsc && currentTarget) {
+    const targetFreq = 45 + currentTarget.vibe.chaos * 15;
+    droneOsc.frequency.linearRampToValueAtTime(targetFreq, now + 0.3);
+  }
+
+  // Update bg particles
+  bgParticles.forEach(p => {
+    p.x += Math.cos(p.angle) * p.speed;
+    p.y += Math.sin(p.angle) * p.speed;
+    if (p.x < -10) p.x = W + 10;
+    if (p.x > W + 10) p.x = -10;
+    if (p.y < -10) p.y = H + 10;
+    if (p.y > H + 10) p.y = -10;
+  });
+}
+
+function drawGame(dt, timestamp) {
+  const now = audioCtx.currentTime;
+  const vibe = currentTarget ? currentTarget.vibe : (targetIndex < TOTAL_TARGETS ? vibeSequence[targetIndex] : VIBES[1]);
+
+  // Background
+  const bgColor = vibe.bg;
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  // Screen shake
+  if (envShake > 0) {
+    const sx = (Math.random() - 0.5) * envShake * 2;
+    const sy = (Math.random() - 0.5) * envShake * 2;
+    ctx.save();
+    ctx.translate(sx, sy);
+  }
+
+  // Grid
+  const gridOp = 0.02 + vibe.chaos * 0.01;
+  ctx.strokeStyle = `rgba(${vibe.id === 'boss' ? '255,23,68' : '0,229,255'},${gridOp})`;
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 50) {
+    const wobble = vibe.chaos >= 2 ? Math.sin(timestamp * 0.003 + x * 0.1) * vibe.chaos : 0;
+    ctx.beginPath(); ctx.moveTo(x + wobble, 0); ctx.lineTo(x + wobble, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 50) {
+    const wobble = vibe.chaos >= 2 ? Math.cos(timestamp * 0.003 + y * 0.1) * vibe.chaos : 0;
+    ctx.beginPath(); ctx.moveTo(0, y + wobble); ctx.lineTo(W, y + wobble); ctx.stroke();
+  }
+
+  // Background particles
+  bgParticles.forEach(p => {
+    ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Noise overlay for high chaos
+  if (noiseOpacity > 0) {
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${noiseOpacity * Math.random()})`;
+      ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
+    }
+  }
+
+  // Beat pulse rings
+  for (let i = beatPulses.length - 1; i >= 0; i--) {
+    const p = beatPulses[i];
+    const age = now - p.time;
+    if (age > 0.8) { beatPulses.splice(i, 1); continue; }
+    const progress = age / 0.8;
+    const r = progress * Math.max(W, H) * 0.35;
+    const alpha = p.alpha * (1 - progress);
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2);
+    ctx.strokeStyle = vibe.color.replace(')', `,${alpha})`).replace('#', '');
+
+    // Parse hex to rgba
+    const hex = vibe.color;
+    const cr = parseInt(hex.slice(1, 3), 16);
+    const cg = parseInt(hex.slice(3, 5), 16);
+    const cb = parseInt(hex.slice(5, 7), 16);
+    ctx.strokeStyle = `rgba(${cr},${cg},${cb},${alpha})`;
+    ctx.lineWidth = 2 * (1 - progress);
+    ctx.stroke();
+  }
+
+  // Decoys
+  decoys.forEach(d => {
+    const pulse = Math.sin(timestamp * 0.003 * d.speed + d.phase) * 0.5 + 0.5;
+    const op = d.opacity * pulse;
+    ctx.strokeStyle = `rgba(255, 60, 60, ${op})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(d.x + Math.sin(timestamp * 0.002 + d.phase) * 8, d.y + Math.cos(timestamp * 0.0015 + d.phase) * 8,
+            d.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner dot
+    ctx.fillStyle = `rgba(255, 60, 60, ${op * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(d.x + Math.sin(timestamp * 0.002 + d.phase) * 8, d.y + Math.cos(timestamp * 0.0015 + d.phase) * 8,
+            3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Blackout effect
+  if (envBlackout > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${0.7 + Math.sin(timestamp * 0.003) * 0.1})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Current target
+  if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
+    const t = currentTarget;
+    const tx = t.x + t.driftX;
+    const ty = t.y + t.driftY;
+    const elapsed = now - t.spawnTime;
+    const duration = t.strikeTime - t.spawnTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Heartbeat pulse
+    let pulseScale = 1;
+    if (t.surprise && t.surprise.id === 'heartbeat') {
+      pulseScale = 1 + Math.sin(t.pulsePhase) * 0.15;
+    }
+
+    const effectiveRadius = t.radius * pulseScale;
+
+    // Approach ring
+    const approachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
+    const ringBrightness = 0.25 + progress * 0.75;
+    ctx.beginPath();
+    ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Check cursor proximity
+    const dx = mouseX - tx;
+    const dy = mouseY - ty;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const isHovering = dist <= effectiveRadius * 1.8;
+
+    // Outer glow
+    const glowAmt = isHovering ? 0.5 : 0.2;
+    const gradient = ctx.createRadialGradient(tx, ty, 0, tx, ty, effectiveRadius * 2.5);
+
+    const hex = t.vibe.color;
+    const cr = parseInt(hex.slice(1, 3), 16);
+    const cg = parseInt(hex.slice(3, 5), 16);
+    const cb = parseInt(hex.slice(5, 7), 16);
+
+    gradient.addColorStop(0, `rgba(${cr},${cg},${cb},${glowAmt})`);
+    gradient.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    ctx.beginPath();
+    ctx.arc(tx, ty, effectiveRadius * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Core circle
+    ctx.beginPath();
+    ctx.arc(tx, ty, effectiveRadius, 0, Math.PI * 2);
+    ctx.fillStyle = isHovering
+      ? `rgba(${cr},${cg},${cb},0.35)`
+      : `rgba(${cr},${cg},${cb},0.15)`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.4 + progress * 0.6})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+    ctx.fillStyle = t.vibe.color;
+    ctx.fill();
+
+    // Hold ring (shows how well you're holding on target)
+    if (isHovering && t.holdSamples > 5) {
+      const holdPct = t.holdInside / t.holdSamples;
+      ctx.beginPath();
+      ctx.arc(tx, ty, effectiveRadius + 8, -Math.PI / 2,
+              -Math.PI / 2 + holdPct * Math.PI * 2);
+      ctx.strokeStyle = holdPct >= 0.8
+        ? 'rgba(0, 230, 118, 0.7)'
+        : 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // Gift sparkle
+    if (t.vibe.id === 'gift') {
+      for (let i = 0; i < 4; i++) {
+        const angle = timestamp * 0.003 + i * (Math.PI / 2);
+        const sparkX = tx + Math.cos(angle) * (effectiveRadius + 16);
+        const sparkY = ty + Math.sin(angle) * (effectiveRadius + 16);
+        ctx.fillStyle = `rgba(0, 255, 200, ${0.4 + Math.sin(timestamp * 0.01 + i) * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(sparkX, sparkY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Boss danger ring
+    if (t.vibe.id === 'boss') {
+      const dangerPulse = Math.sin(timestamp * 0.008) * 0.5 + 0.5;
+      ctx.beginPath();
+      ctx.arc(tx, ty, effectiveRadius + 20, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 23, 68, ${dangerPulse * 0.4})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Vibe label (subtle)
+    if (t.vibe.id !== 'flow') {
+      document.getElementById('hud-vibe').textContent = t.vibe.name;
+      document.getElementById('hud-vibe').style.color = t.vibe.color;
+    } else {
+      document.getElementById('hud-vibe').textContent = '';
+    }
+  }
+
+  // Multiplier display
+  const mult = getMultiplier();
+  if (mult > 1) {
+    ctx.font = '600 12px Inter';
+    ctx.fillStyle = 'rgba(224, 64, 251, 0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${mult}x MULTIPLIER`, W / 2, 95);
+  }
+
+  // Border pulse on beat
+  if (beatPulses.length > 0) {
+    const latest = beatPulses[beatPulses.length - 1];
+    const age = now - latest.time;
+    if (age < 0.12) {
+      const alpha = 0.12 * (1 - age / 0.12);
+      const hex = vibe.color;
+      const cr = parseInt(hex.slice(1, 3), 16);
+      const cg = parseInt(hex.slice(3, 5), 16);
+      const cb = parseInt(hex.slice(5, 7), 16);
+      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, W - 2, H - 2);
+    }
+  }
+
+  if (envShake > 0) ctx.restore();
+}
+
+function drawIdleBackground(dt, timestamp) {
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, W, H);
+
+  // Ambient floating dots
+  const now = timestamp / 1000;
+  for (let i = 0; i < 8; i++) {
+    const x = W * (0.15 + 0.7 * Math.sin(now * 0.07 + i * 1.1));
+    const y = H * (0.15 + 0.7 * Math.cos(now * 0.05 + i * 0.8));
+    const r = 1.5 + Math.sin(now + i) * 0.5;
+
+    const colors = ['#00e5ff', '#e040fb', '#ff9100', '#00e676'];
+    const hex = colors[i % colors.length];
+    const cr = parseInt(hex.slice(1, 3), 16);
+    const cg = parseInt(hex.slice(3, 5), 16);
+    const cb = parseInt(hex.slice(5, 7), 16);
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr},${cg},${cb},0.08)`;
+    ctx.fill();
+  }
+}
+
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
+    const alpha = p.life / p.maxLife;
+    const hex = p.color;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawFeedbacks(dt) {
+  for (let i = feedbacks.length - 1; i >= 0; i--) {
+    const f = feedbacks[i];
+    f.life -= dt;
+    if (f.life <= 0) { feedbacks.splice(i, 1); continue; }
+    const progress = 1 - f.life / f.maxLife;
+    const alpha = 1 - progress;
+    const yOff = progress * 45;
+
+    ctx.font = '700 20px Orbitron';
+    ctx.textAlign = 'center';
+    const hex = f.color;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.fillText(f.text, f.x, f.y - yOff);
+  }
+}
+
+// ─── Start ───
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
