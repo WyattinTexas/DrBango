@@ -26,8 +26,10 @@
   const BOSS_FRONT = PB_ASSETS + 'Front_Kodako.png';
   // Positions as % of .pb-field so they survive any frame height (the field
   // is the flex middle between the boss plate and the bottom panel)
-  const SOLO_POS = [{ x: '40%', y: '52%' }, { x: '22%', y: '68%' }, { x: '60%', y: '68%' }]; // active, sl-left, sl-right
-  const BOSS_POS = { x: '41%', y: '6%' };
+  // Team sits in the LOWER band, below where the dice arena settles (~47%),
+  // so dice never cover the sprites. active = front-center, sidelines flank.
+  const SOLO_POS = [{ x: '37%', y: '62%' }, { x: '9%', y: '56%' }, { x: '63%', y: '56%' }]; // active, sl-left, sl-right
+  const BOSS_POS = { x: '41%', y: '5%' };
 
   let pbActive = false;
   let pbTimer = null;
@@ -76,9 +78,10 @@
 .pb-minihp{position:absolute;width:64px;height:6px;background:rgba(0,0,0,.6);border-radius:3px;z-index:4;overflow:hidden;}
 .pb-minihp>div{height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);transition:width .4s;}
 
-/* 3D dice arena (ported from model_a) */
-#pb-dice3d{position:absolute;top:12%;left:5%;width:90%;height:48%;z-index:20;pointer-events:none;overflow:hidden;}
-#pb-dice3d-overlay{position:absolute;top:27%;left:0;width:100%;height:23%;z-index:1;
+/* 3D dice arena (ported from model_a) — sits in the boss→team gap (upper-middle)
+   so dice settle ABOVE the team sprites and never cover them */
+#pb-dice3d{position:absolute;top:13%;left:5%;width:90%;height:34%;z-index:20;pointer-events:none;overflow:hidden;}
+#pb-dice3d-overlay{position:absolute;top:20%;left:0;width:100%;height:22%;z-index:1;
   background:rgba(0,0,0,.35);backdrop-filter:blur(2px);}
 #portrait-battle .die-physics{position:absolute;z-index:10;perspective:350px;pointer-events:none;}
 #portrait-battle .die-cube{width:100%;height:100%;position:relative;transform-style:preserve-3d;}
@@ -151,12 +154,32 @@
   text-align:center;min-height:32px;display:flex;align-items:center;justify-content:center;
   border:1px solid rgba(255,255,255,.05);}
 .pb-narrator b{color:#ffd54f;padding:0 2px;}
-.pb-cards{display:flex;gap:6px;padding:6px 10px 4px;align-items:flex-end;}
-.pb-card{width:0;flex:1;aspect-ratio:2.5/3.5;border-radius:6px;overflow:hidden;border:2px solid rgba(255,255,255,.12);
-  object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:all .25s;cursor:pointer;}
-.pb-card.pb-active{border-color:#4fc3f7;box-shadow:0 0 12px rgba(79,195,247,.3);transform:translateY(-10px);}
-.pb-card.pb-dead{opacity:.3;filter:grayscale(1);}
-.pb-roll-wrap{display:flex;justify-content:center;padding:2px 10px 6px;}
+/* Collapsible card tray — tucked by default; ▲ CARDS toggle slides it up */
+.pb-card-tray{max-height:0;overflow:hidden;transition:max-height .32s ease;}
+.pb-bottom.pb-cards-open .pb-card-tray{max-height:260px;}
+.pb-cards{display:flex;gap:6px;padding:8px 10px 4px;align-items:flex-end;}
+.pb-card-wrap{position:relative;width:0;flex:1;aspect-ratio:2.5/3.5;transition:transform .25s;cursor:pointer;}
+.pb-card-wrap.pb-active{transform:translateY(-10px);}
+.pb-card-img{display:block;width:100%;height:100%;border-radius:6px;overflow:hidden;border:2px solid rgba(255,255,255,.12);
+  object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.pb-card-wrap.pb-active .pb-card-img{border-color:#4fc3f7;box-shadow:0 0 12px rgba(79,195,247,.3);}
+.pb-card-wrap.pb-dead .pb-card-img{opacity:.3;filter:grayscale(1);}
+.pb-card-desc{position:absolute;inset:0;background:rgba(8,12,24,.95);border-radius:6px;border:2px solid #4fc3f7;
+  padding:8px 6px;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s;z-index:5;}
+.pb-card-wrap.pb-show-desc .pb-card-desc{opacity:1;pointer-events:auto;}
+.pb-card-desc .pb-cd-name{font-family:'Bangers',cursive;font-size:13px;color:#4fc3f7;letter-spacing:1px;text-align:center;line-height:1.1;}
+.pb-card-desc .pb-cd-hp{font-size:10px;color:#9adcff;text-align:center;margin-top:1px;}
+.pb-card-desc .pb-cd-ability{font-size:11px;color:#ffd54f;font-weight:600;text-align:center;margin-top:4px;}
+.pb-card-desc .pb-cd-text{font-size:10px;line-height:1.25;color:#dfe9f5;margin-top:3px;flex:1;overflow:auto;}
+.pb-card-desc .pb-cd-sendin{margin-top:4px;font-family:'Bangers',cursive;font-size:11px;letter-spacing:1px;
+  padding:5px;border-radius:6px;border:1px solid #4ade80;background:rgba(20,60,30,.92);color:#86efac;cursor:pointer;}
+.pb-action-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:4px 10px 6px;position:relative;}
+.pb-card-toggle{position:absolute;left:12px;display:flex;flex-direction:column;align-items:center;gap:0;
+  font-size:9px;letter-spacing:1px;font-family:'Bangers',cursive;color:#9adcff;line-height:1.1;
+  background:rgba(14,40,70,.85);border:1px solid rgba(79,195,247,.5);border-radius:10px;padding:5px 11px;cursor:pointer;}
+.pb-card-toggle:active{transform:scale(.93);}
+.pb-card-toggle .pb-arrow{font-size:12px;line-height:1;transition:transform .3s;}
+.pb-bottom.pb-cards-open .pb-card-toggle .pb-arrow{transform:rotate(180deg);}
 .pb-roll{font-family:'Bangers',cursive;font-size:20px;letter-spacing:2px;padding:10px 44px;border:3px solid #7c3aed;
   border-radius:50px;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;cursor:pointer;
   box-shadow:0 0 20px rgba(124,58,237,.4);}
@@ -239,8 +262,11 @@
       </div>
       <div class="pb-narrator" id="pb-narrator">…</div>
       <div class="pb-extras"><div id="pb-resources"></div><div id="pb-abilities"></div></div>
-      <div class="pb-cards" id="pb-cards"></div>
-      <div class="pb-roll-wrap"><button class="pb-roll" id="pb-roll" onclick="pbRollClick()">ROLL</button></div>
+      <div class="pb-card-tray"><div class="pb-cards" id="pb-cards"></div></div>
+      <div class="pb-action-row">
+        <button class="pb-card-toggle" onclick="pbToggleCards()"><span class="pb-arrow">&#9650;</span><span>CARDS</span></button>
+        <button class="pb-roll" id="pb-roll" onclick="pbRollClick()">ROLL</button>
+      </div>
     </div>
   </div>`;
     // Mount on BODY. Mounting inside #raid-screen dies: raid UI rewrites its
@@ -273,7 +299,7 @@
   }
 
   // Multi-player slot positions (2-3 raiders side by side facing the boss)
-  const MULTI_POS = [{ x: '15%', y: '58%' }, { x: '40%', y: '66%' }, { x: '65%', y: '58%' }];
+  const MULTI_POS = [{ x: '13%', y: '58%' }, { x: '40%', y: '66%' }, { x: '63%', y: '58%' }];
 
   function raidPlayers() {
     const R = window.currentRaid;
@@ -479,22 +505,49 @@
     });
   }
 
+  let _lastCardsSig = '';
   function renderCards() {
     const wrap = $pb('pb-cards');
     if (!wrap) return;
     const act = safeActive(B.red);
+    const team = B.red.ghosts.slice(0, 3);
+    // Signature guard: skip the rebuild (which would reset an open description
+    // mid-read) unless the team's visible state actually changed.
+    const sig = team.map(g => (g.name || '') + ':' + g.hp + ':' + (g.ko ? 'k' : '') + ':' + (g === act ? 'a' : '')).join('|');
+    if (sig === _lastCardsSig) return;
+    _lastCardsSig = sig;
+    // preserve which card's description is open across rebuilds
+    const openName = wrap.getAttribute('data-open') || '';
     wrap.innerHTML = '';
-    B.red.ghosts.slice(0, 3).forEach(g => {
-      const img = document.createElement('img');
-      img.className = 'pb-card' + (g === act ? ' pb-active' : '') + (g.ko ? ' pb-dead' : '');
-      let art = g.art;
-      if (!art) { try { art = (typeof getGhost === 'function' && getGhost(g.baseId || g.id) || {}).art; } catch (e) {} }
-      img.src = art || '';
-      img.alt = g.name;
-      // KO-pick proxy: clicking a portrait card clicks the matching hidden
-      // arena card in #battle-view (sideline slots are the engine's picker).
-      img.onclick = function () { pbProxyCardClick(g.name); };
-      wrap.appendChild(img);
+    team.forEach(g => {
+      let card = null;
+      try { card = (typeof getGhost === 'function') && getGhost(g.baseId || g.id); } catch (e) {}
+      const ability = g.ability || (card && card.ability) || '';
+      const abilityDesc = g.abilityDesc || (card && card.abilityDesc) || '';
+      const art = g.art || (card && card.art) || '';
+      const isAct = g === act;
+      const cell = document.createElement('div');
+      cell.className = 'pb-card-wrap' + (isAct ? ' pb-active' : '') + (g.ko ? ' pb-dead' : '') +
+        (g.name === openName ? ' pb-show-desc' : '');
+      const safeName = (g.name || '').replace(/'/g, '');
+      cell.innerHTML =
+        '<img class="pb-card-img" src="' + (art || '') + '" alt="' + (g.name || '') + '">' +
+        '<div class="pb-card-desc">' +
+          '<div class="pb-cd-name">' + (g.name || '') + '</div>' +
+          '<div class="pb-cd-hp">' + Math.max(0, g.hp) + '/' + (g.maxHp || '?') + ' HP' + (g.ko ? ' · KO' : '') + '</div>' +
+          (ability ? '<div class="pb-cd-ability">' + ability + '</div>' : '') +
+          '<div class="pb-cd-text">' + (abilityDesc || 'No ability.') + '</div>' +
+          // SEND IN proxies the engine KO-picker (benched, living spiritkins only)
+          (!isAct && !g.ko ? '<button class="pb-cd-sendin" onclick="event.stopPropagation();pbProxyCardClick(\'' + safeName + '\')">SEND IN</button>' : '') +
+        '</div>';
+      // tap a card → toggle ITS description (closing any other)
+      cell.onclick = function () {
+        const showing = cell.classList.contains('pb-show-desc');
+        wrap.querySelectorAll('.pb-card-wrap').forEach(c => c.classList.remove('pb-show-desc'));
+        if (showing) { wrap.setAttribute('data-open', ''); }
+        else { cell.classList.add('pb-show-desc'); wrap.setAttribute('data-open', g.name || ''); }
+      };
+      wrap.appendChild(cell);
     });
   }
 
@@ -563,9 +616,17 @@
   }
 
   // ── PROXIES ──────────────────────────────────────────────────────
+  window.pbToggleCards = function () {
+    const bottom = document.querySelector('#portrait-battle .pb-bottom');
+    if (bottom) bottom.classList.toggle('pb-cards-open');
+  };
+  function pbCloseCards() {
+    const bottom = document.querySelector('#portrait-battle .pb-bottom');
+    if (bottom) bottom.classList.remove('pb-cards-open');
+  }
   window.pbRollClick = function () {
     const real = $pb('rollRedBtn');
-    if (real && !real.disabled) real.click();
+    if (real && !real.disabled) { pbCloseCards(); real.click(); }
   };
   window.pbProxyCardClick = function (ghostName) {
     // engine KO picker = clicking sideline slot cards inside #battle-view
@@ -648,6 +709,9 @@
     _pbAbilityQueue = [];
     _pbAbilityShowing = false;
     _lastDice = { red: '', blue: '' };
+    _lastCardsSig = '';
+    pbCloseCards();
+    const cw = $pb('pb-cards'); if (cw) cw.setAttribute('data-open', '');
     if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
     const bv = $pb('battle-view');
     if (bv) bv.classList.remove('pb-offscreen', 'pb-peek');
