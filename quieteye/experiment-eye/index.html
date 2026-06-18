@@ -2748,17 +2748,27 @@ function drawGame(dt, timestamp) {
   decoys.forEach(d => {
     const pulse = Math.sin(timestamp * 0.003 * d.speed + d.phase) * 0.5 + 0.5;
     const op = d.opacity * pulse * (1 - z);
+    const dx = d.x + Math.sin(timestamp * 0.002 + d.phase) * 8;
+    const dy = d.y + Math.cos(timestamp * 0.0015 + d.phase) * 8;
+    // Dashed outer ring — distinguishes from real targets
+    ctx.setLineDash([4, 4]);
     ctx.strokeStyle = `rgba(255, 60, 60, ${op})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(d.x + Math.sin(timestamp * 0.002 + d.phase) * 8, d.y + Math.cos(timestamp * 0.0015 + d.phase) * 8,
-            d.radius, 0, Math.PI * 2);
+    ctx.arc(dx, dy, d.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Inner shimmer ring
+    const shimmer = Math.sin(timestamp * 0.006 + d.phase) * 0.3 + 0.5;
+    ctx.strokeStyle = `rgba(255, 60, 60, ${op * shimmer * 0.4})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(dx, dy, d.radius * 0.6, 0, Math.PI * 2);
     ctx.stroke();
     // Inner dot
     ctx.fillStyle = `rgba(255, 60, 60, ${op * 0.5})`;
     ctx.beginPath();
-    ctx.arc(d.x + Math.sin(timestamp * 0.002 + d.phase) * 8, d.y + Math.cos(timestamp * 0.0015 + d.phase) * 8,
-            3, 0, Math.PI * 2);
+    ctx.arc(dx, dy, 2, 0, Math.PI * 2);
     ctx.fill();
   });
 
