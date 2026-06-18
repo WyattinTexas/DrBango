@@ -733,6 +733,13 @@ let isTouch = false;
 let matchMode = false;
 const MATCH_TARGETS = 10;
 const HALFTIME_TARGET = 5;
+const CLUTCH_THRESHOLD = 3; // last N targets trigger clutch check
+const CLUTCH_SCORE_GAP = 150; // score gap to trigger clutch mode
+
+// ─── Clutch Time State ───
+let inClutch = false;
+let clutchTransition = 0; // 0 = normal, 1 = full clutch
+let clutchHeartbeatTimer = 0;
 
 // ─── VIBES: the soul of the experiment ───
 // Each target gets a random vibe that changes the world
@@ -1020,6 +1027,47 @@ function playZoneExit() {
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.start(t + i * 0.06); osc.stop(t + 0.3);
   });
+}
+
+function playClutchHeartbeat() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // Deep double-thump heartbeat
+  [0, 0.12].forEach(offset => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(55, t + offset);
+    osc.frequency.exponentialRampToValueAtTime(30, t + offset + 0.15);
+    gain.gain.setValueAtTime(0.2, t + offset);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.18);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + offset); osc.stop(t + offset + 0.25);
+  });
+}
+
+function playClutchEnter() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // Tension rising tone
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(80, t);
+  osc.frequency.linearRampToValueAtTime(160, t + 0.8);
+  gain.gain.setValueAtTime(0.06, t);
+  gain.gain.linearRampToValueAtTime(0.1, t + 0.6);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 1.1);
+  // High tension ping
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'sine'; osc2.frequency.value = 1400;
+  gain2.gain.setValueAtTime(0.08, t + 0.3);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+  osc2.connect(gain2); gain2.connect(audioCtx.destination);
+  osc2.start(t + 0.3); osc2.stop(t + 1.0);
 }
 
 function playNoise(dur, vol) {
@@ -1437,6 +1485,9 @@ function startGame() {
 
   inTheZone = false;
   zoneTransition = 0;
+  inClutch = false;
+  clutchTransition = 0;
+  clutchHeartbeatTimer = 0;
 
   const totalCount = matchMode ? MATCH_TARGETS : TOTAL_TARGETS;
 
@@ -1751,6 +1802,32 @@ function updateGame(dt, timestamp) {
   zoneTransition += (zoneTarget - zoneTransition) * dt * 3; // smooth ~0.3s transition
   if (Math.abs(zoneTransition - zoneTarget) < 0.01) zoneTransition = zoneTarget;
 
+  // CLUTCH TIME detection (match mode, final rounds, close score)
+  if (matchMode && aiState) {
+    const remainingTargets = MATCH_TARGETS - targetIndex;
+    const scoreGap = Math.abs(score - aiState.score);
+    const shouldClutch = remainingTargets <= CLUTCH_THRESHOLD && scoreGap <= CLUTCH_SCORE_GAP && remainingTargets > 0;
+    if (shouldClutch && !inClutch) {
+      inClutch = true;
+      playClutchEnter();
+      showFeedback('CLUTCH TIME', W / 2, H * 0.25, '#ffd700');
+    } else if (!shouldClutch && targetIndex < MATCH_TARGETS) {
+      inClutch = false;
+    }
+    // Clutch heartbeat
+    if (inClutch) {
+      clutchHeartbeatTimer += dt;
+      if (clutchHeartbeatTimer >= 0.85) {
+        clutchHeartbeatTimer = 0;
+        playClutchHeartbeat();
+      }
+    }
+  }
+  // Clutch transition (smooth lerp)
+  const clutchTarget = inClutch ? 1 : 0;
+  clutchTransition += (clutchTarget - clutchTransition) * dt * 4;
+  if (Math.abs(clutchTransition - clutchTarget) < 0.01) clutchTransition = clutchTarget;
+
   // Update bg particles
   bgParticles.forEach(p => {
     p.x += Math.cos(p.angle) * p.speed;
@@ -2015,6 +2092,38 @@ function drawGame(dt, timestamp) {
   }
 
   if (effectiveShake > 0) ctx.restore();
+
+  // CLUTCH TIME visual indicator — dramatic pulsing when match is tight
+  const cl = clutchTransition;
+  if (cl > 0.1) {
+    const clutchPulse = Math.sin(timestamp * 0.006) * 0.5 + 0.5;
+    // Red pulsing border
+    ctx.strokeStyle = `rgba(255, 215, 0, ${cl * 0.15 * (0.5 + clutchPulse * 0.5)})`;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(0, 0, W, H);
+    // Inner border
+    ctx.strokeStyle = `rgba(255, 61, 61, ${cl * 0.08 * clutchPulse})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(4, 4, W - 8, H - 8);
+    // "CLUTCH" text at top center
+    ctx.globalAlpha = cl * (0.12 + clutchPulse * 0.08);
+    ctx.font = '900 13px Orbitron';
+    ctx.fillStyle = '#ffd700';
+    ctx.textAlign = 'center';
+    ctx.fillText('C L U T C H', W / 2, H - 16);
+    ctx.globalAlpha = 1;
+    // Score gap indicator
+    if (matchMode && aiState) {
+      const gap = score - aiState.score;
+      const gapText = gap > 0 ? `+${gap}` : `${gap}`;
+      const gapColor = gap > 0 ? '#00e676' : gap < 0 ? '#ff3d3d' : '#ffd700';
+      ctx.globalAlpha = cl * 0.3;
+      ctx.font = '700 10px Orbitron';
+      ctx.fillStyle = gapColor;
+      ctx.fillText(gapText, W / 2, H - 32);
+      ctx.globalAlpha = 1;
+    }
+  }
 
   // THE ZONE visual indicator — subtle white border glow when in zone
   if (z > 0.1) {
@@ -2552,8 +2661,10 @@ function endMatch() {
   document.body.classList.remove('gameplay-active');
   stopDrone();
   vignetteEl.style.opacity = 0;
-
+  // Clutch state preserved for results display, then reset after
   showMatchResults();
+  inClutch = false;
+  clutchTransition = 0;
 }
 
 function showMatchResults() {
@@ -2567,6 +2678,12 @@ function showMatchResults() {
     mmrDelta = 20 + Math.floor(Math.random() * 11); // +20 to +30
   } else {
     mmrDelta = -(10 + Math.floor(Math.random() * 11)); // -10 to -20
+  }
+
+  // Clutch win bonus: extra MMR if won during clutch
+  const wasClutch = inClutch || clutchTransition > 0.5;
+  if (won && wasClutch) {
+    mmrDelta += 5; // bonus for clutch victory
   }
 
   const oldMMR = getPlayerMMR();
@@ -2584,12 +2701,14 @@ function showMatchResults() {
     opponent: aiOpponent.name,
     myScore, oppScore,
     won, mmrDelta,
-    newMMR,
+    newMMR, clutch: wasClutch,
     timestamp: Date.now(),
   });
 
-  // Banner
+  // Banner (clean up any previous clutch badge)
   const banner = document.getElementById('mr-banner');
+  const prevClutch = banner.nextElementSibling;
+  if (prevClutch && prevClutch.textContent.includes('CLUTCH')) prevClutch.remove();
   banner.textContent = won ? 'VICTORY' : 'DEFEAT';
   banner.className = 'mr-banner ' + (won ? 'victory' : 'defeat');
 
@@ -2599,6 +2718,13 @@ function showMatchResults() {
   } else {
     playZoneExit(); // Sad descent
     playMissSound();
+  }
+
+  // Clutch badge under banner
+  if (wasClutch) {
+    banner.insertAdjacentHTML('afterend',
+      `<div style="font-family:Orbitron;font-size:12px;font-weight:700;letter-spacing:4px;color:#ffd700;margin-top:-8px;text-shadow:0 0 20px rgba(255,215,0,0.4)">CLUTCH ${won ? 'VICTORY' : 'MATCH'}</div>`
+    );
   }
 
   // Comparison
