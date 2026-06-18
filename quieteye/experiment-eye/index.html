@@ -3375,6 +3375,19 @@ function drawGame(dt, timestamp) {
     ctx.strokeStyle = `rgba(224,64,251,${sonarAlpha})`;
     ctx.lineWidth = 1;
     ctx.stroke();
+    // Sonar ping sound — plays at start of each sonar cycle
+    if (sonarPhase < 0.02 && audioCtx) {
+      const sp = audioCtx.currentTime;
+      const ping = audioCtx.createOscillator();
+      const pGain = audioCtx.createGain();
+      ping.type = 'sine';
+      ping.frequency.setValueAtTime(1800, sp);
+      ping.frequency.exponentialRampToValueAtTime(1200, sp + 0.08);
+      pGain.gain.setValueAtTime(0.04, sp);
+      pGain.gain.exponentialRampToValueAtTime(0.001, sp + 0.15);
+      ping.connect(pGain); pGain.connect(audioCtx.destination);
+      ping.start(sp); ping.stop(sp + 0.2);
+    }
     // Breathing darkness — edges pulse inward like the void is closing in
     const breathe = Math.sin(timestamp * 0.001) * 0.5 + 0.5;
     const darkR = Math.min(W, H) * (0.3 + breathe * 0.15);
