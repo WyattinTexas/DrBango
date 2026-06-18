@@ -418,10 +418,23 @@
         .map(([f,v])=>'<div class="die-face '+c+' face-'+f+'">'+pipHTML(v)+'</div>').join('');}
     let _physics = {};
     const arena = () => $pb('pb-dice3d');
+    // Smart grid: normal rolls (≤ fit-one-row) stay one big row; big rolls
+    // (Bonzai +5, Smolder, etc.) wrap to a 2nd row and auto-shrink to fit
+    // the phone width. Shared by showRolling (element size) + reveal (layout).
+    const D_GAP = 12, D_ROWGAP = 10, D_PAD = 8, D_MAX = 52, D_MIN = 30;
+    function gridLayout(count, W) {
+      const fitOneRow = Math.floor((W - D_PAD + D_GAP) / (D_MAX + D_GAP));
+      const rows = count <= Math.max(1, fitOneRow) ? 1 : 2;
+      const perRow = Math.ceil(count / rows);
+      let dieSize = Math.floor((W - D_PAD - (perRow - 1) * D_GAP) / perRow);
+      dieSize = Math.max(D_MIN, Math.min(D_MAX, dieSize));
+      return { rows, perRow, dieSize };
+    }
     function showRolling(team, count) {
       const a = arena(); if (!a || !count) return;
       if (_physics[team]) { cancelAnimationFrame(_physics[team].raf); _physics[team].els.forEach(e=>e.remove()); }
-      const W=a.offsetWidth,H=a.offsetHeight,dieSize=52,half=dieSize/2,pad=10;
+      const W=a.offsetWidth,H=a.offsetHeight,pad=10;
+      const dieSize=gridLayout(count, W).dieSize, half=dieSize/2;
       const minX=pad,maxX=W-pad-dieSize,minY=pad,maxY=H-pad-dieSize;
       const isRed = team !== 'blue';
       const handX = isRed?minX+10:maxX-10, handY = isRed?maxY-5:minY+5;
@@ -468,23 +481,33 @@
     function reveal(team, values) {
       const ph=_physics[team]; if(!ph||!ph.dice.length) return;
       cancelAnimationFrame(ph.raf);
-      const a=arena(),W=a.offsetWidth,H=a.offsetHeight,dieSize=52,gap=14;
+      const a=arena(),W=a.offsetWidth,H=a.offsetHeight;
       const isRed = team !== 'blue';
-      const totalW=values.length*dieSize+(values.length-1)*gap;
-      const startX=W*0.5-totalW/2;
-      const trayY=isRed?H*0.65-14:H*0.35-15;
-      values.forEach((v,i)=>{const dd=ph.dice[i];if(!dd)return;
+      const {rows, perRow, dieSize} = gridLayout(values.length, W);
+      // vertical band: boss (blue) settles up top, your team (red) lower —
+      // so the two teams' dice never collide even when both wrap to 2 rows
+      const band = isRed ? { top: H*0.44, h: H*0.54 } : { top: H*0.02, h: H*0.40 };
+      const totalH = rows*dieSize + (rows-1)*D_ROWGAP;
+      const startY = band.top + Math.max(0, (band.h - totalH) / 2);
+      values.forEach((v,i)=>{
+        const dd=ph.dice[i]; if(!dd) return;
+        const row = Math.floor(i / perRow);
+        const colCount = Math.min(perRow, values.length - row*perRow);
+        const col = i - row*perRow;
+        const rowW = colCount*dieSize + (colCount-1)*D_GAP;
+        const x = (W*0.5 - rowW/2) + col*(dieSize+D_GAP);
+        const y = startY + row*(dieSize+D_ROWGAP);
         const tgt=FACE_TARGET[v],frx=nearestSnap(dd.rx,tgt.rx),fry=nearestSnap(dd.ry,tgt.ry),frz=nearestSnap(dd.rz,0);
         setTimeout(()=>{dd.el.classList.add('settling');
-          dd.el.style.left=(startX+i*(dieSize+gap))+'px';dd.el.style.top=trayY+'px';
-          dd.cube.style.transform='rotateX('+frx+'deg) rotateY('+fry+'deg) rotateZ('+frz+'deg)';},i*80);
+          dd.el.style.left=x+'px';dd.el.style.top=y+'px';
+          dd.cube.style.transform='rotateX('+frx+'deg) rotateY('+fry+'deg) rotateZ('+frz+'deg)';},i*70);
       });
       setTimeout(()=>{ph.settled=true;
         // highlight matching dice (pairs/trips) per team
         const counts={};values.forEach(v=>counts[v]=(counts[v]||0)+1);
         const best=Object.keys(counts).reduce((acc,k)=>counts[k]>counts[acc]?k:acc,Object.keys(counts)[0]);
         if(counts[best]>=2){ph.dice.forEach((dd,i)=>{if(values[i]===+best)dd.el.classList.add('pb-win');});}
-      },values.length*80+750);
+      },values.length*70+750);
     }
     function clear(team){
       if(team){if(_physics[team]){cancelAnimationFrame(_physics[team].raf);_physics[team].els.forEach(e=>e.remove());delete _physics[team];}return;}
