@@ -857,6 +857,7 @@ let currentTarget = null;
 let secondTarget = null; // DOUBLE surprise — second simultaneous target
 let targetIndex = 0;
 let feedbacks = [];
+let scorePopups = [];
 let particles = [];
 let decoys = [];
 let beatPulses = [];
@@ -1656,6 +1657,8 @@ function processStrikeOnTarget(target) {
   }
 
   showFeedback(fbText, target.x, target.y - 20, color);
+  // Floating score number — shows actual points earned
+  showScorePopup(totalPoints, target.x, target.y + 10);
   spawnParticles(target.x, target.y, color, particleCount);
   flashScreen(color, 0.08);
 
@@ -1825,6 +1828,10 @@ function showFeedback(text, x, y, color) {
   feedbacks.push({ text, x, y, color, life: 1.0, maxLife: 1.0 });
 }
 
+function showScorePopup(points, x, y) {
+  scorePopups.push({ points, x: x + (Math.random() - 0.5) * 20, y, life: 1.2, maxLife: 1.2 });
+}
+
 function spawnParticles(x, y, color, count) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -1893,7 +1900,7 @@ function startGame() {
   currentTarget = null;
   secondTarget = null;
   targetIndex = 0;
-  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = [];
+  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = []; scorePopups = [];
   scheduledBeats = [];
 
   // Set adaptive difficulty for solo
@@ -2273,6 +2280,7 @@ function gameLoop(timestamp) {
   drawParticles(dt);
   drawTouchRipples(dt);
   drawFeedbacks(dt);
+  drawScorePopups(dt);
 
   requestAnimationFrame(gameLoop);
 }
@@ -3192,6 +3200,22 @@ function drawFeedbacks(dt) {
     const b = parseInt(hex.slice(5, 7), 16);
     ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
     ctx.fillText(f.text, f.x, f.y - yOff);
+  }
+}
+
+function drawScorePopups(dt) {
+  for (let i = scorePopups.length - 1; i >= 0; i--) {
+    const s = scorePopups[i];
+    s.life -= dt;
+    if (s.life <= 0) { scorePopups.splice(i, 1); continue; }
+    const progress = 1 - s.life / s.maxLife;
+    const alpha = progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
+    const yOff = progress * 60;
+    const scale = 1 + progress * 0.3;
+    ctx.font = `700 ${Math.round(14 * scale)}px Inter`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+    ctx.fillText('+' + s.points, s.x, s.y - yOff);
   }
 }
 
