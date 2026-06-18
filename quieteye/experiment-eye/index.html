@@ -839,6 +839,7 @@ let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
 let comboShield = false; // GIFT reward: protects combo from next miss
 let holdAccuracies = [];
 let holdDurations = [];
+let targetRatings = []; // per-target rating history for chart
 let vibeSequence = [];
 let surpriseFlags = [];
 let knowledgeUnlocked = [];
@@ -1431,11 +1432,13 @@ function processStrikeOnTarget(target) {
       processAIStrike();
       updateMatchHUD();
     }
+    targetRatings.push('miss');
     // Only advance if both targets are resolved (or no second target)
     if (!secondTarget || secondTarget.hit || secondTarget.missed) advanceTarget();
     return;
   }
 
+  targetRatings.push(rating);
   const totalPoints = Math.round((points + holdBonus + vibeBonus) * mult);
   score += totalPoints;
   combo++;
@@ -1650,7 +1653,7 @@ function startGame() {
   score = 0; combo = 0; bestCombo = 0;
   perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0;
   comboShield = false;
-  holdAccuracies = []; holdDurations = [];
+  holdAccuracies = []; holdDurations = []; targetRatings = [];
   knowledgeUnlocked = [];
   currentTarget = null;
   secondTarget = null;
@@ -1809,6 +1812,26 @@ function showResults() {
   if (knowledgeUnlocked.length >= 4) medalsRow.innerHTML += '<span class="medal cyan">SCHOLAR</span>';
   if (new Set(vibeSequence.map(v => v.id)).size >= 7) medalsRow.innerHTML += '<span class="medal purple">VIBE EXPLORER</span>';
 
+  // Accuracy chart — per-target rating visualization
+  if (targetRatings.length > 0) {
+    const ratingColors = { perfect: '#ffd700', great: '#00e676', good: '#42a5f5', miss: '#ff5252' };
+    const ratingHeights = { perfect: 100, great: 70, good: 40, miss: 15 };
+    const barW = Math.min(12, Math.floor((360 - targetRatings.length) / targetRatings.length));
+    const gap = 2;
+    const chartW = targetRatings.length * (barW + gap);
+    const chartH = 50;
+    let chartHTML = `<div style="margin:10px 0;text-align:center">
+      <div style="font-family:Orbitron;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.2);margin-bottom:6px">ACCURACY</div>
+      <div style="display:inline-flex;align-items:flex-end;gap:${gap}px;height:${chartH}px">`;
+    targetRatings.forEach((r, i) => {
+      const h = Math.round(chartH * (ratingHeights[r] || 15) / 100);
+      const c = ratingColors[r] || '#555';
+      chartHTML += `<div style="width:${barW}px;height:${h}px;background:${c};border-radius:1px;opacity:0.7"></div>`;
+    });
+    chartHTML += '</div></div>';
+    medalsRow.insertAdjacentHTML('afterend', chartHTML);
+  }
+
   // Knowledge earned
   const knowledgeEl = document.getElementById('results-knowledge');
   if (knowledgeUnlocked.length > 0) {
@@ -1914,6 +1937,7 @@ function updateGame(dt, timestamp) {
         && now >= currentTarget.strikeTime + 0.25) {
       currentTarget.missed = true;
       misses++;
+      targetRatings.push('miss');
       holdDurations.push((now - currentTarget.spawnTime) * 1000);
       holdAccuracies.push(0);
       if (comboShield) {
