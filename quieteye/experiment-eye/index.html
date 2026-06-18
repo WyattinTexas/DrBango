@@ -793,6 +793,34 @@ const TOTAL_TARGETS = 25;
 const BASE_BPM = 110;
 const BASELINE_COUNT = 3;
 
+// ─── Progressive Difficulty ───
+// Game adapts based on your solo run history
+function getAdaptiveDifficulty() {
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('experiment-eye-history') || '[]'); } catch(e) {}
+  if (history.length < 3) return { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timingScale: 1.0 };
+
+  // Average grade score from last 5 runs
+  const gradeMap = { 'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+  const recent = history.slice(0, 5);
+  const avgGrade = recent.reduce((s, r) => s + (gradeMap[r.grade] || 2), 0) / recent.length;
+
+  if (avgGrade >= 5) {
+    // Elite player: faster, smaller, tighter
+    return { label: 'ELITE', bpmScale: 1.15, radiusScale: 0.82, timingScale: 0.8 };
+  } else if (avgGrade >= 4) {
+    // Strong player: moderate increase
+    return { label: 'HARD', bpmScale: 1.08, radiusScale: 0.9, timingScale: 0.9 };
+  } else if (avgGrade >= 3) {
+    return { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timingScale: 1.0 };
+  } else {
+    // Struggling: slightly easier
+    return { label: 'EASY', bpmScale: 0.93, radiusScale: 1.1, timingScale: 1.15 };
+  }
+}
+
+let activeDifficulty = { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timingScale: 1.0 };
+
 // ─── Game State ───
 let score = 0;
 let combo = 0;
@@ -1197,8 +1225,15 @@ function spawnTarget() {
     playBossWarning();
   }
 
-  // Set BPM for this target
-  beatInterval = 60 / (BASE_BPM * vibe.bpmMult);
+  // Progressive difficulty scaling (solo only)
+  if (!matchMode) {
+    radius = Math.round(radius * activeDifficulty.radiusScale);
+    approachRadius = Math.round(approachRadius * activeDifficulty.radiusScale);
+  }
+
+  // Set BPM for this target (scaled by difficulty)
+  const diffBpmScale = matchMode ? 1.0 : activeDifficulty.bpmScale;
+  beatInterval = 60 / (BASE_BPM * vibe.bpmMult * diffBpmScale);
 
   // Set environment
   applyVibe(vibe);
@@ -1348,14 +1383,16 @@ function processStrikeOnTarget(target) {
 
   // Gift targets are more forgiving
   const giftBonus = target.vibe.id === 'gift' ? 30 : 0;
+  // Progressive difficulty scales timing windows
+  const ts = matchMode ? 1.0 : activeDifficulty.timingScale;
 
-  if (diff <= 50 + giftBonus) {
+  if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
     perfects++; playHitSound('perfect');
-  } else if (diff <= 120 + giftBonus) {
+  } else if (diff <= (120 * ts) + giftBonus) {
     rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
     greats++; playHitSound('great');
-  } else if (diff <= 200 + giftBonus) {
+  } else if (diff <= (200 * ts) + giftBonus) {
     rating = 'good'; color = '#42a5f5'; points = 50; particleCount = 8;
     goods++; playHitSound('good');
   } else {
@@ -1533,9 +1570,18 @@ function startGame() {
   holdAccuracies = []; holdDurations = [];
   knowledgeUnlocked = [];
   currentTarget = null;
+  secondTarget = null;
   targetIndex = 0;
   feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = [];
   scheduledBeats = [];
+
+  // Set adaptive difficulty for solo
+  activeDifficulty = matchMode ? { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timingScale: 1.0 } : getAdaptiveDifficulty();
+  if (!matchMode && activeDifficulty.label !== 'NORMAL') {
+    // Brief flash showing difficulty level
+    setTimeout(() => showFeedback(activeDifficulty.label + ' MODE', W / 2, H * 0.35,
+      activeDifficulty.label === 'ELITE' ? '#ffd700' : activeDifficulty.label === 'HARD' ? '#ff9100' : '#00e5ff'), 300);
+  }
 
   inTheZone = false;
   zoneTransition = 0;
@@ -1653,8 +1699,9 @@ function showResults() {
   document.getElementById('results-grade').textContent = grade;
   document.getElementById('results-grade').style.color = gradeColor;
   document.getElementById('results-score').textContent = score + ' pts';
+  const diffLabel = activeDifficulty.label !== 'NORMAL' ? ` | ${activeDifficulty.label}` : '';
   document.getElementById('results-subtitle').textContent =
-    `${consistency}% consistent | ${onBeatPct}% on-beat | ${avgHold}% hold`;
+    `${consistency}% consistent | ${onBeatPct}% on-beat | ${avgHold}% hold${diffLabel}`;
 
   document.getElementById('results-stats').innerHTML = `
     <span class="label">Perfects</span><span class="value perfect">${perfects}</span>
