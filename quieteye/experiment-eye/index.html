@@ -95,6 +95,7 @@ canvas {
   font-family: 'Orbitron', sans-serif;
   font-size: 32px; font-weight: 900;
   color: #00e5ff;
+  transition: text-shadow 0.3s, transform 0.15s;
 }
 #hud-combo .combo-label {
   font-size: 10px;
@@ -1875,14 +1876,29 @@ function flashScreen(color, opacity) {
 // ─── HUD ───
 function updateHUD() {
   document.getElementById('hud-score').textContent = Math.round(displayScore);
-  document.getElementById('combo-num').textContent = `${combo}x`;
-  // Shield indicator on combo
-  document.getElementById('combo-num').style.textShadow = comboShield ? '0 0 12px #00ffcc' : 'none';
+  const comboEl = document.getElementById('combo-num');
+  comboEl.textContent = `${combo}x`;
+  // Combo glow scaling — intensifies with combo count
+  if (comboShield) {
+    comboEl.style.textShadow = '0 0 12px #00ffcc';
+  } else if (combo >= 15) {
+    comboEl.style.textShadow = '0 0 20px currentColor, 0 0 40px currentColor';
+    comboEl.style.transform = 'scale(1.15)';
+  } else if (combo >= 10) {
+    comboEl.style.textShadow = '0 0 15px currentColor, 0 0 30px currentColor';
+    comboEl.style.transform = 'scale(1.1)';
+  } else if (combo >= 5) {
+    comboEl.style.textShadow = '0 0 10px currentColor';
+    comboEl.style.transform = 'scale(1.05)';
+  } else {
+    comboEl.style.textShadow = 'none';
+    comboEl.style.transform = 'scale(1)';
+  }
   // Dynamic vibe color on HUD
   if (currentTarget) {
     const vc = currentTarget.vibe.color;
     document.getElementById('hud-score').style.color = vc;
-    document.getElementById('combo-num').style.color = vc;
+    comboEl.style.color = vc;
   }
 
   // Consistency (based on hold duration variance after baseline)
