@@ -471,6 +471,11 @@ let envBlackout = 0;
 let envVignette = 0;
 let noiseOpacity = 0;
 
+// THE ZONE — flow state reward
+let inTheZone = false;
+let zoneTransition = 0; // 0 = normal, 1 = full zone
+let zoneDronePlaying = false;
+
 // ─── Resize ───
 function resize() {
   dpr = window.devicePixelRatio || 1;
@@ -643,6 +648,37 @@ function stopDrone() {
     } catch(e) {}
     droneOsc = null; droneGain = null;
   }
+}
+
+function playZoneEnter() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // Ethereal rising chord — you've entered flow state
+  [261.6, 329.6, 392, 523.3].forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = f;
+    gain.gain.setValueAtTime(0, t + i * 0.1);
+    gain.gain.linearRampToValueAtTime(0.06, t + i * 0.1 + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 1.2);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.1); osc.stop(t + 1.5);
+  });
+}
+
+function playZoneExit() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // Quick descending tone — zone broken
+  [400, 300, 200].forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.08, t + i * 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.15);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.06); osc.stop(t + 0.3);
+  });
 }
 
 function playNoise(dur, vol) {
@@ -857,6 +893,7 @@ function processStrike() {
     goods++; playHitSound('good');
   } else {
     rating = 'miss'; color = '#ff5252'; points = 0; misses++;
+    if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
     combo = 0; playMissSound();
     currentTarget.missed = true;
     showFeedback('MISS', currentTarget.x, currentTarget.y - 20, color);
@@ -883,6 +920,15 @@ function processStrike() {
   if (combo === 5 || combo === 10 || combo === 15 || combo === 20) {
     playComboChord(combo / 5);
     showFeedback(`${combo}x COMBO!`, W / 2, H * 0.4, '#e040fb');
+  }
+
+  // THE ZONE — enter flow state at 10 combo
+  if (combo >= 10 && !inTheZone) {
+    inTheZone = true;
+    playZoneEnter();
+    showFeedback('THE ZONE', W / 2, H * 0.3, '#ffffff');
+    stopDrone();
+    startDrone(110, 0.015); // gentle high drone for zone
   }
 
   // Update HUD
@@ -985,6 +1031,9 @@ function startGame() {
   feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = [];
   scheduledBeats = [];
 
+  inTheZone = false;
+  zoneTransition = 0;
+
   generateSequence();
 
   titleScreen.style.display = 'none';
@@ -1077,6 +1126,7 @@ function showResults() {
   if (consistency >= 90) medalsRow.innerHTML += '<span class="medal gold">UNSHAKEABLE</span>';
   if (perfectRate >= 0.5) medalsRow.innerHTML += '<span class="medal gold">PRECISION</span>';
   if (bestCombo >= 15) medalsRow.innerHTML += '<span class="medal cyan">LOCKED IN</span>';
+  if (bestCombo >= 10) medalsRow.innerHTML += '<span class="medal purple">ENTERED THE ZONE</span>';
   if (misses === 0) medalsRow.innerHTML += '<span class="medal purple">PERFECT RUN</span>';
   if (total === TOTAL_TARGETS) medalsRow.innerHTML += '<span class="medal cyan">FULL EXPERIMENT</span>';
 
@@ -1184,6 +1234,7 @@ function updateGame(dt, timestamp) {
         && now >= currentTarget.strikeTime + 0.25) {
       currentTarget.missed = true;
       misses++;
+      if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
       combo = 0;
       holdDurations.push((now - currentTarget.spawnTime) * 1000);
       holdAccuracies.push(0);
@@ -1248,6 +1299,11 @@ function updateGame(dt, timestamp) {
     droneOsc.frequency.linearRampToValueAtTime(targetFreq, now + 0.3);
   }
 
+  // THE ZONE transition (smooth lerp)
+  const zoneTarget = inTheZone ? 1 : 0;
+  zoneTransition += (zoneTarget - zoneTransition) * dt * 3; // smooth ~0.3s transition
+  if (Math.abs(zoneTransition - zoneTarget) < 0.01) zoneTransition = zoneTarget;
+
   // Update bg particles
   bgParticles.forEach(p => {
     p.x += Math.cos(p.angle) * p.speed;
@@ -1263,21 +1319,32 @@ function drawGame(dt, timestamp) {
   const now = audioCtx.currentTime;
   const vibe = currentTarget ? currentTarget.vibe : (targetIndex < TOTAL_TARGETS ? vibeSequence[targetIndex] : VIBES[1]);
 
-  // Background
-  const bgColor = vibe.bg;
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, W, H);
+  // Background — zone desaturates toward deep blue-black
+  const z = zoneTransition;
+  if (z > 0.01) {
+    // Lerp bg toward zone color #060810
+    ctx.fillStyle = '#060810';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1 - z;
+    ctx.fillStyle = vibe.bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = vibe.bg;
+    ctx.fillRect(0, 0, W, H);
+  }
 
-  // Screen shake
-  if (envShake > 0) {
-    const sx = (Math.random() - 0.5) * envShake * 2;
-    const sy = (Math.random() - 0.5) * envShake * 2;
+  // Screen shake — suppressed in zone
+  const effectiveShake = envShake * (1 - z);
+  if (effectiveShake > 0) {
+    const sx = (Math.random() - 0.5) * effectiveShake * 2;
+    const sy = (Math.random() - 0.5) * effectiveShake * 2;
     ctx.save();
     ctx.translate(sx, sy);
   }
 
-  // Grid
-  const gridOp = 0.02 + vibe.chaos * 0.01;
+  // Grid — fades in zone
+  const gridOp = (0.02 + vibe.chaos * 0.01) * (1 - z * 0.8);
   ctx.strokeStyle = `rgba(${vibe.id === 'boss' ? '255,23,68' : '0,229,255'},${gridOp})`;
   ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 50) {
@@ -1289,18 +1356,19 @@ function drawGame(dt, timestamp) {
     ctx.beginPath(); ctx.moveTo(0, y + wobble); ctx.lineTo(W, y + wobble); ctx.stroke();
   }
 
-  // Background particles
+  // Background particles — fade in zone
   bgParticles.forEach(p => {
-    ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+    ctx.fillStyle = `rgba(255,255,255,${p.opacity * (1 - z * 0.9)})`;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // Noise overlay for high chaos
-  if (noiseOpacity > 0) {
+  // Noise overlay for high chaos — suppressed in zone
+  const effectiveNoise = noiseOpacity * (1 - z);
+  if (effectiveNoise > 0) {
     for (let i = 0; i < 60; i++) {
-      ctx.fillStyle = `rgba(255,255,255,${noiseOpacity * Math.random()})`;
+      ctx.fillStyle = `rgba(255,255,255,${effectiveNoise * Math.random()})`;
       ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
     }
   }
@@ -1327,10 +1395,10 @@ function drawGame(dt, timestamp) {
     ctx.stroke();
   }
 
-  // Decoys
+  // Decoys — hidden in the zone
   decoys.forEach(d => {
     const pulse = Math.sin(timestamp * 0.003 * d.speed + d.phase) * 0.5 + 0.5;
-    const op = d.opacity * pulse;
+    const op = d.opacity * pulse * (1 - z);
     ctx.strokeStyle = `rgba(255, 60, 60, ${op})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1488,7 +1556,21 @@ function drawGame(dt, timestamp) {
     }
   }
 
-  if (envShake > 0) ctx.restore();
+  if (effectiveShake > 0) ctx.restore();
+
+  // THE ZONE visual indicator — subtle white border glow when in zone
+  if (z > 0.1) {
+    ctx.strokeStyle = `rgba(255, 255, 255, ${z * 0.08})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, W, H);
+    // "THE ZONE" text at bottom
+    ctx.globalAlpha = z * 0.2;
+    ctx.font = '900 11px Orbitron';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText('T H E   Z O N E', W / 2, H - 20);
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawIdleBackground(dt, timestamp) {
