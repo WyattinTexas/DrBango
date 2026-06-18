@@ -2405,13 +2405,25 @@ function showResults() {
     const gap = 2;
     const chartW = targetRatings.length * (barW + gap);
     const chartH = 50;
+    // Find longest perfect streak for hot zone highlight
+    let bestStreakStart = -1, bestStreakLen = 0, curStart = -1, curLen = 0;
+    targetRatings.forEach((r, i) => {
+      if (r === 'perfect') {
+        if (curStart === -1) curStart = i;
+        curLen++;
+        if (curLen > bestStreakLen) { bestStreakLen = curLen; bestStreakStart = curStart; }
+      } else { curStart = -1; curLen = 0; }
+    });
+
     let chartHTML = `<div style="margin:10px 0;text-align:center">
       <div style="font-family:Orbitron;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.2);margin-bottom:6px">ACCURACY</div>
       <div style="display:inline-flex;align-items:flex-end;gap:${gap}px;height:${chartH}px">`;
     targetRatings.forEach((r, i) => {
       const h = Math.round(chartH * (ratingHeights[r] || 15) / 100);
       const c = ratingColors[r] || '#555';
-      chartHTML += `<div style="width:${barW}px;height:${h}px;background:${c};border-radius:1px;opacity:0.7"></div>`;
+      const isHotZone = bestStreakLen >= 3 && i >= bestStreakStart && i < bestStreakStart + bestStreakLen;
+      const hotStyle = isHotZone ? 'box-shadow:0 2px 4px rgba(255,215,0,0.4);opacity:1' : 'opacity:0.7';
+      chartHTML += `<div style="width:${barW}px;height:${h}px;background:${c};border-radius:1px;${hotStyle}"></div>`;
     });
     chartHTML += '</div>';
     chartHTML += '<div style="display:flex;justify-content:center;gap:12px;margin-top:4px;font-size:9px;color:rgba(255,255,255,0.2)">';
