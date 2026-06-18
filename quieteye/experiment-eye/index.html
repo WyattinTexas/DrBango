@@ -2924,6 +2924,39 @@ function drawGame(dt, timestamp) {
     ctx.fillText(breathPhase < 4 ? 'inhale' : 'exhale', W / 2, H / 2 + breathRadius + 20);
   }
 
+  // Storm lightning — random bright flashes with thunder rumble
+  if (vibe.id === 'storm' && Math.random() < 0.003) {
+    // Lightning flash: bright white overlay that decays
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(0, 0, W, H);
+    // Lightning bolt — jagged line from top
+    const lx = Math.random() * W;
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(lx, 0);
+    let ly = 0;
+    while (ly < H * 0.7) {
+      ly += 15 + Math.random() * 25;
+      const jag = (Math.random() - 0.5) * 30;
+      ctx.lineTo(lx + jag, ly);
+    }
+    ctx.stroke();
+    // Thunder rumble sound
+    if (audioCtx) {
+      const t = audioCtx.currentTime;
+      const noise = audioCtx.createOscillator();
+      const nGain = audioCtx.createGain();
+      noise.type = 'sawtooth';
+      noise.frequency.setValueAtTime(40, t);
+      noise.frequency.exponentialRampToValueAtTime(20, t + 0.3);
+      nGain.gain.setValueAtTime(0.06, t);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      noise.connect(nGain); nGain.connect(audioCtx.destination);
+      noise.start(t); noise.stop(t + 0.5);
+    }
+  }
+
   // Boss heartbeat — background pulses red with a double-beat rhythm
   if (vibe.id === 'boss') {
     // Double-beat: thump-thump...pause (1.2s cycle)
