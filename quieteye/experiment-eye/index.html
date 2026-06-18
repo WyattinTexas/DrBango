@@ -1063,6 +1063,40 @@ function stopDrone() {
   }
 }
 
+// Whisper noise — eerie filtered white noise
+let whisperNoiseNode = null, whisperGain = null;
+function startWhisperNoise() {
+  stopWhisperNoise();
+  stopDrone();
+  if (!audioCtx) return;
+  const bufferSize = audioCtx.sampleRate * 2;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+  whisperNoiseNode = audioCtx.createBufferSource();
+  whisperNoiseNode.buffer = buffer;
+  whisperNoiseNode.loop = true;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 800;
+  filter.Q.value = 0.5;
+  whisperGain = audioCtx.createGain();
+  whisperGain.gain.value = 0.015;
+  whisperNoiseNode.connect(filter);
+  filter.connect(whisperGain);
+  whisperGain.connect(audioCtx.destination);
+  whisperNoiseNode.start();
+}
+function stopWhisperNoise() {
+  if (whisperNoiseNode) {
+    try {
+      whisperGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+      whisperNoiseNode.stop(audioCtx.currentTime + 0.6);
+    } catch(e) {}
+    whisperNoiseNode = null; whisperGain = null;
+  }
+}
+
 function playZoneEnter() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
@@ -1329,10 +1363,16 @@ function spawnTarget() {
   playApproachTone(nextBeatTime, beatInterval, toneFreq);
 
   // Start drone for atmospheric vibes
-  if (vibe.id === 'retro') {
+  if (vibe.id === 'whisper') {
+    startWhisperNoise();
+  } else if (vibe.id === 'retro') {
+    stopWhisperNoise();
     startDrone(82.4, 0.025); // warm E2 pad for synthwave
   } else if (vibe.chaos >= 1) {
+    stopWhisperNoise();
     startDrone(45 + vibe.chaos * 10, 0.02 + vibe.chaos * 0.01);
+  } else {
+    stopWhisperNoise();
   }
 }
 
@@ -1829,7 +1869,7 @@ function showTitle() {
   crosshair.style.display = 'none';
   document.body.classList.remove('gameplay-active');
   currentTarget = null;
-  stopDrone();
+  stopDrone(); stopWhisperNoise();
   vignetteEl.style.opacity = 0;
 
   // Hide all match overlays
@@ -1846,7 +1886,7 @@ function endGame() {
   hudEl.style.display = 'none';
   crosshair.style.display = 'none';
   document.body.classList.remove('gameplay-active');
-  stopDrone();
+  stopDrone(); stopWhisperNoise();
   vignetteEl.style.opacity = 0;
   showResults();
 }
@@ -3420,7 +3460,7 @@ function endMatch() {
   crosshair.style.display = 'none';
   aiCursorEl.style.display = 'none';
   document.body.classList.remove('gameplay-active');
-  stopDrone();
+  stopDrone(); stopWhisperNoise();
   vignetteEl.style.opacity = 0;
   // Clutch state preserved for results display, then reset after
   showMatchResults();
