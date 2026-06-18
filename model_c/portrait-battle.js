@@ -194,12 +194,17 @@
   background:rgba(180,40,40,.75);color:#fff;border:1px solid rgba(255,255,255,.25);cursor:pointer;
   font-family:'Bangers',cursive;letter-spacing:1px;}
 
-.pb-extras{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 12px;min-height:22px;}
+.pb-extras{display:flex;align-items:center;justify-content:flex-start;gap:6px;padding:0 12px;min-height:0;}
 #pb-resources{display:flex;gap:8px;font-size:12px;color:#cfe8ff;text-shadow:0 1px 2px #000;}
 #pb-resources span{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:1px 7px;}
-#pb-abilities{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-#pb-abilities button{font-size:10px;padding:3px 9px;border-radius:10px;border:1px solid rgba(79,195,247,.5);
-  background:rgba(14,40,70,.85);color:#9adcff;cursor:pointer;font-family:'Bangers',cursive;letter-spacing:1px;}
+/* Ability action pills — pre-roll actions (Bonzai, forge, etc.) docked right
+   above ROLL, gold + pulsing so they read as obviously tappable */
+#pb-abilities{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:2px 10px;}
+#pb-abilities:empty{display:none;}
+#pb-abilities button{font-size:12px;padding:8px 16px;border-radius:16px;border:1.5px solid #ffcf4d;
+  background:linear-gradient(135deg,#7a3d10,#c47a18);color:#fff;cursor:pointer;
+  font-family:'Bangers',cursive;letter-spacing:1px;box-shadow:0 0 14px rgba(255,180,60,.55);
+  animation:pbBtnPulse 1.2s ease-in-out infinite;}
 #pb-abilities button:active{transform:scale(.93);}
 
 /* dev toggle back to landscape */
@@ -263,8 +268,9 @@
         <div class="pb-hptext" id="pb-player-hptext"></div>
       </div>
       <div class="pb-narrator" id="pb-narrator">…</div>
-      <div class="pb-extras"><div id="pb-resources"></div><div id="pb-abilities"></div></div>
+      <div class="pb-extras"><div id="pb-resources"></div></div>
       <div class="pb-card-tray"><div class="pb-cards" id="pb-cards"></div></div>
+      <div id="pb-abilities"></div>
       <div class="pb-action-row">
         <button class="pb-card-toggle" onclick="pbToggleCards()"><span class="pb-arrow">&#9650;</span><span>CARDS</span></button>
         <button class="pb-roll" id="pb-roll" onclick="pbRollClick()">ROLL</button>
@@ -570,19 +576,23 @@
     const wrap = $pb('pb-abilities');
     const realWrap = document.querySelector('#red-ability-buttons');
     if (!wrap || !realWrap) return;
-    // mirror visible engine ability buttons (forge, lucky stone, etc.) as
-    // proxy pills — the real buttons live offscreen in #battle-view
+    // Mirror engine ability buttons (Bonzai, forge, etc.) as tappable pills.
+    // NOTE: #battle-view is parked offscreen with visibility:hidden, which the
+    // buttons INHERIT — so a computed-visibility check filters out EVERY button
+    // (the v0.09→v0.10 "no pills ever show" bug). The engine only injects a
+    // button here when the ability is actually usable (clears innerHTML
+    // otherwise), so presence === actionable. We only drop disabled / display:none.
     const reals = Array.from(realWrap.querySelectorAll('button')).filter(b => {
-      const st = getComputedStyle(b);
-      return st.display !== 'none' && st.visibility !== 'hidden' && !b.disabled;
+      if (b.disabled) return false;
+      return getComputedStyle(b).display !== 'none';
     });
     const html = reals.map(b => b.textContent.replace(/\s+/g, ' ').trim()).join('||');
     if (html === _lastAbilityHtml) return;
     _lastAbilityHtml = html;
     wrap.innerHTML = '';
-    reals.forEach((b, i) => {
+    reals.forEach((b) => {
       const btn = document.createElement('button');
-      btn.textContent = b.textContent.replace(/\s+/g, ' ').trim().slice(0, 22);
+      btn.textContent = b.textContent.replace(/\s+/g, ' ').trim().slice(0, 30);
       btn.onclick = function () { b.click(); };
       wrap.appendChild(btn);
     });
