@@ -846,6 +846,7 @@ const SURPRISES = [
   { id: 'double',    name: 'DOUBLE',     desc: 'Two targets — hit both!', duration: 0 },
   { id: 'trail',     name: 'TRAIL',      desc: 'Target leaves ghost afterimages', duration: 0 },
   { id: 'freeze',    name: 'FREEZE',     desc: 'Ring freezes, then rushes!', duration: 0 },
+  { id: 'blind',     name: 'BLIND',      desc: 'Invisible until you get close!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -1449,6 +1450,7 @@ function spawnTarget() {
   if (surprise && surprise.id === 'trail') showFeedback('TRAIL!', x, y - 40, '#e040fb');
   if (surprise && surprise.id === 'decoy') showFeedback('DECOYS!', x, y - 40, '#ff5252');
   if (surprise && surprise.id === 'mirror') showFeedback('MIRROR!', x, y - 40, '#e040fb');
+  if (surprise && surprise.id === 'blind') showFeedback('BLIND!', W / 2, H * 0.3, '#ffffff');
 
   // FREEZE surprise — freeze approach ring at 40% then rush
   if (surprise && surprise.id === 'freeze') {
@@ -3050,7 +3052,14 @@ function drawGame(dt, timestamp) {
     // Whisper mode: everything about the target is barely visible
     // It shimmers — opacity oscillates gently so you can find it if you look carefully
     const isWhisper = t.vibe.id === 'whisper';
-    const whisperDim = isWhisper ? (0.15 + Math.sin(timestamp * 0.004) * 0.08) : 1;
+    let whisperDim = isWhisper ? (0.15 + Math.sin(timestamp * 0.004) * 0.08) : 1;
+    // BLIND surprise: invisible unless cursor is close
+    if (t.surprise && t.surprise.id === 'blind') {
+      const bdx = mouseX - tx, bdy = mouseY - ty;
+      const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
+      const revealRange = t.radius * 4;
+      whisperDim = bDist < revealRange ? Math.max(0.05, 1 - bDist / revealRange) : 0.02;
+    }
 
     // Approach ring — with beat-synced bounce
     const baseApproachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
