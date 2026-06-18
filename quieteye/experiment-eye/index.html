@@ -1401,6 +1401,7 @@ function spawnTarget() {
     trailTimer: 0,
     freezeUntil: 0, // FREEZE surprise: progress pauses until this time
     freezeProgress: 0, // progress value where it froze
+    spawnScale: 0, // pop-in animation from 0 to 1
   };
 
   // Surprise announcements
@@ -2393,6 +2394,11 @@ function updateGame(dt, timestamp) {
     }
   }
 
+  // Spawn scale animation (pop-in)
+  if (currentTarget && currentTarget.spawnScale < 1) {
+    currentTarget.spawnScale = Math.min(1, currentTarget.spawnScale + dt * 6); // ~0.17s pop-in
+  }
+
   // Hold tracking
   if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
     const tx = currentTarget.x + currentTarget.driftX;
@@ -2869,7 +2875,10 @@ function drawGame(dt, timestamp) {
       pulseScale = 1 + Math.sin(t.pulsePhase) * 0.15;
     }
 
-    const effectiveRadius = t.radius * pulseScale;
+    // Spawn pop-in: overshoot ease (1 -> 1.15 -> 1)
+    const ss = t.spawnScale;
+    const spawnEase = ss < 1 ? ss * (1 + 0.15 * Math.sin(ss * Math.PI)) : 1;
+    const effectiveRadius = t.radius * pulseScale * spawnEase;
 
     // Whisper mode: everything about the target is barely visible
     // It shimmers — opacity oscillates gently so you can find it if you look carefully
