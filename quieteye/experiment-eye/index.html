@@ -704,6 +704,7 @@ canvas {
     <div class="results-stats" id="results-stats"></div>
     <div id="medals-row"></div>
     <div id="results-knowledge"></div>
+    <div id="session-insight" style="display:none;font-family:Inter;font-size:11px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin:8px 0 2px;font-style:italic"></div>
     <div id="history-section">
       <h4>YOUR EXPERIMENTS</h4>
       <div id="history-list"></div>
@@ -2416,6 +2417,29 @@ function showResults() {
     knowledgeEl.innerHTML = '';
   }
 
+  // Session insight — compare to history
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('experiment-eye-history') || '[]'); } catch(e) {}
+  const insightEl = document.getElementById('session-insight');
+  if (history.length >= 3) {
+    const pastScores = history.map(h => h.score).sort((a, b) => a - b);
+    const rank = pastScores.filter(s => s < score).length;
+    const pct = Math.round((rank / pastScores.length) * 100);
+    const gradeMap = { 'S+': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+    const bestHistGrade = Math.max(...history.map(h => gradeMap[h.grade] || 0));
+    let insight = '';
+    if (pct >= 90) insight = 'TOP 10% — one of your best runs ever';
+    else if (pct >= 75) insight = `Top ${100 - pct}% of your runs`;
+    else if (pct >= 50) insight = 'Above your average';
+    else if (pct >= 25) insight = 'Below your usual performance';
+    else insight = 'Rough run — shake it off';
+    if ((gradeMap[grade] || 0) > bestHistGrade) insight = 'YOUR BEST GRADE EVER';
+    insightEl.textContent = insight;
+    insightEl.style.display = 'block';
+  } else {
+    insightEl.style.display = 'none';
+  }
+
   // Save & render history
   const run = {
     date: new Date().toLocaleDateString(),
@@ -2424,8 +2448,6 @@ function showResults() {
     vibes: new Set(vibeSequence.map(v => v.id)).size,
     id: Date.now(),
   };
-  let history = [];
-  try { history = JSON.parse(localStorage.getItem('experiment-eye-history') || '[]'); } catch(e) {}
   history.unshift(run);
   history = history.slice(0, 15);
   localStorage.setItem('experiment-eye-history', JSON.stringify(history));
