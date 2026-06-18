@@ -865,6 +865,7 @@ const SCHEDULE_AHEAD = 0.15;
 // Environment
 let envHue = 0;
 let envShake = 0;
+let impactShake = 0; // momentary hit shake, decays quickly
 let envBlackout = 0;
 let envVignette = 0;
 let noiseOpacity = 0;
@@ -1425,14 +1426,14 @@ function processStrikeOnTarget(target) {
 
   if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
-    perfects++; playHitSound('perfect');
+    perfects++; playHitSound('perfect'); triggerImpactShake(3);
     if (isTouch && navigator.vibrate) navigator.vibrate([10, 30, 10]); // double tap haptic
   } else if (diff <= (120 * ts) + giftBonus) {
     rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
-    greats++; playHitSound('great');
+    greats++; playHitSound('great'); triggerImpactShake(1.5);
   } else if (diff <= (200 * ts) + giftBonus) {
     rating = 'good'; color = '#42a5f5'; points = 50; particleCount = 8;
-    goods++; playHitSound('good');
+    goods++; playHitSound('good'); triggerImpactShake(0.5);
   } else {
     rating = 'miss'; color = '#ff5252'; points = 0; misses++;
     target.missed = true;
@@ -1489,6 +1490,7 @@ function processStrikeOnTarget(target) {
     // Shrink each phase
     target.radius = Math.max(10, Math.round(target.radius * 0.75));
     target.approachRadius = Math.max(30, Math.round(target.approachRadius * 0.8));
+    triggerImpactShake(5);
 
     // Reset timing — new beat window for this phase
     const now2 = audioCtx.currentTime;
@@ -1518,6 +1520,7 @@ function processStrikeOnTarget(target) {
     showFeedback('BOSS SLAIN +300', W / 2, H * 0.25, '#ffd700');
     spawnParticles(target.x, target.y, '#ffd700', 35);
     playComboChord(4);
+    triggerImpactShake(10);
   }
 
   showFeedback(fbText, target.x, target.y - 20, color);
@@ -1615,6 +1618,11 @@ function showKnowledge(text) {
   setTimeout(() => knowledgePopup.classList.remove('show'), 4000);
 }
 
+// ─── Impact Shake ───
+function triggerImpactShake(intensity) {
+  impactShake = Math.max(impactShake, intensity);
+}
+
 // ─── Combo Milestones ───
 function checkComboMilestone(comboCount) {
   if (comboCount === 5) {
@@ -1622,6 +1630,7 @@ function checkComboMilestone(comboCount) {
     flashScreen('#ff9100', 0.15);
     spawnParticles(W / 2, H / 2, '#ff9100', 20);
     playComboChord(2);
+    triggerImpactShake(4);
     if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
   } else if (comboCount === 10) {
     showFeedback('UNSTOPPABLE', W / 2, H * 0.3, '#e040fb');
@@ -1634,6 +1643,7 @@ function checkComboMilestone(comboCount) {
       spawnParticles(ex, ey, '#e040fb', 10);
     }
     playComboChord(4);
+    triggerImpactShake(6);
     if (navigator.vibrate) navigator.vibrate([30, 50, 30, 50, 30]);
   } else if (comboCount === 15) {
     showFeedback('L E G E N D A R Y', W / 2, H * 0.3, '#ffd700');
@@ -1646,6 +1656,7 @@ function checkComboMilestone(comboCount) {
       spawnParticles(bx, by, '#ffd700', 8);
     }
     playComboChord(5);
+    triggerImpactShake(8);
     if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 40, 60, 40]);
   } else if (comboCount >= 20 && comboCount % 5 === 0) {
     showFeedback('G O D L I K E', W / 2, H * 0.3, '#ffffff');
@@ -1657,6 +1668,7 @@ function checkComboMilestone(comboCount) {
       spawnParticles(rx, ry, i % 2 === 0 ? '#ffd700' : '#ffffff', 3);
     }
     playComboChord(6);
+    triggerImpactShake(12);
     if (navigator.vibrate) navigator.vibrate([50, 40, 50, 40, 50, 40, 50, 40, 80]);
   }
 }
@@ -2221,6 +2233,12 @@ function updateGame(dt, timestamp) {
     if (p.y < -10) p.y = H + 10;
     if (p.y > H + 10) p.y = -10;
   });
+
+  // Decay impact shake rapidly
+  if (impactShake > 0) {
+    impactShake *= Math.pow(0.001, dt); // ~10x decay per second
+    if (impactShake < 0.1) impactShake = 0;
+  }
 }
 
 function drawGame(dt, timestamp) {
@@ -2243,8 +2261,8 @@ function drawGame(dt, timestamp) {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Screen shake — suppressed in zone
-  const effectiveShake = envShake * (1 - z);
+  // Screen shake — suppressed in zone, combine vibe shake + impact shake
+  const effectiveShake = (envShake + impactShake) * (1 - z * 0.7);
   if (effectiveShake > 0) {
     const sx = (Math.random() - 0.5) * effectiveShake * 2;
     const sy = (Math.random() - 0.5) * effectiveShake * 2;
