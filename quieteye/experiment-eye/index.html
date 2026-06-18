@@ -1659,9 +1659,15 @@ function processStrike() {
   processStrikeOnTarget(currentTarget);
 }
 
+let clickDistances = []; // spatial distance from cursor to target center at click time
+
 function processStrikeOnTarget(target) {
   const now = audioCtx.currentTime;
   const diff = Math.abs(now - target.strikeTime) * 1000;
+
+  // Track spatial click distance
+  const clickDist = Math.hypot(mouseX - (target.x + target.driftX), mouseY - (target.y + target.driftY));
+  clickDistances.push(clickDist);
 
   // Hold accuracy
   const holdAcc = target.holdSamples > 0
@@ -2121,7 +2127,7 @@ function startGame() {
   perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0; perfectStreak = 0; lastWasMiss = false; lastVibeId = '';
   comboShield = false;
   giftDoubleNext = false;
-  holdAccuracies = []; holdDurations = []; targetRatings = [];
+  holdAccuracies = []; holdDurations = []; targetRatings = []; clickDistances = [];
   knowledgeUnlocked = [];
   currentTarget = null;
   secondTarget = null;
@@ -2357,6 +2363,7 @@ function showResults() {
     <span class="label">Vibes Survived</span><span class="value">${new Set(vibeSequence.map(v => v.id)).size}</span>
     ${bossesSlain > 0 ? `<span class="label">Bosses Slain</span><span class="value perfect">${bossesSlain}</span>` : ''}
     ${misses > 0 ? `<span class="label">Misses Cost</span><span class="value miss">~${misses * 120} pts</span>` : ''}
+    ${clickDistances.length > 0 ? `<span class="label">Avg Aim</span><span class="value">${Math.round(clickDistances.reduce((a,b) => a+b, 0) / clickDistances.length)}px</span>` : ''}
   `;
 
   // Medals
