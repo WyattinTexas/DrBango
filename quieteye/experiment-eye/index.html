@@ -769,7 +769,8 @@ canvas {
   <div class="halftime-title">HALFTIME</div>
   <div class="halftime-comparison" id="halftime-comparison"></div>
   <div class="halftime-who-leads" id="halftime-who-leads"></div>
-  <button class="action-btn" id="halftime-continue-btn" style="margin-top:16px">ROUND 2</button>
+  <div id="halftime-countdown" style="font-family:Orbitron;font-size:14px;letter-spacing:3px;color:rgba(255,255,255,0.4);margin-top:12px"></div>
+  <button class="action-btn" id="halftime-continue-btn" style="margin-top:8px">ROUND 2</button>
 </div>
 
 <!-- Match Results overlay -->
@@ -808,8 +809,8 @@ let isTouch = false;
 
 // ─── Match Mode State ───
 let matchMode = false;
-const MATCH_TARGETS = 10;
-const HALFTIME_TARGET = 5;
+const MATCH_TARGETS = 21;
+const HALFTIME_TARGET = 10;
 const CLUTCH_THRESHOLD = 3; // last N targets trigger clutch check
 const CLUTCH_SCORE_GAP = 150; // score gap to trigger clutch mode
 
@@ -4134,17 +4135,9 @@ function drawGame(dt, timestamp) {
     ctx.fill();
 
     // Lock-on glow — pulsing ring when cursor is inside target (perfect aim zone)
-    if (dist <= effectiveRadius * 0.8 && !t.hit && !t.missed) {
-      const lockPulse = Math.sin(timestamp * 0.01) * 0.5 + 0.5;
-      ctx.beginPath();
-      ctx.arc(tx, ty, effectiveRadius * 0.6, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,255,255,${(0.1 + lockPulse * 0.15) * whisperDim})`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    // Hold accuracy still tracked for +LOCK bonus, but no visual ring
-    // (removed: filling arc was misleading — looked like a progress bar to complete)
+    // Hold accuracy still tracked for +LOCK bonus — no visual indicators
+    // (lock-on glow and hold ring removed: both confused players into
+    //  thinking they needed to complete a circle rather than time the tap)
 
     // Gift sparkle
     if (t.vibe.id === 'gift') {
@@ -5194,16 +5187,39 @@ function showHalftime() {
   }
 
   overlay.classList.add('show');
+
+  // 20-second countdown to auto-start round 2
+  let htCountdown = 20;
+  const htCountdownEl = document.getElementById('halftime-countdown');
+  htCountdownEl.textContent = `ROUND 2 IN ${htCountdown}s`;
+  if (window._htInterval) clearInterval(window._htInterval);
+  window._htInterval = setInterval(() => {
+    htCountdown--;
+    if (htCountdown <= 0) {
+      clearInterval(window._htInterval);
+      window._htInterval = null;
+      resumeFromHalftime();
+    } else {
+      htCountdownEl.textContent = `ROUND 2 IN ${htCountdown}s`;
+      if (htCountdown <= 5) htCountdownEl.style.color = '#ff9100';
+    }
+  }, 1000);
 }
 
-document.getElementById('halftime-continue-btn').addEventListener('click', () => {
+function resumeFromHalftime() {
+  if (window._htInterval) { clearInterval(window._htInterval); window._htInterval = null; }
   document.getElementById('halftime-overlay').classList.remove('show');
+  document.getElementById('halftime-countdown').style.color = 'rgba(255,255,255,0.4)';
   gameState = 'playing';
   if (!isTouch) {
     crosshair.style.display = 'block';
     document.body.classList.add('gameplay-active');
   }
   aiCursorEl.style.display = 'block';
+}
+
+document.getElementById('halftime-continue-btn').addEventListener('click', () => {
+  resumeFromHalftime();
 });
 
 // ─── Match End ───
