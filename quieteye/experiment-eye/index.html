@@ -793,6 +793,7 @@ const matchHudEl = document.getElementById('match-hud');
 let W, H, dpr;
 let audioCtx = null;
 let gameState = 'title';
+let gameStartTime = 0; // for tracking time played
 let mouseX = 0, mouseY = 0;
 let isTouch = false;
 
@@ -2165,6 +2166,7 @@ function startGame() {
   }
 
   gameState = 'playing';
+  gameStartTime = Date.now();
   nextBeatTime = audioCtx.currentTime + 0.6;
   beatInterval = 60 / BASE_BPM;
 }
@@ -2484,7 +2486,7 @@ function showResults() {
   localStorage.setItem('experiment-eye-history', JSON.stringify(history));
 
   // Update lifetime stats + daily streak
-  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score, medalsEarned });
+  updateLifetimeStats({ perfects, greats, bossesSlain, bestCombo, score, medalsEarned, elapsedMs: Date.now() - gameStartTime });
   recordDailyPlay();
 
   const histEl = document.getElementById('history-list');
@@ -3928,6 +3930,7 @@ function updateLifetimeStats(runData) {
   stats.bestComboEver = Math.max(stats.bestComboEver || 0, runData.bestCombo || 0);
   stats.bestScoreEver = Math.max(stats.bestScoreEver || 0, runData.score || 0);
   stats.totalMedals = (stats.totalMedals || 0) + (runData.medalsEarned || 0);
+  stats.totalTimeMs = (stats.totalTimeMs || 0) + (runData.elapsedMs || 0);
   try { localStorage.setItem('experiment-eye-lifetime', JSON.stringify(stats)); } catch(e) {}
 }
 
@@ -3980,6 +3983,10 @@ function updateTitleStats() {
     if (lifetime.totalBosses > 0) parts.push(`${lifetime.totalBosses} bosses`);
     if (lifetime.bestComboEver > 0) parts.push(`${lifetime.bestComboEver}x best combo`);
     if (lifetime.totalMedals > 0) parts.push(`${lifetime.totalMedals} medals`);
+    if (lifetime.totalTimeMs > 0) {
+      const mins = Math.round(lifetime.totalTimeMs / 60000);
+      parts.push(mins >= 60 ? `${(mins / 60).toFixed(1)}h trained` : `${mins}m trained`);
+    }
     lifetimeEl.textContent = parts.join(' · ');
   } else {
     lifetimeEl.textContent = '';
