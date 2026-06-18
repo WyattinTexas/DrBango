@@ -405,6 +405,7 @@ const VIBES = [
   { id: 'blackout', name: 'BLACKOUT', weight: 8,  color: '#e040fb', bg: '#020204', chaos: 2, bpmMult: 0.9 },
   { id: 'gift',     name: 'GIFT',     weight: 4,  color: '#00ffcc', bg: '#0a1410', chaos: 0, bpmMult: 0.7 },
   { id: 'boss',     name: 'BOSS',     weight: 3,  color: '#ff1744', bg: '#1a0a0a', chaos: 4, bpmMult: 1.4 },
+  { id: 'whisper',  name: 'WHISPER',  weight: 6,  color: '#334455', bg: '#030408', chaos: 0, bpmMult: 0.85 },
 ];
 
 // ─── KNOWLEDGE REWARDS ───
@@ -814,7 +815,7 @@ function spawnTarget() {
   };
 
   // Schedule approach tone with vibe-specific frequency
-  const toneFreq = vibe.id === 'boss' ? 100 : vibe.id === 'gift' ? 300 : 180;
+  const toneFreq = vibe.id === 'boss' ? 100 : vibe.id === 'gift' ? 300 : vibe.id === 'whisper' ? 800 : 180;
   playApproachTone(nextBeatTime, beatInterval, toneFreq);
 
   // Start drone for atmospheric vibes
@@ -830,10 +831,14 @@ function applyVibe(vibe) {
   envVignette = vibe.chaos >= 1 ? 0.3 + vibe.chaos * 0.15 : 0;
   noiseOpacity = vibe.chaos >= 3 ? 0.1 + (vibe.chaos - 3) * 0.1 : 0;
 
+  // Whisper: no vignette, nothing — just emptiness
+  if (vibe.id === 'whisper') { envVignette = 0; }
+
   vignetteEl.style.opacity = envVignette;
 
-  // Spawn bg particles
+  // Spawn bg particles (none for whisper)
   bgParticles = [];
+  if (vibe.id === 'whisper') return; // pure empty void
   const particleCount = 5 + vibe.chaos * 8;
   for (let i = 0; i < particleCount; i++) {
     bgParticles.push({
@@ -1343,8 +1348,8 @@ function drawGame(dt, timestamp) {
     ctx.translate(sx, sy);
   }
 
-  // Grid — fades in zone
-  const gridOp = (0.02 + vibe.chaos * 0.01) * (1 - z * 0.8);
+  // Grid — fades in zone, hidden in whisper
+  const gridOp = vibe.id === 'whisper' ? 0 : (0.02 + vibe.chaos * 0.01) * (1 - z * 0.8);
   ctx.strokeStyle = `rgba(${vibe.id === 'boss' ? '255,23,68' : '0,229,255'},${gridOp})`;
   ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 50) {
@@ -1436,13 +1441,18 @@ function drawGame(dt, timestamp) {
 
     const effectiveRadius = t.radius * pulseScale;
 
+    // Whisper mode: everything about the target is barely visible
+    // It shimmers — opacity oscillates gently so you can find it if you look carefully
+    const isWhisper = t.vibe.id === 'whisper';
+    const whisperDim = isWhisper ? (0.15 + Math.sin(timestamp * 0.004) * 0.08) : 1;
+
     // Approach ring
     const approachR = t.approachRadius - (t.approachRadius - effectiveRadius) * progress;
-    const ringBrightness = 0.25 + progress * 0.75;
+    const ringBrightness = (0.25 + progress * 0.75) * whisperDim;
     ctx.beginPath();
     ctx.arc(tx, ty, approachR, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isWhisper ? 1 : 2;
     ctx.stroke();
 
     // Check cursor proximity
@@ -1452,7 +1462,7 @@ function drawGame(dt, timestamp) {
     const isHovering = dist <= effectiveRadius * 1.8;
 
     // Outer glow
-    const glowAmt = isHovering ? 0.5 : 0.2;
+    const glowAmt = (isHovering ? 0.5 : 0.2) * whisperDim;
     const gradient = ctx.createRadialGradient(tx, ty, 0, tx, ty, effectiveRadius * 2.5);
 
     const hex = t.vibe.color;
@@ -1471,17 +1481,17 @@ function drawGame(dt, timestamp) {
     ctx.beginPath();
     ctx.arc(tx, ty, effectiveRadius, 0, Math.PI * 2);
     ctx.fillStyle = isHovering
-      ? `rgba(${cr},${cg},${cb},0.35)`
-      : `rgba(${cr},${cg},${cb},0.15)`;
+      ? `rgba(${cr},${cg},${cb},${0.35 * whisperDim})`
+      : `rgba(${cr},${cg},${cb},${0.15 * whisperDim})`;
     ctx.fill();
-    ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.4 + progress * 0.6})`;
+    ctx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.4 + progress * 0.6) * whisperDim})`;
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Center dot
     ctx.beginPath();
-    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
-    ctx.fillStyle = t.vibe.color;
+    ctx.arc(tx, ty, isWhisper ? 2 : 3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr},${cg},${cb},${whisperDim})`;
     ctx.fill();
 
     // Hold ring (shows how well you're holding on target)
@@ -1491,9 +1501,9 @@ function drawGame(dt, timestamp) {
       ctx.arc(tx, ty, effectiveRadius + 8, -Math.PI / 2,
               -Math.PI / 2 + holdPct * Math.PI * 2);
       ctx.strokeStyle = holdPct >= 0.8
-        ? 'rgba(0, 230, 118, 0.7)'
-        : 'rgba(255, 255, 255, 0.25)';
-      ctx.lineWidth = 2.5;
+        ? `rgba(0, 230, 118, ${0.7 * whisperDim})`
+        : `rgba(255, 255, 255, ${0.25 * whisperDim})`;
+      ctx.lineWidth = isWhisper ? 1.5 : 2.5;
       ctx.stroke();
     }
 
