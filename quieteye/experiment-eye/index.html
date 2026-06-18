@@ -758,6 +758,7 @@ const VIBES = [
   { id: 'gift',     name: 'GIFT',     weight: 4,  color: '#00ffcc', bg: '#0a1410', chaos: 0, bpmMult: 0.7 },
   { id: 'boss',     name: 'BOSS',     weight: 3,  color: '#ff1744', bg: '#1a0a0a', chaos: 4, bpmMult: 1.4 },
   { id: 'whisper',  name: 'WHISPER',  weight: 6,  color: '#334455', bg: '#030408', chaos: 0, bpmMult: 0.85 },
+  { id: 'retro',    name: 'RETRO',    weight: 8,  color: '#ff6ec7', bg: '#120818', chaos: 1, bpmMult: 0.95 },
 ];
 
 // ─── KNOWLEDGE REWARDS ───
@@ -1295,7 +1296,9 @@ function spawnTarget() {
   playApproachTone(nextBeatTime, beatInterval, toneFreq);
 
   // Start drone for atmospheric vibes
-  if (vibe.chaos >= 1) {
+  if (vibe.id === 'retro') {
+    startDrone(82.4, 0.025); // warm E2 pad for synthwave
+  } else if (vibe.chaos >= 1) {
     startDrone(45 + vibe.chaos * 10, 0.02 + vibe.chaos * 0.01);
   }
 }
@@ -1975,17 +1978,49 @@ function drawGame(dt, timestamp) {
     ctx.translate(sx, sy);
   }
 
-  // Grid — fades in zone, hidden in whisper
-  const gridOp = vibe.id === 'whisper' ? 0 : (0.02 + vibe.chaos * 0.01) * (1 - z * 0.8);
-  ctx.strokeStyle = `rgba(${vibe.id === 'boss' ? '255,23,68' : '0,229,255'},${gridOp})`;
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 50) {
-    const wobble = vibe.chaos >= 2 ? Math.sin(timestamp * 0.003 + x * 0.1) * vibe.chaos : 0;
-    ctx.beginPath(); ctx.moveTo(x + wobble, 0); ctx.lineTo(x + wobble, H); ctx.stroke();
-  }
-  for (let y = 0; y < H; y += 50) {
-    const wobble = vibe.chaos >= 2 ? Math.cos(timestamp * 0.003 + y * 0.1) * vibe.chaos : 0;
-    ctx.beginPath(); ctx.moveTo(0, y + wobble); ctx.lineTo(W, y + wobble); ctx.stroke();
+  // Grid — fades in zone, hidden in whisper, synthwave perspective for retro
+  if (vibe.id === 'retro') {
+    // Synthwave perspective grid — horizon at 40% height, lines converge
+    const horizon = H * 0.4;
+    const gridColor = 'rgba(255,110,199,';
+    const baseOp = 0.06 * (1 - z * 0.8);
+
+    // Horizontal lines with perspective spacing (closer together near horizon)
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 16; i++) {
+      const t = i / 15;
+      const y = horizon + (H - horizon) * (t * t); // quadratic for perspective
+      const fade = 0.3 + t * 0.7;
+      ctx.strokeStyle = gridColor + (baseOp * fade) + ')';
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Vertical lines converging to center horizon
+    const cx = W / 2;
+    for (let i = -8; i <= 8; i++) {
+      const bottomX = cx + i * (W / 10);
+      const fade = 1 - Math.abs(i) * 0.06;
+      ctx.strokeStyle = gridColor + (baseOp * fade) + ')';
+      ctx.beginPath(); ctx.moveTo(cx, horizon); ctx.lineTo(bottomX, H); ctx.stroke();
+    }
+    // Gradient sun at horizon
+    const sunGrad = ctx.createRadialGradient(cx, horizon, 0, cx, horizon, H * 0.18);
+    sunGrad.addColorStop(0, 'rgba(255,110,199,0.08)');
+    sunGrad.addColorStop(0.5, 'rgba(160,40,200,0.03)');
+    sunGrad.addColorStop(1, 'rgba(160,40,200,0)');
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const gridOp = vibe.id === 'whisper' ? 0 : (0.02 + vibe.chaos * 0.01) * (1 - z * 0.8);
+    ctx.strokeStyle = `rgba(${vibe.id === 'boss' ? '255,23,68' : '0,229,255'},${gridOp})`;
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 50) {
+      const wobble = vibe.chaos >= 2 ? Math.sin(timestamp * 0.003 + x * 0.1) * vibe.chaos : 0;
+      ctx.beginPath(); ctx.moveTo(x + wobble, 0); ctx.lineTo(x + wobble, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 50) {
+      const wobble = vibe.chaos >= 2 ? Math.cos(timestamp * 0.003 + y * 0.1) * vibe.chaos : 0;
+      ctx.beginPath(); ctx.moveTo(0, y + wobble); ctx.lineTo(W, y + wobble); ctx.stroke();
+    }
   }
 
   // Background particles — fade in zone
