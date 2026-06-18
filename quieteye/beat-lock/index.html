@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BEAT LOCK</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0a0a14;
+  font-family: 'Inter', sans-serif;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+}
+canvas {
+  display: block;
+  width: 100%; height: 100%;
+  position: fixed; top: 0; left: 0;
+}
+#ui {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui > * { pointer-events: auto; }
+
+/* Title Screen */
+#title-screen {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 20px;
+  text-align: center;
+}
+#title-screen h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 72px; font-weight: 900;
+  letter-spacing: 12px;
+  color: #00e5ff;
+  text-shadow: 0 0 40px rgba(0,229,255,0.4), 0 0 80px rgba(0,229,255,0.15);
+}
+#title-screen .tagline {
+  font-size: 18px; font-weight: 300;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 30px;
+}
+.bpm-buttons {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  justify-content: center;
+}
+.bpm-btn {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px; font-weight: 700;
+  padding: 16px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  min-width: 130px;
+}
+.bpm-btn:hover {
+  background: rgba(0,229,255,0.1);
+  border-color: rgba(0,229,255,0.4);
+  transform: translateY(-2px);
+}
+.bpm-btn .bpm-label {
+  display: block; font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  margin-top: 4px; font-family: 'Inter', sans-serif;
+  font-weight: 400;
+}
+
+/* HUD */
+#hud {
+  position: fixed; top: 0; left: 0;
+  width: 100%; padding: 20px 28px;
+  display: none;
+  z-index: 20;
+  pointer-events: none;
+}
+#hud-score {
+  position: absolute; top: 20px; left: 28px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 24px; font-weight: 700;
+}
+#hud-combo {
+  position: absolute; top: 16px; left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+}
+#hud-combo .combo-num {
+  font-size: 36px; font-weight: 900;
+  color: #00e5ff;
+  transition: transform 0.1s;
+}
+#hud-combo .combo-label {
+  font-size: 11px; color: rgba(255,255,255,0.4);
+  letter-spacing: 2px;
+}
+#hud-combo .hold-acc {
+  font-size: 11px; color: rgba(255,255,255,0.3);
+  margin-top: 2px;
+}
+#hud-count {
+  position: absolute; top: 20px; right: 28px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px; font-weight: 400;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Results Screen */
+#results-screen {
+  display: none; flex-direction: column;
+  align-items: center; gap: 16px;
+  text-align: center;
+  max-width: 420px;
+}
+#results-screen h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 28px; font-weight: 700;
+  margin-bottom: 4px;
+}
+#results-grade {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 80px; font-weight: 900;
+  line-height: 1;
+}
+#results-score {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 36px; font-weight: 700;
+  color: #00e5ff;
+}
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  font-size: 15px;
+  text-align: left;
+  width: 100%;
+}
+.results-grid .label {
+  color: rgba(255,255,255,0.4);
+  text-align: right;
+}
+.results-grid .value {
+  font-weight: 600;
+}
+.results-grid .perfect { color: #ffd700; }
+.results-grid .great { color: #00e676; }
+.results-grid .good { color: #42a5f5; }
+.results-grid .miss { color: #ff5252; }
+#on-the-beat {
+  font-size: 14px; color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+}
+#results-history {
+  width: 100%; margin-top: 8px;
+  font-size: 12px; color: rgba(255,255,255,0.35);
+  text-align: left;
+}
+#results-history h4 {
+  font-size: 11px; letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.25);
+}
+.history-row {
+  display: flex; justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+#play-again-btn {
+  margin-top: 16px;
+  background: rgba(0,229,255,0.12);
+  border: 1px solid rgba(0,229,255,0.3);
+  color: #00e5ff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px; font-weight: 700;
+  padding: 14px 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#play-again-btn:hover {
+  background: rgba(0,229,255,0.2);
+  transform: translateY(-2px);
+}
+
+/* Custom cursor */
+#crosshair {
+  position: fixed;
+  width: 24px; height: 24px;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+}
+.gameplay-active { cursor: none !important; }
+.gameplay-active * { cursor: none !important; }
+</style>
+</head>
+<body oncontextmenu="return false">
+<canvas id="c"></canvas>
+
+<div id="crosshair">
+  <svg width="24" height="24" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+    <line x1="12" y1="0" x2="12" y2="8" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+    <line x1="12" y1="16" x2="12" y2="24" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+    <line x1="0" y1="12" x2="8" y2="12" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+    <line x1="16" y1="12" x2="24" y2="12" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+  </svg>
+</div>
+
+<div id="ui">
+  <div id="title-screen">
+    <h1>BEAT LOCK</h1>
+    <div class="tagline">Hold Steady. Strike on the Beat.</div>
+    <div class="bpm-buttons">
+      <button class="bpm-btn" onclick="startGame(90)">CHILL<span class="bpm-label">90 BPM</span></button>
+      <button class="bpm-btn" onclick="startGame(120)">FLOW<span class="bpm-label">120 BPM</span></button>
+      <button class="bpm-btn" onclick="startGame(140)">PUSH<span class="bpm-label">140 BPM</span></button>
+      <button class="bpm-btn" onclick="startGame(160)">ELITE<span class="bpm-label">160 BPM</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="hud-score">0</div>
+  <div id="hud-combo">
+    <div class="combo-num" id="combo-num">0x</div>
+    <div class="combo-label">COMBO</div>
+    <div class="hold-acc" id="hold-acc"></div>
+  </div>
+  <div id="hud-count" id="hud-count">0 / 30</div>
+</div>
+
+<div id="ui">
+  <div id="results-screen">
+    <h2>ROUND COMPLETE</h2>
+    <div id="results-grade"></div>
+    <div id="results-score"></div>
+    <div class="results-grid" id="results-grid"></div>
+    <div id="on-the-beat"></div>
+    <div id="results-history"></div>
+    <button id="play-again-btn" onclick="showTitle()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ─── Globals ───
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const crosshair = document.getElementById('crosshair');
+const titleScreen = document.getElementById('title-screen');
+const resultsScreen = document.getElementById('results-screen');
+const hud = document.getElementById('hud');
+
+let W, H, dpr;
+let audioCtx = null;
+let state = 'title'; // title | countdown | playing | results
+let mouseX = 0, mouseY = 0;
+let isTouch = false;
+
+// Game state
+let bpm = 120;
+let beatInterval = 0.5; // seconds
+let nextBeatTime = 0;
+let beatIndex = 0;
+let score = 0;
+let combo = 0;
+let bestCombo = 0;
+let targetsHit = 0;
+let targetCount = 0;
+const TOTAL_TARGETS = 30;
+
+let perfects = 0, greats = 0, goods = 0, misses = 0;
+let holdAccuracies = [];
+let currentTarget = null;
+let feedbacks = [];
+let beatPulses = [];
+let particles = [];
+let droneOsc = null;
+let droneGain = null;
+
+// Scheduling
+let scheduledBeats = [];
+const SCHEDULE_AHEAD = 0.15; // schedule beats 150ms ahead
+
+// ─── Resize ───
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── Audio ───
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playKick(time) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(80, time);
+  osc.frequency.exponentialRampToValueAtTime(30, time + 0.12);
+  gain.gain.setValueAtTime(0.6, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + 0.25);
+}
+
+function playApproachTone(startTime, duration) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(200, startTime);
+  osc.frequency.linearRampToValueAtTime(600, startTime + duration);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.06, startTime + duration * 0.5);
+  gain.gain.linearRampToValueAtTime(0.12, startTime + duration * 0.9);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+}
+
+function playPerfectSound() {
+  const t = audioCtx.currentTime;
+  [1200, 1800, 2400].forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15 + i * 0.03);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.02); osc.stop(t + 0.25);
+  });
+}
+
+function playGreatSound() {
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = 800;
+  gain.gain.setValueAtTime(0.2, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.15);
+}
+
+function playGoodSound() {
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 500;
+  gain.gain.setValueAtTime(0.1, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.12);
+}
+
+function playMissSound() {
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, t);
+  osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
+  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.25);
+}
+
+function playComboMilestone(level) {
+  const t = audioCtx.currentTime;
+  const base = 400 + level * 100;
+  [0, 4, 7].forEach((semitone, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = base * Math.pow(2, semitone / 12);
+    gain.gain.setValueAtTime(0.12, t + i * 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.3);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.06); osc.stop(t + 0.5);
+  });
+}
+
+function startDrone() {
+  if (droneOsc) return;
+  droneOsc = audioCtx.createOscillator();
+  droneGain = audioCtx.createGain();
+  droneOsc.type = 'sine';
+  droneOsc.frequency.value = 55;
+  droneGain.gain.value = 0.04;
+  droneOsc.connect(droneGain);
+  droneGain.connect(audioCtx.destination);
+  droneOsc.start();
+}
+
+function stopDrone() {
+  if (droneOsc) {
+    droneGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+    droneOsc.stop(audioCtx.currentTime + 0.6);
+    droneOsc = null; droneGain = null;
+  }
+}
+
+// ─── Target ───
+function spawnTarget() {
+  const margin = 80;
+  const x = margin + Math.random() * (W - margin * 2);
+  const y = margin + Math.random() * (H - margin * 2);
+  currentTarget = {
+    x, y,
+    radius: 30,
+    approachRadius: 80,
+    spawnTime: nextBeatTime, // spawned on this beat
+    strikeTime: nextBeatTime + beatInterval, // should be clicked on NEXT beat
+    holdSamples: 0,
+    holdInside: 0,
+    hit: false,
+    missed: false
+  };
+  // Schedule approach tone
+  playApproachTone(nextBeatTime, beatInterval);
+}
+
+// ─── Particles ───
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 200;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.4 + Math.random() * 0.3,
+      maxLife: 0.4 + Math.random() * 0.3,
+      color,
+      size: 2 + Math.random() * 3
+    });
+  }
+}
+
+// ─── Feedback text ───
+function showFeedback(text, x, y, color) {
+  feedbacks.push({ text, x, y, color, life: 1.0, maxLife: 1.0 });
+}
+
+// ─── Hit detection ───
+function getMultiplier() {
+  if (combo >= 20) return 3;
+  if (combo >= 15) return 2.5;
+  if (combo >= 10) return 2;
+  if (combo >= 5) return 1.5;
+  return 1;
+}
+
+function processStrike() {
+  if (!currentTarget || currentTarget.hit || currentTarget.missed) return;
+  if (state !== 'playing') return;
+
+  const now = audioCtx.currentTime;
+  const diff = Math.abs(now - currentTarget.strikeTime) * 1000; // ms
+
+  // Hold accuracy
+  const holdAcc = currentTarget.holdSamples > 0
+    ? currentTarget.holdInside / currentTarget.holdSamples
+    : 0;
+  holdAccuracies.push(holdAcc);
+  const holdBonus = holdAcc >= 0.8 ? 50 : 0;
+
+  let points = 0;
+  let rating = '';
+  let color = '';
+  let particleCount = 0;
+  const mult = getMultiplier();
+
+  if (diff <= 50) {
+    rating = 'PERFECT'; color = '#ffd700'; points = 150; particleCount = 20;
+    perfects++; playPerfectSound();
+  } else if (diff <= 120) {
+    rating = 'GREAT'; color = '#00e676'; points = 100; particleCount = 12;
+    greats++; playGreatSound();
+  } else if (diff <= 200) {
+    rating = 'GOOD'; color = '#42a5f5'; points = 50; particleCount = 6;
+    goods++; playGoodSound();
+  } else {
+    rating = 'MISS'; color = '#ff5252'; points = 0; particleCount = 0;
+    misses++; combo = 0; playMissSound();
+    currentTarget.missed = true;
+    showFeedback('MISS', currentTarget.x, currentTarget.y - 20, color);
+    targetCount++;
+    document.getElementById('hud-count').textContent = `${targetCount} / ${TOTAL_TARGETS}`;
+    currentTarget = null;
+    return;
+  }
+
+  // Apply score
+  const totalPoints = Math.round((points + holdBonus) * mult);
+  score += totalPoints;
+  combo++;
+  if (combo > bestCombo) bestCombo = combo;
+  targetsHit++;
+  currentTarget.hit = true;
+
+  // Feedback
+  let feedbackText = rating;
+  if (holdBonus > 0) feedbackText += ' +LOCK';
+  showFeedback(feedbackText, currentTarget.x, currentTarget.y - 20, color);
+  spawnParticles(currentTarget.x, currentTarget.y, color, particleCount);
+
+  // Combo milestones
+  if (combo === 5 || combo === 10 || combo === 15 || combo === 20) {
+    playComboMilestone(combo / 5);
+  }
+
+  // Update HUD
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('combo-num').textContent = `${combo}x`;
+  targetCount++;
+  document.getElementById('hud-count').textContent = `${targetCount} / ${TOTAL_TARGETS}`;
+
+  const avgHold = holdAccuracies.length > 0
+    ? Math.round(holdAccuracies.reduce((a, b) => a + b, 0) / holdAccuracies.length * 100)
+    : 0;
+  document.getElementById('hold-acc').textContent = `${avgHold}% hold`;
+
+  currentTarget = null;
+}
+
+// ─── Game start ───
+function startGame(selectedBpm) {
+  initAudio();
+  bpm = selectedBpm;
+  beatInterval = 60 / bpm;
+  score = 0; combo = 0; bestCombo = 0; targetsHit = 0; targetCount = 0;
+  perfects = 0; greats = 0; goods = 0; misses = 0;
+  holdAccuracies = [];
+  currentTarget = null;
+  feedbacks = [];
+  beatPulses = [];
+  particles = [];
+  beatIndex = 0;
+
+  titleScreen.style.display = 'none';
+  resultsScreen.style.display = 'none';
+  hud.style.display = 'block';
+  document.getElementById('hud-score').textContent = '0';
+  document.getElementById('combo-num').textContent = '0x';
+  document.getElementById('hud-count').textContent = `0 / ${TOTAL_TARGETS}`;
+  document.getElementById('hold-acc').textContent = '';
+
+  if (!isTouch) {
+    crosshair.style.display = 'block';
+    document.body.classList.add('gameplay-active');
+  }
+
+  startDrone();
+
+  // Start beats after a short delay
+  state = 'playing';
+  nextBeatTime = audioCtx.currentTime + 0.5; // first beat in 500ms
+}
+
+function showTitle() {
+  state = 'title';
+  titleScreen.style.display = 'flex';
+  resultsScreen.style.display = 'none';
+  hud.style.display = 'none';
+  crosshair.style.display = 'none';
+  document.body.classList.remove('gameplay-active');
+  currentTarget = null;
+  stopDrone();
+}
+
+function showResults() {
+  state = 'results';
+  hud.style.display = 'none';
+  crosshair.style.display = 'none';
+  document.body.classList.remove('gameplay-active');
+  stopDrone();
+
+  const total = perfects + greats + goods + misses;
+  const onBeatPct = total > 0 ? Math.round((perfects + greats) / total * 100) : 0;
+  const avgHold = holdAccuracies.length > 0
+    ? Math.round(holdAccuracies.reduce((a, b) => a + b, 0) / holdAccuracies.length * 100)
+    : 0;
+
+  // Grade calculation
+  const hitRate = total > 0 ? (perfects + greats) / total : 0;
+  const perfectRate = total > 0 ? perfects / total : 0;
+  const gradeScore = hitRate * 0.7 + perfectRate * 0.2 + (avgHold / 100) * 0.1;
+  let grade, gradeColor;
+  if (gradeScore >= 0.95) { grade = 'S+'; gradeColor = '#ffd700'; }
+  else if (gradeScore >= 0.88) { grade = 'S'; gradeColor = '#ffd700'; }
+  else if (gradeScore >= 0.80) { grade = 'A'; gradeColor = '#00e676'; }
+  else if (gradeScore >= 0.70) { grade = 'B'; gradeColor = '#42a5f5'; }
+  else if (gradeScore >= 0.55) { grade = 'C'; gradeColor = '#ff9800'; }
+  else { grade = 'D'; gradeColor = '#ff5252'; }
+
+  document.getElementById('results-grade').textContent = grade;
+  document.getElementById('results-grade').style.color = gradeColor;
+  document.getElementById('results-score').textContent = score;
+
+  document.getElementById('results-grid').innerHTML = `
+    <span class="label">Perfects</span><span class="value perfect">${perfects}</span>
+    <span class="label">Greats</span><span class="value great">${greats}</span>
+    <span class="label">Goods</span><span class="value good">${goods}</span>
+    <span class="label">Misses</span><span class="value miss">${misses}</span>
+    <span class="label">Best Combo</span><span class="value">${bestCombo}x</span>
+    <span class="label">Hold Accuracy</span><span class="value">${avgHold}%</span>
+  `;
+
+  document.getElementById('on-the-beat').textContent = `${onBeatPct}% on the beat`;
+
+  // Save to history
+  const run = {
+    date: new Date().toLocaleDateString(),
+    score, bpm, grade, onBeatPct
+  };
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('beatlock-history') || '[]'); } catch(e) {}
+  history.unshift(run);
+  history = history.slice(0, 5);
+  localStorage.setItem('beatlock-history', JSON.stringify(history));
+
+  // Show history
+  const histEl = document.getElementById('results-history');
+  if (history.length > 1) {
+    histEl.innerHTML = '<h4>Recent Runs</h4>' + history.map(h =>
+      `<div class="history-row">
+        <span>${h.date}</span>
+        <span>${h.bpm} BPM</span>
+        <span>${h.score} pts</span>
+        <span>${h.grade}</span>
+      </div>`
+    ).join('');
+  } else {
+    histEl.innerHTML = '';
+  }
+
+  resultsScreen.style.display = 'flex';
+}
+
+// ─── Input ───
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  crosshair.style.transform = `translate(${mouseX - 12}px, ${mouseY - 12}px)`;
+});
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (state === 'playing') processStrike();
+});
+
+document.addEventListener('touchstart', (e) => {
+  isTouch = true;
+  crosshair.style.display = 'none';
+  if (state === 'playing') {
+    const touch = e.touches[0];
+    mouseX = touch.clientX;
+    mouseY = touch.clientY;
+    processStrike();
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (state === 'playing') {
+    const touch = e.touches[0];
+    mouseX = touch.clientX;
+    mouseY = touch.clientY;
+  }
+}, { passive: true });
+
+// ─── Main Loop ───
+let lastTime = 0;
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, W, H);
+
+  if (state === 'playing') {
+    updatePlaying(dt);
+    drawPlaying(dt);
+  } else if (state === 'title' || state === 'results') {
+    drawAmbient(dt);
+  }
+
+  // Draw particles (all states)
+  drawParticles(dt);
+
+  // Draw feedbacks
+  drawFeedbacks(dt);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function updatePlaying(dt) {
+  const now = audioCtx.currentTime;
+
+  // Schedule and process beats
+  while (nextBeatTime <= now + SCHEDULE_AHEAD) {
+    // Schedule the kick sound
+    playKick(nextBeatTime);
+
+    // On the beat: check for miss on current target, spawn new target
+    const beatT = nextBeatTime;
+    scheduledBeats.push(beatT);
+
+    nextBeatTime += beatInterval;
+    beatIndex++;
+  }
+
+  // Process scheduled beats that have passed
+  while (scheduledBeats.length > 0 && scheduledBeats[0] <= now) {
+    const bt = scheduledBeats.shift();
+
+    // Beat pulse visual
+    beatPulses.push({ time: now, x: W / 2, y: H / 2, radius: 0, alpha: 0.3 });
+
+    // If current target exists and its strike time has passed, it's a miss
+    if (currentTarget && !currentTarget.hit && !currentTarget.missed && now >= currentTarget.strikeTime + 0.2) {
+      currentTarget.missed = true;
+      misses++;
+      combo = 0;
+      showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
+      playMissSound();
+      targetCount++;
+      document.getElementById('hud-count').textContent = `${targetCount} / ${TOTAL_TARGETS}`;
+      document.getElementById('combo-num').textContent = '0x';
+      holdAccuracies.push(0);
+      currentTarget = null;
+    }
+
+    // Spawn new target if needed
+    if (!currentTarget && targetCount < TOTAL_TARGETS) {
+      spawnTarget();
+    } else if (!currentTarget && targetCount >= TOTAL_TARGETS) {
+      showResults();
+      return;
+    }
+  }
+
+  // Update hold tracking for current target
+  if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
+    const dx = mouseX - currentTarget.x;
+    const dy = mouseY - currentTarget.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    currentTarget.holdSamples++;
+    if (dist <= currentTarget.radius * 1.5) {
+      currentTarget.holdInside++;
+    }
+  }
+
+  // Drone pitch shift
+  if (droneOsc) {
+    const notes = [55, 58.27, 61.74, 55, 65.41, 61.74];
+    const noteIdx = Math.floor(targetCount / 5) % notes.length;
+    droneOsc.frequency.linearRampToValueAtTime(notes[noteIdx], audioCtx.currentTime + 0.5);
+  }
+}
+
+function drawPlaying(dt) {
+  const now = audioCtx.currentTime;
+
+  // Beat pulse rings
+  for (let i = beatPulses.length - 1; i >= 0; i--) {
+    const p = beatPulses[i];
+    const age = now - p.time;
+    if (age > 0.8) { beatPulses.splice(i, 1); continue; }
+    const progress = age / 0.8;
+    const r = progress * Math.max(W, H) * 0.4;
+    const alpha = p.alpha * (1 - progress);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+    ctx.lineWidth = 2 * (1 - progress);
+    ctx.stroke();
+  }
+
+  // Screen border pulse
+  if (beatPulses.length > 0) {
+    const latest = beatPulses[beatPulses.length - 1];
+    const age = now - latest.time;
+    if (age < 0.15) {
+      const alpha = 0.15 * (1 - age / 0.15);
+      ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, W - 4, H - 4);
+    }
+  }
+
+  // Target
+  if (currentTarget && !currentTarget.hit && !currentTarget.missed) {
+    const t = currentTarget;
+    const elapsed = now - t.spawnTime;
+    const duration = t.strikeTime - t.spawnTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Approach ring
+    const approachR = t.approachRadius - (t.approachRadius - t.radius) * progress;
+    const ringBrightness = 0.3 + progress * 0.7;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, approachR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${ringBrightness})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Target core
+    const dx = mouseX - t.x;
+    const dy = mouseY - t.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const isHovering = dist <= t.radius * 1.5;
+    const glow = isHovering ? 0.6 : 0.3;
+
+    // Outer glow
+    const gradient = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, t.radius * 2);
+    gradient.addColorStop(0, `rgba(0, 229, 255, ${glow})`);
+    gradient.addColorStop(1, 'rgba(0, 229, 255, 0)');
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.radius * 2, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Core circle
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+    ctx.fillStyle = isHovering ? 'rgba(0, 229, 255, 0.35)' : 'rgba(0, 229, 255, 0.15)';
+    ctx.fill();
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.5 + progress * 0.5})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#00e5ff';
+    ctx.fill();
+
+    // Lock indicator when hovering
+    if (isHovering && t.holdSamples > 5) {
+      const holdPct = t.holdInside / t.holdSamples;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.radius + 6, -Math.PI / 2, -Math.PI / 2 + holdPct * Math.PI * 2);
+      ctx.strokeStyle = holdPct >= 0.8 ? 'rgba(0, 230, 118, 0.7)' : 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // Multiplier display
+  const mult = getMultiplier();
+  if (mult > 1) {
+    ctx.font = '600 13px Inter';
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${mult}x MULTIPLIER`, W / 2, 105);
+  }
+}
+
+function drawAmbient(dt) {
+  // Subtle ambient floating particles on title/results
+  const now = performance.now() / 1000;
+  for (let i = 0; i < 5; i++) {
+    const x = W * (0.2 + 0.6 * Math.sin(now * 0.1 + i * 1.3));
+    const y = H * (0.2 + 0.6 * Math.cos(now * 0.08 + i * 0.9));
+    const r = 1.5 + Math.sin(now + i) * 0.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+    ctx.fill();
+  }
+}
+
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+    const alpha = p.life / p.maxLife;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fillStyle = p.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('##', '#');
+
+    // Parse hex color to rgba
+    const hex = p.color;
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawFeedbacks(dt) {
+  for (let i = feedbacks.length - 1; i >= 0; i--) {
+    const f = feedbacks[i];
+    f.life -= dt;
+    if (f.life <= 0) { feedbacks.splice(i, 1); continue; }
+    const progress = 1 - f.life / f.maxLife;
+    const alpha = 1 - progress;
+    const yOff = progress * 40;
+
+    ctx.font = '700 22px Orbitron';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = f.color.length === 7
+      ? `rgba(${parseInt(f.color.slice(1,3),16)},${parseInt(f.color.slice(3,5),16)},${parseInt(f.color.slice(5,7),16)},${alpha})`
+      : f.color;
+    ctx.fillText(f.text, f.x, f.y - yOff);
+  }
+}
+
+// ─── Start ───
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
