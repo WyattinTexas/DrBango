@@ -3,1253 +3,301 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LOCK & STRIKE — Quiet Eye Training</title>
+<title>QUIET EYE LAB — Pickleball Focus Training</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  :root {
-    --bg: #0a0a12;
-    --surface: #12121e;
-    --accent: #00e5ff;
-    --accent2: #7c4dff;
-    --gold: #ffd740;
-    --red: #ff1744;
-    --green: #00e676;
-    --text: #e0e0e0;
-    --dim: #555;
-  }
-
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: #0a0a12;
+    color: #e0e0e0;
     font-family: 'Inter', sans-serif;
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-    cursor: none;
-    user-select: none;
-  }
-
-  /* === CUSTOM CURSOR === */
-  #crosshair {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9999;
-    width: 48px;
-    height: 48px;
-    transform: translate(-50%, -50%);
-  }
-  #crosshair .ring {
-    position: absolute;
-    top: 4px; left: 4px;
-    width: 40px; height: 40px;
-    border: 2px solid var(--accent);
-    border-radius: 50%;
-    opacity: 0.8;
-    transition: all 0.15s;
-  }
-  #crosshair .dot {
-    position: absolute;
-    top: 22px; left: 22px;
-    width: 4px; height: 4px;
-    background: var(--accent);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-  }
-  #crosshair .line {
-    position: absolute;
-    background: var(--accent);
-    opacity: 0.5;
-  }
-  #crosshair .line.h { top: 23px; left: 0; width: 48px; height: 1px; }
-  #crosshair .line.v { left: 23px; top: 0; height: 48px; width: 1px; }
-
-  #crosshair.locked .ring {
-    border-color: var(--green);
-    box-shadow: 0 0 20px rgba(0, 230, 118, 0.5);
-    transform: scale(0.7);
-  }
-  #crosshair.locked .dot { background: var(--green); }
-  #crosshair.locked .line { background: var(--green); opacity: 0.8; }
-
-  #crosshair.strike .ring {
-    border-color: var(--gold);
-    box-shadow: 0 0 30px rgba(255, 215, 64, 0.8);
-    transform: scale(1.3);
-    opacity: 0;
-    transition: all 0.3s;
-  }
-
-  /* === ARENA === */
-  #arena {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background:
-      radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.03) 0%, transparent 60%),
-      var(--bg);
-  }
-
-  /* Grid lines */
-  #arena::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background-image:
-      linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  /* === HUD === */
-  #hud {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 32px;
-    z-index: 100;
-    background: linear-gradient(to bottom, rgba(10,10,18,0.9), transparent);
-  }
-
-  .hud-block {
-    text-align: center;
-  }
-  .hud-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: var(--dim);
-    text-transform: uppercase;
-  }
-  .hud-value {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 28px;
-    font-weight: 900;
-    color: var(--accent);
-  }
-  .hud-value.gold { color: var(--gold); }
-  .hud-value.red { color: var(--red); }
-
-  #combo-display {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
-    color: var(--accent2);
-    margin-top: 2px;
-  }
-
-  /* === TARGET === */
-  .target {
-    position: absolute;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-  }
-
-  .target-outer {
-    width: 120px; height: 120px;
-    border: 2px solid rgba(255, 23, 68, 0.4);
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    animation: pulse-ring 1.5s ease-in-out infinite;
-  }
-
-  .target-mid {
-    width: 80px; height: 80px;
-    border: 2px solid rgba(255, 23, 68, 0.6);
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .target-inner {
-    width: 40px; height: 40px;
-    background: radial-gradient(circle, var(--red), rgba(255, 23, 68, 0.3));
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 30px rgba(255, 23, 68, 0.4);
-  }
-
-  .target-core {
-    width: 12px; height: 12px;
-    background: white;
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 10px white;
-  }
-
-  /* Lock-on progress ring */
-  .lock-ring {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 140px; height: 140px;
-  }
-  .lock-ring svg {
-    width: 100%; height: 100%;
-    transform: rotate(-90deg);
-  }
-  .lock-ring circle {
-    fill: none;
-    stroke: var(--green);
-    stroke-width: 3;
-    stroke-dasharray: 440;
-    stroke-dashoffset: 440;
-    stroke-linecap: round;
-    filter: drop-shadow(0 0 6px rgba(0, 230, 118, 0.6));
-    transition: stroke-dashoffset 0.05s linear;
-  }
-
-  @keyframes pulse-ring {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
-    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.7; }
-  }
-
-  /* === PARTICLES === */
-  .particle {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-
-  /* === SCORE POPUP === */
-  .score-popup {
-    position: absolute;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 900;
-    font-size: 32px;
-    pointer-events: none;
-    animation: float-up 1s ease-out forwards;
-    text-shadow: 0 0 20px currentColor;
-    z-index: 200;
-  }
-  @keyframes float-up {
-    0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-    20% { transform: translate(-50%, -10px) scale(1.2); opacity: 1; }
-    100% { transform: translate(-50%, -80px) scale(0.8); opacity: 0; }
-  }
-
-  /* === SCREENS === */
-  .screen {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    z-index: 500;
-    background: var(--bg);
-    cursor: default;
+    padding: 60px 20px;
   }
-  .screen.hidden { display: none; }
-
-  .title {
+  .logo {
     font-family: 'Orbitron', sans-serif;
-    font-size: 64px;
+    font-size: 52px;
     font-weight: 900;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    background: linear-gradient(135deg, #00e5ff, #7c4dff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 8px;
   }
-  .subtitle {
+  .tagline {
     font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     letter-spacing: 6px;
-    color: var(--dim);
-    margin-bottom: 48px;
+    color: #555;
+    margin-bottom: 12px;
   }
-
-  .mode-select {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 40px;
-  }
-
-  .mode-btn {
-    background: var(--surface);
-    border: 2px solid var(--dim);
-    color: var(--text);
-    font-family: 'Orbitron', sans-serif;
+  .ben-quote {
+    font-style: italic;
+    color: #777;
     font-size: 14px;
-    padding: 20px 32px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
+    margin-bottom: 48px;
+    max-width: 600px;
     text-align: center;
-    min-width: 180px;
+    line-height: 1.6;
   }
-  .mode-btn:hover {
-    border-color: var(--accent);
-    background: rgba(0, 229, 255, 0.05);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0, 229, 255, 0.15);
+  .ben-quote span { color: #00e5ff; font-style: normal; font-weight: 600; }
+
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    max-width: 1100px;
+    width: 100%;
+    margin-bottom: 60px;
   }
-  .mode-btn .mode-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 8px;
+
+  .game-card {
+    background: #12121e;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 32px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
   }
-  .mode-btn .mode-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    color: var(--dim);
+  .game-card:hover {
+    border-color: var(--card-color, #00e5ff);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 30px var(--card-glow, rgba(0,229,255,0.1));
+  }
+  .game-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-color, #00e5ff);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .game-card:hover::before { opacity: 1; }
+
+  .card-number {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: #444;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--card-color, #00e5ff);
+    margin-bottom: 6px;
+  }
+  .card-subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 16px;
     font-weight: 300;
   }
+  .card-desc {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #999;
+    margin-bottom: 20px;
+  }
+  .card-skill {
+    display: inline-block;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--card-color, #00e5ff);
+    color: var(--card-color, #00e5ff);
+    opacity: 0.7;
+  }
 
-  .start-hint {
+  .card-ben {
+    margin-top: 14px;
     font-size: 12px;
-    color: var(--dim);
-    letter-spacing: 2px;
-    margin-top: 20px;
+    color: #666;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    padding-top: 14px;
   }
+  .card-ben strong { color: #aaa; }
 
-  /* === RESULTS === */
-  #results {
-    text-align: center;
-  }
-  .result-title {
+  .section-label {
     font-family: 'Orbitron', sans-serif;
-    font-size: 48px;
-    font-weight: 900;
-    margin-bottom: 32px;
-  }
-  .result-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-bottom: 40px;
-    min-width: 500px;
-  }
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 20px;
-  }
-  .stat-card .stat-val {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 36px;
-    font-weight: 900;
-    color: var(--accent);
-  }
-  .stat-card .stat-label {
     font-size: 11px;
-    letter-spacing: 2px;
-    color: var(--dim);
-    text-transform: uppercase;
-    margin-top: 4px;
-  }
-
-  .grade {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 80px;
-    font-weight: 900;
-    margin: 20px 0;
-  }
-  .grade-label {
-    font-size: 13px;
     letter-spacing: 4px;
-    color: var(--dim);
-    margin-bottom: 8px;
+    color: #444;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 1100px;
+    text-align: left;
   }
 
-  .play-again {
-    background: none;
-    border: 2px solid var(--accent);
-    color: var(--accent);
+  .science-box {
+    max-width: 1100px;
+    width: 100%;
+    background: #12121e;
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 16px;
+    padding: 32px 40px;
+  }
+  .science-box h3 {
     font-family: 'Orbitron', sans-serif;
-    font-size: 16px;
-    padding: 14px 40px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 20px;
+    font-size: 14px;
+    color: #00e5ff;
+    margin-bottom: 16px;
+    letter-spacing: 2px;
   }
-  .play-again:hover {
-    background: var(--accent);
-    color: var(--bg);
+  .science-box p {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #888;
+    margin-bottom: 12px;
   }
-
-  /* === COUNTDOWN === */
-  #countdown {
-    position: fixed;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Orbitron', sans-serif;
-    font-size: 120px;
-    font-weight: 900;
-    color: var(--accent);
-    z-index: 400;
-    text-shadow: 0 0 60px rgba(0, 229, 255, 0.5);
-    display: none;
-  }
-
-  /* === TIMER BAR === */
-  #timer-bar {
-    position: fixed;
-    bottom: 0; left: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    z-index: 100;
-    transition: width 0.1s linear;
-    box-shadow: 0 0 10px var(--accent);
-  }
-
-  /* === BOTTOM HUD === */
-  #bottom-hud {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+  .science-box strong { color: #ccc; }
+  .stat-row {
     display: flex;
     gap: 40px;
-    z-index: 100;
-    opacity: 0.6;
+    margin-top: 20px;
+    flex-wrap: wrap;
   }
-  .bottom-stat {
+  .stat-item {
+    text-align: center;
+  }
+  .stat-num {
     font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: var(--dim);
-  }
-  .bottom-stat span {
-    color: var(--text);
-  }
-
-  /* === MISS FLASH === */
-  .miss-flash {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(255, 23, 68, 0.1);
-    pointer-events: none;
-    z-index: 50;
-    animation: flash-out 0.3s ease-out forwards;
-  }
-  @keyframes flash-out {
-    to { opacity: 0; }
-  }
-
-  /* === STREAK BANNER === */
-  .streak-banner {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Orbitron', sans-serif;
-    font-size: 24px;
+    font-size: 32px;
     font-weight: 900;
-    color: var(--gold);
-    text-shadow: 0 0 40px rgba(255, 215, 64, 0.6);
-    z-index: 300;
-    animation: streak-pop 0.8s ease-out forwards;
-    pointer-events: none;
+    color: #7c4dff;
   }
-  @keyframes streak-pop {
-    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-    30% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+  .stat-desc {
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 1px;
+    margin-top: 4px;
   }
 </style>
 </head>
 <body>
 
-<!-- Custom Crosshair -->
-<div id="crosshair">
-  <div class="ring"></div>
-  <div class="dot"></div>
-  <div class="line h"></div>
-  <div class="line v"></div>
+<div class="logo">QUIET EYE LAB</div>
+<div class="tagline">PICKLEBALL FOCUS TRAINING</div>
+<p class="ben-quote">
+  "Elite athletes' quiet eye duration is <span>62% longer</span> than non-experts.
+  Under pressure, trained QE is more resilient — the gaze stays locked even when anxiety spikes."
+  <br>— Dr. Joan Vickers, University of Calgary
+</p>
+
+<div class="section-label">TRAINING DRILLS</div>
+
+<div class="games-grid">
+
+  <a href="dink-patience/" class="game-card" style="--card-color: #00e676; --card-glow: rgba(0,230,118,0.1);">
+    <div class="card-number">DRILL 01</div>
+    <div class="card-title">DINK PATIENCE</div>
+    <div class="card-subtitle">Shot Selection Training</div>
+    <div class="card-desc">
+      Balls arc toward your kitchen. Some pop high (triggers), some stay low (traps).
+      Lock on, read the ball, then decide: attack or reset. Patience wins.
+    </div>
+    <div class="card-skill">TRIGGER DISCRIMINATION</div>
+    <div class="card-ben"><strong>Ben Johns skill:</strong> Never attacks a trap ball. Waits for the green light, then commits 100%.</div>
+  </a>
+
+  <a href="trajectory-reader/" class="game-card" style="--card-color: #448aff; --card-glow: rgba(68,138,255,0.1);">
+    <div class="card-number">DRILL 02</div>
+    <div class="card-title">TRAJECTORY READER</div>
+    <div class="card-subtitle">Predictive Positioning</div>
+    <div class="card-desc">
+      A ball launches across the court and vanishes into fog. Lock your cursor on where you think it will land — before it arrives. Trust your read.
+    </div>
+    <div class="card-skill">ANTICIPATION</div>
+    <div class="card-ben"><strong>Ben Johns skill:</strong> Pre-positions before the ball arrives. Looks slow because he already knows.</div>
+  </a>
+
+  <a href="paddle-read/" class="game-card" style="--card-color: #ff9100; --card-glow: rgba(255,145,0,0.1);">
+    <div class="card-number">DRILL 03</div>
+    <div class="card-title">PADDLE READ</div>
+    <div class="card-subtitle">Contact Point Focus</div>
+    <div class="card-desc">
+      An opponent's paddle flashes at different angles. Lock your eyes on the paddle face, ignore body fakes, and predict where the shot goes.
+    </div>
+    <div class="card-skill">OPPONENT READING</div>
+    <div class="card-ben"><strong>Ben Johns skill:</strong> Watches the paddle face at contact, not the body. Sees through every fake.</div>
+  </a>
+
+  <a href="kitchen-rally/" class="game-card" style="--card-color: #7c4dff; --card-glow: rgba(124,77,255,0.1);">
+    <div class="card-number">DRILL 04</div>
+    <div class="card-title">KITCHEN RALLY</div>
+    <div class="card-subtitle">Sustained Focus</div>
+    <div class="card-desc">
+      A continuous dink rally. Lock on, dink back, repeat. Your score is based on QE consistency —
+      same focus on exchange 1 and exchange 20.
+    </div>
+    <div class="card-skill">FOCUS ENDURANCE</div>
+    <div class="card-ben"><strong>Ben Johns skill:</strong> Maintains identical focus across 20-dink rallies without breaking rhythm.</div>
+  </a>
+
+  <a href="pressure-cooker/" class="game-card" style="--card-color: #ff1744; --card-glow: rgba(255,23,68,0.1);">
+    <div class="card-number">DRILL 05</div>
+    <div class="card-title">PRESSURE COOKER</div>
+    <div class="card-subtitle">Clutch Performance</div>
+    <div class="card-desc">
+      Lock on targets as the environment descends into chaos — screen shake, decoys, visual noise.
+      Your QE at Level 5 must match Level 1. Stay ice cold.
+    </div>
+    <div class="card-skill">PRESSURE RESILIENCE</div>
+    <div class="card-ben"><strong>Ben Johns skill:</strong> Same quiet eye at 9-9-2 as at 1-0. Never chokes because his process doesn't change.</div>
+  </a>
+
+  <a href="lock-strike/" class="game-card" style="--card-color: #555; --card-glow: rgba(100,100,100,0.05);">
+    <div class="card-number">ORIGINAL</div>
+    <div class="card-title">LOCK & STRIKE</div>
+    <div class="card-subtitle">General QE Training</div>
+    <div class="card-desc">
+      The original. Static targets, lock on, strike. Three modes: Focus, Blitz, Zen.
+      Good warmup, but not pickleball-specific.
+    </div>
+    <div class="card-skill">BASELINE</div>
+  </a>
+
 </div>
 
-<!-- Title Screen -->
-<div id="title-screen" class="screen">
-  <div class="title">LOCK & STRIKE</div>
-  <div class="subtitle">QUIET EYE TRAINING</div>
-  <div class="mode-select">
-    <div class="mode-btn" onclick="startGame('focus')">
-      <div class="mode-name">FOCUS</div>
-      <div class="mode-desc">10 targets<br>Hold steady, then strike</div>
+<div class="science-box">
+  <h3>THE SCIENCE</h3>
+  <p>
+    <strong>Quiet Eye (QE)</strong> is the final stable visual fixation on a critical target before initiating a motor action.
+    Coined by Dr. Joan Vickers in 1987, decades of research show that expert athletes hold their gaze
+    significantly longer and more steadily than novices — and that this skill can be trained.
+  </p>
+  <p>
+    In pickleball, QE applies to: tracking the ball to the opponent's contact point, reading paddle angle before the shot,
+    fixating on the landing zone before you move, and maintaining visual discipline across long dink rallies.
+  </p>
+  <div class="stat-row">
+    <div class="stat-item">
+      <div class="stat-num">62%</div>
+      <div class="stat-desc">Longer QE in experts vs novices</div>
     </div>
-    <div class="mode-btn" onclick="startGame('blitz')">
-      <div class="mode-name">BLITZ</div>
-      <div class="mode-desc">30 seconds<br>Lock as many as you can</div>
+    <div class="stat-item">
+      <div class="stat-num">~970ms</div>
+      <div class="stat-desc">Elite QE duration (basketball)</div>
     </div>
-    <div class="mode-btn" onclick="startGame('zen')">
-      <div class="mode-name">ZEN</div>
-      <div class="mode-desc">No timer, no score<br>Pure practice</div>
+    <div class="stat-item">
+      <div class="stat-num">8%</div>
+      <div class="stat-desc">Accuracy improvement from QE training</div>
     </div>
-  </div>
-  <div class="start-hint">SELECT A MODE TO BEGIN</div>
-</div>
-
-<!-- Countdown -->
-<div id="countdown"></div>
-
-<!-- HUD -->
-<div id="hud" style="display:none;">
-  <div class="hud-block">
-    <div class="hud-label">Score</div>
-    <div class="hud-value gold" id="score-display">0</div>
-  </div>
-  <div class="hud-block">
-    <div class="hud-label" id="round-label">Round</div>
-    <div class="hud-value" id="round-display">1 / 10</div>
-  </div>
-  <div class="hud-block">
-    <div class="hud-label">Streak</div>
-    <div class="hud-value" id="streak-display">0</div>
-    <div id="combo-display"></div>
+    <div class="stat-item">
+      <div class="stat-num">2-3s</div>
+      <div class="stat-desc">Elite golf putting QE</div>
+    </div>
   </div>
 </div>
 
-<!-- Timer Bar -->
-<div id="timer-bar" style="display:none;"></div>
-
-<!-- Bottom HUD -->
-<div id="bottom-hud" style="display:none;">
-  <div class="bottom-stat">PERFECT <span id="perfect-count">0</span></div>
-  <div class="bottom-stat">GOOD <span id="good-count">0</span></div>
-  <div class="bottom-stat">MISS <span id="miss-count">0</span></div>
-  <div class="bottom-stat">AVG LOCK <span id="avg-lock">0</span>ms</div>
-</div>
-
-<!-- Arena -->
-<div id="arena"></div>
-
-<!-- Results Screen -->
-<div id="results-screen" class="screen hidden">
-  <div id="results">
-    <div class="result-title">MISSION COMPLETE</div>
-    <div class="grade-label">QUIET EYE GRADE</div>
-    <div class="grade" id="grade">A</div>
-    <div class="result-stats">
-      <div class="stat-card">
-        <div class="stat-val" id="r-score">0</div>
-        <div class="stat-label">Final Score</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="r-accuracy">0%</div>
-        <div class="stat-label">Accuracy</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="r-streak">0</div>
-        <div class="stat-label">Best Streak</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="r-perfect">0</div>
-        <div class="stat-label">Perfects</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="r-avglock">0ms</div>
-        <div class="stat-label">Avg Lock Time</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="r-stability">0%</div>
-        <div class="stat-label">Stability</div>
-      </div>
-    </div>
-    <button class="play-again" onclick="backToMenu()">PLAY AGAIN</button>
-  </div>
-</div>
-
-<script>
-// === AUDIO ENGINE ===
-const AudioEngine = {
-  ctx: null,
-  init() {
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-  },
-  play(type) {
-    if (!this.ctx) this.init();
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-
-    switch(type) {
-      case 'lock-tick': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 800 + Math.random() * 200;
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialDecayTo?.(0.001, now + 0.05) ||
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.05);
-        break;
-      }
-      case 'lock-complete': {
-        [880, 1100, 1320].forEach((f, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = f;
-          gain.gain.setValueAtTime(0.12, now + i * 0.06);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.15);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(now + i * 0.06);
-          osc.stop(now + i * 0.06 + 0.15);
-        });
-        break;
-      }
-      case 'strike-perfect': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-        // Sparkle
-        for (let i = 0; i < 3; i++) {
-          const s = ctx.createOscillator();
-          const g = ctx.createGain();
-          s.type = 'sine';
-          s.frequency.value = 2000 + i * 400;
-          g.gain.setValueAtTime(0.06, now + 0.1 + i * 0.05);
-          g.gain.exponentialRampToValueAtTime(0.001, now + 0.3 + i * 0.05);
-          s.connect(g).connect(ctx.destination);
-          s.start(now + 0.1 + i * 0.05);
-          s.stop(now + 0.3 + i * 0.05);
-        }
-        break;
-      }
-      case 'strike-good': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(500, now);
-        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.08);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.2);
-        break;
-      }
-      case 'miss': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.25);
-        break;
-      }
-      case 'countdown': {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 440;
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
-        break;
-      }
-      case 'go': {
-        [523, 659, 784, 1047].forEach((f, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'square';
-          osc.frequency.value = f;
-          gain.gain.setValueAtTime(0.1, now + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.2);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(now + i * 0.08);
-          osc.stop(now + i * 0.08 + 0.2);
-        });
-        break;
-      }
-      case 'streak': {
-        [1047, 1319, 1568].forEach((f, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = f;
-          gain.gain.setValueAtTime(0.08, now + i * 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.3);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(now + i * 0.1);
-          osc.stop(now + i * 0.1 + 0.3);
-        });
-        break;
-      }
-    }
-  }
-};
-
-// === GAME STATE ===
-let game = {
-  mode: null,
-  active: false,
-  score: 0,
-  streak: 0,
-  bestStreak: 0,
-  round: 0,
-  maxRounds: 10,
-  perfects: 0,
-  goods: 0,
-  misses: 0,
-  lockTimes: [],
-  stabilityScores: [],
-  // Current target
-  target: null,
-  targetEl: null,
-  lockProgress: 0,
-  lockRequired: 500, // ms to hold
-  isLocking: false,
-  isLocked: false,
-  lockStartTime: 0,
-  // Cursor tracking
-  mouseX: 0,
-  mouseY: 0,
-  wobbleHistory: [],
-  // Blitz timer
-  blitzTime: 30,
-  blitzStart: 0,
-  // Difficulty scaling
-  targetSize: 40, // inner radius
-  lockRequired: 500,
-};
-
-const arena = document.getElementById('arena');
-const crosshair = document.getElementById('crosshair');
-const hud = document.getElementById('hud');
-const bottomHud = document.getElementById('bottom-hud');
-const timerBar = document.getElementById('timer-bar');
-const countdownEl = document.getElementById('countdown');
-
-// === CURSOR ===
-document.addEventListener('mousemove', (e) => {
-  game.mouseX = e.clientX;
-  game.mouseY = e.clientY;
-  crosshair.style.left = e.clientX + 'px';
-  crosshair.style.top = e.clientY + 'px';
-
-  if (game.active) {
-    game.wobbleHistory.push({ x: e.clientX, y: e.clientY, t: Date.now() });
-    if (game.wobbleHistory.length > 60) game.wobbleHistory.shift();
-  }
-});
-
-document.addEventListener('click', (e) => {
-  if (!game.active) return;
-  if (!game.target) return;
-
-  if (game.isLocked) {
-    strikeTarget();
-  } else if (game.isLocking) {
-    // Clicked too early — partial lock
-    earlyStrike();
-  } else {
-    // Clicked with no lock
-    missTarget('NO LOCK');
-  }
-});
-
-// === GAME FLOW ===
-function startGame(mode) {
-  game.mode = mode;
-  game.score = 0;
-  game.streak = 0;
-  game.bestStreak = 0;
-  game.round = 0;
-  game.perfects = 0;
-  game.goods = 0;
-  game.misses = 0;
-  game.lockTimes = [];
-  game.stabilityScores = [];
-  game.wobbleHistory = [];
-
-  // Mode config
-  if (mode === 'focus') {
-    game.maxRounds = 10;
-    game.lockRequired = 500;
-  } else if (mode === 'blitz') {
-    game.maxRounds = 999;
-    game.blitzTime = 30;
-    game.lockRequired = 350;
-  } else {
-    game.maxRounds = 999;
-    game.lockRequired = 500;
-  }
-
-  document.getElementById('title-screen').classList.add('hidden');
-  document.getElementById('results-screen').classList.add('hidden');
-
-  // Countdown
-  doCountdown(() => {
-    game.active = true;
-    hud.style.display = 'flex';
-    bottomHud.style.display = 'flex';
-    if (mode === 'blitz') {
-      timerBar.style.display = 'block';
-      game.blitzStart = Date.now();
-    }
-    updateHUD();
-    spawnTarget();
-  });
-}
-
-function doCountdown(cb) {
-  countdownEl.style.display = 'block';
-  let count = 3;
-  countdownEl.textContent = count;
-  AudioEngine.play('countdown');
-
-  const interval = setInterval(() => {
-    count--;
-    if (count > 0) {
-      countdownEl.textContent = count;
-      AudioEngine.play('countdown');
-    } else if (count === 0) {
-      countdownEl.textContent = 'GO';
-      countdownEl.style.color = 'var(--green)';
-      AudioEngine.play('go');
-    } else {
-      clearInterval(interval);
-      countdownEl.style.display = 'none';
-      countdownEl.style.color = 'var(--accent)';
-      cb();
-    }
-  }, 600);
-}
-
-// === TARGET ===
-function spawnTarget() {
-  if (!game.active) return;
-  game.round++;
-
-  // Difficulty scaling
-  const difficulty = Math.min(game.round / 15, 1);
-  game.targetSize = Math.max(20, 40 - difficulty * 20);
-  if (game.mode === 'blitz') {
-    game.lockRequired = Math.max(200, 350 - difficulty * 100);
-  } else if (game.mode === 'focus') {
-    game.lockRequired = Math.max(350, 500 + difficulty * 200);
-  }
-
-  // Random position with margin
-  const margin = 100;
-  const x = margin + Math.random() * (window.innerWidth - margin * 2);
-  const y = margin + Math.random() * (window.innerHeight - margin * 2);
-
-  game.target = { x, y };
-  game.lockProgress = 0;
-  game.isLocking = false;
-  game.isLocked = false;
-
-  // Create target element
-  const el = document.createElement('div');
-  el.className = 'target';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.width = '140px';
-  el.style.height = '140px';
-
-  el.innerHTML = `
-    <div class="target-outer"></div>
-    <div class="target-mid"></div>
-    <div class="target-inner" style="width:${game.targetSize * 2}px;height:${game.targetSize * 2}px;"></div>
-    <div class="target-core"></div>
-    <div class="lock-ring">
-      <svg viewBox="0 0 140 140">
-        <circle cx="70" cy="70" r="66" />
-      </svg>
-    </div>
-  `;
-
-  // Spawn animation
-  el.style.transform = 'translate(-50%, -50%) scale(0)';
-  el.style.transition = 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)';
-  arena.appendChild(el);
-  requestAnimationFrame(() => {
-    el.style.transform = 'translate(-50%, -50%) scale(1)';
-  });
-
-  game.targetEl = el;
-
-  // Auto-miss timer for focus mode (5 seconds)
-  if (game.mode === 'focus') {
-    game.autoMissTimer = setTimeout(() => {
-      if (game.active && game.target && !game.isLocked) {
-        missTarget('TOO SLOW');
-      }
-    }, 5000);
-  }
-
-  updateHUD();
-}
-
-function removeTarget() {
-  if (game.targetEl) {
-    game.targetEl.style.transform = 'translate(-50%, -50%) scale(0)';
-    const el = game.targetEl;
-    setTimeout(() => el.remove(), 200);
-    game.targetEl = null;
-    game.target = null;
-  }
-  if (game.autoMissTimer) {
-    clearTimeout(game.autoMissTimer);
-    game.autoMissTimer = null;
-  }
-}
-
-// === LOCK MECHANIC ===
-function gameLoop() {
-  if (!game.active || !game.target) {
-    requestAnimationFrame(gameLoop);
-    return;
-  }
-
-  const dx = game.mouseX - game.target.x;
-  const dy = game.mouseY - game.target.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const lockRadius = game.targetSize + 25; // Forgiving lock radius
-
-  if (dist <= lockRadius && !game.isLocked) {
-    if (!game.isLocking) {
-      game.isLocking = true;
-      game.lockStartTime = Date.now();
-      crosshair.classList.add('locked');
-    }
-
-    // Calculate wobble (stability)
-    const recent = game.wobbleHistory.slice(-10);
-    let wobble = 0;
-    if (recent.length > 1) {
-      for (let i = 1; i < recent.length; i++) {
-        const ddx = recent[i].x - recent[i-1].x;
-        const ddy = recent[i].y - recent[i-1].y;
-        wobble += Math.sqrt(ddx * ddx + ddy * ddy);
-      }
-      wobble /= recent.length;
-    }
-
-    // Progress increases based on stability
-    const stabilityBonus = Math.max(0.5, 1 - wobble / 20);
-    const elapsed = Date.now() - game.lockStartTime;
-    game.lockProgress = Math.min(1, elapsed / game.lockRequired);
-
-    // Tick sound
-    if (Math.random() < 0.15) AudioEngine.play('lock-tick');
-
-    // Update lock ring
-    const circle = game.targetEl?.querySelector('.lock-ring circle');
-    if (circle) {
-      circle.style.strokeDashoffset = 440 - (440 * game.lockProgress);
-    }
-
-    // Lock complete!
-    if (game.lockProgress >= 1 && !game.isLocked) {
-      game.isLocked = true;
-      game.lockTime = Date.now() - game.lockStartTime;
-      game.currentStability = stabilityBonus;
-      AudioEngine.play('lock-complete');
-
-      // Visual feedback — target pulses green
-      const inner = game.targetEl?.querySelector('.target-inner');
-      if (inner) {
-        inner.style.background = 'radial-gradient(circle, var(--green), rgba(0, 230, 118, 0.3))';
-        inner.style.boxShadow = '0 0 40px rgba(0, 230, 118, 0.6)';
-      }
-      const core = game.targetEl?.querySelector('.target-core');
-      if (core) core.style.boxShadow = '0 0 20px var(--green)';
-    }
-  } else if (dist > lockRadius && game.isLocking && !game.isLocked) {
-    // Moved out — reset lock
-    game.isLocking = false;
-    game.lockProgress = 0;
-    crosshair.classList.remove('locked');
-    const circle = game.targetEl?.querySelector('.lock-ring circle');
-    if (circle) circle.style.strokeDashoffset = 440;
-  }
-
-  // Blitz timer
-  if (game.mode === 'blitz') {
-    const elapsed = (Date.now() - game.blitzStart) / 1000;
-    const remaining = game.blitzTime - elapsed;
-    if (remaining <= 0) {
-      endGame();
-      requestAnimationFrame(gameLoop);
-      return;
-    }
-    timerBar.style.width = (remaining / game.blitzTime * 100) + '%';
-    document.getElementById('round-display').textContent = Math.ceil(remaining) + 's';
-  }
-
-  requestAnimationFrame(gameLoop);
-}
-
-// === STRIKE ===
-function strikeTarget() {
-  const dx = game.mouseX - game.target.x;
-  const dy = game.mouseY - game.target.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-
-  // How centered was the click?
-  const accuracy = 1 - Math.min(1, dist / game.targetSize);
-  const isPerfect = accuracy > 0.7;
-
-  // Stability metric
-  const stability = game.currentStability || 0.5;
-  game.stabilityScores.push(stability);
-  game.lockTimes.push(game.lockTime || game.lockRequired);
-
-  // Score calculation
-  let points = Math.round(100 * accuracy * stability);
-  const streakMultiplier = 1 + game.streak * 0.15;
-  points = Math.round(points * streakMultiplier);
-
-  if (isPerfect) {
-    game.perfects++;
-    points += 50;
-    AudioEngine.play('strike-perfect');
-    spawnParticles(game.target.x, game.target.y, 'var(--gold)', 20);
-    showScorePopup(game.target.x, game.target.y, `+${points}`, 'var(--gold)', 'PERFECT');
-  } else {
-    game.goods++;
-    AudioEngine.play('strike-good');
-    spawnParticles(game.target.x, game.target.y, 'var(--green)', 12);
-    showScorePopup(game.target.x, game.target.y, `+${points}`, 'var(--green)', 'GOOD');
-  }
-
-  game.score += points;
-  game.streak++;
-  if (game.streak > game.bestStreak) game.bestStreak = game.streak;
-
-  // Streak milestones
-  if (game.streak === 3) showStreakBanner('ON FIRE x3');
-  if (game.streak === 5) { showStreakBanner('UNSTOPPABLE x5'); AudioEngine.play('streak'); }
-  if (game.streak === 10) { showStreakBanner('GODLIKE x10'); AudioEngine.play('streak'); }
-
-  crosshair.classList.remove('locked');
-  crosshair.classList.add('strike');
-  setTimeout(() => crosshair.classList.remove('strike'), 300);
-
-  removeTarget();
-  updateHUD();
-
-  // Next target or end
-  if (game.mode === 'focus' && game.round >= game.maxRounds) {
-    setTimeout(() => endGame(), 500);
-  } else {
-    setTimeout(() => spawnTarget(), 400 + Math.random() * 300);
-  }
-}
-
-function earlyStrike() {
-  // Partial credit for clicking during lock (not ideal)
-  const partial = Math.round(30 * game.lockProgress);
-  game.goods++;
-  game.streak++;
-  if (game.streak > game.bestStreak) game.bestStreak = game.streak;
-  game.score += partial;
-  game.lockTimes.push(Date.now() - game.lockStartTime);
-  game.stabilityScores.push(0.3);
-
-  AudioEngine.play('strike-good');
-  spawnParticles(game.target.x, game.target.y, 'var(--accent)', 6);
-  showScorePopup(game.target.x, game.target.y, `+${partial}`, 'var(--accent)', 'EARLY');
-
-  crosshair.classList.remove('locked');
-  removeTarget();
-  updateHUD();
-
-  if (game.mode === 'focus' && game.round >= game.maxRounds) {
-    setTimeout(() => endGame(), 500);
-  } else {
-    setTimeout(() => spawnTarget(), 400 + Math.random() * 300);
-  }
-}
-
-function missTarget(reason = 'MISS') {
-  game.misses++;
-  game.streak = 0;
-
-  AudioEngine.play('miss');
-
-  // Miss flash
-  const flash = document.createElement('div');
-  flash.className = 'miss-flash';
-  document.body.appendChild(flash);
-  setTimeout(() => flash.remove(), 300);
-
-  if (game.target) {
-    showScorePopup(game.target.x, game.target.y, reason, 'var(--red)');
-    spawnParticles(game.target.x, game.target.y, 'var(--red)', 8);
-  }
-
-  crosshair.classList.remove('locked');
-  removeTarget();
-  updateHUD();
-
-  if (game.mode === 'focus' && game.round >= game.maxRounds) {
-    setTimeout(() => endGame(), 500);
-  } else {
-    setTimeout(() => spawnTarget(), 600);
-  }
-}
-
-// === EFFECTS ===
-function spawnParticles(x, y, color, count) {
-  for (let i = 0; i < count; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    const size = 3 + Math.random() * 6;
-    p.style.width = size + 'px';
-    p.style.height = size + 'px';
-    p.style.background = color;
-    p.style.left = x + 'px';
-    p.style.top = y + 'px';
-    p.style.boxShadow = `0 0 ${size * 2}px ${color}`;
-    arena.appendChild(p);
-
-    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
-    const speed = 80 + Math.random() * 120;
-    const tx = Math.cos(angle) * speed;
-    const ty = Math.sin(angle) * speed;
-
-    p.animate([
-      { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
-      { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(0)`, opacity: 0 }
-    ], { duration: 400 + Math.random() * 300, easing: 'ease-out' });
-
-    setTimeout(() => p.remove(), 700);
-  }
-}
-
-function showScorePopup(x, y, text, color, subtitle = '') {
-  const el = document.createElement('div');
-  el.className = 'score-popup';
-  el.style.left = x + 'px';
-  el.style.top = (y - 30) + 'px';
-  el.style.color = color;
-  el.innerHTML = text + (subtitle ? `<div style="font-size:14px;margin-top:4px;">${subtitle}</div>` : '');
-  arena.appendChild(el);
-  setTimeout(() => el.remove(), 1000);
-}
-
-function showStreakBanner(text) {
-  const el = document.createElement('div');
-  el.className = 'streak-banner';
-  el.textContent = text;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 800);
-}
-
-// === HUD ===
-function updateHUD() {
-  document.getElementById('score-display').textContent = game.score;
-  document.getElementById('streak-display').textContent = game.streak;
-
-  if (game.mode === 'focus') {
-    document.getElementById('round-label').textContent = 'Round';
-    document.getElementById('round-display').textContent = `${Math.min(game.round, game.maxRounds)} / ${game.maxRounds}`;
-  } else if (game.mode === 'blitz') {
-    document.getElementById('round-label').textContent = 'Time';
-  } else {
-    document.getElementById('round-label').textContent = 'Targets';
-    document.getElementById('round-display').textContent = game.round;
-  }
-
-  const multiplier = 1 + game.streak * 0.15;
-  document.getElementById('combo-display').textContent =
-    game.streak >= 2 ? `x${multiplier.toFixed(2)}` : '';
-
-  document.getElementById('perfect-count').textContent = game.perfects;
-  document.getElementById('good-count').textContent = game.goods;
-  document.getElementById('miss-count').textContent = game.misses;
-
-  const avgLock = game.lockTimes.length > 0
-    ? Math.round(game.lockTimes.reduce((a,b) => a+b, 0) / game.lockTimes.length)
-    : 0;
-  document.getElementById('avg-lock').textContent = avgLock;
-}
-
-// === END GAME ===
-function endGame() {
-  game.active = false;
-  removeTarget();
-  hud.style.display = 'none';
-  bottomHud.style.display = 'none';
-  timerBar.style.display = 'none';
-
-  const total = game.perfects + game.goods + game.misses;
-  const accuracy = total > 0 ? Math.round((game.perfects + game.goods) / total * 100) : 0;
-  const avgLock = game.lockTimes.length > 0
-    ? Math.round(game.lockTimes.reduce((a,b) => a+b, 0) / game.lockTimes.length)
-    : 0;
-  const avgStability = game.stabilityScores.length > 0
-    ? Math.round(game.stabilityScores.reduce((a,b) => a+b, 0) / game.stabilityScores.length * 100)
-    : 0;
-
-  // Grade
-  const gradeScore = (game.score / (total * 150 || 1)) * 100;
-  let grade, gradeColor;
-  if (gradeScore >= 90 || (game.perfects >= 8 && game.misses === 0)) { grade = 'S+'; gradeColor = 'var(--gold)'; }
-  else if (gradeScore >= 75) { grade = 'S'; gradeColor = 'var(--gold)'; }
-  else if (gradeScore >= 60) { grade = 'A'; gradeColor = 'var(--green)'; }
-  else if (gradeScore >= 45) { grade = 'B'; gradeColor = 'var(--accent)'; }
-  else if (gradeScore >= 30) { grade = 'C'; gradeColor = 'var(--accent2)'; }
-  else { grade = 'D'; gradeColor = 'var(--red)'; }
-
-  document.getElementById('r-score').textContent = game.score;
-  document.getElementById('r-accuracy').textContent = accuracy + '%';
-  document.getElementById('r-streak').textContent = game.bestStreak;
-  document.getElementById('r-perfect').textContent = game.perfects;
-  document.getElementById('r-avglock').textContent = avgLock + 'ms';
-  document.getElementById('r-stability').textContent = avgStability + '%';
-
-  const gradeEl = document.getElementById('grade');
-  gradeEl.textContent = grade;
-  gradeEl.style.color = gradeColor;
-  gradeEl.style.textShadow = `0 0 40px ${gradeColor}`;
-
-  const resultTitle = document.querySelector('.result-title');
-  if (grade === 'S+') resultTitle.textContent = 'FLAWLESS';
-  else if (grade === 'S') resultTitle.textContent = 'EXCEPTIONAL';
-  else if (grade === 'A') resultTitle.textContent = 'WELL DONE';
-  else if (grade === 'B') resultTitle.textContent = 'SOLID WORK';
-  else resultTitle.textContent = 'KEEP TRAINING';
-
-  document.getElementById('results-screen').classList.remove('hidden');
-}
-
-function backToMenu() {
-  document.getElementById('results-screen').classList.add('hidden');
-  document.getElementById('title-screen').classList.remove('hidden');
-}
-
-// === INIT ===
-requestAnimationFrame(gameLoop);
-
-// Prevent right-click
-document.addEventListener('contextmenu', e => e.preventDefault());
-</script>
 </body>
 </html>

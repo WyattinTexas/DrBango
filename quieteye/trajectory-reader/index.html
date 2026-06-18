@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRAJECTORY READER</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1523;
+    color: #e0e6f0;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    cursor: none;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+  #ui-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #ui-overlay > * { pointer-events: auto; }
+  .screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 21, 35, 0.92);
+    backdrop-filter: blur(12px);
+    transition: opacity 0.5s;
+    z-index: 20;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; }
+  .title-text {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 6vw, 4.5rem);
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #c8ff00, #00ffc8, #c8ff00);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s ease infinite;
+    margin-bottom: 0.3em;
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(0.9rem, 2vw, 1.3rem);
+    color: #8899bb;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 2.5em;
+  }
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 1em 3em;
+    background: linear-gradient(135deg, #c8ff00, #7aff5a);
+    color: #0f1523;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: transform 0.15s, box-shadow 0.15s;
+    text-transform: uppercase;
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 30px rgba(200, 255, 0, 0.35);
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 2px solid #8899bb;
+    color: #8899bb;
+    font-size: 0.9rem;
+    padding: 0.7em 2em;
+    margin-top: 1em;
+  }
+  .btn-secondary:hover {
+    border-color: #c8ff00;
+    color: #c8ff00;
+    box-shadow: 0 4px 20px rgba(200, 255, 0, 0.15);
+  }
+  .instructions {
+    max-width: 520px;
+    text-align: center;
+    line-height: 1.8;
+    font-size: 1rem;
+    color: #99aabb;
+    margin-bottom: 2em;
+  }
+  .instructions strong { color: #c8ff00; }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: #667788;
+    z-index: 15;
+    pointer-events: none;
+  }
+  #hud.hidden { display: none; }
+  .hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .hud-label { font-size: 0.6rem; text-transform: uppercase; color: #556677; }
+  .hud-value { color: #c8ff00; font-size: 0.9rem; }
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2em 3em;
+    margin: 1.5em 0 2em;
+  }
+  .result-item {
+    text-align: center;
+  }
+  .result-label {
+    font-size: 0.75rem;
+    color: #667788;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.3em;
+    font-family: 'Orbitron', sans-serif;
+  }
+  .result-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #c8ff00;
+    font-family: 'Orbitron', sans-serif;
+  }
+  .grade {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 5rem;
+    font-weight: 900;
+    margin: 0.2em 0;
+  }
+  .grade-s { color: #c8ff00; text-shadow: 0 0 40px rgba(200,255,0,0.5); }
+  .grade-a { color: #00ffc8; text-shadow: 0 0 30px rgba(0,255,200,0.4); }
+  .grade-b { color: #5588ff; }
+  .grade-c { color: #ffaa00; }
+  .grade-d { color: #ff5555; }
+  #feedback {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #lock-indicator {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: #556677;
+    pointer-events: none;
+    z-index: 15;
+  }
+  #lock-indicator.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui-overlay">
+  <!-- TITLE SCREEN -->
+  <div class="screen" id="title-screen">
+    <div class="title-text">TRAJECTORY READER</div>
+    <div class="subtitle">Predict the Landing</div>
+    <button class="btn" id="btn-start">BEGIN</button>
+    <button class="btn btn-secondary" id="btn-how">How to Play</button>
+  </div>
+
+  <!-- INSTRUCTIONS SCREEN -->
+  <div class="screen hidden" id="instructions-screen">
+    <div class="title-text" style="font-size:clamp(1.5rem,4vw,2.5rem);margin-bottom:0.8em;">QUIET EYE</div>
+    <div class="instructions">
+      <strong>Watch the ball</strong> as it launches from across the court.<br><br>
+      It will <strong>disappear into the fog</strong>.<br><br>
+      <strong>Lock your cursor</strong> onto where you think it will land.<br>
+      Hold steady. <strong>Trust your read.</strong><br><br>
+      The earlier you lock on and the longer you hold,<br>
+      the bigger your score.<br><br>
+      <strong>15 balls per round.</strong> Difficulty ramps.
+    </div>
+    <button class="btn" id="btn-start2">START ROUND</button>
+    <button class="btn btn-secondary" id="btn-back">Back</button>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div class="screen hidden" id="results-screen">
+    <div class="title-text" style="font-size:clamp(1.2rem,3vw,2rem);margin-bottom:0.3em;">ROUND COMPLETE</div>
+    <div class="grade" id="grade">A</div>
+    <div class="results-grid">
+      <div class="result-item"><div class="result-label">Total Score</div><div class="result-value" id="r-score">0</div></div>
+      <div class="result-item"><div class="result-label">Avg Error</div><div class="result-value" id="r-error">0px</div></div>
+      <div class="result-item"><div class="result-label">Perfect Reads</div><div class="result-value" id="r-perfect">0</div></div>
+      <div class="result-item"><div class="result-label">Early Locks</div><div class="result-value" id="r-early">0%</div></div>
+      <div class="result-item"><div class="result-label">Avg QE Duration</div><div class="result-value" id="r-qe">0ms</div></div>
+      <div class="result-item"><div class="result-label">Best Streak</div><div class="result-value" id="r-streak">0</div></div>
+    </div>
+    <button class="btn" id="btn-again">PLAY AGAIN</button>
+    <button class="btn btn-secondary" id="btn-menu">Menu</button>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-item"><span class="hud-label">Score</span><span class="hud-value" id="hud-score">0</span></div>
+    <div class="hud-item"><span class="hud-label">Ball</span><span class="hud-value" id="hud-ball">1/15</span></div>
+    <div class="hud-item"><span class="hud-label">Avg Error</span><span class="hud-value" id="hud-error">--</span></div>
+    <div class="hud-item"><span class="hud-label">QE Lock</span><span class="hud-value" id="hud-qe">--</span></div>
+    <div class="hud-item"><span class="hud-label">Early %</span><span class="hud-value" id="hud-early">--</span></div>
+  </div>
+  <div id="feedback"></div>
+  <div id="lock-indicator" class="hidden">Hold steady to LOCK</div>
+</div>
+
+<script>
+// ============================================================
+// TRAJECTORY READER - Quiet Eye Training for Pickleball
+// ============================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// --- Audio Engine ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, duration, type = 'sine', vol = 0.15, attack = 0.01, decay = 0.1) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + attack);
+  gain.gain.linearRampToValueAtTime(vol * 0.6, audioCtx.currentTime + attack + duration * 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + attack + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + attack + duration + 0.05);
+}
+
+function playNoise(duration, vol = 0.08) {
+  const bufSize = audioCtx.sampleRate * duration;
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 800;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+  src.stop(audioCtx.currentTime + duration + 0.05);
+}
+
+const SFX = {
+  launch() { playNoise(0.25, 0.1); playTone(200, 0.15, 'sine', 0.06); },
+  enterFog() { playTone(150, 0.3, 'sine', 0.05, 0.05, 0.2); playNoise(0.2, 0.04); },
+  lock() { playTone(880, 0.08, 'square', 0.12); playTone(1320, 0.08, 'square', 0.08); },
+  perfect() {
+    playTone(660, 0.1, 'sine', 0.15);
+    setTimeout(() => playTone(880, 0.1, 'sine', 0.15), 80);
+    setTimeout(() => playTone(1320, 0.15, 'sine', 0.18), 160);
+  },
+  great() { playTone(660, 0.12, 'sine', 0.12); setTimeout(() => playTone(880, 0.12, 'sine', 0.12), 100); },
+  good() { playTone(440, 0.15, 'triangle', 0.1); },
+  miss() { playTone(180, 0.25, 'sawtooth', 0.08); playNoise(0.15, 0.06); },
+  land() { playNoise(0.08, 0.12); playTone(300, 0.06, 'sine', 0.06); },
+};
+
+// --- Sizing ---
+let W, H, scale;
+function resize() {
+  W = canvas.width = window.innerWidth * devicePixelRatio;
+  H = canvas.height = window.innerHeight * devicePixelRatio;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  scale = Math.min(W / 1200, H / 700);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Court geometry (side view) ---
+function court() {
+  const groundY = H * 0.72;
+  const courtLeft = W * 0.08;
+  const courtRight = W * 0.92;
+  const courtW = courtRight - courtLeft;
+  const netX = courtLeft + courtW * 0.5;
+  const netTop = groundY - 90 * scale;
+  const fogLeft = netX - courtW * 0.14;
+  const fogRight = netX + courtW * 0.14;
+  return { groundY, courtLeft, courtRight, courtW, netX, netTop, fogLeft, fogRight };
+}
+
+// --- Game State ---
+const TOTAL_BALLS = 15;
+let state = 'title'; // title, instructions, playing, waiting, reveal, results
+let ballIndex = 0;
+let score = 0;
+let errors = [];
+let perfects = 0;
+let earlyLocks = 0;
+let qeDurations = [];
+let streak = 0;
+let bestStreak = 0;
+
+// Current ball
+let ball = null;
+let ballTrail = [];
+let lockPos = null;
+let lockTime = 0;
+let lockHoldStart = 0;
+let isLocked = false;
+let brokeRead = false;
+let cursorSteadyStart = 0;
+let lastCursorPos = { x: 0, y: 0 };
+let mouseX = W / 2, mouseY = H / 2;
+let revealTimer = 0;
+let feedbackTimer = 0;
+let feedbackText = '';
+let feedbackColor = '#c8ff00';
+let particles = [];
+let fogPhase = 0;
+
+// --- Trajectory math ---
+function createBall(index) {
+  const c = court();
+  const diff = index / (TOTAL_BALLS - 1); // 0..1 difficulty
+
+  // Launch from opponent side (right side)
+  const launchX = c.courtRight - c.courtW * (0.05 + Math.random() * 0.15);
+  const launchY = c.groundY - (20 + Math.random() * 30) * scale;
+
+  // Landing on player side (left side)
+  const landMinX = c.courtLeft + c.courtW * 0.05;
+  const landMaxX = c.fogLeft - c.courtW * 0.05;
+  const landX = landMinX + Math.random() * (landMaxX - landMinX);
+  const landY = c.groundY;
+
+  // Arc height based on shot type
+  const shotTypes = ['lob', 'medium', 'drive'];
+  let shotType;
+  if (diff < 0.3) shotType = 'lob';
+  else if (diff < 0.6) shotType = Math.random() < 0.5 ? 'lob' : 'medium';
+  else shotType = shotTypes[Math.floor(Math.random() * 3)];
+
+  const arcHeights = { lob: 280 + Math.random() * 80, medium: 160 + Math.random() * 60, drive: 80 + Math.random() * 40 };
+  const arcHeight = arcHeights[shotType] * scale;
+
+  // Speed
+  const speeds = { lob: 0.4 + Math.random() * 0.15, medium: 0.6 + Math.random() * 0.2, drive: 0.85 + Math.random() * 0.25 };
+  let speed = speeds[shotType] * (1 + diff * 0.3);
+
+  // Curve/spin for later balls
+  let curveAmount = 0;
+  if (diff > 0.4) curveAmount = (Math.random() - 0.5) * 30 * scale * diff;
+
+  // Wind for later balls
+  let wind = 0;
+  if (diff > 0.65) wind = (Math.random() - 0.5) * 15 * scale * (diff - 0.65) / 0.35;
+
+  // Disappear point (30-40% of path)
+  const disappearT = 0.30 + Math.random() * 0.10;
+
+  return {
+    launchX, launchY, landX, landY,
+    arcHeight, speed, curveAmount, wind,
+    disappearT, shotType,
+    t: 0, // 0..1 progress
+    active: true,
+    visible: true,
+    enteredFog: false,
+    landed: false,
+    fogSounded: false
+  };
+}
+
+function ballPos(b, t) {
+  const x = b.launchX + (b.landX - b.launchX) * t + b.curveAmount * Math.sin(t * Math.PI) + b.wind * t * t;
+  const baseY = b.launchY + (b.landY - b.launchY) * t;
+  const arc = -b.arcHeight * 4 * t * (1 - t);
+  return { x, y: baseY + arc };
+}
+
+// --- Particles ---
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed * scale,
+      vy: Math.sin(angle) * speed * scale - 2 * scale,
+      life: 1,
+      decay: 0.015 + Math.random() * 0.02,
+      size: (2 + Math.random() * 3) * scale,
+      color
+    });
+  }
+}
+
+// --- Feedback ---
+function showFeedback(text, color) {
+  feedbackText = text;
+  feedbackColor = color;
+  feedbackTimer = 90;
+  const el = document.getElementById('feedback');
+  el.textContent = text;
+  el.style.color = color;
+  el.style.opacity = 1;
+  el.style.textShadow = `0 0 20px ${color}`;
+}
+
+// --- HUD ---
+function updateHUD() {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-ball').textContent = `${ballIndex}/${TOTAL_BALLS}`;
+  document.getElementById('hud-error').textContent = errors.length ? Math.round(errors.reduce((a, b) => a + b, 0) / errors.length) + 'px' : '--';
+  document.getElementById('hud-qe').textContent = qeDurations.length ? Math.round(qeDurations.reduce((a, b) => a + b, 0) / qeDurations.length) + 'ms' : '--';
+  document.getElementById('hud-early').textContent = ballIndex > 0 ? Math.round(earlyLocks / ballIndex * 100) + '%' : '--';
+}
+
+// --- Screens ---
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  if (id) document.getElementById(id).classList.remove('hidden');
+}
+
+function startGame() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  state = 'playing';
+  ballIndex = 0;
+  score = 0;
+  errors = [];
+  perfects = 0;
+  earlyLocks = 0;
+  qeDurations = [];
+  streak = 0;
+  bestStreak = 0;
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('lock-indicator').classList.remove('hidden');
+  nextBall();
+}
+
+function nextBall() {
+  if (ballIndex >= TOTAL_BALLS) {
+    showResults();
+    return;
+  }
+  ball = createBall(ballIndex);
+  ballTrail = [];
+  lockPos = null;
+  lockTime = 0;
+  lockHoldStart = 0;
+  isLocked = false;
+  brokeRead = false;
+  cursorSteadyStart = 0;
+  revealTimer = 0;
+  ballIndex++;
+  updateHUD();
+  state = 'playing';
+  SFX.launch();
+}
+
+function scoreBall() {
+  const c = court();
+  const actualPos = ballPos(ball, 1);
+
+  // If no lock, treat cursor position as prediction
+  const predX = lockPos ? lockPos.x : mouseX;
+  const predY = lockPos ? lockPos.y : c.groundY;
+
+  const dx = predX - actualPos.x;
+  const dy = predY - actualPos.y;
+  const dist = Math.sqrt(dx * dx + dy * dy) / scale;
+
+  errors.push(dist);
+
+  let baseScore = 0;
+  let label = '';
+  let color = '';
+  if (dist < 15) { baseScore = 100; label = 'PERFECT'; color = '#c8ff00'; perfects++; SFX.perfect(); spawnParticles(actualPos.x, actualPos.y, '#c8ff00', 30); }
+  else if (dist < 35) { baseScore = 70; label = 'GREAT'; color = '#00ffc8'; SFX.great(); spawnParticles(actualPos.x, actualPos.y, '#00ffc8', 18); }
+  else if (dist < 60) { baseScore = 40; label = 'GOOD'; color = '#5588ff'; SFX.good(); spawnParticles(actualPos.x, actualPos.y, '#5588ff', 10); }
+  else { baseScore = 10; label = 'MISS'; color = '#ff5555'; SFX.miss(); }
+
+  // Timing multiplier — how early was the lock relative to ball emerging from fog?
+  let timingMult = 1;
+  let timingLabel = '';
+  if (isLocked && lockTime > 0) {
+    const lockT = lockTime; // ball.t at time of lock
+    const emergeT = 1; // ball lands at t=1, fog ends conceptually
+    const earlyness = 1 - lockT; // how much of journey remained
+    if (earlyness > 0.55) { timingMult = 2; timingLabel = ' x2 EARLY'; earlyLocks++; }
+    else if (earlyness > 0.35) { timingMult = 1.5; timingLabel = ' x1.5'; earlyLocks++; }
+    else { timingLabel = ''; }
+  }
+
+  // QE duration bonus
+  let qeBonus = 0;
+  let qeDur = 0;
+  if (isLocked && lockHoldStart > 0) {
+    qeDur = performance.now() - lockHoldStart;
+    qeDurations.push(qeDur);
+    if (qeDur > 800) qeBonus = 30;
+    else if (qeDur > 400) qeBonus = 15;
+  }
+
+  // Broke read penalty
+  let penalty = brokeRead ? -20 : 0;
+
+  const total = Math.max(0, Math.round((baseScore * timingMult) + qeBonus + penalty));
+  score += total;
+
+  if (dist < 60) { streak++; if (streak > bestStreak) bestStreak = streak; }
+  else streak = 0;
+
+  showFeedback(`${label}${timingLabel}  +${total}`, color);
+  updateHUD();
+
+  // Store for reveal
+  ball.actualPos = actualPos;
+  ball.predPos = { x: predX, y: predY };
+  ball.dist = dist;
+  ball.scoreLabel = label;
+}
+
+function showResults() {
+  state = 'results';
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('lock-indicator').classList.add('hidden');
+
+  const avgError = errors.length ? Math.round(errors.reduce((a, b) => a + b, 0) / errors.length) : 0;
+  const avgQE = qeDurations.length ? Math.round(qeDurations.reduce((a, b) => a + b, 0) / qeDurations.length) : 0;
+
+  document.getElementById('r-score').textContent = score;
+  document.getElementById('r-error').textContent = avgError + 'px';
+  document.getElementById('r-perfect').textContent = perfects;
+  document.getElementById('r-early').textContent = Math.round(earlyLocks / TOTAL_BALLS * 100) + '%';
+  document.getElementById('r-qe').textContent = avgQE + 'ms';
+  document.getElementById('r-streak').textContent = bestStreak;
+
+  let grade, gradeClass;
+  if (score >= 1800) { grade = 'S'; gradeClass = 'grade-s'; }
+  else if (score >= 1400) { grade = 'A'; gradeClass = 'grade-a'; }
+  else if (score >= 1000) { grade = 'B'; gradeClass = 'grade-b'; }
+  else if (score >= 600) { grade = 'C'; gradeClass = 'grade-c'; }
+  else { grade = 'D'; gradeClass = 'grade-d'; }
+
+  const gradeEl = document.getElementById('grade');
+  gradeEl.textContent = grade;
+  gradeEl.className = 'grade ' + gradeClass;
+
+  showScreen('results-screen');
+}
+
+// --- Input ---
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX * devicePixelRatio;
+  mouseY = e.clientY * devicePixelRatio;
+
+  if (state === 'playing' || state === 'waiting') {
+    const dx = mouseX - lastCursorPos.x;
+    const dy = mouseY - lastCursorPos.y;
+    const movement = Math.sqrt(dx * dx + dy * dy);
+
+    if (movement > 5 * scale) {
+      cursorSteadyStart = performance.now();
+      if (isLocked && !brokeRead) {
+        // Check if moved far from lock pos
+        const ldx = mouseX - lockPos.x;
+        const ldy = mouseY - lockPos.y;
+        if (Math.sqrt(ldx * ldx + ldy * ldy) > 20 * scale) {
+          brokeRead = true;
+          isLocked = false;
+        }
+      }
+    }
+    lastCursorPos = { x: mouseX, y: mouseY };
+
+    // Auto-lock if steady for 300ms
+    if (!isLocked && !brokeRead && cursorSteadyStart > 0) {
+      const steadyTime = performance.now() - cursorSteadyStart;
+      if (steadyTime > 300 && ball && ball.t > ball.disappearT * 0.5) {
+        lockPos = { x: mouseX, y: mouseY };
+        lockTime = ball.t;
+        lockHoldStart = performance.now();
+        isLocked = true;
+        SFX.lock();
+      }
+    }
+  }
+});
+
+canvas.addEventListener('click', e => {
+  if (state === 'playing' && ball && !isLocked) {
+    lockPos = { x: mouseX, y: mouseY };
+    lockTime = ball ? ball.t : 0;
+    lockHoldStart = performance.now();
+    isLocked = true;
+    brokeRead = false;
+    SFX.lock();
+  }
+});
+
+// --- Button handlers ---
+document.getElementById('btn-start').onclick = () => showScreen('instructions-screen');
+document.getElementById('btn-how').onclick = () => showScreen('instructions-screen');
+document.getElementById('btn-start2').onclick = startGame;
+document.getElementById('btn-back').onclick = () => showScreen('title-screen');
+document.getElementById('btn-again').onclick = startGame;
+document.getElementById('btn-menu').onclick = () => { showScreen('title-screen'); state = 'title'; };
+
+// --- Draw ---
+function drawCourt() {
+  const c = court();
+
+  // Sky gradient
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, c.groundY);
+  skyGrad.addColorStop(0, '#0a0f1a');
+  skyGrad.addColorStop(0.5, '#111b2e');
+  skyGrad.addColorStop(1, '#1a2540');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, c.groundY);
+
+  // Ground
+  const groundGrad = ctx.createLinearGradient(0, c.groundY, 0, H);
+  groundGrad.addColorStop(0, '#2a3a28');
+  groundGrad.addColorStop(1, '#1a2518');
+  ctx.fillStyle = groundGrad;
+  ctx.fillRect(0, c.groundY, W, H - c.groundY);
+
+  // Court surface
+  ctx.fillStyle = '#3d5a4a';
+  ctx.fillRect(c.courtLeft, c.groundY - 4 * scale, c.courtW, 8 * scale);
+
+  // Court lines
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 2 * scale;
+  ctx.beginPath();
+  ctx.moveTo(c.courtLeft, c.groundY);
+  ctx.lineTo(c.courtRight, c.groundY);
+  ctx.stroke();
+
+  // Kitchen lines (NVZ)
+  const kitchenLeft = c.netX - c.courtW * 0.12;
+  const kitchenRight = c.netX + c.courtW * 0.12;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.setLineDash([6 * scale, 4 * scale]);
+  ctx.beginPath();
+  ctx.moveTo(kitchenLeft, c.groundY - 4 * scale);
+  ctx.lineTo(kitchenLeft, c.groundY + 4 * scale);
+  ctx.moveTo(kitchenRight, c.groundY - 4 * scale);
+  ctx.lineTo(kitchenRight, c.groundY + 4 * scale);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Net
+  ctx.strokeStyle = '#aabbcc';
+  ctx.lineWidth = 3 * scale;
+  ctx.beginPath();
+  ctx.moveTo(c.netX, c.groundY);
+  ctx.lineTo(c.netX, c.netTop);
+  ctx.stroke();
+
+  // Net mesh
+  ctx.strokeStyle = 'rgba(170, 187, 204, 0.3)';
+  ctx.lineWidth = 1 * scale;
+  const meshCount = 8;
+  for (let i = 0; i < meshCount; i++) {
+    const y = c.netTop + (c.groundY - c.netTop) * i / meshCount;
+    ctx.beginPath();
+    ctx.moveTo(c.netX - 6 * scale, y);
+    ctx.lineTo(c.netX + 6 * scale, y);
+    ctx.stroke();
+  }
+
+  // Net post top
+  ctx.fillStyle = '#ccddee';
+  ctx.beginPath();
+  ctx.arc(c.netX, c.netTop, 4 * scale, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFog() {
+  const c = court();
+  fogPhase += 0.008;
+
+  const fogOpacity = 0.55 + Math.sin(fogPhase) * 0.08;
+  const fogW = c.fogRight - c.fogLeft;
+  const expand = Math.sin(fogPhase * 1.3) * 8 * scale;
+
+  const grad = ctx.createLinearGradient(c.fogLeft - expand, 0, c.fogRight + expand, 0);
+  grad.addColorStop(0, 'rgba(15, 21, 35, 0)');
+  grad.addColorStop(0.2, `rgba(25, 35, 55, ${fogOpacity * 0.7})`);
+  grad.addColorStop(0.4, `rgba(30, 45, 70, ${fogOpacity})`);
+  grad.addColorStop(0.6, `rgba(30, 45, 70, ${fogOpacity})`);
+  grad.addColorStop(0.8, `rgba(25, 35, 55, ${fogOpacity * 0.7})`);
+  grad.addColorStop(1, 'rgba(15, 21, 35, 0)');
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(c.fogLeft - expand - 20 * scale, 0, fogW + expand * 2 + 40 * scale, H);
+
+  // Subtle fog particles
+  ctx.fillStyle = `rgba(40, 60, 90, ${0.15 + Math.sin(fogPhase * 2) * 0.05})`;
+  for (let i = 0; i < 5; i++) {
+    const px = c.fogLeft + Math.sin(fogPhase + i * 1.3) * fogW * 0.3 + fogW * 0.5;
+    const py = H * 0.2 + Math.cos(fogPhase * 0.7 + i * 2.1) * H * 0.3;
+    const r = (15 + Math.sin(fogPhase + i) * 8) * scale;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawBall() {
+  if (!ball) return;
+  const c = court();
+
+  // Draw trail
+  ctx.lineWidth = 3 * scale;
+  for (let i = 1; i < ballTrail.length; i++) {
+    const alpha = i / ballTrail.length * 0.6;
+    ctx.strokeStyle = `rgba(200, 255, 0, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(ballTrail[i - 1].x, ballTrail[i - 1].y);
+    ctx.lineTo(ballTrail[i].x, ballTrail[i].y);
+    ctx.stroke();
+  }
+
+  if (ball.visible && !ball.landed) {
+    const pos = ballPos(ball, ball.t);
+
+    // Glow
+    const glow = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 20 * scale);
+    glow.addColorStop(0, 'rgba(200, 255, 0, 0.4)');
+    glow.addColorStop(1, 'rgba(200, 255, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 20 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball
+    ctx.fillStyle = '#c8ff00';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 7 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bright center
+    ctx.fillStyle = '#eeffaa';
+    ctx.beginPath();
+    ctx.arc(pos.x - 2 * scale, pos.y - 2 * scale, 2.5 * scale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw last known trajectory hint (dotted arc) when in fog
+  if (!ball.visible && !ball.landed) {
+    const startT = ball.disappearT;
+    ctx.strokeStyle = 'rgba(200, 255, 0, 0.15)';
+    ctx.lineWidth = 2 * scale;
+    ctx.setLineDash([4 * scale, 8 * scale]);
+    ctx.beginPath();
+    const p0 = ballPos(ball, startT);
+    ctx.moveTo(p0.x, p0.y);
+    // Only show a portion of the extrapolated path — a hint, not a spoiler
+    const hintEnd = Math.min(startT + 0.15, 1);
+    for (let t = startT; t <= hintEnd; t += 0.02) {
+      const p = ballPos(ball, t);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawReticle() {
+  if (state !== 'playing' && state !== 'waiting') return;
+  const c = court();
+
+  const cx = isLocked ? lockPos.x : mouseX;
+  const cy = isLocked ? lockPos.y : mouseY;
+
+  if (isLocked) {
+    // Locked reticle — solid, bright
+    ctx.strokeStyle = '#c8ff00';
+    ctx.lineWidth = 2.5 * scale;
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, 18 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cross
+    const s = 24 * scale;
+    ctx.beginPath();
+    ctx.moveTo(cx - s, cy); ctx.lineTo(cx - 10 * scale, cy);
+    ctx.moveTo(cx + 10 * scale, cy); ctx.lineTo(cx + s, cy);
+    ctx.moveTo(cx, cy - s); ctx.lineTo(cx, cy - 10 * scale);
+    ctx.moveTo(cx, cy + 10 * scale); ctx.lineTo(cx, cy + s);
+    ctx.stroke();
+
+    // Center dot
+    ctx.fillStyle = '#c8ff00';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lock text
+    ctx.fillStyle = 'rgba(200, 255, 0, 0.7)';
+    ctx.font = `${10 * scale}px Orbitron`;
+    ctx.textAlign = 'center';
+    ctx.fillText('LOCKED', cx, cy + 34 * scale);
+
+    // QE timer
+    if (lockHoldStart) {
+      const dur = performance.now() - lockHoldStart;
+      ctx.fillText(Math.round(dur) + 'ms', cx, cy + 48 * scale);
+    }
+  } else {
+    // Free cursor — subtle reticle
+    ctx.strokeStyle = 'rgba(200, 255, 0, 0.4)';
+    ctx.lineWidth = 1.5 * scale;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const s = 20 * scale;
+    ctx.beginPath();
+    ctx.moveTo(cx - s, cy); ctx.lineTo(cx - 8 * scale, cy);
+    ctx.moveTo(cx + 8 * scale, cy); ctx.lineTo(cx + s, cy);
+    ctx.moveTo(cx, cy - s); ctx.lineTo(cx, cy - 8 * scale);
+    ctx.moveTo(cx, cy + 8 * scale); ctx.lineTo(cx, cy + s);
+    ctx.stroke();
+
+    // Steadiness indicator
+    if (cursorSteadyStart > 0) {
+      const steady = Math.min((performance.now() - cursorSteadyStart) / 300, 1);
+      if (steady > 0.1 && steady < 1) {
+        ctx.strokeStyle = `rgba(200, 255, 0, ${steady * 0.6})`;
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14 * scale, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * steady);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawReveal() {
+  if (state !== 'reveal' || !ball) return;
+
+  const actual = ball.actualPos;
+  const pred = ball.predPos;
+  const dist = ball.dist;
+
+  // Distance rings
+  const rings = [
+    { r: 15, color: 'rgba(200, 255, 0, 0.3)', label: 'Perfect' },
+    { r: 35, color: 'rgba(0, 255, 200, 0.2)', label: 'Great' },
+    { r: 60, color: 'rgba(85, 136, 255, 0.12)', label: 'Good' },
+  ];
+  rings.forEach(ring => {
+    ctx.strokeStyle = ring.color;
+    ctx.lineWidth = 1.5 * scale;
+    ctx.beginPath();
+    ctx.arc(actual.x, actual.y, ring.r * scale, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  // Actual landing point
+  ctx.fillStyle = '#ff6644';
+  ctx.beginPath();
+  ctx.arc(actual.x, actual.y, 8 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffaa88';
+  ctx.beginPath();
+  ctx.arc(actual.x, actual.y, 4 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Line from prediction to actual
+  if (pred) {
+    ctx.strokeStyle = dist < 15 ? '#c8ff00' : dist < 35 ? '#00ffc8' : dist < 60 ? '#5588ff' : '#ff5555';
+    ctx.lineWidth = 2 * scale;
+    ctx.setLineDash([4 * scale, 4 * scale]);
+    ctx.beginPath();
+    ctx.moveTo(pred.x, pred.y);
+    ctx.lineTo(actual.x, actual.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Distance label
+    ctx.fillStyle = '#99aabb';
+    ctx.font = `${11 * scale}px Inter`;
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(dist) + 'px', (pred.x + actual.x) / 2, (pred.y + actual.y) / 2 - 10 * scale);
+  }
+
+  // Ball at landing
+  ctx.fillStyle = '#c8ff00';
+  ctx.beginPath();
+  ctx.arc(actual.x, actual.y - 7 * scale, 7 * scale, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// --- Update ---
+function update() {
+  // Particles
+  particles = particles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.1 * scale;
+    p.life -= p.decay;
+    return p.life > 0;
+  });
+
+  // Feedback fade
+  if (feedbackTimer > 0) {
+    feedbackTimer--;
+    if (feedbackTimer < 30) {
+      document.getElementById('feedback').style.opacity = feedbackTimer / 30;
+    }
+  }
+
+  if (state === 'playing' && ball && ball.active) {
+    ball.t += ball.speed * 0.008;
+
+    const c = court();
+    const pos = ballPos(ball, ball.t);
+
+    // Add to trail if visible
+    if (ball.visible) {
+      ballTrail.push({ x: pos.x, y: pos.y });
+      if (ballTrail.length > 25) ballTrail.shift();
+    }
+
+    // Check if entering fog
+    if (ball.t >= ball.disappearT && ball.visible) {
+      ball.visible = false;
+      ball.enteredFog = true;
+      if (!ball.fogSounded) {
+        SFX.enterFog();
+        ball.fogSounded = true;
+      }
+      // Freeze trail
+      state = 'waiting';
+    }
+
+    // Check if landed
+    if (ball.t >= 1) {
+      ball.t = 1;
+      ball.active = false;
+      ball.landed = true;
+      SFX.land();
+      scoreBall();
+      state = 'reveal';
+      revealTimer = 120;
+    }
+  }
+
+  if (state === 'waiting' && ball) {
+    ball.t += ball.speed * 0.008;
+    if (ball.t >= 1) {
+      ball.t = 1;
+      ball.active = false;
+      ball.landed = true;
+      ball.visible = true;
+      SFX.land();
+      scoreBall();
+      state = 'reveal';
+      revealTimer = 120;
+    }
+  }
+
+  if (state === 'reveal') {
+    revealTimer--;
+    if (revealTimer <= 0) {
+      nextBall();
+    }
+  }
+
+  // Lock indicator
+  const lockInd = document.getElementById('lock-indicator');
+  if (state === 'playing' || state === 'waiting') {
+    lockInd.classList.remove('hidden');
+    if (isLocked) {
+      lockInd.textContent = 'READ LOCKED - Hold steady';
+      lockInd.style.color = '#c8ff00';
+    } else if (brokeRead) {
+      lockInd.textContent = 'READ BROKEN - Click to re-lock';
+      lockInd.style.color = '#ff5555';
+    } else {
+      lockInd.textContent = 'Hold steady or click to LOCK prediction';
+      lockInd.style.color = '#556677';
+    }
+  } else {
+    lockInd.classList.add('hidden');
+  }
+}
+
+// --- Main loop ---
+function frame() {
+  resize();
+  update();
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (state !== 'title' && state !== 'instructions' && state !== 'results') {
+    drawCourt();
+    drawBall();
+    drawFog();
+    drawReticle();
+    drawReveal();
+    drawParticles();
+  } else {
+    // Ambient background for menu screens
+    drawCourt();
+    drawFog();
+  }
+
+  requestAnimationFrame(frame);
+}
+
+frame();
+</script>
+</body>
+</html>

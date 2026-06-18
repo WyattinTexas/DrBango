@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PADDLE READ</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --cyan: #00e5ff;
+  --cyan-dim: #00e5ff44;
+  --green: #00ff88;
+  --red: #ff4444;
+  --orange: #ff8800;
+  --gold: #ffd700;
+  --bg: #0a0e17;
+  --surface: #141a2a;
+  --text: #e0e8f0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  cursor: crosshair;
+  user-select: none;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s;
+  z-index: 10;
+}
+.screen.hidden { opacity: 0; pointer-events: none; z-index: -1; }
+
+/* ── TITLE SCREEN ── */
+#title-screen {
+  background: radial-gradient(ellipse at 50% 60%, #0d1a30 0%, var(--bg) 70%);
+}
+#title-screen h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  font-weight: 900;
+  color: var(--cyan);
+  text-shadow: 0 0 40px var(--cyan-dim), 0 0 80px #00e5ff22;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.3em;
+}
+#title-screen .subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  color: #8899aa;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 2.5em;
+}
+.btn {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 0.9em 2.5em;
+  border: 2px solid var(--cyan);
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.btn:hover {
+  background: var(--cyan);
+  color: var(--bg);
+  box-shadow: 0 0 30px var(--cyan-dim);
+}
+.btn + .btn { margin-top: 0.8em; }
+.btn.small { font-size: 0.85rem; padding: 0.6em 1.8em; }
+
+/* ── INSTRUCTIONS ── */
+#instructions-screen {
+  background: var(--bg);
+}
+#instructions-screen .card {
+  max-width: 600px;
+  padding: 2.5em;
+  background: var(--surface);
+  border: 1px solid #1e2a40;
+  border-radius: 8px;
+}
+#instructions-screen h2 {
+  font-family: 'Orbitron', monospace;
+  color: var(--cyan);
+  font-size: 1.4rem;
+  margin-bottom: 1em;
+}
+#instructions-screen p {
+  color: #99aabb;
+  line-height: 1.7;
+  margin-bottom: 1em;
+  font-size: 0.95rem;
+}
+#instructions-screen .key-point {
+  color: var(--cyan);
+  font-weight: 700;
+}
+.paddle-demo {
+  display: flex;
+  gap: 1.2em;
+  justify-content: center;
+  margin: 1.5em 0;
+  flex-wrap: wrap;
+}
+.paddle-demo-item {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #667788;
+}
+.paddle-demo-item .mini-paddle {
+  width: 36px;
+  height: 48px;
+  background: var(--cyan);
+  border-radius: 6px 6px 2px 2px;
+  margin: 0 auto 0.4em;
+  position: relative;
+}
+.paddle-demo-item .mini-paddle::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 12px;
+  background: #556;
+  border-radius: 2px;
+}
+.paddle-demo-item .mini-paddle.left { transform: rotate(-30deg); }
+.paddle-demo-item .mini-paddle.right { transform: rotate(30deg); }
+.paddle-demo-item .mini-paddle.center { transform: rotate(0deg); }
+.paddle-demo-item .mini-paddle.open { transform: perspective(100px) rotateX(-25deg); }
+.paddle-demo-item .mini-paddle.closed { transform: perspective(100px) rotateX(25deg); }
+
+/* ── GAME SCREEN ── */
+#game-screen {
+  background: var(--bg);
+  justify-content: flex-start;
+}
+
+/* HUD */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #0a0e17cc;
+  border-bottom: 1px solid #1a2035;
+  z-index: 20;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hud-item {
+  text-align: center;
+}
+.hud-label {
+  font-size: 0.6rem;
+  color: #556677;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-family: 'Orbitron', monospace;
+}
+.hud-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+.hud-value.streak { color: var(--gold); }
+.hud-value.accuracy { color: var(--green); }
+
+/* Court view */
+.court {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 70px;
+  overflow: hidden;
+}
+
+/* Perspective court lines */
+.court-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.court-bg .net {
+  position: absolute;
+  top: 55%;
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, #ffffff33 20%, #ffffff66 50%, #ffffff33 80%, transparent 100%);
+}
+.court-bg .net::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: repeating-linear-gradient(90deg, transparent 0px, transparent 8px, #ffffff22 8px, #ffffff22 10px);
+}
+.court-bg .court-line {
+  position: absolute;
+  background: #ffffff11;
+}
+.court-bg .line-left { top: 55%; left: 10%; width: 1px; height: 45%; transform-origin: top; transform: skewX(25deg); }
+.court-bg .line-right { top: 55%; right: 10%; width: 1px; height: 45%; transform-origin: top; transform: skewX(-25deg); }
+.court-bg .line-center { top: 55%; left: 50%; width: 1px; height: 45%; }
+.court-bg .kitchen { top: 68%; left: 18%; right: 18%; height: 1px; background: #ffffff0a; }
+
+/* Opponent silhouette */
+.opponent-area {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 55%;
+}
+
+.silhouette {
+  position: relative;
+  width: 120px;
+  height: 220px;
+}
+/* Head */
+.silhouette .head {
+  width: 50px;
+  height: 50px;
+  background: #1a2030;
+  border-radius: 50%;
+  margin: 0 auto 4px;
+  position: relative;
+  transition: transform 0.15s;
+}
+/* Body */
+.silhouette .body {
+  width: 80px;
+  height: 100px;
+  background: #1a2030;
+  border-radius: 20px 20px 10px 10px;
+  margin: 0 auto;
+  position: relative;
+  transition: transform 0.15s;
+}
+/* Arm (holds paddle) */
+.silhouette .arm {
+  position: absolute;
+  top: 10px;
+  right: -30px;
+  width: 60px;
+  height: 16px;
+  background: #1a2030;
+  border-radius: 8px;
+  transform-origin: left center;
+  transition: transform 0.15s;
+}
+
+/* Paddle */
+.paddle-container {
+  position: absolute;
+  top: -10px;
+  right: -55px;
+  transform-origin: center center;
+  transition: none;
+  z-index: 5;
+}
+.paddle {
+  width: 44px;
+  height: 56px;
+  background: var(--cyan);
+  border-radius: 10px 10px 4px 4px;
+  position: relative;
+  box-shadow: 0 0 20px var(--cyan-dim), 0 0 40px #00e5ff11;
+  opacity: 0;
+  transition: opacity 0.08s;
+}
+.paddle.visible { opacity: 1; }
+.paddle .handle {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 16px;
+  background: #334;
+  border-radius: 3px;
+}
+.paddle .face-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 2px;
+  background: #ffffff55;
+}
+
+/* QE focus ring */
+.qe-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70px;
+  height: 80px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  pointer-events: none;
+  transition: border-color 0.15s;
+}
+.qe-ring.active {
+  border-color: #4488ff88;
+  animation: qe-pulse 0.8s ease-in-out infinite;
+}
+@keyframes qe-pulse {
+  0%, 100% { box-shadow: 0 0 10px #4488ff44; }
+  50% { box-shadow: 0 0 25px #4488ff88; }
+}
+
+/* Legs */
+.silhouette .legs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.silhouette .leg {
+  width: 16px;
+  height: 60px;
+  background: #1a2030;
+  border-radius: 6px;
+}
+
+/* Body fake indicator */
+.body-fake-shift {
+  transition: transform 0.2s ease-out;
+}
+
+/* Landing zones */
+.zones-area {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22%;
+  display: flex;
+  padding: 0 5%;
+  gap: 4px;
+  z-index: 15;
+}
+.zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: #0f1520;
+  border: 2px solid #1a2540;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.zone:hover {
+  border-color: var(--cyan);
+  background: #111a2a;
+}
+.zone .zone-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #556677;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.zone .zone-icon {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+  pointer-events: none;
+}
+.zone.correct {
+  background: #003322;
+  border-color: var(--green);
+  animation: zone-flash-green 0.5s;
+}
+.zone.wrong {
+  background: #330011;
+  border-color: var(--red);
+  animation: zone-flash-red 0.5s;
+}
+.zone.adjacent {
+  background: #1a1800;
+  border-color: var(--orange);
+  animation: zone-flash-orange 0.5s;
+}
+@keyframes zone-flash-green {
+  0% { box-shadow: inset 0 0 40px #00ff8844; }
+  100% { box-shadow: none; }
+}
+@keyframes zone-flash-red {
+  0% { box-shadow: inset 0 0 40px #ff444444; }
+  100% { box-shadow: none; }
+}
+@keyframes zone-flash-orange {
+  0% { box-shadow: inset 0 0 40px #ff880044; }
+  100% { box-shadow: none; }
+}
+
+/* Particles */
+.particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* Floating text */
+.float-text {
+  position: absolute;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 1.3rem;
+  pointer-events: none;
+  z-index: 30;
+  animation: float-up 1s ease-out forwards;
+}
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-60px); }
+}
+
+/* Body fake warning */
+.fake-warning {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Orbitron', monospace;
+  font-size: 1rem;
+  color: var(--orange);
+  background: #1a100088;
+  border: 1px solid var(--orange);
+  padding: 0.6em 1.5em;
+  border-radius: 4px;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.fake-warning.show {
+  opacity: 1;
+  animation: fake-warn 1.5s ease-out forwards;
+}
+@keyframes fake-warn {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Ready prompt */
+.ready-prompt {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Orbitron', monospace;
+  font-size: 1.2rem;
+  color: var(--cyan);
+  opacity: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+.ready-prompt.show {
+  animation: ready-blink 0.8s ease-in-out;
+}
+@keyframes ready-blink {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Distractor: afterimage paddles */
+.afterimage-paddle {
+  position: absolute;
+  width: 44px;
+  height: 56px;
+  background: #00e5ff22;
+  border-radius: 10px 10px 4px 4px;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+}
+.afterimage-paddle.flash {
+  opacity: 0.4;
+  animation: afterimage-fade 0.3s ease-out forwards;
+}
+@keyframes afterimage-fade {
+  0% { opacity: 0.4; }
+  100% { opacity: 0; }
+}
+
+/* Background noise distractor */
+.bg-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.crowd-flash {
+  position: absolute;
+  width: 60px;
+  height: 40px;
+  background: #ffffff;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── RESULTS SCREEN ── */
+#results-screen {
+  background: var(--bg);
+}
+#results-screen .results-card {
+  max-width: 440px;
+  width: 90%;
+  background: var(--surface);
+  border: 1px solid #1e2a40;
+  border-radius: 8px;
+  padding: 2.5em;
+  text-align: center;
+}
+#results-screen h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.6rem;
+  color: var(--cyan);
+  margin-bottom: 0.3em;
+}
+.grade {
+  font-family: 'Orbitron', monospace;
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin: 0.2em 0 0.5em;
+}
+.grade.s { color: var(--gold); text-shadow: 0 0 30px #ffd70066; }
+.grade.a { color: var(--green); }
+.grade.b { color: var(--cyan); }
+.grade.c { color: var(--orange); }
+.grade.d { color: var(--red); }
+
+.results-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1em;
+  margin-bottom: 2em;
+}
+.stat-box {
+  background: #0d1220;
+  border-radius: 6px;
+  padding: 1em;
+}
+.stat-box .stat-label {
+  font-size: 0.65rem;
+  color: #556677;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: 'Orbitron', monospace;
+}
+.stat-box .stat-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 0.2em;
+}
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen">
+  <h1>PADDLE READ</h1>
+  <div class="subtitle">Read the Contact Point</div>
+  <button class="btn" onclick="showInstructions()">START</button>
+</div>
+
+<!-- INSTRUCTIONS SCREEN -->
+<div id="instructions-screen" class="screen hidden">
+  <div class="card">
+    <h2>HOW TO READ</h2>
+    <p><span class="key-point">Watch the paddle, not the body.</span> The opponent's paddle will flash briefly. Read its angle to predict where the ball lands.</p>
+    <div class="paddle-demo">
+      <div class="paddle-demo-item"><div class="mini-paddle left"></div>Left</div>
+      <div class="paddle-demo-item"><div class="mini-paddle center"></div>Center</div>
+      <div class="paddle-demo-item"><div class="mini-paddle right"></div>Right</div>
+      <div class="paddle-demo-item"><div class="mini-paddle open"></div>Lob</div>
+      <div class="paddle-demo-item"><div class="mini-paddle closed"></div>Drop</div>
+    </div>
+    <p><span class="key-point">Lock your eyes on the paddle</span> during the flash. Hover your cursor over the paddle face to build your Quiet Eye bonus. Then click the landing zone.</p>
+    <p>Body fakes will try to deceive you. The opponent's body or head may shift one way while the paddle aims another. <span class="key-point">Trust the paddle.</span></p>
+    <button class="btn" onclick="startGame()">BEGIN ROUND</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen hidden">
+  <div class="hud">
+    <div class="hud-item"><div class="hud-label">Score</div><div class="hud-value" id="hud-score">0</div></div>
+    <div class="hud-item"><div class="hud-label">Read</div><div class="hud-value" id="hud-read">0/20</div></div>
+    <div class="hud-item"><div class="hud-label">Accuracy</div><div class="hud-value accuracy" id="hud-accuracy">--</div></div>
+    <div class="hud-item"><div class="hud-label">QE on Paddle</div><div class="hud-value" id="hud-qe">--</div></div>
+    <div class="hud-item"><div class="hud-label">Streak</div><div class="hud-value streak" id="hud-streak">0</div></div>
+  </div>
+
+  <div class="court">
+    <div class="court-bg">
+      <div class="net"></div>
+      <div class="court-line line-left"></div>
+      <div class="court-line line-right"></div>
+      <div class="court-line line-center"></div>
+      <div class="court-line kitchen"></div>
+      <div class="bg-noise" id="bg-noise"></div>
+    </div>
+
+    <div class="opponent-area" id="opponent-area">
+      <div class="silhouette" id="silhouette">
+        <div class="head" id="sil-head"></div>
+        <div class="body body-fake-shift" id="sil-body">
+          <div class="arm" id="sil-arm">
+            <div class="paddle-container" id="paddle-container">
+              <div class="paddle" id="paddle">
+                <div class="handle"></div>
+                <div class="face-line"></div>
+              </div>
+              <div class="qe-ring" id="qe-ring"></div>
+            </div>
+          </div>
+        </div>
+        <div class="legs"><div class="leg"></div><div class="leg"></div></div>
+      </div>
+    </div>
+
+    <div class="ready-prompt" id="ready-prompt">WATCH THE PADDLE</div>
+    <div class="fake-warning" id="fake-warning">BODY FAKE - TRUST THE PADDLE</div>
+
+    <div class="zones-area" id="zones-area">
+      <div class="zone" data-zone="0" onclick="selectZone(0)">
+        <div class="zone-icon">&larr;</div>
+        <div class="zone-label">Left</div>
+      </div>
+      <div class="zone" data-zone="1" onclick="selectZone(1)">
+        <div class="zone-icon">&#8598;</div>
+        <div class="zone-label">Drop</div>
+      </div>
+      <div class="zone" data-zone="2" onclick="selectZone(2)">
+        <div class="zone-icon">&uarr;</div>
+        <div class="zone-label">Center</div>
+      </div>
+      <div class="zone" data-zone="3" onclick="selectZone(3)">
+        <div class="zone-icon">&#8599;</div>
+        <div class="zone-label">Lob</div>
+      </div>
+      <div class="zone" data-zone="4" onclick="selectZone(4)">
+        <div class="zone-icon">&rarr;</div>
+        <div class="zone-label">Right</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div id="results-screen" class="screen hidden">
+  <div class="results-card">
+    <h2>ROUND COMPLETE</h2>
+    <div class="grade" id="result-grade">A</div>
+    <div class="results-stats">
+      <div class="stat-box"><div class="stat-label">Total Score</div><div class="stat-value" id="r-score">0</div></div>
+      <div class="stat-box"><div class="stat-label">Read Accuracy</div><div class="stat-value" id="r-accuracy">0%</div></div>
+      <div class="stat-box"><div class="stat-label">Fakes Survived</div><div class="stat-value" id="r-fakes">0</div></div>
+      <div class="stat-box"><div class="stat-label">Avg QE on Paddle</div><div class="stat-value" id="r-qe">0%</div></div>
+      <div class="stat-box"><div class="stat-label">Best Streak</div><div class="stat-value" id="r-streak">0</div></div>
+      <div class="stat-box"><div class="stat-label">Adjacent Reads</div><div class="stat-value" id="r-adjacent">0</div></div>
+    </div>
+    <button class="btn" onclick="startGame()">PLAY AGAIN</button>
+    <button class="btn small" onclick="showTitle()">MENU</button>
+  </div>
+</div>
+
+<script>
+// ── AUDIO ENGINE ──
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx = null;
+function ensureAudio() { if (!actx) actx = new AudioCtx(); return actx; }
+
+function playTone(freq, duration, type = 'sine', vol = 0.15) {
+  const a = ensureAudio();
+  const osc = a.createOscillator();
+  const gain = a.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, a.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, a.currentTime + duration);
+  osc.connect(gain).connect(a.destination);
+  osc.start();
+  osc.stop(a.currentTime + duration);
+}
+
+function sfxPop() { playTone(1200, 0.08, 'square', 0.12); playTone(800, 0.06, 'sine', 0.08); }
+function sfxCorrect() { playTone(600, 0.12, 'sine', 0.15); setTimeout(() => playTone(800, 0.12, 'sine', 0.15), 80); setTimeout(() => playTone(1000, 0.15, 'sine', 0.12), 160); }
+function sfxWrong() { playTone(200, 0.25, 'triangle', 0.15); }
+function sfxAdjacent() { playTone(500, 0.15, 'sine', 0.1); setTimeout(() => playTone(400, 0.15, 'sine', 0.08), 100); }
+function sfxFakeSurvived() { playTone(1000, 0.1, 'square', 0.1); setTimeout(() => playTone(1200, 0.1, 'square', 0.1), 80); setTimeout(() => playTone(1500, 0.15, 'sine', 0.12), 160); }
+function sfxStreak(n) { for (let i = 0; i < Math.min(n/5, 3); i++) setTimeout(() => playTone(800 + i*200, 0.15, 'sine', 0.1), i * 100); }
+
+// QE sustained tone
+let qeToneOsc = null, qeToneGain = null;
+function startQETone() {
+  const a = ensureAudio();
+  qeToneOsc = a.createOscillator();
+  qeToneGain = a.createGain();
+  qeToneOsc.type = 'sine';
+  qeToneOsc.frequency.value = 300;
+  qeToneGain.gain.value = 0.04;
+  qeToneOsc.connect(qeToneGain).connect(a.destination);
+  qeToneOsc.start();
+}
+function updateQETone(progress) {
+  if (qeToneOsc) { qeToneOsc.frequency.value = 300 + progress * 400; qeToneGain.gain.value = 0.04 + progress * 0.06; }
+}
+function stopQETone() {
+  if (qeToneOsc) { try { qeToneOsc.stop(); } catch(e) {} qeToneOsc = null; qeToneGain = null; }
+}
+
+// ── GAME STATE ──
+const TOTAL_READS = 20;
+const ZONES = ['left', 'drop', 'center', 'lob', 'right'];
+// Paddle rotations per zone: [rotateZ, rotateX]
+const PADDLE_ANGLES = {
+  0: [-35, 0],   // left
+  1: [0, 25],    // drop (closed face)
+  2: [0, 0],     // center
+  3: [0, -25],   // lob (open face)
+  4: [35, 0],    // right
+};
+
+let state = {
+  score: 0,
+  read: 0,
+  correct: 0,
+  streak: 0,
+  bestStreak: 0,
+  adjacent: 0,
+  fakesSurvived: 0,
+  fakesTotal: 0,
+  qeSamples: [],
+  phase: 'idle', // idle, showing, answering
+  currentZone: -1,
+  currentFake: false,
+  fakeDirection: 0,
+  exposureStart: 0,
+  exposureEnd: 0,
+  qeTime: 0,
+  qeTracking: false,
+  answerStart: 0,
+  readSequence: [],
+};
+
+// Build a shuffled sequence with equal zone distribution
+function buildSequence() {
+  const seq = [];
+  for (let i = 0; i < TOTAL_READS; i++) {
+    const zone = i % 5;
+    const readNum = i + 1;
+    // Body fakes start at read 10 and increase
+    let hasFake = false;
+    let fakeDir = 0;
+    if (readNum >= 10 && Math.random() < 0.35 + (readNum - 10) * 0.05) {
+      hasFake = true;
+      fakeDir = Math.random() < 0.5 ? -1 : 1;
+    }
+    seq.push({ zone, hasFake, fakeDir });
+  }
+  // Shuffle
+  for (let i = seq.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [seq[i], seq[j]] = [seq[j], seq[i]];
+  }
+  return seq;
+}
+
+function getExposureTime(readNum) {
+  // 800ms at read 1, decreasing to 300ms at read 20
+  return Math.max(300, 800 - (readNum - 1) * 26);
+}
+
+// ── DOM REFS ──
+const $ = id => document.getElementById(id);
+const paddle = $('paddle');
+const paddleContainer = $('paddle-container');
+const qeRing = $('qe-ring');
+const readyPrompt = $('ready-prompt');
+const fakeWarning = $('fake-warning');
+const silHead = $('sil-head');
+const silBody = $('sil-body');
+const silArm = $('sil-arm');
+const opponentArea = $('opponent-area');
+const zonesArea = $('zones-area');
+const zones = document.querySelectorAll('.zone');
+
+// ── SCREEN MANAGEMENT ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+function showTitle() { showScreen('title-screen'); }
+function showInstructions() { showScreen('instructions-screen'); }
+
+// ── QE TRACKING ──
+let mouseOnPaddle = false;
+paddleContainer.addEventListener('mouseenter', () => {
+  if (state.phase === 'showing') { mouseOnPaddle = true; qeRing.classList.add('active'); startQETone(); }
+});
+paddleContainer.addEventListener('mouseleave', () => {
+  mouseOnPaddle = false; qeRing.classList.remove('active'); stopQETone();
+});
+
+// ── GAME LOOP ──
+function startGame() {
+  state = {
+    score: 0, read: 0, correct: 0, streak: 0, bestStreak: 0,
+    adjacent: 0, fakesSurvived: 0, fakesTotal: 0,
+    qeSamples: [], phase: 'idle', currentZone: -1,
+    currentFake: false, fakeDirection: 0,
+    exposureStart: 0, exposureEnd: 0, qeTime: 0, qeTracking: false,
+    answerStart: 0, readSequence: buildSequence(),
+  };
+  updateHUD();
+  showScreen('game-screen');
+  resetSilhouette();
+  clearZoneStates();
+  setTimeout(() => nextRead(), 600);
+}
+
+function nextRead() {
+  if (state.read >= TOTAL_READS) { endGame(); return; }
+  state.phase = 'idle';
+  resetSilhouette();
+  clearZoneStates();
+
+  // Brief ready prompt
+  readyPrompt.classList.remove('show');
+  void readyPrompt.offsetWidth;
+  readyPrompt.classList.add('show');
+
+  const entry = state.readSequence[state.read];
+  state.currentZone = entry.zone;
+  state.currentFake = entry.hasFake;
+  state.fakeDirection = entry.fakeDir;
+  if (entry.hasFake) state.fakesTotal++;
+
+  const delay = 800 + Math.random() * 600;
+  setTimeout(() => showPaddle(), delay);
+}
+
+function showPaddle() {
+  state.phase = 'showing';
+  const exposure = getExposureTime(state.read + 1);
+
+  // Apply paddle angle
+  const [rz, rx] = PADDLE_ANGLES[state.currentZone];
+  paddleContainer.style.transform = `rotate(${rz}deg) perspective(200px) rotateX(${rx}deg)`;
+  paddle.classList.add('visible');
+  sfxPop();
+
+  // Apply body fake
+  if (state.currentFake) {
+    const fakeShift = state.fakeDirection * 25;
+    silBody.style.transform = `translateX(${fakeShift}px)`;
+    silHead.style.transform = `translateX(${state.fakeDirection * 15}px) rotate(${state.fakeDirection * 10}deg)`;
+  }
+
+  // Maybe spawn afterimage distractors at higher reads
+  if (state.read >= 14 && Math.random() < 0.4) {
+    spawnAfterimages();
+  }
+
+  // Maybe do crowd flash
+  if (state.read >= 12 && Math.random() < 0.3) {
+    spawnCrowdFlash();
+  }
+
+  // QE tracking
+  state.qeTime = 0;
+  state.qeTracking = true;
+  state.exposureStart = performance.now();
+  const qeInterval = setInterval(() => {
+    if (!state.qeTracking) { clearInterval(qeInterval); return; }
+    if (mouseOnPaddle) {
+      state.qeTime += 16;
+      updateQETone(Math.min(1, state.qeTime / exposure));
+    }
+  }, 16);
+
+  // Hide paddle after exposure
+  setTimeout(() => {
+    paddle.classList.remove('visible');
+    state.qeTracking = false;
+    state.phase = 'answering';
+    state.exposureEnd = performance.now();
+    state.answerStart = performance.now();
+    qeRing.classList.remove('active');
+    stopQETone();
+    clearInterval(qeInterval);
+
+    const totalExposure = state.exposureEnd - state.exposureStart;
+    const qePct = totalExposure > 0 ? (state.qeTime / totalExposure) * 100 : 0;
+    state.qeSamples.push(qePct);
+  }, exposure);
+}
+
+function selectZone(chosen) {
+  if (state.phase !== 'answering') return;
+  state.phase = 'idle';
+  state.read++;
+
+  const correct = chosen === state.currentZone;
+  const diff = Math.abs(chosen - state.currentZone);
+  const isAdjacent = diff === 1 && !correct;
+  const answerTime = performance.now() - state.answerStart;
+  const qePct = state.qeSamples.length > 0 ? state.qeSamples[state.qeSamples.length - 1] : 0;
+
+  let points = 0;
+  let feedbackClass = '';
+
+  if (correct) {
+    points = 100;
+    // QE bonus
+    if (qePct >= 80) points += 50;
+    // Speed bonus (up to +30 for answering within 500ms)
+    if (answerTime < 500) points += 30;
+    else if (answerTime < 1000) points += Math.round(30 * (1 - (answerTime - 500) / 500));
+
+    state.correct++;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+    feedbackClass = 'correct';
+
+    if (state.currentFake) { state.fakesSurvived++; sfxFakeSurvived(); }
+    else { sfxCorrect(); }
+
+    if (state.streak % 5 === 0 && state.streak > 0) sfxStreak(state.streak);
+
+    spawnParticles(zones[chosen], '#00ff88');
+    showFloatText(zones[chosen], `+${points}`, '#00ff88');
+  } else if (isAdjacent) {
+    points = 30;
+    state.streak = 0;
+    feedbackClass = 'adjacent';
+    sfxAdjacent();
+    showFloatText(zones[chosen], '+30', '#ff8800');
+    // Highlight correct zone briefly
+    setTimeout(() => { zones[state.currentZone].classList.add('correct'); }, 200);
+  } else {
+    points = 0;
+    state.streak = 0;
+    feedbackClass = 'wrong';
+    sfxWrong();
+    showFloatText(zones[chosen], 'MISS', '#ff4444');
+    // Highlight correct zone
+    setTimeout(() => { zones[state.currentZone].classList.add('correct'); }, 200);
+  }
+
+  // Show body fake warning on wrong answers from fakes
+  if (!correct && state.currentFake) {
+    fakeWarning.classList.remove('show');
+    void fakeWarning.offsetWidth;
+    fakeWarning.classList.add('show');
+  }
+
+  state.score += points;
+  zones[chosen].classList.add(feedbackClass);
+  updateHUD();
+
+  // Next read after delay
+  setTimeout(() => nextRead(), correct ? 1000 : 1600);
+}
+
+function resetSilhouette() {
+  paddleContainer.style.transform = 'rotate(0deg)';
+  paddle.classList.remove('visible');
+  silBody.style.transform = 'translateX(0)';
+  silHead.style.transform = 'translateX(0) rotate(0deg)';
+  qeRing.classList.remove('active');
+  mouseOnPaddle = false;
+  stopQETone();
+}
+
+function clearZoneStates() {
+  zones.forEach(z => z.classList.remove('correct', 'wrong', 'adjacent'));
+}
+
+function updateHUD() {
+  $('hud-score').textContent = state.score;
+  $('hud-read').textContent = `${state.read}/${TOTAL_READS}`;
+  $('hud-accuracy').textContent = state.read > 0 ? `${Math.round(state.correct / state.read * 100)}%` : '--';
+  const avgQE = state.qeSamples.length > 0 ? Math.round(state.qeSamples.reduce((a,b)=>a+b,0) / state.qeSamples.length) : 0;
+  $('hud-qe').textContent = state.qeSamples.length > 0 ? `${avgQE}%` : '--';
+  $('hud-streak').textContent = state.streak;
+}
+
+// ── EFFECTS ──
+function spawnParticles(el, color) {
+  const rect = el.getBoundingClientRect();
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.background = color;
+    p.style.left = rect.left + rect.width/2 + 'px';
+    p.style.top = rect.top + 'px';
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 60 + Math.random() * 80;
+    const dx = Math.cos(angle) * speed;
+    const dy = Math.sin(angle) * speed - 40;
+    document.body.appendChild(p);
+    p.animate([
+      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) scale(0)`, opacity: 0 }
+    ], { duration: 600, easing: 'ease-out' });
+    setTimeout(() => p.remove(), 600);
+  }
+}
+
+function showFloatText(el, text, color) {
+  const rect = el.getBoundingClientRect();
+  const ft = document.createElement('div');
+  ft.className = 'float-text';
+  ft.textContent = text;
+  ft.style.color = color;
+  ft.style.left = rect.left + rect.width/2 - 30 + 'px';
+  ft.style.top = rect.top - 10 + 'px';
+  document.body.appendChild(ft);
+  setTimeout(() => ft.remove(), 1000);
+}
+
+function spawnAfterimages() {
+  const area = opponentArea;
+  for (let i = 0; i < 2; i++) {
+    const ai = document.createElement('div');
+    ai.className = 'afterimage-paddle';
+    const randomZ = (Math.random() - 0.5) * 60;
+    ai.style.transform = `rotate(${randomZ}deg)`;
+    const rect = paddleContainer.getBoundingClientRect();
+    const areaRect = area.getBoundingClientRect();
+    ai.style.left = (rect.left - areaRect.left + (Math.random()-0.5)*40) + 'px';
+    ai.style.top = (rect.top - areaRect.top + (Math.random()-0.5)*30) + 'px';
+    area.appendChild(ai);
+    setTimeout(() => { ai.classList.add('flash'); }, i * 80);
+    setTimeout(() => ai.remove(), 500);
+  }
+}
+
+function spawnCrowdFlash() {
+  const noise = $('bg-noise');
+  for (let i = 0; i < 3; i++) {
+    const flash = document.createElement('div');
+    flash.className = 'crowd-flash';
+    flash.style.left = Math.random() * 80 + 5 + '%';
+    flash.style.top = Math.random() * 30 + 5 + '%';
+    noise.appendChild(flash);
+    flash.animate([
+      { opacity: 0 },
+      { opacity: 0.08 },
+      { opacity: 0 }
+    ], { duration: 200, delay: i * 100 });
+    setTimeout(() => flash.remove(), 500);
+  }
+}
+
+// ── END GAME ──
+function endGame() {
+  const accuracy = state.read > 0 ? Math.round(state.correct / state.read * 100) : 0;
+  const avgQE = state.qeSamples.length > 0 ? Math.round(state.qeSamples.reduce((a,b)=>a+b,0) / state.qeSamples.length) : 0;
+
+  let grade, gradeClass;
+  if (accuracy >= 90 && avgQE >= 70) { grade = 'S'; gradeClass = 's'; }
+  else if (accuracy >= 80) { grade = 'A'; gradeClass = 'a'; }
+  else if (accuracy >= 65) { grade = 'B'; gradeClass = 'b'; }
+  else if (accuracy >= 45) { grade = 'C'; gradeClass = 'c'; }
+  else { grade = 'D'; gradeClass = 'd'; }
+
+  $('result-grade').textContent = grade;
+  $('result-grade').className = 'grade ' + gradeClass;
+  $('r-score').textContent = state.score;
+  $('r-accuracy').textContent = accuracy + '%';
+  $('r-fakes').textContent = `${state.fakesSurvived}/${state.fakesTotal}`;
+  $('r-qe').textContent = avgQE + '%';
+  $('r-streak').textContent = state.bestStreak;
+  $('r-adjacent').textContent = state.adjacent;
+
+  showScreen('results-screen');
+}
+</script>
+</body>
+</html>
