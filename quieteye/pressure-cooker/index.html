@@ -559,7 +559,7 @@ body {
 
 <div id="hud">
   <div id="hud-targets">1 / 15</div>
-  <div id="hud-qe">QE: ---</div>
+  <div id="hud-qe">Hold: ---</div>
   <div id="hud-drift"></div>
 </div>
 
@@ -567,16 +567,16 @@ body {
   <h1>PRESSURE COOKER</h1>
   <div class="subtitle">Keep Your Cool</div>
   <div class="instructions">
-    Your focus is about to be tested.<br><br>
-    Lock on. Strike. Stay calm as the pressure rises.<br>
-    Your quiet eye must not change.
+    Targets will appear. Hold steady on each one, then click.<br><br>
+    The screen will try to distract you.<br>
+    Your job: stay focused. Same rhythm every time.
   </div>
   <button id="start-btn">BEGIN</button>
 </div>
 
 <div id="results-screen">
   <div id="results-inner">
-    <h1>PRESSURE PROFILE</h1>
+    <h1>YOUR RESULTS</h1>
     <div id="results-grade"></div>
     <div id="results-drift"></div>
     <div id="chart-container"></div>
@@ -590,7 +590,7 @@ body {
     <div id="leaderboard-section">
       <h2>YOUR HISTORY</h2>
       <table id="leaderboard-table">
-        <thead><tr><th>#</th><th>Date</th><th>Drift</th><th>Grade</th><th>Baseline</th></tr></thead>
+        <thead><tr><th>#</th><th>Date</th><th>Consistency</th><th>Grade</th></tr></thead>
         <tbody id="leaderboard-body"></tbody>
       </table>
       <button id="clear-history-btn">CLEAR HISTORY</button>
@@ -702,7 +702,7 @@ const LEVELS = [
 ];
 
 const LEVEL_COLORS = ['#00aaff', '#40a0ff', '#ffa040', '#ff6040', '#ff3030'];
-const LEVEL_NAMES = ['CALM', 'WARMING UP', 'HEATING UP', 'BOILING', 'MELTDOWN'];
+const LEVEL_NAMES = ['Calm', 'Light Pressure', 'Medium Pressure', 'Heavy Pressure', 'Full Chaos'];
 
 const TOTAL_TARGETS = 15;
 const BASELINE_COUNT = 3;
@@ -1023,7 +1023,8 @@ function showResults() {
   const resultsGrade = document.getElementById('results-grade');
   resultsGrade.textContent = grade;
   resultsGrade.style.color = gradeColor;
-  document.getElementById('results-drift').textContent = `QE Drift: ${overallDrift}% | Baseline: ${baseline}ms`;
+  const consistency = Math.max(0, 100 - overallDrift);
+  document.getElementById('results-drift').textContent = `${consistency}% consistent — Your natural hold: ${baseline}ms`;
 
   // Chart
   const chartContainer = document.getElementById('chart-container');
@@ -1039,7 +1040,7 @@ function showResults() {
     bline.style.top = baseY + 'px';
     const blabel = document.createElement('div');
     blabel.className = 'baseline-label';
-    blabel.textContent = `baseline ${baseline}ms`;
+    blabel.textContent = `your rhythm ${baseline}ms`;
     bline.appendChild(blabel);
     chartContainer.appendChild(bline);
   }
@@ -1054,7 +1055,7 @@ function showResults() {
 
     const val = document.createElement('div');
     val.className = 'chart-value';
-    val.textContent = r.qeDuration + 'ms';
+    val.textContent = (r.qeDuration / 1000).toFixed(1) + 's';
 
     const bar = document.createElement('div');
     bar.className = 'chart-bar';
@@ -1091,12 +1092,12 @@ function showResults() {
   // Medals
   const medals = document.getElementById('medals');
   medals.innerHTML = '';
-  if (overallDrift < 5) medals.innerHTML += '<span class="medal gold">ICE COLD</span>';
-  if (overallDrift < 15) medals.innerHTML += '<span class="medal silver">STEADY HANDS</span>';
-  if (state.results.length === TOTAL_TARGETS) medals.innerHTML += '<span class="medal bronze">CLUTCH PLAYER</span>';
+  if (overallDrift < 5) medals.innerHTML += '<span class="medal gold">UNSHAKEABLE</span>';
+  if (overallDrift < 15) medals.innerHTML += '<span class="medal silver">STEADY</span>';
+  if (state.results.length === TOTAL_TARGETS) medals.innerHTML += '<span class="medal bronze">FINISHED STRONG</span>';
 
   // Share
-  const shareText = `PRESSURE COOKER QE Drift: ${overallDrift}% [${grade}] | Baseline: ${baseline}ms | drbango.com/quieteye/pressure-cooker/`;
+  const shareText = `PRESSURE COOKER: ${consistency}% consistent [${grade}] | drbango.com/quieteye/pressure-cooker/`;
   document.getElementById('share-text').textContent = shareText;
 
   // Save to leaderboard
@@ -1143,12 +1144,12 @@ function renderLeaderboard(currentDrift, currentGrade, currentBaseline) {
   sorted.forEach((entry, i) => {
     const tr = document.createElement('tr');
     if (entry.id === state._currentRunId) tr.className = 'current-run';
+    const entryConsistency = Math.max(0, 100 - entry.drift);
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${entry.date}</td>
-      <td>${entry.drift}%</td>
+      <td>${entryConsistency}%</td>
       <td>${entry.grade}</td>
-      <td>${entry.baseline}ms</td>
     `;
     tbody.appendChild(tr);
   });
@@ -1251,15 +1252,15 @@ function updateHUD() {
 
   const lastResult = state.results.length > 0 ? state.results[state.results.length - 1] : null;
   if (lastResult) {
-    hudQE.textContent = `QE: ${lastResult.qeDuration}ms`;
+    hudQE.textContent = `Hold: ${lastResult.qeDuration}ms`;
     const baseline = getBaseline();
-    // Show drift only after baseline is set (after target 3)
+    // Show consistency only after baseline is set (after target 3)
     if (baseline > 0 && state.globalTarget >= BASELINE_COUNT) {
-      // Running drift: average drift of all post-baseline results so far
       const postBaseline = state.results.slice(BASELINE_COUNT);
       if (postBaseline.length > 0) {
         const avgDrift = Math.round(postBaseline.reduce((sum, r) => sum + Math.abs(r.qeDuration - baseline) / baseline * 100, 0) / postBaseline.length);
-        hudDrift.textContent = `DRIFT: ${avgDrift}%`;
+        const consistency = Math.max(0, 100 - avgDrift);
+        hudDrift.textContent = `${consistency}% consistent`;
       } else {
         hudDrift.textContent = '';
       }
@@ -1267,7 +1268,7 @@ function updateHUD() {
       hudDrift.textContent = '';
     }
   } else {
-    hudQE.textContent = 'QE: ---';
+    hudQE.textContent = 'Hold: ---';
     hudDrift.textContent = '';
   }
 }
