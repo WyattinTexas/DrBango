@@ -875,6 +875,7 @@ let bgParticles = [];
 let touchRipples = []; // mobile tap feedback
 let accuracyRings = []; // accuracy feedback rings at click position
 let hitExplosions = []; // expanding fade-out circles on hit
+let missMarkers = []; // red X markers at miss positions
 let cursorTrail = []; // recent cursor positions for trail effect
 
 // Audio
@@ -1592,6 +1593,7 @@ function processStrikeOnTarget(target) {
       combo = 0; playMissSound();
       if (isTouch && navigator.vibrate) navigator.vibrate(40); // heavy miss haptic
       showFeedback('MISS', target.x, target.y - 20, color);
+      missMarkers.push({ x: target.x + target.driftX, y: target.y + target.driftY, age: 0, maxAge: 0.6 });
       flashScreen(color, 0.15);
     }
     if (matchMode) {
@@ -1939,7 +1941,7 @@ function startGame() {
   currentTarget = null;
   secondTarget = null;
   targetIndex = 0;
-  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = []; scorePopups = []; accuracyRings = []; hitExplosions = [];
+  feedbacks = []; particles = []; decoys = []; beatPulses = []; bgParticles = []; cursorTrail = []; scorePopups = []; accuracyRings = []; hitExplosions = []; missMarkers = [];
   scheduledBeats = [];
 
   // Set adaptive difficulty for solo
@@ -2321,6 +2323,7 @@ function gameLoop(timestamp) {
     drawIdleBackground(dt, timestamp);
   }
 
+  drawMissMarkers(dt);
   drawHitExplosions(dt);
   drawParticles(dt);
   drawTouchRipples(dt);
@@ -2368,6 +2371,7 @@ function updateGame(dt, timestamp) {
         if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
         combo = 0;
         showFeedback('MISS', currentTarget.x, currentTarget.y - 20, '#ff5252');
+        missMarkers.push({ x: currentTarget.x + currentTarget.driftX, y: currentTarget.y + currentTarget.driftY, age: 0, maxAge: 0.6 });
         playMissSound();
         flashScreen('#ff5252', 0.12);
         // Encouragement after miss
@@ -3250,6 +3254,26 @@ function drawTouchRipples(dt) {
     ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
     ctx.lineWidth = 2 * (1 - progress);
+    ctx.stroke();
+  }
+}
+
+function drawMissMarkers(dt) {
+  for (let i = missMarkers.length - 1; i >= 0; i--) {
+    const m = missMarkers[i];
+    m.age += dt;
+    if (m.age >= m.maxAge) { missMarkers.splice(i, 1); continue; }
+    const progress = m.age / m.maxAge;
+    const alpha = (1 - progress) * 0.6;
+    const size = 12 + progress * 4;
+    ctx.strokeStyle = `rgba(255, 82, 82, ${alpha})`;
+    ctx.lineWidth = 3 * (1 - progress * 0.5);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(m.x - size, m.y - size);
+    ctx.lineTo(m.x + size, m.y + size);
+    ctx.moveTo(m.x + size, m.y - size);
+    ctx.lineTo(m.x - size, m.y + size);
     ctx.stroke();
   }
 }
