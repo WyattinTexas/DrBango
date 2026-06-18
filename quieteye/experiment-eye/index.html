@@ -998,6 +998,34 @@ function playKick(time, intensity) {
   osc.start(time); osc.stop(time + 0.3);
 }
 
+function playUIClick() {
+  if (!audioCtx) initAudio();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(900, t);
+  osc.frequency.exponentialRampToValueAtTime(600, t + 0.06);
+  gain.gain.setValueAtTime(0.08, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.1);
+}
+
+function playUIHover() {
+  if (!audioCtx) return; // don't init just for hover
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(1200, t);
+  gain.gain.setValueAtTime(0.02, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 0.05);
+}
+
 function playApproachTone(startTime, duration, freq) {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();
@@ -2034,13 +2062,23 @@ function updateHUD() {
 // ─── Game Flow ───
 document.getElementById('solo-btn').addEventListener('click', () => {
   initAudio();
+  playUIClick();
   matchMode = false;
   startGame();
 });
+document.getElementById('solo-btn').addEventListener('mouseenter', () => playUIHover());
 document.getElementById('match-btn').addEventListener('click', () => {
   initAudio();
+  playUIClick();
   matchMode = true;
   startMatchmaking();
+});
+document.getElementById('match-btn').addEventListener('mouseenter', () => playUIHover());
+
+// Wire hover sounds to all title-btn and action-btn
+document.querySelectorAll('.action-btn').forEach(btn => {
+  btn.addEventListener('mouseenter', () => playUIHover());
+  btn.addEventListener('click', () => playUIClick());
 });
 
 function startGame() {
