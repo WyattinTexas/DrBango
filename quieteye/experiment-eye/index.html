@@ -853,6 +853,7 @@ let particles = [];
 let decoys = [];
 let beatPulses = [];
 let bgParticles = [];
+let touchRipples = []; // mobile tap feedback
 
 // Audio
 let droneOsc = null, droneGain = null;
@@ -1425,6 +1426,7 @@ function processStrikeOnTarget(target) {
   if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
     perfects++; playHitSound('perfect');
+    if (isTouch && navigator.vibrate) navigator.vibrate([10, 30, 10]); // double tap haptic
   } else if (diff <= (120 * ts) + giftBonus) {
     rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
     greats++; playHitSound('great');
@@ -1443,6 +1445,7 @@ function processStrikeOnTarget(target) {
     } else {
       if (inTheZone) { inTheZone = false; playZoneExit(); showFeedback('ZONE BROKEN', W / 2, H * 0.35, '#ff5252'); }
       combo = 0; playMissSound();
+      if (isTouch && navigator.vibrate) navigator.vibrate(40); // heavy miss haptic
       showFeedback('MISS', target.x, target.y - 20, color);
       flashScreen(color, 0.15);
     }
@@ -1954,6 +1957,10 @@ document.addEventListener('touchstart', (e) => {
   if (gameState === 'playing') {
     const t = e.touches[0];
     mouseX = t.clientX; mouseY = t.clientY;
+    // Touch ripple effect
+    touchRipples.push({ x: mouseX, y: mouseY, age: 0, maxAge: 0.4 });
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(15);
     processStrike();
   }
 }, { passive: true });
@@ -1980,6 +1987,7 @@ function gameLoop(timestamp) {
   }
 
   drawParticles(dt);
+  drawTouchRipples(dt);
   drawFeedbacks(dt);
 
   requestAnimationFrame(gameLoop);
@@ -2054,7 +2062,8 @@ function updateGame(dt, timestamp) {
     const dy = mouseY - ty;
     const dist = Math.sqrt(dx * dx + dy * dy);
     currentTarget.holdSamples++;
-    if (dist <= currentTarget.radius * 1.8) {
+    const holdMult = isTouch ? 2.4 : 1.8; // larger hit zone on touch
+    if (dist <= currentTarget.radius * holdMult) {
       currentTarget.holdInside++;
     }
 
@@ -2363,7 +2372,7 @@ function drawGame(dt, timestamp) {
     const dx = mouseX - tx;
     const dy = mouseY - ty;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const isHovering = dist <= effectiveRadius * 1.8;
+    const isHovering = dist <= effectiveRadius * (isTouch ? 2.4 : 1.8);
 
     // Outer glow
     const glowAmt = (isHovering ? 0.5 : 0.2) * whisperDim;
@@ -2632,6 +2641,22 @@ function drawParticles(dt) {
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+function drawTouchRipples(dt) {
+  for (let i = touchRipples.length - 1; i >= 0; i--) {
+    const r = touchRipples[i];
+    r.age += dt;
+    if (r.age >= r.maxAge) { touchRipples.splice(i, 1); continue; }
+    const progress = r.age / r.maxAge;
+    const radius = 20 + progress * 40;
+    const alpha = (1 - progress) * 0.3;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.lineWidth = 2 * (1 - progress);
+    ctx.stroke();
   }
 }
 
