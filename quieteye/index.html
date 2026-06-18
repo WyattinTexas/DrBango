@@ -236,6 +236,21 @@
     </div>
   </a>
 
+  <a href="beat-lock/" class="game-card" style="--c: #e040fb; --glow: rgba(224,64,251,0.12);">
+    <div class="card-preview"><canvas id="cv7"></canvas></div>
+    <div class="card-body">
+      <div class="card-top">
+        <div class="card-title">BEAT LOCK</div>
+        <div class="card-number">DRILL 06</div>
+      </div>
+      <div class="card-oneliner">Hold steady. Strike on the beat.</div>
+      <div class="card-bottom">
+        <div class="card-skill">RHYTHM + FOCUS</div>
+        <div class="play-btn">PLAY &rarr;</div>
+      </div>
+    </div>
+  </a>
+
   <a href="lock-strike/" class="game-card" style="--c: #666; --glow: rgba(100,100,100,0.08);">
     <div class="card-preview"><canvas id="cv6"></canvas></div>
     <div class="card-body">
@@ -275,6 +290,8 @@ function initPreviews() {
   animatePressure(document.getElementById('cv5'));
   // 6. Lock & Strike — crosshair locking on target
   animateLock(document.getElementById('cv6'));
+  // 7. Beat Lock — rhythm circles
+  animateBeatLock(document.getElementById('cv7'));
 }
 
 function setupCanvas(canvas) {
@@ -633,6 +650,62 @@ function animateLock(canvas) {
     ctx.beginPath(); ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12); ctx.stroke();
     ctx.strokeStyle = '#00e5ff40';
     ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function animateBeatLock(canvas) {
+  const { ctx, w, h } = setupCanvas(canvas);
+  let t = 0;
+  function draw() {
+    t += 0.025;
+    ctx.clearRect(0, 0, w, h);
+    // Dark bg
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, w, h);
+    // Beat pulse ring (expands on each "beat")
+    const beatPhase = (t * 2) % 2;
+    if (beatPhase < 0.5) {
+      const pulseR = beatPhase * 2 * Math.max(w, h) * 0.4;
+      ctx.strokeStyle = `rgba(224, 64, 251, ${0.3 - beatPhase * 0.6})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(w * 0.5, h * 0.5, pulseR, 0, Math.PI * 2); ctx.stroke();
+    }
+    // Target position (shifts each "beat")
+    const beatIdx = Math.floor(t * 2);
+    const tx = w * 0.3 + (Math.sin(beatIdx * 2.7) * 0.5 + 0.5) * w * 0.4;
+    const ty = h * 0.3 + (Math.cos(beatIdx * 1.9) * 0.5 + 0.5) * h * 0.4;
+    // Approach ring (shrinks within beat)
+    const approachPhase = (t * 2) % 1;
+    const approachR = 40 - approachPhase * 25;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 + approachPhase * 0.5})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(tx, ty, approachR, 0, Math.PI * 2); ctx.stroke();
+    // Target core
+    ctx.fillStyle = '#e040fb';
+    ctx.shadowColor = '#e040fb80';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(tx, ty, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(tx, ty, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // "PERFECT" text flash near beat
+    if (approachPhase > 0.85) {
+      ctx.fillStyle = `rgba(255, 215, 0, ${(approachPhase - 0.85) * 6})`;
+      ctx.font = 'bold 11px Orbitron';
+      ctx.textAlign = 'center';
+      ctx.fillText('PERFECT', tx, ty - 22);
+    }
+    // Combo counter
+    ctx.fillStyle = '#e040fb40';
+    ctx.font = 'bold 16px Orbitron';
+    ctx.textAlign = 'center';
+    ctx.fillText('x' + (Math.floor(t) % 8 + 1), w * 0.5, 25);
+    // BPM label
+    ctx.fillStyle = '#ffffff15';
+    ctx.font = '9px Orbitron';
+    ctx.fillText('120 BPM', w * 0.5, h - 12);
     requestAnimationFrame(draw);
   }
   draw();
