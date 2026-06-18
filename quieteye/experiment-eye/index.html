@@ -84,7 +84,13 @@ canvas {
 #hud-score {
   font-family: 'Orbitron', sans-serif;
   font-size: 22px; font-weight: 700;
+  transition: text-shadow 0.15s;
 }
+@keyframes scorePop {
+  0% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+#hud-score.pop { animation: scorePop 0.2s ease-out; }
 #hud-consistency {
   font-size: 12px;
   color: rgba(255,255,255,0.4);
@@ -1930,8 +1936,18 @@ function flashScreen(color, opacity) {
 }
 
 // ─── HUD ───
+let lastDisplayedScore = 0;
 function updateHUD() {
-  document.getElementById('hud-score').textContent = Math.round(displayScore);
+  const scoreEl = document.getElementById('hud-score');
+  const roundedScore = Math.round(displayScore);
+  scoreEl.textContent = roundedScore;
+  // Pop on significant score gain (100+)
+  if (roundedScore - lastDisplayedScore >= 100) {
+    scoreEl.classList.remove('pop');
+    scoreEl.offsetHeight;
+    scoreEl.classList.add('pop');
+  }
+  lastDisplayedScore = roundedScore;
   const comboEl = document.getElementById('combo-num');
   const prevComboText = comboEl.textContent;
   comboEl.textContent = `${combo}x`;
