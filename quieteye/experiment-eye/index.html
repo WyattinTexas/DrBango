@@ -2653,6 +2653,34 @@ function drawGame(dt, timestamp) {
     }
   }
 
+  // Run timeline bar — bottom of screen
+  const totalCount = matchMode ? MATCH_TARGETS : TOTAL_TARGETS;
+  const barHeight = 3;
+  const barY = H - barHeight;
+  const segW = W / totalCount;
+  for (let i = 0; i < totalCount; i++) {
+    const segVibe = vibeSequence[i];
+    if (!segVibe) continue;
+    const hex = segVibe.color;
+    const sr = parseInt(hex.slice(1, 3), 16);
+    const sg = parseInt(hex.slice(3, 5), 16);
+    const sb = parseInt(hex.slice(5, 7), 16);
+    if (i < targetIndex) {
+      // Completed — full color
+      const rating = targetRatings[i];
+      const alpha = rating === 'miss' ? 0.15 : rating === 'good' ? 0.3 : rating === 'great' ? 0.5 : 0.7;
+      ctx.fillStyle = `rgba(${sr},${sg},${sb},${alpha})`;
+    } else if (i === targetIndex) {
+      // Current — pulsing
+      const pulse = Math.sin(timestamp * 0.008) * 0.3 + 0.7;
+      ctx.fillStyle = `rgba(${sr},${sg},${sb},${pulse * 0.5})`;
+    } else {
+      // Future — very dim
+      ctx.fillStyle = `rgba(${sr},${sg},${sb},0.06)`;
+    }
+    ctx.fillRect(i * segW, barY, segW - 1, barHeight);
+  }
+
   if (effectiveShake > 0) ctx.restore();
 
   // CLUTCH TIME visual indicator — dramatic pulsing when match is tight
