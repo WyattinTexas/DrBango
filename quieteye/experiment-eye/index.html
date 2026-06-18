@@ -845,6 +845,7 @@ let score = 0;
 let combo = 0;
 let bestCombo = 0;
 let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
+let perfectStreak = 0;
 let comboShield = false; // GIFT reward: protects combo from next miss
 let giftDoubleNext = false; // GIFT reward: double points on next target
 let holdAccuracies = [];
@@ -1547,7 +1548,10 @@ function processStrikeOnTarget(target) {
 
   if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
-    perfects++; playHitSound('perfect'); triggerImpactShake(3);
+    perfects++; perfectStreak++; playHitSound('perfect'); triggerImpactShake(3);
+    if (perfectStreak === 3) showFeedback('PRECISION', W / 2, H * 0.3, '#ffd700');
+    else if (perfectStreak === 5) { showFeedback('FLAWLESS', W / 2, H * 0.3, '#ffd700'); spawnParticles(W / 2, H / 2, '#ffd700', 20); }
+    else if (perfectStreak >= 7 && perfectStreak % 2 === 1) { showFeedback('INHUMAN ' + perfectStreak + 'x', W / 2, H * 0.3, '#ffd700'); spawnParticles(W / 2, H / 2, '#ffd700', 30); triggerImpactShake(5); }
     if (matchMode && !firstBloodClaimed) {
       firstBloodClaimed = true;
       showFeedback('FIRST BLOOD', W / 2, H * 0.25, '#ff1744');
@@ -1557,12 +1561,12 @@ function processStrikeOnTarget(target) {
     if (isTouch && navigator.vibrate) navigator.vibrate([10, 30, 10]); // double tap haptic
   } else if (diff <= (120 * ts) + giftBonus) {
     rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
-    greats++; playHitSound('great'); triggerImpactShake(1.5);
+    greats++; perfectStreak = 0; playHitSound('great'); triggerImpactShake(1.5);
   } else if (diff <= (200 * ts) + giftBonus) {
     rating = 'good'; color = '#42a5f5'; points = 50; particleCount = 8;
-    goods++; playHitSound('good'); triggerImpactShake(0.5);
+    goods++; perfectStreak = 0; playHitSound('good'); triggerImpactShake(0.5);
   } else {
-    rating = 'miss'; color = '#ff5252'; points = 0; misses++;
+    rating = 'miss'; color = '#ff5252'; points = 0; misses++; perfectStreak = 0;
     target.missed = true;
     if (comboShield) {
       // Shield absorbs the miss — combo preserved!
@@ -1892,7 +1896,7 @@ document.getElementById('match-btn').addEventListener('click', () => {
 function startGame() {
   stopTipRotation();
   score = 0; combo = 0; bestCombo = 0;
-  perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0;
+  perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0; perfectStreak = 0;
   comboShield = false;
   giftDoubleNext = false;
   holdAccuracies = []; holdDurations = []; targetRatings = [];
@@ -3086,6 +3090,15 @@ function drawGame(dt, timestamp) {
       ctx.fillText(gapText, W / 2, H - 32);
       ctx.globalAlpha = 1;
     }
+  }
+
+  // Perfect streak golden glow — subtle gold border when 3+ perfects in a row
+  if (perfectStreak >= 3) {
+    const psAlpha = Math.min(0.25, 0.08 + (perfectStreak - 3) * 0.02);
+    const psPulse = Math.sin(timestamp * 0.005) * 0.3 + 0.7;
+    ctx.strokeStyle = `rgba(255, 215, 0, ${psAlpha * psPulse})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, W, H);
   }
 
   // THE ZONE visual indicator — subtle white border glow when in zone
