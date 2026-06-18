@@ -900,6 +900,7 @@ const SURPRISES = [
   { id: 'spin',      name: 'SPIN',       desc: 'Everything rotates!', duration: 0 },
   { id: 'shrink',    name: 'SHRINK',     desc: 'Target shrinks over time!', duration: 0 },
   { id: 'strobe',    name: 'STROBE',     desc: 'Ring stutters in bursts!', duration: 0 },
+  { id: 'meteorite', name: 'METEORITE', desc: 'Target falls from the sky!', duration: 0 },
 ];
 
 // ─── Game Config ───
@@ -1539,6 +1540,11 @@ function spawnTarget() {
   // Surprise announcements
   if (surprise && surprise.id === 'giant') showFeedback('GIANT!', x, y - 40, '#ffd700');
   if (surprise && surprise.id === 'tiny') showFeedback('TINY!', x, y - 40, '#ff9100');
+  if (surprise && surprise.id === 'meteorite') {
+    currentTarget.y = margin; // start near top
+    currentTarget.meteoriteTargetY = margin + Math.random() * (H - margin * 3); // fall destination
+    showFeedback('METEORITE!', currentTarget.x, currentTarget.y - 30, '#ff9100');
+  }
   if (surprise && surprise.id === 'gravity') showFeedback('GRAVITY!', x, y - 40, '#42a5f5');
   if (surprise && surprise.id === 'heartbeat') showFeedback('HEARTBEAT!', x, y - 40, '#ff3d3d');
   if (surprise && surprise.id === 'trail') showFeedback('TRAIL!', x, y - 40, '#e040fb');
@@ -2466,6 +2472,7 @@ function generateRunName() {
   if (surprisesUsed.includes('strobe')) adjectives.push('Flickering');
   if (surprisesUsed.includes('shrink')) adjectives.push('Shrinking');
   if (surprisesUsed.includes('spin')) adjectives.push('Spiraling');
+  if (surprisesUsed.includes('meteorite')) adjectives.push('Falling');
 
   // Noun based on dominant vibe
   const nouns = [];
@@ -2484,6 +2491,7 @@ function generateRunName() {
   if (surprisesUsed.includes('blind')) nouns.push('Blindspot', 'Dark');
   if (surprisesUsed.includes('freeze')) nouns.push('Frost', 'Freeze');
   if (surprisesUsed.includes('decoy')) nouns.push('Mirage', 'Decoy');
+  if (surprisesUsed.includes('meteorite')) nouns.push('Meteor', 'Comet');
   if (nouns.length === 0) nouns.push('Flow', 'Pulse', 'Focus', 'Run');
 
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
@@ -3082,6 +3090,14 @@ function updateGame(dt, timestamp) {
       currentTarget.x = 90 + Math.random() * (W - 180);
       currentTarget.y = 90 + Math.random() * (H - 180);
       showFeedback('SHIFTED!', currentTarget.x, currentTarget.y - 30, '#e040fb');
+    }
+
+    // Surprise: meteorite — target falls from sky toward destination
+    if (currentTarget.surprise && currentTarget.surprise.id === 'meteorite') {
+      const fallDist = (currentTarget.meteoriteTargetY || H * 0.5) - currentTarget.y;
+      if (Math.abs(fallDist) > 1) {
+        currentTarget.driftY += fallDist * 0.03; // ease toward target Y
+      }
     }
 
     // Surprise: gravity — target drifts
@@ -3841,6 +3857,21 @@ function drawGame(dt, timestamp) {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
+    }
+
+    // Meteorite fire trail — fiery streak above falling target
+    if (t.surprise && t.surprise.id === 'meteorite' && Math.abs(t.driftY) > 2) {
+      for (let m = 0; m < 5; m++) {
+        const trailY = ty - 10 - m * 14;
+        const trailAlpha = (0.2 - m * 0.035) * whisperDim;
+        const trailW = effectiveRadius * (1.2 - m * 0.15);
+        if (trailAlpha > 0) {
+          ctx.beginPath();
+          ctx.arc(tx + (Math.random() - 0.5) * 3, trailY, trailW, 0, Math.PI * 2);
+          ctx.fillStyle = m < 2 ? `rgba(255,180,50,${trailAlpha})` : `rgba(255,80,20,${trailAlpha * 0.7})`;
+          ctx.fill();
+        }
+      }
     }
 
     // Approach ring — with beat-synced bounce
