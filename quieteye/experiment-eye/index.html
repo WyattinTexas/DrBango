@@ -745,6 +745,9 @@ const HALFTIME_TARGET = 5;
 const CLUTCH_THRESHOLD = 3; // last N targets trigger clutch check
 const CLUTCH_SCORE_GAP = 150; // score gap to trigger clutch mode
 
+// ─── Match Announcements ───
+let firstBloodClaimed = false;
+
 // ─── Clutch Time State ───
 let inClutch = false;
 let clutchTransition = 0; // 0 = normal, 1 = full clutch
@@ -1430,6 +1433,12 @@ function processStrikeOnTarget(target) {
   if (diff <= (50 * ts) + giftBonus) {
     rating = 'perfect'; color = '#ffd700'; points = 150; particleCount = 25;
     perfects++; playHitSound('perfect'); triggerImpactShake(3);
+    if (matchMode && !firstBloodClaimed) {
+      firstBloodClaimed = true;
+      showFeedback('FIRST BLOOD', W / 2, H * 0.25, '#ff1744');
+      flashScreen('#ff1744', 0.15);
+      triggerImpactShake(6);
+    }
     if (isTouch && navigator.vibrate) navigator.vibrate([10, 30, 10]); // double tap haptic
   } else if (diff <= (120 * ts) + giftBonus) {
     rating = 'great'; color = '#00e676'; points = 100; particleCount = 15;
@@ -1758,6 +1767,7 @@ function startGame() {
   inClutch = false;
   clutchTransition = 0;
   clutchHeartbeatTimer = 0;
+  firstBloodClaimed = false;
 
   const totalCount = matchMode ? MATCH_TARGETS : TOTAL_TARGETS;
 
@@ -3164,6 +3174,11 @@ function processAIStrike() {
   if (absTiming <= 50) {
     aiPoints = 150;
     aiState.perfects++;
+    if (!firstBloodClaimed) {
+      firstBloodClaimed = true;
+      showFeedback('FIRST BLOOD — ' + aiOpponent.name.toUpperCase(), W / 2, H * 0.25, '#ff1744');
+      flashScreen('#ff1744', 0.1);
+    }
   } else if (absTiming <= 120) {
     aiPoints = 100;
     aiState.greats++;
