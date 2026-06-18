@@ -826,7 +826,7 @@ let activeDifficulty = { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timin
 let score = 0;
 let combo = 0;
 let bestCombo = 0;
-let perfects = 0, greats = 0, goods = 0, misses = 0;
+let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
 let holdAccuracies = [];
 let holdDurations = [];
 let vibeSequence = [];
@@ -1268,6 +1268,8 @@ function spawnTarget() {
     driftX: 0, driftY: 0,
     mirrorTriggered: false,
     pulsePhase: 0,
+    bossPhase: vibe.id === 'boss' ? 1 : 0, // 0 = not boss, 1-3 = boss phases
+    bossMaxPhases: 3,
   };
 
   // DOUBLE surprise — spawn a second target on the opposite side
@@ -1418,12 +1420,61 @@ function processStrikeOnTarget(target) {
   score += totalPoints;
   combo++;
   if (combo > bestCombo) bestCombo = combo;
-  target.hit = true;
 
   // Feedback
   let fbText = rating.toUpperCase();
   if (holdBonus > 0) fbText += ' +LOCK';
   if (vibeBonus > 0) fbText += ` +${vibeBonus}`;
+
+  // MULTI-PHASE BOSS: if boss and not final phase, relocate and shrink
+  if (target.bossPhase > 0 && target.bossPhase < target.bossMaxPhases) {
+    target.bossPhase++;
+    const phaseLabel = target.bossPhase === 2 ? 'PHASE 2' : 'PHASE 3';
+    showFeedback(fbText, target.x, target.y - 20, color);
+    spawnParticles(target.x, target.y, color, particleCount);
+    flashScreen('#ff1744', 0.1);
+    showFeedback(phaseLabel, W / 2, H * 0.35, '#ff1744');
+
+    // Relocate to random position
+    const margin = 90;
+    target.x = margin + Math.random() * (W - margin * 2);
+    target.y = margin + Math.random() * (H - margin * 2);
+    target.driftX = 0; target.driftY = 0;
+
+    // Shrink each phase
+    target.radius = Math.max(10, Math.round(target.radius * 0.75));
+    target.approachRadius = Math.max(30, Math.round(target.approachRadius * 0.8));
+
+    // Reset timing — new beat window for this phase
+    const now2 = audioCtx.currentTime;
+    target.spawnTime = now2;
+    target.strikeTime = now2 + beatInterval * 0.85; // slightly faster each phase
+    target.holdSamples = 0;
+    target.holdInside = 0;
+    target.mirrorTriggered = false;
+
+    // Schedule approach tone for new phase
+    playApproachTone(now2, beatInterval * 0.85, 100 + target.bossPhase * 30);
+    playBossWarning();
+
+    // Update HUD only, don't advance
+    if (matchMode) { updateMatchHUD(); } else { updateHUD(); }
+    return;
+  }
+
+  // Mark as hit (normal targets and boss phase 3)
+  target.hit = true;
+
+  // Boss phase 3 complete — bonus celebration
+  if (target.bossPhase >= target.bossMaxPhases) {
+    bossesSlain++;
+    const bossBonus = 300;
+    score += bossBonus;
+    showFeedback('BOSS SLAIN +300', W / 2, H * 0.25, '#ffd700');
+    spawnParticles(target.x, target.y, '#ffd700', 35);
+    playComboChord(4);
+  }
+
   showFeedback(fbText, target.x, target.y - 20, color);
   spawnParticles(target.x, target.y, color, particleCount);
   flashScreen(color, 0.08);
@@ -1569,7 +1620,7 @@ document.getElementById('match-btn').addEventListener('click', () => {
 
 function startGame() {
   score = 0; combo = 0; bestCombo = 0;
-  perfects = 0; greats = 0; goods = 0; misses = 0;
+  perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0;
   holdAccuracies = []; holdDurations = [];
   knowledgeUnlocked = [];
   currentTarget = null;
@@ -1713,6 +1764,7 @@ function showResults() {
     <span class="label">Misses</span><span class="value miss">${misses}</span>
     <span class="label">Best Combo</span><span class="value">${bestCombo}x</span>
     <span class="label">Vibes Survived</span><span class="value">${new Set(vibeSequence.map(v => v.id)).size}</span>
+    ${bossesSlain > 0 ? `<span class="label">Bosses Slain</span><span class="value perfect">${bossesSlain}</span>` : ''}
   `;
 
   // Medals
@@ -1724,6 +1776,7 @@ function showResults() {
   if (bestCombo >= 10) medalsRow.innerHTML += '<span class="medal purple">ENTERED THE ZONE</span>';
   if (misses === 0) medalsRow.innerHTML += '<span class="medal purple">PERFECT RUN</span>';
   if (total === TOTAL_TARGETS) medalsRow.innerHTML += '<span class="medal cyan">FULL EXPERIMENT</span>';
+  if (bossesSlain >= 1) medalsRow.innerHTML += '<span class="medal gold">BOSS SLAYER</span>';
 
   // Knowledge earned
   const knowledgeEl = document.getElementById('results-knowledge');
@@ -2182,16 +2235,31 @@ function drawGame(dt, timestamp) {
       }
     }
 
-    // Boss danger ring
+    // Boss danger ring + phase indicator
     if (t.vibe.id === 'boss') {
       const dangerPulse = Math.sin(timestamp * 0.008) * 0.5 + 0.5;
-      ctx.beginPath();
-      ctx.arc(tx, ty, effectiveRadius + 20, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 23, 68, ${dangerPulse * 0.4})`;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // Multiple danger rings based on phase
+      const rings = t.bossMaxPhases - t.bossPhase + 1;
+      for (let r = 0; r < rings; r++) {
+        ctx.beginPath();
+        ctx.arc(tx, ty, effectiveRadius + 15 + r * 10, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 23, 68, ${dangerPulse * (0.3 - r * 0.08)})`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // Phase dots under target
+      if (t.bossPhase > 0) {
+        for (let p = 0; p < t.bossMaxPhases; p++) {
+          const dotX = tx - (t.bossMaxPhases - 1) * 6 / 2 + p * 6;
+          const dotY = ty + effectiveRadius + 10;
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+          ctx.fillStyle = p < t.bossPhase ? 'rgba(255,23,68,0.8)' : 'rgba(255,255,255,0.2)';
+          ctx.fill();
+        }
+      }
     }
 
     // Vibe label (subtle)
