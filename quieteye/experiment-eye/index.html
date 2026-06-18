@@ -605,6 +605,7 @@ canvas {
       <span id="streak-icon" style="font-size:18px"></span>
       <span id="streak-text" style="font-family:Orbitron;font-size:12px;font-weight:700;letter-spacing:3px"></span>
     </div>
+    <div id="pb-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,215,0,0.25);letter-spacing:2px;margin-top:4px"></div>
     <div id="mmr-display" style="font-family:Orbitron;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-top:4px"></div>
     <div class="title-btn-row">
       <button class="title-btn" id="solo-btn">SOLO</button>
@@ -1800,7 +1801,17 @@ function showResults() {
 
   document.getElementById('results-grade').textContent = grade;
   document.getElementById('results-grade').style.color = gradeColor;
-  document.getElementById('results-score').textContent = score + ' pts';
+  // Personal best check (solo only)
+  const prevPB = getPersonalBest();
+  const isNewPB = score > prevPB && score > 0;
+  if (isNewPB) {
+    setPersonalBest(score);
+    document.getElementById('results-score').textContent = score + ' pts  \u2605 NEW PB!';
+    document.getElementById('results-score').style.textShadow = '0 0 20px rgba(255,215,0,0.5)';
+  } else {
+    document.getElementById('results-score').textContent = score + ' pts';
+    document.getElementById('results-score').style.textShadow = 'none';
+  }
   const diffLabel = activeDifficulty.label !== 'NORMAL' ? ` | ${activeDifficulty.label}` : '';
   document.getElementById('results-subtitle').textContent =
     `${consistency}% consistent | ${onBeatPct}% on-beat | ${avgHold}% hold${diffLabel}`;
@@ -1827,6 +1838,7 @@ function showResults() {
   if (bossesSlain >= 1) medalsRow.innerHTML += '<span class="medal gold">BOSS SLAYER</span>';
   if (knowledgeUnlocked.length >= 4) medalsRow.innerHTML += '<span class="medal cyan">SCHOLAR</span>';
   if (new Set(vibeSequence.map(v => v.id)).size >= 7) medalsRow.innerHTML += '<span class="medal purple">VIBE EXPLORER</span>';
+  if (isNewPB) medalsRow.innerHTML += '<span class="medal gold">NEW RECORD</span>';
 
   // Accuracy chart — per-target rating visualization
   if (targetRatings.length > 0) {
@@ -2677,6 +2689,13 @@ function addMatchHistory(entry) {
   } catch(e) {}
 }
 
+function getPersonalBest() {
+  try { return parseInt(localStorage.getItem('experiment-eye-pb')) || 0; } catch(e) { return 0; }
+}
+function setPersonalBest(val) {
+  try { localStorage.setItem('experiment-eye-pb', val); } catch(e) {}
+}
+
 function getWinStreak() {
   try { return parseInt(localStorage.getItem('experiment-eye-streak')) || 0; } catch(e) { return 0; }
 }
@@ -2688,6 +2707,15 @@ function updateTitleStats() {
   const mmr = getPlayerMMR();
   const rec = getPlayerRecord();
   const streak = getWinStreak();
+  const pb = getPersonalBest();
+
+  // Personal best display
+  const pbEl = document.getElementById('pb-display');
+  if (pb > 0) {
+    pbEl.textContent = `BEST: ${pb} pts`;
+  } else {
+    pbEl.textContent = '';
+  }
 
   // MMR display
   const mmrEl = document.getElementById('mmr-display');
