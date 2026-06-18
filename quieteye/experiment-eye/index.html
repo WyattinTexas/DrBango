@@ -848,6 +848,7 @@ let activeDifficulty = { label: 'NORMAL', bpmScale: 1.0, radiusScale: 1.0, timin
 
 // ─── Game State ───
 let score = 0;
+let displayScore = 0; // smoothly animated toward actual score
 let combo = 0;
 let bestCombo = 0;
 let perfects = 0, greats = 0, goods = 0, misses = 0, bossesSlain = 0;
@@ -1868,7 +1869,7 @@ function flashScreen(color, opacity) {
 
 // ─── HUD ───
 function updateHUD() {
-  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-score').textContent = Math.round(displayScore);
   document.getElementById('combo-num').textContent = `${combo}x`;
   // Shield indicator on combo
   document.getElementById('combo-num').style.textShadow = comboShield ? '0 0 12px #00ffcc' : 'none';
@@ -1904,7 +1905,7 @@ document.getElementById('match-btn').addEventListener('click', () => {
 
 function startGame() {
   stopTipRotation();
-  score = 0; combo = 0; bestCombo = 0;
+  score = 0; displayScore = 0; combo = 0; bestCombo = 0;
   perfects = 0; greats = 0; goods = 0; misses = 0; bossesSlain = 0; perfectStreak = 0;
   comboShield = false;
   giftDoubleNext = false;
@@ -2507,6 +2508,14 @@ function updateGame(dt, timestamp) {
   if (impactShake > 0) {
     impactShake *= Math.pow(0.001, dt); // ~10x decay per second
     if (impactShake < 0.1) impactShake = 0;
+  }
+
+  // Smooth score counter — lerp display score toward actual
+  if (displayScore !== score) {
+    const diff = score - displayScore;
+    displayScore += diff * Math.min(1, dt * 8); // fast catch-up
+    if (Math.abs(score - displayScore) < 1) displayScore = score;
+    updateHUD();
   }
 
   // Record cursor trail
