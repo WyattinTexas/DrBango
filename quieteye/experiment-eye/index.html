@@ -1147,6 +1147,54 @@ function playClutchHeartbeat() {
   });
 }
 
+function playGradeSound(grade) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  if (grade === 'S+' || grade === 'S') {
+    // Triumphant ascending chord
+    [523.3, 659.3, 784, 1047].forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.12, t + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.5);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t + i * 0.06); osc.stop(t + 0.7);
+    });
+  } else if (grade === 'A') {
+    // Bright positive chord
+    [440, 554.4, 659.3].forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.1, t + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t + i * 0.04); osc.stop(t + 0.5);
+    });
+  } else if (grade === 'B') {
+    // Neutral single tone
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = 440;
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.35);
+  } else {
+    // C/D: descending sad tone
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.4);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.55);
+  }
+}
+
 function playClutchEnter() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
@@ -1970,6 +2018,9 @@ function showResults() {
   else if (gradeScore >= 0.60) { grade = 'B'; gradeColor = '#42a5f5'; }
   else if (gradeScore >= 0.45) { grade = 'C'; gradeColor = '#ff9100'; }
   else { grade = 'D'; gradeColor = '#ff5252'; }
+
+  // Play grade-appropriate sound
+  playGradeSound(grade);
 
   // Run name
   const runName = generateRunName();
