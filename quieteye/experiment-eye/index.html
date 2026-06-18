@@ -2436,6 +2436,24 @@ function drawGame(dt, timestamp) {
     ctx.translate(sx, sy);
   }
 
+  // Zen breathing circle — slow expand/contract in background
+  if (vibe.id === 'zen') {
+    // 8-second breath cycle: 4s inhale (expand), 4s exhale (contract)
+    const breathPhase = (timestamp * 0.001) % 8;
+    const breathT = breathPhase < 4 ? breathPhase / 4 : 1 - (breathPhase - 4) / 4;
+    const breathEase = breathT * breathT * (3 - 2 * breathT); // smoothstep
+    const breathRadius = 60 + breathEase * 120; // 60 to 180
+    const breathAlpha = 0.02 + breathEase * 0.02; // very subtle
+    const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, breathRadius);
+    grad.addColorStop(0, `rgba(0,229,255,${breathAlpha})`);
+    grad.addColorStop(0.7, `rgba(0,229,255,${breathAlpha * 0.3})`);
+    grad.addColorStop(1, 'rgba(0,229,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, breathRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Grid — fades in zone, hidden in whisper, synthwave perspective for retro
   if (vibe.id === 'retro') {
     // Synthwave perspective grid — horizon at 40% height, lines converge
