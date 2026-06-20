@@ -1218,6 +1218,9 @@
         <button class="header-btn" id="themeOpenBtn" title="Theme" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
         </button>
+        <button class="header-btn" id="breatheOpenBtn" title="Box Breathing" style="font-size:14px;">
+          &#x1F4A8;
+        </button>
         <button class="header-btn" id="chartToggleBtn" title="Toggle chart">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </button>
@@ -1374,6 +1377,52 @@
     </div>
     <a class="shop-btn-primary" href="https://drbango.com/ladder/buy" target="_blank" rel="noopener">BUY NOW</a>
     <a class="shop-btn-secondary" href="https://drbango.com/ladder/about" target="_blank" rel="noopener">LEARN MORE</a>
+  </div>
+</div>
+
+<!-- Breathing Drawer -->
+<div class="drawer-overlay" id="breatheOverlay"></div>
+<div class="drawer" id="breatheDrawer" style="height:85vh;">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <div>
+      <div class="drawer-title">Box Breathing</div>
+      <div class="lb-drill-label">4-4-4-4 &middot; 10 Rounds</div>
+    </div>
+    <button class="drawer-close" id="breatheCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="drawer-body" style="padding:16px;overflow-y:auto;">
+    <div id="breatheTimerContainer" style="text-align:center;">
+      <div id="bb-phase" style="font-size:1.5em;font-weight:700;color:var(--accent);margin-bottom:4px;">Ready</div>
+      <div style="position:relative;width:100%;height:100px;margin:12px 0 8px;">
+        <svg id="bb-svg" viewBox="0 0 400 100" preserveAspectRatio="none" style="display:block;width:100%;height:100%;">
+          <defs>
+            <linearGradient id="bbfill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(74,144,196,0.12)"/>
+              <stop offset="100%" stop-color="rgba(74,144,196,0)"/>
+            </linearGradient>
+          </defs>
+          <path id="bb-fill" fill="url(#bbfill)"/>
+          <path id="bb-path" fill="none" stroke="rgba(74,144,196,0.15)" stroke-width="2"/>
+          <path id="bb-trail" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+          <circle id="bb-glow" r="10" fill="rgba(74,144,196,0.2)"/>
+          <circle id="bb-dot" r="5" fill="var(--accent)"/>
+        </svg>
+        <div style="display:flex;justify-content:space-around;margin-top:6px;font-size:0.7em;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-dim);">
+          <span id="bb-wl-0">Inhale</span><span id="bb-wl-1">Hold</span><span id="bb-wl-2">Exhale</span><span id="bb-wl-3">Hold</span>
+        </div>
+      </div>
+      <div id="bb-count" style="font-size:3em;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px;">4</div>
+      <div style="display:flex;justify-content:center;gap:20px;margin-bottom:14px;font-size:0.85em;color:var(--text-dim);">
+        <span>Round <strong id="bb-round">0</strong>/10</span>
+        <span>Elapsed <strong id="bb-elapsed">0:00</strong></span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:8px;">
+        <button id="bb-start" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(var(--accent-rgb),0.3);border-radius:10px;padding:10px 32px;font-size:1em;font-weight:600;cursor:pointer;font-family:'Barlow',sans-serif;">Start</button>
+        <button id="bb-reset" style="background:var(--surface);color:var(--text-dim);border:1px solid var(--border);border-radius:10px;padding:10px 24px;font-size:1em;font-weight:600;cursor:pointer;font-family:'Barlow',sans-serif;">Reset</button>
+      </div>
+      <div id="bb-pips" style="display:flex;gap:5px;justify-content:center;margin-top:14px;"></div>
+    </div>
   </div>
 </div>
 
@@ -2112,6 +2161,77 @@ const fbDb = firebase.database();
   });
   shopCloseBtn.addEventListener('click', closeShop);
   shopOverlay.addEventListener('click', closeShop);
+
+  // ── BREATHING DRAWER ──
+  const breatheOverlay = document.getElementById('breatheOverlay');
+  const breatheDrawer = document.getElementById('breatheDrawer');
+  document.getElementById('breatheOpenBtn').addEventListener('click', () => {
+    openDrawer(breatheOverlay, breatheDrawer);
+    if (!window._bbInit) initBreathingTimer();
+  });
+  document.getElementById('breatheCloseBtn').addEventListener('click', () => closeDrawer(breatheOverlay, breatheDrawer));
+  breatheOverlay.addEventListener('click', () => closeDrawer(breatheOverlay, breatheDrawer));
+
+  function initBreathingTimer() {
+    window._bbInit = true;
+    const pipsEl = document.getElementById('bb-pips');
+    const PHASES = ['Inhale', 'Hold', 'Exhale', 'Hold'];
+    const SECS = 4, ROUNDS = 10;
+    let running = false, paused = false, tmr = null, rAf = null;
+    let phase = 0, sec = SECS, round = 1, elapsed = 0, lastTick = 0;
+
+    for (let i = 0; i < ROUNDS; i++) {
+      const p = document.createElement('div');
+      p.style.cssText = 'width:10px;height:10px;border-radius:50%;background:rgba(0,0,0,0.08);transition:background 0.3s;';
+      p.className = 'bb-pip';
+      pipsEl.appendChild(p);
+    }
+
+    const VH = 100, M = 10, TOP = M, BOT = VH - M;
+    const wavePath = `M 0,${BOT} C 35,${BOT} 65,${TOP} 100,${TOP} L 200,${TOP} C 235,${TOP} 265,${BOT} 300,${BOT} L 400,${BOT}`;
+    document.getElementById('bb-path').setAttribute('d', wavePath);
+    document.getElementById('bb-fill').setAttribute('d', wavePath + ` L 400,${VH} L 0,${VH} Z`);
+    const pathEl = document.getElementById('bb-path');
+    const pathLen = pathEl.getTotalLength();
+    document.getElementById('bb-trail').setAttribute('d', wavePath);
+    const trailEl = document.getElementById('bb-trail');
+    trailEl.style.strokeDasharray = pathLen;
+    trailEl.style.strokeDashoffset = pathLen;
+
+    function cycProg(f) { f=f||0; return Math.min(1,Math.max(0,(phase+Math.max(0,1-((sec-f)/SECS)))/4)); }
+    function posDot(p) {
+      const pt = pathEl.getPointAtLength(p * pathLen);
+      document.getElementById('bb-dot').setAttribute('cx',pt.x);
+      document.getElementById('bb-dot').setAttribute('cy',pt.y);
+      document.getElementById('bb-glow').setAttribute('cx',pt.x);
+      document.getElementById('bb-glow').setAttribute('cy',pt.y);
+      trailEl.style.strokeDashoffset = pathLen*(1-p);
+    }
+    function updLabels() { for(let i=0;i<4;i++) { const el=document.getElementById('bb-wl-'+i); el.style.color=i===phase?'var(--accent)':'var(--text-dim)'; } }
+    function updPips() { const ps=pipsEl.children; for(let i=0;i<ROUNDS;i++) { ps[i].style.background=i<round-1?'var(--accent)':i===round-1&&running?'rgba(var(--accent-rgb),0.4)':'rgba(0,0,0,0.08)'; } }
+    function fmt(s) { return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+    function render(f) {
+      document.getElementById('bb-phase').textContent = running?PHASES[phase]:(paused?'Paused':'Ready');
+      document.getElementById('bb-count').textContent = sec;
+      document.getElementById('bb-round').textContent = running||paused?round:0;
+      document.getElementById('bb-elapsed').textContent = fmt(elapsed);
+      posDot(cycProg(f)); updLabels(); updPips();
+    }
+    function anim() { if(!running)return; posDot(cycProg(Math.min((performance.now()-lastTick)/1000,1))); rAf=requestAnimationFrame(anim); }
+    function tick() {
+      elapsed++; sec--; lastTick=performance.now();
+      if(sec<=0) { phase++; if(phase>=4) { phase=0; if(round>=ROUNDS) { running=false; document.getElementById('bb-phase').textContent='Complete'; document.getElementById('bb-count').textContent='\u2713'; document.getElementById('bb-start').textContent='Start'; posDot(1); Array.from(pipsEl.children).forEach(p=>{p.style.background='var(--accent)';}); clearInterval(tmr);tmr=null;cancelAnimationFrame(rAf);return; } round++; } sec=SECS; } render();
+    }
+    document.getElementById('bb-start').addEventListener('click', function() {
+      if(!running&&!paused) { running=true;paused=false;phase=0;sec=SECS;round=1;elapsed=0;lastTick=performance.now();this.textContent='Pause';render();tmr=setInterval(tick,1000);rAf=requestAnimationFrame(anim); }
+      else if(running) { running=false;paused=true;clearInterval(tmr);tmr=null;cancelAnimationFrame(rAf);this.textContent='Resume';render(); }
+      else if(paused) { running=true;paused=false;lastTick=performance.now();this.textContent='Pause';render();tmr=setInterval(tick,1000);rAf=requestAnimationFrame(anim); }
+    });
+    document.getElementById('bb-reset').addEventListener('click', function() {
+      running=false;paused=false;clearInterval(tmr);tmr=null;cancelAnimationFrame(rAf);phase=0;sec=SECS;round=1;elapsed=0;document.getElementById('bb-start').textContent='Start';trailEl.style.strokeDashoffset=pathLen;render();
+    });
+    posDot(0); render();
+  }
 
   // Period chips
   document.querySelectorAll('.lb-period-chip').forEach(chip => {
