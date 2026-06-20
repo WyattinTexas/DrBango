@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Box Breathing Timer</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #2a2a3a;
+    --text: #e8e8ef;
+    --text2: #8888a0;
+    --cyan: #22d3ee;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { width: 100%; max-width: 500px; }
+  h1 {
+    text-align: center;
+    font-size: 1.4em;
+    font-weight: 800;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, var(--cyan), #67e8f9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text2);
+    margin-bottom: 24px;
+  }
+  .breath-timer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+  .breath-timer-phase {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 2px;
+  }
+  .breath-timer-wave {
+    position: relative;
+    width: 100%;
+    height: 120px;
+    margin: 16px 0 8px;
+  }
+  .breath-timer-wave svg { display: block; width: 100%; height: 100%; }
+  .breath-timer-wave-labels {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 8px;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+  }
+  .breath-timer-wave-labels span { transition: color 0.3s; }
+  .breath-timer-wave-labels span.on { color: var(--cyan); }
+  .breath-timer-countdown {
+    font-size: 3.5em;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .breath-timer-meta {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+    font-size: 0.85em;
+    color: var(--text2);
+  }
+  .breath-timer-meta strong { color: var(--text); }
+  .breath-timer-btn {
+    background: rgba(34,211,238,0.12);
+    color: var(--cyan);
+    border: 1px solid rgba(34,211,238,0.3);
+    border-radius: 10px;
+    padding: 14px 40px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin: 0 6px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .breath-timer-btn:hover { background: rgba(34,211,238,0.2); }
+  .breath-timer-btn:active { transform: scale(0.97); }
+  .breath-timer-btn.reset-btn {
+    background: rgba(255,255,255,0.05);
+    color: var(--text2);
+    border-color: var(--border);
+  }
+  .breath-timer-pips {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .breath-timer-pip {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    transition: background 0.3s;
+  }
+  .breath-timer-pip.done { background: var(--cyan); }
+  .breath-timer-pip.cur { background: rgba(34,211,238,0.4); box-shadow: 0 0 8px rgba(34,211,238,0.4); }
+  .instructions {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.8em;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Box Breathing</h1>
+  <div class="subtitle">4 sec inhale — 4 sec hold — 4 sec exhale — 4 sec hold</div>
+
+  <div class="breath-timer" id="breath-timer">
+    <div class="breath-timer-phase" id="bt-phase">Ready</div>
+    <div class="breath-timer-wave">
+      <svg id="bt-svg" viewBox="0 0 400 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="wfill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(34,211,238,0.12)"/>
+            <stop offset="100%" stop-color="rgba(34,211,238,0)"/>
+          </linearGradient>
+        </defs>
+        <path id="bt-fill" fill="url(#wfill)"/>
+        <path id="bt-path" fill="none" stroke="rgba(34,211,238,0.15)" stroke-width="2"/>
+        <path id="bt-trail" fill="none" stroke="var(--cyan)" stroke-width="2.5"/>
+        <circle id="bt-glow" r="10" fill="rgba(34,211,238,0.2)"/>
+        <circle id="bt-dot" r="5" fill="var(--cyan)"/>
+      </svg>
+      <div class="breath-timer-wave-labels">
+        <span id="bt-wl-0">Inhale</span>
+        <span id="bt-wl-1">Hold</span>
+        <span id="bt-wl-2">Exhale</span>
+        <span id="bt-wl-3">Hold</span>
+      </div>
+    </div>
+    <div class="breath-timer-countdown" id="bt-count">4</div>
+    <div class="breath-timer-meta">
+      <span>Round <strong id="bt-round">0</strong> / 10</span>
+      <span>Elapsed <strong id="bt-elapsed">0:00</strong></span>
+      <span>Total <strong>5:20</strong></span>
+    </div>
+    <div>
+      <button class="breath-timer-btn" id="bt-start" onclick="btToggle()">Start</button>
+      <button class="breath-timer-btn reset-btn" onclick="btReset()">Reset</button>
+    </div>
+    <div class="breath-timer-pips" id="bt-pips"></div>
+  </div>
+
+  <div class="instructions">
+    Sit upright. Breathe through your nose.<br>
+    10 rounds. 5 minutes 20 seconds total.
+  </div>
+</div>
+
+<script>
+(function() {
+  const pipsEl = document.getElementById('bt-pips');
+  const PHASES = ['Inhale', 'Hold', 'Exhale', 'Hold'];
+  const SECS = 4;
+  const ROUNDS = 10;
+
+  let running = false, paused = false, timer = null, raf = null;
+  let phase = 0, sec = SECS, round = 1, elapsed = 0;
+  let lastTickTime = 0;
+
+  for (let i = 0; i < ROUNDS; i++) {
+    const p = document.createElement('div');
+    p.className = 'breath-timer-pip';
+    pipsEl.appendChild(p);
+  }
+
+  const VW = 400, VH = 100, M = 10;
+  const TOP = M, BOT = VH - M;
+
+  function buildWavePath() {
+    return `M 0,${BOT} C 35,${BOT} 65,${TOP} 100,${TOP} L 200,${TOP} C 235,${TOP} 265,${BOT} 300,${BOT} L 400,${BOT}`;
+  }
+  function buildFillPath() {
+    return buildWavePath() + ` L 400,${VH} L 0,${VH} Z`;
+  }
+
+  const wavePath = buildWavePath();
+  document.getElementById('bt-path').setAttribute('d', wavePath);
+  document.getElementById('bt-fill').setAttribute('d', buildFillPath());
+
+  const pathEl = document.getElementById('bt-path');
+  const pathLen = pathEl.getTotalLength();
+
+  document.getElementById('bt-trail').setAttribute('d', wavePath);
+  const trailEl = document.getElementById('bt-trail');
+  trailEl.style.strokeDasharray = pathLen;
+  trailEl.style.strokeDashoffset = pathLen;
+
+  function getCycleProgress(frac) {
+    frac = frac || 0;
+    const phaseProgress = 1 - ((sec - frac) / SECS);
+    return Math.min(1, Math.max(0, (phase + Math.max(0, phaseProgress)) / 4));
+  }
+
+  function positionDot(progress) {
+    const pt = pathEl.getPointAtLength(progress * pathLen);
+    document.getElementById('bt-dot').setAttribute('cx', pt.x);
+    document.getElementById('bt-dot').setAttribute('cy', pt.y);
+    document.getElementById('bt-glow').setAttribute('cx', pt.x);
+    document.getElementById('bt-glow').setAttribute('cy', pt.y);
+    trailEl.style.strokeDashoffset = pathLen * (1 - progress);
+  }
+
+  function updateLabels() {
+    for (let i = 0; i < 4; i++) {
+      document.getElementById('bt-wl-' + i).classList.toggle('on', i === phase);
+    }
+  }
+
+  function updatePips() {
+    const pips = pipsEl.children;
+    for (let i = 0; i < ROUNDS; i++) {
+      pips[i].className = 'breath-timer-pip';
+      if (i < round - 1) pips[i].classList.add('done');
+      else if (i === round - 1 && running) pips[i].classList.add('cur');
+    }
+  }
+
+  function formatTime(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function render(frac) {
+    document.getElementById('bt-phase').textContent = running ? PHASES[phase] : (paused ? 'Paused' : 'Ready');
+    document.getElementById('bt-count').textContent = sec;
+    document.getElementById('bt-round').textContent = running || paused ? round : 0;
+    document.getElementById('bt-elapsed').textContent = formatTime(elapsed);
+    positionDot(getCycleProgress(frac));
+    updateLabels();
+    updatePips();
+  }
+
+  function animate() {
+    if (!running) return;
+    const frac = Math.min((performance.now() - lastTickTime) / 1000, 1);
+    positionDot(getCycleProgress(frac));
+    raf = requestAnimationFrame(animate);
+  }
+
+  function tick() {
+    elapsed++;
+    sec--;
+    lastTickTime = performance.now();
+    if (sec <= 0) {
+      phase++;
+      if (phase >= 4) {
+        phase = 0;
+        if (round >= ROUNDS) {
+          running = false;
+          document.getElementById('bt-phase').textContent = 'Complete';
+          document.getElementById('bt-count').textContent = '\u2713';
+          document.getElementById('bt-start').textContent = 'Start';
+          positionDot(1);
+          Array.from(pipsEl.children).forEach(p => { p.className = 'breath-timer-pip done'; });
+          clearInterval(timer); timer = null;
+          cancelAnimationFrame(raf);
+          return;
+        }
+        round++;
+      }
+      sec = SECS;
+    }
+    render();
+  }
+
+  window.btToggle = function() {
+    if (!running && !paused) {
+      running = true; paused = false;
+      phase = 0; sec = SECS; round = 1; elapsed = 0;
+      lastTickTime = performance.now();
+      document.getElementById('bt-start').textContent = 'Pause';
+      render();
+      timer = setInterval(tick, 1000);
+      raf = requestAnimationFrame(animate);
+    } else if (running) {
+      running = false; paused = true;
+      clearInterval(timer); timer = null;
+      cancelAnimationFrame(raf);
+      document.getElementById('bt-start').textContent = 'Resume';
+      render();
+    } else if (paused) {
+      running = true; paused = false;
+      lastTickTime = performance.now();
+      document.getElementById('bt-start').textContent = 'Pause';
+      render();
+      timer = setInterval(tick, 1000);
+      raf = requestAnimationFrame(animate);
+    }
+  };
+
+  window.btReset = function() {
+    running = false; paused = false;
+    clearInterval(timer); timer = null;
+    cancelAnimationFrame(raf);
+    phase = 0; sec = SECS; round = 1; elapsed = 0;
+    document.getElementById('bt-start').textContent = 'Start';
+    trailEl.style.strokeDashoffset = pathLen;
+    render();
+  };
+
+  positionDot(0);
+  render();
+})();
+</script>
+
+</body>
+</html>
