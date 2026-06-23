@@ -409,21 +409,28 @@
   // Publish my team's state to my raid slot when my turn ends, so benched
   // sprites show real HP on everyone's screens. Skin-level write — namespaced
   // raid tree only, no ported-file edits.
-  let _wasFighter = false;
+  let _lastFieldSig = '';
   function publishFieldState() {
     try {
       const R = window.currentRaid;
       const myUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
       if (!R || !R.players || !myUid || !battleReady()) return;
+      const amFighter = R.currentFighterUid === myUid;
+      // ONLY the active fighter owns a valid B.red. On a spectator, B.red is
+      // snapshot-synced to the CURRENT fighter — publishing it would overwrite
+      // our own slot with someone else's team (the benched-sprite-shows-fighter
+      // bug). So publish continuously WHILE fighting; the last write before we
+      // hand off persists as our benched state for everyone else to read.
+      if (!amFighter) return;
       const slots = Object.keys(R.players);
       const myKey = slots.find(k => R.players[k] && R.players[k].uid === myUid);
-      const amFighter = R.currentFighterUid === myUid;
-      if (myKey != null && _wasFighter && !amFighter) {
-        const ghosts = B.red.ghosts.map(g => ({ name: g.name || '', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko }));
-        firebase.database().ref('mp_modelc/raids/instances/' + (R.instanceId || R.id) + '/players/' + myKey + '/fieldState')
-          .set({ ghosts: ghosts, at: Date.now() }).catch(() => {});
-      }
-      _wasFighter = amFighter;
+      if (myKey == null) return;
+      const ghosts = B.red.ghosts.map(g => ({ name: g.name || '', hp: g.hp || 0, maxHp: g.maxHp || 1, ko: !!g.ko }));
+      const sig = ghosts.map(g => g.name + ':' + g.hp + ':' + (g.ko ? 'k' : '')).join('|');
+      if (sig === _lastFieldSig) return; // throttle: only write on change
+      _lastFieldSig = sig;
+      firebase.database().ref('mp_modelc/raids/instances/' + (R.instanceId || R.id) + '/players/' + myKey + '/fieldState')
+        .set({ ghosts: ghosts, at: Date.now() }).catch(() => {});
     } catch (e) {}
   }
 
@@ -782,6 +789,7 @@
     _pbAbilityShowing = false;
     _lastDice = { red: '', blue: '' };
     _specRoll = { red: null, blue: null };
+    _lastFieldSig = '';
     _lastCardsSig = '';
     pbCloseCards();
     const cw = $pb('pb-cards'); if (cw) cw.setAttribute('data-open', '');
