@@ -548,6 +548,13 @@
 
   // Dice lifecycle detector: engine sets B.preRoll[team].dice null -> [values]
   let _lastDice = { red: '', blue: '' };
+  // Values we last animated a reveal for. At turn-end the engine clears the
+  // dice then the bridge's "force one last snapshot" re-feeds the SAME final
+  // roll back in (fighter B.redDice or spectator _specRoll), which the cleared
+  // _lastDice would treat as a fresh roll → phantom re-roll right at handoff.
+  // Skipping a re-animation of identical values kills it; the settled dice are
+  // still on screen so they just persist until the next turn clears them.
+  let _lastRevealed = { red: '', blue: '' };
   // Spectator dice: the fighter's roll reaches us only via the battleState
   // snapshot's lastRoll (B.preRoll / B.redDice are NOT synced on spectators).
   // The updateSpectatorFromSnapshot hook captures it here so we can animate it.
@@ -569,6 +576,9 @@
       const key = dice ? dice.join(',') : '';
       if (key && key !== _lastDice[team]) {
         _lastDice[team] = key;
+        // phantom guard: turn-end re-feeds the same final roll — don't re-roll it
+        if (key === _lastRevealed[team]) return;
+        _lastRevealed[team] = key;
         PbDice.clear(team);
         PbDice.showRolling(team, dice.length);
         setTimeout(() => PbDice.reveal(team, dice), 900);
@@ -788,6 +798,7 @@
     _pbAbilityQueue = [];
     _pbAbilityShowing = false;
     _lastDice = { red: '', blue: '' };
+    _lastRevealed = { red: '', blue: '' };
     _specRoll = { red: null, blue: null };
     _lastFieldSig = '';
     _lastCardsSig = '';
