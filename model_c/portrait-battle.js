@@ -316,6 +316,29 @@
     return slots.map(k => R.players[k]).filter(Boolean);
   }
 
+  // Resolve a benched (non-fighting) player's on-field spiritkin for the shared
+  // stage. In this SEQUENTIAL raid only the current fighter has live battle
+  // state (B.red, snapshot-synced). For everyone else we have no live per-ghost
+  // HP, so: prefer the player's published fieldState (written at turn handoff),
+  // else resolve their chosen roster IDs → ghost cards at full HP.
+  function resolveBenchedGhost(pl) {
+    if (!pl) return null;
+    const fs = pl.fieldState;
+    if (fs && Array.isArray(fs.ghosts) && fs.ghosts.length) {
+      return fs.ghosts.find(t => t && !t.ko) || fs.ghosts[0];
+    }
+    const ids = Array.isArray(pl.team) ? pl.team : (pl.team && pl.team.ghosts) || [];
+    for (const id of ids) {
+      let card = null;
+      try { card = (typeof getGhost === 'function') && getGhost(id); } catch (e) {}
+      if (card) {
+        const hp = card.maxHp || card.hp || 1;
+        return { name: card.name, hp: hp, maxHp: hp, ko: false, art: card.art };
+      }
+    }
+    return null;
+  }
+
   function addSprite(field, src, opts) {
     const img = document.createElement('img');
     img.className = 'pb-sprite' + (opts.active ? ' pb-active' : '') + (opts.dead ? ' pb-dead' : '') + (opts.boss ? ' pb-boss' : '');
@@ -346,20 +369,20 @@
 
     if (players && players.length > 1) {
       // ── SHARED STAGE (2-3 players): one sprite per player's active spiritkin ──
+      // match the fighter by uid, falling back to slot index (players is sorted
+      // by slot, so i === currentFighterIdx identifies the active slot)
+      const fighterIdx = window.currentRaid && window.currentRaid.currentFighterIdx;
       players.slice(0, 3).forEach((pl, i) => {
-        const isFighter = pl.uid === fighterUid;
+        const isFighter = (pl.uid && pl.uid === fighterUid) || (!fighterUid && i === fighterIdx);
         // live state for the fighter comes from B (snapshot-mirrored on spectators);
-        // benched players show their published fieldState, falling back to slot team
+        // benched players show published fieldState, else their roster at full HP
         let g = null;
         if (isFighter && battleReady()) g = safeActive(B.red);
-        else {
-          const fs = pl.fieldState;
-          const team = (fs && fs.ghosts) || (pl.team && (pl.team.ghosts || pl.team)) || [];
-          g = (Array.isArray(team) ? team : Object.values(team)).find(t => t && !t.ko) || null;
-        }
+        else g = resolveBenchedGhost(pl);
         const pos = MULTI_POS[i];
+        const pname = pl.displayName || pl.name || ('Player ' + (i + 1));
         addSprite(field, PLAYER_BACKS[i % PLAYER_BACKS.length], {
-          name: (pl.name || '') + (g ? ' — ' + g.name : ''),
+          name: pname + (g && g.name ? ' — ' + g.name : ''),
           active: isFighter, dead: !!(g && g.ko) || (pl.status === 'done'),
           x: pos.x, y: pos.y,
           hp: g ? g.hp : null, maxHp: g ? g.maxHp : null
@@ -518,10 +541,24 @@
 
   // Dice lifecycle detector: engine sets B.preRoll[team].dice null -> [values]
   let _lastDice = { red: '', blue: '' };
+  // Spectator dice: the fighter's roll reaches us only via the battleState
+  // snapshot's lastRoll (B.preRoll / B.redDice are NOT synced on spectators).
+  // The updateSpectatorFromSnapshot hook captures it here so we can animate it.
+  let _specRoll = { red: null, blue: null };
+  function pbIsSpectating() {
+    // authoritative engine role — robust to spectator→fighter handoff (a
+    // later-slot raider spectates first, then fights on their own turn)
+    try { return typeof _currentRaidRole !== 'undefined' && _currentRaidRole === 'spectator'; }
+    catch (e) { return false; }
+  }
   function renderDice() {
     const pr = B.preRoll;
+    const spec = pbIsSpectating();
     ['red', 'blue'].forEach(team => {
-      const dice = (pr && pr[team] && pr[team].dice) || B[team + 'Dice'];
+      // on a spectator, trust ONLY the published roll (local B dice are stale)
+      const dice = spec
+        ? (_specRoll[team] && _specRoll[team].length ? _specRoll[team] : null)
+        : ((pr && pr[team] && pr[team].dice) || B[team + 'Dice']);
       const key = dice ? dice.join(',') : '';
       if (key && key !== _lastDice[team]) {
         _lastDice[team] = key;
@@ -744,6 +781,7 @@
     _pbAbilityQueue = [];
     _pbAbilityShowing = false;
     _lastDice = { red: '', blue: '' };
+    _specRoll = { red: null, blue: null };
     _lastCardsSig = '';
     pbCloseCards();
     const cw = $pb('pb-cards'); if (cw) cw.setAttribute('data-open', '');
@@ -810,6 +848,24 @@
       };
       wrapped._pbFxWrapped = true;
       window.playDamageSfx = wrapped;
+    }
+    // 2d. Spectator dice: capture the fighter's published roll. The bridge
+    // writes lastRoll straight to DOM dice (#red-dice/#blue-dice) and never
+    // into B, so the portrait skin has no other way to see a spectator roll.
+    if (typeof window.updateSpectatorFromSnapshot === 'function' && !window.updateSpectatorFromSnapshot._pbWrapped) {
+      const orig = window.updateSpectatorFromSnapshot;
+      const wrapped = function (snapshot) {
+        try {
+          if (snapshot && snapshot.lastRoll) {
+            _specRoll = { red: snapshot.lastRoll.player || null, blue: snapshot.lastRoll.boss || null };
+          } else {
+            _specRoll = { red: null, blue: null };
+          }
+        } catch (e) {}
+        return orig.apply(this, arguments);
+      };
+      wrapped._pbWrapped = true;
+      window.updateSpectatorFromSnapshot = wrapped;
     }
     // 3. Raid over → bridge hides #battle-view → exit portrait
     const bv = $pb('battle-view');
