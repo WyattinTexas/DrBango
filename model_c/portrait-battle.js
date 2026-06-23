@@ -587,6 +587,11 @@
   function renderDice() {
     const pr = B.preRoll;
     const spec = pbIsSpectating();
+    // When WE are the fighter, B.redDice is the truth — drop any spectator roll
+    // left over from an earlier spectating stint. Without this a stale _specRoll
+    // (e.g. the previous fighter's Bonzai roll) re-animates the instant our role
+    // flips back to 'spectator' at handoff: the cross-turn phantom re-roll.
+    if (!spec) { _specRoll.red = null; _specRoll.blue = null; }
     ['red', 'blue'].forEach(team => {
       // on a spectator, trust ONLY the published roll (local B dice are stale)
       const dice = spec
