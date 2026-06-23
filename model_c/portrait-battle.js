@@ -554,7 +554,17 @@
   // _lastDice would treat as a fresh roll → phantom re-roll right at handoff.
   // Skipping a re-animation of identical values kills it; the settled dice are
   // still on screen so they just persist until the next turn clears them.
+  // Canonical (order-independent) values we last animated. The fighter path
+  // reads B.preRoll[team].dice; the spectator path reads B.redDice/snapshot —
+  // the SAME roll can arrive in a different ORDER, so a plain-string compare
+  // missed the turn-end re-feed and the phantom slipped through. Sort first.
   let _lastRevealed = { red: '', blue: '' };
+  // Fighter-change gate: at handoff the engine re-feeds the PREVIOUS fighter's
+  // final roll right as the turn flips. After the active fighter changes we
+  // suppress ALL dice animation until the dice clear once — only the NEXT
+  // fighter's fresh roll (which arrives after a clear) should animate.
+  let _lastFighterUid = null;
+  let _awaitClear = { red: false, blue: false };
   // Spectator dice: the fighter's roll reaches us only via the battleState
   // snapshot's lastRoll (B.preRoll / B.redDice are NOT synced on spectators).
   // The updateSpectatorFromSnapshot hook captures it here so we can animate it.
@@ -568,25 +578,40 @@
   function renderDice() {
     const pr = B.preRoll;
     const spec = pbIsSpectating();
+    // Detect a handoff: when the active fighter changes, arm the await-clear
+    // gate for both teams so the re-fed previous roll can't re-animate.
+    const fUid = (window.currentRaid && window.currentRaid.currentFighterUid) || null;
+    if (fUid !== _lastFighterUid) {
+      _lastFighterUid = fUid;
+      _awaitClear.red = true;
+      _awaitClear.blue = true;
+    }
     ['red', 'blue'].forEach(team => {
       // on a spectator, trust ONLY the published roll (local B dice are stale)
       const dice = spec
         ? (_specRoll[team] && _specRoll[team].length ? _specRoll[team] : null)
         : ((pr && pr[team] && pr[team].dice) || B[team + 'Dice']);
       const key = dice ? dice.join(',') : '';
-      if (key && key !== _lastDice[team]) {
-        _lastDice[team] = key;
-        // phantom guard: turn-end re-feeds the same final roll — don't re-roll it
-        if (key === _lastRevealed[team]) return;
-        _lastRevealed[team] = key;
-        PbDice.clear(team);
-        PbDice.showRolling(team, dice.length);
-        setTimeout(() => PbDice.reveal(team, dice), 900);
-      } else if (!key && _lastDice[team]) {
-        _lastDice[team] = '';
-        // dice cleared by engine -> next roll incoming; fade old tray after a beat
-        setTimeout(() => { if (!(_lastDice[team])) PbDice.clear(team); }, 1200);
+      if (!key) {
+        // dice cleared — the next non-empty value is a genuine new roll
+        _awaitClear[team] = false;
+        if (_lastDice[team]) {
+          _lastDice[team] = '';
+          setTimeout(() => { if (!(_lastDice[team])) PbDice.clear(team); }, 1200);
+        }
+        return;
       }
+      if (key === _lastDice[team]) return; // unchanged
+      _lastDice[team] = key;
+      // order-independent compare so a re-fed roll in a different dice order
+      // is still recognized as the same roll, not a fresh one
+      const canon = dice.slice().sort(function (a, b) { return a - b; }).join(',');
+      // phantom guards: (1) post-handoff lingering roll, (2) identical re-feed
+      if (_awaitClear[team] || canon === _lastRevealed[team]) return;
+      _lastRevealed[team] = canon;
+      PbDice.clear(team);
+      PbDice.showRolling(team, dice.length);
+      setTimeout(() => PbDice.reveal(team, dice), 900);
     });
   }
 
@@ -799,6 +824,8 @@
     _pbAbilityShowing = false;
     _lastDice = { red: '', blue: '' };
     _lastRevealed = { red: '', blue: '' };
+    _lastFighterUid = null;
+    _awaitClear = { red: false, blue: false };
     _specRoll = { red: null, blue: null };
     _lastFieldSig = '';
     _lastCardsSig = '';
