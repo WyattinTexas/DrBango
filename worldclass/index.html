@@ -1817,41 +1817,45 @@ const MORNING_ACTIVATION = {
 };
 
 // ─── BREATHING TIMER HTML ───
-const BREATH_TIMER_HTML = `<div class="breath-timer" id="breath-timer">
-  <div class="breath-timer-phase" id="bt-phase">Ready</div>
+let _btInstanceCount = 0;
+function makeBreathTimerHTML() {
+  const n = _btInstanceCount++;
+  return `<div class="breath-timer" data-bt="${n}">
+  <div class="breath-timer-phase" id="bt-phase-${n}">Ready</div>
   <div class="breath-timer-wave">
-    <svg id="bt-svg" viewBox="0 0 400 100" preserveAspectRatio="none">
+    <svg viewBox="0 0 400 100" preserveAspectRatio="none">
       <defs>
-        <linearGradient id="wfill" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="wfill-${n}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="rgba(34,211,238,0.12)"/>
           <stop offset="100%" stop-color="rgba(34,211,238,0)"/>
         </linearGradient>
       </defs>
-      <path id="bt-fill" fill="url(#wfill)"/>
-      <path id="bt-path" fill="none" stroke="rgba(34,211,238,0.15)" stroke-width="2"/>
-      <path id="bt-trail" fill="none" stroke="var(--cyan)" stroke-width="2.5"/>
-      <circle id="bt-glow" r="10" fill="rgba(34,211,238,0.2)"/>
-      <circle id="bt-dot" r="5" fill="var(--cyan)"/>
+      <path id="bt-fill-${n}" fill="url(#wfill-${n})"/>
+      <path id="bt-path-${n}" fill="none" stroke="rgba(34,211,238,0.15)" stroke-width="2"/>
+      <path id="bt-trail-${n}" fill="none" stroke="var(--cyan)" stroke-width="2.5"/>
+      <circle id="bt-glow-${n}" r="10" fill="rgba(34,211,238,0.2)"/>
+      <circle id="bt-dot-${n}" r="5" fill="var(--cyan)"/>
     </svg>
     <div class="breath-timer-wave-labels">
-      <span id="bt-wl-0">Inhale</span>
-      <span id="bt-wl-1">Hold</span>
-      <span id="bt-wl-2">Exhale</span>
-      <span id="bt-wl-3">Hold</span>
+      <span id="bt-wl-${n}-0">Inhale</span>
+      <span id="bt-wl-${n}-1">Hold</span>
+      <span id="bt-wl-${n}-2">Exhale</span>
+      <span id="bt-wl-${n}-3">Hold</span>
     </div>
   </div>
-  <div class="breath-timer-countdown" id="bt-count">4</div>
+  <div class="breath-timer-countdown" id="bt-count-${n}">4</div>
   <div class="breath-timer-meta">
-    <span>Round <strong id="bt-round">0</strong> / 10</span>
-    <span>Elapsed <strong id="bt-elapsed">0:00</strong></span>
+    <span>Round <strong id="bt-round-${n}">0</strong> / 10</span>
+    <span>Elapsed <strong id="bt-elapsed-${n}">0:00</strong></span>
     <span>Total <strong>5:20</strong></span>
   </div>
   <div>
-    <button class="breath-timer-btn" id="bt-start" onclick="btToggle()">Start</button>
-    <button class="breath-timer-btn reset-btn" onclick="btReset()">Reset</button>
+    <button class="breath-timer-btn" id="bt-start-${n}" onclick="btToggle(${n})">Start</button>
+    <button class="breath-timer-btn reset-btn" onclick="btReset(${n})">Reset</button>
   </div>
-  <div class="breath-timer-pips" id="bt-pips"></div>
+  <div class="breath-timer-pips" id="bt-pips-${n}"></div>
 </div>`;
+}
 
 // ─── ALL WORKOUT DATA ───
 const PROGRAM_START = '2026-06-18';
@@ -2497,7 +2501,7 @@ function renderToday() {
     });
 
     if (section.hasBreathingTimer) {
-      html += BREATH_TIMER_HTML;
+      html += makeBreathTimerHTML();
     }
 
     html += '</div>';
@@ -2541,163 +2545,164 @@ function highlightTodayInCalendar() {
 renderToday();
 highlightTodayInCalendar();
 
-// ─── BOX BREATHING TIMER (WAVE) ───
+// ─── BOX BREATHING TIMER (WAVE) — supports multiple instances ───
 (function() {
-  const pipsEl = document.getElementById('bt-pips');
-  if (!pipsEl) return; // no breathing timer today
-
   const PHASES = ['Inhale', 'Hold', 'Exhale', 'Hold'];
   const SECS = 4;
   const ROUNDS = 10;
-
-  let running = false, paused = false, timer = null, raf = null;
-  let phase = 0, sec = SECS, round = 1, elapsed = 0;
-  let lastTickTime = 0;
-
-  // build pips
-  for (let i = 0; i < ROUNDS; i++) {
-    const p = document.createElement('div');
-    p.className = 'breath-timer-pip';
-    pipsEl.appendChild(p);
-  }
-
   const VW = 400, VH = 100, M = 10;
   const TOP = M, BOT = VH - M;
 
   function buildWavePath() {
     return `M 0,${BOT} C 35,${BOT} 65,${TOP} 100,${TOP} L 200,${TOP} C 235,${TOP} 265,${BOT} 300,${BOT} L 400,${BOT}`;
   }
-
   function buildFillPath() {
     return buildWavePath() + ` L 400,${VH} L 0,${VH} Z`;
   }
-
-  const wavePath = buildWavePath();
-  document.getElementById('bt-path').setAttribute('d', wavePath);
-  document.getElementById('bt-fill').setAttribute('d', buildFillPath());
-
-  const pathEl = document.getElementById('bt-path');
-  const pathLen = pathEl.getTotalLength();
-
-  document.getElementById('bt-trail').setAttribute('d', wavePath);
-  const trailEl = document.getElementById('bt-trail');
-  trailEl.style.strokeDasharray = pathLen;
-  trailEl.style.strokeDashoffset = pathLen;
-
-  function getCycleProgress(frac) {
-    frac = frac || 0;
-    const phaseProgress = 1 - ((sec - frac) / SECS);
-    return Math.min(1, Math.max(0, (phase + Math.max(0, phaseProgress)) / 4));
-  }
-
-  function positionDot(progress) {
-    const pt = pathEl.getPointAtLength(progress * pathLen);
-    document.getElementById('bt-dot').setAttribute('cx', pt.x);
-    document.getElementById('bt-dot').setAttribute('cy', pt.y);
-    document.getElementById('bt-glow').setAttribute('cx', pt.x);
-    document.getElementById('bt-glow').setAttribute('cy', pt.y);
-    trailEl.style.strokeDashoffset = pathLen * (1 - progress);
-  }
-
-  function updateLabels() {
-    for (let i = 0; i < 4; i++) {
-      document.getElementById('bt-wl-' + i).classList.toggle('on', i === phase);
-    }
-  }
-
-  function updatePips() {
-    const pips = pipsEl.children;
-    for (let i = 0; i < ROUNDS; i++) {
-      pips[i].className = 'breath-timer-pip';
-      if (i < round - 1) pips[i].classList.add('done');
-      else if (i === round - 1 && running) pips[i].classList.add('cur');
-    }
-  }
-
   function formatTime(s) {
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   }
 
-  function render(frac) {
-    document.getElementById('bt-phase').textContent = running ? PHASES[phase] : (paused ? 'Paused' : 'Ready');
-    document.getElementById('bt-count').textContent = sec;
-    document.getElementById('bt-round').textContent = running || paused ? round : 0;
-    document.getElementById('bt-elapsed').textContent = formatTime(elapsed);
-    positionDot(getCycleProgress(frac));
-    updateLabels();
-    updatePips();
-  }
+  const instances = {};
 
-  function animate() {
-    if (!running) return;
-    const frac = Math.min((performance.now() - lastTickTime) / 1000, 1);
-    positionDot(getCycleProgress(frac));
-    raf = requestAnimationFrame(animate);
-  }
+  function initTimer(n) {
+    const $ = id => document.getElementById(id + '-' + n);
+    const pipsEl = $('bt-pips');
+    if (!pipsEl) return;
 
-  function tick() {
-    elapsed++;
-    sec--;
-    lastTickTime = performance.now();
-    if (sec <= 0) {
-      phase++;
-      if (phase >= 4) {
-        phase = 0;
-        if (round >= ROUNDS) {
-          running = false;
-          document.getElementById('bt-phase').textContent = 'Complete';
-          document.getElementById('bt-count').textContent = '\u2713';
-          document.getElementById('bt-start').textContent = 'Start';
-          positionDot(1);
-          Array.from(pipsEl.children).forEach(p => { p.className = 'breath-timer-pip done'; });
-          clearInterval(timer); timer = null;
-          cancelAnimationFrame(raf);
-          return;
-        }
-        round++;
-      }
-      sec = SECS;
+    for (let i = 0; i < ROUNDS; i++) {
+      const p = document.createElement('div');
+      p.className = 'breath-timer-pip';
+      pipsEl.appendChild(p);
     }
-    render();
-  }
 
-  window.btToggle = function() {
-    if (!running && !paused) {
-      running = true; paused = false;
-      phase = 0; sec = SECS; round = 1; elapsed = 0;
-      lastTickTime = performance.now();
-      document.getElementById('bt-start').textContent = 'Pause';
-      render();
-      timer = setInterval(tick, 1000);
-      raf = requestAnimationFrame(animate);
-    } else if (running) {
-      running = false; paused = true;
-      clearInterval(timer); timer = null;
-      cancelAnimationFrame(raf);
-      document.getElementById('bt-start').textContent = 'Resume';
-      render();
-    } else if (paused) {
-      running = true; paused = false;
-      lastTickTime = performance.now();
-      document.getElementById('bt-start').textContent = 'Pause';
-      render();
-      timer = setInterval(tick, 1000);
-      raf = requestAnimationFrame(animate);
-    }
-  };
+    const wavePath = buildWavePath();
+    $('bt-path').setAttribute('d', wavePath);
+    $('bt-fill').setAttribute('d', buildFillPath());
 
-  window.btReset = function() {
-    running = false; paused = false;
-    clearInterval(timer); timer = null;
-    cancelAnimationFrame(raf);
-    phase = 0; sec = SECS; round = 1; elapsed = 0;
-    document.getElementById('bt-start').textContent = 'Start';
+    const pathEl = $('bt-path');
+    const pathLen = pathEl.getTotalLength();
+    const trailEl = $('bt-trail');
+    trailEl.setAttribute('d', wavePath);
+    trailEl.style.strokeDasharray = pathLen;
     trailEl.style.strokeDashoffset = pathLen;
-    render();
-  };
 
-  positionDot(0);
-  render();
+    const state = { running: false, paused: false, timer: null, raf: null, phase: 0, sec: SECS, round: 1, elapsed: 0, lastTickTime: 0 };
+    instances[n] = state;
+
+    function getCycleProgress(frac) {
+      frac = frac || 0;
+      const pp = 1 - ((state.sec - frac) / SECS);
+      return Math.min(1, Math.max(0, (state.phase + Math.max(0, pp)) / 4));
+    }
+    function positionDot(progress) {
+      const pt = pathEl.getPointAtLength(progress * pathLen);
+      $('bt-dot').setAttribute('cx', pt.x);
+      $('bt-dot').setAttribute('cy', pt.y);
+      $('bt-glow').setAttribute('cx', pt.x);
+      $('bt-glow').setAttribute('cy', pt.y);
+      trailEl.style.strokeDashoffset = pathLen * (1 - progress);
+    }
+    function updateLabels() {
+      for (let i = 0; i < 4; i++) {
+        document.getElementById('bt-wl-' + n + '-' + i).classList.toggle('on', i === state.phase);
+      }
+    }
+    function updatePips() {
+      const pips = pipsEl.children;
+      for (let i = 0; i < ROUNDS; i++) {
+        pips[i].className = 'breath-timer-pip';
+        if (i < state.round - 1) pips[i].classList.add('done');
+        else if (i === state.round - 1 && state.running) pips[i].classList.add('cur');
+      }
+    }
+    function render() {
+      $('bt-phase').textContent = state.running ? PHASES[state.phase] : (state.paused ? 'Paused' : 'Ready');
+      $('bt-count').textContent = state.sec;
+      $('bt-round').textContent = state.running || state.paused ? state.round : 0;
+      $('bt-elapsed').textContent = formatTime(state.elapsed);
+      positionDot(getCycleProgress());
+      updateLabels();
+      updatePips();
+    }
+    function animate() {
+      if (!state.running) return;
+      const frac = Math.min((performance.now() - state.lastTickTime) / 1000, 1);
+      positionDot(getCycleProgress(frac));
+      state.raf = requestAnimationFrame(animate);
+    }
+    function tick() {
+      state.elapsed++;
+      state.sec--;
+      state.lastTickTime = performance.now();
+      if (state.sec <= 0) {
+        state.phase++;
+        if (state.phase >= 4) {
+          state.phase = 0;
+          if (state.round >= ROUNDS) {
+            state.running = false;
+            $('bt-phase').textContent = 'Complete';
+            $('bt-count').textContent = '\u2713';
+            $('bt-start').textContent = 'Start';
+            positionDot(1);
+            Array.from(pipsEl.children).forEach(p => { p.className = 'breath-timer-pip done'; });
+            clearInterval(state.timer); state.timer = null;
+            cancelAnimationFrame(state.raf);
+            return;
+          }
+          state.round++;
+        }
+        state.sec = SECS;
+      }
+      render();
+    }
+
+    instances[n].toggle = function() {
+      if (!state.running && !state.paused) {
+        state.running = true; state.paused = false;
+        state.phase = 0; state.sec = SECS; state.round = 1; state.elapsed = 0;
+        state.lastTickTime = performance.now();
+        $('bt-start').textContent = 'Pause';
+        render();
+        state.timer = setInterval(tick, 1000);
+        state.raf = requestAnimationFrame(animate);
+      } else if (state.running) {
+        state.running = false; state.paused = true;
+        clearInterval(state.timer); state.timer = null;
+        cancelAnimationFrame(state.raf);
+        $('bt-start').textContent = 'Resume';
+        render();
+      } else if (state.paused) {
+        state.running = true; state.paused = false;
+        state.lastTickTime = performance.now();
+        $('bt-start').textContent = 'Pause';
+        render();
+        state.timer = setInterval(tick, 1000);
+        state.raf = requestAnimationFrame(animate);
+      }
+    };
+
+    instances[n].reset = function() {
+      state.running = false; state.paused = false;
+      clearInterval(state.timer); state.timer = null;
+      cancelAnimationFrame(state.raf);
+      state.phase = 0; state.sec = SECS; state.round = 1; state.elapsed = 0;
+      $('bt-start').textContent = 'Start';
+      trailEl.style.strokeDashoffset = pathLen;
+      render();
+    };
+
+    positionDot(0);
+    render();
+  }
+
+  // Init all timer instances
+  for (let i = 0; i < _btInstanceCount; i++) {
+    initTimer(i);
+  }
+
+  window.btToggle = function(n) { if (instances[n]) instances[n].toggle(); };
+  window.btReset = function(n) { if (instances[n]) instances[n].reset(); };
 })();
 </script>
 
