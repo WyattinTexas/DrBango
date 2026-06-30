@@ -1,5 +1,5 @@
 // World Class Training — service worker (scoped to /training/)
-const CACHE_NAME = 'worldclass-v1';
+const CACHE_NAME = 'worldclass-v2';
 
 // Relative URLs resolve against /training/ (the SW's scope)
 const ASSETS = [
