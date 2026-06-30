@@ -20,18 +20,6 @@
   // are therefore unreliable — use querySelector, which is NOT overridden.
   const $pb = (id) => document.querySelector('#' + id);
 
-  // TEMP DEBUG (v0.19) — log dice decisions to #portrait-battle[data-dbg] so the
-  // /tmp/dread harness can scrape the exact showRolling/skip sequence. Remove
-  // once the Bonzai + phantom interaction is understood.
-  let _pbDbg = [];
-  function pbDbg(s) {
-    try {
-      _pbDbg.push(s);
-      const el = $pb('portrait-battle');
-      if (el) el.setAttribute('data-dbg', _pbDbg.slice(-18).join(' ; '));
-    } catch (e) {}
-  }
-
   const PB_ASSETS = 'assets/';
   // Placeholder sprites (Wyatt 2026-06-11: use these 4 until real art)
   const PLAYER_BACKS = [PB_ASSETS + 'Back_Gary.png', PB_ASSETS + 'Back_Shoo.png', PB_ASSETS + 'Back_Scallywags.png'];
@@ -605,9 +593,8 @@
         // sort before comparing — that's the phantom re-roll guard. A genuine
         // new roll (incl. Bonzai's 8 dice) is a different multiset → animates.
         const canon = dice.slice().sort(function (a, b) { return a - b; }).join(',');
-        if (canon === _lastRevealed[team]) { pbDbg('skip-' + team[0] + '[' + dice.length + ']' + key); return; }
+        if (canon === _lastRevealed[team]) return;
         _lastRevealed[team] = canon;
-        pbDbg('ANIM-' + team[0] + '[' + dice.length + ']' + key + (spec ? '(s)' : '(f)'));
         PbDice.clear(team);
         PbDice.showRolling(team, dice.length);
         setTimeout(() => PbDice.reveal(team, dice), 900);
@@ -809,7 +796,6 @@
 
   // ── ENTER / EXIT ─────────────────────────────────────────────────
   window.enterPortraitBattle = function () {
-    pbDbg('ENTER');
     buildDom();
     const bv = $pb('battle-view');
     if (bv) bv.classList.add('pb-offscreen');
@@ -822,7 +808,6 @@
     renderPortrait();
   };
   window.exitPortraitBattle = function () {
-    pbDbg('EXIT');
     pbActive = false;
     try { PbDice.clear(); } catch (e) {}
     _pbAbilityQueue = [];
