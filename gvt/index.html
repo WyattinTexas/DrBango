@@ -28,10 +28,10 @@
 
 <div class="overlay" id="title">
   <h1><span class="g">GREEN</span> vs <span class="t">TAN</span></h1>
-  <p>The Tan Army is marching on your Toy Box.</p>
-  <p style="opacity:0.65">Drag soldiers from the tray. If one gets knocked over — tap him. He'll get back up. They always do.</p>
+  <p>The Tan Army is marching on your Toy Box — in columns, lines, Redcoat ranks, and guerrilla ambushes, from every side of the carpet.</p>
+  <p style="opacity:0.65">Drag soldiers anywhere. If one gets knocked over — tap him. He'll get back up. They always do.</p>
   <button class="btn" id="playBtn">Deploy</button>
-  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.1 · FM-GVT-03 spec · Level 1: The Living-Room Carpet</p>
+  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.2 "Formations" · Level 1: The Living-Room Carpet</p>
 </div>
 
 <div class="overlay hidden" id="lose">
@@ -76,21 +76,26 @@ const FDEF = {
   jeep:    { hp:12, spd:88, bounty:25, leak:2, w:78, vehicle:true },
   tank:    { hp:60, spd:20, bounty:100,leak:3, w:96, vehicle:true }
 };
+// ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
+const T = { x:130, y:300 };           // the Toy Box
+const LEAK_R = 64;
+function edgePt(e){
+  if(e==='right')  return { x:1020, y:140+Math.random()*320 };
+  if(e==='top')    return { x:460+Math.random()*420, y:-70 };
+  return { x:380+Math.random()*440, y:670 };   // bottom
+}
 const WAVES = [
-  mix([['tanrifle',6,1.4]]),
-  mix([['tanrifle',10,1.1]]),
-  mix([['crawler',8,0.9]]),
-  inter([['tanrifle',12,1.0],['crawler',4,3.0]]),
-  officerWave(10),
-  inter([['tanrifle',14,0.9],['crawler',6,2.1],['officer',1,6]]),
-  inter([['jeep',1,4],['tanrifle',8,1.0]]),
-  inter([['jeep',2,7],['crawler',10,1.2]]),
-  inter([['tanrifle',18,0.7],['officer',2,6],['jeep',1,9]]),
-  inter([['tank',1,3],['tanrifle',8,1.6]])
+  { name:'THE COLUMN',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right',at:0} ] },
+  { name:'THE THIN TAN LINE', groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0} ] },
+  { name:'THE GUERRILLAS',    groups:[ {f:'guerrilla',t:'crawler',n:3,e:'top',at:0}, {f:'guerrilla',t:'crawler',n:3,e:'right',at:2}, {f:'guerrilla',t:'crawler',n:2,e:'bottom',at:4} ] },
+  { name:'THE PINCER',        groups:[ {f:'column',t:'tanrifle',n:6,e:'top',at:0}, {f:'column',t:'tanrifle',n:6,e:'bottom',at:3} ] },
+  { name:'THE REDCOATS',      groups:[ {f:'redcoat',t:'tanrifle',n:10,e:'right',at:0,officer:true} ] },
+  { name:'JUNGLE AMBUSH',     groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0}, {f:'guerrilla',t:'crawler',n:8,e:'top',at:3} ] },
+  { name:'THE MOTORCADE',     groups:[ {f:'solo',t:'jeep',n:1,e:'right',at:0}, {f:'column',t:'tanrifle',n:8,e:'right',at:2} ] },
+  { name:'TWIN AMBUSH',       groups:[ {f:'guerrilla',t:'crawler',n:10,e:'bottom',at:0}, {f:'solo',t:'jeep',n:1,e:'top',at:5}, {f:'column',t:'tanrifle',n:6,e:'right',at:7} ] },
+  { name:'THE GRAND PARADE',  groups:[ {f:'redcoat',t:'tanrifle',n:12,e:'right',at:0,officer:true}, {f:'line',t:'tanrifle',n:8,e:'top',at:6,officer:true} ] },
+  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:8}, {f:'guerrilla',t:'crawler',n:4,e:'bottom',at:6} ] }
 ];
-function mix(groups){ const q=[]; let t=0; groups.forEach(g=>{ for(let i=0;i<g[1];i++){ q.push({type:g[0], at:t}); t+=g[2]; } }); return q; }
-function inter(groups){ const q=[]; groups.forEach(g=>{ let t=1+Math.random()*0; for(let i=0;i<g[1];i++){ q.push({type:g[0], at:t}); t+=g[2]; } }); return q.sort((a,b)=>a.at-b.at); }
-function officerWave(n){ const q=mix([['tanrifle',n,1.0]]); q.push({type:'officer', at:5}); return q.sort((a,b)=>a.at-b.at); }
 
 // ================= PATH =================
 function cubic(p0,p1,p2,p3,t){ const u=1-t; return { x:u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0], y:u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1] }; }
@@ -181,16 +186,16 @@ const SFX = {
 // ================= STATE =================
 const S = {
   mode:'title', plastic:120, lives:10, wave:0, waveActive:false, queue:[], waveT:0,
-  units:[], foes:[], shots:[], fx:[], blobs:[], floats:[],
-  sel:null, drag:null, speed:1, shake:0, t:0,
+  units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[],
+  sel:null, drag:null, speed:1, shake:0, t:0, ann:null,
   maxDown:0, placedAny:false, hintT:0, cleared:false
 };
 let idc=1;
 
 function reset(){
   S.plastic=120; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
-  S.units=[]; S.foes=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[];
-  S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false;
+  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[];
+  S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null;
 }
 
 function placeUnit(type,x,y){
@@ -200,7 +205,6 @@ function placeUnit(type,x,y){
 }
 function canPlace(x,y,type){
   if(x<58||x>W-24||y<70||y>H-92) return false;
-  if(distToPath(x,y)<46) return false;
   if(x<215&&y>200&&y<380) return false; // toy box zone
   for(const u of S.units){ if(Math.hypot(u.x-x,u.y-y)<40) return false; }
   return true;
@@ -216,12 +220,48 @@ function standUp(u){
 }
 function spawnWave(){
   if(S.wave>=WAVES.length||S.waveActive) return;
-  S.queue = WAVES[S.wave].map(e=>({type:e.type, at:e.at}));
+  const w=WAVES[S.wave];
+  S.queue = w.groups.map(g=>Object.assign({},g));
+  S.ann = { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; SFX.horn();
 }
-function spawnFoe(type){
+function spawnFoe(type,x,y,form,gu){
   const d=FDEF[type];
-  S.foes.push({ id:idc++, type, def:d, hp:d.hp, s:-20-Math.random()*20, wob:Math.random()*6.28, shot:(type==='officer'?3:0), rammed:{} });
+  const f={ id:idc++, type, def:d, hp:d.hp, x, y, vx:0, vy:0, wob:Math.random()*6.28,
+    shot:(type==='officer'?3:0), rammed:{}, form:form||null, off:null,
+    gu:!!gu, dash:false, gt:Math.random()*0.8, tgt:null };
+  S.foes.push(f);
+  return f;
+}
+function spawnGroup(g){
+  if(g.f==='guerrilla'||g.f==='solo'){
+    for(let i=0;i<g.n;i++){ const p=edgePt(g.e); spawnFoe(g.t, p.x+(Math.random()-0.5)*60, p.y+(Math.random()-0.5)*40, null, g.f==='guerrilla'); }
+    return;
+  }
+  const ep=edgePt(g.e);
+  const list=[];
+  if(g.f==='column'){ for(let i=0;i<g.n;i++) list.push({t:g.t, fx:-i*36, fy:0}); }
+  else if(g.f==='line'){ for(let i=0;i<g.n;i++) list.push({t:g.t, fx:0, fy:(i-(g.n-1)/2)*42}); }
+  else if(g.f==='redcoat'){
+    const cols=Math.ceil(g.n/2);
+    for(let i=0;i<g.n;i++){ const r=i%2, c=(i/2)|0; list.push({t:g.t, fx:-r*42, fy:(c-(cols-1)/2)*38}); }
+  }
+  else if(g.f==='wedge'){
+    list.push({t:g.t, fx:0, fy:0});
+    for(let k=1;k<=(g.escort||0);k++){ const row=Math.ceil(k/2); list.push({t:'tanrifle', fx:-42*row, fy:(k%2?1:-1)*38*row}); }
+  }
+  if(g.officer){ const rear=Math.min.apply(null, list.map(o=>o.fx)); list.push({t:'officer', fx:rear-48, fy:0}); }
+  const form={ x:ep.x, y:ep.y, kind:g.f, timer:Math.random(), halted:false, dir:{x:-1,y:0}, members:[],
+    speed:Math.min.apply(null, list.map(o=>FDEF[o.t].spd)) };
+  const d0=Math.hypot(T.x-ep.x,T.y-ep.y);
+  form.dir={x:(T.x-ep.x)/d0, y:(T.y-ep.y)/d0};
+  list.forEach(o=>{
+    const sx=form.x+form.dir.x*o.fx-form.dir.y*o.fy, sy=form.y+form.dir.y*o.fx+form.dir.x*o.fy;
+    const foe=spawnFoe(o.t, sx, sy, form, false);
+    foe.off=o;
+    form.members.push(foe);
+  });
+  S.forms.push(form);
 }
 function endBattle(win){
   S.mode = win?'win':'lose';
@@ -241,53 +281,90 @@ function update(dt){
   S.t+=dt; S.hintT+=dt;
   if(S.shake>0) S.shake=Math.max(0,S.shake-dt*3);
 
-  // spawn queue
+  // spawn queue (groups)
   if(S.waveActive){
     S.waveT+=dt;
-    for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){ spawnFoe(S.queue[i].type); S.queue.splice(i,1); } }
+    for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){ spawnGroup(S.queue[i]); S.queue.splice(i,1); } }
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
       if(S.wave>=WAVES.length){ if(!S.cleared){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
       else { S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM}); }
     }
   }
+  if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
+
+  // formations: anchors wheel toward the Toy Box
+  for(let i=S.forms.length-1;i>=0;i--){
+    const fo=S.forms[i];
+    fo.members=fo.members.filter(m=>S.foes.indexOf(m)>=0);
+    if(fo.members.length===0){ S.forms.splice(i,1); continue; }
+    let spd=fo.speed;
+    if(fo.kind==='redcoat'){ fo.timer+=dt; const c=fo.timer%3.2; fo.halted=c>2.3; if(fo.halted) spd=0; }
+    const d=Math.hypot(T.x-fo.x, T.y-fo.y);
+    if(d<115){ fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue; } // ranks break, charge!
+    fo.dir={x:(T.x-fo.x)/d, y:(T.y-fo.y)/d};
+    fo.x+=fo.dir.x*spd*dt; fo.y+=fo.dir.y*spd*dt;
+  }
 
   // foes
   for(let i=S.foes.length-1;i>=0;i--){
     const f=S.foes[i];
-    let spd=f.def.spd;
+    let aura=1;
     if(f.type!=='officer'){
-      for(const o of S.foes){ if(o.type==='officer'){ const op=pathPos(o.s), fp=pathPos(f.s); if(Math.hypot(op.x-fp.x,op.y-fp.y)<100){ spd*=1.3; break; } } }
+      for(const o of S.foes){ if(o.type==='officer' && Math.hypot(o.x-f.x,o.y-f.y)<110){ aura=1.3; break; } }
     }
-    f.s+=spd*dt;
-    const p=pathPos(f.s);
+    const px=f.x, py=f.y;
+    if(f.form){
+      const fo=f.form, o=f.off;
+      const sx=fo.x+fo.dir.x*o.fx-fo.dir.y*o.fy, sy=fo.y+fo.dir.y*o.fx+fo.dir.x*o.fy;
+      const dd=Math.hypot(sx-f.x, sy-f.y);
+      if(dd>2){
+        const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(dd>70?1.8:1.15);
+        f.x+=(sx-f.x)/dd*Math.min(sp*dt,dd); f.y+=(sy-f.y)/dd*Math.min(sp*dt,dd);
+      }
+    } else if(f.gu){
+      f.gt-=dt;
+      if(f.dash && f.tgt){
+        const dd=Math.hypot(f.tgt.x-f.x, f.tgt.y-f.y);
+        if(dd<8||f.gt<=0){ f.dash=false; f.gt=0.5+Math.random()*1.1; }
+        else { const sp=f.def.spd*aura*1.6; f.x+=(f.tgt.x-f.x)/dd*sp*dt; f.y+=(f.tgt.y-f.y)/dd*sp*dt; }
+      } else if(f.gt<=0){
+        f.dash=true; f.gt=0.7+Math.random()*0.7;
+        f.tgt={ x:f.x+(T.x-f.x)*0.35+(Math.random()-0.5)*100, y:f.y+(T.y-f.y)*0.35+(Math.random()-0.5)*100 };
+      }
+    } else {
+      const d=Math.hypot(T.x-f.x, T.y-f.y);
+      if(d>1){ const sp=f.def.spd*aura; f.x+=(T.x-f.x)/d*sp*dt; f.y+=(T.y-f.y)/d*sp*dt; }
+    }
+    if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
+
     // officer potshot
     if(f.type==='officer'){
       f.shot+=dt;
       if(f.shot>=5){
         f.shot=0;
         let best=null,bd=1e9;
-        for(const u of S.units){ if(u.down) continue; const d=Math.hypot(u.x-p.x,u.y-p.y); if(d<130&&d<bd){bd=d;best=u;} }
-        if(best){ knock(best,p.x,p.y); S.fx.push({k:'tracer',x1:p.x,y1:p.y-30,x2:best.x,y2:best.y-20,t:0,dur:0.12}); }
+        for(const u of S.units){ if(u.down) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<130&&d<bd){bd=d;best=u;} }
+        if(best){ knock(best,f.x,f.y); S.fx.push({k:'tracer',x1:f.x,y1:f.y-30,x2:best.x,y2:best.y-20,t:0,dur:0.12}); }
       }
     }
     // jeep ram
     if(f.type==='jeep'){
-      for(const u of S.units){ if(u.down||f.rammed[u.id]) continue; if(Math.hypot(u.x-p.x,u.y-p.y)<58){ f.rammed[u.id]=1; knock(u,p.x,p.y); } }
+      for(const u of S.units){ if(u.down||f.rammed[u.id]) continue; if(Math.hypot(u.x-f.x,u.y-f.y)<58){ f.rammed[u.id]=1; knock(u,f.x,f.y); } }
     }
     // tank cannon
     if(f.type==='tank'){
       f.shot+=dt;
       if(f.shot>=8){
         f.shot=0;
-        const cands=S.units.filter(u=>!u.down&&Math.hypot(u.x-p.x,u.y-p.y)<220);
-        if(cands.length){ const u=cands[(Math.random()*cands.length)|0]; knock(u,p.x,p.y); SFX.boom(); S.shake=0.5;
+        const cands=S.units.filter(u=>!u.down&&Math.hypot(u.x-f.x,u.y-f.y)<220);
+        if(cands.length){ const u=cands[(Math.random()*cands.length)|0]; knock(u,f.x,f.y); SFX.boom(); S.shake=0.5;
           S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:34}); }
       }
     }
-    if(f.s>=PATH_LEN-6){
+    if(Math.hypot(T.x-f.x, T.y-f.y)<LEAK_R){
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
-      S.fx.push({k:'ring',x:120,y:290,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
+      S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
       if(S.lives<=0){ S.lives=0; endBattle(false); return; }
     }
   }
@@ -306,30 +383,29 @@ function update(dt){
     u.cd-=dt;
     if(u.cd>0) continue;
     const def=u.def;
-    let best=null,bs=-1;
+    let best=null,bs=1e9;
     for(const f of S.foes){
-      if(f.s<0) continue;
-      const p=pathPos(f.s);
-      const d=Math.hypot(p.x-u.x,p.y-u.y);
+      if(f.x>W+40||f.x<-60||f.y<-60||f.y>H+60) continue;
+      const d=Math.hypot(f.x-u.x,f.y-u.y);
       if(d>def.rng) continue;
       if(def.minRng&&d<def.minRng) continue;
-      if(f.s>bs){ bs=f.s; best=f; }
+      const db=Math.hypot(T.x-f.x,T.y-f.y);
+      if(db<bs){ bs=db; best=f; }
     }
     if(!best) continue;
     u.cd=1/def.rate;
     const dmg = def.dmg * (u.vet?1.5:1);
-    const tp=pathPos(best.s);
     if(u.type==='bazooka'){
       SFX.rocket();
       S.shots.push({k:'rocket',x:u.x+14,y:u.y-30,tid:best.id,spd:280,dmg,splash:def.splash,vx2:true,src:u});
     } else if(u.type==='mortar'){
       SFX.rocket();
-      const lead=pathPos(Math.min(PATH_LEN,best.s+best.def.spd*1.0));
+      const lead={ x:Math.max(20,Math.min(W-20,best.x+(best.vx||0)*1.0)), y:Math.max(20,Math.min(H-20,best.y+(best.vy||0)*1.0)) };
       S.shots.push({k:'lob',x:u.x,y:u.y-30,tx:lead.x,ty:lead.y,t:0,dur:1.0,dmg,splash:def.splash,src:u});
     } else {
       (u.type==='mgunner'?SFX.mg:SFX.pew)();
       best.hp-=dmg;
-      S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:tp.x,y2:tp.y-18,t:0,dur:0.08});
+      S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.08});
       hitCheck(best,u);
     }
   }
@@ -339,7 +415,7 @@ function update(dt){
     const sh=S.shots[i];
     if(sh.k==='rocket'){
       const f=S.foes.find(o=>o.id===sh.tid);
-      const tp = f? pathPos(f.s) : null;
+      const tp = f? {x:f.x,y:f.y} : null;
       if(!tp){ S.shots.splice(i,1); continue; }
       const dx=tp.x-sh.x, dy=(tp.y-14)-sh.y, d=Math.hypot(dx,dy);
       if(d<10){ S.shots.splice(i,1); splash(tp.x,tp.y,sh.splash,sh.dmg,true,sh.src); }
@@ -366,11 +442,10 @@ function hitCheck(f,u){
   if(f.hp<=0){
     const idx=S.foes.indexOf(f);
     if(idx>=0){
-      const p=pathPos(f.s);
       S.foes.splice(idx,1);
       if(u)u.kills++;
-      S.blobs.push({x:p.x,y:p.y,v:f.def.bounty,t:0});
-      if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:p.x,y:p.y-20,t:0,dur:0.5,R:40}); }
+      S.blobs.push({x:f.x,y:f.y,v:f.def.bounty,t:0});
+      if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     }
   }
 }
@@ -378,8 +453,8 @@ function splash(x,y,R,dmg,vx2,src){
   SFX.boom();
   S.fx.push({k:'puff',x,y:y-10,t:0,dur:0.45,R:R});
   for(let i=S.foes.length-1;i>=0;i--){
-    const f=S.foes[i]; const p=pathPos(f.s);
-    if(Math.hypot(p.x-x,p.y-y)<=R+f.def.w*0.3){
+    const f=S.foes[i];
+    if(Math.hypot(f.x-x,f.y-y)<=R+f.def.w*0.3){
       f.hp -= dmg * (vx2&&f.def.vehicle?2:1);
       hitCheck(f,src);
     }
@@ -419,11 +494,11 @@ function drawRug(){
   cx.globalAlpha=0.32; cx.strokeStyle='#7d4234'; cx.lineWidth=2;
   for(let y=90;y<H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(W-30,y); cx.stroke(); }
   cx.globalAlpha=1;
-  // path
-  cx.lineCap='round';
+  // rug runner (decor only — the Tan go anywhere they please now)
+  cx.lineCap='round'; cx.globalAlpha=0.35;
   cx.strokeStyle='rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();
   cx.strokeStyle='#D9C4A0'; cx.lineWidth=70; pathStroke();
-  cx.globalAlpha=0.5; cx.strokeStyle='#c4ad87'; cx.lineWidth=70; cx.setLineDash([4,30]); pathStroke(); cx.setLineDash([]); cx.globalAlpha=1;
+  cx.globalAlpha=1;
 }
 function pathStroke(){ cx.beginPath(); cx.moveTo(PATH_PTS[0].x,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) cx.lineTo(PATH_PTS[i].x,PATH_PTS[i].y); cx.stroke(); }
 
@@ -449,7 +524,7 @@ function draw(){
   // actors sorted by y
   const actors=[];
   for(const u of S.units) if(!(S.drag&&S.drag.unit===u)) actors.push({y:u.y,f:()=>drawUnit(u)});
-  for(const f of S.foes){ const p=pathPos(f.s); actors.push({y:p.y,f:()=>drawFoe(f,p)}); }
+  for(const f of S.foes) actors.push({y:f.y,f:()=>drawFoe(f)});
   actors.sort((a,b)=>a.y-b.y).forEach(a=>a.f());
 
   // shots
@@ -484,7 +559,21 @@ function draw(){
   if(!S.placedAny && S.mode==='play'){
     cx.globalAlpha=0.75+0.25*Math.sin(S.t*4);
     cx.font='bold 24px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center';
-    cx.fillText('DRAG A RIFLEMAN ONTO THE CARPET', W/2, H-118);
+    cx.fillText('DRAG A RIFLEMAN ANYWHERE — THE TAN COME FROM ALL SIDES', W/2, H-118);
+    cx.globalAlpha=1;
+  }
+
+  // formation announce card
+  if(S.ann){
+    const k=Math.min(1,(2.6-S.ann.t)*4), out=Math.min(1,S.ann.t*2.5);
+    cx.globalAlpha=Math.min(k,out);
+    cx.fillStyle='rgba(38,40,31,0.92)';
+    const tw=cx.measureText(S.ann.txt).width;
+    cx.font='bold 40px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
+    const w2=cx.measureText(S.ann.txt).width/2+34;
+    rr(W/2-w2,168,w2*2,64,10); cx.fill();
+    cx.fillStyle='#FFF3C4';
+    cx.fillText(S.ann.txt, W/2, 212);
     cx.globalAlpha=1;
   }
 }
@@ -511,14 +600,15 @@ function drawUnit(u){
     }
   }
 }
-function drawFoe(f,p){
-  const wob=f.type==='jeep'||f.type==='tank'?0:Math.sin(S.t*7+f.wob)*0.05;
-  drawSprite(f.type,p.x,p.y,f.def.w,0,wob);
+function drawFoe(f){
+  const march = f.form&&!f.form.halted ? Math.sin(S.t*9+(f.form.timer||0))*0.045 : 0;
+  const wob = f.type==='jeep'||f.type==='tank' ? 0 : (f.gu&&!f.dash ? 0 : Math.sin(S.t*7+f.wob)*0.05) + march;
+  drawSprite(f.type,f.x,f.y,f.def.w,0,wob);
   if(f.hp<f.def.hp){
     const k=f.hp/f.def.hp;
     const bo=Math.min(72,f.def.w*1.1);
-    cx.fillStyle='rgba(0,0,0,0.4)'; cx.fillRect(p.x-16,p.y-bo,32,4);
-    cx.fillStyle=k>0.4?'#7FA35C':'#D96A55'; cx.fillRect(p.x-16,p.y-bo,32*k,4);
+    cx.fillStyle='rgba(0,0,0,0.4)'; cx.fillRect(f.x-16,f.y-bo,32,4);
+    cx.fillStyle=k>0.4?'#7FA35C':'#D96A55'; cx.fillRect(f.x-16,f.y-bo,32*k,4);
   }
 }
 
