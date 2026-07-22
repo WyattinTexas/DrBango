@@ -102,13 +102,13 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">© 2026 CORKSCREW GAMES · INSERT DOG TAG TO CONTINUE · v0.8</div>
+  <div class="coinop">© 2026 CORKSCREW GAMES · INSERT DOG TAG TO CONTINUE · v0.9</div>
   <div class="scanlines"></div>
 </div>
 
 <div class="overlay hidden" id="lose">
-  <h1 style="color:#D2B489">THE TOY BOX<br>HAS FALLEN</h1>
-  <p>The Tan flag flies over your carpet. Sarge would like a word.</p>
+  <h1 style="color:#D2B489" id="loseTitle">THE TOY BOX<br>HAS FALLEN</h1>
+  <p id="loseText">The Tan flag flies over your carpet. Sarge would like a word.</p>
   <button class="btn" id="retryBtn">Rally &amp; Retry</button>
   <button class="btn" id="hqBtn" style="background:#5A5D4C; margin-top:0.6rem">Retreat to HQ</button>
 </div>
@@ -152,7 +152,7 @@ const META_DEFAULT = {
   campaign:0, levelStars:{},                          // highest level beaten, stars per level
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
-  lasers:[], laserOn:null,
+  lasers:[], laserOn:null, dyes:[], dyeOn:null,
   avatar:'rifleman', deviceId:'', name:'',
   ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0 },
   rivalDays:{}                                        // 'YYYY-MM-DD' -> color beaten
@@ -279,6 +279,7 @@ const UDEF = {
 };
 const FDEF = {
   tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:140, fireCd:3.2, name:'tan' },
+  tanmg:   { hp:3,  spd:34, bounty:8,  leak:1, w:54, rng:112, fireCd:2.6 },
   crawler: { hp:1,  spd:72, bounty:4,  leak:1, w:50, low:true, rng:110, fireCd:4 },
   officer: { hp:4,  spd:44, bounty:15, leak:1, w:52 },
   jeep:    { hp:12, spd:88, bounty:25, leak:2, w:78, vehicle:true },
@@ -327,7 +328,6 @@ sarge: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-
 minesweeper: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M46 122 L54 96" stroke-width="11"/><path d="M66 120 L58 96" stroke-width="11"/><path d="M56 96 L58 70" stroke-width="16"/><path d="M57 74 L74 87" stroke-width="8"/><path d="M56 79 L69 92" stroke-width="8"/><path d="M71 89 L100 111" stroke-width="4"/></g><rect x="42" y="68" width="11" height="20" rx="3" fill="currentColor"/><ellipse cx="103" cy="115" rx="11" ry="4" fill="currentColor"/><g transform="translate(61,56)">'+HEAD+'</g>',
 flame: BASE+'<rect x="34" y="62" width="9" height="30" rx="4.5" fill="currentColor"/><rect x="44" y="64" width="9" height="30" rx="4.5" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M44 122 L54 96" stroke-width="11"/><path d="M72 120 L58 96" stroke-width="11"/><path d="M54 96 L62 71" stroke-width="16"/><path d="M61 75 L82 79" stroke-width="8"/><path d="M62 80 L90 84" stroke-width="8"/><path d="M84 82 L107 86" stroke-width="4.5"/><path d="M42 94 Q64 106 86 83" stroke-width="3"/></g><g transform="translate(67,57)">'+HEAD+'</g>',
 radioman: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M30 121 L46 109" stroke-width="11"/><path d="M46 111 L54 93" stroke-width="11"/><path d="M54 93 L68 101 L70 119" stroke-width="11"/><path d="M52 95 L58 70" stroke-width="16"/><path d="M58 73 L67 61" stroke-width="8"/><path d="M57 78 L74 87" stroke-width="8"/><path d="M44 66 L32 30" stroke-width="2.5"/></g><circle cx="31.5" cy="28" r="2.5" fill="currentColor"/><rect x="38" y="64" width="15" height="25" rx="3.5" fill="currentColor"/><rect x="63" y="50" width="7" height="12" rx="3" fill="currentColor" transform="rotate(-15 66 56)"/><g transform="translate(64,57)">'+HEAD+'</g>',
-tanrifle: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M74 122 L62 96" stroke-width="11"/><path d="M46 118 L58 96" stroke-width="11"/><path d="M60 96 L58 68" stroke-width="16"/><path d="M46 30 L44 72" stroke-width="4.5"/><path d="M58 72 L46 63" stroke-width="8"/><path d="M60 74 L74 88" stroke-width="8"/></g><g transform="translate(56,54)">'+HEAD+'</g>',
 crawler: '<ellipse cx="60" cy="129" rx="50" ry="7.5" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="50" ry="7.5" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M114 116 L92 108" stroke-width="9"/><path d="M108 108 L88 103" stroke-width="9"/><path d="M90 107 L60 102" stroke-width="14"/><path d="M60 102 L44 112" stroke-width="8"/><path d="M62 98 L44 100" stroke-width="8"/><path d="M28 94 L66 90" stroke-width="4.5"/></g><g transform="translate(50,86)">'+HEAD+'</g>',
 officer: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M76 122 L62 96" stroke-width="11"/><path d="M46 120 L58 96" stroke-width="11"/><path d="M60 96 L58 70" stroke-width="15"/><path d="M56 74 L40 52" stroke-width="8"/><path d="M60 76 L74 88" stroke-width="8"/></g><rect x="26" y="38" width="11" height="5" rx="1.5" fill="currentColor"/><rect x="31.5" y="38" width="4.5" height="9" rx="1.5" fill="currentColor"/><circle cx="54" cy="56" r="8" fill="currentColor"/><rect x="42" y="50" width="24" height="4.5" rx="2.2" fill="currentColor"/><rect x="45" y="42" width="18" height="9" rx="2.5" fill="currentColor"/>',
 jeep: '<ellipse cx="70" cy="129" rx="58" ry="7.5" fill="#000" opacity="0.28"/><ellipse cx="70" cy="126" rx="58" ry="7.5" fill="currentColor"/><rect x="38" y="86" width="76" height="20" rx="5" fill="currentColor"/><rect x="24" y="92" width="24" height="14" rx="4" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round"><path d="M64 88 L70 70" stroke-width="4"/><path d="M56 70 L70 70" stroke-width="4"/><path d="M92 74 L92 88" stroke-width="8"/></g><circle cx="98" cy="64" r="7.5" fill="currentColor"/><circle cx="46" cy="110" r="11" fill="currentColor"/><circle cx="46" cy="110" r="4.5" fill="#000" opacity="0.3"/><circle cx="100" cy="110" r="11" fill="currentColor"/><circle cx="100" cy="110" r="4.5" fill="#000" opacity="0.3"/>',
@@ -335,13 +335,18 @@ tank: '<ellipse cx="70" cy="130" rx="64" ry="7" fill="#000" opacity="0.28"/><rec
 toybox: '<ellipse cx="80" cy="126" rx="66" ry="10" fill="#000" opacity="0.3"/><rect x="20" y="52" width="120" height="70" rx="6" fill="#8f6b3f"/><rect x="20" y="52" width="120" height="70" rx="6" fill="none" stroke="#6e5130" stroke-width="3"/><rect x="12" y="36" width="136" height="26" rx="6" fill="#a37c4a" stroke="#6e5130" stroke-width="3"/><path d="M80 74 l6 12 13 2 -9 9 2 13 -12 -6 -12 6 2 -13 -9 -9 13 -2 z" fill="#e8d9b0"/>',
 blob: '<path d="M6 18 Q2 10 10 8 Q12 2 20 4 Q30 2 32 10 Q38 12 34 18 Q30 22 20 20 Q10 23 6 18 z" fill="currentColor" transform="scale(2.6)"/>'
 };
+// 7/22 remold: Tan infantry aim their rifles FORWARD like the Green riflemen
+// (mirrored to face the way they march) — and the Tan fields an MG team now.
+const MIRROR = s=>'<g transform="translate(120,0) scale(-1,1)">'+s+'</g>';
+SPRITES_SRC.tanrifle = MIRROR(SPRITES_SRC.rifleman);
+SPRITES_SRC.tanmg    = MIRROR(SPRITES_SRC.mgunner);
 const IMG = {};
 let assetsLeft = 0;
 function buildSprites(done){
   const jobs = [];
   for(const k in SPRITES_SRC){
     const vb = (k==='jeep'||k==='tank') ? '0 0 140 140' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';
-    const color = (k==='tanrifle'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='blob') ? TAN : GREEN;
+    const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='blob') ? TAN : GREEN;
     jobs.push([k, vb, color]);
   }
   assetsLeft = jobs.length;
@@ -423,7 +428,7 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.downsLevel=0;
+  S.ffLevel=0; S.downsLevel=0; S.invasion=null;
 }
 function startBattle(levelN, rival){
   reset();
@@ -447,7 +452,8 @@ function hideAllOverlays(){ ['title','lose','win','menu','picker'].forEach(id=>{
 const INVADE_CARDS = [
   { key:'squad',    name:'SQUAD ×5',    cost:25, f:'column',    t:'tanrifle', n:5 },
   { key:'line',     name:'LINE ×8',     cost:40, f:'line',      t:'tanrifle', n:8 },
-  { key:'crawlers', name:'CRAWLERS ×4', cost:20, f:'guerrilla', t:'crawler',  n:4 },
+  { key:'crawlers', name:'CRAWLER ×4',  cost:20, f:'guerrilla', t:'crawler',  n:4 },
+  { key:'mg',       name:'MG TEAM ×3',  cost:35, f:'line',      t:'tanmg',    n:3 },
   { key:'redcoats', name:'REDCOATS',    cost:60, f:'redcoat',   t:'tanrifle', n:10, officer:true },
   { key:'jeep',     name:'JEEP',        cost:25, f:'solo',      t:'jeep',     n:1 },
   { key:'tank',     name:'TANK',        cost:60, f:'wedge',     t:'tank',     n:1, escort:4 }
@@ -484,21 +490,27 @@ function invadeRemaining(){ return S.invasion? S.invasion.budget-S.invasion.spen
 function endInvasion(won){
   if(!S.invasion||S.invasion.resolved) return;
   S.invasion.resolved=true;
-  S.mode='win';
+  S.mode=won?'win':'lose';
+  const inv=S.invasion;
   fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({device:META.deviceId,target:S.invasion.uid,won:!!won})})
+    body:JSON.stringify({device:META.deviceId,target:inv.uid,won:!!won})})
     .then(r=>r.json()).then(d=>{
       const el=document.getElementById('medalText');
-      if(el&&won){ el.textContent = d.bonus>0? ('FIRST WIN TODAY vs '+S.invasion.name+' — BONUS +'+d.bonus+'★ ('+d.capLeft+' bonus wins left today)')
-                                   : ('Already beat '+S.invasion.name+' today — glory only.');
+      if(el&&won){ el.textContent = (d.bonus>0? ('FIRST WIN TODAY vs '+inv.name+' — BONUS +'+d.bonus+'★ ('+d.capLeft+' bonus wins left today)')
+                                   : ('Already beat '+inv.name+' today — rematch glory')) + ' · +2★ spoils';
         if(d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta(); } }
     }).catch(()=>{});
   document.getElementById(won?'win':'lose').classList.remove('hidden');
   if(won){
-    document.getElementById('winTitle').innerHTML='THEIR TOY BOX<br>HAS FALLEN';
-    document.getElementById('medalRow').textContent='⚑';
-    document.getElementById('medalText').textContent='Their room is yours. Reporting to HQ…';
+    // a WIN screen that looks like one — you broke their box, fly the flag
+    META.starBank+=2; META.starsLifetime+=2; saveMeta(); netSync();   // spoils of war — every raid pays
+    const wt=document.getElementById('winTitle');
+    wt.innerHTML='INVASION<br>VICTORIOUS'; wt.style.color='#D2B489';
+    document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
+    document.getElementById('medalText').textContent='Their toy box is broken — the room is yours. +2★ spoils of war.';
   } else {
+    document.getElementById('loseTitle').innerHTML='INVASION<br>REPELLED';
+    document.getElementById('loseText').textContent='Their line held and your budget ran dry. Regroup and hit that room again.';
     SFX.ouch();
   }
 }
@@ -513,25 +525,26 @@ function gritCap(u){ return u.def.grit + (u.vet?1:0); }
 function tanHit(u,fx,fy){
   if(u.down) return;
   u.hits++; u.hitT=0;
-  S.fx.push({k:'tracer',x1:fx,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
+  S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
   if(u.hits>=gritCap(u)){ knock(u,fx,fy); }
 }
+function frng(f){ return f.def.rng + (S.invasion?15:0); }   // your invaders shoot with conviction
 function tanShoot(f){
   let best=null,bd=1e9;
   for(const u of S.units){
     if(u.down) continue;
     if(S.drag&&S.drag.unit===u) continue;
     const d=Math.hypot(u.x-f.x,u.y-f.y);
-    if(d<=f.def.rng&&d<bd){bd=d;best=u;}
+    if(d<=frng(f)&&d<bd){bd=d;best=u;}
   }
-  if(best){ SFX.tpew(); tanHit(best,f.x,f.y); return true; }
+  if(best){ (f.type==='tanmg'?SFX.mg:SFX.tpew)(); tanHit(best,f.x,f.y); return true; }
   return false;
 }
 function hasGreenTarget(f){
   for(const u of S.units){
     if(u.down) continue;
     if(S.drag&&S.drag.unit===u) continue;
-    if(Math.hypot(u.x-f.x,u.y-f.y)<=f.def.rng) return true;
+    if(Math.hypot(u.x-f.x,u.y-f.y)<=frng(f)) return true;
   }
   return false;
 }
@@ -548,6 +561,10 @@ function knock(u, srcx, srcy){
   if(u.down) return;
   u.down=true; u.downT=0; u.hits=0; S.downsLevel++; SFX.clack();
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
+  if(S.invasion && !S.invasion.resolved){
+    S.invasion.budget+=8;   // his dog tag, your war chest — knockdowns pay the invader
+    S.floats.push({x:u.x,y:u.y-64,txt:'+8 TAGS',t:0,col:'#FFF3C4'});
+  }
   coachEvent('down', u);
 }
 function standUp(u){
@@ -570,8 +587,8 @@ function spawnFoe(type,x,y,form,gu){
   const f={ id:idc++, type, def:d, hp:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)), hpMax:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)),
     x, y, vx:0, vy:0, wob:Math.random()*6.28,
     spdMul:(m.spd||1), fireMul:(m.fire||1), bountyMul:(m.bounty||1),
-    shot:(type==='officer'?3:(type==='tanrifle'?2.4:0)), rammed:{}, form:form||null, off:null,
-    gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0 };
+    shot:(type==='officer'?3:(type==='tanrifle'?2.4:(type==='tanmg'?1.8:0))), rammed:{}, form:form||null, off:null,
+    gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0, burst:0, burstT:0 };
   S.foes.push(f);
   return f;
 }
@@ -581,7 +598,7 @@ const IMGT = {};
 function buildFoeTint(hex){
   if(IMGT[hex]) return;
   IMGT[hex]={};
-  ['tanrifle','crawler','officer','jeep','tank'].forEach(k=>{
+  ['tanrifle','tanmg','crawler','officer','jeep','tank'].forEach(k=>{
     const vb=(k==='jeep'||k==='tank')?'0 0 140 140':'0 0 120 140';
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
@@ -590,6 +607,24 @@ function buildFoeTint(hex){
   });
 }
 function foeImg(k){ return (S.rival&&IMGT[S.rival.hex]&&IMGT[S.rival.hex][k])||IMG[k]; }
+// DYE KITS: your whole army repainted in a rival's color (shop, 20★ a color)
+const IMGU={};
+const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman'];
+function dyeHex(){ const a=META.dyeOn&&ARMIES.find(x=>x.id===META.dyeOn); return a? a.hex : null; }
+function buildUnitTint(hex){
+  if(!hex||IMGU[hex]) return;
+  IMGU[hex]={};
+  GREEN_UNITS.forEach(k=>{
+    const body=SPRITES_SRC[k].split('currentColor').join(hex);
+    const im=new Image();
+    im.onload=()=>{ IMGU[hex][k]=im; };
+    im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>');
+  });
+}
+function unitImg(k){
+  if(S.invasion) return IMG[k];              // defenders wear their own factory green
+  const hx=dyeHex(); return (hx&&IMGU[hx]&&IMGU[hx][k])||IMG[k];
+}
 function spawnGroup(g){
   if(g.f==='guerrilla'||g.f==='solo'){
     for(let i=0;i<g.n;i++){ const p=edgePt(g.e); spawnFoe(g.t, p.x+(Math.random()-0.5)*60, p.y+(Math.random()-0.5)*40, null, g.f==='guerrilla'); }
@@ -648,10 +683,15 @@ function endBattle(win){
   }
   S.mode = win?'win':'lose';
   document.getElementById(win?'win':'lose').classList.remove('hidden');
-  if(!win){ SFX.ouch(); return; }
+  if(!win){
+    document.getElementById('loseTitle').innerHTML='THE TOY BOX<br>HAS FALLEN';
+    document.getElementById('loseText').textContent='The Tan flag flies over your carpet. Sarge would like a word.';
+    SFX.ouch(); return;
+  }
 
   const firstEver = !S.rival && S.levelN===1 && META.campaign===0;
-  document.getElementById('winTitle').innerHTML = S.rival? (S.rival.name+'<br>DEFEATED') : 'CARPET<br>SECURED';
+  const wtEl=document.getElementById('winTitle'); wtEl.style.color='#7FA35C';
+  wtEl.innerHTML = S.rival? (S.rival.name+'<br>DEFEATED') : 'CARPET<br>SECURED';
   const m1=true, m2=S.lives>=10, m3=S.maxDown<=3.05 && !S.units.some(u=>u.down&&u.downT>3.05);
   let stars=(m1?1:0)+(m2?1:0)+(m3?1:0);
   document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
@@ -662,15 +702,12 @@ function endBattle(win){
     if(!META.rivalDays[day]){
       META.rivalDays[day]=S.rival.id; META.stats.rivalWins++;
       stars=5; msg='DAILY RIVAL DOWN · BONUS +5★';
-    } else { stars=0; msg='Rival already beaten today — nothing but glory.'; }
+    } else { stars=1; msg='Rival already beaten today — +1★ for the drill.'; }
   } else {
+    // stars flow freely (7/22): every win pays its medals in full, replays too
     const prev=META.levelStars['l'+S.levelN]||0;
-    if(S.levelN>5){ stars=Math.min(stars,1); msg+=' · deep-campaign pay: 1★'; }   // the drop-off
-    const gain=Math.max(0,stars-prev);
     META.levelStars['l'+S.levelN]=Math.max(prev,stars);
     if(S.levelN>META.campaign) META.campaign=S.levelN;
-    if(gain===0) msg+=' · (no new stars — already earned)';
-    stars=gain;
   }
   META.starBank+=stars; META.starsLifetime+=stars;
   const xpGain = 30 + stars*30 + S.wave*4;
@@ -806,16 +843,23 @@ function update(dt){
     // return fire: redcoats volley on the halt. Everyone else STOPS to shoot —
     // a visible half-second wind-up where they're standing still and you can
     // drop them first. Then they fire and keep coming.
-    if((f.type==='tanrifle'||f.type==='crawler') && !f.burrow && f.x<W-10 && f.x>-40){
+    if((f.type==='tanrifle'||f.type==='tanmg'||f.type==='crawler') && !f.burrow && f.x<W-10 && f.x>-40){
       if(f.form && f.form.kind==='redcoat'){
         if(f.form.doVolley) tanShoot(f);
+      } else if(f.burst>0){
+        f.burstT-=dt;   // the MG walks his burst in — brrrt, one grit hit per round
+        if(f.burstT<=0){ tanShoot(f); f.burst--; f.burstT=0.12; if(f.burst<=0) f.shot=Math.random()*0.4; }
       } else if(f.aimT>0){
         f.aimT-=dt;
-        if(f.aimT<=0){ if(tanShoot(f)) f.shot=Math.random()*0.6; else f.shot=f.def.fireCd*0.7; }
+        if(f.aimT<=0){
+          if(tanShoot(f)){ if(f.type==='tanmg'){ f.burst=2; f.burstT=0.12; } f.shot=Math.random()*0.6; }
+          else f.shot=f.def.fireCd*0.7;
+        }
       } else {
         f.shot+=dt;
-        const cd=f.def.fireCd*(f.fireMul||1);
-        if(f.shot>=cd && hasGreenTarget(f)){ f.aimT=0.55; }   // halt... aim...
+        // when YOU are the Tan (invasions), infantry fire like the Green riflemen do
+        const cd=f.def.fireCd*(f.fireMul||1)*(S.invasion?0.45:1);
+        if(f.shot>=cd && hasGreenTarget(f)){ f.aimT=S.invasion?0.35:0.55; }   // halt... aim...
       }
     }
     // officer potshot
@@ -972,7 +1016,7 @@ function hitCheck(f,u){
       // the fallen stay where they fell — flipped over like real toys
       S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w, img:foeImg(f.type) });
       if(S.corpses.length>90) S.corpses.shift();
-      S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
+      if(!S.invasion) S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty (invaders don't loot their own dead)
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
       else SFX.clack();
@@ -1120,7 +1164,7 @@ function draw(){
   for(const fl of S.floats){ cx.globalAlpha=Math.min(1,2-fl.t*1.8); cx.font='bold 19px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=fl.col; cx.textAlign='center'; cx.fillText(fl.txt,fl.x,fl.y); cx.globalAlpha=1; }
 
   // dragged unit on top
-  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,S.drag.type==='mortar'?58:54,0,0);
+  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,S.drag.type==='mortar'?58:54,0,0,unitImg(S.drag.type));
     cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(S.drag.x+26,S.drag.y+30,60,24,0.4,0,7); cx.fill(); cx.globalAlpha=1; }
 
   cx.restore();
@@ -1211,15 +1255,15 @@ function ring(x,y,r,fill,stroke){
   cx.strokeStyle=stroke; cx.lineWidth=2.5; cx.setLineDash([8,8]); cx.beginPath(); cx.arc(x,y,r,0,7); cx.stroke(); cx.setLineDash([]);
 }
 function drawUnit(u){
-  const w=u.type==='mortar'?58:54;
+  const w=u.type==='mortar'?58:54, im=unitImg(u.type);
   if(u.down){
-    drawSprite(u.type,u.x,u.y,w,-1.36,0);
+    drawSprite(u.type,u.x,u.y,w,-1.36,0,im);
     const pul=0.5+0.5*Math.sin(S.t*6);
     cx.globalAlpha=0.5+0.4*pul; cx.strokeStyle='#fff'; cx.lineWidth=2.5;
     cx.beginPath(); cx.arc(u.x,u.y-14,16+5*pul,0,7); cx.stroke(); cx.globalAlpha=1;
   } else {
-    drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03));
-    if(u.vet){ cx.fillStyle='#fff'; cx.fillRect(u.x-12,u.y-3,24,4); }
+    drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),im);
+    if(u.vet){ cx.fillStyle= META.dyeOn==='white'?'#4A4A4A':'#fff'; cx.fillRect(u.x-12,u.y-3,24,4); }
     if(u.sprue>0){
       cx.globalAlpha=Math.max(0,u.sprue/0.45); cx.strokeStyle=GREEN; cx.lineWidth=4;
       const g=1+(1-u.sprue/0.45)*0.5;
@@ -1259,7 +1303,7 @@ function drawHUD(){
   cx.textBaseline='middle';
   drawTag(32,23,11);
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM; cx.textAlign='left';
-  cx.fillText(S.invasion? ('BUDGET '+invadeRemaining()) : S.plastic, 52, 23);
+  cx.fillText(S.invasion? ('TAGS '+invadeRemaining()) : S.plastic, 52, 23);
   cx.textAlign='center';
   cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
     : S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
@@ -1283,7 +1327,7 @@ function drawHUD(){
 
   // tray — sized and lifted for thumbs (phone bottom edge steals touches)
   if(S.invasion){
-    const tw2=140, th2=70, gap2=8, tot=INVADE_CARDS.length*tw2+(INVADE_CARDS.length-1)*gap2, xI=(W-tot)/2, yI=H-th2-16;
+    const nC=INVADE_CARDS.length, gap2=6, tw2=Math.min(140,(((W-24)-(nC-1)*gap2)/nC)|0), th2=70, tot=nC*tw2+(nC-1)*gap2, xI=(W-tot)/2, yI=H-th2-16;
     cx.textBaseline='alphabetic';
     trayRects.length=INVADE_CARDS.length;
     INVADE_CARDS.forEach((cd,i)=>{
@@ -1295,11 +1339,11 @@ function drawHUD(){
       cx.globalAlpha=ok?1:0.4;
       drawSprite(cd.t, x+30, yI+th2-14, cd.t==='tank'?40:36,0,0,IMG[cd.t]);
       cx.globalAlpha=1;
-      cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.textAlign='left';
+      cx.font='bold 13px "Arial Narrow", Impact, sans-serif'; cx.textAlign='left';
       cx.fillStyle= ok?'#EDD9B4':'#8b8f7a';
-      cx.fillText(cd.name, x+56, yI+28);
+      cx.fillText(cd.name, x+52, yI+28);
       cx.fillStyle= ok?'#FFF3C4':'#8b8f7a'; cx.font='bold 17px "Arial Narrow", Impact, sans-serif';
-      cx.fillText(cd.cost, x+56, yI+52);
+      cx.fillText(cd.cost, x+52, yI+52);
     });
     btnRects.vet=null; btnRects.wave=null;
     return;
@@ -1317,7 +1361,7 @@ function drawHUD(){
     rr(x,y0,tw,th,10); cx.fill();
     if(S.drag&&S.drag.type===s.t){ cx.strokeStyle='#fff'; cx.lineWidth=2; rr(x,y0,tw,th,10); cx.stroke(); }
     cx.globalAlpha=afford?1:0.35;
-    drawSprite(s.t, x+tw/2-14, y0+th-18, 44,0,0);
+    drawSprite(s.t, x+tw/2-14, y0+th-18, 44,0,0,unitImg(s.t));
     cx.globalAlpha=1;
     cx.font='bold 17px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
     cx.fillStyle= afford? '#FFF3C4':'#8b8f7a';
@@ -1427,6 +1471,18 @@ const SHOP_ITEMS=[
   { t:'flame',       cost:15, blurb:'Short range. Melts everything in reach. The crawler answer.' },
   { t:'radioman',    cost:20, blurb:'+25% range to every soldier near him. All antenna, no rifle.' }
 ];
+// THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
+// on the Hobby Bench to read his page.
+const CLASSINFO = {
+  rifleman:   { good:'Long reach (150) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and he has no answer to armor. Needs friends.' },
+  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close.', bad:'Short reach (95). He has to sit up front, right where the trouble is.' },
+  bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and his blasts knock down your own men. Give him room.' },
+  mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
+  sarge:      { good:'FREE, extra grit, and downed men near him stand back up twice as fast.', bad:'Pistol range only. And there is only ever one Sarge.' },
+  minesweeper:{ good:'Seeds the carpet with firecracker mines — brutal on lanes, bridges and choke points.', bad:'Never fires a shot himself, and mines flip your own men too if they wander in.' },
+  flame:      { good:'Torches 3 enemies at once and cooks crawler packs. Nothing shrugs him off.', bad:'Arm\'s-reach range (85). If they\'re not close, he\'s just a man carrying soup.' },
+  radioman:   { good:'+25% range to every soldier standing near him — a whole squad upgrade in one figure.', bad:'All antenna, no rifle. He cannot defend himself, so guard him.' }
+};
 // ---- YOUR ROOM: the HQ is the bedroom from the design docs. One screen,
 // no scrolling — every menu is an object on the floor.
 function roomSVG(){
@@ -1457,14 +1513,17 @@ function roomSVG(){
   +'<g transform="translate(760,236)"><ellipse cx="34" cy="78" rx="34" ry="6" fill="#000" opacity="0.25"/><rect x="10" y="58" width="48" height="18" rx="3" fill="#8a683e"/><path d="M20 14 h28 v14 a14 14 0 0 1 -28 0 z" fill="#D9A544"/><path d="M18 16 q-12 2 -2 14" stroke="#D9A544" stroke-width="4" fill="none"/><path d="M50 16 q12 2 2 14" stroke="#D9A544" stroke-width="4" fill="none"/><rect x="28" y="40" width="12" height="10" fill="#D9A544"/><rect x="20" y="50" width="28" height="8" rx="2" fill="#B8862F"/></g>'
   // medal case (achievements) bottom right on floor
   +'<g transform="translate(712,430)"><ellipse cx="52" cy="66" rx="50" ry="7" fill="#000" opacity="0.25"/><rect x="6" y="18" width="92" height="48" rx="6" fill="#6e5130"/><rect x="12" y="24" width="80" height="36" rx="4" fill="#4a3517"/><circle cx="32" cy="42" r="9" fill="#D9A544"/><circle cx="56" cy="42" r="9" fill="'+(achDone>=5?'#D9A544':'#8a683e')+'"/><circle cx="80" cy="42" r="9" fill="'+(achDone>=10?'#D9A544':'#8a683e')+'"/></g>'
+  // today's rival AT THE DOOR — tonight's invader, in his true colors
+  +'<image href="'+sprURI('tanrifle',riv.hex)+'" x="842" y="402" width="82" height="96"'+(rivDone?' opacity="0.5"':'')+'/>'
   // your figure (avatar) standing on the rug
-  +'<image href="'+sprURI(META.avatar,'#4A6B35')+'" x="330" y="330" width="82" height="96"/>'
+  +'<image href="'+sprURI(META.avatar, dyeHex()||'#4A6B35')+'" x="330" y="330" width="82" height="96"/>'
   +'</svg>';
 }
 const ROOM_SPOTS=[
   { id:'campaign', x:150, y:200, w:220, h:180, label:()=>'CAMPAIGN · LV '+(META.campaign+1), lx:250, ly:392 },
   { id:'shop',     x:378, y:80,  w:150, h:120, label:()=>'SHOP', lx:450, ly:212 },
-  { id:'rival',    x:640, y:96,  w:100, h:140, label:()=>'DAILY RIVAL'+(META.rivalDays[todayStr()]?' ✓':''), lx:686, ly:248 },
+  { id:'rival',    x:820, y:390, w:137, h:150, label:()=>'DAILY RIVAL'+(META.rivalDays[todayStr()]?' ✓':''), lx:874, ly:384 },
+  { id:'rival',    x:640, y:96,  w:100, h:140, label:null, lx:0, ly:0 },
   { id:'promo',    x:98,  y:446, w:140, h:100, label:()=>'PROMOTIONS'+(META.pendingPicks>0?' ('+META.pendingPicks+')':''), lx:170, ly:440 },
   { id:'board',    x:752, y:230, w:90,  h:90,  label:()=>'LEADERBOARD', lx:794, ly:334 },
   { id:'ach',      x:706, y:424, w:110, h:80,  label:()=>'MEDALS '+ACH.filter(a=>META.ach[a.id]).length+'/'+ACH.length, lx:764, ly:518 },
@@ -1472,7 +1531,7 @@ const ROOM_SPOTS=[
   { id:'piggy',    x:88,  y:112, w:130, h:100, label:()=>'★ '+META.starBank, lx:148, ly:106 }
 ];
 function showMenu(){
-  S.mode='menu';
+  S.mode='menu'; S.invasion=null;   // never carry an invasion home to HQ
   hideAllOverlays();
   document.getElementById('menu').classList.remove('hidden');
   renderMenu();
@@ -1488,13 +1547,13 @@ window.addEventListener('resize', sizeRoom);
 function renderMenu(){
   const spots=ROOM_SPOTS.map(sp=>
     '<div onclick="UI.room(\''+sp.id+'\')" style="position:absolute;left:'+sp.x+'px;top:'+sp.y+'px;width:'+sp.w+'px;height:'+sp.h+'px;cursor:pointer"></div>'
-    +'<div class="roomtag" onclick="UI.room(\''+sp.id+'\')" style="left:'+sp.lx+'px;top:'+sp.ly+'px">'+sp.label()+'</div>'
+    +(sp.label? '<div class="roomtag" onclick="UI.room(\''+sp.id+'\')" style="left:'+sp.lx+'px;top:'+sp.ly+'px">'+sp.label()+'</div>' : '')
   ).join('');
   document.getElementById('menuBody').innerHTML =
     '<div class="roomstage" id="roomStage">'
     + roomSVG()
     + spots
-    + '<div class="roomhead"><img src="'+sprURI(META.avatar)+'" style="width:34px;margin-right:8px">'
+    + '<div class="roomhead"><img src="'+sprURI(META.avatar, dyeHex()||undefined)+'" style="width:34px;margin-right:8px">'
       +'<b>COMMANDER · LV '+META.lvl+'</b>'
       +'<div class="xpbar" style="flex:1;max-width:220px;margin:0 12px"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div></div>'
       +(META.pendingPicks>0?'<button class="mbtn alt" style="padding:0.2rem 0.7rem;font-size:0.85rem" onclick="UI.promote()">PROMOTION!</button>':'')
@@ -1514,13 +1573,20 @@ function panelHTML(id){
   const terr=[cfgN.terrain.rocks.length?'ROCKS':null,cfgN.terrain.river?'RIVER':null].filter(Boolean).join(' + ')||'OPEN CARPET';
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()];
   switch(id){
-    case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+(nextL>5?' · deep-campaign pay (1★)':'')+'</p>'
+    case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+'</p>'
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
     case 'shop': return '<h3>THE SHOP</h3>'
       + SHOP_ITEMS.map(s=>{ const owned=META.unlocked.indexOf(s.t)>=0;
         return '<div class="mrow"><img src="'+sprURI(s.t)+'"><div class="grow"><b>'+UDEF[s.t].name+'</b> <small style="opacity:0.6">'+s.blurb+'</small></div>'
         +(owned?'<b style="color:#7FA35C">OWNED</b>':'<button class="mbtn" '+(META.starBank<s.cost?'disabled':'')+' onclick="UI.buy(\''+s.t+'\')">'+s.cost+'★</button>')+'</div>'; }).join('')
+      +'<h3 style="margin-top:12px">DYE KITS <small style="opacity:0.6;font-weight:normal">— repaint your whole army a rival\'s color. 20★</small></h3>'
+      +'<div class="laserrow">'
+      + ARMIES.map(a=>{ const owned=META.dyes.indexOf(a.id)>=0, on=META.dyeOn===a.id;
+        return '<div class="laserchip" style="border-color:'+a.hex+';'+(on?'box-shadow:0 0 12px '+a.hex:'')+'" onclick="UI.dye(\''+a.id+'\')">'
+        +'<img src="'+sprURI('rifleman',a.hex)+'" style="width:30px"><b>'+a.id.toUpperCase()+'</b>'
+        +'<small>'+(on?'WEARING IT':owned?'TAP TO WEAR':'20★')+'</small></div>'; }).join('')
+      +'</div>'+(META.dyeOn?'<p style="font-size:0.85rem;margin:8px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.dye(null);return false">wash it off — back to factory green</a></p>':'')
       +'<h3 style="margin-top:12px">LASERS <small style="opacity:0.6;font-weight:normal">— every shot a beam, every beam a color. 500★</small></h3>'
       +'<div class="laserrow">'
       + LASER_COLORS.map(a=>{ const owned=META.lasers.indexOf(a.id)>=0, on=META.laserOn===a.id;
@@ -1528,13 +1594,17 @@ function panelHTML(id){
         +'<div class="lzbeam" style="background:'+a.hex+'"></div><b>'+a.id.toUpperCase()+'</b>'
         +'<small>'+(on?'EQUIPPED':owned?'TAP TO EQUIP':'500★')+'</small></div>'; }).join('')
       +'</div>'+(META.laserOn?'<p style="font-size:0.85rem;margin-top:8px"><a href="#" style="color:#8b8f7a" onclick="UI.laser(null);return false">switch back to good old gunpowder</a></p>':'');
-    case 'rival': return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+riv.name+'</h3><p>"'+riv.blurb+'"</p>'
-      +'<p>'+(rivDone?'✓ Beaten today — +5★ collected. Rematches are for glory.':'First win today: <b>+5★</b>')+'</p>'
+    case 'rival': return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+riv.name+'</h3>'
+      +'<div style="text-align:center;margin:4px 0 8px"><img src="'+sprURI('tanrifle',riv.hex)+'" style="width:72px"><img src="'+sprURI('tanmg',riv.hex)+'" style="width:72px"><img src="'+sprURI('crawler',riv.hex)+'" style="width:72px"><img src="'+sprURI('officer',riv.hex)+'" style="width:72px"></div>'
+      +'<p>"'+riv.blurb+'"</p>'
+      +'<p>'+(rivDone?'✓ Beaten today — +5★ collected. Rematches pay +1★.':'First win today: <b>+5★</b>')+'</p>'
       +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH':'FIGHT '+riv.name)+'</button>';
     case 'promo': return '<h3>THE HOBBY BENCH</h3>'
       +(META.pendingPicks>0? '<p>Promotions waiting: '+META.pendingPicks+'</p><button class="mbtn" onclick="UI.promote()">CHOOSE A UNIT TO IMPROVE</button>'
         : '<p>No promotions waiting — win battles, earn XP.</p>')
-      +'<div style="margin-top:10px">'+META.unlocked.map(k=>'<div class="mrow"><img src="'+sprURI(k)+'"><div class="grow">'+UDEF[k].name+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>').join('')+'</div>';
+      +'<p style="font-size:0.85rem;opacity:0.6;margin:10px 0 2px">TAP A SOLDIER FOR HIS FIELD MANUAL PAGE:</p>'
+      +'<div>'+TRAY_ORDER.map(k=>{ const own=META.unlocked.indexOf(k)>=0;
+        return '<div class="mrow" style="cursor:pointer'+(own?'':';opacity:0.45')+'" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k, dyeHex()||undefined)+'"><div class="grow">'+UDEF[k].name+(own?'':' <small style="opacity:0.7">(in the shop)</small>')+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>'; }).join('')+'</div>';
     case 'board': setTimeout(loadBoard,0); return '<h3>THE TROPHY — WORLD RANKS</h3>'
       +'<div id="boardRows"><p style="opacity:0.6">Radioing HQ…</p></div>'
       +'<p style="margin-top:10px;font-size:0.9rem">You: <b>'+escH(META.name)+'</b> · '+tierName(META.starsLifetime)+' · '+META.starsLifetime+'★ lifetime · tap any player to ⚔ CHALLENGE them</p>'
@@ -1546,7 +1616,8 @@ function panelHTML(id){
     case 'ach': return '<h3>MEDAL CASE</h3><div class="achgrid">'
       + ACH.map(a=>'<div style="'+(META.ach[a.id]?'':'opacity:0.4')+'"><b>'+(META.ach[a.id]?'✓ ':'')+a.name+'</b><br><small>'+a.desc+'</small></div>').join('')+'</div>';
     case 'avatar': return '<h3>YOUR FIGURE</h3><p>'
-      +['rifleman','mgunner','bazooka','mortar','sarge'].map(k=>'<img src="'+sprURI(k)+'" style="width:52px;cursor:pointer;'+(META.avatar===k?'filter:drop-shadow(0 0 6px #7FA35C)':'opacity:0.55')+'" onclick="UI.avatar(\''+k+'\')">').join(' ')+'</p>';
+      +['rifleman','mgunner','bazooka','mortar','sarge'].map(k=>'<img src="'+sprURI(k, dyeHex()||undefined)+'" style="width:52px;cursor:pointer;'+(META.avatar===k?'filter:drop-shadow(0 0 6px #7FA35C)':'opacity:0.55')+'" onclick="UI.avatar(\''+k+'\')">').join(' ')+'</p>'
+      +(META.dyeOn?'<p style="font-size:0.85rem;opacity:0.6">Wearing '+META.dyeOn.toUpperCase()+' dye — change it in the shop.</p>':'');
   }
   return '';
 }
@@ -1595,6 +1666,22 @@ window.UI = {
     else if(META.starBank>=500){ META.starBank-=500; META.lasers.push(id); META.laserOn=id; SFX.laser(); }
     else { SFX.clack(); return; }
     saveMeta(); renderMenu(); roomModal(panelHTML('shop'));
+  },
+  dye(id){
+    if(id===null){ META.dyeOn=null; saveMeta(); renderMenu(); roomModal(panelHTML('shop')); return; }
+    if(META.dyes.indexOf(id)>=0){ META.dyeOn = META.dyeOn===id? null : id; SFX.blip(); }
+    else if(META.starBank>=20){ META.starBank-=20; META.dyes.push(id); META.dyeOn=id; SFX.blip(); }
+    else { SFX.clack(); return; }
+    if(META.dyeOn) buildUnitTint(dyeHex());
+    saveMeta(); renderMenu(); roomModal(panelHTML('shop'));
+  },
+  classInfo(k){
+    const ci=CLASSINFO[k]||{good:'—',bad:'—'}, r=META.up[k]||0, own=META.unlocked.indexOf(k)>=0;
+    roomModal('<div style="display:flex;gap:14px;align-items:center"><img src="'+sprURI(k, dyeHex()||undefined)+'" style="width:74px">'
+      +'<div><h3 style="margin:0">'+UDEF[k].name+'</h3><small style="opacity:0.6">'+(own?('UPGRADE RANK '+r+' / 5'):'NOT IN YOUR ARMY YET — SEE THE SHOP')+'</small></div></div>'
+      +'<p style="margin-top:12px"><b style="color:#7FA35C">GOOD AT:</b> '+ci.good+'</p>'
+      +'<p><b style="color:#D96A55">BAD AT:</b> '+ci.bad+'</p>'
+      +'<p style="margin-top:8px"><a href="#" style="color:#8b8f7a" onclick="UI.room(\'promo\');return false">← back to the bench</a></p>');
   }
 };
 
@@ -1641,6 +1728,7 @@ function frame(ts){
   draw();
 }
 buildSprites(()=>{ ready=true; });
+try{ if(META.dyeOn) buildUnitTint(dyeHex()); }catch(e){}
 requestAnimationFrame(frame);
 
 // ================= DEBUG API =================
@@ -1654,6 +1742,7 @@ window.GVT = {
   snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
   meta(){ return JSON.parse(JSON.stringify(META)); },
   startLevel(n,rivalId){ startBattle(n, rivalId? ARMIES.find(a=>a.id===rivalId) : null); },
+  invade(t){ startInvasion(t||{uid:'persona_test',name:'Test Dummy',stars:240,defense:null}); },
   menu(){ showMenu(); },
   wipeMeta(){ try{ localStorage.removeItem('gvt_meta'); }catch(e){} },
   cfg(){ return S.cfg; },
