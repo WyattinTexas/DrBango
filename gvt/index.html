@@ -85,6 +85,7 @@
   .pickcard small { opacity:0.7; }
   .tierrow { display:flex; justify-content:space-between; font-size:0.92rem; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
   .yourow { color:#BFE39A; font-weight:bold; background:rgba(127,163,92,0.12); border-radius:4px; padding-left:6px; padding-right:6px; }
+  .chrow { cursor:pointer; } .chrow:hover { background:rgba(210,180,137,0.12); border-radius:4px; }
 </style>
 </head>
 <body>
@@ -101,7 +102,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">© 2026 CORKSCREW GAMES · INSERT DOG TAG TO CONTINUE · v0.7</div>
+  <div class="coinop">© 2026 CORKSCREW GAMES · INSERT DOG TAG TO CONTINUE · v0.8</div>
   <div class="scanlines"></div>
 </div>
 
@@ -159,20 +160,44 @@ const META_DEFAULT = {
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); } } catch(e) {}
 function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
-// device identity + toy-soldier callsign (accounts merge onto this later)
+// device identity + toy-soldier callsign. In the iOS shell the Keychain
+// remembers the device across reinstalls (injected as __GVT_KC_DEVICE).
+if(!META.deviceId && window.__GVT_KC_DEVICE && /^[a-f0-9]{16,64}$/.test(window.__GVT_KC_DEVICE)){
+  META.deviceId = window.__GVT_KC_DEVICE;
+}
 if(!META.deviceId){
   META.deviceId = Array.from({length:32},()=>'0123456789abcdef'[Math.random()*16|0]).join('');
   const RK=['Sgt','Cpl','Capt','Maj','Pvt'], NN=['Wobbles','Bootlace','Kneehigh','Sprue','Dogtag','Carpet','Blaster','Socks','Marbles','Greenie'];
   META.name = RK[Math.random()*RK.length|0]+' '+NN[Math.random()*NN.length|0]+' '+(10+(Math.random()*89|0));
   saveMeta();
 }
+try{ if(window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.gvtSign){ webkit.messageHandlers.gvtSign.postMessage({cmd:'keychain_device', device:META.deviceId}); } }catch(e){}
+// native sign-in callbacks land here
+window.GVTN = {
+  appleSignIn(){ try{ webkit.messageHandlers.gvtSign.postMessage({cmd:'apple_signin'}); }catch(e){} },
+  _appleResult(r){
+    if(!r||!r.ok){ S.floats.push({x:W/2,y:150,txt:'SIGN-IN CANCELED',t:0,col:'#D96A55'}); return; }
+    fetch(NET+'/link',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({device:META.deviceId,provider:'apple',sub:r.sub,name:r.name||META.name})})
+      .then(x=>x.json()).then(d=>{
+        if(!d.ok) return;
+        META.account='apple';
+        if(d.name) META.name=d.name;
+        META.starsLifetime=Math.max(META.starsLifetime,d.stars||0);
+        META.lvl=Math.max(META.lvl,d.lvl||1);
+        META.campaign=Math.max(META.campaign,d.campaign||0);
+        saveMeta();
+        if(S.mode==='menu'){ renderMenu(); roomModal(panelHTML('board')); }
+      }).catch(()=>{});
+  }
+};
 const NET='https://nationgame.live/gvt';
 let lastSync=0;
 function netSync(){
   const now=Date.now(); if(now-lastSync<15000) return; lastSync=now;
   try{
     fetch(NET+'/sync',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({device:META.deviceId,name:META.name,stars:META.starsLifetime,lvl:META.lvl,campaign:META.campaign})}).catch(()=>{});
+      body:JSON.stringify({device:META.deviceId,name:META.name,stars:META.starsLifetime,lvl:META.lvl,campaign:META.campaign,defense:META.defense||undefined})}).catch(()=>{});
   }catch(e){}
 }
 function escH(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -180,12 +205,15 @@ function loadBoard(){
   fetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
     const el=document.getElementById('boardRows'); if(!el) return;
     el.innerHTML = d.board.slice(0,14).map((r,i)=>
-      '<div class="tierrow'+(r.you?' yourow':'')+'"><span>'+(i+1)+'. '+escH(r.name)+(r.you?' — YOU':'')+'</span><span>'+escH(r.tier)+' · ★'+r.stars+'</span></div>').join('')
+      '<div class="tierrow'+(r.you?' yourow':' chrow')+'"'+(r.you?'':' onclick="UI.challenge(\''+r.uid+'\')"')+'>'
+      +'<span>'+(i+1)+'. '+escH(r.name)+(r.you?' — YOU':'')+'</span><span>'+escH(r.tier)+' · ★'+r.stars+(r.you?'':' · ⚔')+'</span></div>').join('')
       + (d.board.some(r=>r.you)? '' : '<p style="font-size:0.85rem;opacity:0.6;margin-top:6px">Win a battle to report in — your callsign is '+escH(META.name)+'.</p>');
+    window.__gvtBoard = d.board;
   }).catch(()=>{
     const el=document.getElementById('boardRows'); if(el) el.innerHTML='<p style="opacity:0.6">HQ unreachable — check back after the next patrol.</p>';
   });
 }
+let chalTarget=null;
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
 function upMul(type){ return 1 + 0.1*(META.up[type]||0); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -415,6 +443,66 @@ function startBattle(levelN, rival){
 }
 function hideAllOverlays(){ ['title','lose','win','menu','picker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
+// ================= INVASION (challenge mode: YOU are the Tan) =================
+const INVADE_CARDS = [
+  { key:'squad',    name:'SQUAD ×5',    cost:25, f:'column',    t:'tanrifle', n:5 },
+  { key:'line',     name:'LINE ×8',     cost:40, f:'line',      t:'tanrifle', n:8 },
+  { key:'crawlers', name:'CRAWLERS ×4', cost:20, f:'guerrilla', t:'crawler',  n:4 },
+  { key:'redcoats', name:'REDCOATS',    cost:60, f:'redcoat',   t:'tanrifle', n:10, officer:true },
+  { key:'jeep',     name:'JEEP',        cost:25, f:'solo',      t:'jeep',     n:1 },
+  { key:'tank',     name:'TANK',        cost:60, f:'wedge',     t:'tank',     n:1, escort:4 }
+];
+function defaultDefense(stars, uid){
+  // personas & snapshotless players still man the line, scaled to their rank
+  const R=(s=>{ let x=0; for(const ch of s) x=(x*31+ch.charCodeAt(0))>>>0; return ()=>{ x=(x*9301+49297)%233280; return x/233280; }; })(uid||'x');
+  const n=3+Math.min(7,Math.floor((stars||0)/120));
+  const types=['rifleman','rifleman','mgunner','bazooka','rifleman','mortar','mgunner','sarge','rifleman','bazooka'];
+  const out=[];
+  for(let i=0;i<n;i++){
+    out.push({t:types[i%types.length], x:250+R()*420, y:110+R()*400, vet:R()<(stars>400?0.5:0.15)});
+  }
+  return out;
+}
+function startInvasion(target){
+  reset();
+  S.levelN=0; S.rival=null;
+  S.invasion={ uid:target.uid, name:target.name, budget:Math.max(120,Math.min(400,120+Math.floor((target.stars||0)/8))), spent:0, resolved:false };
+  S.cfg=levelCfg(2+(target.stars||0)%3); S.cfg.waves=[];   // their terrain, no authored waves
+  const dfn=(target.defense&&target.defense.length? target.defense : defaultDefense(target.stars, target.uid));
+  dfn.forEach(u=>{
+    if(!UDEF[u.t]) return;
+    const p=placeUnit(u.t, Math.max(80,Math.min(W-40,u.x)), Math.max(80,Math.min(H-110,u.y)));
+    p.vet=!!u.vet;
+  });
+  S.plastic=0;
+  hideAllOverlays();
+  S.mode='play';
+  S.ann={txt:'INVADE '+target.name.toUpperCase()+'!', t:2.6};
+  SFX.horn();
+}
+function invadeRemaining(){ return S.invasion? S.invasion.budget-S.invasion.spent : 0; }
+function endInvasion(won){
+  if(!S.invasion||S.invasion.resolved) return;
+  S.invasion.resolved=true;
+  S.mode='win';
+  fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({device:META.deviceId,target:S.invasion.uid,won:!!won})})
+    .then(r=>r.json()).then(d=>{
+      const el=document.getElementById('medalText');
+      if(el&&won){ el.textContent = d.bonus>0? ('FIRST WIN TODAY vs '+S.invasion.name+' — BONUS +'+d.bonus+'★ ('+d.capLeft+' bonus wins left today)')
+                                   : ('Already beat '+S.invasion.name+' today — glory only.');
+        if(d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta(); } }
+    }).catch(()=>{});
+  document.getElementById(won?'win':'lose').classList.remove('hidden');
+  if(won){
+    document.getElementById('winTitle').innerHTML='THEIR TOY BOX<br>HAS FALLEN';
+    document.getElementById('medalRow').textContent='⚑';
+    document.getElementById('medalText').textContent='Their room is yours. Reporting to HQ…';
+  } else {
+    SFX.ouch();
+  }
+}
+
 function placeUnit(type,x,y){
   const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0, hits:0, hitT:0 };
   S.units.push(u); S.placedAny=true; SFX.snap();
@@ -593,6 +681,11 @@ function endBattle(win){
   if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
   document.getElementById('medalText').textContent = msg;
+  if(!S.rival){
+    // your winning line becomes your defense snapshot — this is the room
+    // invaders will face
+    META.defense = S.units.slice(0,14).map(u=>({t:u.type,x:u.x|0,y:u.y|0,vet:!!u.vet}));
+  }
   checkAch(); saveMeta(); netSync();
 }
 
@@ -619,6 +712,12 @@ function update(dt){
   if(!S.waveActive && S.interT>0 && S.mode==='play'){
     S.interT-=dt;
     if(S.interT<=0){ S.interT=0; spawnWave(); }
+  }
+  // invasion: out of budget, out of soldiers, box still standing → repelled
+  if(S.invasion && !S.invasion.resolved && S.lives>0
+     && invadeRemaining()<Math.min.apply(null,INVADE_CARDS.map(c=>c.cost))
+     && S.foes.length===0 && S.queue.length===0){
+    endInvasion(false);
   }
   if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
 
@@ -746,7 +845,7 @@ function update(dt){
     if(Math.hypot(T.x-f.x, T.y-f.y)<LEAK_R){
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
-      if(S.lives<=0){ S.lives=0; endBattle(false); return; }
+      if(S.lives<=0){ S.lives=0; if(S.invasion){ endInvasion(true); } else { endBattle(false); } return; }
     }
   }
 
@@ -1160,14 +1259,15 @@ function drawHUD(){
   cx.textBaseline='middle';
   drawTag(32,23,11);
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM; cx.textAlign='left';
-  cx.fillText(S.plastic, 52, 23);
+  cx.fillText(S.invasion? ('BUDGET '+invadeRemaining()) : S.plastic, 52, 23);
   cx.textAlign='center';
-  cx.fillText(S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
+  cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
+    : S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
     : (S.wave>=S.cfg.waves.length?'ALL WAVES CLEAR'
     : (S.interT>0? ('REPOSITION YOUR MEN — NEXT WAVE IN '+Math.ceil(S.interT)+'S')
     : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY')), W/2-60, 23);
   cx.textAlign='right';
-  cx.fillText('TOY BOX ×'+S.lives, W-16, 23);
+  cx.fillText((S.invasion?'THEIR BOX ×':'TOY BOX ×')+S.lives, W-16, 23);
   // buttons: speed, sound & retreat to HQ (always available — even mid-Level 1)
   btn('spd', W/2+110, 6, 62, 32, S.speed+'×');
   btn('snd', W/2+180, 6, 52, 32, soundOn?'♪':'×');
@@ -1182,6 +1282,28 @@ function drawHUD(){
   } else btnRects.wave=null;
 
   // tray — sized and lifted for thumbs (phone bottom edge steals touches)
+  if(S.invasion){
+    const tw2=140, th2=70, gap2=8, tot=INVADE_CARDS.length*tw2+(INVADE_CARDS.length-1)*gap2, xI=(W-tot)/2, yI=H-th2-16;
+    cx.textBaseline='alphabetic';
+    trayRects.length=INVADE_CARDS.length;
+    INVADE_CARDS.forEach((cd,i)=>{
+      const x=xI+i*(tw2+gap2);
+      trayRects[i]=[x,yI,tw2,th2];
+      const ok=invadeRemaining()>=cd.cost;
+      cx.fillStyle= ok?'rgba(60,45,30,0.94)':'rgba(60,45,30,0.55)';
+      rr(x,yI,tw2,th2,10); cx.fill();
+      cx.globalAlpha=ok?1:0.4;
+      drawSprite(cd.t, x+30, yI+th2-14, cd.t==='tank'?40:36,0,0,IMG[cd.t]);
+      cx.globalAlpha=1;
+      cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.textAlign='left';
+      cx.fillStyle= ok?'#EDD9B4':'#8b8f7a';
+      cx.fillText(cd.name, x+56, yI+28);
+      cx.fillStyle= ok?'#FFF3C4':'#8b8f7a'; cx.font='bold 17px "Arial Narrow", Impact, sans-serif';
+      cx.fillText(cd.cost, x+56, yI+52);
+    });
+    btnRects.vet=null; btnRects.wave=null;
+    return;
+  }
   const tray=TRAY();
   const tw=Math.min(112,((W-60)-(tray.length-1)*10)/tray.length)|0, th=84, gap=10, total=tray.length*tw+(tray.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
   trayRects.length=tray.length;
@@ -1237,6 +1359,21 @@ cv.addEventListener('pointerdown', e=>{
   if(inRect(p.x,p.y,btnRects.wave)){ spawnWave(); return; }
   if(btnRects.vet && inRect(p.x,p.y,btnRects.vet)){
     if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; META.stats.vets++; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'}); }
+    return;
+  }
+  // invasion: tray sends Tan formations; defenders are not yours to touch
+  if(S.invasion){
+    for(let i=0;i<INVADE_CARDS.length;i++){
+      if(inRect(p.x,p.y,trayRects[i])){
+        const cd=INVADE_CARDS[i];
+        if(invadeRemaining()>=cd.cost && !S.invasion.resolved){
+          S.invasion.spent+=cd.cost;
+          spawnGroup({f:cd.f,t:cd.t,n:cd.n,e:['right','right-top','right-bottom'][i%3],officer:cd.officer,escort:cd.escort});
+          SFX.horn();
+        } else SFX.clack();
+        return;
+      }
+    }
     return;
   }
   // tray
@@ -1400,8 +1537,12 @@ function panelHTML(id){
       +'<div style="margin-top:10px">'+META.unlocked.map(k=>'<div class="mrow"><img src="'+sprURI(k)+'"><div class="grow">'+UDEF[k].name+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>').join('')+'</div>';
     case 'board': setTimeout(loadBoard,0); return '<h3>THE TROPHY — WORLD RANKS</h3>'
       +'<div id="boardRows"><p style="opacity:0.6">Radioing HQ…</p></div>'
-      +'<p style="margin-top:10px;font-size:0.9rem">You: <b>'+escH(META.name)+'</b> · '+tierName(META.starsLifetime)+' · '+META.starsLifetime+'★ lifetime</p>'
-      +'<p style="font-size:0.82rem;opacity:0.6">Tiers: Plastic Private 0★ · Bronze Bagged 100★ · Silver Sprue 250★ · Gold Footlocker 500★ · Diamond Shelf 1000★ · Legendary Toy Box 2000★. Google/Apple account linking + challenges: next build.</p>';
+      +'<p style="margin-top:10px;font-size:0.9rem">You: <b>'+escH(META.name)+'</b> · '+tierName(META.starsLifetime)+' · '+META.starsLifetime+'★ lifetime · tap any player to ⚔ CHALLENGE them</p>'
+      +(window.__GVTSHELL
+        ? (META.account? '<p style="font-size:0.9rem;color:#7FA35C">✓ ACCOUNT LINKED (APPLE) — your army follows you across devices.</p>'
+          : '<p><button class="mbtn" onclick="UI.linkApple()"> SIGN IN WITH APPLE</button> <button class="mbtn" style="background:#4A6B8A" onclick="UI.linkGoogle()">GOOGLE</button></p><p id="linkNote" style="font-size:0.8rem;opacity:0.6">Link your account so your stars survive any phone.</p>')
+        : '<p style="font-size:0.82rem;opacity:0.6">Account linking (Apple/Google) is in the iOS app.</p>')
+      +'<p style="font-size:0.82rem;opacity:0.6">Tiers: Plastic Private 0★ · Bronze Bagged 100★ · Silver Sprue 250★ · Gold Footlocker 500★ · Diamond Shelf 1000★ · Legendary Toy Box 2000★.</p>';
     case 'ach': return '<h3>MEDAL CASE</h3><div class="achgrid">'
       + ACH.map(a=>'<div style="'+(META.ach[a.id]?'':'opacity:0.4')+'"><b>'+(META.ach[a.id]?'✓ ':'')+a.name+'</b><br><small>'+a.desc+'</small></div>').join('')+'</div>';
     case 'avatar': return '<h3>YOUR FIGURE</h3><p>'
@@ -1434,6 +1575,20 @@ window.UI = {
     roomModal(panelHTML(id));
   },
   closeModal(ev){ if(ev&&ev.target!==ev.currentTarget) return; const m=document.getElementById('roomModal'); if(m) m.innerHTML=''; },
+  challenge(uid){
+    const row=(window.__gvtBoard||[]).find(r=>r.uid===uid); if(!row) return;
+    roomModal('<h3>⚔ CHALLENGE</h3><p>Radioing for '+escH(row.name)+"'s room layout…</p>");
+    fetch(NET+'/defense?uid='+uid).then(r=>r.json()).then(d=>{
+      chalTarget={uid, name:row.name, stars:row.stars, defense:(d&&d.defense)||null};
+      roomModal('<h3>⚔ INVADE '+escH(row.name).toUpperCase()+'</h3>'
+        +'<p>'+escH(row.tier)+' · ★'+row.stars+(d&&d.defense?' · defends with their real loadout':' · defends with a standing garrison')+'</p>'
+        +'<p>You command the <b>Tan</b>: spend a wave budget, break their toy box. First win vs each player each day: <b>+5★</b> (max 10 bonus wins/day).</p>'
+        +'<button class="mbtn alt" onclick="UI.invadeGo()">LAUNCH THE INVASION</button>');
+    }).catch(()=>{ roomModal('<h3>⚔ CHALLENGE</h3><p>HQ unreachable — try again shortly.</p>'); });
+  },
+  invadeGo(){ if(chalTarget){ audio(); startInvasion(chalTarget); } },
+  linkApple(){ if(window.GVTN) GVTN.appleSignIn(); },
+  linkGoogle(){ const el=document.getElementById('linkNote'); if(el) el.textContent='Google linking lands next update — Apple works today.'; },
   laser(id){
     if(id===null){ META.laserOn=null; saveMeta(); roomModal(panelHTML('shop')); return; }
     if(META.lasers.indexOf(id)>=0){ META.laserOn = META.laserOn===id? null : id; SFX.laser(); }
@@ -1461,10 +1616,13 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
   document.getElementById('titleStripT').innerHTML=t;
 })();
 document.getElementById('retryBtn').addEventListener('click', ()=>{
-  audio(); startBattle(S.levelN, S.rival);
+  audio();
+  if(S.invasion && chalTarget){ startInvasion(chalTarget); }
+  else startBattle(S.levelN, S.rival);
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
+  if(S.invasion){ S.invasion=null; showMenu(); return; }
   if(META.pendingPicks>0) showPicker(); else showMenu();
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
