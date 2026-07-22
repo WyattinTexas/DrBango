@@ -28,10 +28,10 @@
 
 <div class="overlay" id="title">
   <h1><span class="g">GREEN</span> vs <span class="t">TAN</span></h1>
-  <p>The Tan Army is marching in from the right — columns, lines, Redcoat ranks, guerrilla ambushes. Every fallen Tan drops a <b>dog tag</b>: spend them on reinforcements.</p>
-  <p style="opacity:0.65">Between waves, pick your men up and redeploy them. If one gets knocked over — tap him. He'll get back up. They always do.</p>
+  <p>The Tan Army is marching in from the right — and this time <b>they shoot back</b>. Columns, Redcoat volleys, guerrilla ambushes. Every fallen Tan drops a <b>dog tag</b>: spend them on reinforcements.</p>
+  <p style="opacity:0.65">Your men are tougher than theirs — but when one gets knocked over, tap him. He'll get back up. They always do.</p>
   <button class="btn" id="playBtn">Deploy</button>
-  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.3 "Dog Tags" · Level 1: The Living-Room Carpet</p>
+  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.4 "Boot Camp" · Level 1: The Living-Room Carpet</p>
 </div>
 
 <div class="overlay hidden" id="lose">
@@ -62,15 +62,19 @@ window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.styl
 const W=960, H=600, TILE=60;
 const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
 const COSTS = { rifleman:50, mgunner:120, bazooka:150, mortar:200, sarge:0 };
+// Green is deliberately a touch stronger: more range (150 vs 140), faster
+// trigger fingers. You'll take hits — grit soaks 3 before a knockdown —
+// but a decent line wins the firefight. (Wyatt 7/21: "slightly stronger
+// to start... maybe you'll lose one unit at the start.")
 const UDEF = {
-  rifleman:{ rng:150, rate:1.0, dmg:1, air:true,  name:'RIFLEMAN' },
-  mgunner: { rng:95,  rate:4.0, dmg:1, air:false, name:'M. GUNNER' },
-  bazooka: { rng:150, rate:0.4, dmg:4, air:false, splash:45, vx2:true, name:'BAZOOKA' },
-  mortar:  { rng:9999, minRng:120, rate:0.25, dmg:3, air:false, splash:60, name:'MORTAR' },
-  sarge:   { rng:108, rate:1.5, dmg:1, air:true,  name:'SARGE' }
+  rifleman:{ rng:150, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
+  mgunner: { rng:95,  rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
+  bazooka: { rng:150, rate:0.4, dmg:4, air:false, grit:3, splash:45, vx2:true, name:'BAZOOKA' },
+  mortar:  { rng:9999, minRng:120, rate:0.25, dmg:3, air:false, grit:3, splash:60, name:'MORTAR' },
+  sarge:   { rng:108, rate:1.8, dmg:1, air:true,  grit:4, name:'SARGE' }
 };
 const FDEF = {
-  tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, name:'tan' },
+  tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:140, fireCd:3.2, name:'tan' },
   crawler: { hp:1,  spd:72, bounty:4,  leak:1, w:50, low:true },
   officer: { hp:4,  spd:44, bounty:15, leak:1, w:52 },
   jeep:    { hp:12, spd:88, bounty:25, leak:2, w:78, vehicle:true },
@@ -87,7 +91,7 @@ function edgePt(e){
   return { x:1020, y:140+Math.random()*320 };   // right (center lane)
 }
 const WAVES = [
-  { name:'THE COLUMN',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right',at:0} ] },
+  { name:'THE COLUMN',        groups:[ {f:'column',t:'tanrifle',n:5,e:'right',at:0} ] },
   { name:'THE THIN TAN LINE', groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0} ] },
   { name:'THE GUERRILLAS',    groups:[ {f:'guerrilla',t:'crawler',n:3,e:'right-top',at:0}, {f:'guerrilla',t:'crawler',n:3,e:'right',at:2}, {f:'guerrilla',t:'crawler',n:2,e:'right-bottom',at:4} ] },
   { name:'THE PINCER',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right-top',at:0}, {f:'column',t:'tanrifle',n:6,e:'right-bottom',at:3} ] },
@@ -96,7 +100,7 @@ const WAVES = [
   { name:'THE MOTORCADE',     groups:[ {f:'solo',t:'jeep',n:1,e:'right',at:0}, {f:'column',t:'tanrifle',n:8,e:'right',at:2} ] },
   { name:'TWIN AMBUSH',       groups:[ {f:'guerrilla',t:'crawler',n:10,e:'right-bottom',at:0}, {f:'solo',t:'jeep',n:1,e:'right-top',at:5}, {f:'column',t:'tanrifle',n:6,e:'right',at:7} ] },
   { name:'THE GRAND PARADE',  groups:[ {f:'redcoat',t:'tanrifle',n:12,e:'right',at:0,officer:true}, {f:'line',t:'tanrifle',n:8,e:'right-top',at:6,officer:true} ] },
-  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:8}, {f:'guerrilla',t:'crawler',n:4,e:'right-bottom',at:6} ] }
+  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:6}, {f:'guerrilla',t:'crawler',n:4,e:'right-bottom',at:6} ] }
 ];
 
 // ================= PATH =================
@@ -174,6 +178,8 @@ function noise(dur,vol,fc){ if(!soundOn) return; const ac=audio(); if(!ac) retur
 }catch(e){} }
 const SFX = {
   pew:   ()=>tone(900,300,0.08,'square',0.05),
+  tpew:  ()=>tone(520,190,0.09,'square',0.045),
+  volley:()=>{ tone(560,200,0.09,'square',0.05); setTimeout(()=>tone(500,180,0.09,'square',0.05),50); setTimeout(()=>tone(540,190,0.09,'square',0.05),110); },
   mg:    ()=>tone(700,250,0.05,'square',0.04),
   rocket:()=>tone(200,90,0.35,'sawtooth',0.07),
   boom:  ()=>{ noise(0.35,0.22,700); tone(120,40,0.3,'sine',0.14); },
@@ -184,6 +190,27 @@ const SFX = {
   horn:  ()=>{ tone(340,330,0.35,'sawtooth',0.06); setTimeout(()=>tone(452,440,0.5,'sawtooth',0.06),320); },
   ouch:  ()=>tone(240,80,0.4,'sawtooth',0.1)
 };
+
+// ================= BOOT CAMP COACH =================
+// FAVOR-style guiding finger, once per device (localStorage gvt_coach).
+// Steps: 1 drag first soldier → 2 drag second → 3 tap START → 4 first
+// knockdown (slow-mo until he's stood up) → 5 dog-tag toast → 6 reposition.
+let coach = null;
+function coachStart(){
+  try{ if(localStorage.getItem('gvt_coach')) return; }catch(e){}
+  coach = { step:1, t:0, target:null, toast:0 };
+}
+function coachDone(){ coach=null; try{ localStorage.setItem('gvt_coach','1'); }catch(e){} }
+function coachEvent(ev,u){
+  if(!coach) return;
+  if(ev==='place'){ if(coach.step===1){coach.step=2;coach.t=0;} else if(coach.step===2){coach.step=3;coach.t=0;} }
+  else if(ev==='wave'){ if(coach.step<=3){coach.step=4;coach.t=0;} else if(coach.step===6){ coachDone(); } }
+  else if(ev==='down'){ if(coach.step===4&&!coach.target){ coach.target=u; coach.t=0; } }
+  else if(ev==='up'){ if(coach.step===4&&coach.target){ coach.target=null; coach.step=5; coach.t=0; } }
+  else if(ev==='tag'){ if(coach.step===5&&coach.toast===0){ coach.toast=3.2; } }
+  else if(ev==='inter'){ if(coach.step===5){ coach.step=6; coach.t=0; } }
+  else if(ev==='move'){ if(coach.step===6){ coachDone(); } }
+}
 
 // ================= STATE =================
 const S = {
@@ -201,9 +228,28 @@ function reset(){
 }
 
 function placeUnit(type,x,y){
-  const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0 };
+  const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0, hits:0, hitT:0 };
   S.units.push(u); S.placedAny=true; SFX.snap();
+  coachEvent('place');
   return u;
+}
+function gritCap(u){ return u.def.grit + (u.vet?1:0); }
+function tanHit(u,fx,fy){
+  if(u.down) return;
+  u.hits++; u.hitT=0;
+  S.fx.push({k:'tracer',x1:fx,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
+  if(u.hits>=gritCap(u)){ knock(u,fx,fy); }
+}
+function tanShoot(f){
+  let best=null,bd=1e9;
+  for(const u of S.units){
+    if(u.down) continue;
+    if(S.drag&&S.drag.unit===u) continue;
+    const d=Math.hypot(u.x-f.x,u.y-f.y);
+    if(d<=f.def.rng&&d<bd){bd=d;best=u;}
+  }
+  if(best){ SFX.tpew(); tanHit(best,f.x,f.y); return true; }
+  return false;
 }
 function canPlace(x,y,type){
   if(x<58||x>W-24||y<70||y>H-92) return false;
@@ -213,12 +259,14 @@ function canPlace(x,y,type){
 }
 function knock(u, srcx, srcy){
   if(u.down) return;
-  u.down=true; u.downT=0; SFX.clack();
+  u.down=true; u.downT=0; u.hits=0; SFX.clack();
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
+  coachEvent('down', u);
 }
 function standUp(u){
-  u.down=false; if(u.downT>S.maxDown) S.maxDown=u.downT; u.downT=0; SFX.thock();
+  u.down=false; if(u.downT>S.maxDown) S.maxDown=u.downT; u.downT=0; u.hits=0; SFX.thock();
   S.fx.push({k:'ring', x:u.x, y:u.y-24, r:4, R:30, t:0, dur:0.3, col:'rgba(255,255,255,0.9)'});
+  coachEvent('up', u);
 }
 function spawnWave(){
   if(S.wave>=WAVES.length||S.waveActive) return;
@@ -226,11 +274,12 @@ function spawnWave(){
   S.queue = w.groups.map(g=>Object.assign({},g));
   S.ann = { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
+  coachEvent('wave');
 }
 function spawnFoe(type,x,y,form,gu){
   const d=FDEF[type];
   const f={ id:idc++, type, def:d, hp:d.hp, x, y, vx:0, vy:0, wob:Math.random()*6.28,
-    shot:(type==='officer'?3:0), rammed:{}, form:form||null, off:null,
+    shot:(type==='officer'?3:(type==='tanrifle'?2.4:0)), rammed:{}, form:form||null, off:null,
     gu:!!gu, dash:false, gt:Math.random()*0.8, tgt:null };
   S.foes.push(f);
   return f;
@@ -293,7 +342,8 @@ function update(dt){
       else {
         S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
         S.interT=20;   // reposition window: move your men, next wave in 20s
-        for(const u of S.units){ if(u.down){ if(u.downT>S.maxDown) S.maxDown=u.downT; u.down=false; u.downT=0; } }
+        for(const u of S.units){ if(u.down){ if(u.downT>S.maxDown) S.maxDown=u.downT; u.down=false; u.downT=0; u.hits=0; } }
+        coachEvent('inter');
       }
     }
   }
@@ -309,7 +359,13 @@ function update(dt){
     fo.members=fo.members.filter(m=>S.foes.indexOf(m)>=0);
     if(fo.members.length===0){ S.forms.splice(i,1); continue; }
     let spd=fo.speed;
-    if(fo.kind==='redcoat'){ fo.timer+=dt; const c=fo.timer%3.2; fo.halted=c>2.3; if(fo.halted) spd=0; }
+    fo.doVolley=false;
+    if(fo.kind==='redcoat'){
+      fo.timer+=dt; const c=fo.timer%3.2; const wasHalted=fo.halted;
+      fo.halted=c>2.3; if(fo.halted) spd=0;
+      if(!wasHalted&&fo.halted) fo.volley=0.55;                     // PRESENT...
+      if(fo.halted&&fo.volley!=null){ fo.volley-=dt; if(fo.volley<=0){ fo.doVolley=true; fo.volley=null; SFX.volley(); } }  // ...FIRE!
+    }
     const d=Math.hypot(T.x-fo.x, T.y-fo.y);
     if(d<115){ fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue; } // ranks break, charge!
     fo.dir={x:(T.x-fo.x)/d, y:(T.y-fo.y)/d};
@@ -348,6 +404,16 @@ function update(dt){
     }
     if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
 
+    // tan rifle return fire: redcoats volley in sync on the halt; everyone
+    // else pops shots on the march
+    if(f.type==='tanrifle' && f.x<W+20 && f.x>-40){
+      if(f.form && f.form.kind==='redcoat'){
+        if(f.form.doVolley) tanShoot(f);
+      } else {
+        f.shot+=dt;
+        if(f.shot>=f.def.fireCd){ if(tanShoot(f)) f.shot=Math.random()*0.6; else f.shot=f.def.fireCd; }
+      }
+    }
     // officer potshot
     if(f.type==='officer'){
       f.shot+=dt;
@@ -382,6 +448,7 @@ function update(dt){
   // units fire
   for(const u of S.units){
     if(u.sprue>0) u.sprue-=dt;
+    if(!u.down && u.hits>0){ u.hitT+=dt; if(u.hitT>4){ u.hits--; u.hitT=0; } }  // grit recovers out of fire
     if(u.down){
       u.downT+=dt; if(u.downT>S.maxDown) S.maxDown=u.downT;
       let near=false;
@@ -443,6 +510,7 @@ function update(dt){
       S.plastic+=b.v; SFX.blip();
       S.floats.push({x:b.x,y:b.y-14,txt:'+'+b.v,t:0,col:'#FFF3C4'});
       S.blobs.splice(i,1);
+      coachEvent('tag');
     }
   }
   for(let i=S.floats.length-1;i>=0;i--){ const fl=S.floats[i]; fl.t+=dt; fl.y-=22*dt; if(fl.t>1.1) S.floats.splice(i,1); }
@@ -558,7 +626,7 @@ function draw(){
   // fx
   for(const e of S.fx){
     const k=e.t/e.dur;
-    if(e.k==='tracer'){ cx.globalAlpha=1-k; cx.strokeStyle='#FFF3C4'; cx.lineWidth=2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
+    if(e.k==='tracer'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
     else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc'; cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col; cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
@@ -574,13 +642,15 @@ function draw(){
   cx.restore();
   drawHUD();
 
-  // hint
-  if(!S.placedAny && S.mode==='play'){
+  // hint (veterans only — the coach handles rookies)
+  if(!coach && !S.placedAny && S.mode==='play'){
     cx.globalAlpha=0.75+0.25*Math.sin(S.t*4);
     cx.font='bold 24px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center';
     cx.fillText('DRAG A RIFLEMAN ONTO THE CARPET — THE TAN COME FROM THE RIGHT', W/2, H-118);
     cx.globalAlpha=1;
   }
+
+  drawCoach();
 
   // formation announce card
   if(S.ann){
@@ -594,6 +664,53 @@ function draw(){
     cx.fillStyle='#FFF3C4';
     cx.fillText(S.ann.txt, W/2, 212);
     cx.globalAlpha=1;
+  }
+}
+function drawFinger(x,y,press){
+  cx.save(); cx.translate(x,y);
+  if(press>0){ cx.globalAlpha=0.5*press; cx.strokeStyle='#fff'; cx.lineWidth=3; cx.beginPath(); cx.arc(0,2,16+10*(1-press),0,7); cx.stroke(); cx.globalAlpha=1; }
+  cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(3,7,12,6,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.fillStyle='#F0D5B0'; cx.strokeStyle='#8a6a4a'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(0,0,12,0,7); cx.fill(); cx.stroke();
+  cx.fillStyle='#fff'; cx.globalAlpha=0.55; cx.beginPath(); cx.ellipse(-4,-4,4.5,3,0.6,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.restore();
+}
+function ease(k){ return k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; }
+function coachPill(txt){
+  cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center'; cx.textBaseline='middle';
+  const w2=cx.measureText(txt).width/2+26;
+  cx.fillStyle='rgba(38,40,31,0.94)'; rr(W/2-w2,H-142,w2*2,44,10); cx.fill();
+  cx.strokeStyle='#7FA35C'; cx.lineWidth=2.5; rr(W/2-w2,H-142,w2*2,44,10); cx.stroke();
+  cx.fillStyle='#FFF3C4'; cx.fillText(txt, W/2, H-119);
+  cx.textBaseline='alphabetic';
+}
+function fingerDrag(x1,y1,x2,y2){
+  const k=ease(Math.min(1,(coach.t%1.9)/1.5));
+  const mx=(x1+x2)/2, my=Math.min(y1,y2)-70;
+  const u=1-k;
+  const fx=u*u*x1+2*u*k*mx+k*k*x2, fy=u*u*y1+2*u*k*my+k*k*y2;
+  cx.globalAlpha=0.35; cx.setLineDash([3,9]); cx.strokeStyle='#fff'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.moveTo(x1,y1); cx.quadraticCurveTo(mx,my,x2,y2); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+  const press = k<0.08 ? 1-k/0.08 : (k>0.97 ? 1 : 0);
+  drawFinger(fx,fy,press);
+}
+function fingerTap(x,y){
+  const c=(coach.t%0.95)/0.95, press=c<0.3? 1-c/0.3 : 0;
+  drawFinger(x,y+4*Math.sin(c*6.28),press);
+}
+function drawCoach(){
+  if(!coach||S.mode!=='play') return;
+  if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); fingerDrag(252,548,620,280); }
+  else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); fingerDrag(252,548,620,390); }
+  else if(coach.step===3){ coachPill('NOW TAP START — HERE THEY COME'); if(btnRects.wave) fingerTap(btnRects.wave[0]+btnRects.wave[2]/2, btnRects.wave[1]+btnRects.wave[3]/2); }
+  else if(coach.step===4){
+    if(coach.target&&coach.target.down){ coachPill("HE'S HIT! TAP HIM — HE ALWAYS GETS BACK UP"); fingerTap(coach.target.x, coach.target.y-16); }
+  }
+  else if(coach.step===5){ if(coach.toast>0) coachPill('DOG TAGS BUY REINFORCEMENTS — SPEND THEM IN THE TRAY'); }
+  else if(coach.step===6){
+    coachPill('BETWEEN WAVES, DRAG YOUR MEN TO BETTER GROUND');
+    const u=S.units.find(x=>x.type!=='sarge')||S.units[0];
+    if(u&&!(S.drag&&S.drag.unit===u)) fingerDrag(u.x,u.y-14,Math.max(90,u.x-130),Math.max(90,u.y-60));
   }
 }
 function drawTag(x,y,s){
@@ -617,7 +734,7 @@ function drawUnit(u){
     cx.globalAlpha=0.5+0.4*pul; cx.strokeStyle='#fff'; cx.lineWidth=2.5;
     cx.beginPath(); cx.arc(u.x,u.y-14,16+5*pul,0,7); cx.stroke(); cx.globalAlpha=1;
   } else {
-    drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*2+u.phase)*0.022);
+    drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03));
     if(u.vet){ cx.fillStyle='#fff'; cx.fillRect(u.x-12,u.y-3,24,4); }
     if(u.sprue>0){
       cx.globalAlpha=Math.max(0,u.sprue/0.45); cx.strokeStyle=GREEN; cx.lineWidth=4;
@@ -756,7 +873,7 @@ cv.addEventListener('pointerup', e=>{
     return;
   }
   if(canPlace(p.x,p.y,d.type)){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=p.y; d.unit.sprue=0.2; SFX.thock(); }
+    if(d.unit){ d.unit.x=p.x; d.unit.y=p.y; d.unit.sprue=0.2; SFX.thock(); coachEvent('move'); }
     else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,p.y); }
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
@@ -764,13 +881,13 @@ window.addEventListener('pointercancel', ()=>{ S.drag=null; });
 
 // ================= OVERLAY BUTTONS =================
 document.getElementById('playBtn').addEventListener('click', ()=>{
-  audio(); document.getElementById('title').classList.add('hidden'); S.mode='play';
+  audio(); document.getElementById('title').classList.add('hidden'); S.mode='play'; coachStart();
 });
 document.getElementById('retryBtn').addEventListener('click', ()=>{
-  document.getElementById('lose').classList.add('hidden'); reset(); S.mode='play';
+  document.getElementById('lose').classList.add('hidden'); reset(); S.mode='play'; coachStart();
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
-  document.getElementById('win').classList.add('hidden'); reset(); S.mode='play';
+  document.getElementById('win').classList.add('hidden'); reset(); S.mode='play'; coachStart();
 });
 
 // ================= LOOP =================
@@ -779,7 +896,11 @@ function frame(ts){
   requestAnimationFrame(frame);
   if(!ready) return;
   const dt=Math.min(0.05,(ts-last)/1000||0.016); last=ts;
-  if(S.mode==='play') update(dt*S.speed);
+  const slow = (coach && coach.step===4 && coach.target && coach.target.down) ? 0.45 : 1;  // lean in for the first knockdown
+  if(S.mode==='play'){
+    update(dt*S.speed*slow);
+    if(coach){ coach.t+=dt; if(coach.step===5&&coach.toast>0){ coach.toast-=dt; if(coach.toast<0)coach.toast=-1; } }
+  }
   draw();
 }
 buildSprites(()=>{ ready=true; });
@@ -793,7 +914,10 @@ window.GVT = {
   cash(n){ S.plastic=n; },
   start(){ spawnWave(); },
   step(sec){ const n=Math.round(sec*60); for(let i=0;i<n;i++){ if(S.mode==='play') update(1/60); } draw(); },
-  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, active:S.waveActive, foes:S.foes.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet})), queue:S.queue.length }; }
+  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, active:S.waveActive, foes:S.foes.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
+  coachStep(){ return coach? coach.step : null; },
+  beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
+  endCoach(){ coachDone(); }
 };
 </script>
 </body>
