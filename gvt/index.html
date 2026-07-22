@@ -84,6 +84,7 @@
   .pickcard b { display:block; letter-spacing:0.05em; }
   .pickcard small { opacity:0.7; }
   .tierrow { display:flex; justify-content:space-between; font-size:0.92rem; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+  .yourow { color:#BFE39A; font-weight:bold; background:rgba(127,163,92,0.12); border-radius:4px; padding-left:6px; padding-right:6px; }
 </style>
 </head>
 <body>
@@ -151,13 +152,40 @@ const META_DEFAULT = {
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
   lasers:[], laserOn:null,
-  avatar:'rifleman',
+  avatar:'rifleman', deviceId:'', name:'',
   ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0 },
   rivalDays:{}                                        // 'YYYY-MM-DD' -> color beaten
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); } } catch(e) {}
 function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
+// device identity + toy-soldier callsign (accounts merge onto this later)
+if(!META.deviceId){
+  META.deviceId = Array.from({length:32},()=>'0123456789abcdef'[Math.random()*16|0]).join('');
+  const RK=['Sgt','Cpl','Capt','Maj','Pvt'], NN=['Wobbles','Bootlace','Kneehigh','Sprue','Dogtag','Carpet','Blaster','Socks','Marbles','Greenie'];
+  META.name = RK[Math.random()*RK.length|0]+' '+NN[Math.random()*NN.length|0]+' '+(10+(Math.random()*89|0));
+  saveMeta();
+}
+const NET='https://nationgame.live/gvt';
+let lastSync=0;
+function netSync(){
+  const now=Date.now(); if(now-lastSync<15000) return; lastSync=now;
+  try{
+    fetch(NET+'/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({device:META.deviceId,name:META.name,stars:META.starsLifetime,lvl:META.lvl,campaign:META.campaign})}).catch(()=>{});
+  }catch(e){}
+}
+function escH(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function loadBoard(){
+  fetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
+    const el=document.getElementById('boardRows'); if(!el) return;
+    el.innerHTML = d.board.slice(0,14).map((r,i)=>
+      '<div class="tierrow'+(r.you?' yourow':'')+'"><span>'+(i+1)+'. '+escH(r.name)+(r.you?' — YOU':'')+'</span><span>'+escH(r.tier)+' · ★'+r.stars+'</span></div>').join('')
+      + (d.board.some(r=>r.you)? '' : '<p style="font-size:0.85rem;opacity:0.6;margin-top:6px">Win a battle to report in — your callsign is '+escH(META.name)+'.</p>');
+  }).catch(()=>{
+    const el=document.getElementById('boardRows'); if(el) el.innerHTML='<p style="opacity:0.6">HQ unreachable — check back after the next patrol.</p>';
+  });
+}
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
 function upMul(type){ return 1 + 0.1*(META.up[type]||0); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -565,7 +593,7 @@ function endBattle(win){
   if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
   document.getElementById('medalText').textContent = msg;
-  checkAch(); saveMeta();
+  checkAch(); saveMeta(); netSync();
 }
 
 // ================= UPDATE =================
@@ -1312,6 +1340,7 @@ function showMenu(){
   document.getElementById('menu').classList.remove('hidden');
   renderMenu();
   sizeRoom();
+  netSync();
 }
 function sizeRoom(){
   const st=document.getElementById('roomStage'); if(!st) return;
@@ -1369,10 +1398,10 @@ function panelHTML(id){
       +(META.pendingPicks>0? '<p>Promotions waiting: '+META.pendingPicks+'</p><button class="mbtn" onclick="UI.promote()">CHOOSE A UNIT TO IMPROVE</button>'
         : '<p>No promotions waiting — win battles, earn XP.</p>')
       +'<div style="margin-top:10px">'+META.unlocked.map(k=>'<div class="mrow"><img src="'+sprURI(k)+'"><div class="grow">'+UDEF[k].name+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>').join('')+'</div>';
-    case 'board': return '<h3>THE TROPHY</h3>'
-      +[['PLASTIC PRIVATE','0★'],['BRONZE BAGGED','100★'],['SILVER SPRUE','250★'],['GOLD FOOTLOCKER','500★'],['DIAMOND SHELF','1000★'],['LEGENDARY TOY BOX','2000★']].map(t=>'<div class="tierrow"><span>'+t[0]+'</span><span>'+t[1]+'</span></div>').join('')
-      +'<p style="margin-top:8px">You: <b>'+tierName(META.starsLifetime)+'</b> · '+META.starsLifetime+'★ lifetime</p>'
-      +'<p style="font-size:0.85rem;opacity:0.65">Online ranks + account linking arrive with the HQ server (next build) — then you challenge anyone on this board.</p>';
+    case 'board': setTimeout(loadBoard,0); return '<h3>THE TROPHY — WORLD RANKS</h3>'
+      +'<div id="boardRows"><p style="opacity:0.6">Radioing HQ…</p></div>'
+      +'<p style="margin-top:10px;font-size:0.9rem">You: <b>'+escH(META.name)+'</b> · '+tierName(META.starsLifetime)+' · '+META.starsLifetime+'★ lifetime</p>'
+      +'<p style="font-size:0.82rem;opacity:0.6">Tiers: Plastic Private 0★ · Bronze Bagged 100★ · Silver Sprue 250★ · Gold Footlocker 500★ · Diamond Shelf 1000★ · Legendary Toy Box 2000★. Google/Apple account linking + challenges: next build.</p>';
     case 'ach': return '<h3>MEDAL CASE</h3><div class="achgrid">'
       + ACH.map(a=>'<div style="'+(META.ach[a.id]?'':'opacity:0.4')+'"><b>'+(META.ach[a.id]?'✓ ':'')+a.name+'</b><br><small>'+a.desc+'</small></div>').join('')+'</div>';
     case 'avatar': return '<h3>YOUR FIGURE</h3><p>'
