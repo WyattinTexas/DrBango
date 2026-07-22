@@ -28,10 +28,10 @@
 
 <div class="overlay" id="title">
   <h1><span class="g">GREEN</span> vs <span class="t">TAN</span></h1>
-  <p>The Tan Army is marching on your Toy Box — in columns, lines, Redcoat ranks, and guerrilla ambushes, from every side of the carpet.</p>
-  <p style="opacity:0.65">Drag soldiers anywhere. If one gets knocked over — tap him. He'll get back up. They always do.</p>
+  <p>The Tan Army is marching in from the right — columns, lines, Redcoat ranks, guerrilla ambushes. Every fallen Tan drops a <b>dog tag</b>: spend them on reinforcements.</p>
+  <p style="opacity:0.65">Between waves, pick your men up and redeploy them. If one gets knocked over — tap him. He'll get back up. They always do.</p>
   <button class="btn" id="playBtn">Deploy</button>
-  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.2 "Formations" · Level 1: The Living-Room Carpet</p>
+  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.3 "Dog Tags" · Level 1: The Living-Room Carpet</p>
 </div>
 
 <div class="overlay hidden" id="lose">
@@ -79,22 +79,24 @@ const FDEF = {
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 const T = { x:130, y:300 };           // the Toy Box
 const LEAK_R = 64;
+// All invasions arrive from the RIGHT — the enemy horizon (Wyatt+Dylan 7/21).
+// 'right-top'/'right-bottom' bias the entry lane for pincers and flanks.
 function edgePt(e){
-  if(e==='right')  return { x:1020, y:140+Math.random()*320 };
-  if(e==='top')    return { x:460+Math.random()*420, y:-70 };
-  return { x:380+Math.random()*440, y:670 };   // bottom
+  if(e==='right-top')    return { x:1020, y:110+Math.random()*110 };
+  if(e==='right-bottom') return { x:1020, y:380+Math.random()*110 };
+  return { x:1020, y:140+Math.random()*320 };   // right (center lane)
 }
 const WAVES = [
   { name:'THE COLUMN',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right',at:0} ] },
   { name:'THE THIN TAN LINE', groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0} ] },
-  { name:'THE GUERRILLAS',    groups:[ {f:'guerrilla',t:'crawler',n:3,e:'top',at:0}, {f:'guerrilla',t:'crawler',n:3,e:'right',at:2}, {f:'guerrilla',t:'crawler',n:2,e:'bottom',at:4} ] },
-  { name:'THE PINCER',        groups:[ {f:'column',t:'tanrifle',n:6,e:'top',at:0}, {f:'column',t:'tanrifle',n:6,e:'bottom',at:3} ] },
+  { name:'THE GUERRILLAS',    groups:[ {f:'guerrilla',t:'crawler',n:3,e:'right-top',at:0}, {f:'guerrilla',t:'crawler',n:3,e:'right',at:2}, {f:'guerrilla',t:'crawler',n:2,e:'right-bottom',at:4} ] },
+  { name:'THE PINCER',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right-top',at:0}, {f:'column',t:'tanrifle',n:6,e:'right-bottom',at:3} ] },
   { name:'THE REDCOATS',      groups:[ {f:'redcoat',t:'tanrifle',n:10,e:'right',at:0,officer:true} ] },
-  { name:'JUNGLE AMBUSH',     groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0}, {f:'guerrilla',t:'crawler',n:8,e:'top',at:3} ] },
+  { name:'JUNGLE AMBUSH',     groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0}, {f:'guerrilla',t:'crawler',n:8,e:'right-top',at:3} ] },
   { name:'THE MOTORCADE',     groups:[ {f:'solo',t:'jeep',n:1,e:'right',at:0}, {f:'column',t:'tanrifle',n:8,e:'right',at:2} ] },
-  { name:'TWIN AMBUSH',       groups:[ {f:'guerrilla',t:'crawler',n:10,e:'bottom',at:0}, {f:'solo',t:'jeep',n:1,e:'top',at:5}, {f:'column',t:'tanrifle',n:6,e:'right',at:7} ] },
-  { name:'THE GRAND PARADE',  groups:[ {f:'redcoat',t:'tanrifle',n:12,e:'right',at:0,officer:true}, {f:'line',t:'tanrifle',n:8,e:'top',at:6,officer:true} ] },
-  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:8}, {f:'guerrilla',t:'crawler',n:4,e:'bottom',at:6} ] }
+  { name:'TWIN AMBUSH',       groups:[ {f:'guerrilla',t:'crawler',n:10,e:'right-bottom',at:0}, {f:'solo',t:'jeep',n:1,e:'right-top',at:5}, {f:'column',t:'tanrifle',n:6,e:'right',at:7} ] },
+  { name:'THE GRAND PARADE',  groups:[ {f:'redcoat',t:'tanrifle',n:12,e:'right',at:0,officer:true}, {f:'line',t:'tanrifle',n:8,e:'right-top',at:6,officer:true} ] },
+  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:8}, {f:'guerrilla',t:'crawler',n:4,e:'right-bottom',at:6} ] }
 ];
 
 // ================= PATH =================
@@ -186,16 +188,16 @@ const SFX = {
 // ================= STATE =================
 const S = {
   mode:'title', plastic:120, lives:10, wave:0, waveActive:false, queue:[], waveT:0,
-  units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[],
-  sel:null, drag:null, speed:1, shake:0, t:0, ann:null,
+  units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[], corpses:[],
+  sel:null, drag:null, speed:1, shake:0, t:0, ann:null, interT:0,
   maxDown:0, placedAny:false, hintT:0, cleared:false
 };
 let idc=1;
 
 function reset(){
   S.plastic=120; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
-  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[];
-  S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null;
+  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[];
+  S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
 }
 
 function placeUnit(type,x,y){
@@ -223,7 +225,7 @@ function spawnWave(){
   const w=WAVES[S.wave];
   S.queue = w.groups.map(g=>Object.assign({},g));
   S.ann = { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
-  S.wave++; S.waveActive=true; S.waveT=0; SFX.horn();
+  S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
 }
 function spawnFoe(type,x,y,form,gu){
   const d=FDEF[type];
@@ -288,8 +290,16 @@ function update(dt){
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
       if(S.wave>=WAVES.length){ if(!S.cleared){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
-      else { S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM}); }
+      else {
+        S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
+        S.interT=20;   // reposition window: move your men, next wave in 20s
+        for(const u of S.units){ if(u.down){ if(u.downT>S.maxDown) S.maxDown=u.downT; u.down=false; u.downT=0; } }
+      }
     }
+  }
+  if(!S.waveActive && S.interT>0 && S.mode==='play'){
+    S.interT-=dt;
+    if(S.interT<=0){ S.interT=0; spawnWave(); }
   }
   if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
 
@@ -444,8 +454,12 @@ function hitCheck(f,u){
     if(idx>=0){
       S.foes.splice(idx,1);
       if(u)u.kills++;
-      S.blobs.push({x:f.x,y:f.y,v:f.def.bounty,t:0});
+      // the fallen stay where they fell — flipped over like real toys
+      S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w });
+      if(S.corpses.length>90) S.corpses.shift();
+      S.blobs.push({x:f.x,y:f.y-8,v:f.def.bounty,t:0});   // their dog tag — your bounty
       if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
+      else SFX.clack();
     }
   }
 }
@@ -518,8 +532,13 @@ function draw(){
     ring(S.drag.x,S.drag.y,def.minRng?200:def.rng, ok?'rgba(255,255,255,0.10)':'rgba(166,59,42,0.15)', ok?'rgba(255,255,255,0.7)':'rgba(220,90,70,0.9)');
   }
 
-  // blobs
-  for(const b of S.blobs) drawSprite('blob',b.x,b.y,26+4*Math.sin(b.t*12),0,0);
+  // the fallen (under everything alive)
+  cx.globalAlpha=0.85;
+  for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0);
+  cx.globalAlpha=1;
+
+  // dog tags waiting to be collected
+  for(const b of S.blobs) drawTag(b.x,b.y-6-3*Math.sin(b.t*10),13);
 
   // actors sorted by y
   const actors=[];
@@ -559,7 +578,7 @@ function draw(){
   if(!S.placedAny && S.mode==='play'){
     cx.globalAlpha=0.75+0.25*Math.sin(S.t*4);
     cx.font='bold 24px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center';
-    cx.fillText('DRAG A RIFLEMAN ANYWHERE — THE TAN COME FROM ALL SIDES', W/2, H-118);
+    cx.fillText('DRAG A RIFLEMAN ONTO THE CARPET — THE TAN COME FROM THE RIGHT', W/2, H-118);
     cx.globalAlpha=1;
   }
 
@@ -576,6 +595,15 @@ function draw(){
     cx.fillText(S.ann.txt, W/2, 212);
     cx.globalAlpha=1;
   }
+}
+function drawTag(x,y,s){
+  cx.save(); cx.translate(x,y); cx.rotate(-0.35);
+  cx.fillStyle='#C8CDD4'; rr(-s*0.65,-s*0.42,s*1.3,s*0.84,s*0.4); cx.fill();
+  cx.strokeStyle='#7d838d'; cx.lineWidth=1.5; rr(-s*0.65,-s*0.42,s*1.3,s*0.84,s*0.4); cx.stroke();
+  cx.fillStyle='#7d838d'; cx.beginPath(); cx.arc(-s*0.38,0,s*0.14,0,7); cx.fill();
+  cx.strokeStyle='#9aa0a8'; cx.lineWidth=1;
+  cx.beginPath(); cx.moveTo(-s*0.1,-s*0.15); cx.lineTo(s*0.42,-s*0.15); cx.moveTo(-s*0.1,s*0.08); cx.lineTo(s*0.42,s*0.08); cx.stroke();
+  cx.restore();
 }
 function ring(x,y,r,fill,stroke){
   cx.fillStyle=fill; cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill();
@@ -619,11 +647,14 @@ function drawHUD(){
   // top bar
   cx.fillStyle='rgba(38,40,31,0.9)'; cx.fillRect(0,0,W,44);
   cx.textBaseline='middle';
-  drawSprite('blob',30,36,30,0,0);
+  drawTag(32,23,11);
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM; cx.textAlign='left';
   cx.fillText(S.plastic, 52, 23);
   cx.textAlign='center';
-  cx.fillText(S.waveActive? ('WAVE '+S.wave+' / '+WAVES.length) : (S.wave>=WAVES.length?'ALL WAVES CLEAR':'WAVE '+(S.wave+1)+' / '+WAVES.length+' READY'), W/2-60, 23);
+  cx.fillText(S.waveActive? ('WAVE '+S.wave+' / '+WAVES.length)
+    : (S.wave>=WAVES.length?'ALL WAVES CLEAR'
+    : (S.interT>0? ('REPOSITION YOUR MEN — NEXT WAVE IN '+Math.ceil(S.interT)+'S')
+    : 'WAVE '+(S.wave+1)+' / '+WAVES.length+' READY')), W/2-60, 23);
   cx.textAlign='right';
   cx.fillText('TOY BOX ×'+S.lives, W-16, 23);
   // buttons: speed & sound
@@ -707,7 +738,10 @@ cv.addEventListener('pointerdown', e=>{
   for(const u of S.units){ const d=Math.hypot(u.x-p.x,(u.y-20)-p.y); if(d<(u.down?44:30)&&d<hd){hd=d;hit=u;} }
   if(hit){
     if(hit.down){ standUp(hit); S.sel=null; }
-    else if(hit.type==='sarge'){ S.drag={type:'sarge',x:p.x,y:p.y,unit:hit}; S.sel=null; }
+    else if(hit.type==='sarge' || !S.waveActive){
+      // between waves every man is movable — pick him up
+      S.drag={type:hit.type,x:p.x,y:p.y,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
+    }
     else S.sel = (S.sel===hit? null : hit);
     return;
   }
@@ -717,10 +751,14 @@ cv.addEventListener('pointermove', e=>{ if(S.drag){ const p=evPos(e); S.drag.x=p
 cv.addEventListener('pointerup', e=>{
   if(!S.drag) return;
   const p=evPos(e), d=S.drag; S.drag=null;
+  if(d.unit && d.ox!==undefined && Math.hypot(p.x-d.ox,p.y-d.oy)<10){
+    S.sel = (S.sel===d.unit? null : d.unit);   // a tap, not a move — inspect/vet
+    return;
+  }
   if(canPlace(p.x,p.y,d.type)){
     if(d.unit){ d.unit.x=p.x; d.unit.y=p.y; d.unit.sprue=0.2; SFX.thock(); }
     else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,p.y); }
-  } else if(d.unit){ SFX.clack(); } // sarge returns to old spot
+  } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
 window.addEventListener('pointercancel', ()=>{ S.drag=null; });
 
