@@ -21,6 +21,33 @@
     #rotate { display:flex; z-index:50; }
   }
   #err { position:fixed; left:0; right:0; bottom:0; background:#A63B2A; color:#fff; font:12px monospace; padding:4px 8px; z-index:99; display:none; white-space:pre-wrap; }
+  /* ---- HQ menu ---- */
+  .menuwrap { justify-content:flex-start; overflow-y:auto; padding:1.2rem 0 2rem; }
+  .menubody { width:min(92vw, 900px); margin:0 auto; text-align:left; }
+  .mhead { display:flex; align-items:center; gap:14px; border-bottom:2px solid #4A6B35; padding-bottom:10px; margin-bottom:14px; }
+  .mava { width:64px; height:64px; border-radius:50%; background:#4A6B35; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; border:3px solid #7FA35C; flex:0 0 64px; }
+  .mava img { width:52px; }
+  .mhead h2 { margin:0; font-size:1.6rem; letter-spacing:0.05em; }
+  .xpbar { height:10px; background:rgba(255,255,255,0.15); border-radius:5px; overflow:hidden; margin-top:6px; }
+  .xpbar div { height:100%; background:#7FA35C; }
+  .mstat { margin-left:auto; text-align:right; font-size:1.05rem; }
+  .mgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+  .mcard { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:14px 16px; }
+  .mcard h3 { margin:0 0 4px; font-size:1.15rem; letter-spacing:0.06em; text-transform:uppercase; }
+  .mcard p { font-size:0.92rem; margin:0 0 10px; opacity:0.75; }
+  .mbtn { background:#4A6B35; color:#fff; border:none; font-family:inherit; font-weight:bold; font-size:1.05rem; letter-spacing:0.06em; text-transform:uppercase; padding:0.55rem 1.3rem; border-radius:8px; cursor:pointer; }
+  .mbtn.alt { background:#A63B2A; }
+  .mbtn:disabled { opacity:0.45; }
+  .mrow { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.08); font-size:0.95rem; }
+  .mrow img { width:34px; }
+  .mrow .grow { flex:1; }
+  .rivalchip { display:inline-block; width:16px; height:16px; border-radius:50%; vertical-align:-2px; margin-right:6px; border:2px solid rgba(255,255,255,0.5); }
+  .pickrow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:1rem; }
+  .pickcard { background:rgba(255,255,255,0.08); border:2px solid #4A6B35; border-radius:12px; padding:12px 16px; cursor:pointer; text-align:center; min-width:110px; }
+  .pickcard img { width:56px; }
+  .pickcard b { display:block; letter-spacing:0.05em; }
+  .pickcard small { opacity:0.7; }
+  .tierrow { display:flex; justify-content:space-between; font-size:0.92rem; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
 </style>
 </head>
 <body>
@@ -31,20 +58,31 @@
   <p>The Tan Army is marching in from the right — and this time <b>they shoot back</b>. Columns, Redcoat volleys, guerrilla ambushes. Every fallen Tan drops a <b>dog tag</b>: spend them on reinforcements.</p>
   <p style="opacity:0.65">Your men are tougher than theirs — but when one gets knocked over, tap him. He'll get back up. They always do.</p>
   <button class="btn" id="playBtn">Deploy</button>
-  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.5 "Friendly Fire" · Level 1: The Living-Room Carpet</p>
+  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.6 "The Long War" · Endless Campaign · Daily Rivals · The Shop</p>
 </div>
 
 <div class="overlay hidden" id="lose">
   <h1 style="color:#D2B489">THE TOY BOX<br>HAS FALLEN</h1>
   <p>The Tan flag flies over your carpet. Sarge would like a word.</p>
   <button class="btn" id="retryBtn">Rally &amp; Retry</button>
+  <button class="btn" id="hqBtn" style="background:#5A5D4C; margin-top:0.6rem">Retreat to HQ</button>
 </div>
 
 <div class="overlay hidden" id="win">
-  <h1 style="color:#7FA35C">CARPET<br>SECURED</h1>
+  <h1 style="color:#7FA35C" id="winTitle">CARPET<br>SECURED</h1>
   <div class="medals" id="medalRow"></div>
   <p id="medalText"></p>
-  <button class="btn" id="againBtn">Play Again</button>
+  <button class="btn" id="againBtn">Continue</button>
+</div>
+
+<div class="overlay hidden" id="picker">
+  <h1 style="color:#7FA35C; font-size:2.2rem">PROMOTION!</h1>
+  <p>Choose a unit to improve — permanent +10% damage, every battle, forever.</p>
+  <div id="pickRow" class="pickrow"></div>
+</div>
+
+<div class="overlay hidden menuwrap" id="menu">
+  <div id="menuBody" class="menubody"></div>
 </div>
 
 <div class="overlay" id="rotate">
@@ -61,7 +99,70 @@ window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.styl
 // ================= CONSTANTS =================
 const W=960, H=600, TILE=60, DRAG_OFF=56;   // dragged figures ride above the finger so you can see your placement
 const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
-const COSTS = { rifleman:50, mgunner:120, bazooka:150, mortar:200, sarge:0 };
+const COSTS = { rifleman:50, mgunner:120, bazooka:150, mortar:200, sarge:0, minesweeper:100, flame:150, radioman:175 };
+
+// ================= META (the Long War) =================
+const META_DEFAULT = {
+  v:1, lvl:1, xp:0, pendingPicks:0, up:{},           // player level + unit upgrade ranks (+10% dmg each, max 5)
+  campaign:0, levelStars:{},                          // highest level beaten, stars per level
+  starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
+  unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
+  avatar:'rifleman',
+  ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0 },
+  rivalDays:{}                                        // 'YYYY-MM-DD' -> color beaten
+};
+let META = META_DEFAULT;
+try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); } } catch(e) {}
+function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
+function xpNeed(){ return 100 + (META.lvl-1)*50; }
+function upMul(type){ return 1 + 0.1*(META.up[type]||0); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// The ten armies. Each fights a little differently; they ARE those colors.
+const ARMIES = [
+  { id:'blue',   name:'THE BLUE ARMY',   hex:'#5B84C4', blurb:'By the book. No tricks.',            mod:{} },
+  { id:'red',    name:'THE RED ARMY',    hex:'#C05A4A', blurb:'They charge. Everything charges.',   mod:{spd:1.18} },
+  { id:'tan',    name:'THE TAN ARMY',    hex:'#C09E6C', blurb:'The old enemy, in numbers.',         mod:{count:1.25} },
+  { id:'gold',   name:'THE GOLD ARMY',   hex:'#D9A544', blurb:'Gaudy. Drops double dog tags.',      mod:{bounty:2} },
+  { id:'black',  name:'THE BLACK ARMY',  hex:'#4A4A4A', blurb:'Elite plastic. Hard to melt.',       mod:{hp:1.5} },
+  { id:'white',  name:'THE WHITE ARMY',  hex:'#E8E8E8', blurb:'Winter troops. Quick triggers.',     mod:{fire:0.75} },
+  { id:'purple', name:'THE PURPLE ARMY', hex:'#8E6BAE', blurb:'Officer country. Heads down.',       mod:{officers:1} },
+  { id:'green',  name:'THE GREEN ARMY',  hex:'#55793E', blurb:'Traitors?! A mirror match.',         mod:{spd:1.08,hp:1.15} },
+  { id:'orange', name:'THE ORANGE ARMY', hex:'#D07A3A', blurb:'Motor pool. Loves its Jeeps.',       mod:{jeeps:1} },
+  { id:'teal',   name:'THE TEAL ARMY',   hex:'#4AA5A0', blurb:'Frogmen. They come in low.',         mod:{crawlers:1} }
+];
+function todaysRival(){ const d=new Date(); const seed=d.getFullYear()*372+(d.getMonth()+1)*31+d.getDate(); return ARMIES[seed%ARMIES.length]; }
+
+// ================= CAMPAIGN (endless) =================
+function levelCfg(n){
+  const cfg = { n, hpMul: 1+0.08*Math.max(0,n-2), cntMul: 1+0.12*Math.max(0,n-1), waves:[], terrain:{rocks:[],river:null} };
+  const R=(seed=>{ let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; })(n*7919+13);
+  // terrain: L1 bare · L2 rocks · L3 river · L4 rocks · L5 river+rocks · beyond: seeded mix
+  if(n===2||n===4||(n>5&&R()<0.5)) cfg.terrain.rocks=[{x:520+R()*180,y:160+R()*90,r:40+R()*14},{x:420+R()*160,y:380+R()*110,r:36+R()*16}].concat(n>=4?[{x:680+R()*120,y:300+R()*80,r:30+R()*12}]:[]);
+  if(n===3||n===5||(n>5&&R()<0.5)) cfg.terrain.river={x:470+((R()*80)|0), w:56, bridgeY:170+((R()*260)|0), bw:76};
+  const wc = n===1?6 : Math.min(10, 6+Math.ceil(n/2));
+  const POOL=['column','line','guerrilla','pincer','redcoat','jungle','motorcade','twin','parade','push'];
+  for(let i=0;i<wc;i++){
+    const last=(i===wc-1), key = n===1? ['column','line','guerrilla','pincer','redcoat','motorcade'][i] : (last&&n>=3 ? 'push' : POOL[(n*3+i*2+((R()*3)|0))%9]);
+    cfg.waves.push(waveFromKey(key, cfg.cntMul, R));
+  }
+  return cfg;
+}
+function waveFromKey(key, m, R){
+  const c = x=>Math.max(1,Math.round(x*m));
+  switch(key){
+    case 'column':    return { name:'THE COLUMN',        groups:[{f:'column',t:'tanrifle',n:c(5),e:'right',at:0}] };
+    case 'line':      return { name:'THE THIN TAN LINE', groups:[{f:'line',t:'tanrifle',n:c(8),e:'right',at:0}] };
+    case 'guerrilla': return { name:'THE GUERRILLAS',    groups:[{f:'guerrilla',t:'crawler',n:c(3),e:'right-top',at:0},{f:'guerrilla',t:'crawler',n:c(3),e:'right',at:2}] };
+    case 'pincer':    return { name:'THE PINCER',        groups:[{f:'column',t:'tanrifle',n:c(5),e:'right-top',at:0},{f:'column',t:'tanrifle',n:c(5),e:'right-bottom',at:3}] };
+    case 'redcoat':   return { name:'THE REDCOATS',      groups:[{f:'redcoat',t:'tanrifle',n:c(10),e:'right',at:0,officer:true}] };
+    case 'jungle':    return { name:'JUNGLE AMBUSH',     groups:[{f:'line',t:'tanrifle',n:c(7),e:'right',at:0},{f:'guerrilla',t:'crawler',n:c(6),e:'right-top',at:3}] };
+    case 'motorcade': return { name:'THE MOTORCADE',     groups:[{f:'solo',t:'jeep',n:1,e:'right',at:0},{f:'column',t:'tanrifle',n:c(7),e:'right',at:2}] };
+    case 'twin':      return { name:'TWIN AMBUSH',       groups:[{f:'guerrilla',t:'crawler',n:c(8),e:'right-bottom',at:0},{f:'solo',t:'jeep',n:1,e:'right-top',at:5},{f:'column',t:'tanrifle',n:c(5),e:'right',at:7}] };
+    case 'parade':    return { name:'THE GRAND PARADE',  groups:[{f:'redcoat',t:'tanrifle',n:c(10),e:'right',at:0,officer:true},{f:'line',t:'tanrifle',n:c(6),e:'right-top',at:6,officer:true}] };
+    default:          return { name:'THE BIG PUSH',      groups:[{f:'wedge',t:'tank',n:1,e:'right',at:0,escort:c(6)},{f:'guerrilla',t:'crawler',n:c(4),e:'right-bottom',at:6}] };
+  }
+}
 // Green is deliberately a touch stronger: more range (150 vs 140), faster
 // trigger fingers. You'll take hits — grit soaks 3 before a knockdown —
 // but a decent line wins the firefight. (Wyatt 7/21: "slightly stronger
@@ -71,7 +172,10 @@ const UDEF = {
   mgunner: { rng:95,  rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
   bazooka: { rng:150, rate:0.4, dmg:4, air:false, grit:3, splash:45, vx2:true, name:'BAZOOKA' },
   mortar:  { rng:9999, minRng:120, rate:0.25, dmg:3, air:false, grit:3, splash:60, name:'MORTAR' },
-  sarge:   { rng:108, rate:1.8, dmg:1, air:true,  grit:4, name:'SARGE' }
+  sarge:   { rng:108, rate:1.8, dmg:1, air:true,  grit:4, name:'SARGE' },
+  minesweeper:{ rng:130, rate:0.167, dmg:0, air:false, grit:3, name:'SWEEPER', mine:true },
+  flame:   { rng:85,  rate:8,   dmg:0.5, air:false, grit:3, name:'FLAME', multi:3 },
+  radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 }
 };
 const FDEF = {
   tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:140, fireCd:3.2, name:'tan' },
@@ -90,18 +194,7 @@ function edgePt(e){
   if(e==='right-bottom') return { x:1020, y:380+Math.random()*110 };
   return { x:1020, y:140+Math.random()*320 };   // right (center lane)
 }
-const WAVES = [
-  { name:'THE COLUMN',        groups:[ {f:'column',t:'tanrifle',n:5,e:'right',at:0} ] },
-  { name:'THE THIN TAN LINE', groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0} ] },
-  { name:'THE GUERRILLAS',    groups:[ {f:'guerrilla',t:'crawler',n:3,e:'right-top',at:0}, {f:'guerrilla',t:'crawler',n:3,e:'right',at:2}, {f:'guerrilla',t:'crawler',n:2,e:'right-bottom',at:4} ] },
-  { name:'THE PINCER',        groups:[ {f:'column',t:'tanrifle',n:6,e:'right-top',at:0}, {f:'column',t:'tanrifle',n:6,e:'right-bottom',at:3} ] },
-  { name:'THE REDCOATS',      groups:[ {f:'redcoat',t:'tanrifle',n:10,e:'right',at:0,officer:true} ] },
-  { name:'JUNGLE AMBUSH',     groups:[ {f:'line',t:'tanrifle',n:8,e:'right',at:0}, {f:'guerrilla',t:'crawler',n:8,e:'right-top',at:3} ] },
-  { name:'THE MOTORCADE',     groups:[ {f:'solo',t:'jeep',n:1,e:'right',at:0}, {f:'column',t:'tanrifle',n:8,e:'right',at:2} ] },
-  { name:'TWIN AMBUSH',       groups:[ {f:'guerrilla',t:'crawler',n:10,e:'right-bottom',at:0}, {f:'solo',t:'jeep',n:1,e:'right-top',at:5}, {f:'column',t:'tanrifle',n:6,e:'right',at:7} ] },
-  { name:'THE GRAND PARADE',  groups:[ {f:'redcoat',t:'tanrifle',n:12,e:'right',at:0,officer:true}, {f:'line',t:'tanrifle',n:8,e:'right-top',at:6,officer:true} ] },
-  { name:'THE BIG PUSH',      groups:[ {f:'wedge',t:'tank',n:1,e:'right',at:0,escort:6}, {f:'guerrilla',t:'crawler',n:4,e:'right-bottom',at:6} ] }
-];
+// (Waves now come from levelCfg(n) — the campaign is endless.)
 
 // ================= PATH =================
 function cubic(p0,p1,p2,p3,t){ const u=1-t; return { x:u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0], y:u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1] }; }
@@ -131,6 +224,9 @@ mgunner: '<ellipse cx="60" cy="129" rx="50" ry="7.5" fill="#000" opacity="0.28"/
 bazooka: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M50 122 L54 96" stroke-width="11"/><path d="M70 121 L58 96" stroke-width="11"/><path d="M56 96 L62 72" stroke-width="16"/><path d="M58 74 L76 64" stroke-width="8"/><path d="M60 79 L88 61" stroke-width="8"/></g><g stroke="currentColor" fill="none" stroke-linecap="butt"><path d="M26 72 L106 54" stroke-width="10"/><path d="M26 74 L34 70" stroke-width="14"/></g><g transform="translate(66,54)">'+HEAD+'</g>',
 mortar: '<ellipse cx="60" cy="129" rx="45" ry="7.5" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="45" ry="7.5" fill="currentColor"/><ellipse cx="84" cy="122" rx="13" ry="4.5" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M84 121 L96 70" stroke-width="9" stroke-linecap="butt"/><path d="M90 96 L76 120" stroke-width="3"/><path d="M90 96 L104 118" stroke-width="3"/><path d="M26 121 L40 109" stroke-width="11"/><path d="M40 111 L48 93" stroke-width="11"/><path d="M48 93 L58 101 L58 119" stroke-width="11"/><path d="M46 95 L52 71" stroke-width="15"/><path d="M51 75 L72 64" stroke-width="8"/><path d="M52 80 L66 74" stroke-width="8"/></g><rect x="72" y="52" width="9" height="17" rx="4.5" fill="currentColor" transform="rotate(20 76 60)"/><g transform="translate(56,58)">'+HEAD+'</g>',
 sarge: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M40 122 L54 96" stroke-width="11"/><path d="M76 118 L58 96" stroke-width="11"/><path d="M56 96 L58 68" stroke-width="16"/><path d="M60 72 L76 48" stroke-width="8"/><path d="M58 76 L81 72" stroke-width="8"/></g><rect x="74" y="34" width="11" height="5" rx="1.5" fill="currentColor"/><rect x="74" y="34" width="4.5" height="10" rx="1.5" fill="currentColor"/><g transform="translate(52,52)">'+HEAD+'</g>',
+minesweeper: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M46 122 L54 96" stroke-width="11"/><path d="M66 120 L58 96" stroke-width="11"/><path d="M56 96 L58 70" stroke-width="16"/><path d="M57 74 L74 87" stroke-width="8"/><path d="M56 79 L69 92" stroke-width="8"/><path d="M71 89 L100 111" stroke-width="4"/></g><rect x="42" y="68" width="11" height="20" rx="3" fill="currentColor"/><ellipse cx="103" cy="115" rx="11" ry="4" fill="currentColor"/><g transform="translate(61,56)">'+HEAD+'</g>',
+flame: BASE+'<rect x="34" y="62" width="9" height="30" rx="4.5" fill="currentColor"/><rect x="44" y="64" width="9" height="30" rx="4.5" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M44 122 L54 96" stroke-width="11"/><path d="M72 120 L58 96" stroke-width="11"/><path d="M54 96 L62 71" stroke-width="16"/><path d="M61 75 L82 79" stroke-width="8"/><path d="M62 80 L90 84" stroke-width="8"/><path d="M84 82 L107 86" stroke-width="4.5"/><path d="M42 94 Q64 106 86 83" stroke-width="3"/></g><g transform="translate(67,57)">'+HEAD+'</g>',
+radioman: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M30 121 L46 109" stroke-width="11"/><path d="M46 111 L54 93" stroke-width="11"/><path d="M54 93 L68 101 L70 119" stroke-width="11"/><path d="M52 95 L58 70" stroke-width="16"/><path d="M58 73 L67 61" stroke-width="8"/><path d="M57 78 L74 87" stroke-width="8"/><path d="M44 66 L32 30" stroke-width="2.5"/></g><circle cx="31.5" cy="28" r="2.5" fill="currentColor"/><rect x="38" y="64" width="15" height="25" rx="3.5" fill="currentColor"/><rect x="63" y="50" width="7" height="12" rx="3" fill="currentColor" transform="rotate(-15 66 56)"/><g transform="translate(64,57)">'+HEAD+'</g>',
 tanrifle: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M74 122 L62 96" stroke-width="11"/><path d="M46 118 L58 96" stroke-width="11"/><path d="M60 96 L58 68" stroke-width="16"/><path d="M46 30 L44 72" stroke-width="4.5"/><path d="M58 72 L46 63" stroke-width="8"/><path d="M60 74 L74 88" stroke-width="8"/></g><g transform="translate(56,54)">'+HEAD+'</g>',
 crawler: '<ellipse cx="60" cy="129" rx="50" ry="7.5" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="50" ry="7.5" fill="currentColor"/><g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M114 116 L92 108" stroke-width="9"/><path d="M108 108 L88 103" stroke-width="9"/><path d="M90 107 L60 102" stroke-width="14"/><path d="M60 102 L44 112" stroke-width="8"/><path d="M62 98 L44 100" stroke-width="8"/><path d="M28 94 L66 90" stroke-width="4.5"/></g><g transform="translate(50,86)">'+HEAD+'</g>',
 officer: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M76 122 L62 96" stroke-width="11"/><path d="M46 120 L58 96" stroke-width="11"/><path d="M60 96 L58 70" stroke-width="15"/><path d="M56 74 L40 52" stroke-width="8"/><path d="M60 76 L74 88" stroke-width="8"/></g><rect x="26" y="38" width="11" height="5" rx="1.5" fill="currentColor"/><rect x="31.5" y="38" width="4.5" height="9" rx="1.5" fill="currentColor"/><circle cx="54" cy="56" r="8" fill="currentColor"/><rect x="42" y="50" width="24" height="4.5" rx="2.2" fill="currentColor"/><rect x="45" y="42" width="18" height="9" rx="2.5" fill="currentColor"/>',
@@ -215,17 +311,36 @@ function coachEvent(ev,u){
 // ================= STATE =================
 const S = {
   mode:'title', plastic:120, lives:10, wave:0, waveActive:false, queue:[], waveT:0,
-  units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[], corpses:[],
+  units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[], corpses:[], mines:[],
   sel:null, drag:null, speed:1, shake:0, t:0, ann:null, interT:0,
-  maxDown:0, placedAny:false, hintT:0, cleared:false
+  maxDown:0, placedAny:false, hintT:0, cleared:false,
+  cfg: levelCfg(1), levelN:1, rival:null, ffLevel:0, downsLevel:0
 };
 let idc=1;
 
 function reset(){
   S.plastic=120; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
-  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[];
+  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
+  S.ffLevel=0; S.downsLevel=0;
 }
+function startBattle(levelN, rival){
+  reset();
+  S.levelN=levelN; S.rival=rival||null;
+  S.cfg=levelCfg(levelN);
+  if(rival){
+    // rival armies fight on your current front's terrain, in their colors
+    if(rival.mod.officers){ S.cfg.waves.forEach((w,i)=>{ if(i%2===1&&w.groups[0]&&!w.groups[0].officer) w.groups[0].officer=true; }); }
+    if(rival.mod.jeeps){ S.cfg.waves.forEach((w,i)=>{ if(i%3===2) w.groups.push({f:'solo',t:'jeep',n:1,e:'right-top',at:4}); }); }
+    if(rival.mod.crawlers){ S.cfg.waves.forEach((w,i)=>{ if(i%2===0) w.groups.push({f:'guerrilla',t:'crawler',n:3,e:'right-bottom',at:3}); }); }
+    if(rival.mod.count){ S.cfg.waves.forEach(w=>w.groups.forEach(g=>{ if(g.t==='tanrifle') g.n=Math.round(g.n*rival.mod.count); })); }
+    buildFoeTint(rival.hex);
+  }
+  hideAllOverlays();
+  S.mode='play';
+  if(META.campaign===0 && levelN===1) coachStart();
+}
+function hideAllOverlays(){ ['title','lose','win','menu','picker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 function placeUnit(type,x,y){
   const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0, hits:0, hitT:0 };
@@ -254,23 +369,27 @@ function tanShoot(f){
 function canPlace(x,y,type){
   if(x<58||x>W-24||y<70||y>H-92) return false;
   if(x<215&&y>200&&y<380) return false; // toy box zone
+  const RV=S.cfg.terrain.river;
+  if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;        // no standing in the river (or hogging the bridge)
+  for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
   for(const u of S.units){ if(Math.hypot(u.x-x,u.y-y)<40) return false; }
   return true;
 }
 function knock(u, srcx, srcy){
   if(u.down) return;
-  u.down=true; u.downT=0; u.hits=0; SFX.clack();
+  u.down=true; u.downT=0; u.hits=0; S.downsLevel++; SFX.clack();
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
   coachEvent('down', u);
 }
 function standUp(u){
   u.down=false; if(u.downT>S.maxDown) S.maxDown=u.downT; u.downT=0; u.hits=0; SFX.thock();
   S.fx.push({k:'ring', x:u.x, y:u.y-24, r:4, R:30, t:0, dur:0.3, col:'rgba(255,255,255,0.9)'});
+  META.stats.standUps++;
   coachEvent('up', u);
 }
 function spawnWave(){
-  if(S.wave>=WAVES.length||S.waveActive) return;
-  const w=WAVES[S.wave];
+  if(S.wave>=S.cfg.waves.length||S.waveActive) return;
+  const w=S.cfg.waves[S.wave];
   S.queue = w.groups.map(g=>Object.assign({},g));
   S.ann = { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
@@ -278,12 +397,30 @@ function spawnWave(){
 }
 function spawnFoe(type,x,y,form,gu){
   const d=FDEF[type];
-  const f={ id:idc++, type, def:d, hp:d.hp, x, y, vx:0, vy:0, wob:Math.random()*6.28,
+  const m=S.rival? S.rival.mod : {};
+  const f={ id:idc++, type, def:d, hp:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)), hpMax:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)),
+    x, y, vx:0, vy:0, wob:Math.random()*6.28,
+    spdMul:(m.spd||1), fireMul:(m.fire||1), bountyMul:(m.bounty||1),
     shot:(type==='officer'?3:(type==='tanrifle'?2.4:0)), rammed:{}, form:form||null, off:null,
-    gu:!!gu, dash:false, gt:Math.random()*0.8, tgt:null };
+    gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false };
   S.foes.push(f);
   return f;
 }
+
+// tinted foe sprites for the colored armies (one variable — told you it'd pay off)
+const IMGT = {};
+function buildFoeTint(hex){
+  if(IMGT[hex]) return;
+  IMGT[hex]={};
+  ['tanrifle','crawler','officer','jeep','tank'].forEach(k=>{
+    const vb=(k==='jeep'||k==='tank')?'0 0 140 140':'0 0 120 140';
+    const body=SPRITES_SRC[k].split('currentColor').join(hex);
+    const im=new Image();
+    im.onload=()=>{ IMGT[hex][k]=im; };
+    im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+body+'</svg>');
+  });
+}
+function foeImg(k){ return (S.rival&&IMGT[S.rival.hex]&&IMGT[S.rival.hex][k])||IMG[k]; }
 function spawnGroup(g){
   if(g.f==='guerrilla'||g.f==='solo'){
     for(let i=0;i<g.n;i++){ const p=edgePt(g.e); spawnFoe(g.t, p.x+(Math.random()-0.5)*60, p.y+(Math.random()-0.5)*40, null, g.f==='guerrilla'); }
@@ -314,17 +451,68 @@ function spawnGroup(g){
   });
   S.forms.push(form);
 }
+const ACH = [
+  { id:'first',   name:'FIRST VICTORY',    desc:'Win your first battle',                 f:()=>META.campaign>=1 },
+  { id:'stand10', name:'STAND-UP GUY',     desc:'Stand 10 soldiers back up',             f:()=>META.stats.standUps>=10 },
+  { id:'tag500',  name:'TAG COLLECTOR',    desc:'Collect 500 dog tags lifetime',         f:()=>META.stats.tags>=500 },
+  { id:'rival',   name:'RIVAL SLAYER',     desc:'Beat a daily rival army',               f:()=>META.stats.rivalWins>=1 },
+  { id:'deep5',   name:'DEEP CAMPAIGN',    desc:'Beat Level 5',                          f:()=>META.campaign>=5 },
+  { id:'deep10',  name:'THE LONG WAR',     desc:'Beat Level 10',                         f:()=>META.campaign>=10 },
+  { id:'crawl25', name:'CRAWLER CATCHER',  desc:'Melt 25 crawlers',                      f:()=>META.stats.crawlerKills>=25 },
+  { id:'vet1',    name:'STRIPES',          desc:'Promote your first Veteran',            f:()=>META.stats.vets>=1 },
+  { id:'shop1',   name:'QUARTERMASTER',    desc:'Unlock a unit in the shop',             f:()=>META.unlocked.length>5 },
+  { id:'lvl5',    name:'FIVE-STAR GENERAL',desc:'Reach Commander Level 5',               f:()=>META.lvl>=5 }
+];
+function checkAch(){
+  for(const a of ACH){ if(!META.ach[a.id] && a.f()){ META.ach[a.id]=1; S.floats.push({x:W/2,y:150,txt:'ACHIEVEMENT — '+a.name+'!',t:0,col:'#D9A544'}); SFX.blip(); } }
+}
+
 function endBattle(win){
+  // Your first battle is always a victory. No matter what. That's the rule.
+  if(!win && S.levelN===1 && !S.rival && META.campaign===0){
+    S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
+    S.lives=Math.max(1,S.lives);
+    endBattle(true);
+    document.getElementById('winTitle').innerHTML='THE TAN<br>RETREAT?!';
+    document.getElementById('medalText').textContent = "They had you beat — and then they just... left. (The first battle is always a victory. Don't tell the Tan.)";
+    return;
+  }
   S.mode = win?'win':'lose';
   document.getElementById(win?'win':'lose').classList.remove('hidden');
-  if(win){
-    const m1=true, m2=S.lives>=10, m3=S.maxDown<=3.05 && !S.units.some(u=>u.down&&u.downT>3.05);
-    const row=document.getElementById('medalRow');
-    row.textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
-    document.getElementById('medalText').textContent =
-      'Victory' + (m2? ' · Untouched Toy Box':'') + (m3? ' · No soldier left behind':'');
-    try{ localStorage.setItem('gvt_l1', JSON.stringify({m1,m2,m3})); }catch(e){}
-  } else { SFX.ouch(); }
+  if(!win){ SFX.ouch(); return; }
+
+  const firstEver = !S.rival && S.levelN===1 && META.campaign===0;
+  document.getElementById('winTitle').innerHTML = S.rival? (S.rival.name+'<br>DEFEATED') : 'CARPET<br>SECURED';
+  const m1=true, m2=S.lives>=10, m3=S.maxDown<=3.05 && !S.units.some(u=>u.down&&u.downT>3.05);
+  let stars=(m1?1:0)+(m2?1:0)+(m3?1:0);
+  document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
+  let msg = 'Victory' + (m2? ' · Untouched Toy Box':'') + (m3? ' · No soldier left behind':'');
+
+  if(S.rival){
+    const day=todayStr();
+    if(!META.rivalDays[day]){
+      META.rivalDays[day]=S.rival.id; META.stats.rivalWins++;
+      stars=5; msg='DAILY RIVAL DOWN · BONUS +5★';
+    } else { stars=0; msg='Rival already beaten today — nothing but glory.'; }
+  } else {
+    const prev=META.levelStars['l'+S.levelN]||0;
+    if(S.levelN>5){ stars=Math.min(stars,1); msg+=' · deep-campaign pay: 1★'; }   // the drop-off
+    const gain=Math.max(0,stars-prev);
+    META.levelStars['l'+S.levelN]=Math.max(prev,stars);
+    if(S.levelN>META.campaign) META.campaign=S.levelN;
+    if(gain===0) msg+=' · (no new stars — already earned)';
+    stars=gain;
+  }
+  META.starBank+=stars; META.starsLifetime+=stars;
+  const xpGain = 30 + stars*30 + S.wave*4;
+  META.xp += xpGain;
+  msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
+  let promos=0;
+  while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
+  if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
+  if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
+  document.getElementById('medalText').textContent = msg;
+  checkAch(); saveMeta();
 }
 
 // ================= UPDATE =================
@@ -338,7 +526,7 @@ function update(dt){
     for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){ spawnGroup(S.queue[i]); S.queue.splice(i,1); } }
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
-      if(S.wave>=WAVES.length){ if(!S.cleared){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
+      if(S.wave>=S.cfg.waves.length){ if(!S.cleared){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
       else {
         S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
         S.interT=20;   // reposition window: move your men, next wave in 20s
@@ -366,10 +554,19 @@ function update(dt){
       if(!wasHalted&&fo.halted) fo.volley=0.55;                     // PRESENT...
       if(fo.halted&&fo.volley!=null){ fo.volley-=dt; if(fo.volley<=0){ fo.doVolley=true; fo.volley=null; SFX.volley(); } }  // ...FIRE!
     }
-    const d=Math.hypot(T.x-fo.x, T.y-fo.y);
-    if(d<115){ fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue; } // ranks break, charge!
-    fo.dir={x:(T.x-fo.x)/d, y:(T.y-fo.y)/d};
+    const RV=S.cfg.terrain.river;
+    const fgoal = (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:RV.bridgeY} : T;
+    const d=Math.hypot(fgoal.x-fo.x, fgoal.y-fo.y);
+    // ranks break early at a river — no formation fits on a popsicle bridge
+    if(d<115 || (RV && fo.x<RV.x+RV.w+80 && fo.x>RV.x-20)){
+      fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue;
+    }
+    fo.dir={x:(fgoal.x-fo.x)/d, y:(fgoal.y-fo.y)/d};
     fo.x+=fo.dir.x*spd*dt; fo.y+=fo.dir.y*spd*dt;
+    for(const rk of S.cfg.terrain.rocks){
+      const dx=fo.x-rk.x, dy=fo.y-rk.y, dd=Math.hypot(dx,dy), min=rk.r+40;
+      if(dd>0.1&&dd<min){ fo.x+=dx/dd*(min-dd)*Math.min(1,dt*6); fo.y+=dy/dd*(min-dd)*Math.min(1,dt*6); }
+    }
   }
 
   // foes
@@ -380,6 +577,12 @@ function update(dt){
       for(const o of S.foes){ if(o.type==='officer' && Math.hypot(o.x-f.x,o.y-f.y)<110){ aura=1.3; break; } }
     }
     const px=f.x, py=f.y;
+    aura*=f.spdMul||1;
+    // the river funnels everyone to the bridge — except crawlers, who slip under
+    const RV=S.cfg.terrain.river;
+    const goal = (RV && !f.crossed && f.type!=='crawler' && f.x>RV.x+RV.w)
+      ? { x:RV.x+RV.w/2, y:RV.bridgeY } : T;
+    if(RV && f.x<=RV.x-4) f.crossed=true;
     if(f.form){
       const fo=f.form, o=f.off;
       const sx=fo.x+fo.dir.x*o.fx-fo.dir.y*o.fy, sy=fo.y+fo.dir.y*o.fx+fo.dir.x*o.fy;
@@ -389,18 +592,31 @@ function update(dt){
         f.x+=(sx-f.x)/dd*Math.min(sp*dt,dd); f.y+=(sy-f.y)/dd*Math.min(sp*dt,dd);
       }
     } else if(f.gu){
+      // crawlers: dash on the surface, then BURROW under the rug — a moving
+      // bump, untargetable, crossing rivers like they aren't there
       f.gt-=dt;
-      if(f.dash && f.tgt){
+      if(f.burrow){
+        const d=Math.hypot(T.x-f.x,T.y-f.y);
+        if(d>1){ const sp=f.def.spd*aura*0.7; f.x+=(T.x-f.x)/d*sp*dt; f.y+=(T.y-f.y)/d*sp*dt; }
+        if(f.gt<=0){ f.burrow=false; f.dash=true; f.gt=0.8+Math.random()*0.4;
+          f.tgt={ x:f.x+(T.x-f.x)*0.3+(Math.random()-0.5)*90, y:f.y+(T.y-f.y)*0.3+(Math.random()-0.5)*90 };
+          S.fx.push({k:'ring',x:f.x,y:f.y,r:4,R:22,t:0,dur:0.3,col:'rgba(154,90,74,0.9)'}); }
+      } else if(f.dash && f.tgt){
         const dd=Math.hypot(f.tgt.x-f.x, f.tgt.y-f.y);
-        if(dd<8||f.gt<=0){ f.dash=false; f.gt=0.5+Math.random()*1.1; }
+        if(dd<8||f.gt<=0){ f.dash=false; f.burrow=true; f.gt=1.2+Math.random()*0.5; }
         else { const sp=f.def.spd*aura*1.6; f.x+=(f.tgt.x-f.x)/dd*sp*dt; f.y+=(f.tgt.y-f.y)/dd*sp*dt; }
       } else if(f.gt<=0){
-        f.dash=true; f.gt=0.7+Math.random()*0.7;
+        f.dash=true; f.gt=0.7+Math.random()*0.5;
         f.tgt={ x:f.x+(T.x-f.x)*0.35+(Math.random()-0.5)*100, y:f.y+(T.y-f.y)*0.35+(Math.random()-0.5)*100 };
       }
     } else {
-      const d=Math.hypot(T.x-f.x, T.y-f.y);
-      if(d>1){ const sp=f.def.spd*aura; f.x+=(T.x-f.x)/d*sp*dt; f.y+=(T.y-f.y)/d*sp*dt; }
+      const d=Math.hypot(goal.x-f.x, goal.y-f.y);
+      if(d>1){ const sp=f.def.spd*aura; f.x+=(goal.x-f.x)/d*sp*dt; f.y+=(goal.y-f.y)/d*sp*dt; }
+    }
+    // rocks shoulder everyone aside (burrowers too — roots)
+    for(const rk of S.cfg.terrain.rocks){
+      const dx=f.x-rk.x, dy=f.y-rk.y, d=Math.hypot(dx,dy), min=rk.r+16;
+      if(d>0.1&&d<min){ f.x+=dx/d*(min-d)*Math.min(1,dt*8); f.y+=dy/d*(min-d)*Math.min(1,dt*8); }
     }
     if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
 
@@ -411,7 +627,8 @@ function update(dt){
         if(f.form.doVolley) tanShoot(f);
       } else {
         f.shot+=dt;
-        if(f.shot>=f.def.fireCd){ if(tanShoot(f)) f.shot=Math.random()*0.6; else f.shot=f.def.fireCd; }
+        const cd=f.def.fireCd*(f.fireMul||1);
+        if(f.shot>=cd){ if(tanShoot(f)) f.shot=Math.random()*0.6; else f.shot=cd; }
       }
     }
     // officer potshot
@@ -457,21 +674,45 @@ function update(dt){
       continue;
     }
     if(S.drag && S.drag.unit===u) continue; // sarge being carried
+    const def=u.def;
+    if(def.rate===0) continue;              // radioman: all antenna, no rifle
     u.cd-=dt;
     if(u.cd>0) continue;
-    const def=u.def;
-    let best=null,bs=1e9;
+    // minesweeper: plants mines instead of shooting
+    if(def.mine){
+      if(S.mines.filter(mn=>mn.owner===u.id).length<3){
+        u.cd=1/def.rate;
+        S.mines.push({ owner:u.id, x:Math.min(W-30,u.x+40+Math.random()*70), y:Math.max(70,Math.min(H-100,u.y+(Math.random()-0.5)*90)), armT:0.8 });
+        SFX.snap();
+      } else u.cd=1;
+      continue;
+    }
+    // radioman aura: +25% range when he's got your back
+    let rngBonus=1;
+    for(const r of S.units){ if(r.type==='radioman'&&!r.down&&r!==u&&Math.hypot(r.x-u.x,r.y-u.y)<UDEF.radioman.auraR){ rngBonus=UDEF.radioman.auraMul; break; } }
+    let best=null,bs=1e9, extra=[];
     for(const f of S.foes){
-      if(f.x>W-10||f.x<-40||f.y<-30||f.y>H+30) continue;  // no shooting offscreen — wait for them to step onto the carpet
+      if(f.burrow) continue;                 // under the rug: can't be hit
+      if(f.x>W-10||f.x<-40||f.y<-30||f.y>H+30) continue;  // no shooting offscreen
       const d=Math.hypot(f.x-u.x,f.y-u.y);
-      if(d>def.rng) continue;
+      if(d>def.rng*rngBonus) continue;
       if(def.minRng&&d<def.minRng) continue;
       const db=Math.hypot(T.x-f.x,T.y-f.y);
       if(db<bs){ bs=db; best=f; }
+      if(def.multi) extra.push(f);
     }
     if(!best) continue;
     u.cd=1/def.rate;
-    const dmg = def.dmg * (u.vet?1.5:1);
+    const dmg = def.dmg * (u.vet?1.5:1) * upMul(u.type);
+    if(u.type==='flame'){
+      SFX.mg();
+      extra.slice(0,def.multi).forEach(f=>{
+        f.hp-=dmg;
+        S.fx.push({k:'puff',x:(u.x+f.x)/2,y:(u.y+f.y)/2-14,t:0,dur:0.25,R:14});
+        hitCheck(f,u);
+      });
+      continue;
+    }
     if(u.type==='bazooka'){
       SFX.rocket();
       S.shots.push({k:'rocket',x:u.x+14,y:u.y-30,tid:best.id,spd:280,dmg,splash:def.splash,vx2:true,src:u});
@@ -503,11 +744,21 @@ function update(dt){
     }
   }
 
+  // mines: arm, then wait for a foot
+  for(let i=S.mines.length-1;i>=0;i--){
+    const mn=S.mines[i];
+    if(mn.armT>0){ mn.armT-=dt; continue; }
+    for(const f of S.foes){
+      if(f.burrow) continue;
+      if(Math.hypot(f.x-mn.x,f.y-mn.y)<26){ S.mines.splice(i,1); splash(mn.x,mn.y,45,3,false,S.units.find(u=>u.id===mn.owner)||null); break; }
+    }
+  }
+
   // blobs → collect
   for(let i=S.blobs.length-1;i>=0;i--){
     const b=S.blobs[i]; b.t+=dt;
     if(b.t>0.8){
-      S.plastic+=b.v; SFX.blip();
+      S.plastic+=b.v; META.stats.tags+=b.v; SFX.blip();
       S.floats.push({x:b.x,y:b.y-14,txt:'+'+b.v,t:0,col:'#FFF3C4'});
       S.blobs.splice(i,1);
       coachEvent('tag');
@@ -523,9 +774,10 @@ function hitCheck(f,u){
       S.foes.splice(idx,1);
       if(u)u.kills++;
       // the fallen stay where they fell — flipped over like real toys
-      S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w });
+      S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w, img:foeImg(f.type) });
       if(S.corpses.length>90) S.corpses.shift();
-      S.blobs.push({x:f.x,y:f.y-8,v:f.def.bounty,t:0});   // their dog tag — your bounty
+      S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
+      if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
       else SFX.clack();
     }
@@ -547,7 +799,7 @@ function splash(x,y,R,dmg,vx2,src){
     if(u.down) continue;
     if(S.drag&&S.drag.unit===u) continue;
     if(Math.hypot(u.x-x,u.y-y)<=R*0.9){
-      knock(u,x,y);
+      knock(u,x,y); S.ffLevel++;
       S.floats.push({x:u.x,y:u.y-62,txt:'FRIENDLY FIRE!',t:0,col:'#D96A55'});
     }
   }
@@ -566,8 +818,8 @@ function resize(){
 }
 window.addEventListener('resize',resize); resize();
 
-function drawSprite(k,x,y,w,rot,wob){
-  const im=IMG[k]; if(!im) return;
+function drawSprite(k,x,y,w,rot,wob,imgOverride){
+  const im=imgOverride||IMG[k]; if(!im) return;
   const h=w*(im.height/im.width);
   cx.save();
   cx.translate(x,y);
@@ -591,6 +843,26 @@ function drawRug(){
   cx.strokeStyle='rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();
   cx.strokeStyle='#D9C4A0'; cx.lineWidth=70; pathStroke();
   cx.globalAlpha=1;
+  // terrain: the river (spilled from the fish tank) + its popsicle bridge
+  const RV=S.cfg.terrain.river;
+  if(RV){
+    cx.fillStyle='#4E7FA8'; cx.fillRect(RV.x,56,RV.w,H-112);
+    cx.fillStyle='#6E9DC4'; cx.globalAlpha=0.6;
+    for(let y=70;y<H-70;y+=44){ cx.beginPath(); cx.ellipse(RV.x+RV.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
+    cx.globalAlpha=1;
+    const by=RV.bridgeY;
+    cx.fillStyle='#B48A54'; cx.fillRect(RV.x-10, by-RV.bw/2, RV.w+20, RV.bw);
+    cx.strokeStyle='#8a683e'; cx.lineWidth=3;
+    for(let k=0;k<5;k++){ const yy=by-RV.bw/2+6+k*(RV.bw-12)/4; cx.beginPath(); cx.moveTo(RV.x-8,yy); cx.lineTo(RV.x+RV.w+8,yy); cx.stroke(); }
+  }
+  // rocks (borrowed from the fish tank too)
+  for(const rk of S.cfg.terrain.rocks){
+    cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+rk.r*0.55,rk.r*1.05,rk.r*0.4,0,0,7); cx.fill();
+    cx.fillStyle='#8B8578'; cx.beginPath();
+    cx.ellipse(rk.x,rk.y,rk.r,rk.r*0.8,0.2,0,7); cx.fill();
+    cx.fillStyle='#A39C8D'; cx.beginPath(); cx.ellipse(rk.x-rk.r*0.25,rk.y-rk.r*0.3,rk.r*0.5,rk.r*0.32,0.3,0,7); cx.fill();
+    cx.fillStyle='#6F695E'; cx.beginPath(); cx.ellipse(rk.x+rk.r*0.3,rk.y+rk.r*0.25,rk.r*0.36,rk.r*0.2,0.1,0,7); cx.fill();
+  }
 }
 function pathStroke(){ cx.beginPath(); cx.moveTo(PATH_PTS[0].x,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) cx.lineTo(PATH_PTS[i].x,PATH_PTS[i].y); cx.stroke(); }
 
@@ -612,8 +884,14 @@ function draw(){
 
   // the fallen (under everything alive)
   cx.globalAlpha=0.85;
-  for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0);
+  for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0,c.img);
   cx.globalAlpha=1;
+
+  // mines (armed = red eye)
+  for(const mn of S.mines){
+    cx.fillStyle='#3a3a3a'; cx.beginPath(); cx.arc(mn.x,mn.y,9,0,7); cx.fill();
+    cx.fillStyle=mn.armT>0?'#8b8f7a':'#A63B2A'; cx.beginPath(); cx.arc(mn.x,mn.y-3,3,0,7); cx.fill();
+  }
 
   // dog tags waiting to be collected
   for(const b of S.blobs) drawTag(b.x,b.y-6-3*Math.sin(b.t*10),13);
@@ -756,11 +1034,19 @@ function drawUnit(u){
   }
 }
 function drawFoe(f){
+  if(f.burrow){
+    // under the rug: just a moving bump and a guilty ripple
+    cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(f.x,f.y+4,22,8,0,0,7); cx.fill();
+    cx.fillStyle='#9a5a4a'; cx.beginPath(); cx.ellipse(f.x,f.y-2,19,10,0,0,7); cx.fill();
+    cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(f.x-6,f.y-4,5,3.4,5.6); cx.stroke();
+    return;
+  }
   const march = f.form&&!f.form.halted ? Math.sin(S.t*9+(f.form.timer||0))*0.045 : 0;
   const wob = f.type==='jeep'||f.type==='tank' ? 0 : (f.gu&&!f.dash ? 0 : Math.sin(S.t*7+f.wob)*0.05) + march;
-  drawSprite(f.type,f.x,f.y,f.def.w,0,wob);
-  if(f.hp<f.def.hp){
-    const k=f.hp/f.def.hp;
+  drawSprite(f.type,f.x,f.y,f.def.w,0,wob,foeImg(f.type));
+  if(f.hp<f.hpMax){
+    const k=f.hp/f.hpMax;
     const bo=Math.min(72,f.def.w*1.1);
     cx.fillStyle='rgba(0,0,0,0.4)'; cx.fillRect(f.x-16,f.y-bo,32,4);
     cx.fillStyle=k>0.4?'#7FA35C':'#D96A55'; cx.fillRect(f.x-16,f.y-bo,32*k,4);
@@ -768,7 +1054,8 @@ function drawFoe(f){
 }
 
 // ================= HUD =================
-const TRAY=[{t:'rifleman'},{t:'mgunner'},{t:'bazooka'},{t:'mortar'},{t:'sarge'}];
+const TRAY_ORDER=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','sarge'];
+function TRAY(){ return TRAY_ORDER.filter(t=>META.unlocked.indexOf(t)>=0).map(t=>({t})); }
 const trayRects=[], btnRects={};
 function drawHUD(){
   // top bar
@@ -778,17 +1065,17 @@ function drawHUD(){
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM; cx.textAlign='left';
   cx.fillText(S.plastic, 52, 23);
   cx.textAlign='center';
-  cx.fillText(S.waveActive? ('WAVE '+S.wave+' / '+WAVES.length)
-    : (S.wave>=WAVES.length?'ALL WAVES CLEAR'
+  cx.fillText(S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
+    : (S.wave>=S.cfg.waves.length?'ALL WAVES CLEAR'
     : (S.interT>0? ('REPOSITION YOUR MEN — NEXT WAVE IN '+Math.ceil(S.interT)+'S')
-    : 'WAVE '+(S.wave+1)+' / '+WAVES.length+' READY')), W/2-60, 23);
+    : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY')), W/2-60, 23);
   cx.textAlign='right';
   cx.fillText('TOY BOX ×'+S.lives, W-16, 23);
   // buttons: speed & sound
   btn('spd', W/2+110, 6, 62, 32, S.speed+'×');
   btn('snd', W/2+180, 6, 52, 32, soundOn?'♪':'×');
   // start wave
-  if(!S.waveActive && S.wave<WAVES.length && S.mode==='play'){
+  if(!S.waveActive && S.wave<S.cfg.waves.length && S.mode==='play'){
     const bw=180,bh=52,bx=W-bw-24,by=H-bh-116;
     cx.fillStyle='#A63B2A'; rr(bx,by,bw,bh,8); cx.fill();
     cx.fillStyle='#fff'; cx.font='bold 22px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
@@ -797,9 +1084,11 @@ function drawHUD(){
   } else btnRects.wave=null;
 
   // tray — sized and lifted for thumbs (phone bottom edge steals touches)
-  const tw=112, th=84, gap=10, total=TRAY.length*tw+(TRAY.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
+  const tray=TRAY();
+  const tw=Math.min(112,((W-60)-(tray.length-1)*10)/tray.length)|0, th=84, gap=10, total=tray.length*tw+(tray.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
+  trayRects.length=tray.length;
   cx.textBaseline='alphabetic';
-  TRAY.forEach((s,i)=>{
+  tray.forEach((s,i)=>{
     const x=x0+i*(tw+gap);
     trayRects[i]=[x,y0,tw,th];
     const placedSarge = s.t==='sarge' && S.units.some(u=>u.type==='sarge');
@@ -848,13 +1137,14 @@ cv.addEventListener('pointerdown', e=>{
   if(inRect(p.x,p.y,btnRects.snd)){ soundOn=!soundOn; return; }
   if(inRect(p.x,p.y,btnRects.wave)){ spawnWave(); return; }
   if(btnRects.vet && inRect(p.x,p.y,btnRects.vet)){
-    if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'}); }
+    if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; META.stats.vets++; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'}); }
     return;
   }
   // tray
-  for(let i=0;i<TRAY.length;i++){
+  const tray=TRAY();
+  for(let i=0;i<tray.length;i++){
     if(inRect(p.x,p.y,trayRects[i])){
-      const t=TRAY[i].t;
+      const t=tray[i].t;
       if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge')) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; }
       else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null};
       S.sel=null; return;
@@ -891,15 +1181,100 @@ cv.addEventListener('pointerup', e=>{
 window.addEventListener('pointercancel', ()=>{ S.drag=null; });
 
 // ================= OVERLAY BUTTONS =================
+// ================= HQ MENU =================
+function sprURI(k,color){
+  const vb=(k==='jeep'||k==='tank')?'0 0 140 140':'0 0 120 140';
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+SPRITES_SRC[k].split('currentColor').join(color||'#7FA35C')+'</svg>');
+}
+const SHOP_ITEMS=[
+  { t:'minesweeper', cost:10, blurb:'Plants firecracker mines ahead of your line. (Mines don\'t check dog tags either.)' },
+  { t:'flame',       cost:15, blurb:'Short range. Melts everything in reach. The crawler answer.' },
+  { t:'radioman',    cost:20, blurb:'+25% range to every soldier near him. All antenna, no rifle.' }
+];
+let menuTab='hq';
+function showMenu(tab){
+  menuTab=tab||'hq';
+  S.mode='menu';
+  hideAllOverlays();
+  const el=document.getElementById('menu'); el.classList.remove('hidden');
+  renderMenu();
+}
+function renderMenu(){
+  const riv=todaysRival(), rivDone=META.rivalDays[todayStr()];
+  const nextL=META.campaign+1;
+  const cfgN=levelCfg(nextL);
+  const terr=[cfgN.terrain.rocks.length?'ROCKS':null,cfgN.terrain.river?'RIVER':null].filter(Boolean).join(' + ')||'OPEN CARPET';
+  const achDone=ACH.filter(a=>META.ach[a.id]).length;
+  let html = '<div class="mhead">'
+    +'<div class="mava"><img src="'+sprURI(META.avatar)+'"></div>'
+    +'<div style="flex:1"><h2>COMMANDER · LEVEL '+META.lvl+'</h2>'
+    +'<div class="xpbar"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div></div>'
+    +'<small style="opacity:0.6">'+META.xp+' / '+xpNeed()+' XP</small>'
+    +(META.pendingPicks>0?' <button class="mbtn alt" style="margin-left:10px;padding:0.3rem 0.9rem;font-size:0.9rem" onclick="UI.promote()">CLAIM PROMOTION ('+META.pendingPicks+')</button>':'')+'</div>'
+    +'<div class="mstat">★ '+META.starBank+'<br><small style="opacity:0.6">'+META.starsLifetime+' lifetime</small></div></div>';
+
+  if(menuTab==='hq'){
+    html += '<div class="mgrid">'
+    +'<div class="mcard"><h3>Campaign</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+(nextL>5?' · deep-campaign pay (1★)':'')+'</p>'
+      +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
+      +(META.campaign>0?'<p style="margin-top:8px">Beaten: '+META.campaign+' level'+(META.campaign>1?'s':'')+' · replay any: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'')
+    +'</div>'
+    +'<div class="mcard"><h3><span class="rivalchip" style="background:'+riv.hex+'"></span>Daily Rival</h3><p>'+riv.name+' — "'+riv.blurb+'"'+(rivDone?'<br>✓ BEATEN TODAY (+5★ collected)':'<br>First win today: +5★')+'</p>'
+      +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH (GLORY ONLY)':'FIGHT '+riv.name)+'</button></div>'
+    +'<div class="mcard"><h3>Shop</h3><p>Spend stars on reinforcement types.</p>'
+      + SHOP_ITEMS.map(s=>{ const owned=META.unlocked.indexOf(s.t)>=0;
+        return '<div class="mrow"><img src="'+sprURI(s.t)+'"><div class="grow"><b>'+UDEF[s.t].name+'</b><br><small style="opacity:0.7">'+s.blurb+'</small></div>'
+        +(owned?'<b style="color:#7FA35C">OWNED</b>':'<button class="mbtn" '+(META.starBank<s.cost?'disabled':'')+' onclick="UI.buy(\''+s.t+'\')">'+s.cost+'★</button>')+'</div>'; }).join('')
+    +'</div>'
+    +'<div class="mcard"><h3>Achievements · '+achDone+'/'+ACH.length+'</h3>'
+      + ACH.map(a=>'<div class="mrow"><div class="grow"><b style="'+(META.ach[a.id]?'':'opacity:0.45')+'">'+(META.ach[a.id]?'✓ ':'')+a.name+'</b><br><small style="opacity:0.55">'+a.desc+'</small></div></div>').join('')
+    +'</div>'
+    +'<div class="mcard"><h3>Leaderboard</h3><p>Tier ladder — ranks go ONLINE next build (accounts, challenges, the works).</p>'
+      +[['PLASTIC PRIVATE','0★'],['BRONZE BAGGED','100★'],['SILVER SPRUE','250★'],['GOLD FOOTLOCKER','500★'],['DIAMOND SHELF','1000★'],['LEGENDARY TOY BOX','2000★']].map(t=>'<div class="tierrow"><span>'+t[0]+'</span><span>'+t[1]+'</span></div>').join('')
+      +'<p style="margin-top:8px">You: <b>'+tierName(META.starsLifetime)+'</b> ('+META.starsLifetime+'★ lifetime)</p>'
+    +'</div>'
+    +'<div class="mcard"><h3>Avatar</h3><p>Pick your figure.</p>'
+      +['rifleman','mgunner','bazooka','mortar','sarge'].map(k=>'<img src="'+sprURI(k)+'" style="width:44px;cursor:pointer;'+(META.avatar===k?'filter:drop-shadow(0 0 6px #7FA35C)':'opacity:0.6')+'" onclick="UI.avatar(\''+k+'\')">').join(' ')
+    +'</div>'
+    +'</div>';
+  }
+  document.getElementById('menuBody').innerHTML=html;
+}
+function tierName(s){ return s>=2000?'LEGENDARY TOY BOX':s>=1000?'DIAMOND SHELF':s>=500?'GOLD FOOTLOCKER':s>=250?'SILVER SPRUE':s>=100?'BRONZE BAGGED':'PLASTIC PRIVATE'; }
+function showPicker(){
+  hideAllOverlays();
+  document.getElementById('picker').classList.remove('hidden');
+  const opts=META.unlocked.slice(0,8);
+  document.getElementById('pickRow').innerHTML = opts.map(k=>{
+    const r=META.up[k]||0;
+    return '<div class="pickcard" onclick="UI.pick(\''+k+'\')"><img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+  }).join('');
+}
+window.UI = {
+  play(n){ audio(); startBattle(n||META.campaign+1, null); },
+  rival(){ audio(); const r=todaysRival(); startBattle(Math.max(1,Math.min(META.campaign+1,5)), r); },
+  buy(t){ const it=SHOP_ITEMS.find(s=>s.t===t); if(!it||META.starBank<it.cost||META.unlocked.indexOf(t)>=0) return;
+    META.starBank-=it.cost; META.unlocked.push(t); checkAch(); saveMeta(); renderMenu(); },
+  pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=5) return;
+    META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
+    if(META.pendingPicks>0) showPicker(); else showMenu(); },
+  avatar(k){ META.avatar=k; saveMeta(); renderMenu(); },
+  promote(){ if(META.pendingPicks>0) showPicker(); }
+};
+
 document.getElementById('playBtn').addEventListener('click', ()=>{
-  audio(); document.getElementById('title').classList.add('hidden'); S.mode='play'; coachStart();
+  audio();
+  if(META.campaign>0) showMenu();
+  else startBattle(1, null);
 });
 document.getElementById('retryBtn').addEventListener('click', ()=>{
-  document.getElementById('lose').classList.add('hidden'); reset(); S.mode='play'; coachStart();
+  audio(); startBattle(S.levelN, S.rival);
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
-  document.getElementById('win').classList.add('hidden'); reset(); S.mode='play'; coachStart();
+  audio();
+  if(META.pendingPicks>0) showPicker(); else showMenu();
 });
+document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
 
 // ================= LOOP =================
 let last=0, ready=false;
@@ -925,7 +1300,12 @@ window.GVT = {
   cash(n){ S.plastic=n; },
   start(){ spawnWave(); },
   step(sec){ const n=Math.round(sec*60); for(let i=0;i<n;i++){ if(S.mode==='play') update(1/60); } draw(); },
-  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, active:S.waveActive, foes:S.foes.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
+  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
+  meta(){ return JSON.parse(JSON.stringify(META)); },
+  startLevel(n,rivalId){ startBattle(n, rivalId? ARMIES.find(a=>a.id===rivalId) : null); },
+  menu(){ showMenu(); },
+  wipeMeta(){ try{ localStorage.removeItem('gvt_meta'); }catch(e){} },
+  cfg(){ return S.cfg; },
   coachStep(){ return coach? coach.step : null; },
   beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
   endCoach(){ coachDone(); }
