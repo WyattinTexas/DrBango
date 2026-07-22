@@ -31,7 +31,7 @@
   <p>The Tan Army is marching in from the right — and this time <b>they shoot back</b>. Columns, Redcoat volleys, guerrilla ambushes. Every fallen Tan drops a <b>dog tag</b>: spend them on reinforcements.</p>
   <p style="opacity:0.65">Your men are tougher than theirs — but when one gets knocked over, tap him. He'll get back up. They always do.</p>
   <button class="btn" id="playBtn">Deploy</button>
-  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.4 "Boot Camp" · Level 1: The Living-Room Carpet</p>
+  <p style="opacity:0.4; font-size:0.85rem; margin-top:1.2rem">Prototype v0.5 "Friendly Fire" · Level 1: The Living-Room Carpet</p>
 </div>
 
 <div class="overlay hidden" id="lose">
@@ -59,7 +59,7 @@
 window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.style.display='block'; e.textContent='ERR: '+m+' @'+l; document.title='ERR:'+m; };
 
 // ================= CONSTANTS =================
-const W=960, H=600, TILE=60;
+const W=960, H=600, TILE=60, DRAG_OFF=56;   // dragged figures ride above the finger so you can see your placement
 const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
 const COSTS = { rifleman:50, mgunner:120, bazooka:150, mortar:200, sarge:0 };
 // Green is deliberately a touch stronger: more range (150 vs 140), faster
@@ -406,7 +406,7 @@ function update(dt){
 
     // tan rifle return fire: redcoats volley in sync on the halt; everyone
     // else pops shots on the march
-    if(f.type==='tanrifle' && f.x<W+20 && f.x>-40){
+    if(f.type==='tanrifle' && f.x<W-10 && f.x>-40){
       if(f.form && f.form.kind==='redcoat'){
         if(f.form.doVolley) tanShoot(f);
       } else {
@@ -462,7 +462,7 @@ function update(dt){
     const def=u.def;
     let best=null,bs=1e9;
     for(const f of S.foes){
-      if(f.x>W+40||f.x<-60||f.y<-60||f.y>H+60) continue;
+      if(f.x>W-10||f.x<-40||f.y<-30||f.y>H+30) continue;  // no shooting offscreen — wait for them to step onto the carpet
       const d=Math.hypot(f.x-u.x,f.y-u.y);
       if(d>def.rng) continue;
       if(def.minRng&&d<def.minRng) continue;
@@ -539,6 +539,16 @@ function splash(x,y,R,dmg,vx2,src){
     if(Math.hypot(f.x-x,f.y-y)<=R+f.def.w*0.3){
       f.hp -= dmg * (vx2&&f.def.vehicle?2:1);
       hitCheck(f,src);
+    }
+  }
+  // explosives don't check dog tags — friendly fire is real. Place your
+  // AoE men where their shells won't land on your own line.
+  for(const u of S.units){
+    if(u.down) continue;
+    if(S.drag&&S.drag.unit===u) continue;
+    if(Math.hypot(u.x-x,u.y-y)<=R*0.9){
+      knock(u,x,y);
+      S.floats.push({x:u.x,y:u.y-62,txt:'FRIENDLY FIRE!',t:0,col:'#D96A55'});
     }
   }
 }
@@ -646,7 +656,7 @@ function draw(){
   if(!coach && !S.placedAny && S.mode==='play'){
     cx.globalAlpha=0.75+0.25*Math.sin(S.t*4);
     cx.font='bold 24px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center';
-    cx.fillText('DRAG A RIFLEMAN ONTO THE CARPET — THE TAN COME FROM THE RIGHT', W/2, H-118);
+    cx.fillText('DRAG A RIFLEMAN ONTO THE CARPET — THE TAN COME FROM THE RIGHT', W/2, H-134);
     cx.globalAlpha=1;
   }
 
@@ -679,9 +689,9 @@ function ease(k){ return k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; }
 function coachPill(txt){
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center'; cx.textBaseline='middle';
   const w2=cx.measureText(txt).width/2+26;
-  cx.fillStyle='rgba(38,40,31,0.94)'; rr(W/2-w2,H-142,w2*2,44,10); cx.fill();
-  cx.strokeStyle='#7FA35C'; cx.lineWidth=2.5; rr(W/2-w2,H-142,w2*2,44,10); cx.stroke();
-  cx.fillStyle='#FFF3C4'; cx.fillText(txt, W/2, H-119);
+  cx.fillStyle='rgba(38,40,31,0.94)'; rr(W/2-w2,H-158,w2*2,44,10); cx.fill();
+  cx.strokeStyle='#7FA35C'; cx.lineWidth=2.5; rr(W/2-w2,H-158,w2*2,44,10); cx.stroke();
+  cx.fillStyle='#FFF3C4'; cx.fillText(txt, W/2, H-135);
   cx.textBaseline='alphabetic';
 }
 function fingerDrag(x1,y1,x2,y2){
@@ -700,8 +710,8 @@ function fingerTap(x,y){
 }
 function drawCoach(){
   if(!coach||S.mode!=='play') return;
-  if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); fingerDrag(252,548,620,280); }
-  else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); fingerDrag(252,548,620,390); }
+  if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); fingerDrag(236,540,620,280); }
+  else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); fingerDrag(236,540,620,390); }
   else if(coach.step===3){ coachPill('NOW TAP START — HERE THEY COME'); if(btnRects.wave) fingerTap(btnRects.wave[0]+btnRects.wave[2]/2, btnRects.wave[1]+btnRects.wave[3]/2); }
   else if(coach.step===4){
     if(coach.target&&coach.target.down){ coachPill("HE'S HIT! TAP HIM — HE ALWAYS GETS BACK UP"); fingerTap(coach.target.x, coach.target.y-16); }
@@ -779,15 +789,15 @@ function drawHUD(){
   btn('snd', W/2+180, 6, 52, 32, soundOn?'♪':'×');
   // start wave
   if(!S.waveActive && S.wave<WAVES.length && S.mode==='play'){
-    const bw=170,bh=44,bx=W-bw-24,by=H-bh-96;
+    const bw=180,bh=52,bx=W-bw-24,by=H-bh-116;
     cx.fillStyle='#A63B2A'; rr(bx,by,bw,bh,8); cx.fill();
     cx.fillStyle='#fff'; cx.font='bold 22px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
     cx.fillText(S.wave===0?'START WAVE 1':'NEXT WAVE', bx+bw/2, by+bh/2+1);
     btnRects.wave=[bx,by,bw,bh];
   } else btnRects.wave=null;
 
-  // tray
-  const tw=104, th=76, gap=10, total=TRAY.length*tw+(TRAY.length-1)*gap, x0=(W-total)/2, y0=H-th-8;
+  // tray — sized and lifted for thumbs (phone bottom edge steals touches)
+  const tw=112, th=84, gap=10, total=TRAY.length*tw+(TRAY.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
   cx.textBaseline='alphabetic';
   TRAY.forEach((s,i)=>{
     const x=x0+i*(tw+gap);
@@ -845,8 +855,8 @@ cv.addEventListener('pointerdown', e=>{
   for(let i=0;i<TRAY.length;i++){
     if(inRect(p.x,p.y,trayRects[i])){
       const t=TRAY[i].t;
-      if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge')) S.drag={type:t,x:p.x,y:p.y,unit:null}; }
-      else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y,unit:null};
+      if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge')) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; }
+      else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null};
       S.sel=null; return;
     }
   }
@@ -857,14 +867,14 @@ cv.addEventListener('pointerdown', e=>{
     if(hit.down){ standUp(hit); S.sel=null; }
     else if(hit.type==='sarge' || !S.waveActive){
       // between waves every man is movable — pick him up
-      S.drag={type:hit.type,x:p.x,y:p.y,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
+      S.drag={type:hit.type,x:p.x,y:p.y-DRAG_OFF,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
     }
     else S.sel = (S.sel===hit? null : hit);
     return;
   }
   S.sel=null;
 });
-cv.addEventListener('pointermove', e=>{ if(S.drag){ const p=evPos(e); S.drag.x=p.x; S.drag.y=p.y; } });
+cv.addEventListener('pointermove', e=>{ if(S.drag){ const p=evPos(e); S.drag.x=p.x; S.drag.y=p.y-DRAG_OFF; } });
 cv.addEventListener('pointerup', e=>{
   if(!S.drag) return;
   const p=evPos(e), d=S.drag; S.drag=null;
@@ -872,9 +882,10 @@ cv.addEventListener('pointerup', e=>{
     S.sel = (S.sel===d.unit? null : d.unit);   // a tap, not a move — inspect/vet
     return;
   }
-  if(canPlace(p.x,p.y,d.type)){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=p.y; d.unit.sprue=0.2; SFX.thock(); coachEvent('move'); }
-    else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,p.y); }
+  const dy=p.y-DRAG_OFF;                        // the figure floats above your finger
+  if(canPlace(p.x,dy,d.type)){
+    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; SFX.thock(); coachEvent('move'); }
+    else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,dy); }
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
 window.addEventListener('pointercancel', ()=>{ S.drag=null; });
