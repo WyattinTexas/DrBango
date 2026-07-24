@@ -287,6 +287,12 @@ function levelCfg(n){
     const last=(i===wc-1), key = n===1? ['column','line','guerrilla','pincer','redcoat','motorcade'][i] : (last&&n>=3 ? 'push' : POOL[(n*3+i*2+((R()*3)|0))%9]);
     cfg.waves.push(waveFromKey(key, cfg.cntMul, R));
   }
+  // BOSS every third level — the final wave becomes a boss instead of the push.
+  // The three bosses cycle so you meet all of them: L3 giant, L6 piggy, L9 rex…
+  if(n>=3 && n%3===0){
+    const bt=['giant','rollpig','rex'][(Math.floor(n/3)-1)%3];
+    cfg.waves[cfg.waves.length-1]={ name:BOSSDEF[bt].wave, boss:bt, groups:[{f:'boss',t:bt,n:1,e:'right',at:0}] };
+  }
   return cfg;
 }
 function waveFromKey(key, m, R){
@@ -328,7 +334,17 @@ const FDEF = {
   crawler: { hp:1,  spd:72, bounty:4,  leak:1, w:50, low:true, rng:110, fireCd:4 },
   officer: { hp:4,  spd:44, bounty:15, leak:1, w:52 },
   jeep:    { hp:12, spd:88, bounty:25, leak:2, w:78, vehicle:true },
-  tank:    { hp:60, spd:20, bounty:100,leak:3, w:96, vehicle:true }
+  tank:    { hp:60, spd:20, bounty:100,leak:3, w:96, vehicle:true },
+  // ===== BOSSES: rare, huge, and each a different problem to solve =====
+  giant:   { hp:42, spd:26, bounty:70,  leak:5, w:104, rng:150, fireCd:2.3, boss:true },  // slow tanky wall — knocks a man down every couple seconds
+  rollpig: { hp:44, spd:54, bounty:80,  leak:5, w:112, boss:true, splashCd:1.1, splashR:78 }, // fast rush — tumbles in and splashes your line flat
+  rex:     { hp:66, spd:33, bounty:110, leak:6, w:122, boss:true, stompCd:2.0, stompR:100 }   // the bruiser — huge HP, AoE stomp
+};
+// Boss display + wave-announce copy. Titles show on the boss health bar.
+const BOSSDEF = {
+  giant:   { title:'THE BIG SHOT',        wave:'⚠ BOSS · THE BIG SHOT ⚠' },
+  rollpig: { title:'RUNAWAY PIGGY BANK',  wave:'⚠ BOSS · RUNAWAY PIGGY BANK ⚠' },
+  rex:     { title:'THE TIN REX',         wave:'⚠ BOSS · THE TIN REX ⚠' }
 };
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 const T = { x:130, y:300 };           // the Toy Box
@@ -385,13 +401,44 @@ blob: '<path d="M6 18 Q2 10 10 8 Q12 2 20 4 Q30 2 32 10 Q38 12 34 18 Q30 22 20 2
 const MIRROR = s=>'<g transform="translate(120,0) scale(-1,1)">'+s+'</g>';
 SPRITES_SRC.tanrifle = MIRROR(SPRITES_SRC.rifleman);
 SPRITES_SRC.tanmg    = MIRROR(SPRITES_SRC.mgunner);
+// ===== BOSSES (every few campaign levels) =====
+// giant: a MEGA tan rifleman — same body, just drawn huge (tints with the army).
+SPRITES_SRC.giant = SPRITES_SRC.tanrifle;
+// mini T-Rex: a chunky toy dinosaur, fixed dino-green (a monster, not an army man),
+// facing left so it reads as coming IN. Multi-tone for a bit of heft.
+SPRITES_SRC.rex = '<ellipse cx="72" cy="130" rx="54" ry="8" fill="#000" opacity="0.28"/>'
+  +'<path d="M92 100 Q124 100 132 70 Q135 58 128 56 Q122 70 108 82 Q98 92 92 100 z" fill="#4E8C4A"/>'
+  +'<path d="M56 56 l6 -12 6 12 z" fill="#3D6E3B"/><path d="M70 53 l6 -13 6 13 z" fill="#3D6E3B"/><path d="M84 58 l6 -11 6 11 z" fill="#3D6E3B"/>'
+  +'<path d="M42 116 Q30 96 40 74 Q52 52 82 56 Q110 60 112 90 Q113 114 88 122 Q62 128 42 116 z" fill="#4E8C4A"/>'
+  +'<path d="M54 116 Q48 100 56 86 Q68 74 86 78 Q100 82 98 104 Q94 118 76 120 Q62 122 54 116 z" fill="#6FB05E"/>'
+  +'<path d="M62 96 Q54 98 52 106" stroke="#4E8C4A" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="52" cy="107" r="3" fill="#4E8C4A"/>'
+  +'<path d="M74 94 Q94 94 96 120 Q96 128 86 128 L64 128 Q60 116 64 104 Q68 94 74 94 z" fill="#3D6E3B"/>'
+  +'<path d="M84 128 l7 -3 M92 128 l7 -3 M76 128 l7 -3" stroke="#2f5730" stroke-width="3" stroke-linecap="round"/>'
+  +'<path d="M50 70 Q22 62 12 74 Q8 82 16 84 L48 84 Q54 76 50 70 z" fill="#4E8C4A"/>'
+  +'<path d="M48 86 Q26 90 18 99 Q28 101 42 98 Q52 95 50 88 z" fill="#3D6E3B"/>'
+  +'<path d="M18 84 l3 6 3 -6 z M27 84 l3 6 3 -6 z M36 84 l3 6 3 -6 z" fill="#F5EFD8"/>'
+  +'<path d="M25 90 l3 -5 3 5 z M35 90 l3 -5 3 5 z" fill="#F5EFD8"/>'
+  +'<path d="M33 65 Q41 61 49 66" stroke="#3D6E3B" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+  +'<circle cx="40" cy="73" r="6" fill="#fff"/><circle cx="37" cy="74" r="3" fill="#1a1208"/><circle cx="19" cy="75" r="2" fill="#2a3a24"/>';
+// runaway piggy bank: round enemy bank that tumbles in. currentColor → it tints
+// to whatever colour the enemy army is. Shadow is drawn separately (it spins).
+SPRITES_SRC.rollpig = '<circle cx="70" cy="72" r="46" fill="currentColor"/>'
+  +'<path d="M40 44 A46 46 0 0 1 98 40" stroke="#fff" stroke-width="7" fill="none" opacity="0.16" stroke-linecap="round"/>'
+  +'<path d="M52 34 L44 15 L65 27 z" fill="currentColor"/><path d="M88 34 L96 15 L75 27 z" fill="currentColor"/>'
+  +'<rect x="59" y="29" width="24" height="7" rx="3.5" fill="#000" opacity="0.4"/>'
+  +'<ellipse cx="33" cy="78" rx="17" ry="14" fill="currentColor"/>'
+  +'<ellipse cx="29" cy="76" rx="2.6" ry="3.6" fill="#000" opacity="0.4"/><ellipse cx="38" cy="80" rx="2.6" ry="3.6" fill="#000" opacity="0.4"/>'
+  +'<circle cx="55" cy="60" r="6.5" fill="#fff"/><circle cx="53" cy="61" r="3.2" fill="#1a1208"/>'
+  +'<path d="M111 84 q13 3 10 16 q-3 9 -12 5" stroke="currentColor" stroke-width="7.5" fill="none" stroke-linecap="round"/>'
+  +'<rect x="50" y="110" width="11" height="15" rx="4" fill="currentColor"/><rect x="80" y="110" width="11" height="15" rx="4" fill="currentColor"/>'
+  +'<path d="M96 100 A46 46 0 0 1 60 116" stroke="#000" stroke-width="9" fill="none" opacity="0.10" stroke-linecap="round"/>';
 const IMG = {};
 let assetsLeft = 0;
 function buildSprites(done){
   const jobs = [];
   for(const k in SPRITES_SRC){
-    const vb = (k==='jeep'||k==='tank') ? '0 0 140 140' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';
-    const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='blob') ? TAN : GREEN;
+    const vb = (k==='jeep'||k==='tank'||k==='rex'||k==='rollpig') ? '0 0 140 140' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';
+    const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='blob'||k==='giant'||k==='rollpig') ? TAN : GREEN;
     jobs.push([k, vb, color]);
   }
   assetsLeft = jobs.length;
@@ -438,7 +485,11 @@ const SFX = {
   ouch:  ()=>tone(240,80,0.4,'sawtooth',0.1),
   coin:  ()=>{ tone(1180,1560,0.07,'sine',0.07); setTimeout(()=>tone(1560,2100,0.09,'sine',0.05),60); },
   // distant boots on the landing — quiet, so it reads as "out there", not "in here"
-  march: ()=>{ for(let i=0;i<4;i++) setTimeout(()=>{ noise(0.14,0.05,200); tone(72,50,0.16,'sine',0.055); }, i*300); }
+  march: ()=>{ for(let i=0;i<4;i++) setTimeout(()=>{ noise(0.14,0.05,200); tone(72,50,0.16,'sine',0.055); }, i*300); },
+  // BOSS SFX
+  stomp: ()=>{ noise(0.24,0.2,240); tone(96,38,0.28,'sine',0.15); },
+  roar:  ()=>{ tone(200,70,0.55,'sawtooth',0.13); setTimeout(()=>noise(0.4,0.12,520),40); },
+  rumble:()=>{ noise(0.5,0.09,180); tone(60,44,0.5,'sine',0.09); }
 };
 
 // ================= BOOT CAMP COACH =================
@@ -476,23 +527,34 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.downsLevel=0; S.invasion=null;
+  S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false;
 }
 function startBattle(levelN, rival){
   reset();
   S.levelN=levelN; S.rival=rival||null;
   S.cfg=levelCfg(levelN);
   if(rival){
+    // DEFEND THE ROOM: you came to play the game and found the room under attack.
+    // This is a quick sortie, not a campaign level — 4 punchy waves, extra tags
+    // to set up fast, in and out. Win or lose, you're back to the game in a minute.
+    S.cfg.waves = rivalRaidWaves(S.cfg.cntMul);
+    S.plastic = 240;                      // a few more dog tags than usual for the scramble
     // rival armies fight on your current front's terrain, in their colors
     if(rival.mod.officers){ S.cfg.waves.forEach((w,i)=>{ if(i%2===1&&w.groups[0]&&!w.groups[0].officer) w.groups[0].officer=true; }); }
     if(rival.mod.jeeps){ S.cfg.waves.forEach((w,i)=>{ if(i%3===2) w.groups.push({f:'solo',t:'jeep',n:1,e:'right-top',at:4}); }); }
     if(rival.mod.crawlers){ S.cfg.waves.forEach((w,i)=>{ if(i%2===0) w.groups.push({f:'guerrilla',t:'crawler',n:3,e:'right-bottom',at:3}); }); }
     if(rival.mod.count){ S.cfg.waves.forEach(w=>w.groups.forEach(g=>{ if(g.t==='tanrifle') g.n=Math.round(g.n*rival.mod.count); })); }
     buildFoeTint(rival.hex);
+    S.ann={txt:'DEFEND THE ROOM!',t:2.2};
   }
   hideAllOverlays();
   S.mode='play';
   if(META.campaign===0 && levelN===1) coachStart();
+}
+// The room-defense sortie: short, varied, escalating. Opener → flank → spectacle
+// → big finish. Entertaining precisely because it never outstays its welcome.
+function rivalRaidWaves(m){
+  return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
 function hideAllOverlays(){ ['title','lose','win','menu','picker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
@@ -634,18 +696,22 @@ function spawnWave(){
   if(S.wave>=S.cfg.waves.length||S.waveActive) return;
   const w=S.cfg.waves[S.wave];
   S.queue = w.groups.map(g=>Object.assign({},g));
-  S.ann = { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
+  S.ann = w.boss ? { txt:w.name, t:3.2, warn:true } : { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
   coachEvent('wave');
 }
 function spawnFoe(type,x,y,form,gu){
   const d=FDEF[type];
   const m=S.rival? S.rival.mod : {};
-  const f={ id:idc++, type, def:d, hp:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)), hpMax:Math.round(d.hp*S.cfg.hpMul*(m.hp||1)),
+  // bosses don't scale their HP as hard as the rank curve would make them — big
+  // enough to be a wall, not a slog. (Half the hpMul growth.)
+  const hpm = d.boss ? (1+(S.cfg.hpMul-1)*0.5) : S.cfg.hpMul;
+  const f={ id:idc++, type, def:d, hp:Math.round(d.hp*hpm*(m.hp||1)), hpMax:Math.round(d.hp*hpm*(m.hp||1)),
     x, y, vx:0, vy:0, wob:Math.random()*6.28,
     spdMul:(m.spd||1), fireMul:(m.fire||1), bountyMul:(m.bounty||1),
     shot:(type==='officer'?3:(type==='tanrifle'?2.4:(type==='tanmg'?1.8:0))), rammed:{}, form:form||null, off:null,
-    gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0, burst:0, burstT:0 };
+    gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0, burst:0, burstT:0,
+    boss:!!d.boss, spin:0 };
   S.foes.push(f);
   return f;
 }
@@ -655,8 +721,8 @@ const IMGT = {};
 function buildFoeTint(hex){
   if(IMGT[hex]) return;
   IMGT[hex]={};
-  ['tanrifle','tanmg','crawler','officer','jeep','tank'].forEach(k=>{
-    const vb=(k==='jeep'||k==='tank')?'0 0 140 140':'0 0 120 140';
+  ['tanrifle','tanmg','crawler','officer','jeep','tank','giant','rollpig'].forEach(k=>{
+    const vb=(k==='jeep'||k==='tank'||k==='rollpig')?'0 0 140 140':'0 0 120 140';
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
     im.onload=()=>{ IMGT[hex][k]=im; };
@@ -687,6 +753,12 @@ function unitImg(k){
 // the veteran stripe has to contrast with whatever colour that army is wearing
 function vetStripe(){ const h=S.invasion? S.invasion.theirHex : dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
 function spawnGroup(g){
+  if(g.f==='boss'){
+    // one boss, dead center, marching straight for the toy box
+    const b=spawnFoe(g.t, 1030, 300, null, false);
+    S.shake=0.6; if(g.t==='rex') SFX.roar(); else if(g.t==='rollpig') SFX.rumble(); else SFX.horn();
+    return;
+  }
   if(g.f==='guerrilla'||g.f==='solo'){
     for(let i=0;i<g.n;i++){ const p=edgePt(g.e); spawnFoe(g.t, p.x+(Math.random()-0.5)*60, p.y+(Math.random()-0.5)*40, null, g.f==='guerrilla'); }
     return;
@@ -752,7 +824,7 @@ function endBattle(win){
 
   const firstEver = !S.rival && S.levelN===1 && META.campaign===0;
   const wtEl=document.getElementById('winTitle'); wtEl.style.color='#7FA35C';
-  wtEl.innerHTML = S.rival? (S.rival.name+'<br>DEFEATED') : 'CARPET<br>SECURED';
+  wtEl.innerHTML = S.rival? (S.rival.name+'<br>DEFEATED') : (S.bossKilled? 'BOSS<br>DEFEATED' : 'CARPET<br>SECURED');
   const m1=true, m2=S.lives>=10, m3=S.maxDown<=3.05 && !S.units.some(u=>u.down&&u.downT>3.05);
   let stars=(m1?1:0)+(m2?1:0)+(m3?1:0);
   document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
@@ -770,9 +842,12 @@ function endBattle(win){
     META.levelStars['l'+S.levelN]=Math.max(prev,stars);
     if(S.levelN>META.campaign) META.campaign=S.levelN;
   }
+  // a felled boss pays a bounty on top of the level's medals
+  if(S.bossKilled && !S.rival){ META.starBank+=2; META.starsLifetime+=2; }
   META.starBank+=stars; META.starsLifetime+=stars;
-  const xpGain = 30 + stars*30 + S.wave*4;
+  const xpGain = 30 + stars*30 + S.wave*4 + (S.bossKilled?40:0);
   META.xp += xpGain;
+  if(S.bossKilled && !S.rival) msg = 'BOSS DOWN! '+msg+' · +2★ bounty';
   msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
   let promos=0;
   while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
@@ -860,7 +935,7 @@ function update(dt){
     else {
     // the river funnels everyone to the bridge — except crawlers, who slip under
     const RV=S.cfg.terrain.river;
-    const goal = (RV && !f.crossed && f.type!=='crawler' && f.x>RV.x+RV.w)
+    const goal = (RV && !f.crossed && f.type!=='crawler' && !f.boss && f.x>RV.x+RV.w)
       ? { x:RV.x+RV.w/2, y:RV.bridgeY } : T;
     if(RV && f.x<=RV.x-4) f.crossed=true;
     if(f.form){
@@ -947,8 +1022,36 @@ function update(dt){
           S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:34}); }
       }
     }
+    // ===== BOSS attacks (only once they're on the carpet) =====
+    if(f.boss && f.x<W-10){
+      f.shot+=dt;
+      if(f.type==='giant'){
+        // the big shot: a slow, heavy knockdown on the nearest man in reach
+        if(f.shot>=f.def.fireCd){
+          f.shot=0; let best=null,bd=1e9;
+          for(const u of S.units){ if(u.down) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<f.def.rng&&d<bd){bd=d;best=u;} }
+          if(best){ knock(best,f.x,f.y); SFX.tpew(); S.fx.push({k:'tracer',x1:f.x-16,y1:f.y-96,x2:best.x,y2:best.y-18,t:0,dur:0.12,col:'#EDD9A8'}); }
+        }
+      } else if(f.type==='rex'){
+        // stomp: an AoE knockdown that flattens everyone nearby. You hear it coming.
+        if(f.shot>=f.def.stompCd){
+          f.shot=0; SFX.stomp(); S.shake=0.55;
+          S.fx.push({k:'ring',x:f.x,y:f.y+6,r:12,R:f.def.stompR,t:0,dur:0.42,col:'rgba(62,42,30,0.75)'});
+          for(const u of S.units){ if(!u.down && Math.hypot(u.x-f.x,u.y-f.y)<f.def.stompR) knock(u,f.x,f.y); }
+        }
+      } else if(f.type==='rollpig'){
+        // just rolls in and bowls your line over — splash knockdowns as it tumbles
+        f.spin-=dt*(2.4+f.def.spd/40);   // rolling left → spins counter-clockwise
+        if(f.shot>=f.def.splashCd){
+          f.shot=0; let hit=false;
+          for(const u of S.units){ if(!u.down && Math.hypot(u.x-f.x,u.y-f.y)<f.def.splashR){ knock(u,f.x,f.y); hit=true; } }
+          if(hit){ SFX.thock(); S.shake=0.3; S.fx.push({k:'ring',x:f.x,y:f.y+4,r:10,R:f.def.splashR,t:0,dur:0.34,col:'rgba(255,255,255,0.55)'}); }
+        }
+      }
+    }
     if(Math.hypot(T.x-f.x, T.y-f.y)<LEAK_R){
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
+      if(f.boss){ S.shake=0.7; S.floats.push({x:T.x,y:T.y-70,txt:'THE BOSS BROKE THROUGH!',t:0,col:'#D96A55'}); }
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
       if(S.lives<=0){ S.lives=0; if(S.invasion){ endInvasion(true); } else { endBattle(false); } return; }
     }
@@ -1079,7 +1182,13 @@ function hitCheck(f,u){
       if(S.corpses.length>90) S.corpses.shift();
       if(!S.invasion) S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty (invaders don't loot their own dead)
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
-      if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
+      if(f.boss){
+        // a boss goes down LOUD: shake, a burst of smoke, and a victory shout
+        SFX.boom(); S.shake=0.85; S.bossKilled=true;
+        for(let j=0;j<4;j++) S.fx.push({k:'puff',x:f.x+(Math.random()-0.5)*46,y:f.y-24+(Math.random()-0.5)*46,t:0,dur:0.6,R:44});
+        S.floats.push({x:f.x,y:f.y-72,txt:'BOSS DOWN!',t:0,col:'#FFF3C4'});
+      }
+      else if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
       else SFX.clack();
     }
   }
@@ -1241,16 +1350,21 @@ function draw(){
 
   drawCoach();
 
-  // formation announce card
+  // formation announce card (boss waves flash a red warning banner)
   if(S.ann){
-    const k=Math.min(1,(2.6-S.ann.t)*4), out=Math.min(1,S.ann.t*2.5);
+    const dur=S.ann.warn?3.2:2.6;
+    const k=Math.min(1,(dur-S.ann.t)*4), out=Math.min(1,S.ann.t*2.5);
     cx.globalAlpha=Math.min(k,out);
-    cx.fillStyle='rgba(38,40,31,0.92)';
-    const tw=cx.measureText(S.ann.txt).width;
     cx.font='bold 40px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
     const w2=cx.measureText(S.ann.txt).width/2+34;
-    rr(W/2-w2,168,w2*2,64,10); cx.fill();
-    cx.fillStyle='#FFF3C4';
+    if(S.ann.warn){
+      cx.fillStyle='rgba(140,40,32,0.94)'; rr(W/2-w2,168,w2*2,64,10); cx.fill();
+      cx.strokeStyle='#FFD24A'; cx.lineWidth=3; rr(W/2-w2,168,w2*2,64,10); cx.stroke();
+      cx.fillStyle='#FFF3C4';
+    } else {
+      cx.fillStyle='rgba(38,40,31,0.92)'; rr(W/2-w2,168,w2*2,64,10); cx.fill();
+      cx.fillStyle='#FFF3C4';
+    }
     cx.fillText(S.ann.txt, W/2, 212);
     cx.globalAlpha=1;
   }
@@ -1302,6 +1416,18 @@ function drawCoach(){
     if(u&&!(S.drag&&S.drag.unit===u)) fingerDrag(u.x,u.y-14,Math.max(90,u.x-130),Math.max(90,u.y-60));
   }
 }
+// the boss health bar: a big red menace bar under the top HUD strip
+function drawBossBar(){
+  const b=S.foes.find(f=>f.boss); if(!b) return;
+  const k=Math.max(0,b.hp/b.hpMax), bw=W*0.46, bx=(W-bw)/2, by=54;
+  cx.fillStyle='rgba(20,16,12,0.9)'; rr(bx-8,by-7,bw+16,28,9); cx.fill();
+  cx.fillStyle='rgba(0,0,0,0.5)'; cx.fillRect(bx,by,bw,14);
+  cx.fillStyle=k>0.35?'#C0473A':'#8a2f26'; cx.fillRect(bx,by,bw*k,14);
+  cx.strokeStyle='rgba(255,255,255,0.55)'; cx.lineWidth=1.5; cx.strokeRect(bx,by,bw,14);
+  cx.fillStyle='#FFF3C4'; cx.font='bold 15px "Arial Narrow", Impact, sans-serif';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText((BOSSDEF[b.type]?BOSSDEF[b.type].wave:'⚠ BOSS ⚠'), W/2, by+7);
+}
 function drawTag(x,y,s){
   cx.save(); cx.translate(x,y); cx.rotate(-0.35);
   cx.fillStyle='#C8CDD4'; rr(-s*0.65,-s*0.42,s*1.3,s*0.84,s*0.4); cx.fill();
@@ -1335,6 +1461,18 @@ function drawUnit(u){
   }
 }
 function drawFoe(f){
+  if(f.boss){
+    if(f.type==='rollpig'){
+      const im=foeImg('rollpig');
+      cx.fillStyle='rgba(0,0,0,0.24)'; cx.beginPath(); cx.ellipse(f.x,f.y,f.def.w*0.36,8,0,0,7); cx.fill();
+      if(im){ const w=f.def.w, h=w*(im.height/im.width);
+        cx.save(); cx.translate(f.x, f.y-h/2); cx.rotate(f.spin); cx.drawImage(im,-w/2,-h/2,w,h); cx.restore(); }
+    } else {
+      // giant / rex: a heavy, slow idle sway so they feel massive
+      drawSprite(f.type,f.x,f.y,f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028,foeImg(f.type));
+    }
+    return;   // boss HP is on the big top bar, not a little sprite bar
+  }
   if(f.burrow){
     // under the rug: just a moving bump and a guilty ripple
     cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(f.x,f.y+4,22,8,0,0,7); cx.fill();
@@ -1373,6 +1511,7 @@ function drawHUD(){
     : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY')), W/2-60, 23);
   cx.textAlign='right';
   cx.fillText((S.invasion?'THEIR BOX ×':'TOY BOX ×')+S.lives, W-16, 23);
+  drawBossBar();
   // buttons: speed, sound & retreat to HQ (always available — even mid-Level 1)
   btn('spd', W/2+110, 6, 62, 32, S.speed+'×');
   btn('snd', W/2+180, 6, 52, 32, soundOn?'♪':'×');
@@ -1957,7 +2096,8 @@ window.GVT = {
   cfg(){ return S.cfg; },
   coachStep(){ return coach? coach.step : null; },
   beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
-  endCoach(){ coachDone(); }
+  endCoach(){ coachDone(); },
+  boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); }
 };
 </script>
 </body>
