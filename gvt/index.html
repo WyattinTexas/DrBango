@@ -169,7 +169,7 @@ window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.styl
 // ================= CONSTANTS =================
 const W=960, H=600, TILE=60, DRAG_OFF=56;   // dragged figures ride above the finger so you can see your placement
 const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
-const COSTS = { rifleman:25, mgunner:80, bazooka:150, mortar:200, sarge:0, minesweeper:75, flame:150, radioman:100 };
+const COSTS = { rifleman:40, mgunner:100, bazooka:150, mortar:200, sarge:0, minesweeper:120, flame:150, radioman:100 };
 
 // ================= META (the Long War) =================
 const META_DEFAULT = {
@@ -309,9 +309,11 @@ function waveFromKey(key, m, R){
 // but a decent line wins the firefight. (Wyatt 7/21: "slightly stronger
 // to start... maybe you'll lose one unit at the start.")
 const UDEF = {
-  // 7/23 balance: riflemen + MG reach further (+15%), Sarge hits harder (+50%),
+  // 7/24 balance: rifleman reach +10% (165) — and the TAN rifle now matches it
+  // (FDEF rng 165), so both shoot from about the same distance; the tan just
+  // takes a ~0.5s wind-up to open up. MG reach +15% (109), Sarge damage +50%,
   // the bazooka fires 20% slower, and both indirect guns scatter 40% wider.
-  rifleman:{ rng:173, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
+  rifleman:{ rng:165, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
   mgunner: { rng:109, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
   bazooka: { rng:150, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },
   mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },
@@ -321,7 +323,7 @@ const UDEF = {
   radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 }
 };
 const FDEF = {
-  tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:140, fireCd:3.2, name:'tan' },
+  tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:165, fireCd:3.2, name:'tan' },  // matches your rifleman's reach — the ~0.5s aim wind-up is their only tell
   tanmg:   { hp:3,  spd:34, bounty:8,  leak:1, w:54, rng:112, fireCd:2.6 },
   crawler: { hp:1,  spd:72, bounty:4,  leak:1, w:50, low:true, rng:110, fireCd:4 },
   officer: { hp:4,  spd:44, bounty:15, leak:1, w:52 },
@@ -1533,7 +1535,7 @@ const SHOP_ITEMS=[
 // THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
 // at the Training Academy to read their page.
 const CLASSINFO = {
-  rifleman:   { good:'Long reach (173) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. Needs friends.' },
+  rifleman:   { good:'Long reach (165) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. The tan rifle now reaches just as far — but you fire first.' },
   mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close.', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
   bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and those blasts knock down your own men. Give them room.' },
   mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
@@ -1592,7 +1594,14 @@ function roomRuckus(riv){
     +flat('tanmg',745,70,58,82)              // sprawled out in YOUR bed
     +fig('tanrifle',856,48,56,-0.17)         // and one more standing on it
     +fig('tanrifle',224,200,56,-0.29)        // on top of the toy box, like they own it
-    +fig('tanrifle',190,140,58,-0.05)        // helping himself to the piggy bank
+    // THE PIGGY-BANK HEIST: a whole crew trying to make off with your savings —
+    // one shoving from the left, one hauling from the right, a crawler dragging
+    // it out from underneath. The piggy stays visible between them: you can see
+    // it being stolen, which is the joke.
+    +fig('tanrifle',196,138,58,-0.05)        // heaving from the right
+    +fig('tanrifle',58,150,54,-0.42)         // shoving from the left
+    +fig('tanmg',150,120,46,-0.6)            // reaching over the top
+    +flat('crawler',104,206,58,4)            // one flat underneath, dragging it out
     +fig('tanmg',690,196,52,-0.23)           // the one who knocked the blocks over
     +block(632,248,'#D9A544',18)+block(676,268,'#4A6B8A',-24)+block(644,292,'#C85A4A',7)
     +'</g>';
