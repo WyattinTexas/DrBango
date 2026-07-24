@@ -180,7 +180,10 @@ const META_DEFAULT = {
   lasers:[], laserOn:null, dyes:[], dyeOn:null,
   avatar:'rifleman', deviceId:'', name:'',
   ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0 },
-  rivalDays:{}                                        // 'YYYY-MM-DD' -> color beaten
+  rivalDays:{},                                       // 'YYYY-MM-DD' -> color beaten
+  // SARGE'S ARSENAL: weapons unlocked by campaign progress, equipped in the
+  // Training Academy, each upgraded through the promotion picker once unlocked.
+  sargeWeapon:'pistol', sargeUnlocked:[], sargeUp:{}, sargeSeen:[]
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); } } catch(e) {}
@@ -346,6 +349,26 @@ const BOSSDEF = {
   rollpig: { title:'RUNAWAY PIGGY BANK',  wave:'⚠ BOSS · RUNAWAY PIGGY BANK ⚠' },
   rex:     { title:'THE TIN REX',         wave:'⚠ BOSS · THE TIN REX ⚠' }
 };
+// ===== SARGE'S ARSENAL =====
+// The pistol is his default (upgrades with the SARGE unit promotion). The three
+// specials unlock as the campaign rolls on and each has its own upgrade rank
+// (META.sargeUp), chosen at the promotion picker once unlocked.
+const SARGE_WEAPONS = {
+  pistol:    { name:'SERVICE PISTOL', unlock:0,  desc:'His trusty sidearm — steady, reliable, always there.' },
+  shotgun:   { name:'SHOTGUN',        unlock:5,  desc:'A hair less reach than the pistol, but a wide cone that flattens a whole cluster at once.' },
+  sniper:    { name:'SNIPER RIFLE',   unlock:10, desc:'Reaches clear across the carpet and hits like a truck — but a long, slow reload.' },
+  lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge charges out, carves up whatever is close, blocks incoming fire, then falls back to his post.' }
+};
+const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber'];
+// effective combat stats for whatever Sarge is carrying, at its current rank
+function sargeStats(){
+  const w=SARGE_WEAPONS[META.sargeWeapon]?META.sargeWeapon:'pistol';
+  const r=Math.min(5, (w==='pistol'? (META.up.sarge||0) : (META.sargeUp[w]||0)));
+  if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:1.1+0.35*r, cone:0.62+0.05*r };
+  if(w==='sniper')     return { w, r, rng:340, rate:0.22, dmg:9+3*r };
+  if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*r, cd:2.1, block:Math.min(0.75,0.34+0.09*r) };
+  return { w:'pistol', r, rng:108, rate:1.8, dmg:1.5 };   // default; unit-upgrade mult applied on the default path
+}
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 const T = { x:130, y:300 };           // the Toy Box
 const LEAK_R = 64;
@@ -641,11 +664,53 @@ function placeUnit(type,x,y){
   return u;
 }
 function gritCap(u){ return u.def.grit + (u.vet?1:0); }
+// a lightsaber Sarge deflects some incoming fire — spark and shrug it off
+function saberBlocks(u){
+  if(u.type!=='sarge' || META.sargeWeapon!=='lightsaber') return false;
+  const sw=sargeStats();
+  if(sw.block && Math.random()<sw.block){
+    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:'rgba(140,220,255,0.9)'}); SFX.snap(); return true;
+  }
+  return false;
+}
 function tanHit(u,fx,fy){
   if(u.down) return;
+  if(saberBlocks(u)) return;                 // deflected off the blade
   u.hits++; u.hitT=0;
   S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
   if(u.hits>=gritCap(u)){ knock(u,fx,fy); }
+}
+// LIGHTSABER: Sarge charges the nearest foe, carves it up, then falls back to
+// his post. Home is where he was placed. State: idle → out → back.
+function updateSaber(u,dt,sw){
+  if(!u.home) u.home={x:u.x,y:u.y};
+  if(!u.saberState) u.saberState='idle';
+  u.saberCd=(u.saberCd||0)-dt;
+  if(u.saberState==='idle'){
+    if(u.saberCd>0) return;
+    let best=null,bd=sw.aggro;
+    for(const f of S.foes){ if(f.burrow||f.x>W-6) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+    if(best){ u.saberState='out'; u.saberTarget=best; SFX.laser(); }
+    return;
+  }
+  if(u.saberState==='out'){
+    const f=u.saberTarget;
+    if(!f || S.foes.indexOf(f)<0){ u.saberState='back'; return; }
+    const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
+    if(d>26){ const sp=470; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
+    else {
+      const vm=(u.vet?1.5:1);
+      f.hp-=sw.dmg*vm; hitCheck(f,u);            // massive strike
+      for(const g of S.foes){ if(g!==f && !g.burrow && Math.hypot(g.x-u.x,g.y-u.y)<46){ g.hp-=sw.dmg*0.5*vm; hitCheck(g,u); } }  // a cleave to whatever else is close
+      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:'rgba(120,220,255,0.85)'});
+      SFX.laser(); S.shake=0.2; u.saberState='back'; u.saberCd=sw.cd;
+    }
+    return;
+  }
+  // back home
+  const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
+  if(d>4){ const sp=390; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
+  else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; }
 }
 function frng(f){ return f.def.rng + (S.invasion?15:0); }   // your invaders shoot with conviction
 function tanShoot(f){
@@ -678,6 +743,7 @@ function canPlace(x,y,type){
 }
 function knock(u, srcx, srcy){
   if(u.down) return;
+  if(saberBlocks(u)) return;                 // the blade turns it aside
   u.down=true; u.downT=0; u.hits=0; S.downsLevel++; SFX.clack();
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
   if(S.invasion && !S.invasion.resolved){
@@ -842,12 +908,17 @@ function endBattle(win){
     META.levelStars['l'+S.levelN]=Math.max(prev,stars);
     if(S.levelN>META.campaign) META.campaign=S.levelN;
   }
+  // SARGE unlocks a new weapon as the campaign advances — announced right here
+  let sargeNew=[];
+  for(const wk of SARGE_ORDER){ const wd=SARGE_WEAPONS[wk];
+    if(wd.unlock>0 && META.campaign>=wd.unlock && META.sargeUnlocked.indexOf(wk)<0){ META.sargeUnlocked.push(wk); sargeNew.push(wd.name); } }
   // a felled boss pays a bounty on top of the level's medals
   if(S.bossKilled && !S.rival){ META.starBank+=2; META.starsLifetime+=2; }
   META.starBank+=stars; META.starsLifetime+=stars;
   const xpGain = 30 + stars*30 + S.wave*4 + (S.bossKilled?40:0);
   META.xp += xpGain;
   if(S.bossKilled && !S.rival) msg = 'BOSS DOWN! '+msg+' · +2★ bounty';
+  if(sargeNew.length) msg += ' · ⚔ SARGE UNLOCKED THE '+sargeNew.join(' & ')+'! Equip it at the Training Academy';
   msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
   let promos=0;
   while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
@@ -1069,6 +1140,37 @@ function update(dt){
       continue;
     }
     if(S.drag && S.drag.unit===u) continue; // sarge being carried
+    // ===== SARGE'S ARSENAL: specials get their own handling; the pistol falls
+    // through to the default path below (and keeps its SARGE-unit upgrade). =====
+    if(u.type==='sarge'){
+      const sw=sargeStats();
+      if(sw.w!=='pistol'){
+        if(sw.w==='lightsaber'){ updateSaber(u,dt,sw); continue; }
+        u.cd-=dt; if(u.cd>0) continue;
+        let rb=1; for(const r of S.units){ if(r.type==='radioman'&&!r.down&&r!==u&&Math.hypot(r.x-u.x,r.y-u.y)<UDEF.radioman.auraR){ rb=UDEF.radioman.auraMul; break; } }
+        let best=null,bs=1e9;
+        for(const f of S.foes){ if(f.burrow) continue; if(f.x>W-10||f.x<-40||f.y<-30||f.y>H+30) continue;
+          const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue; const db=Math.hypot(T.x-f.x,T.y-f.y); if(db<bs){bs=db;best=f;} }
+        if(!best) continue;
+        u.cd=1/sw.rate; const vm=(u.vet?1.5:1);
+        if(sw.w==='shotgun'){
+          // a wide CONE aimed at the nearest cluster — flattens everyone inside it
+          SFX.thock(); (SFX.pew)();
+          const ang=Math.atan2(best.y-u.y,best.x-u.x);
+          for(let j=S.foes.length-1;j>=0;j--){ const f=S.foes[j]; if(f.burrow) continue;
+            const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue;
+            let da=Math.abs(Math.atan2(f.y-u.y,f.x-u.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
+            if(da<=sw.cone){ f.hp-=sw.dmg*vm; hitCheck(f,u); } }
+          S.fx.push({k:'cone',x:u.x+8,y:u.y-24,ang,spread:sw.cone,rng:sw.rng*rb,t:0,dur:0.16});
+        } else if(sw.w==='sniper'){
+          // one heavy round clear across the carpet
+          SFX.tpew(); S.shake=0.14; best.hp-=sw.dmg*vm;
+          S.fx.push({k:'tracer',x1:u.x+14,y1:u.y-28,x2:best.x,y2:best.y-18,t:0,dur:0.2,col:'#FFF3C4',w:3});
+          S.fx.push({k:'puff',x:best.x,y:best.y-16,t:0,dur:0.3,R:16}); hitCheck(best,u);
+        }
+        continue;
+      }
+    }
     const def=u.def;
     if(def.rate===0) continue;              // radioman: all antenna, no rifle
     u.cd-=dt;
@@ -1328,6 +1430,9 @@ function draw(){
     else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc'; cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col; cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
+    else if(e.k==='cone'){ // the shotgun blast — a quick fan of buckshot
+      cx.globalAlpha=(1-k)*0.5; cx.fillStyle='#FFE39A';
+      cx.beginPath(); cx.moveTo(e.x,e.y); cx.arc(e.x,e.y,e.rng*(0.5+0.5*k),e.ang-e.spread,e.ang+e.spread); cx.closePath(); cx.fill(); cx.globalAlpha=1; }
   }
 
   // floats
@@ -1450,6 +1555,7 @@ function drawUnit(u){
     cx.beginPath(); cx.arc(u.x,u.y-14,16+5*pul,0,7); cx.stroke(); cx.globalAlpha=1;
   } else {
     drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),im);
+    if(u.type==='sarge') drawSargeWeapon(u);
     if(u.vet){ cx.fillStyle=vetStripe(); cx.fillRect(u.x-12,u.y-3,24,4); }
     if(u.sprue>0){
       cx.globalAlpha=Math.max(0,u.sprue/0.45); cx.strokeStyle=GREEN; cx.lineWidth=4;
@@ -1458,6 +1564,22 @@ function drawUnit(u){
       cx.beginPath(); cx.moveTo(u.x-30*g,u.y-28); cx.lineTo(u.x-38*g,u.y-28); cx.moveTo(u.x+30*g,u.y-28); cx.lineTo(u.x+38*g,u.y-28); cx.stroke();
       cx.globalAlpha=1;
     }
+  }
+}
+// show what Sarge is packing, right on the figure
+function drawSargeWeapon(u){
+  const w=META.sargeWeapon;
+  if(w==='shotgun'){ cx.strokeStyle='#3a2c1c'; cx.lineWidth=5.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+4,u.y-30); cx.lineTo(u.x+30,u.y-33); cx.stroke(); cx.strokeStyle='#5a4a34'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(u.x+18,u.y-32); cx.lineTo(u.x+30,u.y-33); cx.stroke(); }
+  else if(w==='sniper'){ cx.strokeStyle='#26261f'; cx.lineWidth=3.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+2,u.y-30); cx.lineTo(u.x+46,u.y-36); cx.stroke(); cx.fillStyle='#26261f'; cx.fillRect(u.x+18,u.y-41,5,6); }
+  else if(w==='lightsaber'){
+    const dashing=(u.saberState==='out'||u.saberState==='back');
+    const blade='#7FE3FF', len=dashing?34:28, ang=dashing?-0.9:-0.5;
+    cx.save(); cx.shadowColor=blade; cx.shadowBlur=dashing?16:10;
+    cx.strokeStyle=blade; cx.lineWidth=6; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(u.x+8,u.y-24); cx.lineTo(u.x+8+Math.cos(ang)*len,u.y-24+Math.sin(ang)*len); cx.stroke();
+    cx.strokeStyle='#ffffff'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(u.x+8,u.y-24); cx.lineTo(u.x+8+Math.cos(ang)*len,u.y-24+Math.sin(ang)*len); cx.stroke();
+    cx.restore();
+    if(dashing){ cx.globalAlpha=0.28; cx.fillStyle=blade; cx.beginPath(); cx.ellipse(u.x,u.y-16,20,26,0,0,7); cx.fill(); cx.globalAlpha=1; }
   }
 }
 function drawFoe(f){
@@ -1654,7 +1776,7 @@ cv.addEventListener('pointerup', e=>{
   }
   const dy=p.y-DRAG_OFF;                        // the figure floats above your finger
   if(canPlace(p.x,dy,d.type)){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; SFX.thock(); coachEvent('move'); }
+    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move'); }
     else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,dy); }
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
@@ -1828,7 +1950,9 @@ const ROOM_SPOTS=[
     label:()=>META.rivalDays[todayStr()]? 'REPELLED TODAY ✓' : todaysRival().name+' IS INVADING',
     cls:()=>META.rivalDays[todayStr()]? '' : 'alarm', lx:788, ly:362 },
   { id:'rival',    x:640, y:96,  w:100, h:140, label:null, lx:0, ly:0 },
-  { id:'promo',    x:98,  y:446, w:140, h:100, label:()=>'PROMOTIONS'+(META.pendingPicks>0?' ('+META.pendingPicks+')':''), lx:170, ly:440 },
+  { id:'promo',    x:98,  y:446, w:140, h:100,
+    label:()=>'PROMOTIONS'+(META.pendingPicks>0?' ('+META.pendingPicks+')':'')+(META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)?' ⚔NEW':''),
+    cls:()=>META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)?'alarm':'', lx:170, ly:440 },
   { id:'board',    x:752, y:230, w:90,  h:90,  label:()=>'WORLD RANKINGS', lx:794, ly:334 },
   { id:'ach',      x:622, y:432, w:110, h:80,  label:()=>'MEDALS '+ACH.filter(a=>META.ach[a.id]).length+'/'+ACH.length, lx:680, ly:526 },
   { id:'avatar',   x:322, y:322, w:100, h:110, label:()=>'YOU', lx:371, ly:448 },
@@ -1919,10 +2043,21 @@ function panelHTML(id){
       +'<p>"'+riv.blurb+'"</p>'
       +'<p>'+(rivDone?'✓ Beaten today — +5★ collected. Rematches pay +1★.':'First win today: <b>+5★</b>')+'</p>'
       +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH':'FIGHT '+riv.name)+'</button>';
-    case 'promo': return '<h3>THE TRAINING ACADEMY</h3>'
+    case 'promo':
+      // stepping into the academy clears the "NEW WEAPON" nudge
+      META.sargeUnlocked.forEach(wk=>{ if(META.sargeSeen.indexOf(wk)<0) META.sargeSeen.push(wk); }); saveMeta();
+      return '<h3>THE TRAINING ACADEMY</h3>'
       +(META.pendingPicks>0? '<p>Promotions waiting: '+META.pendingPicks+'</p><button class="mbtn" onclick="UI.promote()">CHOOSE A UNIT TO IMPROVE</button>'
         : '<p>No promotions waiting — win battles, earn XP.</p>')
-      +'<p style="font-size:0.85rem;opacity:0.6;margin:10px 0 2px">TAP A SOLDIER FOR THEIR FIELD MANUAL PAGE:</p>'
+      +'<h3 style="margin-top:14px">SARGE\'S ARSENAL <small style="opacity:0.6;font-weight:normal">— tap to equip; unlocked weapons upgrade at promotions</small></h3>'
+      +'<div>'+SARGE_ORDER.map(wk=>{ const wd=SARGE_WEAPONS[wk];
+        const unlocked=(wk==='pistol'||META.sargeUnlocked.indexOf(wk)>=0);
+        const eq=((META.sargeWeapon||'pistol')===wk);
+        const rank=wk==='pistol'?(META.up.sarge||0):(META.sargeUp[wk]||0);
+        if(!unlocked) return '<div class="mrow" style="opacity:0.45"><img src="'+sprURI('sarge')+'"><div class="grow"><b>'+wd.name+'</b> <small>'+wd.desc+'</small></div><b>🔒 L'+wd.unlock+'</b></div>';
+        return '<div class="mrow" style="cursor:pointer'+(eq?';background:rgba(127,163,92,0.12);border-radius:6px':'')+'" onclick="UI.equipSarge(\''+wk+'\')"><img src="'+sprURI('sarge')+'"><div class="grow"><b>'+wd.name+(rank>0?' <span style="color:#7FA35C">'+'▮'.repeat(rank)+'</span>':'')+'</b> <small style="opacity:0.6">'+wd.desc+'</small></div>'
+          +(eq?'<b style="color:#7FA35C">EQUIPPED</b>':'<button class="mbtn" style="padding:0.3rem 0.9rem;font-size:0.9rem" onclick="event.stopPropagation();UI.equipSarge(\''+wk+'\')">EQUIP</button>')+'</div>'; }).join('')+'</div>'
+      +'<p style="font-size:0.85rem;opacity:0.6;margin:14px 0 2px">TAP A SOLDIER FOR THEIR FIELD MANUAL PAGE:</p>'
       +'<div>'+TRAY_ORDER.map(k=>{ const own=META.unlocked.indexOf(k)>=0;
         return '<div class="mrow" style="cursor:pointer'+(own?'':';opacity:0.45')+'" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k, dyeHex()||undefined)+'"><div class="grow">'+UDEF[k].name+(own?'':' <small style="opacity:0.7">(in the shop)</small>')+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>'; }).join('')+'</div>';
     case 'board': setTimeout(loadBoard,0); return '<h3>WORLD RANKINGS</h3>'
@@ -1952,11 +2087,16 @@ function tierName(s){ return s>=2000?'LEGENDARY TOY BOX':s>=1000?'DIAMOND SHELF'
 function showPicker(){
   hideAllOverlays();
   document.getElementById('picker').classList.remove('hidden');
-  const opts=META.unlocked.slice(0,8);
-  document.getElementById('pickRow').innerHTML = opts.map(k=>{
+  const units=META.unlocked.slice(0,8).map(k=>{
     const r=META.up[k]||0;
     return '<div class="pickcard" onclick="UI.pick(\''+k+'\')"><img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
-  }).join('');
+  });
+  // unlocked Sarge weapons are upgradeable here too — that's the whole "level it up" path
+  const weps=META.sargeUnlocked.filter(wk=>SARGE_WEAPONS[wk]).map(wk=>{
+    const r=META.sargeUp[wk]||0;
+    return '<div class="pickcard" style="border-color:#7FA35C" onclick="UI.pickW(\''+wk+'\')"><img src="'+sprURI('sarge')+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+  });
+  document.getElementById('pickRow').innerHTML = units.concat(weps).join('');
 }
 window.UI = {
   play(n){ audio(); startBattle(n||META.campaign+1, null); },
@@ -1966,6 +2106,11 @@ window.UI = {
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=5) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
+  pickW(wk){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if((META.sargeUp[wk]||0)>=5) return;
+    META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--; saveMeta();
+    if(META.pendingPicks>0) showPicker(); else showMenu(); },
+  equipSarge(wk){ if(wk!=='pistol' && META.sargeUnlocked.indexOf(wk)<0) return;
+    META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
   promote(){ if(META.pendingPicks>0) showPicker(); },
   room(id){
@@ -2097,7 +2242,9 @@ window.GVT = {
   coachStep(){ return coach? coach.step : null; },
   beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
   endCoach(){ coachDone(); },
-  boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); }
+  boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
+  sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ if(w==='pistol') META.up.sarge=rank; else META.sargeUp[w]=rank; } saveMeta(); return sargeStats(); },
+  unlockSarge(){ META.sargeUnlocked=['shotgun','sniper','lightsaber']; saveMeta(); return META.sargeUnlocked; }
 };
 </script>
 </body>
