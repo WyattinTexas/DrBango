@@ -37,7 +37,7 @@
   @keyframes waddle { from { transform:rotate(-4.5deg);} to { transform:rotate(4.5deg);} }
   .coinop { position:absolute; bottom:3%; width:100%; text-align:center; font-family:'Arial Narrow', Impact, sans-serif; font-weight:bold; font-size:0.75rem; letter-spacing:0.22em; color:#5A5D4C; text-transform:uppercase; pointer-events:none; }
   .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.16) 2px 4px); }
-  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat{ animation:none; } }
   @media (orientation: portrait) {
     #rotate { display:flex; z-index:50; }
   }
@@ -95,8 +95,11 @@
   @keyframes rivpace { from { transform:translateX(3px);} to { transform:translateX(-9px);} }
   /* the tan army on tan floorboards is near-invisible without a rim — this dark
      halo is what makes ALL ten army colours read against the wood */
-  .rivfig,.rivdown { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
+  .rivfig,.rivdown,.vicfig,.vicdown { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
   .rivfig { transform-box:fill-box; transform-origin:50% 94%; animation:waddle 0.48s ease-in-out infinite alternate; }
+  /* your lot aren't marching — they're bobbing about enjoying the place */
+  .vicfig { transform-box:fill-box; transform-origin:50% 94%; animation:bobble 1.7s ease-in-out infinite alternate; }
+  @keyframes bobble { from { transform:translateY(0) rotate(-3.2deg);} to { transform:translateY(-5px) rotate(3.2deg);} }
   .doorlight { animation:spill 3.6s ease-in-out infinite alternate; }
   @keyframes spill { from { opacity:0.72;} to { opacity:1;} }
   .roomtag.alarm { background:#A63B2A; box-shadow:0 0 15px rgba(166,59,42,0.8); animation:blink 1.25s linear infinite; }
@@ -166,7 +169,7 @@ window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.styl
 // ================= CONSTANTS =================
 const W=960, H=600, TILE=60, DRAG_OFF=56;   // dragged figures ride above the finger so you can see your placement
 const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
-const COSTS = { rifleman:50, mgunner:120, bazooka:150, mortar:200, sarge:0, minesweeper:100, flame:150, radioman:175 };
+const COSTS = { rifleman:25, mgunner:80, bazooka:150, mortar:200, sarge:0, minesweeper:75, flame:150, radioman:100 };
 
 // ================= META (the Long War) =================
 const META_DEFAULT = {
@@ -306,11 +309,13 @@ function waveFromKey(key, m, R){
 // but a decent line wins the firefight. (Wyatt 7/21: "slightly stronger
 // to start... maybe you'll lose one unit at the start.")
 const UDEF = {
-  rifleman:{ rng:150, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
-  mgunner: { rng:95,  rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
-  bazooka: { rng:150, rate:0.4, dmg:4, air:false, grit:3, splash:55, scatter:60, vx2:true, name:'BAZOOKA' },
-  mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:70, name:'MORTAR' },
-  sarge:   { rng:108, rate:1.8, dmg:1, air:true,  grit:4, name:'SARGE' },
+  // 7/23 balance: riflemen + MG reach further (+15%), Sarge hits harder (+50%),
+  // the bazooka fires 20% slower, and both indirect guns scatter 40% wider.
+  rifleman:{ rng:173, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
+  mgunner: { rng:109, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
+  bazooka: { rng:150, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },
+  mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },
+  sarge:   { rng:108, rate:1.8, dmg:1.5, air:true,  grit:4, name:'SARGE' },
   minesweeper:{ rng:130, rate:0.167, dmg:0, air:false, grit:3, name:'SWEEPER', mine:true },
   flame:   { rng:85,  rate:8,   dmg:0.5, air:false, grit:3, name:'FLAME', multi:3 },
   radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 }
@@ -1528,11 +1533,11 @@ const SHOP_ITEMS=[
 // THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
 // at the Training Academy to read their page.
 const CLASSINFO = {
-  rifleman:   { good:'Long reach (150) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. Needs friends.' },
-  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close.', bad:'Short reach (95). Has to sit up front, right where the trouble is.' },
+  rifleman:   { good:'Long reach (173) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. Needs friends.' },
+  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close.', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
   bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and those blasts knock down your own men. Give them room.' },
   mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
-  sarge:      { good:'FREE, extra grit, and downed men nearby stand back up twice as fast.', bad:'Pistol range only. And there is only ever one Sarge.' },
+  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast.', bad:'Pistol range only. And there is only ever one Sarge.' },
   minesweeper:{ good:'Seeds the carpet with firecracker mines — brutal on lanes, bridges and choke points.', bad:'Never fires a shot, and mines flip your own men too if they wander in.' },
   flame:      { good:'Torches 3 enemies at once and cooks crawler packs. Nothing shrugs this off.', bad:'Arm\'s-reach range (85). If they\'re not close, that is just a soldier carrying soup.' },
   radioman:   { good:'+25% range to every soldier standing nearby — a whole squad upgrade in one figure.', bad:'All antenna, no rifle. Cannot return fire at all, so guard them.' }
@@ -1592,6 +1597,22 @@ function roomRuckus(riv){
     +block(632,248,'#D9A544',18)+block(676,268,'#4A6B8A',-24)+block(644,292,'#C85A4A',7)
     +'</g>';
 }
+// AFTER THE WIN: the room is yours again, and your own army is loose in it —
+// bobbing about, feet up on the bed they just won back, Sarge stood on the toy
+// box surveying the place. Same spots the Tan were squatting in.
+function roomVictory(){
+  const hex = dyeHex() || '#4A6B35';
+  const fig=(k,x,y,w,d)=>'<image class="vicfig" href="'+sprURI(k,hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
+  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
+    return '<image class="vicdown" href="'+sprURI(k,hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+  return '<g>'
+    +flat('mgunner',762,72,56,80)        // feet up in the bed he just won back
+    +fig('sarge',236,198,58,-0.5)        // Sarge up on the toy box, surveying his room
+    +fig('rifleman',196,146,54,-0.9)     // keeping the piggy bank company
+    +fig('mgunner',534,300,52,-0.2)      // and a couple just enjoying the rug
+    +fig('rifleman',470,392,54,-1.3)
+    +'</g>';
+}
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()];
   const achDone=ACH.filter(a=>META.ach[a.id]).length;
@@ -1644,8 +1665,9 @@ function roomSVG(){
   +medal(52, achDone>=5, '#CFCFCF', '#4A6B8A')
   +medal(77, achDone>=10,'#C08A4A', '#4A6B35')
   +'<path d="M9 59 L46 13 L62 13 L25 59 z" fill="#fff" opacity="0.06"/></g>'
-  // today's rival: a squad in the doorway AND the run of your room
-  +(rivDone? '' : roomRuckus(riv))
+  // today's rival: a squad in the doorway AND the run of your room —
+  // or, once they're beaten, your own men enjoying the quiet
+  +(rivDone? roomVictory() : roomRuckus(riv))
   +doorSquad(riv, rivDone)
   // your figure (avatar) standing on the rug
   +'<image href="'+sprURI(META.avatar, dyeHex()||'#4A6B35')+'" x="330" y="330" width="82" height="96"/>'
