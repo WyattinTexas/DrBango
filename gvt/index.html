@@ -183,7 +183,7 @@ const META_DEFAULT = {
   rivalDays:{},                                       // 'YYYY-MM-DD' -> color beaten
   // SARGE'S ARSENAL: weapons unlocked by campaign progress, equipped in the
   // Training Academy, each upgraded through the promotion picker once unlocked.
-  sargeWeapon:'pistol', sargeUnlocked:[], sargeUp:{}, sargeSeen:[]
+  sargeWeapon:'pistol', sargeUnlocked:[], sargeUp:{}, sargeSeen:[], saberColor:null
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); } } catch(e) {}
@@ -360,6 +360,12 @@ const SARGE_WEAPONS = {
   lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge charges out, carves up whatever is close, blocks incoming fire, then falls back to his post.' }
 };
 const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber'];
+// pick your blade — the glow is your colour, the core is always white-hot
+const SABER_COLORS=[
+  {id:'blue',hex:'#4DA6FF'},{id:'red',hex:'#FF4D4D'},{id:'green',hex:'#5BE870'},
+  {id:'purple',hex:'#B45BFF'},{id:'orange',hex:'#FF9A3D'},{id:'teal',hex:'#3DE0D0'}
+];
+function saberHex(){ return META.saberColor || '#4DA6FF'; }
 // effective combat stats for whatever Sarge is carrying, at its current rank
 function sargeStats(){
   const w=SARGE_WEAPONS[META.sargeWeapon]?META.sargeWeapon:'pistol';
@@ -569,6 +575,8 @@ function startBattle(levelN, rival){
     if(rival.mod.count){ S.cfg.waves.forEach(w=>w.groups.forEach(g=>{ if(g.t==='tanrifle') g.n=Math.round(g.n*rival.mod.count); })); }
     buildFoeTint(rival.hex);
     S.ann={txt:'DEFEND THE ROOM!',t:2.2};
+  } else {
+    S.plastic = 210;    // campaign: +40 dog tags to work with (Wyatt 7/24)
   }
   hideAllOverlays();
   S.mode='play';
@@ -669,7 +677,7 @@ function saberBlocks(u){
   if(u.type!=='sarge' || META.sargeWeapon!=='lightsaber') return false;
   const sw=sargeStats();
   if(sw.block && Math.random()<sw.block){
-    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:'rgba(140,220,255,0.9)'}); SFX.snap(); return true;
+    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHex()}); SFX.snap(); return true;
   }
   return false;
 }
@@ -702,7 +710,7 @@ function updateSaber(u,dt,sw){
       const vm=(u.vet?1.5:1);
       f.hp-=sw.dmg*vm; hitCheck(f,u);            // massive strike
       for(const g of S.foes){ if(g!==f && !g.burrow && Math.hypot(g.x-u.x,g.y-u.y)<46){ g.hp-=sw.dmg*0.5*vm; hitCheck(g,u); } }  // a cleave to whatever else is close
-      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:'rgba(120,220,255,0.85)'});
+      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHex()});
       SFX.laser(); S.shake=0.2; u.saberState='back'; u.saberCd=sw.cd;
     }
     return;
@@ -1573,13 +1581,24 @@ function drawSargeWeapon(u){
   else if(w==='sniper'){ cx.strokeStyle='#26261f'; cx.lineWidth=3.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+2,u.y-30); cx.lineTo(u.x+46,u.y-36); cx.stroke(); cx.fillStyle='#26261f'; cx.fillRect(u.x+18,u.y-41,5,6); }
   else if(w==='lightsaber'){
     const dashing=(u.saberState==='out'||u.saberState==='back');
-    const blade='#7FE3FF', len=dashing?34:28, ang=dashing?-0.9:-0.5;
-    cx.save(); cx.shadowColor=blade; cx.shadowBlur=dashing?16:10;
-    cx.strokeStyle=blade; cx.lineWidth=6; cx.lineCap='round';
-    cx.beginPath(); cx.moveTo(u.x+8,u.y-24); cx.lineTo(u.x+8+Math.cos(ang)*len,u.y-24+Math.sin(ang)*len); cx.stroke();
-    cx.strokeStyle='#ffffff'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(u.x+8,u.y-24); cx.lineTo(u.x+8+Math.cos(ang)*len,u.y-24+Math.sin(ang)*len); cx.stroke();
+    const col=saberHex(), len=dashing?38:32, ang=dashing?-0.98:-0.52;
+    const hx=u.x+8, hy=u.y-22;                              // the hand
+    const gx=hx-Math.cos(ang)*6, gy=hy-Math.sin(ang)*6;     // grip end
+    const bx=hx+Math.cos(ang)*3, by=hy+Math.sin(ang)*3;     // blade emitter
+    const tx=hx+Math.cos(ang)*len, ty=hy+Math.sin(ang)*len; // blade tip
+    // HILT: a stubby metal handle with an emitter collar
+    cx.lineCap='butt';
+    cx.strokeStyle='#2c2c2c'; cx.lineWidth=6.5; cx.beginPath(); cx.moveTo(gx,gy); cx.lineTo(bx,by); cx.stroke();
+    cx.strokeStyle='#9a9a9a'; cx.lineWidth=3.5; cx.beginPath(); cx.moveTo(gx+(bx-gx)*0.5,gy+(by-gy)*0.5); cx.lineTo(bx,by); cx.stroke();
+    cx.strokeStyle='#d8d8d8'; cx.lineWidth=6.5; cx.beginPath(); cx.moveTo(bx-Math.cos(ang)*2,by-Math.sin(ang)*2); cx.lineTo(bx,by); cx.stroke();
+    // BLADE: colored bloom → colored body → white-hot core → bright tip
+    cx.save(); cx.lineCap='round'; cx.shadowColor=col; cx.shadowBlur=dashing?20:14;
+    cx.globalAlpha=0.5; cx.strokeStyle=col; cx.lineWidth=11; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();
+    cx.globalAlpha=1; cx.lineWidth=6.5; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();
+    cx.shadowBlur=0; cx.strokeStyle='#ffffff'; cx.lineWidth=2.6; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();
+    cx.fillStyle='#ffffff'; cx.beginPath(); cx.arc(tx,ty,2.8,0,7); cx.fill();
     cx.restore();
-    if(dashing){ cx.globalAlpha=0.28; cx.fillStyle=blade; cx.beginPath(); cx.ellipse(u.x,u.y-16,20,26,0,0,7); cx.fill(); cx.globalAlpha=1; }
+    if(dashing){ cx.globalAlpha=0.26; cx.fillStyle=col; cx.beginPath(); cx.ellipse(u.x,u.y-16,20,26,0,0,7); cx.fill(); cx.globalAlpha=1; }
   }
 }
 function drawFoe(f){
@@ -2056,7 +2075,11 @@ function panelHTML(id){
         const rank=wk==='pistol'?(META.up.sarge||0):(META.sargeUp[wk]||0);
         if(!unlocked) return '<div class="mrow" style="opacity:0.45"><img src="'+sprURI('sarge')+'"><div class="grow"><b>'+wd.name+'</b> <small>'+wd.desc+'</small></div><b>🔒 L'+wd.unlock+'</b></div>';
         return '<div class="mrow" style="cursor:pointer'+(eq?';background:rgba(127,163,92,0.12);border-radius:6px':'')+'" onclick="UI.equipSarge(\''+wk+'\')"><img src="'+sprURI('sarge')+'"><div class="grow"><b>'+wd.name+(rank>0?' <span style="color:#7FA35C">'+'▮'.repeat(rank)+'</span>':'')+'</b> <small style="opacity:0.6">'+wd.desc+'</small></div>'
-          +(eq?'<b style="color:#7FA35C">EQUIPPED</b>':'<button class="mbtn" style="padding:0.3rem 0.9rem;font-size:0.9rem" onclick="event.stopPropagation();UI.equipSarge(\''+wk+'\')">EQUIP</button>')+'</div>'; }).join('')+'</div>'
+          +(eq?'<b style="color:#7FA35C">EQUIPPED</b>':'<button class="mbtn" style="padding:0.3rem 0.9rem;font-size:0.9rem" onclick="event.stopPropagation();UI.equipSarge(\''+wk+'\')">EQUIP</button>')+'</div>'
+          // once the saber is unlocked, pick your blade colour right here
+          +(wk==='lightsaber'&&unlocked? '<div style="padding:2px 0 6px 52px"><small style="opacity:0.6">BLADE COLOUR — </small>'
+            + SABER_COLORS.map(c=>'<span onclick="event.stopPropagation();UI.saberColor(\''+c.hex+'\')" title="'+c.id+'" style="display:inline-block;width:24px;height:24px;border-radius:50%;background:'+c.hex+';margin:0 4px;cursor:pointer;vertical-align:middle;box-shadow:0 0 9px '+c.hex+';border:3px solid '+(saberHex()===c.hex?'#fff':'transparent')+'"></span>').join('')
+            + '</div>' : ''); }).join('')+'</div>'
       +'<p style="font-size:0.85rem;opacity:0.6;margin:14px 0 2px">TAP A SOLDIER FOR THEIR FIELD MANUAL PAGE:</p>'
       +'<div>'+TRAY_ORDER.map(k=>{ const own=META.unlocked.indexOf(k)>=0;
         return '<div class="mrow" style="cursor:pointer'+(own?'':';opacity:0.45')+'" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k, dyeHex()||undefined)+'"><div class="grow">'+UDEF[k].name+(own?'':' <small style="opacity:0.7">(in the shop)</small>')+'</div><b>'+('▮'.repeat(META.up[k]||0)||'—')+'</b></div>'; }).join('')+'</div>';
@@ -2111,6 +2134,9 @@ window.UI = {
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
   equipSarge(wk){ if(wk!=='pistol' && META.sargeUnlocked.indexOf(wk)<0) return;
     META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
+  saberColor(hex){ if(META.sargeUnlocked.indexOf('lightsaber')<0) return;
+    META.saberColor=hex; META.sargeWeapon='lightsaber';   // choosing a blade equips it
+    SFX.laser(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
   promote(){ if(META.pendingPicks>0) showPicker(); },
   room(id){
