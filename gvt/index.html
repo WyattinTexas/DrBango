@@ -271,8 +271,9 @@ const BF_TICK   = 20;    // dog tags per 10s passive drip
 const BF_START  = 210;   // opening purse — the campaign's exact wallet
 // a breakthrough is a FREE LEAK: reach the base, deal this, vanish. ~12 = a KO.
 const BF_BASEDMG= { rifleman:6, minesweeper:7, flame:8, mgunner:8, radioman:8, bazooka:9, mortar:10, sarge:18 };
-// Per-unit pace: moveSpd px/s, setup = seconds that must elapse AFTER halting
-// (re-armed by ANY movement, so relocating a heavy re-pays its whole wind-up).
+// Per-unit pace: moveSpd px/s. (The old `setup` dig-in wind-up is GONE — Wyatt
+// 7/24: "no loading bar on them firing, it just fires" — halted men shoot the
+// moment a target is in reach, exactly like the campaign.)
 // BF_PACE is the one playtest knob on top of Wyatt's table: the table was written
 // against a "~900px walk", but side-locking actually puts ~1660px between your
 // furthest-forward legal drop and their toy box — at the raw numbers a rifleman
@@ -288,22 +289,22 @@ const BF_MOVE = {
   // during its approach and nothing else was ever worth buying. Dropping BF reach
   // to 120 restores the ladder — flame 85 < MG 109 < rifle 120 < mines 130 <
   // bazooka 150 < mortar 340 — so the heavies finally out-range the line.
-  rifleman:   { moveSpd:44, setup:0.4, hp:3, rng:120 },
+  rifleman:   { moveSpd:44, hp:3, rng:120 },
   // the short-range brawlers eat free fire for their whole approach — a rifleman
   // out-ranges them 165 to 109/85 and both sides halt at their OWN range, so
   // without the extra plastic they die before they ever bite. This is what makes
   // "crawls up, slow to bite, then shreds" actually happen.
-  flame:      { moveSpd:40, setup:0.6, hp:6 },
-  minesweeper:{ moveSpd:34, setup:0.8, hp:3 },
-  radioman:   { moveSpd:32, setup:0.5, hp:3 },
-  mgunner:    { moveSpd:20, setup:1.3, hp:8 },
-  bazooka:    { moveSpd:19, setup:1.5, hp:3 },
+  flame:      { moveSpd:40, hp:6 },
+  minesweeper:{ moveSpd:34, hp:3 },
+  radioman:   { moveSpd:32, hp:3 },
+  mgunner:    { moveSpd:20, hp:8 },
+  bazooka:    { moveSpd:19, hp:3 },
   // the campaign mortar's rng:9999 was bounded by a 960 carpet and an offscreen
   // cull. On a 1920 field that would be map-wide artillery, so BF gives it a real
   // (huge) reach instead — it still outranges every gun here and keeps its
   // minRng:120 dead zone, which is the whole point of the piece.
-  mortar:     { moveSpd:12, setup:2.5, hp:3, rng:340 },
-  sarge:      { moveSpd:40, setup:0.4, hp:6 }
+  mortar:     { moveSpd:12, hp:3, rng:340 },
+  sarge:      { moveSpd:40, hp:6 }
 };
 for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE);
 // The four maps. Each generator builds the LEFT half and the loader mirrors it
@@ -1203,7 +1204,7 @@ function bfUnitStep(u,dt){
   if(u.dropT>0){                                  // 5s ghost: inert, untargetable, invulnerable
     u.dropT-=dt;
     if(u.dropT<=0){
-      u.dropT=0; u.setupLeft=u.def.setup||0;
+      u.dropT=0;
       bfSfx(SFX.thock, u.x);
       S.fx.push({k:'ring',x:u.x,y:u.y-4,r:6,R:30,t:0,dur:0.3,col:'rgba(255,255,255,0.85)'});
       S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.3,R:18});
@@ -1216,17 +1217,28 @@ function bfUnitStep(u,dt){
   const b=S.bf.base[enemySide(u)];
   const atBase=bfAtBase(u,b);
   if(!tgt && !atBase){
-    // nobody marches a ruler line (Wyatt 7/24): every man holds HIS lane with an
-    // easy weave in it — like the campaign, they only funnel in near the box
-    const wy=Math.sin(S.t*1.1+(u.weave||0))*34;
-    const gy=Math.abs(b.x-u.x)<280 ? b.y : Math.max(84,Math.min(H-104,(u.laneY!=null?u.laneY:b.y)+wy));
-    bfMarch(u,dt,{x:b.x,y:gy});
+    // real people don't march a ruler line (Wyatt 7/24): every man walks his own
+    // zig — a fresh sub-goal every second or so, a rare hitch in his step — and
+    // only funnels straight onto the box over the last stretch
+    if(u.pauseT>0){ u.pauseT-=dt; return false; }        // picking his footing (idle sway, no waddle)
+    if(Math.abs(b.x-u.x)<280){ u.wp=null; bfMarch(u,dt,b); }
+    else {
+      u.wpT=(u.wpT||0)-dt;
+      if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
+        const dir=(u.side==='you')?1:-1, lane=(u.laneY!=null?u.laneY:b.y);
+        u.wp={ x:u.x+dir*(90+Math.random()*110),
+               y:Math.max(84,Math.min(H-104,(lane+(Math.random()-0.5)*100)*0.6+u.y*0.4)) };
+        u.wpT=1.0+Math.random()*1.3;
+        if(Math.random()<0.10) u.pauseT=0.15+Math.random()*0.3;
+      }
+      bfMarch(u,dt,u.wp);
+    }
     u.marching=true;
-    u.setupLeft=u.def.setup||0;                  // MOVING re-arms setup AND means "not firing"
     return false;
   }
-  if(u.setupLeft>0){ u.setupLeft-=dt; return false; }   // just halted — dig in before the first shot
   if(!tgt && atBase){ bfLeak(u); return false; }
+  // a target in reach and he's standing still → BOOM. No wind-up, no loading
+  // bar — straight through into the campaign's untouched weapon code.
   return true;
 }
 
@@ -1413,10 +1425,10 @@ function placeUnit(type,x,y,side,seat){
     u.seat=(seat!=null)? seat : (side==='you'? 0 : S.bf.team);
     u.def=Object.assign({}, UDEF[type], BF_MOVE[type]||{});   // per-unit copy — never mutate the shared UDEF
     u.hpMax=u.def.hp||3; u.hp=u.hpMax;
-    u.dropT=DROP_T; u.setupLeft=0; u.dead=false; u.sprue=0;
+    u.dropT=DROP_T; u.dead=false; u.sprue=0;
     u.goal={ x:b.x, y:b.y };
-    // his own lane, his own stride, his own sway — the march reads like people
-    u.laneY=y; u.gait=0.92+Math.random()*0.16; u.weave=Math.random()*6.28; u.marching=false;
+    // his own lane, his own stride, his own path — the march reads like people
+    u.laneY=y; u.gait=0.92+Math.random()*0.16; u.wp=null; u.wpT=0; u.pauseT=0; u.marching=false;
     if(type==='sarge'){ u.home={x,y}; u.saberState='idle'; u.saberCd=0; }
   }
   S.units.push(u); S.placedAny=true; SFX.snap();
@@ -2002,12 +2014,13 @@ function update(dt){
       });
       continue;
     }
+    const mzl=(S.bf&&u.side==='foe')?-1:1;         // muzzles point the way the figure faces
     if(u.type==='bazooka'){
       bfSfx(SFX.rocket, u.x);
       // dumb-fire: he shoots where they WERE, roughly. It's a big rocket.
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
-      S.shots.push({k:'rocket',x:u.x+14,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash,vx2:true,src:u});
+      S.shots.push({k:'rocket',x:u.x+14*mzl,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash,vx2:true,src:u});
     } else if(u.type==='mortar'){
       bfSfx(SFX.rocket, u.x);
       // aims at where they are + scatter — he can lead them or whiff entirely
@@ -2020,10 +2033,10 @@ function update(dt){
       if(lz){ bfSfx(SFX.laser, u.x); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x); }
       hurt(best,dmgF,u);
       if(lz){
-        S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.14,col:lz.hex,w:4});
-        S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.1,col:'#ffffff',w:1.5});
+        S.fx.push({k:'tracer',x1:u.x+16*mzl,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.14,col:lz.hex,w:4});
+        S.fx.push({k:'tracer',x1:u.x+16*mzl,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.1,col:'#ffffff',w:1.5});
       } else {
-        S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.08});
+        S.fx.push({k:'tracer',x1:u.x+16*mzl,y1:u.y-26,x2:best.x,y2:best.y-18,t:0,dur:0.08});
       }
     }
   }
@@ -2086,7 +2099,7 @@ function hitCheck(f,u){
     f.dead=true;
     if(u && u.kills!=null) u.kills++;
     S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(Math.random()<0.5?-1.83:1.83),
-      w:(f.type==='mortar'?58:54), img:unitImg(f.type,f) });
+      w:(f.type==='mortar'?58:54), img:unitImg(f.type,f), flip:(f.side==='foe') });
     if(S.corpses.length>90) S.corpses.shift();
     // his dog tag goes to whoever'S SEAT got him — yours as a collectible blob,
     // an AI seat's straight into that purse
@@ -2175,11 +2188,12 @@ function resize(){
 }
 window.addEventListener('resize',resize); resize();
 
-function drawSprite(k,x,y,w,rot,wob,imgOverride){
+function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
   const im=imgOverride||IMG[k]; if(!im) return;
   const h=w*(im.height/im.width);
   cx.save();
   cx.translate(x,y);
+  if(flip) cx.scale(-1,1);        // the right-side army faces the way it marches
   cx.rotate((rot||0)+(wob||0));
   cx.drawImage(im,-w/2,-h+h*0.08,w,h);
   cx.restore();
@@ -2293,7 +2307,7 @@ function draw(){
 
   // the fallen (under everything alive)
   cx.globalAlpha=0.85;
-  for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0,c.img);
+  for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0,c.img,c.flip);
   cx.globalAlpha=1;
 
   // mines (armed = red eye)
@@ -2495,36 +2509,30 @@ function drawUnit(u){
     }
   }
 }
-// THE DROP-IN. Five seconds of a plummeting, half-there figure inside a
-// shrinking sprue frame, with a ring draining around the spot he'll land on.
-// He can't move, can't shoot, can't be shot — placement becomes a PREDICTION.
+// THE DROP-IN, sleek cut (Wyatt 7/24): a figure actually FALLING — accelerating
+// down with a little pendulum sway, the shadow rushing up to meet him, one thin
+// countdown ring. No sprue box cluttering the field. He can't move, can't
+// shoot, can't be shot — placement stays a PREDICTION.
 function drawBFUnit(u,w,im){
+  const flip=(u.side==='foe');
   if(u.dropT>0){
-    const k=1-u.dropT/DROP_T, lift=(1-k)*(1-k)*70;
-    cx.globalAlpha=0.26+0.12*k; cx.fillStyle='#000';
-    cx.beginPath(); cx.ellipse(u.x,u.y,9+17*k,3.5+6*k,0,0,7); cx.fill();     // the shadow rushes up to meet him
-    cx.globalAlpha=0.42+0.4*k;
-    drawSprite(u.type,u.x,u.y-lift,w,0,0,im);
+    const k=1-u.dropT/DROP_T, lift=(1-k*k)*84;                               // a real drop speeds UP
+    const sway=Math.sin(u.phase+k*6.5)*4*(1-k);
+    cx.globalAlpha=0.24+0.16*k; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(u.x,u.y,8+16*k,3+6*k,0,0,7); cx.fill();      // the shadow rushes up to meet him
+    cx.globalAlpha=0.38+0.5*k;
+    drawSprite(u.type,u.x+sway,u.y-lift,w,0,Math.sin(u.phase+k*9)*0.06,im,flip);
     cx.globalAlpha=1;
-    const col=(u.side==='you'?'#BFE39A':'#E8A08C');
-    cx.strokeStyle=col; cx.lineWidth=3.5; cx.lineCap='round';               // the countdown drains away
-    cx.beginPath(); cx.arc(u.x,u.y-4,27,-Math.PI/2,-Math.PI/2+6.283*(1-k)); cx.stroke();
+    const col=(u.side==='you'?'rgba(191,227,154,0.85)':'rgba(232,160,140,0.85)');
+    cx.strokeStyle=col; cx.lineWidth=2.5; cx.lineCap='round';               // the countdown drains away
+    cx.beginPath(); cx.arc(u.x,u.y-3,21,-Math.PI/2,-Math.PI/2+6.283*(1-k)); cx.stroke();
     cx.lineCap='butt';
-    const g=1.5-k*0.5;                                                       // the sprue frame closes in
-    cx.globalAlpha=0.55*(1-k)+0.2; cx.strokeStyle=col; cx.lineWidth=4;
-    cx.strokeRect(u.x-30*g,u.y-64*g-lift,60*g,72*g);
-    cx.globalAlpha=1;
     return;
   }
   // on the march he waddles like the campaign armies do; halted he settles
   // into the gentle idle sway — the difference is what makes the field read
-  drawSprite(u.type,u.x,u.y,w,0, u.marching? Math.sin(S.t*7+u.phase)*0.05 : Math.sin(S.t*2.2+u.phase)*0.024, im);
+  drawSprite(u.type,u.x,u.y,w,0, u.marching? Math.sin(S.t*7+u.phase)*0.05 : Math.sin(S.t*2.2+u.phase)*0.024, im, flip);
   if(u.type==='sarge') drawSargeWeapon(u);
-  if(u.setupLeft>0){    // digging in — an amber arc that says "not firing yet"
-    const k=1-u.setupLeft/Math.max(0.01,u.def.setup||1);
-    cx.strokeStyle='rgba(255,211,74,0.9)'; cx.lineWidth=3; cx.lineCap='round';
-    cx.beginPath(); cx.arc(u.x,u.y-38,15,-Math.PI/2,-Math.PI/2+6.283*k); cx.stroke(); cx.lineCap='butt';
-  }
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
     cx.fillStyle='rgba(0,0,0,0.45)'; cx.fillRect(u.x-15,u.y-60,30,4);
@@ -3371,7 +3379,7 @@ window.GVT = {
       razed:{you:b.base.foe.dmgTaken, them:b.base.you.dmgTaken},
       cam:Math.round(b.cam.x), vw:Math.round(VW), corpses:S.corpses.length,
       units:S.units.filter(u=>!u.dead).map(u=>({s:u.side,st:u.seat,t:u.type,x:u.x|0,y:u.y|0,hp:u.hp,
-        drop:+(u.dropT||0).toFixed(1), setup:+(u.setupLeft||0).toFixed(2)})) }; }
+        drop:+(u.dropT||0).toFixed(1), marching:!!u.marching})) }; }
 };
 </script>
 </body>
