@@ -632,7 +632,10 @@
   #picker h1 { font-size:clamp(1.9rem,6vw,2.6rem); margin:0.2rem 0 0.3rem; }
   #picker > p { font-size:1.15rem; }
   .pickrow { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:1rem; }
-  .pickcard { background:rgba(255,255,255,0.08); border:3px solid #4A6B35; border-radius:16px; padding:16px 20px; cursor:pointer; text-align:center; min-width:150px; }
+  .pickcard { position:relative; background:rgba(255,255,255,0.08); border:3px solid #4A6B35; border-radius:16px; padding:16px 20px; cursor:pointer; text-align:center; min-width:150px; }
+  /* rank badge, pinned INSIDE the corner — #picker scrolls, and anything hung
+     off the edge of a card gets clipped by that scroller */
+  .pickcard .lvchip { position:absolute; top:7px; right:9px; margin:0; font-size:0.8rem; }
   .pickcard img { width:82px; }
   .pickcard b { display:block; letter-spacing:0.04em; font-size:1.15rem; margin-top:4px; }
   .pickcard small { opacity:0.75; font-size:0.98rem; }
@@ -658,6 +661,11 @@
   .acflag { position:absolute; top:-11px; left:50%; transform:translateX(-50%); background:#7FA35C; color:#141810;
     font-weight:bold; font-size:0.72rem; letter-spacing:0.09em; padding:3px 9px; border-radius:9px; white-space:nowrap; }
   .chev { width:66px; height:13px; display:block; margin:6px auto 0; }
+  /* past five stripes the count goes numeric — the chevron row is full and the
+     badge carries the rank (LV 37). Brass on the card, like a name plate. */
+  .lvchip { display:block; width:-moz-fit-content; width:fit-content; margin:4px auto 0; padding:1px 8px 2px;
+    border-radius:9px; background:linear-gradient(180deg,#E8C25A,#B8862F); color:#241c0c;
+    font-size:0.74rem; font-weight:bold; letter-spacing:0.07em; white-space:nowrap; }
   .sabrow { text-align:center; margin:12px 0 0; }
   .sabdot { display:inline-block; width:34px; height:34px; border-radius:50%; margin:0 7px; cursor:pointer;
     vertical-align:middle; border:4px solid transparent; }
@@ -729,7 +737,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.16</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.17</div>
   <div class="scanlines"></div>
 </div>
 
@@ -749,7 +757,7 @@
 
 <div class="overlay hidden" id="picker">
   <h1 style="color:#7FA35C; font-size:2.2rem">PROMOTION!</h1>
-  <p id="pickHint">Choose a unit to improve — permanent +10% damage, every battle, forever.</p>
+  <p id="pickHint">Choose a soldier to promote — permanent damage, every battle, forever. Every rank counts, all the way to 100.</p>
   <!-- the door. Only appears when every rank is maxed — see showPicker. It sits
        ABOVE the cards on purpose: eleven MAXED cards push anything below them
        off the bottom of a phone, and this is the only way off this screen. -->
@@ -968,7 +976,7 @@ const BF_PERSONA = {
 
 // ================= META (the Long War) =================
 const META_DEFAULT = {
-  v:1, lvl:1, xp:0, pendingPicks:0, up:{},           // player level + unit upgrade ranks (+10% dmg each, max 5)
+  v:1, lvl:1, xp:0, pendingPicks:0, up:{},           // player level + unit upgrade ranks (+10% dmg a rank, tapering, to RANK_MAX)
   campaign:0, levelStars:{},                          // highest level beaten, stars per level
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
@@ -1102,7 +1110,39 @@ function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac)); }   // a fr
 // pay it in and promote as far as it carries (one award is at most one rank)
 function grantXP(amt){ META.xp+=amt; let p=0; while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; p++; } return p; }
 function promoTag(p){ return p>0? ' · PROMOTED TO LEVEL '+META.lvl+'!' : ''; }
-function upMul(type){ return 1 + 0.1*(META.up[type]||0); }
+// ============ THE HUNDRED-RANK LADDER (Wyatt 7/25) ============
+// Every unit and every one of Sarge's weapons levels to 100 now, not 5. But
+// every formula in this file was a straight line — +10% damage a rank, +3 sniper
+// damage a rank, a pistol compounding +5% a rank — and a straight line taken to
+// rank 100 is a cheat code: ×11 damage, a 400-rounds-a-second sidearm, a
+// shotgun cone wider than a circle.
+//
+// So the ladder keeps its first ten rungs EXACTLY as they shipped and then
+// tapers. rankUnits() does that conversion — "how many full-value ranks has
+// this soldier really banked" — and every stat below is its OLD formula with
+// the raw rank swapped for rankUnits(rank). Ranks 0-10 return themselves, so
+// nothing a live save already earned moves by a hair, and rank 100 is a real
+// ~3.5× main instead of a game-ender.
+//
+//   rank      1     5    10     20     50    100
+//   units     1     5    10   15.5   21.0   24.7
+//   damage  1.1×  1.5×  2.0×  2.55×  3.10×  3.47×
+//
+// Gains shrink forever but never reach zero (it's a log, not a cap): rank 100
+// still pays +0.5% damage where rank 5 paid +10%, and grinding 50 → 100 is
+// still worth ×1.12 of your output.
+// Two stats slope 5× steeper than the rest — Sarge's CRIT odds and the pistol's
+// compounding rate — and were already at a sane ceiling by rank 5, so they
+// taper from 5 instead of 10 (rankUnitsFast). Their 0-5 values are exact too.
+// MIGRATION IS FREE: raising a cap is all this is. `up`/`sargeUp` are plain
+// numbers loaded straight off gvt_meta and nothing clamped them on the way in.
+const RANK_MAX=100;                        // the cap, everywhere: META.up and META.sargeUp alike
+const RANK_FULL=10, RANK_TAPER=5;          // full-value rungs, then the decay constant
+const RANK_FULL_F=5, RANK_TAPER_F=2;       // the steep stats' shorter full-value window
+function rankCurve(r,full,taper){ r=Math.max(0,Math.min(RANK_MAX,r||0)); return r<=full? r : full+taper*Math.log(1+(r-full)/taper); }
+function rankUnits(r){ return rankCurve(r,RANK_FULL,RANK_TAPER); }
+function rankUnitsFast(r){ return rankCurve(r,RANK_FULL_F,RANK_TAPER_F); }
+function upMul(type){ return 1 + 0.1*rankUnits(META.up[type]||0); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dayBack(n){ const d=new Date(Date.now()-n*864e5); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
@@ -1212,8 +1252,12 @@ function waveFromKey(key, m, R){
 // +10%/rank) — the two stack, one on the gun, one on the man. Lives here rather
 // than in SARGE_WEAPONS because UDEF.sarge (the unit table) needs it too and is
 // built first; sargeStats()/bfSargeKit()/BF_AI_SARGE all read it back.
+// 7/25 (100 RANKS): +5% COMPOUNDING is the most dangerous curve in the file —
+// rank 100 raw would be ×131, four hundred rounds a second. It rides the FAST
+// taper (full value through rank 5, exactly as shipped, then shrinking), which
+// lands rank 100 at ×1.85 ≈ 5.7 shots/s — quick, not a minigun.
 const PISTOL_RATE = 1.8*1.7;
-function pistolRate(r){ return PISTOL_RATE*Math.pow(1.05, r||0); }
+function pistolRate(r){ return PISTOL_RATE*Math.pow(1.05, rankUnitsFast(r)); }
 const UDEF = {
   // 7/24 balance: rifleman reach +10% (165) — and the TAN rifle now matches it
   // (FDEF rng 165), so both shoot from about the same distance; the tan just
@@ -1277,12 +1321,20 @@ function saberHex(){ return META.saberColor || '#4DA6FF'; }
 // effective combat stats for whatever Sarge is carrying, at its current rank
 function sargeStats(){
   const w=SARGE_WEAPONS[META.sargeWeapon]?META.sargeWeapon:'pistol';
-  const r=Math.min(5, (w==='pistol'? (META.up.sarge||0) : (META.sargeUp[w]||0)));
-  if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:1.1+0.35*r, cone:0.62+0.05*r };
+  const r=Math.min(RANK_MAX, (w==='pistol'? (META.up.sarge||0) : (META.sargeUp[w]||0)));
+  // `r` is the RAW rank — it's what the cards print and what rides the co-op
+  // wire. `u` is what the numbers are built from: the same rank after the
+  // taper (see THE HUNDRED-RANK LADDER; through rank 10, u === r).
+  const u=rankUnits(r);
+  // the cone is the one stat with a hard ceiling, because it's an ANGLE: the old
+  // straight line passes a half-angle of π around rank 50 — a full circle, Sarge
+  // shooting the men behind him. 1.2 rad half-angle (a ~137° fan, reached about
+  // rank 13) is as wide as a shotgun gets.
+  if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:1.1+0.35*u, cone:Math.min(1.2,0.62+0.05*u) };
   // 7/24 (Wyatt): the long rifle cycles 30% faster at base, and every rank oils the bolt another +2%
   // 7/25 (Wyatt): +20% reach on top of that — 340 → 408, the longest gun on the carpet
-  if(w==='sniper')     return { w, r, rng:408, rate:0.22*1.3*(1+0.02*r), dmg:9+3*r };
-  if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*r, cd:2.1, block:Math.min(0.75,0.34+0.09*r) };
+  if(w==='sniper')     return { w, r, rng:408, rate:0.22*1.3*(1+0.02*u), dmg:9+3*u };
+  if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*u, cd:2.1, block:Math.min(0.75,0.34+0.09*u) };
   // the sidearm: 70% faster than it used to be, +5% a rank on top of that (see
   // PISTOL_RATE). Damage still comes off the SARGE unit's upMul on the default
   // firing path, which is where the pistol lands.
@@ -1440,14 +1492,22 @@ function sargeWepURI(wk, bodyHex, bladeHex){
   const body = art.split('currentColor').join(bodyHex||'#7FA35C').split('BLADEHEX').join(bladeHex||saberHex());
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>');
 }
-// five rank slots, chevrons earned in gold — the academy speaks stripes, not bars
+// five rank slots, chevrons earned in gold — the academy speaks stripes, not
+// bars. Ranks run to 100 now and nobody can read a hundred chevrons, so the row
+// stops at five and a badge takes over the count past that: five gold stripes
+// and "LV 37" under them reads like a service record. (Wyatt 7/25: chevrons to
+// 5, then a numeric rank badge.)
 function chevSVG(r){
+  r=Math.max(0,Math.min(RANK_MAX,r|0));
   let s='<svg class="chev" viewBox="0 0 66 13">';
   for(let i=0;i<5;i++){ const x=i*13+1.5, on=i<r;
     s+='<path d="M'+x+' 8.5 l5 -6.5 l5 6.5 v3.5 l-5 -6.5 l-5 6.5 z" fill="'+(on?'#E8C25A':'none')+'" stroke="'+(on?'#B8862F':'rgba(255,255,255,0.22)')+'" stroke-width="1.2"/>';
   }
-  return s+'</svg>';
+  return s+'</svg>'+lvChip(r);
 }
+// the badge itself, on its own so the promotion picker's big cards can wear one
+// too (there it corner-pins — see .pickcard .lvchip)
+function lvChip(r){ return r>5? '<span class="lvchip">LV '+Math.min(RANK_MAX,r|0)+'</span>' : ''; }
 const IMG = {};
 let assetsLeft = 0;
 function buildSprites(done){
@@ -2249,12 +2309,18 @@ function hurt(f,dmg,src){
 // each (the rank of the weapon in his hands is the one that counts). On the
 // battlefield the opposing army crits at the stock 5% — same rule as upMul:
 // its difficulty is decisions, not stat padding.
+// 7/25 (100 RANKS): both slopes now run through the taper, because a straight
+// line puts Sarge past a 100% crit rate by rank 19 — every shot doubled, which
+// is just a damage buff with a gold float on it. Sarge takes the FAST taper (his
+// +5% was already steep) and lands at 69% at rank 100; the trigger-men reach 30%.
+// The 0.75 ceiling is unreachable inside 100 ranks — it's there so a rigged rank
+// can't hand out a certainty.
 const CRIT_MULT=2;
 function critChance(u){
-  if(u.type==='sarge') return 0.05 + 0.05*(unitSargeStats(u).r||0);
+  if(u.type==='sarge') return Math.min(0.75, 0.05 + 0.05*rankUnitsFast(unitSargeStats(u).r||0));
   if(u.type!=='rifleman' && u.type!=='mgunner') return 0;
   const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0);
-  return 0.05 + 0.01*r;
+  return 0.05 + 0.01*rankUnits(r);
 }
 function rollCrit(u){ return Math.random() < critChance(u); }
 function critFx(f){
@@ -4916,11 +4982,11 @@ const SHOP_ITEMS=[
 // THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
 // at the Training Academy to read their page.
 const CLASSINFO = {
-  rifleman:   { good:'Long reach (165) and a steady trigger — the backbone of every line. One shot in twenty lands a CRIT for double damage (+1% per rank).', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. The tan rifle now reaches just as far — but you fire first.' },
-  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close. One burst in twenty CRITs for double damage (+1% per rank).', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
+  rifleman:   { good:'Long reach (165) and a steady trigger — the backbone of every line. One shot in twenty lands a CRIT for double damage, and every rank he earns nudges those odds up.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. The tan rifle now reaches just as far — but you fire first.' },
+  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close. One burst in twenty CRITs for double damage, and every rank he earns nudges those odds up.', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
   bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and those blasts knock down your own men. Give them room.' },
   mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
-  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast. His sidearm is the fastest trigger in the army, and every rank adds +10% damage, +5% rate of fire and +5% to his CRIT odds (double damage).', bad:'Pistol range only. And there is only ever one Sarge.' },
+  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast. His sidearm is the fastest trigger in the army, and every promotion adds damage, rate of fire and CRIT odds (double damage) — the first ten ranks pay the most, and he keeps climbing all the way to rank 100.', bad:'Pistol range only. And there is only ever one Sarge.' },
   minesweeper:{ good:'Seeds the carpet with firecracker mines — brutal on lanes, bridges and choke points.', bad:'Never fires a shot, and mines flip your own men too if they wander in.' },
   flame:      { good:'Torches 3 enemies at once and cooks crawler packs. Nothing shrugs this off.', bad:'Arm\'s-reach range (85). If they\'re not close, that is just a soldier carrying soup.' },
   radioman:   { good:'+25% range to every soldier standing nearby — a whole squad upgrade in one figure.', bad:'All antenna, no rifle. Cannot return fire at all, so guard them.' }
@@ -5648,22 +5714,22 @@ function showPicker(){
   document.getElementById('picker').classList.remove('hidden');
   const units=META.unlocked.slice(0,8).map(k=>{
     const r=META.up[k]||0;
-    return '<div class="pickcard" onclick="UI.pick(\''+k+'\')"><img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+    return '<div class="pickcard" onclick="UI.pick(\''+k+'\')">'+lvChip(r)+'<img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
   });
   // unlocked Sarge weapons are upgradeable here too — that's the whole "level it up" path
   const weps=META.sargeUnlocked.filter(wk=>SARGE_WEAPONS[wk]).map(wk=>{
     const r=META.sargeUp[wk]||0;
-    return '<div class="pickcard" style="border-color:#7FA35C" onclick="UI.pickW(\''+wk+'\')"><img src="'+sargeWepURI(wk, dyeHex()||undefined)+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+    return '<div class="pickcard" style="border-color:#7FA35C" onclick="UI.pickW(\''+wk+'\')">'+lvChip(r)+'<img src="'+sargeWepURI(wk, dyeHex()||undefined)+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
   });
   document.getElementById('pickRow').innerHTML = units.concat(weps).join('');
   // EVERY RANK MAXED? Then every card on this screen refuses the tap and there
   // is no other way off it. Hand back a door — the picks stay banked for the
   // next soldier you unlock. (XP now arrives fast enough to reach that wall.)
-  const room = META.unlocked.slice(0,8).some(k=>(META.up[k]||0)<5)
-            || META.sargeUnlocked.some(wk=>SARGE_WEAPONS[wk]&&(META.sargeUp[wk]||0)<5);
+  const room = META.unlocked.slice(0,8).some(k=>(META.up[k]||0)<RANK_MAX)
+            || META.sargeUnlocked.some(wk=>SARGE_WEAPONS[wk]&&(META.sargeUp[wk]||0)<RANK_MAX);
   document.getElementById('pickOutBtn').classList.toggle('hidden', room);
   document.getElementById('pickHint').textContent = room
-    ? 'Choose a unit to improve — permanent +10% damage, every battle, forever.'
+    ? 'Choose a soldier to promote — permanent damage, every battle, forever. Every rank counts, all the way to 100.'
     : 'Every soldier in the box is decorated to the hilt. Your promotions keep — spend them on the next unit you unlock.';
 }
 window.UI = {
@@ -5700,10 +5766,10 @@ window.UI = {
     if(!pk){ renderShop(); return; }
     pk.classList.add('buying');
     setTimeout(()=>shopRefresh(), 1000); },
-  pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=5) return;
+  pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
-  pickW(wk){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if((META.sargeUp[wk]||0)>=5) return;
+  pickW(wk){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if((META.sargeUp[wk]||0)>=RANK_MAX) return;
     META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--; saveMeta();
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
   equipSarge(wk){ if(wk!=='pistol' && META.sargeUnlocked.indexOf(wk)<0) return;
@@ -5854,7 +5920,7 @@ window.UI = {
   classInfo(k){
     const ci=CLASSINFO[k]||{good:'—',bad:'—'}, r=META.up[k]||0, own=META.unlocked.indexOf(k)>=0;
     roomModal('<div style="display:flex;gap:14px;align-items:center"><img src="'+sprURI(k, dyeHex()||undefined)+'" style="width:74px">'
-      +'<div><h3 style="margin:0">'+UDEF[k].name+'</h3><small style="opacity:0.6">'+(own?('UPGRADE RANK '+r+' / 5'):'NOT IN YOUR ARMY YET — SEE THE SHOP')+'</small></div></div>'
+      +'<div><h3 style="margin:0">'+UDEF[k].name+'</h3><small style="opacity:0.6">'+(own?('UPGRADE RANK '+r+' / '+RANK_MAX):'NOT IN YOUR ARMY YET — SEE THE SHOP')+'</small></div></div>'
       +'<p style="margin-top:12px"><b style="color:#7FA35C">GOOD AT:</b> '+ci.good+'</p>'
       +'<p><b style="color:#D96A55">BAD AT:</b> '+ci.bad+'</p>'
       +'<p style="margin-top:8px"><a href="#" style="color:#8b8f7a" onclick="UI.room(\'promo\');return false">← back to the academy</a></p>');
@@ -5974,7 +6040,26 @@ window.GVT = {
   beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
   endCoach(){ coachDone(); },
   boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
-  sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ if(w==='pistol') META.up.sarge=rank; else META.sargeUp[w]=rank; } saveMeta(); return sargeStats(); },
+  sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ const r=Math.max(0,Math.min(RANK_MAX,rank|0)); if(w==='pistol') META.up.sarge=r; else META.sargeUp[w]=r; } saveMeta(); return sargeStats(); },
+  // ===== THE HUNDRED-RANK LADDER test rig =====
+  // GVT.rank('rifleman',50) puts a unit on any rung and reports what it bought;
+  // GVT.curve(100) reads the WHOLE table at a rank without touching your save —
+  // one call to audit the taper at 1 / 10 / 50 / 100.
+  rank(t,r){ if(!UDEF[t]) return null; META.up[t]=Math.max(0,Math.min(RANK_MAX,r|0)); saveMeta();
+    if(S.mode==='menu') renderMenu();
+    return { type:t, rank:META.up[t], units:+rankUnits(META.up[t]).toFixed(3),
+      dmgMul:+upMul(t).toFixed(3), crit:+critChance({type:t}).toFixed(3) }; },
+  curve(r){ r=Math.max(0,Math.min(RANK_MAX,r|0));
+    const u=rankUnits(r), f=rankUnitsFast(r), keep=[META.sargeWeapon,META.up.sarge,META.sargeUp.shotgun,META.sargeUp.sniper,META.sargeUp.lightsaber];
+    const at=w=>{ META.sargeWeapon=w; if(w==='pistol') META.up.sarge=r; else META.sargeUp[w]=r; return sargeStats(); };
+    const out={ rank:r, units:+u.toFixed(3), unitsFast:+f.toFixed(3), dmgMul:+(1+0.1*u).toFixed(3),
+      critTrigger:+(0.05+0.01*u).toFixed(4), critSarge:+Math.min(0.75,0.05+0.05*f).toFixed(4),
+      pistolRate:+pistolRate(r).toFixed(4),
+      shotgun:at('shotgun'), sniper:at('sniper'), saber:at('lightsaber') };
+    META.sargeWeapon=keep[0];
+    if(keep[1]==null) delete META.up.sarge; else META.up.sarge=keep[1];
+    ['shotgun','sniper','lightsaber'].forEach((w,i)=>{ if(keep[i+2]==null) delete META.sargeUp[w]; else META.sargeUp[w]=keep[i+2]; });
+    return out; },
   unlockSarge(){ META.sargeUnlocked=['shotgun','sniper','lightsaber']; saveMeta(); return META.sargeUnlocked; },
   // ===== CO-OP =====
   coop(){ return COOP? { code:COOP.code, role:COOP.role, ui:COOP.ui, state:COOP.state, level:COOP.level,
