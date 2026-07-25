@@ -729,7 +729,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.12</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.13</div>
   <div class="scanlines"></div>
 </div>
 
@@ -749,7 +749,11 @@
 
 <div class="overlay hidden" id="picker">
   <h1 style="color:#7FA35C; font-size:2.2rem">PROMOTION!</h1>
-  <p>Choose a unit to improve — permanent +10% damage, every battle, forever.</p>
+  <p id="pickHint">Choose a unit to improve — permanent +10% damage, every battle, forever.</p>
+  <!-- the door. Only appears when every rank is maxed — see showPicker. It sits
+       ABOVE the cards on purpose: eleven MAXED cards push anything below them
+       off the bottom of a phone, and this is the only way off this screen. -->
+  <button class="btn hidden" id="pickOutBtn" style="margin-bottom:0.2rem">FULLY DECORATED — BACK TO HQ</button>
   <div id="pickRow" class="pickrow"></div>
 </div>
 
@@ -1048,7 +1052,22 @@ function wrLoad(){
 }
 
 let chalTarget=null;
+// ================= THE XP ECONOMY =================
+// Every payout is a FRACTION OF THE LEVEL YOU'RE STANDING ON, never a flat
+// number. The ladder gets taller as you climb (100 + 50 a rung), so a flat
+// reward quietly shrinks to nothing by rank 20 — which is exactly what it did.
+// Now: win a battleground and you're all but promoted, beat a campaign level
+// and you're halfway there, lose and you still moved.
+const XP_BF_WIN=0.90, XP_BF_TEAM=0.01,   // 1v1 pays 91% of a level, 10v10 the whole thing
+      XP_CAMPAIGN_WIN=0.50,              // two carpets secured = one promotion, at EVERY rank
+      XP_BOSS=0.10,                      // a felled boss pays a little on top
+      XP_INVASION_WIN=0.15,              // raiding someone else's room is a short sortie
+      XP_LOSS=0.10;                      // ten defeats still promote you — losing is progress
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
+function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac)); }   // a fraction of a level -> real XP
+// pay it in and promote as far as it carries (one award is at most one rank)
+function grantXP(amt){ META.xp+=amt; let p=0; while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; p++; } return p; }
+function promoTag(p){ return p>0? ' · PROMOTED TO LEVEL '+META.lvl+'!' : ''; }
 function upMul(type){ return 1 + 0.1*(META.up[type]||0); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dayBack(n){ const d=new Date(Date.now()-n*864e5); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -1561,12 +1580,16 @@ function endInvasion(won){
   S.invasion.resolved=true;
   S.mode=won?'win':'lose';
   const inv=S.invasion;
+  // a raid pays either way: 15% of a level for taking the room, and the same
+  // tenth every defeat in the game pays for the walk home
+  const xpGain=xpFor(won? XP_INVASION_WIN : XP_LOSS), promos=grantXP(xpGain);
+  const spoils=(won? ' · +2★ spoils of war':'')+' · +'+xpGain+' XP'+promoTag(promos);
   fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({device:META.deviceId,target:inv.uid,won:!!won})})
     .then(r=>r.json()).then(d=>{
       const el=document.getElementById('medalText');
       if(el&&won){ el.textContent = (d.bonus>0? ('FIRST WIN TODAY vs '+inv.name+' — BONUS +'+d.bonus+'★ ('+d.capLeft+' bonus wins left today)')
-                                   : ('Already beat '+inv.name+' today — rematch glory')) + ' · +2★ spoils';
+                                   : ('Already beat '+inv.name+' today — rematch glory')) + spoils;
         if(d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta(); } }
     }).catch(()=>{});
   document.getElementById(won?'win':'lose').classList.remove('hidden');
@@ -1576,10 +1599,11 @@ function endInvasion(won){
     const wt=document.getElementById('winTitle');
     wt.innerHTML='INVASION<br>VICTORIOUS'; wt.style.color='#D2B489';
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
-    document.getElementById('medalText').textContent='Their toy box is broken — the room is yours. +2★ spoils of war.';
+    document.getElementById('medalText').textContent='Their toy box is broken — the room is yours.'+spoils;
   } else {
+    saveMeta();
     document.getElementById('loseTitle').innerHTML='INVASION<br>REPELLED';
-    document.getElementById('loseText').textContent='Their line held and your budget ran dry. Regroup and hit that room again.';
+    document.getElementById('loseText').textContent='Their line held and your budget ran dry. Regroup and hit that room again.'+spoils;
     SFX.ouch();
   }
 }
@@ -2044,18 +2068,17 @@ function endBattlefield(reason){
   S.mode=won?'win':'lose';
   document.getElementById(won?'win':'lose').classList.remove('hidden');
   if(won){
-    // WIN = +25★ AND A PILE OF XP (Wyatt 7/24) — bigger battles pay bigger XP,
-    // and the XP feeds the same promotion picker the campaign does.
+    // WIN = +25★ AND VERY NEARLY A PROMOTION (Wyatt 7/24): 91% of the level
+    // you're on at 1v1, the whole thing at 10v10 — the biggest single payout in
+    // the game, and it feeds the same promotion picker the campaign does.
     META.bfWins++;
-    const starGain=25, xpGain=50+25*(bf.team||1);
+    const starGain=25, xpGain=xpFor(Math.min(1, XP_BF_WIN+XP_BF_TEAM*(bf.team||1)));
     // 1v1 and 2v2 have their own ladders, so they keep their own books — for
     // YOUR seat only. 3v3+ feed nothing but the lifetime totals and the medals.
     const wrR=META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
     META.starBank+=starGain; META.starsLifetime+=starGain;
-    META.xp+=xpGain;
-    let promos=0;
-    while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
-    const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+(promos>0? ' · PROMOTED TO LEVEL '+META.lvl+'!':'');
+    const promos=grantXP(xpGain);
+    const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+promoTag(promos);
     const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C'; wt.innerHTML=copy[0];
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
     document.getElementById('medalText').textContent=margin+' · '+copy[1]+spoils;
@@ -2071,8 +2094,10 @@ function endBattlefield(reason){
   } else {
     META.bfLosses++;
     const wrL=META.bfRecord[bf.team]; if(wrL) wrL.l++;
+    // a beating is still a lesson — every defeat pays a tenth of a level
+    const xpGain=xpFor(XP_LOSS), promos=grantXP(xpGain);
     document.getElementById('loseTitle').innerHTML=copy[0];
-    document.getElementById('loseText').textContent=margin+' · '+copy[1];
+    document.getElementById('loseText').textContent=margin+' · '+copy[1]+' · +'+xpGain+' XP'+promoTag(promos);
     SFX.ouch();
   }
   checkAch(); saveMeta(); netSync();
@@ -3226,9 +3251,11 @@ function endBattle(win){
   }
   document.getElementById(win?'win':'lose').classList.remove('hidden');
   if(!win){
+    // you still learned the ground — a defeat pays a tenth of a level
+    const xpGain=xpFor(XP_LOSS), promos=grantXP(xpGain);
     document.getElementById('loseTitle').innerHTML='THE TOY BOX<br>HAS FALLEN';
-    document.getElementById('loseText').textContent='The Tan flag flies over your carpet. Sarge would like a word.';
-    checkAch(); saveMeta();   // a lost battle still locks in its ace and medals
+    document.getElementById('loseText').textContent='The Tan flag flies over your carpet. Sarge would like a word. · +'+xpGain+' XP for the trouble'+promoTag(promos);
+    checkAch(); saveMeta();   // a lost battle still locks in its ace, its medals and its XP
     SFX.ouch(); return;
   }
 
@@ -3268,13 +3295,11 @@ function endBattle(win){
   // a felled boss pays a bounty on top of the level's medals
   if(S.bossKilled && !S.rival){ META.starBank+=2; META.starsLifetime+=2; }
   META.starBank+=stars; META.starsLifetime+=stars;
-  const xpGain = 30 + stars*30 + S.wave*4 + (S.bossKilled?40:0);
-  META.xp += xpGain;
+  const xpGain = xpFor(XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0));
   if(S.bossKilled && !S.rival) msg = 'BOSS DOWN! '+msg+' · +2★ bounty';
   if(sargeNew.length) msg += ' · ⚔ SARGE UNLOCKED THE '+sargeNew.join(' & ')+'! Equip it at the Training Academy';
   msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
-  let promos=0;
-  while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
+  let promos=grantXP(xpGain);
   if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
   if(S.coop && COOP && COOP.mate) msg += ' · 🤝 TWO-COMMANDER VICTORY — '+COOP.mate.name.toUpperCase()+"'S CAMPAIGN ADVANCED TOO!";
@@ -5331,6 +5356,15 @@ function showPicker(){
     return '<div class="pickcard" style="border-color:#7FA35C" onclick="UI.pickW(\''+wk+'\')"><img src="'+sargeWepURI(wk, dyeHex()||undefined)+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=5?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
   });
   document.getElementById('pickRow').innerHTML = units.concat(weps).join('');
+  // EVERY RANK MAXED? Then every card on this screen refuses the tap and there
+  // is no other way off it. Hand back a door — the picks stay banked for the
+  // next soldier you unlock. (XP now arrives fast enough to reach that wall.)
+  const room = META.unlocked.slice(0,8).some(k=>(META.up[k]||0)<5)
+            || META.sargeUnlocked.some(wk=>SARGE_WEAPONS[wk]&&(META.sargeUp[wk]||0)<5);
+  document.getElementById('pickOutBtn').classList.toggle('hidden', room);
+  document.getElementById('pickHint').textContent = room
+    ? 'Choose a unit to improve — permanent +10% damage, every battle, forever.'
+    : 'Every soldier in the box is decorated to the hilt. Your promotions keep — spend them on the next unit you unlock.';
 }
 window.UI = {
   play(n){ audio(); startBattle(n||META.campaign+1, null); },
@@ -5556,10 +5590,11 @@ document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
   if(S.coop && COOP){ if(META.pendingPicks>0) showPicker(); else { showMenu(); UI.coopOpen(); } return; }
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
-  if(S.invasion){ S.invasion=null; showMenu(); return; }
+  if(S.invasion){ S.invasion=null; if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // a raid can promote you too
   if(META.pendingPicks>0) showPicker(); else showMenu();
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
+document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
 
 // ================= LOOP =================
 let last=0, ready=false;
@@ -5620,6 +5655,14 @@ window.GVT = {
     unlocked:META.unlocked.slice(), dyes:META.dyes.slice(), dyeOn:META.dyeOn,
     lasers:META.lasers.slice(), laserOn:META.laserOn,
     packs:SHOP_ITEMS.map(s=>s.t+':'+(META.unlocked.indexOf(s.t)>=0?'own':'shelf')) }; },
+  // XP test rig: GVT.xp() reads the whole economy at your current rank,
+  // GVT.lvl(n,xp) puts you on any rung to prove the payouts scale with it
+  xp(){ return { lvl:META.lvl, xp:META.xp, need:xpNeed(), picks:META.pendingPicks,
+    pays:{ bf1v1:xpFor(XP_BF_WIN+XP_BF_TEAM), bf10v10:xpFor(Math.min(1,XP_BF_WIN+XP_BF_TEAM*10)),
+      campaign:xpFor(XP_CAMPAIGN_WIN), boss:xpFor(XP_CAMPAIGN_WIN+XP_BOSS),
+      invasion:xpFor(XP_INVASION_WIN), loss:xpFor(XP_LOSS) } }; },
+  lvl(n,xp){ META.lvl=Math.max(1,n|0); META.xp=Math.max(0,xp|0); META.pendingPicks=0; saveMeta();
+    return { lvl:META.lvl, xp:META.xp, need:xpNeed() }; },
   bfRec(n,w,l){ if(n){ META.bfRecord[n]={w:w|0,l:l|0,s:0}; saveMeta(); } return META.bfRecord; },
   // piggy test rig: GVT.pig(12) = 12-day streak defended yesterday, unclaimed
   pig(streak,opts){ opts=opts||{};
