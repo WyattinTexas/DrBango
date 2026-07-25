@@ -149,6 +149,17 @@
   .wt-m2 .n { font-size:clamp(19px,3.6vh,30px); color:#BFE39A; letter-spacing:0.06em; }
   .wt-m2 small { font-size:clamp(10px,1.9vh,14px); letter-spacing:0.14em; color:#BFC6AD; }
   .wt-m2:active { transform:scale(0.96); }
+  /* HOLD THE LINE: a full-width slim bar under the size shelf. Deliberately gold
+     rather than green — it is a CO-OP mission with real people in it, not another
+     row of AI seats, and the colour is the fastest way to say so. Sized on vh so
+     the second shelf can't push the map chips off a 375px-tall phone. */
+  .wt-hold { flex:1; max-width:min(760px,96vw); display:flex; flex-direction:column; align-items:center;
+    gap:2px; background:linear-gradient(180deg,rgba(46,36,18,0.94),rgba(22,17,10,0.94));
+    border:2.5px solid rgba(232,196,106,0.55); border-radius:14px;
+    padding:clamp(4px,1vh,9px) clamp(10px,1.6vw,20px); color:#EDEADF; font:inherit; cursor:pointer; }
+  .wt-hold .n { font-size:clamp(15px,2.9vh,24px); color:#FFD24A; letter-spacing:0.06em; }
+  .wt-hold small { font-size:clamp(8px,1.6vh,12px); letter-spacing:0.12em; color:#D9CBA6; text-align:center; }
+  .wt-hold:active { transform:scale(0.97); }
   .wt-hop { display:flex; align-items:center; gap:clamp(4px,0.7vw,8px); background:rgba(14,12,9,0.72);
     border:2px dashed rgba(191,198,173,0.35); border-radius:14px; padding:clamp(5px,1.2vh,10px) clamp(8px,1.2vw,14px); }
   .wt-hop .lab { font-size:clamp(9px,1.8vh,13px); letter-spacing:0.14em; color:#BFC6AD; margin-right:4px; white-space:nowrap; }
@@ -1212,7 +1223,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.22</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.23</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1668,7 +1679,11 @@ const META_DEFAULT = {
   bfMap:'crossing', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1, // BATTLEFIELD: last map, record, squad size
   // WORLD RANKINGS: 1v1 and 2v2 are their own ladders, so they keep their own
   // W/L (and the stars they paid). 3v3+ only ever feed bfWins/bfLosses.
-  bfRecord:{ 1:{w:0,l:0,s:0}, 2:{w:0,l:0,s:0} }, wrSeen:[]
+  bfRecord:{ 1:{w:0,l:0,s:0}, 2:{w:0,l:0,s:0} }, wrSeen:[],
+  // THE CO-OP SERVICE RECORD: every campaign level you have beaten with at least
+  // one other REAL commander beside you — both co-op modes write here. Nothing
+  // reads it yet; the GIANT BANANA (all 100 levels, all of them together) will.
+  coopLevels:[]
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); } } catch(e) {}
@@ -1679,7 +1694,11 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
 // profile — normalise both modes here (and never alias META_DEFAULT's copy).
 (function(){ const r=META.bfRecord||{};
   META.bfRecord={ 1:Object.assign({w:0,l:0,s:0}, r[1]||{}), 2:Object.assign({w:0,l:0,s:0}, r[2]||{}) };
-  if(!Array.isArray(META.wrSeen)) META.wrSeen=[]; })();
+  if(!Array.isArray(META.wrSeen)) META.wrSeen=[];
+  // ⚠ Object.assign hands a save with no coopLevels the DEFAULT ARRAY ITSELF, so
+  // the first co-op win would push into META_DEFAULT and every later `new` profile
+  // would be born having beaten it. Build a fresh one — the same trap META.enh hit.
+  META.coopLevels = Array.isArray(META.coopLevels)? META.coopLevels.slice() : []; })();
 // SABER COLOURS GO PREMIUM (v1.18) — MIGRATION. Anyone who already picked a blade
 // KEEPS it: that colour is grandfathered in as owned and chosen, and their free
 // once-pick counts as spent. A save that unlocked the saber but never touched a
@@ -1762,9 +1781,10 @@ window.GVTN = {
 const NET='https://nationgame.live/gvt';
 // a friend's invite link (?coop=CODE): stash the code, scrub the URL so a
 // refresh doesn't re-join, and connect the moment they reach the room
-let coopJoinPend=null;
-try{ const cm=location.search.match(/[?&]coop=([A-Za-z0-9]{4,8})/i);
-  if(cm){ coopJoinPend=cm[1].toUpperCase(); history.replaceState(null,'',location.pathname); } }catch(e){}
+let coopJoinPend=null, coopJoinMode='pair';
+try{ const cm=location.search.match(/[?&](coop|squad)=([A-Za-z0-9]{4,8})/i);
+  if(cm){ coopJoinMode=cm[1].toLowerCase()==='squad'?'squad':'pair';
+    coopJoinPend=cm[2].toUpperCase(); history.replaceState(null,'',location.pathname); } }catch(e){}
 let lastSync=0;
 function netSync(){
   const now=Date.now(); if(now-lastSync<15000) return Promise.resolve(); lastSync=now;
@@ -1773,10 +1793,16 @@ function netSync(){
     return fetch(NET+'/sync',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId,name:META.name,stars:META.starsLifetime,lvl:META.lvl,campaign:META.campaign,color:META.dyeOn||null,defense:META.defense||undefined,
         // the battleground ladders report in here; /challenge still pays every star
-        bf1w:META.bfRecord[1].w,bf1l:META.bfRecord[1].l,bf2w:META.bfRecord[2].w,bf2l:META.bfRecord[2].l})})
+        bf1w:META.bfRecord[1].w,bf1l:META.bfRecord[1].l,bf2w:META.bfRecord[2].w,bf2l:META.bfRecord[2].l,
+        // the co-op service record rides along both ways — HQ unions it, so a
+        // reinstall gets every level-beaten-together back
+        coopLevels:META.coopLevels})})
       .then(r=>r.json()).then(d=>{
         // HQ is the authority on display names — if it turned ours down, take its word
         if(d&&d.ok&&d.name&&d.name!==META.name){ META.name=d.name; saveMeta(); }
+        if(d&&d.ok&&Array.isArray(d.coopLevels)&&d.coopLevels.length>META.coopLevels.length){
+          META.coopLevels=d.coopLevels.slice(); saveMeta();
+        }
         return d;
       }).catch(()=>{});
   }catch(e){}
@@ -1821,7 +1847,13 @@ const XP_BF_WIN=0.90, XP_BF_TEAM=0.01,   // 1v1 pays 91% of a level, 10v10 the w
       XP_CAMPAIGN_WIN=0.50,              // two carpets secured = one promotion, at EVERY rank
       XP_BOSS=0.10,                      // a felled boss pays a little on top
       XP_INVASION_WIN=0.15,              // raiding someone else's room is a short sortie
-      XP_LOSS=0.10;                      // ten defeats still promote you — losing is progress
+      XP_LOSS=0.10,                      // ten defeats still promote you — losing is progress
+      // HOLD THE LINE (v1.23). Wyatt: winning one of these must feel GREAT, and pay
+      // at LEAST the battleground win. The battleground caps at exactly one level
+      // (0.90 + 0.01×team, min'd at 1) — so the squad mission STARTS there and pays
+      // more for every commander who stood with you. Ten of you = 1.54 levels, the
+      // biggest single payout in the game, which is the point.
+      XP_SQUAD_WIN=1.00, XP_SQUAD_MATE=0.06;
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
 function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac)); }   // a fraction of a level -> real XP
 // pay it in and promote as far as it carries (one award is at most one rank)
@@ -2369,6 +2401,7 @@ function reset(){
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0;
   S.coop=null;    // co-op battles re-arm this right after startBattle
+  S.sq=null;      // …and a squad mission arms its streaming ticker there too
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
 }
 function startBattle(levelN, rival){
@@ -2668,15 +2701,35 @@ function bfQueueTeardown(){
 // HQ, so both sims hold both armies. The small stuff drifts (aim, lanes,
 // kill order) — the HOST sim referees everything that counts: lives, wave
 // starts, and the verdict. A win counts for BOTH campaigns. That's the point.
+// v1.23 widened this from a PAIR to a PARTY. Everything below is shared: the two
+// modes differ only in how many chairs there are and which endpoint family they
+// talk to. COOP.mode 'pair' = the v1.9 Allied Campaign (host/guest, `role` 'h'/'g');
+// COOP.mode 'squad' = HOLD THE LINE (up to ten, `role` is the SEAT NUMBER as a
+// string). `role` is only ever an IDENTITY — "am I the referee?" is COOP.host,
+// which the server can hand to somebody else mid-match if a host walks out.
 let COOP=null;            // the party — outlives battles, dies on leave
 let coopLaunching=false;  // true only inside coopStartBattle's startBattle call
 function coopMe(){ return { name:META.name, camp:META.campaign, hex:dyeHex() }; }
-function coopPost(ep,body){
-  return fetch(NET+'/coop/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
+function coopIsHost(){ return !!(COOP && COOP.host); }
+function coopGuest(){ return !!(S.coop && COOP && !COOP.host); }   // "not the referee"
+function coopSquad(){ return !!(COOP && COOP.mode==='squad'); }
+// every OTHER commander in the party, in one shape both modes can render
+function coopRoster(){
+  if(!COOP) return [];
+  if(COOP.mode==='squad') return (COOP.members||[]).filter(m=>m.seat!==COOP.seat);
+  return COOP.mate? [COOP.mate] : [];
+}
+function coopHumans(){ return coopSquad()? Math.max(1,(COOP.members||[]).length) : (COOP&&COOP.mate?2:1); }
+// `fam` is an override for the one caller that has already torn COOP down and so
+// can no longer be asked which family it belongs to — see coopLeave.
+function coopPost(ep,body,fam){
+  fam = fam || (coopSquad()? '/lobby/' : '/coop/');
+  return fetch(NET+fam+ep,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe()},body||{}))}).then(r=>r.json());
 }
-function coopFresh(ui){
-  return { code:null, role:null, mate:null, level:0, state:'idle', ui:ui||'idle', seq:0,
+function coopFresh(ui,mode){
+  return { mode:mode||'pair', code:null, role:null, host:false, seat:0, mate:null, members:[],
+           pc:1, seatHex:{}, level:0, state:'idle', ui:ui||'idle', seq:0,
            outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
            mateHex:null, misses:0, qT0:Date.now() };
 }
@@ -2694,7 +2747,7 @@ function coopTick(){
       if(!r||!r.ok){ coopMiss(r); return; }
       COOP.misses=0;
       if(r.waiting){ coopPanelSync(); return; }
-      COOP.code=r.code; COOP.role=r.role; COOP.mate=r.mate; COOP.level=r.level;
+      COOP.code=r.code; COOP.role=r.role; COOP.host=(r.role==='h'); COOP.mate=r.mate; COOP.level=r.level;
       COOP.state=r.state||'paired'; COOP.ui='paired';
       SFX.horn(); coopPanelOpen();
     }).catch(()=>{ if(COOP){ COOP.busy=false; coopMiss(); } });
@@ -2705,7 +2758,7 @@ function coopTick(){
   const body={ code:COOP.code, seq:COOP.seq };
   const sending=COOP.outQ.slice(0,40);
   if(sending.length) body.cmds=sending;
-  if(S.coop && COOP.role==='h' && !COOP.ended) body.beacon={ lives:S.lives, wave:S.wave };
+  if(S.coop && COOP.host && !COOP.ended) body.beacon={ lives:S.lives, wave:S.wave };
   if(COOP.wantBattle) body.set='battle';
   coopPost('poll', body).then(r=>{
     if(!COOP) return; COOP.busy=false;
@@ -2717,11 +2770,13 @@ function coopTick(){
 }
 function coopMiss(r){
   if(!COOP) return;
-  if(r && (r.err==='no party' || r.err==='party full')){
-    // the party is gone — mate left, or HQ swept it
-    const nm=COOP.mate? COOP.mate.name : 'YOUR ALLY';
-    if(S.coop){ coopDissolve(nm.toUpperCase()+' WENT HOME — CARRY ON, COMMANDER!'); }
-    else { clearTimeout(COOP.pollT); COOP=coopFresh('idle'); COOP.note='Your ally left the party.'; coopPanelSync(); }
+  if(r && (r.err==='no party' || r.err==='party full' || r.err==='in battle')){
+    // the party is gone — everyone left, or HQ swept it
+    const nm=coopSquad()? 'THE SQUAD' : (COOP.mate? COOP.mate.name.toUpperCase() : 'YOUR ALLY');
+    const sq=coopSquad();
+    if(S.coop){ coopDissolve(nm+(sq?' STOOD DOWN':' WENT HOME')+' — CARRY ON, COMMANDER!'); }
+    else { const m=COOP.mode; clearTimeout(COOP.pollT); COOP=coopFresh('idle',m);
+           COOP.note=sq? 'That squad has stood down.' : 'Your ally left the party.'; coopPanelSync(); }
     return;
   }
   COOP.misses++; coopPanelSync();
@@ -2729,26 +2784,69 @@ function coopMiss(r){
 function coopOnPoll(r){
   const wasState=COOP.state;
   COOP.state=r.state; COOP.level=r.level;
-  if(r.mate){ COOP.mate=r.mate; COOP.lastSeen=r.mate.seen||0; }
+  if(coopSquad()){
+    // ⚠ role is the wire IDENTITY and the cmds filter below reads it — set it
+    // BEFORE replaying anything, or a re-seated client applies its own orders twice.
+    if(typeof r.seat==='number'){ COOP.seat=r.seat; COOP.role=String(r.seat); }
+    COOP.host=!!r.host;                        // the chair can change hands mid-match
+    if(Array.isArray(r.members)){ COOP.members=r.members; coopSeatColours(); }
+    COOP.pc=r.pc||r.players||COOP.members.length||1;
+  } else if(r.mate){ COOP.mate=r.mate; COOP.lastSeen=r.mate.seen||0; }
+  let sqTop=0;
   (r.cmds||[]).forEach(cm=>{
     if(cm.q>COOP.seq) COOP.seq=cm.q;
-    if(cm.p!==COOP.role) coopApply(cm);
+    if(cm.p===COOP.role) return;
+    // ⚠ wave tickers COALESCE. A reconnecting client replays the battle's whole
+    // command log from seq 0 (that is the v1.9 rejoin story), and applying five
+    // of these in a row would rebase all five waves onto the same instant and
+    // dump the entire level on the carpet at once. Only the newest one counts.
+    if(cm.k==='sqw'){ sqTop=Math.max(sqTop, cm.n|0); return; }
+    coopApply(cm);
   });
-  // the referee's word lands: lives as spoken, waves caught up
-  if(S.coop && COOP && COOP.role==='g' && r.beacon && !COOP.ended){
-    if(typeof r.beacon.lives==='number') S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
-    if((r.beacon.wave|0)>S.wave) coopCatchUp(r.beacon.wave|0);
-  }
+  // the referee's word on lives lands straight away
+  if(S.coop && COOP && !COOP.host && r.beacon && !COOP.ended && typeof r.beacon.lives==='number')
+    S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
   if(!COOP) return;                            // an applied 'end' can tear things down
   if(r.state!=='battle') COOP.wantBattle=false;
   if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu') coopStartBattle();
-  else if(wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
-  else coopPanelSync();
-  // a mate silent mid-battle has put the controller down
-  if(S.coop && COOP.lastSeen>12){
+  else if(!coopSquad() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
+  else {
+    if(coopSquad() && S.mode==='menu' && COOP.ui!=='lobby' && COOP.ui!=='enter'){ COOP.ui='lobby'; coopPanelOpen(); }
+    else coopPanelSync();
+  }
+  // ⚠ THE WAVE CATCH-UP GOES LAST, after the battle may have STARTED on this
+  // frame. A client rejoining a live match gets the whole command log on the poll
+  // that also flips it into the battle — and coopApply/sqCatchUp both no-op while
+  // we are still standing in the room, so anything done above that line is thrown
+  // away. Done here, a reconnecting commander lands on the right wave.
+  if(S.coop && !COOP.ended){
+    let want=sqTop;
+    if(!COOP.host && r.beacon) want=Math.max(want, r.beacon.wave|0);
+    // ⚠ NEVER coopCatchUp() in a squad mission — it wipes the carpet and calls
+    // spawnWave(), which overwrites S.queue and resets S.waveT, the very clock
+    // every streamed group's rebased `at` is measured against.
+    if(want>S.wave){ if(S.sq) sqCatchUp(want); else if(!COOP.host) coopCatchUp(want); }
+  }
+  // PAIR: a mate silent mid-battle has put the controller down and the battle goes
+  // solo. SQUAD: one quiet commander is just nine other people still fighting —
+  // the roster shrinks (HQ prunes them), their men fight on, nobody is wedged.
+  if(S.coop && !coopSquad() && COOP.lastSeen>12){
     const nm=COOP.mate? COOP.mate.name : 'YOUR ALLY';
     coopDissolve(nm.toUpperCase()+"'S SIGNAL DROPPED — CARRY ON!");
   }
+}
+// Ten armies on one carpet: every commander keeps their own dye if it is legible
+// next to the ones already taken, else the roster hands them a spare. Same picker
+// the battleground's twenty seats use — so nobody ever fights their own colour.
+function coopSeatColours(){
+  if(!COOP) return;
+  const used=[dyeHex()||GREEN], map={};
+  for(const m of (COOP.members||[])){
+    if(m.seat===COOP.seat) continue;
+    map[String(m.seat)] = bfPickHex(used, m.hex||null);
+  }
+  COOP.seatHex=map;
+  for(const h of Object.values(map)) buildUnitTint(h);
 }
 function coopUnit(cid){ return S.units.find(u=>u.cid===cid); }
 function coopSend(cm){ if(COOP && S.coop && !COOP.ended) COOP.outQ.push(cm); }
@@ -2773,7 +2871,10 @@ function coopApply(cm){
     if(!UDEF[cm.t] || coopUnit(cm.id)) return; // replay-safe
     const x=Math.max(58,Math.min(W-24,cm.x|0)), y=Math.max(70,Math.min(H-92,cm.y|0));
     const u=placeUnit(cm.t,x,y);
-    u.cid=cm.id; u.coopBy=cm.p; u.coopHex=COOP.mateHex;
+    // whose man this is decides his colour: one ally has ONE tint, a squad of ten
+    // looks him up by seat. (An unknown seat falls back to honest toy blue.)
+    u.cid=cm.id; u.coopBy=cm.p;
+    u.coopHex = coopSquad()? (COOP.seatHex[cm.p]||'#5B84C4') : COOP.mateHex;
     if(cm.um) u.coopUM=Math.max(1,Math.min(1.6,+cm.um||1));
     // The ally's bench, filtered to parts this build actually knows about. ALWAYS
     // set (empty when they sent none, or are on an older build) — its presence is
@@ -2786,7 +2887,10 @@ function coopApply(cm){
     return;
   }
   if(cm.k==='wave'){ coopCatchUp(cm.n|0); return; }
-  if(cm.k==='wava'){ if(COOP.role==='h' && !S.waveActive && S.mode==='play') spawnWave(); return; }
+  // HOLD THE LINE: the referee's stream ticker. Not a catch-up — the wave is
+  // ADDED to whatever is already walking on, which is the whole mode.
+  if(cm.k==='sqw'){ sqCatchUp(cm.n|0); return; }
+  if(cm.k==='wava'){ if(COOP.host && !S.waveActive && S.mode==='play') spawnWave(); return; }
   const u=coopUnit(cm.id); if(!u) return;
   if(cm.k==='mv'){
     u.x=Math.max(58,Math.min(W-24,cm.x|0)); u.y=Math.max(70,Math.min(H-92,cm.y|0)); u.sprue=0.2;
@@ -2811,14 +2915,118 @@ function coopStartBattle(){
   startBattle(COOP.level, null);
   coopLaunching=false;
   S.coop=COOP;
-  // the ally fights in their own colour — or honest toy blue if that clashes
-  let hx=COOP.mate && COOP.mate.hex;
-  const mine=(dyeHex()||'').toLowerCase();
-  if(!hx || hx.toLowerCase()===mine) hx = (mine==='#5b84c4'? '#4AA5A0' : '#5B84C4');
-  COOP.mateHex=hx; buildUnitTint(hx);
-  S.ann={txt:'ALLIED MISSION — LEVEL '+S.levelN, t:2.8};
+  if(coopSquad()){
+    // HOLD THE LINE: same level, same terrain, same kinds of formations — sized
+    // for the squad and streamed at us without a break. `pc` came off HQ and is
+    // FROZEN there, so all ten sims build the identical army even if a commander
+    // drops mid-match. Never re-derive it from the live roster.
+    const p=Math.max(1,Math.min(SQ_MAX,COOP.pc|0));
+    sqScaleCfg(S.cfg,p);
+    S.sq={ p, t:0, nextT:SQ_GRACE };
+    coopSeatColours();
+    S.ann={txt:'HOLD THE LINE — LEVEL '+S.levelN+' · '+p+' COMMANDER'+(p===1?'':'S'), t:3.2};
+  } else {
+    // the ally fights in their own colour — or honest toy blue if that clashes
+    let hx=COOP.mate && COOP.mate.hex;
+    const mine=(dyeHex()||'').toLowerCase();
+    if(!hx || hx.toLowerCase()===mine) hx = (mine==='#5b84c4'? '#4AA5A0' : '#5B84C4');
+    COOP.mateHex=hx; buildUnitTint(hx);
+    S.ann={txt:'ALLIED MISSION — LEVEL '+S.levelN, t:2.8};
+  }
   SFX.horn();
   coopTick();
+}
+
+// ================= HOLD THE LINE: THE SQUAD MISSION (v1.23) =================
+// Wyatt 7/25: the campaign, fought in the STYLE OF THE BATTLEFIELD — up to TEN
+// real commanders on one carpet, the same tan army in the same kinds of
+// formations, but the waves DO NOT WAIT. They come in gradually and they keep
+// coming, and the level is over when the last one is off the rug.
+//
+// It rides the co-op relay unchanged (mirrored full local sims; the host sim is
+// referee for lives and the verdict). All that is new is WHO pumps the waves and
+// HOW BIG the tan army is.
+const SQ_MAX=10;         // ten chairs, same as the battleground's ten seats
+const SQ_GRACE=10;       // seconds to dig in before the first wave walks on
+const SQ_GAP=15;         // and another every fifteen after that, cleared or not
+// ⚠ THE SUB-LINEAR CALL (Wyatt: "a LITTLE easier with 10 — I want a
+// ten-people-together-win situation"). Each commander may field SQ_CAP men, so
+// the DEFENCE grows exactly linearly with the lobby. The tan army grows as
+// players^0.82, which is deliberately slower: ten commanders field 10× the guns
+// against 6.63× the enemy, so the carpet is 1.51× kinder at ten than it is alone.
+// Not a walkover — a win ten people can actually reach together.
+// (The cap is what makes that arithmetic true at all: every player banks EVERY
+// kill's bounty in co-op, so at ten commanders money stops being a limit and
+// something else has to be. One const each; all three are Wyatt's to overrule.)
+const SQ_EXP=0.82;
+const SQ_BOSS_EXP=0.5;   // bosses multiply at half that again — three at ten, not seven
+// ⚠ TEN, not six, and the number was MEASURED not guessed. The cap cancels out of
+// the ten-vs-one comparison (that ratio is pure SQ_EXP), so what it actually sets
+// is the mode's ABSOLUTE difficulty against the campaign everyone already knows.
+// A late-campaign carpet carries about ten men; at cap 6 a squad of ten fielded
+// 60 against 6.61× the Tan — measurably HARDER than playing the level alone, and
+// "winning must feel great" was the brief. At 10 a lone commander gets the
+// campaign's own ratio (and the streaming assault on top of it), and ten
+// commanders get 1.5× kinder than the campaign. That is the ten-people-win.
+const SQ_CAP=10;         // men on the carpet PER COMMANDER
+function sqEnemyMul(p){ return Math.pow(Math.max(1,p), SQ_EXP); }
+// A campaign level beaten with company. `lastSync=0` because HQ's 15s throttle
+// would otherwise eat the one sync that matters, and this record is the whole
+// point of the write.
+function noteCoopLevel(n){
+  n=n|0; if(n<1) return;
+  if(!Array.isArray(META.coopLevels)) META.coopLevels=[];
+  if(META.coopLevels.indexOf(n)>=0) return;
+  META.coopLevels.push(n); META.coopLevels.sort((a,b)=>a-b);
+  lastSync=0;
+}
+// Same waves, same formations — just more of them in each. Pure arithmetic over
+// the already-seeded cfg, so every sim in the lobby builds the identical army
+// without another roll of the level's RNG.
+function sqScaleCfg(cfg,p){
+  const s=sqEnemyMul(p), bs=Math.max(1,Math.round(Math.pow(Math.max(1,p),SQ_BOSS_EXP)));
+  for(const w of cfg.waves) for(const g of w.groups){
+    if(g.f==='boss'){ g.n=bs; continue; }
+    g.n=Math.max(1,Math.round((g.n||1)*s));
+    if(g.escort) g.escort=Math.max(1,Math.round(g.escort*s));
+  }
+  return cfg;
+}
+// how many of the men out there are MINE — an ally's don't count against my cap
+function sqMine(){ let k=0; for(const u of S.units){ if(!u.coopBy && !u.dead) k++; } return k; }
+function sqAtCap(){ return !!S.sq && sqMine()>=SQ_CAP; }
+// the referee's ticker. ⚠ It runs on its OWN clock, not S.waveT — that one stops
+// dead between waves, and the whole point of this mode is that nothing stops.
+function sqTick(dt){
+  const sq=S.sq; sq.t+=dt;
+  if(coopIsHost() && S.wave<S.cfg.waves.length && sq.t>=sq.nextT) sqPushWave(S.wave+1);
+}
+// ADD a wave to whatever is already walking on. `at` is rebased onto the running
+// spawn clock, so a group that used to arrive "3s into its wave" still does.
+function sqPushWave(n,remote){
+  if(!S.sq || S.mode!=='play') return;
+  n=Math.max(1,Math.min(S.cfg.waves.length,n|0));
+  if(n<=S.wave) return;                          // replay-safe, like every other command
+  const w=S.cfg.waves[n-1];
+  for(const g of w.groups) S.queue.push(Object.assign({},g,{at:S.waveT+(g.at||0)}));
+  S.wave=n; S.waveActive=true;
+  S.ann = w.boss? {txt:w.name,t:3.0,warn:true} : {txt:'WAVE '+n+' — '+w.name+'!',t:2.0};
+  S.sq.nextT=S.sq.t+SQ_GAP;
+  SFX.horn();
+  // one push per frame and the clock resets with it, so a host coming back from a
+  // stall sends ONE wave, never a burst of the five it slept through.
+  if(!remote && coopIsHost()) coopSend({k:'sqw', n});
+}
+// The referee is further along than this sim is — a dropped command, or a client
+// that just reconnected. SKIP to that wave rather than marching every wave we
+// missed on at once. Nothing already walking is cleared: this is a streaming
+// assault, and the men on the carpet are the point. (The pair mission's
+// coopCatchUp does the opposite on purpose — it has a wave GATE to keep in step.)
+function sqCatchUp(n){
+  n=Math.max(0,Math.min(S.cfg.waves.length, n|0));
+  if(!S.sq || S.mode!=='play' || n<=S.wave) return;
+  S.wave=n-1;
+  sqPushWave(n, true);
 }
 // the referee's verdict arrives by relay (guest path — the host judged it live)
 function coopVerdict(win){
@@ -2840,21 +3048,68 @@ function coopDissolve(msg){
 function coopLeave(){
   if(!COOP) return;
   clearTimeout(COOP.pollT);
-  const code=COOP.code;
+  // ⚠ READ THE FAMILY FIRST. COOP is gone by the time the request is built, and
+  // coopPost would then ask a null party which endpoint it wants and always answer
+  // "the pair one" — so standing down from a squad never actually left it. The seat
+  // stayed occupied until HQ's 45s prune, which blocks a tenth player from joining
+  // and, worse, counts a departed commander into the FROZEN army size if the leader
+  // deploys inside that window.
+  const code=COOP.code, fam=coopSquad()? '/lobby/' : '/coop/';
   COOP=null; S.coop=null;
-  try{ coopPost('leave', code?{code}:{}).catch(()=>{}); }catch(e){}
+  try{ coopPost('leave', code?{code}:{}, fam).catch(()=>{}); }catch(e){}
 }
 // ---- the co-op panel (room-modal family, big and kid-proof) ----
 function coopPanelHTML(){
   const c=COOP;
-  let h='<div id="coopPanel"><h3>🤝 TWO-PLAYER MISSION</h3>';
-  const rule='<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! You play the level of whichever commander is <b>furthest</b> — beat it and <b>both</b> campaigns advance.</p>';
-  if(!c || c.ui==='idle'){
-    h+=rule
+  const squad=!!(c&&c.mode==='squad');
+  // THE FRONT DOOR: two missions, one card, and a kid can tell them apart at a
+  // glance — two soldiers or a whole squad.
+  if(!c || c.ui==='pick'){
+    return '<div id="coopPanel"><h3>🤝 PLAY WITH FRIENDS</h3>'
+      +'<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 10px">Pick your kind of mission. Either way, <b>everyone\'s</b> campaign moves up when you win.</p>'
       +(c&&c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
-      +'<button class="coopbtn" onclick="UI.coopHost()"><span class="ico">🔗</span><span>INVITE A FRIEND<small>Get a code and a link to send them</small></span></button>'
-      +'<button class="coopbtn" onclick="UI.coopEnterUI()"><span class="ico">🎟️</span><span>ENTER A FRIEND\'S CODE<small>They sent you one? Punch it in</small></span></button>'
-      +'<button class="coopbtn" onclick="UI.coopQueue()"><span class="ico">🎲</span><span>FIND AN ALLY<small>Match with another commander out there</small></span></button>';
+      +'<button class="coopbtn" onclick="UI.coopMode(\'pair\')"><span class="ico">🤝</span><span>TWO-PLAYER MISSION<small>You and one friend, a normal campaign level</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopMode(\'squad\')"><span class="ico">🎖</span><span>HOLD THE LINE<small>Up to TEN of you — the Tan never stop coming</small></span></button>'
+      +'</div>';
+  }
+  let h='<div id="coopPanel"><h3>'+(squad?'🎖 HOLD THE LINE':'🤝 TWO-PLAYER MISSION')+'</h3>';
+  const rule=squad
+    ? '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Up to <b>10 real commanders</b> on one carpet. The Tan come in <b>without stopping</b> — no breaks between waves. Beat the level and <b>every</b> campaign advances. <b>'+SQ_CAP+' men each</b>, so everybody matters.</p>'
+    : '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! You play the level of whichever commander is <b>furthest</b> — beat it and <b>both</b> campaigns advance.</p>';
+  const back='<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopPick();return false">← other missions</a></p>';
+  if(c.ui==='idle'){
+    h+=rule
+      +(c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
+      +'<button class="coopbtn" onclick="UI.coopHost()"><span class="ico">🔗</span><span>'+(squad?'START A SQUAD':'INVITE A FRIEND')+'<small>Get a code and a link to send '+(squad?'everyone':'them')+'</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopEnterUI()"><span class="ico">🎟️</span><span>ENTER A '+(squad?'SQUAD':'FRIEND\'S')+' CODE<small>They sent you one? Punch it in</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopQueue()"><span class="ico">🎲</span><span>'+(squad?'FIND A SQUAD':'FIND AN ALLY')+'<small>'+(squad?'Fall in with commanders out there':'Match with another commander out there')+'</small></span></button>'
+      +back;
+  } else if(squad && c.ui==='lobby'){
+    // THE MUSTER: the code up top, everybody who has fallen in, and one order.
+    const mem=(c.members||[]).slice().sort((a,b)=>a.seat-b.seat);
+    const n=Math.max(1,mem.length), amHost=!!c.host;
+    const rows=mem.map(m=>{
+      const mine=m.seat===c.seat, hex=mine?(dyeHex()||GREEN):(c.seatHex[String(m.seat)]||'#5B84C4');
+      return '<div class="coopally" style="margin:3px 0">'
+        +'<span class="rivalchip" style="background:'+escH(hex)+'"></span>'
+        +'<b>'+escH(m.name||'COMMANDER')+'</b>'+(mine?' <span style="opacity:0.7">— YOU</span>':'')
+        +(m.host?' <span style="color:#E8C46A">★ LEADER</span>':'')
+        +'<span style="margin-left:auto;opacity:0.7">'+((m.seen|0)>8?'📡 …':'✓')+'</span></div>';
+    }).join('');
+    const open=Array.from({length:Math.max(0,SQ_MAX-n)},()=>
+      '<div class="coopally" style="margin:3px 0;opacity:0.45"><span class="rivalchip" style="background:#3a3f30"></span>OPEN SEAT</div>').join('');
+    h+='<p style="text-align:center;font-size:1.05rem;margin:2px 0 0">SQUAD CODE</p>'
+      +'<div class="coopcode">'+escH(c.code||'·····')+'</div>'
+      +'<button class="mbtn" style="width:100%" onclick="UI.coopShare()">'+(navigator.share?'📤 SEND THE INVITE LINK':'📋 COPY THE INVITE LINK')+'</button>'
+      +'<div id="coopNote" style="text-align:center;font-size:0.95rem;opacity:0.7;margin-top:6px">or read them the code — it goes in ENTER A SQUAD CODE</div>'
+      +'<div style="margin:10px 0 4px;font-size:1.05rem"><b>'+n+' OF '+SQ_MAX+'</b> FALLEN IN</div>'
+      +rows+open
+      +'<p style="font-size:0.98rem;opacity:0.8;margin:8px 0 6px">LEVEL <b>'+c.level+'</b> — the furthest commander\'s next one. <b>'+Math.round(sqEnemyMul(n)*10)/10+'×</b> the usual Tan for '+n+'.</p>'
+      +(c.wantBattle? '<div class="coopwait" style="font-size:1.2rem">⚔ DEPLOYING…</div>'
+        : amHost
+          ? '<button class="mbtn alt" style="width:100%;font-size:1.3rem" onclick="UI.coopDeploy()">⚔ HOLD THE LINE — LEVEL '+c.level+'</button>'
+          : '<div class="coopwait">WAITING FOR THE LEADER TO GIVE THE ORDER…</div>')
+      +'<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">leave the squad</a></p>';
   } else if(c.ui==='host'){
     h+='<p style="text-align:center;font-size:1.05rem;margin:2px 0 0">YOUR MISSION CODE</p>'
       +'<div class="coopcode">'+escH(c.code||'·····')+'</div>'
@@ -3825,7 +4080,7 @@ function spawnWave(remote){
   S.ann = w.boss ? { txt:w.name, t:3.2, warn:true } : { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
   // allied mission: the host's wave call goes out on the relay
-  if(S.coop && COOP && COOP.role==='h' && !remote) coopSend({k:'wave', n:S.wave});
+  if(S.coop && COOP && COOP.host && !remote) coopSend({k:'wave', n:S.wave});
   coachEvent('wave');
 }
 function spawnFoe(type,x,y,form,gu){
@@ -3894,8 +4149,11 @@ function unitW(t){ return t==='bftank'? 92 : t==='bfjeep'? 76 : t==='mortar'? 58
 function vetStripe(){ const h=S.invasion? S.invasion.theirHex : dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
 function spawnGroup(g){
   if(g.f==='boss'){
-    // one boss, dead center, marching straight for the toy box
-    const b=spawnFoe(g.t, 1030, 300, null, false);
+    // one boss, dead center, marching straight for the toy box — but a SQUAD
+    // mission fields more than one, so they come down the right edge in a row
+    // instead of stacking on a single pixel. (n is 1 everywhere else.)
+    const n=Math.max(1,g.n|0);
+    for(let i=0;i<n;i++) spawnFoe(g.t, 1030, n===1? 300 : 140+(320/(n-1))*i, null, false);
     S.shake=0.6; if(g.t==='rex') SFX.roar(); else if(g.t==='rollpig') SFX.rumble(); else SFX.horn();
     return;
   }
@@ -4409,7 +4667,7 @@ function endBattle(win){
   // which advances BOTH campaigns on a win and relays the word to the ally.
   if(S.coop && COOP && !COOP.ended){
     COOP.ended=true;
-    if(COOP.role==='h') coopPost('end',{code:COOP.code, won:win, level:S.levelN}).catch(()=>{});
+    if(COOP.host) coopPost('end',{code:COOP.code, won:win, level:S.levelN}).catch(()=>{});
   }
   document.getElementById(win?'win':'lose').classList.remove('hidden');
   if(!win){
@@ -4457,14 +4715,26 @@ function endBattle(win){
   // a felled boss pays a bounty on top of the level's medals
   if(S.bossKilled && !S.rival){ META.starBank+=2; META.starsLifetime+=2; }
   META.starBank+=stars; META.starsLifetime+=stars;
-  const xpGain = xpFor(XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0));
+  // HOLD THE LINE pays the biggest purse in the game — a full level for turning up
+  // and 6% more for every commander who stood with you (ten of you = 1.54 levels).
+  // It starts where the battleground's capped 10v10 win ends, which was the brief.
+  const xpGain = xpFor(coopSquad()
+    ? XP_SQUAD_WIN + XP_SQUAD_MATE*Math.max(0,coopHumans()-1) + (S.bossKilled? XP_BOSS:0)
+    : XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0));
   if(S.bossKilled && !S.rival) msg = 'BOSS DOWN! '+msg+' · +2★ bounty';
   if(sargeNew.length) msg += ' · ⚔ SARGE UNLOCKED THE '+sargeNew.join(' & ')+'! Equip it at the Training Academy';
   msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
   let promos=grantXP(xpGain);
   if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
-  if(S.coop && COOP && COOP.mate) msg += ' · 🤝 TWO-COMMANDER VICTORY — '+COOP.mate.name.toUpperCase()+"'S CAMPAIGN ADVANCED TOO!";
+  if(S.coop && COOP && coopSquad()){
+    const n=coopHumans();
+    msg += ' · 🎖 THE LINE HELD — ALL '+n+' COMMANDER'+(n===1?"'S CAMPAIGN":"S' CAMPAIGNS")+' ADVANCED TOGETHER!';
+  } else if(S.coop && COOP && COOP.mate) msg += ' · 🤝 TWO-COMMANDER VICTORY — '+COOP.mate.name.toUpperCase()+"'S CAMPAIGN ADVANCED TOO!";
+  // THE CO-OP SERVICE RECORD (groundwork, v1.23): this campaign level, beaten with
+  // real people beside you. Both modes write it, and it only counts with 2+ humans
+  // actually still on the carpet — the GIANT BANANA will read it, nothing else does.
+  if(!S.rival && S.coop && COOP && coopHumans()>=2) noteCoopLevel(S.levelN);
   document.getElementById('medalText').textContent = msg;
   if(!S.rival){
     // your winning line becomes your defense snapshot — this is the room
@@ -4482,6 +4752,10 @@ function update(dt){
   // S.foes stays empty below, so the whole wave/boss path just sits there.
   if(S.bf) bfTick(dt);
 
+  // HOLD THE LINE pumps its own waves, on its own clock, whether or not the last
+  // one is dead. It has to run OUTSIDE the S.waveActive gate below, because a
+  // briefly-empty carpet is exactly the moment the next wave has to be on its way.
+  if(S.sq && S.mode==='play') sqTick(dt);
   // spawn queue (groups)
   if(S.waveActive){
     S.waveT+=dt;
@@ -4489,7 +4763,8 @@ function update(dt){
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
       // allied mission: the guest sim never calls the verdict — the referee does
-      if(S.wave>=S.cfg.waves.length){ if(!S.cleared && !(S.coop&&COOP&&COOP.role==='g')){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
+      if(S.wave>=S.cfg.waves.length){ if(!S.cleared && !coopGuest()){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
+      else if(S.sq){ /* a lull, not a wave clear — no bonus, no breather, the ticker owns the cadence */ }
       else {
         S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
         S.interT=20;   // reposition window: move your men, next wave in 20s
@@ -4501,7 +4776,7 @@ function update(dt){
   if(!S.waveActive && S.interT>0 && S.mode==='play'){
     S.interT-=dt;
     // allied mission: the host calls every wave — the guest holds the line here
-    if(S.interT<=0){ if(S.coop&&COOP&&COOP.role==='g'){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
+    if(S.interT<=0){ if(coopGuest()){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
   }
   // invasion: out of budget, out of soldiers, box still standing → repelled
   if(S.invasion && !S.invasion.resolved && S.lives>0
@@ -4719,7 +4994,7 @@ function update(dt){
         if(S.invasion){ endInvasion(true); }
         // allied mission: the guest's local count can run hot — the referee's
         // beacon restores the truth, or delivers the loss, within a second
-        else if(!(S.coop&&COOP&&COOP.role==='g')){ endBattle(false); }
+        else if(!coopGuest()){ endBattle(false); }
         return; }
     }
   }
@@ -5452,10 +5727,24 @@ function drawBaseBar(bx,by,bw,k,label,col){
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText(label, bx+bw/2, by+7);
 }
+// HOLD THE LINE reads its own clock, because there is no "wave ready" state to
+// report — either the next one is on its way, or the last one is on the carpet.
+function sqHudLine(){
+  const tot=S.cfg.waves.length;
+  if(S.wave>=tot) return S.foes.length||S.queue.length? ('LAST WAVE — CLEAR THE CARPET!') :
+    (S.coop?'CARPET CLEAR — HQ CONFIRMING…':'ALL WAVES CLEAR');
+  const left=Math.max(0,Math.ceil(S.sq.nextT-S.sq.t));
+  if(S.wave===0) return 'DIG IN! FIRST WAVE IN '+left+'S';
+  return 'WAVE '+S.wave+' / '+tot+' — NEXT IN '+left+'S';
+}
 function drawBossBar(){
-  const b=S.foes.find(f=>f.boss); if(!b) return;
-  const k=Math.max(0,b.hp/b.hpMax), bw=W*0.46;
-  drawBaseBar((VW-bw)/2, 54, bw, k, (BOSSDEF[b.type]?BOSSDEF[b.type].wave:'⚠ BOSS ⚠'), k>0.35?'#C0473A':'#8a2f26');
+  const bs=S.foes.filter(f=>f.boss); if(!bs.length) return;
+  // a squad mission can field three of them — one bar for the whole set, or the
+  // player watches a full bar while two more monsters walk in behind it
+  let hp=0, mx=0; for(const b of bs){ hp+=Math.max(0,b.hp); mx+=b.hpMax; }
+  const k=mx? hp/mx : 0, bw=W*0.46, b0=bs[0];
+  const nm=(BOSSDEF[b0.type]?BOSSDEF[b0.type].wave:'⚠ BOSS ⚠');
+  drawBaseBar((VW-bw)/2, 54, bw, k, (bs.length>1? bs.length+' × '+nm : nm), k>0.35?'#C0473A':'#8a2f26');
 }
 // The battlefield scoreboard: both toy boxes, and a tug bar so nobody ever has
 // to do the arithmetic on who is actually winning.
@@ -5662,14 +5951,20 @@ function drawHUD(){
     cx.fillText((sudden?'SUDDEN ':'')+bfClock(), VW/2-60, 23);
     cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
   } else {
-    const coopHold = S.coop && COOP && COOP.role==='g' && !S.waveActive;
+    const coopHold = coopGuest() && !S.waveActive;
     cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
+      : S.sq? sqHudLine()
       : S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
       : (S.wave>=S.cfg.waves.length? (S.coop?'CARPET CLEAR — HQ CONFIRMING…':'ALL WAVES CLEAR')
       : (coopHold && S.interT<=0.5? ('WAVE '+(S.wave+1)+' — ON '+((COOP.mate&&COOP.mate.name)||'YOUR ALLY').toUpperCase()+"'S ORDER")
       : (S.interT>0? ('REPOSITION YOUR MEN — NEXT WAVE IN '+Math.ceil(S.interT)+'S')
       : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY'))), VW/2-60, 23);
-    if(S.coop && COOP && COOP.mate){
+    if(S.sq){
+      const n=coopHumans();
+      cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
+      cx.fillText('🎖 HOLD THE LINE · '+n+' COMMANDER'+(n===1?'':'S')+' · YOUR MEN '+sqMine()+'/'+SQ_CAP, VW/2-60, 56);
+      cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
+    } else if(S.coop && COOP && COOP.mate){
       cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
       cx.fillText('🤝 ALLIED MISSION · '+COOP.mate.name.toUpperCase(), VW/2-60, 56);
       cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
@@ -5709,8 +6004,11 @@ function drawHUD(){
     btnRects.vet=null; btnRects.wave=null;
     return;
   }
-  // start wave
-  if(!S.waveActive && S.wave<S.cfg.waves.length && S.mode==='play'){
+  // start wave — ⚠ never in HOLD THE LINE. The ticker owns the cadence there, and
+  // spawnWave() would OVERWRITE the streaming queue and reset S.waveT, which every
+  // already-queued group's rebased `at` is measured against. There is a window
+  // where it would otherwise draw (the dig-in grace, and any lull between waves).
+  if(!S.waveActive && !S.sq && S.wave<S.cfg.waves.length && S.mode==='play'){
     const bw=180,bh=52,bx=VW-bw-24,by=H-bh-116;
     cx.fillStyle='#A63B2A'; rr(bx,by,bw,bh,8); cx.fill();
     cx.fillStyle='#fff'; cx.font='bold 22px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
@@ -5748,8 +6046,11 @@ function drawHUD(){
   tray.forEach((s,i)=>{
     const x=x0+i*(tw+gap);
     trayRects[i]=[x,y0,tw,th];
-    const placedSarge = s.t==='sarge' && S.units.some(u=>u.type==='sarge');
-    const afford = s.t==='sarge' ? !placedSarge : S.plastic>=COSTS[s.t];
+    // ⚠ one Sarge EACH in co-op — the tray CARD has to filter the ally's men the
+    // same way the tap handler already does, or nine allied Sarges grey out your
+    // own FREE card for the whole mission.
+    const placedSarge = s.t==='sarge' && S.units.some(u=>u.type==='sarge'&&!u.coopBy);
+    const afford = (s.t==='sarge' ? !placedSarge : S.plastic>=COSTS[s.t]) && !sqAtCap();
     cx.fillStyle= afford? 'rgba(38,40,31,0.92)':'rgba(38,40,31,0.6)';
     rr(x,y0,tw,th,10); cx.fill();
     if(S.drag&&S.drag.type===s.t){ cx.strokeStyle='#fff'; cx.lineWidth=2; rr(x,y0,tw,th,10); cx.stroke(); }
@@ -5798,7 +6099,7 @@ cv.addEventListener('pointerdown', e=>{
   if(inRect(p.x,p.y,btnRects.hq)){ S.drag=null; if(S.coop) coopLeave(); showMenu(); return; }  // walking out folds the party
   if(inRect(p.x,p.y,btnRects.wave)){
     // allied mission: the guest asks, the host calls it
-    if(S.coop && COOP && COOP.role==='g'){ coopSend({k:'wava'}); SFX.blip(); }
+    if(coopGuest()){ coopSend({k:'wava'}); SFX.blip(); }
     else spawnWave();
     return;
   }
@@ -5845,6 +6146,7 @@ cv.addEventListener('pointerdown', e=>{
   for(let i=0;i<tray.length;i++){
     if(inRect(p.x,p.y,trayRects[i])){
       const t=tray[i].t;
+      if(sqAtCap()){ SFX.clack(); S.sel=null; return; }   // that many each — that's the squad rule
       if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge'&&!u.coopBy)) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; }  // one Sarge EACH in co-op
       else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null};
       S.sel=null; return;
@@ -5855,7 +6157,9 @@ cv.addEventListener('pointerdown', e=>{
   for(const u of S.units){ const d=Math.hypot(u.x-p.x,(u.y-20)-p.y); if(d<(u.down?44:30)&&d<hd){hd=d;hit=u;} }
   if(hit){
     if(hit.down){ standUp(hit); if(S.coop&&hit.cid) coopSend({k:'up',id:hit.cid}); S.sel=null; }
-    else if(hit.type==='sarge' || !S.waveActive){
+    // HOLD THE LINE never stops for a reposition window, so it can't borrow the
+    // campaign's "only between waves" rule — your men stay movable throughout.
+    else if(hit.type==='sarge' || !S.waveActive || S.sq){
       // between waves every man is movable — pick him up
       S.drag={type:hit.type,x:p.x,y:p.y-DRAG_OFF,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
     }
@@ -5892,7 +6196,9 @@ cv.addEventListener('pointerup', e=>{
     return;
   }
   const dy=p.y-DRAG_OFF;                        // the figure floats above your finger
-  if(canPlace(p.x,dy,d.type)){
+  // the squad cap gates NEW men only — a man already on the carpet can always be
+  // picked up and moved, cap or no cap (there is no reposition window to wait for)
+  if(canPlace(p.x,dy,d.type) && (d.unit || !sqAtCap())){
     if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move');
       if(S.coop && d.unit.cid) coopSend({k:'mv', id:d.unit.cid, x:p.x|0, y:dy|0}); }
     else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy); coopPlaced(nu); }
@@ -6409,13 +6715,15 @@ function showMenu(){
   S.mode='menu'; S.invasion=null;   // never carry an invasion home to HQ
   S.bf=null; S.pan=null; S.speed=1; resize();   // ...nor a battlefield: the room is 960 wide again
   S.coop=null;                      // the battle flag only — the party (COOP) rides on
+  S.sq=null;                        // ...and the streaming ticker stops at the door
   hideAllOverlays();
   document.getElementById('menu').classList.remove('hidden');
   renderMenu();
   sizeRoom();
   netSync();
   // a friend's invite link brought them here — connect the two right now
-  if(coopJoinPend){ const code=coopJoinPend; coopJoinPend=null; UI.coopOpen(); UI.coopJoin(code); }
+  if(coopJoinPend){ const code=coopJoinPend, md=coopJoinMode; coopJoinPend=null;
+    SFX.blip(); if(COOP) coopLeave(); COOP=coopFresh('enter',md); UI.coopJoin(code); }
   // if they haven't been dealt with today, you can hear them out on the landing
   if(!META.rivalDays[todayStr()] && Date.now()-lastMarch>45000){ lastMarch=Date.now(); SFX.march(); }
   // Sarge just earned the saber and it has no colour yet — that's the ceremony, and
@@ -6529,6 +6837,11 @@ function renderWarTable(){
       +'<div class="wt-hop"><span class="lab">MORE MAYHEM →</span>'
       +[3,4,5,6,7,8,9,10].map(n=>'<button type="button" onclick="UI.wtPlay('+n+')">'+n+'v'+n+'</button>').join('')
       +'</div></div>'
+    // HOLD THE LINE lives on the War Table too — it is a battlefield-shaped
+    // mission, and this is the screen a kid comes to when they want one.
+    +'<div class="wt-shelf"><button type="button" class="wt-hold" onclick="UI.wtHold()">'
+      +'<span class="n">🎖 HOLD THE LINE</span>'
+      +'<small>UP TO 10 REAL COMMANDERS · ONE CARPET · THE TAN NEVER STOP</small></button></div>'
     +'<div class="wt-foot">'+maps+'<div class="wt-spacer"></div>'
       +(w+l>0? '<div class="wt-rec">RECORD <b>'+w+'W · '+l+'L</b></div>':'')
     +'</div>';
@@ -7148,7 +7461,7 @@ function panelHTML(id){
   switch(id){
     case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+'</p>'
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
-      +'<button class="mbtn alt" style="margin-top:10px" onclick="UI.coopOpen()">🤝 TWO-PLAYER MISSION</button>'
+      +'<button class="mbtn alt" style="margin-top:10px" onclick="UI.coopOpen()">🤝 PLAY WITH FRIENDS — UP TO 10</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
     // (the old text shop lived here — it's SARGE'S SURPLUS now, see renderShop)
     case 'rival': return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+riv.name+'</h3>'
@@ -7279,6 +7592,11 @@ window.UI = {
   rival(){ audio(); const r=todaysRival(); startBattle(Math.max(1,Math.min(META.campaign+1,5)), r); },
   // WAR TABLE: every size button is a launcher — tap = queue that size right now
   wtPlay(n){ audio(); SFX.blip(); bfQueueStart(n); },
+  // the War Table's own door into HOLD THE LINE — straight to the squad panel,
+  // no chooser in the way (they already told us which kind of mission they want)
+  wtHold(){ audio(); SFX.blip(); closeWarTable();
+    if(COOP && coopSquad() && COOP.code){ roomModal(coopPanelHTML()); return; }   // already mustered
+    UI.coopMode('squad'); },
   wtMap(id){ if(!BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id; SFX.blip(); saveMeta(); renderWarTable(); },
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- WORLD RANKINGS ----
@@ -7440,22 +7758,37 @@ window.UI = {
   },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
   promote(){ if(META.pendingPicks>0) showPicker(); },
-  // ===== CO-OP: the allied campaign =====
-  coopOpen(){ SFX.blip(); if(!COOP) COOP=coopFresh('idle'); roomModal(coopPanelHTML()); },
+  // ===== CO-OP: the allied campaign, and HOLD THE LINE =====
+  // Walking in on a live party lands you back IN it; otherwise you get the chooser.
+  coopOpen(){ SFX.blip();
+    if(!COOP) COOP=coopFresh('pick');
+    else if(COOP.ui==='idle' && !COOP.code) COOP.ui='pick';
+    roomModal(coopPanelHTML()); },
+  coopPick(){ SFX.clack(); const m=COOP&&COOP.mode;
+    if(COOP) coopLeave(); COOP=coopFresh('pick',m); roomModal(coopPanelHTML()); },
+  coopMode(m){ SFX.blip();
+    if(COOP) coopLeave();
+    COOP=coopFresh('idle', m==='squad'?'squad':'pair');
+    roomModal(coopPanelHTML()); },
   coopHost(){
     SFX.blip();
+    const md=(COOP&&COOP.mode)||'pair', sq=md==='squad';
     if(COOP) coopLeave();
-    COOP=coopFresh('host');
+    COOP=coopFresh(sq?'lobby':'host', md);
     roomModal(coopPanelHTML());
     coopPost('create').then(r=>{
-      if(!COOP||COOP.ui!=='host') return;
-      if(r&&r.ok){ COOP.code=r.code; COOP.role='h'; COOP.state='open'; roomModal(coopPanelHTML()); coopTick(); }
+      if(!COOP||(COOP.ui!=='host'&&COOP.ui!=='lobby')) return;
+      if(r&&r.ok){ COOP.code=r.code; COOP.role=sq?String(r.seat|0):'h'; COOP.host=true;
+        COOP.seat=r.seat|0; COOP.level=r.level||COOP.level;
+        COOP.members=sq?[Object.assign({},coopMe(),{seat:r.seat|0,seen:0,host:true})]:COOP.members;
+        COOP.state='open'; roomModal(coopPanelHTML()); coopTick(); }
       else UI.coopCancel('HQ is unreachable — try again in a minute.');
-    }).catch(()=>{ if(COOP&&COOP.ui==='host') UI.coopCancel('HQ is unreachable — try again in a minute.'); });
+    }).catch(()=>{ if(COOP&&(COOP.ui==='host'||COOP.ui==='lobby')) UI.coopCancel('HQ is unreachable — try again in a minute.'); });
   },
   coopEnterUI(){
     SFX.blip();
-    if(!COOP||COOP.code){ if(COOP) coopLeave(); COOP=coopFresh('enter'); } else { COOP.ui='enter'; COOP.note=null; }
+    const md=(COOP&&COOP.mode)||'pair';
+    if(!COOP||COOP.code){ if(COOP) coopLeave(); COOP=coopFresh('enter',md); } else { COOP.ui='enter'; COOP.note=null; }
     roomModal(coopPanelHTML());
     const i=document.getElementById('coopIn');
     if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); UI.coopJoin(); } }; }
@@ -7465,39 +7798,67 @@ window.UI = {
     code=String(code||(i&&i.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
     if(!/^[A-Z2-9]{4,8}$/.test(code)){ if(COOP){ COOP.note='That doesn\'t look like a code — 5 letters and numbers.'; roomModal(coopPanelHTML()); } SFX.clack(); return; }
     if(!COOP) COOP=coopFresh('enter');
+    const sq=coopSquad();
     coopPost('join',{code}).then(r=>{
       if(!COOP) return;
       if(r&&r.ok){
-        COOP.code=r.code; COOP.role='g'; COOP.mate=r.mate; COOP.level=r.level;
-        COOP.state=r.state||'paired'; COOP.ui='paired'; COOP.note=null;
+        COOP.code=r.code; COOP.host=!!r.host; COOP.level=r.level; COOP.note=null;
+        if(sq){ COOP.seat=r.seat|0; COOP.role=String(r.seat|0); COOP.members=r.members||[];
+                COOP.pc=r.players||1; COOP.state=r.state||'open'; COOP.ui='lobby'; coopSeatColours(); }
+        else  { COOP.role='g'; COOP.mate=r.mate; COOP.state=r.state||'paired'; COOP.ui='paired'; }
         SFX.horn(); coopPanelOpen(); coopTick();
       } else {
         COOP.note = r&&r.err==='own code'? 'That\'s YOUR code — your friend types it, not you!'
-          : r&&r.err==='party full'? 'That party already marched off with two commanders.'
-          : 'No party answers to that code — double-check it with your friend.';
+          : r&&r.err==='in battle'? 'That squad is already fighting — catch the next one!'
+          : r&&r.err==='party full'? (sq? 'That squad already has all ten commanders.' : 'That party already marched off with two commanders.')
+          : 'No '+(sq?'squad':'party')+' answers to that code — double-check it with your friend.';
         COOP.ui='enter'; roomModal(coopPanelHTML());
         const j=document.getElementById('coopIn'); if(j){ j.value=code; j.focus(); }
         SFX.clack();
       }
     }).catch(()=>{ if(COOP){ COOP.note='HQ is unreachable — try again in a minute.'; roomModal(coopPanelHTML()); } });
   },
-  coopQueue(){ SFX.blip(); if(COOP) coopLeave(); COOP=coopFresh('queue'); roomModal(coopPanelHTML()); coopTick(); },
+  // PAIR: sit on a bench until somebody sits down beside you. SQUAD: HQ walks you
+  // straight into the public lobby closest to full, so ten strangers converge on
+  // ONE carpet instead of forming five separate pairs.
+  coopQueue(){
+    SFX.blip();
+    const md=(COOP&&COOP.mode)||'pair';
+    if(COOP) coopLeave();
+    if(md!=='squad'){ COOP=coopFresh('queue'); roomModal(coopPanelHTML()); coopTick(); return; }
+    COOP=coopFresh('lobby','squad');
+    roomModal(coopPanelHTML());
+    coopPost('queue').then(r=>{
+      if(!COOP||COOP.ui!=='lobby') return;
+      if(r&&r.ok){ COOP.code=r.code; COOP.seat=r.seat|0; COOP.role=String(r.seat|0);
+        COOP.host=!!r.host; COOP.level=r.level||COOP.level;
+        COOP.members=r.members||[Object.assign({},coopMe(),{seat:r.seat|0,seen:0,host:!!r.host})];
+        COOP.pc=r.players||1; COOP.state='open'; coopSeatColours();
+        roomModal(coopPanelHTML()); coopTick(); }
+      else UI.coopCancel('HQ is unreachable — try again in a minute.');
+    }).catch(()=>{ if(COOP&&COOP.ui==='lobby') UI.coopCancel('HQ is unreachable — try again in a minute.'); });
+  },
   coopShare(){
     if(!COOP||!COOP.code) return;
-    const link=location.origin+location.pathname+'?coop='+COOP.code;
+    const link=location.origin+location.pathname+'?'+(coopSquad()?'squad':'coop')+'='+COOP.code;
     const note=document.getElementById('coopNote');
     const done=t=>{ if(note){ note.textContent=t; note.style.color='#BFE39A'; note.style.opacity='1'; } SFX.coin(); };
-    if(navigator.share){ navigator.share({title:'Green vs Tan', text:'Join my army! Code '+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
+    if(navigator.share){ navigator.share({title:'Green vs Tan', text:(coopSquad()?'Fall in — HOLD THE LINE with us! Code ':'Join my army! Code ')+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
     else if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(()=>done('LINK COPIED — PASTE IT TO YOUR FRIEND!')).catch(()=>{ if(note) note.textContent=link; }); }
     else if(note){ note.textContent=link; }
   },
   coopCancel(noteText){
+    const md=(COOP&&COOP.mode)||'pair';
     coopLeave();
-    COOP=coopFresh('idle'); if(typeof noteText==='string') COOP.note=noteText;
+    COOP=coopFresh('idle',md); if(typeof noteText==='string') COOP.note=noteText;
     roomModal(coopPanelHTML()); SFX.clack();
   },
   coopDeploy(){
-    if(!COOP||COOP.ui!=='paired'||COOP.wantBattle) return;
+    if(!COOP||COOP.wantBattle) return;
+    // ⚠ only the leader may give the order in a squad — nine other fingers on the
+    // button is the one way a ten-player lobby could ever start twice.
+    if(coopSquad()){ if(COOP.ui!=='lobby'||!COOP.host) return; }
+    else if(COOP.ui!=='paired') return;
     audio(); SFX.horn();
     COOP.wantBattle=true;
     roomModal(coopPanelHTML());
@@ -7829,7 +8190,9 @@ window.GVT = {
     return out; },
   unlockSarge(){ META.sargeUnlocked=['shotgun','sniper','lightsaber']; saveMeta(); return META.sargeUnlocked; },
   // ===== CO-OP =====
-  coop(){ return COOP? { code:COOP.code, role:COOP.role, ui:COOP.ui, state:COOP.state, level:COOP.level,
+  coop(){ return COOP? { mode:COOP.mode, code:COOP.code, role:COOP.role, host:COOP.host, seat:COOP.seat,
+    ui:COOP.ui, state:COOP.state, level:COOP.level, pc:COOP.pc, humans:coopHumans(),
+    members:(COOP.members||[]).map(m=>({seat:m.seat,name:m.name,camp:m.camp,host:!!m.host,seen:m.seen|0})),
     mate:COOP.mate&&COOP.mate.name, mateHex:COOP.mateHex, seq:COOP.seq, out:COOP.outQ.length,
     battle:!!S.coop, ended:COOP.ended, lastSeen:COOP.lastSeen,
     units:S.units.map(u=>({cid:u.cid||null,t:u.type,by:u.coopBy||'me',x:u.x|0,y:u.y|0,down:u.down,vet:u.vet,sw:u.coopSW&&u.coopSW.w})) } : null; },
@@ -7837,13 +8200,30 @@ window.GVT = {
   coopJoin(code){ UI.coopJoin(code); },
   coopQueue(){ UI.coopQueue(); },
   coopDeploy(){ UI.coopDeploy(); },
+  // ===== HOLD THE LINE RIG =====
+  // sqMode() puts the panel in squad shape without a tap; sq() reads the LIVE
+  // stream state (never a stored copy) so a test asserts on the real ticker;
+  // sqPlan(p) answers "what army would p commanders face on level n" straight
+  // off the same scaler the battle uses.
+  sqMode(m){ UI.coopMode(m||'squad'); return COOP&&COOP.mode; },
+  sq(){ return S.sq? { players:S.sq.p, t:+S.sq.t.toFixed(2), nextT:+S.sq.nextT.toFixed(2),
+      nextIn:+Math.max(0,S.sq.nextT-S.sq.t).toFixed(2), wave:S.wave, waves:S.cfg.waves.length,
+      waveActive:S.waveActive, queued:S.queue.length, foes:S.foes.length, lives:S.lives,
+      mine:sqMine(), cap:SQ_CAP, atCap:sqAtCap(), host:coopIsHost(), hud:sqHudLine() } : null; },
+  sqPlan(p,n){ const cfg=levelCfg(n||(META.campaign+1)); sqScaleCfg(cfg, p||1);
+    return { level:n||(META.campaign+1), players:p||1, mul:+sqEnemyMul(p||1).toFixed(3),
+      waves:cfg.waves.length, foes:cfg.waves.reduce((k,w)=>k+w.groups.reduce((j,g)=>j+(g.n||0)+(g.escort||0),0),0),
+      perWave:cfg.waves.map(w=>w.groups.reduce((j,g)=>j+(g.n||0)+(g.escort||0),0)) }; },
+  sqPush(){ if(!S.sq) return null; sqPushWave(S.wave+1); return GVT.sq(); },
+  coopLevels(){ return (META.coopLevels||[]).slice(); },
   coopPlace(t,x,y){ if(!S.coop||!UDEF[t]) return null;
+    if(sqAtCap()) return null;                    // the rig obeys the squad cap too
     if(t!=='sarge' && S.plastic<COSTS[t]) return null;
     if(!canPlace(x,y,t)) return null;
     if(t!=='sarge') S.plastic-=COSTS[t];
     return coopPlaced(placeUnit(t,x,y)).cid; },
   coopStand(cid){ const u=coopUnit(cid); if(u&&u.down){ standUp(u); coopSend({k:'up',id:cid}); } return u&&!u.down; },
-  coopWave(){ if(S.coop&&COOP&&COOP.role==='g') coopSend({k:'wava'}); else spawnWave(); },
+  coopWave(){ if(coopGuest()) coopSend({k:'wava'}); else spawnWave(); },
   coopQuit(){ coopLeave(); },
   // ===== BATTLEFIELD =====
   battlefield(mapId,diff,team){ startBattlefield(mapId, diff, team); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },
