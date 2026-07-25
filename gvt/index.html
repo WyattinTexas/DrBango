@@ -2759,13 +2759,21 @@ function coopTick(){
   const sending=COOP.outQ.slice(0,40);
   if(sending.length) body.cmds=sending;
   if(S.coop && COOP.host && !COOP.ended) body.beacon={ lives:S.lives, wave:S.wave };
-  if(COOP.wantBattle) body.set='battle';
+  // ⚠ CARRY THE ORDER WITH THE REQUEST IT RODE ON. A poll already in flight when
+  // DEPLOY is pressed comes back saying "still open" — of course it does, it was
+  // sent before the order existed — and clearing wantBattle on THAT reply throws
+  // the order away before it is ever sent. The button then sits on "DEPLOYING…"
+  // for good. Invisible on a local server (nothing is ever in flight) and easy on
+  // a real one; this bit the LIVE box on the very first try. Bug is v1.9's, so the
+  // pair mission had it too.
+  const sentWant=!!COOP.wantBattle;
+  if(sentWant) body.set='battle';
   coopPost('poll', body).then(r=>{
     if(!COOP) return; COOP.busy=false;
     if(!r||!r.ok){ coopMiss(r); return; }
     COOP.misses=0;
     COOP.outQ.splice(0, sending.length);       // delivered — safe to drop
-    coopOnPoll(r);
+    coopOnPoll(r, sentWant);
   }).catch(()=>{ if(COOP){ COOP.busy=false; coopMiss(); } });
 }
 function coopMiss(r){
@@ -2781,7 +2789,7 @@ function coopMiss(r){
   }
   COOP.misses++; coopPanelSync();
 }
-function coopOnPoll(r){
+function coopOnPoll(r, sentWant){
   const wasState=COOP.state;
   COOP.state=r.state; COOP.level=r.level;
   if(coopSquad()){
@@ -2807,7 +2815,8 @@ function coopOnPoll(r){
   if(S.coop && COOP && !COOP.host && r.beacon && !COOP.ended && typeof r.beacon.lives==='number')
     S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
   if(!COOP) return;                            // an applied 'end' can tear things down
-  if(r.state!=='battle') COOP.wantBattle=false;
+  // only a reply to a request that ACTUALLY CARRIED the order may cancel it
+  if(r.state!=='battle' && sentWant) COOP.wantBattle=false;
   if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu') coopStartBattle();
   else if(!coopSquad() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
   else {
