@@ -333,7 +333,12 @@
   .sh-sign b { display:block; font-size:clamp(11px,2.9vh,21px); letter-spacing:0.08em; color:#3A2A14;
     white-space:nowrap; text-shadow:0 1px 0 rgba(255,243,196,0.35); }
   .sh-sign small { display:block; font-size:clamp(5px,1.3vh,10px); letter-spacing:0.2em; color:#543D1F; white-space:nowrap; }
-  .sh-tabs { display:flex; gap:clamp(3px,0.6vw,7px); margin-left:auto; }
+  /* the plaque bar was measured FULL at 640×320 with five departments, so it is
+     allowed to shrink and scroll rather than push the register off the screen —
+     shopMarkTabs() walks the lit plaque back into view after a jump */
+  .sh-tabs { display:flex; gap:clamp(3px,0.6vw,7px); margin-left:auto; min-width:0;
+    overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+  .sh-tabs::-webkit-scrollbar { display:none; }
   .sh-tab { border:2px solid var(--woodsh); background:#33261A; color:#D2B489; cursor:pointer;
     font-size:clamp(8px,1.8vh,13px); letter-spacing:0.1em; border-radius:4px; white-space:nowrap;
     padding:clamp(3px,1vh,7px) clamp(4px,0.9vw,11px); }
@@ -561,7 +566,107 @@
   .sh-poster::before { content:''; position:absolute; top:-6px; left:50%; width:34px; height:12px;
     margin-left:-17px; background:rgba(200,190,160,0.7); transform:rotate(2deg); }
   @media (max-width:900px) { .sh-poster { display:none; } }
-  /* --- dept 4: THE BACK COUNTER, the laser case (the store goes dark down here) --- */
+  /* --- dept 4: ROOM DECORATIONS, the toy shelf (v1.21) ---
+     The bright department. Four boxed toys on a shelf up top, and underneath the
+     two things that are more than a toy: the piggy's bank rail and the banana,
+     which gets a whole wide crate to itself because it IS the centrepiece.
+     ⚠ Nothing here sets font-size on a <button> — #toyshop button{font:inherit}
+     is an ID-scoped shorthand and would eat it. All sized text lives in spans. */
+  #shDecor { border-right:6px solid #171008;
+    background:radial-gradient(circle at 22% 12%, rgba(255,214,140,0.09), transparent 60%),
+      linear-gradient(180deg,#4A3A26,#33261A); }
+  #shDecor h2 { color:#E8C88A; }
+  .sh-decrow { flex:1 1 54%; min-height:0; display:flex; align-items:stretch; justify-content:center;
+    gap:clamp(4px,1.4vw,16px); padding:clamp(1px,0.5vh,5px) 0; }
+  .sh-dbox { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
+    gap:clamp(1px,0.5vh,4px); }
+  .sh-dec { position:relative; flex:1 1 auto; width:100%; min-height:0; border:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; text-align:center; color:#2A2118;
+    padding:clamp(2px,0.9vh,7px) 4px clamp(3px,1.1vh,9px); border-radius:5px;
+    background:linear-gradient(166deg,#F0E2C2,#DCCBA4 46%,#BFA97E);
+    box-shadow:0 6px 13px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.16); }
+  .sh-dec::before { content:''; position:absolute; inset:0; border-radius:5px; pointer-events:none;
+    background:repeating-linear-gradient(90deg,rgba(120,95,60,0.13) 0 1px,transparent 1px 9px); }
+  .sh-dec:active { transform:translateY(2px); }
+  .sh-dwin { flex:1 1 auto; min-height:0; width:92%; display:flex; align-items:center; justify-content:center;
+    border-radius:4px; border:2px solid rgba(90,80,60,0.38); margin-bottom:clamp(1px,0.5vh,4px);
+    box-shadow:inset 0 0 12px rgba(70,60,40,0.28);
+    background:linear-gradient(150deg,rgba(255,255,255,0.32),rgba(255,255,255,0.05) 42%,rgba(120,140,160,0.10) 66%,rgba(255,255,255,0.18)); }
+  .sh-dwin svg { max-width:94%; max-height:94%; width:auto; height:auto;
+    filter:drop-shadow(0 3px 2px rgba(0,0,0,0.28)); }
+  .sh-dn { display:block; font-size:clamp(8px,1.95vh,15px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
+  .sh-dsub { display:block; font-size:clamp(4px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
+  .sh-dtag { display:block; margin-top:1px; font-family:var(--hand); font-weight:normal;
+    font-size:clamp(6px,1.45vh,11px); color:#8A3A1E; line-height:1.05; }
+  .sh-dprice { position:absolute; right:-5%; top:6%; width:30%; aspect-ratio:1; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--hand);
+    font-size:clamp(8px,1.9vh,15px); transform:rotate(-11deg);
+    background:radial-gradient(circle at 35% 30%, #FF9A50, var(--sticker) 70%);
+    border:2px dashed rgba(255,255,255,0.55); box-shadow:0 3px 6px rgba(0,0,0,0.45); }
+  .sh-dstamp, .sh-dec.buying::after, .sh-nan.buying::after { position:absolute; left:50%; top:6%; white-space:nowrap;
+    transform:translateX(-50%) rotate(-7deg); border:3px double var(--deepgreen); color:var(--deepgreen);
+    border-radius:6px; padding:0 6px; font-size:clamp(7px,1.6vh,12px); letter-spacing:0.14em;
+    background:rgba(237,228,204,0.72); }
+  .sh-dec.own .sh-dtag { visibility:hidden; }
+  /* the elephant's colour rail: ten army colours, two rows of five */
+  .sh-drail { flex:0 0 auto; display:grid; grid-template-columns:repeat(5,1fr); gap:clamp(1px,0.4vw,4px); }
+  .sh-dot { width:clamp(10px,2.7vh,18px); height:clamp(10px,2.7vh,18px); border-radius:50%; padding:0;
+    border:2px solid #241D14; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.5); }
+  .sh-dot.on { border-color:#FFF3C4; box-shadow:0 0 7px rgba(255,243,196,0.9); transform:scale(1.14); }
+  .sh-dot:active { transform:translateY(1px); }
+  /* the bottom shelf: the bank rail and the banana crate, side by side */
+  .sh-decbig { flex:1 1 46%; min-height:0; display:flex; align-items:stretch; justify-content:center;
+    gap:clamp(5px,1.8vw,22px); padding-bottom:clamp(1px,0.6vh,6px); }
+  .sh-bank { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:clamp(1px,0.5vh,4px); border-radius:6px; padding:clamp(2px,0.8vh,7px) 6px;
+    background:linear-gradient(180deg,rgba(255,240,200,0.07),rgba(0,0,0,0.22));
+    box-shadow:inset 0 0 0 1px rgba(217,165,68,0.22); }
+  /* ⚠ width:100% is load-bearing. The rail centres its children, and an inline
+     <svg> sized width:auto has no intrinsic width — so the window shrank to the
+     svg, the svg sized itself off the window, and the whole bank measured 0px. */
+  .sh-bwin { position:relative; flex:1 1 auto; min-height:0; width:100%;
+    display:flex; align-items:center; justify-content:center; }
+  .sh-bwin svg { max-height:100%; max-width:100%; width:auto; height:auto; filter:drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
+  .sh-bnext { position:absolute; left:2%; top:2%; font-style:normal; font-size:clamp(5px,1.15vh,9px);
+    letter-spacing:0.22em; color:#8FBF63; }
+  .sh-btx { display:block; text-align:center; line-height:1.1; }
+  .sh-btx b { display:block; font-size:clamp(8px,1.85vh,14px); letter-spacing:0.1em; color:#E8C88A; }
+  .sh-btx i { display:block; font-style:normal; font-size:clamp(5px,1.2vh,10px); letter-spacing:0.14em; color:#A2937A; }
+  /* the banana gets a crate of its own — a wide one, because that is the joke */
+  .sh-nan { position:relative; flex:1.15 1 0; min-width:0; border:none; cursor:pointer; border-radius:5px;
+    display:flex; align-items:center; gap:clamp(3px,1vw,12px); text-align:left; color:#2A2118;
+    padding:clamp(2px,0.9vh,8px) clamp(4px,1.2vw,14px);
+    background:linear-gradient(166deg,#F4E7C6,#E2D0A6 44%,#C3AC80);
+    box-shadow:0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.16); }
+  .sh-nan::before { content:''; position:absolute; inset:0; border-radius:5px; pointer-events:none;
+    background:repeating-linear-gradient(90deg,rgba(120,95,60,0.13) 0 1px,transparent 1px 9px); }
+  .sh-nan:active { transform:translateY(2px); }
+  /* it does not fit in the box, so it does not fit in the box */
+  .sh-nwin { flex:0 0 auto; height:112%; align-self:center; display:flex; align-items:center; }
+  .sh-nwin svg { height:100%; width:auto; filter:drop-shadow(0 4px 4px rgba(0,0,0,0.45)); }
+  .sh-ntx { flex:1 1 auto; min-width:0; }
+  .sh-ntx b { display:block; font-size:clamp(9px,2.2vh,17px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
+  .sh-ntx i { display:block; font-style:normal; font-size:clamp(4px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
+  .sh-ntx em { display:block; margin-top:2px; font-style:normal; font-family:var(--hand); font-weight:normal;
+    font-size:clamp(6px,1.5vh,12px); color:#8A3A1E; line-height:1.06; }
+  .sh-nan.own .sh-ntx em { visibility:hidden; }
+  /* the crate is wide, so a sticker sized on its WIDTH comes out the size of a
+     dinner plate — size the centrepiece's tag off the crate's height instead */
+  .sh-nan .sh-dprice { width:auto; height:52%; right:3%; top:24%; }
+  /* UNBOXING, ported verbatim from the crate: flash, the goods leave the box,
+     the sticker peels, the stamp slams — and renderShop() is held ~1s so the
+     innerHTML rebuild can't kill it halfway through */
+  .sh-dec.buying .sh-dwin, .sh-nan.buying .sh-nwin { animation:shpop 0.5s ease-out; }
+  .sh-dec.buying .sh-dwin svg, .sh-nan.buying .sh-nwin svg { animation:shhop 0.85s 0.1s cubic-bezier(.4,.05,.6,1) forwards; }
+  @keyframes shhop { 0% { transform:translateY(0) rotate(0); } 45% { transform:translateY(-14%) rotate(-7deg); }
+    100% { transform:translateY(10%) rotate(4deg); } }
+  .sh-dec.buying .sh-dprice, .sh-nan.buying .sh-dprice { animation:shpeel 0.4s ease-in forwards; }
+  .sh-dec.buying .sh-dtag, .sh-nan.buying .sh-ntx em { opacity:0; transition:opacity 0.25s; }
+  .sh-dec.buying::after, .sh-nan.buying::after { content:'IN YOUR ROOM ✓'; animation:shstamp 0.42s 0.45s both; }
+  .sh-dec.deny .sh-dprice, .sh-nan.deny .sh-dprice { animation:shno 0.42s; }
+  .sh-bank.deny .sh-pcap { animation:shno3 0.42s; color:#E08A6A; }
+  @media (prefers-reduced-motion:reduce){ .sh-dec.buying .sh-dwin svg, .sh-nan.buying .sh-nwin svg { animation:none; } }
+  /* --- dept 5: THE BACK COUNTER, the laser case (the store goes dark down here) --- */
   #shLasers { background:linear-gradient(90deg,#241B12 0,#12100E 22%,#0E0C12 100%); }
   #shLasers h2 { color:#7A8CA8; }
   #shLasers h2 small { color:#5A6A85; }
@@ -595,7 +700,7 @@
     40% { transform:translateX(6px); } 60% { transform:translateX(-4px); } 80% { transform:translateX(4px); } }
   .sh-counsel { flex:0 0 auto; text-align:center; font-family:var(--hand); font-weight:normal;
     font-size:clamp(7px,1.6vh,13px); color:#7A8CA8; margin:2px 0 0; }
-  /* --- dept 5: THE CRYSTAL CASE, right beside the lasers (v1.18) ---
+  /* --- dept 6: THE CRYSTAL CASE, right beside the lasers (v1.18) ---
      Blade colours are stock now: one is free at the unlock ceremony, the rest are
      cut glass under the same glass as the ray guns. Sarge stands in the case light
      holding whatever is currently in the hilt, so the swatch you tap has a face. */
@@ -886,6 +991,110 @@
   /* gold = a reward waiting (red .alarm stays for threats) */
   .roomtag.gold { background:#8a6d1c; box-shadow:0 0 15px rgba(217,165,68,0.85); animation:blink 1.25s linear infinite; }
   .roomtag.gold:hover { background:#a5851f; }
+  /* ---- ROOM DECORATIONS (v1.21) ----
+     Same law as the rival squad above and for the same reason: renderMenu()
+     rebuilds the room with innerHTML on every purchase, so every frame of this
+     is a declarative keyframe on a class. Nothing here holds state, nothing here
+     needs tearing down, and a tap is one class on and off again.
+     ⚠ A CSS `transform` REPLACES an element's SVG transform attribute, so no
+     animated class below ever sits on a group that carries transform="…" — the
+     static placement always lives on a group of its own inside it. */
+  .dec { filter:drop-shadow(0 0 2.6px rgba(26,18,10,0.92)) drop-shadow(3px 5px 5px rgba(0,0,0,0.38)); }
+  /* THE ELEPHANT — breathing, one ear on the breeze; trunk up and a squash on tap */
+  .elbody { transform-box:fill-box; transform-origin:50% 100%; animation:elbreathe 3.4s ease-in-out infinite alternate; }
+  @keyframes elbreathe { from { transform:scale(1,1); } to { transform:scale(0.985,1.028); } }
+  .elear { transform-box:fill-box; transform-origin:12% 26%; animation:elflap 2.6s ease-in-out infinite alternate; }
+  @keyframes elflap { from { transform:rotate(-5deg); } to { transform:rotate(10deg); } }
+  .eltrunk { transform-box:fill-box; transform-origin:65% 0%; }
+  .dec-eleph.react .elbody { animation:elsquash 0.55s ease-out; }
+  @keyframes elsquash { 0% { transform:scale(1,1); } 28% { transform:scale(1.08,0.9); }
+    62% { transform:scale(0.96,1.06); } 100% { transform:scale(1,1); } }
+  .dec-eleph.react .eltrunk { animation:eltoot 0.85s ease-in-out; }
+  @keyframes eltoot { 0% { transform:rotate(0); } 24% { transform:rotate(128deg); }
+    64% { transform:rotate(118deg); } 100% { transform:rotate(0); } }
+  .dec-eleph.react .elear { animation:elflare 0.85s ease-in-out; }
+  @keyframes elflare { 0% { transform:rotate(0); } 26% { transform:rotate(38deg); }
+    62% { transform:rotate(26deg); } 100% { transform:rotate(0); } }
+  /* THE TOY TRAIN — three cars on one loop, spaced by negative delay. The
+     keyframes are the track sampled at UNIFORM ARC LENGTH, so the gap between
+     cars holds all the way round instead of collapsing in the turns. The base
+     transform is where each car parks when the animation is off. */
+  .trcar { transform:translate(268px,530px); animation:trloop 16s linear infinite; }
+  .trcar.c2 { transform:translate(301.8px,530px); }
+  .trcar.c3 { transform:translate(335.6px,530px); }
+  @keyframes trloop { 0%{transform:translate(268px,530px)} 32.105%{transform:translate(392px,530px)} 33.895%{transform:translate(398.8px,531.1px)} 35.684%{transform:translate(404.9px,534.2px)} 37.474%{transform:translate(409.8px,539.1px)} 39.263%{transform:translate(412.9px,545.2px)} 41.053%{transform:translate(414px,552px)} 42.842%{transform:translate(412.9px,558.8px)} 44.632%{transform:translate(409.8px,564.9px)} 46.421%{transform:translate(404.9px,569.8px)} 48.211%{transform:translate(398.8px,572.9px)} 50%{transform:translate(392px,574px)} 82.105%{transform:translate(268px,574px)} 83.895%{transform:translate(261.2px,572.9px)} 85.684%{transform:translate(255.1px,569.8px)} 87.474%{transform:translate(250.2px,564.9px)} 89.263%{transform:translate(247.1px,558.8px)} 91.053%{transform:translate(246px,552px)} 92.842%{transform:translate(247.1px,545.2px)} 94.632%{transform:translate(250.2px,539.1px)} 96.421%{transform:translate(255.1px,534.2px)} 98.211%{transform:translate(261.2px,531.1px)} 100%{transform:translate(268px,530px)} }
+  .trpuff { transform-box:fill-box; transform-origin:50% 90%; animation:trchuff 1.7s ease-out infinite; }
+  @keyframes trchuff { 0% { opacity:0.85; transform:scale(0.35) translateY(0); }
+    100% { opacity:0; transform:scale(2.3) translateY(-11px); } }
+  .dec-train.react .trpuff { animation:trchuff 0.5s ease-out infinite; }
+  /* ROBO-SARGE 3000 — bounded by construction: no wander keyframe is more than
+     150px out from where he's parked, so he can never leave the rug. */
+  .robwalk { animation:robwander 19s linear infinite; }
+  @keyframes robwander { 0%,3% { transform:translate(0,0); }
+    10%,14% { transform:translate(94px,12px); } 22%,27% { transform:translate(146px,78px); }
+    36%,40% { transform:translate(58px,104px); } 49%,54% { transform:translate(132px,138px); }
+    63%,68% { transform:translate(16px,92px); } 77%,81% { transform:translate(104px,40px); }
+    90%,94% { transform:translate(30px,26px); } 100% { transform:translate(0,0); } }
+  .roblean { transform-box:fill-box; transform-origin:50% 100%; animation:roblean 19s linear infinite; }
+  @keyframes roblean { 0%,26.9% { transform:rotate(3.5deg); } 27%,39.9% { transform:rotate(-3.5deg); }
+    40%,53.9% { transform:rotate(3.5deg); } 54%,67.9% { transform:rotate(-3.5deg); }
+    68%,80.9% { transform:rotate(3.5deg); } 81%,100% { transform:rotate(-3.5deg); } }
+  .robbob { animation:robbob 0.44s ease-in-out infinite alternate; }
+  @keyframes robbob { from { transform:translateY(0); } to { transform:translateY(-2.6px); } }
+  .robarm { transform-box:fill-box; transform-origin:50% 8%; animation:robswing 0.88s ease-in-out infinite alternate; }
+  .robarm.b { animation-direction:alternate-reverse; }
+  @keyframes robswing { from { transform:rotate(-12deg); } to { transform:rotate(14deg); } }
+  .robhead { transform-box:fill-box; transform-origin:50% 82%; }
+  .robant { animation:blink 1.1s linear infinite; }
+  .robled { animation:robled 1.05s steps(1,end) infinite; }
+  .robled.y { animation-delay:0.35s; } .robled.z { animation-delay:0.7s; }
+  @keyframes robled { 0%,32% { opacity:1; } 33%,100% { opacity:0.22; } }
+  .dec-robot.react .robhead { animation:robspin 0.8s cubic-bezier(.3,1.3,.5,1); }
+  @keyframes robspin { from { transform:rotate(0); } to { transform:rotate(360deg); } }
+  .dec-robot.react .robarm.a { animation:robupa 0.85s ease-out; }
+  .dec-robot.react .robarm.b { animation:robupb 0.85s ease-out; }
+  @keyframes robupa { 0% { transform:rotate(0); } 28% { transform:rotate(-158deg); }
+    66% { transform:rotate(-142deg); } 100% { transform:rotate(0); } }
+  @keyframes robupb { 0% { transform:rotate(0); } 28% { transform:rotate(158deg); }
+    66% { transform:rotate(142deg); } 100% { transform:rotate(0); } }
+  .dec-robot.react .robled { animation:robled 0.12s steps(1,end) infinite; }
+  /* THE GIANT BANANA — leans in the corner, wobbles on its base when you poke it */
+  .nanaw { transform-box:fill-box; transform-origin:38% 98%; animation:nanasway 5.6s ease-in-out infinite alternate; }
+  @keyframes nanasway { from { transform:rotate(-1.1deg); } to { transform:rotate(1.5deg); } }
+  .dec-nana.react .nanaw { animation:nanawob 1.25s cubic-bezier(.25,.85,.4,1); }
+  @keyframes nanawob { 0% { transform:rotate(0); } 13% { transform:rotate(-7.5deg); }
+    31% { transform:rotate(5.4deg); } 49% { transform:rotate(-3.6deg); } 67% { transform:rotate(2.2deg); }
+    84% { transform:rotate(-1.1deg); } 100% { transform:rotate(0); } }
+  .nanaface { transform-box:fill-box; transform-origin:50% 62%; }
+  .dec-nana.react .nanaface { animation:nanaface 1.25s ease-out; }
+  @keyframes nanaface { 0%,100% { transform:scale(1); } 18% { transform:scale(1.2); } 48% { transform:scale(0.93); } }
+  /* THE SPACE RUG — stars on staggered delays, a planet that turns, and comets
+     clipped to the rug so nothing streaks out across the floorboards */
+  .rugstar { animation:rugtwink 3.1s ease-in-out infinite alternate; }
+  .rugstar.big { animation-duration:4.4s; }
+  @keyframes rugtwink { from { opacity:0.2; } to { opacity:1; } }
+  .rugplanet { transform-box:fill-box; transform-origin:50% 50%; animation:rugbob 7.6s ease-in-out infinite alternate; }
+  @keyframes rugbob { from { transform:translateY(-3px) rotate(-1.6deg); } to { transform:translateY(3px) rotate(1.6deg); } }
+  .rugcomet, .rugzip { opacity:0; }
+  .rugcomet.a { animation:rugfly1 7.4s ease-in infinite 1.1s; }
+  .rugcomet.b { animation:rugfly2 9.6s ease-in infinite 4.7s; }
+  @keyframes rugfly1 { 0% { opacity:0; transform:translate(30px,116px); } 5% { opacity:1; }
+    30% { opacity:1; } 38%,100% { opacity:0; transform:translate(700px,392px); } }
+  @keyframes rugfly2 { 0% { opacity:0; transform:translate(40px,500px); } 4% { opacity:1; }
+    26% { opacity:1; } 34%,100% { opacity:0; transform:translate(690px,150px); } }
+  .dec-space.react .rugzip { animation:rugzip 1s ease-out; }
+  @keyframes rugzip { 0% { opacity:0; transform:translate(56px,138px); } 8% { opacity:1; }
+    78% { opacity:1; } 100% { opacity:0; transform:translate(704px,436px); } }
+  .dec-space.react .rugplanet { animation:rugpop 0.9s ease-out; }
+  @keyframes rugpop { 0%,100% { transform:scale(1); } 26% { transform:scale(1.13); } }
+  /* ⚠ THE OVERRIDE MUST FOLLOW EVERY RULE IT CANCELS (the v1.11 medal-case trap:
+     a kill-list at the top of the file loses to an animation declared later) —
+     and it is ID-scoped so it also outranks the `.dec-x.react .y` tap rules,
+     which are two classes deep and would otherwise win on specificity. */
+  @media (prefers-reduced-motion: reduce){
+    #decEleph, #decTrain, #decRobot, #decNana, #decSpace, #decBank,
+    #decEleph *, #decTrain *, #decRobot *, #decNana *, #decSpace *, #decBank * { animation:none; }
+  }
   /* CO-OP: allied campaign — big friendly buttons in the room-modal family */
   .coopbtn { display:flex; align-items:center; gap:14px; width:100%; text-align:left; margin-top:12px; padding:13px 16px;
     font-family:inherit; font-size:1.22rem; font-weight:bold; letter-spacing:0.04em; color:#EDEADF;
@@ -918,7 +1127,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.20</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.21</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1134,6 +1343,54 @@ function vehNextCost(t){ const r=vehTier(t); return r>=VEH_TIERS? 0 : VEH_TIER_C
 // itself is left alone: the opposing armies read it, and their motor pool is
 // none of your business.
 function bfTray(){ return BF_TYPES.filter(t=>VEH_ORDER.indexOf(t)<0 || vehOwns(t)); }
+
+// ===== ROOM DECORATIONS (v1.21, Wyatt 7/25) =====
+// "Decorations do little funny things in the room, give the player things to
+// CLICK on, and really make the room nice." So not one of these is a menu: each
+// is an object that lives on the floor, does something on its own, and does
+// something FUNNIER when you tap it. ⚠ Every last frame of it is declarative
+// CSS/SVG — renderMenu() rebuilds the room with innerHTML on every purchase, so
+// a rAF loop or an interval here would leak on the first thing you buy (the v1.0
+// room rule). The only JS a tap does is add a class and take it off again.
+// ★ PRICES — MY CALL, flagged for Wyatt. Anchors either side: a dye kit is 20★
+// (the whole army, deliberately cheap), a blade crystal 120★, a laser 500★ (the
+// showpiece). Decorations carry no combat value at all, so they ladder from an
+// impulse buy up to exactly one centrepiece: elephant 30 · train 60 · robot 90 ·
+// space rug 120 (it repaints the entire floor of the room) · GIANT BANANA 300 —
+// half the height of the room, the thing you save up for. Whole set 600★, still
+// nearly a fifth under one ray gun.
+const DECOR_ORDER=['elephant','train','robot','spacerug','banana'];
+const DECOR_COST={ elephant:30, train:60, robot:90, spacerug:120, banana:300 };
+const DECOR_INFO={
+  elephant:{ name:'THE ELEPHANT',    sub:'PLUSH · TEN ARMY COLOURS',  tag:'TAP HIM — HE TOOTS!' },
+  train:{    name:'THE TOY TRAIN',   sub:'LOCO · COAL CAR · CABOOSE', tag:'ROUND AND ROUND, FOREVER!' },
+  robot:{    name:'ROBO-SARGE 3000', sub:'WALKS! TURNS! BLEEPS!',     tag:'GOES WHEREVER HE LIKES!' },
+  spacerug:{ name:'THE SPACE RUG',   sub:'DEEP SPACE · WALL TO WALL', tag:'PLANETS AND SHOOTING STARS!' },
+  banana:{   name:'THE BIG BANANA',  sub:'PLUSH · ABSURDLY LARGE',    tag:'TAP IT — IT SQUEAKS!' }
+};
+// PIGGY BANK UPGRADES. Bigger, more serious banks — and a bank that holds more
+// pays you more. ⚠ THE CADENCE IS MY CALL (Wyatt asked me to pick one and note
+// it): **+1★ PER TIER, PER DAY, PAID ON THE SAME TAP** the painted piggy already
+// pays on. Two reasons, and the second decided it: (1) the piggy has exactly one
+// payout moment and one animation — a second cadence would drop stars during a
+// win screen that already has its own ★ line, where nobody would see them;
+// (2) "+1★ per campaign win" is an INFINITE FAUCET, because campaign wins pay
+// their medal stars in full on replays (v0.9) — you would farm level 1 forever.
+// A day cannot be farmed. ⚠ SECOND CALL: **A BANK PAYS EVEN AT STREAK ZERO.**
+// Today a pink piggy pays nothing and only toots; buy the strongbox and it has
+// something for you every single day, which is what makes the first upgrade feel
+// bought instead of promised. Ceiling: rainbow streak 9★ + bank 3★ = 12★/day.
+const BANK_TIERS=[
+  { name:'THE STRONGBOX',     cost:90,  desc:'Steel, a slot and a carry handle.' },
+  { name:'THE VAULT',         cost:200, desc:'Dial, hinges, gold on the corners.' },
+  { name:'THE BANK OF SARGE', cost:420, desc:'Marble pillars. Actual pillars.' }
+];
+function decOwns(id){ const d=META.decor; return !!(d && d.own && d.own.indexOf(id)>=0); }
+function bankTier(){ return Math.max(0, Math.min(BANK_TIERS.length, (META.bankTier)|0)); }
+function bankNextCost(){ const r=bankTier(); return r>=BANK_TIERS.length? 0 : BANK_TIERS[r].cost; }
+// the plush elephant wears whichever army colour you picked for him; until you
+// pick one he matches the army you are actually fielding
+function elephHex(){ return (META.decor&&META.decor.eleph) || dyeHex() || '#7FA35C'; }
 // The four maps. Each generator builds the LEFT half and the loader mirrors it
 // across MID, so both armies always fight the same ground. Coords are authored
 // MID-relative where the feature belongs to the middle of the war (so 10v10's
@@ -1234,6 +1491,9 @@ const META_DEFAULT = {
   // THE MOTOR POOL: which vehicles you own, and how many armour plates are on
   // each. Owning one is what puts its card in the battleground tray at all.
   vehOwned:[], vehUp:{}, vehGift:0,
+  // ROOM DECORATIONS: which ones are on the floor, what colour the elephant is,
+  // and how grand the piggy's bank has got (each bank tier pays +1★ a day).
+  decor:{ own:[], eleph:null }, bankTier:0,
   bfMap:'crossing', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1, // BATTLEFIELD: last map, record, squad size
   // WORLD RANKINGS: 1v1 and 2v2 are their own ladders, so they keep their own
   // W/L (and the stars they paid). 3v3+ only ever feed bfWins/bfLosses.
@@ -1276,6 +1536,14 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
     VEH_ORDER.forEach(t=>{ if(META.vehOwned.indexOf(t)<0) META.vehOwned.push(t); });
   META.vehGift=1;
 })();
+// ROOM DECORATIONS (v1.21) — nothing to grandfather (the department is brand
+// new and nobody has ever owned one), but `decor` is NESTED and Object.assign
+// above only fills the top level, so an older save arrives with no `own` array
+// at all. Normalise the shape here, exactly like bfRecord — and build a fresh
+// object rather than keeping META_DEFAULT's, or a first-boot save aliases it.
+(function(){ const d=META.decor||{};
+  META.decor={ own:Array.isArray(d.own)? d.own.slice() : [], eleph:d.eleph||null };
+  META.bankTier=Math.max(0, Math.min(BANK_TIERS.length, (META.bankTier)|0)); })();
 function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
 // device identity + toy-soldier callsign. In the iOS shell the Keychain
 // remembers the device across reinstalls (injected as __GVT_KC_DEVICE).
@@ -1442,21 +1710,31 @@ function pigCheck(){
   if(p.last===todayStr() || p.last===dayBack(1)) return false;
   p.streak=0; saveMeta(); return true;
 }
-function pigClaimable(){ pigCheck(); return pigTier()>0 && META.piggy.claimed!==todayStr(); }
+// WHAT THE PIGGY OWES YOU TODAY: its paint streak plus its bank. The two stack
+// additively so the room only ever has to show one number — and a bank means a
+// pink, streakless piggy still has something for you every day (v1.21).
+function pigPayout(){ return pigTier()+bankTier(); }
+function pigClaimable(){ pigCheck(); return pigPayout()>0 && META.piggy.claimed!==todayStr(); }
 // the one-line piggy report used by the rival panel — where the invasion lives
 function pigPanelLine(){
   pigCheck();
-  const p=META.piggy, t=pigTier();
+  const p=META.piggy, t=pigTier(), b=bankTier();
   let s='<p style="font-size:1.02rem"><b>🐷 THE PIGGY BANK</b> — ';
   if(!p.streak) s+='beat the invaders every day to keep it safe. Five days in a row paints it '+PIG_COLORS[1].name
     +' — and a painted piggy pays free stars every day.';
   else {
     s+=PIG_COLORS[t].name+' · '+p.streak+' day'+(p.streak===1?'':'s')+' safe';
-    if(t>0) s+=' · pays +'+t+'★ a day — tap it!';
-    if(t<9){ const need=5*(t+1)-p.streak; s+=' · '+need+' more day'+(need===1?'':'s')+' → '+PIG_COLORS[t+1].name+' (+'+(t+1)+'★ a day)'; }
+    if(pigPayout()>0) s+=' · pays +'+pigPayout()+'★ a day — tap it!';
+    if(t<9){ const need=5*(t+1)-p.streak; s+=' · '+need+' more day'+(need===1?'':'s')+' → '+PIG_COLORS[t+1].name+' (+'+(t+1+b)+'★ a day)'; }
     else s+=' · THE RAINBOW PIGGY — as painted as they come';
   }
   s+=' Miss a day and it pops back to pink.</p>';
+  // the bank is bought, not earned, so it gets its own line
+  if(b) s+='<p style="font-size:1.02rem"><b>🏦 '+BANK_TIERS[b-1].name+'</b> — '+BANK_TIERS[b-1].desc
+    +' Adds <b>+'+b+'★ a day</b> to the piggy, streak or no streak.'
+    +(b<BANK_TIERS.length? ' Next up: '+BANK_TIERS[b].name+', '+BANK_TIERS[b].cost+'★ at the Surplus.':' Nothing left to buy — that is the whole bank.')+'</p>';
+  else s+='<p style="font-size:1.02rem"><b>🏦 BANK UPGRADES</b> — a proper bank pays you every day even with no streak at all. '
+    +BANK_TIERS[0].name+' is '+BANK_TIERS[0].cost+'★ at SARGE\'S SURPLUS.</p>';
   return s;
 }
 
@@ -1860,7 +2138,19 @@ const SFX = {
   // BOSS SFX
   stomp: ()=>{ noise(0.24,0.2,240); tone(96,38,0.28,'sine',0.15); },
   roar:  ()=>{ tone(200,70,0.55,'sawtooth',0.13); setTimeout(()=>noise(0.4,0.12,520),40); },
-  rumble:()=>{ noise(0.5,0.09,180); tone(60,44,0.5,'sine',0.09); }
+  rumble:()=>{ noise(0.5,0.09,180); tone(60,44,0.5,'sine',0.09); },
+  // ===== ROOM DECORATIONS (v1.21): one silly noise each, mouth-made like the rest =====
+  trumpet:()=>{ tone(210,560,0.34,'sawtooth',0.075); noise(0.16,0.03,900);
+                setTimeout(()=>tone(540,300,0.2,'square',0.04),160); },
+  whistle:()=>{ tone(760,752,0.3,'triangle',0.05); tone(1010,1000,0.3,'triangle',0.032); noise(0.24,0.05,700);
+                setTimeout(()=>{ tone(620,614,0.34,'triangle',0.05); tone(830,822,0.34,'triangle',0.028); },250); },
+  bleep:  ()=>{ tone(1200,900,0.09,'square',0.055);
+                setTimeout(()=>tone(900,700,0.09,'square',0.05),110);
+                setTimeout(()=>{ tone(700,180,0.24,'square',0.05); noise(0.2,0.02,2600); },220); },
+  twink:  ()=>{ tone(1400,2600,0.22,'sine',0.05);
+                setTimeout(()=>tone(2100,3400,0.2,'sine',0.035),90);
+                setTimeout(()=>tone(2800,4200,0.18,'sine',0.025),180); },
+  squeak: ()=>{ tone(700,1500,0.11,'sine',0.075); setTimeout(()=>tone(1500,620,0.15,'sine',0.06),110); }
 };
 
 // ================= BOOT CAMP COACH =================
@@ -5354,11 +5644,13 @@ const CLASSINFO = {
 // no scrolling — every menu is an object on the floor.
 // The piggy bank, painted by its survival streak. Tier 9 gets the rainbow —
 // a gradient def rides inside the group so roomSVG stays one string.
-function pigSvg(){
+// noId: the shop's bank shelf draws the very same pig, and two #piggyG in one
+// document would have piggyHop() animating whichever the DOM found first
+function pigSvg(noId){
   pigCheck();
   const t=pigTier(), c=PIG_COLORS[t], rain=(t===9);
   const body=rain?'url(#pigrain)':c.body;
-  return '<g id="piggyG" class="pigwrap">'
+  return '<g'+(noId?'':' id="piggyG"')+' class="pigwrap">'
     +(rain?'<defs><linearGradient id="pigrain" x1="0" y1="0" x2="1" y2="1">'
       +'<stop offset="0" stop-color="#E48FB4"/><stop offset="0.25" stop-color="#E8C25A"/>'
       +'<stop offset="0.5" stop-color="#8FD6A8"/><stop offset="0.75" stop-color="#7FB2E5"/>'
@@ -5447,6 +5739,277 @@ function roomVictory(){
     +fig('rifleman',470,392,54,-1.3)
     +'</g>';
 }
+// ================= ROOM DECORATIONS: THE ART (v1.21) =================
+// Everything below returns SVG that drops straight into roomSVG()'s one string.
+// No timers, no rAF, no per-frame anything — every bit of movement is a CSS
+// keyframe on a class, so an innerHTML rebuild (which happens on EVERY purchase)
+// just starts it over instead of leaking. A tap adds a class and takes it off
+// again; that is the entire JS surface of the department.
+// ⚠ Every prop wears the .dec dark rim. The floor is #C8A170 and the elephant
+// comes in TAN and WHITE — without a rim those two are literally invisible on
+// the floorboards (the tan-on-tan rule earned in v1.0).
+// SHADE is one translucent black wash laid over a shape already filled in the
+// item's colour: one overlay reads as "darker" for all ten armies at once, where
+// a hand-picked dark hex only reads for the colour it was picked against.
+const DEC_SHADE='rgba(0,0,0,0.19)';
+// THE PLUSH ELEPHANT — sat on the floor by the bed, in whichever army colour you
+// picked for him. Tap: trunk up, ears out, and he toots.
+// ⚠ each prop is split ART / WRAPPER so the shop shelf can show the very toy
+// that ends up on the floor — one drawing, two framings, and a card that can
+// never drift out of step with the room.
+function elephArt(c){
+  const dbl=(a)=>'<'+a.replace('%F%',c)+'/><'+a.replace('%F%',DEC_SHADE)+'/>';
+  return '<ellipse cx="50" cy="86" rx="42" ry="7.5" fill="#000" opacity="0.25"/>'
+    +'<g class="elbody">'
+      // the two far legs and the far ear are the same shape twice: colour, then wash
+      +dbl('rect x="24" y="54" width="19" height="32" rx="9" fill="%F%"')
+      +dbl('rect x="60" y="54" width="19" height="32" rx="9" fill="%F%"')
+      +'<path d="M86 44 q13 8 8 22" stroke="'+c+'" stroke-width="5.5" fill="none" stroke-linecap="round"/>'
+      +'<ellipse cx="54" cy="46" rx="35" ry="27" fill="'+c+'"/>'
+      +'<circle cx="25" cy="38" r="22" fill="'+c+'"/>'
+      +'<g class="elear"><ellipse cx="34" cy="31" rx="13" ry="16" fill="'+c+'"/>'
+        +'<ellipse cx="34" cy="31" rx="13" ry="16" fill="'+DEC_SHADE+'"/></g>'
+      +'<g class="eltrunk"><path d="M8 40 q-10 14 -6 27 q3 8 10 6" stroke="'+c+'" stroke-width="11" fill="none" stroke-linecap="round"/></g>'
+      +'<path d="M15 50 q-7 5 -9 11" stroke="#F2EEDC" stroke-width="4.5" fill="none" stroke-linecap="round"/>'
+      +'<circle cx="21" cy="31" r="3.6" fill="#2A2118"/><circle cx="22.2" cy="29.8" r="1.2" fill="#fff"/>'
+      +'<path d="M54 20 q2 27 -3 50" stroke="rgba(0,0,0,0.16)" stroke-width="2" fill="none" stroke-dasharray="4 5"/>'
+    +'</g>';
+}
+const ELEPH_VB='0 6 98 90';
+function elephSVG(){
+  return '<g class="dec dec-eleph" id="decEleph" transform="translate(632,240)">'+elephArt(elephHex())+'</g>';
+}
+// THE TOY TRAIN — a stadium of track on the floorboards at the back of the room
+// with three cars going round it, forever. ⚠ THE LOOP IS PURE translate(): the
+// keyframes are the track sampled at UNIFORM ARC LENGTH (not uniform angle), so
+// the cars keep a constant gap instead of piling up in the turns, and because
+// nothing rotates there is no transform-origin/transform-box to get wrong on an
+// SVG group. Each car is the same animation with a negative delay — the same
+// trick the marching rival squad uses for its waddle.
+function trainSVG(){
+  const car=(art,delay,cls)=>'<g class="trcar '+cls+'" style="animation-delay:'+delay+'s">'+art+'</g>';
+  const wheels='<circle cx="-9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
+    +'<circle cx="9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>';
+  const loco='<g><rect x="-16" y="-4" width="32" height="14" rx="3" fill="#A63B2A"/>'
+    +'<rect x="-15" y="-15" width="13" height="12" rx="2.5" fill="#3B4A55"/>'
+    +'<rect x="-12" y="-12" width="7" height="6" rx="1" fill="#BFD4DE"/>'
+    +'<rect x="0" y="-11" width="16" height="8" rx="4" fill="#2E3A44"/>'
+    +'<rect x="11" y="-17" width="6" height="7" rx="1.5" fill="#2E3A44"/>'
+    +'<circle class="trpuff" cx="14" cy="-21" r="5" fill="#E8E4D4" opacity="0.85"/>'
+    +wheels+'</g>';
+  const coal='<g><rect x="-14" y="-6" width="28" height="16" rx="2.5" fill="#3B4A55"/>'
+    +'<rect x="-10" y="-10" width="20" height="6" rx="2" fill="#22262B"/>'+wheels+'</g>';
+  const boose='<g><rect x="-14" y="-5" width="28" height="15" rx="2.5" fill="#C1533E"/>'
+    +'<rect x="-12" y="-14" width="24" height="10" rx="2" fill="#D4644E"/>'
+    +'<rect x="-7" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'
+    +'<rect x="2" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'+wheels+'</g>';
+  return '<g class="dec dec-train" id="decTrain">'
+    // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers
+    +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="#8E7A5C" opacity="0.5"/>'
+    +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="none" stroke="#7A6448" stroke-width="15" stroke-dasharray="3.5 12"/>'
+    +'<path d="M268 535 H392 a17 17 0 0 1 0 34 H268 a17 17 0 0 1 0 -34 z" fill="none" stroke="#9AA2AE" stroke-width="2.4"/>'
+    +'<path d="M268 525 H392 a27 27 0 0 1 0 54 H268 a27 27 0 0 1 0 -54 z" fill="none" stroke="#9AA2AE" stroke-width="2.4"/>'
+    +car(loco,0,'c1')+car(coal,-1.4,'c2')+car(boose,-2.8,'c3')
+    +'</g>';
+}
+// ROBO-SARGE 3000 — an 80s chrome robot that trundles about the rug on his own
+// business. ⚠ THE WANDER IS BOUNDED BY CONSTRUCTION: the keyframes are hand-
+// written offsets from his corner, none of them more than 150px out, so he can
+// never walk off the rug, into the toy box or under the war table however long
+// he runs. He also stops dead under prefers-reduced-motion. Tap: head spin,
+// arms up, three descending bleeps.
+function roboArt(){
+  return '<ellipse cx="0" cy="32" rx="19" ry="4.5" fill="#000" opacity="0.25"/>'
+      +'<rect x="-12" y="14" width="9" height="15" rx="2.5" fill="#6E7480"/>'
+      +'<rect x="3" y="14" width="9" height="15" rx="2.5" fill="#6E7480"/>'
+      +'<rect x="-15" y="27" width="13" height="6" rx="2.5" fill="#474C56"/>'
+      +'<rect x="2" y="27" width="13" height="6" rx="2.5" fill="#474C56"/>'
+      +'<g class="robarm a"><rect x="-23" y="-7" width="7.5" height="21" rx="3.5" fill="#8A919C"/></g>'
+      +'<g class="robarm b"><rect x="15.5" y="-7" width="7.5" height="21" rx="3.5" fill="#8A919C"/></g>'
+      +'<rect x="-15" y="-9" width="30" height="25" rx="5" fill="#9AA2AE" stroke="#5A606B" stroke-width="2"/>'
+      +'<rect x="-10" y="-5" width="20" height="9" rx="2" fill="#2E3440"/>'
+      +'<circle class="robled x" cx="-5" cy="-0.5" r="2.1" fill="#FF5A3C"/>'
+      +'<circle class="robled y" cx="0.5" cy="-0.5" r="2.1" fill="#4FE07A"/>'
+      +'<circle class="robled z" cx="6" cy="-0.5" r="2.1" fill="#D9A544"/>'
+      +'<rect x="-8" y="8" width="16" height="4.5" rx="2.2" fill="#6E7480"/>'
+      +'<path d="M0 -27 L0 -37" stroke="#5A606B" stroke-width="2.5"/>'
+      +'<circle class="robant" cx="0" cy="-39" r="3.8" fill="#FF5A3C"/>'
+      +'<g class="robhead"><rect x="-12" y="-28" width="24" height="19" rx="3.5" fill="#B6BDC8" stroke="#5A606B" stroke-width="2"/>'
+        +'<rect x="-8" y="-23" width="16" height="8" rx="2" fill="#1A2230"/>'
+        +'<rect x="-5.5" y="-21" width="4" height="4" rx="1" fill="#4FE07A"/>'
+        +'<rect x="1.5" y="-21" width="4" height="4" rx="1" fill="#4FE07A"/></g>';
+}
+const ROBO_VB='-26 -44 52 82';
+function roboSVG(){
+  // ⚠ FOUR nested groups on purpose: a CSS transform REPLACES an SVG transform
+  // attribute outright, so the static translate that parks him on the rug has to
+  // live on a group of its own, inside the three that CSS animates.
+  return '<g class="dec dec-robot" id="decRobot" onclick="UI.decorTap(\'robot\')" style="cursor:pointer">'
+    +'<g class="robwalk"><g class="roblean"><g class="robbob"><g transform="translate(440,250)">'
+    +roboArt()+'</g></g></g></g></g>';
+}
+// THE GIANT BANANA — the centrepiece. Three hundred pixels of plush fruit
+// propped in the corner, half the height of the room, with a face on it. Tap:
+// it wobbles on its base and squeaks. It is drawn as one very fat round-capped
+// stroke, which is exactly how the soldiers' limbs are drawn — same idiom, one
+// hundred times the size, which is the joke.
+function bananaArt(){
+  return '<ellipse cx="60" cy="556" rx="46" ry="9" fill="#000" opacity="0.28"/>'
+    +'<g class="nanaw">'
+      +'<path d="M52 546 C 16 464, 24 340, 70 268" stroke="#E0B02F" stroke-width="58" fill="none" stroke-linecap="round"/>'
+      +'<path d="M52 546 C 16 464, 24 340, 70 268" stroke="#F2CE45" stroke-width="46" fill="none" stroke-linecap="round"/>'
+      +'<path d="M44 540 C 12 462, 20 344, 62 276" stroke="#FBE486" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.75"/>'
+      +'<path d="M66 536 C 36 460, 44 348, 82 282" stroke="#D9A22A" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.6"/>'
+      +'<path d="M70 268 l6 -16" stroke="#7A5A22" stroke-width="12" fill="none" stroke-linecap="round"/>'
+      +'<ellipse cx="52" cy="552" rx="16" ry="8" fill="#7A5A22"/>'
+      // the face, because a plush toy that big has to be looking at you
+      +'<g class="nanaface"><circle cx="42" cy="368" r="12" fill="#FFFFFF"/><circle cx="70" cy="358" r="12" fill="#FFFFFF"/>'
+        +'<circle cx="44" cy="370" r="5.5" fill="#2A2118"/><circle cx="72" cy="360" r="5.5" fill="#2A2118"/>'
+        +'<circle cx="46" cy="367.5" r="1.9" fill="#fff"/><circle cx="74" cy="357.5" r="1.9" fill="#fff"/>'
+        +'<path d="M40 392 q16 14 31 -3" stroke="#2A2118" stroke-width="4" fill="none" stroke-linecap="round"/></g>'
+      +'<path d="M36 320 q10 6 4 16" stroke="rgba(122,90,34,0.35)" stroke-width="2.5" fill="none" stroke-dasharray="4 5"/>'
+    +'</g>';
+}
+const NANA_VB='10 240 100 330';
+function bananaSVG(){ return '<g class="dec dec-nana" id="decNana">'+bananaArt()+'</g>'; }
+// THE SPACE RUG — the same rug, only now it is deep space. Stars twinkle on
+// staggered delays, a ringed planet turns, and a comet crosses every few
+// seconds; tapping the planet fires one on demand. The comets are clipped to
+// the rug so nothing streaks out over the floorboards.
+function rugStarField(){
+  let x=20250725, out='';                        // fixed seed: the stars must NOT
+  const R=()=>{ x=(x*1103515245+12345)&0x7fffffff; return x/0x7fffffff; };  // move on every buy
+  for(let i=0;i<58;i++)
+    out+='<circle class="rugstar" cx="'+(72+R()*536).toFixed(1)+'" cy="'+(108+R()*396).toFixed(1)
+      +'" r="'+(0.8+R()*1.9).toFixed(2)+'" fill="#FFF6DC" style="animation-delay:'+(R()*4.2).toFixed(2)+'s"/>';
+  for(let i=0;i<7;i++){
+    const px=(96+R()*488).toFixed(1), py=(124+R()*364).toFixed(1);
+    out+='<g class="rugstar big" transform="translate('+px+','+py+')" style="animation-delay:'+(R()*3.4).toFixed(2)+'s">'
+      +'<path d="M0 -7 L1.7 -1.7 L7 0 L1.7 1.7 L0 7 L-1.7 1.7 L-7 0 L-1.7 -1.7 z" fill="#FFF6DC"/></g>';
+  }
+  return out;
+}
+function roomRugSVG(){
+  if(!decOwns('spacerug'))
+    return '<rect x="60" y="96" width="560" height="420" rx="18" fill="#5F7290"/>'
+      +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#7C8FAC" stroke-width="7"/>';
+  return '<defs>'
+    +'<radialGradient id="rugneb" cx="0.32" cy="0.3" r="0.85">'
+      +'<stop offset="0" stop-color="#42307E"/><stop offset="0.42" stop-color="#211F55"/>'
+      +'<stop offset="1" stop-color="#0F1030"/></radialGradient>'
+    +'<clipPath id="rugclip"><rect x="60" y="96" width="560" height="420" rx="18"/></clipPath>'
+    +'</defs>'
+    +'<g class="dec-space" id="decSpace">'
+    +'<rect x="60" y="96" width="560" height="420" rx="18" fill="url(#rugneb)"/>'
+    +'<g clip-path="url(#rugclip)">'
+      +'<ellipse cx="196" cy="430" rx="230" ry="96" fill="#4A2E7A" opacity="0.3"/>'
+      +'<ellipse cx="486" cy="176" rx="180" ry="82" fill="#1E4C7A" opacity="0.28"/>'
+      +rugStarField()
+      // the planet you tap, rings and all
+      +'<g class="rugplanet"><ellipse cx="300" cy="152" rx="58" ry="15" fill="none" stroke="#C8A05A" stroke-width="5" opacity="0.85"/>'
+        +'<circle cx="300" cy="152" r="34" fill="#C56A45"/>'
+        +'<path d="M270 142 q28 -9 58 -2" stroke="#E0906A" stroke-width="6" fill="none" opacity="0.75"/>'
+        +'<path d="M272 164 q30 8 56 -2" stroke="#9E4E33" stroke-width="7" fill="none" opacity="0.7"/>'
+        +'<circle cx="288" cy="140" r="7" fill="rgba(255,255,255,0.16)"/>'
+        +'<path d="M300 118 a34 34 0 0 0 0 68" fill="rgba(0,0,0,0.22)"/>'
+        +'<ellipse cx="300" cy="152" rx="58" ry="15" fill="none" stroke="#E8C878" stroke-width="2.4" opacity="0.9"/></g>'
+      +'<circle class="rugmoon" cx="176" cy="278" r="13" fill="#C9CDD4"/>'
+      +'<circle cx="171" cy="274" r="3.4" fill="#A8AEB8"/><circle cx="180" cy="283" r="2.4" fill="#A8AEB8"/>'
+      // two comets on the house, and a third that only flies when you tap
+      +'<g class="rugcomet a"><path d="M0 0 L-62 -26" stroke="#FFF6DC" stroke-width="3" stroke-linecap="round" opacity="0.55"/>'
+        +'<circle cx="0" cy="0" r="4" fill="#FFF6DC"/></g>'
+      +'<g class="rugcomet b"><path d="M0 0 L-52 20" stroke="#BFE39A" stroke-width="2.6" stroke-linecap="round" opacity="0.5"/>'
+        +'<circle cx="0" cy="0" r="3.4" fill="#EDFBDA"/></g>'
+      +'<g class="rugzip"><path d="M0 0 L-86 -34" stroke="#FFF3C4" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>'
+        +'<circle cx="0" cy="0" r="6" fill="#FFFFFF"/></g>'
+    +'</g>'
+    +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#5A4EA8" stroke-width="7"/>'
+    +'<rect x="60" y="96" width="560" height="420" rx="18" fill="none" stroke="#2A2450" stroke-width="4"/>'
+    +'</g>';
+}
+// THE PIGGY'S BANK. Bigger and more serious every tier, drawn BEHIND the pig so
+// it frames her without swallowing her — and outside #piggyG, so the hop is
+// still just the pig hopping on top of her own bank.
+function bankArt(r){
+  if(!r) return '';
+  const s='<ellipse cx="148" cy="216" rx="66" ry="9" fill="#000" opacity="0.28"/>';
+  if(r===1) return s
+    +'<rect x="88" y="136" width="120" height="80" rx="6" fill="#6E7480" stroke="#474C56" stroke-width="3"/>'
+    +'<rect x="94" y="142" width="108" height="68" rx="4" fill="#828896"/>'
+    +'<rect x="132" y="126" width="32" height="11" rx="4" fill="#5A606B"/>'
+    +'<rect x="122" y="148" width="52" height="7" rx="3.5" fill="#2E3440"/>'
+    +'<g fill="#5A606B"><circle cx="97" cy="145" r="3"/><circle cx="199" cy="145" r="3"/>'
+      +'<circle cx="97" cy="207" r="3"/><circle cx="199" cy="207" r="3"/></g>';
+  if(r===2) return s
+    +'<rect x="84" y="130" width="128" height="88" rx="7" fill="#5A606B" stroke="#3A3F47" stroke-width="3"/>'
+    +'<rect x="90" y="136" width="116" height="76" rx="5" fill="#767D8A"/>'
+    +'<rect x="128" y="120" width="40" height="11" rx="4" fill="#D9A544"/>'
+    +'<g fill="none" stroke="#D9A544" stroke-width="3"><path d="M90 145 h116"/><path d="M96 205 h104"/></g>'
+    +'<circle cx="106" cy="176" r="13" fill="#3A3F47" stroke="#D9A544" stroke-width="2.5"/>'
+    +'<path d="M106 176 L106 166 M106 176 L114 181" stroke="#E8C878" stroke-width="2.6" stroke-linecap="round"/>'
+    +'<rect x="190" y="150" width="8" height="52" rx="4" fill="#3A3F47"/>'
+    +'<rect x="118" y="140" width="60" height="7" rx="3.5" fill="#2E3440"/>';
+  return s
+    // THE BANK OF SARGE: actual marble, actual pillars, a star on the pediment
+    +'<rect x="80" y="204" width="136" height="16" rx="3" fill="#D8D2C4" stroke="#A79F8C" stroke-width="2"/>'
+    +'<rect x="84" y="148" width="16" height="58" rx="3" fill="#EDE7D8" stroke="#A79F8C" stroke-width="2"/>'
+    +'<rect x="196" y="148" width="16" height="58" rx="3" fill="#EDE7D8" stroke="#A79F8C" stroke-width="2"/>'
+    +'<rect x="100" y="152" width="96" height="54" rx="3" fill="#8E7A5C" opacity="0.35"/>'
+    +'<rect x="78" y="138" width="140" height="14" rx="3" fill="#D8D2C4" stroke="#A79F8C" stroke-width="2"/>'
+    +'<path d="M74 138 L148 112 L222 138 z" fill="#EDE7D8" stroke="#A79F8C" stroke-width="2.5"/>'
+    +'<g transform="translate(148,131) scale(1.5)">'+STAR5+' fill="#D9A544"/></g>'
+    +'<rect x="122" y="160" width="52" height="7" rx="3.5" fill="#2E3440"/>'
+    +'<text x="148" y="200" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="12" letter-spacing="1.5" fill="#6E6152">SAVINGS</text>';
+}
+const BANK_VB='72 106 156 122';
+function bankSVG(){ const r=bankTier(); return r? '<g class="dec dec-bank" id="decBank">'+bankArt(r)+'</g>' : ''; }
+// Everything that lives loose on the floor, in one call. Draw order is z order:
+// the robot is on the rug and the banana is in the corner, so both go down
+// before the invaders (who must always be in front of your furniture).
+function decorSVG(){
+  return (decOwns('train')? trainSVG():'')
+    +(decOwns('banana')? bananaSVG():'')
+    +(decOwns('elephant')? elephSVG():'')
+    +(decOwns('robot')? roboSVG():'');
+}
+// ROOM_SPOTS-style tap anchors, one per owned decoration — same invisible
+// absolutely-positioned div the room's hotspots use, minus the label (a
+// decoration is not a menu; the reaction IS the whole point of tapping it).
+// ⚠ THE ROBOT HAS NO ANCHOR HERE ON PURPOSE: he moves, so a fixed rectangle
+// would either miss him or blanket a third of the rug. His handler is on the
+// SVG group itself, which tracks him wherever he has wandered to.
+const DECOR_SPOTS={
+  train:    { x:240, y:514, w:186, h:82 },
+  spacerug: { x:258, y:110, w:86,  h:86  },   // the planet — the rest of the rug is other people's hotspots
+  elephant: { x:624, y:232, w:110, h:106 },
+  banana:   { x:4,   y:288, w:96,  h:274 }
+};
+function decorSpots(){
+  let s='';
+  for(const id in DECOR_SPOTS){
+    if(!decOwns(id)) continue;
+    const p=DECOR_SPOTS[id];
+    s+='<div onclick="UI.decorTap(\''+id+'\')" style="position:absolute;left:'+p.x+'px;top:'+p.y
+      +'px;width:'+p.w+'px;height:'+p.h+'px;cursor:pointer"></div>';
+  }
+  return s;
+}
+// A tap on a decoration: play its noise, flip the reaction class on, take it off
+// when the animation is done. Nothing else — no save, no re-render, no state.
+const DECOR_REACT={
+  elephant:{ el:'decEleph', ms:900,  sfx:'trumpet' },
+  train:   { el:'decTrain', ms:1000, sfx:'whistle' },
+  robot:   { el:'decRobot', ms:900,  sfx:'bleep'   },
+  spacerug:{ el:'decSpace', ms:1100, sfx:'twink'   },
+  banana:  { el:'decNana',  ms:1300, sfx:'squeak'  }
+};
+function decorReact(id){
+  const d=DECOR_REACT[id]; if(!d) return;
+  if(SFX[d.sfx]) SFX[d.sfx]();
+  const el=document.getElementById(d.el); if(!el) return;
+  el.classList.remove('react'); void el.getBoundingClientRect(); el.classList.add('react');
+  setTimeout(()=>{ try{ el.classList.remove('react'); }catch(e){} }, d.ms);
+}
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()];
   const achDone=ACH.filter(a=>META.ach[a.id]).length;
@@ -5460,9 +6023,8 @@ function roomSVG(){
   // wood floor + planks
   +'<rect width="960" height="600" fill="#C8A170"/>'
   +'<g stroke="#B08A58" stroke-width="2.5" opacity="0.6"><path d="M0 75 H960 M0 150 H960 M0 225 H960 M0 300 H960 M0 375 H960 M0 450 H960 M0 525 H960"/><path d="M240 0 V75 M700 75 V150 M420 150 V225 M180 225 V300 M760 300 V375 M340 375 V450 M620 450 V525 M200 525 V600" stroke-width="2"/></g>'
-  // rug
-  +'<rect x="60" y="96" width="560" height="420" rx="18" fill="#5F7290"/>'
-  +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#7C8FAC" stroke-width="7"/>'
+  // rug — plain wool, or deep space once you've bought the SPACE RUG
+  +roomRugSVG()
   // THE TACTICAL MAP (Wyatt 7/24: "make it look like a battlefield") — a dark
   // war-room chart on the rug: grid, landmasses, dashed capture rings, green
   // friendlies pushing from the southwest, red hostiles holding the northeast,
@@ -5488,7 +6050,9 @@ function roomSVG(){
   +'<path'+(rivDone?'':' class="doorlight"')+' d="M905 412 L716 436 L716 522 L905 538 z" fill="url(#spillg)" opacity="'+(rivDone?'0.45':'1')+'"/>'
   // toy box (campaign)
   +'<g transform="translate(150,210) scale(1.35)">'+SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,'')+'</g>'
-  // piggy bank — wearing whatever colour its survival streak has earned
+  // piggy bank — wearing whatever colour its survival streak has earned, stood
+  // in front of whatever bank she's been upgraded into
+  +bankSVG()
   +pigSvg()
   // army crate (shop)
   +'<g transform="translate(390,86)"><ellipse cx="60" cy="96" rx="56" ry="8" fill="#000" opacity="0.25"/><rect x="8" y="34" width="104" height="60" rx="4" fill="#B48A54" stroke="#8a683e" stroke-width="3"/><path d="M8 36 L-12 16 L30 12 L42 34 z" fill="#C69A62" stroke="#8a683e" stroke-width="2.5"/><path d="M112 36 L132 16 L90 12 L78 34 z" fill="#C69A62" stroke="#8a683e" stroke-width="2.5"/><text x="60" y="70" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="15" fill="#5c4326">SHOP</text></g>'
@@ -5517,6 +6081,9 @@ function roomSVG(){
   +medal(52, achDone>=20, '#CFCFCF', '#4A6B8A')
   +medal(77, achDone>=40,'#C08A4A', '#4A6B35')
   +'<path d="M9 59 L46 13 L62 13 L25 59 z" fill="#fff" opacity="0.06"/></g>'
+  // ROOM DECORATIONS: the loose ones — train, banana, elephant, robot. Before
+  // the invaders, who are always in front of your furniture.
+  +decorSVG()
   // today's rival: a squad in the doorway AND the run of your room —
   // or, once they're beaten, your own men enjoying the quiet
   +(rivDone? roomVictory() : roomRuckus(riv))
@@ -5541,12 +6108,12 @@ const ROOM_SPOTS=[
     label:()=>'BATTLEFIELD'+(META.bfWins?' · '+META.bfWins+'W':''), lx:514, ly:556 },
   { id:'avatar',   x:322, y:322, w:100, h:110, label:()=>'YOU', lx:371, ly:448 },
   { id:'piggy',    x:88,  y:112, w:130, h:100,
-    label:()=>{ const t=pigTier();
+    label:()=>{ const t=pigPayout();
       if(t>0 && META.piggy.claimed!==todayStr()) return 'TAP THE PIGGY! +'+t+'★';
-      if(t>0) return '★ '+META.starBank+' · '+PIG_COLORS[t].name+' PIGGY';
+      if(t>0) return '★ '+META.starBank+' · '+(bankTier()? BANK_TIERS[bankTier()-1].name : PIG_COLORS[pigTier()].name+' PIGGY');
       if(META.piggy.streak>0) return '★ '+META.starBank+' · PIGGY DAY '+META.piggy.streak+'/5';
       return '★ '+META.starBank; },
-    cls:()=>(pigTier()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:148, ly:106 }
+    cls:()=>(pigPayout()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:148, ly:106 }
 ];
 let lastMarch=0;
 function showMenu(){
@@ -5578,7 +6145,7 @@ function renderMenu(){
   const spots=ROOM_SPOTS.map(sp=>
     '<div onclick="UI.room(\''+sp.id+'\')" style="position:absolute;left:'+sp.x+'px;top:'+sp.y+'px;width:'+sp.w+'px;height:'+sp.h+'px;cursor:pointer"></div>'
     +(sp.label? '<div class="roomtag'+(sp.cls&&sp.cls()?' '+sp.cls():'')+'" onclick="UI.room(\''+sp.id+'\')" style="left:'+sp.lx+'px;top:'+sp.ly+'px">'+sp.label()+'</div>' : '')
-  ).join('');
+  ).join('') + decorSpots();   // ...and one anchor per decoration you own
   document.getElementById('menuBody').innerHTML =
     '<div class="roomstage" id="roomStage">'
     + roomSVG()
@@ -5600,7 +6167,7 @@ function piggyHop(){
   if(g){ g.classList.remove('hop'); void g.getBoundingClientRect(); g.classList.add('hop'); }
   const st=document.getElementById('roomStage');
   if(pigClaimable()){
-    const t=pigTier();
+    const t=pigPayout();          // paint streak + bank tier — one tap, one number
     META.piggy.claimed=todayStr();
     META.starBank+=t; META.starsLifetime+=t; saveMeta();
     SFX.coin();
@@ -5836,8 +6403,13 @@ function closeWorldRank(){
 // labels already fit at 640×320 with little to spare, so a fifth is one SHORT
 // word. The department's own sign carries the long name (THE MOTOR POOL), exactly
 // how THE BACK COUNTER hangs behind a plaque reading LASERS.
+// ⚠ v1.20 measured the plaque bar at 474px inside 474px at 640×320 — it was
+// already full. A SIXTH department therefore paid for itself twice: PAINT & DYE
+// dropped to the one word PAINT (its own hanging sign still reads PAINT & DYE,
+// exactly how MOTORS hangs under THE MOTOR POOL), and .sh-tabs learned to scroll
+// so the bar can never clip a plaque again however many aisles get added.
 const SHOP_TABS = [ {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
-                    {id:'paint', lab:'PAINT &amp; DYE'},
+                    {id:'paint', lab:'PAINT'}, {id:'decor', lab:'DECOR'},
                     {id:'lasers', lab:'LASERS'}, {id:'saber', lab:'CRYSTALS'} ];
 let SHOP = { tab:'figs', jumpT:0 };
 function shopIsOpen(){ const el=document.getElementById('toyshop'); return !!el && !el.classList.contains('hidden'); }
@@ -5961,6 +6533,103 @@ function shopVialHTML(c){
     +vialSVG(c.hex, own && !shut)
     +'<span class="sh-vn">'+c.id.toUpperCase()+' <span class="sh-brass">'+brass+'</span></span></button>';
 }
+// ===== dept 4: ROOM DECORATIONS =====
+// The shelf shows the ACTUAL toy — every card draws the same art function the
+// room draws, cropped to its own ink so a tall banana and a wide train each fill
+// their window (the lesson the motor pool's square windows taught in v1.20).
+function decShopArt(id){
+  if(id==='elephant') return '<svg viewBox="'+ELEPH_VB+'">'+elephArt(elephHex())+'</svg>';
+  if(id==='robot')    return '<svg viewBox="'+ROBO_VB+'">'+roboArt()+'</svg>';
+  if(id==='banana')   return '<svg viewBox="'+NANA_VB+'">'+bananaArt()+'</svg>';
+  if(id==='train'){
+    // a straight length of track for the box art — the loop is what it does at home
+    const wh='<circle cx="-9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
+      +'<circle cx="9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>';
+    return '<svg viewBox="0 0 152 60">'
+      +'<path d="M6 46 H146" stroke="#7A6448" stroke-width="15" stroke-dasharray="3.5 13"/>'
+      +'<path d="M6 42 H146 M6 50 H146" stroke="#9AA2AE" stroke-width="2.6"/>'
+      +'<g transform="translate(34,34)"><rect x="-16" y="-4" width="32" height="14" rx="3" fill="#A63B2A"/>'
+        +'<rect x="-15" y="-15" width="13" height="12" rx="2.5" fill="#3B4A55"/>'
+        +'<rect x="-12" y="-12" width="7" height="6" rx="1" fill="#BFD4DE"/>'
+        +'<rect x="0" y="-11" width="16" height="8" rx="4" fill="#2E3A44"/>'
+        +'<rect x="11" y="-17" width="6" height="7" rx="1.5" fill="#2E3A44"/>'
+        +'<circle cx="14" cy="-24" r="6" fill="#E8E4D4" opacity="0.8"/>'
+        +'<circle cx="20" cy="-33" r="4" fill="#E8E4D4" opacity="0.5"/>'+wh+'</g>'
+      +'<g transform="translate(76,34)"><rect x="-14" y="-6" width="28" height="16" rx="2.5" fill="#3B4A55"/>'
+        +'<rect x="-10" y="-10" width="20" height="6" rx="2" fill="#22262B"/>'+wh+'</g>'
+      +'<g transform="translate(118,34)"><rect x="-14" y="-5" width="28" height="15" rx="2.5" fill="#C1533E"/>'
+        +'<rect x="-12" y="-14" width="24" height="10" rx="2" fill="#D4644E"/>'
+        +'<rect x="-7" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'
+        +'<rect x="2" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'+wh+'</g></svg>';
+  }
+  // the space rug: a swatch of the real thing, stars and planet and all
+  return '<svg viewBox="0 0 150 112">'
+    +'<defs><radialGradient id="shrugg" cx="0.34" cy="0.3" r="0.85">'
+      +'<stop offset="0" stop-color="#42307E"/><stop offset="0.42" stop-color="#211F55"/>'
+      +'<stop offset="1" stop-color="#0F1030"/></radialGradient></defs>'
+    +'<rect x="2" y="2" width="146" height="108" rx="8" fill="url(#shrugg)" stroke="#5A4EA8" stroke-width="3"/>'
+    +'<g fill="#FFF6DC"><circle cx="22" cy="20" r="1.6"/><circle cx="46" cy="12" r="1.1"/><circle cx="70" cy="26" r="1.8"/>'
+      +'<circle cx="118" cy="16" r="1.4"/><circle cx="134" cy="42" r="1.7"/><circle cx="18" cy="58" r="1.3"/>'
+      +'<circle cx="38" cy="84" r="1.7"/><circle cx="66" cy="98" r="1.2"/><circle cx="96" cy="88" r="1.6"/>'
+      +'<circle cx="126" cy="76" r="1.2"/><circle cx="88" cy="52" r="1.1"/><circle cx="52" cy="46" r="1.4"/></g>'
+    +'<path d="M104 30 L105.9 24.6 L111.3 22.7 L105.9 20.8 L104 15.4 L102.1 20.8 L96.7 22.7 L102.1 24.6 z" fill="#FFF6DC"/>'
+    +'<g><ellipse cx="52" cy="66" rx="30" ry="8" fill="none" stroke="#C8A05A" stroke-width="3"/>'
+      +'<circle cx="52" cy="66" r="18" fill="#C56A45"/>'
+      +'<path d="M36 60 q15 -5 31 -1" stroke="#E0906A" stroke-width="3.4" fill="none" opacity="0.75"/>'
+      +'<path d="M37 72 q16 4 30 -1" stroke="#9E4E33" stroke-width="4" fill="none" opacity="0.7"/>'
+      +'<path d="M52 48 a18 18 0 0 0 0 36" fill="rgba(0,0,0,0.22)"/>'
+      +'<ellipse cx="52" cy="66" rx="30" ry="8" fill="none" stroke="#E8C878" stroke-width="1.5"/></g>'
+    +'<path d="M132 92 L104 80" stroke="#FFF6DC" stroke-width="2.4" stroke-linecap="round" opacity="0.6"/>'
+    +'<circle cx="133" cy="92.5" r="3" fill="#FFF6DC"/></svg>';
+}
+// one boxed decoration on the shelf. The elephant carries a colour rail under it:
+// before you own him a swatch buys him IN THAT COLOUR (the pick is the purchase),
+// after that swatches repaint him for nothing — a plush toy is not a dye kit.
+function shopDecHTML(id){
+  const own=decOwns(id), inf=DECOR_INFO[id];
+  // THE CENTREPIECE gets a wide crate of its own on the bottom shelf, and the
+  // art is deliberately taller than the box — it does not fit, which is the joke
+  if(id==='banana') return '<button type="button" class="sh-nan'+(own?' own':'')+'" id="shdc-banana" '
+    +'onclick="UI.decorBuy(\'banana\')">'
+    +'<span class="sh-nwin">'+decShopArt('banana')+'</span>'
+    +'<span class="sh-ntx"><b>'+inf.name+'</b><i>'+inf.sub+'</i><em>'+inf.tag+'</em></span>'
+    +(own? '<span class="sh-dstamp">IN YOUR ROOM ✓</span>' : '<span class="sh-dprice">'+DECOR_COST[id]+'★</span>')
+    +'</button>';
+  let rail='';
+  if(id==='elephant'){
+    const cur=elephHex();
+    rail='<span class="sh-drail">'+ARMIES.map(a=>'<button type="button" class="sh-dot'+(own&&cur===a.hex?' on':'')
+      +'" style="background:'+a.hex+'" title="'+a.id+'" aria-label="'+a.id
+      +'" onclick="event.stopPropagation();UI.decorColor(\''+a.hex+'\')"></button>').join('')+'</span>';
+  }
+  return '<div class="sh-dbox"><button type="button" class="sh-dec'+(own?' own':'')+'" id="shdc-'+id
+      +'" onclick="UI.decorBuy(\''+id+'\')">'
+    +'<span class="sh-dwin">'+decShopArt(id)+'</span>'
+    +'<span class="sh-dn">'+inf.name+'</span>'
+    +'<span class="sh-dsub">'+inf.sub+'</span>'
+    +'<span class="sh-dtag">'+inf.tag+'</span>'
+    +(own? '<span class="sh-dstamp">IN YOUR ROOM ✓</span>' : '<span class="sh-dprice">'+DECOR_COST[id]+'★</span>')
+    +'</button>'+rail+'</div>';
+}
+// THE BANK RAIL. Same one-control idea as the motor pool's armour rail: tap any
+// unbought plate and it buys the NEXT one in line, and the caption always names
+// the exact price and the exact stars a day it adds.
+function shopBankHTML(){
+  const r=bankTier(), maxed=r>=BANK_TIERS.length;
+  let plates='';
+  for(let i=0;i<BANK_TIERS.length;i++)
+    plates+='<button type="button" class="sh-pl '+(i<r?'on':(i===r?'next':'far'))+'" onclick="UI.bankBuy()" '
+      +'aria-label="'+BANK_TIERS[i].name+'"></button>';
+  const cap = maxed? 'THE WHOLE BANK — +'+r+'★ A DAY'
+    : BANK_TIERS[r].name+' '+BANK_TIERS[r].cost+'★ · +1★ A DAY MORE';
+  return '<div class="sh-bank" id="shBank">'
+    +'<span class="sh-bwin"><svg viewBox="'+BANK_VB+'">'+bankArt(maxed? r : r+1)+pigSvg(true)+'</svg>'
+      +(maxed?'':'<i class="sh-bnext">NEXT</i>')+'</span>'
+    +'<span class="sh-btx"><b>PIGGY BANK UPGRADES</b>'
+      +'<i>'+(r? BANK_TIERS[r-1].name+' · ' : '')+'PAYS +'+pigPayout()+'★ A DAY RIGHT NOW</i></span>'
+    +'<span class="sh-prow">'+plates+'</span>'
+    +'<span class="sh-pcap">'+cap+'</span></div>';
+}
 function renderShop(){
   const el=document.getElementById('toyshop'); if(!el) return;
   const jars2=ARMIES.slice(5).map(shopJarHTML).join('')
@@ -5990,6 +6659,9 @@ function renderShop(){
         +'<div class="sh-plank"></div><div class="sh-pricerail">DYE KITS — 20★ · BUY IT, WEAR IT, WASH IT OFF ANY TIME</div></div>'
         +'<div class="sh-shelf sh-shelf2"><div class="sh-jars">'+jars2+'</div>'
         +'<div class="sh-plank"></div><div class="sh-pricerail">FACTORY GREEN IS ALWAYS FREE</div></div></section>'
+      +'<section class="sh-dept" id="shDecor"><h2>ROOM DECORATIONS<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING</small></h2>'
+        +'<div class="sh-decrow">'+['elephant','train','robot','spacerug'].map(shopDecHTML).join('')+'</div>'
+        +'<div class="sh-decbig">'+shopBankHTML()+shopDecHTML('banana')+'</div></section>'
       +'<section class="sh-dept" id="shLasers"><h2>THE BACK COUNTER<small>FUTURE TECH · SOLD UNDER GLASS</small></h2>'
         +'<div class="sh-neon">LASERS</div><div class="sh-case">'+guns+'</div>'
         +'<div class="sh-counsel">every shot a beam, every beam a color — 500★ · ask Sarge for a demonstration</div></section>'
@@ -6026,7 +6698,14 @@ function shopScroll(){
 }
 function shopMarkTabs(id){
   const tabs=document.querySelectorAll('#toyshop .sh-tab');
-  for(let k=0;k<tabs.length;k++) tabs[k].classList.toggle('on', tabs[k].getAttribute('data-go')===id);
+  for(let k=0;k<tabs.length;k++){
+    const on=tabs[k].getAttribute('data-go')===id;
+    tabs[k].classList.toggle('on', on);
+    // six plaques don't always fit — keep the lit one where a thumb can see it
+    if(on && tabs[k].parentNode && tabs[k].parentNode.scrollWidth>tabs[k].parentNode.clientWidth+1){
+      try{ tabs[k].scrollIntoView({block:'nearest', inline:'nearest'}); }catch(e){}
+    }
+  }
 }
 // A tap on a plaque walks you down the aisle; a re-render must LAND there, not slide.
 function shopJump(id, smooth){
@@ -6280,6 +6959,46 @@ window.UI = {
     META.starBank-=cost; META.vehUp[t]=r+1; saveMeta(); renderMenu();
     SFX.thock(); setTimeout(()=>SFX.coin(), 120);
     shopRefresh(); },
+  // ===== ROOM DECORATIONS =====
+  // Buying one changes the ROOM, not the army, so every one of these ends with a
+  // renderMenu() as well as the shop refresh — the thing you just bought has to
+  // be standing on the floor the moment you walk out of the store.
+  decorBuy(id){
+    if(DECOR_ORDER.indexOf(id)<0 || decOwns(id)) return;
+    if(META.starBank<DECOR_COST[id]){ shopDeny('shdc-'+id); return; }
+    META.starBank-=DECOR_COST[id]; META.decor.own.push(id);
+    if(id==='elephant' && !META.decor.eleph) META.decor.eleph=dyeHex()||'#7FA35C';
+    saveMeta(); renderMenu();
+    if(!shopIsOpen()) return;
+    const st=document.getElementById('shStars'); if(st) st.textContent=META.starBank+'★';
+    SFX.thock(); setTimeout(()=>SFX.coin(), 120);
+    const c=document.getElementById('shdc-'+id);
+    if(!c){ renderShop(); return; }
+    c.classList.add('buying');                 // let the unboxing play before the rebuild
+    setTimeout(()=>shopRefresh(), 1000);
+    // ...and once it's home, the toy introduces itself
+    setTimeout(()=>{ if(DECOR_REACT[id] && SFX[DECOR_REACT[id].sfx]) SFX[DECOR_REACT[id].sfx](); }, 620);
+  },
+  // a swatch on the elephant's rail. Unowned, the pick IS the purchase (he comes
+  // in ten colours — choosing one is how you buy him); owned, it repaints free.
+  decorColor(hex){
+    if(!ARMIES.some(a=>a.hex===hex)) return;
+    if(!decOwns('elephant')){
+      if(META.starBank<DECOR_COST.elephant){ shopDeny('shdc-elephant'); return; }
+      META.decor.eleph=hex; UI.decorBuy('elephant'); return;
+    }
+    META.decor.eleph=hex; SFX.blip(); saveMeta(); renderMenu(); shopRefresh();
+  },
+  bankBuy(){
+    const r=bankTier(); if(r>=BANK_TIERS.length) return;
+    const cost=BANK_TIERS[r].cost;
+    if(META.starBank<cost){ shopDeny('shBank'); return; }
+    META.starBank-=cost; META.bankTier=r+1; saveMeta(); renderMenu();
+    SFX.thock(); setTimeout(()=>SFX.coin(), 120);
+    shopRefresh();
+  },
+  // a tap on a decoration standing in the room: noise, wobble, nothing else
+  decorTap(id){ audio(); decorReact(id); },
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
@@ -6577,6 +7296,24 @@ window.GVT = {
     chosen:META.saberColor, chosenName:META.saberColor?sabName(META.saberColor):null,
     hex:saberHex(), owned:(META.sabColOwned||[]).map(sabName), stars:META.starBank,
     weapon:META.sargeWeapon }; },
+  // ===== ROOM DECORATIONS RIG =====
+  // GVT.decor() reads the whole department, GVT.decorTap('robot') fires a
+  // reaction without a pointer, GVT.bank(n) forces a bank tier.
+  decor(){ return { stars:META.starBank, owned:(META.decor.own||[]).slice(),
+    eleph:META.decor.eleph, elephHex:elephHex(),
+    prices:DECOR_ORDER.map(id=>id+':'+DECOR_COST[id]+(decOwns(id)?' OWNED':'')),
+    bank:bankTier(), bankName:bankTier()? BANK_TIERS[bankTier()-1].name:null,
+    bankNext:bankNextCost(), pigTier:pigTier(), pigPayout:pigPayout(),
+    claimable:pigClaimable(), claimed:META.piggy.claimed,
+    inRoom:DECOR_ORDER.filter(id=>!!document.getElementById(DECOR_REACT[id].el)),
+    spots:Object.keys(DECOR_SPOTS).filter(decOwns) }; },
+  decorTap(id){ decorReact(id); const d=DECOR_REACT[id];
+    const el=d&&document.getElementById(d.el);
+    return el? el.className.baseVal||el.className : null; },
+  bank(n){ META.bankTier=Math.max(0,Math.min(BANK_TIERS.length,n|0)); saveMeta(); renderMenu(); shopRefresh(); return bankTier(); },
+  decorGive(id){ if(DECOR_ORDER.indexOf(id)<0) return null;
+    if(!decOwns(id)) META.decor.own.push(id);
+    saveMeta(); renderMenu(); shopRefresh(); return META.decor.own.slice(); },
   // ===== THE MOTOR POOL RIG =====
   motor(){ const o={ stars:META.starBank, tray:bfTray(), gifted:!!META.vehGift };
     VEH_ORDER.forEach(t=>{ const r=vehTier(t);
