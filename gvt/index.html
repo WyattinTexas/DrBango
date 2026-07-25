@@ -729,7 +729,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.13</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.14</div>
   <div class="scanlines"></div>
 </div>
 
@@ -813,18 +813,30 @@ function bfBaseHP(team){ return Math.round(BASE_HP*Math.pow(team,0.75)); }
 // 20 seats at 10v10 need 20 readable colours: the ten ARMIES plus these spares,
 // each hand-picked to clear hexNear() against the rest of the palette
 const BF_EXTRA_HEX=['#E890C8','#9CC24E','#6FC7E8','#223E7A','#96703F','#C24AC2','#F0E858','#7A2E2E','#1E6E62','#8EE8B0','#B0A0E0'];
-const BF_TYPES=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','sarge'];
+// THE MOTOR POOL joins the tray last, in front of the free Sarge — the two
+// vehicles are battleground-only, so they never appear in TRAY_ORDER, the shop
+// or the campaign roster (Wyatt 7/25: jeep 250, tank 500).
+const BF_TYPES=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','bfjeep','bftank','sarge'];
 // SAME DOG TAGS AS THE CAMPAIGN (Wyatt 7/24: "use the same ones so players
 // aren't confused") — BF_COST *is* the campaign price list, Sarge free like
 // always. The passive drip and the kill bounties are scaled into campaign
 // money so the playtested deploy cadence (a placement every 4-8s mid-game)
 // survives the switch: the old +1/10s on a 2-tag rifleman is +20/10s on a 40.
-const BF_COST   = Object.assign({}, COSTS);
-const BF_BOUNTY = { rifleman:20, minesweeper:60, flame:75, mgunner:50, radioman:50, bazooka:75, mortar:100, sarge:50 };
+// (…plus the two vehicles, at Wyatt's prices — the only BF-only line items.)
+const BF_COST   = Object.assign({}, COSTS, { bfjeep:250, bftank:500 });
+// every bounty on this board is exactly half the sticker price — the vehicles
+// keep the rule, so killing a tank funds a tank of your own eventually
+const BF_BOUNTY = { rifleman:20, minesweeper:60, flame:75, mgunner:50, radioman:50, bazooka:75, mortar:100, sarge:50, bfjeep:125, bftank:250 };
 const BF_TICK   = 20;    // dog tags per 10s passive drip
 const BF_START  = 210;   // opening purse — the campaign's exact wallet
 // a breakthrough is a FREE LEAK: reach the base, deal this, vanish. ~12 = a KO.
-const BF_BASEDMG= { rifleman:6, minesweeper:7, flame:8, mgunner:8, radioman:8, bazooka:9, mortar:10, sarge:18 };
+// ⚠ the jeep's 12 is measured, not guessed: harnessed against a hard AI board it
+// reaches the box 93% of the time (its pace IS its armour — it is inside any one
+// gun's reach for well under a second). A delivery that reliable has to be
+// priced BELOW what an infantryman would theoretically do, or it becomes an
+// auto-include: 12 is ~17% of a 1v1 box, so two jeeps is a third of their base
+// and most of your match income, and the ram is what you actually aim it at.
+const BF_BASEDMG= { rifleman:6, minesweeper:7, flame:8, mgunner:8, radioman:8, bazooka:9, mortar:10, sarge:18, bfjeep:12, bftank:26 };
 // Per-unit pace: moveSpd px/s. (The old `setup` dig-in wind-up is GONE — Wyatt
 // 7/24: "no loading bar on them firing, it just fires" — halted men shoot the
 // moment a target is in reach, exactly like the campaign.)
@@ -858,7 +870,23 @@ const BF_MOVE = {
   // (huge) reach instead — it still outranges every gun here and keeps its
   // minRng:120 dead zone, which is the whole point of the piece.
   mortar:     { moveSpd:12, hp:3, rng:340 },
-  sarge:      { moveSpd:40, hp:6 }
+  sarge:      { moveSpd:40, hp:6 },
+  // ===== THE MOTOR POOL (Wyatt 7/25) — the only two pieces on this carpet that
+  // aren't men, and they're deliberately opposite bets.
+  // The JEEP doesn't stop for ANYBODY: 3× a rifleman's pace, no gun at all, and
+  // it flattens whatever it clips on the way through (once each). You buy it to
+  // watch it tear across the board and put a dent in their box 4 seconds later.
+  // The TANK is the grind: half a rifleman's pace (the campaign's own 88/20-vs-40
+  // ratio kept intact), the longest gun short of the mortar, and enough plastic
+  // to soak a whole line while it shells them. Pace still rides BF_PACE, so the
+  // one playtest knob keeps scaling the whole board.
+  // 24 plastic is measured, not guessed: the run from the furthest-forward legal
+  // drop to their box is ~950px, which at this pace is 4.3 seconds under fire.
+  // 24 means ONE machine gunner in the lane (4.5 dps) does not stop it and TWO
+  // do — so the jeep beats an unprepared flank and loses to an answer, which is
+  // the whole point of a 250-tag gamble. (At 16 it died to a single MG.)
+  bfjeep:     { moveSpd:130, hp:24 },
+  bftank:     { moveSpd:22,  hp:40 }
 };
 for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE);
 // The four maps. Each generator builds the LEFT half and the loader mirrors it
@@ -914,22 +942,28 @@ const BF_MAPS = [
 // medium 79%, hard 33%. HARD is the pre-tune AI verbatim — Wyatt: today's
 // difficulty "is okay as a hard opponent" — parked at 1200★ where it belongs.
 const BF_AI = {
-  easy:   { every:3.4, hoard:0,   counterWeight:0.05, blunderP:0.5,  safeDrop:false, save:0,   focus:'center', inc:0.7,  wildP:0.5  },
-  medium: { every:2.3, hoard:60,  counterWeight:0.25, blunderP:0.32, safeDrop:true,  save:0.1, focus:'weak',   inc:0.82, wildP:0.32 },
-  hard:   { every:0.9, hoard:160, counterWeight:1.0,  blunderP:0.0,  safeDrop:true,  save:0.5, focus:'focus',  inc:1.0,  wildP:0    }
+  // `motor` = the chance, per decision, that a comfortable seat opens a MOTOR
+  // POOL FUND and starts banking for a vehicle (see OpponentBrain.decide). Hard
+  // decides four times as often as easy, so its number is the smallest — the
+  // three tiers all land around one fund an army per match.
+  easy:   { every:3.4, hoard:0,   counterWeight:0.05, blunderP:0.5,  safeDrop:false, save:0,   focus:'center', inc:0.7,  wildP:0.5,  motor:0.07 },
+  medium: { every:2.3, hoard:60,  counterWeight:0.25, blunderP:0.32, safeDrop:true,  save:0.1, focus:'weak',   inc:0.82, wildP:0.32, motor:0.06 },
+  hard:   { every:0.9, hoard:160, counterWeight:1.0,  blunderP:0.0,  safeDrop:true,  save:0.5, focus:'focus',  inc:1.0,  wildP:0,    motor:0.035 }
 };
 // the daily rival's colour ALSO picks how they fight — a free themed opponent
 const BF_PERSONA = {
-  red:   { name:'BLITZ',   pref:{ rifleman:2.2, flame:1.8, mgunner:0.7, mortar:0.3, bazooka:0.6, minesweeper:0.4, radioman:0.5, sarge:1.2 } },
-  black: { name:'BULWARK', pref:{ mgunner:2.0, mortar:1.8, bazooka:1.4, rifleman:0.8, flame:0.6, minesweeper:1.0, radioman:1.1, sarge:1.0 } },
-  tan:   { name:'THE HORDE',pref:{ rifleman:2.6, minesweeper:1.2, mgunner:0.9, flame:0.9, bazooka:0.5, mortar:0.4, radioman:0.6, sarge:0.9 } },
-  teal:  { name:'FROGMEN', pref:{ flame:2.0, minesweeper:1.8, rifleman:1.2, mgunner:1.0, bazooka:0.6, mortar:0.6, radioman:0.8, sarge:1.0 } },
-  purple:{ name:'OFFICERS',pref:{ sarge:2.4, radioman:1.6, rifleman:1.1, mgunner:1.0, bazooka:0.9, mortar:0.8, flame:0.7, minesweeper:0.6 } },
-  orange:{ name:'MOTOR POOL',pref:{ bazooka:2.0, mgunner:1.3, rifleman:1.0, mortar:1.0, flame:0.8, minesweeper:0.8, radioman:0.7, sarge:1.0 } },
-  gold:  { name:'THE GAUDY',pref:{ mortar:1.6, bazooka:1.4, rifleman:1.2, mgunner:1.2, flame:1.0, minesweeper:1.0, radioman:1.0, sarge:1.4 } },
-  white: { name:'WINTER',  pref:{ mgunner:1.8, rifleman:1.4, flame:1.2, radioman:1.2, bazooka:0.8, mortar:0.8, minesweeper:0.7, sarge:1.0 } },
-  blue:  { name:'BY THE BOOK',pref:{ rifleman:1.4, mgunner:1.3, bazooka:1.1, mortar:1.0, flame:1.0, minesweeper:1.0, radioman:1.0, sarge:1.1 } },
-  green: { name:'THE MIRROR',pref:{ rifleman:1.5, mgunner:1.2, flame:1.2, bazooka:1.0, mortar:1.0, minesweeper:0.9, radioman:1.0, sarge:1.3 } }
+  red:   { name:'BLITZ',   pref:{ rifleman:2.2, flame:1.8, mgunner:0.7, mortar:0.3, bazooka:0.6, minesweeper:0.4, radioman:0.5, sarge:1.2, bfjeep:2.0, bftank:0.5 } },
+  black: { name:'BULWARK', pref:{ mgunner:2.0, mortar:1.8, bazooka:1.4, rifleman:0.8, flame:0.6, minesweeper:1.0, radioman:1.1, sarge:1.0, bfjeep:0.5, bftank:1.9 } },
+  tan:   { name:'THE HORDE',pref:{ rifleman:2.6, minesweeper:1.2, mgunner:0.9, flame:0.9, bazooka:0.5, mortar:0.4, radioman:0.6, sarge:0.9, bfjeep:0.8, bftank:0.4 } },
+  teal:  { name:'FROGMEN', pref:{ flame:2.0, minesweeper:1.8, rifleman:1.2, mgunner:1.0, bazooka:0.6, mortar:0.6, radioman:0.8, sarge:1.0, bfjeep:1.0, bftank:0.7 } },
+  purple:{ name:'OFFICERS',pref:{ sarge:2.4, radioman:1.6, rifleman:1.1, mgunner:1.0, bazooka:0.9, mortar:0.8, flame:0.7, minesweeper:0.6, bfjeep:0.8, bftank:1.0 } },
+  // the colour whose blurb has always been "Motor pool. Loves its Jeeps." finally
+  // has jeeps to love
+  orange:{ name:'MOTOR POOL',pref:{ bazooka:2.0, mgunner:1.3, rifleman:1.0, mortar:1.0, flame:0.8, minesweeper:0.8, radioman:0.7, sarge:1.0, bfjeep:2.4, bftank:2.0 } },
+  gold:  { name:'THE GAUDY',pref:{ mortar:1.6, bazooka:1.4, rifleman:1.2, mgunner:1.2, flame:1.0, minesweeper:1.0, radioman:1.0, sarge:1.4, bfjeep:1.2, bftank:1.7 } },
+  white: { name:'WINTER',  pref:{ mgunner:1.8, rifleman:1.4, flame:1.2, radioman:1.2, bazooka:0.8, mortar:0.8, minesweeper:0.7, sarge:1.0, bfjeep:0.9, bftank:1.2 } },
+  blue:  { name:'BY THE BOOK',pref:{ rifleman:1.4, mgunner:1.3, bazooka:1.1, mortar:1.0, flame:1.0, minesweeper:1.0, radioman:1.0, sarge:1.1, bfjeep:1.1, bftank:1.1 } },
+  green: { name:'THE MIRROR',pref:{ rifleman:1.5, mgunner:1.2, flame:1.2, bazooka:1.0, mortar:1.0, minesweeper:0.9, radioman:1.0, sarge:1.3, bfjeep:1.1, bftank:1.1 } }
 };
 
 // ================= META (the Long War) =================
@@ -1183,7 +1217,14 @@ const UDEF = {
   sarge:   { rng:108, rate:1.8, dmg:1.5, air:true,  grit:4, name:'SARGE' },
   minesweeper:{ rng:130, rate:0.167, dmg:0, air:false, grit:3, name:'SWEEPER', mine:true },
   flame:   { rng:85,  rate:8,   dmg:0.5, air:false, grit:3, name:'FLAME', multi:3 },
-  radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 }
+  radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 },
+  // ===== BATTLEGROUND-ONLY (Wyatt 7/25). Never in TRAY_ORDER, the shop, the
+  // Field Manual or a campaign level — the campaign roster is untouched. The
+  // jeep carries no gun at all (rate 0 keeps it out of the weapon code entirely;
+  // it hurts people by driving into them, see bfRam). Pace + plastic live in
+  // BF_MOVE with the rest of the battleground table.
+  bfjeep:  { rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'JEEP', vehicle:true, ram:4, ramR:46 },
+  bftank:  { rng:210, rate:0.5, dmg:6, air:false, grit:3, name:'TANK', vehicle:true, splash:48, scatter:26 }
 };
 const FDEF = {
   tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:165, fireCd:3.2, name:'tan' },  // matches your rifleman's reach — the ~0.5s aim wind-up is their only tell
@@ -1285,8 +1326,17 @@ blob: '<path d="M6 18 Q2 10 10 8 Q12 2 20 4 Q30 2 32 10 Q38 12 34 18 Q30 22 20 2
 // 7/22 remold: Tan infantry aim their rifles FORWARD like the Green riflemen
 // (mirrored to face the way they march) — and the Tan fields an MG team now.
 const MIRROR = s=>'<g transform="translate(120,0) scale(-1,1)">'+s+'</g>';
+// the vehicles are drawn on a WIDER canvas (140), so they need their own flip —
+// mirroring them across 120 would slice the front wheel off
+const MIRROR_V = s=>'<g transform="translate(140,0) scale(-1,1)">'+s+'</g>';
 SPRITES_SRC.tanrifle = MIRROR(SPRITES_SRC.rifleman);
 SPRITES_SRC.tanmg    = MIRROR(SPRITES_SRC.mgunner);
+// 7/25: YOUR motor pool. Same two vehicles the Tan have been driving at you
+// since v0.2 — cast in green (buildSprites paints anything not on the TAN list)
+// and turned around, so they face the way YOUR army marches like every other
+// green figure. drawBFUnit's `flip` then does the right thing for both teams.
+SPRITES_SRC.bfjeep = MIRROR_V(SPRITES_SRC.jeep);
+SPRITES_SRC.bftank = MIRROR_V(SPRITES_SRC.tank);
 // ===== BOSSES (every few campaign levels) =====
 // giant: a MEGA tan rifleman — same body, just drawn huge (tints with the army).
 SPRITES_SRC.giant = SPRITES_SRC.tanrifle;
@@ -1388,7 +1438,7 @@ let assetsLeft = 0;
 function buildSprites(done){
   const jobs = [];
   for(const k in SPRITES_SRC){
-    const vb = (k==='jeep'||k==='tank'||k==='rex'||k==='rollpig') ? '0 0 140 140' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';
+    const vb = (k==='jeep'||k==='tank'||k==='bfjeep'||k==='bftank'||k==='rex'||k==='rollpig') ? '0 0 140 140' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';
     const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='blob'||k==='giant'||k==='rollpig') ? TAN : GREEN;
     jobs.push([k, vb, color]);
   }
@@ -2020,6 +2070,10 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
+    // every commander but you draws his Sarge's weapon out of the crate, once,
+    // here — so a seat's Sarge carries the same thing all match, even if he goes
+    // down and gets bought again. Seat 0 keeps your Academy loadout untouched.
+    st.kit = st.human? null : bfSargeKit(bfRollWeapon());
     st.brain = st.human? null : new OpponentBrain(diff, st.persona);
     if(st.brain) st.brain.cd = 0.7 + st.i*0.13 + Math.random()*0.5;   // 20 brains never fire in lockstep
     // each AI seat anchors to its own slice of the front — ten brains all
@@ -2126,15 +2180,44 @@ function PRIO(u,f){ return S.bf ? Math.hypot(u.x-f.x,u.y-f.y) : Math.hypot(T.x-f
 // the AI's Sarge carries the service pistol; YOURS (seat 0 — the human, on any
 // team size) carries whatever you equipped. Teammate seats are AI too.
 const BF_AI_SARGE={ w:'pistol', r:0, rng:108, rate:1.8, dmg:1.5 };
+// ===== THE ARMORY ROLL (Wyatt 7/25) =====
+// Every OTHER commander on the field draws his Sarge's weapon out of the same
+// crate, once, when the seats are dealt. Weighted so the blade stays the thing
+// you notice: 10% lightsaber · 30% pistol · 30% shotgun · 30% sniper — Wyatt:
+// "not that many should have the lightsaber."
+// YOUR seat is never rolled. The code has always distinguished the human by
+// SEAT (bfHumanU = seat 0), so seat 0 keeps fighting with exactly what you
+// equipped in the Academy, ranks and all; every AI seat — teammates included,
+// since they are AI too — gets a drawn weapon at STOCK rank 0, which is the
+// same rule upMul and critChance already use (their difficulty is decisions,
+// not stat padding).
+const BF_ARMORY=[['lightsaber',0.10],['pistol',0.30],['shotgun',0.30],['sniper',0.30]];
+function bfRollWeapon(){
+  const r=Math.random(); let acc=0;
+  for(const row of BF_ARMORY){ acc+=row[1]; if(r<acc) return row[0]; }
+  return 'pistol';
+}
+// rank-0 twin of sargeStats() — same table, none of your promotions. A drawn
+// blade also draws its own colour, so twenty Sarges aren't all swinging yours.
+function bfSargeKit(w){
+  if(w==='shotgun')    return { w, r:0, rng:103, rate:2.0, dmg:1.1, cone:0.62 };
+  if(w==='sniper')     return { w, r:0, rng:408, rate:0.22*1.3, dmg:9 };
+  if(w==='lightsaber') return { w, r:0, aggro:175, dmg:7, cd:2.1, block:0.34,
+                                saber:SABER_COLORS[(Math.random()*SABER_COLORS.length)|0].hex };
+  return { w:'pistol', r:0, rng:108, rate:1.8, dmg:1.5 };
+}
 function bfHumanU(u){ return !S.bf || u.seat===0; }
 function unitSargeStats(u){
   if(u && u.coopSW) return u.coopSW;           // the ally's Sarge carries the ALLY's loadout
-  return (S.bf && !bfHumanU(u)) ? BF_AI_SARGE : sargeStats();
+  if(S.bf && !bfHumanU(u)){ const st=S.bf.seats[u.seat]; return (st&&st.kit)||BF_AI_SARGE; }
+  return sargeStats();
 }
+// whose blade is this? a drawn one glows its own colour; yours glows the one
+// you picked in the Academy
+function saberHexU(u){ const sw=u&&unitSargeStats(u); return (sw&&sw.saber)||saberHex(); }
 function saberBlocksU(u){
   if(u.type!=='sarge') return false;
-  if(S.bf && !bfHumanU(u)) return false;                   // AI Sarges have no blade
-  return saberBlocks(u);
+  return saberBlocks(u);                       // a drawn blade deflects exactly like yours does
 }
 // at 10v10 forty guns firing across a 3000px carpet would be a wall of bleeps —
 // battle sounds only play when the fight is actually on (or near) your screen
@@ -2188,6 +2271,7 @@ function applyDeploy(seat,type,x,y){
 
 // ================= BATTLEFIELD: MOVEMENT + THE FREE LEAK =================
 function bfAggro(u){
+  if(u.def.ram) return 0;                    // the jeep halts for nothing — it drives THROUGH you
   if(u.type==='sarge'){ const sw=unitSargeStats(u); return sw.aggro||sw.rng||108; }
   if(u.def.rng>=9000) return 260;            // the mortar would "see" the whole world and never advance
   return u.def.rng || u.def.auraR || 120;    // the radioman halts with the line he is buffing
@@ -2259,6 +2343,26 @@ function bfLeak(u){
     setTimeout(()=>{ S.speed=1; endBattlefield(won?'ko':'koLoss'); }, 900);
   }
 }
+// THE JEEP'S "WEAPON" is the bumper. Anything it clips gets flattened — ONCE
+// each, so it can plow the length of a line without grinding the same man to
+// paste, and it never slows down doing it. Damage funnels through hurt() like
+// every other source, so the blade can still turn it aside and the kill (and
+// the dog tag) lands in the driver's purse.
+function bfRam(u){
+  if(!u.rammed) u.rammed={};
+  const R=u.def.ramR||46;
+  for(const o of S.units){
+    if(o.dead||o.dropT>0||o.side===u.side||u.rammed[o.id]) continue;
+    if(Math.hypot(o.x-u.x,o.y-u.y)>R) continue;
+    u.rammed[o.id]=1;
+    S.fx.push({k:'puff',x:o.x,y:o.y-18,t:0,dur:0.3,R:20});
+    bfSfx(SFX.thock, u.x);
+    hurt(o, u.def.ram, u);
+  }
+  // rooster tail of carpet dust off the back wheels — you can hear it coming
+  if(u.marching && Math.random()<0.4)
+    S.fx.push({k:'puff',x:u.x-(u.side==='you'?28:-28),y:u.y-4,t:0,dur:0.3,R:11});
+}
 // One step of one combatant. Returns TRUE when he may fall through into the
 // (entirely untouched) weapon code below.
 function bfUnitStep(u,dt){
@@ -2273,6 +2377,7 @@ function bfUnitStep(u,dt){
     }
     return false;
   }
+  if(u.def.ram) bfRam(u);                                  // the bumper checks before the wheels turn
   if(u.saberState && u.saberState!=='idle') return true;   // let a charging Sarge finish his run
   u.marching=false;
   const tgt=bfNearestEnemy(u, bfAggro(u));
@@ -2400,12 +2505,15 @@ function bfCounter(t,mine,theirs){
   const pushing=live.filter(u=>u.x>MID-40).length;
   const turtle=live.length>=3 && live.every(u=>u.x<MID-200);
   let s=0;
-  if(swarm>=3){ if(t==='mgunner') s+=2.2; if(t==='flame') s+=1.8; if(t==='minesweeper') s+=1.0; }
-  if(pushing>=2){ if(t==='mgunner') s+=1.6; if(t==='flame') s+=1.4; if(t==='bazooka') s+=1.0; }
-  if(turtle){ if(t==='mortar') s+=2.4; if(t==='bazooka') s+=1.2; }
-  if(heavies>=2){ if(t==='mortar') s+=1.4; if(t==='rifleman') s+=0.6; }
+  if(swarm>=3){ if(t==='mgunner') s+=2.2; if(t==='flame') s+=1.8; if(t==='minesweeper') s+=1.0; if(t==='bftank') s+=1.4; }
+  if(pushing>=2){ if(t==='mgunner') s+=1.6; if(t==='flame') s+=1.4; if(t==='bazooka') s+=1.0; if(t==='bftank') s+=1.0; }
+  // a turtling army has nothing standing between the jeep and their box — that
+  // is exactly the board the runner was built for
+  if(turtle){ if(t==='mortar') s+=2.4; if(t==='bazooka') s+=1.2; if(t==='bfjeep') s+=1.4; }
+  if(heavies>=2){ if(t==='mortar') s+=1.4; if(t==='rifleman') s+=0.6; if(t==='bftank') s+=0.8; }
   if(live.some(u=>u.type==='sarge')){ if(t==='bazooka') s+=1.2; if(t==='mortar') s+=1.0; }
   if(!live.length && t==='rifleman') s+=1.2;                       // a clear lane wants runners
+  if(!live.length && t==='bfjeep') s+=1.8;                         // …and an empty lane wants the fast one
   if(mine.length>=2 && !mine.some(u=>u.type==='radioman') && t==='radioman') s+=0.5;
   return s;
 }
@@ -2428,6 +2536,46 @@ OpponentBrain.prototype.decide=function(view,budget){
   const afford=BF_TYPES.filter(t=>BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
+  // ===== THE MOTOR POOL FUND (7/25) =====
+  // This brain spends on every cooldown, so on the drip alone it would never
+  // once hold 250 tags and no computer army would EVER field a vehicle — the
+  // player would have a power item to themselves. So a seat that is comfortable
+  // (a line already on the board, nobody breaking through) occasionally stops
+  // buying and banks for one instead. That is exactly the trade a player makes,
+  // including the bad half of it: while the fund is open it reinforces NOTHING.
+  // It abandons the fund the moment somebody is actually breaking through, so
+  // this can never be baited into a collapse, and it stops at two a match.
+  // ⚠ THE GATE THAT MATTERS: it only ever shops while it is AHEAD OR LEVEL on
+  // base damage. Measured — with the fund open on every board it cost the
+  // computer army ~17% of its output, because a minute of banking is a minute
+  // of no reinforcements. Spending that minute only when it is already winning
+  // puts the whole cost in games the player was losing anyway, and leaves the
+  // close ones (the ones the ~80%-player-wins tune is about) untouched.
+  const winning = view.foeBaseHP <= view.myBaseHP;
+  // …and — the rule that took two measured passes to get right — it only ever
+  // CONVERTS A WINDFALL. It does not fast. "Can I afford it before the whistle"
+  // was the wrong question: at 3v3 all three seats answered yes, all three
+  // stopped reinforcing for eighty seconds, and the army's output went from 33
+  // to 0. The right question is "am I nearly there already", so the fund is a
+  // short top-up after a fat bounty, never a hunger strike. Drip-only estimate
+  // (bounties stop while it holds), so it under-buys rather than over-banks.
+  const drip=(BF_TICK/10)*(view.overtime?2:1)*(this.d.inc||1);
+  const canFund=(t)=>{
+    const fill=(BF_COST[t]-budget)/drip;                    // seconds of holding fire
+    return fill <= Math.min(26, view.timeLeft*0.30) && (view.timeLeft-fill) >= 30;
+  };
+  if(this.fund){
+    if(pressure || !winning || !canFund(this.fund) || (this.vehicles||0)>=2) this.fund=null;   // a breakthrough beats a shopping trip
+    else if(budget < BF_COST[this.fund]) return [];                 // still saving up — nothing else gets bought
+    else { const ft=this.fund; this.fund=null; this.vehicles=(this.vehicles||0)+1;
+      const fs=this.pickSpot(ft,theirs,mine,view);
+      if(fs) return [{ kind:'place', type:ft, x:fs.x, y:fs.y }]; }
+  } else if(!pressure && winning && own.length>=3 && (this.vehicles||0)<2 && Math.random()<(this.d.motor||0)){
+    // the tank is a long shot on a short clock; the jeep is the one an army can
+    // realistically get to, so it's the default order
+    const want=(budget>=340 && canFund('bftank') && Math.random()<0.35)? 'bftank' : 'bfjeep';
+    if(canFund(want)){ this.fund=want; return []; }
+  }
   if(!pressure && budget<this.d.hoard) return [];                  // bank for a real answer
   if(this.d.save && !pressure && budget<BF_COST.mortar && Math.random()<this.d.save) return [];
   let pick=afford[0], bs=-1e9;
@@ -2534,7 +2682,7 @@ function saberBlocks(u){
   const sw=unitSargeStats(u);
   if(sw.w!=='lightsaber') return false;
   if(sw.block && Math.random()<sw.block){
-    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHex()}); SFX.snap(); return true;
+    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHexU(u)}); bfSfx(SFX.snap,u.x); return true;
   }
   return false;
 }
@@ -2566,7 +2714,7 @@ function updateSaber(u,dt,sw){
   if(u.saberState==='idle'){
     if(u.saberCd>0) return;
     const best=saberNext(u,sw);
-    if(best){ u.saberState='out'; u.saberTarget=best; SFX.laser(); }
+    if(best){ u.saberState='out'; u.saberTarget=best; bfSfx(SFX.laser,u.x); }
     return;
   }
   if(u.saberState==='out'){
@@ -2585,8 +2733,10 @@ function updateSaber(u,dt,sw){
       if(cm>1) critFx(f);
       hurt(f,sw.dmg*vm*cm,u);                     // massive strike
       for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm*cm,u); } }  // a cleave to whatever else is close
-      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHex()});
-      SFX.laser(); S.shake=0.2; u.saberSwing=0.5;
+      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHexU(u)});
+      // twenty commanders can now draw a blade — an offscreen strike must not
+      // shove the camera around, and only YOUR Sarge gets to rock the room
+      bfSfx(SFX.laser,u.x); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5;
       const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
       if(nx){ u.saberTarget=nx; return; }
       u.saberState='back'; u.saberCd=sw.cd;
@@ -2705,16 +2855,17 @@ function buildFoeTint(hex){
 function foeImg(k){ const hex = S.invasion? S.invasion.myHex : (S.rival&&S.rival.hex); return (hex&&IMGT[hex]&&IMGT[hex][k])||IMG[k]; }
 // DYE KITS: your whole army repainted in a rival's color (shop, 20★ a color)
 const IMGU={};
-const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman'];
+const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman','bfjeep','bftank'];
 function dyeHex(){ const a=META.dyeOn&&ARMIES.find(x=>x.id===META.dyeOn); return a? a.hex : null; }
 function buildUnitTint(hex){
   if(!hex||IMGU[hex]) return;
   IMGU[hex]={};
   GREEN_UNITS.forEach(k=>{
+    const vb=(k==='bfjeep'||k==='bftank')?'0 0 140 140':'0 0 120 140';   // the vehicles ride a wider box
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
     im.onload=()=>{ IMGU[hex][k]=im; };
-    im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>');
+    im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+body+'</svg>');
   });
 }
 function unitImg(k,u){
@@ -2729,6 +2880,9 @@ function unitImg(k,u){
   const hx=dyeHex(); return (hx&&IMGU[hx]&&IMGU[hx][k])||IMG[k];
 }
 const BF_ME={side:'you',seat:0};        // for tray cards and the dragged figure
+// how big a figure is drawn on the carpet — one answer, so the man, his ghost
+// and his corpse are always the same size (the vehicles dwarf the infantry)
+function unitW(t){ return t==='bftank'? 92 : t==='bfjeep'? 76 : t==='mortar'? 58 : 54; }
 // the veteran stripe has to contrast with whatever colour that army is wearing
 function vetStripe(){ const h=S.invasion? S.invasion.theirHex : dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
 function spawnGroup(g){
@@ -3568,8 +3722,14 @@ function update(dt){
           const mzx=u.x+48, mzy=u.y-37;                          // the muzzle, where drawSargeWeapon leaves the barrel
           const htx=best.x, hty=best.y-18;
           const ang=Math.atan2(hty-mzy,htx-mzx);
-          bfSfx(SFX.crack, u.x); S.shake=RM?0.05:0.34;
-          if(!RM && !S.coop) S.hitStop=0.07;                     // the punch — never in co-op: two sims, one clock
+          // 7/25: the armory roll means a 10v10 can field a dozen snipers. The
+          // whole visual read (flash, tracer, slug, rings, dust) stays on every
+          // one of them — but SHAKE and HIT-STOP are player feedback, and are
+          // yours alone. A dozen commanders taking turns freezing your clock
+          // would be a stutter, not a punch.
+          const mine=bfHumanU(u);
+          bfSfx(SFX.crack, u.x); if(mine) S.shake=RM?0.05:0.34;
+          if(mine && !RM && !S.coop) S.hitStop=0.07;             // the punch — never in co-op: two sims, one clock
           u.snipeT=SNIPE_KICK;                                   // the barrel rocks back on the figure
           S.floats.push({x:mzx+16,y:mzy-16,txt:'CRACK!',t:0,col:'#FFF3C4'});
           // MUZZLE: a wisp of smoke off the barrel with the star flash ON TOP of it
@@ -3638,7 +3798,20 @@ function update(dt){
       continue;
     }
     const mzl=(S.bf&&u.side==='foe')?-1:1;         // muzzles point the way the figure faces
-    if(u.type==='bazooka'){
+    if(u.type==='bftank'){
+      // THE CANNON: flat, fast and nearly on the money — it reuses the rocket
+      // pipeline, just with a fraction of the bazooka's scatter and no anti-
+      // vehicle bonus. A visible tank rocks the room a little when it fires;
+      // one offscreen does not (twenty seats' worth of shake would be a mess).
+      bfSfx(SFX.boom, u.x);
+      if(bfVis(u.x) && !reducedMotion()) S.shake=Math.max(S.shake,0.11);
+      const a=Math.random()*6.283, r=Math.random()*def.scatter;
+      const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
+      const mzx=u.x+42*mzl, mzy=u.y-44;
+      S.fx.push({k:'puff',x:mzx,y:mzy,t:0,dur:0.4,R:14});                 // smoke first — fx draw in PUSH order,
+      S.fx.push({k:'flash',x:mzx,y:mzy,ang:Math.atan2(ty-mzy,tx-mzx),R:20,lw:3.2,t:0,dur:0.13});   // so the flash sits on top of it
+      S.shots.push({k:'rocket',x:mzx,y:mzy,tx,ty,spd:520,dmg,splash:def.splash,vx2:false,src:u});
+    } else if(u.type==='bazooka'){
       bfSfx(SFX.rocket, u.x);
       // dumb-fire: he shoots where they WERE, roughly. It's a big rocket.
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
@@ -3729,8 +3902,8 @@ function hitCheck(f,u){
     if(f.dead || f.hp>0) return;
     f.dead=true;
     if(u && u.kills!=null){ u.kills++; noteAce(u); }
-    S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(Math.random()<0.5?-1.83:1.83),
-      w:(f.type==='mortar'?58:54), img:unitImg(f.type,f), flip:(f.side==='foe') });
+    S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)),
+      w:unitW(f.type), img:unitImg(f.type,f), flip:(f.side==='foe') });
     if(S.corpses.length>90) S.corpses.shift();
     // his dog tag goes to whoever'S SEAT got him — yours as a collectible blob,
     // an AI seat's straight into that purse
@@ -3738,7 +3911,9 @@ function hitCheck(f,u){
     const st=(u && u.seat!=null && S.bf)? S.bf.seats[u.seat] : null;
     if(st && st.human){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
     else if(st) st.purse+=v;
-    bfSfx(SFX.clack, f.x);
+    // a man clatters over; a vehicle goes up (same beat the campaign gives them)
+    if(f.def.vehicle){ bfSfx(SFX.boom, f.x); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
+    else bfSfx(SFX.clack, f.x);
     return;
   }
   if(f.hp<=0){
@@ -4022,7 +4197,10 @@ function draw(){
   if(S.drag){
     const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?'you':undefined);
     const def=UDEF[S.drag.type];
-    ring(S.drag.x,S.drag.y,def.minRng?200:def.rng, ok?'rgba(255,255,255,0.10)':'rgba(166,59,42,0.15)', ok?'rgba(255,255,255,0.7)':'rgba(220,90,70,0.9)');
+    // the jeep has no reach to show, so it shows its bumper instead — a 250-tag
+    // drop with no ring under it reads as a dead card
+    const rr2=def.minRng?200:(def.rng||(def.ram?def.ramR*1.7:0));
+    ring(S.drag.x,S.drag.y,rr2, ok?'rgba(255,255,255,0.10)':'rgba(166,59,42,0.15)', ok?'rgba(255,255,255,0.7)':'rgba(220,90,70,0.9)');
   }
 
   // the fallen (under everything alive)
@@ -4082,7 +4260,7 @@ function draw(){
   for(const fl of S.floats){ cx.globalAlpha=Math.min(1,2-fl.t*1.8); cx.font='bold 19px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=fl.col; cx.textAlign='center'; cx.fillText(fl.txt,fl.x,fl.y); cx.globalAlpha=1; }
 
   // dragged unit on top
-  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,S.drag.type==='mortar'?58:54,0,0,unitImg(S.drag.type,S.bf?BF_ME:null));
+  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?BF_ME:null));
     cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(S.drag.x+26,S.drag.y+30,60,24,0.4,0,7); cx.fill(); cx.globalAlpha=1; }
 
   cx.restore();
@@ -4221,7 +4399,7 @@ function ring(x,y,r,fill,stroke){
   cx.strokeStyle=stroke; cx.lineWidth=2.5; cx.setLineDash([8,8]); cx.beginPath(); cx.arc(x,y,r,0,7); cx.stroke(); cx.setLineDash([]);
 }
 function drawUnit(u){
-  const w=u.type==='mortar'?58:54, im=unitImg(u.type,u);
+  const w=unitW(u.type), im=unitImg(u.type,u);
   if(S.bf){ drawBFUnit(u,w,im); return; }
   if(u.down){
     drawSprite(u.type,u.x,u.y,w,-1.36,0,im);
@@ -4262,19 +4440,25 @@ function drawBFUnit(u,w,im){
     return;
   }
   // on the march he waddles like the campaign armies do; halted he settles
-  // into the gentle idle sway — the difference is what makes the field read
-  drawSprite(u.type,u.x,u.y,w,0, u.marching? Math.sin(S.t*7+u.phase)*0.05 : Math.sin(S.t*2.2+u.phase)*0.024, im, flip);
+  // into the gentle idle sway — the difference is what makes the field read.
+  // A vehicle does NEITHER: a rocking chassis reads as broken, not alive (the
+  // campaign's drawFoe has zeroed the wobble on jeeps and tanks since v0.2).
+  const wob = u.def.vehicle? 0 : (u.marching? Math.sin(S.t*7+u.phase)*0.05 : Math.sin(S.t*2.2+u.phase)*0.024);
+  drawSprite(u.type,u.x,u.y,w,0, wob, im, flip);
   if(u.type==='sarge') drawSargeWeapon(u);
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
-    cx.fillStyle='rgba(0,0,0,0.45)'; cx.fillRect(u.x-15,u.y-60,30,4);
+    // a man's bar clears his helmet at 60; a tank is taller than that, so the
+    // vehicles get theirs lifted off the hull (same rule drawFoe uses)
+    const bo=u.def.vehicle? Math.min(84, w*0.95) : 60;
+    cx.fillStyle='rgba(0,0,0,0.45)'; cx.fillRect(u.x-15,u.y-bo,30,4);
     cx.fillStyle=(u.side==='you'? (k>0.4?'#7FA35C':'#D96A55') : (k>0.4?'#D2B489':'#8a2f26'));
-    cx.fillRect(u.x-15,u.y-60,30*k,4);
+    cx.fillRect(u.x-15,u.y-bo,30*k,4);
   }
 }
 // show what Sarge is packing, right on the figure
 function drawSargeWeapon(u){
-  const w=(S.bf && !bfHumanU(u))? 'pistol' : META.sargeWeapon;   // every AI Sarge carries the sidearm
+  const w=unitSargeStats(u).w;   // yours = what you equipped; theirs = what they drew from the crate
   if(w==='shotgun'){ cx.strokeStyle='#3a2c1c'; cx.lineWidth=5.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+4,u.y-30); cx.lineTo(u.x+30,u.y-33); cx.stroke(); cx.strokeStyle='#5a4a34'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(u.x+18,u.y-32); cx.lineTo(u.x+30,u.y-33); cx.stroke(); }
   else if(w==='sniper'){
     // the long rifle — and its KICK: for a beat after a shot the barrel rocks
@@ -4289,7 +4473,7 @@ function drawSargeWeapon(u){
   }
   else if(w==='lightsaber'){
     const dashing=(u.saberState==='out'||u.saberState==='back');
-    const col=saberHex(), len=dashing?38:32, ang=dashing?-0.98:-0.52;
+    const col=saberHexU(u), len=dashing?38:32, ang=dashing?-0.98:-0.52;
     const hx=u.x+8, hy=u.y-22;                              // the hand
     const gx=hx-Math.cos(ang)*6, gy=hy-Math.sin(ang)*6;     // grip end
     const bx=hx+Math.cos(ang)*3, by=hy+Math.sin(ang)*3;     // blade emitter
@@ -5711,7 +5895,8 @@ window.GVT = {
   bfSnap(){ if(!S.bf) return null; const b=S.bf;
     return { map:b.mapId, team:b.team, phase:b.phase, t:+b.timeLeft.toFixed(1), ot:b.ot, resolved:b.resolved,
       worldW:WORLD_W, purse:{you:S.plastic, foe:b.seats[b.team].purse}, diff:b.ai.diff, rival:b.rival.id,
-      seats:b.seats.map(st=>({i:st.i,name:st.name,team:st.team,hex:st.hex,human:st.human,purse:st.human?S.plastic:st.purse})),
+      seats:b.seats.map(st=>({i:st.i,name:st.name,team:st.team,hex:st.hex,human:st.human,purse:st.human?S.plastic:st.purse,
+        sw:st.human? sargeStats().w : (st.kit&&st.kit.w)})),
       baseHP:{you:b.base.you.hp, foe:b.base.foe.hp},
       razed:{you:b.base.foe.dmgTaken, them:b.base.you.dmgTaken},
       cam:Math.round(b.cam.x), vw:Math.round(VW), corpses:S.corpses.length,
