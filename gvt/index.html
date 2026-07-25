@@ -325,10 +325,18 @@ const BF_MAPS = [
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
 // decisions, never resources. blunderP is the humanizing dial.
+// Softened 7/24 (Wyatt: "players should win ~80% — not a pushover"). Measured
+// with a sensible-player harness: decision knobs alone barely moved win rates
+// (the AI's teeth are interception placement + economy parity), so the real
+// levers are `inc` (enemy-team passive income, the spec's sanctioned handicap)
+// and `wildP` (chance a placement ignores the lane logic entirely).
+// Measured vs the harness (win% for a sensible player, n=14/14/12): easy 79%,
+// medium 79%, hard 33%. HARD is the pre-tune AI verbatim — Wyatt: today's
+// difficulty "is okay as a hard opponent" — parked at 1200★ where it belongs.
 const BF_AI = {
-  easy:   { every:2.5, hoard:0,   counterWeight:0.1, blunderP:0.35, safeDrop:false, save:0,    focus:'center' },
-  medium: { every:1.6, hoard:100, counterWeight:0.5, blunderP:0.15, safeDrop:true,  save:0.25, focus:'weak'   },
-  hard:   { every:0.9, hoard:160, counterWeight:1.0, blunderP:0.0,  safeDrop:true,  save:0.5,  focus:'focus'  }
+  easy:   { every:3.4, hoard:0,   counterWeight:0.05, blunderP:0.5,  safeDrop:false, save:0,   focus:'center', inc:0.7,  wildP:0.5  },
+  medium: { every:2.3, hoard:60,  counterWeight:0.25, blunderP:0.32, safeDrop:true,  save:0.1, focus:'weak',   inc:0.82, wildP:0.32 },
+  hard:   { every:0.9, hoard:160, counterWeight:1.0,  blunderP:0.0,  safeDrop:true,  save:0.5, focus:'focus',  inc:1.0,  wildP:0    }
 };
 // the daily rival's colour ALSO picks how they fight — a free themed opponent
 const BF_PERSONA = {
@@ -863,7 +871,9 @@ function bfTerrain(map){
   const rivers=(half.rivers||[]).map(rv=>({x:rv.x,w:rv.w,bridges:rv.bridges.map(b=>({y:b.y,bw:b.bw}))}));
   return { rocks, river:null, rivers };
 }
-function bfDifficulty(){ return META.starsLifetime>=500?'hard' : META.starsLifetime>=100?'medium' : 'easy'; }
+// slower ramp (7/24): 25★ wins climb the ladder fast, so hard sits far out —
+// most players live on easy/medium, which are tuned for ~80% player wins
+function bfDifficulty(){ return META.starsLifetime>=1200?'hard' : META.starsLifetime>=250?'medium' : 'easy'; }
 
 // ================= BATTLEFIELD: SEATS (1v1 – 10v10) =================
 // Every combatant belongs to a SEAT — an owner with a name, a colour, a purse
@@ -1267,8 +1277,9 @@ function bfTick(dt){
   // faster — symmetric, so it never reads as the computer cheating.
   const otm=bf.ot?2:1;
   const boost={ you:(my<th?1.25:1), foe:(th<my?1.25:1) };
+  const inc=(BF_AI[bf.ai.diff]||{}).inc||1;        // the one visible handicap: enemy passive ticks slower on lower tiers
   for(const st of bf.seats){
-    st.tagT += dt*otm*boost[st.team];
+    st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc : 1);
     if(st.tagT>=10){ st.tagT-=10;
       if(st.human){ S.plastic+=BF_TICK;
         S.floats.push({x:bf.base.you.x+46,y:bf.base.you.y-72,txt:'+'+BF_TICK,t:0,col:'#FFF3C4'}); }
@@ -1394,6 +1405,10 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
       if(s>bs){ bs=s; focusY=y; }
     }
   }
+  // a wild placement ignores the lane read entirely — the humanizing miss that
+  // actually moves win rates (a blundered UNIT still lands in the right lane;
+  // a blundered LANE is what a player can punish)
+  if(this.d.wildP && Math.random()<this.d.wildP) focusY=110+Math.random()*(H-220);
   // a team seat leans toward its own slice of the front; interception still
   // pulls it off-lane when someone is genuinely breaking through
   if(view && view.laneBias!=null) focusY = focusY*0.55 + view.laneBias*0.45;
