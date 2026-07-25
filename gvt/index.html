@@ -729,7 +729,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.15</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.16</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1205,6 +1205,15 @@ function waveFromKey(key, m, R){
 // trigger fingers. You'll take hits — grit soaks 3 before a knockdown —
 // but a decent line wins the firefight. (Wyatt 7/21: "slightly stronger
 // to start... maybe you'll lose one unit at the start.")
+// THE SIDEARM'S CADENCE (7/25, Wyatt): "increase the firing speed of the pistol
+// by 70%... when leveled it improves its attackspeed by 5%". Base 1.8 → 3.06
+// shots/s, and every promotion rank compounds another +5% on top (rank 5 =
+// ×1.276, ~3.9 shots/s). Damage still rides the SARGE unit promotion (upMul,
+// +10%/rank) — the two stack, one on the gun, one on the man. Lives here rather
+// than in SARGE_WEAPONS because UDEF.sarge (the unit table) needs it too and is
+// built first; sargeStats()/bfSargeKit()/BF_AI_SARGE all read it back.
+const PISTOL_RATE = 1.8*1.7;
+function pistolRate(r){ return PISTOL_RATE*Math.pow(1.05, r||0); }
 const UDEF = {
   // 7/24 balance: rifleman reach +10% (165) — and the TAN rifle now matches it
   // (FDEF rng 165), so both shoot from about the same distance; the tan just
@@ -1214,7 +1223,7 @@ const UDEF = {
   mgunner: { rng:109, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
   bazooka: { rng:150, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },
   mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },
-  sarge:   { rng:108, rate:1.8, dmg:1.5, air:true,  grit:4, name:'SARGE' },
+  sarge:   { rng:108, rate:PISTOL_RATE, dmg:1.5, air:true,  grit:4, name:'SARGE' },
   minesweeper:{ rng:130, rate:0.167, dmg:0, air:false, grit:3, name:'SWEEPER', mine:true },
   flame:   { rng:85,  rate:8,   dmg:0.5, air:false, grit:3, name:'FLAME', multi:3 },
   radioman:{ rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'RADIO', auraR:120, auraMul:1.25 },
@@ -1249,10 +1258,13 @@ const BOSSDEF = {
 // specials unlock as the campaign rolls on and each has its own upgrade rank
 // (META.sargeUp), chosen at the promotion picker once unlocked.
 const SARGE_WEAPONS = {
-  pistol:    { name:'SERVICE PISTOL', unlock:0,  desc:'His trusty sidearm — steady, reliable, always there.' },
+  pistol:    { name:'SERVICE PISTOL', unlock:0,  desc:'His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up again.' },
   shotgun:   { name:'SHOTGUN',        unlock:5,  desc:'A hair less reach than the pistol, but a wide cone that flattens a whole cluster at once.' },
   sniper:    { name:'SNIPER RIFLE',   unlock:10, desc:'The longest reach on the carpet (408) and a hit like a truck — you hear the crack from the doorway. But a long, slow reload.' },
-  lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' }
+  // 7/25 (Wyatt): it is called the SABER everywhere a player can read it. The
+  // internal key stays 'lightsaber' — it is threaded through saves, the coop
+  // wire and the armory roll, and none of that is player-facing.
+  lightsaber:{ name:'SABER',          unlock:12, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' }
 };
 const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber'];
 const SNIPE_KICK=0.22;   // how long the long rifle rocks back on the figure after a shot
@@ -1271,7 +1283,10 @@ function sargeStats(){
   // 7/25 (Wyatt): +20% reach on top of that — 340 → 408, the longest gun on the carpet
   if(w==='sniper')     return { w, r, rng:408, rate:0.22*1.3*(1+0.02*r), dmg:9+3*r };
   if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*r, cd:2.1, block:Math.min(0.75,0.34+0.09*r) };
-  return { w:'pistol', r, rng:108, rate:1.8, dmg:1.5 };   // default; unit-upgrade mult applied on the default path
+  // the sidearm: 70% faster than it used to be, +5% a rank on top of that (see
+  // PISTOL_RATE). Damage still comes off the SARGE unit's upMul on the default
+  // firing path, which is where the pistol lands.
+  return { w:'pistol', r, rng:108, rate:pistolRate(r), dmg:1.5 };
 }
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 const T = { x:130, y:300 };           // the Toy Box
@@ -2179,7 +2194,7 @@ function TGT(u){ return S.bf ? bfEnemies(u.side) : S.foes; }
 function PRIO(u,f){ return S.bf ? Math.hypot(u.x-f.x,u.y-f.y) : Math.hypot(T.x-f.x,T.y-f.y); }
 // the AI's Sarge carries the service pistol; YOURS (seat 0 — the human, on any
 // team size) carries whatever you equipped. Teammate seats are AI too.
-const BF_AI_SARGE={ w:'pistol', r:0, rng:108, rate:1.8, dmg:1.5 };
+const BF_AI_SARGE={ w:'pistol', r:0, rng:108, rate:PISTOL_RATE, dmg:1.5 };
 // ===== THE ARMORY ROLL (Wyatt 7/25) =====
 // Every OTHER commander on the field draws his Sarge's weapon out of the same
 // crate, once, when the seats are dealt. Weighted so the blade stays the thing
@@ -2204,7 +2219,7 @@ function bfSargeKit(w){
   if(w==='sniper')     return { w, r:0, rng:408, rate:0.22*1.3, dmg:9 };
   if(w==='lightsaber') return { w, r:0, aggro:175, dmg:7, cd:2.1, block:0.34,
                                 saber:SABER_COLORS[(Math.random()*SABER_COLORS.length)|0].hex };
-  return { w:'pistol', r:0, rng:108, rate:1.8, dmg:1.5 };
+  return { w:'pistol', r:0, rng:108, rate:PISTOL_RATE, dmg:1.5 };   // the drawn sidearm is fast too; the +5%/rank is yours alone
 }
 function bfHumanU(u){ return !S.bf || u.seat===0; }
 function unitSargeStats(u){
@@ -3849,13 +3864,18 @@ function update(dt){
       }
     }
     const def=u.def;
-    if(def.rate===0) continue;              // radioman: all antenna, no rifle
+    // Anyone still here with a Sarge is holding the SIDEARM (every other weapon
+    // has already been dealt with and continued out above). His cadence comes off
+    // the WEAPON table, not the unit table — that's where his +5%-a-rank attack
+    // speed lives. An ally's relayed loadout carries their own rank across.
+    const rate=(u.type==='sarge')? (unitSargeStats(u).rate||def.rate) : def.rate;
+    if(rate===0) continue;                  // radioman: all antenna, no rifle
     u.cd-=dt;
     if(u.cd>0) continue;
     // minesweeper: plants mines instead of shooting
     if(def.mine){
       if(S.mines.filter(mn=>mn.owner===u.id).length<3){
-        u.cd=1/def.rate;
+        u.cd=1/rate;
         // he seeds the ground AHEAD of himself — which way that is depends on the side
         const dir=(S.bf && u.side==='foe')? -1 : 1;
         const mx=u.x+dir*(40+Math.random()*70);
@@ -3880,7 +3900,7 @@ function update(dt){
       if(def.multi) extra.push(f);
     }
     if(!best) continue;
-    u.cd=1/def.rate;
+    u.cd=1/rate;
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
     const dmg = def.dmg * (u.vet?1.5:1) * ((S.bf&&!bfHumanU(u))?1:(u.coopUM!=null?u.coopUM:upMul(u.type)));
@@ -4900,7 +4920,7 @@ const CLASSINFO = {
   mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close. One burst in twenty CRITs for double damage (+1% per rank).', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
   bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and those blasts knock down your own men. Give them room.' },
   mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
-  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast. His shots CRIT for double damage — and every rank adds +5% to the odds.', bad:'Pistol range only. And there is only ever one Sarge.' },
+  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast. His sidearm is the fastest trigger in the army, and every rank adds +10% damage, +5% rate of fire and +5% to his CRIT odds (double damage).', bad:'Pistol range only. And there is only ever one Sarge.' },
   minesweeper:{ good:'Seeds the carpet with firecracker mines — brutal on lanes, bridges and choke points.', bad:'Never fires a shot, and mines flip your own men too if they wander in.' },
   flame:      { good:'Torches 3 enemies at once and cooks crawler packs. Nothing shrugs this off.', bad:'Arm\'s-reach range (85). If they\'re not close, that is just a soldier carrying soup.' },
   radioman:   { good:'+25% range to every soldier standing nearby — a whole squad upgrade in one figure.', bad:'All antenna, no rifle. Cannot return fire at all, so guard them.' }
