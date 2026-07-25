@@ -298,7 +298,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.6.2</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.7</div>
   <div class="scanlines"></div>
 </div>
 
@@ -419,18 +419,46 @@ const BF_MOVE = {
 };
 for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE);
 // The four maps. Each generator builds the LEFT half and the loader mirrors it
-// across x=960, so both armies always fight the same ground.
+// across MID, so both armies always fight the same ground. Coords are authored
+// MID-relative where the feature belongs to the middle of the war (so 10v10's
+// wider carpet keeps the set piece at the front line, not stranded in a corner).
+// Terrain kit: rocks (block+shoulder; art:'cup'/'block' reskins), rivers (cross
+// at bridges only; y0/y1 bound the water, open:true bridges are dry gaps),
+// ponds (wade through at 0.42x speed), tracks (race track — 1.35x speed),
+// balls (wrecking balls that patrol y0..y1 and plow everyone aside).
 const BF_MAPS = [
-  { id:'open', name:'OPEN CARPET', blurb:'No cover anywhere. A pure line-push — flanks are wide open and a fast runner can go all the way.',
-    build:()=>({ rocks:[], rivers:[] }) },
-  { id:'spill', name:'THE SPILL', blurb:'A tipped-over cup in each half. Lanes choke down; the mortar lobs clean over it.',
-    build:()=>({ rocks:[{x:470,y:300,r:74}], rivers:[] }) },
+  { id:'open', name:'OPEN CARPET', blurb:'The toy bin tipped over everything. One clean lane is left — and the wrecking balls roll right across it. Time your push.',
+    build:()=>({ rocks:[
+        {x:MID-608,y:118,r:34,art:'block',ltr:'G',bc:'#C0483B'},
+        {x:MID-440,y:96, r:33,art:'block',ltr:'V',bc:'#4E7FA8'},
+        {x:MID-270,y:132,r:35,art:'block',ltr:'T',bc:'#6E8F4E'},
+        {x:MID-114,y:98, r:33,art:'block',ltr:'A',bc:'#C7913B'},
+        {x:MID-522,y:210,r:34,art:'block',ltr:'B',bc:'#6E8F4E'},
+        {x:MID-350,y:218,r:33,art:'block',ltr:'K',bc:'#C0483B'},
+        {x:MID-172,y:206,r:34,art:'block',ltr:'E',bc:'#4E7FA8'},
+        {x:MID-592,y:396,r:34,art:'block',ltr:'R',bc:'#C7913B'},
+        {x:MID-420,y:452,r:35,art:'block',ltr:'O',bc:'#4E7FA8'},
+        {x:MID-254,y:392,r:33,art:'block',ltr:'W',bc:'#C0483B'},
+        {x:MID-96, y:458,r:34,art:'block',ltr:'N',bc:'#6E8F4E'} ],
+      rivers:[], balls:[ {x:MID-192,y0:150,y1:452,r:46,spd:56} ] }) },
+  { id:'spill', name:'THE SPILL', blurb:'The juice cup finally went over. Bridge the stream, wade the slow pond or loop the dry bank — wrecking balls patrol the middle.',
+    build:()=>({ rocks:[ {x:MID-400,y:112,r:48,art:'cup'} ],
+      rivers:[ {x:MID-426,w:52,y0:138,y1:398,col:'#7A4E8E',col2:'#9C6FB2',
+                bridges:[{y:252,bw:82},{y:472,bw:96,open:true}]} ],
+      ponds:[ {x:MID-400,y:406,rx:96,ry:50,duck:true,col:'#7A4E8E',col2:'#9C6FB2'} ],
+      balls:[ {x:MID-110,y0:170,y1:432,r:40,spd:52} ] }) },
   { id:'crossing', name:'THE CROSSING', blurb:'A spill from the fish tank splits the carpet. Two popsicle bridges — hold one and you hold the match.',
     build:()=>({ rocks:[{x:330,y:150,r:34},{x:330,y:452,r:34}],
                  rivers:[{x:MID-36,w:72,bridges:[{y:172,bw:78},{y:428,bw:78}]}] }) },
-  { id:'stone', name:'STONE ROW', blurb:'Staggered stones the whole way across. Cover everywhere, lanes everywhere — flame and MG own the gaps.',
-    build:()=>({ rocks:[{x:250,y:190,r:30},{x:250,y:410,r:30},{x:420,y:300,r:32},
-                        {x:590,y:170,r:28},{x:590,y:430,r:28},{x:760,y:300,r:30}], rivers:[] }) }
+  { id:'stone', name:'STONE ROW', blurb:'Pebbles and boulders litter the middle — pick a seam and weave, or floor it down the race track flank.',
+    build:()=>({ rocks:[
+        {x:MID-710,y:180,r:30},{x:MID-710,y:420,r:30},{x:MID-540,y:300,r:32},
+        {x:MID-370,y:160,r:28},{x:MID-370,y:436,r:27},{x:MID-200,y:300,r:30},
+        {x:MID-610,y:100,r:22},{x:MID-260,y:104,r:23},
+        {x:MID-625,y:252,r:14},{x:MID-458,y:214,r:13},{x:MID-462,y:386,r:14},
+        {x:MID-295,y:296,r:13},{x:MID-192,y:182,r:12},{x:MID-622,y:344,r:13},
+        {x:MID-105,y:392,r:14},{x:MID-55,y:120,r:12} ],
+      rivers:[], tracks:[ {x0:120,x1:MID,y:487,h:38} ] }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
 // decisions, never resources. blunderP is the humanizing dial.
@@ -1093,13 +1121,27 @@ function hexNear(a,b){
   return Math.abs(x[0]-y[0])+Math.abs(x[1]-y[1])+Math.abs(x[2]-y[2]) < 90;
 }
 function bfMap(id){ return BF_MAPS.find(m=>m.id===id)||BF_MAPS[0]; }
-// a map generator builds the LEFT half; everything mirrors across x=960 so both
-// armies always fight the exact same ground (and every existing rock loop works)
+// a map generator builds the LEFT half; everything mirrors across MID so both
+// armies always fight the exact same ground (and every existing rock loop works).
+// A feature that already straddles the middle IS its own mirror — stamp it once.
 function bfTerrain(map){
   const half=map.build();
-  const rocks=half.rocks.concat(half.rocks.map(r=>({x:WORLD_W-r.x,y:r.y,r:r.r})));
-  const rivers=(half.rivers||[]).map(rv=>({x:rv.x,w:rv.w,bridges:rv.bridges.map(b=>({y:b.y,bw:b.bw}))}));
-  return { rocks, river:null, rivers };
+  const rocks=(half.rocks||[]).flatMap(r=> Math.abs((WORLD_W-r.x)-r.x)<1 ? [{...r}] : [{...r},{...r,x:WORLD_W-r.x}]);
+  const rivers=(half.rivers||[]).flatMap(rv=>{
+    const a={...rv, bridges:rv.bridges.map(b=>({...b}))};
+    const mx=WORLD_W-rv.x-rv.w;
+    return Math.abs(mx-rv.x)<1 ? [a] : [a, {...a, x:mx, bridges:rv.bridges.map(b=>({...b}))}];
+  });
+  const ponds=(half.ponds||[]).flatMap(p=> Math.abs((WORLD_W-p.x)-p.x)<1 ? [{...p}] : [{...p},{...p,x:WORLD_W-p.x}]);
+  const balls=(half.balls||[]).flatMap(b=>{
+    const a={...b, y:b.y0, dir:1, roll:0};
+    return Math.abs((WORLD_W-b.x)-b.x)<1 ? [a] : [a, {...a, x:WORLD_W-b.x}];
+  });
+  const tracks=(half.tracks||[]).flatMap(t=>{
+    const m={...t, x0:WORLD_W-t.x1, x1:WORLD_W-t.x0};
+    return (Math.abs(m.x0-t.x0)<1 && Math.abs(m.x1-t.x1)<1) ? [{...t}] : [{...t}, m];
+  });
+  return { rocks, river:null, rivers, ponds, balls, tracks };
 }
 // slower ramp (7/24): 25★ wins climb the ladder fast, so hard sits far out —
 // most players live on easy/medium, which are tuned for ~80% player wins
@@ -1420,9 +1462,32 @@ function bfAggro(u){
   if(u.def.rng>=9000) return 260;            // the mortar would "see" the whole world and never advance
   return u.def.rng || u.def.auraR || 120;    // the radioman halts with the line he is buffing
 }
+// the ground underfoot, checked on the march only (diggers-in hold their spot):
+// pond juice slows him to a wade, the race track flank doubles his hustle
+function bfGround(u){
+  let m=1, wet=false;
+  for(const p of (S.cfg.terrain.ponds||[])){
+    const nx=(u.x-p.x)/p.rx, ny=(u.y-p.y)/p.ry;
+    if(nx*nx+ny*ny<1){ m=0.42; wet=true;
+      if(!u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:20,t:0,dur:0.4,col:p.col2||'#6E9DC4'});
+      break; }
+  }
+  if(!wet){
+    if(u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:16,t:0,dur:0.3,col:'rgba(237,234,223,0.7)'});
+    for(const tk of (S.cfg.terrain.tracks||[])){
+      if(u.y>tk.y-tk.h/2 && u.y<tk.y+tk.h/2 && u.x>tk.x0 && u.x<tk.x1){
+        m=1.35;
+        if(Math.random()<0.06) S.fx.push({k:'puff',x:u.x+(u.side==='you'?-14:14),y:u.y-4,t:0,dur:0.25,R:9});
+        break; }
+    }
+  }
+  u.wet=wet;
+  return m;
+}
 function bfMarch(u,dt,goal){
   let gx=goal.x, gy=goal.y;
-  // a river funnels everyone onto a popsicle bridge
+  // a river funnels everyone onto a popsicle bridge (an open "bridge" is just
+  // the dry bank below the pond — same funnel, no planks)
   for(const rv of (S.cfg.terrain.rivers||[])){
     const mid=rv.x+rv.w/2;
     if((u.x<mid)!==(gx<mid)){
@@ -1432,10 +1497,14 @@ function bfMarch(u,dt,goal){
       gy = br.y;
     }
   }
-  const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1);
+  const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u);
   u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt;
   for(const rk of S.cfg.terrain.rocks){          // rocks shoulder him aside (reused kernel)
     const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+16;
+    if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
+  }
+  for(const bl of (S.cfg.terrain.balls||[])){    // the wrecking ball is a rock that's going places
+    const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
   }
   u.y=Math.max(74,Math.min(H-96,u.y));
@@ -1515,6 +1584,22 @@ function bfTick(dt){
     bf.cam.vx*=Math.pow(0.02,dt);
     if(Math.abs(bf.cam.vx)<8 || bf.cam.x<=0 || bf.cam.x>=WORLD_W-VW) bf.cam.vx=0;
   }
+  // toy wrecking balls patrol their beat — anyone in the way gets plowed aside
+  // (standing, firing, doesn't matter; only spawn ghosts and the fallen escape)
+  for(const bl of (S.cfg.terrain.balls||[])){
+    bl.y+=bl.dir*bl.spd*dt;
+    if(bl.y>=bl.y1){ bl.y=bl.y1; bl.dir=-1; } else if(bl.y<=bl.y0){ bl.y=bl.y0; bl.dir=1; }
+    bl.roll=(bl.roll||0)+bl.dir*bl.spd*dt/bl.r;
+    for(const u of S.units){
+      if(u.dead||u.dropT>0) continue;
+      const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
+      if(dd>0.1&&dd<min){
+        u.x+=ax/dd*(min-dd)*Math.min(1,dt*10); u.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
+        u.y=Math.max(74,Math.min(H-96,u.y));
+        if(u.home){ u.home.x=u.x; u.home.y=u.y; }
+      }
+    }
+  }
   if(bf.resolved||bf.ending) return;
   bf.timeLeft-=dt;
   const secs=Math.max(0,Math.ceil(bf.timeLeft));
@@ -1575,7 +1660,8 @@ function buildBFView(dt, st){
   return { dt, timeLeft:bf.timeLeft, phase:bf.phase, overtime:bf.ot,
     myBaseHP:mine.hp, foeBaseHP:theirs.hp, myPurse:st.purse, mySeat:st.i, laneBias:st.laneBias,
     cp:(x,y,t)=>canPlace(Math.round(mir? WORLD_W-x : x), Math.round(y), t, st.team),
-    units, map:{ width:WORLD_W, rocks:S.cfg.terrain.rocks, rivers:S.cfg.terrain.rivers } };
+    units, map:{ width:WORLD_W, rocks:S.cfg.terrain.rocks, rivers:S.cfg.terrain.rivers,
+                 ponds:S.cfg.terrain.ponds||[], balls:S.cfg.terrain.balls||[], tracks:S.cfg.terrain.tracks||[] } };
 }
 function bfCounter(t,mine,theirs){
   const live=theirs.filter(u=>u.dropT<=0);
@@ -1665,7 +1751,7 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   if(view && view.laneBias!=null) focusY = focusY*0.55 + view.laneBias*0.45;
   const back=(type==='mortar'||type==='bazooka'||type==='mgunner');
   let best=null, bs=-1e9;
-  for(let i=0;i<16;i++){
+  for(let i=0;i<24;i++){          // 24 tries, not 16 — the strewn maps eat candidates
     const x=Math.round(lo+Math.random()*(hi-lo));
     const spread=(this.d.focus==='focus'?110:(this.d.focus==='weak'?190:300));
     const y=Math.round(Math.max(92,Math.min(H-108, focusY+(Math.random()-0.5)*spread)));
@@ -1810,8 +1896,13 @@ function canPlace(x,y,type,side){
     const s=side||'you';
     if(s==='you' && x>MID-MID_BUFFER) return false;
     if(s==='foe' && x<MID+MID_BUFFER) return false;
-    for(const rv of (S.cfg.terrain.rivers||[])){ if(x>rv.x-16 && x<rv.x+rv.w+16) return false; }
+    for(const rv of (S.cfg.terrain.rivers||[])){
+      if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:H-56)+16) return false; }
     for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
+    for(const p of (S.cfg.terrain.ponds||[])){
+      const nx=(x-p.x)/(p.rx+12), ny=(y-p.y)/(p.ry+12); if(nx*nx+ny*ny<1) return false; }
+    for(const bl of (S.cfg.terrain.balls||[])){    // his whole beat is off-limits, not just where he is now
+      if(Math.abs(x-bl.x)<bl.r+16 && y>bl.y0-bl.r-16 && y<bl.y1+bl.r+16) return false; }
     for(const u of S.units){ if(!u.dead && u.side===s && Math.hypot(u.x-x,u.y-y)<34) return false; }
     return true;
   }
@@ -2566,16 +2657,60 @@ function drawRug(){
     cx.strokeStyle='#D9C4A0'; cx.lineWidth=70; pathStroke();
     cx.globalAlpha=1;
   }
-  // battlefield rivers: the same spilled fish tank, mirrored, with two bridges
+  // battlefield rivers: fish-tank water or spilled juice, mirrored. y0/y1 bound
+  // the wet part (THE SPILL's stream pours from the cup down into its pond);
+  // an open:true "bridge" is dry carpet, so it gets a funnel and no planks.
   for(const rv of (S.bf? (S.cfg.terrain.rivers||[]) : [])){
-    cx.fillStyle='#4E7FA8'; cx.fillRect(rv.x,56,rv.w,H-112);
-    cx.fillStyle='#6E9DC4'; cx.globalAlpha=0.6;
-    for(let y=70;y<H-70;y+=44){ cx.beginPath(); cx.ellipse(rv.x+rv.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
+    const y0=rv.y0!=null?rv.y0:56, y1=rv.y1!=null?rv.y1:H-56;
+    cx.fillStyle=rv.col||'#4E7FA8'; cx.fillRect(rv.x,y0,rv.w,y1-y0);
+    cx.beginPath(); cx.ellipse(rv.x+rv.w/2,y0,rv.w/2,9,0,0,7); cx.fill();   // rounded spout
+    cx.fillStyle=rv.col2||'#6E9DC4'; cx.globalAlpha=0.6;
+    for(let y=y0+14;y<y1-6;y+=44){ cx.beginPath(); cx.ellipse(rv.x+rv.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
     cx.globalAlpha=1;
+    if(rv.y1!=null){                                // froth where the pour lands
+      cx.globalAlpha=0.75; cx.fillStyle='#EDEADF';
+      for(let k=0;k<3;k++){ const ph=S.t*2+k*2.1;
+        cx.beginPath(); cx.ellipse(rv.x+rv.w/2+(k-1)*14, y1-2+3*Math.sin(ph), 7+2*Math.sin(ph*1.3), 3, 0, 0, 7); cx.fill(); }
+      cx.globalAlpha=1;
+    }
     for(const br of rv.bridges){
+      if(br.open) continue;
       cx.fillStyle='#B48A54'; cx.fillRect(rv.x-10, br.y-br.bw/2, rv.w+20, br.bw);
       cx.strokeStyle='#8a683e'; cx.lineWidth=3;
       for(let k=0;k<5;k++){ const yy=br.y-br.bw/2+6+k*(br.bw-12)/4; cx.beginPath(); cx.moveTo(rv.x-8,yy); cx.lineTo(rv.x+rv.w+8,yy); cx.stroke(); }
+    }
+  }
+  // the race track flank — bright plastic speedway; the dashes stream so it
+  // reads as the fast lane even before anyone hits it
+  for(const tk of (S.bf? (S.cfg.terrain.tracks||[]) : [])){
+    const ty=tk.y-tk.h/2;
+    cx.fillStyle='rgba(0,0,0,0.18)'; cx.fillRect(tk.x0,ty+tk.h-5,tk.x1-tk.x0,8);
+    cx.fillStyle='#D97B2E'; cx.fillRect(tk.x0,ty,tk.x1-tk.x0,tk.h);
+    cx.fillStyle='#B85E1C'; cx.fillRect(tk.x0,ty,tk.x1-tk.x0,5); cx.fillRect(tk.x0,ty+tk.h-5,tk.x1-tk.x0,5);
+    cx.strokeStyle='rgba(255,255,255,0.55)'; cx.lineWidth=3; cx.setLineDash([20,16]); cx.lineDashOffset=-S.t*60;
+    cx.beginPath(); cx.moveTo(tk.x0+8,tk.y); cx.lineTo(tk.x1-8,tk.y); cx.stroke();
+    cx.setLineDash([]); cx.lineDashOffset=0;
+    cx.strokeStyle='#A85218'; cx.lineWidth=2;
+    for(let x=tk.x0+66;x<tk.x1-10;x+=132){ cx.beginPath(); cx.moveTo(x,ty+2); cx.lineTo(x,ty+tk.h-2); cx.stroke(); }
+  }
+  // spill ponds: wade-through-slow juice, with a resident rubber duck
+  for(const p of (S.bf? (S.cfg.terrain.ponds||[]) : [])){
+    cx.fillStyle='rgba(0,0,0,0.2)'; cx.beginPath(); cx.ellipse(p.x+4,p.y+6,p.rx*1.04,p.ry*1.04,0,0,7); cx.fill();
+    cx.fillStyle=p.col||'#4E7FA8'; cx.beginPath(); cx.ellipse(p.x,p.y,p.rx,p.ry,0,0,7); cx.fill();
+    cx.fillStyle=p.col2||'#6E9DC4'; cx.globalAlpha=0.55;
+    for(let k=0;k<4;k++){ const a=k*1.7+S.t*0.9;
+      cx.beginPath(); cx.ellipse(p.x+Math.cos(a)*p.rx*0.45, p.y+Math.sin(a)*p.ry*0.45, 13, 4.5, 0, 0, 7); cx.fill(); }
+    cx.globalAlpha=1;
+    cx.strokeStyle='rgba(237,234,223,0.5)'; cx.lineWidth=2;
+    cx.beginPath(); cx.ellipse(p.x,p.y,p.rx,p.ry,0,0,7); cx.stroke();
+    if(p.duck){ // strictly decorative, deeply important
+      const dx=p.x+Math.cos(S.t*0.35+p.x)*p.rx*0.4, dy=p.y+Math.sin(S.t*0.35+p.x)*p.ry*0.4;
+      cx.save(); cx.translate(dx,dy+Math.sin(S.t*1.6+p.x)); cx.rotate(Math.sin(S.t*1.6+p.x)*0.1);
+      cx.fillStyle='#F2C531'; cx.beginPath(); cx.ellipse(0,0,13,9,0,0,7); cx.fill();
+      cx.beginPath(); cx.arc(8,-9,6.5,0,7); cx.fill();
+      cx.fillStyle='#E07B2E'; cx.beginPath(); cx.moveTo(13.5,-10); cx.lineTo(20,-8); cx.lineTo(13.5,-6.5); cx.closePath(); cx.fill();
+      cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(9.5,-11,1.3,0,7); cx.fill();
+      cx.restore();
     }
   }
   // terrain: the river (spilled from the fish tank) + its popsicle bridge
@@ -2590,14 +2725,63 @@ function drawRug(){
     cx.strokeStyle='#8a683e'; cx.lineWidth=3;
     for(let k=0;k<5;k++){ const yy=by-RV.bw/2+6+k*(RV.bw-12)/4; cx.beginPath(); cx.moveTo(RV.x-8,yy); cx.lineTo(RV.x+RV.w+8,yy); cx.stroke(); }
   }
-  // rocks (borrowed from the fish tank too)
+  // rocks (borrowed from the fish tank too) — or, in costume: the tipped juice
+  // cup and the alphabet blocks (round hitbox, square heart)
   for(const rk of S.cfg.terrain.rocks){
+    if(rk.art==='cup'){ drawCupRock(rk); continue; }
+    if(rk.art==='block'){ drawToyBlock(rk); continue; }
     cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+rk.r*0.55,rk.r*1.05,rk.r*0.4,0,0,7); cx.fill();
     cx.fillStyle='#8B8578'; cx.beginPath();
     cx.ellipse(rk.x,rk.y,rk.r,rk.r*0.8,0.2,0,7); cx.fill();
     cx.fillStyle='#A39C8D'; cx.beginPath(); cx.ellipse(rk.x-rk.r*0.25,rk.y-rk.r*0.3,rk.r*0.5,rk.r*0.32,0.3,0,7); cx.fill();
     cx.fillStyle='#6F695E'; cx.beginPath(); cx.ellipse(rk.x+rk.r*0.3,rk.y+rk.r*0.25,rk.r*0.36,rk.r*0.2,0.1,0,7); cx.fill();
   }
+  // wrecking balls last — tallest thing on the carpet
+  for(const bl of (S.bf? (S.cfg.terrain.balls||[]) : [])) drawWreckBall(bl);
+}
+// THE SPILL's cup, knocked clean over, mouth to the carpet — the stream draws
+// from just under it, so together they read as one long accident
+function drawCupRock(rk){
+  cx.save(); cx.translate(rk.x,rk.y);
+  cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(4,rk.r*0.62,rk.r*1.15,rk.r*0.42,0,0,7); cx.fill();
+  cx.rotate(1.05);
+  cx.fillStyle='#C0483B'; cx.fillRect(-rk.r*0.9,-rk.r*0.62,rk.r*1.7,rk.r*1.24);
+  cx.fillStyle='#A63B30'; cx.fillRect(-rk.r*0.9,-rk.r*0.62,rk.r*0.34,rk.r*1.24);
+  cx.fillStyle='#EDEADF'; cx.beginPath(); cx.ellipse(rk.r*0.8,0,rk.r*0.24,rk.r*0.66,0,0,7); cx.fill();  // sippy lid
+  cx.fillStyle='#D8D2C0'; cx.fillRect(rk.r*0.9,-rk.r*0.18,rk.r*0.34,rk.r*0.36);                          // spout
+  cx.fillStyle='rgba(255,255,255,0.25)'; cx.fillRect(-rk.r*0.55,-rk.r*0.44,rk.r*0.9,rk.r*0.18);          // shine
+  cx.restore();
+}
+// OPEN CARPET's alphabet blocks — every one tilted its own lazy way (the tilt
+// hangs off the letter, so it's stable frame to frame with no RNG in the draw)
+function drawToyBlock(rk){
+  const s=rk.r*1.72, h=s/2, tilt=(((rk.ltr||'A').charCodeAt(0))%7-3)*0.055;
+  cx.save(); cx.translate(rk.x,rk.y);
+  cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(3,h*0.72,s*0.62,h*0.4,0,0,7); cx.fill();
+  cx.rotate(tilt);
+  cx.fillStyle='#B9975B'; cx.fillRect(-h+4,-h+4,s,s);
+  cx.fillStyle='#E4C98F'; cx.fillRect(-h,-h,s,s);
+  cx.strokeStyle=rk.bc||'#C0483B'; cx.lineWidth=4; cx.strokeRect(-h+5,-h+5,s-10,s-10);
+  cx.fillStyle=rk.bc||'#C0483B'; cx.font='900 '+Math.round(s*0.56)+'px Arial';
+  cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(rk.ltr||'A',0,2);
+  cx.restore();
+}
+// the toy crane's wrecking ball, off its chain and on patrol — the shackle eye
+// orbits with the roll so it genuinely reads as tumbling
+function drawWreckBall(bl){
+  cx.fillStyle='rgba(0,0,0,0.3)'; cx.beginPath(); cx.ellipse(bl.x+5,bl.y+bl.r*0.72,bl.r*1.1,bl.r*0.38,0,0,7); cx.fill();
+  const g=cx.createRadialGradient(bl.x-bl.r*0.35,bl.y-bl.r*0.45,bl.r*0.15,bl.x,bl.y,bl.r);
+  g.addColorStop(0,'#6A6A74'); g.addColorStop(0.55,'#3B3B44'); g.addColorStop(1,'#191920');
+  cx.fillStyle=g; cx.beginPath(); cx.arc(bl.x,bl.y,bl.r,0,7); cx.fill();
+  cx.save(); cx.translate(bl.x,bl.y); cx.rotate(bl.roll||0);
+  cx.strokeStyle='rgba(255,255,255,0.16)'; cx.lineWidth=4;
+  cx.beginPath(); cx.arc(0,0,bl.r*0.82,0.4,2.2); cx.stroke();
+  cx.strokeStyle='rgba(0,0,0,0.35)';
+  cx.beginPath(); cx.arc(0,0,bl.r*0.6,3.6,5.3); cx.stroke();
+  cx.fillStyle='#23232B'; cx.beginPath(); cx.arc(0,-bl.r*0.92,7,0,7); cx.fill();
+  cx.strokeStyle='#4A4A54'; cx.lineWidth=3.5; cx.beginPath(); cx.arc(0,-bl.r*1.12,6.5,0,7); cx.stroke();
+  cx.restore();
+  cx.fillStyle='rgba(255,255,255,0.5)'; cx.beginPath(); cx.ellipse(bl.x-bl.r*0.34,bl.y-bl.r*0.42,bl.r*0.16,bl.r*0.1,-0.6,0,7); cx.fill();
 }
 function pathStroke(){ cx.beginPath(); cx.moveTo(PATH_PTS[0].x,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) cx.lineTo(PATH_PTS[i].x,PATH_PTS[i].y); cx.stroke(); }
 // Each army's toy box, flying its own colours. The enemy's is the same box
@@ -3493,9 +3677,9 @@ function piggyHop(){
 // hideAllOverlays() tears it down the moment any battle actually starts.
 const WT_MAP_GLYPHS = {
   crossing:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><path d="M20 1c3 6-2 10 1 15s-1 9 1 13" stroke="#5B84C4" stroke-width="7" fill="none"/><rect x="15" y="7" width="12" height="4" rx="1.5" fill="#D9B36C"/><rect x="16" y="20" width="12" height="4" rx="1.5" fill="#D9B36C"/>',
-  spill:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="14" cy="19" rx="9" ry="5" fill="#7A4E8E" opacity="0.85"/><ellipse cx="33" cy="11" rx="8" ry="4.5" fill="#7A4E8E" opacity="0.85"/><rect x="9" y="8" width="7" height="5" rx="1" fill="#EDEADF" transform="rotate(-24 12 10)"/>',
-  stone:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="10" cy="9" rx="5" ry="3.6" fill="#9A9A90"/><ellipse cx="24" cy="16" rx="5.5" ry="4" fill="#8A8A80"/><ellipse cx="37" cy="8" rx="4.5" ry="3.2" fill="#9A9A90"/><ellipse cx="13" cy="23" rx="4.5" ry="3.2" fill="#8A8A80"/><ellipse cx="35" cy="22" rx="5" ry="3.4" fill="#9A9A90"/>',
-  open:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><rect x="5" y="5" width="36" height="20" rx="2" fill="#B25E36"/><path d="M8 10h30M8 15h30M8 20h30" stroke="#8E4526" stroke-width="1.4"/>'
+  spill:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><path d="M10 8v10M36 8v10" stroke="#7A4E8E" stroke-width="4"/><ellipse cx="10" cy="21.5" rx="6" ry="3.4" fill="#7A4E8E"/><ellipse cx="36" cy="21.5" rx="6" ry="3.4" fill="#7A4E8E"/><rect x="6" y="2.5" width="8" height="6" rx="2" fill="#C0483B" transform="rotate(-24 10 5.5)"/><rect x="32" y="2.5" width="8" height="6" rx="2" fill="#C0483B" transform="rotate(24 36 5.5)"/><rect x="6.5" y="11" width="7" height="3" rx="1" fill="#D9B36C"/><rect x="32.5" y="11" width="7" height="3" rx="1" fill="#D9B36C"/><circle cx="19.5" cy="15" r="3.2" fill="#3B3B44"/><circle cx="26.5" cy="15" r="3.2" fill="#3B3B44"/>',
+  stone:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="10" cy="8" rx="5" ry="3.6" fill="#9A9A90"/><ellipse cx="23" cy="13" rx="5.5" ry="4" fill="#8A8A80"/><ellipse cx="37" cy="7" rx="4.5" ry="3.2" fill="#9A9A90"/><circle cx="16" cy="18" r="1.6" fill="#8A8A80"/><circle cx="31" cy="17" r="1.5" fill="#9A9A90"/><circle cx="7" cy="15" r="1.4" fill="#8A8A80"/><rect x="2" y="22.5" width="42" height="4.6" rx="2" fill="#D97B2E"/><path d="M6 24.8h4M14 24.8h4M22 24.8h4M30 24.8h4M38 24.8h4" stroke="#FFF" stroke-width="1.1" opacity="0.6"/>',
+  open:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><g fill="#E4C98F"><rect x="4" y="3" width="6" height="6" rx="1" stroke="#C0483B" stroke-width="0.9"/><rect x="13" y="4.5" width="5.5" height="5.5" rx="1" stroke="#4E7FA8" stroke-width="0.9"/><rect x="26" y="3" width="5.5" height="5.5" rx="1" stroke="#6E8F4E" stroke-width="0.9"/><rect x="35" y="4" width="6" height="6" rx="1" stroke="#C7913B" stroke-width="0.9"/><rect x="5" y="21" width="6" height="6" rx="1" stroke="#6E8F4E" stroke-width="0.9"/><rect x="15" y="21.5" width="5.5" height="5.5" rx="1" stroke="#C7913B" stroke-width="0.9"/><rect x="26.5" y="21" width="6" height="6" rx="1" stroke="#C0483B" stroke-width="0.9"/><rect x="35.5" y="21.5" width="5.5" height="5.5" rx="1" stroke="#4E7FA8" stroke-width="0.9"/></g><circle cx="23" cy="15" r="3.4" fill="#3B3B44"/>'
 };
 // CROSSING leads (the flagship), OPEN CARPET last
 const WT_MAP_ORDER = ['crossing','spill','stone','open'];
