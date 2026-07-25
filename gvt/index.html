@@ -298,7 +298,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.6.1</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.6.2</div>
   <div class="scanlines"></div>
 </div>
 
@@ -704,7 +704,7 @@ const SARGE_WEAPONS = {
   pistol:    { name:'SERVICE PISTOL', unlock:0,  desc:'His trusty sidearm — steady, reliable, always there.' },
   shotgun:   { name:'SHOTGUN',        unlock:5,  desc:'A hair less reach than the pistol, but a wide cone that flattens a whole cluster at once.' },
   sniper:    { name:'SNIPER RIFLE',   unlock:10, desc:'Reaches clear across the carpet and hits like a truck — but a long, slow reload.' },
-  lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge charges out, carves up whatever is close, blocks incoming fire, then falls back to his post.' }
+  lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' }
 };
 const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber'];
 // pick your blade — the glow is your colour, the core is always white-hot
@@ -718,7 +718,8 @@ function sargeStats(){
   const w=SARGE_WEAPONS[META.sargeWeapon]?META.sargeWeapon:'pistol';
   const r=Math.min(5, (w==='pistol'? (META.up.sarge||0) : (META.sargeUp[w]||0)));
   if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:1.1+0.35*r, cone:0.62+0.05*r };
-  if(w==='sniper')     return { w, r, rng:340, rate:0.22, dmg:9+3*r };
+  // 7/24 (Wyatt): the long rifle cycles 30% faster at base, and every rank oils the bolt another +2%
+  if(w==='sniper')     return { w, r, rng:340, rate:0.22*1.3*(1+0.02*r), dmg:9+3*r };
   if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*r, cd:2.1, block:Math.min(0.75,0.34+0.09*r) };
   return { w:'pistol', r, rng:108, rate:1.8, dmg:1.5 };   // default; unit-upgrade mult applied on the default path
 }
@@ -1372,6 +1373,24 @@ function hurt(f,dmg,src){
   if(S.bf && f.side && saberBlocksU(f)) return;
   f.hp-=dmg; hitCheck(f,src);
 }
+// ===== CRITICAL HITS (Wyatt 7/24): the trigger-men — rifleman, MG and Sarge
+// (whatever he's carrying) — land the occasional CRIT for DOUBLE damage.
+// 5% base; each promotion rank adds +1%, except Sarge, whose ranks add +5%
+// each (the rank of the weapon in his hands is the one that counts). On the
+// battlefield the opposing army crits at the stock 5% — same rule as upMul:
+// its difficulty is decisions, not stat padding.
+const CRIT_MULT=2;
+function critChance(u){
+  if(u.type==='sarge') return 0.05 + 0.05*(unitSargeStats(u).r||0);
+  if(u.type!=='rifleman' && u.type!=='mgunner') return 0;
+  const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0);
+  return 0.05 + 0.01*r;
+}
+function rollCrit(u){ return Math.random() < critChance(u); }
+function critFx(f){
+  S.floats.push({x:f.x,y:f.y-66,txt:'CRIT!',t:0,col:'#FFD24A'});
+  S.fx.push({k:'ring',x:f.x,y:f.y-16,r:5,R:30,t:0,dur:0.22,col:'#FFD24A'});
+}
 
 // ================= BATTLEFIELD: THE COMMAND BOUNDARY =================
 // Player taps, AI decisions and (later) a network peer all land HERE. One
@@ -1678,13 +1697,21 @@ function placeUnit(type,x,y,side,seat){
     u.goal={ x:b.x, y:b.y };
     // his own lane, his own stride, his own path — the march reads like people
     u.laneY=y; u.gait=0.92+Math.random()*0.16; u.wp=null; u.wpT=0; u.pauseT=0; u.marching=false;
-    if(type==='sarge'){ u.home={x,y}; u.saberState='idle'; u.saberCd=0; }
+    if(type==='sarge'){ u.home={x,y}; u.saberState='idle'; u.saberCd=0;
+      // 7/24 (Wyatt): a lightsaber Sarge wades into melee now — double the plastic (HP +100%)
+      if(unitSargeStats(u).w==='lightsaber'){ u.hpMax*=2; u.hp=u.hpMax; }
+    }
   }
   S.units.push(u); S.placedAny=true; SFX.snap();
   coachEvent('place');
   return u;
 }
-function gritCap(u){ return u.def.grit + (u.vet?1:0); }
+// 7/24 (Wyatt): the saber Sarge's HP +100% — in campaign units that's grit, so
+// he soaks double the hits before a knockdown (vet bonus rides on top)
+function gritCap(u){
+  const saber = u.type==='sarge' && !S.bf && sargeStats().w==='lightsaber';
+  return u.def.grit*(saber?2:1) + (u.vet?1:0);
+}
 // a lightsaber Sarge deflects some incoming fire — spark and shrug it off
 function saberBlocks(u){
   if(u.type!=='sarge' || META.sargeWeapon!=='lightsaber') return false;
@@ -1701,36 +1728,56 @@ function tanHit(u,fx,fy){
   S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
   if(u.hits>=gritCap(u)){ knock(u,fx,fy); }
 }
-// LIGHTSABER: Sarge charges the nearest foe, carves it up, then falls back to
-// his post. Home is where he was placed. State: idle → out → back.
+// LIGHTSABER (7/24 rework, Wyatt): Sarge DASHES at the nearest foe, carves it
+// up — and if anyone else is still in reach he presses the attack, strike
+// after strike, instead of retreating after one kill. Only when nobody is
+// left in reach does he fall back to his post: in the campaign that's where
+// he was placed; on the battlefield home is where the dash started (bfMarch
+// keeps it under his feet), so he returns there and resumes the march on the
+// enemy base as normal. State: idle → out (chains) → back.
+// (u.saberCd now ticks in the units-fire loop head, so a marching battlefield
+// Sarge re-arms on the move instead of standing frozen at first contact.)
+function saberNext(u,sw){
+  if(S.bf) return bfNearestEnemy(u,sw.aggro);
+  let best=null,bd=sw.aggro;
+  for(const f of S.foes){ if(f.burrow||f.x>W-6) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+  return best;
+}
 function updateSaber(u,dt,sw){
   if(!u.home) u.home={x:u.x,y:u.y};
   if(!u.saberState) u.saberState='idle';
-  u.saberCd=(u.saberCd||0)-dt;
   if(u.saberState==='idle'){
     if(u.saberCd>0) return;
-    let best=null,bd=sw.aggro;
-    if(S.bf) best=bfNearestEnemy(u,sw.aggro);
-    else for(const f of S.foes){ if(f.burrow||f.x>W-6) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+    const best=saberNext(u,sw);
     if(best){ u.saberState='out'; u.saberTarget=best; SFX.laser(); }
     return;
   }
   if(u.saberState==='out'){
     const f=u.saberTarget;
     const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||S.foes.indexOf(f)<0);
-    if(gone){ u.saberState='back'; return; }
+    if(gone){
+      const nx=saberNext(u,sw);                   // denied his kill — carve the next one instead
+      if(nx){ u.saberTarget=nx; return; }
+      u.saberState='back'; return;
+    }
+    u.saberSwing=(u.saberSwing||0)-dt;            // recovery between chained strikes
     const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
-    if(d>26){ const sp=470; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
-    else {
-      const vm=(u.vet?1.5:1);
-      hurt(f,sw.dmg*vm,u);                        // massive strike
-      for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm,u); } }  // a cleave to whatever else is close
+    if(d>26){ const sp=680; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   // a real dash — he's IN quick
+    else if(u.saberSwing<=0){
+      const vm=(u.vet?1.5:1), cm=rollCrit(u)?CRIT_MULT:1;
+      if(cm>1) critFx(f);
+      hurt(f,sw.dmg*vm*cm,u);                     // massive strike
+      for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm*cm,u); } }  // a cleave to whatever else is close
       S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHex()});
-      SFX.laser(); S.shake=0.2; u.saberState='back'; u.saberCd=sw.cd;
+      SFX.laser(); S.shake=0.2; u.saberSwing=0.5;
+      const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
+      if(nx){ u.saberTarget=nx; return; }
+      u.saberState='back'; u.saberCd=sw.cd;
     }
     return;
   }
-  // back home
+  // nobody left in reach — back to his post (campaign: where he was placed;
+  // battlefield: where the dash began, then the march resumes from idle)
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
   if(d>4){ const sp=390; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
   else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; }
@@ -2213,6 +2260,7 @@ function update(dt){
   // units fire
   for(const u of S.units){
     if(u.sprue>0) u.sprue-=dt;
+    if(u.saberCd>0) u.saberCd-=dt;   // saber rest ticks even mid-march (BF) — he dashes in without the stand-and-wait
     // BATTLEFIELD pre-step: drop-in gate, march, halt, setup wind-up, free leak.
     // Falls THROUGH into the untouched weapon code when he's dug in with a target.
     if(S.bf && !bfUnitStep(u,dt)) continue;
@@ -2239,6 +2287,7 @@ function update(dt){
           const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue; const db=PRIO(u,f); if(db<bs){bs=db;best=f;} }
         if(!best) continue;
         u.cd=1/sw.rate; const vm=(u.vet?1.5:1);
+        const cm=rollCrit(u)?CRIT_MULT:1; if(cm>1) critFx(best);   // Sarge crits with whatever he's holding — one roll per trigger pull
         if(sw.w==='shotgun'){
           // a wide CONE aimed at the nearest cluster — flattens everyone inside it
           bfSfx(SFX.thock, u.x); bfSfx(SFX.pew, u.x);
@@ -2246,13 +2295,13 @@ function update(dt){
           for(let j=list.length-1;j>=0;j--){ const f=list[j]; if(f.burrow||f.dead) continue;
             const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue;
             let da=Math.abs(Math.atan2(f.y-u.y,f.x-u.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
-            if(da<=sw.cone){ hurt(f,sw.dmg*vm,u); } }
+            if(da<=sw.cone){ hurt(f,sw.dmg*vm*cm,u); } }
           S.fx.push({k:'cone',x:u.x+8,y:u.y-24,ang,spread:sw.cone,rng:sw.rng*rb,t:0,dur:0.16});
         } else if(sw.w==='sniper'){
           // one heavy round clear across the carpet
           bfSfx(SFX.tpew, u.x); S.shake=0.14;
           S.fx.push({k:'tracer',x1:u.x+14,y1:u.y-28,x2:best.x,y2:best.y-18,t:0,dur:0.2,col:'#FFF3C4',w:3});
-          S.fx.push({k:'puff',x:best.x,y:best.y-16,t:0,dur:0.3,R:16}); hurt(best,sw.dmg*vm,u);
+          S.fx.push({k:'puff',x:best.x,y:best.y-16,t:0,dur:0.3,R:16}); hurt(best,sw.dmg*vm*cm,u);
         }
         continue;
       }
@@ -2316,7 +2365,8 @@ function update(dt){
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
       S.shots.push({k:'lob',x:u.x,y:u.y-30,tx,ty,t:0,dur:1.0,dmg,splash:def.splash,src:u});
     } else {
-      const dmgF = (best.type==='crawler'&&u.type==='rifleman')? dmg*0.1 : dmg;   // crawlers shrug off rifle fire
+      let dmgF = (best.type==='crawler'&&u.type==='rifleman')? dmg*0.1 : dmg;   // crawlers shrug off rifle fire
+      if(rollCrit(u)){ dmgF*=CRIT_MULT; critFx(best); }   // the trigger-men: rifleman / MG / Sarge's pistol
       const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? ARMIES.find(ar=>ar.id===META.laserOn) : null;   // only YOUR figures pack lasers
       if(lz){ bfSfx(SFX.laser, u.x); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x); }
       hurt(best,dmgF,u);
@@ -3149,11 +3199,11 @@ const SHOP_ITEMS=[
 // THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
 // at the Training Academy to read their page.
 const CLASSINFO = {
-  rifleman:   { good:'Long reach (165) and a steady trigger — the backbone of every line. Cheap, dependable, everywhere.', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. The tan rifle now reaches just as far — but you fire first.' },
-  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close.', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
+  rifleman:   { good:'Long reach (165) and a steady trigger — the backbone of every line. One shot in twenty lands a CRIT for double damage (+1% per rank).', bad:'Rifle rounds barely dent crawlers, and there is no answer to armor here. The tan rifle now reaches just as far — but you fire first.' },
+  mgunner:    { good:'Fastest gun on the carpet — shreds infantry and crawler packs before they close. One burst in twenty CRITs for double damage (+1% per rank).', bad:'Short reach (109). Has to sit up front, right where the trouble is.' },
   bazooka:    { good:'Big splash damage, DOUBLE against Jeeps and Tanks. The armor answer.', bad:'Slow reload and a wild aim — and those blasts knock down your own men. Give them room.' },
   mortar:     { good:'Rains shells on any spot on the carpet — no range limit at all.', bad:'Blind up close (nothing inside 120), shells scatter, and friendly fire is very real.' },
-  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast.', bad:'Pistol range only. And there is only ever one Sarge.' },
+  sarge:      { good:'FREE, hits harder than anyone expects, extra grit, and downed men nearby stand back up twice as fast. His shots CRIT for double damage — and every rank adds +5% to the odds.', bad:'Pistol range only. And there is only ever one Sarge.' },
   minesweeper:{ good:'Seeds the carpet with firecracker mines — brutal on lanes, bridges and choke points.', bad:'Never fires a shot, and mines flip your own men too if they wander in.' },
   flame:      { good:'Torches 3 enemies at once and cooks crawler packs. Nothing shrugs this off.', bad:'Arm\'s-reach range (85). If they\'re not close, that is just a soldier carrying soup.' },
   radioman:   { good:'+25% range to every soldier standing nearby — a whole squad upgrade in one figure.', bad:'All antenna, no rifle. Cannot return fire at all, so guard them.' }
