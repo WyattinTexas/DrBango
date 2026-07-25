@@ -409,6 +409,22 @@
   /* gold = a reward waiting (red .alarm stays for threats) */
   .roomtag.gold { background:#8a6d1c; box-shadow:0 0 15px rgba(217,165,68,0.85); animation:blink 1.25s linear infinite; }
   .roomtag.gold:hover { background:#a5851f; }
+  /* CO-OP: allied campaign — big friendly buttons in the room-modal family */
+  .coopbtn { display:flex; align-items:center; gap:14px; width:100%; text-align:left; margin-top:12px; padding:13px 16px;
+    font-family:inherit; font-size:1.22rem; font-weight:bold; letter-spacing:0.04em; color:#EDEADF;
+    background:linear-gradient(180deg,#2E4A22,#243D1B); border:3px solid #4A6B35; border-radius:16px; cursor:pointer; }
+  .coopbtn:active { transform:scale(0.98); }
+  .coopbtn .ico { font-size:2rem; line-height:1; }
+  .coopbtn small { display:block; font-size:0.92rem; font-weight:normal; opacity:0.75; letter-spacing:0.02em; margin-top:2px; }
+  .coopcode { font-family:Impact,'Arial Narrow',sans-serif; font-size:3.2rem; letter-spacing:0.32em; text-align:center;
+    color:#FFD24A; text-shadow:0 3px 0 rgba(0,0,0,0.45); margin:8px 0 2px; padding-left:0.32em; }
+  .coopwait { text-align:center; opacity:0.85; font-size:1.08rem; margin:10px 0; animation:coopblink 1.6s ease-in-out infinite; }
+  @keyframes coopblink { 50% { opacity:0.3; } }
+  .coopally { display:flex; align-items:center; gap:12px; background:rgba(127,163,92,0.12); border:2px solid #4A6B35;
+    border-radius:14px; padding:10px 14px; margin:10px 0; font-size:1.18rem; }
+  .coopin { font-family:Impact,'Arial Narrow',sans-serif; font-size:1.9rem; text-transform:uppercase; letter-spacing:0.28em;
+    text-align:center; width:100%; box-sizing:border-box; padding:0.45rem; border-radius:12px; border:2px solid #4A6B35;
+    background:#141810; color:#EDEADF; }
 </style>
 </head>
 <body>
@@ -425,7 +441,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.8</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.9</div>
   <div class="scanlines"></div>
 </div>
 
@@ -689,6 +705,11 @@ window.GVTN = {
   }
 };
 const NET='https://nationgame.live/gvt';
+// a friend's invite link (?coop=CODE): stash the code, scrub the URL so a
+// refresh doesn't re-join, and connect the moment they reach the room
+let coopJoinPend=null;
+try{ const cm=location.search.match(/[?&]coop=([A-Za-z0-9]{4,8})/i);
+  if(cm){ coopJoinPend=cm[1].toUpperCase(); history.replaceState(null,'',location.pathname); } }catch(e){}
 let lastSync=0;
 function netSync(){
   const now=Date.now(); if(now-lastSync<15000) return Promise.resolve(); lastSync=now;
@@ -1147,6 +1168,7 @@ function reset(){
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1;
+  S.coop=null;    // co-op battles re-arm this right after startBattle
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
 }
 function startBattle(levelN, rival){
@@ -1172,7 +1194,8 @@ function startBattle(levelN, rival){
   }
   hideAllOverlays();
   S.mode='play';
-  if(META.campaign===0 && levelN===1) coachStart();
+  // no boot-camp coach mid co-op — the ally IS the coach
+  if(META.campaign===0 && levelN===1 && !coopLaunching) coachStart();
 }
 // The room-defense sortie: short, varied, escalating. Opener → flank → spectacle
 // → big finish. Entertaining precisely because it never outstays its welcome.
@@ -1433,6 +1456,231 @@ function bfQueueTeardown(){
   ['bfqChip','bfqRoster','bfqFound'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('on'); });
 }
 
+// ================= CO-OP: THE ALLIED CAMPAIGN =================
+// Two commanders, one carpet. Both clients run the FULL local sim of the same
+// level (levelCfg is seeded — same terrain, same waves); what the players DO
+// (place / move / stand up / vet / wave) rides a little command relay through
+// HQ, so both sims hold both armies. The small stuff drifts (aim, lanes,
+// kill order) — the HOST sim referees everything that counts: lives, wave
+// starts, and the verdict. A win counts for BOTH campaigns. That's the point.
+let COOP=null;            // the party — outlives battles, dies on leave
+let coopLaunching=false;  // true only inside coopStartBattle's startBattle call
+function coopMe(){ return { name:META.name, camp:META.campaign, hex:dyeHex() }; }
+function coopPost(ep,body){
+  return fetch(NET+'/coop/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe()},body||{}))}).then(r=>r.json());
+}
+function coopFresh(ui){
+  return { code:null, role:null, mate:null, level:0, state:'idle', ui:ui||'idle', seq:0,
+           outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
+           mateHex:null, misses:0, qT0:Date.now() };
+}
+// one heartbeat for everything: pairing, matchmaking, and the in-battle relay
+function coopTick(){
+  if(!COOP) return;
+  clearTimeout(COOP.pollT);
+  if(!COOP.code && COOP.ui!=='queue') return;  // idle/enter panels have nothing to say
+  COOP.pollT=setTimeout(coopTick, S.coop? 1000 : 2000);
+  if(COOP.busy) return;
+  if(COOP.ui==='queue' && !COOP.code){
+    COOP.busy=true;
+    coopPost('queue',{}).then(r=>{
+      if(!COOP) return; COOP.busy=false;
+      if(!r||!r.ok){ coopMiss(r); return; }
+      COOP.misses=0;
+      if(r.waiting){ coopPanelSync(); return; }
+      COOP.code=r.code; COOP.role=r.role; COOP.mate=r.mate; COOP.level=r.level;
+      COOP.state=r.state||'paired'; COOP.ui='paired';
+      SFX.horn(); coopPanelOpen();
+    }).catch(()=>{ if(COOP){ COOP.busy=false; coopMiss(); } });
+    return;
+  }
+  if(!COOP.code) return;
+  COOP.busy=true;
+  const body={ code:COOP.code, seq:COOP.seq };
+  const sending=COOP.outQ.slice(0,40);
+  if(sending.length) body.cmds=sending;
+  if(S.coop && COOP.role==='h' && !COOP.ended) body.beacon={ lives:S.lives, wave:S.wave };
+  if(COOP.wantBattle) body.set='battle';
+  coopPost('poll', body).then(r=>{
+    if(!COOP) return; COOP.busy=false;
+    if(!r||!r.ok){ coopMiss(r); return; }
+    COOP.misses=0;
+    COOP.outQ.splice(0, sending.length);       // delivered — safe to drop
+    coopOnPoll(r);
+  }).catch(()=>{ if(COOP){ COOP.busy=false; coopMiss(); } });
+}
+function coopMiss(r){
+  if(!COOP) return;
+  if(r && (r.err==='no party' || r.err==='party full')){
+    // the party is gone — mate left, or HQ swept it
+    const nm=COOP.mate? COOP.mate.name : 'YOUR ALLY';
+    if(S.coop){ coopDissolve(nm.toUpperCase()+' WENT HOME — CARRY ON, COMMANDER!'); }
+    else { clearTimeout(COOP.pollT); COOP=coopFresh('idle'); COOP.note='Your ally left the party.'; coopPanelSync(); }
+    return;
+  }
+  COOP.misses++; coopPanelSync();
+}
+function coopOnPoll(r){
+  const wasState=COOP.state;
+  COOP.state=r.state; COOP.level=r.level;
+  if(r.mate){ COOP.mate=r.mate; COOP.lastSeen=r.mate.seen||0; }
+  (r.cmds||[]).forEach(cm=>{
+    if(cm.q>COOP.seq) COOP.seq=cm.q;
+    if(cm.p!==COOP.role) coopApply(cm);
+  });
+  // the referee's word lands: lives as spoken, waves caught up
+  if(S.coop && COOP && COOP.role==='g' && r.beacon && !COOP.ended){
+    if(typeof r.beacon.lives==='number') S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
+    if((r.beacon.wave|0)>S.wave) coopCatchUp(r.beacon.wave|0);
+  }
+  if(!COOP) return;                            // an applied 'end' can tear things down
+  if(r.state!=='battle') COOP.wantBattle=false;
+  if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu') coopStartBattle();
+  else if(wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
+  else coopPanelSync();
+  // a mate silent mid-battle has put the controller down
+  if(S.coop && COOP.lastSeen>12){
+    const nm=COOP.mate? COOP.mate.name : 'YOUR ALLY';
+    coopDissolve(nm.toUpperCase()+"'S SIGNAL DROPPED — CARRY ON!");
+  }
+}
+function coopUnit(cid){ return S.units.find(u=>u.cid===cid); }
+function coopSend(cm){ if(COOP && S.coop && !COOP.ended) COOP.outQ.push(cm); }
+// stamp a freshly-placed unit with a shared id and radio the order out
+function coopPlaced(u){
+  if(!S.coop || !COOP || !u) return u;
+  u.cid=COOP.role+(COOP.cnt++);
+  const cm={k:'place', id:u.cid, t:u.type, x:u.x|0, y:u.y|0, um:+upMul(u.type).toFixed(2)};
+  if(u.type==='sarge') cm.sw=sargeStats();
+  coopSend(cm);
+  return u;
+}
+function coopApply(cm){
+  if(!cm || typeof cm!=='object') return;
+  if(cm.k==='end'){ coopVerdict(cm.r==='win'); return; }
+  if(!S.coop || S.mode!=='play') return;       // battle talk means nothing at HQ or on an end screen
+  if(cm.k==='place'){
+    if(!UDEF[cm.t] || coopUnit(cm.id)) return; // replay-safe
+    const x=Math.max(58,Math.min(W-24,cm.x|0)), y=Math.max(70,Math.min(H-92,cm.y|0));
+    const u=placeUnit(cm.t,x,y);
+    u.cid=cm.id; u.coopBy=cm.p; u.coopHex=COOP.mateHex;
+    if(cm.um) u.coopUM=Math.max(1,Math.min(1.6,+cm.um||1));
+    if(cm.t==='sarge' && cm.sw && typeof cm.sw==='object'){
+      u.coopSW=cm.sw;
+      if(cm.sw.w==='lightsaber'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; u.saberCd=0; }
+    }
+    return;
+  }
+  if(cm.k==='wave'){ coopCatchUp(cm.n|0); return; }
+  if(cm.k==='wava'){ if(COOP.role==='h' && !S.waveActive && S.mode==='play') spawnWave(); return; }
+  const u=coopUnit(cm.id); if(!u) return;
+  if(cm.k==='mv'){
+    u.x=Math.max(58,Math.min(W-24,cm.x|0)); u.y=Math.max(70,Math.min(H-92,cm.y|0)); u.sprue=0.2;
+    if(u.type==='sarge'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; }
+    return;
+  }
+  if(cm.k==='up'){ if(u.down) standUp(u); return; }
+  if(cm.k==='vet'){ if(!u.vet){ u.vet=true; S.floats.push({x:u.x,y:u.y-70,txt:'VETERAN!',t:0,col:'#fff'}); } return; }
+}
+// bring this sim to wave n on the referee's word — stragglers just retreat
+function coopCatchUp(n){
+  n=Math.max(0,Math.min(S.cfg.waves.length,n|0));
+  if(S.wave>=n || S.mode!=='play') return;
+  for(const f of S.foes) S.fx.push({k:'smoke',x:f.x,y:f.y-14,t:0,dur:0.5});
+  S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
+  S.wave=n-1; spawnWave(true);
+}
+function coopStartBattle(){
+  UI.closeModal();
+  COOP.ended=false; COOP.wantBattle=false; COOP.cnt=1; COOP.seq=0; COOP.outQ.length=0;
+  coopLaunching=true;
+  startBattle(COOP.level, null);
+  coopLaunching=false;
+  S.coop=COOP;
+  // the ally fights in their own colour — or honest toy blue if that clashes
+  let hx=COOP.mate && COOP.mate.hex;
+  const mine=(dyeHex()||'').toLowerCase();
+  if(!hx || hx.toLowerCase()===mine) hx = (mine==='#5b84c4'? '#4AA5A0' : '#5B84C4');
+  COOP.mateHex=hx; buildUnitTint(hx);
+  S.ann={txt:'ALLIED MISSION — LEVEL '+S.levelN, t:2.8};
+  SFX.horn();
+  coopTick();
+}
+// the referee's verdict arrives by relay (guest path — the host judged it live)
+function coopVerdict(win){
+  if(COOP) COOP.ended=true;
+  if(!S.coop || S.mode!=='play') return;
+  S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
+  if(win){ S.wave=S.cfg.waves.length; S.lives=Math.max(1,S.lives); }
+  endBattle(win);
+}
+// the ally has gone — the battle sails on as a solo command
+function coopDissolve(msg){
+  const wasBattle=!!S.coop;
+  S.coop=null;
+  if(COOP){ clearTimeout(COOP.pollT); COOP=null; }
+  if(wasBattle){ S.ann={txt:msg||'YOUR ALLY WENT HOME — CARRY ON!', t:3.2}; SFX.clack(); }
+  const m=document.getElementById('roomModal');
+  if(S.mode==='menu' && m && document.getElementById('coopPanel')) roomModal(coopPanelHTML());
+}
+function coopLeave(){
+  if(!COOP) return;
+  clearTimeout(COOP.pollT);
+  const code=COOP.code;
+  COOP=null; S.coop=null;
+  try{ coopPost('leave', code?{code}:{}).catch(()=>{}); }catch(e){}
+}
+// ---- the co-op panel (room-modal family, big and kid-proof) ----
+function coopPanelHTML(){
+  const c=COOP;
+  let h='<div id="coopPanel"><h3>🤝 TWO-PLAYER MISSION</h3>';
+  const rule='<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! You play the level of whichever commander is <b>furthest</b> — beat it and <b>both</b> campaigns advance.</p>';
+  if(!c || c.ui==='idle'){
+    h+=rule
+      +(c&&c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
+      +'<button class="coopbtn" onclick="UI.coopHost()"><span class="ico">🔗</span><span>INVITE A FRIEND<small>Get a code and a link to send them</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopEnterUI()"><span class="ico">🎟️</span><span>ENTER A FRIEND\'S CODE<small>They sent you one? Punch it in</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopQueue()"><span class="ico">🎲</span><span>FIND AN ALLY<small>Match with another commander out there</small></span></button>';
+  } else if(c.ui==='host'){
+    h+='<p style="text-align:center;font-size:1.05rem;margin:2px 0 0">YOUR MISSION CODE</p>'
+      +'<div class="coopcode">'+escH(c.code||'·····')+'</div>'
+      +'<button class="mbtn" style="width:100%" onclick="UI.coopShare()">'+(navigator.share?'📤 SEND THE INVITE LINK':'📋 COPY THE INVITE LINK')+'</button>'
+      +'<div id="coopNote" style="text-align:center;font-size:0.95rem;opacity:0.7;margin-top:6px">or tell them the code — it goes in ENTER A FRIEND\'S CODE</div>'
+      +'<div class="coopwait">WAITING FOR YOUR ALLY…</div>'
+      +'<p style="text-align:center;margin:4px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">never mind — stand down</a></p>';
+  } else if(c.ui==='enter'){
+    h+='<p style="font-size:1.05rem;margin:2px 0 8px">Type the code your friend sent you:</p>'
+      +'<input id="coopIn" class="coopin" maxlength="8" spellcheck="false" autocomplete="off" placeholder="·····">'
+      +(c.note? '<p style="color:#D96A55;font-size:1rem;margin:8px 0 0">'+escH(c.note)+'</p>':'')
+      +'<button class="mbtn alt" style="width:100%;margin-top:12px" onclick="UI.coopJoin()">REPORT FOR DUTY</button>'
+      +'<p style="text-align:center;margin:8px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">← back</a></p>';
+  } else if(c.ui==='queue'){
+    const s=((Date.now()-c.qT0)/1000)|0;
+    h+='<div class="coopwait" style="font-size:1.25rem;margin-top:14px">🔎 CALLING ALL COMMANDERS…</div>'
+      +'<p style="text-align:center;font-size:1.05rem;opacity:0.75">IN LINE '+(s/60|0)+':'+String(s%60).padStart(2,'0')+' — first ally to answer joins you</p>'
+      +'<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">WITHDRAW</a></p>';
+  } else if(c.ui==='paired'){
+    const m=c.mate||{}, away=c.lastSeen>8;
+    h+='<div class="coopally"><span class="rivalchip" style="background:'+escH(m.hex||'#5B84C4')+'"></span>'
+      +'<b>'+escH(m.name||'ALLY')+'</b><span style="opacity:0.65">· '+((m.camp|0)>0? 'BEAT LEVEL '+(m.camp|0) : 'NEW RECRUIT')+'</span>'
+      +'<span style="margin-left:auto">'+(away?'📡 …':'✓ READY')+'</span></div>'
+      +rule
+      +(c.wantBattle
+        ? '<div class="coopwait" style="font-size:1.2rem">⚔ DEPLOYING…</div>'
+        : '<button class="mbtn alt" style="width:100%;font-size:1.3rem" onclick="UI.coopDeploy()">⚔ DEPLOY TOGETHER — LEVEL '+c.level+'</button>')
+      +'<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">leave the party</a></p>';
+  }
+  return h+'</div>';
+}
+function coopPanelOpen(){ if(S.mode==='menu') roomModal(coopPanelHTML()); }
+function coopPanelSync(){
+  if(S.mode!=='menu' || !document.getElementById('coopPanel')) return;
+  if(COOP && COOP.ui==='enter') return;        // never re-render under their typing
+  const held=document.activeElement && document.activeElement.id==='coopIn';
+  if(!held) roomModal(coopPanelHTML());
+}
+
 function startBattlefield(mapId,diffOverride,teamSize,plan){
   bfQueueTeardown();
   reset();                                     // invasion-style: wipe FIRST, then build the session
@@ -1551,7 +1799,10 @@ function PRIO(u,f){ return S.bf ? Math.hypot(u.x-f.x,u.y-f.y) : Math.hypot(T.x-f
 // team size) carries whatever you equipped. Teammate seats are AI too.
 const BF_AI_SARGE={ w:'pistol', r:0, rng:108, rate:1.8, dmg:1.5 };
 function bfHumanU(u){ return !S.bf || u.seat===0; }
-function unitSargeStats(u){ return (S.bf && !bfHumanU(u)) ? BF_AI_SARGE : sargeStats(); }
+function unitSargeStats(u){
+  if(u && u.coopSW) return u.coopSW;           // the ally's Sarge carries the ALLY's loadout
+  return (S.bf && !bfHumanU(u)) ? BF_AI_SARGE : sargeStats();
+}
 function saberBlocksU(u){
   if(u.type!=='sarge') return false;
   if(S.bf && !bfHumanU(u)) return false;                   // AI Sarges have no blade
@@ -1946,13 +2197,14 @@ function placeUnit(type,x,y,side,seat){
 // 7/24 (Wyatt): the saber Sarge's HP +100% — in campaign units that's grit, so
 // he soaks double the hits before a knockdown (vet bonus rides on top)
 function gritCap(u){
-  const saber = u.type==='sarge' && !S.bf && sargeStats().w==='lightsaber';
+  const saber = u.type==='sarge' && !S.bf && unitSargeStats(u).w==='lightsaber';
   return u.def.grit*(saber?2:1) + (u.vet?1:0);
 }
 // a lightsaber Sarge deflects some incoming fire — spark and shrug it off
 function saberBlocks(u){
-  if(u.type!=='sarge' || META.sargeWeapon!=='lightsaber') return false;
-  const sw=sargeStats();
+  if(u.type!=='sarge') return false;
+  const sw=unitSargeStats(u);
+  if(sw.w!=='lightsaber') return false;
   if(sw.block && Math.random()<sw.block){
     S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHex()}); SFX.snap(); return true;
   }
@@ -2082,12 +2334,14 @@ function standUp(u){
   META.stats.standUps++;
   coachEvent('up', u);
 }
-function spawnWave(){
+function spawnWave(remote){
   if(S.wave>=S.cfg.waves.length||S.waveActive) return;
   const w=S.cfg.waves[S.wave];
   S.queue = w.groups.map(g=>Object.assign({},g));
   S.ann = w.boss ? { txt:w.name, t:3.2, warn:true } : { txt:'WAVE '+(S.wave+1)+' — '+w.name+'!', t:2.6 };
   S.wave++; S.waveActive=true; S.waveT=0; S.interT=0; S.drag=null; SFX.horn();
+  // allied mission: the host's wave call goes out on the relay
+  if(S.coop && COOP && COOP.role==='h' && !remote) coopSend({k:'wave', n:S.wave});
   coachEvent('wave');
 }
 function spawnFoe(type,x,y,form,gu){
@@ -2142,6 +2396,8 @@ function unitImg(k,u){
   if(S.bf && u && u.side){ const h=S.bf.hex[u.side]; return (h&&IMGU[h]&&IMGU[h][k])||IMG[k]; }
   // in an invasion these are THEIR defenders — their account colour, not yours
   if(S.invasion){ const h=S.invasion.theirHex; return (h&&IMGU[h]&&IMGU[h][k])||IMG[k]; }
+  // an allied commander's men wear the ALLY's colour — you can always tell whose is whose
+  if(u && u.coopHex){ const h=u.coopHex; return (IMGU[h]&&IMGU[h][k])||IMG[k]; }
   const hx=dyeHex(); return (hx&&IMGU[hx]&&IMGU[hx][k])||IMG[k];
 }
 const BF_ME={side:'you',seat:0};        // for tray cards and the dragged figure
@@ -2230,7 +2486,8 @@ function endBattle(win){
   // battle mercy, all of it. (Invasions end elsewhere; those men aren't yours.)
   if(!S.invasion && (S.aceKills||0) > META.stats.bestUnitKills) META.stats.bestUnitKills = S.aceKills;
   // Your first battle is always a victory. No matter what. That's the rule.
-  if(!win && S.levelN===1 && !S.rival && META.campaign===0){
+  // (Except allied missions — the referee's verdict is the verdict.)
+  if(!win && S.levelN===1 && !S.rival && META.campaign===0 && !S.coop){
     S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
     S.lives=Math.max(1,S.lives);
     endBattle(true);
@@ -2239,6 +2496,12 @@ function endBattle(win){
     return;
   }
   S.mode = win?'win':'lose';
+  // ALLIED MISSION: the host sim is the referee — it files the verdict with HQ,
+  // which advances BOTH campaigns on a win and relays the word to the ally.
+  if(S.coop && COOP && !COOP.ended){
+    COOP.ended=true;
+    if(COOP.role==='h') coopPost('end',{code:COOP.code, won:win, level:S.levelN}).catch(()=>{});
+  }
   document.getElementById(win?'win':'lose').classList.remove('hidden');
   if(!win){
     document.getElementById('loseTitle').innerHTML='THE TOY BOX<br>HAS FALLEN';
@@ -2292,11 +2555,12 @@ function endBattle(win){
   while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; promos++; }
   if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
+  if(S.coop && COOP && COOP.mate) msg += ' · 🤝 TWO-COMMANDER VICTORY — '+COOP.mate.name.toUpperCase()+"'S CAMPAIGN ADVANCED TOO!";
   document.getElementById('medalText').textContent = msg;
   if(!S.rival){
     // your winning line becomes your defense snapshot — this is the room
-    // invaders will face
-    META.defense = S.units.slice(0,14).map(u=>({t:u.type,x:u.x|0,y:u.y|0,vet:!!u.vet}));
+    // invaders will face (your OWN men only; the ally's march home with them)
+    META.defense = S.units.filter(u=>!u.coopBy).slice(0,14).map(u=>({t:u.type,x:u.x|0,y:u.y|0,vet:!!u.vet}));
   }
   checkAch(); saveMeta(); netSync();
 }
@@ -2315,7 +2579,8 @@ function update(dt){
     for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){ spawnGroup(S.queue[i]); S.queue.splice(i,1); } }
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
-      if(S.wave>=S.cfg.waves.length){ if(!S.cleared){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
+      // allied mission: the guest sim never calls the verdict — the referee does
+      if(S.wave>=S.cfg.waves.length){ if(!S.cleared && !(S.coop&&COOP&&COOP.role==='g')){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
       else {
         S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
         S.interT=20;   // reposition window: move your men, next wave in 20s
@@ -2326,7 +2591,8 @@ function update(dt){
   }
   if(!S.waveActive && S.interT>0 && S.mode==='play'){
     S.interT-=dt;
-    if(S.interT<=0){ S.interT=0; spawnWave(); }
+    // allied mission: the host calls every wave — the guest holds the line here
+    if(S.interT<=0){ if(S.coop&&COOP&&COOP.role==='g'){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
   }
   // invasion: out of budget, out of soldiers, box still standing → repelled
   if(S.invasion && !S.invasion.resolved && S.lives>0
@@ -2495,7 +2761,12 @@ function update(dt){
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
       if(f.boss){ S.shake=0.7; S.floats.push({x:T.x,y:T.y-70,txt:'THE BOSS BROKE THROUGH!',t:0,col:'#D96A55'}); }
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
-      if(S.lives<=0){ S.lives=0; if(S.invasion){ endInvasion(true); } else { endBattle(false); } return; }
+      if(S.lives<=0){ S.lives=0;
+        if(S.invasion){ endInvasion(true); }
+        // allied mission: the guest's local count can run hot — the referee's
+        // beacon restores the truth, or delivers the loss, within a second
+        else if(!(S.coop&&COOP&&COOP.role==='g')){ endBattle(false); }
+        return; }
     }
   }
 
@@ -2583,7 +2854,7 @@ function update(dt){
     u.cd=1/def.rate;
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
-    const dmg = def.dmg * (u.vet?1.5:1) * ((S.bf&&!bfHumanU(u))?1:upMul(u.type));
+    const dmg = def.dmg * (u.vet?1.5:1) * ((S.bf&&!bfHumanU(u))?1:(u.coopUM!=null?u.coopUM:upMul(u.type)));
     const WX = S.bf? WORLD_W : W;
     if(u.type==='flame'){
       bfSfx(SFX.mg, u.x);
@@ -3298,11 +3569,18 @@ function drawHUD(){
     cx.fillText((sudden?'SUDDEN ':'')+bfClock(), VW/2-60, 23);
     cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
   } else {
+    const coopHold = S.coop && COOP && COOP.role==='g' && !S.waveActive;
     cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
       : S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
-      : (S.wave>=S.cfg.waves.length?'ALL WAVES CLEAR'
+      : (S.wave>=S.cfg.waves.length? (S.coop?'CARPET CLEAR — HQ CONFIRMING…':'ALL WAVES CLEAR')
+      : (coopHold && S.interT<=0.5? ('WAVE '+(S.wave+1)+' — ON '+((COOP.mate&&COOP.mate.name)||'YOUR ALLY').toUpperCase()+"'S ORDER")
       : (S.interT>0? ('REPOSITION YOUR MEN — NEXT WAVE IN '+Math.ceil(S.interT)+'S')
-      : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY')), VW/2-60, 23);
+      : 'WAVE '+(S.wave+1)+' / '+S.cfg.waves.length+' READY'))), VW/2-60, 23);
+    if(S.coop && COOP && COOP.mate){
+      cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
+      cx.fillText('🤝 ALLIED MISSION · '+COOP.mate.name.toUpperCase(), VW/2-60, 56);
+      cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
+    }
   }
   cx.textAlign='right';
   cx.fillText(S.bf? (S.bf.team>1? S.bf.team+'v'+S.bf.team : S.bf.rival.name) : ((S.invasion?'THEIR BOX ×':'TOY BOX ×')+S.lives), VW-16, 23);
@@ -3421,12 +3699,18 @@ cv.addEventListener('pointerdown', e=>{
   audio();
   const p=evPos(e);
   // buttons
-  if(inRect(p.x,p.y,btnRects.spd)){ S.speed=S.speed===1?2:1; return; }
+  if(inRect(p.x,p.y,btnRects.spd)){ if(S.coop){ SFX.clack(); } else S.speed=S.speed===1?2:1; return; }  // two sims, one clock — no 2× in co-op
   if(inRect(p.x,p.y,btnRects.snd)){ soundOn=!soundOn; return; }
-  if(inRect(p.x,p.y,btnRects.hq)){ S.drag=null; showMenu(); return; }
-  if(inRect(p.x,p.y,btnRects.wave)){ spawnWave(); return; }
+  if(inRect(p.x,p.y,btnRects.hq)){ S.drag=null; if(S.coop) coopLeave(); showMenu(); return; }  // walking out folds the party
+  if(inRect(p.x,p.y,btnRects.wave)){
+    // allied mission: the guest asks, the host calls it
+    if(S.coop && COOP && COOP.role==='g'){ coopSend({k:'wava'}); SFX.blip(); }
+    else spawnWave();
+    return;
+  }
   if(btnRects.vet && inRect(p.x,p.y,btnRects.vet)){
-    if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; META.stats.vets++; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'}); }
+    if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; META.stats.vets++; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'});
+      if(S.coop && S.sel.cid) coopSend({k:'vet', id:S.sel.cid}); }
     return;
   }
   // BATTLEFIELD. The whole gesture question is settled by where the finger LANDS:
@@ -3466,7 +3750,7 @@ cv.addEventListener('pointerdown', e=>{
   for(let i=0;i<tray.length;i++){
     if(inRect(p.x,p.y,trayRects[i])){
       const t=tray[i].t;
-      if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge')) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; }
+      if(t==='sarge'){ if(!S.units.some(u=>u.type==='sarge'&&!u.coopBy)) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; }  // one Sarge EACH in co-op
       else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null};
       S.sel=null; return;
     }
@@ -3475,7 +3759,7 @@ cv.addEventListener('pointerdown', e=>{
   let hit=null,hd=1e9;
   for(const u of S.units){ const d=Math.hypot(u.x-p.x,(u.y-20)-p.y); if(d<(u.down?44:30)&&d<hd){hd=d;hit=u;} }
   if(hit){
-    if(hit.down){ standUp(hit); S.sel=null; }
+    if(hit.down){ standUp(hit); if(S.coop&&hit.cid) coopSend({k:'up',id:hit.cid}); S.sel=null; }
     else if(hit.type==='sarge' || !S.waveActive){
       // between waves every man is movable — pick him up
       S.drag={type:hit.type,x:p.x,y:p.y-DRAG_OFF,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
@@ -3514,8 +3798,9 @@ cv.addEventListener('pointerup', e=>{
   }
   const dy=p.y-DRAG_OFF;                        // the figure floats above your finger
   if(canPlace(p.x,dy,d.type)){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move'); }
-    else { S.plastic-=COSTS[d.type]; placeUnit(d.type,p.x,dy); }
+    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move');
+      if(S.coop && d.unit.cid) coopSend({k:'mv', id:d.unit.cid, x:p.x|0, y:dy|0}); }
+    else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy); coopPlaced(nu); }
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
 window.addEventListener('pointercancel', ()=>{ S.drag=null; S.pan=null; });
@@ -3745,11 +4030,14 @@ let lastMarch=0;
 function showMenu(){
   S.mode='menu'; S.invasion=null;   // never carry an invasion home to HQ
   S.bf=null; S.pan=null; S.speed=1; resize();   // ...nor a battlefield: the room is 960 wide again
+  S.coop=null;                      // the battle flag only — the party (COOP) rides on
   hideAllOverlays();
   document.getElementById('menu').classList.remove('hidden');
   renderMenu();
   sizeRoom();
   netSync();
+  // a friend's invite link brought them here — connect the two right now
+  if(coopJoinPend){ const code=coopJoinPend; coopJoinPend=null; UI.coopOpen(); UI.coopJoin(code); }
   // if they haven't been dealt with today, you can hear them out on the landing
   if(!META.rivalDays[todayStr()] && Date.now()-lastMarch>45000){ lastMarch=Date.now(); SFX.march(); }
 }
@@ -4022,6 +4310,7 @@ function panelHTML(id){
   switch(id){
     case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+'</p>'
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
+      +'<button class="mbtn alt" style="margin-top:10px" onclick="UI.coopOpen()">🤝 TWO-PLAYER MISSION</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
     case 'shop': return '<h3>THE SHOP</h3>'
       + SHOP_ITEMS.map(s=>{ const owned=META.unlocked.indexOf(s.t)>=0;
@@ -4161,6 +4450,69 @@ window.UI = {
     SFX.laser(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
   promote(){ if(META.pendingPicks>0) showPicker(); },
+  // ===== CO-OP: the allied campaign =====
+  coopOpen(){ SFX.blip(); if(!COOP) COOP=coopFresh('idle'); roomModal(coopPanelHTML()); },
+  coopHost(){
+    SFX.blip();
+    if(COOP) coopLeave();
+    COOP=coopFresh('host');
+    roomModal(coopPanelHTML());
+    coopPost('create').then(r=>{
+      if(!COOP||COOP.ui!=='host') return;
+      if(r&&r.ok){ COOP.code=r.code; COOP.role='h'; COOP.state='open'; roomModal(coopPanelHTML()); coopTick(); }
+      else UI.coopCancel('HQ is unreachable — try again in a minute.');
+    }).catch(()=>{ if(COOP&&COOP.ui==='host') UI.coopCancel('HQ is unreachable — try again in a minute.'); });
+  },
+  coopEnterUI(){
+    SFX.blip();
+    if(!COOP||COOP.code){ if(COOP) coopLeave(); COOP=coopFresh('enter'); } else { COOP.ui='enter'; COOP.note=null; }
+    roomModal(coopPanelHTML());
+    const i=document.getElementById('coopIn');
+    if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); UI.coopJoin(); } }; }
+  },
+  coopJoin(code){
+    const i=document.getElementById('coopIn');
+    code=String(code||(i&&i.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    if(!/^[A-Z2-9]{4,8}$/.test(code)){ if(COOP){ COOP.note='That doesn\'t look like a code — 5 letters and numbers.'; roomModal(coopPanelHTML()); } SFX.clack(); return; }
+    if(!COOP) COOP=coopFresh('enter');
+    coopPost('join',{code}).then(r=>{
+      if(!COOP) return;
+      if(r&&r.ok){
+        COOP.code=r.code; COOP.role='g'; COOP.mate=r.mate; COOP.level=r.level;
+        COOP.state=r.state||'paired'; COOP.ui='paired'; COOP.note=null;
+        SFX.horn(); coopPanelOpen(); coopTick();
+      } else {
+        COOP.note = r&&r.err==='own code'? 'That\'s YOUR code — your friend types it, not you!'
+          : r&&r.err==='party full'? 'That party already marched off with two commanders.'
+          : 'No party answers to that code — double-check it with your friend.';
+        COOP.ui='enter'; roomModal(coopPanelHTML());
+        const j=document.getElementById('coopIn'); if(j){ j.value=code; j.focus(); }
+        SFX.clack();
+      }
+    }).catch(()=>{ if(COOP){ COOP.note='HQ is unreachable — try again in a minute.'; roomModal(coopPanelHTML()); } });
+  },
+  coopQueue(){ SFX.blip(); if(COOP) coopLeave(); COOP=coopFresh('queue'); roomModal(coopPanelHTML()); coopTick(); },
+  coopShare(){
+    if(!COOP||!COOP.code) return;
+    const link=location.origin+location.pathname+'?coop='+COOP.code;
+    const note=document.getElementById('coopNote');
+    const done=t=>{ if(note){ note.textContent=t; note.style.color='#BFE39A'; note.style.opacity='1'; } SFX.coin(); };
+    if(navigator.share){ navigator.share({title:'Green vs Tan', text:'Join my army! Code '+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
+    else if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(()=>done('LINK COPIED — PASTE IT TO YOUR FRIEND!')).catch(()=>{ if(note) note.textContent=link; }); }
+    else if(note){ note.textContent=link; }
+  },
+  coopCancel(noteText){
+    coopLeave();
+    COOP=coopFresh('idle'); if(typeof noteText==='string') COOP.note=noteText;
+    roomModal(coopPanelHTML()); SFX.clack();
+  },
+  coopDeploy(){
+    if(!COOP||COOP.ui!=='paired'||COOP.wantBattle) return;
+    audio(); SFX.horn();
+    COOP.wantBattle=true;
+    roomModal(coopPanelHTML());
+    clearTimeout(COOP.pollT); coopTick();      // fire the order right now
+  },
   room(id){
     if(id==='piggy'){ piggyHop(); return; }
     if(id==='bf'){ openWarTable(); return; }   // the battle plan unrolls the full War Table scene
@@ -4232,7 +4584,8 @@ window.UI = {
 // PRESS START: the whole screen is the button, like god and 1985 intended
 document.getElementById('title').addEventListener('pointerdown', ()=>{
   audio(); SFX.blip();
-  if(META.campaign>0) showMenu();
+  // an invite link outranks the virgin-L1 fast path — get them connected first
+  if(META.campaign>0 || coopJoinPend) showMenu();
   else startBattle(1, null);
 });
 (function fillStrip(){
@@ -4248,12 +4601,14 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
 })();
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
+  if(S.coop && COOP){ showMenu(); UI.coopOpen(); return; }   // back to the party — go again together
   if(S.bf){ startBattlefield(S.bf.mapId, null, S.bf.team); return; }   // instant rematch, same size, no queue
   if(S.invasion && chalTarget){ startInvasion(chalTarget); }
   else startBattle(S.levelN, S.rival);
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
+  if(S.coop && COOP){ if(META.pendingPicks>0) showPicker(); else { showMenu(); UI.coopOpen(); } return; }
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
   if(S.invasion){ S.invasion=null; showMenu(); return; }
   if(META.pendingPicks>0) showPicker(); else showMenu();
@@ -4308,6 +4663,23 @@ window.GVT = {
   boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
   sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ if(w==='pistol') META.up.sarge=rank; else META.sargeUp[w]=rank; } saveMeta(); return sargeStats(); },
   unlockSarge(){ META.sargeUnlocked=['shotgun','sniper','lightsaber']; saveMeta(); return META.sargeUnlocked; },
+  // ===== CO-OP =====
+  coop(){ return COOP? { code:COOP.code, role:COOP.role, ui:COOP.ui, state:COOP.state, level:COOP.level,
+    mate:COOP.mate&&COOP.mate.name, mateHex:COOP.mateHex, seq:COOP.seq, out:COOP.outQ.length,
+    battle:!!S.coop, ended:COOP.ended, lastSeen:COOP.lastSeen,
+    units:S.units.map(u=>({cid:u.cid||null,t:u.type,by:u.coopBy||'me',x:u.x|0,y:u.y|0,down:u.down,vet:u.vet,sw:u.coopSW&&u.coopSW.w})) } : null; },
+  coopHost(){ UI.coopHost(); },
+  coopJoin(code){ UI.coopJoin(code); },
+  coopQueue(){ UI.coopQueue(); },
+  coopDeploy(){ UI.coopDeploy(); },
+  coopPlace(t,x,y){ if(!S.coop||!UDEF[t]) return null;
+    if(t!=='sarge' && S.plastic<COSTS[t]) return null;
+    if(!canPlace(x,y,t)) return null;
+    if(t!=='sarge') S.plastic-=COSTS[t];
+    return coopPlaced(placeUnit(t,x,y)).cid; },
+  coopStand(cid){ const u=coopUnit(cid); if(u&&u.down){ standUp(u); coopSend({k:'up',id:cid}); } return u&&!u.down; },
+  coopWave(){ if(S.coop&&COOP&&COOP.role==='g') coopSend({k:'wava'}); else spawnWave(); },
+  coopQuit(){ coopLeave(); },
   // ===== BATTLEFIELD =====
   battlefield(mapId,diff,team){ startBattlefield(mapId, diff, team); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },
   bfQueue(size){ bfQueueStart(size); return BFQ && { size:BFQ.size, joined:BFQ.joined }; },
