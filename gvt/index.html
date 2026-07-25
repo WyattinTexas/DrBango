@@ -1223,7 +1223,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.23</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.24</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1782,8 +1782,9 @@ const NET='https://nationgame.live/gvt';
 // a friend's invite link (?coop=CODE): stash the code, scrub the URL so a
 // refresh doesn't re-join, and connect the moment they reach the room
 let coopJoinPend=null, coopJoinMode='pair';
-try{ const cm=location.search.match(/[?&](coop|squad)=([A-Za-z0-9]{4,8})/i);
-  if(cm){ coopJoinMode=cm[1].toLowerCase()==='squad'?'squad':'pair';
+try{ const cm=location.search.match(/[?&](coop|squad|room)=([A-Za-z0-9]{4,8})/i);
+  if(cm){ const kd=cm[1].toLowerCase();
+    coopJoinMode = kd==='squad'? 'squad' : kd==='room'? 'room' : 'pair';
     coopJoinPend=cm[2].toUpperCase(); history.replaceState(null,'',location.pathname); } }catch(e){}
 let lastSync=0;
 function netSync(){
@@ -2581,7 +2582,7 @@ function bfSeatPlan(team, riv){
   const myHex=dyeHex()||GREEN;
   const used=[myHex], names={ [META.name]:1 };
   const uname=()=>{ let n=callsign(), guard=0; while(names[n] && guard++<25) n=callsign(); names[n]=1; return n; };
-  const seats=[{ i:0, name:META.name, team:'you', hex:myHex, human:true, brain:null, purse:BF_START, tagT:0, persona:null }];
+  const seats=[{ i:0, name:META.name, team:'you', hex:myHex, human:true, me:true, brain:null, purse:BF_START, tagT:0, persona:null }];
   for(let k=1;k<team;k++){ const hex=bfPickHex(used);
     seats.push({ i:k, name:uname(), team:'you', hex, human:false, brain:null, purse:BF_START, tagT:0, persona:{id:bfPersonaFor(hex)} }); }
   for(let k=0;k<team;k++){ const cap=(k===0);          // the daily rival captains the other side
@@ -2713,17 +2714,25 @@ function coopMe(){ return { name:META.name, camp:META.campaign, hex:dyeHex() }; 
 function coopIsHost(){ return !!(COOP && COOP.host); }
 function coopGuest(){ return !!(S.coop && COOP && !COOP.host); }   // "not the referee"
 function coopSquad(){ return !!(COOP && COOP.mode==='squad'); }
-// every OTHER commander in the party, in one shape both modes can render
+// v1.24: the third mode. A PRIVATE BATTLEFIELD ROOM — the battleground, behind an
+// invite, with real people in the chairs on both sides. It shares this whole
+// relay; what differs is that it has TWO SIDES and no random door at all.
+function coopRoom(){ return !!(COOP && COOP.mode==='room'); }
+function roomBattle(){ return !!(S.coop && S.bf && coopRoom()); }
+// the group modes both keep a members[] roster; the pair keeps one mate
+function coopMulti(){ return coopSquad() || coopRoom(); }
+// every OTHER commander in the party, in one shape all three modes can render
 function coopRoster(){
   if(!COOP) return [];
-  if(COOP.mode==='squad') return (COOP.members||[]).filter(m=>m.seat!==COOP.seat);
+  if(coopMulti()) return (COOP.members||[]).filter(m=>m.seat!==COOP.seat);
   return COOP.mate? [COOP.mate] : [];
 }
-function coopHumans(){ return coopSquad()? Math.max(1,(COOP.members||[]).length) : (COOP&&COOP.mate?2:1); }
+function coopHumans(){ return coopMulti()? Math.max(1,(COOP.members||[]).length) : (COOP&&COOP.mate?2:1); }
+function coopFam(){ return coopRoom()? '/room/' : coopSquad()? '/lobby/' : '/coop/'; }
 // `fam` is an override for the one caller that has already torn COOP down and so
 // can no longer be asked which family it belongs to — see coopLeave.
 function coopPost(ep,body,fam){
-  fam = fam || (coopSquad()? '/lobby/' : '/coop/');
+  fam = fam || coopFam();
   return fetch(NET+fam+ep,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe()},body||{}))}).then(r=>r.json());
 }
@@ -2731,7 +2740,9 @@ function coopFresh(ui,mode){
   return { mode:mode||'pair', code:null, role:null, host:false, seat:0, mate:null, members:[],
            pc:1, seatHex:{}, level:0, state:'idle', ui:ui||'idle', seq:0,
            outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
-           mateHex:null, misses:0, qT0:Date.now() };
+           mateHex:null, misses:0, qT0:Date.now(),
+           // room only: the table settings, and which chair you took
+           team:META.bfTeam||1, map:META.bfMap, side:'y', slot:0, wantSide:null, wantTeam:0 };
 }
 // one heartbeat for everything: pairing, matchmaking, and the in-battle relay
 function coopTick(){
@@ -2758,7 +2769,26 @@ function coopTick(){
   const body={ code:COOP.code, seq:COOP.seq };
   const sending=COOP.outQ.slice(0,40);
   if(sending.length) body.cmds=sending;
-  if(S.coop && COOP.host && !COOP.ended) body.beacon={ lives:S.lives, wave:S.wave };
+  if(S.coop && COOP.host && !COOP.ended){
+    // THE REFEREE'S BEACON. In the campaign modes it carries lives and the wave
+    // number; in a room it carries the only four numbers a battleground result
+    // can turn on — both toy boxes, the clock, and which phase we are in. Every
+    // other sim adopts them rather than trusting its own drifted copy.
+    body.beacon = roomBattle()
+      ? { hy:S.bf.base.you.hp, hf:S.bf.base.foe.hp,
+          dy:S.bf.base.you.dmgTaken, df:S.bf.base.foe.dmgTaken,
+          tl:Math.round(S.bf.timeLeft*10)/10, ph:S.bf.phase, ot:S.bf.ot?1:0 }
+      : { lives:S.lives, wave:S.wave };
+  }
+  // the room's table orders ride the same poll — the host's size/map stepper and
+  // anybody's SWITCH SIDES. Request-scoped, so they clear on the reply that
+  // carried them (the deploy-race law, applied to every flag on this request).
+  const sentSide=COOP.wantSide, sentTeam=COOP.wantTeam;
+  if(coopRoom()){
+    if(sentSide) body.side=sentSide;
+    if(sentTeam) body.team=sentTeam;
+    if(COOP.wantMap){ body.map=COOP.wantMap; }
+  }
   // ⚠ CARRY THE ORDER WITH THE REQUEST IT RODE ON. A poll already in flight when
   // DEPLOY is pressed comes back saying "still open" — of course it does, it was
   // sent before the order existed — and clearing wantBattle on THAT reply throws
@@ -2773,6 +2803,9 @@ function coopTick(){
     if(!r||!r.ok){ coopMiss(r); return; }
     COOP.misses=0;
     COOP.outQ.splice(0, sending.length);       // delivered — safe to drop
+    if(sentSide && COOP.wantSide===sentSide) COOP.wantSide=null;
+    if(sentTeam && COOP.wantTeam===sentTeam) COOP.wantTeam=0;
+    if(body.map && COOP.wantMap===body.map) COOP.wantMap=null;
     coopOnPoll(r, sentWant);
   }).catch(()=>{ if(COOP){ COOP.busy=false; coopMiss(); } });
 }
@@ -2780,25 +2813,35 @@ function coopMiss(r){
   if(!COOP) return;
   if(r && (r.err==='no party' || r.err==='party full' || r.err==='in battle')){
     // the party is gone — everyone left, or HQ swept it
-    const nm=coopSquad()? 'THE SQUAD' : (COOP.mate? COOP.mate.name.toUpperCase() : 'YOUR ALLY');
-    const sq=coopSquad();
+    const nm=coopRoom()? 'THE ROOM' : coopSquad()? 'THE SQUAD' : (COOP.mate? COOP.mate.name.toUpperCase() : 'YOUR ALLY');
+    const sq=coopMulti();
     if(S.coop){ coopDissolve(nm+(sq?' STOOD DOWN':' WENT HOME')+' — CARRY ON, COMMANDER!'); }
     else { const m=COOP.mode; clearTimeout(COOP.pollT); COOP=coopFresh('idle',m);
-           COOP.note=sq? 'That squad has stood down.' : 'Your ally left the party.'; coopPanelSync(); }
+           COOP.note=coopRoom()? 'That room has closed.' : sq? 'That squad has stood down.' : 'Your ally left the party.'; coopPanelSync(); }
     return;
   }
   COOP.misses++; coopPanelSync();
 }
 function coopOnPoll(r, sentWant){
   const wasState=COOP.state;
-  COOP.state=r.state; COOP.level=r.level;
-  if(coopSquad()){
+  COOP.state=r.state; if(r.level!=null) COOP.level=r.level;
+  if(coopMulti()){
     // ⚠ role is the wire IDENTITY and the cmds filter below reads it — set it
     // BEFORE replaying anything, or a re-seated client applies its own orders twice.
     if(typeof r.seat==='number'){ COOP.seat=r.seat; COOP.role=String(r.seat); }
     COOP.host=!!r.host;                        // the chair can change hands mid-match
-    if(Array.isArray(r.members)){ COOP.members=r.members; coopSeatColours(); }
+    if(Array.isArray(r.members)){ COOP.members=r.members;
+      if(coopRoom()) roomSeatColours(); else coopSeatColours(); }
     COOP.pc=r.pc||r.players||COOP.members.length||1;
+    if(coopRoom()){
+      // ⚠ the table settings are HQ's, not this client's — but never overwrite a
+      // change of my own that is still in flight, or the stepper snaps back one
+      // tick before the server has heard about it.
+      if(typeof r.team==='number' && !COOP.wantTeam) COOP.team=Math.max(1,Math.min(BF_MAX_TEAM,r.team));
+      if(typeof r.map==='string' && r.map && !COOP.wantMap) COOP.map=r.map;
+      const mine=(COOP.members||[]).find(m=>m.seat===COOP.seat);
+      if(mine && !COOP.wantSide){ COOP.side=mine.side||'y'; COOP.slot=mine.slot|0; }
+    }
   } else if(r.mate){ COOP.mate=r.mate; COOP.lastSeen=r.mate.seen||0; }
   let sqTop=0;
   (r.cmds||[]).forEach(cm=>{
@@ -2814,13 +2857,20 @@ function coopOnPoll(r, sentWant){
   // the referee's word on lives lands straight away
   if(S.coop && COOP && !COOP.host && r.beacon && !COOP.ended && typeof r.beacon.lives==='number')
     S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
+  // ...and in a room, the referee's word on both toy boxes and the clock. A
+  // guest's own sim keeps SHOWING its drifted numbers between beacons — the men
+  // still shoot, the bases still crumble — but every second the truth lands on
+  // top of it, so no two screens can disagree about who is winning.
+  if(roomBattle() && COOP && !COOP.host && r.beacon && !COOP.ended) roomAdoptBeacon(r.beacon);
   if(!COOP) return;                            // an applied 'end' can tear things down
   // only a reply to a request that ACTUALLY CARRIED the order may cancel it
   if(r.state!=='battle' && sentWant) COOP.wantBattle=false;
-  if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu') coopStartBattle();
-  else if(!coopSquad() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
+  if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu'){
+    if(coopRoom()) roomStartBattle(); else coopStartBattle();
+  }
+  else if(!coopMulti() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
   else {
-    if(coopSquad() && S.mode==='menu' && COOP.ui!=='lobby' && COOP.ui!=='enter'){ COOP.ui='lobby'; coopPanelOpen(); }
+    if(coopMulti() && S.mode==='menu' && COOP.ui!=='lobby' && COOP.ui!=='enter'){ COOP.ui='lobby'; coopPanelOpen(); }
     else coopPanelSync();
   }
   // ⚠ THE WAVE CATCH-UP GOES LAST, after the battle may have STARTED on this
@@ -2828,7 +2878,10 @@ function coopOnPoll(r, sentWant){
   // that also flips it into the battle — and coopApply/sqCatchUp both no-op while
   // we are still standing in the room, so anything done above that line is thrown
   // away. Done here, a reconnecting commander lands on the right wave.
-  if(S.coop && !COOP.ended){
+  // ⚠ WAVES ARE A CAMPAIGN IDEA. A room is a battleground: S.foes stays empty,
+  // there is no wave gate and no ticker, and running the catch-up here would
+  // spawnWave() a campaign wave onto a battlefield that has none.
+  if(S.coop && !COOP.ended && !S.bf){
     let want=sqTop;
     if(!COOP.host && r.beacon) want=Math.max(want, r.beacon.wave|0);
     // ⚠ NEVER coopCatchUp() in a squad mission — it wipes the carpet and calls
@@ -2837,9 +2890,10 @@ function coopOnPoll(r, sentWant){
     if(want>S.wave){ if(S.sq) sqCatchUp(want); else if(!COOP.host) coopCatchUp(want); }
   }
   // PAIR: a mate silent mid-battle has put the controller down and the battle goes
-  // solo. SQUAD: one quiet commander is just nine other people still fighting —
-  // the roster shrinks (HQ prunes them), their men fight on, nobody is wedged.
-  if(S.coop && !coopSquad() && COOP.lastSeen>12){
+  // solo. SQUAD/ROOM: one quiet commander is just the other nineteen still
+  // fighting — the roster shrinks (HQ prunes them), their men fight on, nobody
+  // is wedged, and in a room the referee keeps refereeing.
+  if(S.coop && !coopMulti() && COOP.lastSeen>12){
     const nm=COOP.mate? COOP.mate.name : 'YOUR ALLY';
     coopDissolve(nm.toUpperCase()+"'S SIGNAL DROPPED — CARRY ON!");
   }
@@ -2874,6 +2928,8 @@ function coopPlaced(u){
 }
 function coopApply(cm){
   if(!cm || typeof cm!=='object') return;
+  // a private room speaks its own two words (place / end) — different shape, same wire
+  if(coopRoom()){ roomApply(cm); return; }
   if(cm.k==='end'){ coopVerdict(cm.r==='win'); return; }
   if(!S.coop || S.mode!=='play') return;       // battle talk means nothing at HQ or on an end screen
   if(cm.k==='place'){
@@ -3037,6 +3093,151 @@ function sqCatchUp(n){
   S.wave=n-1;
   sqPushWave(n, true);
 }
+// ============ THE PRIVATE BATTLEFIELD ROOM (v1.24) ============
+// Wyatt 7/25: friends should be able to play the battleground TOGETHER, up to
+// 10v10, behind an invite — the same modes, the same maps, the same clock. So
+// this is the battleground with the AI seats handed over to real people, and it
+// rides the co-op relay unchanged: mirrored full local sims, one referee.
+//
+// THREE THINGS ARE TRUE HERE AND NOWHERE ELSE IN THE GAME:
+//  1. A commander can be sitting on the RIGHT-HAND side of the carpet. Nothing is
+//     mirrored per client (the world is absolute, so a relayed x is the same spot
+//     on all twenty screens) — instead bfMySeat()/bfMyTeam() answer "which chair",
+//     and the camera, the bars, the tray and the verdict all read from those.
+//  2. There is no wave gate, no lives and no campaign level, so the referee's
+//     beacon carries the two TOY BOXES and the clock instead.
+//  3. Empty chairs are filled by the AI, so a room never has to wait for a
+//     twentieth friend to show up. See ROOM_AI_FILL.
+// ⚠ INVITE-ONLY IS STRUCTURAL, not a flag: the server's room table has no `pub`
+// column and no listing query, so FIND AN ALLY / FIND A SQUAD cannot see one.
+const ROOM_MAX=BF_MAX_TEAM;    // 10 a side — the battleground's own ceiling
+// ⚠ SEAT FILLING, and it is a real call (Wyatt's to overrule): a room STARTS WHEN
+// THE HOST SAYS SO and the computer takes every chair nobody claimed. The
+// alternative — hold the match until all 2N seats have a person in them — means
+// three friends who wanted a 2v2 can never start one, and it makes the size
+// stepper a trap rather than a choice. AI fill also keeps the sides even, which
+// is the thing that actually decides whether a match is worth playing.
+const ROOM_AI_FILL=true;
+// every commander keeps their own dye if it reads next to the ones already
+// taken, else the roster hands them a spare. Same picker the battleground's
+// twenty seats use, so nobody ever fights their own colour.
+function roomSeatColours(){
+  if(!COOP) return;
+  const used=[dyeHex()||GREEN], map={};
+  for(const m of (COOP.members||[])){
+    if(m.seat===COOP.seat) continue;
+    map[String(m.seat)] = bfPickHex(used, m.hex||null);
+  }
+  COOP.seatHex=map;
+  for(const h of Object.values(map)) buildUnitTint(h);
+}
+// THE SEAT PLAN, built from the room's roster instead of rolled locally. Real
+// people take the chairs they picked; the computer takes the rest.
+function roomSeatPlan(team){
+  const riv=todaysRival(), mine=(dyeHex()||GREEN);
+  const used=[mine], names={};
+  const uname=()=>{ let n=callsign(), guard=0; while(names[n] && guard++<25) n=callsign(); names[n]=1; return n; };
+  const byS={}; for(const m of (COOP.members||[])) byS[m.seat]=m;
+  const seats=[];
+  for(let i=0;i<team*2;i++){
+    const tm=(i<team)?'you':'foe', m=byS[i];
+    if(m){
+      const me=(m.seat===COOP.seat);
+      const hex = me? mine : (COOP.seatHex[String(i)] || bfPickHex(used, m.hex||null));
+      if(!me) used.push(hex);
+      names[m.name||'']=1;
+      seats.push({ i, name:(m.name||'COMMANDER'), team:tm, hex, human:true, me, brain:null,
+                   purse:BF_START, tagT:0, persona:null });
+    } else {
+      const cap=(i===team && !byS[team]);      // the daily rival captains an unclaimed right flank
+      const hex=bfPickHex(used, cap? riv.hex:null);
+      seats.push({ i, name:uname(), team:tm, hex, human:false, me:false, brain:null,
+                   purse:BF_START, tagT:0, persona:{ id: cap? riv.id : bfPersonaFor(hex) } });
+    }
+  }
+  return seats;
+}
+function roomStartBattle(){
+  UI.closeModal();
+  COOP.ended=false; COOP.wantBattle=false; COOP.cnt=1; COOP.seq=0; COOP.outQ.length=0;
+  const team=Math.max(1,Math.min(ROOM_MAX,COOP.team|0));
+  coopLaunching=true;
+  startBattlefield(COOP.map, null, team, roomSeatPlan(team));
+  coopLaunching=false;
+  S.coop=COOP;
+  S.bf.room=true;
+  const ppl=Math.max(1,(COOP.members||[]).length);
+  S.ann={ txt:'PRIVATE BATTLE — '+team+' v '+team+' · '+ppl+' REAL COMMANDER'+(ppl===1?'':'S'), t:3.0 };
+  SFX.horn();
+  coopTick();
+}
+// the referee's numbers land on top of this sim's own. Only the four that decide
+// a result — everything else (where the men are, who shot whom) is allowed to
+// drift, exactly as it does in the campaign co-op.
+function roomAdoptBeacon(b){
+  const bf=S.bf; if(!bf || bf.resolved) return;
+  if(typeof b.hy==='number') bf.base.you.hp=Math.max(0,Math.min(bf.base.you.hpMax,b.hy|0));
+  if(typeof b.hf==='number') bf.base.foe.hp=Math.max(0,Math.min(bf.base.foe.hpMax,b.hf|0));
+  if(typeof b.dy==='number') bf.base.you.dmgTaken=Math.max(0,b.dy|0);
+  if(typeof b.df==='number') bf.base.foe.dmgTaken=Math.max(0,b.df|0);
+  if(typeof b.tl==='number') bf.timeLeft=Math.max(0,+b.tl||0);
+  if(b.ph==='sudden' && bf.phase!=='sudden'){ bf.phase='sudden'; S.ann={txt:'SUDDEN DEATH — FIRST HIT WINS',t:3,warn:true}; SFX.horn(); }
+  if(b.ot && !bf.ot){ bf.ot=true; S.ann={txt:'PUSH! — DOUBLE TAGS',t:2.4,warn:true}; SFX.horn(); }
+}
+// ONE order on the wire, and it is the one the battleground already had: a
+// commander put a man down. It carries the same optional loadout fields the
+// campaign co-op relays (rank, Sarge's kit, the mod bench) plus the hull points
+// off the Vehicle Hub, so a friend's men fight at THEIR strength on your screen.
+// ⚠ `n` CARRIES THE SEAT THE ORDER IS FOR, and it is not the same thing as who
+// sent it. HQ stamps every command with the SENDER's seat (`p`) — right for your
+// own men, wrong for the eighteen AI chairs the referee is relaying on behalf of,
+// which would all arrive wearing the referee's colours and count against the
+// referee's Sarge. `n` was already on the whitelist, so this cost no wire change.
+function roomPlaced(seat,type,x,y){
+  if(!roomBattle() || !COOP || COOP.ended) return;
+  const cm={ k:'place', n:seat|0, t:type, x:x|0, y:y|0 };
+  if(seat===bfMySeat()){
+    // your men fight at YOUR rank, with YOUR bench and YOUR hull points
+    cm.um=+upMul(type).toFixed(2);
+    if(type==='sarge') cm.sw=sargeStats();
+    const mo=enhWire(); if(mo) cm.mo=mo;
+    if(VEH_ORDER.indexOf(type)>=0) cm.vh=vehHP(type)|0;
+  } else if(type==='sarge'){
+    // an AI seat's Sarge drew his weapon out of the crate once, on the referee's
+    // client — relay it, or each screen would roll him a different one
+    const st=S.bf.seats[seat]; if(st && st.kit) cm.sw=st.kit;
+  }
+  coopSend(cm);
+}
+function roomApply(cm){
+  if(cm.k==='end'){ roomVerdict(cm.r, cm.n); return; }
+  if(cm.k!=='place' || !S.bf || S.mode!=='play') return;
+  const seat=(typeof cm.n==='number')? (cm.n|0) : parseInt(cm.p,10);
+  if(!(seat>=0) || !S.bf.seats[seat]) return;
+  const u=applyDeploy(seat, cm.t, cm.x|0, cm.y|0, true);
+  if(!u) return;
+  // the same three ownership fields the campaign co-op uses, so enhU / upMul /
+  // unitSargeStats all read the OWNER's kit off the unit without knowing a room
+  // exists. `coopMods` is always set: its presence is what marks a figure as
+  // "relayed, not mine".
+  if(cm.um) u.coopUM=Math.max(1,Math.min(1.6,+cm.um||1));
+  u.coopMods=Array.isArray(cm.mo)? cm.mo.filter(id=>ENH_ORDER.indexOf(id)>=0) : [];
+  if(cm.t==='sarge' && cm.sw && typeof cm.sw==='object'){
+    u.coopSW=cm.sw;
+    if(cm.sw.w==='lightsaber'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; u.saberCd=0; }
+  }
+  // a machine off THEIR shelf carries the armour THEY bolted on
+  if(cm.vh && u.def && u.def.vehicle){ u.hpMax=Math.max(1,Math.min(200,cm.vh|0)); u.hp=u.hpMax; }
+}
+// the referee's verdict, relayed. `ranked` (0/1) is HQ's farm guard — see
+// endBattlefield for what it does and does not gate.
+function roomVerdict(reason, ranked){
+  if(COOP) { COOP.ended=true; COOP.ranked=(ranked==null? 1 : (ranked|0)); }
+  if(!S.bf || S.mode!=='play' || S.bf.resolved) return;
+  S.bf.ending=false;
+  endBattlefield(String(reason||'time'), true);
+}
+
 // the referee's verdict arrives by relay (guest path — the host judged it live)
 function coopVerdict(win){
   if(COOP) COOP.ended=true;
@@ -3063,24 +3264,38 @@ function coopLeave(){
   // stayed occupied until HQ's 45s prune, which blocks a tenth player from joining
   // and, worse, counts a departed commander into the FROZEN army size if the leader
   // deploys inside that window.
-  const code=COOP.code, fam=coopSquad()? '/lobby/' : '/coop/';
+  const code=COOP.code, fam=coopFam();
   COOP=null; S.coop=null;
-  try{ coopPost('leave', code?{code}:{}, fam).catch(()=>{}); }catch(e){}
+  // ⚠ NEVER SEND THE CODELESS LEAVE. HQ reads a leave with no code as "stand this
+  // commander down from EVERY party they are sitting in" — and every one of these
+  // buttons (OPEN A ROOM, START A SQUAD, INVITE A FRIEND) tears the old party
+  // down and then immediately creates a new one. The two requests are in flight
+  // together, so a wildcard leave that lands after the create deletes the seat in
+  // the party you just made and HQ sweeps the empty room out from under you: the
+  // code arrives, the first poll 404s, and the panel says "that room has closed"
+  // about a room that existed for a quarter of a second. A party you never joined
+  // has nothing to leave — so say nothing. (Latent in the squad path since v1.23
+  // for exactly the same reason; this fixes all three families at once.)
+  if(!code) return;
+  try{ coopPost('leave', {code}, fam).catch(()=>{}); }catch(e){}
 }
 // ---- the co-op panel (room-modal family, big and kid-proof) ----
 function coopPanelHTML(){
   const c=COOP;
   const squad=!!(c&&c.mode==='squad');
+  const room=!!(c&&c.mode==='room'&&c.ui!=='pick');
   // THE FRONT DOOR: two missions, one card, and a kid can tell them apart at a
   // glance — two soldiers or a whole squad.
   if(!c || c.ui==='pick'){
     return '<div id="coopPanel"><h3>🤝 PLAY WITH FRIENDS</h3>'
-      +'<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 10px">Pick your kind of mission. Either way, <b>everyone\'s</b> campaign moves up when you win.</p>'
+      +'<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 10px">Pick your kind of game. Fight the Tan together, or fight <b>each other</b>.</p>'
       +(c&&c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
       +'<button class="coopbtn" onclick="UI.coopMode(\'pair\')"><span class="ico">🤝</span><span>TWO-PLAYER MISSION<small>You and one friend, a normal campaign level</small></span></button>'
       +'<button class="coopbtn" onclick="UI.coopMode(\'squad\')"><span class="ico">🎖</span><span>HOLD THE LINE<small>Up to TEN of you — the Tan never stop coming</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopMode(\'room\')"><span class="ico">⚔</span><span>PRIVATE BATTLE<small>Your friends only — up to 10 v 10 on the battlefield</small></span></button>'
       +'</div>';
   }
+  if(room) return roomPanelHTML(c);
   let h='<div id="coopPanel"><h3>'+(squad?'🎖 HOLD THE LINE':'🤝 TWO-PLAYER MISSION')+'</h3>';
   const rule=squad
     ? '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Up to <b>10 real commanders</b> on one carpet. The Tan come in <b>without stopping</b> — no breaks between waves. Beat the level and <b>every</b> campaign advances. <b>'+SQ_CAP+' men each</b>, so everybody matters.</p>'
@@ -3150,6 +3365,77 @@ function coopPanelHTML(){
   }
   return h+'</div>';
 }
+// ---- THE PRIVATE ROOM's own panel: a door, then a table with two benches ----
+function roomPanelHTML(c){
+  let h='<div id="coopPanel"><h3>⚔ PRIVATE BATTLE</h3>';
+  const back='<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopPick();return false">← other games</a></p>';
+  if(c.ui==='idle'){
+    return h+'<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">The battlefield, <b>friends only</b>. Up to <b>10 v 10</b>, real people on <b>both</b> sides, and the computer takes any seat nobody claims. <b>The winning team gets ★ and XP</b>, same as always.</p>'
+      +'<p style="font-size:0.95rem;opacity:0.6;margin:0 0 8px">Nobody can wander in — a room can only be reached with its code.</p>'
+      +(c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
+      +'<button class="coopbtn" onclick="UI.roomHost()"><span class="ico">🔗</span><span>OPEN A ROOM<small>Get a code and a link to send everyone</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopEnterUI()"><span class="ico">🎟️</span><span>ENTER A ROOM CODE<small>They sent you one? Punch it in</small></span></button>'
+      +back+'</div>';
+  }
+  if(c.ui==='enter'){
+    return h+'<p style="font-size:1.05rem;margin:2px 0 8px">Type the room code your friend sent you:</p>'
+      +'<input id="coopIn" class="coopin" maxlength="8" spellcheck="false" autocomplete="off" placeholder="·····">'
+      +(c.note? '<p style="color:#D96A55;font-size:1rem;margin:8px 0 0">'+escH(c.note)+'</p>':'')
+      +'<button class="mbtn alt" style="width:100%;margin-top:12px" onclick="UI.coopJoin()">REPORT FOR DUTY</button>'
+      +'<p style="text-align:center;margin:8px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">← back</a></p></div>';
+  }
+  // THE TABLE. Two benches side by side, every chair either a commander or an
+  // open seat the computer will take — so a kid can see at a glance who is on
+  // whose team, and tap a seat to change their mind.
+  const team=Math.max(1,Math.min(ROOM_MAX,c.team|0));
+  const mem=(c.members||[]), amHost=!!c.host;
+  const bySeat={}; for(const m of mem) bySeat[m.seat]=m;
+  const bench=(sd,label,col)=>{
+    let rows='';
+    for(let k=0;k<team;k++){
+      const seat=k+(sd==='f'?team:0), m=bySeat[seat];
+      const mine=m && m.seat===c.seat;
+      const hex=m? (mine? (dyeHex()||GREEN) : (c.seatHex[String(seat)]||'#5B84C4')) : '#3a3f30';
+      rows+='<div class="coopally" style="margin:3px 0'+(m?'':';opacity:0.5')+'">'
+        +'<span class="rivalchip" style="background:'+escH(hex)+'"></span>'
+        +(m? '<b>'+escH(m.name||'COMMANDER')+'</b>'+(mine?' <span style="opacity:0.7">— YOU</span>':'')
+             +(m.host?' <span style="color:#E8C46A">★</span>':'')
+             +'<span style="margin-left:auto;opacity:0.7">'+((m.seen|0)>8?'📡':'✓')+'</span>'
+           : '<span style="opacity:0.8">'+(ROOM_AI_FILL?'COMPUTER':'OPEN SEAT')+'</span>')
+        +'</div>';
+    }
+    return '<div style="flex:1;min-width:0"><div style="font-size:1rem;color:'+col+';margin-bottom:2px">'
+      +label+(c.side===sd?' <span style="opacity:0.7">(you)</span>':'')+'</div>'+rows+'</div>';
+  };
+  const humans=mem.length;
+  h+='<p style="text-align:center;font-size:1.05rem;margin:2px 0 0">ROOM CODE</p>'
+    +'<div class="coopcode">'+escH(c.code||'·····')+'</div>'
+    +'<button class="mbtn" style="width:100%" onclick="UI.coopShare()">'+(navigator.share?'📤 SEND THE INVITE LINK':'📋 COPY THE INVITE LINK')+'</button>'
+    +'<div id="coopNote" style="text-align:center;font-size:0.95rem;opacity:0.7;margin-top:6px">or read them the code — it goes in ENTER A ROOM CODE</div>';
+  if(amHost){
+    h+='<div style="display:flex;align-items:center;gap:8px;margin:12px 0 2px">'
+      +'<span style="font-size:1.05rem">TEAM SIZE</span>'
+      +'<button class="mbtn" style="padding:2px 14px" onclick="UI.roomTeam(-1)">−</button>'
+      +'<b style="font-size:1.3rem;min-width:74px;text-align:center">'+team+' v '+team+'</b>'
+      +'<button class="mbtn" style="padding:2px 14px" onclick="UI.roomTeam(1)">+</button>'
+      +'<span style="margin-left:auto;font-size:0.95rem;opacity:0.75">'+escH(bfMap(c.map).name)+'</span>'
+      +'<button class="mbtn" style="padding:2px 10px" onclick="UI.roomMap()">MAP ▸</button>'
+      +'</div>';
+  } else {
+    h+='<div style="margin:12px 0 2px;font-size:1.05rem"><b>'+team+' v '+team+'</b> · '+escH(bfMap(c.map).name)+'</div>';
+  }
+  h+='<div style="display:flex;gap:10px;margin:6px 0 4px">'
+    +bench('y','GREEN SQUAD','#BFE39A')+bench('f','TAN SQUAD','#E8A08C')+'</div>'
+    +'<button class="mbtn" style="width:100%;margin-top:2px" onclick="UI.roomSide()">⇄ SWITCH TO THE '+(c.side==='y'?'TAN':'GREEN')+' SIDE</button>'
+    +'<p style="font-size:0.95rem;opacity:0.75;margin:8px 0 6px"><b>'+humans+'</b> real commander'+(humans===1?'':'s')
+      +' · the computer takes the other '+Math.max(0,team*2-humans)+'. Winning team: <b>+25★ and XP</b> each.</p>'
+    +(c.wantBattle? '<div class="coopwait" style="font-size:1.2rem">⚔ DEPLOYING…</div>'
+      : amHost
+        ? '<button class="mbtn alt" style="width:100%;font-size:1.3rem" onclick="UI.coopDeploy()">⚔ FIGHT — '+team+' v '+team+'</button>'
+        : '<div class="coopwait">WAITING FOR THE HOST TO START IT…</div>')
+    +'<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">leave the room</a></p>';
+  return h+'</div>';
+}
 function coopPanelOpen(){ if(S.mode==='menu') roomModal(coopPanelHTML()); }
 function coopPanelSync(){
   if(S.mode!=='menu' || !document.getElementById('coopPanel')) return;
@@ -3183,14 +3469,21 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
     st.laneBias = team>1 ? 110 + (idx+0.5)*((H-220)/team) : null;   // 1v1 keeps the tuned solo brain untouched
   }
   const bhp=bfBaseHP(team);
+  // WHICH ONE IS MINE. In every solo battleground that is seat 0 on the left, and
+  // the plan says so. In a private room the plan comes off the room's roster and
+  // your chair may well be one of the ten on the RIGHT — so the camera opens
+  // looking at your own toy box, not somebody else's.
+  const meSeat=seats.find(st=>st.me) || seats[0];
+  const myTeam=meSeat.team;
   S.cfg={ n:0, hpMul:1, cntMul:1, waves:[], terrain:bfTerrain(map) };
   S.bf = { resolved:false, ending:false, mapId:map.id, mapName:map.name, phase:'live',
     team, timeLeft:bfClockFor(team), ot:false, seats, myKills:0,
+    mySeat:meSeat.i, myTeam,
     base:{ you:{x:130,y:300,hp:bhp,hpMax:bhp,dmgTaken:0},
            foe:{x:WORLD_W-130,y:300,hp:bhp,hpMax:bhp,dmgTaken:0} },
     ai:{ diff },
     rival:riv, hex:{ you:seats[0].hex, foe:seats[team].hex },
-    cam:{ x:0, vx:0 } };
+    cam:{ x:(myTeam==='foe'? Math.max(0,WORLD_W-VW) : 0), vx:0 } };
   S.plastic=BF_START;                          // every purse starts level
   META.bfMap=map.id; META.bfTeam=team; saveMeta();
   resize();                                    // the world just got wider — refit
@@ -3209,18 +3502,55 @@ const BF_END = {
   edge:      ['WON<br>ON THE PUSH','Nothing separated the bases, so it went to whoever was deepest. That was you.'],
   edgeLoss:  ['LOST<br>ON THE PUSH','Nothing separated the bases, and their man was deeper than yours.']
 };
-function endBattlefield(reason){
+// every `reason` is written from the LEFT-HAND team's point of view, because
+// that is the only side a player could ever be on before v1.24. A commander
+// sitting on the right reads the same result upside down — one flip, so the
+// referee can keep relaying exactly one word for the whole room.
+const BF_FLIP={ ko:'koLoss', koLoss:'ko', time:'timeLoss', timeLoss:'time',
+                sudden:'suddenLoss', suddenLoss:'sudden', edge:'edgeLoss', edgeLoss:'edge' };
+function endBattlefield(reason, fromRelay){
   const bf=S.bf; if(!bf||bf.resolved) return;
+  // ⚠ ONE REFEREE, ONE VERDICT — AND THE REFEREE WAITS FOR IT LIKE EVERYBODY
+  // ELSE. Twenty sims drift (separate RNG on every screen — that is the
+  // architecture, not a bug), so nobody but the host judges a room match. The
+  // host posts its word and then resolves off the SAME relayed command the other
+  // nineteen do, which is what makes every client run the identical end path
+  // with the identical `ranked` flag already in hand. Resolving locally and
+  // patching the ladder when HQ's reply landed was the alternative; one code
+  // path beats two, and the ladder is exactly the thing that must not be racy.
+  if(roomBattle() && !fromRelay){
+    if(!coopIsHost() || COOP.ended) return;   // a guest never judges; the relay will tell it
+    COOP.ended=true; bf.ending=true; S.speed=1; S.drag=null; S.pan=null;
+    coopPost('end',{code:COOP.code, reason:reason}).catch(()=>{});
+    // ...and if HQ never answers, nobody is left standing on a finished carpet
+    setTimeout(()=>{ if(S.bf===bf && !bf.resolved) endBattlefield(reason, true); }, 6000);
+    return;
+  }
   bf.resolved=true; bf.ending=false; S.speed=1; S.drag=null; S.pan=null;
+  if(bfMyTeam()==='foe') reason=BF_FLIP[reason]||reason;
   const won=(reason==='ko'||reason==='time'||reason==='sudden'||reason==='edge');
   // lifetime tallies land win OR lose — the kills happened either way
   META.stats.bfKills += (bf.myKills||0);
   if((S.aceKills||0) > META.stats.bestUnitKills) META.stats.bestUnitKills = S.aceKills;
-  const my=bf.base.foe.dmgTaken, th=bf.base.you.dmgTaken;
+  const my=bf.base[bfFoeTeam()].dmgTaken, th=bf.base[bfMyTeam()].dmgTaken;
   const copy=BF_END[reason]||BF_END[won?'time':'timeLoss'];
   const margin='YOU RAZED '+my+' — THEY RAZED '+th;
   S.mode=won?'win':'lose';
   document.getElementById(won?'win':'lose').classList.remove('hidden');
+  // ===== A PRIVATE ROOM PAYS THE SAME, AND RANKS ON A LEASH =====
+  // Wyatt, 7/25, verbatim: "THE WINNING TEAM STILL GETS XP AND STARS." So it
+  // does — every single time, exactly what a battleground win against the
+  // computer pays, no cap and no discount. What a room CANNOT be is a ladder
+  // machine: two friends trading wins would own the World Rankings in an evening,
+  // and that board is the one thing in the game that compares you to strangers.
+  // So HQ counts the results in each room each day and, past ROOM_RANK_CAP, says
+  // `ranked:0` — those matches are FRIENDLIES. They still pay ★ and XP, they
+  // still count on your lifetime tally and your medals; they just stop moving
+  // your W-L. (`room` is false for every solo battleground, so nothing that was
+  // live yesterday changed.)
+  const priv=!!bf.room;
+  const ranked=!priv || (COOP? (COOP.ranked==null?1:COOP.ranked)!==0 : true);
+  const friendly=priv && !ranked;
   if(won){
     // WIN = +25★ AND VERY NEARLY A PROMOTION (Wyatt 7/24): 91% of the level
     // you're on at 1v1, the whole thing at 10v10 — the biggest single payout in
@@ -3229,16 +3559,19 @@ function endBattlefield(reason){
     const starGain=25, xpGain=xpFor(Math.min(1, XP_BF_WIN+XP_BF_TEAM*(bf.team||1)));
     // 1v1 and 2v2 have their own ladders, so they keep their own books — for
     // YOUR seat only. 3v3+ feed nothing but the lifetime totals and the medals.
-    const wrR=META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
+    const wrR=ranked && META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
     META.starBank+=starGain; META.starsLifetime+=starGain;
     const promos=grantXP(xpGain);
-    const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+promoTag(promos);
+    const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+promoTag(promos)
+      +(friendly? ' · FRIENDLY (no ladder)' : '');
     const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C'; wt.innerHTML=copy[0];
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
     document.getElementById('medalText').textContent=margin+' · '+copy[1]+spoils;
     // report the win to HQ the same way an invasion does — /challenge pays the
     // first-of-the-day bonus. NEVER route rewards through /sync (it clamps).
-    fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
+    // ⚠ Not from a private room: that bonus is for beating the DAILY RIVAL, and
+    // a room has no rival in it — the seats belong to your friends.
+    if(!priv) fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId,target:'bf_'+bf.rival.id,won:true})})
       .then(r=>r.json()).then(d=>{
         const el=document.getElementById('medalText');
@@ -3247,7 +3580,7 @@ function endBattlefield(reason){
       }).catch(()=>{});
   } else {
     META.bfLosses++;
-    const wrL=META.bfRecord[bf.team]; if(wrL) wrL.l++;
+    const wrL=ranked && META.bfRecord[bf.team]; if(wrL) wrL.l++;
     // a beating is still a lesson — every defeat pays a tenth of a level
     const xpGain=xpFor(XP_LOSS), promos=grantXP(xpGain);
     document.getElementById('loseTitle').innerHTML=copy[0];
@@ -3306,7 +3639,18 @@ function bfSargeKit(w){
                                 saber:SABER_COLORS[(Math.random()*SABER_COLORS.length)|0].hex };
   return { w:'pistol', r:0, rng:108, rate:PISTOL_RATE, dmg:1.5 };   // the drawn sidearm is fast too; the +5%/rank is yours alone
 }
-function bfHumanU(u){ return !S.bf || u.seat===0; }
+// ===== WHICH CHAIR AM I IN? (v1.24, PRIVATE ROOMS) =====
+// Every battleground up to now answered "seat 0, on team 'you'", because there
+// was only ever one real person on the carpet. A private room seats friends in
+// the other nineteen chairs — INCLUDING the ten on the right-hand side — so the
+// answer became a lookup. That is the whole of the change: the world stays
+// ABSOLUTE (nothing is mirrored per client, unlike the AI brains' view), so one
+// relayed x means the same patch of carpet on all twenty screens.
+function bfMySeat(){ return S.bf? (S.bf.mySeat|0) : 0; }
+function bfMyTeam(){ return (S.bf && S.bf.myTeam) || 'you'; }
+function bfFoeTeam(){ return bfMyTeam()==='you'? 'foe' : 'you'; }
+function bfMe(){ return { side:bfMyTeam(), seat:bfMySeat() }; }   // tray cards + the dragged figure
+function bfHumanU(u){ return !S.bf || u.seat===bfMySeat(); }
 function unitSargeStats(u){
   if(u && u.coopSW) return u.coopSW;           // the ally's Sarge carries the ALLY's loadout
   if(S.bf && !bfHumanU(u)){ const st=S.bf.seats[u.seat]; return (st&&st.kit)||BF_AI_SARGE; }
@@ -3355,9 +3699,17 @@ function critFx(f){
 }
 
 // ================= BATTLEFIELD: THE COMMAND BOUNDARY =================
-// Player taps, AI decisions and (later) a network peer all land HERE. One
-// consumer, three producers — that single seam is the whole future-PvP story.
-function applyDeploy(seat,type,x,y){
+// Player taps, AI decisions and a network peer all land HERE. One consumer,
+// three producers — and as of v1.24 the third one is real: a private room's
+// relayed placement comes through this same door.
+// ⚠ A RELAYED ORDER IS A FACT, NOT A REQUEST. The commander who gave it already
+// paid for it out of their own purse and already checked the ground on their own
+// screen; re-running the money and the legality here would judge their order
+// against a sim that has drifted (two sims, separate RNG — that is the whole
+// architecture). So `relay` skips the purse and the placement rules and just
+// puts the man where they put him. Bounds still clamp, because a wire value is
+// still a wire value.
+function applyDeploy(seat,type,x,y,relay){
   const bf=S.bf; if(!bf||bf.resolved||bf.ending) return null;
   if(typeof seat==='string') seat = seat==='foe'? bf.team : 0;   // legacy callers: first seat of that side
   const st=bf.seats[seat]; if(!st) return null;
@@ -3365,12 +3717,15 @@ function applyDeploy(seat,type,x,y){
   x=Math.round(x); y=Math.round(y);                        // wire form and sim agree
   const cost=BF_COST[type];
   if(type==='sarge' && S.units.some(u=>!u.dead&&u.seat===seat&&u.type==='sarge')) return null;   // one Sarge per PLAYER
-  // you can only field a machine you actually own. Seat 0 only — vehOwns() reads
-  // YOUR save, so it has nothing to say about anybody else's motor pool.
-  if(seat===0 && VEH_ORDER.indexOf(type)>=0 && !vehOwns(type)) return null;
-  if(!canPlace(x,y,type,st.team)) return null;
-  if(st.human){ if(S.plastic<cost) return null; S.plastic-=cost; }
-  else { if(st.purse<cost) return null; st.purse-=cost; }
+  if(relay){ x=Math.max(40,Math.min(WORLD_W-40,x)); y=Math.max(74,Math.min(H-96,y)); }
+  else {
+    // you can only field a machine you actually own. YOUR chair only — vehOwns()
+    // reads YOUR save, so it has nothing to say about anybody else's motor pool.
+    if(st.me && VEH_ORDER.indexOf(type)>=0 && !vehOwns(type)) return null;
+    if(!canPlace(x,y,type,st.team)) return null;
+    if(st.me){ if(S.plastic<cost) return null; S.plastic-=cost; }
+    else if(!st.human){ if(st.purse<cost) return null; st.purse-=cost; }
+  }
   const u=placeUnit(type,x,y,st.team,seat);
   // the landing reticle: a ring that closes on the spot he's dropping into
   S.fx.push({ k:'ring', x, y:y-6, r:56, R:15, t:0, dur:0.55,
@@ -3501,12 +3856,17 @@ function bfLeak(u){
   SFX.ouch();
   S.fx.push({k:'ring',x:b.x-10,y:b.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
   S.floats.push({x:b.x,y:b.y-84,txt:'−'+dmg,t:0,col:u.side==='you'?'#BFE39A':'#D96A55'});
-  if(bf.phase==='sudden'){ endBattlefield(u.side==='you'?'sudden':'suddenLoss'); return; }
+  // ⚠ ONLY THE REFEREE CALLS IT. In a private room every sim has its own copy of
+  // both toy boxes and they drift between beacons, so a guest whose copy hits
+  // zero first would end a match the host is still playing. The guest still gets
+  // the shake and the slow-mo — it just waits for the word.
+  const ref=(!roomBattle() || coopIsHost());
+  if(bf.phase==='sudden'){ if(ref) endBattlefield(u.side==='you'?'sudden':'suddenLoss'); return; }
   if(b.hp<=0){
     // a KO is rare and it should feel like one: shake, slow-mo, then the card
     bf.ending=true; S.shake=1.0; S.speed=0.35; SFX.boom();
     const won=(u.side==='you');
-    setTimeout(()=>{ S.speed=1; endBattlefield(won?'ko':'koLoss'); }, 900);
+    setTimeout(()=>{ S.speed=1; if(ref) endBattlefield(won?'ko':'koLoss'); else bf.ending=false; }, 900);
   }
 }
 // THE JEEP'S "WEAPON" is the bumper. Anything it clips gets flattened — ONCE
@@ -3618,20 +3978,30 @@ function bfTick(dt){
   for(const st of bf.seats){
     st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc : 1);
     if(st.tagT>=10){ st.tagT-=10;
-      if(st.human){ S.plastic+=BF_TICK;
-        S.floats.push({x:bf.base.you.x+46,y:bf.base.you.y-72,txt:'+'+BF_TICK,t:0,col:'#FFF3C4'}); }
-      else st.purse+=BF_TICK;
+      if(st.me){ S.plastic+=BF_TICK;
+        S.floats.push({x:bf.base[bfMyTeam()].x+46,y:bf.base[bfMyTeam()].y-72,txt:'+'+BF_TICK,t:0,col:'#FFF3C4'}); }
+      else st.purse+=BF_TICK;   // an allied commander's real purse lives on THEIR client
     }
-    // every AI seat decides behind the same boundary a network peer will use —
-    // teammate brains see the field MIRRORED so one tuned brain plays both ways
-    if(st.brain && st.brain.tick(dt)){
+    // every AI seat decides behind the same boundary a network peer uses —
+    // teammate brains see the field MIRRORED so one tuned brain plays both ways.
+    // ⚠ IN A ROOM ONLY THE REFEREE THINKS FOR THEM. A brain is pure Math.random,
+    // so twenty clients each rolling their own would field twenty DIFFERENT AI
+    // armies on what is supposed to be one carpet. The host rolls once and
+    // relays the placement like any other order.
+    if(st.brain && (!roomBattle() || coopIsHost()) && st.brain.tick(dt)){
       const view=buildBFView(dt, st);
       const cmds=st.brain.decide(view, st.purse)||[];
-      for(const c of cmds) applyDeploy(st.i, c.type, st.mir? WORLD_W-c.x : c.x, c.y);
+      for(const c of cmds){
+        const cx2=st.mir? WORLD_W-c.x : c.x;
+        if(applyDeploy(st.i, c.type, cx2, c.y)) roomPlaced(st.i, c.type, Math.round(cx2), Math.round(c.y));
+      }
     }
   }
   if(bf.timeLeft<=0){
     bf.timeLeft=0;
+    // the clock runs everywhere (it is what the HUD reads), but the whistle is
+    // the referee's — a guest's copy of it arrives on the beacon
+    if(roomBattle() && !coopIsHost()) return;
     if(bf.phase==='live'){
       if(my>th) endBattlefield('time');
       else if(my<th) endBattlefield('timeLoss');
@@ -4033,7 +4403,7 @@ function canPlace(x,y,type,side){
   // nobody can drop an invulnerable spawn ghost right on top of the enemy line.
   if(S.bf){
     if(x<40||x>WORLD_W-40||y<74||y>H-96) return false;
-    const s=side||'you';
+    const s=side||bfMyTeam();
     if(s==='you' && x>MID-MID_BUFFER) return false;
     if(s==='foe' && x<MID+MID_BUFFER) return false;
     for(const rv of (S.cfg.terrain.rivers||[])){
@@ -4150,7 +4520,7 @@ function unitImg(k,u){
   if(u && u.coopHex){ const h=u.coopHex; return (IMGU[h]&&IMGU[h][k])||IMG[k]; }
   const hx=dyeHex(); return (hx&&IMGU[hx]&&IMGU[hx][k])||IMG[k];
 }
-const BF_ME={side:'you',seat:0};        // for tray cards and the dragged figure
+// (bfMe() replaced the old const BF_ME here in v1.24 — your chair moves now)
 // how big a figure is drawn on the carpet — one answer, so the man, his ghost
 // and his corpse are always the same size (the vehicles dwarf the infantry)
 function unitW(t){ return t==='bftank'? 92 : t==='bfjeep'? 76 : t==='mortar'? 58 : 54; }
@@ -5144,7 +5514,11 @@ function update(dt){
     u.cd=1/(rate*ra.rate);
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
-    const dmg = def.dmg * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) * ((S.bf&&!bfHumanU(u))?1:(u.coopUM!=null?u.coopUM:upMul(u.type)));
+    // ⚠ ORDER MATTERS: a RELAYED man carries his owner's rank in coopUM and it has
+    // to win, because on the battlefield "not my seat" used to mean "factory
+    // stock" — true of an AI chair, and dead wrong for the friend sitting in it.
+    const dmg = def.dmg * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) *
+      (u.coopUM!=null? u.coopUM : ((S.bf&&!bfHumanU(u))?1:upMul(u.type)));
     if(tube && Math.random()<ENH_BAZ_BACK){ enhBackfire(u); continue; }   // no rocket leaves the tube
     const WX = S.bf? WORLD_W : W;
     if(u.type==='flame'){
@@ -5280,8 +5654,8 @@ function hitCheck(f,u){
     // an AI seat's straight into that purse
     const v=bfBounty(f.type);
     const st=(u && u.seat!=null && S.bf)? S.bf.seats[u.seat] : null;
-    if(st && st.human){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
-    else if(st) st.purse+=v;
+    if(st && st.me){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
+    else if(st && !st.human) st.purse+=v;   // a friend banks their own kills, on their own screen
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
     if(f.def.vehicle){ bfSfx(SFX.boom, f.x); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     else bfSfx(SFX.clack, f.x);
@@ -5571,7 +5945,7 @@ function draw(){
     ring(S.sel.x,S.sel.y,S.sel.def.minRng?200:S.sel.def.rng,'rgba(255,255,255,0.10)','rgba(255,255,255,0.7)');
   }
   if(S.drag){
-    const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?'you':undefined);
+    const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?bfMyTeam():undefined);
     const def=UDEF[S.drag.type];
     // the jeep has no reach to show, so it shows its bumper instead — a 250-tag
     // drop with no ring under it reads as a dead card
@@ -5636,7 +6010,7 @@ function draw(){
   for(const fl of S.floats){ cx.globalAlpha=Math.min(1,2-fl.t*1.8); cx.font='bold 19px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=fl.col; cx.textAlign='center'; cx.fillText(fl.txt,fl.x,fl.y); cx.globalAlpha=1; }
 
   // dragged unit on top
-  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?BF_ME:null));
+  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?bfMe():null));
     cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(S.drag.x+26,S.drag.y+30,60,24,0.4,0,7); cx.fill(); cx.globalAlpha=1; }
 
   cx.restore();
@@ -5759,7 +6133,9 @@ function drawBossBar(){
 // to do the arithmetic on who is actually winning.
 function drawBFBars(){
   const bf=S.bf, bw=Math.min(240,(VW-40)*0.27);
-  const you=bf.base.you, foe=bf.base.foe;
+  // YOURS is always the left-hand bar, whichever side of the carpet you woke up
+  // on — the bars answer "how am I doing", not "what is at x=130".
+  const you=bf.base[bfMyTeam()], foe=bf.base[bfFoeTeam()];
   drawBaseBar(16, 54, bw, you.hp/you.hpMax, 'YOUR TOY BOX '+you.hp, you.hp/you.hpMax>0.35?'#7FA35C':'#8a2f26');
   drawBaseBar(VW-16-bw, 54, bw, foe.hp/foe.hpMax, 'THEIR TOY BOX '+foe.hp, foe.hp/foe.hpMax>0.35?'#C0473A':'#8a2f26');
   // tug bar — your damage dealt vs theirs, always summing to the full width
@@ -5959,6 +6335,14 @@ function drawHUD(){
     cx.font='bold '+(urgent?27:23)+'px "Arial Narrow", Impact, sans-serif';
     cx.fillText((sudden?'SUDDEN ':'')+bfClock(), VW/2-60, 23);
     cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
+    // a private battle says so, and says who is really out there
+    if(S.bf.room){
+      const n=coopHumans();
+      cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
+      cx.fillText('⚔ PRIVATE BATTLE · '+n+' REAL COMMANDER'+(n===1?'':'S')
+        +' · YOU: '+(bfMyTeam()==='you'?'GREEN':'TAN'), VW/2-60, 56);
+      cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
+    }
   } else {
     const coopHold = coopGuest() && !S.waveActive;
     cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
@@ -5996,13 +6380,13 @@ function drawHUD(){
     TT.forEach((t,i)=>{
       const x=x0+i*(tw+gap);
       trayRects[i]=[x,y0,tw,th];
-      const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===0&&u.type==='sarge');
+      const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===bfMySeat()&&u.type==='sarge');
       const afford = !placed && S.plastic>=BF_COST[t];
       cx.fillStyle= afford? 'rgba(38,40,31,0.92)':'rgba(38,40,31,0.6)';
       rr(x,y0,tw,th,10); cx.fill();
       if(S.drag&&S.drag.type===t){ cx.strokeStyle='#fff'; cx.lineWidth=2; rr(x,y0,tw,th,10); cx.stroke(); }
       cx.globalAlpha=afford?1:0.35;
-      drawSprite(t, x+tw/2-14, y0+th-18, 44,0,0,unitImg(t,BF_ME));
+      drawSprite(t, x+tw/2-14, y0+th-18, 44,0,0,unitImg(t,bfMe()));
       cx.globalAlpha=1;
       cx.font='bold 17px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
       cx.fillStyle= afford? '#FFF3C4':'#8b8f7a';
@@ -6126,7 +6510,7 @@ cv.addEventListener('pointerdown', e=>{
     for(let i=0;i<TT.length;i++){
       if(inRect(p.x,p.y,trayRects[i])){
         const t=TT[i];
-        const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===0&&u.type==='sarge');
+        const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===bfMySeat()&&u.type==='sarge');
         if(!placed && S.plastic>=BF_COST[t]){ const w=evPosW(e); S.drag={type:t,x:w.x,y:w.y-DRAG_OFF,unit:null}; }
         else SFX.clack();
         S.sel=null; return;
@@ -6196,7 +6580,10 @@ cv.addEventListener('pointerup', e=>{
   const d=S.drag; S.drag=null;
   if(S.bf){
     const w=evPosW(e), dy=w.y-DRAG_OFF;
-    if(!applyDeploy(0, d.type, w.x, dy)) SFX.clack();   // seat 0 — the human's chair
+    // your chair, whichever it is — and in a private room the order goes out on
+    // the relay too, but ONLY if it actually landed (no purse, no radio call)
+    if(applyDeploy(bfMySeat(), d.type, w.x, dy)) roomPlaced(bfMySeat(), d.type, Math.round(w.x), Math.round(dy));
+    else SFX.clack();
     return;
   }
   const p=evPos(e);
@@ -6851,6 +7238,10 @@ function renderWarTable(){
     +'<div class="wt-shelf"><button type="button" class="wt-hold" onclick="UI.wtHold()">'
       +'<span class="n">🎖 HOLD THE LINE</span>'
       +'<small>UP TO 10 REAL COMMANDERS · ONE CARPET · THE TAN NEVER STOP</small></button></div>'
+    // ...and the private room, which is this very screen played against friends
+    +'<div class="wt-shelf"><button type="button" class="wt-hold" onclick="UI.wtRoom()">'
+      +'<span class="n">⚔ PRIVATE BATTLE</span>'
+      +'<small>FRIENDS ONLY · UP TO 10 v 10 · WINNING TEAM TAKES 25★ + XP</small></button></div>'
     +'<div class="wt-foot">'+maps+'<div class="wt-spacer"></div>'
       +(w+l>0? '<div class="wt-rec">RECORD <b>'+w+'W · '+l+'L</b></div>':'')
     +'</div>';
@@ -7606,6 +7997,10 @@ window.UI = {
   wtHold(){ audio(); SFX.blip(); closeWarTable();
     if(COOP && coopSquad() && COOP.code){ roomModal(coopPanelHTML()); return; }   // already mustered
     UI.coopMode('squad'); },
+  // the War Table's door into a PRIVATE BATTLE — same shortcut, same rule
+  wtRoom(){ audio(); SFX.blip(); closeWarTable();
+    if(COOP && coopRoom() && COOP.code){ roomModal(coopPanelHTML()); return; }    // already at the table
+    UI.coopMode('room'); },
   wtMap(id){ if(!BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id; SFX.blip(); saveMeta(); renderWarTable(); },
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- WORLD RANKINGS ----
@@ -7777,7 +8172,7 @@ window.UI = {
     if(COOP) coopLeave(); COOP=coopFresh('pick',m); roomModal(coopPanelHTML()); },
   coopMode(m){ SFX.blip();
     if(COOP) coopLeave();
-    COOP=coopFresh('idle', m==='squad'?'squad':'pair');
+    COOP=coopFresh('idle', (m==='squad'||m==='room')? m : 'pair');
     roomModal(coopPanelHTML()); },
   coopHost(){
     SFX.blip();
@@ -7794,6 +8189,45 @@ window.UI = {
       else UI.coopCancel('HQ is unreachable — try again in a minute.');
     }).catch(()=>{ if(COOP&&(COOP.ui==='host'||COOP.ui==='lobby')) UI.coopCancel('HQ is unreachable — try again in a minute.'); });
   },
+  // ---- PRIVATE BATTLE ROOM ----
+  roomHost(){
+    SFX.blip();
+    if(COOP) coopLeave();
+    COOP=coopFresh('lobby','room');
+    COOP.team=Math.max(1,Math.min(ROOM_MAX,META.bfTeam||1)); COOP.map=META.bfMap;
+    roomModal(coopPanelHTML());
+    coopPost('create',{team:COOP.team, map:COOP.map}).then(r=>{
+      if(!COOP||COOP.ui!=='lobby') return;
+      if(r&&r.ok){ COOP.code=r.code; COOP.host=true; COOP.seat=r.seat|0; COOP.role=String(r.seat|0);
+        COOP.side=r.side||'y'; COOP.slot=r.slot|0; COOP.team=r.team||COOP.team; COOP.map=r.map||COOP.map;
+        COOP.members=[Object.assign({},coopMe(),{seat:r.seat|0,side:COOP.side,slot:COOP.slot,seen:0,host:true})];
+        COOP.state='open'; roomModal(coopPanelHTML()); coopTick(); }
+      else UI.coopCancel('HQ is unreachable — try again in a minute.');
+    }).catch(()=>{ if(COOP&&COOP.ui==='lobby') UI.coopCancel('HQ is unreachable — try again in a minute.'); });
+  },
+  // the stepper is OPTIMISTIC — it moves the moment you tap it and rides the next
+  // poll out; HQ has the last word (it will not shrink a side out from under
+  // somebody) and the reply that carried the change is the one that clears it.
+  roomTeam(d){
+    if(!COOP||!coopRoom()||!COOP.host||COOP.state==='battle') return;
+    const n=Math.max(1,Math.min(ROOM_MAX,(COOP.team|0)+d));
+    if(n===COOP.team){ SFX.clack(); return; }
+    COOP.team=n; COOP.wantTeam=n; SFX.blip(); roomModal(coopPanelHTML());
+  },
+  roomMap(){
+    if(!COOP||!coopRoom()||!COOP.host||COOP.state==='battle') return;
+    const i=BF_MAPS.findIndex(m=>m.id===COOP.map);
+    COOP.map=BF_MAPS[(i+1+BF_MAPS.length)%BF_MAPS.length].id;
+    COOP.wantMap=COOP.map; SFX.blip(); roomModal(coopPanelHTML());
+  },
+  roomSide(){
+    if(!COOP||!coopRoom()||COOP.state==='battle') return;
+    const want=COOP.side==='y'?'f':'y';
+    COOP.wantSide=want; SFX.blip();
+    // don't paint the swap yet — HQ picks the actual slot, and a full bench
+    // means you stay where you are rather than being told a lie for two seconds
+    roomModal(coopPanelHTML());
+  },
   coopEnterUI(){
     SFX.blip();
     const md=(COOP&&COOP.mode)||'pair';
@@ -7807,20 +8241,24 @@ window.UI = {
     code=String(code||(i&&i.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
     if(!/^[A-Z2-9]{4,8}$/.test(code)){ if(COOP){ COOP.note='That doesn\'t look like a code — 5 letters and numbers.'; roomModal(coopPanelHTML()); } SFX.clack(); return; }
     if(!COOP) COOP=coopFresh('enter');
-    const sq=coopSquad();
+    const sq=coopSquad(), rm=coopRoom(), grp=sq||rm;
     coopPost('join',{code}).then(r=>{
       if(!COOP) return;
       if(r&&r.ok){
-        COOP.code=r.code; COOP.host=!!r.host; COOP.level=r.level; COOP.note=null;
-        if(sq){ COOP.seat=r.seat|0; COOP.role=String(r.seat|0); COOP.members=r.members||[];
-                COOP.pc=r.players||1; COOP.state=r.state||'open'; COOP.ui='lobby'; coopSeatColours(); }
+        COOP.code=r.code; COOP.host=!!r.host; if(r.level!=null) COOP.level=r.level; COOP.note=null;
+        if(grp){ COOP.seat=r.seat|0; COOP.role=String(r.seat|0); COOP.members=r.members||[];
+                COOP.pc=r.players||1; COOP.state=r.state||'open'; COOP.ui='lobby';
+                if(rm){ COOP.team=r.team||COOP.team; COOP.map=r.map||COOP.map;
+                        COOP.side=r.side||'y'; COOP.slot=r.slot|0; roomSeatColours(); }
+                else coopSeatColours(); }
         else  { COOP.role='g'; COOP.mate=r.mate; COOP.state=r.state||'paired'; COOP.ui='paired'; }
         SFX.horn(); coopPanelOpen(); coopTick();
       } else {
+        const what=rm?'room':sq?'squad':'party';
         COOP.note = r&&r.err==='own code'? 'That\'s YOUR code — your friend types it, not you!'
-          : r&&r.err==='in battle'? 'That squad is already fighting — catch the next one!'
-          : r&&r.err==='party full'? (sq? 'That squad already has all ten commanders.' : 'That party already marched off with two commanders.')
-          : 'No '+(sq?'squad':'party')+' answers to that code — double-check it with your friend.';
+          : r&&r.err==='in battle'? 'That '+what+' is already fighting — catch the next one!'
+          : r&&r.err==='party full'? (rm? 'That room is full — every seat is taken.' : sq? 'That squad already has all ten commanders.' : 'That party already marched off with two commanders.')
+          : 'No '+what+' answers to that code — double-check it with your friend.';
         COOP.ui='enter'; roomModal(coopPanelHTML());
         const j=document.getElementById('coopIn'); if(j){ j.value=code; j.focus(); }
         SFX.clack();
@@ -7849,10 +8287,10 @@ window.UI = {
   },
   coopShare(){
     if(!COOP||!COOP.code) return;
-    const link=location.origin+location.pathname+'?'+(coopSquad()?'squad':'coop')+'='+COOP.code;
+    const link=location.origin+location.pathname+'?'+(coopRoom()?'room':coopSquad()?'squad':'coop')+'='+COOP.code;
     const note=document.getElementById('coopNote');
     const done=t=>{ if(note){ note.textContent=t; note.style.color='#BFE39A'; note.style.opacity='1'; } SFX.coin(); };
-    if(navigator.share){ navigator.share({title:'Green vs Tan', text:(coopSquad()?'Fall in — HOLD THE LINE with us! Code ':'Join my army! Code ')+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
+    if(navigator.share){ navigator.share({title:'Green vs Tan', text:(coopRoom()?'Get in here — PRIVATE BATTLE! Code ':coopSquad()?'Fall in — HOLD THE LINE with us! Code ':'Join my army! Code ')+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
     else if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(()=>done('LINK COPIED — PASTE IT TO YOUR FRIEND!')).catch(()=>{ if(note) note.textContent=link; }); }
     else if(note){ note.textContent=link; }
   },
@@ -7866,7 +8304,7 @@ window.UI = {
     if(!COOP||COOP.wantBattle) return;
     // ⚠ only the leader may give the order in a squad — nine other fingers on the
     // button is the one way a ten-player lobby could ever start twice.
-    if(coopSquad()){ if(COOP.ui!=='lobby'||!COOP.host) return; }
+    if(coopMulti()){ if(COOP.ui!=='lobby'||!COOP.host) return; }
     else if(COOP.ui!=='paired') return;
     audio(); SFX.horn();
     COOP.wantBattle=true;
@@ -8209,6 +8647,31 @@ window.GVT = {
   coopJoin(code){ UI.coopJoin(code); },
   coopQueue(){ UI.coopQueue(); },
   coopDeploy(){ UI.coopDeploy(); },
+  // ===== PRIVATE BATTLE ROOM RIG =====
+  // roomMode() puts the panel in room shape without a tap; room() reads the LIVE
+  // table AND, mid-match, the live carpet — whose chair is whose, what the
+  // referee's numbers are, and whether this result is going in the books.
+  roomMode(){ UI.coopMode('room'); return COOP&&COOP.mode; },
+  roomHost(t,m){ if(t) META.bfTeam=Math.max(1,Math.min(ROOM_MAX,t|0)); if(m) META.bfMap=m; UI.roomHost(); },
+  roomTeam(d){ UI.roomTeam(d|0); return COOP&&COOP.team; },
+  roomSide(){ UI.roomSide(); return COOP&&COOP.side; },
+  roomMap(){ UI.roomMap(); return COOP&&COOP.map; },
+  room(){
+    if(!COOP || COOP.mode!=='room') return null;
+    const o={ code:COOP.code, host:!!COOP.host, seat:COOP.seat, side:COOP.side, slot:COOP.slot,
+      team:COOP.team, map:COOP.map, ui:COOP.ui, state:COOP.state, humans:coopHumans(),
+      ranked:COOP.ranked==null?null:COOP.ranked, ended:!!COOP.ended, seq:COOP.seq,
+      members:(COOP.members||[]).map(m=>({seat:m.seat,side:m.side,name:m.name,host:!!m.host,seen:m.seen|0})) };
+    if(S.bf) o.bf={ battle:!!roomBattle(), mySeat:bfMySeat(), myTeam:bfMyTeam(),
+      you:S.bf.base.you.hp, foe:S.bf.base.foe.hp,
+      razedYou:S.bf.base.foe.dmgTaken, razedFoe:S.bf.base.you.dmgTaken,
+      clock:+S.bf.timeLeft.toFixed(1), phase:S.bf.phase, resolved:S.bf.resolved,
+      plastic:S.plastic,
+      seats:S.bf.seats.map(st=>({i:st.i,team:st.team,name:st.name,human:!!st.human,me:!!st.me,ai:!!st.brain})),
+      units:S.units.filter(u=>!u.dead).map(u=>({t:u.type,seat:u.seat,side:u.side,x:u.x|0,y:u.y|0,
+        hp:u.hp,mine:bfHumanU(u),um:u.coopUM||null,mods:u.coopMods||null,vh:u.def&&u.def.vehicle?u.hpMax:null})) };
+    return o;
+  },
   // ===== HOLD THE LINE RIG =====
   // sqMode() puts the panel in squad shape without a tap; sq() reads the LIVE
   // stream state (never a stored copy) so a test asserts on the real ticker;
@@ -8242,7 +8705,15 @@ window.GVT = {
     const seat = typeof s==='number'? s : (s==='foe'? S.bf.team : 0);
     const st=S.bf.seats[seat]; if(!st) return null;
     const u=placeUnit(type,Math.round(x),Math.round(y),st.team,seat); return u&&u.id; },
-  bfDrop(s,type,x,y){ return S.bf? (applyDeploy(s==null?'you':s,type,x,y)||{}).id||null : null; },   // goes through the purse
+  // ⚠ goes through the purse AND the relay — the same two things a real finger
+  // does. A rig that only calls applyDeploy() tests half the door and reports a
+  // private room in which nobody's men ever cross.
+  bfDrop(s,type,x,y){
+    if(!S.bf) return null;
+    const seat=(s==null?'you':s), u=applyDeploy(seat,type,x,y);
+    if(u) roomPlaced(u.seat, type, Math.round(x), Math.round(y));
+    return (u||{}).id||null;
+  },
   bfAI(diff){ if(!S.bf) return null; S.bf.seats.forEach(st=>{ if(st.brain) st.brain.setDiff(diff); });
     S.bf.ai.diff=diff; return diff; },
   bfEnd(r){ endBattlefield(r||'time'); },
