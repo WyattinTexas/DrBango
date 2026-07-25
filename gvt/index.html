@@ -729,7 +729,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.11</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.12</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1191,10 +1191,11 @@ const BOSSDEF = {
 const SARGE_WEAPONS = {
   pistol:    { name:'SERVICE PISTOL', unlock:0,  desc:'His trusty sidearm — steady, reliable, always there.' },
   shotgun:   { name:'SHOTGUN',        unlock:5,  desc:'A hair less reach than the pistol, but a wide cone that flattens a whole cluster at once.' },
-  sniper:    { name:'SNIPER RIFLE',   unlock:10, desc:'Reaches clear across the carpet and hits like a truck — but a long, slow reload.' },
+  sniper:    { name:'SNIPER RIFLE',   unlock:10, desc:'The longest reach on the carpet (408) and a hit like a truck — you hear the crack from the doorway. But a long, slow reload.' },
   lightsaber:{ name:'LIGHTSABER',     unlock:12, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' }
 };
 const SARGE_ORDER=['pistol','shotgun','sniper','lightsaber'];
+const SNIPE_KICK=0.22;   // how long the long rifle rocks back on the figure after a shot
 // pick your blade — the glow is your colour, the core is always white-hot
 const SABER_COLORS=[
   {id:'blue',hex:'#4DA6FF'},{id:'red',hex:'#FF4D4D'},{id:'green',hex:'#5BE870'},
@@ -1207,7 +1208,8 @@ function sargeStats(){
   const r=Math.min(5, (w==='pistol'? (META.up.sarge||0) : (META.sargeUp[w]||0)));
   if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:1.1+0.35*r, cone:0.62+0.05*r };
   // 7/24 (Wyatt): the long rifle cycles 30% faster at base, and every rank oils the bolt another +2%
-  if(w==='sniper')     return { w, r, rng:340, rate:0.22*1.3*(1+0.02*r), dmg:9+3*r };
+  // 7/25 (Wyatt): +20% reach on top of that — 340 → 408, the longest gun on the carpet
+  if(w==='sniper')     return { w, r, rng:408, rate:0.22*1.3*(1+0.02*r), dmg:9+3*r };
   if(w==='lightsaber') return { w, r, aggro:175, dmg:7+2.5*r, cd:2.1, block:Math.min(0.75,0.34+0.09*r) };
   return { w:'pistol', r, rng:108, rate:1.8, dmg:1.5 };   // default; unit-upgrade mult applied on the default path
 }
@@ -1383,6 +1385,10 @@ function buildSprites(done){
 }
 
 // ================= AUDIO =================
+// the OS "reduce motion" switch, read live — the canvas honours it the same way
+// the CSS does: no screen shake, no fast-moving streaks, gentler flashes.
+const RMQ = (window.matchMedia? window.matchMedia('(prefers-reduced-motion: reduce)') : null);
+function reducedMotion(){ return !!(RMQ && RMQ.matches); }
 let AC=null, soundOn=true;
 function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended'){ try{AC.resume();}catch(e){} } return AC; }
 function tone(f0,f1,dur,type,vol){ if(!soundOn) return; const ac=audio(); if(!ac) return; try{
@@ -1402,6 +1408,11 @@ function noise(dur,vol,fc){ if(!soundOn) return; const ac=audio(); if(!ac) retur
 const SFX = {
   pew:   ()=>tone(900,300,0.08,'square',0.05),
   tpew:  ()=>tone(520,190,0.09,'square',0.045),
+  // THE SNIPER'S CRACK — the loudest thing on the carpet. A hard bright snap,
+  // a whip-crack falling away, a thump in the chest, and the report rolling back
+  // off the bedroom walls a beat later.
+  crack: ()=>{ noise(0.05,0.42,9000); tone(1700,110,0.1,'square',0.13); tone(150,46,0.28,'sine',0.16);
+               setTimeout(()=>{ noise(0.14,0.07,1300); tone(430,170,0.13,'sawtooth',0.04); },130); },
   volley:()=>{ tone(560,200,0.09,'square',0.05); setTimeout(()=>tone(500,180,0.09,'square',0.05),50); setTimeout(()=>tone(540,190,0.09,'square',0.05),110); },
   mg:    ()=>tone(700,250,0.05,'square',0.04),
   rocket:()=>tone(200,90,0.35,'sawtooth',0.07),
@@ -1459,7 +1470,7 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1;
+  S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0;
   S.coop=null;    // co-op battles re-arm this right after startBattle
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
 }
@@ -3485,6 +3496,7 @@ function update(dt){
   for(const u of S.units){
     if(u.sprue>0) u.sprue-=dt;
     if(u.saberCd>0) u.saberCd-=dt;   // saber rest ticks even mid-march (BF) — he dashes in without the stand-and-wait
+    if(u.snipeT>0) u.snipeT-=dt;     // the long rifle's recoil rides out on the figure
     // BATTLEFIELD pre-step: drop-in gate, march, halt, setup wind-up, free leak.
     // Falls THROUGH into the untouched weapon code when he's dug in with a target.
     if(S.bf && !bfUnitStep(u,dt)) continue;
@@ -3522,10 +3534,35 @@ function update(dt){
             if(da<=sw.cone){ hurt(f,sw.dmg*vm*cm,u); } }
           S.fx.push({k:'cone',x:u.x+8,y:u.y-24,ang,spread:sw.cone,rng:sw.rng*rb,t:0,dur:0.16});
         } else if(sw.w==='sniper'){
-          // one heavy round clear across the carpet
-          bfSfx(SFX.tpew, u.x); S.shake=0.14;
-          S.fx.push({k:'tracer',x1:u.x+14,y1:u.y-28,x2:best.x,y2:best.y-18,t:0,dur:0.2,col:'#FFF3C4',w:3});
-          S.fx.push({k:'puff',x:best.x,y:best.y-16,t:0,dur:0.3,R:16}); hurt(best,sw.dmg*vm*cm,u);
+          // ONE HEAVY ROUND CLEAR ACROSS THE CARPET — and the whole room should
+          // know it. Star flash off the barrel tip, a fat tracer with a white-hot
+          // slug riding down it, a beat of hit-stop, then dust where it lands.
+          // Motion-sensitive players get every read of that WITHOUT the shake,
+          // the streak or the hard flash.
+          const RM=reducedMotion();
+          const mzx=u.x+48, mzy=u.y-37;                          // the muzzle, where drawSargeWeapon leaves the barrel
+          const htx=best.x, hty=best.y-18;
+          const ang=Math.atan2(hty-mzy,htx-mzx);
+          bfSfx(SFX.crack, u.x); S.shake=RM?0.05:0.34;
+          if(!RM && !S.coop) S.hitStop=0.07;                     // the punch — never in co-op: two sims, one clock
+          u.snipeT=SNIPE_KICK;                                   // the barrel rocks back on the figure
+          S.floats.push({x:mzx+16,y:mzy-16,txt:'CRACK!',t:0,col:'#FFF3C4'});
+          // MUZZLE: a wisp of smoke off the barrel with the star flash ON TOP of it
+          // (fx draw in push order — smoke pushed second would swallow the flash)
+          S.fx.push({k:'puff',x:mzx+6,y:mzy-4,t:0,dur:0.45,R:13});
+          S.fx.push({k:'flash',x:mzx,y:mzy,ang,R:RM?13:24,lw:RM?2.4:3.6,t:0,dur:RM?0.1:0.16});
+          // TRACER: soft glow, hot body, white core — three layers snapping out in order
+          S.fx.push({k:'tracer',x1:mzx,y1:mzy,x2:htx,y2:hty,t:0,dur:0.3, col:'#FFC24A',w:9,a:0.34});
+          S.fx.push({k:'tracer',x1:mzx,y1:mzy,x2:htx,y2:hty,t:0,dur:0.24,col:'#FFF3C4',w:4});
+          S.fx.push({k:'tracer',x1:mzx,y1:mzy,x2:htx,y2:hty,t:0,dur:0.16,col:'#ffffff',w:1.6});
+          if(!RM) S.fx.push({k:'slug',x1:mzx,y1:mzy,x2:htx,y2:hty,t:0,dur:0.1});
+          // IMPACT: carpet dust kicked up, a spark flash over it, then the rings
+          // rolling out on top — same push-order rule as the muzzle
+          for(let j=0;j<3;j++) S.fx.push({k:'puff',x:htx+(Math.random()-0.5)*30,y:hty+6+(Math.random()-0.5)*20,t:0,dur:0.4,R:15});
+          S.fx.push({k:'flash',x:htx,y:hty,ang:ang+Math.PI,R:RM?12:20,lw:3,t:0,dur:0.14});
+          S.fx.push({k:'ring',x:htx,y:hty,r:4, R:32,t:0,dur:0.22,col:'#FFFFFF'});
+          S.fx.push({k:'ring',x:htx,y:hty,r:10,R:54,t:0,dur:0.34,col:'#FFD24A'});
+          hurt(best,sw.dmg*vm*cm,u);
         }
         continue;
       }
@@ -3995,7 +4032,19 @@ function draw(){
   // fx
   for(const e of S.fx){
     const k=e.t/e.dur;
-    if(e.k==='tracer'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=e.w||2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
+    if(e.k==='tracer'){ cx.globalAlpha=(1-k)*(e.a||1); cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=e.w||2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
+    else if(e.k==='flash'){ // muzzle / impact star: long spikes along the shot, short ones across it
+      cx.globalAlpha=1-k; const R=e.R*(0.55+0.75*k);
+      cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(e.x,e.y,R*0.4,0,7); cx.fill();
+      cx.strokeStyle='#FFD86B'; cx.lineWidth=e.lw||3; cx.lineCap='round';
+      for(let i=0;i<4;i++){ const a2=e.ang+i*Math.PI/2, rr=(i%2===0)?R:R*0.5;
+        cx.beginPath(); cx.moveTo(e.x,e.y); cx.lineTo(e.x+Math.cos(a2)*rr,e.y+Math.sin(a2)*rr); cx.stroke(); }
+      cx.lineCap='butt'; cx.globalAlpha=1; }
+    else if(e.k==='slug'){ // the round itself, tearing down the tracer
+      const p=e.x1+(e.x2-e.x1)*k, q=e.y1+(e.y2-e.y1)*k, b=Math.max(0,k-0.22);
+      cx.strokeStyle='#ffffff'; cx.lineWidth=3.4; cx.lineCap='round';
+      cx.beginPath(); cx.moveTo(e.x1+(e.x2-e.x1)*b,e.y1+(e.y2-e.y1)*b); cx.lineTo(p,q); cx.stroke();
+      cx.lineCap='butt'; cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(p,q,3.2,0,7); cx.fill(); }
     else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc'; cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col; cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
@@ -4202,7 +4251,17 @@ function drawBFUnit(u,w,im){
 function drawSargeWeapon(u){
   const w=(S.bf && !bfHumanU(u))? 'pistol' : META.sargeWeapon;   // every AI Sarge carries the sidearm
   if(w==='shotgun'){ cx.strokeStyle='#3a2c1c'; cx.lineWidth=5.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+4,u.y-30); cx.lineTo(u.x+30,u.y-33); cx.stroke(); cx.strokeStyle='#5a4a34'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(u.x+18,u.y-32); cx.lineTo(u.x+30,u.y-33); cx.stroke(); }
-  else if(w==='sniper'){ cx.strokeStyle='#26261f'; cx.lineWidth=3.5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+2,u.y-30); cx.lineTo(u.x+46,u.y-36); cx.stroke(); cx.fillStyle='#26261f'; cx.fillRect(u.x+18,u.y-41,5,6); }
+  else if(w==='sniper'){
+    // the long rifle — and its KICK: for a beat after a shot the barrel rocks
+    // back and up, trailing smoke off the muzzle. You can see he just touched one off.
+    const kick=(u.snipeT>0? u.snipeT/SNIPE_KICK : 0), bx=-9*kick, by=-3*kick;
+    cx.strokeStyle='#26261f'; cx.lineWidth=3.5; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(u.x+2+bx,u.y-30+by); cx.lineTo(u.x+46+bx,u.y-36+by); cx.stroke();
+    cx.fillStyle='#26261f'; cx.fillRect(u.x+18+bx,u.y-41+by,5,6);       // the scope
+    cx.fillStyle='#8fb0c8'; cx.fillRect(u.x+22+bx,u.y-40+by,1.6,2.2);   // a glint off the glass
+    if(kick>0){ cx.globalAlpha=kick*0.5; cx.fillStyle='#e8e0cc';
+      cx.beginPath(); cx.arc(u.x+50+bx,u.y-37+by-6*(1-kick),4+7*(1-kick),0,7); cx.fill(); cx.globalAlpha=1; }
+  }
   else if(w==='lightsaber'){
     const dashing=(u.saberState==='out'||u.saberState==='back');
     const col=saberHex(), len=dashing?38:32, ang=dashing?-0.98:-0.52;
@@ -5508,7 +5567,9 @@ function frame(ts){
   requestAnimationFrame(frame);
   if(!ready) return;
   const dt=Math.min(0.05,(ts-last)/1000||0.016); last=ts;
-  const slow = (coach && coach.step===4 && coach.target && coach.target.down) ? 0.45 : 1;  // lean in for the first knockdown
+  if(S.hitStop>0) S.hitStop=Math.max(0,S.hitStop-dt);   // drains on the WALL clock, so it always lets go
+  const slow = (coach && coach.step===4 && coach.target && coach.target.down) ? 0.45   // lean in for the first knockdown
+             : (S.hitStop>0 ? 0.2 : 1);                                                 // ...and the sniper's punch lands
   if(S.mode==='play'){
     update(dt*S.speed*slow);
     if(coach){ coach.t+=dt; if(coach.step===5&&coach.toast>0){ coach.toast-=dt; if(coach.toast<0)coach.toast=-1; } }
