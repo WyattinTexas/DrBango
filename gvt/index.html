@@ -296,6 +296,220 @@
     line-height:1.5; text-transform:none; }
   .wr-mfoot b { color:#FFD24A; }
   .wr-mfoot .mbtn { font-size:1rem; padding:0.35rem 0.7rem; }
+  /* ---- SARGE'S SURPLUS: the shop as a vintage toy-store aisle ----
+     Third scene in the War Table family: #toyshop is a TOP-LEVEL fixed overlay
+     at z20 (never inside .roomstage — its transform:scale would shrink the whole
+     store ~62% on a phone), rendered by renderShop() and torn down by
+     hideAllOverlays(). Three departments ride a scroll-snap aisle; the plaques
+     up top jump straight to one. Geometry is percentages OF the pack/jar/gun box
+     and type is vh-clamped, so one screen holds at 320px tall and only gets
+     roomier upward. Every state change is declarative CSS — renderShop()
+     innerHTML-rebuilds on every purchase. */
+  #toyshop { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; overflow:hidden;
+    --dw:min(92vw,980px);
+    --wood:#B48A54; --woodhi:#C69A62; --wooddk:#8a683e; --woodsh:#5c4326;
+    --card:#EDE4CC; --sticker:#E8762C; --gold:#D9A544; --deepgreen:#4A6B35;
+    --hand:'Marker Felt','Segoe Print','Comic Sans MS',cursive;
+    background:#241B12; color:#EDEADF; font-weight:bold;
+    font-family:'Arial Narrow', Impact, 'Helvetica Neue', sans-serif;
+    user-select:none; -webkit-user-select:none; }
+  /* the page has no global box-sizing reset — the store needs one, or the aisle's
+     department width (and with it the snap arithmetic) drifts by its padding */
+  #toyshop, #toyshop *, #toyshop *::before, #toyshop *::after { box-sizing:border-box; }
+  #toyshop button { font:inherit; color:inherit; }
+  /* the door out, the hanging shop sign, the plaques, the register */
+  .sh-bar { position:relative; z-index:3; flex:0 0 auto; display:flex; align-items:center;
+    gap:clamp(4px,1.1vw,12px); padding:0 clamp(6px,1.2vw,14px); height:clamp(42px,12vh,58px);
+    background:linear-gradient(180deg,#1C1610,#1C1610 86%,rgba(28,22,16,0)); }
+  .sh-x { width:clamp(30px,8vh,40px); height:clamp(30px,8vh,40px); border-radius:50%; flex:0 0 auto;
+    border:2px solid #6b6152; background:#141008; font-size:clamp(13px,3vh,19px); cursor:pointer; }
+  .sh-x:active { transform:scale(0.94); }
+  .sh-sign { position:relative; margin-top:clamp(8px,2.4vh,14px); padding:3px clamp(7px,1.4vw,16px) 4px;
+    transform:rotate(-1.2deg); flex:0 1 auto; text-align:center; border-radius:5px;
+    background:linear-gradient(180deg,var(--woodhi),var(--wood) 60%,var(--wooddk));
+    border:2px solid var(--woodsh); box-shadow:0 3px 8px rgba(0,0,0,0.5); }
+  .sh-sign::before, .sh-sign::after { content:''; position:absolute; top:-13px; width:2px; height:13px; background:#6b6152; }
+  .sh-sign::before { left:18%; } .sh-sign::after { right:18%; }
+  .sh-sign b { display:block; font-size:clamp(11px,2.9vh,21px); letter-spacing:0.08em; color:#3A2A14;
+    white-space:nowrap; text-shadow:0 1px 0 rgba(255,243,196,0.35); }
+  .sh-sign small { display:block; font-size:clamp(5px,1.3vh,10px); letter-spacing:0.2em; color:#543D1F; white-space:nowrap; }
+  .sh-tabs { display:flex; gap:clamp(3px,0.6vw,7px); margin-left:auto; }
+  .sh-tab { border:2px solid var(--woodsh); background:#33261A; color:#D2B489; cursor:pointer;
+    font-size:clamp(8px,1.8vh,13px); letter-spacing:0.1em; border-radius:4px; white-space:nowrap;
+    padding:clamp(3px,1vh,7px) clamp(4px,0.9vw,11px); }
+  .sh-tab.on { background:var(--deepgreen); border-color:#7FA35C; color:#fff; }
+  .sh-tab:active { transform:scale(0.95); }
+  .sh-reg { display:flex; align-items:center; gap:5px; flex:0 0 auto; background:#141008;
+    border:2px solid var(--woodsh); border-radius:20px; padding:3px clamp(6px,1vw,13px) 3px 5px; }
+  .sh-reg svg { width:clamp(19px,5vh,30px); height:auto; }
+  .sh-reg b { color:var(--gold); font-size:clamp(11px,2.7vh,19px); font-variant-numeric:tabular-nums; }
+  /* the aisle. The tail spacer is what lets the LAST department reach snap-start:
+     without it, 3×dept minus one viewport leaves it permanently short. */
+  .sh-aisle { position:relative; flex:1; min-height:0; display:flex; overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
+  .sh-aisle::-webkit-scrollbar { display:none; }
+  .sh-dept { position:relative; flex:0 0 auto; width:var(--dw); height:100%; overflow:hidden;
+    scroll-snap-align:start; display:flex; flex-direction:column;
+    padding:clamp(2px,0.8vh,8px) clamp(8px,1.6vw,20px) clamp(4px,1vh,10px); }
+  .sh-end { flex:0 0 calc(100vw - var(--dw)); }
+  .sh-dept h2 { margin:0 0 2px; font-size:clamp(11px,2.6vh,20px); letter-spacing:0.2em; color:#D2B489; }
+  .sh-dept h2 small { display:block; font-size:clamp(6px,1.4vh,11px); letter-spacing:0.16em; color:#9a8a6a; margin-top:1px; }
+  /* --- dept 1: NEW RECRUITS, the figure wall --- */
+  #shWall { border-right:6px solid #171008;
+    background:radial-gradient(circle, #16100A 2.1px, transparent 2.7px) 8px 10px/26px 26px,
+      linear-gradient(180deg,#3A2C1E,#33261A); }
+  .sh-packrow { flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    gap:clamp(8px,2vw,22px); }
+  .sh-pack { position:relative; flex:0 0 auto; height:clamp(150px,62vh,300px); max-height:100%;
+    aspect-ratio:196/262; border:none; padding:0; cursor:pointer; text-align:center; color:#2A2118;
+    background:linear-gradient(160deg,#F4ECD8,var(--card) 45%,#D9CCA8); border-radius:9px 9px 5px 5px;
+    box-shadow:0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.15); }
+  .sh-pack:active { transform:translateY(2px); }
+  .sh-hang { position:absolute; top:2.2%; left:50%; width:17%; height:3.4%; transform:translateX(-50%);
+    background:#1E150C; border-radius:5px; box-shadow:inset 0 2px 3px #000; }
+  .sh-band { display:block; margin:7% 4% 0; padding:2% 4px 3%; border-radius:4px; color:#FFF6E2; }
+  .sh-band i { display:block; font-style:normal; font-size:clamp(5px,1.15vh,9px); letter-spacing:0.3em; opacity:0.85; }
+  .sh-band b { display:block; font-size:clamp(12px,2.7vh,21px); letter-spacing:0.04em; line-height:1.08;
+    text-shadow:0 2px 0 rgba(0,0,0,0.25); }
+  .sh-bub { position:relative; display:block; margin:3% 13% 0; height:48%; border-radius:12px;
+    border:2px solid rgba(90,80,60,0.35); box-shadow:inset 0 0 14px rgba(70,60,40,0.25);
+    background:linear-gradient(135deg,rgba(255,255,255,0.38),rgba(255,255,255,0.07) 38%,rgba(120,140,160,0.10) 62%,rgba(255,255,255,0.22)); }
+  .sh-bub img { height:88%; width:auto; margin-top:5%; filter:drop-shadow(0 3px 2px rgba(0,0,0,0.28)); }
+  .sh-bub::after { content:''; position:absolute; inset:0; border-radius:12px; pointer-events:none;
+    background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,0.35) 38%,transparent 46%); }
+  .sh-tagline { display:block; margin:4% 7% 0; font-family:var(--hand); font-weight:normal;
+    font-size:clamp(8px,1.9vh,14px); color:#8A3A1E; line-height:1.08; }
+  .sh-ages { position:absolute; bottom:2%; left:0; right:0; font-size:clamp(4px,1vh,8px);
+    letter-spacing:0.2em; color:#8a795a; }
+  .sh-price { position:absolute; right:-5%; top:39%; width:27%; aspect-ratio:1; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--hand);
+    font-size:clamp(11px,2.3vh,18px); transform:rotate(-9deg);
+    background:radial-gradient(circle at 35% 30%, #FF9A50, var(--sticker) 70%);
+    border:2px dashed rgba(255,255,255,0.55); box-shadow:0 3px 6px rgba(0,0,0,0.45); }
+  .sh-burst { position:absolute; left:-4%; top:35%; width:24%; height:auto; color:#B01E2E; }
+  .sh-burst text { font:800 11px 'Arial Narrow',Impact,sans-serif; fill:#fff; }
+  .sh-stamp, .sh-pack.buying::after { position:absolute; left:50%; bottom:13%; white-space:nowrap;
+    transform:translateX(-50%) rotate(-8deg); border:3px double var(--deepgreen); color:var(--deepgreen);
+    border-radius:6px; padding:1px 9px; font-size:clamp(11px,2.2vh,17px); letter-spacing:0.2em;
+    background:rgba(237,228,204,0.55); }
+  .sh-pack.own .sh-bub img, .sh-pack.own .sh-tagline { visibility:hidden; }
+  /* the figure steps out of the bubble and stands in front — dark rim so a tan or
+     white army never vanishes into the cardstock */
+  .sh-step { position:absolute; bottom:22%; left:50%; height:43%; width:auto; transform:translateX(-50%);
+    filter:drop-shadow(0 0 3px rgba(0,0,0,0.85)) drop-shadow(0 5px 4px rgba(0,0,0,0.5));
+    animation:shbob 2.6s ease-in-out infinite alternate; pointer-events:none; }
+  @keyframes shbob { from { transform:translateX(-50%) rotate(-2.4deg); } to { transform:translateX(-50%) rotate(2.4deg); } }
+  .sh-rail { flex:0 0 auto; height:clamp(8px,2.2vh,15px); margin:0 calc(clamp(8px,1.6vw,20px) * -1);
+    background:linear-gradient(180deg,var(--woodhi),var(--wood) 55%,var(--wooddk));
+    border-top:2px solid var(--woodsh); box-shadow:0 4px 8px rgba(0,0,0,0.5); }
+  /* BUY CEREMONY: the bubble flashes, the figure drops to the rail, the sticker
+     peels off and the stamp slams down. It plays on the UNOWNED markup and the
+     render swaps in the owned state a second later — innerHTML mid-animation
+     would kill it dead (the piggyHop lesson). */
+  .sh-pack.buying .sh-bub { animation:shpop 0.5s ease-out; }
+  @keyframes shpop { 35% { box-shadow:inset 0 0 26px rgba(255,246,200,0.85), 0 0 20px rgba(255,238,180,0.6); } }
+  .sh-pack.buying .sh-bub img { animation:shdrop 0.8s 0.12s cubic-bezier(.45,.05,.6,1) forwards; }
+  @keyframes shdrop { 0% { transform:translateY(0) rotate(0); } 58% { transform:translateY(26%) rotate(10deg); }
+    76% { transform:translateY(17%) rotate(4deg); } 100% { transform:translateY(21%) rotate(6deg); } }
+  .sh-pack.buying .sh-price, .sh-pack.buying .sh-burst { animation:shpeel 0.4s ease-in forwards; }
+  @keyframes shpeel { to { transform:scale(0.15) rotate(-50deg); opacity:0; } }
+  .sh-pack.buying .sh-tagline { opacity:0; transition:opacity 0.25s; }
+  .sh-pack.buying::after { content:'ENLISTED ✓'; animation:shstamp 0.42s 0.42s both; }
+  @keyframes shstamp { 0% { transform:translateX(-50%) rotate(-8deg) scale(2.8); opacity:0; }
+    65% { transform:translateX(-50%) rotate(-8deg) scale(0.9); opacity:1; }
+    100% { transform:translateX(-50%) rotate(-8deg) scale(1); opacity:1; } }
+  /* not enough stars: the price shakes its head. No dead disabled buttons. */
+  .sh-pack.deny .sh-price { animation:shno 0.42s; }
+  @keyframes shno { 0%,100% { transform:rotate(-9deg) translateX(0); } 20% { transform:rotate(-9deg) translateX(-7px); }
+    40% { transform:rotate(-9deg) translateX(7px); } 60% { transform:rotate(-9deg) translateX(-5px); }
+    80% { transform:rotate(-9deg) translateX(5px); } }
+  /* --- dept 2: PAINT & DYE, the paint shelf --- */
+  #shPaint { border-right:6px solid #171008; background:linear-gradient(180deg,#2E2318,#241B12); }
+  .sh-shelf { position:relative; flex:0 0 auto; }
+  /* enough air that the lower jars' price tags clear the upper shelf's price rail */
+  .sh-shelf2 { margin-top:clamp(20px,6.5vh,38px); margin-bottom:clamp(12px,2.6vh,20px); }
+  .sh-jars { display:flex; align-items:flex-end; justify-content:center; gap:clamp(4px,1.1vw,12px);
+    padding:0 6px clamp(1px,0.4vh,3px); }
+  .sh-plank { height:clamp(9px,2.2vh,16px); border-radius:2px;
+    background:linear-gradient(180deg,var(--woodhi),var(--wood) 50%,var(--wooddk));
+    border-top:2px solid #d8b184; border-bottom:3px solid var(--woodsh); box-shadow:0 6px 10px rgba(0,0,0,0.5); }
+  .sh-pricerail { position:absolute; left:8%; right:8%; bottom:clamp(-15px,-2vh,-9px);
+    height:clamp(10px,2.1vh,15px); background:#F0E8D2; border-radius:2px; color:#5B4A28;
+    font-size:clamp(5px,1.25vh,10px); letter-spacing:0.14em; display:flex; align-items:center;
+    justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.4); white-space:nowrap; overflow:hidden; }
+  .sh-jar { position:relative; z-index:0; width:clamp(46px,21vh,108px); border:none; background:none;
+    padding:0; cursor:pointer; }
+  .sh-jar svg { width:100%; height:auto; display:block; }
+  .sh-jar:active { transform:translateY(2px); }
+  .sh-jn { display:block; font-family:var(--hand); font-weight:normal; font-size:clamp(6px,1.4vh,11px);
+    color:#C8BCA0; margin-top:1px; }
+  .sh-tag { position:absolute; top:-9%; right:-6%; z-index:1; background:var(--sticker); color:#fff;
+    font-family:var(--hand); font-size:clamp(6px,1.5vh,11px); padding:1px 5px; border-radius:3px;
+    transform:rotate(7deg); box-shadow:0 2px 3px rgba(0,0,0,0.4); white-space:nowrap; }
+  .sh-tag.own { background:var(--deepgreen); }
+  .sh-tag.wear { background:var(--gold); color:#3A2A14; }
+  /* the soldier wearing that colour stands behind the jar — a hard dark rim keeps
+     him off the jar he matches (tan-on-tan, teal-on-teal-glow) */
+  .sh-wearer { position:absolute; bottom:44%; left:50%; width:78%; height:auto; transform:translateX(-50%);
+    z-index:-1; animation:shbob 2.2s ease-in-out infinite alternate;
+    filter:drop-shadow(0 0 3px rgba(0,0,0,0.95)) drop-shadow(0 2px 4px rgba(0,0,0,0.75)); }
+  .sh-jar.wearing svg { filter:drop-shadow(0 0 10px var(--jarhex)); animation:shbloom 0.7s ease-out; }
+  @keyframes shbloom { 0% { filter:drop-shadow(0 0 0 var(--jarhex)); } 45% { filter:drop-shadow(0 0 26px var(--jarhex)); }
+    100% { filter:drop-shadow(0 0 10px var(--jarhex)); } }
+  .sh-jar.deny .sh-tag { animation:shno2 0.42s; }
+  @keyframes shno2 { 0%,100% { transform:rotate(7deg) translateX(0); } 20% { transform:rotate(7deg) translateX(-6px); }
+    40% { transform:rotate(7deg) translateX(6px); } 60% { transform:rotate(7deg) translateX(-4px); }
+    80% { transform:rotate(7deg) translateX(4px); } }
+  .sh-bucket { width:clamp(48px,22vh,112px); border:none; background:none; padding:0; cursor:pointer; }
+  .sh-bucket svg { width:100%; height:auto; display:block; }
+  .sh-bucket small { display:block; font-family:var(--hand); font-weight:normal;
+    font-size:clamp(6px,1.4vh,11px); color:#9ab0c0; }
+  .sh-bucket.off { opacity:0.4; }
+  .sh-poster { position:absolute; left:clamp(8px,1.4vw,18px); top:clamp(34px,7vh,60px);
+    width:clamp(110px,13vw,170px); padding:8px 10px 6px; transform:rotate(-3.5deg); background:var(--card);
+    border-radius:3px; box-shadow:0 4px 9px rgba(0,0,0,0.5); text-align:center; }
+  .sh-poster b { font-family:var(--hand); color:#8A3A1E; font-size:clamp(11px,1.7vh,15px); }
+  .sh-poster img { width:30%; height:auto; }
+  .sh-poster::before { content:''; position:absolute; top:-6px; left:50%; width:34px; height:12px;
+    margin-left:-17px; background:rgba(200,190,160,0.7); transform:rotate(2deg); }
+  @media (max-width:900px) { .sh-poster { display:none; } }
+  /* --- dept 3: THE BACK COUNTER, the laser case (the store goes dark down here) --- */
+  #shLasers { background:linear-gradient(90deg,#241B12 0,#12100E 22%,#0E0C12 100%); }
+  #shLasers h2 { color:#7A8CA8; }
+  #shLasers h2 small { color:#5A6A85; }
+  .sh-neon { align-self:center; margin:1px 0 3px; font-size:clamp(15px,4vh,34px); letter-spacing:0.32em;
+    padding-left:0.32em; color:#E4FBFF; animation:shflick 3.4s linear infinite;
+    text-shadow:0 0 6px #59E3FF, 0 0 16px #59E3FF, 0 0 32px #2B7FD4; }
+  @keyframes shflick { 0%,93%,95.5%,100% { opacity:1; } 94%,95% { opacity:0.45; } }
+  .sh-case { position:relative; flex:1; min-height:0; margin-bottom:3px; border-radius:10px; overflow:hidden;
+    border:2px solid rgba(150,190,235,0.35);
+    background:linear-gradient(180deg,rgba(140,180,255,0.08),rgba(140,180,255,0.02) 60%,#1E1430);
+    box-shadow:inset 0 0 24px rgba(60,90,140,0.25), 0 8px 14px rgba(0,0,0,0.5); }
+  .sh-case::after { content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(115deg,transparent 42%,rgba(210,235,255,0.10) 50%,transparent 58%); }
+  .sh-gunrow { display:flex; justify-content:space-evenly; align-items:center; height:50%; }
+  .sh-gun { position:relative; width:clamp(88px,37vh,168px); border:none; background:none; padding:0; cursor:pointer; }
+  .sh-gwrap { position:relative; display:block; }
+  .sh-gun img { width:92%; height:auto; display:block; margin:0 auto; filter:drop-shadow(0 0 5px var(--ghex)); }
+  .sh-gn { display:block; text-align:center; font-size:clamp(6px,1.4vh,11px); letter-spacing:0.16em; color:#8FA6C8; }
+  .sh-brass { display:inline-block; margin-top:1px; background:linear-gradient(180deg,#E8C878,#B08A38);
+    color:#3A2A0A; font-size:0.95em; letter-spacing:0.06em; padding:0 5px; border-radius:2px; }
+  .sh-gun.eq .sh-gwrap { transform:rotate(-7deg); }   /* it tilts up and fires */
+  .sh-gun.eq img { filter:drop-shadow(0 0 12px var(--ghex)) drop-shadow(0 0 24px var(--ghex)); }
+  .sh-gun.eq .sh-brass { background:linear-gradient(180deg,#B9E8FF,#59A6D8); color:#08283A; }
+  .sh-beam { position:absolute; top:48%; left:76%; width:0; height:clamp(2px,0.6vh,4px); border-radius:2px;
+    opacity:0; pointer-events:none; background:linear-gradient(90deg,#fff,var(--ghex) 30%,transparent);
+    box-shadow:0 0 9px var(--ghex); }
+  .sh-gun.eq .sh-beam { width:44%; opacity:1; animation:shpew 1.6s ease-in-out infinite; }
+  @keyframes shpew { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+  .sh-gun.deny .sh-brass { animation:shno3 0.42s; }
+  @keyframes shno3 { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-6px); }
+    40% { transform:translateX(6px); } 60% { transform:translateX(-4px); } 80% { transform:translateX(4px); } }
+  .sh-counsel { flex:0 0 auto; text-align:center; font-family:var(--hand); font-weight:normal;
+    font-size:clamp(7px,1.6vh,13px); color:#7A8CA8; margin:2px 0 0; }
+  @media (prefers-reduced-motion:reduce) {
+    .sh-step, .sh-wearer, .sh-neon, .sh-gun.eq .sh-beam, .sh-jar.wearing svg { animation:none; }
+  }
   #err { position:fixed; left:0; right:0; bottom:0; background:#A63B2A; color:#fff; font:12px monospace; padding:4px 8px; z-index:99; display:none; white-space:pre-wrap; }
   /* ---- HQ = Your Room: one screen, no scrolling ---- */
   .menuwrap { justify-content:center; align-items:center; overflow:hidden; padding:0; background:#141810; }
@@ -312,11 +526,6 @@
   .rmcard h3 { margin:0 0 10px; font-size:1.6rem; letter-spacing:0.05em; text-transform:uppercase; }
   .rmcard p { font-size:1.15rem; margin:0 0 12px; line-height:1.35; }
   .rmx { position:absolute; top:10px; right:14px; background:none; border:none; color:#c3c8b4; font-size:1.9rem; line-height:1; cursor:pointer; padding:4px 8px; }
-  .laserrow { display:flex; flex-wrap:wrap; gap:10px; }
-  .laserchip { border:2px solid; border-radius:12px; padding:11px 12px; width:120px; text-align:center; cursor:pointer; background:rgba(0,0,0,0.3); }
-  .laserchip b { display:block; font-size:1rem; letter-spacing:0.06em; }
-  .laserchip small { opacity:0.65; font-size:0.86rem; }
-  .lzbeam { height:5px; border-radius:2px; margin:3px 0 8px; box-shadow:0 0 8px currentColor; }
   .achgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px 18px; font-size:1.04rem; }
   .blinker { animation:blink 1.4s linear infinite; }
   @keyframes blink { 0%,65% {opacity:1;} 75%,100% {opacity:0.15;} }
@@ -441,7 +650,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.9</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.10</div>
   <div class="scanlines"></div>
 </div>
 
@@ -478,6 +687,10 @@
 <!-- WORLD RANKINGS: the leaderboard scene. Same rules as the War Table —
      top-level sibling, z20, torn down by hideAllOverlays(). -->
 <div id="worldrank" class="hidden"></div>
+
+<!-- SARGE'S SURPLUS: the shop, as a toy-store aisle you walk. Same rules again —
+     top-level sibling, z20, rendered by renderShop(). -->
+<div id="toyshop" class="hidden"></div>
 
 <div class="overlay" id="rotate">
   <h1>&#8635;</h1>
@@ -1202,7 +1415,7 @@ function startBattle(levelN, rival){
 function rivalRaidWaves(m){
   return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
-function hideAllOverlays(){ ['title','lose','win','menu','picker','wartable','worldrank'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
+function hideAllOverlays(){ ['title','lose','win','menu','picker','wartable','worldrank','toyshop'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 // ================= INVASION (challenge mode: YOU are the Tan) =================
 const INVADE_CARDS = [
@@ -3811,10 +4024,12 @@ function sprURI(k,color){
   const vb=(k==='jeep'||k==='tank')?'0 0 140 140':'0 0 120 140';
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+SPRITES_SRC[k].split('currentColor').join(color||'#7FA35C')+'</svg>');
 }
+// The three unlockable figures. cost is the economy; name/band/tag are how the
+// carded blister pack reads on the pegboard in SARGE'S SURPLUS (see renderShop).
 const SHOP_ITEMS=[
-  { t:'minesweeper', cost:10, blurb:'Plants firecracker mines ahead of your line. (Mines don\'t check dog tags either.)' },
-  { t:'flame',       cost:15, blurb:'Short range. Melts everything in reach. The crawler answer.' },
-  { t:'radioman',    cost:20, blurb:'+25% range to every soldier nearby. All antenna, no rifle.' }
+  { t:'minesweeper', cost:10, name:'THE SWEEPER',    band:'#C9822E', tag:'REAL MINE-PLANTING ACTION! 3 firecracker mines included.' },
+  { t:'flame',       cost:15, name:'THE FLAME',      band:'#C04A2E', tag:'MELTS THE WHOLE FRONT ROW! The crawler answer.' },
+  { t:'radioman',    cost:20, name:'THE RADIO MAN',  band:'#4E7DB0', tag:'+25% RANGE TO THE WHOLE SQUAD! All antenna, no rifle.' }
 ];
 // THE FIELD MANUAL: what every class is good at — and bad at. Tap a soldier
 // at the Training Academy to read their page.
@@ -4297,6 +4512,154 @@ function closeWorldRank(){
   WR.muster=false; WR.rename=false;
 }
 
+// ================= SARGE'S SURPLUS (the shop) =================
+// Wyatt 7/24: the shop should feel like a cool toy soldier shop where you unlock
+// the three characters, all the dye kits and all the lasers — "not just text and
+// a list." So the army crate opens a full-screen 1959 surplus store you walk:
+// three departments on a scroll-snap aisle (figure wall / paint shelf / laser
+// case under glass), all of it the game's own sprite art. The economy underneath
+// is untouched — 10/15/20★ figures, 20★ dye kits that auto-wear and wash off
+// free, 500★ lasers that auto-equip and toggle.
+const SHOP_TABS = [ {id:'figs', lab:'FIGURES'}, {id:'paint', lab:'PAINT &amp; DYE'}, {id:'lasers', lab:'LASERS'} ];
+let SHOP = { tab:'figs', jumpT:0 };
+function shopIsOpen(){ const el=document.getElementById('toyshop'); return !!el && !el.classList.contains('hidden'); }
+// a ray gun in the game's own molded-plastic idiom: thick round-capped strokes
+function rayURI(hex){
+  const s='<g stroke="'+hex+'" fill="none" stroke-linecap="round">'
+    +'<path d="M22 34 L96 34" stroke-width="13"/>'
+    +'<path d="M30 24 L44 24" stroke-width="7"/><path d="M52 22 L66 22" stroke-width="7"/>'
+    +'<path d="M34 46 L30 62" stroke-width="11"/><path d="M46 40 L52 50" stroke-width="6"/></g>'
+    +'<circle cx="100" cy="34" r="9" fill="none" stroke="'+hex+'" stroke-width="4"/>'
+    +'<circle cx="100" cy="34" r="3.2" fill="#FFFFFF"/>'
+    +'<path d="M26 22 L26 46" stroke="'+hex+'" stroke-width="5" stroke-linecap="round" fill="none"/>';
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 68">'+s+'</svg>');
+}
+// a model-paint jar. sealed = full and capped; owned/wearing = lid ajar with a
+// loaded brush leaning on it.
+function jarSVG(hex,state){
+  const seal=(state==='sealed');
+  const lid = seal? ' x="10" y="6"' : ' transform="rotate(-14 16 12)" x="4" y="2"';
+  return '<svg viewBox="0 0 64 78">'
+    +'<ellipse cx="32" cy="74" rx="24" ry="3.5" fill="#000" opacity="0.35"/>'
+    +'<rect x="12" y="18" width="40" height="54" rx="7" fill="rgba(225,235,240,0.14)" stroke="rgba(230,240,250,0.45)" stroke-width="2"/>'
+    +'<rect x="16" y="'+(seal?30:36)+'" width="32" height="'+(seal?38:32)+'" rx="5" fill="'+hex+'"/>'
+    +'<rect'+lid+' width="44" height="11" rx="4" fill="#8A8578"/>'
+    +'<path d="M20 24 L26 62" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>'
+    +(seal?'':'<g transform="rotate(24 54 40)"><rect x="52" y="18" width="5" height="30" rx="2" fill="#B48A54"/><rect x="50.5" y="44" width="8" height="12" rx="3" fill="'+hex+'"/></g>')
+    +'</svg>';
+}
+const SH_BUCKET='<svg viewBox="0 0 66 74"><ellipse cx="33" cy="69" rx="24" ry="4" fill="#000" opacity="0.35"/><path d="M12 28 L18 68 L48 68 L54 28 z" fill="#7A93A8" stroke="#54687A" stroke-width="2.5"/><ellipse cx="33" cy="28" rx="21" ry="6" fill="#9FB6C8" stroke="#54687A" stroke-width="2.5"/><ellipse cx="33" cy="28" rx="15" ry="3.8" fill="#CFE4F0"/><circle cx="24" cy="20" r="5" fill="#E8F4FA" opacity="0.9"/><circle cx="35" cy="14" r="7" fill="#E8F4FA" opacity="0.8"/><circle cx="46" cy="21" r="4" fill="#E8F4FA" opacity="0.9"/><path d="M14 34 a 26 8 0 0 0 38 0" stroke="#E8F4FA" stroke-width="3" fill="none" opacity="0.6"/></svg>';
+const SH_BURST='<svg class="sh-burst" viewBox="0 0 46 46"><path d="M23 1 L27 12 L38 5 L34 16 L46 16 L36 23 L46 30 L34 30 L38 41 L27 34 L23 45 L19 34 L8 41 L12 30 L0 30 L10 23 L0 16 L12 16 L8 5 L19 12 z" fill="currentColor"/><text x="23" y="27" text-anchor="middle">NEW!</text></svg>';
+const SH_PIG='<svg viewBox="0 0 104 86"><ellipse cx="52" cy="52" rx="42" ry="30" fill="#E48FB4"/><rect x="22" y="74" width="10" height="12" rx="4" fill="#B4577E"/><rect x="72" y="74" width="10" height="12" rx="4" fill="#B4577E"/><ellipse cx="14" cy="54" rx="10" ry="8" fill="#E48FB4"/><circle cx="11" cy="53" r="2" fill="#5C2338"/><circle cx="17" cy="53" r="2" fill="#5C2338"/><rect x="48" y="20" width="16" height="4" rx="2" fill="#5C2338"/></svg>';
+// The pack on the peg. The figure in the bubble is factory green — that's how it
+// ships. The one who steps out once he's yours wears YOUR army colour.
+function shopPackHTML(s){
+  const own=META.unlocked.indexOf(s.t)>=0, dye=dyeHex()||undefined;
+  return '<button type="button" class="sh-pack'+(own?' own':'')+'" id="shpk-'+s.t+'" onclick="UI.buy(\''+s.t+'\')">'
+    +'<span class="sh-hang"></span>'
+    +'<span class="sh-band" style="background:'+s.band+'"><i>GREEN ARMY · SHELF SERIES</i><b>'+s.name+'</b></span>'
+    +'<span class="sh-bub"><img src="'+sprURI(s.t)+'" alt=""></span>'
+    +'<span class="sh-tagline">'+s.tag+'</span>'
+    +(own? '<span class="sh-stamp">ENLISTED ✓</span><img class="sh-step" src="'+sprURI(s.t,dye)+'" alt="">'
+         : SH_BURST+'<span class="sh-price">'+s.cost+'★</span>')
+    +'<span class="sh-ages">AGES 5 &amp; UP · NO BATTERIES · EVER</span></button>';
+}
+function shopJarHTML(a){
+  const own=META.dyes.indexOf(a.id)>=0, on=META.dyeOn===a.id;
+  const st = on? 'wearing' : own? 'owned' : 'sealed';
+  return '<button type="button" class="sh-jar'+(on?' wearing':'')+'" id="shjr-'+a.id+'" style="--jarhex:'+a.hex+'" onclick="UI.dye(\''+a.id+'\')">'
+    +jarSVG(a.hex,st)
+    +(st==='sealed'? '<span class="sh-tag">20★</span>'
+      : st==='owned'? '<span class="sh-tag own">YOURS</span>'
+      : '<span class="sh-tag wear">WEARING IT</span><img class="sh-wearer" src="'+sprURI('rifleman',a.hex)+'" alt="">')
+    +'<span class="sh-jn">'+a.id+'</span></button>';
+}
+function shopGunHTML(a){
+  const own=META.lasers.indexOf(a.id)>=0, eq=META.laserOn===a.id;
+  return '<button type="button" class="sh-gun'+(eq?' eq':'')+'" id="shgn-'+a.id+'" style="--ghex:'+a.hex+'" onclick="UI.laser(\''+a.id+'\')">'
+    +'<span class="sh-gwrap"><img src="'+rayURI(a.hex)+'" alt=""><span class="sh-beam"></span></span>'
+    +'<span class="sh-gn">'+a.id.toUpperCase()+' <span class="sh-brass">'+(eq?'EQUIPPED':own?'TAP TO EQUIP':'500★')+'</span></span></button>';
+}
+function renderShop(){
+  const el=document.getElementById('toyshop'); if(!el) return;
+  const jars2=ARMIES.slice(5).map(shopJarHTML).join('')
+    +'<button type="button" class="sh-bucket'+(META.dyeOn?'':' off')+'" onclick="UI.dye(null)">'
+    +SH_BUCKET+'<small>wash it off — free</small></button>';
+  const guns=[LASER_COLORS.slice(0,4),LASER_COLORS.slice(4)]
+    .map(row=>'<div class="sh-gunrow">'+row.map(shopGunHTML).join('')+'</div>').join('');
+  el.innerHTML =
+    '<div class="sh-bar">'
+      +'<button type="button" class="sh-x" onclick="UI.shopClose()">✕</button>'
+      +'<div class="sh-sign"><b>SARGE\'S SURPLUS</b><small>FINE PLASTIC GOODS · EST. 1959</small></div>'
+      +'<nav class="sh-tabs">'+SHOP_TABS.map(t=>'<button type="button" class="sh-tab'+(SHOP.tab===t.id?' on':'')
+        +'" data-go="'+t.id+'" onclick="UI.shopTab(\''+t.id+'\')">'+t.lab+'</button>').join('')+'</nav>'
+      +'<div class="sh-reg">'+SH_PIG+'<b id="shStars">'+META.starBank+'★</b></div>'
+    +'</div>'
+    +'<div class="sh-aisle" id="shAisle">'
+      +'<section class="sh-dept" id="shWall"><h2>NEW RECRUITS<small>CARDED FIGURES — EACH SOLD SEPARATELY</small></h2>'
+        +'<div class="sh-packrow">'+SHOP_ITEMS.map(shopPackHTML).join('')+'</div>'
+        +'<div class="sh-rail"></div></section>'
+      +'<section class="sh-dept" id="shPaint"><h2>PAINT &amp; DYE<small>REPAINT THE WHOLE ARMY — 20★ THE JAR</small></h2>'
+        +'<div class="sh-poster"><b>COLOR YOUR ARMY!</b><div>'
+        +['#5B84C4','#C05A4A','#D9A544'].map(h=>'<img src="'+sprURI('rifleman',h)+'" alt="">').join('')+'</div></div>'
+        +'<div class="sh-shelf" style="margin-top:auto"><div class="sh-jars">'+ARMIES.slice(0,5).map(shopJarHTML).join('')+'</div>'
+        +'<div class="sh-plank"></div><div class="sh-pricerail">DYE KITS — 20★ · BUY IT, WEAR IT, WASH IT OFF ANY TIME</div></div>'
+        +'<div class="sh-shelf sh-shelf2"><div class="sh-jars">'+jars2+'</div>'
+        +'<div class="sh-plank"></div><div class="sh-pricerail">FACTORY GREEN IS ALWAYS FREE</div></div></section>'
+      +'<section class="sh-dept" id="shLasers"><h2>THE BACK COUNTER<small>FUTURE TECH · SOLD UNDER GLASS</small></h2>'
+        +'<div class="sh-neon">LASERS</div><div class="sh-case">'+guns+'</div>'
+        +'<div class="sh-counsel">every shot a beam, every beam a color — 500★ · ask Sarge for a demonstration</div></section>'
+      +'<div class="sh-end"></div>'
+    +'</div>';
+  const a=document.getElementById('shAisle');
+  a.addEventListener('scroll', shopScroll, {passive:true});
+  shopJump(SHOP.tab, false);
+}
+// Which department you're standing in front of, from where the aisle stopped.
+function shopScroll(){
+  const a=document.getElementById('shAisle'); if(!a||!a.firstElementChild) return;
+  const w=a.firstElementChild.offsetWidth||1;
+  const i=Math.max(0, Math.min(SHOP_TABS.length-1, Math.round(a.scrollLeft/w)));
+  // a plaque tap is still gliding: stay lit on the destination until we get there,
+  // or until the glide plainly isn't happening (a hand grabbed the aisle mid-flight)
+  if(SHOP.jumpT){
+    if(SHOP_TABS[i].id===SHOP.tab){ SHOP.jumpT=0; return; }   // landed
+    if(Date.now()<=SHOP.jumpT) return;                        // still gliding
+    SHOP.jumpT=0;                                             // gave up — trust the aisle again
+  }
+  if(SHOP_TABS[i].id===SHOP.tab) return;
+  SHOP.tab=SHOP_TABS[i].id; shopMarkTabs(SHOP.tab);
+}
+function shopMarkTabs(id){
+  const tabs=document.querySelectorAll('#toyshop .sh-tab');
+  for(let k=0;k<tabs.length;k++) tabs[k].classList.toggle('on', tabs[k].getAttribute('data-go')===id);
+}
+// A tap on a plaque walks you down the aisle; a re-render must LAND there, not slide.
+function shopJump(id, smooth){
+  SHOP.tab=id;
+  SHOP.jumpT = smooth? Date.now()+1400 : 0;
+  const a=document.getElementById('shAisle'); if(!a||!a.firstElementChild) return;
+  const i=Math.max(0, SHOP_TABS.findIndex(t=>t.id===id));
+  if(!smooth) a.style.scrollBehavior='auto';
+  a.scrollLeft = i*a.firstElementChild.offsetWidth;
+  if(!smooth) a.style.scrollBehavior='';
+  shopMarkTabs(id);
+}
+function shopRefresh(){ if(shopIsOpen()) renderShop(); }
+// no dead disabled buttons: the price tag shakes its head and clacks at you
+function shopDeny(id){
+  SFX.clack();
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.remove('deny'); void el.offsetWidth; el.classList.add('deny');
+  setTimeout(()=>{ try{ el.classList.remove('deny'); }catch(e){} }, 500);
+}
+function openShop(){
+  SHOP.tab='figs';                                   // you always come in the front door
+  document.getElementById('toyshop').classList.remove('hidden');
+  renderShop();                                      // ...after it's visible, or the aisle measures 0 wide
+}
+function closeShop(){ const el=document.getElementById('toyshop'); if(el) el.classList.add('hidden'); }
+
 function roomModal(inner){
   document.getElementById('roomModal').innerHTML =
     '<div class="rmback" onclick="UI.closeModal(event)"><div class="rmcard" onclick="event.stopPropagation()">'
@@ -4312,24 +4675,7 @@ function panelHTML(id){
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
       +'<button class="mbtn alt" style="margin-top:10px" onclick="UI.coopOpen()">🤝 TWO-PLAYER MISSION</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
-    case 'shop': return '<h3>THE SHOP</h3>'
-      + SHOP_ITEMS.map(s=>{ const owned=META.unlocked.indexOf(s.t)>=0;
-        return '<div class="mrow"><img src="'+sprURI(s.t)+'"><div class="grow"><b>'+UDEF[s.t].name+'</b> <small style="opacity:0.6">'+s.blurb+'</small></div>'
-        +(owned?'<b style="color:#7FA35C">OWNED</b>':'<button class="mbtn" '+(META.starBank<s.cost?'disabled':'')+' onclick="UI.buy(\''+s.t+'\')">'+s.cost+'★</button>')+'</div>'; }).join('')
-      +'<h3 style="margin-top:12px">DYE KITS <small style="opacity:0.6;font-weight:normal">— repaint your whole army a rival\'s color. 20★</small></h3>'
-      +'<div class="laserrow">'
-      + ARMIES.map(a=>{ const owned=META.dyes.indexOf(a.id)>=0, on=META.dyeOn===a.id;
-        return '<div class="laserchip" style="border-color:'+a.hex+';'+(on?'box-shadow:0 0 12px '+a.hex:'')+'" onclick="UI.dye(\''+a.id+'\')">'
-        +'<img src="'+sprURI('rifleman',a.hex)+'" style="width:30px"><b>'+a.id.toUpperCase()+'</b>'
-        +'<small>'+(on?'WEARING IT':owned?'TAP TO WEAR':'20★')+'</small></div>'; }).join('')
-      +'</div>'+(META.dyeOn?'<p style="font-size:0.85rem;margin:8px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.dye(null);return false">wash it off — back to factory green</a></p>':'')
-      +'<h3 style="margin-top:12px">LASERS <small style="opacity:0.6;font-weight:normal">— every shot a beam, every beam a color. 500★</small></h3>'
-      +'<div class="laserrow">'
-      + LASER_COLORS.map(a=>{ const owned=META.lasers.indexOf(a.id)>=0, on=META.laserOn===a.id;
-        return '<div class="laserchip" style="border-color:'+a.hex+';'+(on?'box-shadow:0 0 12px '+a.hex:'')+'" onclick="UI.laser(\''+a.id+'\')">'
-        +'<div class="lzbeam" style="background:'+a.hex+'"></div><b>'+a.id.toUpperCase()+'</b>'
-        +'<small>'+(on?'EQUIPPED':owned?'TAP TO EQUIP':'500★')+'</small></div>'; }).join('')
-      +'</div>'+(META.laserOn?'<p style="font-size:0.85rem;margin-top:8px"><a href="#" style="color:#8b8f7a" onclick="UI.laser(null);return false">switch back to good old gunpowder</a></p>':'');
+    // (the old text shop lived here — it's SARGE'S SURPLUS now, see renderShop)
     case 'rival': return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+riv.name+'</h3>'
       +'<div style="text-align:center;margin:4px 0 8px"><img src="'+sprURI('tanrifle',riv.hex)+'" style="width:72px"><img src="'+sprURI('tanmg',riv.hex)+'" style="width:72px"><img src="'+sprURI('crawler',riv.hex)+'" style="width:72px"><img src="'+sprURI('officer',riv.hex)+'" style="width:72px"></div>'
       +'<p>"'+riv.blurb+'"</p>'
@@ -4435,8 +4781,18 @@ window.UI = {
   wrRename(){ SFX.blip(); WR.muster=true; WR.rename=true; renderWorldRank();
     setTimeout(()=>UI.renameStart(),0); },
   wrClose(){ SFX.clack(); closeWorldRank(); },
-  buy(t){ const it=SHOP_ITEMS.find(s=>s.t===t); if(!it||META.starBank<it.cost||META.unlocked.indexOf(t)>=0) return;
-    META.starBank-=it.cost; META.unlocked.push(t); checkAch(); saveMeta(); renderMenu(); roomModal(panelHTML('shop')); },
+  // BUY CEREMONY: the ✕ of it is the timing — the pack plays its little unboxing
+  // and only THEN does renderShop() rebuild into the ENLISTED state.
+  buy(t){ const it=SHOP_ITEMS.find(s=>s.t===t); if(!it||META.unlocked.indexOf(t)>=0) return;
+    if(META.starBank<it.cost){ shopDeny('shpk-'+t); return; }
+    META.starBank-=it.cost; META.unlocked.push(t); checkAch(); saveMeta(); renderMenu();
+    if(!shopIsOpen()) return;
+    const st=document.getElementById('shStars'); if(st) st.textContent=META.starBank+'★';
+    const pk=document.getElementById('shpk-'+t);
+    SFX.thock(); setTimeout(()=>SFX.coin(), 120);
+    if(!pk){ renderShop(); return; }
+    pk.classList.add('buying');
+    setTimeout(()=>shopRefresh(), 1000); },
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=5) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
     if(META.pendingPicks>0) showPicker(); else showMenu(); },
@@ -4516,7 +4872,8 @@ window.UI = {
   room(id){
     if(id==='piggy'){ piggyHop(); return; }
     if(id==='bf'){ openWarTable(); return; }   // the battle plan unrolls the full War Table scene
-    if(id==='board'){ openWorldRank(); return; }  // ...and the trophy unrolls WORLD RANKINGS
+    if(id==='board'){ openWorldRank(); return; }  // ...the trophy unrolls WORLD RANKINGS
+    if(id==='shop'){ openShop(); return; }        // ...and the army crate opens SARGE'S SURPLUS
     roomModal(panelHTML(id));
   },
   closeModal(ev){ if(ev&&ev.target!==ev.currentTarget) return; const m=document.getElementById('roomModal'); if(m) m.innerHTML=''; },
@@ -4556,20 +4913,24 @@ window.UI = {
   },
   linkApple(){ if(window.GVTN) GVTN.appleSignIn(); },
   linkGoogle(){ const el=document.getElementById('linkNote'); if(el) el.textContent='Google linking lands next update — Apple works today.'; },
+  // ===== SARGE'S SURPLUS: same economy as ever, new counter =====
+  shopTab(id){ SFX.blip(); shopJump(id, true); },
+  shopClose(){ SFX.clack(); closeShop(); },
   laser(id){
-    if(id===null){ META.laserOn=null; saveMeta(); roomModal(panelHTML('shop')); return; }
+    if(id===null){ META.laserOn=null; saveMeta(); shopRefresh(); return; }
     if(META.lasers.indexOf(id)>=0){ META.laserOn = META.laserOn===id? null : id; SFX.laser(); }
-    else if(META.starBank>=500){ META.starBank-=500; META.lasers.push(id); META.laserOn=id; SFX.laser(); }
-    else { SFX.clack(); return; }
-    saveMeta(); renderMenu(); roomModal(panelHTML('shop'));
+    else if(META.starBank>=500){ META.starBank-=500; META.lasers.push(id); META.laserOn=id; SFX.laser(); SFX.coin(); }
+    else { shopDeny('shgn-'+id); return; }
+    saveMeta(); renderMenu(); shopRefresh();
   },
   dye(id){
-    if(id===null){ META.dyeOn=null; saveMeta(); renderMenu(); roomModal(panelHTML('shop')); return; }
+    if(id===null){ if(!META.dyeOn){ SFX.clack(); return; }    // the wash bucket, free, any time
+      META.dyeOn=null; SFX.blip(); saveMeta(); renderMenu(); shopRefresh(); return; }
     if(META.dyes.indexOf(id)>=0){ META.dyeOn = META.dyeOn===id? null : id; SFX.blip(); }
-    else if(META.starBank>=20){ META.starBank-=20; META.dyes.push(id); META.dyeOn=id; SFX.blip(); }
-    else { SFX.clack(); return; }
+    else if(META.starBank>=20){ META.starBank-=20; META.dyes.push(id); META.dyeOn=id; SFX.coin(); }
+    else { shopDeny('shjr-'+id); return; }
     if(META.dyeOn) buildUnitTint(dyeHex());
-    saveMeta(); renderMenu(); roomModal(panelHTML('shop'));
+    saveMeta(); renderMenu(); shopRefresh();
   },
   classInfo(k){
     const ci=CLASSINFO[k]||{good:'—',bad:'—'}, r=META.up[k]||0, own=META.unlocked.indexOf(k)>=0;
@@ -4650,6 +5011,12 @@ window.GVT = {
   wrState(){ return { open:wrIsOpen(), tab:WR.tab, muster:WR.muster, err:WR.err,
     target:WR.target, rows:wrTop(wrList(WR.tab)).map(r=>r.rank+' '+r.name+' '+r.val),
     counts:WR.data? {board:WR.data.board.length,bf1:WR.data.bf1.length,bf2:WR.data.bf2.length} : null }; },
+  // SARGE'S SURPLUS test rig: GVT.shop('lasers') walks straight to a department
+  shop(tab){ openShop(); if(tab) shopJump(tab, false); return SHOP.tab; },
+  shopState(){ return { open:shopIsOpen(), tab:SHOP.tab, stars:META.starBank,
+    unlocked:META.unlocked.slice(), dyes:META.dyes.slice(), dyeOn:META.dyeOn,
+    lasers:META.lasers.slice(), laserOn:META.laserOn,
+    packs:SHOP_ITEMS.map(s=>s.t+':'+(META.unlocked.indexOf(s.t)>=0?'own':'shelf')) }; },
   bfRec(n,w,l){ if(n){ META.bfRecord[n]={w:w|0,l:l|0,s:0}; saveMeta(); } return META.bfRecord; },
   // piggy test rig: GVT.pig(12) = 12-day streak defended yesterday, unclaimed
   pig(streak,opts){ opts=opts||{};
