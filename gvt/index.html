@@ -37,7 +37,7 @@
   @keyframes waddle { from { transform:rotate(-4.5deg);} to { transform:rotate(4.5deg);} }
   .coinop { position:absolute; bottom:3%; width:100%; text-align:center; font-family:'Arial Narrow', Impact, sans-serif; font-weight:bold; font-size:0.75rem; letter-spacing:0.22em; color:#5A5D4C; text-transform:uppercase; pointer-events:none; }
   .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.16) 2px 4px); }
-  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat,.wt-flank,.wt-play{ animation:none; } }
   @media (orientation: portrait) {
     #rotate { display:flex; z-index:50; }
   }
@@ -95,11 +95,80 @@
   .bfq-go:active { transform:scale(0.97); }
   .bfq-no { font-family:'Arial Narrow', Impact, sans-serif; font-weight:bold; font-size:12px; letter-spacing:0.1em; text-transform:uppercase;
     color:#E8B0A0; background:rgba(120,40,30,0.55); border:1px solid rgba(200,100,80,0.5); border-radius:9px; padding:8px 22px; cursor:pointer; }
-  /* squad-size picker in the battlefield panel — big kid-friendly chips */
-  .bfseg { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 12px; }
-  .bfseg button { flex:1 0 17%; min-width:74px; height:46px; font-family:inherit; font-weight:bold; font-size:1.05rem; letter-spacing:0.04em;
-    color:#EDEADF; background:rgba(0,0,0,0.3); border:2px solid rgba(127,163,92,0.4); border-radius:10px; cursor:pointer; }
-  .bfseg button.on { background:#4A6B35; border-color:#BFE39A; box-shadow:0 0 12px rgba(127,163,92,0.4); }
+  /* ---- WAR TABLE: the battlefield entry scene ----
+     one screen, no scroll, the battle photo as the hero. Sits UNDER the queue
+     UI (z20 < chip z45/ring z48) so queueing keeps you on the scene while the
+     pill ticks; hideAllOverlays() tears it down when a match actually starts. */
+  #wartable { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; background:#141810;
+    font-family:'Arial Narrow', Impact, 'Helvetica Neue', sans-serif; font-weight:bold; text-transform:uppercase;
+    color:#EDEADF; user-select:none; -webkit-user-select:none; }
+  #wtBg { position:absolute; inset:0;
+    background:url(bf_hero.jpg) center 42%/cover no-repeat,
+      linear-gradient(180deg,#33200f,#8a5731 48%,#1d1208); }  /* carpet-toned fallback shows while the photo loads */
+  #wtBg::before { content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(12,10,7,0.9) 0%, rgba(12,10,7,0.25) 17%, rgba(12,10,7,0) 34%,
+      rgba(12,10,7,0) 52%, rgba(12,10,7,0.62) 74%, rgba(12,10,7,0.94) 100%); }
+  #wtBg::after { content:''; position:absolute; inset:0;
+    background:radial-gradient(120% 90% at 50% 46%, transparent 55%, rgba(10,8,5,0.55) 100%); }
+  .wt-top { position:relative; z-index:2; display:flex; align-items:center; gap:12px;
+    padding:clamp(8px,1.8vh,16px) clamp(12px,2vw,26px) 0; }
+  .wt-wordmark { font-size:clamp(22px,4.6vh,44px); letter-spacing:0.1em;
+    text-shadow:0 2px 0 #10140D, 0 0 26px rgba(191,227,154,0.35); white-space:nowrap; }
+  .wt-wordmark b { color:#BFE39A; }
+  .wt-spacer { flex:1; }
+  .wt-chip { display:flex; align-items:center; gap:8px; background:rgba(18,15,11,0.9); border:2px solid rgba(127,163,92,0.45);
+    border-radius:999px; padding:6px 14px; font-size:clamp(12px,2.2vh,16px); letter-spacing:0.06em; white-space:nowrap; }
+  .wt-chip .wt-dot { width:15px; height:15px; border-radius:50%; border:2px solid rgba(255,255,255,0.55); flex-shrink:0; }
+  .wt-chip small { color:#BFC6AD; font-size:0.82em; }
+  .wt-x { width:clamp(38px,6.4vh,48px); height:clamp(38px,6.4vh,48px); border-radius:12px; background:rgba(18,15,11,0.9);
+    border:2px solid rgba(127,163,92,0.45); color:#EDEADF; font:inherit; font-size:clamp(17px,3vh,22px); cursor:pointer; flex-shrink:0; }
+  .wt-x:active { transform:scale(0.94); }
+  .wt-mid { position:relative; z-index:2; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:clamp(6px,1.6vh,14px); padding:0 12px; min-height:0; }
+  .wt-playwrap { display:flex; align-items:flex-end; gap:clamp(10px,2vw,22px); }
+  .wt-flank { height:clamp(58px,13.5vh,108px); filter:drop-shadow(0 4px 6px rgba(0,0,0,0.6)); animation:wtbob 1.5s ease-in-out infinite; }
+  .wt-flank.r { animation-delay:-0.75s; }
+  @keyframes wtbob { 0%,100% { transform:rotate(-3.5deg); } 50% { transform:rotate(3.5deg); } }
+  .wt-play { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    min-width:clamp(240px,34vw,420px); padding:clamp(10px,2.4vh,20px) clamp(26px,4vw,54px);
+    background:linear-gradient(180deg,#5B7F42,#3E5B2C); border:3px solid #BFE39A; border-radius:20px;
+    color:#fff; font:inherit; cursor:pointer;
+    box-shadow:0 0 0 4px rgba(16,20,13,0.55), 0 0 38px rgba(127,163,92,0.5), 0 10px 24px rgba(0,0,0,0.55);
+    animation:wtbreathe 2.2s ease-in-out infinite; }
+  @keyframes wtbreathe { 50% { box-shadow:0 0 0 4px rgba(16,20,13,0.55), 0 0 58px rgba(127,163,92,0.5), 0 10px 24px rgba(0,0,0,0.55); } }
+  .wt-play:active { transform:scale(0.97); }
+  .wt-play .big { font-size:clamp(30px,7.4vh,62px); letter-spacing:0.08em; line-height:1; text-shadow:0 3px 0 rgba(0,0,0,0.35); }
+  .wt-play .sub { font-size:clamp(12px,2.4vh,18px); letter-spacing:0.18em; color:#FFF3C4; }
+  .wt-reward { display:flex; align-items:center; gap:8px; background:rgba(24,20,12,0.88); border:2px solid rgba(255,210,74,0.55);
+    color:#FFD24A; border-radius:999px; padding:5px 16px; font-size:clamp(12px,2.3vh,17px); letter-spacing:0.1em;
+    text-shadow:0 1px 0 rgba(0,0,0,0.5); }
+  .wt-shelf { position:relative; z-index:2; display:flex; align-items:center; justify-content:center;
+    gap:clamp(8px,1.4vw,16px); padding:0 12px clamp(4px,1vh,8px); }
+  .wt-m2 { display:flex; align-items:center; gap:10px; background:rgba(18,15,11,0.9); border:2.5px solid rgba(127,163,92,0.45);
+    border-radius:14px; padding:clamp(6px,1.4vh,12px) clamp(14px,2vw,24px); color:#EDEADF; font:inherit; cursor:pointer; }
+  .wt-m2 .n { font-size:clamp(19px,3.6vh,30px); color:#BFE39A; letter-spacing:0.06em; }
+  .wt-m2 small { font-size:clamp(10px,1.9vh,14px); letter-spacing:0.14em; color:#BFC6AD; }
+  .wt-m2:active { transform:scale(0.96); }
+  .wt-hop { display:flex; align-items:center; gap:clamp(4px,0.7vw,8px); background:rgba(14,12,9,0.72);
+    border:2px dashed rgba(191,198,173,0.35); border-radius:14px; padding:clamp(5px,1.2vh,10px) clamp(8px,1.2vw,14px); }
+  .wt-hop .lab { font-size:clamp(9px,1.8vh,13px); letter-spacing:0.14em; color:#BFC6AD; margin-right:4px; white-space:nowrap; }
+  .wt-hop button { min-width:clamp(40px,5.4vw,62px); padding:clamp(5px,1.2vh,10px) 4px; background:rgba(0,0,0,0.4);
+    border:2px solid rgba(127,163,92,0.35); border-radius:10px; color:#EDEADF; font:inherit;
+    font-size:clamp(12px,2.3vh,17px); cursor:pointer; }
+  .wt-hop button:active { transform:scale(0.93); }
+  .wt-foot { position:relative; z-index:2; display:flex; align-items:stretch; gap:clamp(8px,1.2vw,14px);
+    padding:0 clamp(12px,2vw,26px) clamp(10px,2vh,18px); }
+  .wt-map { flex:1; max-width:210px; display:flex; align-items:center; gap:10px; background:rgba(18,15,11,0.9);
+    border:2.5px solid rgba(127,163,92,0.3); border-radius:14px; padding:clamp(6px,1.3vh,12px) clamp(8px,1vw,14px);
+    color:#EDEADF; font:inherit; cursor:pointer; }
+  .wt-map svg { width:clamp(30px,4.6vw,46px); height:auto; flex-shrink:0; }
+  .wt-map .nm { font-size:clamp(11px,2.1vh,15px); letter-spacing:0.07em; text-align:left; line-height:1.05; }
+  .wt-map.on { border-color:#BFE39A; background:rgba(46,58,34,0.92); box-shadow:0 0 16px rgba(127,163,92,0.35); }
+  .wt-map.on .nm::after { content:' ✓'; color:#BFE39A; }
+  .wt-map:active { transform:scale(0.96); }
+  .wt-rec { align-self:center; font-size:clamp(12px,2.2vh,16px); letter-spacing:0.1em; color:#BFC6AD;
+    background:rgba(14,12,9,0.72); border-radius:999px; padding:6px 14px; border:2px solid rgba(191,198,173,0.25); white-space:nowrap; }
+  .wt-rec b { color:#EDEADF; }
   #err { position:fixed; left:0; right:0; bottom:0; background:#A63B2A; color:#fff; font:12px monospace; padding:4px 8px; z-index:99; display:none; white-space:pre-wrap; }
   /* ---- HQ = Your Room: one screen, no scrolling ---- */
   .menuwrap { justify-content:center; align-items:center; overflow:hidden; padding:0; background:#141810; }
@@ -203,7 +272,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.5</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.6</div>
   <div class="scanlines"></div>
 </div>
 
@@ -231,6 +300,11 @@
   <div id="menuBody" class="menubody"></div>
   <div id="roomModal"></div>   <!-- OUTSIDE the scaled room so modals render full-size on phones -->
 </div>
+
+<!-- WAR TABLE: the battlefield entry scene. A TOP-LEVEL sibling (never inside
+     .roomstage — its transform:scale would shrink the whole screen ~62% on
+     phones). Rendered by renderWarTable() on open. -->
+<div id="wartable" class="hidden"></div>
 
 <div class="overlay" id="rotate">
   <h1>&#8635;</h1>
@@ -378,10 +452,13 @@ const META_DEFAULT = {
   // SARGE'S ARSENAL: weapons unlocked by campaign progress, equipped in the
   // Training Academy, each upgraded through the promotion picker once unlocked.
   sargeWeapon:'pistol', sargeUnlocked:[], sargeUp:{}, sargeSeen:[], saberColor:null,
-  bfMap:'open', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1  // BATTLEFIELD: last map, record, squad size
+  bfMap:'crossing', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1  // BATTLEFIELD: last map, record, squad size
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); } } catch(e) {}
+// THE CROSSING is the battlefield's flagship map — anyone who never actually
+// fought a match gets nudged onto it; testers with real history keep their pick.
+if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
 function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
 // device identity + toy-soldier callsign. In the iOS shell the Keychain
 // remembers the device across reinstalls (injected as __GVT_KC_DEVICE).
@@ -835,7 +912,7 @@ function startBattle(levelN, rival){
 function rivalRaidWaves(m){
   return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
-function hideAllOverlays(){ ['title','lose','win','menu','picker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
+function hideAllOverlays(){ ['title','lose','win','menu','picker','wartable'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 // ================= INVASION (challenge mode: YOU are the Tan) =================
 const INVADE_CARDS = [
@@ -3265,6 +3342,57 @@ function piggyHop(){
     }
   }
 }
+// ================= WAR TABLE (the battlefield entry scene) =================
+// Full-screen scene over the menu — the battle photo is the hero. 1v1 is THE
+// default: the big button always says 1v1, it never follows the last-played
+// size. 2v2 gets second billing; 3v3–10v10 are hop-in LAUNCHERS — tapping one
+// queues that size right then, no persistent selection. Map chips ARE a radio
+// and persist to META.bfMap. z20 keeps it UNDER the queue UI (chip z45, ring
+// z48), so queueing leaves you on the scene while the pill ticks up top;
+// hideAllOverlays() tears it down the moment any battle actually starts.
+const WT_MAP_GLYPHS = {
+  crossing:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><path d="M20 1c3 6-2 10 1 15s-1 9 1 13" stroke="#5B84C4" stroke-width="7" fill="none"/><rect x="15" y="7" width="12" height="4" rx="1.5" fill="#D9B36C"/><rect x="16" y="20" width="12" height="4" rx="1.5" fill="#D9B36C"/>',
+  spill:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="14" cy="19" rx="9" ry="5" fill="#7A4E8E" opacity="0.85"/><ellipse cx="33" cy="11" rx="8" ry="4.5" fill="#7A4E8E" opacity="0.85"/><rect x="9" y="8" width="7" height="5" rx="1" fill="#EDEADF" transform="rotate(-24 12 10)"/>',
+  stone:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="10" cy="9" rx="5" ry="3.6" fill="#9A9A90"/><ellipse cx="24" cy="16" rx="5.5" ry="4" fill="#8A8A80"/><ellipse cx="37" cy="8" rx="4.5" ry="3.2" fill="#9A9A90"/><ellipse cx="13" cy="23" rx="4.5" ry="3.2" fill="#8A8A80"/><ellipse cx="35" cy="22" rx="5" ry="3.4" fill="#9A9A90"/>',
+  open:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><rect x="5" y="5" width="36" height="20" rx="2" fill="#B25E36"/><path d="M8 10h30M8 15h30M8 20h30" stroke="#8E4526" stroke-width="1.4"/>'
+};
+// CROSSING leads (the flagship), OPEN CARPET last
+const WT_MAP_ORDER = ['crossing','spill','stone','open'];
+function renderWarTable(){
+  const riv=todaysRival();
+  const w=META.bfWins||0, l=META.bfLosses||0;
+  const maps=WT_MAP_ORDER.map(id=>{ const m=bfMap(id);
+    return '<button type="button" class="wt-map'+(META.bfMap===id?' on':'')+'" onclick="UI.wtMap(\''+id+'\')">'
+      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[id]+'</svg><span class="nm">'+m.name+'</span></button>'; }).join('');
+  document.getElementById('wartable').innerHTML =
+    '<div id="wtBg"></div>'
+    +'<div class="wt-top"><div class="wt-wordmark">THE <b>BATTLEFIELD</b></div><div class="wt-spacer"></div>'
+      +'<div class="wt-chip"><span class="wt-dot" style="background:'+riv.hex+';box-shadow:0 0 9px '+riv.hex+'"></span>'
+      +'<span>TODAY: '+escH(riv.name)+' <small>· '+bfDifficulty().toUpperCase()+'</small></span></div>'
+      +'<button type="button" class="wt-x" onclick="UI.wtClose()">✕</button></div>'
+    +'<div class="wt-mid"><div class="wt-playwrap">'
+      // your colour on the left flank, today's rival tinted on the right
+      +'<img class="wt-flank" src="'+sprURI('rifleman','#7FA35C')+'" alt="">'
+      +'<button type="button" class="wt-play" onclick="UI.wtPlay(1)"><span class="big">⚔ PLAY 1v1</span>'
+      +'<span class="sub">TAP TO QUEUE — BATTLE IN SECONDS</span></button>'
+      +'<img class="wt-flank r" src="'+sprURI('tanrifle',riv.hex)+'" alt="">'
+      +'</div>'
+    +'<div class="wt-reward">★ WIN = +25★ + XP · FIRST WIN TODAY +5★</div></div>'
+    +'<div class="wt-shelf">'
+      +'<button type="button" class="wt-m2" onclick="UI.wtPlay(2)"><span class="n">2v2</span><small>GRAB AN ALLY</small></button>'
+      +'<div class="wt-hop"><span class="lab">MORE MAYHEM →</span>'
+      +[3,4,5,6,7,8,9,10].map(n=>'<button type="button" onclick="UI.wtPlay('+n+')">'+n+'v'+n+'</button>').join('')
+      +'</div></div>'
+    +'<div class="wt-foot">'+maps+'<div class="wt-spacer"></div>'
+      +(w+l>0? '<div class="wt-rec">RECORD <b>'+w+'W · '+l+'L</b></div>':'')
+    +'</div>';
+}
+function openWarTable(){
+  renderWarTable();
+  document.getElementById('wartable').classList.remove('hidden');
+}
+function closeWarTable(){ document.getElementById('wartable').classList.add('hidden'); }
+
 function roomModal(inner){
   document.getElementById('roomModal').innerHTML =
     '<div class="rmback" onclick="UI.closeModal(event)"><div class="rmcard" onclick="event.stopPropagation()">'
@@ -3279,30 +3407,6 @@ function panelHTML(id){
     case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+'</p>'
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
-    case 'bf': {
-      const diff=bfDifficulty(), per=(BF_PERSONA[riv.id]||BF_PERSONA.blue).name;
-      const t=Math.max(1,Math.min(BF_MAX_TEAM,META.bfTeam||1));
-      return '<h3>THE BATTLEFIELD</h3>'
-      +'<p>Up to ten armies a side, one long carpet, and a toy box at each end. Drop men on <b>your</b> half — they land in two seconds, march, and halt to fight whatever they run into. Whoever smashes more of the other box before the whistle wins.</p>'
-      +'<p style="font-size:1rem;opacity:0.72">Same dog tags as the campaign — they drip in on their own (+'+BF_TICK+' every 10s) and every kill pays a bounty · your promotions and Sarge\'s weapon come with you · <b style="color:#FFF3C4">WIN = +25★ AND A PILE OF XP</b></p>'
-      +'<p style="margin:10px 0 4px"><b>SQUAD SIZE</b> <small style="opacity:0.62">— '
-        +(t===1? 'just you against one army' : 'you + '+(t-1)+' allied '+(t===2?'army':'armies')+' against '+t)+', every player their own colour</small></p>'
-      +'<div class="bfseg">'
-      + Array.from({length:BF_MAX_TEAM},(_,k)=>{ const n=k+1;
-        return '<button type="button" class="'+(t===n?'on':'')+'" onclick="UI.bfTeam('+n+')">'+n+'v'+n+'</button>'; }).join('')
-      +'</div>'
-      +'<div>'
-      + BF_MAPS.map(m=>{ const on=(META.bfMap===m.id);
-        return '<div class="mrow" style="cursor:pointer'+(on?';background:rgba(127,163,92,0.14);border-radius:6px':'')+'" onclick="UI.bfMap(\''+m.id+'\')">'
-        +'<div class="grow"><b>'+m.name+'</b> <small style="opacity:0.62">'+m.blurb+'</small></div>'
-        +(on?'<b style="color:#7FA35C">CHOSEN</b>':'<button class="mbtn" style="padding:0.3rem 0.9rem;font-size:0.9rem" onclick="event.stopPropagation();UI.bfMap(\''+m.id+'\')">PICK</button>')
-        +'</div>'; }).join('')
-      +'</div>'
-      +'<p style="margin-top:12px"><span class="rivalchip" style="background:'+riv.hex+'"></span>Today <b>'+riv.name+'</b> captains the other side — they fight like <b>'+per+'</b> · '+diff.toUpperCase()+'</p>'
-      +'<button class="mbtn alt" onclick="UI.battlefield()">QUEUE UP — '+t+'v'+t+'</button>'
-      +'<p style="font-size:0.95rem;opacity:0.6;margin-top:10px">Soldiers drop into your queue while you wait — then BOOM, the battle starts.'
-      +(META.bfWins+META.bfLosses>0? ' Record: '+META.bfWins+' W · '+META.bfLosses+' L · first win each day pays a bonus.':'')+'</p>';
-    }
     case 'shop': return '<h3>THE SHOP</h3>'
       + SHOP_ITEMS.map(s=>{ const owned=META.unlocked.indexOf(s.t)>=0;
         return '<div class="mrow"><img src="'+sprURI(s.t)+'"><div class="grow"><b>'+UDEF[s.t].name+'</b> <small style="opacity:0.6">'+s.blurb+'</small></div>'
@@ -3401,9 +3505,10 @@ function showPicker(){
 window.UI = {
   play(n){ audio(); startBattle(n||META.campaign+1, null); },
   rival(){ audio(); const r=todaysRival(); startBattle(Math.max(1,Math.min(META.campaign+1,5)), r); },
-  battlefield(){ audio(); bfQueueStart(META.bfTeam||1); },
-  bfTeam(n){ n=Math.max(1,Math.min(BF_MAX_TEAM,n|0)); META.bfTeam=n; SFX.blip(); saveMeta(); roomModal(panelHTML('bf')); },
-  bfMap(id){ if(!BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id; SFX.blip(); saveMeta(); roomModal(panelHTML('bf')); },
+  // WAR TABLE: every size button is a launcher — tap = queue that size right now
+  wtPlay(n){ audio(); SFX.blip(); bfQueueStart(n); },
+  wtMap(id){ if(!BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id; SFX.blip(); saveMeta(); renderWarTable(); },
+  wtClose(){ SFX.clack(); closeWarTable(); },
   buy(t){ const it=SHOP_ITEMS.find(s=>s.t===t); if(!it||META.starBank<it.cost||META.unlocked.indexOf(t)>=0) return;
     META.starBank-=it.cost; META.unlocked.push(t); checkAch(); saveMeta(); renderMenu(); roomModal(panelHTML('shop')); },
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=5) return;
@@ -3421,6 +3526,7 @@ window.UI = {
   promote(){ if(META.pendingPicks>0) showPicker(); },
   room(id){
     if(id==='piggy'){ piggyHop(); return; }
+    if(id==='bf'){ openWarTable(); return; }   // the battle plan unrolls the full War Table scene
     roomModal(panelHTML(id));
   },
   closeModal(ev){ if(ev&&ev.target!==ev.currentTarget) return; const m=document.getElementById('roomModal'); if(m) m.innerHTML=''; },
